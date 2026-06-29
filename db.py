@@ -40,14 +40,15 @@ def _secret(key: str) -> str:
         return val
     try:
         import streamlit as st
-        val = st.secrets.get(key)
-        if val:
-            return val
-    except Exception:
-        pass
-    raise EnvironmentError(
-        f"'{key}' not found. Set it in your OS environment or .streamlit/secrets.toml."
-    )
+        return str(st.secrets[key])
+    except KeyError:
+        raise EnvironmentError(
+            f"'{key}' not found in .streamlit/secrets.toml."
+        ) from None
+    except Exception as exc:
+        raise EnvironmentError(
+            f"Could not read '{key}' from Streamlit secrets: {exc}"
+        ) from exc
 
 
 def _client() -> Client:

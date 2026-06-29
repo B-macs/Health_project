@@ -1,17 +1,21 @@
 # RESUME: Health & Performance Autoregulation Engine
 
 ## PROJECT OBJECTIVE
-Build a highly private, data-driven, **local** Health and Performance Application that eliminates training guesswork and optimizes physical recovery and athletic scaling. The application acts as an objective "Autoregulation Engine" — using historical data, subjective daily inputs, and objective biometrics to dictate exact daily training volumes — while protecting the user from injury relapse through mathematical safety guardrails separated from predictive AI parsing.
+Build a highly private, data-driven Health and Performance Application that eliminates training guesswork and optimises physical recovery and athletic scaling. The application acts as an objective "Autoregulation Engine" — using historical data, subjective daily inputs, and objective biometrics to dictate exact daily training volumes — while protecting the user from injury relapse through mathematical safety guardrails separated from predictive AI parsing.
 
 ---
 
-## LOCKED-IN ARCHITECTURE (Non-Negotiable)
+## ARCHITECTURE — CURRENT STATE (as built)
 
-| Layer | Decision |
-|---|---|
-| **Execution** | Local only — absolute data privacy, zero cloud dependency |
-| **Frontend / UI** | Streamlit + AG Grid — high-density data grid, inline editing, no dashboards or Kanban |
-| **Database** | Local SQLite — append-only, continuous time-series relational architecture; data is never overwritten |
+> **Note on original spec:** The original architecture spec called for local-only SQLite. This changed during development. The decisions below reflect what is actually running.
+
+| Layer | Original Decision | Current Decision | Reason Changed |
+|---|---|---|---|
+| **Execution** | Local only | Streamlit + Notion cloud DB | Notion provides structured database, relation properties, and a queryable API without a local server to maintain |
+| **Frontend / UI** | Streamlit + AG Grid | Streamlit + responsive CSS (no AG Grid in active use) | Data Grid page removed; responsive dual-theme (Oura/Whoop) CSS system replaces it |
+| **Database** | Local SQLite | Notion API — 4 databases | Notion selected; SQLite schema preserved in resume.md for reference but not in use |
+| **Biometrics source** | Manual Apple Health entry on Autoregulation page | Google Sheets sync — Export Health App → Google Sheets → App | Auto-sync removes manual entry entirely; engine reads directly without a sync step |
+| **Training entry** | Manual session logging via Training Entry page | Auto-logged by Training Plan on session completion | Training Entry page removed; logging is triggered by completing a guided day |
 
 ---
 
@@ -24,7 +28,7 @@ Build a highly private, data-driven, **local** Health and Performance Applicatio
 Every new piece of functionality must be built in two explicit phases. Phase 1 is mandatory. Phase 2 is only permitted once Phase 1 is complete, tested, and confirmed working.
 
 **Phase 1 — Deterministic Python (Always built first)**
-All logic is implemented as explicit, rule-based Python code. This means:
+All logic is implemented as explicit, rule-based Python code:
 - If/else decision trees with clearly documented conditions
 - Keyword matching tables with hardcoded term lists
 - Threshold-based scoring using explicit numeric mappings
@@ -33,234 +37,267 @@ All logic is implemented as explicit, rule-based Python code. This means:
 - Unit-testable without any external service, API key, or model
 
 **Phase 2 — AI Layer (Only added if Phase 1 is demonstrably insufficient)**
-An AI or LLM component may be added on top of a working deterministic implementation only when all of the following are true:
+An AI or LLM component may be added on top of a working deterministic implementation only when:
 1. The Phase 1 deterministic version has been built and is running
-2. There is a specific, documented limitation of the deterministic version that AI would improve
+2. There is a specific, documented limitation that AI would improve
 3. The AI output feeds into the system as structured data — it never directly controls a safety decision
-4. A fallback to the deterministic version exists if the AI call fails or returns an unexpected response
+4. A fallback to the deterministic version exists if the AI call fails
 
 ### The Hard Boundary: AI Never Controls Safety
 
-Regardless of how mature the AI layer becomes, the following components must always remain 100% deterministic and must never be influenced by AI output:
+Regardless of how mature the AI layer becomes, these components must always remain 100% deterministic:
 - The Traffic Light biometric multiplier (Green / Yellow / Red)
 - The ACWR calculation and its hard-lock thresholds
 - The Stage 1 / 2 / 3 transition conditions
 - The injury decay function and Background Watcher trigger logic
 - Any prescribed set, rep, or volume target output to the user
 
-AI components may only populate advisory fields — summaries, tags, flagged body parts, sentiment scores. They are inputs to the human's awareness, not inputs to the engine's calculations.
+AI components may only populate advisory fields — summaries, tags, flagged body parts, sentiment scores.
 
-### How to Apply This Rule When Adding New Code
+---
 
-When a new feature is requested, Claude Code must follow this sequence before writing any code:
+## CURRENT APPLICATION STRUCTURE
 
-1. **State the feature in plain English** — what does it need to do?
-2. **Write the deterministic version** — what keyword list, threshold, formula, or decision tree covers 80% of cases?
-3. **Identify the gap** — what does the deterministic version fail to handle that would meaningfully affect the user?
-4. **Decide** — if the gap is significant and not safety-critical, add an AI layer on top. If the gap is minor or the function is safety-critical, ship the deterministic version only.
-5. **Document the decision** in a code comment: `# DETERMINISTIC-ONLY: reason` or `# AI LAYER ADDED: reason, fallback = [function name]`
+### Pages (Streamlit sidebar navigation)
+
+| File | Page | Purpose |
+|---|---|---|
+| `app.py` | Morning Check-In | Daily readiness entry: pain score, tightness, sensation tags, lifestyle factors |
+| `pages/0_Training_Plan.py` | Training Plan | 14-day interactive rehab session guide with live timers, auto-logging, exit confirmation |
+| `pages/3_Autoregulation.py` | Autoregulation | Background config only — stage selector + directive summary. Full data in AI Insights |
+| `pages/4_AI_Insights.py` | AI Insights | Engine data tab (ACWR, biometrics, injury weight) + parser queue + tightness map + macro trends + MRI intelligence |
+| `pages/6_Sync.py` | Sync | Google Sheets biometric data status viewer |
+
+### Removed Pages (intentionally)
+| Page | Reason Removed |
+|---|---|
+| Training Entry | Replaced by Training Plan auto-logging |
+| Data Grid | Background-only; no user-facing value during Stage 1 |
+| Biomechanical Profile | Data moved to `patient_profile.py` (clinical input file) |
+
+### Core Modules
+
+| File | Role |
+|---|---|
+| `engine.py` | Pure deterministic maths — traffic light, ACWR, injury weight decay, stage state machine, volume recommendation. No DB access, no Streamlit. |
+| `db.py` | Notion API backend — all read/write. Equivalent to the SQLite schema below but using Notion databases. |
+| `sync_sheets.py` | Google Sheets direct reader — pulls biometric rows, maps columns, returns engine-compatible format. No Notion sync needed. |
+| `training_plan.py` | 14-day exercise prescription data — all exercise specs, mechanics, biomechanical cues, progressions, regressions. |
+| `patient_profile.py` | Clinical input file — MRI findings + biomechanical assessment + muscle imbalance summary + pre-session release protocol. Updated before each new training block. |
+| `styles.py` | Responsive dual-theme CSS + component helpers. Oura palette (mobile ≤768px) / Whoop palette (desktop ≥769px). |
+| `ai.py` | Phase 2 AI layer — session note parser, tightness parser, macro trend analysis. Advisory only. |
+| `rules.py` | Movement safety rules — maps exercises to stage contraindications. |
+| `stats.py` | Deterministic statistical analysis — lag correlations, slopes, recovery direction. |
 
 ---
 
 ## LOGIC SEPARATION
 
-### A. Strict Deterministic Engine (Hard-coded Math & Rules)
+### A. Strict Deterministic Engine (`engine.py`)
 
 **Traffic Light Biometric Autoregulation**
-Evaluates daily morning biometrics (HRV, RHR, Sleep) against 7-day and 28-day rolling averages:
 
-| Signal | Condition | Action |
-|---|---|---|
-| Green | Biometrics at or above rolling averages | Standard Progressive Overload |
-| Yellow | Drop within 10% of rolling average | Scale volume down 20–30%, hold intensity baseline |
-| Red | Drastic biometric drop | Hard-lock to deload / mobility-only |
+Evaluates HRV, RHR, Sleep against 28-day rolling baseline:
+
+| Signal | Condition | Volume Multiplier | User-Facing Message |
+|---|---|---|---|
+| Green | Biometrics at or above baseline | 1.05× (overload) | Nothing shown — train normally |
+| Yellow | Drop within 10–25% | 0.75× | "Reduced load today — keep session controlled" |
+| Red | Drop >25% | 0.0× | "Rest day — mobility and walking only" |
+| Grey | Insufficient data (<7 days) | 1.0× | Nothing shown |
+
+**Directive delivery:** The directive surfaces as a plain-language banner at the top of the Training Plan page. Numeric data (ACWR, HRV delta, injury weight %) is never shown in Training Plan — only in AI Insights.
 
 **Acute-to-Chronic Workload Ratio (ACWR)**
 ```
-ACWR = Acute Workload (7-day avg volume) / Chronic Workload (28-day avg volume)
+ACWR = 7-day avg session AU / 28-day avg session AU
+Session AU = Session-RPE × Duration (minutes)   [Foster method]
 ```
-Hard constraint: If ACWR > 1.3 → engine hard-locks upper training limits for the week.
+Stage 1 ACWR ceiling: 1.2. Stage 2: 1.3. Hard-lock triggers if exceeded.
+
+**Injury Weight Decay**
+$$\text{Injury Weight} = e^{-\lambda t}$$
+λ = 0.05 (default, reviewed every 14 days). t = pain-free days.
+- >70%: Conservative load even on green biometric days
+- 20–70%: Standard stage constraints apply
+- <20%: Background watcher only
+
+**Volume Recommendation Cascade (priority order)**
+1. Observation mode (< 14 days biometric data) → hold at comfortable effort
+2. Red traffic light → rest/mobility only
+3. ACWR hard lock → cap at 75% volume
+4. Yellow traffic light → 75% volume
+5. Injury weight > 70% (green bio) → 85% volume (conservative)
+6. All clear → 105% volume (progressive overload)
 
 ---
 
-### B. Probabilistic Engine (AI / LLM — Phase 2 only, advisory output only)
+### B. Probabilistic Engine (`ai.py` — Phase 2, advisory only)
 
-> These components are only active after their deterministic equivalents are built and running. Each has a documented deterministic fallback. None of these outputs feed into safety calculations.
-
-- **Medical & Diagnostic Ingestion:** Parses raw unstructured medical text (MRI reports, clinical impressions) to isolate structural pathology and map it to database anatomical tags. *Deterministic fallback: pre-populated keyword tag list from known MRI terminology.*
-- **Subjective Text Synthesis:** Evaluates daily qualitative log entries and converts them into structured severity scores and automated tightness maps. *Deterministic fallback: keyword-to-tag matcher covering core sensation terms (sharp, tight, stiff, dull, neural, normal).*
-- **Macro Trend Recognition:** Evaluates long-term, non-linear relationships across months of data. *Deterministic fallback: fixed lag-correlation check between 48-hour HRV drop and next-day pain score.*
+| Component | What it does | Deterministic fallback |
+|---|---|---|
+| Session note parser | Extracts body parts, sentiment, warning level from free-text | Keyword-to-tag matcher (see library below) |
+| Tightness parser | Converts subjective tightness text to severity + body parts | Keyword severity weights |
+| Macro trend analysis | Interprets lag correlations across 90-day dataset | Fixed lag-correlation (HRV drop → pain score 48h later) |
+| Movement risk assessment | Maps MRI findings + recent session notes to movement flags | Pre-populated movement contraindication list in `rules.py` |
 
 ---
 
 ## STAGE STATE MACHINE
-Evaluated every 14 days. The user profile moves forward (never backward unless triggered). **All transition logic is deterministic — no AI involvement.**
 
-### Stage 1 — Rehab (Tissue Tolerance Focus)
-- Strict volume caps
-- Conservative ACWR ceiling (max 1.2)
-- High weight on injury parameters
+Evaluated at Day 14 and every 14 days thereafter. **All transition logic is deterministic.**
 
-### Stage 2 — Transition (Work Capacity Focus)
+### Stage 1 — Rehab (Tissue Tolerance Focus) ← CURRENT
+- Conservative ACWR ceiling: 1.2
+- High injury weight influence (starts at 100%, decays with pain-free days)
+- Bodyweight only — no external load
+- Session RPE ceiling: 7/10
+
+### Stage 2 — Transition (Work Capacity Focus) ← NEXT BLOCK
 - Specific rehab movements blend into standard training warm-ups
-- Volume constraints loosen
-- ACWR ceiling rises toward 1.3
+- ACWR ceiling: 1.3
+- External load introduced (barbell, cable)
+- 4-week block — reassess after completion
+- Progressive overload prescription: +2.5 kg per session (vs +1 rep in Stage 1)
 
-### Stage 3 — Performance & Growth (Athletic Focus)
-- Injury status factor decays via automated time-decay function:
+### Stage 3 — Performance & Growth
+- Injury weight < 20% → becomes silent background watcher
+- Full progressive overload protocols
+- Background Watcher re-activates on any session note matching trigger terms
 
-$$\text{Injury Weight} = e^{-\lambda t}$$
+**Stage 1 → 2 transition criteria (all must be met):**
 
-where $t$ = days since last flare-up and weeks of pain-free completed load.
-- Injury data becomes a silent "Background Watcher" — alerts only if daily subjective inputs or movement patterns align with historical baseline pathologies.
-
-**Stage transition trigger conditions (deterministic, evaluated every 14 days):**
-
-| Condition | Required Value |
+| Criterion | Threshold |
 |---|---|
-| Average daily pain score | < 1.0 over trailing 14 days |
-| Plan compliance | > 90% of logged sessions completed |
-| HRV trend | Stable or improving (no chronic downward trend over 14 days) |
-| Days since last pain score > 2 | ≥ 28 consecutive days to advance from Stage 1 → 2 |
+| Pain-free streak | ≥ 14 consecutive days |
+| Average 14-day tightness | ≤ 3.0 / 10 |
+| McGill Big 3 | Performed pain-free with good form (Day 14 screen) |
+| Hip hinge full range | Pain ≤ 2/10 at arms-past-knees range |
+| Physiotherapist sign-off | Required |
 
 ---
 
-## FOUNDATIONAL BASELINE (User Profile)
+## CLINICAL INPUT — `patient_profile.py`
 
-> **Decay principle:** This baseline is the engine's highest-priority constraint at kickoff. Its weight decays automatically over time as pain-free training milestones are met (e.g., 4 consecutive weeks without a flare-up, Stage progression). By Stage 3 it becomes a silent background watcher — only re-activates if subjective inputs or movement patterns match historical pathology signatures. The raw MRI data is stored permanently in `diagnostic_profile`; only its *influence weight* decays.
+Updated before each new training block. Single source of truth for MRI findings and biomechanical assessment. **Not a UI page** — it is code that the training plan reads.
 
----
+### MRI (10.11.2025, DIE RADIOLOGIE Munich)
 
-### Q1 — Injury Profile (MRI — 10.11.2025, DIE RADIOLOGIE Munich)
+**Primary — L5/S1:**
+- Moderately activated osteochondrosis with paradiscal bone oedema and mild erosive changes
+- Narrow retrolisthesis + broad-based disc protrusion right dorsolateral
+- Moderate right foraminal stenosis; mild left
+- Hot level — primary driver of acute symptoms
 
-**Primary active pathology — L5/S1:**
-- Moderately activated osteochondrosis with paradiscal bone edema and mild erosive changes
-- Narrow retrolisthesis (vertebra sliding posterior) + broad-based disc protrusion **right dorsolateral**
-- **Moderate right foraminal stenosis** (nerve root at risk on right side), mild left
-- This is the hot level — the one most likely driving acute symptoms
+**Secondary — L3/L4 and L4/5:**
+- Flat protrusions left dorsolateral; covered annulus tears (contained, stable)
+- Retrolisthesis at L4/5
+- Mild foraminal stenosis at both levels
 
-**Secondary pathology — L3/4 and L4/5:**
-- Flat disc protrusions **left dorsolateral** at both levels; covered annulus fibrosus tears (contained, stable)
-- Retrolisthesis also present at L4/5
-- Mild foraminal stenosis at both levels (not moderate)
+**Cleared:** Spinal canal clear, facet joints clear, SI joints normal, musculature symmetric
 
-**Cleared structures:**
-- Spinal canal: clear on MR-myelography — no cord or cauda compression
-- Facet joints: no significant degeneration or inflammation
-- Sacroiliac joints (ISG): normal
-- Back musculature: symmetric, no atrophy, no edema — neurological function preserved
+**Downstream:** Psoas/hip flexor hypertonicity (L1–L4 origin) amplifying L5/S1 foraminal compression
 
-**Kinetic chain downstream effects:**
-- Hip flexor / glute tightness: psoas originates L1–L4; chronic tightness from sitting pulls lumbar spine into extension, compressing already stenotic foramina at L5/S1 → pain amplifier
-- Mid-back strain (resolved): was a compensation pattern; not structurally relevant now but logged as historical compensation
+### Biomechanical Profile (5 Assessed Findings)
 
-**Movement constraints for Stage 1:**
-- Avoid: heavy axial compression, end-range lumbar flexion under load, rotation under load, lumbar hyperextension
-- Priority movements: hip-hinge (controlled, light), glute activation, core bracing, walking, hip flexor release
-- Right-side loading: monitor closely (L5/S1 foraminal stenosis right side)
+| # | Finding | Structures | Training Implication |
+|---|---|---|---|
+| 1 | Upper glute / hip crest chronic tightness | Glute medius (upper fibres), piriformis | Must INHIBIT before activating — release first, strengthen second |
+| 2 | Standing hinge crack — right sit-bone area | RIGHT posterior hip capsule, proximal hamstring tendon at ischial tuberosity | Right posterior capsule needs direct mobilisation; ischial desensitisation required |
+| 3 | Sitting forward-bend releases | Thoracic facets T6–T10, horizontal lumbar facets at L5/S1 | Thoracic extension work + thread-the-needle; posterior pelvic tilt for lumbar base |
+| 4 | 90° hip click RIGHT side only (painless) | Iliopsoas tendon over iliopectineal eminence | All right hip flexion cues: NEUTRAL or slight INTERNAL rotation — external rotation triggers snap |
+| 5 | Wide-stance windmill cracks | Anterior hip capsule, pubic symphysis, lumbar facet joints (rotation) | Lateral lunge, 90/90 flow, Pallof press address these — introduce wide stance slowly |
 
-**Stage at kickoff:** Stage 1 — Rehab (Tissue Tolerance Focus)
+**Primary imbalance:** Under-firing glute max + deep core → upper glutes/hip flexors over-grip for artificial stability → compressed joints + snapping tendons.
 
----
-
-### Q2 — Apple Health Metrics (Full Suite)
-All available metrics synced. Priority columns for the autoregulation Traffic Light: HRV, RHR, Sleep Duration, Deep Sleep, Active Energy. Full capture also includes: Weight, Steps, Average Heart Rate.
+**Pre-session release protocol (runs at START of every session, ~5 min):**
+1. Upper Glute/TFL Self-Release — wall pressure, 2 × 90s each side
+2. Piriformis Contract-Relax (PNF) — 3 × 5 cycles each side
+3. *(Hip-focused sessions add)* Right Posterior Hip Capsule Cross-Body Stretch — 3 × 60s right only
+4. *(Right hip loaded)* Right Hip Tendon Path Drill (Coxa Saltans) — 2 × 10 reps right only
 
 ---
 
-### Q3 — Data Entry Method (Custom Gym UI + Notes)
-- **Set input:** Dial / spinner for reps + weight per set. No free-text volume entry.
-- **Rest timer:** Auto-started between sets; rest duration captured automatically in seconds.
-- **Session notes:** In-gym typed free-text describing how exercises felt, perceived difficulty, physical sensations. Stored raw. In Phase 1, parsed by deterministic keyword matcher. In Phase 2, optionally parsed by AI if deterministic output is insufficient.
+## 14-DAY TRAINING PLAN (Stage 1)
+
+### Structure
+- Hardcoded bodyweight prescription in `training_plan.py`
+- Interactive session guide in `pages/0_Training_Plan.py`
+- Day determined automatically from plan start date stored in Notion Config DB
+- Session completion auto-logs all exercises to Notion Training DB
+
+### Session Features
+- Exercise-by-exercise guided flow — one exercise shown at a time
+- Live countdown timers: hold timer (isometric), rest timer (auto-starts after set complete), duration timer (walking, breathing)
+- Timer state persisted to browser `localStorage` — navigating away and returning resumes mid-timer
+- Session state persisted in `st.session_state` — navigate to any other page and return exactly where you left off
+- Exit Training button in sidebar (only visible when session is active) — requires confirmation before discarding progress
+- Rest timer auto-starts on entering rest phase; no Skip button (Next Set serves that function)
+- On completion: RPE slider + duration input + session notes → auto-logged to Notion
+
+### Week 1 Focus: Neural Reset (Days 1–7)
+Daily pre-session biomechanical release block → tissue tolerance, neural desensitisation, psoas inhibition, McGill protocol introduction, gluteal activation foundation, thoracic mobility, walking baseline
+
+### Week 2 Focus: Neuromuscular Loading (Days 8–14)
+McGill protocol progression, functional hip hinge (RDL), single-leg stability, isometric endurance, functional integration (sit-to-stand, step-ups, plank), Day 14 stage readiness assessment
 
 ---
 
-### Initial Training Program Structure
-**Weeks 1–2: Observation-Only Phase**
-No structured progressive overload targets. Purpose: establish baseline data across all inputs before the engine makes programming decisions.
-- Log all movement sessions (type, sets, reps, weight, RPE)
-- Capture daily biometrics via Apple Health sync
-- Record daily readiness + subjective notes each session
-- Engine reads and learns — no auto-generated training targets issued until end of Week 2
-- At end of Week 2: first 7-day and 14-day rolling averages are valid → Traffic Light system activates → ACWR baseline established → Bucket 4 logic becomes meaningful
+## BIOMETRICS PIPELINE
 
----
-
-## DATABASE SCHEMA (SQLite)
-
-Schema refined from answers above. Changes vs. original spec: `daily_biometrics` expanded for full Apple Health suite; `training_log` split into session-level + per-set-level tables; `session_notes` table added for qualitative input with both deterministic and AI-parseable fields.
-
-```sql
--- Core baseline medical context and history
-CREATE TABLE diagnostic_profile (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    injury_focus TEXT,               -- E.g., "Lower back bulging disc"
-    mri_raw_text TEXT,               -- Unstructured diagnostic text
-    historical_compensations TEXT    -- Past injuries causing potential kinetic imbalances
-);
-
--- Continuous timeline for daily tracking & subjective logs
-CREATE TABLE daily_readiness (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    current_condition TEXT,          -- General readiness/feeling
-    subjective_tightness TEXT,       -- Sensation text
-    pain_score INTEGER               -- Scale 0-10
-);
-
--- Session-level training record (one row per session)
-CREATE TABLE training_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    movement_name TEXT,              -- E.g., "Romanian Deadlift"
-    movement_type TEXT,              -- "Weight", "Stretch", "Conditioning", "Rehab"
-    planned_sets INTEGER,
-    planned_reps INTEGER,
-    rpe INTEGER                      -- Rate of Perceived Exertion (1-10)
-);
-
--- Per-set granular data captured via dial + auto-timer
-CREATE TABLE training_set_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    training_log_id INTEGER REFERENCES training_log(id),
-    set_number INTEGER,
-    reps_completed INTEGER,          -- captured from dial
-    weight_kg REAL,                  -- captured from dial
-    rest_time_seconds INTEGER,       -- captured from auto-timer
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- Free-text session notes with deterministic parse fields populated first
--- AI summary fields only populated if Phase 2 AI layer is active
-CREATE TABLE session_notes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    training_log_id INTEGER REFERENCES training_log(id),
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    raw_text TEXT,                        -- verbatim input
-    -- Phase 1 deterministic fields (always populated)
-    det_matched_keywords TEXT,            -- comma-separated matched sensation terms
-    det_flagged_body_parts TEXT,          -- matched anatomical terms from keyword list
-    det_severity_score REAL,             -- rule-based 0.0-5.0 from keyword weights
-    -- Phase 2 AI fields (only populated if AI layer active, never used in safety calc)
-    ai_summary TEXT,                      -- populated after AI parsing
-    ai_sentiment_score REAL,             -- parsed: -1.0 (negative) to 1.0 (positive)
-    ai_flagged_body_parts TEXT           -- AI-extracted anatomical tags
-);
-
--- Centralized Apple Health data sync repository (full suite)
-CREATE TABLE daily_biometrics (
-    date DATE PRIMARY KEY,
-    resting_heart_rate INTEGER,
-    heart_rate_avg INTEGER,          -- daily average
-    hrv_ms REAL,
-    sleep_duration_hours REAL,
-    sleep_deep_hours REAL,
-    active_energy_kcal INTEGER,
-    weight_kg REAL,
-    steps INTEGER
-);
 ```
+Export Health App (iPhone)
+        ↓
+Google Sheets (daily_biometrics_master / Sheet1)
+        ↓  [gspread service account — read only]
+sync_sheets.get_biometric_rolling(sheet_id, days=28)
+        ↓  [30-min cache via @st.cache_data(ttl=1800)]
+engine.traffic_light(biometric_rows)
+        ↓
+Directive → Training Plan banner (plain language)
+Full data → AI Insights → Engine Data tab
+```
+
+### Column Mapping (Google Sheets → Engine)
+
+| Sheet Column | Engine Field | Conversion |
+|---|---|---|
+| `Date/Time` | `date` | Extract YYYY-MM-DD |
+| `Active Energy (kJ)` | `active_kcal` | ÷ 4.184 |
+| `Heart Rate Variability (ms)` | `hrv_ms` | Direct |
+| `Resting Heart Rate (count/min)` | `resting_heart_rate` | Direct |
+| `Sleep Analysis [Total] (hr)` | `sleep_duration_hours` | Direct |
+| `Sleep Analysis [Deep] (hr)` | `sleep_deep_hours` | Direct |
+| `Step Count (count)` | `steps` | Direct |
+| `Weight (kg)` | `weight_kg` | Direct |
+
+---
+
+## NOTION DATABASE SCHEMA (current backend)
+
+Four databases, replacing the original SQLite schema. Equivalent data structure.
+
+| Notion DB | Replaces SQLite Table | Key Properties |
+|---|---|---|
+| `NOTION_DB_READINESS` | `daily_readiness` | Date, Condition, Tightness (0–10), Pain (0–10), Body Areas (multi-select), Sensations (multi-select), Note, Tightness Score parsed |
+| `NOTION_DB_TRAINING` | `training_log` + `training_set_log` | Movement, Session Date, Session ID, Type, Planned Sets/Reps, Exercise RPE, Sets (JSON), Session RPE, Session Duration, Session AU, Notes |
+| `NOTION_DB_BIOMETRICS` | `daily_biometrics` | Log Date, RHR, HRV, Sleep Hours, Deep Sleep Hours, Active kcal, Weight kg, Steps |
+| `NOTION_DB_CONFIG` | Config + `diagnostic_profile` | Key/Value store — plan_start_date, current_stage, diagnostic_profile (JSON), latest_movement_risk (JSON), injury_weight_decay_lambda |
+
+> **Note:** Biometrics DB is no longer written to by the app. Google Sheets is the authoritative source for biometric data, read directly by `sync_sheets.py`. The Notion biometrics DB is retained for backwards compatibility but receives no new writes.
+
+---
+
+## RESPONSIVE UI SYSTEM (`styles.py`)
+
+Two visual themes applied automatically via CSS media query at 768px breakpoint:
+
+| Breakpoint | Theme | Palette | Typography | Components |
+|---|---|---|---|---|
+| ≥ 769px (desktop) | **Whoop** | Near-black `#07080D`, high-contrast white, `#00E874` green | Dense, tight, monospace labels | Compact left-bordered stat blocks, 4px radius |
+| ≤ 768px (mobile) | **Oura** | Deep navy `#0B0F1E`, muted pastels — sage green, muted amber, dusty coral | Large, light-weight headings, generous spacing | Soft rounded cards (18px radius), SVG arc rings |
+
+`inject_css()` called once per page. `dual_layout(desktop_html, mobile_html)` wraps content in `.whoop-only` / `.oura-only` divs toggled by `@media` query.
 
 ---
 
@@ -269,34 +306,23 @@ CREATE TABLE daily_biometrics (
 | Bucket | Title | Status |
 |---|---|---|
 | **1** | Discovery & Dynamic Logic Blueprint | COMPLETE ✅ |
-| **2** | Local Database Schema & Initialization Scripts | COMPLETE ✅ |
-| **3** | Data Input Engine & Interactive Data Grid Setup | COMPLETE ✅ |
-| **4** | The Autoregulation & ACWR Mathematical Algorithm | COMPLETE ✅ |
-| **5** | AI Text / MRI Parsing Engines & Multi-Month Performance Scaling | COMPLETE ✅ |
-
-> **Note on Bucket 5 status:** Bucket 5 is marked complete for its deterministic Phase 1 implementations. Any AI components within Bucket 5 are advisory-only overlays and must not be assumed to be the primary logic path. Verify via codebase audit which Phase 2 components are active before adding new features.
-
----
-
-## BUCKET 2 SCOPE
-
-All three foundational questions are answered. Bucket 2 deliverables:
-
-1. `schema.sql` — Full SQLite schema (all 7 tables above), with `IF NOT EXISTS` guards
-2. `init_db.py` — Python script that creates the database file (`health_engine.db`), runs the schema, and seeds `diagnostic_profile` with the user's baseline injury data
-3. `requirements.txt` — Python dependencies: `streamlit`, `pandas`, `sqlite3` (stdlib), `anthropic` (available for Phase 2 AI calls — not imported or used until Phase 1 equivalent is confirmed working)
-
-**Seed data for `diagnostic_profile` (run once at init):**
-- `injury_focus`: "L5/S1 activated osteochondrosis with retrolisthesis and right dorsolateral disc protrusion; moderate right foraminal stenosis. Secondary flat protrusions L3/4 and L4/5 left dorsolateral with covered annulus tears and mild foraminal stenosis. Downstream: chronic hip flexor/glute tightness (psoas, L1-L4 origin)."
-- `historical_compensations`: "Mid-back muscle strain (resolved); was a compensation pattern from lower back tightness. No structural residual. Psoas tightness from prolonged sitting amplifies L5/S1 foraminal compression."
-- `mri_raw_text`: "MRI LWS mit Myelographie und knöch. Becken, 10.11.2025, DIE RADIOLOGIE München. LWK5/SWK1: Moderat ausgeprägte aktivierte Osteochondrose mit bandförmigem paradiscalem Knochenödem und geringen erosiven Veränderungen. Schmale breitbasige Retrospondylose und Bandscheibenprotrusion mit rechts dorsolateraler Betonung. Dadurch moderate Foramenstenose rechts, geringgradig links. LWK 3/4: Flache breitbasige Bandscheibenprotrusion links dorsolateral mit gedecktem Riss im Anulus fibrosus. Geringgradige Foramenstenose. LWK 4/5: Flache Retrospondylose und Bandscheibenprotrusion links dorsolateral mit gedecktem Riss im Anulus fibrosus. Geringgradige Foramenstenose. Kein Nachweis einer Myelonkompression. Rückenmuskulatur seitengleich ohne wesentliche Atrophie."
-- `injury_weight_decay_lambda`: 0.05 *(suggested starting λ — decay reviewed every 14 days at stage evaluation)*
+| **2** | Local Database Schema & Initialization | COMPLETE ✅ (migrated to Notion) |
+| **3** | Data Input Engine — Morning Check-In, Biometrics, Training | COMPLETE ✅ |
+| **4** | Autoregulation & ACWR Mathematical Engine | COMPLETE ✅ |
+| **5** | AI Text / MRI Parsing & Macro Trend Analysis | COMPLETE ✅ (Phase 1 deterministic + Phase 2 AI layer) |
+| **6** | 14-Day Interactive Training Plan (Stage 1 Rehab) | COMPLETE ✅ |
+| **7** | Google Sheets Biometric Auto-Sync | COMPLETE ✅ |
+| **8** | Responsive UI System (Oura/Whoop dual-theme) | COMPLETE ✅ |
+| **9** | Clinical Input Profile System (`patient_profile.py`) | COMPLETE ✅ |
+| **10** | Autoregulation → Background; Directive into Training Plan | COMPLETE ✅ |
+| **11** | Biomechanical Profile Integration into Training Plan | IN PROGRESS 🔄 (agent running) |
+| **12** | 4-Week Stage 2 Transition Plan | PENDING — begins after Day 14 assessment |
+| **13** | Apple Health Direct API Sync | PENDING — replace Google Sheets intermediary |
+| **14** | Stage 2 Training Entry (barbell/cable — external load) | PENDING |
 
 ---
 
 ## KEYWORD LIBRARY — DETERMINISTIC PARSER (Phase 1 Reference)
-
-> This is the master keyword list used by the deterministic session note parser. It must be updated manually when new terms are encountered. This is the source of truth for Phase 1 parsing — AI parsing in Phase 2 supplements this list, it does not replace it.
 
 ### Sensation Tags
 
@@ -317,36 +343,59 @@ All three foundational questions are answered. Bucket 2 deliverables:
 | lower back, lumbar, L5, S1, disc | lower_back |
 | right side, right leg, right hip | right_side |
 | left side, left leg, left hip | left_side |
-| glute, glutes, buttock | glute |
-| hip flexor, psoas, hip | hip_flexor |
+| glute, glutes, buttock, sit bone, ischial | glute |
+| hip flexor, psoas, hip, groin | hip_flexor |
 | hamstring, back of leg | hamstring |
 | calf, achilles, ankle | lower_leg |
 | mid back, thoracic | mid_back |
 | neck, cervical | neck |
+| upper glute, hip crest, TFL | upper_glute |
+| piriformis, deep hip | piriformis |
 
-### Background Watcher Trigger Terms
-If any of the following appear in session notes while in Stage 3, the Background Watcher re-activates a 48-hour conservative volume constraint automatically:
-
-`shooting`, `nerve`, `numb`, `tingling`, `right leg`, `right foot`, `L5`, `S1`, `sciatica`, `disc`, `foraminal`
+### Background Watcher Trigger Terms (Stage 3 — re-activates conservative constraint)
+`shooting`, `nerve`, `numb`, `tingling`, `right leg`, `right foot`, `L5`, `S1`, `sciatica`, `disc`, `foraminal`, `snap`, `click`, `sit bone`, `ischial`
 
 ---
 
 ## RULES FOR FUTURE DEVELOPMENT
 
-The following rules apply to every Claude Code session working on this project:
+1. **Read `resume.md` and `patient_profile.py`** before writing any new code. Architecture decisions here are locked. Do not re-litigate them.
 
-1. **Read this file first** before writing any new code. The architecture decisions here are locked. Do not re-litigate them.
+2. **Deterministic first, always.** No AI component is to be added to any new feature until the deterministic equivalent is written, tested, and confirmed working.
 
-2. **Deterministic first, always.** No AI component is to be added to any new feature until the deterministic equivalent is written, tested, and confirmed working. State this explicitly in a comment.
+3. **AI never touches safety outputs.** Traffic Light multiplier, ACWR ratio, stage transitions, and final prescribed volume are always deterministic. Period.
 
-3. **AI never touches safety outputs.** The Traffic Light multiplier, ACWR ratio, stage transitions, and final prescribed volume are always the product of deterministic code. Period.
+4. **No new dependency without justification.** State what it replaces and why the existing stack cannot handle it. Pin to exact version in `requirements.txt`.
 
-4. **No new dependency without justification.** Before adding any new Python package, state what it replaces and why the existing stack cannot handle it.
+5. **Notion is the write backend; Google Sheets is the biometric read source.** Do not add manual biometric entry anywhere in the app. The pipeline is: Export Health App → Google Sheets → `sync_sheets.py` → engine.
 
-5. **Schema changes require a migration script.** Never alter the live `.db` file manually. All schema changes go through a versioned migration script so the data history is never at risk.
+6. **Autoregulation is background.** The engine directive is exposed as plain language in the Training Plan only. Numeric metrics (ACWR, HRV delta, injury weight %) appear in AI Insights → Engine Data tab only.
 
-6. **Every new function needs a one-line comment** stating whether it is `DETERMINISTIC` or `AI-LAYER` and what its fallback is if it fails.
+7. **Training sessions are logged automatically by the Training Plan.** No manual training entry page. Do not re-add one.
 
-7. **The keyword library above is the living document** for the deterministic parser. Update it in this file whenever new terms are added to the code.
+8. **The pre-session release protocol must precede every training session.** The biomechanical profile mandates inhibiting overactive structures (glute medius, piriformis) before activating underactive ones (glute max, deep core). Any new training block must preserve this sequencing.
+
+9. **Right-side asymmetry is a clinical finding, not a preference.** All exercises involving right hip flexion >60° require a neutral/internal rotation cue. All right posterior hip capsule mobilisation is unilateral (right only). Document this wherever it appears.
+
+10. **`patient_profile.py` is updated before each new training block.** After Day 14 assessment, update findings, imbalances, and stage exit criteria before generating the Stage 2 plan.
+
+11. **Every new function needs a one-line comment** stating whether it is `DETERMINISTIC` or `AI-LAYER` and what its fallback is if it fails.
+
+12. **The keyword library above is the living document** for the deterministic parser. Update it in this file whenever new terms are added to the code.
 
 ---
+
+## OPEN DECISIONS / KNOWN GAPS
+
+| Item | Status | Notes |
+|---|---|---|
+| HRV data from Google Sheets | Often blank | Export Health App does not always capture HRV daily; traffic light runs on available data |
+| Notion biometrics DB | No longer written to | Could be removed in future; kept for backwards compat with `get_biometric_rolling()` in db.py |
+| Stage 2 training plan | Not yet built | Needs barbell/cable movement library, updated ACWR ceiling, external load auto-logging |
+| Apple Health direct sync | Not implemented | Would remove Google Sheets intermediary; requires Apple Health HealthKit API or shortcut automation |
+| `training_plan.py` | Agent update in progress | Biomechanical profile integration being written; includes pre-session release blocks for all 14 days |
+| `14_day_plan.md` | Agent writing | Readable document of full 14-day plan — not yet in project root |
+
+---
+
+*Last updated: 2026-06-29*

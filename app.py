@@ -6,12 +6,14 @@ Runs as the Streamlit home page: streamlit run app.py
 import streamlit as st
 from datetime import date
 import db
+import styles
 
 st.set_page_config(
     page_title="Health Engine",
     layout="wide",
     initial_sidebar_state="expanded",
 )
+styles.inject_css()
 
 # ── Reference data ────────────────────────────────────────────────────────────
 
@@ -139,5 +141,5 @@ if submitted:
     )
     st.success(
         f"Check-in saved — Tightness {tightness_score}/10, Pain {pain_score}/10. "
-        "Head to Training Entry when ready to log your session."
+        "Head to Training Plan when ready to start your session."
     )

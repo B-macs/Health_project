@@ -7,21 +7,189 @@ using deterministic keyword matching. No external API or model required.
 import json
 import streamlit as st
 import pandas as pd
+from datetime import date
 import db
 import ai
 import engine
+import sync_sheets
+import styles
 import stats as stats_mod
 
 st.set_page_config(page_title="Insights", layout="wide")
-st.title("Insights -- Rule-Based Parser")
-st.caption("Keyword matching converts raw text into structured clinical data. No external API required.")
+styles.inject_css()
+st.title("Insights")
+st.caption("Engine metrics, biometric trends, session pattern analysis.")
 
 # ── Shared data ───────────────────────────────────────────────────────────────
 injury_profile = db.get_diagnostic_profile()
 
-tab_queue, tab_tightness, tab_trends, tab_mri = st.tabs([
-    "Processing Queue", "Tightness Map", "Macro Trends", "MRI Intelligence"
+tab_engine, tab_queue, tab_tightness, tab_trends, tab_mri = st.tabs([
+    "Engine Data", "Processing Queue", "Tightness Map", "Macro Trends", "MRI Intelligence"
 ])
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Tab 0 — Engine Data (all the numbers behind the directive)
+# ─────────────────────────────────────────────────────────────────────────────
+
+with tab_engine:
+    st.caption(f"Data as of {date.today().strftime('%A %d %B')} · refreshes every 30 min")
+
+    @st.cache_data(ttl=1800, show_spinner=False)
+    def _bio():
+        sheet_id = st.secrets.get("GOOGLE_SHEETS_ID", "")
+        return sync_sheets.get_biometric_rolling(sheet_id, 28) if sheet_id else []
+
+    @st.cache_data(ttl=1800, show_spinner=False)
+    def _au():      return db.get_daily_session_au(28)
+    @st.cache_data(ttl=1800, show_spinner=False)
+    def _streak():  return db.get_pain_free_streak()
+    @st.cache_data(ttl=1800, show_spinner=False)
+    def _tight():   return db.get_avg_tightness(14)
+    @st.cache_data(ttl=1800, show_spinner=False)
+    def _diag():    return db.get_diagnostic_profile()
+    @st.cache_data(ttl=1800, show_spinner=False)
+    def _stage():   return db.get_current_stage()
+
+    if st.button("Refresh engine data", use_container_width=False):
+        st.cache_data.clear()
+        st.rerun()
+
+    with st.spinner("Loading…"):
+        bio_rows      = _bio()
+        au_rows       = _au()
+        pain_streak   = _streak()
+        avg_tight     = _tight()
+        diagnostic    = _diag()
+        current_stage = _stage()
+        lambda_val    = float(diagnostic.get("injury_weight_decay_lambda") or 0.05)
+
+        tl          = engine.traffic_light(bio_rows)
+        acwr_result = engine.acwr(au_rows, current_stage)
+        inj_weight  = engine.injury_weight(lambda_val, pain_streak)
+        obs_rem     = engine.observation_days_remaining(tl["data_days"])
+        rec         = engine.volume_recommendation(tl, acwr_result, current_stage, obs_rem, inj_weight)
+        inj_signal  = engine.injury_weight_signal(inj_weight)
+
+    # ── Directive ──────────────────────────────────────────────────────────────
+    sig = rec["signal_color"]
+    sig_color = engine.SIGNAL_COLORS.get(sig, engine.SIGNAL_COLORS["grey"])
+    st.markdown(
+        f"<div style='background:{sig_color}20;border-left:4px solid {sig_color};"
+        f"border-radius:6px;padding:12px 16px;margin-bottom:16px;'>"
+        f"<div style='font-size:10px;color:{sig_color};font-family:monospace;"
+        f"letter-spacing:2px;margin-bottom:2px;'>DIRECTIVE</div>"
+        f"<div style='font-size:17px;font-weight:700;color:#E8EAF0;'>{rec['label']}</div>"
+        f"<div style='font-size:12px;color:#9AA3B2;margin-top:4px;'>{rec['action']}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Key metrics strip ──────────────────────────────────────────────────────
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Stage",         f"Stage {current_stage}")
+    col2.metric("Pain-Free",     f"{pain_streak} days")
+    col3.metric("Injury Weight", f"{int(inj_weight * 100)}%",
+                help="e^(-λt) — decays toward 0% as pain-free days accumulate")
+    acwr_val = acwr_result.get("acwr")
+    col4.metric("ACWR",          f"{acwr_val:.2f}" if acwr_val else "—",
+                delta=f"ceiling {acwr_result['ceiling']}",
+                delta_color="off")
+
+    st.divider()
+
+    # ── Biometric traffic light ────────────────────────────────────────────────
+    st.subheader("Biometric Traffic Light")
+    if tl["status"] == "insufficient_data":
+        st.info(tl["message"])
+    else:
+        overall_color = engine.SIGNAL_COLORS.get(tl["overall"], engine.SIGNAL_COLORS["grey"])
+        st.markdown(
+            f"Overall: <span style='color:{overall_color};font-weight:700;'>"
+            f"{tl['overall'].upper()}</span> — {tl['message']}",
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        metrics = tl.get("metrics", {})
+        c_hrv, c_rhr, c_sleep = st.columns(3)
+        def _metric_card(col, key, label):
+            m = metrics.get(key, {})
+            val = m.get("value")
+            unit = m.get("unit", "")
+            baseline = m.get("baseline_28d")
+            delta = m.get("delta_pct")
+            sig_k = m.get("signal", "grey")
+            color = engine.SIGNAL_COLORS.get(sig_k, engine.SIGNAL_COLORS["grey"])
+            val_str = f"{val} {unit}" if val is not None else "—"
+            base_str = f"28d avg: {baseline} {unit}" if baseline else "No baseline"
+            delta_str = (f"{'▲' if delta > 0 else '▼'} {abs(delta):.1f}%" if delta else "")
+            col.markdown(
+                f"<div style='background:#1A1F2E;border-left:4px solid {color};"
+                f"border-radius:6px;padding:12px 14px;'>"
+                f"<div style='font-size:10px;color:#888;font-family:monospace;"
+                f"letter-spacing:1px;'>{label}</div>"
+                f"<div style='font-size:26px;font-weight:700;color:#E8EAF0;"
+                f"font-family:monospace;'>{val_str}</div>"
+                f"<div style='font-size:11px;color:#888;'>{base_str}</div>"
+                f"<div style='font-size:11px;color:{color};'>{delta_str}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+        _metric_card(c_hrv,   "hrv_ms",             "HRV")
+        _metric_card(c_rhr,   "resting_heart_rate",  "RHR")
+        _metric_card(c_sleep, "sleep_duration_hours","SLEEP")
+
+    st.divider()
+
+    # ── ACWR workload chart ────────────────────────────────────────────────────
+    st.subheader("Workload Trend — 28 Days")
+    col_vals, col_chart = st.columns([1, 3], gap="large")
+
+    with col_vals:
+        st.metric("ACWR",            f"{acwr_val:.3f}" if acwr_val else "—")
+        st.metric("Acute 7d avg AU", str(acwr_result["acute_avg"]))
+        st.metric("Chronic 28d avg", str(acwr_result["chronic_avg"]))
+        st.metric("Stage ceiling",   str(acwr_result["ceiling"]))
+        if acwr_result["hard_locked"]:
+            st.error("Hard lock — do not increase volume.")
+
+    with col_chart:
+        import datetime as _dt
+        daily_au = acwr_result.get("daily_au_28", [0.0] * 28)
+        today_dt = date.today()
+        chart_dates = [
+            (today_dt - _dt.timedelta(days=27 - i)).strftime("%b %d") for i in range(28)
+        ]
+        df_au = pd.DataFrame({
+            "Date": chart_dates, "AU": daily_au,
+            "Window": ["Chronic (28d)"] * 21 + ["Acute (7d)"] * 7,
+        })
+        df_c = df_au[df_au["Window"] == "Chronic (28d)"].set_index("Date")["AU"]
+        df_a = df_au[df_au["Window"] == "Acute (7d)"].set_index("Date")["AU"]
+        st.caption("Daily session AU — last 28 days")
+        st.bar_chart(pd.concat([df_c.rename("Chronic 28d"), df_a.rename("Acute 7d")], axis=1),
+                     color=["#3D4F6B", "#00E874"])
+
+    st.divider()
+
+    # ── Injury weight ─────────────────────────────────────────────────────────
+    st.subheader("Injury Baseline Weight")
+    inj_color = engine.SIGNAL_COLORS[inj_signal]
+    col_iw, col_iw_desc = st.columns([1, 3], gap="large")
+    with col_iw:
+        st.markdown(
+            f"<div style='font-size:48px;font-weight:700;font-family:monospace;"
+            f"color:{inj_color};'>{int(inj_weight * 100)}%</div>",
+            unsafe_allow_html=True,
+        )
+        st.progress(inj_weight)
+    with col_iw_desc:
+        st.caption(
+            f"λ = {lambda_val} · {pain_streak} pain-free days\n\n"
+            "Exponential decay e^(−λt): starts at 100% on injury day, "
+            "approaches 0% as pain-free training accumulates. "
+            "Below 20% the injury data becomes a silent background watcher only."
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────

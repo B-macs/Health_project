@@ -1,18 +1,36 @@
 {
   "permissions": {
     "allow": [
-      "Bash(*)",
       "Read(*)",
-      "Write(*)",
-      "Edit(*)",
       "Glob(*)",
       "Grep(*)",
-      "WebFetch(*)",
-      "WebSearch(*)",
-      "TodoWrite(*)",
-      "Agent(*)"
+      "Edit(*)",
+      "Write(*)",
+      "Bash(*)",
+      "PowerShell(*)",
+      "mcp__*",
+      "Edit(**)",
+      "Write(**)",
+      "Edit(./**)",
+      "Write(./**)",
+      "Edit(/.claude/**)",
+      "Write(/.claude/**)",
+      "Edit(/scripts/**)",
+      "Write(/scripts/**)",
+      "Edit(/proposals/**)",
+      "Write(/proposals/**)",
+      "Edit(/.tmp/**)",
+      "Write(/.tmp/**)"
     ],
-    "deny": [],
-    "defaultMode": "bypassPermissions"
+    "deny": [
+      "Bash(rm:*)",
+      "Bash(rmdir:*)",
+      "Bash(del:*)",
+      "PowerShell(Remove-Item*)",
+      "PowerShell(rm *)",
+      "PowerShell(del *)",
+      "PowerShell(Expand-Archive*)",
+      "Bash(unzip:*)"
+    ]
   }
 }
