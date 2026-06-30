@@ -14,6 +14,7 @@ Separation of concerns:
 
 import math
 from datetime import date, timedelta
+import rules as _rules
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -252,7 +253,7 @@ def acwr(daily_au_rows: list[dict], stage: int = 1) -> dict:
         hard_locked   : bool
         daily_au_28   : list[float]  (28 entries, day -27 to today)
     """
-    ceiling = 1.2 if stage == 1 else 1.3
+    ceiling = _rules.STAGE_CONSTRAINTS.get(stage, {}).get("acwr_ceiling", 1.3)
 
     # Build a fully-populated 28-day calendar (rest days = 0 AU)
     today     = date.today()

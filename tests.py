@@ -137,6 +137,7 @@ ac_empty = engine.acwr([], stage=1)
 check("no data -> acwr is None",         ac_empty["acwr"], None)
 check("no data -> Stage 1 ceiling 1.2",  ac_empty["ceiling"], 1.2)
 check("Stage 2 ceiling is 1.3",         engine.acwr([], stage=2)["ceiling"], 1.3)
+check("Stage 3 ceiling is 1.5",         engine.acwr([], stage=3)["ceiling"], 1.5)
 
 # Build 28 days of uniform 200 AU -> ACWR = 1.0 (optimal)
 today = date.today()
