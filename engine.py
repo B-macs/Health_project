@@ -73,6 +73,30 @@ def compute_session_au(rpe: int, duration_minutes: int) -> float:
     return float(rpe * duration_minutes)
 
 
+# Cardiovascular Load Factor per stage.
+# Scales raw Foster AU before strain conversion because the Foster method was
+# calibrated for sport/endurance training; rehab exercises generate a fraction
+# of the cardiovascular and systemic stress at equivalent RPE × duration.
+#   Stage 1: isolated bodyweight rehab — minimal HR elevation → 10% of sport load
+#   Stage 2: transition (mixed cardio + loaded strength)      → 40%
+#   Stage 3: performance (full sport/strength loads)          → 100%
+STAGE_CLF: dict[int, float] = {1: 0.04, 2: 0.40, 3: 1.0}
+
+
+def au_to_strain(raw_au: float, stage: int = 1) -> float:
+    """
+    Convert Foster AU to a 0-21 strain score with stage-specific CLF scaling.
+
+    The database always stores raw Foster AU (RPE × duration) so historical
+    comparisons stay valid. CLF is applied at display/computation time only.
+    """
+    clf          = STAGE_CLF.get(stage, 1.0)
+    effective_au = raw_au * clf
+    if effective_au <= 0:
+        return 0.0
+    return round(min(21.0, math.log(effective_au + 1) / math.log(601.0) * 21.0), 1)
+
+
 def injury_weight_signal(weight: float) -> str:
     """Classify injury weight into a traffic-light signal for display."""
     if weight > 0.50:
