@@ -10,7 +10,7 @@ import os
 import sqlite3
 
 DB_PATH = "health_engine.db"
-SCHEMA_PATH = "schema.sql"
+SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "schema.sql")
 
 # ── Seed data from MRI report (DIE RADIOLOGIE München, 10.11.2025) ────────────
 
