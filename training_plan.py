@@ -7,6 +7,16 @@ disc protrusion (moderate right foraminal stenosis). L3/4 and L4/5 flat protrusi
 left dorsolateral with covered annulus tears. Downstream: psoas/hip flexor
 hypertonicity amplifying L5/S1 compression.
 
+Biomechanical profile integrated (from patient_profile.py):
+  1. Upper glute/hip crest chronic tightness — overactive glute medius + piriformis
+     MUST inhibit before activating. Pre-session release precedes every day.
+  2. Right posterior hip capsule restriction — causes standing hinge crack / ischial release
+  3. Lumbar + thoracic facet compression — addressed by thoracic extension + rotation work
+  4. Right Coxa Saltans (iliopsoas snap at 90°) — all right hip flexion cues use neutral/IR
+  5. Wide-stance rotational cracks — hip capsule + pubic symphysis + facet end-range
+  Primary imbalance: under-firing glute max/deep core → upper glutes over-grip for stability.
+  Sequence: INHIBIT overactive structures FIRST, then ACTIVATE underactive ones.
+
 EQUIPMENT: Bodyweight only. Household items permitted (rolled towel, chair, book, wall).
 ACWR ceiling: 1.2 (Stage 1). Session RPE ceiling: 7/10.
 
@@ -17,7 +27,7 @@ Exercise type keys:
   "duration"   — continuous timed activity (walking, breathing)
 
 # DETERMINISTIC-ONLY: all prescriptions derived from MRI findings and evidence-based
-# lumbar disc rehabilitation protocols (McGill, Danneels, Hides).
+# lumbar disc rehabilitation protocols (McGill, Danneels, Hides) + biomechanical profile.
 """
 
 from __future__ import annotations
@@ -63,6 +73,136 @@ def _ex(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Biomechanical Profile Release Exercises
+#  Defined once, inserted at the START of each session per the assignment plan.
+#  Sequence matters: inhibit overactive → then activate underactive.
+# ─────────────────────────────────────────────────────────────────────────────
+
+UPPER_GLUTE_RELEASE = _ex(
+    name="Upper Glute / TFL Self-Release",
+    ex_type="hold",
+    laterality="bilateral",
+    sets=2, hold_seconds=90, rest_seconds=30,
+    mechanics=(
+        "Stand side-on to a wall, 10–15 cm away. "
+        "Press the UPPER outer hip (the shelf just below the hip crest — not the side of the thigh) "
+        "directly into the wall corner. Adjust until you find the exact area of grip or tightness. "
+        "Hold sustained pressure 90 seconds — allow tissue to soften, do not fight it. "
+        "You will feel a gradual release or warmth. "
+        "RIGHT side will feel significantly tighter — spend extra time. "
+        "Alternative: lie on your side and use your OWN fist to apply sustained pressure to the area."
+    ),
+    biomechanical_focus=(
+        "Autogenic inhibition of overactive glute medius + TFL — the chronic gripping pattern "
+        "that is the primary source of joint compression in your biomechanical profile. Sustained "
+        "pressure triggers the Golgi tendon organ reflex, temporarily reducing resting tone. "
+        "Must precede any glute activation work — if done after, the overactive fibres compete."
+    ),
+    progression="Release felt within 60s → maintain pressure and add 5 slow hip circles.",
+    regression="Wall pressure too intense → apply fist pressure while lying on your side.",
+)
+
+RIGHT_HIP_CAPSULE = _ex(
+    name="Right Posterior Hip Capsule Stretch",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=3, hold_seconds=60, rest_seconds=45,
+    mechanics=(
+        "Lie on your back. Pull your RIGHT knee DIAGONALLY toward your LEFT shoulder. "
+        "This is NOT a standard knee-to-chest — it must cross the midline. "
+        "Use both hands behind the thigh. "
+        "You should feel a deep stretch inside the BACK of the RIGHT hip joint, not the outer hip. "
+        "If feeling it in the outer hip (TFL/IT band area): pull the knee more toward the opposite shoulder. "
+        "Add gentle internal rotation of the right thigh (roll slightly inward) to intensify. "
+        "RIGHT SIDE ONLY — do not mirror on the left. Left posterior capsule is not restricted."
+    ),
+    biomechanical_focus=(
+        "RIGHT posterior hip capsule release — the tight capsule identified as the cause of the "
+        "standing hinge crack and the resistance felt during single-leg RDL on the right. "
+        "Also reduces the compressive force on the right L5/S1 foramen by restoring femoral head position."
+    ),
+    progression="Deep stretch achieved → add 5-second internal rotation hold at end range before releasing.",
+    regression="Sharp deep joint pain → reduce diagonal angle, keep knee more toward ipsilateral shoulder.",
+)
+
+PIRIFORMIS_PNF = _ex(
+    name="Piriformis Contract-Relax (PNF)",
+    ex_type="reps",
+    laterality="unilateral",
+    sets=3, reps=5, rest_seconds=60,
+    mechanics=(
+        "Lie on your back, right ankle crossed over left knee (figure-4 position). "
+        "CYCLE — repeat 5 times per side: "
+        "1. CONTRACT — push your RIGHT knee DOWNWARD (away from you) for 5 seconds, "
+        "resisting with your LEFT hand. Isometric — no movement. "
+        "2. RELAX — immediately release the push entirely. "
+        "3. DEEPEN — draw BOTH legs gently toward your chest, going 5–10% deeper than before. "
+        "The piriformis is temporarily inhibited post-contraction — this is the window to gain range. "
+        "Hold 3 seconds, then contract again. "
+        "Complete 5 cycles right side, then repeat left side."
+    ),
+    biomechanical_focus=(
+        "PNF piriformis inhibition — autogenic inhibition post-isometric contraction is significantly "
+        "more effective than passive stretch at releasing the chronically overactive piriformis + deep "
+        "hip rotators identified in your biomechanical profile. Directly addresses the upper glute "
+        "gripping pattern that is the anchor of your joint compression."
+    ),
+    progression="Gaining range each cycle → perform in 90/90 seated position for greater hip flexion bias.",
+    regression="Sharp buttock pain during contraction → remove pressing phase, passive figure-4 only.",
+)
+
+ISCHIAL_RELEASE = _ex(
+    name="Ischial Tuberosity Hamstring Release",
+    ex_type="hold",
+    laterality="bilateral",
+    sets=2, hold_seconds=90, rest_seconds=45,
+    mechanics=(
+        "Sit on a hard surface (wooden chair, floor, or firm step). "
+        "Place a small rolled sock or folded cloth under your RIGHT sit bone. "
+        "Lean slightly forward at the hip — feel your weight load into the sit bone. "
+        "Hold 90 seconds. You are applying sustained pressure to the proximal hamstring "
+        "attachment at the ischial tuberosity — the exact location of the structural release "
+        "identified in your biomechanical profile. "
+        "A dull ache or warmth is normal. Sharp pain → stop immediately. "
+        "Repeat on the left side with same or smaller object."
+    ),
+    biomechanical_focus=(
+        "Proximal hamstring tendon desensitisation — directly targets the high-tension "
+        "upper hamstring attachment that shifts over the ischial tuberosity during the standing hinge. "
+        "Sustained compression improves tendon gliding mechanics and reduces the reactive tension "
+        "that accumulates with prolonged sitting."
+    ),
+    progression="Comfortable → lean further forward to increase proximal hamstring load.",
+    regression="Too intense → use softer surface, no raised object, shorter hold.",
+)
+
+COXA_SALTANS_DRILL = _ex(
+    name="Right Hip Tendon Path Drill (Coxa Saltans)",
+    ex_type="reps",
+    laterality="unilateral",
+    sets=2, reps=10, rest_seconds=45,
+    mechanics=(
+        "Stand beside a wall, fingertip touch for balance. RIGHT leg only. "
+        "Slowly raise your RIGHT knee toward 90 degrees. "
+        "CRITICAL: keep the hip in NEUTRAL or very slight INTERNAL rotation as you lift. "
+        "Do NOT externally rotate (turn the knee outward) as you raise it — "
+        "external rotation is what causes the snap by moving the tendon over the bony ridge. "
+        "If you feel the click: find the exact angle where it begins (usually 60–80°). "
+        "Practice controlling through that range slowly, maintaining neutral rotation. "
+        "Lower with the same neutral rotation. RIGHT SIDE ONLY."
+    ),
+    biomechanical_focus=(
+        "Iliopsoas tendon path retraining — the snap occurs when the tendon crosses the "
+        "iliopectineal eminence during combined hip flexion + external rotation. "
+        "Internal rotation bias shifts the tendon path to prevent the crossing. "
+        "Over time this retrains the motor pattern to avoid the snap during daily movement."
+    ),
+    progression="10 reps without snap → progress to single-leg stand at 90° hip flexion with neutral rotation.",
+    regression="Cannot prevent snap → work only to 60° until tendon path ingrains at lower angle first.",
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  14-DAY PLAN
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -78,6 +218,8 @@ PLAN[1] = {
     "phase": "Week 1: Neural Reset",
     "session_rpe_target": 3,
     "exercises": [
+        UPPER_GLUTE_RELEASE,
+        RIGHT_HIP_CAPSULE,
         _ex(
             name="Supine Knee-to-Chest",
             ex_type="hold",
@@ -149,6 +291,8 @@ PLAN[2] = {
     "phase": "Week 1: Neural Reset",
     "session_rpe_target": 3,
     "exercises": [
+        UPPER_GLUTE_RELEASE,
+        PIRIFORMIS_PNF,
         _ex(
             name="90/90 Hip Flexor Hold",
             ex_type="hold",
@@ -165,23 +309,6 @@ PLAN[2] = {
             biomechanical_focus="Hip capsule + iliopsoas lengthening; reduces anterior pelvic tilt that increases lumbar lordosis and compresses L5/S1.",
             progression="Pain free → lean torso further forward over front knee.",
             regression="Lower back pain → sit more upright, reduce forward lean.",
-        ),
-        _ex(
-            name="Supine Figure-4 Piriformis Stretch",
-            ex_type="hold",
-            laterality="unilateral",
-            sets=3, hold_seconds=45, rest_seconds=60,
-            mechanics=(
-                "Lie on your back, both knees bent. "
-                "Cross your RIGHT ankle over your LEFT knee — the crossed leg looks like a figure '4'. "
-                "Option A: Push the crossed knee gently AWAY from you with one hand. "
-                "Option B: Interlace hands behind the left thigh and draw BOTH legs toward your chest. "
-                "Feel the stretch in the outer buttock of the crossed leg. "
-                "Hold. Switch sides."
-            ),
-            biomechanical_focus="Piriformis + external hip rotator release — reduces SI joint compression and downstream neural irritation in the L5/S1 distribution.",
-            progression="Pain free → add a gentle ankle dorsiflexion on the crossed foot to add sciatic nerve component.",
-            regression="Sharp buttock pain → try Option A only with less push. If still painful, skip.",
         ),
         _ex(
             name="Side-Lying Hip Abduction",
@@ -220,6 +347,8 @@ PLAN[3] = {
     "phase": "Week 1: Neural Reset",
     "session_rpe_target": 5,
     "exercises": [
+        UPPER_GLUTE_RELEASE,
+        RIGHT_HIP_CAPSULE,
         _ex(
             name="McGill Modified Curl-Up",
             ex_type="hold_reps",
@@ -293,6 +422,8 @@ PLAN[4] = {
     "phase": "Week 1: Neural Reset",
     "session_rpe_target": 5,
     "exercises": [
+        ISCHIAL_RELEASE,
+        UPPER_GLUTE_RELEASE,
         _ex(
             name="Supine Glute Bridge (Bilateral)",
             ex_type="reps",
@@ -319,7 +450,9 @@ PLAN[4] = {
                 "Keeping feet together, rotate your TOP knee upward toward the ceiling — like a clamshell opening. "
                 "Do NOT let your pelvis roll backward — this is the most common mistake. "
                 "Hold 1 second at the top. Lower under control over 3 seconds. "
-                "Complete all reps on one side before switching."
+                "Complete all reps on one side before switching. "
+                "RIGHT SIDE NOTE: your right glute medius is overactive — if it fatigues faster "
+                "than expected, reduce reps by 5 on the right and focus on quality over quantity."
             ),
             biomechanical_focus="Glute medius isolation — prevents hip drop (Trendelenburg) that creates lateral lumbar shear through L3-L5 during gait.",
             progression="20 reps easy → add a resistance band above the knees, or increase to 25 reps.",
@@ -366,6 +499,7 @@ PLAN[5] = {
     "phase": "Week 1: Neural Reset",
     "session_rpe_target": 6,
     "exercises": [
+        UPPER_GLUTE_RELEASE,
         _ex(
             name="Wall Sit (Isometric Quad)",
             ex_type="hold",
@@ -437,6 +571,7 @@ PLAN[6] = {
     "phase": "Week 1: Neural Reset",
     "session_rpe_target": 3,
     "exercises": [
+        ISCHIAL_RELEASE,
         _ex(
             name="Cat-Cow (Slow Flow)",
             ex_type="reps",
@@ -505,6 +640,7 @@ PLAN[7] = {
     "phase": "Week 1: Neural Reset",
     "session_rpe_target": 2,
     "exercises": [
+        PIRIFORMIS_PNF,
         _ex(
             name="Diaphragmatic Breathing",
             ex_type="duration",
@@ -561,7 +697,10 @@ PLAN[7] = {
                 "(4) Lying flat on back. (5) Walking 5 steps. "
                 "Write your scores in the Session Notes. Compare these scores with your Day 1 baseline. "
                 "Any score that is lower than Day 1 = progress. "
-                "Any score that has increased = flag for physiotherapist review."
+                "Any score that has increased = flag for physiotherapist review. "
+                "Also assess the 5 biomechanical patterns from your profile: "
+                "(6) Upper glute release — has the grip reduced after 7 days? "
+                "(7) Standing hinge — does the sit-bone area feel less restricted?"
             ),
             biomechanical_focus="Self-assessment provides the subjective outcome measure for Stage 1 → 2 progression evaluation.",
             progression="All scores ≤3/10 → excellent progress. Continue to Week 2.",
@@ -580,6 +719,8 @@ PLAN[8] = {
     "phase": "Week 2: Neuromuscular Loading",
     "session_rpe_target": 6,
     "exercises": [
+        UPPER_GLUTE_RELEASE,
+        PIRIFORMIS_PNF,
         _ex(
             name="McGill Curl-Up (Progressed)",
             ex_type="hold_reps",
@@ -650,6 +791,7 @@ PLAN[9] = {
     "phase": "Week 2: Neuromuscular Loading",
     "session_rpe_target": 6,
     "exercises": [
+        COXA_SALTANS_DRILL,
         _ex(
             name="RDL Hip Hinge to Wall",
             ex_type="reps",
@@ -676,7 +818,10 @@ PLAN[9] = {
                 "During the hold, make small deliberate shifts: forward, backward, slightly sideways. "
                 "Focus on: your hip staying LEVEL — pelvis not dropping on the non-standing side. "
                 "If the pelvis drops, it means glute medius is fatiguing. "
-                "Switch legs. Complete all sets."
+                "Switch legs. Complete all sets. "
+                "RIGHT HIP NOTE: when balancing on your right leg, keep the hip in slight "
+                "internal rotation to prevent the iliopsoas tendon snap. If the click occurs, "
+                "externally rotate slightly less."
             ),
             biomechanical_focus="Proprioceptive + glute medius endurance under single-leg stance — essential for controlling lateral lumbar shift during gait, which is the primary functional demand of the L-spine.",
             progression="60 seconds easy with wall → progress to no wall, then eyes closed.",
@@ -725,6 +870,8 @@ PLAN[10] = {
     "phase": "Week 2: Neuromuscular Loading",
     "session_rpe_target": 6,
     "exercises": [
+        UPPER_GLUTE_RELEASE,
+        RIGHT_HIP_CAPSULE,
         _ex(
             name="Pallof Press Hold (Doorframe)",
             ex_type="hold",
@@ -795,6 +942,8 @@ PLAN[11] = {
     "phase": "Week 2: Neuromuscular Loading",
     "session_rpe_target": 5,
     "exercises": [
+        COXA_SALTANS_DRILL,
+        ISCHIAL_RELEASE,
         _ex(
             name="Sciatic Nerve Floss",
             ex_type="reps",
@@ -858,7 +1007,9 @@ PLAN[11] = {
                 "Briefly lean over each front knee for 3 seconds. "
                 "Continue transitioning. "
                 "Each full transition = 1 rep. "
-                "This is ACTIVE mobility — use your muscles to move, not momentum."
+                "This is ACTIVE mobility — use your muscles to move, not momentum. "
+                "RIGHT HIP NOTE: during the 90/90 transition, maintain slight internal rotation "
+                "bias on the right to prevent the iliopsoas snap identified in your profile."
             ),
             biomechanical_focus="Hip internal + external rotation mobility under bodyweight — restores the full rotational range of the hip joint that is essential for protecting the lumbar spine from rotational stress during daily activities.",
             progression="5 transitions smooth → hold each position for 5 seconds before transitioning.",
@@ -872,6 +1023,7 @@ PLAN[12] = {
     "phase": "Week 2: Neuromuscular Loading",
     "session_rpe_target": 6,
     "exercises": [
+        ISCHIAL_RELEASE,
         _ex(
             name="Chair Sit-to-Stand",
             ex_type="reps",
@@ -945,6 +1097,8 @@ PLAN[13] = {
     "phase": "Week 2: Neuromuscular Loading",
     "session_rpe_target": 7,
     "exercises": [
+        UPPER_GLUTE_RELEASE,
+        PIRIFORMIS_PNF,
         _ex(
             name="Bird-Dog with Full Reach",
             ex_type="hold_reps",
@@ -989,7 +1143,10 @@ PLAN[13] = {
                 "Aim for a 'T' shape — torso and back leg parallel to floor. "
                 "Maintain neutral spine. Arms reach toward floor. "
                 "Return to standing by driving through the right heel and squeezing right glute. "
-                "Complete all reps. Switch sides."
+                "Complete all reps. Switch sides. "
+                "RIGHT SIDE NOTE: loading the right single-leg RDL will tension the posterior "
+                "hip capsule — this may produce the deep ischial/sit-bone release identified in "
+                "your profile. This is a structural release, not pain."
             ),
             biomechanical_focus="Single-leg hip hinge under proprioceptive challenge — builds the unilateral posterior chain capacity and hip proprioception essential for protecting L5/S1 during single-leg loading in daily activity.",
             progression="10 reps clean, minimal wall contact → remove wall entirely.",
@@ -1021,6 +1178,8 @@ PLAN[14] = {
     "phase": "Week 2: Programme Assessment",
     "session_rpe_target": 5,
     "exercises": [
+        RIGHT_HIP_CAPSULE,
+        COXA_SALTANS_DRILL,
         _ex(
             name="McGill Big 3 — Quality Screen",
             ex_type="reps",
@@ -1062,7 +1221,9 @@ PLAN[14] = {
                 "Stand freely. Hinge at hips to maximum comfortable range — let arms hang past knee level if possible. "
                 "Hold 1 second at the bottom. Return with glute squeeze. "
                 "Note: what is your maximum pain-free range? How does it compare to Day 4? "
-                "Log this in session notes."
+                "Log this in session notes. "
+                "BIOMECHANICAL CHECK: compare right vs left hip hinge range. Note if right side "
+                "produces the ischial tuberosity release. This data goes to your physiotherapist."
             ),
             biomechanical_focus="Hip hinge range of motion and posterior chain capacity — this is the functional test for whether the L5/S1 pathway is desensitised enough to tolerate progressive loading in Stage 2.",
             progression="Full range, pain ≤2/10 → criteria met for Stage 2 Transition programming.",
