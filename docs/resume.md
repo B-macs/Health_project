@@ -58,15 +58,17 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 
 ## CURRENT APPLICATION STRUCTURE
 
-### Pages (Streamlit sidebar navigation)
+### SPA Navigation
 
-| File | Page | Purpose |
+`app.py` is the single Streamlit entry point. Navigation is handled by a JS bridge (`nav.py`) that sets `st.session_state["_nav_page"]`; the router in `app.py` dispatches to the appropriate view. `_pages/*.py` stubs exist only to redirect back to `app.py` and suppress the Streamlit sidebar auto-nav.
+
+| View module | Page | Purpose |
 |---|---|---|
-| `app.py` | Morning Check-In | Daily readiness entry: pain score, tightness, sensation tags, lifestyle factors |
-| `pages/0_Training_Plan.py` | Training Plan | 14-day interactive rehab session guide with live timers, auto-logging, exit confirmation |
-| `pages/3_Autoregulation.py` | Autoregulation | Background config only — stage selector + directive summary. Full data in AI Insights |
-| `pages/4_AI_Insights.py` | AI Insights | Engine data tab (ACWR, biometrics, injury weight) + parser queue + tightness map + macro trends + MRI intelligence |
-| `pages/6_Sync.py` | Sync | Google Sheets biometric data status viewer |
+| `app.py` (home route) | Home | Dashboard: readiness summary, ACWR, traffic light, session directive |
+| `views/checkin.py` | Morning Check-In | Daily readiness entry: pain score, tightness, sensation tags, lifestyle factors |
+| `views/training.py` | Training Plan | 14-day interactive rehab session guide with live timers, auto-logging, exit confirmation |
+| `views/insights.py` | AI Insights | Engine data tab (ACWR, biometrics, injury weight) + parser queue + tightness map + macro trends + MRI intelligence |
+| `views/sync.py` | Sync | Google Sheets biometric data status viewer |
 
 ### Removed Pages (intentionally)
 | Page | Reason Removed |
@@ -79,15 +81,28 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 
 | File | Role |
 |---|---|
-| `engine.py` | Pure deterministic maths — traffic light, ACWR, injury weight decay, stage state machine, volume recommendation. No DB access, no Streamlit. |
+| `engine.py` | Pure deterministic maths — traffic light, ACWR, injury weight decay, stage state machine, volume recommendation. No DB access, no Streamlit. Derives per-stage ceilings from `rules.STAGE_CONSTRAINTS`. |
+| `rules.py` | Movement safety rules — `STAGE_CONSTRAINTS` (ACWR ceilings, RPE caps, volume caps per stage). `MOVEMENT_RULES` (contraindicated / caution / cleared). Single source of truth for guardrails. |
 | `db.py` | Notion API backend — all read/write. Equivalent to the SQLite schema below but using Notion databases. |
 | `sync_sheets.py` | Google Sheets direct reader — pulls biometric rows, maps columns, returns engine-compatible format. No Notion sync needed. |
-| `training_plan.py` | 14-day exercise prescription data — all exercise specs, mechanics, biomechanical cues, progressions, regressions. |
-| `patient_profile.py` | Clinical input file — MRI findings + biomechanical assessment + muscle imbalance summary + pre-session release protocol. Updated before each new training block. |
-| `styles.py` | Responsive dual-theme CSS + component helpers. Oura palette (mobile ≤768px) / Whoop palette (desktop ≥769px). |
-| `ai.py` | Phase 2 AI layer — session note parser, tightness parser, macro trend analysis. Advisory only. |
-| `rules.py` | Movement safety rules — maps exercises to stage contraindications. |
+| `training_plan.py` | 14-day exercise prescription data — exercise specs, mechanics, biomechanical cues, progressions, regressions, pre-session release protocol integrated per day. |
+| `training_constants.py` | Single source for `EXERCISES` catalogue, `ANATOMICAL_LOCATIONS`, `SENSATION_TAGS`. Imported by `views/checkin.py`. |
+| `patient_profile.py` | Clinical input file — MRI findings + biomechanical assessment + muscle imbalance summary. Not imported by active code; human reference. Updated before each new training block. |
+| `readiness.py` | Readiness score calculator — HRV 40% / Sleep 35% / RHR 25%; adaptive baselines; `NOT_COMPUTED` sentinel. |
 | `stats.py` | Deterministic statistical analysis — lag correlations, slopes, recovery direction. |
+| `styles.py` | Responsive dual-theme CSS + component helpers. Oura palette (mobile ≤768px) / Whoop palette (desktop ≥769px). |
+| `nav.py` | Bottom nav bar + JS bridge. Exposes `stNav()` in parent window; MutationObserver hides `◉nav◉` trigger buttons. |
+| `ai.py` | Phase 2 AI layer — session note parser, tightness parser, macro trend analysis. Advisory only. `MODEL_FAST = MODEL_SMART = "rules-based"` (no LLM called). |
+
+### Supporting Directories
+
+| Directory | Contents |
+|---|---|
+| `views/` | `checkin.py`, `training.py`, `insights.py`, `sync.py` — SPA view modules |
+| `_pages/` | 6 stubs — each calls `st.switch_page("app.py")` to suppress sidebar auto-nav |
+| `scripts/` | `init_notion.py` — one-shot CLI setup for Notion databases |
+| `legacy/` | `init_db.py` + `schema.sql` — SQLite era, not used at runtime |
+| `docs/` | `INVENTORY.md`, `resume.md`, `focus.md`, `playbook.md`, `progress.json`, `training/*.md` |
 
 ---
 
@@ -222,7 +237,7 @@ Updated before each new training block. Single source of truth for MRI findings 
 
 ### Structure
 - Hardcoded bodyweight prescription in `training_plan.py`
-- Interactive session guide in `pages/0_Training_Plan.py`
+- Interactive session guide in `views/training.py`
 - Day determined automatically from plan start date stored in Notion Config DB
 - Session completion auto-logs all exercises to Notion Training DB
 
@@ -315,7 +330,7 @@ Two visual themes applied automatically via CSS media query at 768px breakpoint:
 | **8** | Responsive UI System (Oura/Whoop dual-theme) | COMPLETE ✅ |
 | **9** | Clinical Input Profile System (`patient_profile.py`) | COMPLETE ✅ |
 | **10** | Autoregulation → Background; Directive into Training Plan | COMPLETE ✅ |
-| **11** | Biomechanical Profile Integration into Training Plan | IN PROGRESS 🔄 (agent running) |
+| **11** | Biomechanical Profile Integration into Training Plan | COMPLETE ✅ |
 | **12** | 4-Week Stage 2 Transition Plan | PENDING — begins after Day 14 assessment |
 | **13** | Apple Health Direct API Sync | PENDING — replace Google Sheets intermediary |
 | **14** | Stage 2 Training Entry (barbell/cable — external load) | PENDING |
@@ -393,9 +408,9 @@ Two visual themes applied automatically via CSS media query at 768px breakpoint:
 | Notion biometrics DB | No longer written to | Could be removed in future; kept for backwards compat with `get_biometric_rolling()` in db.py |
 | Stage 2 training plan | Not yet built | Needs barbell/cable movement library, updated ACWR ceiling, external load auto-logging |
 | Apple Health direct sync | Not implemented | Would remove Google Sheets intermediary; requires Apple Health HealthKit API or shortcut automation |
-| `training_plan.py` | Agent update in progress | Biomechanical profile integration being written; includes pre-session release blocks for all 14 days |
-| `14_day_plan.md` | Agent writing | Readable document of full 14-day plan — not yet in project root |
+| `Training plan/` folder | Stale duplicate | Contents moved to `docs/training/`; manual deletion needed (`Remove-Item -Recurse -Force "Training plan"`) |
+| `patient_profile.py` not imported | Informational | Human-readable reference only — not wired into active code. Will be imported when Stage 2 plan reads biomechanical profile programmatically. |
 
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-06-30 — post Phase 1-4 codebase review and refiling*

@@ -1,0 +1,163 @@
+{
+  "schema": "health-engine-progress/v1",
+  "last_updated": "2026-06-30",
+  "project": "Health Engine — Codebase Review & Refiling",
+  "gate": {
+    "command": "python tests.py",
+    "passing": 141,
+    "total": 141
+  },
+  "phases": {
+    "phase_1": {
+      "label": "Inventory",
+      "status": "complete",
+      "output": "docs/INVENTORY.md",
+      "commit": "536dcfc",
+      "summary": "34 files audited, architecture mapped, 14 problems catalogued (2 red, 6 orange, 6 yellow)"
+    },
+    "phase_2": {
+      "label": "Plan",
+      "status": "complete",
+      "output": "conversation — no artifact",
+      "summary": "Minimal reorganisation approved: active modules stay at root, legacy/CLI/docs moved to subdirectories, duplicate constants to be wired via import"
+    },
+    "phase_3": {
+      "label": "Execute",
+      "status": "complete",
+      "commits": [
+        "pre-existing unstaged work staged and committed (7 commits)",
+        "G1: wire ANATOMICAL_LOCATIONS + SENSATION_TAGS import in views/checkin.py",
+        "G2: move init_db.py + schema.sql to legacy/; fix SCHEMA_PATH",
+        "G3: move Training_System.md + Stage_1_14_Day_Plan.md to docs/training/",
+        "G4: move resume.md to docs/",
+        "G5: remove streamlit-aggrid from requirements.txt",
+        "P1: fix ACWR Stage 3 ceiling (engine.py + rules.py + tests.py)"
+      ],
+      "summary": "13 commits total. Gate: 141/141."
+    },
+    "phase_4": {
+      "label": "Document",
+      "status": "complete",
+      "files": [
+        "CLAUDE.md",
+        "docs/resume.md (updated)",
+        "docs/focus.md",
+        "docs/playbook.md",
+        "docs/progress.json"
+      ],
+      "summary": "All five Phase 4 documents written from real codebase content."
+    }
+  },
+  "problems": [
+    {
+      "id": "P1",
+      "severity": "red",
+      "title": "ACWR Stage 3 ceiling hardcoded to 1.3 instead of 1.5",
+      "status": "passing",
+      "fix": "engine.py derives ceiling from rules.STAGE_CONSTRAINTS; test added"
+    },
+    {
+      "id": "P2",
+      "severity": "orange",
+      "title": "ANATOMICAL_LOCATIONS duplicated in training_constants.py and views/checkin.py",
+      "status": "passing",
+      "fix": "G1: views/checkin.py now imports from training_constants"
+    },
+    {
+      "id": "P3",
+      "severity": "orange",
+      "title": "SENSATION_TAGS duplicated in training_constants.py and views/checkin.py",
+      "status": "passing",
+      "fix": "G1: views/checkin.py now imports from training_constants"
+    },
+    {
+      "id": "P4",
+      "severity": "orange",
+      "title": "patient_profile.py not imported by any active module",
+      "status": "accepted",
+      "note": "Intentional — human reference only. Stays at root for easy editing. Not wired."
+    },
+    {
+      "id": "P5",
+      "severity": "orange",
+      "title": "ai.py MODEL_FAST / MODEL_SMART constants reference LLM model names",
+      "status": "accepted",
+      "note": "Constants are currently unused sentinels. No LLM is called. Leave as-is."
+    },
+    {
+      "id": "P6",
+      "severity": "orange",
+      "title": "sync_sheets.py has no error handling for missing credentials",
+      "status": "accepted",
+      "note": "Out of scope for refiling phase. Would require behaviour change — defer."
+    },
+    {
+      "id": "P7",
+      "severity": "orange",
+      "title": "training_plan.py: PLAN dict and training_constants.py: EXERCISES may drift",
+      "status": "accepted",
+      "note": "Different concerns (day plan vs. exercise catalogue). No deduplication needed."
+    },
+    {
+      "id": "P8",
+      "severity": "yellow",
+      "title": "README.md is empty",
+      "status": "accepted",
+      "note": "CLAUDE.md now covers onboarding. README can remain minimal or be filled later."
+    },
+    {
+      "id": "P9",
+      "severity": "yellow",
+      "title": "No .gitignore entry for legacy/ SQLite database",
+      "status": "accepted",
+      "note": "health_engine.db is not created by default; Notion is the live backend. Deferred."
+    },
+    {
+      "id": "P10",
+      "severity": "orange",
+      "title": "init_db.py and schema.sql at root — orphaned legacy files",
+      "status": "passing",
+      "fix": "G2: moved to legacy/; SCHEMA_PATH made __file__-relative"
+    },
+    {
+      "id": "P11",
+      "severity": "yellow",
+      "title": "streamlit-aggrid in requirements.txt but unused",
+      "status": "passing",
+      "fix": "G5: removed from requirements.txt"
+    },
+    {
+      "id": "P12",
+      "severity": "yellow",
+      "title": "Training plan/ at root — stale duplicate of docs/training/",
+      "status": "partial",
+      "note": "Contents copied to docs/training/ in G3. Manual deletion blocked by sandbox deny rules. User must run: Remove-Item -Recurse -Force 'Training plan'"
+    },
+    {
+      "id": "P13",
+      "severity": "yellow",
+      "title": "Oura_template.jpg and background_templates/ untracked",
+      "status": "accepted",
+      "note": "Out of scope for refiling. User should commit or gitignore when ready."
+    },
+    {
+      "id": "P14",
+      "severity": "yellow",
+      "title": "docs/resume.md had stale pages/ references",
+      "status": "passing",
+      "fix": "Phase 4: updated to reflect _pages/ stubs + views/ structure"
+    }
+  ],
+  "manual_actions_required": [
+    {
+      "action": "Delete stale duplicate directory",
+      "command": "Remove-Item -Recurse -Force 'Training plan'",
+      "reason": "Sandbox deny rules block Remove-Item inside Claude — must be run in user terminal"
+    },
+    {
+      "action": "Commit or gitignore untracked assets",
+      "files": ["Oura_template.jpg", "background_templates/"],
+      "reason": "Design assets not yet committed — decide whether they belong in git"
+    }
+  ]
+}
