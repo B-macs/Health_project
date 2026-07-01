@@ -20,15 +20,15 @@
       "Edit(/proposals/**)",
       "Write(/proposals/**)",
       "Edit(/.tmp/**)",
-      "Write(/.tmp/**)"
-    ],
-    "deny": [
+      "Write(/.tmp/**)",
       "Bash(rm:*)",
       "Bash(rmdir:*)",
       "Bash(del:*)",
       "PowerShell(Remove-Item*)",
       "PowerShell(rm *)",
-      "PowerShell(del *)",
+      "PowerShell(del *)"
+    ],
+    "deny": [
       "PowerShell(Expand-Archive*)",
       "Bash(unzip:*)"
     ]
