@@ -40,24 +40,23 @@ st.set_page_config(
 st.markdown(nav.CHROME_CSS, unsafe_allow_html=True)
 
 # ─── SPA Router ───────────────────────────────────────────────────────────────
-# Navigation uses st.session_state (set by nav.inject's on_click buttons) so
-# the WebSocket stays alive across transitions — no reconnect, no flash.
-# URL query params ("?page=X") are honoured as a fallback for direct links.
-_page = st.session_state.get("_nav_page",
-         st.query_params.get("page", "home"))
+# Primary: session_state["_nav_page"] set by nav trigger buttons (WebSocket rerun,
+#          no page reload, same connection).
+# Fallback: st.query_params["page"] for direct URL access and first load.
+_page = st.session_state.get("_nav_page") or st.query_params.get("page", "home")
 
 if _page == "training":
     from views import training as _v
-    styles.inject_css(); nav.inject("training"); _v.render(); st.stop()
+    styles.inject_css(); _v.render(); nav.inject("training"); st.stop()
 elif _page == "insights":
     from views import insights as _v
-    styles.inject_css(); nav.inject("insights"); _v.render(); st.stop()
+    styles.inject_css(); _v.render(); nav.inject("insights"); st.stop()
 elif _page == "sync":
     from views import sync as _v
-    styles.inject_css(); nav.inject("sync"); _v.render(); st.stop()
+    styles.inject_css(); _v.render(); nav.inject("sync"); st.stop()
 elif _page == "checkin":
     from views import checkin as _v
-    styles.inject_css(); nav.inject(""); _v.render(); st.stop()
+    styles.inject_css(); _v.render(); nav.inject(""); st.stop()
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -449,9 +448,9 @@ _header_html = (
     '</div>'
 )
 
-# FAB — Morning Check-In (stNav keeps WebSocket alive, no page reload)
+# FAB — Morning Check-In (?page=checkin → SPA router dispatches views/checkin.py)
 _fab_html = (
-    '<div onclick="stNav(\'checkin\')">'
+    '<a href="?page=checkin" style="text-decoration:none;">'
     '<div style="position:fixed;bottom:80px;'
     'right:max(20px,calc((100vw - 480px)/2 + 16px));'
     'z-index:900;width:52px;height:52px;border-radius:50%;background:#FFFFFF;'
@@ -459,7 +458,7 @@ _fab_html = (
     'box-shadow:0 4px 20px rgba(0,0,0,0.45);cursor:pointer;">'
     '<span style="font-size:28px;color:#0B0F1E;line-height:1;font-weight:300;">+</span>'
     '</div>'
-    '</div>'
+    '</a>'
 )
 
 # ─── Home-specific CSS (home-page-only overrides) ─────────────────────────────
@@ -501,12 +500,13 @@ _card_sleep = _card_html(
 # ─── Render ───────────────────────────────────────────────────────────────────
 
 # CHROME_CSS already injected at top of script (before data fetching)
-st.markdown(_home_css,    unsafe_allow_html=True)  # home-specific layout
+styles.inject_css()                                # base styles (same as other pages)
+st.markdown(_home_css,    unsafe_allow_html=True)  # home-specific overrides (480px max-width etc.)
 st.markdown(_header_html, unsafe_allow_html=True)  # fixed date header
 st.markdown(_fab_html,    unsafe_allow_html=True)  # FAB → Check-In
-nav.inject("home", max_width=480)  # bottom nav with JS bridge + session_state buttons
 
 if view == "strain":
     st.markdown(_strain_detail(), unsafe_allow_html=True)
 else:
     st.markdown(_card_readiness + _card_strain + _card_sleep, unsafe_allow_html=True)
+nav.inject("home")

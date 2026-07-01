@@ -17,7 +17,7 @@ Confidence key: 🟢 fully read, high confidence · 🟠 partially read or conta
 | 5 | `stats.py` | Deterministic statistical engine — lag correlation, trend slopes, recovery direction, symptom detection. | `lag_correlation`, `trend_slope`, `recovery_direction`, `session_tonnage`, `detect_neural_symptoms`, `detect_urgent_symptoms`, `auto_warning_level`, `compute_all_correlations`; `NEURAL_KEYWORDS` (17 items), `URGENT_KEYWORDS` (12 items) | — | `ai.py` (as `_stats`), `views/insights.py` (as `stats_mod`), `tests.py` | 🟢 |
 | 6 | `rules.py` | Movement safety rules + stage constraints. Single source of truth for ACWR ceilings, RPE ceilings, volume caps per stage. | `check_movement`, `get_contraindicated_always`, `get_cleared_for_stage`, `get_caution_movements`, `get_stage_constraints`, `movement_safety_summary`; `MovementRule` dataclass; `MOVEMENT_RULES` (35 entries); `STAGE_CONSTRAINTS` dict (stages 1-3) | — | `ai.py` (as `_rules`), `tests.py` | 🟢 |
 | 7 | `ai.py` | Deterministic rule-based text parsers. No LLM calls. `MODEL_FAST = MODEL_SMART = "rules-based"` for API compatibility. | `parse_session_note`, `parse_tightness`, `analyze_macro_trends`, `assess_movement_risk`; `_SEVERITY_TABLE` (38), `_SENSATION_MAP` (35), `_BODY_PART_MAP` (23), `_POSITIVE_WORDS` (20), `_NEGATIVE_WORDS` (18), `_HEADLINES`, `_LOAD_NOTES`, `_RECOMMENDATIONS`, `_CORR_TEMPLATES` (18) | `stats` (as `_stats`), `rules` (as `_rules`) | `views/insights.py` | 🟢 |
-| 8 | `nav.py` | Bottom navigation bar + JS bridge (session-state nav, no page reload). MutationObserver hides `◉nav◉` trigger buttons. | `inject`, `bottom_nav_html`, `_set_page`; `CHROME_CSS`, `_ITEMS` (4 nav items), `_ALL_PAGES` (5 including checkin FAB), `_JS_BRIDGE_TMPL` | — | `app.py` | 🟢 |
+| 8 | `nav.py` | Bottom navigation bar + JS bridge (URL-based nav via `?page=X`). No hidden trigger buttons. | `inject`, `bottom_nav_html`; `CHROME_CSS`, `_ITEMS` (4 nav items), `_JS_BRIDGE_TMPL` | — | `app.py` | 🟢 |
 | 9 | `styles.py` | Dual-theme CSS (Oura palette ≤768px / Whoop palette ≥769px). Component helpers for SVG rings, stat blocks, cards. | `inject_css`, `oura_ring`, `oura_card`, `whoop_stat`, `whoop_panel`, `dual_layout`; `OURA` dict, `WHOOP` dict; `_build_css()` | — | `app.py` (and via views as needed) | 🟢 |
 | 10 | `sync_sheets.py` | Google Sheets biometrics reader (gspread, service account). Returns same row format as `db.get_biometric_rolling()`. | `get_biometric_rolling`, `fetch_all_rows`; column mappings for HRV, RHR, sleep, steps, weight | — | `app.py`, `views/training.py`, `views/insights.py`, `views/sync.py` | 🟢 |
 | 11 | `training_constants.py` | Exercise catalogue + enum lists. Intended single source for ANATOMICAL_LOCATIONS and SENSATION_TAGS. | `EXERCISES` (4 categories), `ALL_EXERCISES`, `MOVEMENT_TYPES`, `VELOCITY_OPTIONS`, `ANATOMICAL_LOCATIONS` (21 items), `SENSATION_TAGS` (9 items) | — | ⚠️ Nothing imports it — `ANATOMICAL_LOCATIONS` and `SENSATION_TAGS` duplicated in `views/checkin.py` without import | 🟠 |
@@ -50,23 +50,19 @@ Confidence key: 🟢 fully read, high confidence · 🟠 partially read or conta
 ## Implicit Architecture
 
 ```
-Streamlit SPA (single WebSocket connection, no page reloads)
+Streamlit URL-nav (each nav tap reloads to ?page=X, Streamlit reconnects)
 ══════════════════════════════════════════════════════════════
 
-  _pages/*.py (stubs)           ← Streamlit auto-discovers;
-       │ st.switch_page()          all redirect to app.py
-       ▼
   app.py  ──────────────────────────────────┐
   (SPA router)                              │ home dashboard
-       │ reads st.session_state["_nav_page"]│ rendered inline
+       │ reads st.query_params["page"]      │ rendered inline
        ├── "checkin"  → views/checkin.py    │
        ├── "training" → views/training.py   │
        ├── "insights" → views/insights.py   │
        └── "sync"     → views/sync.py       │
   
   nav.py ← injected by app.py               │
-    JS bridge (stNav() in parent window)    │
-    MutationObserver hides ◉nav◉ buttons   │
+    JS bridge: stNav(page) sets ?page=X     │
 
   ── Pure logic (no I/O) ────────────────────────────────────
   engine.py      ← zero internal imports

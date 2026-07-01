@@ -1,38 +1,18 @@
 """
-nav.py — Shared bottom navigation bar.
+nav.py — Bottom navigation bar.
 
-Navigation uses st.session_state + on_click callbacks so the WebSocket
-stays alive across transitions (no reconnect = no flash, no new page load).
+Single-layer pattern: four st.button() widgets in st.columns(4), positioned
+fixed at the bottom of the viewport via CSS. No separate visual HTML, no
+invisible overlay — one layer, one source of truth.
 
-How it works:
-  1. Hidden Streamlit buttons (labelled ◉nav◉<page>◉) handle actual navigation.
-     Their on_click sets st.session_state["_nav_page"] and triggers a rerun.
-  2. A same-origin component iframe injects stNav() into the parent window and
-     uses a MutationObserver to keep the trigger buttons invisible.
-  3. The visual HTML nav bar calls stNav('<page>') on click — which finds
-     and programmatically clicks the matching hidden button.
+Navigation: on_click sets st.session_state["_nav_page"], triggering a WebSocket
+rerun without page reload or new connection.
 
-Call nav.inject(active) once per page, after styles.inject_css().
+Call nav.inject(active) once per page, AFTER all page content is rendered.
 active keys: "home" | "training" | "insights" | "sync" | ""
 """
 
 import streamlit as st
-import streamlit.components.v1 as components
-
-# ─── Chrome-suppression CSS ───────────────────────────────────────────────────
-
-CHROME_CSS: str = """<style>
-[data-testid="stSidebar"],
-[data-testid="collapsedControl"],
-[data-testid="stSidebarNav"],
-#MainMenu,
-[data-testid="stHeader"],
-[data-testid="stToolbar"],
-.stDeployButton,
-footer { display:none !important; }
-
-.main .block-container { padding-bottom:80px !important; }
-</style>"""
 
 # ─── Nav items ────────────────────────────────────────────────────────────────
 
@@ -43,121 +23,178 @@ _ITEMS = [
     ("↻",  "Sync",     "sync"),
 ]
 
-# Checkin has a trigger button (for the FAB) but no visible nav item
-_ALL_PAGES = _ITEMS + [("", "Check-In", "checkin")]
+# ─── Chrome-suppression + nav CSS ─────────────────────────────────────────────
+
+CHROME_CSS: str = """<style>
+[data-testid="stSidebar"],
+[data-testid="stSidebarCollapseButton"],
+[data-testid="collapsedControl"],
+[data-testid="stSidebarNav"],
+[data-testid="stSidebarNavItems"],
+[data-testid="stSidebarNavViewButton"],
+[data-testid="stTopNavSection"],
+[data-testid="stTopNavPopover"],
+[data-testid="stNavSectionHeader"],
+[data-testid="stMainMenu"],
+#MainMenu,
+[data-testid="stHeader"],
+[data-testid="stToolbar"],
+[data-testid="stAppDeployButton"],
+.stDeployButton,
+footer { display:none !important; }
+
+.main .block-container { padding-bottom:80px !important; }
+
+/* ── Nav marker: remove from layout, keep in DOM for :has() ──────────────── */
+[data-testid="stElementContainer"]:has(.stNavRow) {
+    display: none !important;
+}
+
+/* ── Nav container (stElementContainer wrapping stHorizontalBlock) ───────────
+   Streamlit 1.58 wraps every rendered element in stElementContainer.
+   The marker's container is :has(.stNavRow); the NEXT sibling is the buttons. */
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"] {
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    height: 68px !important;
+    z-index: 9000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #0B0F1E !important;
+    border-top: 1px solid #1E2840 !important;
+    overflow: hidden !important;
+}
+
+/* ── Flex row: prevent Streamlit's 640px column-stacking breakpoint ──────────
+   Below 640px Streamlit sets min-width: calc(100% - 1.8rem) on each column,
+   stacking them vertically. Override to force 4 equal columns. */
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stHorizontalBlock"] {
+    height: 68px !important;
+    gap: 0 !important;
+    flex-wrap: nowrap !important;
+    align-items: stretch !important;
+}
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stColumn"] {
+    flex: 1 1 0 !important;
+    min-width: 0 !important;
+    height: 68px !important;
+    padding: 0 !important;
+}
+
+/* ── Propagate height down through inner stElementContainer ──────────────── */
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stColumn"] > div {
+    height: 68px !important;
+}
+
+/* ── Button: full-height transparent slab ───────────────────────────────── */
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"] button {
+    width: 100% !important;
+    height: 68px !important;
+    min-height: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    padding: 0 4px !important;
+    box-shadow: none !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"] button:hover {
+    background: rgba(255,255,255,0.06) !important;
+    border: none !important;
+}
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"] button:focus,
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"] button:focus-visible {
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+/* ── Button text: icon on first line (larger), label on second (smaller) ─────
+   Label string is "{icon}  \\n{label}" — two trailing spaces create a markdown
+   hard line break (<br>), so ::first-line matches the icon. */
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"] button p,
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"] button span {
+    white-space: pre-line !important;
+    text-align: center !important;
+    line-height: 1.25 !important;
+    font-size: 10px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+}
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"] button p::first-line {
+    font-size: 20px !important;
+}
+
+/* ── Inactive colour (overrides styles.py mobile button defaults) ──────────── */
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-secondary"],
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="baseButton-secondary"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 4px !important;
+}
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-secondary"] p,
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-secondary"] span,
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="baseButton-secondary"] p,
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="baseButton-secondary"] span {
+    color: #6B7A9B !important;
+}
+
+/* ── Active colour ─────────────────────────────────────────────────────────── */
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-primary"],
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="baseButton-primary"] {
+    background: transparent !important;
+    border: none !important;
+    padding: 0 4px !important;
+}
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-primary"] p,
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-primary"] span,
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="baseButton-primary"] p,
+[data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
+    [data-testid="baseButton-primary"] span {
+    color: #D4DCEE !important;
+}
+</style>"""
 
 
 def _set_page(page: str) -> None:
     st.session_state["_nav_page"] = page
 
 
-# ─── JS bridge template ───────────────────────────────────────────────────────
-# Runs inside a 1px same-origin iframe → can access window.parent.document.
-# 1. Exposes stNav() in the parent window for onclick handlers.
-# 2. Hides the ◉nav◉ trigger buttons by targeting their unique marker text.
-
-_JS_BRIDGE_TMPL = """
-<script>
-(function() {{
-  // Hide all ◉nav◉ trigger buttons — target only these, leave other buttons alone
-  function hideNavTriggers() {{
-    var btns = window.parent.document.querySelectorAll(
-      'button[data-testid="baseButton-secondary"]'
-    );
-    for (var i = 0; i < btns.length; i++) {{
-      var p = btns[i].querySelector('p');
-      if (p && p.textContent.indexOf('◉nav◉') !== -1) {{
-        var col = btns[i].closest('[data-testid="stColumn"]');
-        if (col) col.style.cssText = 'position:absolute;left:-9999px;overflow:hidden;width:1px;height:1px;';
-      }}
-    }}
-  }}
-
-  // Expose stNav in parent window so onclick="stNav(...)" works in st.markdown content
-  window.parent.stNav = function(page) {{
-    var marker = '◉nav◉' + page + '◉';
-    var btns = window.parent.document.querySelectorAll(
-      'button[data-testid="baseButton-secondary"]'
-    );
-    for (var i = 0; i < btns.length; i++) {{
-      var p = btns[i].querySelector('p');
-      if (p && p.textContent.indexOf(marker) !== -1) {{
-        btns[i].click();
-        return;
-      }}
-    }}
-  }};
-
-  // Hide immediately and re-hide after any Streamlit re-render
-  hideNavTriggers();
-  setTimeout(hideNavTriggers, 150);
-  var obs = new MutationObserver(hideNavTriggers);
-  obs.observe(window.parent.document.body, {{childList: true, subtree: true}});
-}})();
-</script>
-"""
-
-
-def _item_html(icon: str, label: str, page: str, active: bool) -> str:
-    col = "#D4DCEE" if active else "#6B7A9B"
-    dot = (
-        '<div style="width:4px;height:4px;border-radius:50%;background:#6BAF8B;'
-        'margin:2px auto 0;"></div>'
-    ) if active else '<div style="height:6px;"></div>'
-    return (
-        f'<div onclick="stNav(\'{page}\')" style="display:flex;flex-direction:column;'
-        f'align-items:center;justify-content:center;flex:1;padding:8px 4px;cursor:pointer;">'
-        f'<span style="font-size:20px;line-height:1;">{icon}</span>'
-        f'<span style="font-size:10px;color:{col};margin-top:3px;letter-spacing:0.2px;">'
-        f'{label}</span>'
-        f'{dot}'
-        f'</div>'
-    )
-
-
-def bottom_nav_html(active: str = "", max_width: int = 0) -> str:
-    inner_style = (
-        f"max-width:{max_width}px;margin:0 auto;height:68px;display:flex;align-items:stretch;"
-        if max_width else
-        "height:68px;display:flex;align-items:stretch;"
-    )
-    items = "".join(
-        _item_html(icon, label, page, page == active)
-        for icon, label, page in _ITEMS
-    )
-    return (
-        '<div style="position:fixed;bottom:0;left:0;right:0;z-index:900;'
-        'background:#0B0F1E;border-top:1px solid #1E2840;">'
-        f'<div style="{inner_style}">'
-        + items +
-        '</div></div>'
-    )
-
-
 def inject(active: str = "", max_width: int = 0) -> None:
     """
-    Inject sidebar-suppression CSS, JS navigation bridge, hidden trigger
-    buttons, and the visual bottom nav bar.
-
-    Must be called after st.set_page_config().
+    Render sidebar-suppression CSS and fixed bottom nav buttons.
+    Must be called after all page content is rendered.
+    max_width is accepted for API compatibility but ignored (buttons span full width).
     """
-    # 1. Hide sidebar / chrome immediately
     st.markdown(CHROME_CSS, unsafe_allow_html=True)
-
-    # 2. JS bridge — 1px same-origin iframe; exposes stNav() in parent window
-    #    and hides the ◉nav◉ trigger buttons
-    components.html(_JS_BRIDGE_TMPL, height=1, scrolling=False)
-
-    # 3. Hidden trigger buttons for all pages (including checkin for the FAB)
-    _cols = st.columns(len(_ALL_PAGES))
-    for col, (_, _, page) in zip(_cols, _ALL_PAGES):
+    # Marker: :has(.stNavRow) in CHROME_CSS identifies the nav container that follows.
+    st.markdown('<div class="stNavRow" style="display:none"></div>', unsafe_allow_html=True)
+    cols = st.columns(len(_ITEMS))
+    for col, (icon, label, page) in zip(cols, _ITEMS):
         with col:
             st.button(
-                f"◉nav◉{page}◉",  # ◉nav◉page◉ — unique marker for JS to find
-                key=f"_nb_{page}",
+                f"{icon}  \n{label}",
+                key=f"_nav_{page}",
                 on_click=_set_page,
                 args=(page,),
+                type="primary" if page == active else "secondary",
+                use_container_width=True,
             )
-
-    # 4. Visual nav bar (pure HTML, no <a href> — uses stNav() onclick)
-    st.markdown(bottom_nav_html(active, max_width=max_width), unsafe_allow_html=True)

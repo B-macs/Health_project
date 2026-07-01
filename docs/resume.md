@@ -60,7 +60,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 
 ### SPA Navigation
 
-`app.py` is the single Streamlit entry point. Navigation is handled by a JS bridge (`nav.py`) that sets `st.session_state["_nav_page"]`; the router in `app.py` dispatches to the appropriate view. `_pages/*.py` stubs exist only to redirect back to `app.py` and suppress the Streamlit sidebar auto-nav.
+`app.py` is the single Streamlit entry point. Navigation is handled by a JS bridge (`nav.py`) that sets `st.session_state["_nav_page"]`; the router in `app.py` dispatches to the appropriate view. `_pages/` was removed — Streamlit 1.36+ auto-detects that directory as a multi-page app and renders an unwanted top-nav bar. All routing is handled by the `st.session_state["_nav_page"]` state machine in `app.py`; no `_pages/` stubs are needed.
 
 | View module | Page | Purpose |
 |---|---|---|
@@ -91,7 +91,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `readiness.py` | Readiness score calculator — HRV 40% / Sleep 35% / RHR 25%; adaptive baselines; `NOT_COMPUTED` sentinel. |
 | `stats.py` | Deterministic statistical analysis — lag correlations, slopes, recovery direction. |
 | `styles.py` | Responsive dual-theme CSS + component helpers. Oura palette (mobile ≤768px) / Whoop palette (desktop ≥769px). |
-| `nav.py` | Bottom nav bar + JS bridge. Exposes `stNav()` in parent window; MutationObserver hides `◉nav◉` trigger buttons. |
+| `nav.py` | Bottom nav bar + JS bridge. Exposes `stNav(page)` in parent window; navigation is URL-based (`?page=X`). No hidden trigger buttons. |
 | `ai.py` | Phase 2 AI layer — session note parser, tightness parser, macro trend analysis. Advisory only. `MODEL_FAST = MODEL_SMART = "rules-based"` (no LLM called). |
 
 ### Supporting Directories
@@ -99,7 +99,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | Directory | Contents |
 |---|---|
 | `views/` | `checkin.py`, `training.py`, `insights.py`, `sync.py` — SPA view modules |
-| `_pages/` | 6 stubs — each calls `st.switch_page("app.py")` to suppress sidebar auto-nav |
+| `_pages/` | **Deleted** — triggered Streamlit 1.36+ auto top-nav; all routing is in `app.py` SPA router |
 | `scripts/` | `init_notion.py` — one-shot CLI setup for Notion databases |
 | `legacy/` | `init_db.py` + `schema.sql` — SQLite era, not used at runtime |
 | `docs/` | `INVENTORY.md`, `resume.md`, `focus.md`, `playbook.md`, `progress.json`, `training/*.md` |
@@ -398,6 +398,8 @@ Two visual themes applied automatically via CSS media query at 768px breakpoint:
 
 12. **The keyword library above is the living document** for the deterministic parser. Update it in this file whenever new terms are added to the code.
 
+13. **Bottom nav (Home / Training / Insights / Sync) must be present and functional on every page at all times.** `nav.inject(active)` must be called on every route in `app.py`. The call must come *after* all page content is rendered so that the hidden trigger buttons appear below the cards, not above them. The FAB (+) for Check-In relies on the same JS bridge — do not remove or reorder `nav.inject()` without testing both the bottom bar and the FAB.
+
 ---
 
 ## OPEN DECISIONS / KNOWN GAPS
@@ -413,4 +415,4 @@ Two visual themes applied automatically via CSS media query at 768px breakpoint:
 
 ---
 
-*Last updated: 2026-06-30 — post Phase 1-4 codebase review and refiling*
+*Last updated: 2026-07-01 — nav architecture locked; _pages/ removed; bottom nav rules documented*

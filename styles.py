@@ -199,7 +199,8 @@ p, .stMarkdown p, li   {{ color:{W['text']} !important; font-size:13px !importan
 [data-testid="stCaptionContainer"] p {{ color:{W['subtext']} !important; font-size:10px !important; }}
 hr {{ border-color:{W['border']} !important; margin:10px 0 !important; }}
 
-/* Native metrics */
+/* Native metrics — covers stMetric (1.36+) and metric-container (legacy) */
+[data-testid="stMetric"],
 [data-testid="metric-container"] {{ background:{W['surface']} !important;
     border:1px solid {W['border']} !important; border-radius:{W['radius']} !important;
     padding:10px 14px !important; }}
@@ -209,10 +210,12 @@ hr {{ border-color:{W['border']} !important; margin:10px 0 !important; }}
     text-transform:uppercase !important; letter-spacing:1.5px !important; }}
 [data-testid="stMetricDelta"]    {{ font-size:10px !important; }}
 
-/* Buttons */
+/* Buttons — covers Streamlit ≤1.35 (baseButton-*) and 1.36+ (stBaseButton-*) */
+[data-testid="stBaseButton-secondary"],
 [data-testid="baseButton-secondary"] {{ background:{W['surface_hi']} !important;
     color:{W['text']} !important; border:1px solid {W['border']} !important;
     border-radius:{W['radius']} !important; font-size:12px !important; }}
+[data-testid="stBaseButton-primary"],
 [data-testid="baseButton-primary"]   {{ background:{W['green']} !important;
     color:{W['bg']} !important; border:none !important;
     border-radius:{W['radius']} !important; font-size:12px !important; font-weight:700 !important; }}
@@ -267,7 +270,8 @@ hr {{ border-color:{W['border']} !important; margin:10px 0 !important; }}
     [data-testid="stCaptionContainer"] p {{ color:{O['subtext']} !important; font-size:12px !important; }}
     hr {{ border-color:{O['border']} !important; margin:18px 0 !important; }}
 
-    /* Metrics — larger, rounded */
+    /* Metrics — larger, rounded; covers stMetric (1.36+) and metric-container (legacy) */
+    [data-testid="stMetric"],
     [data-testid="metric-container"] {{ background:{O['surface']} !important;
         border:none !important; border-radius:{O['radius']} !important;
         padding:20px !important; box-shadow:0 2px 14px rgba(0,0,0,0.3) !important; }}
@@ -276,10 +280,12 @@ hr {{ border-color:{W['border']} !important; margin:10px 0 !important; }}
     [data-testid="stMetricLabel"]    {{ color:{O['subtext']} !important;
         font-size:12px !important; text-transform:none !important; letter-spacing:0 !important; }}
 
-    /* Buttons — large touch targets */
+    /* Buttons — large touch targets; covers both old and new testid names */
+    [data-testid="stBaseButton-secondary"],
     [data-testid="baseButton-secondary"] {{ background:{O['surface_hi']} !important;
         color:{O['text']} !important; border:none !important; border-radius:14px !important;
         font-size:15px !important; padding:14px !important; }}
+    [data-testid="stBaseButton-primary"],
     [data-testid="baseButton-primary"]   {{ background:{O['green']} !important;
         color:{O['bg']} !important; border:none !important; border-radius:14px !important;
         font-size:15px !important; font-weight:600 !important; padding:14px !important; }}

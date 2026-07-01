@@ -69,7 +69,7 @@ Reference data:
   training_constants.py — EXERCISES catalogue, ANATOMICAL_LOCATIONS, SENSATION_TAGS
   patient_profile.py    — clinical data (not imported by active code — human reference)
 
-_pages/*.py  — st.switch_page("app.py") stubs (suppress Streamlit sidebar)
+_pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py)
 legacy/      — SQLite era, not used at runtime (init_db.py, schema.sql)
 docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md
