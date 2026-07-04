@@ -11,6 +11,7 @@ from datetime import date
 import time
 import db
 import engine
+import nav
 import sync_sheets
 import training_plan as tp
 
@@ -19,8 +20,13 @@ import training_plan as tp
 #  JavaScript Timer Components — all use localStorage to persist across navigation
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _hold_timer(seconds: int, label: str = "HOLD", timer_key: str = "tp_h") -> None:
-    """Isometric hold countdown. Saves state to localStorage; auto-resumes on return."""
+def _hold_timer(seconds: int, label: str = "HOLD", timer_key: str = "tp_h",
+                set_auto_start: bool = False) -> None:
+    """Isometric hold countdown. Auto-completes at 0 (clicks the ✓ button in parent).
+    set_auto_start=True writes tp_auto_start to localStorage so the NEXT hold timer
+    (same exercise, next rep/side) auto-starts without a button press.
+    Reads tp_auto_start on load to auto-start when flagged by rest timer or previous hold."""
+    _flag_js = "try { localStorage.setItem('tp_auto_start', '1'); } catch(e) {}" if set_auto_start else ""
     components.html(f"""
 <div style="text-align:center;padding:12px 0;font-family:monospace;">
   <div style="font-size:13px;color:#00D4AA;letter-spacing:3px;margin-bottom:6px;">{label}</div>
@@ -39,15 +45,49 @@ def _hold_timer(seconds: int, label: str = "HOLD", timer_key: str = "tp_h") -> N
 var _total = {seconds};
 var _remaining = {seconds};
 var _iv;
+var _beeped = {{}};
 var _TKEY = "{timer_key}";
+
+function _beep(freq, dur, vol) {{
+  try {{
+    var ctx = window._audioCtx || (window._audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+    if (ctx.state === 'suspended') ctx.resume();
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.connect(g); g.connect(ctx.destination);
+    o.type = 'sine'; o.frequency.value = freq;
+    g.gain.setValueAtTime(vol || 0.35, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+    o.start(ctx.currentTime); o.stop(ctx.currentTime + dur);
+  }} catch(e) {{}}
+}}
+function _tickBeep() {{ _beep(880, 0.12, 0.35); }}
+function _doneBeep() {{
+  _beep(660, 0.18, 0.5);
+  setTimeout(function() {{ _beep(880, 0.28, 0.65); }}, 220);
+}}
 
 function _save(running) {{
   try {{ localStorage.setItem(_TKEY, JSON.stringify({{total:_total,remaining:_remaining,savedAt:Date.now(),running:running}})); }} catch(e) {{}}
 }}
 function _clear() {{ try {{ localStorage.removeItem(_TKEY); }} catch(e) {{}} }}
 
-// Auto-restore on load
+function _autoComplete() {{
+  try {{
+    var btns = window.parent.document.querySelectorAll('button');
+    for (var i = 0; i < btns.length; i++) {{
+      if (btns[i].textContent.trim().charAt(0) === '✓') {{ btns[i].click(); return; }}
+    }}
+  }} catch(e) {{}}
+}}
+
+// Auto-restore on load; auto-start if flagged by rest timer or previous hold/rep
 (function() {{
+  try {{
+    if (localStorage.getItem('tp_auto_start')) {{
+      localStorage.removeItem('tp_auto_start');
+      startHold(); return;
+    }}
+  }} catch(e) {{}}
   try {{
     var s = JSON.parse(localStorage.getItem(_TKEY)||'null');
     if (!s || s.total !== _total) return;
@@ -65,20 +105,25 @@ function _clear() {{ try {{ localStorage.removeItem(_TKEY); }} catch(e) {{}} }}
 }})();
 
 function startHold() {{
-  clearInterval(_iv); _save(true);
+  clearInterval(_iv); _beeped={{}}; _save(true);
   document.getElementById('btn-start').textContent = '⏸ Pause';
   document.getElementById('btn-start').onclick = pauseHold;
   _iv = setInterval(function() {{
     _remaining = Math.max(0, _remaining - 1);
+    var r = Math.round(_remaining);
     var el = document.getElementById('hold-num');
     el.textContent = Math.ceil(_remaining);
-    if (_remaining <= 5) {{ el.style.color='#FF4B4B'; el.style.transform='scale(1.1)';
+    if (_remaining <= 3) {{ el.style.color='#FF4B4B'; el.style.transform='scale(1.1)';
       setTimeout(function(){{ el.style.transform='scale(1)'; }}, 200); }}
+    if (r >= 1 && r <= 3 && !_beeped[r]) {{ _beeped[r]=true; _tickBeep(); }}
     if (_remaining <= 0) {{
       clearInterval(_iv); _clear();
       el.textContent='✓'; el.style.color='#00D4AA';
       document.getElementById('btn-start').textContent='▶ Start';
       document.getElementById('btn-start').onclick=startHold;
+      _doneBeep();
+      {_flag_js}
+      setTimeout(_autoComplete, 700);
     }}
   }}, 1000);
 }}
@@ -88,7 +133,7 @@ function pauseHold() {{
   document.getElementById('btn-start').onclick=startHold;
 }}
 function resetHold() {{
-  clearInterval(_iv); _clear(); _remaining=_total;
+  clearInterval(_iv); _clear(); _remaining=_total; _beeped={{}};
   var el=document.getElementById('hold-num');
   el.textContent=_total; el.style.color='#00D4AA';
   document.getElementById('btn-start').textContent='▶ Start';
@@ -141,6 +186,7 @@ function _goBeep()  {{
 }}
 
 function _autoAdvance() {{
+  try {{ localStorage.setItem('tp_auto_start', '1'); }} catch(e) {{}}
   try {{
     var btns = window.parent.document.querySelectorAll('button');
     for (var i = 0; i < btns.length; i++) {{
@@ -512,11 +558,6 @@ def render():
             st.session_state.tp_exit_confirm = True
             st.rerun()
 
-    if st.button("Reset Plan (set new start date)", use_container_width=True):
-        db.set_config("plan_start_date", "")
-        _reset_session()
-        st.rerun()
-
     st.divider()
 
     # ── Before plan start ─────────────────────────────────────────────────────
@@ -535,6 +576,10 @@ def render():
             "Open **Autoregulation** to check Stage 1 → 2 progression criteria. "
             "If criteria are met, confirm with your physiotherapist before advancing."
         )
+        if st.button("Back to Home", type="primary", use_container_width=True):
+            st.session_state["_nav_page"] = "home"
+            st.rerun()
+        nav.inject("training")
         st.stop()
 
     # ── Engine directive banner ───────────────────────────────────────────────
@@ -632,19 +677,30 @@ def render():
                 st.rerun()
 
         else:
-            st.success(
-                f"**Day {day_num} session logged.**  "
-                "Open Morning Check-In to record your pain score. See you tomorrow."
+            st.balloons()
+            st.markdown(
+                f"<div style='background:#071410;border:2px solid #00E874;"
+                f"border-radius:16px;padding:32px 24px;margin-bottom:20px;text-align:center;'>"
+                f"<div style='font-size:13px;color:#00E874;font-family:monospace;"
+                f"letter-spacing:3px;margin-bottom:10px;'>DAY {day_num} COMPLETE</div>"
+                f"<div style='font-size:26px;font-weight:700;color:#FFFFFF;margin-bottom:10px;'>"
+                f"Congratulations — session logged.</div>"
+                f"<div style='font-size:14px;color:#888;line-height:1.65;'>"
+                f"All {n_ex} exercises done. Record your pain score in Morning Check-In "
+                f"and come back tomorrow.</div>"
+                f"</div>",
+                unsafe_allow_html=True,
             )
             if day_num < 14:
                 next_plan = tp.PLAN[day_num + 1]
                 with st.expander(f"Preview: Day {day_num + 1} — {next_plan['objective']}", expanded=False):
                     for nex in next_plan["exercises"]:
                         st.markdown(f"- {_type_icon(nex)} **{nex['name']}** — {_prescription_label(nex)}")
-            if st.button("Redo today's session", use_container_width=True):
-                _reset_session()
+            if st.button("Back to Home", type="primary", use_container_width=True):
+                st.session_state["_nav_page"] = "home"
                 st.rerun()
 
+        nav.inject("training")
         st.stop()
 
     # ── Exercise progress list ────────────────────────────────────────────────
@@ -788,6 +844,9 @@ def render():
                     st.session_state.tp_phase = "intro"
                     st.rerun()
             else:
+                # Clear any stale tp_auto_start from the rest timer — reps exercises have no
+                # hold timer to consume it, so it must not leak into the next exercise.
+                components.html('<script>try{localStorage.removeItem("tp_auto_start");}catch(e){}</script>', height=0)
                 _side_note = f" — {_side.upper()} SIDE" if is_uni else ""
                 st.markdown(
                     f"<div style='background:#1A1F2E;border-radius:8px;padding:20px;text-align:center;'>"
@@ -823,7 +882,11 @@ def render():
                     st.rerun()
             else:
                 _hold_label = f"HOLD — {_side.upper()} SIDE" if is_uni else "HOLD"
-                _hold_timer(ex["hold_seconds"], label=_hold_label, timer_key=_hold_key)
+                # Right→left side transition has no rest timer, so the hold timer itself
+                # must flag the left side's timer to auto-start.
+                _set_auto_start = is_uni and _side == "right"
+                _hold_timer(ex["hold_seconds"], label=_hold_label, timer_key=_hold_key,
+                            set_auto_start=_set_auto_start)
                 _btn_label = "✓ Right Side Done" if (is_uni and _side == "right") else f"✓ Set {cur_set} Complete"
                 if st.button(_btn_label, type="primary", use_container_width=True):
                     _mark_start()
@@ -851,8 +914,14 @@ def render():
                     st.rerun()
             else:
                 _side_suffix = f" — {_side.upper()}" if is_uni else ""
+                # More reps in this set → next rep's hold timer needs to auto-start.
+                # Last rep, side-switch (unilateral right→left) → left side rep 1 needs to auto-start.
+                # Last rep, set ends → rest timer will set the flag; don't set it here.
+                _set_auto_start = (cur_rep < reps_per_set) or (
+                    cur_rep >= reps_per_set and is_uni and _side == "right"
+                )
                 _hold_timer(ex["hold_seconds"], label=f"REP {cur_rep} of {reps_per_set}{_side_suffix}",
-                            timer_key=_hold_key)
+                            timer_key=_hold_key, set_auto_start=_set_auto_start)
                 if st.button(f"✓ Rep {cur_rep} Done", type="primary", use_container_width=True):
                     _mark_start()
                     if cur_rep >= reps_per_set:

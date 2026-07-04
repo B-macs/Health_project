@@ -147,6 +147,38 @@ _readiness_score = readiness_model.compute_readiness(selected_date, _bio_rows)
 _strain_score    = _au_to_strain(_au_day["total_au"] if _au_day else None)
 _sleep_hours     = _bio_day.get("sleep_duration_hours") if _bio_day else None
 
+# Rolling 7-day prior strain — body load already accumulated before today's session.
+# Builds a true 7-day average including rest days (0 AU), so it can't be inflated
+# by training frequency. Excludes today so it always reflects pre-session state.
+_au_by_date = {r["date"]: float(r["total_au"]) for r in _au_rows}
+_prior_7d_au = [
+    _au_by_date.get((date.today() - timedelta(days=d)).isoformat(), 0.0)
+    for d in range(1, 8)
+]
+_prior_avg_au   = sum(_prior_7d_au) / 7
+_rolling_strain = engine.au_to_strain(_prior_avg_au, _current_stage) if _prior_avg_au > 0 else None
+# When no session today: show rolling body load. After training: show today's strain.
+_strain_is_rolling = _strain_score is None and _rolling_strain is not None
+_display_strain    = _strain_score if _strain_score is not None else _rolling_strain
+
+# Step count modifier: shift displayed strain by yesterday's non-training load.
+# Baseline: 7 days before yesterday (today-8 through today-2), non-None only.
+if _display_strain is not None:
+    _yesterday_str   = (date.today() - timedelta(days=1)).isoformat()
+    _baseline_strs   = {(date.today() - timedelta(days=d)).isoformat() for d in range(2, 9)}
+    _yesterday_steps = next(
+        (r["steps"] for r in _bio_rows
+         if r.get("date") == _yesterday_str and r.get("steps") is not None),
+        None,
+    )
+    _baseline_steps = [
+        r["steps"] for r in _bio_rows
+        if r.get("date") in _baseline_strs and r.get("steps") is not None
+    ]
+    _step_mod = engine.step_strain_modifier(_yesterday_steps, _baseline_steps)
+    if _step_mod != 0.0:
+        _display_strain = round(max(0.0, min(21.0, _display_strain + _step_mod)), 1)
+
 # Progressive sleep baseline (7→14→28→56 nights, outliers <4h/>11h removed)
 _sleep_base_hours, _sleep_base_window = readiness_model.sleep_baseline(_bio_rows)
 _sleep_need = _sleep_base_hours if _sleep_base_hours else _SLEEP_NEED_HOURS
@@ -257,7 +289,7 @@ def _readiness_meta(score) -> tuple:
     return c, str(int(s)), lbl, hdr, descs[lbl], ""
 
 
-def _strain_meta(score) -> tuple:
+def _strain_meta(score, is_rolling: bool = False) -> tuple:
     if score is None:
         return "#555555", "--", "No Readings", "No workload logged", \
                "No training data recorded for this day."
@@ -266,14 +298,28 @@ def _strain_meta(score) -> tuple:
     elif s < 10: c, lbl = "#BFA06A", "Moderate"
     elif s < 14: c, lbl = "#C47878", "Hard"
     else:        c, lbl = "#C47878", "Strenuous"
-    heads = {"Light": "Light day", "Moderate": "Building momentum",
-             "Hard": "High output", "Strenuous": "Peak effort"}
-    descs = {
-        "Light":       "Minimal cardiovascular stress. Ideal for active recovery.",
-        "Moderate":    "Solid aerobic work accumulating. Body is adapting.",
-        "Hard":        "Significant load logged. Adequate recovery needed before next session.",
-        "Strenuous":   "Max exertion. Full recovery required before your next training block.",
-    }
+    if is_rolling:
+        heads = {
+            "Light":     "Low body load",
+            "Moderate":  "Moderate body load",
+            "Hard":      "High body load",
+            "Strenuous": "Very high body load",
+        }
+        descs = {
+            "Light":     "Low average training load over the past 7 days. Body has capacity to build.",
+            "Moderate":  "Steady training stimulus from recent sessions. On track for adaptation.",
+            "Hard":      "Significant accumulated load going into today. Prioritise recovery.",
+            "Strenuous": "High load from recent sessions. Assess recovery before adding more volume.",
+        }
+    else:
+        heads = {"Light": "Light day", "Moderate": "Building momentum",
+                 "Hard": "High output", "Strenuous": "Peak effort"}
+        descs = {
+            "Light":     "Minimal cardiovascular stress. Ideal for active recovery.",
+            "Moderate":  "Solid aerobic work accumulating. Body is adapting.",
+            "Hard":      "Significant load logged. Adequate recovery needed before next session.",
+            "Strenuous": "Max exertion. Full recovery required before your next training block.",
+        }
     return c, f"{s:.1f}", lbl, heads[lbl], descs[lbl]
 
 
@@ -395,7 +441,8 @@ def _strain_detail() -> str:
             f'</div>'
         )
 
-    s_col, s_disp, s_lbl, _, _ = _strain_meta(_strain_score)
+    s_col, s_disp, s_lbl, _, _ = _strain_meta(_display_strain, is_rolling=_strain_is_rolling)
+    _detail_label = "STRAIN · 7D AVG" if _strain_is_rolling else f"STRAIN · {date_label}"
     return (
         f'<div style="padding:16px;">'
         f'<div style="display:flex;align-items:center;margin-bottom:20px;">'
@@ -403,7 +450,7 @@ def _strain_detail() -> str:
         f'text-decoration:none;margin-right:14px;line-height:1;">←</a>'
         f'<div>'
         f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;'
-        f'text-transform:uppercase;margin-bottom:2px;">STRAIN · {date_label}</div>'
+        f'text-transform:uppercase;margin-bottom:2px;">{_detail_label}</div>'
         f'<div style="font-size:30px;font-weight:800;color:{s_col};line-height:1;">{s_disp}</div>'
         f'<div style="font-size:12px;color:#6B7A9B;margin-top:2px;">{s_lbl}</div>'
         f'</div>'
@@ -482,10 +529,11 @@ _card_readiness = _card_html(
     r_disp, r_lbl, r_col, r_hdr, r_desc, r_tert,
 )
 
-s_col, s_disp, s_lbl, s_hdr, s_desc = _strain_meta(_strain_score)
+s_col, s_disp, s_lbl, s_hdr, s_desc = _strain_meta(_display_strain, is_rolling=_strain_is_rolling)
+_strain_card_label = "STRAIN  ·  7D AVG" if _strain_is_rolling else "STRAIN"
 _card_strain = _card_html(
-    "STRAIN", _bg["strain"],
-    _arc_svg(_strain_score, 21, s_col),
+    _strain_card_label, _bg["strain"],
+    _arc_svg(_display_strain, 21, s_col),
     s_disp, s_lbl, s_col, s_hdr, s_desc,
     click_href=f"?d={selected_date}&view=strain",
 )

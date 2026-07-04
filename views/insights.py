@@ -310,7 +310,7 @@ def render() -> None:
             daily_au   = acwr_result.get("daily_au_28", [0.0] * 28)
             today_dt   = date.today()
             chart_dates = [
-                (today_dt - _dt.timedelta(days=27 - i)).strftime("%b %d")
+                (today_dt - _dt.timedelta(days=27 - i)).strftime("%Y-%m-%d")
                 for i in range(28)
             ]
             df_au = pd.DataFrame({

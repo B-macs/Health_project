@@ -98,6 +98,37 @@ def au_to_strain(raw_au: float, stage: int = 1) -> float:
     return round(min(21.0, math.log(effective_au + 1) / math.log(601.0) * 21.0), 1)
 
 
+def step_strain_modifier(
+    yesterday_steps: int | None,
+    baseline_steps: list[int],
+) -> float:
+    """
+    Additive modifier for strain based on how yesterday's step count compares
+    to the personal 7-day baseline (days today-8 through today-2).
+    Returns 0.0 if data is insufficient (< 4 baseline days or std == 0).
+
+    Thresholds: 0.75σ / 1.5σ.  Asymmetric caps: +1.5 high, -1.0 low
+    (excess walking adds compressive load for L5/S1; low steps is less critical).
+    """
+    if yesterday_steps is None or len(baseline_steps) < 4:
+        return 0.0
+    mean = sum(baseline_steps) / len(baseline_steps)
+    variance = sum((x - mean) ** 2 for x in baseline_steps) / len(baseline_steps)
+    std = math.sqrt(variance)
+    if std == 0:
+        return 0.0
+    z = (yesterday_steps - mean) / std
+    if z >= 1.5:
+        return 1.5
+    if z >= 0.75:
+        return 0.75
+    if z <= -1.5:
+        return -1.0
+    if z <= -0.75:
+        return -0.5
+    return 0.0
+
+
 def injury_weight_signal(weight: float) -> str:
     """Classify injury weight into a traffic-light signal for display."""
     if weight > 0.50:
