@@ -3,6 +3,9 @@
 .env
 .env.*
 
+# Clinical input files — personal medical documents, never commit
+Input_files/
+
 # Virtual environment
 venv/
 .venv/

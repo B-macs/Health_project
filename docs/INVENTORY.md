@@ -41,7 +41,7 @@ Confidence key: 🟢 fully read, high confidence · 🟠 partially read or conta
 | 29 | `requirements.txt` | Python dependencies (6 packages). | `streamlit>=1.58`, `pandas>=3.0`, `numpy>=2.0`, `notion-client==2.2.1`, `streamlit-aggrid>=1.2`, `gspread>=6.0` | — | — | 🟠 |
 | 30 | `resume.md` | Full architecture specification, development philosophy, stage machine, biometric pipeline, Notion schema, agile roadmap, keyword library. | Living document — 400 lines. Last updated 2026-06-29. | — | Read by developers; all new code should comply with rules section | 🟢 |
 | 31 | `README.md` | Empty (project name only — encoding issue) | — | — | — | 🟠 |
-| 32 | `.streamlit/secrets.toml` | All production secrets: Notion API key + 5 DB IDs, Google Sheets ID, full Google service account JSON (private key included). | Real credentials — Notion key `ntn_520514...`, GCP project `[REDACTED-GCP-PROJECT]` | — | Streamlit runtime → `db.py` (via `st.secrets`), `sync_sheets.py` | 🔴 |
+| 32 | `.streamlit/secrets.toml` | All production secrets: Notion API key + 5 DB IDs, Google Sheets ID, full Google service account JSON (private key included). | Real credentials — Notion key `[REDACTED]`, GCP project `[REDACTED]` | — | Streamlit runtime → `db.py` (via `st.secrets`), `sync_sheets.py` | 🔴 |
 | 33 | `Training plan/Training_System.md` | Human-readable methodology overview: load formulas, CLF table, ACWR, readiness score, sleep baseline, data sources, file index. | Reference doc — mirrors `engine.py` + `readiness.py` formulas | — | — (human reference) | 🟢 |
 | 34 | `Training plan/Stage_1_14_Day_Plan.md` | Day-by-day exercise plan in readable form. Maps to `training_plan.py` PLAN dict. | 14 days / 2 weeks; exercises, mechanics, biomechanical cues, progressions | — | — (human reference) | 🟢 |
 
@@ -211,7 +211,7 @@ All active code lives in `_pages/` (stubs). The `pages/` deletions are staged bu
 
 **File:** `.streamlit/secrets.toml`  
 **Status:** Gitignored ✅ — confirmed NOT in git history.  
-**Risk:** File contains Notion API key (`ntn_[REDACTED]...`), 4 Notion DB UUIDs, Google Sheets ID, and a full GCP service account private key (RSA). If this file is ever accidentally staged (e.g. `git add .`), all credentials will be committed in plaintext.  
+**Risk:** File contains Notion API key (`[REDACTED]`), 4 Notion DB UUIDs, Google Sheets ID, and a full GCP service account private key (RSA). If this file is ever accidentally staged (e.g. `git add .`), all credentials will be committed in plaintext.  
 **Recommendation (Phase 2, out-of-scope for refiling):** Rotate credentials if `.streamlit/secrets.toml` has ever been shared. Ensure `.gitignore` entry is preserved in any future reorg. No change needed for Phase 3 refiling — this is flagged for awareness only.
 
 ---
