@@ -51,7 +51,10 @@ class DayCell:
     weekday_label: str
     state: str  # "completed" | "missed" | "planned" | "rest"
     day_number_in_phase: int | None
-    session_ref: SessionRecord | None = None
+    # Whatever the caller's session lookup provided for this date — the day
+    # strip's own lookup is a cheap {"date": ...} existence check, not a full
+    # SessionRecord, so this stays a loose dict rather than forcing one.
+    session_ref: dict | None = None
 
 
 @dataclass(frozen=True)
