@@ -5,7 +5,8 @@ Call render() from the SPA router in app.py.
 
 from datetime import date
 import streamlit as st
-import db
+import repo
+from services.models import CheckInRecord
 from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
 
 
@@ -79,7 +80,8 @@ def render() -> None:
         )
 
     if submitted:
-        db.save_daily_readiness(
+        repo.get_repository().save_check_in(CheckInRecord(
+            date=str(date.today()),
             current_condition=current_condition,
             tightness_score=tightness_score,
             pain_score=pain_score,
@@ -89,7 +91,7 @@ def render() -> None:
             alcohol_units=alcohol_units,
             travel_flag=travel_flag,
             psych_stress_score=psych_stress,
-        )
+        ))
         st.success(
             f"Check-in saved — Tightness {tightness_score}/10, Pain {pain_score}/10. "
             "Head to Training Plan when ready to start your session."
