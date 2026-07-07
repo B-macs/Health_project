@@ -11,15 +11,16 @@ explicit Exit (with confirmation) ends the session.
 
 import streamlit as st
 import streamlit.components.v1 as components
+from dataclasses import asdict
 from datetime import date, timedelta
 import json
 import time
-import db
-import engine
 import nav
-import phase as ph  # aliased: render()'s guided flow already has a local var named `phase`
-import sync_sheets
+import repo
 import training_plan as tp
+from services import engine
+from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
+from services import sessions as sess
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -325,33 +326,27 @@ function pauseDur() {{
 #  Session State
 # ─────────────────────────────────────────────────────────────────────────────
 
-_CHECKPOINT_FIELDS = (
-    "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
-    "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
-)
-
-
 def _save_checkpoint(day_num: int) -> None:
     """Persist in-progress training state to Notion so it survives a dropped
     Streamlit session (e.g. phone backgrounded for several minutes) — session_state
     alone only lives as long as the browser's websocket connection stays open."""
     try:
-        data = {"day_num": day_num}
-        data.update({k: st.session_state[k] for k in _CHECKPOINT_FIELDS})
-        db.set_config("training_progress", json.dumps(data))
+        state = {k: st.session_state[k] for k in sess.CHECKPOINT_FIELDS}
+        payload = sess.checkpoint_payload(day_num, state)
+        repo.get_repository().set_config("training_progress", json.dumps(payload))
     except Exception:
         pass  # never block the training flow on a persistence failure
 
 
 def _load_checkpoint(day_num: int) -> dict | None:
-    raw = db.get_config_value("training_progress")
+    raw = repo.get_repository().get_config_value("training_progress")
     if not raw:
         return None
     try:
         data = json.loads(raw)
     except Exception:
         return None
-    return data if data.get("day_num") == day_num else None
+    return sess.restore_from_checkpoint(data, day_num)
 
 
 def _init_state(day_num: int | None = None):
@@ -374,14 +369,14 @@ def _init_state(day_num: int | None = None):
     if is_fresh_session and day_num is not None:
         checkpoint = _load_checkpoint(day_num)
         if checkpoint:
-            for k in _CHECKPOINT_FIELDS:
+            for k in sess.CHECKPOINT_FIELDS:
                 if k in checkpoint:
                     st.session_state[k] = checkpoint[k]
         # Authoritative check, independent of the checkpoint above: if a session is
         # already logged in Notion for today, never allow re-entering the exercise
         # flow — a missing/stale/lost checkpoint must not let a second session start.
         try:
-            if db.has_logged_session(date.today()):
+            if repo.get_repository().has_logged_session(date.today()):
                 st.session_state.tp_done_today = True
                 st.session_state.tp_session_logged = True
         except Exception:
@@ -402,7 +397,7 @@ def _reset_session(day_num: int | None = None):
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _get_plan_start() -> date | None:
-    raw = db.get_config_value("plan_start_date")
+    raw = repo.get_repository().get_config_value("plan_start_date")
     if raw:
         try:
             return date.fromisoformat(raw.strip())
@@ -416,104 +411,30 @@ def _get_day_number(plan_start: date) -> int:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Exercise Display Helpers
+#  Exercise display / auto-logging helpers now live in services/sessions.py —
+#  _prescription_label/_type_icon/_movement_category/_planned_reps/
+#  _make_sets_data/_estimate_duration all became sess.* below. Only the I/O
+#  orchestration (writing the session to Notion) stays here.
 # ─────────────────────────────────────────────────────────────────────────────
-
-def _prescription_label(ex: dict) -> str:
-    t = ex["type"]
-    if t == "hold":
-        sides = " each side" if ex["laterality"] == "unilateral" else ""
-        return f"{ex['sets']} sets × {ex['hold_seconds']}s hold{sides}  |  {ex['rest_seconds']}s rest"
-    if t == "hold_reps":
-        sides = " each side" if ex["laterality"] in ("unilateral", "alternating") else ""
-        return f"{ex['sets']} sets × {ex['reps_in_set']} reps × {ex['hold_seconds']}s hold{sides}  |  {ex['rest_seconds']}s rest"
-    if t == "reps":
-        sides = " each side" if ex["laterality"] in ("unilateral", "alternating") else ""
-        tempo = f"  Tempo {ex['tempo']}" if ex.get("tempo") else ""
-        return f"{ex['sets']} sets × {ex['reps']} reps{sides}{tempo}  |  {ex['rest_seconds']}s rest"
-    if t == "duration":
-        return f"{ex['duration_minutes']} minutes continuous"
-    return ""
-
-
-def _type_icon(ex: dict) -> str:
-    return {"hold": "⏱", "hold_reps": "⏱", "reps": "↕", "duration": "🚶"}.get(ex["type"], "•")
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  Auto-logging Helpers
-# ─────────────────────────────────────────────────────────────────────────────
-
-def _movement_category(ex: dict) -> str:
-    name = ex["name"].lower()
-    if any(k in name for k in ("walk", "breath", "diaphragm")):
-        return "Conditioning"
-    if any(k in name for k in ("glute bridge", "rdl", "hinge", "deadlift")):
-        return "Hip Hinge"
-    if any(k in name for k in ("bird", "plank", "curl-up", "curl up", "side lying",
-                                "dead bug", "pallof")):
-        return "Core Stability"
-    if any(k in name for k in ("squat", "lunge", "step")):
-        return "Squat Pattern"
-    return "Mobility"
-
-
-def _planned_reps(ex: dict) -> int:
-    t = ex["type"]
-    if t == "reps":       return ex.get("reps") or 1
-    if t == "hold_reps":  return ex.get("reps_in_set") or 1
-    return 1
-
-
-def _make_sets_data(ex: dict) -> list[dict]:
-    t, sets, rest = ex["type"], ex.get("sets", 1), ex.get("rest_seconds", 60)
-    out = []
-    if t == "duration":
-        out.append({"set_num": 1, "reps": 1, "weight": 0.0, "rest": 0,
-                    "tut": (ex.get("duration_minutes") or 0) * 60, "velocity": "continuous"})
-    elif t == "reps":
-        for i in range(1, sets + 1):
-            out.append({"set_num": i, "reps": ex.get("reps") or 1, "weight": 0.0,
-                        "rest": rest, "tut": 0, "velocity": "controlled"})
-    elif t == "hold":
-        for i in range(1, sets + 1):
-            out.append({"set_num": i, "reps": 1, "weight": 0.0,
-                        "rest": rest, "tut": ex.get("hold_seconds") or 0, "velocity": "isometric"})
-    elif t == "hold_reps":
-        for i in range(1, sets + 1):
-            out.append({"set_num": i, "reps": ex.get("reps_in_set") or 1, "weight": 0.0,
-                        "rest": rest, "tut": ex.get("hold_seconds") or 0, "velocity": "isometric"})
-    return out
-
-
-def _estimate_duration(exercises: list) -> int:
-    total = 120
-    for ex in exercises:
-        t, sets, rest = ex["type"], ex.get("sets", 1), ex.get("rest_seconds", 60)
-        if t == "duration":       total += (ex.get("duration_minutes") or 0) * 60 + 30
-        elif t == "hold":         total += sets * (ex.get("hold_seconds") or 0) + (sets - 1) * rest + 30
-        elif t == "hold_reps":    total += sets * (ex.get("hold_seconds") or 0) * (ex.get("reps_in_set") or 1) + (sets - 1) * rest + 30
-        elif t == "reps":         total += sets * 20 + (sets - 1) * rest + 30
-    return max(10, round(total / 60))
-
 
 def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
                       duration_minutes: int, notes: str) -> None:
-    session_info = db.create_training_session(
+    r = repo.get_repository()
+    session_info = r.create_training_session(
         session_date=date.today(),
         duration_minutes=duration_minutes,
         session_rpe=session_rpe,
     )
     last_id = None
     for ex in exercises:
-        last_id = db.save_training_exercise(
+        last_id = r.save_training_exercise(
             session_id=session_info["session_id"],
             movement_name=ex["name"],
-            movement_type=_movement_category(ex),
+            movement_type=sess.movement_category(ex),
             planned_sets=ex.get("sets", 1),
-            planned_reps=_planned_reps(ex),
+            planned_reps=sess.planned_reps(ex),
             rpe=session_rpe,
-            sets=_make_sets_data(ex),
+            sets=sess.make_sets_data(ex),
             note="",
             session_date=session_info["session_date"],
             session_duration_minutes=session_info["duration_minutes"],
@@ -521,7 +442,7 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             session_au=session_info["session_au"],
         )
     if notes.strip() and last_id:
-        db.save_session_notes(last_id, notes)
+        r.save_session_notes(last_id, notes)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -531,13 +452,13 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
 @st.cache_data(ttl=1800, show_spinner=False)
 def _engine_directive() -> dict:
     try:
-        sheet_id = st.secrets.get("GOOGLE_SHEETS_ID", "")
-        bio      = sync_sheets.get_biometric_rolling(sheet_id, 28) if sheet_id else []
-        au       = db.get_daily_session_au(28)
-        diag     = db.get_diagnostic_profile()
-        stage    = db.get_current_stage()
-        streak   = db.get_pain_free_streak()
-        tight    = db.get_avg_tightness(14)
+        r        = repo.get_repository()
+        bio      = [asdict(b) for b in r.get_biometric_rolling(days=28)]
+        au       = r.get_daily_session_au(28)
+        diag     = r.get_diagnostic_profile()
+        stage    = r.get_current_stage()
+        streak   = r.get_pain_free_streak()
+        tight    = r.get_avg_tightness(14)
         lam      = float(diag.get("injury_weight_decay_lambda") or 0.05)
         tl       = engine.traffic_light(bio)
         acwr_r   = engine.acwr(au, stage)
@@ -549,8 +470,8 @@ def _engine_directive() -> dict:
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _bio_for_readiness(sheet_id: str) -> list[dict]:
-    return sync_sheets.get_biometric_rolling(sheet_id, days=14)
+def _bio_for_readiness() -> list[dict]:
+    return [asdict(b) for b in repo.get_repository().get_biometric_rolling(days=14)]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -603,31 +524,26 @@ def _progress_bar(label: str, value_label: str, fraction: float) -> None:
         unsafe_allow_html=True,
     )
 
-# The pre-session release protocol (CLAUDE.md rule #6) is always the same five
-# shared exercises inserted first in every day's list — detect them by identity
-# with the real constants so this stays in sync if training_plan.py changes.
-_RELEASE_EXERCISE_NAMES = frozenset({
-    tp.UPPER_GLUTE_RELEASE["name"],
-    tp.RIGHT_HIP_CAPSULE["name"],
-    tp.PIRIFORMIS_PNF["name"],
-    tp.ISCHIAL_RELEASE["name"],
-    tp.COXA_SALTANS_DRILL["name"],
-})
+# The pre-session release protocol's exercise-name set now lives in
+# services.sessions.RELEASE_EXERCISE_NAMES (used below via sess.*).
 
 
 @st.cache_data(ttl=300, show_spinner=False)
 def _week_logged_dates(week_start_iso: str) -> set[str]:
     week_start = date.fromisoformat(week_start_iso)
-    return db.get_logged_session_dates(week_start, week_start + timedelta(days=6))
+    return repo.get_repository().get_logged_session_dates(week_start, week_start + timedelta(days=6))
 
 
-def _seed_and_get_active_phase(plan_start: date | None) -> tuple[list[dict], dict | None]:
+def _seed_and_get_active_phase(plan_start: date | None) -> tuple[list, object | None]:
     """Reads phases from the Config DB; one-time-seeds Phase 1 from the existing
     plan_start_date if no phases have been configured yet. Returns (phases, active)."""
-    phases = db.get_phases()
-    if not phases and plan_start is not None:
-        phases = [ph.default_phase(plan_start)]
-        db.set_phases(phases)
+    r = repo.get_repository()
+    phases = r.get_phases()
+    if not phases:
+        seeded = sess.seed_default_phase(phases, plan_start)
+        if seeded:
+            r.set_phases(seeded)
+            phases = seeded
     return phases, ph.active_phase(phases, date.today())
 
 
@@ -670,14 +586,14 @@ _WEEK_STRIP_BASE_CSS = f"""
 """
 
 
-def _marker_glyph_and_color(cell: dict, is_today: bool) -> tuple[str, str]:
-    if cell["state"] == "completed":
+def _marker_glyph_and_color(cell, is_today: bool) -> tuple[str, str]:
+    if cell.state == "completed":
         return "✓", _MARKER_GREEN
     if is_today:
         return "●", _MARKER_GREEN
-    if cell["state"] == "missed":
+    if cell.state == "missed":
         return "○", _MARKER_MISSED
-    if cell["state"] == "planned":
+    if cell.state == "planned":
         return "●", _MARKER_PLANNED
     return "○", _MARKER_REST  # rest
 
@@ -722,7 +638,7 @@ def _render_day_strip(active: dict | None) -> None:
                 st.rerun()
 
     selected_idx = next(
-        (i for i, c in enumerate(cells) if c["date"] == st.session_state.tp_selected_date), None
+        (i for i, c in enumerate(cells) if c.date == st.session_state.tp_selected_date), None
     )
 
     # Per-cell marker colour (day columns are nth-child(2)..nth-child(8); the
@@ -730,7 +646,7 @@ def _render_day_strip(active: dict | None) -> None:
     # computed fresh each render since we already know every cell's state here.
     marker_rules = []
     for i, cell in enumerate(cells):
-        is_today = cell["date"] == today
+        is_today = cell.date == today
         _, color = _marker_glyph_and_color(cell, is_today)
         marker_rules.append(
             f"""[data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"]
@@ -762,13 +678,13 @@ def _render_day_strip(active: dict | None) -> None:
             st.session_state.tp_week_start = ph.clamp_week_start(candidate, active) if active else candidate
             st.rerun()
     for i, (col, cell) in enumerate(zip(day_cols, cells)):
-        is_today = cell["date"] == today
+        is_today = cell.date == today
         glyph, _ = _marker_glyph_and_color(cell, is_today)
-        label = cell["date"].strftime("%d/%m") if i == selected_idx else cell["weekday_label"]
+        label = cell.date.strftime("%d/%m") if i == selected_idx else cell.weekday_label
         with col:
-            if st.button(f"{glyph}  \n{label}", key=f"tp_day_{cell['date'].isoformat()}",
+            if st.button(f"{glyph}  \n{label}", key=f"tp_day_{cell.date.isoformat()}",
                          use_container_width=True):
-                st.session_state.tp_selected_date = cell["date"]
+                st.session_state.tp_selected_date = cell.date
                 st.rerun()
     with col_next:
         if st.button("›", key="tp_wk_next", use_container_width=True,
@@ -778,29 +694,12 @@ def _render_day_strip(active: dict | None) -> None:
             st.rerun()
 
 
-def _coach_message(directive: dict, today_plan: dict) -> tuple[str, str]:
-    """Dynamic headline sourced from the real engine directive (readiness/ACWR-driven),
-    falling back to the day's clinical objective — never fabricated copy."""
-    headline = directive.get("action") or today_plan["objective"]
-    subtitle = today_plan["phase"]
-    return headline, subtitle
-
-
-def _focus_areas(exercises: list) -> list[str]:
-    seen: list[str] = []
-    for ex in exercises:
-        cat = _movement_category(ex)
-        if cat not in seen:
-            seen.append(cat)
-    return seen
-
-
-def _render_workout_card(day_num: int, phase_obj: dict, today_plan: dict,
+def _render_workout_card(day_num: int, phase_obj, today_plan: dict,
                           exercises: list, duration_min: int) -> None:
-    focus_text = ", ".join(_focus_areas(exercises)) or "Full Body"
+    focus_text = ", ".join(sess.focus_areas(exercises)) or "Full Body"
     n_ex = len(exercises)
-    phase_length = phase_obj["length_days"]
-    phase_name = phase_obj["name"]
+    phase_length = phase_obj.length_days
+    phase_name = phase_obj.name
     st.markdown(
         f"""
 <div style='background:{_OV_BG_ELEV};border-radius:16px;padding:22px 20px;margin-bottom:22px;'>
@@ -851,7 +750,7 @@ def _render_exercise_timeline(exercises: list) -> None:
         return
     rows = []
     for ex in exercises:
-        icon = _type_icon(ex)
+        icon = sess.type_icon(ex)
         rows.append(
             f"""
 <div style='position:relative;padding:14px 0 14px 34px;
@@ -860,7 +759,7 @@ def _render_exercise_timeline(exercises: list) -> None:
               background:{_OV_BG_ELEV};border:2px solid rgba(255,255,255,0.18);display:flex;
               align-items:center;justify-content:center;font-size:10px;'>{icon}</div>
   <div style='color:{_OV_TEXT_PRI};font-size:15px;font-weight:600;'>{ex["name"]}</div>
-  <div style='color:{_OV_TEXT_SEC};font-size:12.5px;margin-top:2px;'>{_prescription_label(ex)}</div>
+  <div style='color:{_OV_TEXT_SEC};font-size:12.5px;margin-top:2px;'>{sess.prescription_label(ex)}</div>
 </div>
 """
         )
@@ -879,12 +778,12 @@ def _render_past_completed(d: date) -> None:
     """Read-only log for a past date that was completed — no Start/complete actions."""
     _day_overline(d)
     try:
-        sessions = db.get_recent_sessions(days=(date.today() - d).days + 3)
+        sessions = repo.get_repository().get_recent_sessions(days=(date.today() - d).days + 3)
     except Exception:
         sessions = []
-    day_rows = [s for s in sessions if s.get("session_date") == d.isoformat()]
+    day_session = next((s for s in sessions if s.session_date == d.isoformat()), None)
 
-    if not day_rows:
+    if not day_session or not day_session.exercises:
         # Logged per the day strip's own check, but the detail fetch came back
         # empty (e.g. cache/read race) — say so plainly rather than fabricate rows.
         st.markdown(
@@ -895,14 +794,14 @@ def _render_past_completed(d: date) -> None:
         )
         return
 
-    first = day_rows[0]
     st.markdown(
         f"""
 <div style='background:{_OV_BG_ELEV};border-radius:16px;padding:20px;margin-bottom:16px;'>
   <div style='color:{_MARKER_GREEN};font-size:13px;letter-spacing:1px;margin-bottom:6px;'>✓ SESSION LOGGED</div>
   <div style='color:{_OV_TEXT_SEC};font-size:13px;'>
-    RPE {first.get("session_rpe", "—")}/10 · {first.get("session_duration_minutes", "—")} min ·
-    {first.get("session_au", "—")} AU</div>
+    RPE {day_session.session_rpe if day_session.session_rpe is not None else "—"}/10 ·
+    {day_session.session_duration_minutes if day_session.session_duration_minutes is not None else "—"} min ·
+    {day_session.session_au if day_session.session_au is not None else "—"} AU</div>
 </div>
 """,
         unsafe_allow_html=True,
@@ -910,16 +809,16 @@ def _render_past_completed(d: date) -> None:
     rows_html = "".join(
         f"<div style='padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);'>"
         f"<div style='color:{_OV_TEXT_PRI};font-size:14px;font-weight:600;'>"
-        f"✓ {r.get('movement_name', '')}</div>"
+        f"✓ {r.name}</div>"
         f"<div style='color:{_OV_TEXT_SEC};font-size:12px;margin-top:2px;'>"
-        f"{r.get('movement_type', '')} · {r.get('planned_sets', '—')} sets"
+        f"{r.movement_type} · {r.planned_sets if r.planned_sets is not None else '—'} sets"
         f"</div></div>"
-        for r in day_rows
+        for r in day_session.exercises
     )
     st.markdown(f"<div>{rows_html}</div>", unsafe_allow_html=True)
 
 
-def _render_past_missed(d: date, active: dict) -> None:
+def _render_past_missed(d: date, active) -> None:
     """Read-only view of what was planned for a past date that wasn't completed."""
     _day_overline(d)
     day_num = ph.day_number_in_phase(active, d)
@@ -928,33 +827,33 @@ def _render_past_missed(d: date, active: dict) -> None:
         f"margin-bottom:16px;'>NOT COMPLETED</div>",
         unsafe_allow_html=True,
     )
-    today_plan = tp.PLAN.get(day_num) if active["phase_number"] == 1 else None
+    today_plan = tp.PLAN.get(day_num) if active.phase_number == 1 else None
     if not today_plan:
-        st.info(f"Day {day_num} of {active['name']} has no authored content on record.")
+        st.info(f"Day {day_num} of {active.name} has no authored content on record.")
         return
-    st.caption(f"Day {day_num} of {active['length_days']} — {today_plan['objective']} (planned, not done)")
+    st.caption(f"Day {day_num} of {active.length_days} — {today_plan['objective']} (planned, not done)")
     _render_exercise_timeline(today_plan["exercises"])
 
 
-def _render_future_day(d: date, active: dict) -> None:
+def _render_future_day(d: date, active) -> None:
     """Preview for a future date within the active phase. No Start action — you
     can't begin a day out of sequence."""
     day_num = ph.day_number_in_phase(active, d)
     _day_overline(d)
-    today_plan = tp.PLAN.get(day_num) if active["phase_number"] == 1 else None
+    today_plan = tp.PLAN.get(day_num) if active.phase_number == 1 else None
     if not today_plan:
         st.markdown(
             f"<div style='color:{_OV_TEXT_SEC};font-size:13px;margin-bottom:12px;'>"
-            f"Scheduled for {d.strftime('%B')} {d.day} · Day {day_num} of {active['length_days']}</div>",
+            f"Scheduled for {d.strftime('%B')} {d.day} · Day {day_num} of {active.length_days}</div>",
             unsafe_allow_html=True,
         )
-        st.info(f"Day {day_num} of {active['name']} has no authored content yet.")
+        st.info(f"Day {day_num} of {active.name} has no authored content yet.")
         return
     st.markdown(
         f"""
 <div style='color:{_OV_TEXT_PRI};font-size:22px;font-weight:700;margin-bottom:4px;'>{today_plan['objective']}</div>
 <div style='color:{_OV_TEXT_SEC};font-size:13px;margin-bottom:18px;'>
-    Day {day_num} of {active["length_days"]} — RPE target ≤{today_plan["session_rpe_target"]}/10<br>
+    Day {day_num} of {active.length_days} — RPE target ≤{today_plan["session_rpe_target"]}/10<br>
     Scheduled for {d.strftime('%B')} {d.day}</div>
 """,
         unsafe_allow_html=True,
@@ -971,15 +870,15 @@ def _render_rest_day(d: date) -> None:
     )
 
 
-def _render_no_active_phase(phases: list[dict]) -> None:
+def _render_no_active_phase(phases: list) -> None:
     """Reassessment gap — no phase covers today. Never shows a placeholder workout."""
     upcoming = sorted(
-        (p for p in phases if p.get("status") == "upcoming"),
-        key=lambda p: p["start_date"],
+        (p for p in phases if p.status == "upcoming"),
+        key=lambda p: p.start_date,
     )
     next_line = (
-        f"Next phase — <strong style='color:{_OV_TEXT_PRI};'>{upcoming[0]['name']}</strong> "
-        f"— starts {upcoming[0]['start_date']}."
+        f"Next phase — <strong style='color:{_OV_TEXT_PRI};'>{upcoming[0].name}</strong> "
+        f"— starts {upcoming[0].start_date}."
         if upcoming else
         "No upcoming phase configured yet."
     )
@@ -995,24 +894,22 @@ def _render_no_active_phase(phases: list[dict]) -> None:
     )
 
 
-def _render_day_detail(d: date, active: dict, phases: list[dict]) -> None:
+def _render_day_detail(d: date, active, phases: list) -> None:
     """Dispatcher for any selected date other than today — active is guaranteed
     non-None here (the 'no active phase at all' case is handled by the caller
     before this is reached)."""
-    day_num = ph.day_number_in_phase(active, d)
-    if not (1 <= day_num <= active["length_days"]):
+    try:
+        is_logged = repo.get_repository().has_logged_session(d)
+    except Exception:
+        is_logged = False
+    state = sess.day_view_state(d, date.today(), active, is_logged)
+    if state == "rest":
         _render_rest_day(d)
-        return
-    if d < date.today():
-        try:
-            completed = db.has_logged_session(d)
-        except Exception:
-            completed = False
-        if completed:
-            _render_past_completed(d)
-        else:
-            _render_past_missed(d, active)
-    else:
+    elif state == "past_completed":
+        _render_past_completed(d)
+    elif state == "past_missed":
+        _render_past_missed(d, active)
+    else:  # "future"
         _render_future_day(d, active)
 
 
@@ -1072,14 +969,14 @@ _FAB_CSS = f"""<style>
 </style>"""
 
 
-def _render_overview(day_num: int, active: dict, today_plan: dict,
+def _render_overview(day_num: int, active, today_plan: dict,
                       exercises: list, directive: dict, readiness_modifier: dict) -> None:
     """Today's session — coach header, workout card, accordions, floating actions.
     The day strip, phase resolution, and past/future/rest routing all happen once
     in render() before this is ever called; this only ever renders today."""
     today = date.today()
-    duration_min       = _estimate_duration(exercises)
-    headline, subtitle  = _coach_message(directive, today_plan)
+    duration_min       = sess.estimate_duration(exercises)
+    headline, subtitle  = sess.coach_message(directive, today_plan)
 
     st.markdown(
         f"""
@@ -1094,8 +991,7 @@ def _render_overview(day_num: int, active: dict, today_plan: dict,
 
     _render_workout_card(day_num, active, today_plan, exercises, duration_min)
 
-    release_exercises = [ex for ex in exercises if ex["name"] in _RELEASE_EXERCISE_NAMES]
-    main_exercises     = [ex for ex in exercises if ex["name"] not in _RELEASE_EXERCISE_NAMES]
+    release_exercises, main_exercises = sess.split_release_and_main(exercises)
 
     if release_exercises:
         with st.expander(f"Release Protocol  ·  {len(release_exercises)}", expanded=False):
@@ -1136,8 +1032,10 @@ def render():
     _init_state(day_num)
 
     # ── Readiness modifier — computed once per render, applied to prescriptions ─
-    _sheet_id = st.secrets.get("GOOGLE_SHEETS_ID", "")
-    _rm_bio = _bio_for_readiness(_sheet_id) if _sheet_id else []
+    try:
+        _rm_bio = _bio_for_readiness()
+    except Exception:
+        _rm_bio = []
     _readiness_modifier = engine.readiness_training_modifier(_rm_bio)
     _volume_factor = _readiness_modifier.get("volume_factor", 1.0)
 
@@ -1158,7 +1056,7 @@ def render():
         start_input = st.date_input("Plan start date", value=date.today(),
                                     help="You can backdate if you've already started.")
         if st.button("Begin 14-Day Plan", type="primary", use_container_width=True):
-            db.set_config("plan_start_date", str(start_input))
+            repo.get_repository().set_config("plan_start_date", str(start_input))
             st.success(f"Plan starts {start_input}. Come back each day for your session.")
             st.rerun()
         st.stop()
@@ -1317,7 +1215,7 @@ def render():
             if st.session_state.tp_session_start_ts > 0:
                 elapsed_minutes = max(5, int((time.time() - st.session_state.tp_session_start_ts) / 60))
             else:
-                elapsed_minutes = _estimate_duration(exercises)
+                elapsed_minutes = sess.estimate_duration(exercises)
             with st.form("log_session_form"):
                 session_rpe = st.slider("Session RPE — how hard did it feel?",
                                         min_value=1, max_value=10, value=5,
@@ -1359,7 +1257,7 @@ def render():
                 next_plan = tp.PLAN[day_num + 1]
                 with st.expander(f"Preview: Day {day_num + 1} — {next_plan['objective']}", expanded=False):
                     for nex in next_plan["exercises"]:
-                        st.markdown(f"- {_type_icon(nex)} **{nex['name']}** — {_prescription_label(nex)}")
+                        st.markdown(f"- {sess.type_icon(nex)} **{nex['name']}** — {sess.prescription_label(nex)}")
             if st.button("Back to Home", type="primary", use_container_width=True):
                 st.session_state["_nav_page"] = "home"
                 st.rerun()
@@ -1421,9 +1319,9 @@ def render():
         f"<div style='font-size:11px;color:#E8ECEF;font-family:monospace;"
         f"text-transform:uppercase;letter-spacing:2px;'>Exercise {ex_n} of {n_ex}</div>"
         f"<div style='font-size:24px;font-weight:700;color:#E8ECEF;margin:4px 0;'>"
-        f"{_type_icon(ex)} {ex['name']}</div>"
+        f"{sess.type_icon(ex)} {ex['name']}</div>"
         f"<div style='font-size:13px;color:#8A99A3;font-family:monospace;'>"
-        f"{_prescription_label(ex)}</div></div>",
+        f"{sess.prescription_label(ex)}</div></div>",
         unsafe_allow_html=True,
     )
 
