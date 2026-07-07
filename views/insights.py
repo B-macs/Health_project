@@ -10,17 +10,17 @@ Caller is responsible for st.set_page_config(), styles.inject_css(), nav.inject(
 """
 
 import json
-import datetime as _dt
+from dataclasses import asdict
 from datetime import date
 
 import streamlit as st
 import pandas as pd
 
-import db
-import ai
-import engine
-import sync_sheets
-import stats as stats_mod
+import repo
+from services import ai
+from services import engine
+from services import stats as stats_mod
+from services import insights as insights_svc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -30,23 +30,24 @@ import stats as stats_mod
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _bio():
-    sheet_id = st.secrets.get("GOOGLE_SHEETS_ID", "")
-    return sync_sheets.get_biometric_rolling(sheet_id, 28) if sheet_id else []
+    # engine.py/readiness.py still work on plain dicts -- asdict() converts
+    # the typed BiometricRecord back to the exact shape they expect.
+    return [asdict(r) for r in repo.get_repository().get_biometric_rolling(days=28)]
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _au():          return db.get_daily_session_au(28)
+def _au():          return repo.get_repository().get_daily_session_au(28)
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _streak():      return db.get_pain_free_streak()
+def _streak():      return repo.get_repository().get_pain_free_streak()
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _tight():       return db.get_avg_tightness(14)
+def _tight():       return repo.get_repository().get_avg_tightness(14)
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _diag():        return db.get_diagnostic_profile()
+def _diag():        return repo.get_repository().get_diagnostic_profile()
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _stage():       return db.get_current_stage()
+def _stage():       return repo.get_repository().get_current_stage()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ def render() -> None:
     st.title("Insights")
     st.caption("Engine metrics, biometric trends, session pattern analysis.")
 
-    injury_profile = db.get_diagnostic_profile()
+    injury_profile = repo.get_repository().get_diagnostic_profile()
 
     (
         tab_directive, tab_engine, tab_queue,
@@ -110,7 +111,7 @@ def render() -> None:
                 type="primary",
                 key="directive_advance_btn",
             ):
-                db.set_config("current_stage", str(stage_advance["next_stage"]))
+                repo.get_repository().set_config("current_stage", str(stage_advance["next_stage"]))
                 st.cache_data.clear()
                 st.rerun()
 
@@ -118,32 +119,7 @@ def render() -> None:
 
         # ── Today's directive — plain language, no raw data ───────────────────
         sig = rec["signal_color"]
-
-        _LABELS = {
-            "green":  "Train normally today.",
-            "yellow": "Reduced load today — keep the session controlled, don't push to failure.",
-            "orange": "Reduced load today — keep the session controlled, don't push to failure.",
-            "red":    "Rest day — mobility and walking only. No loaded training.",
-            "grey":   "Building baseline — train at comfortable effort.",
-        }
-        _DETAIL = {
-            "green":  rec["action"],
-            "yellow": (
-                "Biometrics are slightly below your rolling average. "
-                "Scale back total volume by around 20–25%. "
-                "Hold intensity — just do fewer sets."
-            ),
-            "orange": (
-                "Biometrics are slightly below your rolling average. "
-                "Scale back total volume by around 20–25%. "
-                "Hold intensity — just do fewer sets."
-            ),
-            "red":    "Biometrics show significant systemic fatigue. Rest is the training stimulus today.",
-            "grey":   rec["action"],
-        }
-
-        label  = _LABELS.get(sig, rec["label"])
-        detail = _DETAIL.get(sig, rec["action"])
+        label, detail = insights_svc.directive_copy(rec)
 
         if sig == "red":
             st.error(f"**{label}**\n\n{detail}")
@@ -192,7 +168,7 @@ def render() -> None:
                 type="primary",
                 key="directive_stage_confirm",
             ):
-                db.set_config("current_stage", str(new_stage))
+                repo.get_repository().set_config("current_stage", str(new_stage))
                 st.cache_data.clear()
                 st.rerun()
 
@@ -274,7 +250,7 @@ def render() -> None:
                 color     = engine.SIGNAL_COLORS.get(sig_k, engine.SIGNAL_COLORS["grey"])
                 val_str   = f"{val} {unit}" if val is not None else "—"
                 base_str  = f"28d avg: {baseline} {unit}" if baseline else "No baseline"
-                delta_str = (f"{'▲' if delta > 0 else '▼'} {abs(delta):.1f}%" if delta else "")
+                delta_str = insights_svc.metric_delta_str(delta)
                 col.markdown(
                     f"<div style='background:#1A1F2E;border-left:4px solid {color};"
                     f"border-radius:6px;padding:12px 14px;'>"
@@ -307,16 +283,12 @@ def render() -> None:
                 st.error("Hard lock — do not increase volume.")
 
         with col_chart:
-            daily_au   = acwr_result.get("daily_au_28", [0.0] * 28)
-            today_dt   = date.today()
-            chart_dates = [
-                (today_dt - _dt.timedelta(days=27 - i)).strftime("%Y-%m-%d")
-                for i in range(28)
-            ]
+            daily_au = acwr_result.get("daily_au_28", [0.0] * 28)
+            chart    = insights_svc.acwr_chart_data(daily_au, today=date.today())
             df_au = pd.DataFrame({
-                "Date":   chart_dates,
-                "AU":     daily_au,
-                "Window": ["Chronic (28d)"] * 21 + ["Acute (7d)"] * 7,
+                "Date":   chart["dates"],
+                "AU":     chart["au"],
+                "Window": chart["windows"],
             })
             df_c = df_au[df_au["Window"] == "Chronic (28d)"].set_index("Date")["AU"]
             df_a = df_au[df_au["Window"] == "Acute (7d)"].set_index("Date")["AU"]
@@ -352,8 +324,8 @@ def render() -> None:
     # =========================================================================
 
     with tab_queue:
-        unparsed_notes     = db.get_unparsed_session_notes()
-        unparsed_readiness = db.get_unparsed_readiness()
+        unparsed_notes     = repo.get_repository().get_unparsed_session_notes()
+        unparsed_readiness = repo.get_repository().get_unparsed_readiness()
 
         col_a, col_b = st.columns(2)
         col_a.metric("Session notes pending",    len(unparsed_notes))
@@ -378,7 +350,7 @@ def render() -> None:
                 for note in unparsed_notes:
                     try:
                         result = ai.parse_session_note(note["raw_text"], injury_profile)
-                        db.update_session_note_ai(
+                        repo.get_repository().update_session_note_ai(
                             note_id=note["id"],
                             summary=result["summary"],
                             sentiment_score=result["sentiment_score"],
@@ -393,7 +365,7 @@ def render() -> None:
                 for entry in unparsed_readiness:
                     try:
                         result = ai.parse_tightness(entry["subjective_tightness"], injury_profile)
-                        db.update_readiness_ai(
+                        repo.get_repository().update_readiness_ai(
                             row_id=entry["id"],
                             severity=result["severity"],
                             body_parts=result["body_parts"],
@@ -415,7 +387,7 @@ def render() -> None:
                     st.rerun()
 
         # Warnings panel
-        flagged = db.get_flagged_entries()
+        flagged = repo.get_repository().get_flagged_entries()
         if flagged:
             st.divider()
             st.subheader("Active Warnings")
@@ -445,20 +417,12 @@ def render() -> None:
     # =========================================================================
 
     with tab_tightness:
-        parsed_rows = db.get_parsed_readiness(limit=90)
+        parsed_rows = repo.get_repository().get_parsed_readiness(limit=90)
 
         if not parsed_rows:
             st.info("No parsed readiness entries yet. Run the Processing Queue first.")
         else:
-            body_freq: dict = {}
-            for row in parsed_rows:
-                parts_raw = row.get("ai_body_parts") or "[]"
-                try:
-                    parts = json.loads(parts_raw)
-                except Exception:
-                    parts = []
-                for p in parts:
-                    body_freq[p] = body_freq.get(p, 0) + 1
+            body_freq = insights_svc.body_region_frequency(parsed_rows)
 
             if body_freq:
                 st.subheader("Most Flagged Body Regions")
@@ -507,7 +471,7 @@ def render() -> None:
     with tab_trends:
         st.subheader("Multi-Week Trend Analysis")
 
-        trend_data = db.get_macro_trend_data(90)
+        trend_data = repo.get_repository().get_macro_trend_data(90)
         n_bio      = len(trend_data["biometrics"])
         n_sessions = len(trend_data["sessions"])
 
@@ -533,18 +497,7 @@ def render() -> None:
             )
 
             if slopes:
-                slope_rows = [
-                    {
-                        "Variable":    k.replace("_slope", "").replace("_", " ").title(),
-                        "Slope / day": f"{v:+.5f}" if v is not None else "--",
-                        "Direction":   (
-                            ("improving" if v < 0 else "worsening")
-                            if (v is not None and k in ("pain_slope", "tightness_slope"))
-                            else ("improving" if (v is not None and v > 0) else "--")
-                        ),
-                    }
-                    for k, v in slopes.items()
-                ]
+                slope_rows = insights_svc.slope_direction_rows(slopes)
                 st.dataframe(pd.DataFrame(slope_rows), use_container_width=True, hide_index=True)
 
             if notable:
@@ -626,7 +579,7 @@ def render() -> None:
                     label_visibility="collapsed",
                 )
 
-            recent_notes = db.get_recent_raw_notes(limit=20)
+            recent_notes = repo.get_repository().get_recent_raw_notes(limit=20)
 
             if recent_notes:
                 note_summary_lines = []
@@ -646,7 +599,7 @@ def render() -> None:
             else:
                 notes_summary_str = "No session notes logged yet."
 
-            latest_risk = db.get_latest_movement_risk()
+            latest_risk = repo.get_repository().get_latest_movement_risk()
             if latest_risk:
                 ts = str(latest_risk.get("timestamp", ""))[:16]
                 st.caption(f"Last assessment: {ts} (rules-based)")
@@ -687,7 +640,7 @@ def render() -> None:
                         result = ai.assess_movement_risk(
                             injury_profile, notes_summary_str, stage=current_stage
                         )
-                        db.save_movement_risk(
+                        repo.get_repository().save_movement_risk(
                             risk_summary      = result["risk_summary"],
                             flagged_movements = result["flagged_movements"],
                             safe_movements    = result["safe_movements"],
