@@ -472,6 +472,30 @@ def get_recent_sessions(days: int = 60) -> list[dict]:
     return out
 
 
+def has_logged_session(d: date) -> bool:
+    """True if a training session is already logged in Notion for this calendar date.
+    Authoritative source of truth for 'already trained today' — independent of any
+    client-side session_state or resume checkpoint, both of which can be lost or reset."""
+    pages = _query_all(
+        _dbs()["training"],
+        filter_={"property": "Session Date", "date": {"equals": str(d)}},
+    )
+    return len(pages) > 0
+
+
+def get_logged_session_dates(start: date, end: date) -> set[str]:
+    """Set of ISO date strings with at least one logged training session in [start, end].
+    One query for a whole date range — used by the week strip instead of one call per day."""
+    pages = _query_all(
+        _dbs()["training"],
+        filter_={"and": [
+            {"property": "Session Date", "date": {"on_or_after": str(start)}},
+            {"property": "Session Date", "date": {"on_or_before": str(end)}},
+        ]},
+    )
+    return {d for p in pages if (d := _get(p, "Session Date", "date"))}
+
+
 def get_daily_session_au(days: int = 28) -> list[dict]:
     """Return [{date, total_au}] for ACWR — one entry per calendar day."""
     cutoff = (date.today() - timedelta(days=days)).isoformat()
@@ -723,6 +747,22 @@ def get_config_value(key: str) -> str | None:
     """Read a single config value by key. Returns None if key not found."""
     page = _config_page(key)
     return _get(page, "Value", "rich_text") if page else None
+
+
+def get_phases() -> list[dict]:
+    """List of phase dicts (see phase.py), stored as one JSON blob under the
+    'phases' config key — same pattern as the 'training_progress' checkpoint."""
+    raw = get_config_value("phases")
+    if not raw:
+        return []
+    try:
+        return json.loads(raw)
+    except Exception:
+        return []
+
+
+def set_phases(phases: list[dict]) -> None:
+    set_config("phases", json.dumps(phases))
 
 
 def get_diagnostic_profile() -> dict:

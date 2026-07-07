@@ -11,6 +11,7 @@ from datetime import date, timedelta
 import engine
 import stats
 import rules
+import phase
 
 # ── Test runner ───────────────────────────────────────────────────────────────
 
@@ -595,6 +596,114 @@ check("rest_seconds unchanged",
 # Missing fields are passed through untouched
 check("missing reps not added",
       "reps" not in _avm({"hold_seconds": 30}, 0.75), True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  phase.py — Phase model and weekly day-strip view
+# ─────────────────────────────────────────────────────────────────────────────
+
+section("phase — day_number_in_phase")
+
+p14 = phase.default_phase(date(2026, 6, 29), length_days=14, phase_number=1, name="Stage 1 Rehab")
+
+# Anchor the 28-day phase's start to a real Monday: week-paging math (tested later)
+# only spans exactly 4 calendar weeks when a 4-week block starts on a Monday — a
+# misaligned start genuinely touches 5 calendar weeks, which is correct for a real
+# Mon-Sun strip, not a bug. Deriving the Monday here (rather than hardcoding a date)
+# avoids needing to know 2026-09-01's real-world weekday.
+_p28_start = date(2026, 9, 1) - timedelta(days=date(2026, 9, 1).weekday())
+p28 = phase.default_phase(_p28_start, length_days=28, phase_number=2, name="Stage 2")
+
+check("day 1 of 14-day phase",               phase.day_number_in_phase(p14, date(2026, 6, 29)), 1)
+check("day 14 (last) of 14-day phase",        phase.day_number_in_phase(p14, date(2026, 7, 12)), 14)
+check("day 15 (past end) of 14-day phase",    phase.day_number_in_phase(p14, date(2026, 7, 13)), 15)
+check("day 1 of 28-day phase",                phase.day_number_in_phase(p28, _p28_start), 1)
+check("day 28 (last) of 28-day phase",
+      phase.day_number_in_phase(p28, _p28_start + timedelta(days=27)), 28)
+
+
+section("phase — active_phase (reassessment gaps)")
+
+# Phase 1: 2026-06-29 .. 2026-07-12 (14 days). Gap. Phase 2 starts 2026-07-20.
+p1 = phase.default_phase(date(2026, 6, 29), length_days=14, phase_number=1, name="Stage 1 Rehab")
+p2 = phase.default_phase(date(2026, 7, 20), length_days=28, phase_number=2, name="Stage 2")
+phases = [p1, p2]
+
+check("mid-phase-1 date resolves to phase 1",
+      phase.active_phase(phases, date(2026, 7, 5))["phase_number"], 1)
+check("phase-1 last day still resolves to phase 1",
+      phase.active_phase(phases, date(2026, 7, 12))["phase_number"], 1)
+check("day after phase 1 ends, before phase 2 starts -> reassessment gap",
+      phase.active_phase(phases, date(2026, 7, 13)), None)
+check("day before phase 2 starts -> still a gap",
+      phase.active_phase(phases, date(2026, 7, 19)), None)
+check("phase-2 start date resolves to phase 2",
+      phase.active_phase(phases, date(2026, 7, 20))["phase_number"], 2)
+check("no phases configured at all -> None",
+      phase.active_phase([], date(2026, 7, 5)), None)
+
+p1_completed = dict(p1)
+p1_completed["status"] = "completed"
+check("a completed-status phase is never returned as active",
+      phase.active_phase([p1_completed], date(2026, 7, 5)), None)
+
+
+section("phase — phase_week_bounds / clamp_week_start")
+
+lo, hi = phase.phase_week_bounds(p14)
+check("phase_week_bounds lo is a Monday", lo.weekday(), 0)
+check("phase_week_bounds hi is a Monday", hi.weekday(), 0)
+check("lo's week contains the phase start date",
+      lo <= date(2026, 6, 29) <= lo + timedelta(days=6), True)
+check("hi's week contains the phase's last day",
+      hi <= date(2026, 7, 12) <= hi + timedelta(days=6), True)
+
+lo28, hi28 = phase.phase_week_bounds(p28)
+check("28-day phase spans exactly 4 week pages", (hi28 - lo28).days // 7 + 1, 4)
+
+check("clamp: candidate before phase start clamps to lo",
+      phase.clamp_week_start(lo - timedelta(days=21), p14), lo)
+check("clamp: candidate after phase end clamps to hi",
+      phase.clamp_week_start(hi + timedelta(days=21), p14), hi)
+_mid_week = lo + timedelta(days=7)
+check("clamp: candidate within range passes through unchanged",
+      phase.clamp_week_start(_mid_week, p14), _mid_week)
+
+
+section("phase — get_week_view state derivation")
+
+# Test week starts exactly on the phase's day 1 -- sidesteps needing to know the
+# real-world weekday of any date; get_week_view doesn't require week_start to be
+# a Monday (that convention is enforced by the caller via phase_week_bounds).
+_p_start = date.fromisoformat(p14["start_date"])
+_sessions = [{"date": (_p_start + timedelta(days=1)).isoformat()}]   # day 2 logged
+_fake_today = _p_start + timedelta(days=3)                           # day 4 is "today"
+
+cells = phase.get_week_view(_p_start, p14, _sessions, today=_fake_today)
+check("get_week_view returns 7 cells", len(cells), 7)
+
+check("day 1 (past, unlogged, in-phase) -> missed",   cells[0]["state"], "missed")
+check("day 2 (past, logged) -> completed",             cells[1]["state"], "completed")
+check("day 2's session_ref matches the logged record", cells[1]["session_ref"]["date"], _sessions[0]["date"])
+check("day 3 (past, unlogged) -> missed",               cells[2]["state"], "missed")
+check("day 4 (== today, unlogged) -> planned",          cells[3]["state"], "planned")
+check("day 4 has no session_ref",                       cells[3]["session_ref"], None)
+check("day 7 (future, in-phase) -> planned",            cells[6]["state"], "planned")
+check("day_number_in_phase populated for an in-phase cell", cells[0]["day_number_in_phase"], 1)
+
+_outside_week_start = _p_start - timedelta(days=21)  # 3 weeks before phase start
+_outside_cells = phase.get_week_view(_outside_week_start, p14, [], today=_fake_today)
+check("week entirely before phase start -> every cell is rest",
+      all(c["state"] == "rest" for c in _outside_cells), True)
+check("rest cells carry no day_number_in_phase",
+      all(c["day_number_in_phase"] is None for c in _outside_cells), True)
+
+_gap_cells = phase.get_week_view(_p_start, None, [], today=_fake_today)
+check("no active phase (reassessment gap) -> every cell is rest",
+      all(c["state"] == "rest" for c in _gap_cells), True)
+
+check("weekday_label is a 3-letter uppercase abbreviation",
+      cells[0]["weekday_label"], _p_start.strftime("%a").upper()[:3])
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Summary

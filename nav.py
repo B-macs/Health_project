@@ -153,23 +153,27 @@ footer { display:none !important; }
 }
 
 /* ── Active colour ─────────────────────────────────────────────────────────── */
+/* [data-testid="..."] repeated on each selector below is a deliberate
+   specificity boost (doubling an attribute selector is valid CSS and reliably
+   outweighs simpler page-level button rules like the training page's white-pill
+   CTA override) so the active nav tab never gets swallowed by another page's CSS. */
 [data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
-    [data-testid="stBaseButton-primary"],
+    [data-testid="stBaseButton-primary"][data-testid="stBaseButton-primary"],
 [data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
-    [data-testid="baseButton-primary"] {
+    [data-testid="baseButton-primary"][data-testid="baseButton-primary"] {
     background: transparent !important;
     border: none !important;
     padding: 0 4px !important;
 }
 [data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
-    [data-testid="stBaseButton-primary"] p,
+    [data-testid="stBaseButton-primary"][data-testid="stBaseButton-primary"] p,
 [data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
-    [data-testid="stBaseButton-primary"] span,
+    [data-testid="stBaseButton-primary"][data-testid="stBaseButton-primary"] span,
 [data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
-    [data-testid="baseButton-primary"] p,
+    [data-testid="baseButton-primary"][data-testid="baseButton-primary"] p,
 [data-testid="stElementContainer"]:has(.stNavRow) + [data-testid="stElementContainer"]
-    [data-testid="baseButton-primary"] span {
-    color: #D4DCEE !important;
+    [data-testid="baseButton-primary"][data-testid="baseButton-primary"] span {
+    color: #00E874 !important;
 }
 </style>"""
 

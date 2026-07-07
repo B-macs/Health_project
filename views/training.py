@@ -1,17 +1,23 @@
 """
 Training Plan — Interactive 14-Day Rehab Session Guide.
-Session state persists across navigation — return exactly where you left off.
-Timers resume via localStorage. Only completing all exercises or an explicit
-Exit (with confirmation) ends the session.
+Progress persists across navigation and across dropped sessions — return exactly
+where you left off. In-session state lives in st.session_state for the active
+browser connection, and is checkpointed to Notion (Config DB, key
+"training_progress") on every set/rep/exercise transition, so a lost websocket
+connection (e.g. phone backgrounded for several minutes) can be restored on
+reconnect. Timers resume via localStorage. Only completing all exercises or an
+explicit Exit (with confirmation) ends the session.
 """
 
 import streamlit as st
 import streamlit.components.v1 as components
-from datetime import date
+from datetime import date, timedelta
+import json
 import time
 import db
 import engine
 import nav
+import phase as ph  # aliased: render()'s guided flow already has a local var named `phase`
 import sync_sheets
 import training_plan as tp
 
@@ -29,15 +35,15 @@ def _hold_timer(seconds: int, label: str = "HOLD", timer_key: str = "tp_h",
     _flag_js = "try { localStorage.setItem('tp_auto_start', '1'); } catch(e) {}" if set_auto_start else ""
     components.html(f"""
 <div style="text-align:center;padding:12px 0;font-family:monospace;">
-  <div style="font-size:13px;color:#00D4AA;letter-spacing:3px;margin-bottom:6px;">{label}</div>
-  <div id="hold-num" style="font-size:72px;font-weight:700;color:#00D4AA;
+  <div style="font-size:13px;color:#E8ECEF;letter-spacing:3px;margin-bottom:6px;">{label}</div>
+  <div id="hold-num" style="font-size:72px;font-weight:700;color:#E8ECEF;
        line-height:1;margin-bottom:12px;transition:color 0.3s;">{seconds}</div>
   <div style="display:flex;gap:10px;justify-content:center;">
     <button id="btn-start" onclick="startHold()" style="
-        background:#00D4AA;color:#0E1117;border:none;border-radius:6px;
+        background:#E8ECEF;color:#0E1117;border:none;border-radius:6px;
         padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;">▶ Start</button>
     <button onclick="resetHold()" style="
-        background:#1A1F2E;color:#E8EAF0;border:1px solid #444;
+        background:#1A2026;color:#E8ECEF;border:1px solid #444;
         border-radius:6px;padding:10px 20px;font-size:14px;cursor:pointer;">↺ Reset</button>
   </div>
 </div>
@@ -94,7 +100,7 @@ function _autoComplete() {{
     var el = document.getElementById('hold-num');
     if (s.running) {{
       _remaining = Math.max(0, s.remaining - (Date.now()-s.savedAt)/1000);
-      if (_remaining <= 0) {{ el.textContent='✓'; el.style.color='#00D4AA'; _clear(); return; }}
+      if (_remaining <= 0) {{ el.textContent='✓'; el.style.color='#E8ECEF'; _clear(); return; }}
       el.textContent = Math.ceil(_remaining);
       startHold();
     }} else {{
@@ -118,7 +124,7 @@ function startHold() {{
     if (r >= 1 && r <= 3 && !_beeped[r]) {{ _beeped[r]=true; _tickBeep(); }}
     if (_remaining <= 0) {{
       clearInterval(_iv); _clear();
-      el.textContent='✓'; el.style.color='#00D4AA';
+      el.textContent='✓'; el.style.color='#E8ECEF';
       document.getElementById('btn-start').textContent='▶ Start';
       document.getElementById('btn-start').onclick=startHold;
       _doneBeep();
@@ -135,7 +141,7 @@ function pauseHold() {{
 function resetHold() {{
   clearInterval(_iv); _clear(); _remaining=_total; _beeped={{}};
   var el=document.getElementById('hold-num');
-  el.textContent=_total; el.style.color='#00D4AA';
+  el.textContent=_total; el.style.color='#E8ECEF';
   document.getElementById('btn-start').textContent='▶ Start';
   document.getElementById('btn-start').onclick=startHold;
 }}
@@ -148,7 +154,7 @@ def _rest_timer(seconds: int, timer_key: str = "tp_r") -> None:
     label = f"{m:02d}:{s:02d}"
     components.html(f"""
 <div style="text-align:center;padding:10px 0;font-family:monospace;
-            background:#1A1F2E;border-radius:10px;margin:4px 0;">
+            background:#1A2026;border-radius:10px;margin:4px 0;">
   <div style="font-size:11px;color:#6B7280;letter-spacing:3px;margin-bottom:4px;">REST</div>
   <div id="rest-num" style="font-size:52px;font-weight:700;color:#6B7280;
        line-height:1;margin-bottom:10px;">{label}</div>
@@ -208,7 +214,7 @@ function fmt(n) {{ var m=Math.floor(n/60),s=Math.round(n%60); return (m<10?'0':'
       var el = document.getElementById('rest-num');
       if (s.running) {{
         _rrem = Math.max(0, s.remaining - (Date.now()-s.savedAt)/1000);
-        if (_rrem <= 0) {{ el.textContent='GO'; el.style.color='#00D4AA'; el.style.fontSize='42px'; _clear(); return; }}
+        if (_rrem <= 0) {{ el.textContent='GO'; el.style.color='#E8ECEF'; el.style.fontSize='42px'; _clear(); return; }}
         el.textContent=fmt(_rrem); startRest(); return;
       }} else {{
         _rrem = s.remaining; el.textContent=fmt(_rrem);
@@ -228,12 +234,12 @@ function startRest() {{
     _rrem = Math.max(0, _rrem - 1);
     var r = Math.round(_rrem);
     document.getElementById('rest-num').textContent = fmt(_rrem);
-    if (_rrem <= 5) {{ document.getElementById('rest-num').style.color='#00D4AA'; }}
+    if (_rrem <= 5) {{ document.getElementById('rest-num').style.color='#E8ECEF'; }}
     if (r >= 1 && r <= 3 && !_beeped[r]) {{ _beeped[r]=true; _tickBeep(); }}
     if (_rrem <= 0) {{
       clearInterval(_riv); _clear();
       var el = document.getElementById('rest-num');
-      el.textContent='GO'; el.style.color='#00D4AA'; el.style.fontSize='42px';
+      el.textContent='GO'; el.style.color='#E8ECEF'; el.style.fontSize='42px';
       document.getElementById('rest-btn').textContent='▶ Restart';
       document.getElementById('rest-btn').onclick=function(){{ _beeped={{}}; _rrem=_rtotal; startRest(); }};
       _goBeep();
@@ -283,7 +289,7 @@ function fmt(n) {{ var m=Math.floor(n/60),s=Math.round(n%60); return (m<10?'0':'
     var el = document.getElementById('dur-num');
     if (s.running) {{
       _drem = Math.max(0, s.remaining - (Date.now()-s.savedAt)/1000);
-      if (_drem <= 0) {{ el.textContent='DONE ✓'; el.style.color='#00D4AA'; _clear(); return; }}
+      if (_drem <= 0) {{ el.textContent='DONE ✓'; el.style.color='#E8ECEF'; _clear(); return; }}
       el.textContent=fmt(_drem); startDur();
     }} else {{
       _drem = s.remaining; el.textContent=fmt(_drem);
@@ -298,7 +304,7 @@ function startDur() {{
   _div = setInterval(function() {{
     _drem = Math.max(0, _drem - 1);
     document.getElementById('dur-num').textContent=fmt(_drem);
-    if (_drem <= 30) {{ document.getElementById('dur-num').style.color='#00D4AA'; }}
+    if (_drem <= 30) {{ document.getElementById('dur-num').style.color='#E8ECEF'; }}
     if (_drem <= 0) {{
       clearInterval(_div); _clear();
       document.getElementById('dur-num').textContent='DONE ✓';
@@ -319,7 +325,36 @@ function pauseDur() {{
 #  Session State
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _init_state():
+_CHECKPOINT_FIELDS = (
+    "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
+    "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
+)
+
+
+def _save_checkpoint(day_num: int) -> None:
+    """Persist in-progress training state to Notion so it survives a dropped
+    Streamlit session (e.g. phone backgrounded for several minutes) — session_state
+    alone only lives as long as the browser's websocket connection stays open."""
+    try:
+        data = {"day_num": day_num}
+        data.update({k: st.session_state[k] for k in _CHECKPOINT_FIELDS})
+        db.set_config("training_progress", json.dumps(data))
+    except Exception:
+        pass  # never block the training flow on a persistence failure
+
+
+def _load_checkpoint(day_num: int) -> dict | None:
+    raw = db.get_config_value("training_progress")
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except Exception:
+        return None
+    return data if data.get("day_num") == day_num else None
+
+
+def _init_state(day_num: int | None = None):
     defaults = {
         "tp_ex_idx":           0,
         "tp_set":              1,
@@ -328,19 +363,38 @@ def _init_state():
         "tp_done_today":       False,
         "tp_session_logged":   False,
         "tp_exit_confirm":     False,
+        "tp_started":          False,    # False = show the day-overview screen; True = guided flow
         "tp_side":             "right",  # 'right' → 'left' for unilateral exercises
         "tp_session_start_ts": 0,        # Unix timestamp, set on first set completion
     }
+    is_fresh_session = "tp_ex_idx" not in st.session_state
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
+    if is_fresh_session and day_num is not None:
+        checkpoint = _load_checkpoint(day_num)
+        if checkpoint:
+            for k in _CHECKPOINT_FIELDS:
+                if k in checkpoint:
+                    st.session_state[k] = checkpoint[k]
+        # Authoritative check, independent of the checkpoint above: if a session is
+        # already logged in Notion for today, never allow re-entering the exercise
+        # flow — a missing/stale/lost checkpoint must not let a second session start.
+        try:
+            if db.has_logged_session(date.today()):
+                st.session_state.tp_done_today = True
+                st.session_state.tp_session_logged = True
+        except Exception:
+            pass
 
 
-def _reset_session():
+def _reset_session(day_num: int | None = None):
     for k in list(st.session_state.keys()):
         if k.startswith("tp_"):
             del st.session_state[k]
     _init_state()
+    if day_num is not None:
+        _save_checkpoint(day_num)  # overwrite any saved checkpoint with the cleared state
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -500,12 +554,586 @@ def _bio_for_readiness(sheet_id: str) -> list[dict]:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Day-Overview Screen — shown before a session is started for the day.
+#  Tapping "Start" hands off to the existing guided exercise-by-exercise flow
+#  below, which is unchanged.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_OV_BG_ELEV  = "#1A2026"
+_OV_TEXT_PRI = "#E8ECEF"
+_OV_TEXT_SEC = "#8A99A3"
+_OV_ACCENT   = "#00E874"  # green — reserved for progress fills, active nav tab, today-indicator only
+_OV_AMBER    = "#C9A227"  # missed-day indicator only
+_OV_CTA_BG   = "#FFFFFF"
+_OV_CTA_TEXT = "#12171A"
+
+# Page-wide CSS: every primary-type button becomes a solid white pill (covers
+# "Back to Home", session-log save, and every set/rep-completion button in the
+# guided flow below — one rule, not special-cased per button), and content is
+# constrained to a centered ~840px column. Applied once at the top of render().
+_PAGE_CSS = f"""<style>
+.main .block-container {{ max-width: 840px; margin-left: auto; margin-right: auto; }}
+[data-testid="stBaseButton-primary"], [data-testid="baseButton-primary"] {{
+    background: {_OV_CTA_BG} !important;
+    color: {_OV_CTA_TEXT} !important;
+    border: none !important;
+    border-radius: 28px !important;
+    font-weight: 700 !important;
+}}
+[data-testid="stBaseButton-primary"] p, [data-testid="baseButton-primary"] p {{
+    color: {_OV_CTA_TEXT} !important;
+}}
+</style>"""
+
+
+def _progress_bar(label: str, value_label: str, fraction: float) -> None:
+    """Label row above (muted left, right-aligned value) + a thin rounded green
+    fill — replaces st.progress(..., text=...), which clips its label on mobile."""
+    pct = max(0.0, min(1.0, fraction))
+    st.markdown(
+        f"""
+<div style='display:flex;justify-content:space-between;margin-bottom:5px;'>
+  <span style='color:{_OV_TEXT_SEC};font-size:11px;letter-spacing:0.5px;'>{label}</span>
+  <span style='color:{_OV_TEXT_PRI};font-size:11px;font-weight:600;'>{value_label}</span>
+</div>
+<div style='width:100%;height:7px;background:rgba(255,255,255,0.10);border-radius:4px;overflow:hidden;'>
+  <div style='width:{pct * 100:.0f}%;height:100%;background:{_OV_ACCENT};border-radius:4px;'></div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+# The pre-session release protocol (CLAUDE.md rule #6) is always the same five
+# shared exercises inserted first in every day's list — detect them by identity
+# with the real constants so this stays in sync if training_plan.py changes.
+_RELEASE_EXERCISE_NAMES = frozenset({
+    tp.UPPER_GLUTE_RELEASE["name"],
+    tp.RIGHT_HIP_CAPSULE["name"],
+    tp.PIRIFORMIS_PNF["name"],
+    tp.ISCHIAL_RELEASE["name"],
+    tp.COXA_SALTANS_DRILL["name"],
+})
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _week_logged_dates(week_start_iso: str) -> set[str]:
+    week_start = date.fromisoformat(week_start_iso)
+    return db.get_logged_session_dates(week_start, week_start + timedelta(days=6))
+
+
+def _seed_and_get_active_phase(plan_start: date | None) -> tuple[list[dict], dict | None]:
+    """Reads phases from the Config DB; one-time-seeds Phase 1 from the existing
+    plan_start_date if no phases have been configured yet. Returns (phases, active)."""
+    phases = db.get_phases()
+    if not phases and plan_start is not None:
+        phases = [ph.default_phase(plan_start)]
+        db.set_phases(phases)
+    return phases, ph.active_phase(phases, date.today())
+
+
+_MARKER_GREEN   = "#00E874"
+_MARKER_PLANNED = "#C7D0D6"
+_MARKER_MISSED  = "#B08A3E"
+_MARKER_REST    = "#4A555D"
+_SELECTED_HL    = "#232B32"
+
+_WEEK_STRIP_BASE_CSS = f"""
+[data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"] {{
+    background: #1A2026;
+    border-radius: 16px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}}
+/* Force the row to stay on one line even on narrow mobile widths (Streamlit's
+   default <640px behaviour stacks columns vertically) — same fix nav.py already
+   applies to its own row via the marker + :has() pattern. */
+[data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"]
+    [data-testid="stHorizontalBlock"] {{
+    flex-wrap: nowrap !important;
+    gap: 2px !important;
+}}
+[data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"]
+    [data-testid="stColumn"] {{
+    min-width: 0 !important;
+}}
+[data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"] button {{
+    background: transparent !important;
+    border: none !important;
+    padding: 6px 2px !important;
+    font-size: 11px !important;
+    letter-spacing: 0.5px !important;
+    color: {_OV_TEXT_SEC} !important;
+}}
+[data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"] button:disabled {{
+    opacity: 0.25 !important;
+}}
+"""
+
+
+def _marker_glyph_and_color(cell: dict, is_today: bool) -> tuple[str, str]:
+    if cell["state"] == "completed":
+        return "✓", _MARKER_GREEN
+    if is_today:
+        return "●", _MARKER_GREEN
+    if cell["state"] == "missed":
+        return "○", _MARKER_MISSED
+    if cell["state"] == "planned":
+        return "●", _MARKER_PLANNED
+    return "○", _MARKER_REST  # rest
+
+
+def _render_day_strip(active: dict | None) -> None:
+    """Universal weekly strip — rendered at the very top of the page in every
+    state. Chevrons page one week at a time, clamped to the active phase's week
+    range (phase.clamp_week_start). Selection persists in session_state."""
+    today = date.today()
+    _default_week = today - timedelta(days=today.weekday())
+
+    if "tp_week_start" not in st.session_state:
+        st.session_state.tp_week_start = ph.clamp_week_start(_default_week, active) if active else _default_week
+    if "tp_selected_date" not in st.session_state:
+        st.session_state.tp_selected_date = today
+
+    week_start = st.session_state.tp_week_start
+
+    try:
+        logged_dates = _week_logged_dates(week_start.isoformat())
+    except Exception:
+        logged_dates = set()
+    sessions = [{"date": d} for d in logged_dates]
+    cells = ph.get_week_view(week_start, active, sessions, today=today)
+
+    at_lo = at_hi = False
+    if active:
+        lo, hi = ph.phase_week_bounds(active)
+        at_lo, at_hi = week_start <= lo, week_start >= hi
+
+    # "Today" jump — small, right-aligned, only when viewing a different week.
+    # Rendered with default (secondary) button styling, outside the strip's own
+    # scoped CSS below.
+    if week_start != _default_week:
+        _sp, _today_col = st.columns([5, 1])
+        with _today_col:
+            if st.button("Today", key="tp_wk_today", use_container_width=True):
+                st.session_state.tp_week_start = (
+                    ph.clamp_week_start(_default_week, active) if active else _default_week
+                )
+                st.session_state.tp_selected_date = today
+                st.rerun()
+
+    selected_idx = next(
+        (i for i, c in enumerate(cells) if c["date"] == st.session_state.tp_selected_date), None
+    )
+
+    # Per-cell marker colour (day columns are nth-child(2)..nth-child(8); the
+    # prev/next chevrons occupy 1 and 9) and the selected-slot highlight —
+    # computed fresh each render since we already know every cell's state here.
+    marker_rules = []
+    for i, cell in enumerate(cells):
+        is_today = cell["date"] == today
+        _, color = _marker_glyph_and_color(cell, is_today)
+        marker_rules.append(
+            f"""[data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"]
+                [data-testid="stColumn"]:nth-child({i + 2}) button p::first-line {{
+                color: {color} !important; font-size: 16px !important;
+            }}"""
+        )
+    highlight_rule = ""
+    if selected_idx is not None:
+        highlight_rule = f"""
+        [data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"]
+            [data-testid="stColumn"]:nth-child({selected_idx + 2}) button {{
+            background: {_SELECTED_HL} !important;
+            border-radius: 10px !important;
+            padding: 6px 10px !important;
+        }}"""
+
+    st.markdown(
+        f"<style>{_WEEK_STRIP_BASE_CSS}{''.join(marker_rules)}{highlight_rule}</style>",
+        unsafe_allow_html=True,
+    )
+    st.markdown('<div class="stWeekRow" style="display:none"></div>', unsafe_allow_html=True)
+
+    col_prev, *day_cols, col_next = st.columns([1, 3, 3, 3, 3, 3, 3, 3, 1])
+    with col_prev:
+        if st.button("‹", key="tp_wk_prev", use_container_width=True,
+                     disabled=(active is not None and at_lo)):
+            candidate = week_start - timedelta(days=7)
+            st.session_state.tp_week_start = ph.clamp_week_start(candidate, active) if active else candidate
+            st.rerun()
+    for i, (col, cell) in enumerate(zip(day_cols, cells)):
+        is_today = cell["date"] == today
+        glyph, _ = _marker_glyph_and_color(cell, is_today)
+        label = cell["date"].strftime("%d/%m") if i == selected_idx else cell["weekday_label"]
+        with col:
+            if st.button(f"{glyph}  \n{label}", key=f"tp_day_{cell['date'].isoformat()}",
+                         use_container_width=True):
+                st.session_state.tp_selected_date = cell["date"]
+                st.rerun()
+    with col_next:
+        if st.button("›", key="tp_wk_next", use_container_width=True,
+                     disabled=(active is not None and at_hi)):
+            candidate = week_start + timedelta(days=7)
+            st.session_state.tp_week_start = ph.clamp_week_start(candidate, active) if active else candidate
+            st.rerun()
+
+
+def _coach_message(directive: dict, today_plan: dict) -> tuple[str, str]:
+    """Dynamic headline sourced from the real engine directive (readiness/ACWR-driven),
+    falling back to the day's clinical objective — never fabricated copy."""
+    headline = directive.get("action") or today_plan["objective"]
+    subtitle = today_plan["phase"]
+    return headline, subtitle
+
+
+def _focus_areas(exercises: list) -> list[str]:
+    seen: list[str] = []
+    for ex in exercises:
+        cat = _movement_category(ex)
+        if cat not in seen:
+            seen.append(cat)
+    return seen
+
+
+def _render_workout_card(day_num: int, phase_obj: dict, today_plan: dict,
+                          exercises: list, duration_min: int) -> None:
+    focus_text = ", ".join(_focus_areas(exercises)) or "Full Body"
+    n_ex = len(exercises)
+    phase_length = phase_obj["length_days"]
+    phase_name = phase_obj["name"]
+    st.markdown(
+        f"""
+<div style='background:{_OV_BG_ELEV};border-radius:16px;padding:22px 20px;margin-bottom:22px;'>
+  <div style='display:flex;justify-content:space-between;gap:16px;'>
+    <div style='flex:1;min-width:0;'>
+      <div style='color:{_OV_TEXT_SEC};font-size:14px;margin-bottom:2px;'>{phase_name}</div>
+      <div style='color:{_OV_TEXT_PRI};font-size:34px;font-weight:800;letter-spacing:0.5px;
+                  line-height:1.05;margin-bottom:14px;'>DAY {day_num}</div>
+      <div style='display:grid;grid-template-columns:1fr 1fr;gap:10px 14px;'>
+        <div style='display:flex;align-items:center;gap:7px;'>
+          <span style='font-size:13px;'>⏱</span>
+          <span style='color:{_OV_TEXT_PRI};font-size:13px;'>{duration_min} min</span>
+        </div>
+        <div style='display:flex;align-items:center;gap:7px;'>
+          <span style='font-size:13px;'>🔥</span>
+          <span style='color:{_OV_TEXT_PRI};font-size:13px;'>RPE ≤{today_plan["session_rpe_target"]}/10</span>
+        </div>
+        <div style='display:flex;align-items:center;gap:7px;'>
+          <span style='font-size:13px;'>🎯</span>
+          <span style='color:{_OV_TEXT_PRI};font-size:13px;'>{focus_text}</span>
+        </div>
+        <div style='display:flex;align-items:center;gap:7px;'>
+          <span style='font-size:13px;'>🏠</span>
+          <span style='color:{_OV_TEXT_PRI};font-size:13px;'>Bodyweight Only</span>
+        </div>
+      </div>
+    </div>
+    <div style='width:112px;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;'>
+      <div style='color:{_OV_TEXT_SEC};font-size:11px;margin-bottom:6px;text-align:right;'>
+        {day_num} of {phase_length} sessions</div>
+      <div style='width:100%;height:7px;background:rgba(255,255,255,0.10);border-radius:4px;
+                  overflow:hidden;margin-bottom:16px;'>
+        <div style='width:{day_num / phase_length * 100:.0f}%;height:100%;background:{_OV_ACCENT};
+                    border-radius:4px;'></div>
+      </div>
+      <div style='color:{_OV_TEXT_SEC};font-size:11px;text-align:right;'>{n_ex} exercises</div>
+    </div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_exercise_timeline(exercises: list) -> None:
+    if not exercises:
+        st.caption("No exercises in this section.")
+        return
+    rows = []
+    for ex in exercises:
+        icon = _type_icon(ex)
+        rows.append(
+            f"""
+<div style='position:relative;padding:14px 0 14px 34px;
+            border-left:2px solid rgba(255,255,255,0.10);margin-left:17px;'>
+  <div style='position:absolute;left:-11px;top:16px;width:20px;height:20px;border-radius:50%;
+              background:{_OV_BG_ELEV};border:2px solid rgba(255,255,255,0.18);display:flex;
+              align-items:center;justify-content:center;font-size:10px;'>{icon}</div>
+  <div style='color:{_OV_TEXT_PRI};font-size:15px;font-weight:600;'>{ex["name"]}</div>
+  <div style='color:{_OV_TEXT_SEC};font-size:12.5px;margin-top:2px;'>{_prescription_label(ex)}</div>
+</div>
+"""
+        )
+    st.markdown(f"<div>{''.join(rows)}</div>", unsafe_allow_html=True)
+
+
+def _day_overline(d: date) -> None:
+    st.markdown(
+        f"<div style='color:{_OV_TEXT_SEC};font-size:12px;letter-spacing:2px;font-weight:600;"
+        f"text-transform:uppercase;margin-bottom:14px;'>{d.strftime('%b %d')}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_past_completed(d: date) -> None:
+    """Read-only log for a past date that was completed — no Start/complete actions."""
+    _day_overline(d)
+    try:
+        sessions = db.get_recent_sessions(days=(date.today() - d).days + 3)
+    except Exception:
+        sessions = []
+    day_rows = [s for s in sessions if s.get("session_date") == d.isoformat()]
+
+    if not day_rows:
+        # Logged per the day strip's own check, but the detail fetch came back
+        # empty (e.g. cache/read race) — say so plainly rather than fabricate rows.
+        st.markdown(
+            f"<div style='background:{_OV_BG_ELEV};border-radius:16px;padding:28px 24px;"
+            f"text-align:center;color:{_OV_TEXT_SEC};font-size:14px;'>"
+            f"Session marked complete, but no exercise detail could be loaded.</div>",
+            unsafe_allow_html=True,
+        )
+        return
+
+    first = day_rows[0]
+    st.markdown(
+        f"""
+<div style='background:{_OV_BG_ELEV};border-radius:16px;padding:20px;margin-bottom:16px;'>
+  <div style='color:{_MARKER_GREEN};font-size:13px;letter-spacing:1px;margin-bottom:6px;'>✓ SESSION LOGGED</div>
+  <div style='color:{_OV_TEXT_SEC};font-size:13px;'>
+    RPE {first.get("session_rpe", "—")}/10 · {first.get("session_duration_minutes", "—")} min ·
+    {first.get("session_au", "—")} AU</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+    rows_html = "".join(
+        f"<div style='padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06);'>"
+        f"<div style='color:{_OV_TEXT_PRI};font-size:14px;font-weight:600;'>"
+        f"✓ {r.get('movement_name', '')}</div>"
+        f"<div style='color:{_OV_TEXT_SEC};font-size:12px;margin-top:2px;'>"
+        f"{r.get('movement_type', '')} · {r.get('planned_sets', '—')} sets"
+        f"</div></div>"
+        for r in day_rows
+    )
+    st.markdown(f"<div>{rows_html}</div>", unsafe_allow_html=True)
+
+
+def _render_past_missed(d: date, active: dict) -> None:
+    """Read-only view of what was planned for a past date that wasn't completed."""
+    _day_overline(d)
+    day_num = ph.day_number_in_phase(active, d)
+    st.markdown(
+        f"<div style='color:{_MARKER_MISSED};font-size:13px;letter-spacing:1px;"
+        f"margin-bottom:16px;'>NOT COMPLETED</div>",
+        unsafe_allow_html=True,
+    )
+    today_plan = tp.PLAN.get(day_num) if active["phase_number"] == 1 else None
+    if not today_plan:
+        st.info(f"Day {day_num} of {active['name']} has no authored content on record.")
+        return
+    st.caption(f"Day {day_num} of {active['length_days']} — {today_plan['objective']} (planned, not done)")
+    _render_exercise_timeline(today_plan["exercises"])
+
+
+def _render_future_day(d: date, active: dict) -> None:
+    """Preview for a future date within the active phase. No Start action — you
+    can't begin a day out of sequence."""
+    day_num = ph.day_number_in_phase(active, d)
+    _day_overline(d)
+    today_plan = tp.PLAN.get(day_num) if active["phase_number"] == 1 else None
+    if not today_plan:
+        st.markdown(
+            f"<div style='color:{_OV_TEXT_SEC};font-size:13px;margin-bottom:12px;'>"
+            f"Scheduled for {d.strftime('%B')} {d.day} · Day {day_num} of {active['length_days']}</div>",
+            unsafe_allow_html=True,
+        )
+        st.info(f"Day {day_num} of {active['name']} has no authored content yet.")
+        return
+    st.markdown(
+        f"""
+<div style='color:{_OV_TEXT_PRI};font-size:22px;font-weight:700;margin-bottom:4px;'>{today_plan['objective']}</div>
+<div style='color:{_OV_TEXT_SEC};font-size:13px;margin-bottom:18px;'>
+    Day {day_num} of {active["length_days"]} — RPE target ≤{today_plan["session_rpe_target"]}/10<br>
+    Scheduled for {d.strftime('%B')} {d.day}</div>
+""",
+        unsafe_allow_html=True,
+    )
+    _render_exercise_timeline(today_plan["exercises"])
+
+
+def _render_rest_day(d: date) -> None:
+    _day_overline(d)
+    st.markdown(
+        f"<div style='background:{_OV_BG_ELEV};border-radius:16px;padding:28px 24px;"
+        f"text-align:center;color:{_OV_TEXT_SEC};font-size:14px;'>Rest day.</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_no_active_phase(phases: list[dict]) -> None:
+    """Reassessment gap — no phase covers today. Never shows a placeholder workout."""
+    upcoming = sorted(
+        (p for p in phases if p.get("status") == "upcoming"),
+        key=lambda p: p["start_date"],
+    )
+    next_line = (
+        f"Next phase — <strong style='color:{_OV_TEXT_PRI};'>{upcoming[0]['name']}</strong> "
+        f"— starts {upcoming[0]['start_date']}."
+        if upcoming else
+        "No upcoming phase configured yet."
+    )
+    st.markdown(
+        f"""
+<div style='background:{_OV_BG_ELEV};border-radius:16px;padding:28px 24px;text-align:center;'>
+  <div style='color:{_OV_TEXT_PRI};font-size:20px;font-weight:700;margin-bottom:10px;'>
+    Reassessment — no phase active</div>
+  <div style='color:{_OV_TEXT_SEC};font-size:13px;line-height:1.6;'>{next_line}</div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+
+def _render_day_detail(d: date, active: dict, phases: list[dict]) -> None:
+    """Dispatcher for any selected date other than today — active is guaranteed
+    non-None here (the 'no active phase at all' case is handled by the caller
+    before this is reached)."""
+    day_num = ph.day_number_in_phase(active, d)
+    if not (1 <= day_num <= active["length_days"]):
+        _render_rest_day(d)
+        return
+    if d < date.today():
+        try:
+            completed = db.has_logged_session(d)
+        except Exception:
+            completed = False
+        if completed:
+            _render_past_completed(d)
+        else:
+            _render_past_missed(d, active)
+    else:
+        _render_future_day(d, active)
+
+
+@st.dialog("Session Adaptation")
+def _adapt_session_dialog(readiness_modifier: dict) -> None:
+    factor = readiness_modifier.get("volume_factor", 1.0)
+    if factor == 1.0:
+        st.markdown("**No adaptation today** — your readiness supports the full prescribed volume.")
+    else:
+        direction = "increased" if factor > 1.0 else "reduced"
+        st.markdown(f"**Volume {direction} to {factor:.0%}** of the standard prescription.")
+        st.caption(readiness_modifier.get("description", ""))
+    st.divider()
+    st.caption(
+        "Based on your last 3 days of HRV, RHR and sleep. This adjusts reps, hold time and "
+        "duration automatically — sets and rest periods stay fixed. Safety ceilings (ACWR, "
+        "RPE cap) are never affected by this modifier."
+    )
+    if st.button("Close", use_container_width=True):
+        st.rerun()
+
+
+_FAB_CSS = f"""<style>
+[data-testid="stElementContainer"]:has(.stFabRow) + [data-testid="stElementContainer"] {{
+    position: fixed !important;
+    left: 20px !important;
+    right: 20px !important;
+    bottom: 84px !important;
+    z-index: 8500 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}}
+[data-testid="stElementContainer"]:has(.stFabRow) + [data-testid="stElementContainer"]
+    [data-testid="stHorizontalBlock"] {{
+    gap: 10px !important;
+}}
+[data-testid="stElementContainer"]:has(.stFabRow) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-secondary"] {{
+    background: rgba(42,49,54,0.75) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    border: 1px solid rgba(245,247,248,0.30) !important;
+    color: {_OV_TEXT_PRI} !important;
+    border-radius: 28px !important;
+    height: 56px !important;
+    font-weight: 600 !important;
+}}
+[data-testid="stElementContainer"]:has(.stFabRow) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-primary"] {{
+    background: {_OV_CTA_BG} !important;
+    color: {_OV_CTA_TEXT} !important;
+    border: none !important;
+    border-radius: 28px !important;
+    height: 56px !important;
+    font-weight: 700 !important;
+}}
+</style>"""
+
+
+def _render_overview(day_num: int, active: dict, today_plan: dict,
+                      exercises: list, directive: dict, readiness_modifier: dict) -> None:
+    """Today's session — coach header, workout card, accordions, floating actions.
+    The day strip, phase resolution, and past/future/rest routing all happen once
+    in render() before this is ever called; this only ever renders today."""
+    today = date.today()
+    duration_min       = _estimate_duration(exercises)
+    headline, subtitle  = _coach_message(directive, today_plan)
+
+    st.markdown(
+        f"""
+<div style='color:{_OV_TEXT_SEC};font-size:12px;letter-spacing:2px;font-weight:600;
+            text-transform:uppercase;margin-bottom:10px;'>{today.strftime('%b %d')}</div>
+<div style='color:{_OV_TEXT_PRI};font-size:26px;font-weight:700;line-height:1.3;
+            margin-bottom:8px;'>{headline}</div>
+<div style='color:{_OV_TEXT_SEC};font-size:14px;margin-bottom:20px;'>{subtitle}</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    _render_workout_card(day_num, active, today_plan, exercises, duration_min)
+
+    release_exercises = [ex for ex in exercises if ex["name"] in _RELEASE_EXERCISE_NAMES]
+    main_exercises     = [ex for ex in exercises if ex["name"] not in _RELEASE_EXERCISE_NAMES]
+
+    if release_exercises:
+        with st.expander(f"Release Protocol  ·  {len(release_exercises)}", expanded=False):
+            _render_exercise_timeline(release_exercises)
+
+    with st.expander(f"Workout  ·  {len(main_exercises)}", expanded=True):
+        _render_exercise_timeline(main_exercises)
+
+    # Spacer — keeps the last accordion row from being hidden behind the fixed
+    # floating action bar + bottom nav once scrolled to the end.
+    st.markdown("<div style='height:150px;'></div>", unsafe_allow_html=True)
+
+    st.markdown(_FAB_CSS, unsafe_allow_html=True)
+    st.markdown('<div class="stFabRow" style="display:none"></div>', unsafe_allow_html=True)
+    col_adapt, col_start = st.columns(2, gap="small")
+    with col_adapt:
+        if st.button("Adapt session", use_container_width=True):
+            _adapt_session_dialog(readiness_modifier)
+    with col_start:
+        if st.button("Start", type="primary", use_container_width=True):
+            st.session_state.tp_started = True
+            _save_checkpoint(day_num)
+            st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Main render() — entry point for app.py SPA routing
 # ─────────────────────────────────────────────────────────────────────────────
 
 def render():
-    # ── Session state initialisation ──────────────────────────────────────────
-    _init_state()
+    st.markdown(_PAGE_CSS, unsafe_allow_html=True)
+
+    # ── Session state initialisation — restores from a saved Notion checkpoint
+    #     if this is a fresh session (e.g. the browser dropped its connection
+    #     while a training session was in progress) ───────────────────────────
+    plan_start = _get_plan_start()
+    day_num = _get_day_number(plan_start) if plan_start else None
+    _init_state(day_num)
 
     # ── Readiness modifier — computed once per render, applied to prescriptions ─
     _sheet_id = st.secrets.get("GOOGLE_SHEETS_ID", "")
@@ -517,12 +1145,9 @@ def render():
     #  Main Page
     # ─────────────────────────────────────────────────────────────────────────
 
-    st.title("Training Plan")
-
-    plan_start = _get_plan_start()
-
     # ── Plan not yet configured ───────────────────────────────────────────────
     if plan_start is None:
+        st.title("Training Plan")
         st.subheader("Set Your Plan Start Date")
         st.info(
             "This 14-day progressive rehab plan is tailored to your MRI profile "
@@ -538,8 +1163,35 @@ def render():
             st.rerun()
         st.stop()
 
-    # ── Calculate current day ─────────────────────────────────────────────────
-    day_num = _get_day_number(plan_start)
+    # ── Universal weekly day strip — top of page, every state ───────────────────
+    phases, active = _seed_and_get_active_phase(plan_start)
+    _render_day_strip(active)
+
+    if active is None:
+        _render_no_active_phase(phases)
+        nav.inject("training")
+        st.stop()
+
+    _today = date.today()
+    _selected = st.session_state.tp_selected_date
+    if _selected != _today:
+        _render_day_detail(_selected, active, phases)
+        nav.inject("training")
+        st.stop()
+
+    # ── selected == today: existing day_num-driven flow, unchanged below ────────
+
+    # ── Day-overview screen — shown until "Start" is tapped for today's session ─
+    if (1 <= day_num <= 14 and not st.session_state.tp_done_today
+            and not st.session_state.tp_started):
+        _directive = _engine_directive()
+        today_plan = tp.PLAN[day_num]
+        exercises  = today_plan["exercises"]
+        _render_overview(day_num, active, today_plan, exercises, _directive, _readiness_modifier)
+        nav.inject("training")
+        st.stop()
+
+    st.title("Training Plan")
 
     # ── Status strip ──────────────────────────────────────────────────────────
     session_active = (
@@ -553,7 +1205,7 @@ def render():
     _sc2.metric("Today", str(date.today()))
     if 1 <= day_num <= 14:
         _sc3.metric("Day", f"{day_num} / 14")
-        st.progress(day_num / 14, text=f"{int(day_num / 14 * 100)}% complete")
+        _progress_bar("Phase progress", f"{day_num}/14", day_num / 14)
 
     if session_active:
         st.markdown(
@@ -561,7 +1213,7 @@ def render():
             "padding:10px 12px;margin-bottom:8px;'>"
             "<div style='font-size:10px;color:#FF2D44;letter-spacing:1px;margin-bottom:4px;'>"
             "SESSION IN PROGRESS</div>"
-            "<div style='font-size:11px;color:#888;'>Navigate freely — your place is saved.</div>"
+            "<div style='font-size:11px;color:#8A99A3;'>Navigate freely — your place is saved.</div>"
             "</div>",
             unsafe_allow_html=True,
         )
@@ -617,7 +1269,7 @@ def render():
             f"margin-bottom:10px;'>EXIT TRAINING</div>"
             f"<div style='font-size:22px;font-weight:700;color:#FFFFFF;margin-bottom:8px;'>"
             f"Are you sure you want to leave?</div>"
-            f"<div style='font-size:14px;color:#888;line-height:1.6;'>"
+            f"<div style='font-size:14px;color:#8A99A3;line-height:1.6;'>"
             f"You've completed <strong style='color:#FFFFFF;'>{ex_done} of {n_ex}</strong> exercises today.<br>"
             f"Your progress is saved — you can <strong>return and continue at any time</strong>.<br>"
             f"To fully exit and discard today's progress, click below."
@@ -631,22 +1283,22 @@ def render():
                 st.rerun()
         with col_exit:
             if st.button("Exit & Discard Progress", use_container_width=True):
-                _reset_session()
+                _reset_session(day_num)
                 st.rerun()
         st.stop()
 
     # Header
     st.markdown(
         f"<h2 style='margin-bottom:2px;'>Day {day_num} of 14</h2>"
-        f"<p style='color:#00D4AA;font-family:monospace;font-size:15px;margin-top:0;'>"
+        f"<p style='color:#E8ECEF;font-family:monospace;font-size:15px;margin-top:0;'>"
         f"{today_plan['objective']}</p>"
-        f"<p style='color:#888;font-size:13px;'>{today_plan['phase']} — RPE target: ≤{today_plan['session_rpe_target']}/10</p>",
+        f"<p style='color:#8A99A3;font-size:13px;'>{today_plan['phase']} — RPE target: ≤{today_plan['session_rpe_target']}/10</p>",
         unsafe_allow_html=True,
     )
 
     # Overall day progress bar
     ex_idx = n_ex if st.session_state.tp_done_today else st.session_state.tp_ex_idx
-    st.progress(ex_idx / n_ex, text=f"{ex_idx}/{n_ex} exercises complete")
+    _progress_bar("Today's session", f"{ex_idx}/{n_ex}", ex_idx / n_ex)
     st.divider()
 
     # ── Session done for today ────────────────────────────────────────────────
@@ -685,18 +1337,19 @@ def render():
                 with st.spinner("Saving session to Notion…"):
                     _auto_log_session(day_num, exercises, session_rpe, elapsed_minutes, session_notes)
                 st.session_state.tp_session_logged = True
+                _save_checkpoint(day_num)
                 st.rerun()
 
         else:
             st.balloons()
             st.markdown(
-                f"<div style='background:#071410;border:2px solid #00E874;"
+                f"<div style='background:#1A2026;"
                 f"border-radius:16px;padding:32px 24px;margin-bottom:20px;text-align:center;'>"
                 f"<div style='font-size:13px;color:#00E874;font-family:monospace;"
-                f"letter-spacing:3px;margin-bottom:10px;'>DAY {day_num} COMPLETE</div>"
+                f"letter-spacing:3px;margin-bottom:10px;'>✓ DAY {day_num} COMPLETE</div>"
                 f"<div style='font-size:26px;font-weight:700;color:#FFFFFF;margin-bottom:10px;'>"
                 f"Congratulations — session logged.</div>"
-                f"<div style='font-size:14px;color:#888;line-height:1.65;'>"
+                f"<div style='font-size:14px;color:#8A99A3;line-height:1.65;'>"
                 f"All {n_ex} exercises done. Record your pain score in Morning Check-In "
                 f"and come back tomorrow.</div>"
                 f"</div>",
@@ -717,7 +1370,7 @@ def render():
     # ── Readiness modifier badge ──────────────────────────────────────────────
     if _volume_factor != 1.0:
         _badge_color = (
-            "#00D4AA" if _volume_factor > 1.0
+            "#E8ECEF" if _volume_factor > 1.0
             else ("#FFD700" if _volume_factor >= 0.75 else "#FF4B4B")
         )
         st.markdown(
@@ -735,7 +1388,7 @@ def render():
             done   = i < st.session_state.tp_ex_idx
             active = i == st.session_state.tp_ex_idx
             icon   = "✅" if done else ("▶" if active else "○")
-            color  = "#00D4AA" if active else ("#666" if done else "#444")
+            color  = "#E8ECEF" if active else ("#666" if done else "#444")
             st.markdown(
                 f"<div style='color:{color};font-size:13px;padding:3px 0;'>"
                 f"{icon} {ex['name']}</div>",
@@ -745,6 +1398,7 @@ def render():
     # ── Active exercise ───────────────────────────────────────────────────────
     if st.session_state.tp_ex_idx >= n_ex:
         st.session_state.tp_done_today = True
+        _save_checkpoint(day_num)
         st.rerun()
 
     ex   = engine.apply_exercise_volume_modifier(
@@ -762,13 +1416,13 @@ def render():
 
     # Exercise header
     st.markdown(
-        f"<div style='background:#1A1F2E;border-left:4px solid #00D4AA;"
-        f"border-radius:8px;padding:16px 20px;margin-bottom:12px;'>"
-        f"<div style='font-size:11px;color:#00D4AA;font-family:monospace;"
+        f"<div style='background:#1A2026;"
+        f"border-radius:16px;padding:16px 20px;margin-bottom:12px;'>"
+        f"<div style='font-size:11px;color:#E8ECEF;font-family:monospace;"
         f"text-transform:uppercase;letter-spacing:2px;'>Exercise {ex_n} of {n_ex}</div>"
-        f"<div style='font-size:24px;font-weight:700;color:#E8EAF0;margin:4px 0;'>"
+        f"<div style='font-size:24px;font-weight:700;color:#E8ECEF;margin:4px 0;'>"
         f"{_type_icon(ex)} {ex['name']}</div>"
-        f"<div style='font-size:13px;color:#888;font-family:monospace;'>"
+        f"<div style='font-size:13px;color:#8A99A3;font-family:monospace;'>"
         f"{_prescription_label(ex)}</div></div>",
         unsafe_allow_html=True,
     )
@@ -798,16 +1452,16 @@ def render():
         if ex_type == "duration":
             st.markdown(
                 f"<div style='text-align:center;padding:12px;'>"
-                f"<div style='font-size:11px;color:#888;font-family:monospace;letter-spacing:2px;'>DURATION</div>"
+                f"<div style='font-size:11px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>DURATION</div>"
                 f"<div style='font-size:48px;font-weight:700;color:#FFD700;'>{ex['duration_minutes']}</div>"
-                f"<div style='font-size:13px;color:#888;'>minutes</div></div>",
+                f"<div style='font-size:13px;color:#8A99A3;'>minutes</div></div>",
                 unsafe_allow_html=True,
             )
         else:
             st.markdown(
                 f"<div style='text-align:center;padding:8px;'>"
-                f"<div style='font-size:11px;color:#888;font-family:monospace;letter-spacing:2px;'>SET</div>"
-                f"<div style='font-size:56px;font-weight:700;color:#E8EAF0;line-height:1;'>"
+                f"<div style='font-size:11px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>SET</div>"
+                f"<div style='font-size:56px;font-weight:700;color:#E8ECEF;line-height:1;'>"
                 f"{cur_set}<span style='font-size:28px;color:#555;'>/{total_sets}</span></div></div>",
                 unsafe_allow_html=True,
             )
@@ -815,7 +1469,7 @@ def render():
                 _side_color = "#FF9800" if _side == "right" else "#4FC3F7"
                 st.markdown(
                     f"<div style='text-align:center;margin-top:4px;'>"
-                    f"<div style='font-size:10px;color:#888;font-family:monospace;letter-spacing:2px;'>SIDE</div>"
+                    f"<div style='font-size:10px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>SIDE</div>"
                     f"<div style='font-size:28px;font-weight:700;color:{_side_color};line-height:1.1;'>"
                     f"{_side.upper()}</div></div>",
                     unsafe_allow_html=True,
@@ -823,23 +1477,23 @@ def render():
             if ex_type == "hold_reps" and ex.get("reps_in_set"):
                 st.markdown(
                     f"<div style='text-align:center;'>"
-                    f"<div style='font-size:11px;color:#888;font-family:monospace;letter-spacing:2px;'>REP</div>"
-                    f"<div style='font-size:40px;font-weight:700;color:#00D4AA;line-height:1;'>"
+                    f"<div style='font-size:11px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>REP</div>"
+                    f"<div style='font-size:40px;font-weight:700;color:#E8ECEF;line-height:1;'>"
                     f"{cur_rep}<span style='font-size:22px;color:#555;'>/{ex['reps_in_set']}</span></div></div>",
                     unsafe_allow_html=True,
                 )
             if ex_type == "reps":
                 st.markdown(
                     f"<div style='text-align:center;margin-top:8px;'>"
-                    f"<div style='font-size:11px;color:#888;font-family:monospace;letter-spacing:2px;'>REPS</div>"
-                    f"<div style='font-size:48px;font-weight:700;color:#E8EAF0;line-height:1;'>{ex['reps']}</div></div>",
+                    f"<div style='font-size:11px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>REPS</div>"
+                    f"<div style='font-size:48px;font-weight:700;color:#E8ECEF;line-height:1;'>{ex['reps']}</div></div>",
                     unsafe_allow_html=True,
                 )
                 if ex.get("tempo"):
                     ec, p, cn = (ex["tempo"].split("-") + ["?", "?", "?"])[:3]
                     st.markdown(
                         f"<div style='text-align:center;margin-top:6px;'>"
-                        f"<span style='font-size:11px;color:#888;font-family:monospace;'>"
+                        f"<span style='font-size:11px;color:#8A99A3;font-family:monospace;'>"
                         f"TEMPO: {ec}s lower · {p}s pause · {cn}s lift</span></div>",
                         unsafe_allow_html=True,
                     )
@@ -861,6 +1515,7 @@ def render():
                 st.session_state.tp_rep_in_set = 1
                 st.session_state.tp_side = "right"
                 st.session_state.tp_phase = "intro"
+                _save_checkpoint(day_num)
                 st.rerun()
 
         elif ex_type == "reps":
@@ -869,6 +1524,7 @@ def render():
                 if st.button("→ Next Set", type="primary", use_container_width=True):
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
+                    _save_checkpoint(day_num)
                     st.rerun()
             else:
                 # Clear any stale tp_auto_start from the rest timer — reps exercises have no
@@ -876,10 +1532,10 @@ def render():
                 components.html('<script>try{localStorage.removeItem("tp_auto_start");}catch(e){}</script>', height=0)
                 _side_note = f" — {_side.upper()} SIDE" if is_uni else ""
                 st.markdown(
-                    f"<div style='background:#1A1F2E;border-radius:8px;padding:20px;text-align:center;'>"
-                    f"<div style='color:#888;font-size:13px;margin-bottom:8px;'>"
+                    f"<div style='background:#1A2026;border-radius:8px;padding:20px;text-align:center;'>"
+                    f"<div style='color:#8A99A3;font-size:13px;margin-bottom:8px;'>"
                     f"Perform {ex['reps']} reps{_side_note}</div>"
-                    f"<div style='color:#E8EAF0;font-size:12px;'>"
+                    f"<div style='color:#E8ECEF;font-size:12px;'>"
                     + (f"Tempo: {ex['tempo'].replace('-','s – ')}s" if ex.get("tempo") else "Control each rep")
                     + "</div></div>",
                     unsafe_allow_html=True,
@@ -898,6 +1554,7 @@ def render():
                         else:
                             st.session_state.tp_set += 1
                             st.session_state.tp_phase = "resting"
+                    _save_checkpoint(day_num)
                     st.rerun()
 
         elif ex_type == "hold":
@@ -906,6 +1563,7 @@ def render():
                 if st.button("→ Next Set", type="primary", use_container_width=True):
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
+                    _save_checkpoint(day_num)
                     st.rerun()
             else:
                 _hold_label = f"HOLD — {_side.upper()} SIDE" if is_uni else "HOLD"
@@ -928,6 +1586,7 @@ def render():
                         else:
                             st.session_state.tp_set += 1
                             st.session_state.tp_phase = "resting"
+                    _save_checkpoint(day_num)
                     st.rerun()
 
         elif ex_type == "hold_reps":
@@ -938,6 +1597,7 @@ def render():
                     st.session_state.tp_rep_in_set = 1
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
+                    _save_checkpoint(day_num)
                     st.rerun()
             else:
                 _side_suffix = f" — {_side.upper()}" if is_uni else ""
@@ -968,6 +1628,7 @@ def render():
                                 st.session_state.tp_phase = "resting"
                     else:
                         st.session_state.tp_rep_in_set += 1
+                    _save_checkpoint(day_num)
                     st.rerun()
 
     # ── Clinical guidance section ─────────────────────────────────────────────
@@ -976,8 +1637,8 @@ def render():
 
     with col_bio:
         st.markdown(
-            f"<div style='background:#0E1117;border:1px solid #222;border-radius:8px;padding:14px;'>"
-            f"<div style='font-size:10px;color:#00D4AA;font-family:monospace;"
+            f"<div style='background:#1A2026;border-radius:16px;padding:14px;'>"
+            f"<div style='font-size:10px;color:#E8ECEF;font-family:monospace;"
             f"letter-spacing:2px;margin-bottom:6px;'>BIOMECHANICAL FOCUS</div>"
             f"<div style='font-size:13px;color:#C8CAD0;line-height:1.55;'>{ex['biomechanical_focus']}</div>"
             f"</div>",
@@ -986,11 +1647,11 @@ def render():
 
     with col_prog_reg:
         st.markdown(
-            f"<div style='background:#0E1117;border:1px solid #222;border-radius:8px;padding:14px;'>"
-            f"<div style='font-size:10px;color:#00D4AA;font-family:monospace;"
+            f"<div style='background:#1A2026;border-radius:16px;padding:14px;'>"
+            f"<div style='font-size:10px;color:#E8ECEF;font-family:monospace;"
             f"letter-spacing:2px;margin-bottom:6px;'>PROGRESSION / REGRESSION</div>"
             f"<div style='font-size:12px;color:#C8CAD0;line-height:1.5;'>"
-            f"<span style='color:#00D4AA;'>▲ Progress if:</span> {ex['progression']}<br><br>"
+            f"<span style='color:#E8ECEF;'>▲ Progress if:</span> {ex['progression']}<br><br>"
             f"<span style='color:#FF4B4B;'>▼ Regress if:</span> {ex['regression']}"
             f"</div></div>",
             unsafe_allow_html=True,
@@ -1004,4 +1665,5 @@ def render():
             st.session_state.tp_set = 1
             st.session_state.tp_rep_in_set = 1
             st.session_state.tp_phase = "intro"
+            _save_checkpoint(day_num)
             st.rerun()
