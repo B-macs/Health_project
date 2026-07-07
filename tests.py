@@ -501,6 +501,102 @@ check("heavy deadlift always contraindicated",     "heavy deadlift" in always_co
 check("jumping always contraindicated",            "jumping" in always_contra, True)
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Readiness Training Modifier
+# ─────────────────────────────────────────────────────────────────────────────
+
+section("Readiness Training Modifier")
+
+# Pure bucket helper
+check("high bucket at 85",   engine._bucket_readiness(85),    "high")
+check("normal bucket at 70", engine._bucket_readiness(70),    "normal")
+check("normal bucket at 60", engine._bucket_readiness(60),    "normal")
+check("below bucket at 55",  engine._bucket_readiness(55),    "below")
+check("below bucket at 40",  engine._bucket_readiness(40),    "below")
+check("low bucket at 39",    engine._bucket_readiness(39),    "low")
+check("low bucket at 0",     engine._bucket_readiness(0),     "low")
+check("unknown for None",    engine._bucket_readiness(None),  "unknown")
+
+# Modifier table — via _readiness_modifier_from_buckets
+_mfb = engine._readiness_modifier_from_buckets
+
+check("3-day high -> 1.12", _mfb(["high","high","high"])["volume_factor"],  1.12)
+check("2-day high -> 1.08", _mfb(["high","high","normal"])["volume_factor"], 1.08)
+check("1-day high -> 1.04", _mfb(["high","normal","normal"])["volume_factor"], 1.04)
+check("normal -> 1.00",     _mfb(["normal","normal","normal"])["volume_factor"], 1.00)
+check("1-day below -> 0.90",_mfb(["below","normal","normal"])["volume_factor"], 0.90)
+check("2-day below -> 0.82",_mfb(["below","below","normal"])["volume_factor"],  0.82)
+check("3-day below -> 0.75",_mfb(["below","below","below"])["volume_factor"],   0.75)
+check("1-day low -> 0.75",  _mfb(["low","normal","normal"])["volume_factor"],   0.75)
+check("2-day low -> 0.60",  _mfb(["low","low","normal"])["volume_factor"],      0.60)
+check("3-day low -> 0.50",  _mfb(["low","low","low"])["volume_factor"],         0.50)
+
+# Mixed: high today, low prior -- counts as 1-day high streak (no prior confirmation)
+check("high today, low prior -> 1.04", _mfb(["high","low","low"])["volume_factor"], 1.04)
+check("high today, low prior streak=1", _mfb(["high","low","low"])["streak_days"],   1)
+
+# Mixed: low today, high prior -- counts as 1-day low streak
+check("low today, high prior -> 0.75", _mfb(["low","high","high"])["volume_factor"], 0.75)
+
+# Empty / single unknown bucket
+check("empty list -> 1.00",         _mfb([])["volume_factor"],           1.00)
+check("unknown today -> 1.00",      _mfb(["unknown"])["volume_factor"],  1.00)
+
+# Volume floor — 3-day low never goes below 0.50
+check("3-day low floor at 0.50",   _mfb(["low","low","low"])["volume_factor"] >= 0.50, True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Apply Exercise Volume Modifier
+# ─────────────────────────────────────────────────────────────────────────────
+
+section("Apply Exercise Volume Modifier")
+
+_avm = engine.apply_exercise_volume_modifier
+
+# Fast path: factor == 1.0 returns same object
+_ex_base = {"name": "Bird-Dog", "hold_seconds": 45, "reps": 10, "sets": 3}
+check("factor 1.0 -> same object", _avm(_ex_base, 1.0) is _ex_base, True)
+
+# hold_seconds scaled by 0.75: round(45 * 0.75) = round(33.75) = 34
+check("hold_seconds 0.75: 45 -> 34",
+      _avm({"hold_seconds": 45}, 0.75)["hold_seconds"], 34)
+
+# reps scaled by 1.10: round(10 * 1.1) = round(11.0) = 11
+check("reps 1.10: 10 -> 11",
+      _avm({"reps": 10}, 1.10)["reps"], 11)
+
+# reps_in_set scaled by 0.60: round(5 * 0.60) = round(3.0) = 3
+check("reps_in_set 0.60: 5 -> 3",
+      _avm({"reps_in_set": 5}, 0.60)["reps_in_set"], 3)
+
+# duration_minutes scaled by 0.75: round(20 * 0.75 * 2) / 2 = round(30) / 2 = 15.0
+check("duration_minutes 0.75: 20 -> 15.0",
+      _avm({"duration_minutes": 20}, 0.75)["duration_minutes"], 15.0)
+
+# duration_minutes floor: round(5 * 0.10 * 2) / 2 = 0.0, but max(5, 0.0) = 5.0
+check("duration_minutes floor at 5",
+      _avm({"duration_minutes": 5}, 0.10)["duration_minutes"], 5.0)
+
+# hold_seconds floor: round(6 * 0.10) = 1, max(5, 1) = 5
+check("hold_seconds floor at 5",
+      _avm({"hold_seconds": 6}, 0.10)["hold_seconds"], 5)
+
+# reps floor: round(1 * 0.10) = 0, max(1, 0) = 1
+check("reps floor at 1",
+      _avm({"reps": 1}, 0.10)["reps"], 1)
+
+# sets are NOT changed by the modifier
+check("sets unchanged",
+      _avm({"sets": 3, "reps": 10}, 0.75)["sets"], 3)
+
+# rest_seconds are NOT changed
+check("rest_seconds unchanged",
+      _avm({"rest_seconds": 60, "reps": 10}, 0.75)["rest_seconds"], 60)
+
+# Missing fields are passed through untouched
+check("missing reps not added",
+      "reps" not in _avm({"hold_seconds": 30}, 0.75), True)
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Summary
 # ─────────────────────────────────────────────────────────────────────────────
 

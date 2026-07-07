@@ -15,6 +15,7 @@ Separation of concerns:
 import math
 from datetime import date, timedelta
 import rules as _rules
+import readiness as _readiness
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -136,6 +137,112 @@ def injury_weight_signal(weight: float) -> str:
     if weight > 0.20:
         return "yellow"
     return "green"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  READINESS-TO-TRAINING MODIFIER
+#  Adjusts session volume based on the last 3 days of readiness scores.
+#  Positive adjustments require multi-day confirmation; negatives compound immediately.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# (bucket, streak_days) → (volume_factor, rpe_delta, description)
+_READINESS_MODIFIER_TABLE: dict[tuple, tuple] = {
+    ("high",  3): (1.12, +0.5, "Strong 3-day readiness -- +12% volume"),
+    ("high",  2): (1.08, +0.5, "Strong 2-day readiness -- +8% volume"),
+    ("high",  1): (1.04,  0.0, "Good readiness -- +4% volume"),
+    ("below", 1): (0.90, -0.5, "Below baseline -- -10% volume"),
+    ("below", 2): (0.82, -1.0, "2-day low readiness -- -18% volume"),
+    ("below", 3): (0.75, -1.0, "3-day low readiness -- -25% volume"),
+    ("low",   1): (0.75, -1.0, "Poor readiness -- -25% volume"),
+    ("low",   2): (0.60, -1.5, "2-day poor readiness -- -40% volume"),
+    ("low",   3): (0.50, -1.5, "3-day poor readiness -- mobility only"),
+}
+
+
+def _bucket_readiness(score) -> str:
+    """Classify a 0-100 readiness score into a training bucket."""
+    if score is None or score == _readiness.NOT_COMPUTED:
+        return "unknown"
+    s = float(score)
+    if s >= 80.0:  return "high"
+    if s >= 60.0:  return "normal"
+    if s >= 40.0:  return "below"
+    return "low"
+
+
+def _readiness_modifier_from_buckets(buckets: list[str]) -> dict:
+    """
+    Pure helper: compute modifier dict from a list of readiness bucket labels.
+    buckets[0] = today, buckets[1] = yesterday, buckets[2] = day before.
+    Exposed as a non-underscore name so tests.py can call it directly.
+    """
+    today_bucket = buckets[0] if buckets else "unknown"
+
+    if today_bucket in ("unknown", "normal"):
+        return {"volume_factor": 1.0, "rpe_delta": 0.0,
+                "streak_days": 0, "streak_label": today_bucket, "description": ""}
+
+    neg_buckets = {"below", "low"}
+    streak = 1
+    if today_bucket == "high":
+        if len(buckets) > 1 and buckets[1] == "high":
+            streak = 2
+            if len(buckets) > 2 and buckets[2] == "high":
+                streak = 3
+    elif today_bucket in neg_buckets:
+        if len(buckets) > 1 and buckets[1] in neg_buckets:
+            streak = 2
+            if len(buckets) > 2 and buckets[2] in neg_buckets:
+                streak = 3
+
+    streak = min(streak, 3)
+    factor, rpe_delta, description = _READINESS_MODIFIER_TABLE.get(
+        (today_bucket, streak), (1.0, 0.0, "")
+    )
+    return {
+        "volume_factor": factor,
+        "rpe_delta":     rpe_delta,
+        "streak_days":   streak,
+        "streak_label":  today_bucket,
+        "description":   description,
+    }
+
+
+def readiness_training_modifier(bio_rows: list[dict]) -> dict:
+    """
+    Compute a training volume modifier from the last 3 days of readiness scores.
+
+    Returns volume_factor, rpe_delta, streak_days, streak_label, description.
+    volume_factor is in [0.50, 1.12]; rpe_delta is advisory only.
+    """
+    today  = date.today()
+    scores = []
+    for delta in range(3):
+        d = today - timedelta(days=delta)
+        rows_up_to = [r for r in bio_rows if r.get("date") and r["date"] <= d.isoformat()]
+        scores.append(_readiness.compute_readiness(d, rows_up_to))
+    buckets = [_bucket_readiness(s) for s in scores]
+    return _readiness_modifier_from_buckets(buckets)
+
+
+def apply_exercise_volume_modifier(ex: dict, volume_factor: float) -> dict:
+    """
+    Return a shallow copy of ex with reps/hold_seconds/reps_in_set/duration_minutes
+    scaled by volume_factor. Sets and rest_seconds are unchanged.
+    Returns the same object when volume_factor == 1.0 (fast path).
+    """
+    if volume_factor == 1.0:
+        return ex
+    m = dict(ex)
+    if m.get("reps") is not None:
+        m["reps"] = max(1, round(m["reps"] * volume_factor))
+    if m.get("hold_seconds") is not None:
+        m["hold_seconds"] = max(5, round(m["hold_seconds"] * volume_factor))
+    if m.get("reps_in_set") is not None:
+        m["reps_in_set"] = max(1, round(m["reps_in_set"] * volume_factor))
+    if m.get("duration_minutes") is not None:
+        m["duration_minutes"] = max(5.0, round(m["duration_minutes"] * volume_factor * 2) / 2)
+    return m
 
 
 def observation_days_remaining(data_days: int) -> int:

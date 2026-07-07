@@ -494,6 +494,11 @@ def _engine_directive() -> dict:
         return {"signal_color": "grey", "label": "", "action": "", "multiplier": 1.0}
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _bio_for_readiness(sheet_id: str) -> list[dict]:
+    return sync_sheets.get_biometric_rolling(sheet_id, days=14)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Main render() — entry point for app.py SPA routing
 # ─────────────────────────────────────────────────────────────────────────────
@@ -501,6 +506,12 @@ def _engine_directive() -> dict:
 def render():
     # ── Session state initialisation ──────────────────────────────────────────
     _init_state()
+
+    # ── Readiness modifier — computed once per render, applied to prescriptions ─
+    _sheet_id = st.secrets.get("GOOGLE_SHEETS_ID", "")
+    _rm_bio = _bio_for_readiness(_sheet_id) if _sheet_id else []
+    _readiness_modifier = engine.readiness_training_modifier(_rm_bio)
+    _volume_factor = _readiness_modifier.get("volume_factor", 1.0)
 
     # ─────────────────────────────────────────────────────────────────────────
     #  Main Page
@@ -703,6 +714,21 @@ def render():
         nav.inject("training")
         st.stop()
 
+    # ── Readiness modifier badge ──────────────────────────────────────────────
+    if _volume_factor != 1.0:
+        _badge_color = (
+            "#00D4AA" if _volume_factor > 1.0
+            else ("#FFD700" if _volume_factor >= 0.75 else "#FF4B4B")
+        )
+        st.markdown(
+            f"<div style='background:#0E1117;border-left:3px solid {_badge_color};"
+            f"border-radius:6px;padding:8px 12px;margin-bottom:8px;'>"
+            f"<span style='font-size:11px;color:{_badge_color};font-family:monospace;"
+            f"letter-spacing:1px;'>SESSION ADAPTED &nbsp;·&nbsp; "
+            f"{_readiness_modifier['description']}</span></div>",
+            unsafe_allow_html=True,
+        )
+
     # ── Exercise progress list ────────────────────────────────────────────────
     with st.expander("Today's Exercises", expanded=False):
         for i, ex in enumerate(exercises):
@@ -721,7 +747,8 @@ def render():
         st.session_state.tp_done_today = True
         st.rerun()
 
-    ex   = exercises[st.session_state.tp_ex_idx]
+    ex   = engine.apply_exercise_volume_modifier(
+               exercises[st.session_state.tp_ex_idx], _volume_factor)
     ex_n = st.session_state.tp_ex_idx + 1
 
     # Unique timer keys scoped to this exercise / set / rep / side
