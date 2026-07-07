@@ -15,17 +15,18 @@ from __future__ import annotations
 
 import base64
 import math
+from dataclasses import asdict
 from datetime import date, timedelta
 from pathlib import Path
 
 import streamlit as st
 
-import db
-import engine
 import nav
-import readiness as readiness_model
+import repo
 import styles
-import sync_sheets
+from services import dashboard as dash
+from services import engine
+from services import readiness as readiness_model
 
 # ─── Page config ─────────────────────────────────────────────────────────────
 
@@ -92,18 +93,19 @@ can_go_next = next_date <= _today
 # ─── Data fetching ────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _bio_rolling(sheet_id: str, days: int = 32) -> list[dict]:
-    return sync_sheets.get_biometric_rolling(sheet_id, days=days)
+def _bio_rolling(days: int = 32) -> list[dict]:
+    # engine.py/readiness.py still work on plain dicts -- asdict() converts
+    # the typed BiometricRecord back to the exact shape they expect.
+    return [asdict(r) for r in repo.get_repository().get_biometric_rolling(days=days)]
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _au_history(days: int = 28) -> list[dict]:
-    return db.get_daily_session_au(days)
+    return repo.get_repository().get_daily_session_au(days)
 
 
 try:
-    _sheet_id = st.secrets["GOOGLE_SHEETS_ID"]
-    _bio_rows = _bio_rolling(_sheet_id, days=60)   # 60d to support 56d sleep baseline
+    _bio_rows = _bio_rolling(days=60)   # 60d to support 56d sleep baseline
 except Exception:
     _bio_rows = []
 
@@ -114,7 +116,7 @@ except Exception:
     pass
 
 try:
-    _current_stage = db.get_current_stage()
+    _current_stage = repo.get_repository().get_current_stage()
 except Exception:
     _current_stage = 1
 
@@ -128,64 +130,28 @@ _bio_7d = sorted(
     key=lambda r: r["date"],
 )
 
-# ─── Domain helpers ───────────────────────────────────────────────────────────
-
-def _au_to_strain(au: float | None) -> float | None:
-    if au is None or au <= 0:
-        return None
-    return engine.au_to_strain(au, _current_stage)
-
-
-def _fill_7day(rows: list[dict], key: str) -> list:
-    by_date = {r["date"]: r.get(key) for r in rows}
-    return [by_date.get((selected_date - timedelta(days=6 - i)).isoformat()) for i in range(7)]
-
-
 # ─── Computed values ──────────────────────────────────────────────────────────
 
 _readiness_score = readiness_model.compute_readiness(selected_date, _bio_rows)
-_strain_score    = _au_to_strain(_au_day["total_au"] if _au_day else None)
+_strain_score    = dash.au_to_strain_or_none(_au_day["total_au"] if _au_day else None, _current_stage)
 _sleep_hours     = _bio_day.get("sleep_duration_hours") if _bio_day else None
 
 # Rolling 7-day prior strain — body load already accumulated before today's session.
-# Builds a true 7-day average including rest days (0 AU), so it can't be inflated
-# by training frequency. Excludes today so it always reflects pre-session state.
-_au_by_date = {r["date"]: float(r["total_au"]) for r in _au_rows}
-_prior_7d_au = [
-    _au_by_date.get((date.today() - timedelta(days=d)).isoformat(), 0.0)
-    for d in range(1, 8)
-]
-_prior_avg_au   = sum(_prior_7d_au) / 7
-_rolling_strain = engine.au_to_strain(_prior_avg_au, _current_stage) if _prior_avg_au > 0 else None
+# Excludes today so it always reflects pre-session state.
+_rolling_strain = dash.rolling_prior_strain(_au_rows, _current_stage, today=date.today())
 # When no session today: show rolling body load. After training: show today's strain.
-_strain_is_rolling = _strain_score is None and _rolling_strain is not None
-_display_strain    = _strain_score if _strain_score is not None else _rolling_strain
+_display_strain, _strain_is_rolling = dash.display_strain(_strain_score, _rolling_strain)
 
 # Step count modifier: shift displayed strain by yesterday's non-training load.
-# Baseline: 7 days before yesterday (today-8 through today-2), non-None only.
-if _display_strain is not None:
-    _yesterday_str   = (date.today() - timedelta(days=1)).isoformat()
-    _baseline_strs   = {(date.today() - timedelta(days=d)).isoformat() for d in range(2, 9)}
-    _yesterday_steps = next(
-        (r["steps"] for r in _bio_rows
-         if r.get("date") == _yesterday_str and r.get("steps") is not None),
-        None,
-    )
-    _baseline_steps = [
-        r["steps"] for r in _bio_rows
-        if r.get("date") in _baseline_strs and r.get("steps") is not None
-    ]
-    _step_mod = engine.step_strain_modifier(_yesterday_steps, _baseline_steps)
-    if _step_mod != 0.0:
-        _display_strain = round(max(0.0, min(21.0, _display_strain + _step_mod)), 1)
+_display_strain = dash.apply_step_modifier(_display_strain, _bio_rows, today=date.today())
 
 # Progressive sleep baseline (7→14→28→56 nights, outliers <4h/>11h removed)
 _sleep_base_hours, _sleep_base_window = readiness_model.sleep_baseline(_bio_rows)
 _sleep_need = _sleep_base_hours if _sleep_base_hours else _SLEEP_NEED_HOURS
-_sleep_pct  = round(_sleep_hours / _sleep_need * 100) if _sleep_hours else None
+_sleep_pct  = dash.sleep_percent(_sleep_hours, _sleep_need)
 
-_hrv_7d = _fill_7day(_bio_7d, "hrv_ms")
-_rhr_7d = _fill_7day(_bio_7d, "resting_heart_rate")
+_hrv_7d = dash.fill_7day(_bio_7d, "hrv_ms", selected_date)
+_rhr_7d = dash.fill_7day(_bio_7d, "resting_heart_rate", selected_date)
 
 # ─── Image loading ────────────────────────────────────────────────────────────
 
@@ -269,82 +235,8 @@ def _sparkline(values: list, width: int = 290, height: int = 68,
     )
 
 
-# ─── Status classifiers ───────────────────────────────────────────────────────
-
-def _readiness_meta(score) -> tuple:
-    if score is None or score == _NOT_COMPUTED:
-        return "#555555", "--", "No Readings", "Awaiting Data", \
-               "The readiness model hasn't computed a score yet.", ""
-    s = float(score)
-    if s >= 85:   c, lbl, hdr = "#6BAF8B", "Optimal",       "Bring it on"
-    elif s >= 70: c, lbl, hdr = "#BFA06A", "Good",           "Ready to train"
-    elif s >= 50: c, lbl, hdr = "#BFA06A", "Pay Attention",  "Take it measured"
-    else:         c, lbl, hdr = "#C47878", "Rest",           "Recover today"
-    descs = {
-        "Optimal":      "Your recovery metrics indicate full training capacity today.",
-        "Good":         "Your body is recovered. A solid session is on the cards.",
-        "Pay Attention":"Some recovery markers are below baseline. Train within yourself.",
-        "Rest":         "Significant fatigue signals present. Prioritise rest and mobility.",
-    }
-    return c, str(int(s)), lbl, hdr, descs[lbl], ""
-
-
-def _strain_meta(score, is_rolling: bool = False) -> tuple:
-    if score is None:
-        return "#555555", "--", "No Readings", "No workload logged", \
-               "No training data recorded for this day."
-    s = float(score)
-    if s < 6:    c, lbl = "#6BAF8B", "Light"
-    elif s < 10: c, lbl = "#BFA06A", "Moderate"
-    elif s < 14: c, lbl = "#C47878", "Hard"
-    else:        c, lbl = "#C47878", "Strenuous"
-    if is_rolling:
-        heads = {
-            "Light":     "Low body load",
-            "Moderate":  "Moderate body load",
-            "Hard":      "High body load",
-            "Strenuous": "Very high body load",
-        }
-        descs = {
-            "Light":     "Low average training load over the past 7 days. Body has capacity to build.",
-            "Moderate":  "Steady training stimulus from recent sessions. On track for adaptation.",
-            "Hard":      "Significant accumulated load going into today. Prioritise recovery.",
-            "Strenuous": "High load from recent sessions. Assess recovery before adding more volume.",
-        }
-    else:
-        heads = {"Light": "Light day", "Moderate": "Building momentum",
-                 "Hard": "High output", "Strenuous": "Peak effort"}
-        descs = {
-            "Light":     "Minimal cardiovascular stress. Ideal for active recovery.",
-            "Moderate":  "Solid aerobic work accumulating. Body is adapting.",
-            "Hard":      "Significant load logged. Adequate recovery needed before next session.",
-            "Strenuous": "Max exertion. Full recovery required before your next training block.",
-        }
-    return c, f"{s:.1f}", lbl, heads[lbl], descs[lbl]
-
-
-def _sleep_meta(pct) -> tuple:
-    if pct is None:
-        return "#555555", "--%", "No Readings", "Sleep data missing", \
-               "No sleep data available for this day."
-    p = float(pct)
-    if p >= 85:   c, lbl = "#6BAF8B", "Optimal"
-    elif p >= 70: c, lbl = "#BFA06A", "Good"
-    elif p >= 50: c, lbl = "#BFA06A", "Pay Attention"
-    else:         c, lbl = "#C47878", "Insufficient"
-    heads = {"Optimal": "Well rested", "Good": "Adequate rest",
-             "Pay Attention": "Sleep deficit", "Insufficient": "Significant deficit"}
-    _base_label = (
-        f"{_sleep_base_window}d avg ({_sleep_need:.1f} h)"
-        if _sleep_base_hours else f"target ({_sleep_need:.0f} h)"
-    )
-    descs = {
-        "Optimal":      f"Sleep met or exceeded your personal baseline — {_base_label}.",
-        "Good":         f"You reached {p:.0f}% of your baseline {_base_label}. Recovery is solid.",
-        "Pay Attention":f"Only {p:.0f}% of baseline {_base_label} met. Fatigue may accumulate.",
-        "Insufficient": f"Sleep critically short ({p:.0f}% of baseline {_base_label}). Recovery impaired.",
-    }
-    return c, f"{p:.0f}%", lbl, heads[lbl], descs[lbl]
+# Status classifiers (readiness_meta/strain_meta/sleep_meta) now live in
+# services/dashboard.py — see the "Build cards" section below for call sites.
 
 
 # ─── Card builder ────────────────────────────────────────────────────────────
@@ -441,7 +333,7 @@ def _strain_detail() -> str:
             f'</div>'
         )
 
-    s_col, s_disp, s_lbl, _, _ = _strain_meta(_display_strain, is_rolling=_strain_is_rolling)
+    s_col, s_disp, s_lbl, _, _ = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
     _detail_label = "STRAIN · 7D AVG" if _strain_is_rolling else f"STRAIN · {date_label}"
     return (
         f'<div style="padding:16px;">'
@@ -522,14 +414,14 @@ _home_css = """<style>
 
 # ─── Build cards ─────────────────────────────────────────────────────────────
 
-r_col, r_disp, r_lbl, r_hdr, r_desc, r_tert = _readiness_meta(_readiness_score)
+r_col, r_disp, r_lbl, r_hdr, r_desc, r_tert = dash.readiness_meta(_readiness_score)
 _card_readiness = _card_html(
     "READINESS", _bg["readiness"],
     _arc_svg(_readiness_score, 100, r_col),
     r_disp, r_lbl, r_col, r_hdr, r_desc, r_tert,
 )
 
-s_col, s_disp, s_lbl, s_hdr, s_desc = _strain_meta(_display_strain, is_rolling=_strain_is_rolling)
+s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
 _strain_card_label = "STRAIN  ·  7D AVG" if _strain_is_rolling else "STRAIN"
 _card_strain = _card_html(
     _strain_card_label, _bg["strain"],
@@ -538,7 +430,7 @@ _card_strain = _card_html(
     click_href=f"?d={selected_date}&view=strain",
 )
 
-sl_col, sl_disp, sl_lbl, sl_hdr, sl_desc = _sleep_meta(_sleep_pct)
+sl_col, sl_disp, sl_lbl, sl_hdr, sl_desc = dash.sleep_meta(_sleep_pct, _sleep_need, _sleep_base_window)
 _card_sleep = _card_html(
     "SLEEP", _bg["sleep"],
     _arc_svg(_sleep_pct, 100, sl_col),
