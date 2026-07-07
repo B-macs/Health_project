@@ -206,6 +206,91 @@ PROFILE = {
     },
 
     # ─────────────────────────────────────────────────────────────────────────
+    #  Symptom Log
+    # ─────────────────────────────────────────────────────────────────────────
+
+    "symptom_log": [
+        {
+            "date":   "2026-07-06",
+            "status": "Active — monitoring",
+            "region": "Left lower/mid back — from under left glute up the left side of the spine",
+            "title":  "Left Back Strain (Walking Posture Change)",
+
+            "mechanism": (
+                "Went for a walk with habitual anterior pelvic tilt. "
+                "Attempted posture correction: shifted trunk/ribcage back over the hips "
+                "(swayback-type correction) — no deliberate pelvic tuck; felt unrestricted at the time. "
+                "First 10–15 min: hip flexor stretch sensation bilaterally (expected — relative hip extension). "
+                "Progressive onset thereafter: sensation migrated under left glute → low back → "
+                "up left side of back. No pop, no sharp event. "
+                "Reverted to habitual pattern mid-walk once discomfort built."
+            ),
+
+            "symptoms": {
+                "location": (
+                    "Soreness along a line running up the centre-left of the back, "
+                    "angling laterally (away from spine toward side of body), ending below mid-back. "
+                    "Consistent with iliocostalis fibre direction."
+                ),
+                "painful_with":   ["Walking", "Side-bending RIGHT (stretching left side)"],
+                "pain_free_with": ["Side-bending LEFT (stretching right side)"],
+                "neural":         "None — no leg symptoms, no numbness, no tingling",
+            },
+
+            "assessment": {
+                "likely_tissue": [
+                    "Left erector spinae — iliocostalis (lateral column; matches line angling away from spine)",
+                    "Left quadratus lumborum (QL) — possible co-involvement",
+                ],
+                "mechanism": (
+                    "Trunk held behind base of support forced spinal erectors/QL to contract "
+                    "isometrically in a shortened position for the duration of the walk → "
+                    "fatigue overload strain. Not a stretch injury."
+                ),
+                "why_left": (
+                    "Pre-existing left-side asymmetry; left QL likely already working harder at baseline."
+                ),
+                "underlying_pattern": (
+                    "Anterior pelvic tilt with tight/short psoas, iliacus, rectus femoris; "
+                    "relatively underactive glutes and anterior core."
+                ),
+            },
+
+            "plan": [
+                "Let area settle 3–5 days; keep walking in normal pattern, gentle movement only.",
+                "No forced posture corrections on walks until strength work is established.",
+                "Hip flexor lengthening separately: couch stretch, half-kneeling hip flexor stretch.",
+                "Glute + anterior core strengthening: glute bridges, dead bugs.",
+                "When reintroducing posture changes: 2–3 min doses maximum, not full walks.",
+            ],
+
+            "escalation_criteria": [
+                "Still sore after ~1 week with no improvement → see physio",
+                "Pain becomes sharp or radiates down a leg",
+                "Any numbness or tingling",
+            ],
+
+            "notes": [
+                (
+                    "Baseline activity is high (~16k steps/day, single-leg glute bridges in current "
+                    "physio work, extended dancing 2 days prior without issue) — this is a task-specific "
+                    "overload of sustained isometric postural holding, not a general capacity problem."
+                ),
+                (
+                    "Proprioception note: position felt like hips stacked under shoulders but was "
+                    "actually a slight trunk lean back. Internal sense of 'neutral' is calibrated to "
+                    "habitual anterior tilt — genuinely neutral/corrected positions feel further back "
+                    "than they are. Expect this miscalibration when reintroducing posture drills."
+                ),
+                (
+                    "Lesson: a comfortable posture change is not a conditioned one. "
+                    "Tissues need weeks of graded exposure to adapt — exposure dose matters."
+                ),
+            ],
+        },
+    ],
+
+    # ─────────────────────────────────────────────────────────────────────────
     #  Stage Advancement Criteria (to be evaluated at Day 14)
     # ─────────────────────────────────────────────────────────────────────────
 
