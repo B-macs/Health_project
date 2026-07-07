@@ -4,6 +4,7 @@ verbatim from db.py / sync_sheets.py."""
 
 import ast
 
+import gspread
 import httpx
 import pytest
 from notion_client.errors import APIResponseError
@@ -219,6 +220,108 @@ def test_get_all_records():
 
     out = sheets_client_mod.get_all_records(_Client(), "sheet-xyz")
     assert out == [{"Date/Time": "2026-07-01 08:00", "Heart Rate Variability (ms)": "45.2"}]
+
+
+# ─── Weekly Rollup worksheet primitives ─────────────────────────────────────
+
+class _FakeCell:
+    def __init__(self, row):
+        self.row = row
+
+
+class _FakeWeeklyRollupWorksheet:
+    def __init__(self, rows=None):
+        self.rows = rows or []  # list of row_values lists, in sheet order
+        self.updates = []
+        self.appended = []
+        self.header_written = None
+
+    def get_all_records(self):
+        return [dict(zip(self.header_written or [], r)) for r in self.rows]
+
+    def find(self, query, in_column=None):
+        idx = in_column - 1
+        for i, row in enumerate(self.rows):
+            if idx < len(row) and row[idx] == query:
+                return _FakeCell(row=i + 2)  # +1 for header row, +1 for 1-indexing
+        return None
+
+    def update(self, values, range_name):
+        self.updates.append((range_name, values))
+        # Reflect the update back into self.rows so a second call in the
+        # same test sees the new state, like a real sheet would.
+        row_idx = int("".join(c for c in range_name.split(":")[0] if c.isdigit())) - 2
+        if 0 <= row_idx < len(self.rows):
+            self.rows[row_idx] = list(values[0])
+
+    def append_row(self, values):
+        self.appended.append(values)
+        self.rows.append(list(values))
+
+
+class _FakeSpreadsheet:
+    def __init__(self, worksheets=None):
+        self._worksheets = worksheets or {}
+        self.added = []
+
+    def worksheet(self, name):
+        if name not in self._worksheets:
+            raise gspread.WorksheetNotFound(name)
+        return self._worksheets[name]
+
+    def add_worksheet(self, title, rows, cols):
+        ws = _FakeWeeklyRollupWorksheet()
+        self._worksheets[title] = ws
+        self.added.append({"title": title, "rows": rows, "cols": cols})
+        return ws
+
+
+class _FakeSpreadsheetClient:
+    def __init__(self, spreadsheet):
+        self._spreadsheet = spreadsheet
+
+    def open_by_key(self, sheet_id):
+        return self._spreadsheet
+
+
+_HEADER = ["week_start", "week_end", "phase", "scheduled", "completed", "ratio", "status", "computed_at"]
+
+
+def test_get_or_create_weekly_rollup_worksheet_creates_when_absent():
+    spreadsheet = _FakeSpreadsheet()
+    client = _FakeSpreadsheetClient(spreadsheet)
+    ws = sheets_client_mod.get_or_create_weekly_rollup_worksheet(client, "sheet-1", _HEADER)
+    assert spreadsheet.added == [{"title": "Weekly Rollup", "rows": 200, "cols": 10}]
+    assert ws.updates == [("A1", [_HEADER])]
+
+
+def test_get_or_create_weekly_rollup_worksheet_reuses_existing():
+    existing = _FakeWeeklyRollupWorksheet()
+    spreadsheet = _FakeSpreadsheet({"Weekly Rollup": existing})
+    client = _FakeSpreadsheetClient(spreadsheet)
+    ws = sheets_client_mod.get_or_create_weekly_rollup_worksheet(client, "sheet-1", _HEADER)
+    assert ws is existing
+    assert spreadsheet.added == []
+
+
+def test_upsert_weekly_rollup_row_appends_when_key_not_found():
+    ws = _FakeWeeklyRollupWorksheet()
+    sheets_client_mod.upsert_weekly_rollup_row(ws, key_col=1, key_value="2026-07-06", row_values=["2026-07-06", "x"])
+    assert ws.appended == [["2026-07-06", "x"]]
+    assert ws.updates == []
+
+
+def test_upsert_weekly_rollup_row_updates_in_place_when_key_found():
+    ws = _FakeWeeklyRollupWorksheet(rows=[["2026-07-06", "old"]])
+    sheets_client_mod.upsert_weekly_rollup_row(ws, key_col=1, key_value="2026-07-06", row_values=["2026-07-06", "new"])
+    assert ws.appended == []
+    assert ws.updates == [("A2:B2", [["2026-07-06", "new"]])]
+
+
+def test_upsert_weekly_rollup_row_never_appends_a_duplicate():
+    ws = _FakeWeeklyRollupWorksheet(rows=[["2026-07-06", "old"]])
+    sheets_client_mod.upsert_weekly_rollup_row(ws, key_col=1, key_value="2026-07-06", row_values=["2026-07-06", "new"])
+    assert len(ws.rows) == 1
 
 
 # ─── No Streamlit imports ───────────────────────────────────────────────────

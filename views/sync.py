@@ -7,6 +7,7 @@ import streamlit as st
 import pandas as pd
 from dataclasses import asdict
 import repo
+from services import metrics
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -66,3 +67,16 @@ def render() -> None:
         st.dataframe(pd.DataFrame(engine_rows), use_container_width=True)
     else:
         st.info("No rows within the last 28 days.")
+
+    st.divider()
+    st.subheader("Weekly Rollup")
+    st.caption("Materializes every ended Mon-Sun week's Perfect/Ultimate Week status to its own Sheet tab.")
+    if st.button("Sync Weekly Rollup", use_container_width=False, key="sync_weekly_rollup"):
+        with st.spinner("Syncing Weekly Rollup…"):
+            result = metrics.sync_weekly_rollup(repo.get_repository())
+        if result.ok:
+            n = len(result.synced_week_starts)
+            st.success(f"Synced {n} week{'s' if n != 1 else ''} to the Weekly Rollup tab." if n else
+                       "Weekly Rollup is up to date — no ended weeks to sync yet.")
+        else:
+            st.warning(f"Weekly Rollup sync failed: {result.error}")

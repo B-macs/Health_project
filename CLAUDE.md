@@ -1,6 +1,6 @@
 # CLAUDE.md — Health Engine
 
-*Last updated: 2026-07-07 after the services/ extraction (framework-agnostic backend + logic layer, zero Streamlit imports).*
+*Last updated: 2026-07-07 after the services/ extraction (framework-agnostic backend + logic layer, zero Streamlit imports) and the Weekly Rollup / Perfect-Ultimate Week metric feature.*
 
 ---
 
@@ -23,7 +23,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **192/192 passed**
+Expected: **245/245 passed**
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -36,7 +36,7 @@ Expected: **192/192 passed**
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 192/192 (or higher if new tests were added)
+1. `python -m pytest tests/` → 245/245 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -61,9 +61,14 @@ repo.py — Streamlit-layer bootstrap: builds a services.config.Config from
 services/ — framework-agnostic backend + business logic. ZERO Streamlit
   imports anywhere (enforced by tests/test_no_streamlit_in_services.py).
   Pure logic:      engine.py · readiness.py · stats.py · rules.py · ai.py ·
-                    plan.py · sessions.py · dashboard.py · insights.py
+                    plan.py · sessions.py · dashboard.py · insights.py ·
+                    metrics_logic.py (Weekly Rollup / Perfect-Ultimate Week scoring)
+  Orchestration:    metrics.py — sync_weekly_rollup(); the one services/
+                    module that both computes (via metrics_logic.py) and
+                    does I/O (via repository.py) in the same call.
   Typed models:     models.py (Phase, SessionRecord, ExerciseEntry, DayCell,
-                    CheckInRecord, BiometricRecord — dataclasses)
+                    CheckInRecord, BiometricRecord, WeekScore, StreakInfo —
+                    dataclasses)
   I/O clients:      clients/notion.py, clients/sheets.py (generic primitives
                     only, no column/property names)
   Data access:      repository.py — the ONLY place Notion property names /

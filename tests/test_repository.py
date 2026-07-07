@@ -343,6 +343,131 @@ def test_get_biometric_rolling_empty_sheet_range():
     assert repo.get_biometric_rolling(today=datetime.date(2026, 7, 7)) == []
 
 
+# ─── Weekly Rollup — WeekScore <-> row mapping ──────────────────────────────
+
+class _FakeCell:
+    def __init__(self, row):
+        self.row = row
+
+
+class _FakeWeeklyRollupWorksheet:
+    def __init__(self, rows=None, header=None):
+        self.header = header or [
+            "week_start", "week_end", "phase", "scheduled", "completed", "ratio", "status", "computed_at",
+        ]
+        self.rows = rows or []
+        self.updates = []
+        self.appended = []
+
+    def get_all_records(self):
+        return [dict(zip(self.header, r)) for r in self.rows]
+
+    def find(self, query, in_column=None):
+        idx = in_column - 1
+        for i, row in enumerate(self.rows):
+            if idx < len(row) and row[idx] == query:
+                return _FakeCell(row=i + 2)
+        return None
+
+    def update(self, values, range_name):
+        self.updates.append((range_name, values))
+
+    def append_row(self, values):
+        self.appended.append(values)
+        self.rows.append(list(values))
+
+
+class _FakeWeeklyRollupSpreadsheet:
+    def __init__(self, ws: _FakeWeeklyRollupWorksheet):
+        self._ws = ws
+
+    def worksheet(self, name):
+        return self._ws
+
+
+class _FakeWeeklyRollupSheetsClient:
+    def __init__(self, ws: _FakeWeeklyRollupWorksheet):
+        self._ws = ws
+
+    def open_by_key(self, sheet_id):
+        return _FakeWeeklyRollupSpreadsheet(self._ws)
+
+
+def _repo_with_weekly_rollup(ws: _FakeWeeklyRollupWorksheet) -> Repository:
+    repo = Repository(_config())
+    repo._sheets_client = _FakeWeeklyRollupSheetsClient(ws)
+    return repo
+
+
+def test_upsert_weekly_rollup_writes_expected_row_shape():
+    ws = _FakeWeeklyRollupWorksheet()
+    repo = _repo_with_weekly_rollup(ws)
+    score = models.WeekScore(
+        week_start="2026-07-06", week_end="2026-07-12", phase_number=1,
+        scheduled=5, completed=4, status="perfect", computed_at="2026-07-13T09:00:00",
+    )
+    written = repo.upsert_weekly_rollup([score])
+    assert written == ["2026-07-06"]
+    assert ws.appended == [[
+        "2026-07-06", "2026-07-12", "1", "5", "4", "4/5", "perfect", "2026-07-13T09:00:00",
+    ]]
+
+
+def test_upsert_weekly_rollup_updates_in_place_not_duplicate():
+    ws = _FakeWeeklyRollupWorksheet(rows=[
+        ["2026-07-06", "2026-07-12", "1", "3", "2", "2/3", "normal", "2026-07-13T09:00:00"],
+    ])
+    repo = _repo_with_weekly_rollup(ws)
+    score = models.WeekScore(
+        week_start="2026-07-06", week_end="2026-07-12", phase_number=1,
+        scheduled=5, completed=5, status="ultimate", computed_at="2026-07-20T09:00:00",
+    )
+    repo.upsert_weekly_rollup([score])
+    assert ws.appended == []
+    assert len(ws.rows) == 1
+    assert len(ws.updates) == 1
+
+
+def test_upsert_weekly_rollup_phase_none_writes_empty_string():
+    ws = _FakeWeeklyRollupWorksheet()
+    repo = _repo_with_weekly_rollup(ws)
+    score = models.WeekScore(
+        week_start="2026-06-22", week_end="2026-06-28", phase_number=None,
+        scheduled=0, completed=0, status="no_plan", computed_at="2026-07-01T09:00:00",
+    )
+    repo.upsert_weekly_rollup([score])
+    assert ws.appended[0][2] == ""  # phase column
+
+
+def test_get_weekly_rollup_history_parses_rows_back_to_weekscore():
+    ws = _FakeWeeklyRollupWorksheet(rows=[
+        ["2026-07-06", "2026-07-12", "1", "5", "4", "4/5", "perfect", "2026-07-13T09:00:00"],
+    ])
+    repo = _repo_with_weekly_rollup(ws)
+    history = repo.get_weekly_rollup_history()
+    assert history == [models.WeekScore(
+        week_start="2026-07-06", week_end="2026-07-12", phase_number=1,
+        scheduled=5, completed=4, status="perfect", computed_at="2026-07-13T09:00:00",
+    )]
+
+
+def test_get_weekly_rollup_history_empty_phase_column_becomes_none():
+    ws = _FakeWeeklyRollupWorksheet(rows=[
+        ["2026-06-22", "2026-06-28", "", "0", "0", "0/0", "no_plan", "2026-07-01T09:00:00"],
+    ])
+    repo = _repo_with_weekly_rollup(ws)
+    history = repo.get_weekly_rollup_history()
+    assert history[0].phase_number is None
+
+
+def test_get_weekly_rollup_history_skips_malformed_rows():
+    ws = _FakeWeeklyRollupWorksheet(rows=[
+        ["2026-07-06", "2026-07-12", "1", "not-a-number", "4", "4/5", "perfect", "2026-07-13T09:00:00"],
+    ])
+    repo = _repo_with_weekly_rollup(ws)
+    assert repo.get_weekly_rollup_history() == []
+
+
 # ─── Long-tail dict-returning functions (spot checks) ──────────────────────
 
 def test_get_pain_free_streak_counts_until_first_pain_day():

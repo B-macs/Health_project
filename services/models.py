@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -81,3 +82,32 @@ class BiometricRecord:
     active_kcal: float | None = None
     weight_kg: float | None = None
     steps: int | None = None
+
+
+WeekStatus = Literal["ultimate", "perfect", "normal", "failed", "in_progress", "no_plan"]
+
+
+@dataclass(frozen=True)
+class WeekScore:
+    """One Mon-Sun week's training-plan adherence verdict. `status` is only
+    meaningful once the week has ended ("in_progress" is a live/display-only
+    placeholder for the current week; "no_plan" means zero scheduled
+    sessions, e.g. a reassessment gap). `computed_at` is a persistence
+    timestamp — None until services.metrics writes the row to Sheets."""
+    week_start: str  # ISO date, a Monday
+    week_end: str  # ISO date, the following Sunday
+    phase_number: int | None
+    scheduled: int
+    completed: int
+    status: WeekStatus
+    computed_at: str | None = None
+
+
+@dataclass(frozen=True)
+class StreakInfo:
+    current_streak: int
+    best_streak: int
+    perfect_count: int
+    ultimate_count: int
+    normal_count: int
+    failed_count: int

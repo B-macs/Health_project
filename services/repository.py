@@ -692,6 +692,64 @@ class Repository:
         return sorted(records, key=lambda r: r.date)
 
 
+    # ─────────────────────────────────────────────────────────────────────
+    #  Google Sheets — Weekly Rollup
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _weekly_rollup_ws(self):
+        return sheets.get_or_create_weekly_rollup_worksheet(
+            self._sc, self.config.google_sheets_id, _WEEKLY_ROLLUP_HEADER,
+        )
+
+    def get_weekly_rollup_history(self) -> list[models.WeekScore]:
+        """Every row in the Weekly Rollup tab, mapped back to WeekScore.
+        Rows that fail to parse (e.g. a hand-edited or malformed row) are
+        skipped rather than raising, since this is historical/display data."""
+        raw_rows = sheets.get_weekly_rollup_records(self._weekly_rollup_ws())
+        out = []
+        for row in raw_rows:
+            try:
+                phase_raw = row.get("phase")
+                out.append(models.WeekScore(
+                    week_start=str(row["week_start"]),
+                    week_end=str(row["week_end"]),
+                    phase_number=int(phase_raw) if phase_raw not in (None, "", "None") else None,
+                    scheduled=int(row["scheduled"]),
+                    completed=int(row["completed"]),
+                    status=row["status"],
+                    computed_at=str(row["computed_at"]) if row.get("computed_at") else None,
+                ))
+            except (KeyError, ValueError, TypeError):
+                continue
+        return out
+
+    def upsert_weekly_rollup(self, scores: list[models.WeekScore]) -> list[str]:
+        """Writes each WeekScore as a row in the Weekly Rollup tab, keyed on
+        week_start (update-in-place if that week_start already has a row,
+        append otherwise). Returns the week_start values written."""
+        ws = self._weekly_rollup_ws()
+        written = []
+        for score in scores:
+            row_values = [
+                score.week_start,
+                score.week_end,
+                str(score.phase_number) if score.phase_number is not None else "",
+                str(score.scheduled),
+                str(score.completed),
+                f"{score.completed}/{score.scheduled}",
+                score.status,
+                score.computed_at or "",
+            ]
+            sheets.upsert_weekly_rollup_row(ws, key_col=1, key_value=score.week_start, row_values=row_values)
+            written.append(score.week_start)
+        return written
+
+
+_WEEKLY_ROLLUP_HEADER = [
+    "week_start", "week_end", "phase", "scheduled", "completed", "ratio", "status", "computed_at",
+]
+
+
 def _sheet_date(val) -> str | None:
     try:
         return str(val).split(" ")[0].strip() or None

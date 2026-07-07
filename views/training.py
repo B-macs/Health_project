@@ -19,6 +19,8 @@ import nav
 import repo
 import training_plan as tp
 from services import engine
+from services import metrics
+from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
 from services import sessions as sess
 
@@ -534,6 +536,29 @@ def _week_logged_dates(week_start_iso: str) -> set[str]:
     return repo.get_repository().get_logged_session_dates(week_start, week_start + timedelta(days=6))
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _all_logged_dates(start_iso: str, today_iso: str) -> set[str]:
+    """Every logged session date across the full plan history, for the
+    Weekly Rollup banner's in-memory computation — wider window than
+    _week_logged_dates' single-week fetch above, cached separately."""
+    start = date.fromisoformat(start_iso)
+    today = date.fromisoformat(today_iso)
+    return repo.get_repository().get_logged_session_dates(start, today)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _sync_weekly_rollup_cached() -> tuple[bool, str | None]:
+    """Persists ended weeks to the Weekly Rollup Sheet tab, throttled by the
+    TTL like _engine_directive above. Non-blocking: the caller never stops
+    rendering on failure, since the banner itself is computed in-memory,
+    independent of this write succeeding."""
+    try:
+        result = metrics.sync_weekly_rollup(repo.get_repository())
+        return result.ok, result.error
+    except Exception as exc:
+        return False, str(exc)
+
+
 def _seed_and_get_active_phase(plan_start: date | None) -> tuple[list, object | None]:
     """Reads phases from the Config DB; one-time-seeds Phase 1 from the existing
     plan_start_date if no phases have been configured yet. Returns (phases, active)."""
@@ -596,6 +621,119 @@ def _marker_glyph_and_color(cell, is_today: bool) -> tuple[str, str]:
     if cell.state == "planned":
         return "●", _MARKER_PLANNED
     return "○", _MARKER_REST  # rest
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Weekly Rollup — Perfect/Ultimate Week banner, last-week verdict, and the
+#  day-strip's past-week status badge. All computation is metrics_logic.*
+#  (pure); this section is presentation only. Reuses the existing accent
+#  tokens above — _MARKER_GREEN for positive states, _MARKER_MISSED as the
+#  app's established amber (never red), _OV_TEXT_SEC for muted/neutral.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_VERDICT_TEXT = {
+    "ultimate": "ULTIMATE WEEK",
+    "perfect":  "PERFECT WEEK ✓",
+    "normal":   "Normal week",
+    "failed":   "Failed week",
+    "no_plan":  "No plan scheduled",
+}
+_VERDICT_COLOR = {
+    "ultimate": _MARKER_GREEN,
+    "perfect":  _MARKER_GREEN,
+    "normal":   _OV_TEXT_SEC,
+    "failed":   _MARKER_MISSED,
+    "no_plan":  _OV_TEXT_SEC,
+}
+
+
+def _streak_label(streak, all_ultimate: bool) -> str:
+    n = streak.current_streak
+    if n == 0:
+        return "No active streak"
+    kind = " ultimate" if all_ultimate else ""
+    return f"{n} week{kind} streak"
+
+
+def _current_week_tier(scheduled: int, completed: int) -> tuple[str, str]:
+    """(label, color) for the live current-week progress line. Integer math,
+    matching metrics_logic.score_week's own thresholds."""
+    if scheduled == 0:
+        return "No sessions scheduled this week", _OV_TEXT_SEC
+    if completed == scheduled:
+        return "ULTIMATE WEEK", _MARKER_GREEN
+    if completed * 5 >= scheduled * 4:
+        return f"PERFECT WEEK — {scheduled - completed} to go for ultimate", _MARKER_GREEN
+    needed = -(-(scheduled * 4) // 5)  # ceil(scheduled*4/5)
+    remaining = max(1, needed - completed)
+    return f"{remaining} more for a perfect week", _OV_TEXT_SEC
+
+
+def _render_weekly_rollup_banner(history: list, streak) -> None:
+    """Elevated-surface banner above the day strip — streak / live current-
+    week progress / lifetime tallies — plus, directly under it, last week's
+    verdict once at least one week has actually ended."""
+    current = next((w for w in history if w.status == "in_progress"), None)
+    scheduled = current.scheduled if current else 0
+    completed = current.completed if current else 0
+    tier_label, tier_color = _current_week_tier(scheduled, completed)
+    streak_label = _streak_label(streak, ml.current_streak_is_all_ultimate(history))
+
+    st.markdown(
+        f"""
+<div style='background:{_OV_BG_ELEV};border-radius:16px;padding:16px 20px;margin-bottom:14px;
+            display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;'>
+  <div style='flex:1;min-width:120px;'>
+    <div style='color:{_OV_TEXT_SEC};font-size:11px;letter-spacing:0.5px;margin-bottom:2px;'>STREAK</div>
+    <div style='color:{_OV_TEXT_PRI};font-size:14px;font-weight:700;'>{streak_label}</div>
+  </div>
+  <div style='flex:2;min-width:160px;text-align:center;'>
+    <div style='color:{_OV_TEXT_SEC};font-size:11px;letter-spacing:0.5px;margin-bottom:2px;'>
+      THIS WEEK: {completed}/{scheduled} SESSIONS</div>
+    <div style='color:{tier_color};font-size:14px;font-weight:700;'>{tier_label}</div>
+  </div>
+  <div style='flex:1;min-width:120px;text-align:right;'>
+    <div style='color:{_OV_TEXT_SEC};font-size:12px;'>
+      {streak.perfect_count} perfect · {streak.ultimate_count} ultimate</div>
+  </div>
+</div>
+""",
+        unsafe_allow_html=True,
+    )
+
+    ended = [w for w in history if w.status not in ("in_progress", "no_plan")]
+    if ended:
+        last_week = max(ended, key=lambda w: w.week_start)
+        text = _VERDICT_TEXT[last_week.status]
+        color = _VERDICT_COLOR[last_week.status]
+        st.markdown(
+            f"<div style='color:{_OV_TEXT_SEC};font-size:12px;margin-bottom:12px;'>"
+            f"Last week: <span style='color:{color};font-weight:600;'>{text}</span></div>",
+            unsafe_allow_html=True,
+        )
+
+
+def _render_week_status_badge(history: list, viewed_week_start) -> None:
+    """Small badge shown under the day strip only when paging to a week
+    other than the current one — that week's persisted verdict. The current
+    week's status is already covered by the banner above, so this renders
+    nothing for it."""
+    if viewed_week_start is None:
+        return
+    today = date.today()
+    current_week_start = today - timedelta(days=today.weekday())
+    if viewed_week_start == current_week_start:
+        return
+    week = next((w for w in history if w.week_start == viewed_week_start.isoformat()), None)
+    if week is None or week.status == "in_progress":
+        return
+    text = _VERDICT_TEXT[week.status]
+    color = _VERDICT_COLOR[week.status]
+    st.markdown(
+        f"<div style='color:{_OV_TEXT_SEC};font-size:12px;margin:-8px 0 14px 0;'>"
+        f"Week of {week.week_start}: <span style='color:{color};font-weight:600;'>{text}</span></div>",
+        unsafe_allow_html=True,
+    )
 
 
 def _render_day_strip(active: dict | None) -> None:
@@ -1063,7 +1201,25 @@ def render():
 
     # ── Universal weekly day strip — top of page, every state ───────────────────
     phases, active = _seed_and_get_active_phase(plan_start)
+
+    # ── Weekly Rollup — banner + last-week verdict, above the day strip in
+    #     every state (matching the day strip's own universality) ───────────
+    _sync_ok, _sync_err = _sync_weekly_rollup_cached()
+    history: list = []
+    if phases:
+        _earliest = min(date.fromisoformat(p.start_date) for p in phases)
+        try:
+            _logged = _all_logged_dates(_earliest.isoformat(), date.today().isoformat())
+        except Exception:
+            _logged = set()
+        history = ml.compute_week_history(date.today(), phases, [{"date": d} for d in _logged])
+    streak = ml.compute_streak(history)
+    _render_weekly_rollup_banner(history, streak)
+    if not _sync_ok and _sync_err:
+        st.caption("Weekly rollup sync unavailable — showing live data only.")
+
     _render_day_strip(active)
+    _render_week_status_badge(history, st.session_state.get("tp_week_start"))
 
     if active is None:
         _render_no_active_phase(phases)
