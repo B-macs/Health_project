@@ -13,10 +13,23 @@ tp_ex_idx etc.) and calls these functions with plain values pulled out of it.
 
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from services import plan as _plan
 from services.models import Phase
+
+_RUN_WALK_PATTERN = re.compile(r"\b(walk|run)\w*")
+
+# Extra minutes added to an exercise's own planned duration when the
+# training page's Complete button searches Garmin for a matching completed
+# activity (a 15-min planned walk searches the last 15+5=20 min). Was a
+# per-user Sync-page setting; hardcoded by request. Change this single
+# value if 5 minutes turns out to be too tight/loose — nothing else
+# needs to stay in sync (grep GARMIN_ACTIVITY_BUFFER_MINUTES to confirm
+# both call sites: views/training.py's Garmin info banner and its
+# "✓ Activity Complete" handler).
+GARMIN_ACTIVITY_BUFFER_MINUTES = 5
 
 # The pre-session release protocol (always the same shared exercises inserted
 # first in every plan day) — detected by name so this stays in sync with
@@ -42,6 +55,12 @@ def coach_message(directive: dict, today_plan: dict) -> tuple[str, str]:
     headline = directive.get("action") or today_plan["objective"]
     subtitle = today_plan["phase"]
     return headline, subtitle
+
+
+def is_run_or_walk(ex: dict) -> bool:
+    """Word-boundary match on "walk"/"run" (plus suffixes: walking, running) —
+    a plain substring check would false-positive on names like "Trunk Rotation"."""
+    return bool(_RUN_WALK_PATTERN.search(ex["name"].lower()))
 
 
 def movement_category(ex: dict) -> str:

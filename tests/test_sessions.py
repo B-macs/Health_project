@@ -25,6 +25,23 @@ def test_coach_message_falls_back_to_clinical_objective():
     assert headline == "Tissue Tolerance"
 
 
+# ─── is_run_or_walk ──────────────────────────────────────────────────────────
+
+def test_is_run_or_walk_matches_walking_exercises():
+    assert sessions.is_run_or_walk({"name": "Controlled Walking"}) is True
+    assert sessions.is_run_or_walk({"name": "Walking — Gait Focus"}) is True
+    assert sessions.is_run_or_walk({"name": "5-Minute Walk + Stair Assessment"}) is True
+
+
+def test_is_run_or_walk_does_not_false_positive_on_trunk():
+    # Plain substring matching would wrongly match "run" inside "Trunk".
+    assert sessions.is_run_or_walk({"name": "Trunk Rotation"}) is False
+
+
+def test_is_run_or_walk_false_for_unrelated_exercise():
+    assert sessions.is_run_or_walk({"name": "Glute Bridge"}) is False
+
+
 # ─── movement_category ──────────────────────────────────────────────────────
 
 def test_movement_category_hip_hinge():

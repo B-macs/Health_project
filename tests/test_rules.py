@@ -55,6 +55,16 @@ def test_rules_check_movement():
     check("jumping always contraindicated",            "jumping" in always_contra, True)
 
 
+def test_forward_fold_rule_matches_named_variants():
+    # Generic "forward fold" rule must catch pose names that aren't the exact
+    # "seated forward fold" keyword (e.g. yoga poses authored in services/yoga.py).
+    butterfly = rules.check_movement("Butterfly Forward Fold", current_stage=1)
+    assert butterfly["severity"] == "contraindicated"
+
+    straddle = rules.check_movement("Straddle Forward Fold", current_stage=3)
+    assert straddle["severity"] == "contraindicated"  # stage_cap=1, always contraindicated
+
+
 def test_no_streamlit_import():
     tree = ast.parse(open(rules.__file__, encoding="utf-8").read())
     for node in ast.walk(tree):

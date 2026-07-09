@@ -71,6 +71,12 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="contraindicated", laterality="bilateral",
     ),
     MovementRule(
+        movement="forward fold",
+        reason="End-range lumbar flexion loads covered annulus tears at L3/4 and L4/5. "
+               "Generalizes 'seated forward fold' to catch named variants (e.g. yoga poses).",
+        stage_cap=1, severity="contraindicated", laterality="bilateral",
+    ),
+    MovementRule(
         movement="toe touch",
         reason="End-range lumbar flexion loads covered annulus tears at L3/4 and L4/5.",
         stage_cap=1, severity="contraindicated", laterality="bilateral",

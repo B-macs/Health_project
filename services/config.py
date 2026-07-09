@@ -27,6 +27,11 @@ class Config:
     notion_db_config: str
     google_sheets_id: str
     google_service_account: dict
+    # Optional — Garmin sync is disabled (not an error) when either is blank.
+    garmin_email: str = ""
+    garmin_password: str = ""
+    # Optional — Oura sync is disabled (not an error) when blank.
+    oura_token: str = ""
 
 
 _STR_KEYS = (
@@ -46,6 +51,15 @@ def _resolve_str(key: str, overrides: dict) -> str:
     if val:
         return val
     raise EnvironmentError(f"'{key}' not found in environment or config overrides.")
+
+
+def _resolve_optional_str(key: str, overrides: dict) -> str:
+    """Same lookup as _resolve_str but returns "" instead of raising — for
+    settings that are genuinely optional (the app must keep working without
+    them), not just missing-by-mistake."""
+    if overrides.get(key):
+        return str(overrides[key])
+    return os.getenv(key) or ""
 
 
 def _resolve_service_account(overrides: dict) -> dict:
@@ -73,4 +87,7 @@ def load_config(overrides: dict | None = None) -> Config:
         notion_db_config=_resolve_str("NOTION_DB_CONFIG", overrides),
         google_sheets_id=_resolve_str("GOOGLE_SHEETS_ID", overrides),
         google_service_account=_resolve_service_account(overrides),
+        garmin_email=_resolve_optional_str("GARMIN_EMAIL", overrides),
+        garmin_password=_resolve_optional_str("GARMIN_PASSWORD", overrides),
+        oura_token=_resolve_optional_str("OURA_TOKEN", overrides),
     )

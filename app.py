@@ -104,6 +104,23 @@ def _au_history(days: int = 28) -> list[dict]:
     return repo.get_repository().get_daily_session_au(days)
 
 
+@st.cache_data(ttl=7200, show_spinner=False)  # 2 hours — runs on Home page open, idle in between
+def _sync_oura_cached() -> tuple[bool, str | None]:
+    """Archival Oura sync (its own Sheet tabs — see Repository.sync_oura_all),
+    throttled purely by this cache's TTL rather than a persisted Config-DB
+    marker like Garmin's weekly sync: Oura's official API has generous rate
+    limits (unlike Garmin's unofficial one), so an extra sync after a
+    Streamlit restart is harmless — no need for that extra durability."""
+    r = repo.get_repository()
+    if not r.oura_configured():
+        return True, None
+    try:
+        r.sync_oura_all(days=2)
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
 try:
     _bio_rows = _bio_rolling(days=60)   # 60d to support 56d sleep baseline
 except Exception:
@@ -119,6 +136,8 @@ try:
     _current_stage = repo.get_repository().get_current_stage()
 except Exception:
     _current_stage = 1
+
+_oura_sync_ok, _oura_sync_err = _sync_oura_cached()
 
 _bio_day = next((r for r in _bio_rows if r.get("date") == selected_date.isoformat()), None)
 _au_day  = next((r for r in _au_rows  if r.get("date") == selected_date.isoformat()), None)
@@ -388,9 +407,11 @@ _header_html = (
 )
 
 # FAB — Morning Check-In (?page=checkin → SPA router dispatches views/checkin.py)
+# Anchored just below the fixed date header (57px tall) so it clears the
+# header's right-aligned "›" next-day arrow instead of overlapping it.
 _fab_html = (
     '<a href="?page=checkin" style="text-decoration:none;">'
-    '<div style="position:fixed;bottom:80px;'
+    '<div style="position:fixed;top:69px;'
     'right:max(20px,calc((100vw - 480px)/2 + 16px));'
     'z-index:900;width:52px;height:52px;border-radius:50%;background:#FFFFFF;'
     'display:flex;align-items:center;justify-content:center;'
@@ -449,4 +470,6 @@ if view == "strain":
     st.markdown(_strain_detail(), unsafe_allow_html=True)
 else:
     st.markdown(_card_readiness + _card_strain + _card_sleep, unsafe_allow_html=True)
+if not _oura_sync_ok and _oura_sync_err:
+    st.caption("Oura sync unavailable — will retry next visit.")
 nav.inject("home")

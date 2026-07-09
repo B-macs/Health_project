@@ -23,6 +23,7 @@ from services import metrics
 from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
 from services import sessions as sess
+from services import yoga as yg
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -84,7 +85,16 @@ function _autoComplete() {{
   try {{
     var btns = window.parent.document.querySelectorAll('button');
     for (var i = 0; i < btns.length; i++) {{
-      if (btns[i].textContent.trim().charAt(0) === '✓') {{ btns[i].click(); return; }}
+      // Match the guided-flow's own completion buttons ("✓ Set 2 Complete",
+      // "✓ Right Side Done", "✓ Rep 3 Done", "✓ Activity Complete") — not just
+      // any "✓"-leading button. The week day-strip's completed-day buttons
+      // (e.g. "✓ Mon") also start with "✓" and render earlier in the page,
+      // so a bare "starts with ✓" match was clicking those instead and
+      // navigating away to that day.
+      var t = btns[i].textContent.trim();
+      if (t.charAt(0) === '✓' && (t.includes('Complete') || t.includes('Done'))) {{
+        btns[i].click(); return;
+      }}
     }}
   }} catch(e) {{}}
 }}
@@ -363,6 +373,10 @@ def _init_state(day_num: int | None = None):
         "tp_started":          False,    # False = show the day-overview screen; True = guided flow
         "tp_side":             "right",  # 'right' → 'left' for unilateral exercises
         "tp_session_start_ts": 0,        # Unix timestamp, set on first set completion
+        "tp_fab_open":         False,    # "Add Training" + menu expanded/collapsed
+        "tp_yoga_select":      False,    # showing the yoga-picker sub-screen
+        "tp_yoga_detail":      None,     # slug of the yoga being viewed (video + Complete), if any
+        "tp_garmin_minutes":   {},       # {exercise_idx: actual_minutes} pulled from Garmin on Complete
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
     for k, v in defaults.items():
@@ -422,13 +436,23 @@ def _get_day_number(plan_start: date) -> int:
 def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
                       duration_minutes: int, notes: str) -> None:
     r = repo.get_repository()
+    garmin_minutes = st.session_state.get("tp_garmin_minutes", {})
     session_info = r.create_training_session(
         session_date=date.today(),
         duration_minutes=duration_minutes,
         session_rpe=session_rpe,
     )
     last_id = None
-    for ex in exercises:
+    for idx, ex in enumerate(exercises):
+        actual_min = garmin_minutes.get(idx)
+        # Garmin-verified duration overrides the planned one for this
+        # exercise's own logged tut — a shallow copy so the shared
+        # training_plan.py PLAN dict is never mutated in place.
+        log_ex = dict(ex, duration_minutes=actual_min) if actual_min else ex
+        note = (
+            f"Garmin-verified duration: {actual_min:.0f} min "
+            f"(planned {ex.get('duration_minutes')} min)."
+        ) if actual_min else ""
         last_id = r.save_training_exercise(
             session_id=session_info["session_id"],
             movement_name=ex["name"],
@@ -436,8 +460,8 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             planned_sets=ex.get("sets", 1),
             planned_reps=sess.planned_reps(ex),
             rpe=session_rpe,
-            sets=sess.make_sets_data(ex),
-            note="",
+            sets=sess.make_sets_data(log_ex),
+            note=note,
             session_date=session_info["session_date"],
             session_duration_minutes=session_info["duration_minutes"],
             session_rpe=session_info["session_rpe"],
@@ -555,6 +579,17 @@ def _sync_weekly_rollup_cached() -> tuple[bool, str | None]:
     try:
         result = metrics.sync_weekly_rollup(repo.get_repository())
         return result.ok, result.error
+    except Exception as exc:
+        return False, str(exc)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _sync_garmin_daily_cached() -> tuple[bool, str | None]:
+    """Throttles the due-check itself (cheap) — the actual Garmin sync only
+    ever fires once per week regardless, via Repository.sync_garmin_daily_if_due
+    (Garmin's API is rate-limit-sensitive, unlike the Weekly Rollup sync above)."""
+    try:
+        return repo.get_repository().sync_garmin_daily_if_due()
     except Exception as exc:
         return False, str(exc)
 
@@ -1006,6 +1041,18 @@ def _render_rest_day(d: date) -> None:
         f"text-align:center;color:{_OV_TEXT_SEC};font-size:14px;'>Rest day.</div>",
         unsafe_allow_html=True,
     )
+    suggestion = yg.suggest_for_day("rest_day")
+    if suggestion:
+        st.markdown(
+            f"<div style='margin-top:12px;color:{_OV_TEXT_SEC};font-size:12px;"
+            f"letter-spacing:1px;text-transform:uppercase;'>Optional active rest</div>",
+            unsafe_allow_html=True,
+        )
+        if st.button(f"🧘  {suggestion.name}  ·  {suggestion.total_duration_minutes} min",
+                      key="tp_rest_day_yoga_suggestion", use_container_width=True):
+            st.session_state.tp_yoga_detail = suggestion.slug
+            st.session_state.tp_yoga_select = True
+            st.rerun()
 
 
 def _render_no_active_phase(phases: list) -> None:
@@ -1156,6 +1203,222 @@ def _render_overview(day_num: int, active, today_plan: dict,
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  "Add Training" — floating + menu (Yoga / Extra Workout) and the Yoga picker.
+#  Fixed top-right, mirrors the Home-page FAB's right-edge formula but against
+#  this page's 840px column (see _PAGE_CSS above).
+# ─────────────────────────────────────────────────────────────────────────────
+
+_ADD_FAB_YOGA_BG  = "linear-gradient(135deg, #6BCB77, #2E8B57)"
+_ADD_FAB_EXTRA_BG = "linear-gradient(135deg, #FF7A45, #E8402C)"
+
+_ADD_FAB_CSS = f"""<style>
+[data-testid="stElementContainer"]:has(.stAddFabToggle) + [data-testid="stElementContainer"] {{
+    position: fixed !important;
+    top: 16px !important;
+    right: max(20px, calc((100vw - 840px)/2 + 16px)) !important;
+    z-index: 900 !important;
+    width: 52px !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}}
+[data-testid="stElementContainer"]:has(.stAddFabToggle) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-secondary"] {{
+    width: 52px !important;
+    height: 52px !important;
+    border-radius: 50% !important;
+    background: {_OV_CTA_BG} !important;
+    color: {_OV_CTA_TEXT} !important;
+    border: none !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.45) !important;
+    font-size: 22px !important;
+    font-weight: 400 !important;
+    padding: 0 !important;
+}}
+[data-testid="stElementContainer"]:has(.stAddFabYoga) + [data-testid="stElementContainer"] {{
+    position: fixed !important;
+    top: 78px !important;
+    right: max(20px, calc((100vw - 840px)/2 + 16px)) !important;
+    z-index: 900 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}}
+[data-testid="stElementContainer"]:has(.stAddFabYoga) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-secondary"] {{
+    background: {_ADD_FAB_YOGA_BG} !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 22px !important;
+    height: 44px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35) !important;
+}}
+[data-testid="stElementContainer"]:has(.stAddFabExtra) + [data-testid="stElementContainer"] {{
+    position: fixed !important;
+    top: 130px !important;
+    right: max(20px, calc((100vw - 840px)/2 + 16px)) !important;
+    z-index: 900 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}}
+[data-testid="stElementContainer"]:has(.stAddFabExtra) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-secondary"] {{
+    background: {_ADD_FAB_EXTRA_BG} !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 22px !important;
+    height: 44px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35) !important;
+}}
+</style>"""
+
+
+def _render_add_training_fab() -> None:
+    """Floating "+" menu, fixed top-right, present across every training-page
+    state. Expands to Yoga (→ yoga-picker, same page) and Extra Workout (stub —
+    no destination yet)."""
+    st.markdown(_ADD_FAB_CSS, unsafe_allow_html=True)
+
+    open_ = st.session_state.get("tp_fab_open", False)
+
+    st.markdown('<div class="stAddFabToggle" style="display:none"></div>', unsafe_allow_html=True)
+    if st.button("×" if open_ else "+", key="tp_fab_toggle"):
+        st.session_state.tp_fab_open = not open_
+        st.rerun()
+
+    if open_:
+        st.markdown('<div class="stAddFabYoga" style="display:none"></div>', unsafe_allow_html=True)
+        if st.button("🧘  Yoga", key="tp_fab_yoga"):
+            st.session_state.tp_yoga_select = True
+            st.session_state.tp_fab_open = False
+            st.rerun()
+
+        st.markdown('<div class="stAddFabExtra" style="display:none"></div>', unsafe_allow_html=True)
+        if st.button("💪  Extra Workout", key="tp_fab_extra"):
+            st.session_state.tp_fab_open = False
+            st.toast("Extra Workout logging is coming soon.")
+            st.rerun()
+
+
+def _log_yoga_completion(session: yg.YogaSession) -> None:
+    """Persist a completed yoga session to Notion — mirrors _auto_log_session's
+    shape (one shared session_id/AU/RPE across a row per pose) so it feeds the
+    same get_daily_session_au() aggregate the Home strain card and ACWR read from.
+    Tagged Type="Yoga" so repo.has_logged_session() (which gates the rehab-plan
+    flow) skips it — see that method's docstring."""
+    r = repo.get_repository()
+    try:
+        current_stage = r.get_current_stage()
+    except Exception:
+        current_stage = 1
+    session_info = r.create_training_session(
+        session_date=date.today(),
+        duration_minutes=session.total_duration_minutes,
+        session_rpe=session.estimated_rpe,
+    )
+    for pose in session.poses:
+        severity, note = yg.effective_safety(pose, current_stage)
+        r.save_training_exercise(
+            session_id=session_info["session_id"],
+            movement_name=pose.name,
+            movement_type="Yoga",
+            planned_sets=1,
+            planned_reps=1,
+            rpe=session.estimated_rpe,
+            sets=[{"set_num": 1, "reps": 1, "weight": 0.0,
+                   "rest": 10, "tut": pose.hold_seconds, "velocity": "isometric"}],
+            note=note if severity != "cleared" else "",
+            session_date=session_info["session_date"],
+            session_duration_minutes=session_info["duration_minutes"],
+            session_rpe=session_info["session_rpe"],
+            session_au=session_info["session_au"],
+        )
+
+
+def _render_yoga_detail(session: yg.YogaSession) -> None:
+    """Video link + full routine + safety callouts + Complete. Tapping Complete
+    logs every pose to today and returns to the training page — same page,
+    no navigation."""
+    if st.button("← Back", key="tp_yoga_detail_back"):
+        st.session_state.tp_yoga_detail = None
+        st.rerun()
+
+    st.markdown(
+        f"<div style='font-size:22px;font-weight:700;margin:12px 0 4px;'>{session.name}</div>"
+        f"<div style='color:{_OV_TEXT_SEC};font-size:13px;margin-bottom:14px;'>"
+        f"{session.total_duration_minutes} min · RPE {session.estimated_rpe}/10</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(f"[Watch on YouTube]({session.video_url})")
+
+    try:
+        current_stage = repo.get_repository().get_current_stage()
+    except Exception:
+        current_stage = 1
+    cautions = session.cautions(current_stage)
+    if cautions:
+        notes_html = "".join(
+            f"<div style='margin-top:8px;'><strong style='color:{_OV_TEXT_PRI};'>"
+            f"{'⚠ ' if severity == 'contraindicated' else '· '}{pose.name}</strong>"
+            f"<div style='color:{_OV_TEXT_SEC};font-size:12px;margin-top:2px;'>{note}</div></div>"
+            for pose, severity, note in cautions
+        )
+        st.markdown(
+            f"<div style='background:{_OV_BG_ELEV};border-radius:12px;padding:14px 16px;"
+            f"margin:14px 0;'><div style='color:{_OV_AMBER};font-size:12px;letter-spacing:1px;"
+            f"font-weight:600;'>FORM NOTES FOR THIS PATIENT</div>{notes_html}</div>",
+            unsafe_allow_html=True,
+        )
+
+    rows_html = "".join(
+        f"<div style='display:flex;justify-content:space-between;padding:8px 0;"
+        f"border-bottom:1px solid rgba(255,255,255,0.06);font-size:13px;'>"
+        f"<span style='color:{_OV_TEXT_PRI};'>{p.name}</span>"
+        f"<span style='color:{_OV_TEXT_SEC};'>{p.hold_seconds}s</span></div>"
+        for p in session.poses
+    )
+    with st.expander(f"Full routine · {len(session.poses)} poses"):
+        st.markdown(f"<div>{rows_html}</div>", unsafe_allow_html=True)
+
+    if st.button("Complete", type="primary", key="tp_yoga_complete", use_container_width=True):
+        _log_yoga_completion(session)
+        st.session_state.tp_yoga_detail = None
+        st.session_state.tp_yoga_select = False
+        st.toast(f"Logged {session.name} — nice work.")
+        st.rerun()
+
+
+def _render_yoga_select() -> None:
+    """Yoga picker — reads services.yoga.YOGA_LIBRARY. Rendered in place of the
+    normal training page; "Back" returns via the same tp_yoga_select flag +
+    rerun — no separate page/navigation."""
+    if st.session_state.get("tp_yoga_detail"):
+        session = yg.get(st.session_state.tp_yoga_detail)
+        if session:
+            _render_yoga_detail(session)
+            return
+        st.session_state.tp_yoga_detail = None  # stale/unknown slug — fall through to the list
+
+    st.markdown(
+        "<div style='font-size:22px;font-weight:700;margin-bottom:16px;'>Select Yoga</div>",
+        unsafe_allow_html=True,
+    )
+    if st.button("← Back", key="tp_yoga_back"):
+        st.session_state.tp_yoga_select = False
+        st.rerun()
+
+    if not yg.YOGA_LIBRARY:
+        st.info("No yoga sessions have been added yet — check back soon.")
+        return
+
+    for session in yg.YOGA_LIBRARY:
+        if st.button(f"🧘  {session.name}  ·  {session.total_duration_minutes} min",
+                      key=f"tp_yoga_pick_{session.slug}", use_container_width=True):
+            st.session_state.tp_yoga_detail = session.slug
+            st.rerun()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Main render() — entry point for app.py SPA routing
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -1168,6 +1431,14 @@ def render():
     plan_start = _get_plan_start()
     day_num = _get_day_number(plan_start) if plan_start else None
     _init_state(day_num)
+
+    # ── "Add Training" — floating + menu on every state below; the yoga-picker
+    #     sub-screen short-circuits everything else (same page, no navigation) ──
+    if st.session_state.get("tp_yoga_select"):
+        _render_yoga_select()
+        nav.inject("training")
+        st.stop()
+    _render_add_training_fab()
 
     # ── Readiness modifier — computed once per render, applied to prescriptions ─
     try:
@@ -1205,6 +1476,7 @@ def render():
     # ── Weekly Rollup — banner + last-week verdict, above the day strip in
     #     every state (matching the day strip's own universality) ───────────
     _sync_ok, _sync_err = _sync_weekly_rollup_cached()
+    _garmin_sync_ok, _garmin_sync_err = _sync_garmin_daily_cached()
     history: list = []
     if phases:
         _earliest = min(date.fromisoformat(p.start_date) for p in phases)
@@ -1217,6 +1489,8 @@ def render():
     _render_weekly_rollup_banner(history, streak)
     if not _sync_ok and _sync_err:
         st.caption("Weekly rollup sync unavailable — showing live data only.")
+    if not _garmin_sync_ok and _garmin_sync_err:
+        st.caption("Garmin daily sync unavailable — will retry next visit.")
 
     _render_day_strip(active)
     _render_week_status_badge(history, st.session_state.get("tp_week_start"))
@@ -1561,9 +1835,38 @@ def render():
                 st.session_state.tp_session_start_ts = time.time()
 
         if ex_type == "duration":
-            _duration_timer(ex["duration_minutes"], timer_key=_dur_key)
+            _is_garmin_activity = sess.is_run_or_walk(ex) and repo.get_repository().garmin_configured()
+            if _is_garmin_activity:
+                _window_preview = ex["duration_minutes"] + sess.GARMIN_ACTIVITY_BUFFER_MINUTES
+                st.info(
+                    f"🏃 Start **{ex['name']}** on your Garmin watch now. Tap Complete "
+                    f"below when you're done — activity from the last {_window_preview} min "
+                    f"({ex['duration_minutes']} min planned + {sess.GARMIN_ACTIVITY_BUFFER_MINUTES} min "
+                    f"buffer) is pulled in automatically."
+                )
+            else:
+                _duration_timer(ex["duration_minutes"], timer_key=_dur_key)
             if st.button("✓ Activity Complete", type="primary", use_container_width=True):
                 _mark_start()
+                if _is_garmin_activity:
+                    r = repo.get_repository()
+                    # Window scales with THIS exercise's own planned duration
+                    # (already set in training_plan.py) rather than a flat
+                    # global figure — a 15-min planned walk searches the last
+                    # 15+buffer minutes, a 30-min run searches 30+buffer.
+                    window_min = ex["duration_minutes"] + sess.GARMIN_ACTIVITY_BUFFER_MINUTES
+                    try:
+                        minutes, _matched = r.get_recent_garmin_activity_minutes(window_min)
+                    except Exception:
+                        minutes = 0.0
+                    if minutes > 0:
+                        st.session_state.tp_garmin_minutes[st.session_state.tp_ex_idx] = minutes
+                        st.toast(f"Pulled {minutes:.0f} min from Garmin for {ex['name']}.")
+                    else:
+                        st.toast(
+                            f"No matching Garmin activity found in the last {window_min} "
+                            f"min — logged with the planned duration."
+                        )
                 st.session_state.tp_ex_idx += 1
                 st.session_state.tp_set = 1
                 st.session_state.tp_rep_in_set = 1
