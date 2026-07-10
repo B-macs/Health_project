@@ -21,14 +21,14 @@ from services.models import Phase
 
 _RUN_WALK_PATTERN = re.compile(r"\b(walk|run)\w*")
 
-# Extra minutes added to an exercise's own planned duration when the
-# training page's Complete button searches Garmin for a matching completed
-# activity (a 15-min planned walk searches the last 15+5=20 min). Was a
-# per-user Sync-page setting; hardcoded by request. Change this single
-# value if 5 minutes turns out to be too tight/loose — nothing else
-# needs to stay in sync (grep GARMIN_ACTIVITY_BUFFER_MINUTES to confirm
-# both call sites: views/training.py's Garmin info banner and its
-# "✓ Activity Complete" handler).
+# +/- minutes around an exercise's own planned duration when the training
+# page's Complete button searches today's Garmin activities for one whose
+# OWN duration matches (a 15-min planned walk matches any activity lasting
+# 10-20 min, regardless of when it started). Was a per-user Sync-page
+# setting; hardcoded by request. Change this single value if 5 minutes
+# turns out to be too tight/loose — nothing else needs to stay in sync
+# (grep GARMIN_ACTIVITY_BUFFER_MINUTES to confirm both call sites:
+# views/training.py's Garmin info banner and its "✓ Activity Complete" handler).
 GARMIN_ACTIVITY_BUFFER_MINUTES = 5
 
 # The pre-session release protocol (always the same shared exercises inserted
@@ -61,6 +61,28 @@ def is_run_or_walk(ex: dict) -> bool:
     """Word-boundary match on "walk"/"run" (plus suffixes: walking, running) —
     a plain substring check would false-positive on names like "Trunk Rotation"."""
     return bool(_RUN_WALK_PATTERN.search(ex["name"].lower()))
+
+
+def summarize_garmin_activities(matched: list[dict]) -> dict:
+    """Collapse the (usually one, occasionally several) Garmin activities
+    matched within the Complete-button's search window into the fields
+    logged alongside the Garmin-verified duration: avg_hr and distance/
+    calories are summed/averaged across all matched activities (duration-
+    weighted for avg_hr), max_hr is the max across them. Returns None for
+    any field with nothing to compute (e.g. a Stopwatch-type activity with
+    no HR data) rather than 0, so a blank Notion cell isn't mistaken for
+    a real zero reading."""
+    total_duration = sum((a.get("duration") or 0) for a in matched)
+    hr_weighted = sum((a.get("averageHR") or 0) * (a.get("duration") or 0) for a in matched)
+    max_hr_vals = [a["maxHR"] for a in matched if a.get("maxHR")]
+    distance_total = sum((a.get("distance") or 0) for a in matched)
+    calories_total = sum((a.get("calories") or 0) for a in matched)
+    return {
+        "avg_hr": round(hr_weighted / total_duration) if total_duration and hr_weighted else None,
+        "max_hr": max(max_hr_vals) if max_hr_vals else None,
+        "distance_km": round(distance_total / 1000, 2) if distance_total else None,
+        "calories": round(calories_total) if calories_total else None,
+    }
 
 
 def movement_category(ex: dict) -> str:

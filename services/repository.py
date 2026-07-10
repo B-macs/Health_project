@@ -273,7 +273,9 @@ class Repository:
                                 planned_sets: int, planned_reps: int, rpe: int,
                                 sets: list | None = None, note: str = "", session_date=None,
                                 session_duration_minutes: int = 0, session_rpe: int = 0,
-                                session_au: float = 0.0, today: date | None = None) -> str:
+                                session_au: float = 0.0, today: date | None = None,
+                                garmin_avg_hr: float | None = None, garmin_max_hr: float | None = None,
+                                garmin_distance_km: float | None = None, garmin_calories: float | None = None) -> str:
         today = today or date.today()
         sid = str(session_id) if not isinstance(session_id, dict) else session_id.get("session_id", "")
 
@@ -286,24 +288,44 @@ class Repository:
                     session_date = str(today)
 
         sets_json = json.dumps(sets or [])
-        page = notion.create_page(
-            self._nc, self.config.notion_db_training,
-            properties={
-                "Movement":          notion.title(movement_name),
-                "Session Date":      notion.date_prop(session_date or str(today)),
-                "Session ID":        notion.rich_text(sid),
-                "Type":              notion.select(movement_type),
-                "Planned Sets":      notion.number(planned_sets),
-                "Planned Reps":      notion.number(planned_reps),
-                "Exercise RPE":      notion.number(rpe),
-                "Sets":              notion.rich_text(sets_json),
-                "Notes":             notion.rich_text(note or ""),
-                "Session Duration":  notion.number(session_duration_minutes),
-                "Session RPE":       notion.number(session_rpe),
-                "Session AU":        notion.number(session_au),
-            },
-        )
+        properties = {
+            "Movement":          notion.title(movement_name),
+            "Session Date":      notion.date_prop(session_date or str(today)),
+            "Session ID":        notion.rich_text(sid),
+            "Type":              notion.select(movement_type),
+            "Planned Sets":      notion.number(planned_sets),
+            "Planned Reps":      notion.number(planned_reps),
+            "Exercise RPE":      notion.number(rpe),
+            "Sets":              notion.rich_text(sets_json),
+            "Notes":             notion.rich_text(note or ""),
+            "Session Duration":  notion.number(session_duration_minutes),
+            "Session RPE":       notion.number(session_rpe),
+            "Session AU":        notion.number(session_au),
+        }
+        # Only set on the one exercise row a Garmin activity was actually
+        # matched to — every other row (and every non-Garmin session) simply
+        # omits these properties, leaving that Notion cell blank.
+        if garmin_avg_hr is not None:
+            properties["Activity Avg HR"] = notion.number(garmin_avg_hr)
+        if garmin_max_hr is not None:
+            properties["Activity Max HR"] = notion.number(garmin_max_hr)
+        if garmin_distance_km is not None:
+            properties["Activity Distance (km)"] = notion.number(garmin_distance_km)
+        if garmin_calories is not None:
+            properties["Activity Calories"] = notion.number(garmin_calories)
+
+        page = notion.create_page(self._nc, self.config.notion_db_training, properties=properties)
         return page["id"]
+
+    def ensure_garmin_activity_columns(self) -> list[str]:
+        """One-time schema migration: adds the 4 Garmin-activity Number
+        properties to the Training Log database if they don't already exist.
+        Safe to call repeatedly (a no-op once they're present). Returns the
+        property names actually created."""
+        return notion.ensure_number_properties(
+            self._nc, self.config.notion_db_training,
+            ["Activity Avg HR", "Activity Max HR", "Activity Distance (km)", "Activity Calories"],
+        )
 
     def save_training_set(self, training_log_id: str, set_number: int, reps_completed: int,
                            weight_kg: float, rest_time_seconds: int,
@@ -968,29 +990,41 @@ class Repository:
         return len(activities)
 
     def get_recent_garmin_activity_minutes(
-        self, window_minutes: int, now: datetime | None = None,
+        self, target_minutes: float, buffer_minutes: float, now: datetime | None = None,
     ) -> tuple[float, list[dict]]:
-        """Total duration (minutes) of Garmin activities that STARTED within
-        the last `window_minutes` from `now` — the "just finished, pull it
-        in" hook used by the training page's run/walk Complete button.
-        Returns (0.0, []) if Garmin isn't configured, rather than raising —
-        callers treat that the same as "no matching activity found"."""
+        """Finds the most recent (of the last 10 logged) Garmin activity that
+        started today AND whose OWN duration falls within [target_minutes -
+        buffer_minutes, target_minutes + buffer_minutes] — e.g. a 15-min
+        planned walk with a 5-min buffer matches any of today's activities
+        lasting 10-20 minutes. This is the "just finished, pull it in" hook
+        used by the training page's run/walk Complete button.
+
+        Matching on the activity's OWN duration rather than on how recently
+        it started relative to `now` is deliberate: the previous "started
+        within the last N minutes" check was fragile against any delay
+        between finishing the walk and actually opening the app to tap
+        Complete — a late tap could miss a real match entirely.
+
+        Returns (0.0, []) if Garmin isn't configured or nothing in the last
+        10 activities matches, rather than raising — callers treat that the
+        same as "no matching activity found"."""
         client = self._gc
         if client is None:
             return 0.0, []
-        now = now or datetime.now()
-        cutoff = now - timedelta(minutes=window_minutes)
-        matched, total = [], 0.0
+        today = (now or datetime.now()).date()
+        lo, hi = max(0.0, target_minutes - buffer_minutes), target_minutes + buffer_minutes
         for act in garmin.get_recent_activities(client, limit=10):
             start_local = act.get("startTimeLocal", "")
             try:
                 start_dt = datetime.strptime(start_local, "%Y-%m-%d %H:%M:%S")
             except (ValueError, TypeError):
                 continue
-            if start_dt >= cutoff:
-                matched.append(act)
-                total += (act.get("duration") or 0) / 60
-        return round(total, 1), matched
+            if start_dt.date() != today:
+                continue
+            duration_min = (act.get("duration") or 0) / 60
+            if lo <= duration_min <= hi:
+                return round(duration_min, 1), [act]
+        return 0.0, []
 
 
     # ─────────────────────────────────────────────────────────────────────

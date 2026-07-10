@@ -119,25 +119,78 @@ def test_garmin_activity_row_maps_expected_fields():
 
 
 # ─── get_recent_garmin_activity_minutes ─────────────────────────────────────
+# Matches on the ACTIVITY'S OWN duration (target +/- buffer), not on how
+# recently it started relative to `now` — see the method's docstring for why.
 
-def test_recent_activity_minutes_sums_only_activities_within_window():
+def test_recent_activity_minutes_matches_activity_within_duration_range():
+    # 15-min planned walk, 5-min buffer -> matches anything 10-20 min today,
+    # however long ago it started (here: 3 hours before `now`).
     activities = [
-        {"activityId": 1, "startTimeLocal": "2026-07-08 09:50:00", "duration": 1800.0},  # 10 min ago
-        {"activityId": 2, "startTimeLocal": "2026-07-08 07:00:00", "duration": 3600.0},  # 3h ago - outside window
+        {"activityId": 1, "startTimeLocal": "2026-07-08 07:00:00", "duration": 900.0},  # 15 min, today
     ]
     client = _FakeGarminClient(activities=activities)
     repo = _repo_with_garmin(client)
     minutes, matched = repo.get_recent_garmin_activity_minutes(
-        window_minutes=60, now=datetime(2026, 7, 8, 10, 0, 0),
+        target_minutes=15, buffer_minutes=5, now=datetime(2026, 7, 8, 10, 0, 0),
     )
-    assert minutes == 30.0
+    assert minutes == 15.0
     assert len(matched) == 1
     assert matched[0]["activityId"] == 1
 
 
+def test_recent_activity_minutes_ignores_activity_outside_duration_range():
+    # 40-min activity is outside 15+/-5 = 10-20 min, even though it's today.
+    activities = [{"activityId": 1, "startTimeLocal": "2026-07-08 07:00:00", "duration": 2400.0}]
+    client = _FakeGarminClient(activities=activities)
+    repo = _repo_with_garmin(client)
+    minutes, matched = repo.get_recent_garmin_activity_minutes(
+        target_minutes=15, buffer_minutes=5, now=datetime(2026, 7, 8, 10, 0, 0),
+    )
+    assert (minutes, matched) == (0.0, [])
+
+
+def test_recent_activity_minutes_ignores_activity_from_a_different_day():
+    # Duration matches (15 min) but it was yesterday, not today.
+    activities = [{"activityId": 1, "startTimeLocal": "2026-07-07 07:00:00", "duration": 900.0}]
+    client = _FakeGarminClient(activities=activities)
+    repo = _repo_with_garmin(client)
+    minutes, matched = repo.get_recent_garmin_activity_minutes(
+        target_minutes=15, buffer_minutes=5, now=datetime(2026, 7, 8, 10, 0, 0),
+    )
+    assert (minutes, matched) == (0.0, [])
+
+
+def test_recent_activity_minutes_returns_first_match_in_recency_order():
+    # get_recent_activities() returns newest-first; the first (most recent)
+    # matching activity wins even if an older one in the list also matches.
+    activities = [
+        {"activityId": 1, "startTimeLocal": "2026-07-08 09:00:00", "duration": 960.0},  # 16 min, newest
+        {"activityId": 2, "startTimeLocal": "2026-07-08 06:00:00", "duration": 900.0},  # 15 min, older
+    ]
+    client = _FakeGarminClient(activities=activities)
+    repo = _repo_with_garmin(client)
+    minutes, matched = repo.get_recent_garmin_activity_minutes(
+        target_minutes=15, buffer_minutes=5, now=datetime(2026, 7, 8, 10, 0, 0),
+    )
+    assert minutes == 16.0
+    assert matched[0]["activityId"] == 1
+
+
+def test_recent_activity_minutes_floors_range_at_zero():
+    # target=3, buffer=5 would make the lower bound negative; floored to 0
+    # rather than matching nonsensically (e.g. a 0-min "activity").
+    activities = [{"activityId": 1, "startTimeLocal": "2026-07-08 07:00:00", "duration": 60.0}]  # 1 min
+    client = _FakeGarminClient(activities=activities)
+    repo = _repo_with_garmin(client)
+    minutes, matched = repo.get_recent_garmin_activity_minutes(
+        target_minutes=3, buffer_minutes=5, now=datetime(2026, 7, 8, 10, 0, 0),
+    )
+    assert minutes == 1.0  # still matches: [0, 8] range includes 1 min
+
+
 def test_recent_activity_minutes_returns_zero_when_not_configured():
     repo = Repository(_config())
-    minutes, matched = repo.get_recent_garmin_activity_minutes(60)
+    minutes, matched = repo.get_recent_garmin_activity_minutes(15, 5)
     assert (minutes, matched) == (0.0, [])
 
 
@@ -145,7 +198,7 @@ def test_recent_activity_minutes_ignores_unparseable_timestamps():
     activities = [{"activityId": 1, "startTimeLocal": "", "duration": 600.0}]
     client = _FakeGarminClient(activities=activities)
     repo = _repo_with_garmin(client)
-    minutes, matched = repo.get_recent_garmin_activity_minutes(60, now=datetime(2026, 7, 8, 10, 0, 0))
+    minutes, matched = repo.get_recent_garmin_activity_minutes(15, 5, now=datetime(2026, 7, 8, 10, 0, 0))
     assert (minutes, matched) == (0.0, [])
 
 

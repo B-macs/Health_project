@@ -123,3 +123,18 @@ def create_page(client: Client, database_id: str, properties: dict) -> dict:
 
 def update_page(client: Client, page_id: str, properties: dict) -> dict:
     return client.pages.update(page_id=page_id, properties=properties)
+
+
+def ensure_number_properties(client: Client, database_id: str, names: list[str]) -> list[str]:
+    """Adds any of `names` that don't already exist on the database as Number
+    properties (Notion's schema-update API only adds/overwrites the keys you
+    pass — existing properties not named here are untouched). Returns the
+    names actually created; already-present ones are skipped, so this is
+    safe to call repeatedly. This is a schema change (unlike create_page/
+    update_page, which only touch rows) — callers should treat it as a
+    one-time setup step, not part of a normal write path."""
+    existing = client.databases.retrieve(database_id=database_id).get("properties", {})
+    missing = [n for n in names if n not in existing]
+    if missing:
+        client.databases.update(database_id=database_id, properties={n: {"number": {}} for n in missing})
+    return missing

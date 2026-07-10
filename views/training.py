@@ -377,6 +377,7 @@ def _init_state(day_num: int | None = None):
         "tp_yoga_select":      False,    # showing the yoga-picker sub-screen
         "tp_yoga_detail":      None,     # slug of the yoga being viewed (video + Complete), if any
         "tp_garmin_minutes":   {},       # {exercise_idx: actual_minutes} pulled from Garmin on Complete
+        "tp_garmin_activity_detail": {}, # {exercise_idx: {avg_hr, max_hr, distance_km, calories}}
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
     for k, v in defaults.items():
@@ -437,6 +438,7 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
                       duration_minutes: int, notes: str) -> None:
     r = repo.get_repository()
     garmin_minutes = st.session_state.get("tp_garmin_minutes", {})
+    garmin_detail = st.session_state.get("tp_garmin_activity_detail", {})
     session_info = r.create_training_session(
         session_date=date.today(),
         duration_minutes=duration_minutes,
@@ -449,10 +451,13 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         # exercise's own logged tut — a shallow copy so the shared
         # training_plan.py PLAN dict is never mutated in place.
         log_ex = dict(ex, duration_minutes=actual_min) if actual_min else ex
-        note = (
+        garmin_note = (
             f"Garmin-verified duration: {actual_min:.0f} min "
             f"(planned {ex.get('duration_minutes')} min)."
         ) if actual_min else ""
+        user_note = (st.session_state.get(f"tp_note_{idx}") or "").strip()
+        note = "\n".join(n for n in (garmin_note, user_note) if n)
+        detail = garmin_detail.get(idx) or {}
         last_id = r.save_training_exercise(
             session_id=session_info["session_id"],
             movement_name=ex["name"],
@@ -466,6 +471,10 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             session_duration_minutes=session_info["duration_minutes"],
             session_rpe=session_info["session_rpe"],
             session_au=session_info["session_au"],
+            garmin_avg_hr=detail.get("avg_hr"),
+            garmin_max_hr=detail.get("max_hr"),
+            garmin_distance_km=detail.get("distance_km"),
+            garmin_calories=detail.get("calories"),
         )
     if notes.strip() and last_id:
         r.save_session_notes(last_id, notes)
@@ -1300,12 +1309,14 @@ def _render_add_training_fab() -> None:
             st.rerun()
 
 
-def _log_yoga_completion(session: yg.YogaSession) -> None:
+def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> None:
     """Persist a completed yoga session to Notion — mirrors _auto_log_session's
     shape (one shared session_id/AU/RPE across a row per pose) so it feeds the
     same get_daily_session_au() aggregate the Home strain card and ACWR read from.
     Tagged Type="Yoga" so repo.has_logged_session() (which gates the rehab-plan
-    flow) skips it — see that method's docstring."""
+    flow) skips it — see that method's docstring. `note` is the whole-session
+    note from the completion screen, attached to the last logged pose the same
+    way _auto_log_session attaches the rehab flow's session-wide notes."""
     r = repo.get_repository()
     try:
         current_stage = r.get_current_stage()
@@ -1316,9 +1327,10 @@ def _log_yoga_completion(session: yg.YogaSession) -> None:
         duration_minutes=session.total_duration_minutes,
         session_rpe=session.estimated_rpe,
     )
+    last_id = None
     for pose in session.poses:
-        severity, note = yg.effective_safety(pose, current_stage)
-        r.save_training_exercise(
+        severity, pose_note = yg.effective_safety(pose, current_stage)
+        last_id = r.save_training_exercise(
             session_id=session_info["session_id"],
             movement_name=pose.name,
             movement_type="Yoga",
@@ -1327,12 +1339,14 @@ def _log_yoga_completion(session: yg.YogaSession) -> None:
             rpe=session.estimated_rpe,
             sets=[{"set_num": 1, "reps": 1, "weight": 0.0,
                    "rest": 10, "tut": pose.hold_seconds, "velocity": "isometric"}],
-            note=note if severity != "cleared" else "",
+            note=pose_note if severity != "cleared" else "",
             session_date=session_info["session_date"],
             session_duration_minutes=session_info["duration_minutes"],
             session_rpe=session_info["session_rpe"],
             session_au=session_info["session_au"],
         )
+    if note.strip() and last_id:
+        r.save_session_notes(last_id, note)
 
 
 def _render_yoga_detail(session: yg.YogaSession) -> None:
@@ -1380,8 +1394,14 @@ def _render_yoga_detail(session: yg.YogaSession) -> None:
     with st.expander(f"Full routine · {len(session.poses)} poses"):
         st.markdown(f"<div>{rows_html}</div>", unsafe_allow_html=True)
 
+    yoga_note = st.text_area(
+        "Notes (optional)", key=f"tp_yoga_note_{session.slug}",
+        placeholder="e.g. right hip felt tight during pigeon pose, skipped the forward folds...",
+        height=80,
+    )
+
     if st.button("Complete", type="primary", key="tp_yoga_complete", use_container_width=True):
-        _log_yoga_completion(session)
+        _log_yoga_completion(session, yoga_note)
         st.session_state.tp_yoga_detail = None
         st.session_state.tp_yoga_select = False
         st.toast(f"Logged {session.name} — nice work.")
@@ -1768,6 +1788,18 @@ def render():
     if ex.get("warning"):
         st.error(f"⚠️ {ex['warning']}")
 
+    # Per-exercise note — one per exercise (keyed on _eidx, not on set/rep),
+    # so it persists across every set of this exercise and resets to blank
+    # once tp_ex_idx advances to the next one. Read back by _auto_log_session
+    # via this same key, independent of the session-wide notes field on the
+    # "Save Session to Log" screen at the end.
+    with st.expander("📝 Add a note for this exercise"):
+        st.text_area(
+            "Note", key=f"tp_note_{_eidx}", label_visibility="collapsed",
+            placeholder="e.g. right hip felt tight on the last set, form cue worked well...",
+            height=68,
+        )
+
     # ── Set progress and timers ───────────────────────────────────────────────
     ex_type    = ex["type"]
     cur_set    = st.session_state.tp_set
@@ -1837,12 +1869,13 @@ def render():
         if ex_type == "duration":
             _is_garmin_activity = sess.is_run_or_walk(ex) and repo.get_repository().garmin_configured()
             if _is_garmin_activity:
-                _window_preview = ex["duration_minutes"] + sess.GARMIN_ACTIVITY_BUFFER_MINUTES
+                _lo = max(0, ex["duration_minutes"] - sess.GARMIN_ACTIVITY_BUFFER_MINUTES)
+                _hi = ex["duration_minutes"] + sess.GARMIN_ACTIVITY_BUFFER_MINUTES
                 st.info(
                     f"🏃 Start **{ex['name']}** on your Garmin watch now. Tap Complete "
-                    f"below when you're done — activity from the last {_window_preview} min "
-                    f"({ex['duration_minutes']} min planned + {sess.GARMIN_ACTIVITY_BUFFER_MINUTES} min "
-                    f"buffer) is pulled in automatically."
+                    f"below when you're done — today's most recent Garmin activity "
+                    f"lasting {_lo}-{_hi} min is pulled in automatically, however long "
+                    f"ago it started."
                 )
             else:
                 _duration_timer(ex["duration_minutes"], timer_key=_dur_key)
@@ -1850,22 +1883,25 @@ def render():
                 _mark_start()
                 if _is_garmin_activity:
                     r = repo.get_repository()
-                    # Window scales with THIS exercise's own planned duration
-                    # (already set in training_plan.py) rather than a flat
-                    # global figure — a 15-min planned walk searches the last
-                    # 15+buffer minutes, a 30-min run searches 30+buffer.
-                    window_min = ex["duration_minutes"] + sess.GARMIN_ACTIVITY_BUFFER_MINUTES
+                    # Matches on the ACTIVITY'S OWN duration (± buffer) rather
+                    # than on how recently it started — a 15-min planned walk
+                    # matches today's most recent 10-20 min activity, whether
+                    # Complete is tapped immediately or after a delay.
                     try:
-                        minutes, _matched = r.get_recent_garmin_activity_minutes(window_min)
+                        minutes, matched = r.get_recent_garmin_activity_minutes(
+                            ex["duration_minutes"], sess.GARMIN_ACTIVITY_BUFFER_MINUTES)
                     except Exception:
-                        minutes = 0.0
+                        minutes, matched = 0.0, []
                     if minutes > 0:
                         st.session_state.tp_garmin_minutes[st.session_state.tp_ex_idx] = minutes
+                        st.session_state.tp_garmin_activity_detail[st.session_state.tp_ex_idx] = (
+                            sess.summarize_garmin_activities(matched)
+                        )
                         st.toast(f"Pulled {minutes:.0f} min from Garmin for {ex['name']}.")
                     else:
                         st.toast(
-                            f"No matching Garmin activity found in the last {window_min} "
-                            f"min — logged with the planned duration."
+                            f"No Garmin activity today lasting {_lo}-{_hi} min — "
+                            f"logged with the planned duration."
                         )
                 st.session_state.tp_ex_idx += 1
                 st.session_state.tp_set = 1

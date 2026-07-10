@@ -42,6 +42,41 @@ def test_is_run_or_walk_false_for_unrelated_exercise():
     assert sessions.is_run_or_walk({"name": "Glute Bridge"}) is False
 
 
+# ─── summarize_garmin_activities ─────────────────────────────────────────────
+
+def test_summarize_garmin_activities_single_match():
+    matched = [{"duration": 900.0, "averageHR": 106.0, "maxHR": 144.0,
+                "distance": 1894.75, "calories": 312.0}]
+    summary = sessions.summarize_garmin_activities(matched)
+    assert summary == {"avg_hr": 106, "max_hr": 144.0, "distance_km": 1.89, "calories": 312}
+
+
+def test_summarize_garmin_activities_sums_and_weights_multiple_matches():
+    matched = [
+        {"duration": 600.0, "averageHR": 100.0, "maxHR": 120.0, "distance": 800.0, "calories": 100.0},
+        {"duration": 300.0, "averageHR": 130.0, "maxHR": 150.0, "distance": 400.0, "calories": 50.0},
+    ]
+    summary = sessions.summarize_garmin_activities(matched)
+    # duration-weighted avg_hr: (100*600 + 130*300) / 900 = 110
+    assert summary["avg_hr"] == 110
+    assert summary["max_hr"] == 150.0
+    assert summary["distance_km"] == 1.2
+    assert summary["calories"] == 150
+
+
+def test_summarize_garmin_activities_blanks_missing_fields_instead_of_zero():
+    # A Stopwatch-type activity with no HR/distance data at all.
+    matched = [{"duration": 600.0}]
+    summary = sessions.summarize_garmin_activities(matched)
+    assert summary == {"avg_hr": None, "max_hr": None, "distance_km": None, "calories": None}
+
+
+def test_summarize_garmin_activities_empty_list():
+    assert sessions.summarize_garmin_activities([]) == {
+        "avg_hr": None, "max_hr": None, "distance_km": None, "calories": None,
+    }
+
+
 # ─── movement_category ──────────────────────────────────────────────────────
 
 def test_movement_category_hip_hinge():
