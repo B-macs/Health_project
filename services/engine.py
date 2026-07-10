@@ -241,7 +241,7 @@ def apply_exercise_volume_modifier(ex: dict, volume_factor: float) -> dict:
     if m.get("reps_in_set") is not None:
         m["reps_in_set"] = max(1, round(m["reps_in_set"] * volume_factor))
     if m.get("duration_minutes") is not None:
-        m["duration_minutes"] = max(5.0, round(m["duration_minutes"] * volume_factor * 2) / 2)
+        m["duration_minutes"] = max(5, round(m["duration_minutes"] * volume_factor))
     return m
 
 

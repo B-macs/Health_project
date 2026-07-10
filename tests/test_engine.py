@@ -391,13 +391,21 @@ def test_engine_apply_exercise_volume_modifier():
     check("reps_in_set 0.60: 5 -> 3",
           _avm({"reps_in_set": 5}, 0.60)["reps_in_set"], 3)
 
-    # duration_minutes scaled by 0.75: round(20 * 0.75 * 2) / 2 = round(30) / 2 = 15.0
-    check("duration_minutes 0.75: 20 -> 15.0",
-          _avm({"duration_minutes": 20}, 0.75)["duration_minutes"], 15.0)
+    # duration_minutes scaled by 0.75: round(20 * 0.75) = round(15.0) = 15
+    check("duration_minutes 0.75: 20 -> 15",
+          _avm({"duration_minutes": 20}, 0.75)["duration_minutes"], 15)
 
-    # duration_minutes floor: round(5 * 0.10 * 2) / 2 = 0.0, but max(5, 0.0) = 5.0
+    # duration_minutes floor: round(5 * 0.10) = round(0.5) = 0, but max(5, 0) = 5
     check("duration_minutes floor at 5",
-          _avm({"duration_minutes": 5}, 0.10)["duration_minutes"], 5.0)
+          _avm({"duration_minutes": 5}, 0.10)["duration_minutes"], 5)
+
+    # Regression: duration_minutes must always come back a true int, never a
+    # float — _duration_timer's f"{minutes:02d}:00" formatting raises
+    # ValueError on a float even when its value is a whole number (e.g. 10.0),
+    # and 1.04 * 10 = 10.4 is exactly the kind of factor that used to produce
+    # a non-integer float under the old *2/2 half-minute-rounding formula.
+    check("duration_minutes 1.04: 10 -> int",
+          isinstance(_avm({"duration_minutes": 10}, 1.04)["duration_minutes"], int), True)
 
     # hold_seconds floor: round(6 * 0.10) = 1, max(5, 1) = 5
     check("hold_seconds floor at 5",
