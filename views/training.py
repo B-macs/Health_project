@@ -1530,7 +1530,11 @@ def render():
     # ── selected == today: existing day_num-driven flow, unchanged below ────────
 
     # ── Day-overview screen — shown until "Start" is tapped for today's session ─
-    if (1 <= day_num <= 14 and not st.session_state.tp_done_today
+    # Upper bound is however many days are actually authored in training_plan.py
+    # (originally a hardcoded 14; extended once a 7-day rehab-extension block or
+    # any future block adds more PLAN entries) rather than a magic number.
+    _plan_days = len(tp.PLAN)
+    if (1 <= day_num <= _plan_days and not st.session_state.tp_done_today
             and not st.session_state.tp_started):
         _directive = _engine_directive()
         today_plan = tp.PLAN[day_num]
@@ -1543,7 +1547,7 @@ def render():
 
     # ── Status strip ──────────────────────────────────────────────────────────
     session_active = (
-        1 <= day_num <= 14
+        1 <= day_num <= _plan_days
         and not st.session_state.tp_done_today
         and st.session_state.tp_ex_idx > 0
     )
@@ -1551,9 +1555,9 @@ def render():
     _sc1, _sc2, _sc3 = st.columns(3)
     _sc1.metric("Plan Start", str(plan_start))
     _sc2.metric("Today", str(date.today()))
-    if 1 <= day_num <= 14:
-        _sc3.metric("Day", f"{day_num} / 14")
-        _progress_bar("Phase progress", f"{day_num}/14", day_num / 14)
+    if 1 <= day_num <= _plan_days:
+        _sc3.metric("Day", f"{day_num} / {_plan_days}")
+        _progress_bar("Phase progress", f"{day_num}/{_plan_days}", day_num / _plan_days)
 
     if session_active:
         st.markdown(
@@ -1578,10 +1582,10 @@ def render():
         st.stop()
 
     # ── Plan complete ─────────────────────────────────────────────────────────
-    if day_num > 14:
+    if day_num > _plan_days:
         st.balloons()
         st.success(
-            "**14-Day Stage 1 Rehab Complete.**\n\n"
+            f"**{_plan_days}-Day Stage 1 Rehab Complete.**\n\n"
             "Your objectives: tissue tolerance established, neural desensitisation, "
             "gluteal activation, hip hinge pattern, and spinal stability foundation.\n\n"
             "Open **Autoregulation** to check Stage 1 → 2 progression criteria. "
@@ -1637,7 +1641,7 @@ def render():
 
     # Header
     st.markdown(
-        f"<h2 style='margin-bottom:2px;'>Day {day_num} of 14</h2>"
+        f"<h2 style='margin-bottom:2px;'>Day {day_num} of {_plan_days}</h2>"
         f"<p style='color:#E8ECEF;font-family:monospace;font-size:15px;margin-top:0;'>"
         f"{today_plan['objective']}</p>"
         f"<p style='color:#8A99A3;font-size:13px;'>{today_plan['phase']} — RPE target: ≤{today_plan['session_rpe_target']}/10</p>",
@@ -1703,7 +1707,7 @@ def render():
                 f"</div>",
                 unsafe_allow_html=True,
             )
-            if day_num < 14:
+            if day_num < _plan_days:
                 next_plan = tp.PLAN[day_num + 1]
                 with st.expander(f"Preview: Day {day_num + 1} — {next_plan['objective']}", expanded=False):
                     for nex in next_plan["exercises"]:

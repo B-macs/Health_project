@@ -5,8 +5,32 @@ Single source of truth for MRI findings and biomechanical assessment.
 Referenced by training_plan.py when designing sessions.
 Update this file before generating each new training block.
 
-Current block: 14-Day Stage 1 Rehab (bodyweight only)
-Next block:    4-Week Stage 2 Transition (reassess after Day 14)
+Updated 2026-07-13 against docs/clinical_profile_weighting.md, incorporating
+Input_files/injury_profile.md, Input_files/hypermobility-profile.md, and
+Input_files/2025-training-year.md (all local-only, gitignored — read those
+directly for full detail; only what's currently weight-relevant is
+synthesized here). Recent Notion readiness/training-log data (last 14 days)
+is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
+
+Current block: Stage 1 Rehab, extended by 7 days (Days 15-21, "Week 3: Flare
+  Recovery & Reassessment Prep" in training_plan.py) — decided 2026-07-13.
+  Day 14's exit criteria were not met on the original schedule
+  (pain_free_streak=0, avg_tightness_14d=4.6 vs required <=3.0) because of an
+  active mid-back/lower-back flare (see symptom_log below). By 2026-07-13 the
+  flare was trending down (tightness 8->1 over the window) with today's
+  check-in showing pain=0, tightness=1. Decision made with the user: extend
+  rehab one more week rather than jump to Stage 2, then reassess.
+  Phase 1's length_days was extended from 14 to 21 in the Notion config to
+  match (still phase_number=1 — this is a continuation, not a new phase).
+  Day 21 repeats the Day 14 assessment battery for a direct before/after
+  comparison across the flare.
+  Agreed handling of pain_free_streak specifically: informative, not a hard
+  blocker, if tightness (<=3.0) and pain (<=2/10) are met and physio signs
+  off — a single reversed bad day within an otherwise-improving trend
+  shouldn't be treated the same as a fresh injury restarting the clock.
+Next block: 4-Week Stage 2 Transition — reassess using Day 21's results
+  (2026-07-19) against stage_1_exit_criteria below, per the agreed handling
+  of the streak criterion, before authoring Stage 2.
 """
 
 PROFILE = {
@@ -17,8 +41,10 @@ PROFILE = {
 
     "patient": "Patient",
     "current_stage": 1,
-    "current_block": "14-Day Stage 1 Rehab",
-    "next_reassessment": "After Day 14 — progress to 4-Week Stage 2 if criteria met",
+    "current_block": "Stage 1 Rehab, extended to 21 days (Days 15-21 = Week 3: Flare Recovery & Reassessment Prep)",
+    "next_reassessment": "Day 21 (2026-07-19) — reassess against stage_1_exit_criteria; "
+                          "pain_free_streak treated as informative not blocking if tightness/pain "
+                          "criteria + physio sign-off are met — see module docstring",
 
     # ─────────────────────────────────────────────────────────────────────────
     #  MRI Findings
@@ -51,7 +77,41 @@ PROFILE = {
     },
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  Biomechanical Profile — 5 assessed movement patterns
+    #  Hypermobility — foundational, persistent (NOT time-decayed like the
+    #  injury history below — see docs/clinical_profile_weighting.md #2).
+    #  Full detail: Input_files/hypermobility-profile.md
+    # ─────────────────────────────────────────────────────────────────────────
+
+    "hypermobility": {
+        "status": "Confirmed generalised joint hypermobility",
+        "beighton_score": "6/9 (adult threshold >=5) — palms flat to floor, "
+                           "thumb-to-forearm, 5th-finger and elbow hyperextension all positive",
+        "joint_notes": [
+            "Elbows hyperextend; knees do not",
+            "Flat feet (pes planus)",
+            "Possible HSD/hEDS-spectrum — not yet assessed against 2017 criteria",
+        ],
+        "training_implication": (
+            "Stability-first, proprioception-focused programming throughout — this is a "
+            "standing modifier on every block, not something that resolves or gets "
+            "reassessed away like a healing injury. Favour controlled-range strength/"
+            "stability work over passive end-range stretching or ballistic movement into "
+            "end range. Applies broadly, not just to the joints already symptomatic."
+        ),
+        "autonomic_cluster_note": (
+            "Suspected mild autonomic/low-blood-volume features (low HRV, orthostatic "
+            "lightheadedness on standing transitions, fluid-handling irregularities) "
+            "commonly associated with hypermobility — self-observed, not diagnosed. "
+            "Relevant context for interpreting the readiness engine's HRV-weighted score: "
+            "a personally low HRV baseline may reflect this rather than poor recovery. "
+            "readiness.py's adaptive baseline already calibrates to the individual, so no "
+            "code change implied — just don't over-interpret a low-vs-population-norm HRV "
+            "reading in isolation."
+        ),
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  Biomechanical Profile — 6 assessed movement patterns
     # ─────────────────────────────────────────────────────────────────────────
 
     "biomechanical_findings": [
@@ -131,6 +191,15 @@ PROFILE = {
                 "Retraining the motor path gradually reduces tendon tension and snap frequency."
             ),
             "laterality": "RIGHT ONLY",
+            "additional_evidence_2026_07_08": (
+                "Same right-side click also observed during Dead Bug at ~45° knee flexion "
+                "(supine, both legs raised, extending the right leg) — not just standing 90° "
+                "external rotation. No click when the right leg extends alone from a "
+                "bird-dog-style position with the left leg flat. Suggests the snap-triggering "
+                "range may be broader than originally characterised — cue neutral/internal "
+                "rotation on the right through supine leg-extension patterns too, not only "
+                "standing hip flexion drills."
+            ),
         },
         {
             "id": 5,
@@ -155,7 +224,63 @@ PROFILE = {
             ),
             "laterality": "bilateral",
         },
+        {
+            "id": 6,
+            "title": "Right Shoulder Instability — Maintenance-Dependent, Full Weight",
+            "location": "Right glenohumeral joint / scapula",
+            "history": (
+                "3x anterior dislocations (ages 17/18/21 — bike fall, rugby, surfing) with "
+                "2 surgeries: a capsular stabilisation 'wrap' (shallow glenoid noted "
+                "intra-operatively) which still permitted a 3rd dislocation, then a Latarjet "
+                "coracoid transfer. No dislocations since. Full detail: Input_files/injury_profile.md."
+            ),
+            "structures": ["Right glenohumeral capsule/labrum (post-Latarjet)", "Scapular stabilisers"],
+            "mechanism": (
+                "Escalation to a bony (Latarjet) procedure after a soft-tissue repair failed is "
+                "the standard pathway when connective-tissue laxity undermines capsular repair — "
+                "consistent with the confirmed hypermobility above. Stability now comes from "
+                "muscular control, not passive ligamentous restraint."
+            ),
+            "training_implication": (
+                "NOT a resolved/historical finding despite no dislocations since Latarjet — "
+                "residual shoulder sag, side pain, and right hip pain recur specifically 'if "
+                "training lapses' per injury_profile.md, i.e. stability is maintenance-dependent, "
+                "not permanent. Scapular control/stability work is therefore a STANDING "
+                "requirement, not optional conditioning — especially relevant once Stage 2 "
+                "introduces external load and pressing patterns. Cross-references the 2025 "
+                "strength analysis (Input_files/2025-training-year.md): right scap eccentric "
+                "control still weak, overhead pressing exposes instability with a left tilt, "
+                "and a left rhomboid strain (Jul 2025) occurred under overhead load — same "
+                "underlying issue, do not double-count as a separate caution. Overhead/pressing "
+                "progression in Stage 2 should be conservative and scapular-control-first."
+            ),
+            "laterality": "RIGHT ONLY",
+        },
     ],
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  Historical Injuries — low weight per docs/clinical_profile_weighting.md
+    #  #1 (fully resolved, regardless of age). Context only; full detail in
+    #  Input_files/injury_profile.md. Not itemised in biomechanical_findings
+    #  above because none currently shape exercise selection, except the
+    #  conditional note below.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    "historical_injuries_low_weight": {
+        "resolved_no_current_effect": [
+            "Left clavicle dislocation (age 14) — residual mild elevation, asymptomatic",
+            "Left wrist carpal fracture (age 15-16) — residual plane-to-plane click, asymptomatic",
+            "Right thumb CMC joint surgery (age 25) — asymptomatic",
+        ],
+        "conditional_relevance": (
+            "Left hip flexor (Sartorius) strain, twice (age 26, running/skiing overuse), "
+            "currently resolved with no ongoing symptoms — low weight for THIS block. "
+            "Becomes relevant again only if/when running-type conditioning is introduced "
+            "(services.rules clears 'running' from Stage 2 onward): progress running "
+            "volume conservatively given the prior recurrence, per "
+            "docs/clinical_profile_weighting.md #1's re-stress carve-out."
+        ),
+    },
 
     # ─────────────────────────────────────────────────────────────────────────
     #  Muscle Imbalance Summary
@@ -288,10 +413,86 @@ PROFILE = {
                 ),
             ],
         },
+        {
+            "date":   "2026-07-07",
+            "status": "Active — monitoring, escalating as of 2026-07-10",
+            "region": "Migrating between central lower back and mid-back (right side specifically noted)",
+            "title":  "Mid-Back Re-Injury (Delayed Onset) — Active, Full Weight",
+
+            "mechanism": (
+                "Per Input_files/injury_profile.md #13: delayed-onset flare (~3 days after "
+                "sprints, following a full day of sitting/working then sitting on a bar stool) — "
+                "this is a re-injury of the same mid-back region first strained Oct 2025 "
+                "(#12, MRI'd 10 Nov 2025, resolved ~March 2026 after serious rehab). "
+                "Recent check-in/training-log evidence (full detail: "
+                "Input_files/stage1_recent_data_summary.md): "
+                "2026-07-07 readiness note 'sore but not bad, where I spoke about before'; "
+                "2026-07-09 'same from the strain a few days ago'; "
+                "2026-07-10 pain escalated to 3/10, explicitly migrating between lower back "
+                "and mid-back, mid-back described as worse on the RIGHT side; skipped training "
+                "2026-07-09 due to soreness; using heat pads/15min heat as self-management."
+            ),
+
+            "symptoms": {
+                "location": "Central lower back and mid-back/thoracic, right-side mid-back flagged specifically",
+                "painful_with":   ["Prolonged sitting", "Sprint-type effort (delayed 3 days)", "Day-long low activity/rest — got worse, not better, on 2026-07-10"],
+                "pain_free_with": None,
+                "neural":         "None reported — no leg symptoms, numbness, or tingling",
+            },
+
+            "assessment": {
+                "likely_tissue": [
+                    "Thoracic/lumbar paraspinals and facet structures already flagged in "
+                    "biomechanical finding #3 (thoracic T6-T10 + L5/S1 horizontal facet base)",
+                ],
+                "mechanism": (
+                    "Same overuse + sustained-sitting trigger pattern as the Oct 2025 index "
+                    "episode and the resolved left-back strain above — recurring rather than "
+                    "a one-off, and per docs/clinical_profile_weighting.md #1 this makes it "
+                    "FULL WEIGHT, not context-only, unlike a truly resolved old injury."
+                ),
+                "underlying_pattern": (
+                    "Hip-flexor/glute activation deficits from prolonged sitting (established "
+                    "pattern, see imbalances above) combined with confirmed hypermobility's "
+                    "stability-under-fatigue vulnerability — segmental control breaks down "
+                    "under sustained low-load posture before it breaks down under acute load."
+                ),
+            },
+
+            "plan": [
+                "Do not assume Stage 1 exit criteria are met on Day-14 timing alone — "
+                "pain_free_streak and avg_tightness_14d both currently fail the documented "
+                "thresholds (see stage_1_exit_criteria) because of this flare.",
+                "Continue heat/rest self-management; monitor for the migration pattern "
+                "(lower back <-> mid-back) settling rather than continuing to move.",
+                "Re-evaluate posture/sitting breaks given the identical trigger to the "
+                "resolved Oct 2025 and 2026-06 left-back episodes — this is now a 3rd "
+                "occurrence of the same mechanism.",
+                "Do not author Stage 2 (external load) while this is actively escalating; "
+                "reassess once pain returns to <=2/10 and tightness trend reverses.",
+            ],
+
+            "escalation_criteria": [
+                "No improvement after another week → see physio (physio already involved "
+                "per injury_profile.md #13, ongoing)",
+                "Pain becomes sharp or radiates down a leg",
+                "Any numbness or tingling",
+            ],
+
+            "notes": [
+                "This is the 3rd distinct episode of the same mid-back/prolonged-sitting "
+                "mechanism (Oct 2025 index event, a 2026-06 left-back variant above, now "
+                "this one) — treat the pattern itself, not just each individual flare, as "
+                "the thing to design around in Stage 2.",
+            ],
+        },
     ],
 
     # ─────────────────────────────────────────────────────────────────────────
     #  Stage Advancement Criteria (to be evaluated at Day 14)
+    #  Status as of 2026-07-13: NOT MET — pain_free_streak=0, avg_tightness_14d=4.6
+    #  (required <=3.0) — see symptom_log entry above. Do not advance to Stage 2
+    #  until these are actually satisfied and physio sign-off is obtained.
     # ─────────────────────────────────────────────────────────────────────────
 
     "stage_1_exit_criteria": {

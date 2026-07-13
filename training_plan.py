@@ -201,6 +201,75 @@ COXA_SALTANS_DRILL = _ex(
     regression="Cannot prevent snap → work only to 60° until tendon path ingrains at lower angle first.",
 )
 
+RIGHT_HIP_CAPSULE_REVISED = _ex(
+    name="Right Posterior Hip Capsule Stretch (Revised Cue)",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=2, hold_seconds=60, rest_seconds=45,
+    mechanics=(
+        "Revised version — the standard cross-body cue (Days 1-14) reportedly produced tightness "
+        "at the FRONT/middle of BOTH hips rather than the intended RIGHT posterior capsule, with "
+        "no sensation at the back of the hip/glute (session note, 2026-07-08). Try this instead: "
+        "Lie on your back, RIGHT knee bent. Posteriorly tilt your pelvis slightly and keep your "
+        "LOWER BACK FLAT on the floor throughout — this is the priority, not stretch distance. "
+        "From there, draw the right knee across toward the left shoulder ONLY as far as the lower "
+        "back can stay flat — stop the moment the low back wants to arch or twist off the floor. "
+        "Target sensation: deep in the BACK of the right hip/buttock, not the front groin. "
+        "If you still feel it at the front, the range is too big — reduce it further and prioritise "
+        "the flat-back cue over cross-body distance. Note whether this version lands differently."
+    ),
+    biomechanical_focus=(
+        "Same target as the original (right posterior hip capsule, finding #2) — this variant "
+        "prioritises pelvic control (flat lower back) over stretch distance, since the prior cueing "
+        "may have let the pelvis rotate/tilt, shifting the stretch anteriorly instead of posteriorly. "
+        "A diagnostic adjustment based on direct session feedback, not a confirmed fix yet."
+    ),
+    progression="Deep posterior-hip sensation achieved with flat back → gradually increase cross-body range.",
+    regression="Still feels anterior/frontal → reduce range further; flat-back control takes priority over depth.",
+)
+
+SCAPULAR_WALL_SLIDE = _ex(
+    name="Scapular Wall Slide",
+    ex_type="reps",
+    sets=2, reps=10, tempo="3-1-3", rest_seconds=45,
+    mechanics=(
+        "Stand with your head, upper back, and arms against a wall, elbows and wrists touching the "
+        "wall in a goalpost/W position. Slowly slide your arms up toward a Y position, keeping the "
+        "backs of your wrists and elbows in contact with the wall the whole way. "
+        "Shoulder blades should glide smoothly around the ribcage — no shrugging, no arching the "
+        "low back off neutral to help the arms up. If contact is lost, only slide as high as you "
+        "can keep it. Bodyweight-only scapular control — no external load."
+    ),
+    biomechanical_focus=(
+        "Scapular upward rotation control and lower trapezius/serratus activation — directly "
+        "addresses the maintenance-dependent right shoulder (finding #6): stability since the "
+        "Latarjet repair comes from muscular control, not passive structure, and symptoms have "
+        "recurred specifically when this kind of work lapses."
+    ),
+    progression="Full wrist-to-Y contact maintained pain-free → add a 2-second hold at the top.",
+    regression="Contact lost early or shoulder discomfort → reduce range to where contact holds, or sit for the movement.",
+)
+
+PRONE_Y_RAISE = _ex(
+    name="Prone Y-Raise (Scapular)",
+    ex_type="hold_reps",
+    sets=2, reps_in_set=8, hold_seconds=3, rest_seconds=45,
+    mechanics=(
+        "Lie face down, arms overhead in a Y shape, thumbs pointing up. Lift arms a few inches off "
+        "the floor, squeezing the lower shoulder blades down and together. Hold 3 seconds, lower "
+        "with control. Keep the low back relaxed — this is a shoulder-blade movement, not a back "
+        "extension. If the low back arches to compensate, lift the arms less."
+    ),
+    biomechanical_focus=(
+        "Lower trapezius strengthening — the specific weak link in the right shoulder's eccentric "
+        "control flagged in the 2025 strength analysis, and part of the standing requirement for "
+        "maintaining Latarjet-repair stability (finding #6)."
+    ),
+    progression="Clean 8 reps, no low-back compensation → add a 1-second pause at the very top.",
+    regression="Low back arches to compensate → reduce lift height, focus purely on the scapular squeeze.",
+    warning="Stop if this produces lumbar extension discomfort — reduce lift height immediately.",
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  14-DAY PLAN
@@ -1244,6 +1313,387 @@ PLAN[14] = {
             biomechanical_focus="Integrated functional outcome assessment — walking distance, stair capacity, and pain behaviour during functional tasks are the primary clinical benchmarks for rehabilitation progression.",
             progression="Pain ≤2/10 throughout AND improved from Day 7 scores → Stage 1 COMPLETE. Ready for Stage 2 assessment.",
             regression="Pain >3/10 on stairs or pain worse than Day 7 → discuss with physiotherapist before progressing.",
+        ),
+    ],
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  WEEK 3 — FLARE RECOVERY & REASSESSMENT PREP (Days 15-21)
+#
+#  Added 2026-07-13. Day 14's exit criteria were not met on schedule: an active,
+#  escalating mid-back/lower-back flare (patient_profile.py symptom_log,
+#  3rd occurrence of the same sitting/overuse mechanism) pushed pain_free_streak
+#  to 0 and avg_tightness_14d to 4.6 against the required <=3.0. By 2026-07-13
+#  the flare is trending down (tightness 8->1 over the window) but the streak
+#  and tightness criteria still need a clean week to actually be met.
+#
+#  This week is still Stage 1 (bodyweight only, ACWR ceiling 1.2, RPE ceiling 7,
+#  no spinal loading/end-range extension/loaded rotation) — NOT Stage 2. RPE
+#  targets are kept at Week-1 levels (3-5) rather than Week 2's (5-6) given the
+#  recent flare, with two new elements layered in:
+#    - Right shoulder scapular stability work (SCAPULAR_WALL_SLIDE, PRONE_Y_RAISE)
+#      — patient_profile.py finding #6: shoulder stability is maintenance-
+#      dependent, not resolved, so this is a standing requirement from here on,
+#      not optional conditioning.
+#    - RIGHT_HIP_CAPSULE_REVISED in place of the original cross-body cue,
+#      testing a flat-back-priority variant per direct 2026-07-08 feedback that
+#      the original wasn't landing on the intended structure.
+#  Also applied throughout: even rep counts for bilateral/alternating exercises
+#  (2026-07-08 feedback), and the neutral/internal-rotation cue extended to
+#  supine leg-extension patterns (Dead Bug), not just standing hip flexion, per
+#  the 45-degree clicking observed 2026-07-08 (finding #4 additional evidence).
+#
+#  Day 21 repeats the Day 14 assessment battery (McGill Big 3, single-leg
+#  balance, hip hinge, walk+stair) so the actual reassessment has a fresh,
+#  directly comparable data point on top of the Day 14 baseline.
+# ─────────────────────────────────────────────────────────────────────────────
+
+PLAN[15] = {
+    "objective": "Flare Recovery — Gentle Re-Entry",
+    "phase": "Week 3: Flare Recovery & Reassessment Prep",
+    "session_rpe_target": 3,
+    "exercises": [
+        UPPER_GLUTE_RELEASE,
+        RIGHT_HIP_CAPSULE_REVISED,
+        _ex(
+            name="Thoracic Extension (Rolled Towel)",
+            ex_type="hold",
+            sets=2, hold_seconds=60, rest_seconds=45,
+            mechanics=(
+                "Lie on your back with a rolled towel placed horizontally under your shoulder "
+                "blades (not the neck or lower back). Support your head with your hands. "
+                "Let your upper back gently extend over the towel — relax into it, do not force. "
+                "Breathe slowly. If any point along the towel feels sharp rather than a dull "
+                "stretch, shift the towel slightly and try again."
+            ),
+            biomechanical_focus=(
+                "Thoracic facet mobility (T6-T10, finding #3) — gentle passive extension directly "
+                "targets the mid-back region involved in the current flare, without any lumbar "
+                "loading or end-range lumbar extension."
+            ),
+            progression="Comfortable throughout → hold 90 seconds next session.",
+            regression="Any sharpness → reduce towel thickness or move it to a less sensitive level.",
+        ),
+        _ex(
+            name="Supine Knee-to-Chest (Bilateral)",
+            ex_type="hold",
+            laterality="bilateral",
+            sets=3, hold_seconds=45, rest_seconds=45,
+            mechanics=(
+                "Lie flat on your back. Draw BOTH knees toward your chest together, clasping "
+                "both hands behind your thighs. Hold at a comfortable endpoint — do not pull "
+                "forcefully. This is a decompression hold, matching the same mechanism that has "
+                "helped the mid-back/lower-back flare settle so far this week."
+            ),
+            biomechanical_focus="Bilateral L5/S1 and mid-back decompression — gentle posterior pelvic tilt reduces compressive load along the same segments involved in the current flare.",
+            progression="Pain-free, easy → extend hold to 60 seconds.",
+            regression="Any discomfort → single-leg version (one knee at a time, opposite leg flat).",
+        ),
+        _ex(
+            name="Controlled Walking",
+            ex_type="duration",
+            sets=1, duration_minutes=10, rest_seconds=0,
+            mechanics=(
+                "Walk at an easy, comfortable pace for 10 minutes on flat ground. Habitual "
+                "posture is fine today — this is not a posture-correction walk. Rate tightness/"
+                "pain before and after. Stop early if anything sharpens."
+            ),
+            biomechanical_focus="Low-impact conditioning that maintains tissue health without axial impact — reintroduces walking volume gently after a rest-heavy stretch.",
+            progression="Comfortable throughout → 12 minutes next session.",
+            regression="Any sharpening → reduce to 5 minutes, prioritise rest today.",
+        ),
+    ],
+}
+
+PLAN[16] = {
+    "objective": "Stability Consolidation — Scapular Introduction",
+    "phase": "Week 3: Flare Recovery & Reassessment Prep",
+    "session_rpe_target": 4,
+    "exercises": [
+        UPPER_GLUTE_RELEASE,
+        PIRIFORMIS_PNF,
+        _ex(
+            name="Glute Bridge",
+            ex_type="reps",
+            sets=3, reps=10, tempo="2-1-2", rest_seconds=60,
+            mechanics=(
+                "Lie on your back, knees bent, feet flat hip-width apart. "
+                "Squeeze glutes FIRST, then lift hips — pelvis to shoulders in one straight line, "
+                "no lower back arching. Lower with control. 10 reps, even count both directions."
+            ),
+            biomechanical_focus="Gluteus maximus activation without spinal loading — begins reversing the underactive-glute-max compensation pattern (imbalances) at a volume appropriate for the current flare.",
+            progression="Pain-free, controlled → progress to single-leg version next session.",
+            regression="Any lower-back involvement → reduce range, focus on the glute squeeze only.",
+        ),
+        SCAPULAR_WALL_SLIDE,
+        _ex(
+            name="Dead Bug",
+            ex_type="hold_reps",
+            sets=2, reps_in_set=8, hold_seconds=3, rest_seconds=45,
+            laterality="alternating",
+            mechanics=(
+                "Lie on your back, arms toward the ceiling, knees and hips bent to 90 degrees. "
+                "Slowly extend one arm overhead and the opposite leg out straight, keeping your "
+                "lower back pressed flat into the floor throughout — this is the non-negotiable part. "
+                "RIGHT LEG: keep a neutral/slight-internal-rotation bias as the leg extends, "
+                "especially around 45 degrees of knee flexion — a clicking sensation has been "
+                "noted right around there (finding #4). Move slowly and deliberately through that "
+                "point rather than rushing past it. Return and repeat the other side. "
+                "8 reps each side, even count."
+            ),
+            biomechanical_focus=(
+                "Deep core (transversus abdominis) activation with contralateral limb movement — "
+                "directly targets the underactive deep-core half of the compensation pattern. The "
+                "right-side rotation cue now explicitly extends to this supine pattern, not just "
+                "standing hip flexion, per the 2026-07-08 finding."
+            ),
+            progression="8 clean reps each side, no clicking, flat back maintained → add a 2-second hold at full extension.",
+            regression="Low back lifts off the floor, or clicking is uncomfortable → reduce leg-extension range on the right.",
+        ),
+    ],
+}
+
+PLAN[17] = {
+    "objective": "Thoracic Mobility + Active Recovery",
+    "phase": "Week 3: Flare Recovery & Reassessment Prep",
+    "session_rpe_target": 3,
+    "exercises": [
+        UPPER_GLUTE_RELEASE,
+        _ex(
+            name="Thread-the-Needle (Thoracic Rotation)",
+            ex_type="hold",
+            laterality="bilateral",
+            sets=2, hold_seconds=30, rest_seconds=45,
+            mechanics=(
+                "On hands and knees. Slide one arm underneath your body, threading it through the "
+                "gap between your other arm and knee, rotating your upper back and resting your "
+                "shoulder and ear on the floor. Keep the hips still — rotation comes from the "
+                "thoracic spine, not the lower back. Hold gently, breathe, then unwind slowly. "
+                "Repeat the other side."
+            ),
+            biomechanical_focus="Rotational thoracic facet mobility (finding #3, #5) — directly addresses the mid-back component of the current flare without any lumbar rotation.",
+            progression="Comfortable, smooth rotation → hold 45 seconds.",
+            regression="Any pinching → reduce rotation range, keep the resting shoulder higher off the floor.",
+        ),
+        _ex(
+            name="Child's Pose",
+            ex_type="hold",
+            sets=2, hold_seconds=60, rest_seconds=30,
+            mechanics=(
+                "Kneel, sit back toward your heels, and walk your hands forward, letting your "
+                "chest sink gently toward the floor. Let your back round and lengthen passively — "
+                "this is relaxation, not a forced stretch. Breathe into your back on each inhale."
+            ),
+            biomechanical_focus="Gentle passive lumbar and thoracic flexion decompression — a rest-oriented mobility position rather than an active loading pattern.",
+            progression="Comfortable → hold 90 seconds.",
+            regression="Knee discomfort → place a cushion behind the knees, or reduce hip-to-heel distance.",
+        ),
+        _ex(
+            name="Controlled Walking",
+            ex_type="duration",
+            sets=1, duration_minutes=12, rest_seconds=0,
+            mechanics=(
+                "Easy-pace walk, 12 minutes, flat ground. Rate tightness/pain before and after. "
+                "Today is about consistency, not pushing pace or distance."
+            ),
+            biomechanical_focus="Continued low-impact conditioning, building duration gradually from Day 15's 10 minutes.",
+            progression="Comfortable throughout → 15 minutes next session.",
+            regression="Any sharpening → return to 10 minutes.",
+        ),
+    ],
+}
+
+PLAN[18] = {
+    "objective": "Hip Hinge + Scapular Integration",
+    "phase": "Week 3: Flare Recovery & Reassessment Prep",
+    "session_rpe_target": 4,
+    "exercises": [
+        UPPER_GLUTE_RELEASE,
+        RIGHT_HIP_CAPSULE_REVISED,
+        _ex(
+            name="Wall-Supported Hip Hinge",
+            ex_type="reps",
+            sets=3, reps=10, tempo="3-1-3", rest_seconds=60,
+            mechanics=(
+                "Stand an arm's length from a wall, facing away from it. Hinge at the hips, "
+                "reaching back to gently touch the wall with your hands, keeping the spine neutral "
+                "throughout — this is a hip-driven movement, not a spinal one. Return by squeezing "
+                "the glutes. 10 reps, controlled tempo."
+            ),
+            biomechanical_focus="Neutral-spine hip hinge pattern (cleared movement, services.rules) — the wall provides a proprioceptive range limit while lumbar control is re-established after the flare.",
+            progression="Full range, pain-free → remove the wall, hinge to a comfortable range freely.",
+            regression="Any discomfort → reduce range to a shallower hinge, wall contact sooner.",
+        ),
+        PRONE_Y_RAISE,
+        _ex(
+            name="Bird-Dog",
+            ex_type="hold_reps",
+            sets=3, reps_in_set=8, hold_seconds=5, rest_seconds=45,
+            laterality="alternating",
+            mechanics=(
+                "On hands and knees. Extend one arm forward and the OPPOSITE leg straight back, "
+                "keeping your back flat — no arching, no rotating the hips. Hold 5 seconds, "
+                "return with control. 8 reps each side, even count."
+            ),
+            biomechanical_focus="Contralateral spinal stabilisation without spinal loading — a primary rehab movement for L5/S1, reintroduced at low volume after the flare.",
+            progression="Stable, flat back throughout → extend hold to 8 seconds.",
+            regression="Any wobble or back arching → reduce arm/leg range, keep limbs lower.",
+        ),
+    ],
+}
+
+PLAN[19] = {
+    "objective": "Active Recovery — Tissue Quality",
+    "phase": "Week 3: Flare Recovery & Reassessment Prep",
+    "session_rpe_target": 3,
+    "exercises": [
+        PIRIFORMIS_PNF,
+        ISCHIAL_RELEASE,
+        _ex(
+            name="Cat-Cow",
+            ex_type="reps",
+            sets=2, reps=10, tempo="4-0-4", rest_seconds=45,
+            mechanics=(
+                "On hands and knees. CAT: exhale, round the spine, tuck chin and tailbone. "
+                "COW: inhale, let the belly drop, gently lift head and tailbone. Move only to a "
+                "comfortable range — never force end-range extension."
+            ),
+            biomechanical_focus="Gentle segmental lumbar and thoracic mobilisation without axial load — a low-effort maintenance day between the more demanding sessions either side of it.",
+            progression="Pain-free → 15 reps, add a 2-second pause at each end.",
+            regression="Extension discomfort → Cat position only, skip the Cow phase.",
+        ),
+        _ex(
+            name="Prone Decompression Breathing",
+            ex_type="duration",
+            sets=1, duration_minutes=4, rest_seconds=0,
+            mechanics=(
+                "Lie face down, arms by your sides or folded under your forehead. Breathe deeply "
+                "into your lower back, letting the belly expand into the floor on each inhale. "
+                "Completely passive — no active movement."
+            ),
+            biomechanical_focus="Passive lumbar extension and psoas inhibition via diaphragmatic breathing — a purely restorative close to a deliberately light day.",
+            progression="Comfortable → next session, add passive cobra (hands under shoulders, gentle press-up).",
+            regression="Discomfort face-down → place a folded towel under the abdomen, or stay supine instead.",
+            warning="Stop immediately if leg tingling or numbness occurs in this position.",
+        ),
+    ],
+}
+
+PLAN[20] = {
+    "objective": "Neuromuscular Integration — Glute + Core + Shoulder",
+    "phase": "Week 3: Flare Recovery & Reassessment Prep",
+    "session_rpe_target": 5,
+    "exercises": [
+        UPPER_GLUTE_RELEASE,
+        COXA_SALTANS_DRILL,
+        _ex(
+            name="Single-Leg Glute Bridge",
+            ex_type="hold_reps",
+            laterality="unilateral",
+            sets=2, reps_in_set=8, hold_seconds=2, rest_seconds=60,
+            mechanics=(
+                "Same setup as the bilateral bridge, but extend one leg straight and bridge on "
+                "the other. The RIGHT side has been noticeably harder than the left in prior "
+                "sessions (2026-07-06) — expect that difference, don't force the right side to "
+                "match the left's range, just keep the pelvis level. 8 reps each side, even count."
+            ),
+            biomechanical_focus="Unilateral glute max strength — directly tests and trains the right-left asymmetry already documented, at a low volume appropriate for this stage.",
+            progression="Pelvis stays level both sides → add a 2-second hold at the top.",
+            regression="Pelvis drops/rotates on the right → reduce to bilateral bridge for another session.",
+        ),
+        SCAPULAR_WALL_SLIDE,
+        _ex(
+            name="Dead Bug",
+            ex_type="hold_reps",
+            sets=2, reps_in_set=8, hold_seconds=3, rest_seconds=45,
+            laterality="alternating",
+            mechanics=(
+                "Same as Day 16 — lower back flat throughout, neutral/slight-internal rotation "
+                "bias on the right leg through the ~45-degree range. 8 reps each side, even count."
+            ),
+            biomechanical_focus="Repeat exposure to reinforce the neutral-rotation motor pattern through the supine leg-extension range flagged in finding #4.",
+            progression="8 clean reps each side, no clicking → add a 2-second hold at full extension.",
+            regression="Clicking or discomfort → reduce leg-extension range on the right.",
+        ),
+        _ex(
+            name="Wall Sit",
+            ex_type="hold",
+            sets=2, hold_seconds=60, rest_seconds=60,
+            mechanics=(
+                "Back against a wall, knees at roughly 90 degrees, thighs parallel to the floor. "
+                "Hold 60 seconds — confirmed as sufficient volume for this exercise (2026-07-08 "
+                "feedback), not pushed further without a specific reason to."
+            ),
+            biomechanical_focus="Isometric quad/glute endurance without spinal loading — a stable, well-tolerated hold at an already-confirmed appropriate dose.",
+            progression="Consistently easy at 60s across 2+ sessions → consider single-leg-assisted variation, not just longer duration.",
+            regression="Any discomfort → reduce to 45 seconds.",
+        ),
+    ],
+}
+
+PLAN[21] = {
+    "objective": "Week 3 Self-Assessment — Reassessment Prep",
+    "phase": "Week 3: Flare Recovery & Reassessment Prep",
+    "session_rpe_target": 5,
+    "exercises": [
+        RIGHT_HIP_CAPSULE_REVISED,
+        COXA_SALTANS_DRILL,
+        _ex(
+            name="McGill Big 3 — Quality Screen",
+            ex_type="reps",
+            sets=1, reps=8, rest_seconds=60,
+            mechanics=(
+                "One high-quality set of each: (1) McGill Curl-Up x 8 reps x 8-second hold each. "
+                "(2) Bird-Dog x 8 each side x 8-second hold. (3) Side Bridge x 40 seconds each side. "
+                "A quality screen, not a maximal-effort test. Compare ease and form to both the "
+                "Day 3 baseline and the Day 14 screen — log observations, including whether the "
+                "recent flare changed anything here."
+            ),
+            biomechanical_focus="Functional assessment of the foundational spinal stability system — now with two prior data points (Day 3, Day 14) to compare against, giving a genuine trend rather than a single snapshot.",
+            progression="Equal or better than Day 14 → supports Stage 2 readiness on this measure.",
+            regression="Worse than Day 14 → note the specific exercise/side; flag for physio discussion before advancing.",
+        ),
+        _ex(
+            name="Single-Leg Balance (Eyes Closed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=2, hold_seconds=60, rest_seconds=45,
+            mechanics=(
+                "Stand on one leg, no wall support. Close your eyes once stable. Compare to the "
+                "Day 14 result."
+            ),
+            biomechanical_focus="Proprioceptive re-check — confirms the Day 14 result held (or improved) through the flare and this recovery week.",
+            progression="60 seconds eyes closed, clean, matching or beating Day 14 → criterion re-confirmed.",
+            regression="Notably worse than Day 14 → perform eyes-open, document for physiotherapist.",
+        ),
+        _ex(
+            name="Hip Hinge Full Range Assessment",
+            ex_type="reps",
+            sets=2, reps=10, tempo="3-1-3", rest_seconds=60,
+            mechanics=(
+                "Full hip hinge, no wall, to maximum comfortable range. Hold 1 second at the "
+                "bottom, return with a glute squeeze. Compare pain-free range to Day 14 — has it "
+                "held up through the flare, or regressed? BIOMECHANICAL CHECK: right vs left range, "
+                "and whether the right-side ischial release sensation is still present."
+            ),
+            biomechanical_focus="Hip hinge range and posterior chain capacity — the same functional test used at Day 14, now re-checked after the flare to confirm it's genuinely safe to progress.",
+            progression="Full range, pain <=2/10, matching or beating Day 14 → criterion re-confirmed for Stage 2.",
+            regression="Pain >3/10 at any range, or worse than Day 14 → document the range where pain begins, discuss with physiotherapist before advancing.",
+        ),
+        _ex(
+            name="5-Minute Walk + Stair Assessment",
+            ex_type="duration",
+            sets=1, duration_minutes=7, rest_seconds=0,
+            mechanics=(
+                "Walk briskly for 5 minutes, then up and down a flight of stairs twice at a "
+                "normal pace. Rate pain: start of walk, end of walk, top of stairs, bottom of "
+                "stairs. Compare directly to both the Day 7 and Day 14 scores — this is the same "
+                "functional outcome measure, now with three data points across the flare."
+            ),
+            biomechanical_focus="Integrated functional outcome assessment — the primary clinical benchmark, now showing the trend across Day 7, Day 14, and this recovery check.",
+            progression="Pain <=2/10 throughout, matching or beating Day 14 → Stage 1 genuinely complete, ready for the Stage 2 reassessment conversation.",
+            regression="Pain >3/10 on stairs, or worse than Day 14 → discuss with physiotherapist before progressing; do not start Stage 2 on this data.",
         ),
     ],
 }
