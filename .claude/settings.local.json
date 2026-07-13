@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "PowerShell(py --version)",
-      "PowerShell(py -m pip --version)"
+      "PowerShell(py -m pip --version)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('views/insights.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('views/sync.py', encoding='utf-8'\\).read\\(\\)\\); ast.parse\\(open\\('nav.py', encoding='utf-8'\\).read\\(\\)\\); print\\('syntax ok'\\)\")",
+      "Bash(python -m pytest tests/ -q)",
+      "Bash(./.venv/Scripts/python.exe -m pytest tests/ -q)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/ -q)",
+      "Bash(./venv/Scripts/python.exe -c 'import ast *)",
+      "Bash(./venv/Scripts/python.exe -c \"import app\")"
     ]
   }
 }

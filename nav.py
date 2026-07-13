@@ -20,7 +20,7 @@ _ITEMS = [
     ("⌂",  "Home",     "home"),
     ("📋", "Training", "training"),
     ("🧠", "Insights", "insights"),
-    ("↻",  "Sync",     "sync"),
+    ("↻",  "Voice Training", "sync"),
 ]
 
 # ─── Chrome-suppression + nav CSS ─────────────────────────────────────────────
