@@ -106,9 +106,18 @@ def main() -> None:
     stats = client.get_stats(today)
     sleep = client.get_sleep_data(today)
     stress = client.get_stress_data(today)
+    hrv = client.get_hrv_data(today)
     activities = client.get_activities(0, 10)
 
     _print_json(f"get_stats({today})", stats)
+
+    # HRV: services/repository.py assumes hrvSummary.lastNightAvg (the
+    # commonly-documented shape for this endpoint) -- confirm that's really
+    # there before trusting it in the Oura/Garmin biometric blend.
+    print("\n--- HRV investigation ---")
+    print("top-level hrv keys:", list((hrv or {}).keys()))
+    print("hrvSummary:", (hrv or {}).get("hrvSummary"))
+    _print_json(f"get_hrv_data({today})", hrv)
 
     # Sleep score: confirmed dailySleepDTO doesn't nest "sleepScores" on at
     # least one account/day. Print exactly where (if anywhere) a score
@@ -148,8 +157,8 @@ def main() -> None:
     print(
         "\nDone. If you're happy the field names above line up with what "
         "services/repository.py expects (steps/resting_hr/avg_stress/"
-        "sleep_score/sleep_hours/calories_total/min_hr/max_hr, and the "
-        "activity fields), the Sync page should work the same way from "
+        "sleep_score/sleep_hours/calories_total/min_hr/max_hr/hrv_ms, and "
+        "the activity fields), the Sync page should work the same way from "
         "this network. If any of it looks wrong/missing, paste the output "
         "back and I'll fix the mapping."
     )

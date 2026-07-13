@@ -26,6 +26,7 @@ import json
 import uuid
 from datetime import date, datetime, timedelta
 
+from services import biometrics
 from services import models
 from services.clients import garmin
 from services.clients import notion
@@ -35,7 +36,7 @@ from services.config import Config
 
 _GARMIN_DAILY_HEADER = [
     "date", "steps", "resting_hr", "avg_stress", "sleep_score",
-    "sleep_hours", "calories_total", "min_hr", "max_hr",
+    "sleep_hours", "calories_total", "min_hr", "max_hr", "hrv_ms",
 ]
 _GARMIN_ACTIVITY_HEADER = [
     "activity_id", "date", "name", "type", "start_time_local",
@@ -83,6 +84,9 @@ _OURA_SESSION_HEADER = [
 ]
 _OURA_REST_MODE_HEADER = [
     "rest_mode_id", "start_day", "end_day", "end_time",
+]
+_BIOMETRIC_BLEND_HEADER = [
+    "date", "hrv_ms", "resting_heart_rate", "sleep_duration_hours", "steps", "sources_missing",
 ]
 
 
@@ -783,16 +787,191 @@ class Repository:
             ))
         return out
 
-    def get_biometric_rolling(self, days: int = 28, today: date | None = None) -> list[models.BiometricRecord]:
-        """Last `days` days, sorted ascending by date — the shape the engine's
-        traffic_light()/readiness computations expect. Also the Sync page's
-        "Engine View" preview (previously its own independent, slightly
-        drifted copy of this exact mapping+window)."""
+    def get_sheet1_biometric_rolling(self, days: int = 28, today: date | None = None) -> list[models.BiometricRecord]:
+        """Last `days` days from the legacy Apple Health/Sheet1 export, sorted
+        ascending by date. No longer read by the engine (see
+        get_biometric_rolling below) — kept only for
+        scripts/backfill_garmin_from_sheet1.py and historical reference."""
         today = today or date.today()
         cutoff = (today - timedelta(days=days)).isoformat()
         today_str = str(today)
         records = [r for r in self._sheets_biometric_records() if cutoff <= r.date <= today_str]
         return sorted(records, key=lambda r: r.date)
+
+    def get_all_sheet1_biometric_records(self) -> list[models.BiometricRecord]:
+        """Every Sheet1 row, unwindowed — the full legacy history, for the
+        one-time backfill script (which needs pre-wearable dates that a
+        rolling window would exclude)."""
+        return self._sheets_biometric_records()
+
+    def get_garmin_daily_dates(self) -> set[str]:
+        """Every date already present in the Garmin Daily sheet tab — used by
+        scripts/backfill_garmin_from_sheet1.py so it only fills dates Garmin
+        doesn't already have, never overwriting a real Garmin-synced day."""
+        rows = sheets.get_worksheet_records(self._garmin_daily_ws())
+        return {str(r["date"]) for r in rows if r.get("date")}
+
+    def upsert_garmin_daily_row(self, row: dict) -> None:
+        """Writes one already-mapped row (see biometrics.sheet1_row_to_
+        garmin_daily_row) into the Garmin Daily tab, keyed by date — same
+        upsert primitive sync_garmin_daily uses per-day."""
+        values = [row.get(k, "") for k in _GARMIN_DAILY_HEADER]
+        sheets.upsert_row_by_key(self._garmin_daily_ws(), key_col=1, key_value=row["date"], row_values=values)
+
+    # ─────────────────────────────────────────────────────────────────────
+    #  Blended Oura+Garmin — the engine's live biometric source
+    # ─────────────────────────────────────────────────────────────────────
+    # HRV/RHR/sleep duration: Oura 70% / Garmin 30%. Steps: Garmin 80% /
+    # Oura 20%. Weighting math lives in services/biometrics.py (pure,
+    # tested independently); this method's job is only fetching each
+    # source's already-synced Sheet tab rows and grouping them by date.
+    # Replaces Sheet1 as of this change — see get_sheet1_biometric_rolling
+    # above for the retired pipeline.
+
+    def _oura_daily_steps_by_date(self, start: str, end: str) -> dict[str, int | None]:
+        rows = sheets.get_worksheet_records(self._oura_daily_ws())
+        return {
+            str(r["date"]): (r.get("steps") or None)
+            for r in rows if r.get("date") and start <= str(r["date"]) <= end
+        }
+
+    def _oura_sleep_metrics_by_date(self, start: str, end: str) -> dict[str, dict]:
+        rows = sheets.get_worksheet_records(self._oura_sleep_periods_ws())
+        by_day: dict[str, list[dict]] = {}
+        for r in rows:
+            day = str(r.get("day") or "")
+            if day and start <= day <= end:
+                by_day.setdefault(day, []).append(r)
+
+        out: dict[str, dict] = {}
+        for day, entries in by_day.items():
+            main = biometrics.pick_main_sleep_period(entries)
+            if main is None:
+                continue
+            duration_s = main.get("total_sleep_duration")
+            out[day] = {
+                "hrv_ms": main.get("average_hrv") or None,
+                "resting_heart_rate": main.get("lowest_heart_rate") or None,
+                "sleep_duration_hours": round(duration_s / 3600, 2) if duration_s else None,
+            }
+        return out
+
+    def _garmin_metrics_by_date(self, start: str, end: str) -> dict[str, dict]:
+        rows = sheets.get_worksheet_records(self._garmin_daily_ws())
+        return {
+            str(r["date"]): {
+                "hrv_ms": r.get("hrv_ms") or None,
+                "resting_heart_rate": r.get("resting_hr") or None,
+                "sleep_duration_hours": r.get("sleep_hours") or None,
+                "steps": r.get("steps") or None,
+            }
+            for r in rows if r.get("date") and start <= str(r["date"]) <= end
+        }
+
+    def get_biometric_rolling(self, days: int = 28, today: date | None = None) -> list[models.BiometricRecord]:
+        """Last `days` days, sorted ascending by date — the shape the
+        engine's traffic_light()/readiness computations expect. Blends
+        Oura + Garmin (services/biometrics.py) rather than reading Sheet1;
+        both platforms' Sheet tabs are kept fresh by sync_oura_all (2h cache,
+        app.py) and sync_garmin_daily_if_due (once/day, app.py + training.py)
+        before this reads them. Also the Sync page's "Engine View" preview."""
+        today = today or date.today()
+        start = (today - timedelta(days=days)).isoformat()
+        end = today.isoformat()
+
+        oura_steps = self._oura_daily_steps_by_date(start, end)
+        oura_sleep = self._oura_sleep_metrics_by_date(start, end)
+        garmin_metrics = self._garmin_metrics_by_date(start, end)
+
+        all_dates = set(oura_steps) | set(oura_sleep) | set(garmin_metrics)
+        records = []
+        for d in all_dates:
+            oura_day = dict(oura_sleep.get(d, {}))
+            oura_day["steps"] = oura_steps.get(d)
+            garmin_day = garmin_metrics.get(d, {})
+            records.append(biometrics.blend_biometric_day(d, oura_day, garmin_day))
+        return sorted(records, key=lambda r: r.date)
+
+    # ─────────────────────────────────────────────────────────────────────
+    #  Biometric Blend — persisted history
+    #  get_biometric_rolling() above is a live recompute (cheap, but the
+    #  *result* is never fixed — if a weight changes later, or Oura/Garmin
+    #  retroactively revise a day's raw reading, a live recompute of a past
+    #  date would silently change too). This persists each day's blended
+    #  result once, so "look back at last month" reads a stable snapshot
+    #  rather than a re-derived value. Written by sync_biometric_blend,
+    #  called once/day from app.py (rolling few-day window) and on-demand
+    #  from the Sync page's "Backfill full history" button (wide window).
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _biometric_blend_ws(self):
+        return sheets.get_or_create_worksheet(
+            self._sc, self.config.google_sheets_id,
+            sheets.BIOMETRIC_BLEND_WORKSHEET, _BIOMETRIC_BLEND_HEADER,
+        )
+
+    def _biometric_blend_row(self, record: models.BiometricRecord) -> dict:
+        return {
+            "date": record.date,
+            "hrv_ms": record.hrv_ms if record.hrv_ms is not None else "",
+            "resting_heart_rate": record.resting_heart_rate if record.resting_heart_rate is not None else "",
+            "sleep_duration_hours": record.sleep_duration_hours if record.sleep_duration_hours is not None else "",
+            "steps": record.steps if record.steps is not None else "",
+            "sources_missing": json.dumps(list(record.sources_missing)) if record.sources_missing else "",
+        }
+
+    def upsert_biometric_blend_row(self, record: models.BiometricRecord) -> None:
+        """Writes one blended day into the Biometric Blend tab, keyed by
+        date — re-running this for the same date overwrites it (idempotent),
+        which is how a rolling few-day sync keeps very recent days current
+        while older days (outside that rolling window) stop being touched
+        and become a fixed historical record."""
+        row = self._biometric_blend_row(record)
+        values = [row.get(k, "") for k in _BIOMETRIC_BLEND_HEADER]
+        sheets.upsert_row_by_key(self._biometric_blend_ws(), key_col=1, key_value=record.date, row_values=values)
+
+    def sync_biometric_blend(self, days: int = 7, today: date | None = None) -> int:
+        """Computes get_biometric_rolling(days, today) and persists every
+        resulting day to the Biometric Blend tab. Returns the number of days
+        written. `days` controls how far back to (re)persist — small (e.g. 7)
+        for the routine once/day sync so only recent days get overwritten;
+        large (e.g. 400) for the one-time/on-demand full-history backfill."""
+        records = self.get_biometric_rolling(days=days, today=today)
+        for r in records:
+            self.upsert_biometric_blend_row(r)
+        return len(records)
+
+    def get_biometric_blend_history(
+        self, start: str | None = None, end: str | None = None,
+    ) -> list[models.BiometricRecord]:
+        """Every persisted day from the Biometric Blend tab, optionally
+        restricted to [start, end] (inclusive, ISO date strings) — unbounded
+        by default, unlike get_biometric_rolling's rolling window. Sorted
+        ascending by date."""
+        rows = sheets.get_worksheet_records(self._biometric_blend_ws())
+        out = []
+        for r in rows:
+            d = str(r.get("date") or "")
+            if not d:
+                continue
+            if start and d < start:
+                continue
+            if end and d > end:
+                continue
+            sm_raw = r.get("sources_missing") or ""
+            try:
+                sources_missing = tuple(json.loads(sm_raw)) if sm_raw else ()
+            except (json.JSONDecodeError, TypeError):
+                sources_missing = ()
+            out.append(models.BiometricRecord(
+                date=d,
+                hrv_ms=r.get("hrv_ms") or None,
+                resting_heart_rate=r.get("resting_heart_rate") or None,
+                sleep_duration_hours=r.get("sleep_duration_hours") or None,
+                steps=r.get("steps") or None,
+                sources_missing=sources_missing,
+            ))
+        return sorted(out, key=lambda r: r.date)
 
 
     # ─────────────────────────────────────────────────────────────────────
@@ -850,10 +1029,11 @@ class Repository:
 
     # ─────────────────────────────────────────────────────────────────────
     #  Garmin — daily wellness metrics + activities
-    #  Archival only: does not feed services/engine.py's readiness/ACWR
-    #  pipeline (that stays on Sheet1, unchanged). Used for its own Garmin
-    #  Daily/Activities sheet tabs and for the run/walk training-log hook
-    #  in views/training.py.
+    #  Daily wellness metrics feed services/engine.py's readiness/ACWR
+    #  pipeline (30% weight, blended with Oura — see
+    #  get_biometric_rolling/services/biometrics.py) via the Garmin Daily
+    #  sheet tab written here. Also used for the run/walk training-log hook
+    #  in views/training.py and its own Garmin Activities sheet tab.
     # ─────────────────────────────────────────────────────────────────────
 
     def garmin_configured(self) -> bool:
@@ -879,6 +1059,13 @@ class Repository:
         summary = garmin.get_daily_summary(client, d)
         sleep = garmin.get_sleep_data(client, d)
         stress = garmin.get_stress_data(client, d)
+        hrv = garmin.get_hrv_data(client, d)
+
+        # Unverified against a live payload — hrvSummary.lastNightAvg matches
+        # garminconnect's commonly-documented /hrv-service/hrv/{date} shape.
+        # See services/clients/garmin.py::get_hrv_data and
+        # scripts/garmin_login_test.py for the live-confirmation step.
+        hrv_ms = (hrv.get("hrvSummary") or {}).get("lastNightAvg")
 
         sleep_dto = sleep.get("dailySleepDTO") or {}
         sleep_seconds = sleep_dto.get("sleepTimeSeconds")
@@ -906,6 +1093,7 @@ class Repository:
             "calories_total": summary.get("totalKilocalories"),
             "min_hr": summary.get("minHeartRate"),
             "max_hr": summary.get("maxHeartRate"),
+            "hrv_ms": hrv_ms,
         }
 
     def sync_garmin_daily(self, days: int = 7, today: date | None = None) -> int:
@@ -930,25 +1118,27 @@ class Repository:
         return days
 
     def sync_garmin_daily_if_due(self, days: int = 7, today: date | None = None) -> tuple[bool, str | None]:
-        """Runs sync_garmin_daily() at most once per Mon-Sun week, persisted
-        via the Config DB (garmin_daily_last_synced_week) so it survives
-        across Streamlit reruns/sessions/restarts. Unlike Weekly Rollup
-        (cheap Notion+Sheets only, safe to re-check every 30 min),
-        Garmin's API is rate-limit-sensitive — this must not fire on every
-        page load. (True, None) if not configured or already synced this
-        week (both "nothing to do", not an error) or on success; (False, msg)
-        only on an actual sync failure. Matches services.metrics.
-        sync_weekly_rollup's (ok, error) contract so callers can treat both
-        the same way."""
+        """Runs sync_garmin_daily() at most once per calendar day, persisted
+        via the Config DB (garmin_daily_last_synced_date) so it survives
+        across Streamlit reruns/sessions/restarts. Now triggered on both Home
+        (app.py) and Training page open, since Garmin feeds the engine's
+        biometric blend (services/biometrics.py) and needs current-day data
+        available on open — was weekly-only when Garmin was archival-only.
+        Still throttled to once/day (not every page load): Garmin's API is
+        unofficial and rate-limit-sensitive. (True, None) if not configured or
+        already synced today (both "nothing to do", not an error) or on
+        success; (False, msg) only on an actual sync failure. Matches
+        services.metrics.sync_weekly_rollup's (ok, error) contract so callers
+        can treat both the same way."""
         if not self.garmin_configured():
             return True, None
         today = today or date.today()
-        week_start = str(today - timedelta(days=today.weekday()))
+        today_str = str(today)
         try:
-            if self.get_config_value("garmin_daily_last_synced_week") == week_start:
+            if self.get_config_value("garmin_daily_last_synced_date") == today_str:
                 return True, None
             self.sync_garmin_daily(days=days, today=today)
-            self.set_config("garmin_daily_last_synced_week", week_start, today=today)
+            self.set_config("garmin_daily_last_synced_date", today_str, today=today)
             return True, None
         except Exception as exc:
             return False, str(exc)
@@ -1029,12 +1219,15 @@ class Repository:
 
     # ─────────────────────────────────────────────────────────────────────
     #  Oura — daily summary scores + workouts/sleep periods/sessions/rest
-    #  mode. Archival only, same as Garmin: does not feed the readiness/ACWR
-    #  engine, which keeps reading Sheet1 exactly as it does today. Raw
-    #  high-volume time-series (heartrate, and the per-day series embedded
-    #  in daily_activity/sleep like met.items/class_5_min/heart_rate.items)
-    #  are deliberately NOT pulled — by request, to avoid 100k+ row/year
-    #  Sheet growth. Only the scalar/summary fields are captured.
+    #  mode. Daily steps + sleep-period HRV/RHR/sleep-duration feed
+    #  services/engine.py's readiness/ACWR pipeline (70% weight for HRV/RHR/
+    #  sleep, 20% for steps — blended with Garmin, see
+    #  get_biometric_rolling/services/biometrics.py); workouts/sessions/rest
+    #  mode remain archival only. Raw high-volume time-series (heartrate, and
+    #  the per-day series embedded in daily_activity/sleep like met.items/
+    #  class_5_min/heart_rate.items) are deliberately NOT pulled — by request,
+    #  to avoid 100k+ row/year Sheet growth. Only the scalar/summary fields
+    #  are captured.
     # ─────────────────────────────────────────────────────────────────────
 
     def oura_configured(self) -> bool:

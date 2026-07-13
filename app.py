@@ -106,11 +106,12 @@ def _au_history(days: int = 28) -> list[dict]:
 
 @st.cache_data(ttl=7200, show_spinner=False)  # 2 hours — runs on Home page open, idle in between
 def _sync_oura_cached() -> tuple[bool, str | None]:
-    """Archival Oura sync (its own Sheet tabs — see Repository.sync_oura_all),
-    throttled purely by this cache's TTL rather than a persisted Config-DB
-    marker like Garmin's weekly sync: Oura's official API has generous rate
-    limits (unlike Garmin's unofficial one), so an extra sync after a
-    Streamlit restart is harmless — no need for that extra durability."""
+    """Oura sync (its own Sheet tabs — see Repository.sync_oura_all), feeding
+    the engine's biometric blend (services/biometrics.py) as well as
+    archiving. Throttled purely by this cache's TTL rather than a persisted
+    Config-DB marker like Garmin's daily sync below: Oura's official API has
+    generous rate limits (unlike Garmin's unofficial one), so an extra sync
+    after a Streamlit restart is harmless — no need for that extra durability."""
     r = repo.get_repository()
     if not r.oura_configured():
         return True, None
@@ -120,6 +121,45 @@ def _sync_oura_cached() -> tuple[bool, str | None]:
     except Exception as exc:
         return False, str(exc)
 
+
+@st.cache_data(ttl=7200, show_spinner=False)  # throttled for real by the Config-DB once/day marker below
+def _sync_garmin_cached() -> tuple[bool, str | None]:
+    """Garmin sync (Garmin Daily sheet tab), feeding the engine's biometric
+    blend (30% weight for HRV/RHR/sleep, 80% for steps) as well as archiving.
+    Was weekly-only and Training-page-only when Garmin was archival-only;
+    now also runs on Home open like Oura, but still gated to once/day (not
+    this cache's TTL) via sync_garmin_daily_if_due's Config-DB marker —
+    Garmin's API is unofficial and rate-limit-sensitive, unlike Oura's."""
+    r = repo.get_repository()
+    if not r.garmin_configured():
+        return True, None
+    try:
+        return r.sync_garmin_daily_if_due(days=2)
+    except Exception as exc:
+        return False, str(exc)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _sync_biometric_blend_cached() -> tuple[bool, str | None]:
+    """Persists the last few days of the Oura+Garmin blend to the Biometric
+    Blend sheet tab (Repository.sync_biometric_blend) so past days become a
+    fixed historical record instead of only being re-derivable live from
+    Oura/Garmin's own tabs. Small rolling window (not full history) — the
+    on-demand "Backfill full history" button in Insights → Sync covers the
+    rest, once."""
+    try:
+        repo.get_repository().sync_biometric_blend(days=7)
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+# Oura/Garmin sync must run before _bio_rolling() below — get_biometric_rolling()
+# now reads their Sheet tabs directly, so a stale-cache page load would
+# otherwise blend yesterday's data even though the sync ran moments later.
+_oura_sync_ok, _oura_sync_err = _sync_oura_cached()
+_garmin_sync_ok, _garmin_sync_err = _sync_garmin_cached()
+_blend_sync_ok, _blend_sync_err = _sync_biometric_blend_cached()
 
 try:
     _bio_rows = _bio_rolling(days=60)   # 60d to support 56d sleep baseline
@@ -136,8 +176,6 @@ try:
     _current_stage = repo.get_repository().get_current_stage()
 except Exception:
     _current_stage = 1
-
-_oura_sync_ok, _oura_sync_err = _sync_oura_cached()
 
 _bio_day = next((r for r in _bio_rows if r.get("date") == selected_date.isoformat()), None)
 _au_day  = next((r for r in _au_rows  if r.get("date") == selected_date.isoformat()), None)
@@ -472,4 +510,6 @@ else:
     st.markdown(_card_readiness + _card_strain + _card_sleep, unsafe_allow_html=True)
 if not _oura_sync_ok and _oura_sync_err:
     st.caption("Oura sync unavailable — will retry next visit.")
+if not _garmin_sync_ok and _garmin_sync_err:
+    st.caption("Garmin sync unavailable — will retry next visit.")
 nav.inject("home")

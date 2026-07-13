@@ -52,6 +52,14 @@ def get_stress_data(client, d) -> dict:
     return client.get_stress_data(d.isoformat()) or {}
 
 
+def get_hrv_data(client, d) -> dict:
+    """Unverified against a live payload — field names in repository.py's
+    extraction (hrvSummary.lastNightAvg) match garminconnect's documented
+    /hrv-service/hrv/{date} shape, but should be confirmed with
+    scripts/garmin_login_test.py before being fully trusted."""
+    return client.get_hrv_data(d.isoformat()) or {}
+
+
 def get_recent_activities(client, limit: int = 20) -> list[dict]:
     """Most recent `limit` activities, newest first (Garmin's own default sort)."""
     activities = client.get_activities(0, limit)

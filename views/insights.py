@@ -58,6 +58,10 @@ def _sync_engine_view(sheet_id: str) -> list[dict]:
     records = repo.get_repository().get_biometric_rolling(days=28)
     return [asdict(r) for r in records]
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _blend_history() -> list[dict]:
+    return [asdict(r) for r in repo.get_repository().get_biometric_blend_history()]
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  render()
@@ -250,6 +254,11 @@ def render() -> None:
             metrics = tl.get("metrics", {})
             c_hrv, c_rhr, c_sleep = st.columns(3)
 
+            # Which source (if any) was missing for today's blended reading —
+            # populated by services/biometrics.py's blend_biometric_day().
+            _today_bio = next((r for r in bio_rows if r.get("date") == date.today().isoformat()), None)
+            _sources_missing = set((_today_bio or {}).get("sources_missing") or ())
+
             def _metric_card(col, key, label):
                 m         = metrics.get(key, {})
                 val       = m.get("value")
@@ -273,6 +282,11 @@ def render() -> None:
                     f"</div>",
                     unsafe_allow_html=True,
                 )
+                missing_source = next(
+                    (s.split(":")[1] for s in _sources_missing if s.startswith(f"{key}:")), None,
+                )
+                if missing_source:
+                    col.caption(f"⚠ {missing_source.title()} pending — using the other source only.")
 
             _metric_card(c_hrv,   "hrv_ms",              "HRV")
             _metric_card(c_rhr,   "resting_heart_rate",   "RHR")
@@ -667,7 +681,11 @@ def render() -> None:
     # =========================================================================
 
     with tab_sync:
-        st.caption("Live from Google Sheets · Sheet1 · Auto-read by the engine every 30 min.")
+        st.caption(
+            "Legacy Apple Health export (Sheet1) — no longer read by the engine. "
+            "Kept for historical reference and the one-time Garmin backfill "
+            "(scripts/backfill_garmin_from_sheet1.py) only."
+        )
 
         try:
             sheet_id = st.secrets["GOOGLE_SHEETS_ID"]
@@ -704,10 +722,12 @@ def render() -> None:
                     st.dataframe(df_sync, use_container_width=True, height=400)
 
                     st.divider()
-                    st.subheader("Engine View — Last 28 Days")
+                    st.subheader("Engine View — Last 28 Days (live)")
                     st.caption(
-                        "After column mapping and kJ → kcal conversion, as passed to the "
-                        "traffic-light engine."
+                        "Oura (70%) + Garmin (30%) blend for HRV/RHR/sleep, Garmin (80%) + "
+                        "Oura (20%) for steps — services/biometrics.py — as passed to the "
+                        "traffic-light engine right now. Recomputed on every load; not "
+                        "persisted. No longer sourced from Sheet1 above."
                     )
 
                     engine_rows = _sync_engine_view(sheet_id)
@@ -717,9 +737,51 @@ def render() -> None:
                         st.info("No rows within the last 28 days.")
 
                     st.divider()
+                    st.subheader("Biometric Blend History (persisted)")
                     st.caption(
-                        "Weekly Rollup and Garmin Daily Metrics both sync automatically once a "
-                        "week (checked whenever the Training page loads — no button needed)."
+                        "A fixed daily record of the blend above, written once a day "
+                        "(Repository.sync_biometric_blend) to its own sheet tab. Unlike the "
+                        "live view above, a past day here doesn't change even if Oura/Garmin "
+                        "later revise that day's raw reading — this is what you actually saw "
+                        "at the time."
+                    )
+                    if st.button(
+                        "Backfill full history now",
+                        use_container_width=False,
+                        key="backfill_biometric_blend",
+                    ):
+                        with st.spinner("Computing and persisting the full blend history…"):
+                            try:
+                                n = repo.get_repository().sync_biometric_blend(days=400)
+                                st.success(f"Persisted {n} day(s) to the Biometric Blend tab.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as exc:
+                                st.warning(f"Backfill failed: {exc}")
+
+                    blend_history = _blend_history()
+                    if blend_history:
+                        earliest = date.fromisoformat(blend_history[0]["date"])
+                        latest = date.fromisoformat(blend_history[-1]["date"])
+                        col_from, col_to = st.columns(2)
+                        start_pick = col_from.date_input("From", value=earliest, key="blend_hist_from")
+                        end_pick = col_to.date_input("To", value=latest, key="blend_hist_to")
+                        filtered = [
+                            r for r in blend_history
+                            if str(start_pick) <= r["date"] <= str(end_pick)
+                        ]
+                        st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
+                    else:
+                        st.info(
+                            "No persisted history yet — click \"Backfill full history now\" "
+                            "above, or wait for the automatic once-a-day sync."
+                        )
+
+                    st.divider()
+                    st.caption(
+                        "Weekly Rollup syncs automatically once a week; Garmin Daily Metrics "
+                        "syncs automatically once a day (both checked whenever the Home or "
+                        "Training page loads — no button needed)."
                     )
 
                     st.divider()
@@ -728,16 +790,15 @@ def render() -> None:
                     if not sync_repo.garmin_configured():
                         st.info(
                             "Add GARMIN_EMAIL and GARMIN_PASSWORD to .streamlit/secrets.toml to "
-                            "enable Garmin sync. Archival only — does not feed the "
-                            "readiness/ACWR engine, which keeps reading Sheet1 exactly as it "
-                            "does today."
+                            "enable Garmin sync. Feeds the readiness/ACWR engine (30% weight for "
+                            "HRV/RHR/sleep, 80% for steps, blended with Oura) once configured."
                         )
                     else:
                         st.caption(
-                            "Daily wellness metrics and activities are archived to their own "
-                            "Sheet tabs (Garmin Daily, Garmin Activities) — not read by the "
-                            "readiness/ACWR engine. Daily Metrics also syncs automatically once "
-                            "a week; use the button below to run it on demand."
+                            "Daily wellness metrics feed the readiness/ACWR engine (blended with "
+                            "Oura) and archive to their own Sheet tabs (Garmin Daily, Garmin "
+                            "Activities). Daily Metrics also syncs automatically once a day on "
+                            "Home/Training page open; use the button below to run it on demand."
                         )
 
                         col_daily, col_activities = st.columns(2, gap="small")
@@ -773,17 +834,18 @@ def render() -> None:
                     if not sync_repo.oura_configured():
                         st.info(
                             "Add OURA_TOKEN to .streamlit/secrets.toml to enable Oura sync. "
-                            "Archival only — does not feed the readiness/ACWR engine, which "
-                            "keeps reading Sheet1 exactly as it does today."
+                            "Feeds the readiness/ACWR engine (70% weight for HRV/RHR/sleep, 20% "
+                            "for steps, blended with Garmin) once configured."
                         )
                     else:
                         st.caption(
-                            "Daily summary scores (sleep, readiness, activity, stress, "
-                            "resilience, SpO2, cardiovascular age) archive to the Oura Daily "
-                            "tab; workouts, sleep periods, sessions, and rest-mode periods each "
-                            "get their own tab — not read by the readiness/ACWR engine. Also "
-                            "syncs automatically 2 hours after the Home page is opened; use the "
-                            "button below to pull a full week on demand."
+                            "Daily steps and sleep-period HRV/RHR/sleep-duration feed the "
+                            "readiness/ACWR engine (blended with Garmin). Daily summary scores "
+                            "(sleep, readiness, activity, stress, resilience, SpO2, "
+                            "cardiovascular age) archive to the Oura Daily tab; workouts, "
+                            "sessions, and rest-mode periods each get their own archival tab. "
+                            "Also syncs automatically 2 hours after the Home page is opened; use "
+                            "the button below to pull a full week on demand."
                         )
                         if st.button(
                             "Sync Weekly Oura Details",

@@ -1,6 +1,6 @@
 # CLAUDE.md — Health Engine
 
-*Last updated: 2026-07-07 after the services/ extraction (framework-agnostic backend + logic layer, zero Streamlit imports) and the Weekly Rollup / Perfect-Ultimate Week metric feature.*
+*Last updated: 2026-07-13 after replacing Sheet1/Apple Health with a blended Oura+Garmin biometric source for the engine (`services/biometrics.py`).*
 
 ---
 
@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **245/245 passed**
+Expected: **321/321 passed**
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **245/245 passed**
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 245/245 (or higher if new tests were added)
+1. `python -m pytest tests/` → 311/311 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -64,7 +64,9 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
   imports anywhere (enforced by tests/test_no_streamlit_in_services.py).
   Pure logic:      engine.py · readiness.py · stats.py · rules.py · ai.py ·
                     plan.py · sessions.py · dashboard.py · insights.py ·
-                    metrics_logic.py (Weekly Rollup / Perfect-Ultimate Week scoring)
+                    metrics_logic.py (Weekly Rollup / Perfect-Ultimate Week scoring) ·
+                    biometrics.py (Oura+Garmin blend weights — the engine's
+                    biometric source, replacing Sheet1/Apple Health)
   Orchestration:    metrics.py — sync_weekly_rollup(); the one services/
                     module that both computes (via metrics_logic.py) and
                     does I/O (via repository.py) in the same call.
@@ -106,7 +108,7 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 1. **Deterministic before AI** — implement the rule-based version first; AI layer is only added on top once the deterministic version is tested and working.
 2. **AI never controls safety** — traffic light multiplier, ACWR ceiling, stage transitions, and final prescribed volume are always deterministic. AI output is advisory only.
 3. **`services.rules.STAGE_CONSTRAINTS` is the single source of truth** for per-stage ACWR ceilings, RPE ceilings, and volume caps. `services/engine.py` derives from it; do not duplicate values.
-4. **Notion is the write backend; Google Sheets is the biometric read source.** Do not add manual biometric entry anywhere.
+4. **Notion is the write backend; Oura + Garmin (blended) is the engine's biometric read source.** `services/biometrics.py` blends HRV/RHR/sleep duration at Oura 70% / Garmin 30%, and steps at Garmin 80% / Oura 20% — see `services.repository.Repository.get_biometric_rolling`. Google Sheets is still the intermediary (each platform's own tab, synced by `sync_oura_all`/`sync_garmin_daily_if_due`), and Sheet1/Apple Health is retired from the live pipeline — historical-only, feeding `get_sheet1_biometric_rolling` and the one-time `scripts/backfill_garmin_from_sheet1.py`. `get_biometric_rolling` itself is a **live recompute, not persisted** — the "Biometric Blend" sheet tab (`sync_biometric_blend`/`get_biometric_blend_history`) is the fixed historical record of what was actually computed on a given day, written once/day and viewable unbounded in Insights → Sync. Do not add manual biometric entry anywhere.
 5. **Training sessions are logged automatically by Training Plan.** No manual entry page.
 6. **Pre-session release protocol precedes every training session.** Inhibit overactive structures (glute medius, piriformis) before activating underactive ones (glute max, deep core). Preserve this order in all new training blocks.
 7. **Right-side asymmetry is a clinical finding.** All exercises involving right hip flexion >60° require a neutral/internal rotation cue. Right posterior hip capsule mobilisation is unilateral (right only).
@@ -123,7 +125,8 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 |-------|--------|
 | `Training plan/` folder at root | Stale duplicate of `docs/training/` — delete manually (`Remove-Item -Recurse "Training plan"`) |
 | Stage 2 training plan | Not yet built — begins after Day 14 physiotherapist sign-off |
-| Apple Health direct sync | Pending — would replace Google Sheets intermediary |
+| Garmin HRV field mapping | Unverified against a live payload — `hrvSummary.lastNightAvg` is the commonly-documented shape; confirm with `scripts/garmin_login_test.py` and fix `Repository._garmin_daily_row` if it doesn't match |
+| Garmin backfill | Run `scripts/backfill_garmin_from_sheet1.py` (dry-run first, then `--apply`) once to backfill pre-wearable history into the Garmin Daily tab so readiness baselines aren't starting from empty |
 | Biomechanical review due | 2026-07-19 — update `patient_profile.py` and `init_db.py` seed before Stage 2 |
 | `patient_profile.py` not imported | Informational reference only — not wired into active code |
 | See `docs/REFACTOR_NOTES.md` | Smells/bugs found during the services/ extraction, noted but not fixed beyond what the extraction itself required |

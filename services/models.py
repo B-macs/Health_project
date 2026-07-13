@@ -82,6 +82,11 @@ class BiometricRecord:
     active_kcal: float | None = None
     weight_kg: float | None = None
     steps: int | None = None
+    # Which "engine_field:source" pairs had only one of Oura/Garmin reporting
+    # data for this date — e.g. ("hrv_ms:garmin",) means Oura had no HRV
+    # reading, so Garmin's value was used at 100% weight. Empty when both
+    # sources agreed or the record predates the Oura/Garmin blend (Sheet1).
+    sources_missing: tuple[str, ...] = ()
 
 
 WeekStatus = Literal["ultimate", "perfect", "normal", "failed", "in_progress", "no_plan"]

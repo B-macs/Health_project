@@ -30,10 +30,11 @@ def _config(**overrides) -> Config:
 
 
 class _FakeGarminClient:
-    def __init__(self, stats=None, sleep=None, stress=None, activities=None):
+    def __init__(self, stats=None, sleep=None, stress=None, hrv=None, activities=None):
         self._stats = stats or {}
         self._sleep = sleep or {}
         self._stress = stress or {}
+        self._hrv = hrv or {}
         self._activities = activities or []
 
     def get_stats(self, cdate):
@@ -44,6 +45,9 @@ class _FakeGarminClient:
 
     def get_stress_data(self, cdate):
         return self._stress
+
+    def get_hrv_data(self, cdate):
+        return self._hrv
 
     def get_activities(self, start, limit):
         return self._activities[:limit]
@@ -79,13 +83,14 @@ def test_garmin_daily_row_maps_expected_fields():
         },
         sleep={"dailySleepDTO": {"sleepTimeSeconds": 27000, "sleepScores": {"overall": {"value": 81}}}},
         stress={"avgStressLevel": 28},
+        hrv={"hrvSummary": {"lastNightAvg": 38}},
     )
     repo = _repo_with_garmin(client)
     row = repo._garmin_daily_row(client, date(2026, 7, 8))
     assert row == {
         "date": "2026-07-08", "steps": 8342, "resting_hr": 52, "avg_stress": 28,
         "sleep_score": 81, "sleep_hours": 7.5, "calories_total": 2210.0,
-        "min_hr": 48, "max_hr": 142,
+        "min_hr": 48, "max_hr": 142, "hrv_ms": 38,
     }
 
 
@@ -96,6 +101,7 @@ def test_garmin_daily_row_tolerates_missing_keys():
     assert row["date"] == "2026-07-08"
     assert row["steps"] is None
     assert row["sleep_hours"] is None
+    assert row["hrv_ms"] is None
 
 
 # ─── _garmin_activity_row ────────────────────────────────────────────────────
@@ -206,7 +212,9 @@ def test_recent_activity_minutes_ignores_unparseable_timestamps():
 # get_config_value/set_config are monkeypatched with a plain in-memory dict
 # here rather than a full fake Notion client — this is testing the due-check
 # orchestration, not Notion's config read/write mechanics (already covered
-# by tests/test_repository.py's phases-related tests).
+# by tests/test_repository.py's phases-related tests). Throttle is once per
+# calendar day (garmin_daily_last_synced_date) now that Garmin feeds the
+# engine's biometric blend and is triggered on Home open, not just weekly.
 
 def _repo_with_due_check(client, config_values: dict, sync_calls: list) -> Repository:
     repo = _repo_with_garmin(client)
@@ -225,32 +233,32 @@ def test_sync_if_due_skips_entirely_when_not_configured():
     assert calls == []
 
 
-def test_sync_if_due_runs_first_time_this_week():
+def test_sync_if_due_runs_first_time_today():
     calls, config = [], {}
     repo = _repo_with_due_check(_FakeGarminClient(), config, calls)
-    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))  # a Monday
+    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))
     assert (ok, err) == (True, None)
     assert calls == [(7, date(2026, 7, 13))]
-    assert config["garmin_daily_last_synced_week"] == "2026-07-13"
+    assert config["garmin_daily_last_synced_date"] == "2026-07-13"
 
 
-def test_sync_if_due_skips_when_already_synced_this_week():
+def test_sync_if_due_skips_when_already_synced_today():
     calls = []
-    config = {"garmin_daily_last_synced_week": "2026-07-13"}
+    config = {"garmin_daily_last_synced_date": "2026-07-13"}
     repo = _repo_with_due_check(_FakeGarminClient(), config, calls)
-    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 15))  # same week, Wed
+    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))  # same day
     assert (ok, err) == (True, None)
     assert calls == []
 
 
-def test_sync_if_due_runs_again_in_a_new_week():
+def test_sync_if_due_runs_again_the_next_day():
     calls = []
-    config = {"garmin_daily_last_synced_week": "2026-07-06"}  # last week's Monday
+    config = {"garmin_daily_last_synced_date": "2026-07-12"}  # yesterday
     repo = _repo_with_due_check(_FakeGarminClient(), config, calls)
-    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))  # new week's Monday
+    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))
     assert (ok, err) == (True, None)
     assert calls == [(7, date(2026, 7, 13))]
-    assert config["garmin_daily_last_synced_week"] == "2026-07-13"
+    assert config["garmin_daily_last_synced_date"] == "2026-07-13"
 
 
 def test_sync_if_due_returns_error_on_sync_failure():

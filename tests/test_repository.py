@@ -309,10 +309,10 @@ def _repo_with_sheets(rows) -> Repository:
     return repo
 
 
-def test_get_biometric_rolling_maps_and_converts_units():
+def test_get_sheet1_biometric_rolling_maps_and_converts_units():
     import datetime
     repo = _repo_with_sheets(_SHEET_ROWS)
-    rows = repo.get_biometric_rolling(days=28, today=datetime.date(2026, 7, 7))
+    rows = repo.get_sheet1_biometric_rolling(days=28, today=datetime.date(2026, 7, 7))
     assert len(rows) == 1  # the May row is outside the 28-day window
     r = rows[0]
     assert r.date == "2026-07-07"
@@ -324,10 +324,10 @@ def test_get_biometric_rolling_maps_and_converts_units():
     assert r.steps == 8500
 
 
-def test_get_biometric_rolling_sorted_ascending():
+def test_get_sheet1_biometric_rolling_sorted_ascending():
     import datetime
     repo = _repo_with_sheets(_SHEET_ROWS)
-    rows = repo.get_biometric_rolling(days=120, today=datetime.date(2026, 7, 7))
+    rows = repo.get_sheet1_biometric_rolling(days=120, today=datetime.date(2026, 7, 7))
     assert [r.date for r in rows] == ["2026-05-01", "2026-07-07"]
 
 
@@ -337,10 +337,16 @@ def test_get_raw_sheet_rows_returns_completely_unmapped_rows():
     assert raw == _SHEET_ROWS  # untouched, original column names
 
 
-def test_get_biometric_rolling_empty_sheet_range():
+def test_get_sheet1_biometric_rolling_empty_sheet_range():
     repo = _repo_with_sheets([])
     import datetime
-    assert repo.get_biometric_rolling(today=datetime.date(2026, 7, 7)) == []
+    assert repo.get_sheet1_biometric_rolling(today=datetime.date(2026, 7, 7)) == []
+
+
+def test_get_all_sheet1_biometric_records_unwindowed():
+    repo = _repo_with_sheets(_SHEET_ROWS)
+    records = repo.get_all_sheet1_biometric_records()
+    assert [r.date for r in records] == ["2026-07-07", "2026-05-01"]  # Sheet1 row order, unsorted/unwindowed
 
 
 # ─── Weekly Rollup — WeekScore <-> row mapping ──────────────────────────────

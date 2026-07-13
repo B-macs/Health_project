@@ -595,8 +595,12 @@ def _sync_weekly_rollup_cached() -> tuple[bool, str | None]:
 @st.cache_data(ttl=1800, show_spinner=False)
 def _sync_garmin_daily_cached() -> tuple[bool, str | None]:
     """Throttles the due-check itself (cheap) — the actual Garmin sync only
-    ever fires once per week regardless, via Repository.sync_garmin_daily_if_due
-    (Garmin's API is rate-limit-sensitive, unlike the Weekly Rollup sync above)."""
+    ever fires once per calendar day regardless, via Repository.
+    sync_garmin_daily_if_due (Garmin's API is rate-limit-sensitive, unlike the
+    Weekly Rollup sync above). app.py's Home page also triggers this same
+    once/day sync now that Garmin feeds the engine's biometric blend
+    (services/biometrics.py) — this call here just means it's covered on the
+    Training page too if Home wasn't visited first that day."""
     try:
         return repo.get_repository().sync_garmin_daily_if_due()
     except Exception as exc:

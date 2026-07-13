@@ -25,6 +25,7 @@ OURA_WORKOUTS_WORKSHEET = "Oura Workouts"
 OURA_SLEEP_PERIODS_WORKSHEET = "Oura Sleep Periods"
 OURA_SESSIONS_WORKSHEET = "Oura Sessions"
 OURA_REST_MODE_WORKSHEET = "Oura Rest Mode"
+BIOMETRIC_BLEND_WORKSHEET = "Biometric Blend"
 
 
 def make_client(config: Config):
@@ -40,6 +41,14 @@ def get_all_records(client, sheet_id: str) -> list[dict]:
 # (that lives in services/repository.py). Weekly Rollup was the first
 # writable tab; Garmin Daily/Activities (services/repository.py) reuse the
 # same generic get_or_create_worksheet()/upsert_row_by_key() underneath.
+
+
+def get_worksheet_records(worksheet) -> list[dict]:
+    """Every row in an arbitrary already-opened worksheet, gspread's own
+    dict-per-row parsing, unmapped — the generic counterpart to
+    get_all_records() (which is hardcoded to Sheet1) for the Oura/Garmin
+    tabs, which until now were write-only from the app's perspective."""
+    return worksheet.get_all_records()
 
 
 def get_or_create_worksheet(client, sheet_id: str, title: str, header: list[str]):

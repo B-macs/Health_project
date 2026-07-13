@@ -14,7 +14,7 @@ Build a highly private, data-driven Health and Performance Application that elim
 | **Execution** | Local only | Streamlit + Notion cloud DB | Notion provides structured database, relation properties, and a queryable API without a local server to maintain |
 | **Frontend / UI** | Streamlit + AG Grid | Streamlit + responsive CSS (no AG Grid in active use) | Data Grid page removed; responsive dual-theme (Oura/Whoop) CSS system replaces it |
 | **Database** | Local SQLite | Notion API — 4 databases | Notion selected; SQLite schema preserved in resume.md for reference but not in use |
-| **Biometrics source** | Manual Apple Health entry on Autoregulation page | Google Sheets sync — Export Health App → Google Sheets → App | Auto-sync removes manual entry entirely; engine reads directly without a sync step |
+| **Biometrics source** | Manual Apple Health entry on Autoregulation page | Blended Oura + Garmin read (`services/biometrics.py`) — Oura 70%/Garmin 30% for HRV/RHR/sleep, Garmin 80%/Oura 20% for steps | Apple Health auto-export (Sheet1) proved unreliable; Oura/Garmin were already integrated archivally, so the engine now reads a weighted blend of both instead. Sheet1 is historical-only (one-time backfill source) |
 | **Training entry** | Manual session logging via Training Entry page | Auto-logged by Training Plan on session completion | Training Entry page removed; logging is triggered by completing a guided day |
 
 ---
@@ -260,20 +260,57 @@ McGill protocol progression, functional hip hinge (RDL), single-leg stability, i
 
 ## BIOMETRICS PIPELINE
 
+As of 2026-07-13, the engine's live biometric source is a blended Oura+Garmin
+read — Sheet1/Apple Health auto-export was retired from the live pipeline
+(unreliable auto-export) and is now historical-only.
+
 ```
-Export Health App (iPhone)
-        ↓
-Google Sheets (daily_biometrics_master / Sheet1)
-        ↓  [gspread service account — read only]
-sync_sheets.get_biometric_rolling(sheet_id, days=28)
-        ↓  [30-min cache via @st.cache_data(ttl=1800)]
-engine.traffic_light(biometric_rows)
-        ↓
-Directive → Training Plan banner (plain language)
-Full data → AI Insights → Engine Data tab
+Oura API (official)                    Garmin Connect (unofficial)
+        ↓  sync_oura_all(days=2)               ↓  sync_garmin_daily_if_due(days=2)
+        ↓  [2h cache, app.py, on Home open]     ↓  [once/day, Config-DB gated,
+        ↓                                         app.py Home + training.py]
+Oura Daily / Oura Sleep Periods sheet tabs    Garmin Daily sheet tab
+        └──────────────────┬──────────────────────┘
+                            ↓
+         Repository.get_biometric_rolling(days, today)
+                            ↓  [reads all 3 tabs, groups by date]
+         services.biometrics.blend_biometric_day(date, oura, garmin)
+                            ↓  [Oura 70%/Garmin 30% for HRV/RHR/sleep;
+                            ↓   Garmin 80%/Oura 20% for steps; renormalizes
+                            ↓   to 100% of whichever source is present if
+                            ↓   the other is missing that day]
+                  engine.traffic_light(biometric_rows)
+                            ↓
+      Directive → Training Plan banner (plain language)
+      Full data + sources_missing flags → AI Insights → Engine Data tab
+
+         Repository.sync_biometric_blend(days, today)   [same blend fn]
+                            ↓  [once/day, app.py; also on-demand full-
+                            ↓   history backfill button, Insights → Sync]
+              Biometric Blend sheet tab (persisted, keyed by date)
+                            ↓
+      Repository.get_biometric_blend_history(start, end) — unbounded
+                            ↓
+      Insights → Sync → "Biometric Blend History" table
 ```
 
-### Column Mapping (Google Sheets → Engine)
+`get_biometric_rolling()` above is a **live recompute** — calling it twice
+for the same past date can, in principle, give a different answer if Oura/
+Garmin have revised that day's raw reading since, or if the blend weights
+change. `sync_biometric_blend` persists each day's result once to its own
+"Biometric Blend" sheet tab; a day stops being touched (and so becomes a
+fixed historical record) once it falls outside whichever rolling window the
+next sync runs with (7 days for the daily auto-sync). This is what makes
+"look back at last month" show a stable value rather than a live re-derivation.
+
+Sheet1/Apple Health: `Repository.get_sheet1_biometric_rolling()` /
+`get_all_sheet1_biometric_records()` retain the old mapping+read, used only
+by `scripts/backfill_garmin_from_sheet1.py` (one-time historical backfill
+into the Garmin Daily tab, so readiness.py's 14/28/56-day rolling baselines
+have pre-wearable history) and the legacy raw-preview table in Insights →
+Sync.
+
+### Column Mapping (legacy Sheet1 → Engine, historical/backfill only)
 
 | Sheet Column | Engine Field | Conversion |
 |---|---|---|
@@ -285,6 +322,19 @@ Full data → AI Insights → Engine Data tab
 | `Sleep Analysis [Deep] (hr)` | `sleep_deep_hours` | Direct |
 | `Step Count (count)` | `steps` | Direct |
 | `Weight (kg)` | `weight_kg` | Direct |
+
+### Blend Mapping (Oura + Garmin → Engine, live pipeline)
+
+| Engine Field | Oura Source | Garmin Source | Weights |
+|---|---|---|---|
+| `hrv_ms` | Sleep Periods tab, main sleep period `average_hrv` | Daily tab `hrv_ms` (from `get_hrv_data`) | Oura 70% / Garmin 30% |
+| `resting_heart_rate` | Sleep Periods tab, main sleep period `lowest_heart_rate` | Daily tab `resting_hr` | Oura 70% / Garmin 30% |
+| `sleep_duration_hours` | Sleep Periods tab, main sleep period `total_sleep_duration` ÷ 3600 | Daily tab `sleep_hours` | Oura 70% / Garmin 30% |
+| `steps` | Daily tab `steps` (from `daily_activity`) | Daily tab `steps` | Garmin 80% / Oura 20% |
+
+`weight_kg`, `active_kcal`, `sleep_deep_hours` are out of scope for the blend
+(nothing in `engine.py`/`stats.py`/`insights.py` reads them) and are `None`
+on blended records.
 
 ---
 
@@ -332,7 +382,7 @@ Two visual themes applied automatically via CSS media query at 768px breakpoint:
 | **10** | Autoregulation → Background; Directive into Training Plan | COMPLETE ✅ |
 | **11** | Biomechanical Profile Integration into Training Plan | COMPLETE ✅ |
 | **12** | 4-Week Stage 2 Transition Plan | PENDING — begins after Day 14 assessment |
-| **13** | Apple Health Direct API Sync | PENDING — replace Google Sheets intermediary |
+| **13** | Apple Health Direct API Sync | SUPERSEDED — replaced by the Oura+Garmin blend (2026-07-13) rather than a direct Apple HealthKit sync; Sheet1/Apple Health retired from the live pipeline instead |
 | **14** | Stage 2 Training Entry (barbell/cable — external load) | PENDING |
 
 ---
@@ -406,13 +456,14 @@ Two visual themes applied automatically via CSS media query at 768px breakpoint:
 
 | Item | Status | Notes |
 |---|---|---|
-| HRV data from Google Sheets | Often blank | Export Health App does not always capture HRV daily; traffic light runs on available data |
-| Notion biometrics DB | No longer written to | Could be removed in future; kept for backwards compat with `get_biometric_rolling()` in db.py |
+| HRV data from Sheet1/Apple Health | Often blank (historical only) | No longer the engine's source — see Oura+Garmin blend above. Still true of the retired pipeline for backfill purposes |
+| Garmin HRV field mapping | Unverified | `hrvSummary.lastNightAvg` assumed; confirm with `scripts/garmin_login_test.py` against a live payload |
+| Notion biometrics DB | No longer written to | Could be removed in future; kept for backwards compat |
 | Stage 2 training plan | Not yet built | Needs barbell/cable movement library, updated ACWR ceiling, external load auto-logging |
-| Apple Health direct sync | Not implemented | Would remove Google Sheets intermediary; requires Apple Health HealthKit API or shortcut automation |
+| Garmin backfill from Sheet1 | Needs to be run once | `scripts/backfill_garmin_from_sheet1.py` — dry-run first, then `--apply` — so readiness baselines have pre-wearable history in the Garmin Daily tab |
 | `Training plan/` folder | Stale duplicate | Contents moved to `docs/training/`; manual deletion needed (`Remove-Item -Recurse -Force "Training plan"`) |
 | `patient_profile.py` not imported | Informational | Human-readable reference only — not wired into active code. Will be imported when Stage 2 plan reads biomechanical profile programmatically. |
 
 ---
 
-*Last updated: 2026-07-01 — nav architecture locked; _pages/ removed; bottom nav rules documented*
+*Last updated: 2026-07-13 — Sheet1/Apple Health retired as the engine's biometric source; replaced by a blended Oura+Garmin read (`services/biometrics.py`), with the daily blend persisted to a "Biometric Blend" sheet tab so historical values are a fixed record, not a live re-derivation*
