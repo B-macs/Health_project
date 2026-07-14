@@ -14,7 +14,8 @@
       "Bash(./venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('views/insights.py', encoding='utf-8'\\).read\\(\\)\\); print\\('syntax ok'\\)\")",
       "Bash(./venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('views/checkin.py', encoding='utf-8'\\).read\\(\\)\\); print\\('syntax ok'\\)\")",
       "Bash(ls .claude/launch.json)",
-      "Bash(cat .claude/launch.json)"
+      "Bash(cat .claude/launch.json)",
+      "Bash(python -m pytest tests/test_notion_client.py tests/test_repository.py -q)"
     ]
   }
 }

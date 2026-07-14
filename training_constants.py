@@ -90,6 +90,17 @@ ANATOMICAL_LOCATIONS: list[str] = [
     "Other",
 ]
 
+# Craving type — paired with the Hunger vs Baseline check-in field
+CRAVING_TYPES: list[str] = [
+    "None",
+    "Sweet",
+    "Salty",
+    "Carb/Starchy",
+    "Fatty",
+    "Protein",
+    "Caffeine",
+]
+
 # Sensation tags for daily readiness
 SENSATION_TAGS: list[str] = [
     "Normal",

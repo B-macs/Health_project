@@ -7,29 +7,46 @@ from datetime import date
 import streamlit as st
 import repo
 from services.models import CheckInRecord
-from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
+from training_constants import ANATOMICAL_LOCATIONS, CRAVING_TYPES, SENSATION_TAGS
 
 
 CONDITION_OPTIONS = ["Excellent", "Good", "Average", "Below Average", "Poor"]
 
 # Illustrative reference bands for the 0–10 sliders below — wording/ranges are
 # a starting point, not a clinical standard. Tweak freely; each tuple is
-# (range_label, description) and renders as one line in the reference guide.
+# (range_label, tier_title, description) and renders as one line in the
+# reference guide.
+TIGHTNESS_SCALE_TITLE = "Muscle Tightness Scale"
+TIGHTNESS_SCALE_SUBTITLE = "Rate the level of restriction, stiffness, or resistance in your muscles."
 TIGHTNESS_SCALE_GUIDE = [
-    ("0",    "No tightness — full, unrestricted range of motion."),
-    ("1–2",  "Loose, barely noticeable, no effect on movement."),
-    ("3–4",  "Slight tightness, mild stiffness, doesn't restrict range."),
-    ("5–6",  "Mild DOMS, noticeable stiffness, slight restriction in range of motion."),
-    ("7–8",  "Moderate–severe DOMS, muscle feels stiff/knotted, restricted range, discomfort on stretch."),
-    ("9–10", "Severe tightness, can't move the muscle through full range without pulling/resistance, feels locked up."),
+    ("0",    "No Tightness",                  "Full, unrestricted range of motion."),
+    ("1–2",  "Minimal / Normal",               "Barely noticeable. Muscles feel supple, warm, and ready to move."),
+    ("3–4",  "Mild Tension",                   "Slight stiffness or light DOMS (Delayed Onset Muscle Soreness). "
+                                                "You feel it, but it easily \"unlocks\" with a light warm-up or stretch."),
+    ("5–6",  "Moderate Stiffness / Deep DOMS", "Pronounced tightness and heavy muscle soreness. Movement is "
+                                                "restricted, and stretching feels highly intense but manageable."),
+    ("7–8",  "Severe Tightness",               "Muscles feel highly contracted and guarded. Movement is "
+                                                "uncomfortable, and attempting to stretch feels like hitting a "
+                                                "hard, painful wall."),
+    ("9–10", "Extreme Restriction",            "Muscle feels completely locked up or \"seized.\" Movement is "
+                                                "severely restricted; trying to stretch feels like you might "
+                                                "strain or tear the muscle."),
 ]
 
+PAIN_SCALE_TITLE = "Pain Scale"
+PAIN_SCALE_SUBTITLE = "Rate actual discomfort or pain (which is different from typical muscular fatigue or soreness)."
 PAIN_SCALE_GUIDE = [
-    ("0",    "No pain — pain-free."),
-    ("1–3",  "Mild, noticeable but doesn't affect training."),
-    ("4–5",  "Moderate, distracting, would consider modifying training."),
-    ("6–7",  "Significant pain, limits range/effort, should ease off that movement."),
-    ("8–10", "Severe/sharp pain, stop the movement entirely."),
+    ("0",    "Pain-Free",     "No discomfort at all."),
+    ("1–2",  "Faint",         "A mild, passing ache or twinge. Only noticeable when you actively "
+                               "think about it or press on the area."),
+    ("3–4",  "Mild / Distracting", "A constant dull ache or sharp pinch during certain movements, but "
+                                    "it doesn't stop you from completing daily tasks."),
+    ("5–6",  "Moderate / Limiting", "Clear pain that causes you to alter your movement, compromise your "
+                                     "form, or compensate to avoid discomfort."),
+    ("7–8",  "Severe",         "Intense, sharp, or throbbing pain. Strongly interferes with normal "
+                                "movement and requires you to stop or significantly modify training."),
+    ("9–10", "Debilitating",   "Excruciating pain that makes any movement impossible. Requires "
+                                "immediate rest or medical attention."),
 ]
 
 
@@ -79,7 +96,9 @@ def render() -> None:
             st.subheader("Lifestyle Factors")
             psych_stress = st.select_slider(
                 "Psychological Stress", options=[1, 2, 3, 4, 5], value=1,
-                help="1 = calm / no stress, 5 = high cognitive/emotional load.",
+                help="1 = calm & clear-headed, 5 = high stress / mental fog. "
+                     "Covers both emotional load and mental clarity — deliberately "
+                     "one combined scale rather than two overlapping ones.",
                 key="checkin_stress",
             )
             alcohol_units = st.number_input(
@@ -92,6 +111,63 @@ def render() -> None:
                 "Travel / Location Change",
                 help="Hotel beds, flights, altitude changes — flags HRV/stiffness context for AI.",
                 key="checkin_travel",
+            )
+
+        st.divider()
+        col_joint_gut, col_body_hydration, col_meditation = st.columns(3, gap="large")
+
+        with col_joint_gut:
+            st.subheader("Joint / Gut")
+            instability_events = st.number_input(
+                "Instability Events", min_value=0, max_value=20, value=0, step=1,
+                help="Count of joint subluxation/instability events since yesterday (HSD).",
+                key="checkin_instability",
+            )
+            bristol_type = st.select_slider(
+                "Bristol Stool Type", options=[1, 2, 3, 4, 5, 6, 7], value=4,
+                help="1 = severe constipation, 7 = watery/diarrhea. 3–4 = normal.",
+                key="checkin_bristol",
+            )
+            unusual_stool_colour = st.toggle(
+                "Unusual Colour?", key="checkin_stool_colour",
+            )
+
+        with col_body_hydration:
+            st.subheader("Body / Hydration")
+            hunger_deviation = st.select_slider(
+                "Hunger vs Baseline", options=[-2, -1, 0, 1, 2], value=0,
+                help="−2 = far below normal appetite, +2 = far above normal appetite.",
+                key="checkin_hunger",
+            )
+            craving_type = st.selectbox(
+                "Craving Type", CRAVING_TYPES, key="checkin_craving",
+            )
+            thirst_intensity = st.select_slider(
+                "Morning Thirst Intensity", options=[1, 2, 3, 4, 5], value=1,
+                key="checkin_thirst",
+            )
+            electrolytes_taken = st.toggle(
+                "Salt/Electrolytes Taken", key="checkin_electrolytes",
+            )
+            sodium_mg = st.number_input(
+                "Sodium (mg)", min_value=0, max_value=5000, value=0, step=100,
+                key="checkin_sodium",
+            )
+
+        with col_meditation:
+            st.subheader("Meditation")
+            meditation_done = st.toggle(
+                "Practice Done", key="checkin_meditation_done",
+            )
+            meditation_minutes = st.number_input(
+                "Meditation Minutes", min_value=0.0, max_value=120.0,
+                value=0.0, step=5.0,
+                key="checkin_meditation_minutes",
+            )
+            relaxation_depth = st.select_slider(
+                "Relaxation Depth", options=[1, 2, 3, 4, 5], value=1,
+                help="1 = restless/distracted, 5 = deeply relaxed. Only meaningful if practice was done.",
+                key="checkin_relaxation",
             )
 
         st.divider()
@@ -111,6 +187,17 @@ def render() -> None:
             alcohol_units=alcohol_units,
             travel_flag=travel_flag,
             psych_stress_score=psych_stress,
+            instability_events=instability_events,
+            bristol_type=bristol_type,
+            unusual_stool_colour=unusual_stool_colour,
+            hunger_deviation=hunger_deviation,
+            craving_type=craving_type,
+            thirst_intensity=thirst_intensity,
+            electrolytes_taken=electrolytes_taken,
+            sodium_mg=sodium_mg,
+            meditation_done=meditation_done,
+            meditation_minutes=meditation_minutes,
+            relaxation_depth=relaxation_depth,
         ))
         st.success(
             f"Check-in saved — Tightness {tightness_score}/10, Pain {pain_score}/10. "
@@ -121,10 +208,12 @@ def render() -> None:
     with st.expander("Scale Reference — Tightness & Pain", expanded=False):
         col_t, col_p = st.columns(2, gap="large")
         with col_t:
-            st.markdown("**Tightness Score (0–10)**")
-            for rng, desc in TIGHTNESS_SCALE_GUIDE:
-                st.markdown(f"`{rng}` — {desc}")
+            st.markdown(f"**{TIGHTNESS_SCALE_TITLE}**")
+            st.caption(TIGHTNESS_SCALE_SUBTITLE)
+            for rng, title, desc in TIGHTNESS_SCALE_GUIDE:
+                st.markdown(f"`{rng}` **{title}** — {desc}")
         with col_p:
-            st.markdown("**Pain Score (0–10)**")
-            for rng, desc in PAIN_SCALE_GUIDE:
-                st.markdown(f"`{rng}` — {desc}")
+            st.markdown(f"**{PAIN_SCALE_TITLE}**")
+            st.caption(PAIN_SCALE_SUBTITLE)
+            for rng, title, desc in PAIN_SCALE_GUIDE:
+                st.markdown(f"`{rng}` **{title}** — {desc}")

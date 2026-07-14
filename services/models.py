@@ -69,7 +69,23 @@ class CheckInRecord:
     subjective_tightness: str = ""
     alcohol_units: float | None = None
     travel_flag: bool = False
-    psych_stress_score: float | None = None
+    psych_stress_score: float | None = None  # UI label covers both stress and mental clarity
+    # Joint/HSD
+    instability_events: int | None = None
+    # Gut
+    bristol_type: int | None = None
+    unusual_stool_colour: bool = False
+    # Body
+    hunger_deviation: int | None = None
+    craving_type: str | None = None
+    # Hydration
+    thirst_intensity: int | None = None
+    electrolytes_taken: bool = False
+    sodium_mg: float | None = None
+    # Meditation
+    meditation_done: bool = False
+    meditation_minutes: float | None = None
+    relaxation_depth: int | None = None
 
 
 @dataclass(frozen=True)
