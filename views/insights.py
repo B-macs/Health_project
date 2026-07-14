@@ -1,6 +1,6 @@
 """
-Insights view — Engine Data + Processing Queue +
-Tightness Map - Macro Trends.
+Insights view — BioAge + Engine Data + Processing Queue + Macro Trends
+(Tightness Map + multi-week trend analysis) + Sync.
 
 Usage:
     from views.insights import render
@@ -9,11 +9,14 @@ Usage:
 Caller is responsible for st.set_page_config(), styles.inject_css(), nav.inject().
 """
 
+import base64
 import calendar as cal_mod
 import json
 from dataclasses import asdict
 from datetime import date
+from pathlib import Path
 
+import altair as alt
 import streamlit as st
 import pandas as pd
 
@@ -22,6 +25,72 @@ from services import ai
 from services import engine
 from services import stats as stats_mod
 from services import insights as insights_svc
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  BioAge tab — 4 category cards (Strength/Flexibility/Metabolism/Cardio).
+#  Card backgrounds are optional: filenames in _BIOAGE_BG below, in
+#  background_templates/, appear automatically; if a file is ever missing,
+#  cards fall back to a flat dark background (see _bioage_b64).
+# ─────────────────────────────────────────────────────────────────────────────
+
+_BIOAGE_BG_DIR = Path(__file__).resolve().parent.parent / "background_templates"
+
+_BIOAGE_CATEGORIES: list[str] = ["strength", "flexibility", "metabolism", "cardio"]
+
+_BIOAGE_LABELS: dict[str, str] = {
+    "strength":    "Strength",
+    "flexibility": "Flexibility",
+    "metabolism":  "Metabolism",
+    "cardio":      "Cardio",
+}
+
+_BIOAGE_COLORS: dict[str, str] = {
+    "strength":    "#FF8C42",
+    "flexibility": "#22C3E6",
+    "metabolism":  "#9B6BFF",
+    "cardio":      "#FF4368",
+}
+
+_BIOAGE_BG: dict[str, Path] = {
+    "strength":    _BIOAGE_BG_DIR / "Strength_button.png",
+    "flexibility": _BIOAGE_BG_DIR / "flexibility.png",
+    "metabolism":  _BIOAGE_BG_DIR / "metabolism.png",
+    "cardio":      _BIOAGE_BG_DIR / "cardio.png",
+}
+
+
+@st.cache_data(show_spinner=False)
+def _bioage_b64(path_str: str) -> str:
+    p = Path(path_str)
+    if not p.exists():
+        return ""
+    mime = "image/png" if p.suffix.lower() == ".png" else "image/jpeg"
+    return f"data:{mime};base64,{base64.b64encode(p.read_bytes()).decode()}"
+
+
+def _bioage_card_html(key: str, href: str) -> str:
+    color = _BIOAGE_COLORS[key]
+    label = _BIOAGE_LABELS[key]
+    bg    = _bioage_b64(str(_BIOAGE_BG[key]))
+    bg_css = (
+        f"background-image:linear-gradient(90deg,#0B0F1A 0%,rgba(11,15,26,0.75) 45%,"
+        f"rgba(11,15,26,0.15) 80%),url('{bg}');background-size:cover;"
+        f"background-position:center right;"
+    ) if bg else "background:#0B0F1A;"
+    return (
+        f'<a href="{href}" style="text-decoration:none;">'
+        f'<div style="position:relative;height:150px;border-radius:14px;overflow:hidden;'
+        f'margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);{bg_css}">'
+        f'<div style="position:relative;z-index:1;height:100%;display:flex;'
+        f'align-items:center;justify-content:space-between;padding:0 22px;">'
+        f'<span style="font-size:34px;font-weight:800;color:{color};'
+        f'text-shadow:0 0 18px {color}99,0 0 4px {color};letter-spacing:-0.5px;">{label}</span>'
+        f'<span style="font-size:26px;color:{color};font-weight:300;">&rsaquo;</span>'
+        f'</div>'
+        f'</div>'
+        f'</a>'
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -75,17 +144,46 @@ def render() -> None:
     injury_profile = repo.get_repository().get_diagnostic_profile()
 
     (
-        tab_engine, tab_queue,
+        tab_bioage, tab_engine, tab_queue,
         tab_tightness, tab_sync,
     ) = st.tabs([
+        "BioAge",
         "Engine Data",
         "Processing Queue",
-        "Tightness Map - Macro Trends",
+        "Macro Trends",
         "Sync",
     ])
 
     # =========================================================================
-    #  Tab 0 — Engine Data
+    #  Tab 0 — BioAge
+    # =========================================================================
+
+    with tab_bioage:
+        selected = st.query_params.get("bioage")
+
+        if selected in _BIOAGE_LABELS:
+            color = _BIOAGE_COLORS[selected]
+            label = _BIOAGE_LABELS[selected]
+            st.markdown(
+                '<a href="?page=insights" style="text-decoration:none;color:#9AA3B2;'
+                'font-size:14px;">&larr; Back</a>',
+                unsafe_allow_html=True,
+            )
+            st.markdown(
+                f"<h2 style='color:{color};margin-top:8px;'>{label}</h2>",
+                unsafe_allow_html=True,
+            )
+            st.info(f"{label} biological age breakdown — coming soon.")
+        else:
+            st.caption("Select a category to see its biological age breakdown.")
+            for key in _BIOAGE_CATEGORIES:
+                st.markdown(
+                    _bioage_card_html(key, f"?page=insights&bioage={key}"),
+                    unsafe_allow_html=True,
+                )
+
+    # =========================================================================
+    #  Tab 1 — Engine Data
     # =========================================================================
 
     with tab_engine:
@@ -109,7 +207,6 @@ def render() -> None:
             inj_weight  = engine.injury_weight(lambda_val, pain_streak)
             obs_rem     = engine.observation_days_remaining(tl["data_days"])
             rec         = engine.volume_recommendation(tl, acwr_result, current_stage, obs_rem, inj_weight)
-            inj_signal  = engine.injury_weight_signal(inj_weight)
             stage_info  = engine.stage_status(current_stage, pain_streak, avg_tight)
 
         # ── Directive banner ──────────────────────────────────────────────────
@@ -126,16 +223,7 @@ def render() -> None:
             unsafe_allow_html=True,
         )
 
-        # ── Key metrics strip ─────────────────────────────────────────────────
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Stage",         f"Stage {current_stage}")
-        col2.metric("Pain-Free",     f"{pain_streak} days")
-        col3.metric("Injury Weight", f"{int(inj_weight * 100)}%",
-                    help="e^(-λt) — decays toward 0% as pain-free days accumulate")
         acwr_val = acwr_result.get("acwr")
-        col4.metric("ACWR",          f"{acwr_val:.2f}" if acwr_val else "—",
-                    delta=f"ceiling {acwr_result['ceiling']}",
-                    delta_color="off")
 
         st.divider()
 
@@ -237,29 +325,8 @@ def render() -> None:
                 color=["#3D4F6B", "#00E874"],
             )
 
-        st.divider()
-
-        # ── Injury weight ─────────────────────────────────────────────────────
-        st.subheader("Injury Baseline Weight")
-        inj_color = engine.SIGNAL_COLORS[inj_signal]
-        col_iw, col_iw_desc = st.columns([1, 3], gap="large")
-        with col_iw:
-            st.markdown(
-                f"<div style='font-size:48px;font-weight:700;font-family:monospace;"
-                f"color:{inj_color};'>{int(inj_weight * 100)}%</div>",
-                unsafe_allow_html=True,
-            )
-            st.progress(inj_weight)
-        with col_iw_desc:
-            st.caption(
-                f"λ = {lambda_val} · {pain_streak} pain-free days\n\n"
-                "Exponential decay e^(−λt): starts at 100% on injury day, "
-                "approaches 0% as pain-free training accumulates. "
-                "Below 20% the injury data becomes a silent background watcher only."
-            )
-
     # =========================================================================
-    #  Tab 1 — Processing Queue
+    #  Tab 2 — Processing Queue
     # =========================================================================
 
     with tab_queue:
@@ -378,16 +445,20 @@ def render() -> None:
             selected_date = st.session_state.get("queue_selected_date")
             weeks = cal_mod.Calendar(firstweekday=0).monthdatescalendar(cal_year, cal_month)
 
+            today = date.today()
+
             for week in weeks:
                 week_cols = st.columns(7)
                 for col, day in zip(week_cols, week):
                     day_str     = day.isoformat()
                     day_entries = by_date.get(day_str, [])
+                    is_today    = day == today
+                    cell        = col.container(border=True) if is_today else col
                     if day_entries:
                         levels = {e.get("warning_level") for e in day_entries}
                         ball   = "🔴" if "flag" in levels else "🟡"
                         is_selected = selected_date == day_str
-                        if col.button(
+                        if cell.button(
                             f"{day.day} {ball}",
                             key=f"queue_cal_{day_str}",
                             use_container_width=True,
@@ -396,9 +467,14 @@ def render() -> None:
                             st.session_state["queue_selected_date"] = day_str
                             st.rerun()
                     else:
-                        dim = "#5A6172" if day.month == cal_month else "#2A2E38"
-                        col.markdown(
-                            f"<div style='text-align:center;color:{dim};padding:8px 0;'>{day.day}</div>",
+                        if is_today:
+                            dim, weight = "#00E874", "700"
+                        else:
+                            dim    = "#5A6172" if day.month == cal_month else "#2A2E38"
+                            weight = "400"
+                        cell.markdown(
+                            f"<div style='text-align:center;color:{dim};padding:8px 0;"
+                            f"font-weight:{weight};'>{day.day}</div>",
                             unsafe_allow_html=True,
                         )
 
@@ -426,7 +502,7 @@ def render() -> None:
                     st.markdown("---")
 
     # =========================================================================
-    #  Tab 2 — Tightness Map - Macro Trends
+    #  Tab 3 — Macro Trends
     # =========================================================================
 
     with tab_tightness:
@@ -444,7 +520,22 @@ def render() -> None:
                     .sort_values("Mentions", ascending=False)
                     .reset_index(drop=True)
                 )
-                st.bar_chart(df_freq.set_index("Region")["Mentions"])
+                freq_chart = (
+                    alt.Chart(df_freq)
+                    .mark_bar(color="#00E874")
+                    .encode(
+                        x=alt.X(
+                            "Region:N", title=None, sort="-y",
+                            axis=alt.Axis(
+                                labelAngle=0, labelLimit=1000, labelPadding=10,
+                                labelExpr="split(datum.label, ' — ')",
+                            ),
+                        ),
+                        y=alt.Y("Mentions:Q"),
+                    )
+                    .properties(height=340)
+                )
+                st.altair_chart(freq_chart, use_container_width=True)
                 st.caption(
                     "Frequency of each region appearing in parsed tightness entries "
                     "(keyword matching)."
@@ -465,17 +556,59 @@ def render() -> None:
 
             st.divider()
             st.subheader("Warning Level History")
-            df_warn     = pd.DataFrame(parsed_rows)[["date", "ai_warning_level"]]
-            warn_counts = df_warn["ai_warning_level"].value_counts().reset_index()
-            warn_counts.columns = ["Level", "Count"]
+
+            rows_by_level: dict[str, list[dict]] = {"none": [], "monitor": [], "flag": []}
+            for row in parsed_rows:
+                rows_by_level.setdefault(row.get("ai_warning_level") or "none", []).append(row)
+
+            selected_level = st.session_state.get("tight_warn_level")
+
             col1, col2, col3 = st.columns(3)
-            for _, wrow in warn_counts.iterrows():
-                lvl  = wrow["Level"]
-                cnt  = wrow["Count"]
+            for col, lvl, label in [
+                (col1, "none",    "Clear"),
+                (col2, "monitor", "Monitor"),
+                (col3, "flag",    "Flag"),
+            ]:
                 icon = engine.WARNING_LEVEL_ICONS.get(lvl, "⚫")
-                if lvl == "none":      col1.metric(f"{icon} Clear",   cnt)
-                elif lvl == "monitor": col2.metric(f"{icon} Monitor", cnt)
-                elif lvl == "flag":    col3.metric(f"{icon} Flag",    cnt)
+                cnt  = len(rows_by_level.get(lvl, []))
+                if col.button(
+                    f"{icon} {label} ({cnt})",
+                    key=f"tight_warn_btn_{lvl}",
+                    use_container_width=True,
+                    type="primary" if selected_level == lvl else "secondary",
+                    disabled=cnt == 0,
+                ):
+                    st.session_state["tight_warn_level"] = lvl
+                    st.rerun()
+
+            if selected_level and rows_by_level.get(selected_level):
+                icon = engine.WARNING_LEVEL_ICONS.get(selected_level, "⚫")
+                st.markdown(f"**{icon} {selected_level.upper()} entries**")
+                for row in rows_by_level[selected_level]:
+                    parts = row.get("ai_body_parts") or ""
+                    if isinstance(parts, str) and parts.startswith("["):
+                        try:
+                            parts = ", ".join(json.loads(parts))
+                        except Exception:
+                            pass
+                    sensation = row.get("ai_sensation_type") or ""
+                    if isinstance(sensation, str) and sensation.startswith("["):
+                        try:
+                            sensation = ", ".join(json.loads(sensation))
+                        except Exception:
+                            pass
+                    severity = row.get("ai_tightness_severity")
+                    st.markdown(
+                        f"**{row.get('date', '?')}** &nbsp;·&nbsp; "
+                        f"Tightness {row.get('tightness_score', '—')} &nbsp;·&nbsp; "
+                        f"Pain {row.get('pain_score', '—')}"
+                        + (f" &nbsp;·&nbsp; Severity {severity}" if severity is not None else "")
+                    )
+                    if parts:
+                        st.caption(f"Body areas: {parts}")
+                    if sensation:
+                        st.caption(f"Sensation: {sensation}")
+                    st.markdown("---")
 
         # ── Macro Trends ────────────────────────────────────────────────────
         st.divider()
@@ -569,7 +702,7 @@ def render() -> None:
                     st.markdown(f"- {rec_item}")
 
     # =========================================================================
-    #  Tab 3 — Sync
+    #  Tab 4 — Sync
     # =========================================================================
 
     with tab_sync:

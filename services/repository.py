@@ -22,6 +22,7 @@ prior per-call `Client()` construction in db.py/sync_sheets.py.
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import uuid
 from datetime import date, datetime, timedelta
@@ -906,13 +907,45 @@ class Repository:
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
         }
 
+    def _oura_readiness_contributors_by_date(self, start: str, end: str) -> dict[str, dict]:
+        """Oura's own daily_readiness contributor sub-scores (0-100), from
+        the Oura Daily tab — Oura-exclusive, no Garmin equivalent, so this
+        is a straight passthrough rather than a blend. Feeds
+        services.readiness.compute_readiness alongside HRV/RHR/Sleep."""
+        rows = sheets.get_worksheet_records(self._oura_daily_ws())
+        return {
+            str(r["date"]): {
+                "body_temperature":      r.get("readiness_body_temperature") or None,
+                "recovery_index":        r.get("readiness_recovery_index") or None,
+                "previous_day_activity": r.get("readiness_previous_day_activity") or None,
+            }
+            for r in rows if r.get("date") and start <= str(r["date"]) <= end
+        }
+
+    def _alcohol_units_by_date(self, days: int, today: date) -> dict[str, float]:
+        """Alcohol units logged via the morning check-in (Notion Readiness
+        DB — not a wearable source), keyed by date. Feeds
+        services.readiness.compute_readiness's flat point penalty."""
+        rows = self.get_recent_readiness(days=days, today=today)
+        return {
+            r["date"]: float(r["alcohol_units"])
+            for r in rows
+            if r.get("date") and r.get("alcohol_units") is not None
+        }
+
     def get_biometric_rolling(self, days: int = 28, today: date | None = None) -> list[models.BiometricRecord]:
         """Last `days` days, sorted ascending by date — the shape the
         engine's traffic_light()/readiness computations expect. Blends
         Oura + Garmin (services/biometrics.py) rather than reading Sheet1;
         both platforms' Sheet tabs are kept fresh by sync_oura_all (2h cache,
         app.py) and sync_garmin_daily_if_due (once/day, app.py + training.py)
-        before this reads them. Also the Sync page's "Engine View" preview."""
+        before this reads them. Also the Sync page's "Engine View" preview.
+
+        Oura's readiness contributor sub-scores (body temperature, recovery
+        index, previous day activity) and alcohol units from the morning
+        check-in are attached as a passthrough after blending — neither is
+        part of the Oura/Garmin weighted-average fields above (alcohol isn't
+        even a wearable reading, it's self-reported)."""
         today = today or date.today()
         start = (today - timedelta(days=days)).isoformat()
         end = today.isoformat()
@@ -920,14 +953,30 @@ class Repository:
         oura_steps = self._oura_daily_steps_by_date(start, end)
         oura_sleep = self._oura_sleep_metrics_by_date(start, end)
         garmin_metrics = self._garmin_metrics_by_date(start, end)
+        oura_readiness = self._oura_readiness_contributors_by_date(start, end)
+        alcohol = self._alcohol_units_by_date(days, today)
 
-        all_dates = set(oura_steps) | set(oura_sleep) | set(garmin_metrics)
+        all_dates = (
+            set(oura_steps) | set(oura_sleep) | set(garmin_metrics)
+            | set(oura_readiness) | set(alcohol)
+        )
         records = []
         for d in all_dates:
             oura_day = dict(oura_sleep.get(d, {}))
             oura_day["steps"] = oura_steps.get(d)
             garmin_day = garmin_metrics.get(d, {})
-            records.append(biometrics.blend_biometric_day(d, oura_day, garmin_day))
+            record = biometrics.blend_biometric_day(d, oura_day, garmin_day)
+            contributors = oura_readiness.get(d)
+            if contributors:
+                record = dataclasses.replace(
+                    record,
+                    oura_body_temperature=contributors.get("body_temperature"),
+                    oura_recovery_index=contributors.get("recovery_index"),
+                    oura_previous_day_activity=contributors.get("previous_day_activity"),
+                )
+            if d in alcohol:
+                record = dataclasses.replace(record, alcohol_units=alcohol[d])
+            records.append(record)
         return sorted(records, key=lambda r: r.date)
 
     # ─────────────────────────────────────────────────────────────────────

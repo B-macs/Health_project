@@ -101,6 +101,17 @@ class BiometricRecord:
     # reading, so Garmin's value was used at 100% weight. Empty when both
     # sources agreed or the record predates the Oura/Garmin blend (Sheet1).
     sources_missing: tuple[str, ...] = ()
+    # Oura's own daily_readiness contributor sub-scores (0-100, pre-scored by
+    # Oura against your personal norms) — Oura-exclusive, no Garmin
+    # equivalent, so these are a straight passthrough (None on days Oura
+    # has no reading), not a blended field like the ones above. Feeds
+    # services.readiness.compute_readiness alongside HRV/RHR/Sleep.
+    oura_body_temperature: float | None = None
+    oura_recovery_index: float | None = None
+    oura_previous_day_activity: float | None = None
+    # Alcohol units logged via the morning check-in (Notion Readiness DB,
+    # not a wearable source) — feeds compute_readiness's flat point penalty.
+    alcohol_units: float | None = None
 
 
 WeekStatus = Literal["ultimate", "perfect", "normal", "failed", "in_progress", "no_plan"]

@@ -201,6 +201,10 @@ def render() -> None:
             meditation_minutes=meditation_minutes,
             relaxation_depth=relaxation_depth,
         ))
+        # Readiness (Home page) reads today's alcohol units via cached
+        # get_biometric_rolling() — clear so it recomputes with this
+        # check-in's value instead of serving a stale pre-checkin score.
+        st.cache_data.clear()
         st.success(
             f"Check-in saved — Tightness {tightness_score}/10, Pain {pain_score}/10. "
             "Head to Training Plan when ready to start your session."

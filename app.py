@@ -111,12 +111,20 @@ def _sync_oura_cached() -> tuple[bool, str | None]:
     archiving. Throttled purely by this cache's TTL rather than a persisted
     Config-DB marker like Garmin's daily sync below: Oura's official API has
     generous rate limits (unlike Garmin's unofficial one), so an extra sync
-    after a Streamlit restart is harmless — no need for that extra durability."""
+    after a Streamlit restart is harmless — no need for that extra durability.
+
+    days=7 (not 2): a rolling 2-day window permanently skips any day that
+    falls outside every window the app happened to run during — e.g. the
+    app not being opened for a stretch silently drops those days from Oura
+    Sleep Periods (the only HRV source now that this rig's Garmin device
+    doesn't report HRV at all). A week-wide window self-heals gaps up to
+    that size on the next open; Oura's generous rate limits make the extra
+    pull cheap. See 2026-07-14 fix."""
     r = repo.get_repository()
     if not r.oura_configured():
         return True, None
     try:
-        r.sync_oura_all(days=2)
+        r.sync_oura_all(days=7)
         return True, None
     except Exception as exc:
         return False, str(exc)
@@ -189,7 +197,7 @@ _bio_7d = sorted(
 
 # ─── Computed values ──────────────────────────────────────────────────────────
 
-_readiness_score = readiness_model.compute_readiness(selected_date, _bio_rows)
+_readiness_score = readiness_model.compute_readiness_trend(selected_date, _bio_rows)
 _strain_score    = dash.au_to_strain_or_none(_au_day["total_au"] if _au_day else None, _current_stage)
 _sleep_hours     = _bio_day.get("sleep_duration_hours") if _bio_day else None
 
