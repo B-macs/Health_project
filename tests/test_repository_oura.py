@@ -14,6 +14,9 @@ sync_garmin_activities), only the pure row-mapping functions it calls.
 
 from __future__ import annotations
 
+from datetime import datetime, timedelta
+
+from services.clients import local_cache
 from services.config import Config
 from services.repository import Repository
 
@@ -216,3 +219,56 @@ def test_oura_rest_mode_row_maps_documented_fields():
         "rest_mode_id": "r-1", "start_day": "2026-06-01",
         "end_day": "2026-06-10", "end_time": "2026-06-10T09:00:00+02:00",
     }
+
+
+# ─── oura_last_synced / oura_sync_due / mark_oura_synced ────────────────────
+# Local-file throttle (services/clients/local_cache.py), not st.cache_data —
+# it has to survive both a Streamlit process restart and any unrelated
+# st.cache_data.clear() call elsewhere in the app (views/checkin.py clears it
+# on every check-in save), neither of which an in-memory-only cache survives.
+
+def test_oura_sync_due_when_never_synced(tmp_path, monkeypatch):
+    monkeypatch.setattr(local_cache, "_DEFAULT_PATH", tmp_path / "sync_state.json")
+    repo = Repository(_config())
+    assert repo.oura_last_synced() is None
+    assert repo.oura_sync_due(hours=2) is True
+
+
+def test_oura_sync_not_due_right_after_marking(tmp_path, monkeypatch):
+    monkeypatch.setattr(local_cache, "_DEFAULT_PATH", tmp_path / "sync_state.json")
+    repo = Repository(_config())
+    now = datetime(2026, 7, 14, 10, 0, 0)
+    repo.mark_oura_synced(when=now)
+    assert repo.oura_last_synced() == now
+    assert repo.oura_sync_due(hours=2, now=now + timedelta(minutes=30)) is False
+
+
+def test_oura_sync_due_again_after_window_elapses(tmp_path, monkeypatch):
+    monkeypatch.setattr(local_cache, "_DEFAULT_PATH", tmp_path / "sync_state.json")
+    repo = Repository(_config())
+    now = datetime(2026, 7, 14, 10, 0, 0)
+    repo.mark_oura_synced(when=now)
+    assert repo.oura_sync_due(hours=2, now=now + timedelta(hours=2, minutes=1)) is True
+
+
+def test_oura_sync_throttle_survives_across_repository_instances(tmp_path, monkeypatch):
+    """Simulates a Streamlit process restart (or an unrelated
+    st.cache_data.clear() elsewhere): a brand-new Repository instance still
+    sees the marker a previous one wrote, because it lives on disk rather
+    than on the Repository instance or in Streamlit's in-memory cache."""
+    monkeypatch.setattr(local_cache, "_DEFAULT_PATH", tmp_path / "sync_state.json")
+    repo_a = Repository(_config())
+    repo_a.mark_oura_synced(when=datetime(2026, 7, 14, 9, 0, 0))
+
+    repo_b = Repository(_config())
+    assert repo_b.oura_last_synced() == datetime(2026, 7, 14, 9, 0, 0)
+    assert repo_b.oura_sync_due(hours=2, now=datetime(2026, 7, 14, 9, 30, 0)) is False
+
+
+def test_oura_last_synced_ignores_corrupted_marker(tmp_path, monkeypatch):
+    path = tmp_path / "sync_state.json"
+    monkeypatch.setattr(local_cache, "_DEFAULT_PATH", path)
+    path.write_text('{"oura_last_synced": "not-a-real-timestamp"}')
+    repo = Repository(_config())
+    assert repo.oura_last_synced() is None
+    assert repo.oura_sync_due(hours=2) is True

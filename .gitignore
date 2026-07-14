@@ -21,6 +21,9 @@ __pycache__/
 *.sqlite
 *.sqlite3
 
+# Local sync-throttle state (machine-specific, see services/clients/local_cache.py)
+.sync_state.json
+
 # OS junk
 .DS_Store
 Thumbs.db

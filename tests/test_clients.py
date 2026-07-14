@@ -1,6 +1,7 @@
 """Tests for services/clients/notion.py and services/clients/sheets.py —
 the raw property (de)serializers, pagination/retry, and Sheets read, moved
-verbatim from db.py / sync_sheets.py."""
+verbatim from db.py / sync_sheets.py. Also services/clients/local_cache.py —
+the generic JSON read/write underneath the Oura sync throttle."""
 
 import ast
 
@@ -9,6 +10,7 @@ import httpx
 import pytest
 from notion_client.errors import APIResponseError
 
+from services.clients import local_cache
 from services.clients import notion as notion_client_mod
 from services.clients import sheets as sheets_client_mod
 
@@ -324,9 +326,34 @@ def test_upsert_weekly_rollup_row_never_appends_a_duplicate():
     assert len(ws.rows) == 1
 
 
+# ─── local_cache ─────────────────────────────────────────────────────────────
+
+def test_local_cache_read_missing_file_returns_empty_dict(tmp_path):
+    assert local_cache.read(path=tmp_path / "nope.json") == {}
+
+
+def test_local_cache_read_corrupted_json_returns_empty_dict(tmp_path):
+    p = tmp_path / "bad.json"
+    p.write_text("{not valid json")
+    assert local_cache.read(path=p) == {}
+
+
+def test_local_cache_write_then_read_roundtrip(tmp_path):
+    p = tmp_path / "state.json"
+    local_cache.write({"oura_last_synced": "2026-07-14T09:00:00"}, path=p)
+    assert local_cache.read(path=p) == {"oura_last_synced": "2026-07-14T09:00:00"}
+
+
+def test_local_cache_write_overwrites_existing_file(tmp_path):
+    p = tmp_path / "state.json"
+    local_cache.write({"a": 1}, path=p)
+    local_cache.write({"a": 2}, path=p)
+    assert local_cache.read(path=p) == {"a": 2}
+
+
 # ─── No Streamlit imports ───────────────────────────────────────────────────
 
-@pytest.mark.parametrize("mod", [notion_client_mod, sheets_client_mod])
+@pytest.mark.parametrize("mod", [notion_client_mod, sheets_client_mod, local_cache])
 def test_no_streamlit_import(mod):
     tree = ast.parse(open(mod.__file__, encoding="utf-8").read())
     for node in ast.walk(tree):

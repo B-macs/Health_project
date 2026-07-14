@@ -30,6 +30,7 @@ from datetime import date, datetime, timedelta
 from services import biometrics
 from services import models
 from services.clients import garmin
+from services.clients import local_cache
 from services.clients import notion
 from services.clients import oura
 from services.clients import sheets
@@ -1486,6 +1487,33 @@ class Repository:
             values = [row.get(k, "") for k in header]
             sheets.upsert_row_by_key(worksheet, key_col=1, key_value=str(row[header[0]]), row_values=values)
         return len(entries)
+
+    def oura_last_synced(self) -> datetime | None:
+        """Last time sync_oura_all actually ran, per the local .sync_state.json
+        (see services/clients/local_cache.py for why this isn't just
+        st.cache_data — it needs to survive process restarts and unrelated
+        st.cache_data.clear() calls elsewhere in the app)."""
+        raw = local_cache.read().get("oura_last_synced")
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    def oura_sync_due(self, hours: int = 2, now: datetime | None = None) -> bool:
+        """True if sync_oura_all hasn't run in the last `hours` hours (or
+        has never run). app.py's cached wrapper checks this before paying
+        for a full Oura pull + the per-row Sheets upserts underneath it."""
+        last = self.oura_last_synced()
+        if last is None:
+            return True
+        return (now or datetime.now()) - last >= timedelta(hours=hours)
+
+    def mark_oura_synced(self, when: datetime | None = None) -> None:
+        data = local_cache.read()
+        data["oura_last_synced"] = (when or datetime.now()).isoformat()
+        local_cache.write(data)
 
     def sync_oura_all(self, days: int = 7, today: date | None = None) -> dict:
         """Pulls every configured Oura data type for the last `days` days

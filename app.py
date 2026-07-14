@@ -108,23 +108,34 @@ def _au_history(days: int = 28) -> list[dict]:
 def _sync_oura_cached() -> tuple[bool, str | None]:
     """Oura sync (its own Sheet tabs — see Repository.sync_oura_all), feeding
     the engine's biometric blend (services/biometrics.py) as well as
-    archiving. Throttled purely by this cache's TTL rather than a persisted
-    Config-DB marker like Garmin's daily sync below: Oura's official API has
-    generous rate limits (unlike Garmin's unofficial one), so an extra sync
-    after a Streamlit restart is harmless — no need for that extra durability.
+    archiving.
+
+    Throttled by Repository.oura_sync_due() (a local .sync_state.json file —
+    see services/clients/local_cache.py), NOT just this cache's TTL: this
+    st.cache_data layer alone doesn't reliably throttle anything, since
+    st.cache_data is in-memory (reset by every process restart) and gets
+    wiped by any unrelated st.cache_data.clear() call elsewhere in the app
+    (views/checkin.py clears it on every check-in save) — without the local
+    file, either of those forces a full Oura resync on the very next Home
+    load. Was "purely this cache's TTL, no durability needed" (Oura's official
+    API has generous rate limits) until the days=7 change below made each
+    actual sync heavy enough that this stopped being harmless. See
+    2026-07-14 fix.
 
     days=7 (not 2): a rolling 2-day window permanently skips any day that
     falls outside every window the app happened to run during — e.g. the
     app not being opened for a stretch silently drops those days from Oura
     Sleep Periods (the only HRV source now that this rig's Garmin device
     doesn't report HRV at all). A week-wide window self-heals gaps up to
-    that size on the next open; Oura's generous rate limits make the extra
-    pull cheap. See 2026-07-14 fix."""
+    that size on the next open."""
     r = repo.get_repository()
     if not r.oura_configured():
         return True, None
+    if not r.oura_sync_due(hours=2):
+        return True, None
     try:
         r.sync_oura_all(days=7)
+        r.mark_oura_synced()
         return True, None
     except Exception as exc:
         return False, str(exc)
