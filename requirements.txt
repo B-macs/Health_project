@@ -5,3 +5,7 @@ notion-client==2.2.1
 gspread>=6.0.0
 garminconnect>=0.3.2
 requests>=2.31.0
+praat-parselmouth>=0.4.3
+scipy>=1.11
+soundfile>=0.12
+imageio-ffmpeg>=0.5

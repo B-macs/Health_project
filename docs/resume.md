@@ -68,7 +68,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `views/checkin.py` | Morning Check-In | Daily readiness entry: pain score, tightness, sensation tags, lifestyle factors |
 | `views/training.py` | Training Plan | 14-day interactive rehab session guide with live timers, auto-logging, exit confirmation |
 | `views/insights.py` | AI Insights | Engine data tab (ACWR, biometrics, injury weight) + parser queue + tightness map + macro trends + MRI intelligence |
-| `views/sync.py` | Sync | Google Sheets biometric data status viewer |
+| `views/sync.py` | Voice Training | Embedded Voxplot voice-analysis UI |
 
 ### Removed Pages (intentionally)
 | Page | Reason Removed |
@@ -103,6 +103,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `scripts/` | `init_notion.py` — one-shot CLI setup for Notion databases |
 | `legacy/` | `init_db.py` + `schema.sql` — SQLite era, not used at runtime |
 | `docs/` | `INVENTORY.md`, `resume.md`, `focus.md`, `playbook.md`, `progress.json`, `training/*.md` |
+| `voice_training/voxplot` | Git submodule — standalone Voxplot voice-analysis source; Health pins its commit and embeds its renderer |
 
 ---
 
@@ -363,6 +364,15 @@ Two visual themes applied automatically via CSS media query at 768px breakpoint:
 | ≤ 768px (mobile) | **Oura** | Deep navy `#0B0F1E`, muted pastels — sage green, muted amber, dusty coral | Large, light-weight headings, generous spacing | Soft rounded cards (18px radius), SVG arc rings |
 
 `inject_css()` called once per page. `dual_layout(desktop_html, mobile_html)` wraps content in `.whoop-only` / `.oura-only` divs toggled by `@media` query.
+
+### Voice Training / Voxplot Boundary
+
+Voxplot remains a separate Git repository, embedded in Health as the
+`voice_training/voxplot` submodule. Health owns the route in `views/sync.py`;
+Voxplot owns acoustic analysis, its presentation, and its independent test
+suite. Health records a specific Voxplot commit rather than duplicating its
+source. Voxplot's recordings, research datasets, logs, virtual environment,
+and generated validation output are ignored locally and are never staged.
 
 ---
 
