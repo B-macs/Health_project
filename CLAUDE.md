@@ -1,6 +1,6 @@
 # CLAUDE.md — Health Engine
 
-*Last updated: 2026-07-13 after replacing Sheet1/Apple Health with a blended Oura+Garmin biometric source for the engine (`services/biometrics.py`).*
+*Last updated: 2026-07-14 after adding the Strength BioAge Stage-Adjusted Recovery Score engine (`services/bioage.py`).*
 
 ---
 
@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **321/321 passed**
+Expected: **383/383 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **321/321 passed**
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 311/311 (or higher if new tests were added)
+1. `python -m pytest tests/` → 383/383 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -66,7 +66,10 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     plan.py · sessions.py · dashboard.py · insights.py ·
                     metrics_logic.py (Weekly Rollup / Perfect-Ultimate Week scoring) ·
                     biometrics.py (Oura+Garmin blend weights — the engine's
-                    biometric source, replacing Sheet1/Apple Health)
+                    biometric source, replacing Sheet1/Apple Health) ·
+                    bioage.py (Strength BioAge Stage-Adjusted Recovery Score —
+                    per-region 0-100 scores stay None until a region has real
+                    logged *weighted* volume; see its module docstring)
   Orchestration:    metrics.py — sync_weekly_rollup(); the one services/
                     module that both computes (via metrics_logic.py) and
                     does I/O (via repository.py) in the same call.
@@ -74,7 +77,9 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     CheckInRecord, BiometricRecord, WeekScore, StreakInfo —
                     dataclasses)
   I/O clients:      clients/notion.py, clients/sheets.py (generic primitives
-                    only, no column/property names)
+                    only, no column/property names), clients/local_cache.py
+                    (local JSON file — Oura sync-throttle marker, survives
+                    process restarts unlike st.cache_data)
   Data access:      repository.py — the ONLY place Notion property names /
                     Sheet column names live; ~40 methods, wraps clients/
   Config:           config.py — Config dataclass + load_config(overrides),
@@ -90,8 +95,12 @@ UI helpers:
 
 Reference data:
   training_plan.py      — PLAN dict (14 exercise days, exercise objects)
-  training_constants.py — EXERCISES catalogue, ANATOMICAL_LOCATIONS, SENSATION_TAGS
-  patient_profile.py    — clinical data (not imported by active code — human reference)
+  training_constants.py — EXERCISES catalogue, ANATOMICAL_LOCATIONS, SENSATION_TAGS,
+                           EXERCISE_BODY_REGION (exercise name → upper_body/core/
+                           lower_body, feeds services/bioage.py)
+  patient_profile.py    — clinical data; human reference AND, as of the Strength
+                           BioAge muscle-imbalance count, actively imported by
+                           services/bioage.py (PROFILE["imbalances"])
 
 tests/       — pytest suite (192 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
@@ -128,5 +137,6 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 | Garmin HRV field mapping | Unverified against a live payload — `hrvSummary.lastNightAvg` is the commonly-documented shape; confirm with `scripts/garmin_login_test.py` and fix `Repository._garmin_daily_row` if it doesn't match |
 | Garmin backfill | Run `scripts/backfill_garmin_from_sheet1.py` (dry-run first, then `--apply`) once to backfill pre-wearable history into the Garmin Daily tab so readiness baselines aren't starting from empty |
 | Biomechanical review due | 2026-07-19 — update `patient_profile.py` and `init_db.py` seed before Stage 2 |
-| `patient_profile.py` not imported | Informational reference only — not wired into active code |
+| Strength BioAge scores dormant | By design (`services/bioage.py`) until weighted training begins — training is still Stage 1 bodyweight-only, so all 3 region scores + the hero value show "—". Muscle-imbalance count is unaffected (reads `patient_profile.py` directly) and already shows a real number. |
+| `training_constants.EXERCISE_BODY_REGION` needs upkeep | When Stage 2's training plan is built (row above), its new exercise names need entries here too, or `services/bioage.py` silently excludes them from any region — see that dict's own comment in `training_constants.py`. |
 | See `docs/REFACTOR_NOTES.md` | Smells/bugs found during the services/ extraction, noted but not fixed beyond what the extraction itself required |

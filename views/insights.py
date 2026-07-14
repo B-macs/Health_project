@@ -20,8 +20,11 @@ import altair as alt
 import streamlit as st
 import pandas as pd
 
+import patient_profile
 import repo
+import training_constants
 from services import ai
+from services import bioage
 from services import engine
 from services import stats as stats_mod
 from services import insights as insights_svc
@@ -104,11 +107,27 @@ def _bioage_card_html(key: str, href: str) -> str:
 _MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
+# Shared box dimensions for every illustrated card on this screen (hero, body
+# region rows, muscle balance) so they all render at the same on-screen size,
+# growing proportionally on a wide desktop card rather than staying a fixed
+# height; min/max-height clamp the two ends (enough room for text on mobile,
+# not absurdly tall on an ultrawide monitor). The 5 derived illustrations
+# (see prepare_bioage_illustrations.py) each keep their own native aspect
+# ratio — deliberately minimally cropped, nothing forced to match this box's
+# ratio — and render via background-size:contain so the full image is always
+# visible, letterboxed against this shared box rather than cropped to fill it.
+_CARD_DIMENSIONS_CSS = "aspect-ratio:1194/356;min-height:220px;max-height:420px;"
+
 _STRENGTH_SCREEN: dict = {
     "hero": {
         "title":          "Strength BioAge",
-        "value":          None,   # primary metric — blank until engine computes it
-        "unit":           "years",
+        # "value" (0-100 Stage-Adjusted Recovery Score, an average of the 3
+        # region scores below) is computed at render time by
+        # _strength_bioage_scores() — see services/bioage.py. Stays None
+        # ("—" on screen) until at least one region has real logged weighted
+        # training volume; bodyweight-only rehab work never produces a score.
+        "value":          None,
+        "unit":           "%",
         "description":    "",
         "illustration":   _BIOAGE_BG_DIR / "derived" / "strength_hero.png",
         "accent_color":   _BIOAGE_COLORS["strength"],
@@ -127,19 +146,22 @@ _STRENGTH_SCREEN: dict = {
         "y_max":            None,
         "button_label":     "Show All Progress",
     },
+    # Each "score" below is filled in at render time from
+    # _strength_bioage_scores()["region_scores"][id] — the static None here
+    # is just the shape/fallback if that lookup ever comes back empty.
     "body_regions": [
         {
-            "id": "upper_body", "name": "Upper body", "score": None, "unit": "years",
+            "id": "upper_body", "name": "Upper body", "score": None, "unit": "%",
             "illustration": _BIOAGE_BG_DIR / "derived" / "upper_body.png",
             "accent_color": _BIOAGE_COLORS["strength"],
         },
         {
-            "id": "core", "name": "Core", "score": None, "unit": "years",
+            "id": "core", "name": "Core", "score": None, "unit": "%",
             "illustration": _BIOAGE_BG_DIR / "derived" / "core.png",
             "accent_color": _BIOAGE_COLORS["strength"],
         },
         {
-            "id": "lower_body", "name": "Lower body", "score": None, "unit": "years",
+            "id": "lower_body", "name": "Lower body", "score": None, "unit": "%",
             "illustration": _BIOAGE_BG_DIR / "derived" / "lower_body.png",
             "accent_color": _BIOAGE_COLORS["strength"],
         },
@@ -147,7 +169,10 @@ _STRENGTH_SCREEN: dict = {
     "muscle_balance": {
         "title":            "Muscle balance analysis",
         "summary":          "",
-        "imbalance_count":  None,   # blank
+        # Filled in at render time from _strength_bioage_scores()
+        # ["imbalance_count"] — a real count from patient_profile.PROFILE's
+        # documented clinical findings, not training-history-dependent.
+        "imbalance_count":  None,
         "illustration":     _BIOAGE_BG_DIR / "derived" / "muscle_balance.png",
         "cta_label":        "View All",
     },
@@ -247,14 +272,13 @@ def _progress_chart_svg(
     )
 
 
-def _strength_hero_html() -> str:
-    hero = _STRENGTH_SCREEN["hero"]
+def _strength_hero_html(hero: dict) -> str:
     accent = hero["accent_color"]
     bg = _bioage_b64(str(hero["illustration"]))
     bg_css = (
         f"background-image:linear-gradient(100deg,rgba(11,15,26,0.92) 0%,"
         f"rgba(11,15,26,0.55) 32%,rgba(11,15,26,0.08) 62%),url('{bg}');"
-        f"background-size:cover;background-position:center right;"
+        f"background-size:contain;background-repeat:no-repeat;background-position:center right;"
     ) if bg else "background:#0B0F1A;"
     value = hero["value"] if hero["value"] is not None else "—"
     desc_html = (
@@ -262,13 +286,7 @@ def _strength_hero_html() -> str:
         f'{hero["description"]}</div>'
     ) if hero["description"] else ""
     return (
-        # aspect-ratio matches the derived crop (see prepare_bioage_illustrations.py)
-        # so the hero grows taller on a wide desktop card instead of forcing
-        # background-size:cover to upscale/crop it into a thin strip; min/max-height
-        # clamp the two ends (enough room for the text on mobile, not absurdly
-        # tall on an ultrawide monitor).
-        f'<div style="position:relative;aspect-ratio:1194/356;min-height:220px;'
-        f'max-height:420px;border-radius:22px;overflow:hidden;'
+        f'<div style="position:relative;{_CARD_DIMENSIONS_CSS}border-radius:22px;overflow:hidden;'
         f'margin-bottom:18px;border:1px solid rgba(255,255,255,0.08);{bg_css}'
         f'box-shadow:0 8px 32px rgba(0,0,0,0.4);">'
         f'<div style="position:relative;z-index:1;height:100%;box-sizing:border-box;'
@@ -297,13 +315,13 @@ def _body_region_card_html(region: dict) -> str:
     bg_css = (
         f"background-image:linear-gradient(90deg,rgba(11,15,26,0.88) 0%,"
         f"rgba(11,15,26,0.4) 30%,rgba(11,15,26,0.04) 65%),url('{bg}');"
-        f"background-size:cover;background-position:center right;"
+        f"background-size:contain;background-repeat:no-repeat;background-position:center right;"
     ) if bg else "background:#0B0F1A;"
     score = region["score"] if region["score"] is not None else "—"
     return (
-        f'<div style="position:relative;min-height:132px;border-radius:16px;overflow:hidden;'
+        f'<div style="position:relative;{_CARD_DIMENSIONS_CSS}border-radius:16px;overflow:hidden;'
         f'margin-bottom:12px;border:1px solid rgba(255,255,255,0.06);{bg_css}">'
-        f'<div style="position:relative;z-index:1;min-height:132px;display:flex;'
+        f'<div style="position:relative;z-index:1;height:100%;box-sizing:border-box;display:flex;'
         f'flex-direction:column;justify-content:center;padding:18px 44px 18px 20px;">'
         f'<div style="font-size:20px;font-weight:700;color:{accent};margin-bottom:4px;">'
         f'{region["name"]}</div>'
@@ -316,20 +334,19 @@ def _body_region_card_html(region: dict) -> str:
     )
 
 
-def _muscle_balance_card_html() -> str:
-    mb = _STRENGTH_SCREEN["muscle_balance"]
+def _muscle_balance_card_html(mb: dict) -> str:
     bg = _bioage_b64(str(mb["illustration"]))
     bg_css = (
         f"background-image:linear-gradient(90deg,rgba(11,15,26,0.88) 0%,"
         f"rgba(11,15,26,0.55) 30%,rgba(11,15,26,0.1) 58%),url('{bg}');"
-        f"background-size:cover;background-position:center right;"
+        f"background-size:contain;background-repeat:no-repeat;background-position:center right;"
     ) if bg else "background:#0B0F1A;"
     count = mb["imbalance_count"]
     count_display = str(count) if count is not None else "—"
     return (
-        f'<div style="position:relative;min-height:150px;border-radius:16px;overflow:hidden;'
+        f'<div style="position:relative;{_CARD_DIMENSIONS_CSS}border-radius:16px;overflow:hidden;'
         f'margin-bottom:8px;border:1px solid rgba(255,255,255,0.06);{bg_css}">'
-        f'<div style="position:relative;z-index:1;min-height:150px;display:flex;'
+        f'<div style="position:relative;z-index:1;height:100%;box-sizing:border-box;display:flex;'
         f'flex-direction:column;justify-content:center;padding:20px 22px;">'
         f'<div style="font-size:16px;font-weight:600;color:#F4F6FB;margin-bottom:6px;">'
         f'Muscle imbalances</div>'
@@ -357,6 +374,7 @@ def _render_strength_detail() -> None:
     balance, assessment CTA. One continuous scroll, no sub-tabs/transitions."""
     s = _STRENGTH_SCREEN
     accent = s["hero"]["accent_color"]
+    scores = _strength_bioage_scores()
 
     # Span the full desktop/Whoop breakpoint width, capped only at a generous
     # ceiling — real browser windows rarely exceed this, so in practice the
@@ -370,7 +388,8 @@ def _render_strength_detail() -> None:
         unsafe_allow_html=True,
     )
 
-    st.markdown(_strength_hero_html(), unsafe_allow_html=True)
+    hero = {**s["hero"], "value": scores["hero_value"]}
+    st.markdown(_strength_hero_html(hero), unsafe_allow_html=True)
 
     # ── Progress ──────────────────────────────────────────────────────────
     # Plain divs, not <h3>, below: styles.py's global h3 rule forces
@@ -421,10 +440,11 @@ def _render_strength_detail() -> None:
         unsafe_allow_html=True,
     )
     for region in s["body_regions"]:
-        st.markdown(_body_region_card_html(region), unsafe_allow_html=True)
+        region_with_score = {**region, "score": scores["region_scores"].get(region["id"])}
+        st.markdown(_body_region_card_html(region_with_score), unsafe_allow_html=True)
 
     # ── Muscle balance ────────────────────────────────────────────────────
-    mb = s["muscle_balance"]
+    mb = {**s["muscle_balance"], "imbalance_count": scores["imbalance_count"]}
     bal_l, bal_r = st.columns([2, 1])
     bal_l.markdown(
         f"<div style='color:#F4F6FB;font-size:18px;font-weight:600;"
@@ -436,7 +456,7 @@ def _render_strength_detail() -> None:
         f"{mb['cta_label']} &rsaquo;</div>",
         unsafe_allow_html=True,
     )
-    st.markdown(_muscle_balance_card_html(), unsafe_allow_html=True)
+    st.markdown(_muscle_balance_card_html(mb), unsafe_allow_html=True)
 
     st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
 
@@ -482,6 +502,43 @@ def _sync_engine_view(sheet_id: str) -> list[dict]:
 @st.cache_data(ttl=1800, show_spinner=False)
 def _blend_history() -> list[dict]:
     return [asdict(r) for r in repo.get_repository().get_biometric_blend_history()]
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _strength_bioage_scores() -> dict:
+    """Per-region Stage-Adjusted Recovery Scores (services/bioage.py) + hero
+    average + muscle-imbalance count for the Strength BioAge detail screen.
+    A region's score is None ("—" on screen) until it has real logged
+    weighted volume — deliberate, not a bug, while training is still
+    bodyweight-only (see services/bioage.py's module docstring). Falls back
+    to all-None on a repository error rather than crashing the page, same
+    spirit as app.py's sync wrappers."""
+    try:
+        r = repo.get_repository()
+        sessions = r.get_recent_sessions(days=180)
+        stage = r.get_current_stage()
+    except Exception:
+        sessions, stage = [], 1
+
+    today = date.today()
+    region_scores: dict[str, float | None] = {}
+    for region in bioage.REGIONS:
+        if not bioage.has_weighted_training(sessions, region, training_constants.EXERCISE_BODY_REGION):
+            region_scores[region] = None
+            continue
+        current = bioage.current_window_effort(
+            sessions, region, training_constants.EXERCISE_BODY_REGION, today=today,
+        )
+        ceiling = bioage.region_baseline_ceiling(
+            sessions, region, training_constants.EXERCISE_BODY_REGION, today=today,
+        )
+        region_scores[region] = bioage.region_recovery_score(current, ceiling, stage)
+
+    return {
+        "region_scores":   region_scores,
+        "hero_value":      bioage.hero_score(list(region_scores.values())),
+        "imbalance_count": bioage.muscle_imbalance_count(patient_profile.PROFILE.get("imbalances", {})),
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

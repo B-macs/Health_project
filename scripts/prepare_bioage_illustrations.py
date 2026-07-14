@@ -14,6 +14,9 @@ This script crops each source once into an illustration-only PNG (no text, no
 chevron, no border stroke) written to background_templates/derived/, which
 views/insights.py reads directly. Crop boxes were tuned by hand against these
 specific source images -- re-run and re-tune by eye if the source PNGs change.
+Deliberately minimal: only the baked-in chrome is trimmed, nothing else --
+views/insights.py handles displaying these at a uniform card size via
+background-size:contain rather than cropping them further to fit.
 
 Usage:
     python scripts/prepare_bioage_illustrations.py
@@ -27,10 +30,19 @@ _SRC_DIR = Path(__file__).resolve().parent.parent / "background_templates"
 _OUT_DIR = _SRC_DIR / "derived"
 
 # name -> (source file, x0, x1, y0, y1) as fractions of source width/height.
-# x0 is kept as far left as possible (just past each source's baked-in label
-# text) rather than tight to the figure, so the derived crop keeps as much of
-# the original's native resolution as the text/chevron/border allow — that
-# resolution matters once these render full-bleed on a wide desktop card.
+# Each box is the *minimum* crop needed to exclude the source's baked-in
+# label text (left), chevron (right) and rounded-rect border stroke (all
+# edges) — nothing beyond that is cut. x0 stays as far left, and x1 as far
+# right, as those elements allow; y0/y1 trim only the border stroke, not any
+# actual illustration content (the source canvas has empty black padding
+# above/below the artwork anyway).
+#
+# The 5 crops end up with 5 different aspect ratios as a result (no forced
+# matching). views/insights.py renders all 5 in an identically-sized box
+# (same aspect-ratio/min-height/max-height as the hero) using
+# background-size:contain rather than cover, so every image displays at its
+# own full, uncropped-beyond-this proportions inside that shared box instead
+# of being cropped further to fill it.
 _CROPS: dict[str, tuple[str, float, float, float, float]] = {
     "strength_hero.png":   ("Strength_button.png",     0.30, 0.90, 0.27, 0.72),
     "upper_body.png":      ("Upperbody.png",           0.36, 0.90, 0.23, 0.75),
