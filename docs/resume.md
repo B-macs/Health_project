@@ -408,6 +408,32 @@ Full rationale, implementation details, citations, and still-required
 external validation are in
 [`voice_training/voxplot/docs/voice_quality_measurement_policy.md`](../voice_training/voxplot/docs/voice_quality_measurement_policy.md).
 
+### Voice Training Activity Expansion (2026-07-14)
+
+At the user's request, Voxplot now has ten new activity-card entries:
+Supported Voice Reset, Lip Trill Ease, Voiced /v/ Flow, Nasal Resonance
+Ladder, Resonant Phrase Carryover, Small-Step Pitch Pattern, Gentle Phrase
+Pacing, Easy Articulation Practice, Chant-to-Speech Bridge, and Brief Voice
+Recovery Break. They reuse the existing four-step explanation/countdown/
+results template; no acoustic calculation, Voice Quality score, recording
+protocol, or storage behaviour changed.
+
+Days 1-10 remain the original fixed baseline. Days 11-20 are a low-load
+follow-on so a persisted completed plan can continue at Day 11 rather than
+lose access to the new cards. Each follow-on day retains the required new
+recording and cool-down, adds one new activity alongside a familiar exercise,
+and stays under the existing 15-minute cap.
+
+The content intentionally reflects the current patient profile: Stage 1
+rehabilitation, an active mid-/lower-back flare, and generalised
+hypermobility. New cards permit a supported chair or easy neutral standing,
+avoid a held posture-correction cue and physical loading, and require a
+position change or stop if back symptoms rise. The latest Voice Training
+recording was quality-limited by low sustained-vowel SNR, so this expansion
+does not use its score to progress work or claim a voice change. Complete
+rationale, source links, exact schedule, and stop/escalation rules are in
+[`voice_training/voxplot/docs/training_activity_catalogue.md`](../voice_training/voxplot/docs/training_activity_catalogue.md).
+
 ---
 
 ## AGILE ROADMAP
