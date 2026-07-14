@@ -12,6 +12,26 @@ from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
 
 CONDITION_OPTIONS = ["Excellent", "Good", "Average", "Below Average", "Poor"]
 
+# Illustrative reference bands for the 0–10 sliders below — wording/ranges are
+# a starting point, not a clinical standard. Tweak freely; each tuple is
+# (range_label, description) and renders as one line in the reference guide.
+TIGHTNESS_SCALE_GUIDE = [
+    ("0",    "No tightness — full, unrestricted range of motion."),
+    ("1–2",  "Loose, barely noticeable, no effect on movement."),
+    ("3–4",  "Slight tightness, mild stiffness, doesn't restrict range."),
+    ("5–6",  "Mild DOMS, noticeable stiffness, slight restriction in range of motion."),
+    ("7–8",  "Moderate–severe DOMS, muscle feels stiff/knotted, restricted range, discomfort on stretch."),
+    ("9–10", "Severe tightness, can't move the muscle through full range without pulling/resistance, feels locked up."),
+]
+
+PAIN_SCALE_GUIDE = [
+    ("0",    "No pain — pain-free."),
+    ("1–3",  "Mild, noticeable but doesn't affect training."),
+    ("4–5",  "Moderate, distracting, would consider modifying training."),
+    ("6–7",  "Significant pain, limits range/effort, should ease off that movement."),
+    ("8–10", "Severe/sharp pain, stop the movement entirely."),
+]
+
 
 def render() -> None:
     st.title("Morning Check-In")
@@ -96,3 +116,15 @@ def render() -> None:
             f"Check-in saved — Tightness {tightness_score}/10, Pain {pain_score}/10. "
             "Head to Training Plan when ready to start your session."
         )
+
+    st.divider()
+    with st.expander("Scale Reference — Tightness & Pain", expanded=False):
+        col_t, col_p = st.columns(2, gap="large")
+        with col_t:
+            st.markdown("**Tightness Score (0–10)**")
+            for rng, desc in TIGHTNESS_SCALE_GUIDE:
+                st.markdown(f"`{rng}` — {desc}")
+        with col_p:
+            st.markdown("**Pain Score (0–10)**")
+            for rng, desc in PAIN_SCALE_GUIDE:
+                st.markdown(f"`{rng}` — {desc}")

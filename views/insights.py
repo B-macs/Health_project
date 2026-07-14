@@ -759,7 +759,12 @@ def render() -> None:
                             except Exception as exc:
                                 st.warning(f"Backfill failed: {exc}")
 
-                    blend_history = _blend_history()
+                    try:
+                        blend_history = _blend_history()
+                    except Exception as exc:
+                        blend_history = None
+                        st.warning(f"Could not load blend history: {exc}")
+
                     if blend_history:
                         earliest = date.fromisoformat(blend_history[0]["date"])
                         latest = date.fromisoformat(blend_history[-1]["date"])
@@ -771,7 +776,7 @@ def render() -> None:
                             if str(start_pick) <= r["date"] <= str(end_pick)
                         ]
                         st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
-                    else:
+                    elif blend_history is not None:
                         st.info(
                             "No persisted history yet — click \"Backfill full history now\" "
                             "above, or wait for the automatic once-a-day sync."

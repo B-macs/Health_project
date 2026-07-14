@@ -8,7 +8,13 @@
       "Bash(./.venv/Scripts/python.exe -m pytest tests/ -q)",
       "Bash(./venv/Scripts/python.exe -m pytest tests/ -q)",
       "Bash(./venv/Scripts/python.exe -c 'import ast *)",
-      "Bash(./venv/Scripts/python.exe -c \"import app\")"
+      "Bash(./venv/Scripts/python.exe -c \"import app\")",
+      "Bash(git status *)",
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "Bash(./venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('views/insights.py', encoding='utf-8'\\).read\\(\\)\\); print\\('syntax ok'\\)\")",
+      "Bash(./venv/Scripts/python.exe -c \"import ast; ast.parse\\(open\\('views/checkin.py', encoding='utf-8'\\).read\\(\\)\\); print\\('syntax ok'\\)\")",
+      "Bash(ls .claude/launch.json)",
+      "Bash(cat .claude/launch.json)"
     ]
   }
 }
