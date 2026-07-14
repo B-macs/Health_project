@@ -408,7 +408,7 @@ Full rationale, implementation details, citations, and still-required
 external validation are in
 [`voice_training/voxplot/docs/voice_quality_measurement_policy.md`](../voice_training/voxplot/docs/voice_quality_measurement_policy.md).
 
-### Voice Training Activity Expansion (2026-07-14)
+### Voice Training Activity Library (2026-07-14)
 
 At the user's request, Voxplot now has ten new activity-card entries:
 Supported Voice Reset, Lip Trill Ease, Voiced /v/ Flow, Nasal Resonance
@@ -418,11 +418,18 @@ Recovery Break. They reuse the existing four-step explanation/countdown/
 results template; no acoustic calculation, Voice Quality score, recording
 protocol, or storage behaviour changed.
 
-Days 1-10 remain the original fixed baseline. Days 11-20 are a low-load
-follow-on so a persisted completed plan can continue at Day 11 rather than
-lose access to the new cards. Each follow-on day retains the required new
-recording and cool-down, adds one new activity alongside a familiar exercise,
-and stays under the existing 15-minute cap.
+Days 1-10 remain the original fixed baseline. The Training tab now exposes a
+separate selectable library containing all 22 activities: the 12 baseline
+cards plus these ten new cards. `EXERCISE_LIBRARY` is the single catalogue
+for both the library and later plan authoring, so a future plan can mix and
+match its stable activity ids without duplicating definitions. `NEW_RECORDING`
+remains a daily-plan capture step, not a library activity.
+
+Library practice is explicitly isolated from the daily plan: starting or
+finishing a library card uses the same explanation/countdown/results template
+but does not mark an item complete, change XP, streak, history, or plan
+progress, and does not auto-start the next planned activity. The library is
+available when the next baseline day is locked and after Day 10 is complete.
 
 The content intentionally reflects the current patient profile: Stage 1
 rehabilitation, an active mid-/lower-back flare, and generalised
@@ -431,7 +438,7 @@ avoid a held posture-correction cue and physical loading, and require a
 position change or stop if back symptoms rise. The latest Voice Training
 recording was quality-limited by low sustained-vowel SNR, so this expansion
 does not use its score to progress work or claim a voice change. Complete
-rationale, source links, exact schedule, and stop/escalation rules are in
+rationale, source links, library behaviour, and stop/escalation rules are in
 [`voice_training/voxplot/docs/training_activity_catalogue.md`](../voice_training/voxplot/docs/training_activity_catalogue.md).
 
 ---
@@ -536,4 +543,4 @@ rationale, source links, exact schedule, and stop/escalation rules are in
 
 ---
 
-*Last updated: 2026-07-14 — added the Voxplot Voice Training Measurement Policy: versioned 3-second capture/QC, immutable provenance, comparable-trend handling, and corrected AVQI/ABI reference documentation. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*
+*Last updated: 2026-07-14 — added the Voxplot Voice Training Measurement Policy and separate 22-card activity library; the original 10-day baseline remains fixed, and optional library practice cannot change daily-plan progress. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*
