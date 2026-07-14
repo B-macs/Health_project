@@ -7,7 +7,7 @@ from datetime import date
 import streamlit as st
 import repo
 from services.models import CheckInRecord
-from training_constants import ANATOMICAL_LOCATIONS, CRAVING_TYPES, SENSATION_TAGS
+from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
 
 
 CONDITION_OPTIONS = ["Excellent", "Good", "Average", "Below Average", "Poor"]
@@ -96,9 +96,20 @@ def render() -> None:
             st.subheader("Lifestyle Factors")
             psych_stress = st.select_slider(
                 "Psychological Stress", options=[1, 2, 3, 4, 5], value=1,
-                help="1 = calm & clear-headed, 5 = high stress / mental fog. "
-                     "Covers both emotional load and mental clarity — deliberately "
-                     "one combined scale rather than two overlapping ones.",
+                help=(
+                    "Combined scale — emotional load and mental clarity together, "
+                    "deliberately one metric rather than two overlapping ones.\n\n"
+                    "**1 — Calm & Clear**: Relaxed, minimal stress, sharp focus, "
+                    "thinking feels easy.\n\n"
+                    "**2 — Mostly Calm**: Slight background stress or occasional "
+                    "distraction, still generally clear-headed.\n\n"
+                    "**3 — Moderate**: Noticeable stress or mental fog, focus takes "
+                    "more effort than usual.\n\n"
+                    "**4 — High**: Elevated stress, clarity noticeably reduced, "
+                    "harder to concentrate, on edge.\n\n"
+                    "**5 — Very High**: Significant stress or emotional load, "
+                    "foggy/scattered thinking, hard to focus on simple tasks."
+                ),
                 key="checkin_stress",
             )
             alcohol_units = st.number_input(
@@ -139,9 +150,6 @@ def render() -> None:
                 help="−2 = far below normal appetite, +2 = far above normal appetite.",
                 key="checkin_hunger",
             )
-            craving_type = st.selectbox(
-                "Craving Type", CRAVING_TYPES, key="checkin_craving",
-            )
             thirst_intensity = st.select_slider(
                 "Morning Thirst Intensity", options=[1, 2, 3, 4, 5], value=1,
                 key="checkin_thirst",
@@ -149,19 +157,13 @@ def render() -> None:
             electrolytes_taken = st.toggle(
                 "Salt/Electrolytes Taken", key="checkin_electrolytes",
             )
-            sodium_mg = st.number_input(
-                "Sodium (mg)", min_value=0, max_value=5000, value=0, step=100,
-                key="checkin_sodium",
-            )
 
         with col_meditation:
             st.subheader("Meditation")
-            meditation_done = st.toggle(
-                "Practice Done", key="checkin_meditation_done",
-            )
             meditation_minutes = st.number_input(
                 "Meditation Minutes", min_value=0.0, max_value=120.0,
                 value=0.0, step=5.0,
+                help="Practice Done is inferred automatically — any minutes logged counts as done.",
                 key="checkin_meditation_minutes",
             )
             relaxation_depth = st.select_slider(
@@ -176,6 +178,8 @@ def render() -> None:
         )
 
     if submitted:
+        # No explicit "Practice Done" toggle — inferred from minutes logged.
+        meditation_done = meditation_minutes > 0
         repo.get_repository().save_check_in(CheckInRecord(
             date=str(date.today()),
             current_condition=current_condition,
@@ -191,10 +195,8 @@ def render() -> None:
             bristol_type=bristol_type,
             unusual_stool_colour=unusual_stool_colour,
             hunger_deviation=hunger_deviation,
-            craving_type=craving_type,
             thirst_intensity=thirst_intensity,
             electrolytes_taken=electrolytes_taken,
-            sodium_mg=sodium_mg,
             meditation_done=meditation_done,
             meditation_minutes=meditation_minutes,
             relaxation_depth=relaxation_depth,

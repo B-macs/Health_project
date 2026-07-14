@@ -87,18 +87,10 @@ ANATOMICAL_LOCATIONS: list[str] = [
     "Calf — Right",
     "Calf — Left",
     "Thoracic / Mid Back",
+    "Upper Back — General",
+    "Upper Back — Rhomboids",
+    "Upper Back — Trapezius",
     "Other",
-]
-
-# Craving type — paired with the Hunger vs Baseline check-in field
-CRAVING_TYPES: list[str] = [
-    "None",
-    "Sweet",
-    "Salty",
-    "Carb/Starchy",
-    "Fatty",
-    "Protein",
-    "Caffeine",
 ]
 
 # Sensation tags for daily readiness

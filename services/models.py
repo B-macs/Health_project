@@ -77,12 +77,10 @@ class CheckInRecord:
     unusual_stool_colour: bool = False
     # Body
     hunger_deviation: int | None = None
-    craving_type: str | None = None
     # Hydration
     thirst_intensity: int | None = None
     electrolytes_taken: bool = False
-    sodium_mg: float | None = None
-    # Meditation
+    # Meditation — meditation_done is inferred (minutes > 0), not user-toggled
     meditation_done: bool = False
     meditation_minutes: float | None = None
     relaxation_depth: int | None = None

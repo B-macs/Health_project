@@ -33,7 +33,6 @@ from services.clients import notion
 from services.clients import oura
 from services.clients import sheets
 from services.config import Config
-from training_constants import CRAVING_TYPES
 
 _GARMIN_DAILY_HEADER = [
     "date", "steps", "resting_hr", "avg_stress", "sleep_score",
@@ -142,18 +141,17 @@ class Repository:
         """One-time schema migration: adds the Joint/HSD, Gut, Body,
         Hydration, and Meditation properties to the Readiness database if
         they don't already exist. Safe to call repeatedly. See
-        services.clients.notion.ensure_properties."""
+        services.clients.notion.ensure_properties. Craving Type and Sodium
+        (mg) were removed from the check-in (2026-07-14) — no longer
+        created here, though the columns may still exist in Notion from
+        before if they were never manually deleted."""
         return notion.ensure_properties(self._nc, self.config.notion_db_readiness, {
             "Instability Events":   {"number": {}},
             "Bristol Type":         {"number": {}},
             "Unusual Stool Colour": {"checkbox": {}},
             "Hunger Deviation":     {"number": {}},
-            "Craving Type":         {"select": {
-                "options": [{"name": n} for n in CRAVING_TYPES],
-            }},
             "Thirst Intensity":     {"number": {}},
             "Electrolytes Taken":   {"checkbox": {}},
-            "Sodium (mg)":          {"number": {}},
             "Meditation Done":      {"checkbox": {}},
             "Meditation Minutes":   {"number": {}},
             "Relaxation Depth":     {"number": {}},
@@ -178,10 +176,8 @@ class Repository:
                 "Bristol Type":         notion.number(record.bristol_type),
                 "Unusual Stool Colour": notion.checkbox(record.unusual_stool_colour),
                 "Hunger Deviation":     notion.number(record.hunger_deviation),
-                "Craving Type":         notion.select(record.craving_type),
                 "Thirst Intensity":     notion.number(record.thirst_intensity),
                 "Electrolytes Taken":   notion.checkbox(record.electrolytes_taken),
-                "Sodium (mg)":          notion.number(record.sodium_mg),
                 "Meditation Done":      notion.checkbox(record.meditation_done),
                 "Meditation Minutes":   notion.number(record.meditation_minutes),
                 "Relaxation Depth":     notion.number(record.relaxation_depth),
@@ -214,10 +210,8 @@ class Repository:
                 "bristol_type":          g("Bristol Type", "number"),
                 "unusual_stool_colour":  1 if g("Unusual Stool Colour", "checkbox") else 0,
                 "hunger_deviation":      g("Hunger Deviation", "number"),
-                "craving_type":          g("Craving Type", "select"),
                 "thirst_intensity":      g("Thirst Intensity", "number"),
                 "electrolytes_taken":    1 if g("Electrolytes Taken", "checkbox") else 0,
-                "sodium_mg":             g("Sodium (mg)", "number"),
                 "meditation_done":       1 if g("Meditation Done", "checkbox") else 0,
                 "meditation_minutes":    g("Meditation Minutes", "number"),
                 "relaxation_depth":      g("Relaxation Depth", "number"),

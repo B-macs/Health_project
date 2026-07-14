@@ -250,8 +250,8 @@ def test_save_check_in_maps_hsd_gut_hydration_meditation_fields():
     record = models.CheckInRecord(
         date="2026-07-07", current_condition="Good", tightness_score=3, pain_score=0,
         instability_events=2, bristol_type=4, unusual_stool_colour=True,
-        hunger_deviation=-1, craving_type="Sweet", thirst_intensity=3,
-        electrolytes_taken=True, sodium_mg=500, meditation_done=True,
+        hunger_deviation=-1, thirst_intensity=3,
+        electrolytes_taken=True, meditation_done=True,
         meditation_minutes=10, relaxation_depth=4,
     )
     repo.save_check_in(record)
@@ -260,10 +260,8 @@ def test_save_check_in_maps_hsd_gut_hydration_meditation_fields():
     assert props["Bristol Type"] == {"number": 4.0}
     assert props["Unusual Stool Colour"] == {"checkbox": True}
     assert props["Hunger Deviation"] == {"number": -1.0}
-    assert props["Craving Type"] == {"select": {"name": "Sweet"}}
     assert props["Thirst Intensity"] == {"number": 3.0}
     assert props["Electrolytes Taken"] == {"checkbox": True}
-    assert props["Sodium (mg)"] == {"number": 500.0}
     assert props["Meditation Done"] == {"checkbox": True}
     assert props["Meditation Minutes"] == {"number": 10.0}
     assert props["Relaxation Depth"] == {"number": 4.0}
@@ -294,9 +292,9 @@ def test_get_recent_readiness_maps_hsd_gut_hydration_meditation_fields():
         "Travel": _checkbox_prop(False), "Stress Level": _number_prop(2),
         "Instability Events": _number_prop(1), "Bristol Type": _number_prop(5),
         "Unusual Stool Colour": _checkbox_prop(True),
-        "Hunger Deviation": _number_prop(2), "Craving Type": _select_prop("Salty"),
+        "Hunger Deviation": _number_prop(2),
         "Thirst Intensity": _number_prop(4), "Electrolytes Taken": _checkbox_prop(True),
-        "Sodium (mg)": _number_prop(750), "Meditation Done": _checkbox_prop(True),
+        "Meditation Done": _checkbox_prop(True),
         "Meditation Minutes": _number_prop(15), "Relaxation Depth": _number_prop(5),
     }}
     repo = _repo({"db-readiness": [page]})
@@ -306,10 +304,8 @@ def test_get_recent_readiness_maps_hsd_gut_hydration_meditation_fields():
     assert row["bristol_type"] == 5
     assert row["unusual_stool_colour"] == 1
     assert row["hunger_deviation"] == 2
-    assert row["craving_type"] == "Salty"
     assert row["thirst_intensity"] == 4
     assert row["electrolytes_taken"] == 1
-    assert row["sodium_mg"] == 750
     assert row["meditation_done"] == 1
     assert row["meditation_minutes"] == 15
     assert row["relaxation_depth"] == 5
@@ -317,27 +313,24 @@ def test_get_recent_readiness_maps_hsd_gut_hydration_meditation_fields():
 
 # ─── Check-In schema migration ───────────────────────────────────────────────
 
-def test_ensure_checkin_extension_columns_creates_all_eleven_properties():
+def test_ensure_checkin_extension_columns_creates_all_nine_properties():
     repo = _repo({"db-readiness": []})
     created = repo.ensure_checkin_extension_columns()
     assert set(created) == {
         "Instability Events", "Bristol Type", "Unusual Stool Colour",
-        "Hunger Deviation", "Craving Type", "Thirst Intensity",
-        "Electrolytes Taken", "Sodium (mg)", "Meditation Done",
+        "Hunger Deviation", "Thirst Intensity",
+        "Electrolytes Taken", "Meditation Done",
         "Meditation Minutes", "Relaxation Depth",
     }
     update_call = repo._notion_client.databases.update_calls[0]
     assert update_call["database_id"] == "db-readiness"
-    assert update_call["properties"]["Craving Type"]["select"]["options"] == [
-        {"name": n} for n in ["None", "Sweet", "Salty", "Carb/Starchy", "Fatty", "Protein", "Caffeine"]
-    ]
 
 
 def test_ensure_checkin_extension_columns_is_idempotent():
     repo = _repo({"db-readiness": []})
     first = repo.ensure_checkin_extension_columns()
     second = repo.ensure_checkin_extension_columns()
-    assert len(first) == 11
+    assert len(first) == 9
     assert second == []
 
 

@@ -1,6 +1,6 @@
 """
-Insights view — Training Directive + Engine Data + Processing Queue +
-Tightness Map + Macro Trends + MRI Intelligence.
+Insights view — Engine Data + Processing Queue +
+Tightness Map - Macro Trends.
 
 Usage:
     from views.insights import render
@@ -9,6 +9,7 @@ Usage:
 Caller is responsible for st.set_page_config(), styles.inject_css(), nav.inject().
 """
 
+import calendar as cal_mod
 import json
 from dataclasses import asdict
 from datetime import date
@@ -74,120 +75,17 @@ def render() -> None:
     injury_profile = repo.get_repository().get_diagnostic_profile()
 
     (
-        tab_directive, tab_engine, tab_queue,
-        tab_tightness, tab_trends, tab_mri, tab_sync,
+        tab_engine, tab_queue,
+        tab_tightness, tab_sync,
     ) = st.tabs([
-        "Training Directive",
         "Engine Data",
         "Processing Queue",
-        "Tightness Map",
-        "Macro Trends",
-        "MRI Intelligence",
+        "Tightness Map - Macro Trends",
         "Sync",
     ])
 
     # =========================================================================
-    #  Tab 0 — Training Directive
-    # =========================================================================
-
-    with tab_directive:
-        st.caption(f"{date.today().strftime('%A, %d %B %Y')}")
-
-        with st.spinner("Loading…"):
-            bio_rows      = _bio()
-            au_rows       = _au()
-            pain_streak   = _streak()
-            avg_tight     = _tight()
-            diagnostic    = _diag()
-            current_stage = _stage()
-            lambda_val    = float(diagnostic.get("injury_weight_decay_lambda") or 0.05)
-
-            tl            = engine.traffic_light(bio_rows)
-            acwr_result   = engine.acwr(au_rows, current_stage)
-            inj_weight    = engine.injury_weight(lambda_val, pain_streak)
-            stage_info    = engine.stage_status(current_stage, pain_streak, avg_tight)
-            obs_rem       = engine.observation_days_remaining(tl["data_days"])
-            rec           = engine.volume_recommendation(
-                tl, acwr_result, current_stage, obs_rem, inj_weight,
-            )
-            stage_advance = engine.check_auto_stage_advance(current_stage, pain_streak, avg_tight)
-
-        # Stage advance notification
-        if stage_advance["should_advance"]:
-            st.warning(
-                f"**Stage {stage_advance['current_stage']} criteria met** — "
-                f"ready to advance to Stage {stage_advance['next_stage']}. "
-                f"{stage_advance['criteria_summary']}. "
-                "Confirm with your physiotherapist, then update the stage below."
-            )
-            if st.button(
-                f"Advance to Stage {stage_advance['next_stage']}",
-                type="primary",
-                key="directive_advance_btn",
-            ):
-                repo.get_repository().set_config("current_stage", str(stage_advance["next_stage"]))
-                st.cache_data.clear()
-                st.rerun()
-
-        st.divider()
-
-        # ── Today's directive — plain language, no raw data ───────────────────
-        sig = rec["signal_color"]
-        label, detail = insights_svc.directive_copy(rec)
-
-        if sig == "red":
-            st.error(f"**{label}**\n\n{detail}")
-        elif sig in ("yellow", "orange"):
-            st.warning(f"**{label}**\n\n{detail}")
-        elif sig == "green":
-            st.success(f"**{label}**\n\n{detail}")
-        else:
-            st.info(f"**{label}**\n\n{detail}")
-
-        st.divider()
-
-        # ── Stage progression summary ─────────────────────────────────────────
-        st.subheader("Stage Progression")
-        st.markdown(f"**{stage_info['stage_label']}**")
-        st.caption(stage_info["message"])
-
-        if stage_info.get("progress_days") and stage_info["progress_days"] != "—":
-            st.markdown(f"Pain-free days: `{stage_info['progress_days']}`")
-            st.progress(stage_info["days_progress_pct"])
-
-        if stage_info.get("progress_tightness") and stage_info["progress_tightness"] != "—":
-            st.markdown(f"Tightness target: `{stage_info['progress_tightness']}`")
-            st.progress(stage_info["tight_progress_pct"])
-
-        st.divider()
-
-        # ── Inline stage change control ───────────────────────────────────────
-        st.subheader("Change Stage")
-        st.caption("Change only when physiotherapist confirms progression criteria met.")
-
-        new_stage = st.selectbox(
-            "Stage",
-            [1, 2, 3],
-            index=current_stage - 1,
-            format_func=lambda s: {
-                1: "1 — Rehab",
-                2: "2 — Transition",
-                3: "3 — Performance",
-            }[s],
-            key="directive_stage_select",
-        )
-        if new_stage != current_stage:
-            if st.button(
-                "Confirm Stage Change",
-                type="primary",
-                key="directive_stage_confirm",
-            ):
-                repo.get_repository().set_config("current_stage", str(new_stage))
-                st.cache_data.clear()
-                st.rerun()
-
-    # =========================================================================
-    #  Tab 1 — Engine Data
+    #  Tab 0 — Engine Data
     # =========================================================================
 
     with tab_engine:
@@ -201,6 +99,7 @@ def render() -> None:
             bio_rows      = _bio()
             au_rows       = _au()
             pain_streak   = _streak()
+            avg_tight     = _tight()
             diagnostic    = _diag()
             current_stage = _stage()
             lambda_val    = float(diagnostic.get("injury_weight_decay_lambda") or 0.05)
@@ -211,6 +110,7 @@ def render() -> None:
             obs_rem     = engine.observation_days_remaining(tl["data_days"])
             rec         = engine.volume_recommendation(tl, acwr_result, current_stage, obs_rem, inj_weight)
             inj_signal  = engine.injury_weight_signal(inj_weight)
+            stage_info  = engine.stage_status(current_stage, pain_streak, avg_tight)
 
         # ── Directive banner ──────────────────────────────────────────────────
         sig = rec["signal_color"]
@@ -236,6 +136,21 @@ def render() -> None:
         col4.metric("ACWR",          f"{acwr_val:.2f}" if acwr_val else "—",
                     delta=f"ceiling {acwr_result['ceiling']}",
                     delta_color="off")
+
+        st.divider()
+
+        # ── Stage progression ─────────────────────────────────────────────────
+        st.subheader("Stage Progression")
+        st.markdown(f"**{stage_info['stage_label']}**")
+        st.caption(stage_info["message"])
+
+        if stage_info.get("progress_days") and stage_info["progress_days"] != "—":
+            st.markdown(f"Pain-free days: `{stage_info['progress_days']}`")
+            st.progress(stage_info["days_progress_pct"])
+
+        if stage_info.get("progress_tightness") and stage_info["progress_tightness"] != "—":
+            st.markdown(f"Tightness target: `{stage_info['progress_tightness']}`")
+            st.progress(stage_info["tight_progress_pct"])
 
         st.divider()
 
@@ -344,7 +259,7 @@ def render() -> None:
             )
 
     # =========================================================================
-    #  Tab 2 — Processing Queue
+    #  Tab 1 — Processing Queue
     # =========================================================================
 
     with tab_queue:
@@ -410,34 +325,108 @@ def render() -> None:
                     st.success("All items processed successfully.")
                     st.rerun()
 
-        # Warnings panel
+        # ── Warnings calendar ────────────────────────────────────────────────
         flagged = repo.get_repository().get_flagged_entries()
         if flagged:
             st.divider()
             st.subheader("Active Warnings")
+
+            def _entry_date_str(entry: dict) -> str:
+                d = entry.get("session_date") or entry.get("timestamp") or ""
+                return str(d)[:10]
+
+            by_date: dict[str, list[dict]] = {}
             for entry in flagged:
-                level    = entry.get("warning_level", "monitor")
-                color    = engine.WARNING_LEVEL_ICONS.get(level, "⚫")
-                source   = entry.get("source", "?")
-                date_str = entry.get("session_date") or str(entry.get("timestamp", ""))[:10]
-                parts    = entry.get("body_parts", "")
-                if isinstance(parts, str) and parts.startswith("["):
-                    parts = ", ".join(json.loads(parts))
-                summary  = entry.get("summary", "")
-                movement = entry.get("movement_name", "")
-                st.markdown(
-                    f"{color} **{level.upper()}** &nbsp;·&nbsp; {date_str} &nbsp;·&nbsp; {source}"
-                    + (f" &nbsp;·&nbsp; _{movement}_" if movement else ""),
+                by_date.setdefault(_entry_date_str(entry), []).append(entry)
+
+            if "queue_cal_year" not in st.session_state:
+                anchor = date.fromisoformat(max(by_date)) if by_date else date.today()
+                st.session_state["queue_cal_year"]  = anchor.year
+                st.session_state["queue_cal_month"] = anchor.month
+
+            cal_year  = st.session_state["queue_cal_year"]
+            cal_month = st.session_state["queue_cal_month"]
+
+            nav_prev, nav_label, nav_next = st.columns([1, 3, 1])
+            if nav_prev.button("◀", key="queue_cal_prev"):
+                cal_month -= 1
+                if cal_month < 1:
+                    cal_month, cal_year = 12, cal_year - 1
+                st.session_state["queue_cal_year"]  = cal_year
+                st.session_state["queue_cal_month"] = cal_month
+                st.rerun()
+            nav_label.markdown(
+                f"<div style='text-align:center;font-weight:700;'>"
+                f"{cal_mod.month_name[cal_month]} {cal_year}</div>",
+                unsafe_allow_html=True,
+            )
+            if nav_next.button("▶", key="queue_cal_next"):
+                cal_month += 1
+                if cal_month > 12:
+                    cal_month, cal_year = 1, cal_year + 1
+                st.session_state["queue_cal_year"]  = cal_year
+                st.session_state["queue_cal_month"] = cal_month
+                st.rerun()
+
+            dow_cols = st.columns(7)
+            for col, dow in zip(dow_cols, ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]):
+                col.markdown(
+                    f"<div style='text-align:center;color:#888;font-size:11px;'>{dow}</div>",
                     unsafe_allow_html=True,
                 )
-                if summary:
-                    st.caption(str(summary)[:200])
-                if parts:
-                    st.caption(f"Body areas: {parts}")
-                st.markdown("---")
+
+            selected_date = st.session_state.get("queue_selected_date")
+            weeks = cal_mod.Calendar(firstweekday=0).monthdatescalendar(cal_year, cal_month)
+
+            for week in weeks:
+                week_cols = st.columns(7)
+                for col, day in zip(week_cols, week):
+                    day_str     = day.isoformat()
+                    day_entries = by_date.get(day_str, [])
+                    if day_entries:
+                        levels = {e.get("warning_level") for e in day_entries}
+                        ball   = "🔴" if "flag" in levels else "🟡"
+                        is_selected = selected_date == day_str
+                        if col.button(
+                            f"{day.day} {ball}",
+                            key=f"queue_cal_{day_str}",
+                            use_container_width=True,
+                            type="primary" if is_selected else "secondary",
+                        ):
+                            st.session_state["queue_selected_date"] = day_str
+                            st.rerun()
+                    else:
+                        dim = "#5A6172" if day.month == cal_month else "#2A2E38"
+                        col.markdown(
+                            f"<div style='text-align:center;color:{dim};padding:8px 0;'>{day.day}</div>",
+                            unsafe_allow_html=True,
+                        )
+
+            if selected_date and selected_date in by_date:
+                st.divider()
+                st.markdown(f"**{date.fromisoformat(selected_date).strftime('%A, %d %B %Y')}**")
+                for entry in by_date[selected_date]:
+                    level    = entry.get("warning_level", "monitor")
+                    color    = engine.WARNING_LEVEL_ICONS.get(level, "⚫")
+                    source   = entry.get("source", "?")
+                    parts    = entry.get("body_parts", "")
+                    if isinstance(parts, str) and parts.startswith("["):
+                        parts = ", ".join(json.loads(parts))
+                    summary  = entry.get("summary", "")
+                    movement = entry.get("movement_name", "")
+                    st.markdown(
+                        f"{color} **{level.upper()}** &nbsp;·&nbsp; {source}"
+                        + (f" &nbsp;·&nbsp; _{movement}_" if movement else ""),
+                        unsafe_allow_html=True,
+                    )
+                    if summary:
+                        st.caption(str(summary)[:200])
+                    if parts:
+                        st.caption(f"Body areas: {parts}")
+                    st.markdown("---")
 
     # =========================================================================
-    #  Tab 3 — Tightness Map
+    #  Tab 2 — Tightness Map - Macro Trends
     # =========================================================================
 
     with tab_tightness:
@@ -488,11 +477,8 @@ def render() -> None:
                 elif lvl == "monitor": col2.metric(f"{icon} Monitor", cnt)
                 elif lvl == "flag":    col3.metric(f"{icon} Flag",    cnt)
 
-    # =========================================================================
-    #  Tab 4 — Macro Trends
-    # =========================================================================
-
-    with tab_trends:
+        # ── Macro Trends ────────────────────────────────────────────────────
+        st.divider()
         st.subheader("Multi-Week Trend Analysis")
 
         trend_data = repo.get_repository().get_macro_trend_data(90)
@@ -583,101 +569,7 @@ def render() -> None:
                     st.markdown(f"- {rec_item}")
 
     # =========================================================================
-    #  Tab 5 — MRI Intelligence
-    # =========================================================================
-
-    with tab_mri:
-        st.subheader("MRI x Session Data Cross-Reference")
-
-        if not injury_profile:
-            st.warning("No diagnostic profile found. Run init_db.py to seed the MRI data.")
-        else:
-            with st.expander("Stored MRI Context (raw)", expanded=False):
-                st.caption(f"Injury focus: {injury_profile.get('injury_focus', '--')}")
-                st.caption(f"Compensations: {injury_profile.get('historical_compensations', '--')}")
-                st.text_area(
-                    "MRI raw text",
-                    value=injury_profile.get("mri_raw_text", ""),
-                    height=120,
-                    disabled=True,
-                    label_visibility="collapsed",
-                )
-
-            recent_notes = repo.get_repository().get_recent_raw_notes(limit=20)
-
-            if recent_notes:
-                note_summary_lines = []
-                for n in recent_notes:
-                    date_str = n.get("session_date") or "?"
-                    text     = n.get("ai_summary") or n.get("raw_text", "")[:120]
-                    parts    = n.get("flagged_body_parts") or ""
-                    if isinstance(parts, str) and parts.startswith("["):
-                        try:
-                            parts = ", ".join(json.loads(parts))
-                        except Exception:
-                            pass
-                    note_summary_lines.append(
-                        f"[{date_str}] {text}" + (f" | Areas: {parts}" if parts else "")
-                    )
-                notes_summary_str = "\n".join(note_summary_lines)
-            else:
-                notes_summary_str = "No session notes logged yet."
-
-            latest_risk = repo.get_repository().get_latest_movement_risk()
-            if latest_risk:
-                ts = str(latest_risk.get("timestamp", ""))[:16]
-                st.caption(f"Last assessment: {ts} (rules-based)")
-                st.markdown(f"**Risk Summary**\n\n{latest_risk.get('risk_summary', '--')}")
-
-                flagged_mv = latest_risk.get("flagged_movements", "[]")
-                safe_mv    = latest_risk.get("safe_movements",    "[]")
-                if isinstance(flagged_mv, str):
-                    try:
-                        flagged_mv = json.loads(flagged_mv)
-                    except Exception:
-                        flagged_mv = [flagged_mv]
-                if isinstance(safe_mv, str):
-                    try:
-                        safe_mv = json.loads(safe_mv)
-                    except Exception:
-                        safe_mv = [safe_mv]
-
-                col_flag, col_safe = st.columns(2)
-                with col_flag:
-                    st.markdown("**Movements to Avoid / Modify**")
-                    for m in flagged_mv:
-                        st.markdown(f"- {m}")
-                with col_safe:
-                    st.markdown("**Cleared Movements**")
-                    for m in safe_mv:
-                        st.markdown(f"- {m}")
-
-                corr = latest_risk.get("correlation_notes", "")
-                if corr:
-                    st.info(f"**MRI x Session Pattern:** {corr}")
-
-            current_stage = _stage()
-
-            if st.button("Run Movement Risk Assessment", type="primary", key="mri_assess_btn"):
-                with st.spinner("Applying MRI rules and keyword analysis of session notes..."):
-                    try:
-                        result = ai.assess_movement_risk(
-                            injury_profile, notes_summary_str, stage=current_stage
-                        )
-                        repo.get_repository().save_movement_risk(
-                            risk_summary      = result["risk_summary"],
-                            flagged_movements = result["flagged_movements"],
-                            safe_movements    = result["safe_movements"],
-                            correlation_notes = result["correlation_notes"],
-                            model_used        = ai.MODEL_SMART,
-                        )
-                        st.success("Assessment saved.")
-                        st.rerun()
-                    except Exception as exc:
-                        st.error(f"Assessment failed: {exc}")
-
-    # =========================================================================
-    #  Tab 6 — Sync
+    #  Tab 3 — Sync
     # =========================================================================
 
     with tab_sync:
