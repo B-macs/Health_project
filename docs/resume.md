@@ -431,6 +431,16 @@ but does not mark an item complete, change XP, streak, history, or plan
 progress, and does not auto-start the next planned activity. The library is
 available when the next baseline day is locked and after Day 10 is complete.
 
+Seven connected-speech cards now supply a stable three-sentence practice
+paragraph at the exact explanation step and throughout the timer: Pulmo-Train
+Reading Carryover, Twang Brightness, Resonant Phrase Carryover, Gentle Phrase
+Pacing, Easy Articulation Practice, Chant-to-Speech Bridge, and Cool-Down &
+Carryover Check. The paragraph is a training prompt selected by Voxplot's
+analysis language (currently German), not the short versioned recording
+passage; it therefore does not change capture protocol, Voice Quality scoring,
+provenance, or historical comparability. Brief Voice Recovery Break stays
+quiet-rest-first and retains only its optional closing sentence.
+
 The content intentionally reflects the current patient profile: Stage 1
 rehabilitation, an active mid-/lower-back flare, and generalised
 hypermobility. New cards permit a supported chair or easy neutral standing,
@@ -543,4 +553,4 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 
 ---
 
-*Last updated: 2026-07-14 — added the Voxplot Voice Training Measurement Policy and separate 22-card activity library; the original 10-day baseline remains fixed, and optional library practice cannot change daily-plan progress. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*
+*Last updated: 2026-07-14 — added the Voxplot Voice Training Measurement Policy, separate 22-card activity library, and supplied connected-speech paragraph; the original 10-day baseline remains fixed, and optional library practice cannot change daily-plan progress. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*
