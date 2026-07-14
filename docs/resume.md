@@ -441,6 +441,18 @@ passage; it therefore does not change capture protocol, Voice Quality scoring,
 provenance, or historical comparability. Brief Voice Recovery Break stays
 quiet-rest-first and retains only its optional closing sentence.
 
+**Authoring rule:** every future Voxplot activity that requests connected
+speech (words, phrases, sentences, or reading) must attach a purpose-selected
+paragraph to the exact ActivityStep; the user must not have to invent text.
+The activity documentation must state why the wording matches its target:
+consonant-rich/tongue-twister-style text is for slow articulation precision,
+natural sentences are for resonance, pacing, carryover, or breath-voice work,
+and low-effort text is used only under the activity's comfort/stop conditions.
+Tongue twisters raise articulatory coordination demand; they must never be
+framed as a way to force vocal-fold effort, loudness, or range. Isolated
+sounds, glides, and quiet-rest activities remain paragraph-free unless they
+explicitly transition into connected speech.
+
 The content intentionally reflects the current patient profile: Stage 1
 rehabilitation, an active mid-/lower-back flare, and generalised
 hypermobility. New cards permit a supported chair or easy neutral standing,
