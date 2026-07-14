@@ -374,6 +374,40 @@ suite. Health records a specific Voxplot commit rather than duplicating its
 source. Voxplot's recordings, research datasets, logs, virtual environment,
 and generated validation output are ignored locally and are never staged.
 
+### Voice Training Measurement Policy (2026-07-14)
+
+Voxplot's **Voice Quality** score remains intentionally visible as Brian's
+personal baseline/trend score. Its established `voice_quality_v1` recipe is
+unchanged: equal reference-mapped AVQI-like overall index and Voxplot
+breathiness estimate. The score is not a diagnosis, does not silently fall
+back to one component, and is now labelled as a personal acoustic trend.
+
+New Voxplot sessions use a versioned `de_windowed_3s_v2` capture protocol:
+the user selects at least 3 seconds for each task, then Voxplot
+deterministically chooses an activity-rich contiguous 3-second vowel and
+speech window. It records non-audio QC/provenance (durations, activity,
+level/clipping, codec/source metadata available to Streamlit, model hash,
+raw/display index values, runtime/Praat/CPPS settings, and reference
+cutoffs). Raw audio remains deliberately absent from JSONL and Supabase.
+Legacy sessions stay readable but cannot be recalculated; when v2 data
+exists, default trends compare only matching protocol/scoring versions and
+usable-quality sessions. Same-day retakes now use a median with spread/count,
+and local Europe/Berlin calendar dates prevent UTC/server-date distortion.
+
+The 2020 German AVQI v03.01 paper reports a 1.85 cutoff under its own
+equalised/reference implementation. Voxplot retains 2.70 only as the
+existing personal-reference boundary pending reference-script parity, not as
+a German diagnostic cutoff; changing it now would falsely imply calibration
+and break baseline continuity. The existing CPPS `subtract trend before
+smoothing=True` setting is likewise versioned but unchanged until parity
+outputs exist. The 2.10 custom-breathiness threshold now has one source of
+truth in the VQD-Lasso model JSON; it is not the published ABI or a
+German-phone clinical cutoff.
+
+Full rationale, implementation details, citations, and still-required
+external validation are in
+[`voice_training/voxplot/docs/voice_quality_measurement_policy.md`](../voice_training/voxplot/docs/voice_quality_measurement_policy.md).
+
 ---
 
 ## AGILE ROADMAP
@@ -476,4 +510,4 @@ and generated validation output are ignored locally and are never staged.
 
 ---
 
-*Last updated: 2026-07-13 — Sheet1/Apple Health retired as the engine's biometric source; replaced by a blended Oura+Garmin read (`services/biometrics.py`), with the daily blend persisted to a "Biometric Blend" sheet tab so historical values are a fixed record, not a live re-derivation*
+*Last updated: 2026-07-14 — added the Voxplot Voice Training Measurement Policy: versioned 3-second capture/QC, immutable provenance, comparable-trend handling, and corrected AVQI/ABI reference documentation. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*
