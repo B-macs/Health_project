@@ -94,6 +94,357 @@ def _bioage_card_html(key: str, href: str) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Strength BioAge detail screen (tab_bioage → ?bioage=strength).
+#  Premium dark-mode hero/progress/body-regions/muscle-balance/assessment
+#  layout. Copy, illustrations and layout are the real UI; every *computed*
+#  value (scores, dates, counts, chart history) is a placeholder (None) in
+#  _STRENGTH_SCREEN below until the BioAge engine exists to fill it in.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+
+_STRENGTH_SCREEN: dict = {
+    "hero": {
+        "title":          "Strength BioAge",
+        "value":          None,   # primary metric — blank until engine computes it
+        "unit":           "years",
+        "description":    "",
+        "illustration":   _BIOAGE_BG_DIR / "derived" / "strength_hero.png",
+        "accent_color":   _BIOAGE_COLORS["strength"],
+        "cta_label":      "Assistance",
+        "cta_icon":       "🎙️",
+    },
+    "progress": {
+        "title":            "Progress",
+        "subtitle":         "",
+        "updated_label":    "Updated on",
+        "updated_value":    None,   # blank
+        "real_age_label":   "Real age",
+        "real_age_value":   None,   # blank
+        "chart_points":     [],     # list[(month_index 0-11, value)] — blank
+        "y_min":            None,
+        "y_max":            None,
+        "button_label":     "Show All Progress",
+    },
+    "body_regions": [
+        {
+            "id": "upper_body", "name": "Upper body", "score": None, "unit": "years",
+            "illustration": _BIOAGE_BG_DIR / "derived" / "upper_body.png",
+            "accent_color": _BIOAGE_COLORS["strength"],
+        },
+        {
+            "id": "core", "name": "Core", "score": None, "unit": "years",
+            "illustration": _BIOAGE_BG_DIR / "derived" / "core.png",
+            "accent_color": _BIOAGE_COLORS["strength"],
+        },
+        {
+            "id": "lower_body", "name": "Lower body", "score": None, "unit": "years",
+            "illustration": _BIOAGE_BG_DIR / "derived" / "lower_body.png",
+            "accent_color": _BIOAGE_COLORS["strength"],
+        },
+    ],
+    "muscle_balance": {
+        "title":            "Muscle balance analysis",
+        "summary":          "",
+        "imbalance_count":  None,   # blank
+        "illustration":     _BIOAGE_BG_DIR / "derived" / "muscle_balance.png",
+        "cta_label":        "View All",
+    },
+    "assessment": {
+        "title":        "Test your strength",
+        "description":  (
+            "Perform a strength test to get your muscle balance analysis "
+            "and update your Strength BioAge."
+        ),
+        "primary_cta":          "Start Assessment",
+        "completion_progress":  None,   # blank
+    },
+}
+
+
+def _progress_chart_svg(
+    points: list[tuple[int, float]],
+    y_min: float | None,
+    y_max: float | None,
+    accent: str,
+    width: int = 640,
+    height: int = 220,
+) -> str:
+    """Minimal medical-style line chart: dashed gridlines, Jan-Dec x-axis,
+    optional y-range, single highlighted (latest) point. Renders an empty
+    grid with no plotted point when `points` is empty."""
+    pad_l, pad_r, pad_t, pad_b = 34, 14, 14, 24
+    iw, ih = width - pad_l - pad_r, height - pad_t - pad_b
+    has_range = y_min is not None and y_max is not None and y_max > y_min
+    lo, hi = (y_min, y_max) if has_range else (0.0, 1.0)
+
+    def x_for(m: float) -> float:
+        return pad_l + (m / 11) * iw
+
+    def y_for(v: float) -> float:
+        return pad_t + (1 - (v - lo) / (hi - lo)) * ih
+
+    n_rows = 4
+    grid, y_ticks = [], []
+    for i in range(n_rows + 1):
+        frac = i / n_rows
+        gy = pad_t + frac * ih
+        grid.append(
+            f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{width - pad_r}" y2="{gy:.1f}" '
+            f'stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="2,4"/>'
+        )
+        label = f"{hi - frac * (hi - lo):.0f}" if has_range else "—"
+        y_ticks.append(
+            f'<text x="{pad_l - 8}" y="{gy + 4:.1f}" text-anchor="end" font-size="10" '
+            f'fill="#5A6377" font-family="system-ui">{label}</text>'
+        )
+
+    x_labels = []
+    for i, m in enumerate(_MONTH_LABELS):
+        gx = x_for(i)
+        x_labels.append(
+            f'<line x1="{gx:.1f}" y1="{pad_t}" x2="{gx:.1f}" y2="{height - pad_b}" '
+            f'stroke="rgba(255,255,255,0.04)" stroke-width="1"/>'
+            f'<text x="{gx:.1f}" y="{height - 6}" text-anchor="middle" font-size="9" '
+            f'fill="#5A6377" font-family="system-ui">{m}</text>'
+        )
+
+    line_html = point_html = empty_html = ""
+    if points:
+        pts = sorted(points, key=lambda p: p[0])
+        coords = [(x_for(m), y_for(v)) for m, v in pts]
+        if len(coords) > 1:
+            poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
+            line_html = (
+                f'<polyline points="{poly}" fill="none" stroke="{accent}" '
+                f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
+            )
+        for i, (x, y) in enumerate(coords):
+            is_last = i == len(coords) - 1
+            r, fill = (6, accent) if is_last else (4, "rgba(255,255,255,0.25)")
+            halo = (
+                f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r + 6}" fill="{accent}" opacity="0.18"/>'
+                if is_last else ""
+            )
+            point_html += (
+                f'{halo}<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{fill}" '
+                f'stroke="#07080D" stroke-width="2"/>'
+            )
+    else:
+        empty_html = (
+            f'<text x="{width / 2}" y="{height / 2}" text-anchor="middle" font-size="12" '
+            f'fill="#5A6377" font-style="italic" font-family="system-ui">'
+            f'No progress recorded yet</text>'
+        )
+
+    return (
+        f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
+        f'preserveAspectRatio="xMidYMid meet">'
+        + "".join(grid) + "".join(y_ticks) + "".join(x_labels)
+        + line_html + point_html + empty_html +
+        '</svg>'
+    )
+
+
+def _strength_hero_html() -> str:
+    hero = _STRENGTH_SCREEN["hero"]
+    accent = hero["accent_color"]
+    bg = _bioage_b64(str(hero["illustration"]))
+    bg_css = (
+        f"background-image:linear-gradient(100deg,rgba(11,15,26,0.92) 0%,"
+        f"rgba(11,15,26,0.55) 32%,rgba(11,15,26,0.08) 62%),url('{bg}');"
+        f"background-size:cover;background-position:center right;"
+    ) if bg else "background:#0B0F1A;"
+    value = hero["value"] if hero["value"] is not None else "—"
+    desc_html = (
+        f'<div style="font-size:13px;color:#9AA3B2;margin-top:10px;max-width:220px;">'
+        f'{hero["description"]}</div>'
+    ) if hero["description"] else ""
+    return (
+        # aspect-ratio matches the derived crop (see prepare_bioage_illustrations.py)
+        # so the hero grows taller on a wide desktop card instead of forcing
+        # background-size:cover to upscale/crop it into a thin strip; min/max-height
+        # clamp the two ends (enough room for the text on mobile, not absurdly
+        # tall on an ultrawide monitor).
+        f'<div style="position:relative;aspect-ratio:1194/356;min-height:220px;'
+        f'max-height:420px;border-radius:22px;overflow:hidden;'
+        f'margin-bottom:18px;border:1px solid rgba(255,255,255,0.08);{bg_css}'
+        f'box-shadow:0 8px 32px rgba(0,0,0,0.4);">'
+        f'<div style="position:relative;z-index:1;height:100%;box-sizing:border-box;'
+        f'padding:28px 24px;display:flex;flex-direction:column;justify-content:space-between;">'
+        f'<div>'
+        f'<div style="font-size:11px;color:{accent};letter-spacing:2px;text-transform:uppercase;'
+        f'font-weight:600;margin-bottom:8px;">{hero["title"]}</div>'
+        f'<div style="font-size:46px;font-weight:800;color:#F4F6FB;line-height:1;'
+        f'text-shadow:0 0 24px {accent}40;">{value}'
+        f'<span style="font-size:18px;font-weight:500;color:#9AA3B2;margin-left:8px;">'
+        f'{hero["unit"]}</span></div>'
+        f'{desc_html}'
+        f'</div>'
+        f'<div><span style="display:inline-flex;align-items:center;gap:6px;'
+        f'background:rgba(255,255,255,0.08);color:#D4DCEE;font-size:13px;font-weight:500;'
+        f'padding:10px 18px;border-radius:30px;">{hero["cta_icon"]} {hero["cta_label"]}</span>'
+        f'</div>'
+        f'</div>'
+        f'</div>'
+    )
+
+
+def _body_region_card_html(region: dict) -> str:
+    accent = region["accent_color"]
+    bg = _bioage_b64(str(region["illustration"]))
+    bg_css = (
+        f"background-image:linear-gradient(90deg,rgba(11,15,26,0.88) 0%,"
+        f"rgba(11,15,26,0.4) 30%,rgba(11,15,26,0.04) 65%),url('{bg}');"
+        f"background-size:cover;background-position:center right;"
+    ) if bg else "background:#0B0F1A;"
+    score = region["score"] if region["score"] is not None else "—"
+    return (
+        f'<div style="position:relative;min-height:132px;border-radius:16px;overflow:hidden;'
+        f'margin-bottom:12px;border:1px solid rgba(255,255,255,0.06);{bg_css}">'
+        f'<div style="position:relative;z-index:1;min-height:132px;display:flex;'
+        f'flex-direction:column;justify-content:center;padding:18px 44px 18px 20px;">'
+        f'<div style="font-size:20px;font-weight:700;color:{accent};margin-bottom:4px;">'
+        f'{region["name"]}</div>'
+        f'<div style="font-size:26px;font-weight:300;color:#F4F6FB;">{score}'
+        f'<span style="font-size:12px;color:#9AA3B2;margin-left:6px;">{region["unit"]}</span>'
+        f'</div></div>'
+        f'<div style="position:absolute;top:50%;right:16px;transform:translateY(-50%);'
+        f'font-size:22px;color:{accent};font-weight:300;">&rsaquo;</div>'
+        f'</div>'
+    )
+
+
+def _muscle_balance_card_html() -> str:
+    mb = _STRENGTH_SCREEN["muscle_balance"]
+    bg = _bioage_b64(str(mb["illustration"]))
+    bg_css = (
+        f"background-image:linear-gradient(90deg,rgba(11,15,26,0.88) 0%,"
+        f"rgba(11,15,26,0.55) 30%,rgba(11,15,26,0.1) 58%),url('{bg}');"
+        f"background-size:cover;background-position:center right;"
+    ) if bg else "background:#0B0F1A;"
+    count = mb["imbalance_count"]
+    count_display = str(count) if count is not None else "—"
+    return (
+        f'<div style="position:relative;min-height:150px;border-radius:16px;overflow:hidden;'
+        f'margin-bottom:8px;border:1px solid rgba(255,255,255,0.06);{bg_css}">'
+        f'<div style="position:relative;z-index:1;min-height:150px;display:flex;'
+        f'flex-direction:column;justify-content:center;padding:20px 22px;">'
+        f'<div style="font-size:16px;font-weight:600;color:#F4F6FB;margin-bottom:6px;">'
+        f'Muscle imbalances</div>'
+        f'<div style="font-size:30px;font-weight:300;color:#F4F6FB;">{count_display}'
+        f'<span style="font-size:13px;color:#9AA3B2;margin-left:6px;">imbalances</span></div>'
+        f'</div></div>'
+    )
+
+
+def _assessment_card_html() -> str:
+    a = _STRENGTH_SCREEN["assessment"]
+    return (
+        f'<div style="border-radius:16px;overflow:hidden;margin-bottom:10px;'
+        f'border:1px solid rgba(255,255,255,0.06);'
+        f'background:linear-gradient(135deg,#12161F 0%,#0B0F1A 100%);padding:24px 22px;">'
+        f'<div style="font-size:19px;font-weight:700;color:#F4F6FB;margin-bottom:8px;">'
+        f'{a["title"]}</div>'
+        f'<div style="font-size:13px;color:#9AA3B2;line-height:1.6;">{a["description"]}</div>'
+        f'</div>'
+    )
+
+
+def _render_strength_detail() -> None:
+    """Strength BioAge detail — hero, progress chart, body regions, muscle
+    balance, assessment CTA. One continuous scroll, no sub-tabs/transitions."""
+    s = _STRENGTH_SCREEN
+    accent = s["hero"]["accent_color"]
+
+    # Span the full desktop/Whoop breakpoint width, capped only at a generous
+    # ceiling — real browser windows rarely exceed this, so in practice the
+    # screen goes edge-to-edge; the cap just stops an ultrawide monitor from
+    # stretching the illustrations past the point their (now widened, see
+    # scripts/prepare_bioage_illustrations.py) native resolution supports.
+    st.markdown(
+        '<style>[data-testid="stMainBlockContainer"][data-testid="stMainBlockContainer"]'
+        "{max-width:1600px !important;margin-left:auto !important;"
+        "margin-right:auto !important;}</style>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(_strength_hero_html(), unsafe_allow_html=True)
+
+    # ── Progress ──────────────────────────────────────────────────────────
+    # Plain divs, not <h3>, below: styles.py's global h3 rule forces
+    # font-size:10px + uppercase (!important) which would hijack these.
+    p = s["progress"]
+    updated  = p["updated_value"] or "—"
+    real_age = p["real_age_value"] if p["real_age_value"] is not None else "—"
+
+    head_l, head_r = st.columns([2, 1])
+    head_l.markdown(
+        f"<div style='color:#F4F6FB;font-size:18px;font-weight:600;'>{p['title']}</div>",
+        unsafe_allow_html=True,
+    )
+    head_r.markdown(
+        f"<div style='text-align:right;font-size:11px;color:#5A6377;margin-top:6px;'>"
+        f"{p['updated_label']} {updated}</div>",
+        unsafe_allow_html=True,
+    )
+
+    sub_l, sub_r = st.columns([2, 1])
+    sub_l.markdown(
+        f"<div style='font-size:13px;color:#6BAF8B;'>{p['real_age_label']}: {real_age}</div>",
+        unsafe_allow_html=True,
+    )
+    sub_r.markdown(
+        "<div style='text-align:right;font-size:11px;color:#5A6377;'>Age (yrs)</div>",
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f'<div style="background:#0E1018;border:1px solid rgba(255,255,255,0.06);'
+        f'border-radius:16px;padding:12px 8px 4px;margin:10px 0 16px;">'
+        f'{_progress_chart_svg(p["chart_points"], p["y_min"], p["y_max"], accent)}'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div style="text-align:center;padding:12px;border-radius:30px;'
+        f'background:rgba(255,255,255,0.06);color:#D4DCEE;font-size:13px;'
+        f'font-weight:500;margin-bottom:24px;">{p["button_label"]}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # ── Body performance ──────────────────────────────────────────────────
+    st.markdown(
+        "<div style='color:#F4F6FB;font-size:18px;font-weight:600;"
+        "margin-bottom:12px;'>Body parts</div>",
+        unsafe_allow_html=True,
+    )
+    for region in s["body_regions"]:
+        st.markdown(_body_region_card_html(region), unsafe_allow_html=True)
+
+    # ── Muscle balance ────────────────────────────────────────────────────
+    mb = s["muscle_balance"]
+    bal_l, bal_r = st.columns([2, 1])
+    bal_l.markdown(
+        f"<div style='color:#F4F6FB;font-size:18px;font-weight:600;"
+        f"margin-bottom:12px;'>{mb['title']}</div>",
+        unsafe_allow_html=True,
+    )
+    bal_r.markdown(
+        f"<div style='text-align:right;font-size:13px;color:{accent};margin-top:6px;'>"
+        f"{mb['cta_label']} &rsaquo;</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(_muscle_balance_card_html(), unsafe_allow_html=True)
+
+    st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
+
+    # ── Assessment CTA ────────────────────────────────────────────────────
+    st.markdown(_assessment_card_html(), unsafe_allow_html=True)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Module-level cached data fetchers  (must live outside render() so that
 #  Streamlit recognises them as stable across reruns)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -173,7 +524,10 @@ def render() -> None:
                 f"<h2 style='color:{color};margin-top:8px;'>{label}</h2>",
                 unsafe_allow_html=True,
             )
-            st.info(f"{label} biological age breakdown — coming soon.")
+            if selected == "strength":
+                _render_strength_detail()
+            else:
+                st.info(f"{label} biological age breakdown — coming soon.")
         else:
             st.caption("Select a category to see its biological age breakdown.")
             for key in _BIOAGE_CATEGORIES:
