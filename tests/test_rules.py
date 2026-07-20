@@ -65,6 +65,53 @@ def test_forward_fold_rule_matches_named_variants():
     assert straddle["severity"] == "contraindicated"  # stage_cap=1, always contraindicated
 
 
+def test_stage2_gym_exercises_clear_correctly_at_stage_2():
+    # Goblet Squat and Bulgarian Split Squat both match the "squat" caution
+    # rule (stage_cap=2) — confirm they're usable at Stage 2, not just
+    # theoretically caution-flagged.
+    goblet = rules.check_movement("Goblet Squat", current_stage=2)
+    assert goblet["severity"] == "caution"
+    assert goblet["stage_ok"] is True
+
+    bss = rules.check_movement("Bulgarian Split Squat", current_stage=2)
+    assert bss["severity"] == "caution"
+    assert bss["stage_ok"] is True
+
+
+def test_romanian_deadlift_db_does_not_collide_with_hard_deadlift_stops():
+    # "Romanian Deadlift (DB)" must match the "romanian deadlift" caution
+    # rule, not the always-contraindicated heavy/barbell/conventional
+    # deadlift rules — check_movement takes the strictest MATCHING rule, so
+    # this locks in that the naming choice doesn't accidentally match both.
+    rdl = rules.check_movement("Romanian Deadlift (DB)", current_stage=2)
+    assert rdl["severity"] == "caution"
+    assert rdl["stage_ok"] is True
+
+
+def test_incline_db_press_does_not_match_overhead_press_rule():
+    # Regression lock for the deliberate no-overhead-press design in Stage 2A
+    # (patient_profile.py finding #6 — Latarjet history, documented left-tilt
+    # instability under overhead load): Incline DB Press must NOT trip the
+    # "overhead press" caution rule, since it's a different, back-supported
+    # pattern intentionally substituted in its place.
+    incline = rules.check_movement("Incline DB Press", current_stage=2)
+    assert incline["severity"] == "unknown"
+
+
+def test_hip_thrust_and_pulling_exercises_are_unrestricted_by_omission():
+    # No MOVEMENT_RULES entry matches these — intentional (hip thrust, lat
+    # pulldown, DB row are sagittal-plane/controlled patterns with no
+    # matching contraindication), not an authoring gap.
+    for name in ("Hip Thrust (Loaded)", "Lat Pulldown", "Single-Arm DB Row"):
+        result = rules.check_movement(name, current_stage=2)
+        assert result["severity"] == "unknown"
+
+
+def test_face_pull_cable_is_cleared():
+    face_pull = rules.check_movement("Face Pull (Cable)", current_stage=1)
+    assert face_pull["severity"] == "cleared"
+
+
 def test_no_streamlit_import():
     tree = ast.parse(open(rules.__file__, encoding="utf-8").read())
     for node in ast.walk(tree):

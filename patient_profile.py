@@ -12,25 +12,37 @@ directly for full detail; only what's currently weight-relevant is
 synthesized here). Recent Notion readiness/training-log data (last 14 days)
 is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
 
-Current block: Stage 1 Rehab, extended by 7 days (Days 15-21, "Week 3: Flare
+Stage 1 history: Rehab extended by 7 days (Days 15-21, "Week 3: Flare
   Recovery & Reassessment Prep" in training_plan.py) — decided 2026-07-13.
   Day 14's exit criteria were not met on the original schedule
   (pain_free_streak=0, avg_tightness_14d=4.6 vs required <=3.0) because of an
   active mid-back/lower-back flare (see symptom_log below). By 2026-07-13 the
-  flare was trending down (tightness 8->1 over the window) with today's
+  flare was trending down (tightness 8->1 over the window) with that day's
   check-in showing pain=0, tightness=1. Decision made with the user: extend
   rehab one more week rather than jump to Stage 2, then reassess.
   Phase 1's length_days was extended from 14 to 21 in the Notion config to
-  match (still phase_number=1 — this is a continuation, not a new phase).
-  Day 21 repeats the Day 14 assessment battery for a direct before/after
-  comparison across the flare.
+  match (still phase_number=1 — a continuation, not a new phase).
   Agreed handling of pain_free_streak specifically: informative, not a hard
   blocker, if tightness (<=3.0) and pain (<=2/10) are met and physio signs
   off — a single reversed bad day within an otherwise-improving trend
   shouldn't be treated the same as a fresh injury restarting the clock.
-Next block: 4-Week Stage 2 Transition — reassess using Day 21's results
-  (2026-07-19) against stage_1_exit_criteria below, per the agreed handling
-  of the streak criterion, before authoring Stage 2.
+
+Current block: Stage 2A — 28-Day Gym Strength Block (Phase 2, Days 1-28,
+  training_plan.PLAN_STAGE2), started 2026-07-20. Day 21 reassessment
+  (2026-07-19) passed and the physiotherapist signed off on external load —
+  see stage_transitions below. Pure gym-strength content: goblet/DB squat,
+  Romanian deadlift, hip thrust, incline DB press, lat pulldown/row,
+  Bulgarian split squat, scapular + lumbar-endurance core work. No overhead
+  pressing this block (Latarjet history + documented left-tilt instability
+  under overhead load — see finding #6 below). Deliberately decoupled from
+  the previously-discussed 10km race periodization (Oct 11 2026): running is
+  NOT introduced in this block. That is an explicit deferred decision (the
+  periodization had assumed a 2026-07-12 Stage 2A start; this is ~9 days
+  behind that schedule), not an oversight — revisit at the Day 28
+  reassessment alongside the Stage 2B decision.
+Next block: reassess at Day 28 (2026-08-16) against stage_2_exit_criteria
+  below — decide Stage 2B vs. extending Stage 2A, and the running-
+  introduction question, with the physiotherapist before authoring either.
 """
 
 PROFILE = {
@@ -40,11 +52,15 @@ PROFILE = {
     # ─────────────────────────────────────────────────────────────────────────
 
     "patient": "Patient",
-    "current_stage": 1,
-    "current_block": "Stage 1 Rehab, extended to 21 days (Days 15-21 = Week 3: Flare Recovery & Reassessment Prep)",
-    "next_reassessment": "Day 21 (2026-07-19) — reassess against stage_1_exit_criteria; "
-                          "pain_free_streak treated as informative not blocking if tightness/pain "
-                          "criteria + physio sign-off are met — see module docstring",
+    "current_stage": 2,
+    "current_block": "Stage 2A — 28-Day Gym Strength Block (Days 1-28, started 2026-07-20). "
+                      "Goblet/DB squat, RDL, hip thrust, incline DB press, lat pulldown/row, "
+                      "Bulgarian split squat, scapular + lumbar-endurance core work. No overhead "
+                      "pressing (finding #6) and no running this block — running is an explicit "
+                      "deferred decision (see next_reassessment), not an oversight.",
+    "next_reassessment": "Day 28 (2026-08-16) — reassess against stage_2_exit_criteria; decide "
+                          "Stage 2B vs. extending Stage 2A, and the running-introduction question, "
+                          "with the physiotherapist — see module docstring",
 
     # ─────────────────────────────────────────────────────────────────────────
     #  MRI Findings
@@ -489,10 +505,10 @@ PROFILE = {
     ],
 
     # ─────────────────────────────────────────────────────────────────────────
-    #  Stage Advancement Criteria (to be evaluated at Day 14)
-    #  Status as of 2026-07-13: NOT MET — pain_free_streak=0, avg_tightness_14d=4.6
-    #  (required <=3.0) — see symptom_log entry above. Do not advance to Stage 2
-    #  until these are actually satisfied and physio sign-off is obtained.
+    #  Stage Advancement Criteria
+    #  stage_1_exit_criteria: evaluated at Day 21 (2026-07-19) — MET. Physio
+    #  signed off on external load; see stage_transitions below for the record.
+    #  stage_2_exit_criteria: to be evaluated at Day 28 (2026-08-16).
     # ─────────────────────────────────────────────────────────────────────────
 
     "stage_1_exit_criteria": {
@@ -504,4 +520,32 @@ PROFILE = {
         "hinge": "Pain-free hip hinge to full range (arms past knees)",
         "physio_sign_off": "Required before advancing to Stage 2",
     },
+
+    # Draft — evaluated at the Day 28 reassessment (2026-08-16), mirroring
+    # stage_1_exit_criteria's shape. Not yet evaluated.
+    "stage_2_exit_criteria": {
+        "pain": "≤ 2/10 across all working lifts, no worsening trend through the block",
+        "hip_click": "No increase in Coxa Saltans frequency under loaded squat/split-squat work",
+        "shoulder": "No instability sensation or left-tilt compensation under the incline-press loading introduced this block",
+        "working_loads": "Final working loads logged on all six primary lifts (Goblet Squat, Incline DB Press, RDL, Hip Thrust, Lat Pulldown, Single-Arm DB Row) as the new baseline",
+        "functional_screen": "McGill Big 3, Single-Leg Balance, Hip Hinge Full Range, Walk+Stair — matching or beating the Day 21 Stage 1 screen",
+        "physio_sign_off": "Required before deciding Stage 2B vs. extending Stage 2A, and before introducing running",
+    },
+
+    # ─────────────────────────────────────────────────────────────────────────
+    #  Stage Transitions — append-only record of actual advancement events
+    #  (mirrors the symptom_log convention above: a running list, never
+    #  overwritten). This is the record that a transition's *requirement*
+    #  (stage_N_exit_criteria) was actually satisfied, not just stated.
+    # ─────────────────────────────────────────────────────────────────────────
+
+    "stage_transitions": [
+        {
+            "date": "2026-07-19",
+            "event": "Day 21 reassessment passed; physiotherapist sign-off obtained "
+                     "for Stage 1 -> Stage 2 advancement (external load cleared).",
+            "signed_off_by": "physiotherapist (per user confirmation to this app; "
+                              "not independently verified by the app itself)",
+        },
+    ],
 }

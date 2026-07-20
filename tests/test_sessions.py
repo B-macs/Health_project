@@ -137,8 +137,64 @@ def test_make_sets_data_duration_produces_one_row():
     assert rows[0]["tut"] == 180
 
 
+def test_make_sets_data_uses_weight_kg_when_present():
+    ex = {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 60, "weight_kg": 20.0}
+    rows = sessions.make_sets_data(ex)
+    assert all(r["weight"] == 20.0 for r in rows)
+
+
+def test_make_sets_data_defaults_to_zero_weight_when_absent():
+    # Regression guard — existing Stage 1 bodyweight exercises have no
+    # weight_kg key at all; must still produce 0.0, not a KeyError.
+    ex = {"type": "hold", "sets": 2, "hold_seconds": 30, "rest_seconds": 15}
+    rows = sessions.make_sets_data(ex)
+    assert all(r["weight"] == 0.0 for r in rows)
+
+
 def test_estimate_duration_floor_is_10_minutes():
     assert sessions.estimate_duration([]) >= 10
+
+
+# ─── exercise_duration_seconds ─────────────────────────────────────────────
+
+def test_exercise_duration_seconds_duration_type():
+    ex = {"type": "duration", "duration_minutes": 5}
+    assert sessions.exercise_duration_seconds(ex) == 300
+
+
+def test_exercise_duration_seconds_hold():
+    ex = {"type": "hold", "sets": 3, "hold_seconds": 30, "rest_seconds": 15}
+    # 3*30 + 2*15 = 120
+    assert sessions.exercise_duration_seconds(ex) == 120
+
+
+def test_exercise_duration_seconds_hold_reps():
+    ex = {"type": "hold_reps", "sets": 2, "hold_seconds": 5, "reps_in_set": 4, "rest_seconds": 20}
+    # 2*5*4 + 1*20 = 60
+    assert sessions.exercise_duration_seconds(ex) == 60
+
+
+def test_exercise_duration_seconds_reps():
+    ex = {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 45}
+    # 3*20 + 2*45 = 150
+    assert sessions.exercise_duration_seconds(ex) == 150
+
+
+def test_exercise_duration_seconds_unknown_type_returns_zero():
+    assert sessions.exercise_duration_seconds({"type": "unknown"}) == 0
+
+
+def test_exercise_duration_seconds_sums_to_estimate_duration():
+    # estimate_duration is now built from this function — lock the
+    # relationship in so a future edit to one doesn't silently drift from
+    # the other: 120s base + (per-exercise time + 30s transition) each.
+    exercises = [
+        {"type": "duration", "duration_minutes": 5},
+        {"type": "hold", "sets": 3, "hold_seconds": 30, "rest_seconds": 15},
+        {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 45},
+    ]
+    raw_total = 120 + sum(sessions.exercise_duration_seconds(ex) + 30 for ex in exercises)
+    assert sessions.estimate_duration(exercises) == max(10, round(raw_total / 60))
 
 
 # ─── checkpoint payload / restore ──────────────────────────────────────────
@@ -190,6 +246,53 @@ def test_seed_default_phase_leaves_existing_phases_untouched():
 
 def test_seed_default_phase_no_plan_start_returns_empty():
     assert sessions.seed_default_phase([], None) == []
+
+
+# ─── plan_dict_for_phase ────────────────────────────────────────────────────
+
+def test_plan_dict_for_phase_1_is_stage1_plan():
+    import training_plan as tp
+    assert sessions.plan_dict_for_phase(1) is tp.PLAN
+
+
+def test_plan_dict_for_phase_2_is_stage2_plan():
+    import training_plan as tp
+    assert sessions.plan_dict_for_phase(2) is tp.PLAN_STAGE2
+
+
+def test_plan_dict_for_phase_unknown_returns_none():
+    assert sessions.plan_dict_for_phase(99) is None
+
+
+# ─── begin_new_phase ────────────────────────────────────────────────────────
+
+def test_begin_new_phase_appends_the_new_phase():
+    new_phase = Phase(phase_number=2, name="Stage 2", start_date="2026-07-20",
+                       length_days=28, status="active")
+    updated = sessions.begin_new_phase([_PHASE], new_phase)
+    assert updated[-1] is new_phase
+    assert len(updated) == 2
+
+
+def test_begin_new_phase_marks_a_date_lapsed_prior_phase_completed():
+    # _PHASE runs 2026-06-29 for 14 days -> ends 2026-07-12, well before the
+    # module's real date.today() call in begin_new_phase, so it's lapsed.
+    new_phase = Phase(phase_number=2, name="Stage 2", start_date="2026-07-20",
+                       length_days=28, status="active")
+    updated = sessions.begin_new_phase([_PHASE], new_phase)
+    assert updated[0].status == "completed"
+    assert updated[0].phase_number == _PHASE.phase_number  # unchanged otherwise
+
+
+def test_begin_new_phase_leaves_non_lapsed_phases_untouched():
+    from datetime import timedelta
+    future_phase = Phase(phase_number=1, name="Stage 1", start_date=date.today().isoformat(),
+                          length_days=14, status="active")
+    new_phase = Phase(phase_number=2, name="Stage 2",
+                       start_date=(date.today() + timedelta(days=14)).isoformat(),
+                       length_days=28, status="active")
+    updated = sessions.begin_new_phase([future_phase], new_phase)
+    assert updated[0].status == "active"
 
 
 # ─── day_view_state routing ─────────────────────────────────────────────────

@@ -16,6 +16,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
+import training_plan as tp
 from services import plan as _plan
 from services.models import Phase
 
@@ -144,33 +145,42 @@ def planned_reps(ex: dict) -> int:
 
 def make_sets_data(ex: dict) -> list[dict]:
     t, sets, rest = ex["type"], ex.get("sets", 1), ex.get("rest_seconds", 60)
+    weight = ex.get("weight_kg") or 0.0
     out = []
     if t == "duration":
-        out.append({"set_num": 1, "reps": 1, "weight": 0.0, "rest": 0,
+        out.append({"set_num": 1, "reps": 1, "weight": weight, "rest": 0,
                     "tut": (ex.get("duration_minutes") or 0) * 60, "velocity": "continuous"})
     elif t == "reps":
         for i in range(1, sets + 1):
-            out.append({"set_num": i, "reps": ex.get("reps") or 1, "weight": 0.0,
+            out.append({"set_num": i, "reps": ex.get("reps") or 1, "weight": weight,
                         "rest": rest, "tut": 0, "velocity": "controlled"})
     elif t == "hold":
         for i in range(1, sets + 1):
-            out.append({"set_num": i, "reps": 1, "weight": 0.0,
+            out.append({"set_num": i, "reps": 1, "weight": weight,
                         "rest": rest, "tut": ex.get("hold_seconds") or 0, "velocity": "isometric"})
     elif t == "hold_reps":
         for i in range(1, sets + 1):
-            out.append({"set_num": i, "reps": ex.get("reps_in_set") or 1, "weight": 0.0,
+            out.append({"set_num": i, "reps": ex.get("reps_in_set") or 1, "weight": weight,
                         "rest": rest, "tut": ex.get("hold_seconds") or 0, "velocity": "isometric"})
     return out
 
 
+def exercise_duration_seconds(ex: dict) -> int:
+    """Estimated active time for a single exercise — sets x hold/rep time +
+    rest between sets. Same per-type formulas as estimate_duration's inner
+    loop, but scoped to one exercise (no session-level base/transition
+    buffer), for labeling one exercise in a day's review rather than sizing
+    the whole session."""
+    t, sets, rest = ex["type"], ex.get("sets", 1), ex.get("rest_seconds", 60)
+    if t == "duration":    return (ex.get("duration_minutes") or 0) * 60
+    if t == "hold":        return sets * (ex.get("hold_seconds") or 0) + (sets - 1) * rest
+    if t == "hold_reps":   return sets * (ex.get("hold_seconds") or 0) * (ex.get("reps_in_set") or 1) + (sets - 1) * rest
+    if t == "reps":        return sets * 20 + (sets - 1) * rest
+    return 0
+
+
 def estimate_duration(exercises: list[dict]) -> int:
-    total = 120
-    for ex in exercises:
-        t, sets, rest = ex["type"], ex.get("sets", 1), ex.get("rest_seconds", 60)
-        if t == "duration":    total += (ex.get("duration_minutes") or 0) * 60 + 30
-        elif t == "hold":      total += sets * (ex.get("hold_seconds") or 0) + (sets - 1) * rest + 30
-        elif t == "hold_reps": total += sets * (ex.get("hold_seconds") or 0) * (ex.get("reps_in_set") or 1) + (sets - 1) * rest + 30
-        elif t == "reps":      total += sets * 20 + (sets - 1) * rest + 30
+    total = 120 + sum(exercise_duration_seconds(ex) + 30 for ex in exercises)
     return max(10, round(total / 60))
 
 
@@ -198,6 +208,33 @@ def seed_default_phase(phases: list[Phase], plan_start: date | None) -> list[Pha
     if phases or plan_start is None:
         return phases
     return [_plan.default_phase(plan_start)]
+
+
+_PLAN_BY_PHASE_NUMBER: dict[int, dict[int, dict]] = {1: tp.PLAN, 2: tp.PLAN_STAGE2}
+
+
+def plan_dict_for_phase(phase_number: int) -> dict[int, dict] | None:
+    """The day-number-keyed PLAN dict authored for this phase, or None if
+    nothing's been authored for it yet (legitimate — not every phase has
+    content written)."""
+    return _PLAN_BY_PHASE_NUMBER.get(phase_number)
+
+
+def begin_new_phase(phases: list[Phase], new_phase: Phase) -> list[Phase]:
+    """Append a new phase, marking any prior phase whose date range has
+    already ended as 'completed' (a data-hygiene step — active_phase()'s own
+    date check already excludes lapsed phases regardless, so this doesn't
+    change behavior, just keeps stored status honest). Caller persists via
+    repo.set_phases(); this stays a pure list transform."""
+    today = date.today()
+    updated = [
+        Phase(phase_number=p.phase_number, name=p.name, start_date=p.start_date,
+              length_days=p.length_days,
+              status="completed" if p.status == "active" and _plan.phase_end_date(p) < today else p.status)
+        for p in phases
+    ]
+    updated.append(new_phase)
+    return updated
 
 
 def day_view_state(selected: date, today: date, active: Phase | None, is_logged: bool) -> str:

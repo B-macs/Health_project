@@ -113,11 +113,11 @@ SENSATION_TAGS: list[str] = [
 #  training_plan.py is a self-contained exercise universe (doesn't reference
 #  EXERCISES above), so this map is scoped to its names, not EXERCISES'.
 #
-#  Maintenance: when Stage 2's training plan is built (see CLAUDE.md's Known
-#  Open Issues — not yet built as of this writing), any new exercise names it
-#  introduces need an entry here too, or services.bioage will silently skip
-#  them (an exercise absent from this map counts toward no region at all,
-#  rather than raising).
+#  Maintenance: Stage 2 (training_plan.PLAN_STAGE2) is now built and its new
+#  exercise names are included below. Any *future* block's new exercise names
+#  need an entry here too, or services.bioage will silently skip them (an
+#  exercise absent from this map counts toward no region at all, rather than
+#  raising).
 #
 #  "Week 1 Self-Assessment" is deliberately absent — it's a subjective
 #  checkpoint (pain/tightness self-rating), not a physical exercise with a
@@ -129,6 +129,11 @@ _UPPER_BODY_EXERCISES: tuple[str, ...] = (
     "Prone Y-Raise (Scapular)",
     "Thoracic Extension (Rolled Towel)",
     "Thread-the-Needle (Thoracic Rotation)",
+    # Stage 2A additions
+    "Incline DB Press",
+    "Face Pull (Cable)",
+    "Lat Pulldown",
+    "Single-Arm DB Row",
 )
 
 _CORE_EXERCISES: tuple[str, ...] = (
@@ -154,6 +159,8 @@ _CORE_EXERCISES: tuple[str, ...] = (
     "Forearm Plank",
     "McGill Big 3 — Quality Screen",
     "Child's Pose",
+    # Stage 2A additions
+    "Pallof Press (Cable)",
 )
 
 _LOWER_BODY_EXERCISES: tuple[str, ...] = (
@@ -199,6 +206,12 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Hip Hinge Full Range Assessment",
     "5-Minute Walk + Stair Assessment",
     "Wall-Supported Hip Hinge",
+    # Stage 2A additions
+    "Goblet Squat",
+    "Romanian Deadlift (DB)",
+    "Hip Thrust (Loaded)",
+    "Bulgarian Split Squat",
+    "Lateral Band Walk",
 )
 
 EXERCISE_BODY_REGION: dict[str, str] = {

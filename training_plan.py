@@ -52,6 +52,7 @@ def _ex(
     duration_minutes: int | None = None,
     laterality: str = "bilateral",
     warning: str | None = None,
+    weight_kg: float | None = None,
 ) -> dict:
     return {
         "name": name,
@@ -69,6 +70,7 @@ def _ex(
         "progression": progression,
         "regression": regression,
         "warning": warning,
+        "weight_kg": weight_kg,
     }
 
 
@@ -1694,6 +1696,559 @@ PLAN[21] = {
             biomechanical_focus="Integrated functional outcome assessment — the primary clinical benchmark, now showing the trend across Day 7, Day 14, and this recovery check.",
             progression="Pain <=2/10 throughout, matching or beating Day 14 → Stage 1 genuinely complete, ready for the Stage 2 reassessment conversation.",
             regression="Pain >3/10 on stairs, or worse than Day 14 → discuss with physiotherapist before progressing; do not start Stage 2 on this data.",
+        ),
+    ],
+}
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  STAGE 2A — 28-DAY GYM STRENGTH BLOCK (Phase 2, Days 1-28, starts 2026-07-20)
+#
+#  Cleared 2026-07-19 (Day 21 reassessment passed, physiotherapist signed off
+#  on external load — see patient_profile.PROFILE["stage_transitions"]).
+#  Deliberately decoupled from the previously-discussed 10km race periodization:
+#  NO running is introduced in this block. That decision, and Stage 2B timing,
+#  are deferred to a later reassessment conversation (see Day 28 below).
+#
+#  EQUIPMENT: Commercial gym — dumbbells, cable stack, lat pulldown, bench,
+#  barbell/plates for hip thrust. ACWR ceiling: 1.3. Session RPE ceiling: 8/10.
+#  Starting loads are a conservative fraction of the 2025 strength-year ceiling
+#  (Input_files/2025-training-year.md) — a ceiling, not a starting point, per
+#  docs/clinical_profile_weighting.md #3.
+#
+#  Two right-hip mechanisms, kept distinct (do not conflate their cues):
+#    - Coxa Saltans (iliopsoas snap, hip flexion >60° + external rotation,
+#      standing OR supine): needs an in-movement neutral/internal-rotation
+#      cue. Applies to Goblet Squat depth and Bulgarian Split Squat front leg.
+#    - Posterior capsule / ischial click (hip hinge, opposite leg extended):
+#      addressed by the pre-session release, not an in-movement cue — a click
+#      during RDL is an expected structural release, not a stop signal (a
+#      sharp lumbar symptom is the actual stop signal).
+#
+#  No overhead/standing press this block — deliberate. Overhead press is
+#  Stage-2 "caution" per services/rules.py (technically usable), but the
+#  Latarjet history + the 2025 log's own note ("overhead press exposes
+#  instability, left tilt") + the left rhomboid strain that occurred
+#  specifically under overhead load argue for Incline DB Press (back-
+#  supported, no lumbar-extension moment) as this block's pressing pattern
+#  instead, with heavy scapular-control prerequisite work alongside it.
+#
+#  Progression: fast-track lifts (documented strengths in the 2025 log — Hip
+#  Thrust, Lat Pulldown, DB Row, Face Pull) get +2.5kg every weekly exposure.
+#  Slow-track lifts (documented breakdown patterns — Goblet Squat, RDL,
+#  Incline Press, Bulgarian Split Squat) get +2.5kg only every OTHER exposure;
+#  off-weeks hold load and add a tempo/pause constraint instead. Core work is
+#  sequenced LAST in every loaded session, deliberately post-fatigue — trains
+#  TA/multifidus endurance under fatigue, since "deep core switches off under
+#  fatigue" and "lumbar dominates at moderate load" are the documented weak
+#  links in the 2025 movement-pattern analysis, and training them fresh
+#  doesn't address that.
+# ─────────────────────────────────────────────────────────────────────────────
+
+PLAN_STAGE2: dict[int, dict] = {}
+
+_S2_RELEASE_ALWAYS = [UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF]
+
+
+def _s2_recovery_day(objective: str, template: str) -> dict:
+    """Active-recovery day — always-include release only (not hip-focused/
+    loaded enough to need the add-on release work), alternating between two
+    light content templates so the 14 recovery days in this block aren't
+    pure repetition."""
+    walk_minutes = 15 if template == "A" else 20
+    exercises = list(_S2_RELEASE_ALWAYS)
+    if template == "A":
+        exercises += [
+            _ex(
+                name="Dead Bug",
+                ex_type="hold_reps",
+                laterality="alternating",
+                sets=2, reps_in_set=8, hold_seconds=3, rest_seconds=45,
+                mechanics=(
+                    "Lower back flat throughout. Neutral/slight-internal-rotation bias on the "
+                    "right leg through the ~45-degree knee-extension range (finding #4 — the same "
+                    "click mechanism shows up here, not just standing). 8 reps each side, even count."
+                ),
+                biomechanical_focus="Maintenance dose of the neutral-rotation motor pattern through the supine leg-extension range, on days without loaded hip work.",
+                progression="8 clean reps each side, no clicking → add a 2-second hold at full extension.",
+                regression="Clicking or discomfort → reduce leg-extension range on the right.",
+            ),
+            _ex(
+                name="Pallof Press Hold (Doorframe)",
+                ex_type="hold",
+                laterality="unilateral",
+                sets=2, hold_seconds=30, rest_seconds=45,
+                mechanics="Band or towel anchored at chest height, press straight out and hold, resisting rotation. Bodyweight/band anti-rotation — no cable load, distinct from the loaded cable Pallof press on gym days.",
+                biomechanical_focus="Anti-rotation core control on a light day — addresses finding #5 without adding session load.",
+                progression="Rock solid at 30s → step further from the anchor to increase lever arm.",
+                regression="Trunk rotates → step closer to the anchor.",
+            ),
+            _ex(
+                name="Cat-Cow",
+                ex_type="reps",
+                sets=2, reps=10, tempo="4-0-4", rest_seconds=45,
+                mechanics="Comfortable range only, never forcing end-range lumbar extension.",
+                biomechanical_focus="Gentle segmental lumbar mobilisation between loaded sessions.",
+                progression="Pain-free → 15 reps, add a 2-second pause at each end.",
+                regression="Extension discomfort → Cat position only.",
+            ),
+            _ex(
+                name="Thoracic Extension (Rolled Towel)",
+                ex_type="hold",
+                sets=2, hold_seconds=60, rest_seconds=45,
+                mechanics="Rolled towel under the mid-back, arms overhead, allow gentle passive thoracic extension.",
+                biomechanical_focus="Addresses the T6-T10 facet compression finding — kept in the program even though the block's headline is now loaded strength work, since the mid-back strain is a recurring pattern (3rd occurrence), not a one-off.",
+                progression="Comfortable → thicker towel roll for more extension.",
+                regression="Any lumbar (not thoracic) sensation → thinner towel roll.",
+            ),
+        ]
+    else:
+        exercises += [
+            _ex(
+                name="Scapular Wall Slide",
+                ex_type="reps",
+                sets=2, reps=10, tempo="3-1-3", rest_seconds=45,
+                mechanics="Wrists/elbows stay in contact with the wall throughout — bodyweight-only scapular control, no external load, on a day between loaded sessions.",
+                biomechanical_focus="Maintenance dose for the standing scapular-control requirement (finding #6) — this is not optional conditioning, it's how the Latarjet repair stays stable.",
+                progression="Full contact maintained → add a 2-second hold at the top.",
+                regression="Contact lost early → reduce range.",
+            ),
+            _ex(
+                name="Thread-the-Needle (Thoracic Rotation)",
+                ex_type="reps",
+                laterality="unilateral",
+                sets=2, reps=8, rest_seconds=45,
+                mechanics="Hands and knees, thread one arm under the body then rotate it up toward the ceiling, following it with your eyes. Comfortable range only.",
+                biomechanical_focus="Thoracic rotation without lumbar rotation under load — segmental mobility maintenance on a light day.",
+                progression="Smooth throughout → add a 2-second hold at full rotation.",
+                regression="Any lumbar rotation compensation → reduce range.",
+            ),
+            _ex(
+                name="Full Side Bridge",
+                ex_type="hold",
+                laterality="unilateral",
+                sets=2, hold_seconds=30, rest_seconds=45,
+                mechanics="Full side plank, both legs extended, hips lifted and held level.",
+                biomechanical_focus="Lateral core endurance — the same obliques/QL pattern the 2025 log documents as a genuine strength, maintained on a light day.",
+                progression="Stable throughout → increase to 40 seconds.",
+                regression="Hips sag → regress to the bent-knee version.",
+            ),
+            _ex(
+                name="Child's Pose",
+                ex_type="hold",
+                sets=1, hold_seconds=60, rest_seconds=0,
+                mechanics="Kneel, sit back toward your heels, arms extended forward, let the low back relax into gentle flexion.",
+                biomechanical_focus="Passive restorative close to a light day.",
+                progression="N/A — restorative hold, not a progressed exercise.",
+                regression="Knee discomfort → wider knee stance or place a cushion behind the knees.",
+            ),
+        ]
+    exercises.append(
+        _ex(
+            name="Controlled Walking",
+            ex_type="duration",
+            sets=1, duration_minutes=walk_minutes, rest_seconds=0,
+            mechanics=f"Brisk, comfortable-pace walk, {walk_minutes} minutes continuous. No running — running is an explicitly deferred decision for a later block, not part of Stage 2A.",
+            biomechanical_focus="Low-impact conditioning and active recovery between loaded sessions, without the axial impact running would introduce.",
+            progression="Pain-free throughout → next block may introduce run/walk intervals (separate decision).",
+            regression="Any discomfort → reduce to a shorter, slower walk.",
+        )
+    )
+    return {
+        "objective": objective,
+        "phase": "Stage 2A — Gym Strength Block",
+        "session_rpe_target": 3,
+        "exercises": exercises,
+    }
+
+
+def _s2_session_a(week: int) -> dict:
+    """Squat + Press + Core. Goblet Squat and Incline Press are slow-track
+    (2025 log's documented breakdown patterns); Face Pull is fast-track."""
+    squat_kg  = {1: 10.0, 2: 10.0, 3: 12.5, 4: 12.5}[week]
+    squat_tempo = "3-1-1" if week in (1, 3) else "3-2-1"
+    press_kg  = {1: 8.0, 2: 8.0, 3: 10.0, 4: 10.0}[week]
+    face_pull_kg = {1: 10.0, 2: 12.5, 3: 15.0, 4: 17.5}[week]
+    pallof_kg = {1: 7.5, 2: 7.5, 3: 10.0, 4: 10.0}[week]
+    side_bridge_hold = {1: 30, 2: 35, 3: 40, 4: 45}[week]
+    return {
+        "objective": f"Stage 2A Week {week} — Squat + Press + Core",
+        "phase": "Stage 2A — Gym Strength Block",
+        "session_rpe_target": 6 if week < 4 else 7,
+        "exercises": [
+            UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, COXA_SALTANS_DRILL,
+            _ex(
+                name="Goblet Squat",
+                ex_type="reps",
+                sets=3, reps=8, tempo=squat_tempo, rest_seconds=90,
+                weight_kg=squat_kg,
+                mechanics=(
+                    "Hold one dumbbell vertically at your chest. Squat to a comfortable depth "
+                    "with a brief pause at the bottom. At depth your right hip passes >60° "
+                    "flexion — actively keep the right thigh neutral or slightly internally "
+                    "rotated, do not let it drift into external rotation (Coxa Saltans cue). "
+                    "Brace before you descend, not after — the 2025 log shows bracing collapsing "
+                    "from rep 6 onward under load; this pause tempo trains bracing before load increases."
+                ),
+                biomechanical_focus="Squat pattern retraining — excellent depth/mobility already documented, but bracing collapse under load and a right-side hip shift are the identified weak links this directly targets.",
+                progression="8 clean reps, brace held through the pause, no right-hip drift → next exposure adds load or tempo per the block's slow-track schedule.",
+                regression="Bracing fails before rep 6, or right hip drifts into external rotation → reduce depth slightly and/or hold current load an extra week.",
+            ),
+            _ex(
+                name="Incline DB Press",
+                ex_type="reps",
+                sets=3, reps=10, rest_seconds=75,
+                weight_kg=press_kg,
+                mechanics=(
+                    "Bench set to a moderate incline. Retract the shoulder blades into the bench "
+                    "before every rep. If the right shoulder wants to roll forward or sag at the "
+                    "top, reduce range rather than push through it. No standing or seated overhead "
+                    "pressing this block — this back-supported incline pattern is the deliberate "
+                    "substitute (see block notes above)."
+                ),
+                biomechanical_focus="Conservative, scapular-control-first pressing given the Latarjet history and the 2025 log's documented left-tilt instability under overhead load — directly ceiling-referenced against the 18kg x12 peak.",
+                progression="10 clean reps, scapulae stay retracted, no shoulder roll → next exposure adds load or tempo per the block's slow-track schedule.",
+                regression="Shoulder rolls forward or sags at the top → reduce range of motion before reducing load.",
+            ),
+            _ex(
+                name="Face Pull (Cable)",
+                ex_type="reps",
+                sets=3, reps=12, rest_seconds=60,
+                weight_kg=face_pull_kg,
+                mechanics="Cable at upper-chest height. Pull toward your face, elbows high, squeezing the shoulder blades together and down at the end.",
+                biomechanical_focus="Scapular control and rear-delt/rotator-cuff work — always paired with pressing per finding #6, and a documented strength pattern (fast-track progression).",
+                progression="12 clean reps, full scapular squeeze → +2.5kg next exposure (fast-track).",
+                regression="Shrugging instead of scapular squeeze → reduce load until the movement is clean.",
+            ),
+            _ex(
+                name="Pallof Press (Cable)",
+                ex_type="reps",
+                laterality="unilateral",
+                sets=3, reps=10, rest_seconds=60,
+                weight_kg=pallof_kg,
+                mechanics="Cable at chest height, stand side-on, press the handle straight out and back in without letting the cable rotate your trunk.",
+                biomechanical_focus="Anti-rotation core control under real load — addresses finding #5 and the rotation-under-load caution with a controlled, non-rotational pattern.",
+                progression="10 reps each side with zero trunk rotation → small load increase next exposure.",
+                regression="Any trunk rotation → reduce load until the press is completely still.",
+            ),
+            _ex(
+                name="McGill Curl-Up (Progressed)",
+                ex_type="hold_reps",
+                sets=3, reps_in_set=8, hold_seconds=10, rest_seconds=45,
+                mechanics="One knee bent, hands under the low back, brace and lift only the head/shoulders slightly — a bracing hold, not a crunch. Deliberately placed last, after the squat/press work, to train bracing under real fatigue rather than fresh.",
+                biomechanical_focus="Deep core (TA/multifidus) endurance specifically under fatigue — the documented weak link ('switches off under fatigue') that undertrained core work done fresh doesn't address.",
+                progression="10-second holds feel controlled, no lumbar movement → hold for 12 seconds.",
+                regression="Low back moves during the hold → reduce hold time, prioritise a still spine.",
+            ),
+            _ex(
+                name="Full Side Bridge",
+                ex_type="hold",
+                laterality="unilateral",
+                sets=3, hold_seconds=side_bridge_hold, rest_seconds=45,
+                mechanics="Full side plank, both legs extended, hips lifted and held level, forearm supporting.",
+                biomechanical_focus="Lateral core endurance under post-squat/press fatigue — obliques/QL are a documented strength; this trains that strength to hold up when the rest of the system is already tired.",
+                progression=f"Full {side_bridge_hold}s stable both sides → increase hold next exposure.",
+                regression="Hips sag or shake before time is up → reduce hold time.",
+            ),
+        ],
+    }
+
+
+def _s2_session_b(week: int) -> dict:
+    """Hinge + Pull + Core. RDL is slow-track; Hip Thrust/Lat Pulldown/DB Row
+    are fast-track (documented strengths in the 2025 log)."""
+    rdl_kg    = {1: 10.0, 2: 10.0, 3: 12.5, 4: 12.5}[week]
+    rdl_tempo = "3-1-2" if week in (1, 3) else "3-2-2"
+    thrust_kg = {1: 20.0, 2: 22.5, 3: 25.0, 4: 27.5}[week]
+    pulldown_kg = {1: 25.0, 2: 27.5, 3: 30.0, 4: 32.5}[week]
+    row_kg    = {1: 12.5, 2: 15.0, 3: 17.5, 4: 20.0}[week]
+    return {
+        "objective": f"Stage 2A Week {week} — Hinge + Pull + Core",
+        "phase": "Stage 2A — Gym Strength Block",
+        "session_rpe_target": 6 if week < 4 else 7,
+        "exercises": [
+            UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, ISCHIAL_RELEASE,
+            _ex(
+                name="Romanian Deadlift (DB)",
+                ex_type="reps",
+                sets=3, reps=10, tempo=rdl_tempo, rest_seconds=90,
+                weight_kg=rdl_kg,
+                mechanics=(
+                    "One dumbbell in each hand, hinge from the hips keeping the DBs close to your "
+                    "shins. Stop the descent the instant your lower back wants to round — depth is "
+                    "whatever range you can keep neutral. A right posterior-hip/sit-bone sensation "
+                    "here is an expected structural release (finding #2), not a stop signal; a sharp "
+                    "lumbar symptom is the actual stop signal. Kept well below the 70-90kg range "
+                    "where the 2025 log shows the lumbar taking over and the glutes not finishing lockout."
+                ),
+                biomechanical_focus="Hinge pattern retraining at light load, where the 2025 log shows form is genuinely good — the goal is to keep it good as load returns, not to rush toward the range where it previously broke down.",
+                progression="10 clean reps, neutral spine throughout, glutes finish the lockout → next exposure adds load or tempo per the block's slow-track schedule.",
+                regression="Lower back rounds or glutes don't finish lockout → hold current load, add the tempo constraint instead.",
+            ),
+            _ex(
+                name="Hip Thrust (Loaded)",
+                ex_type="reps",
+                sets=3, reps=10, rest_seconds=75,
+                weight_kg=thrust_kg,
+                mechanics="Upper back on a bench, bar/plate across the hips. Drive through the heels, squeeze the glutes hard at lockout with a 2-second pause, don't hyperextend the lower back at the top.",
+                biomechanical_focus="A documented strength pattern (2025 log: glutes strong in isolation, 50kg+ tolerated well) — fast-tracked accordingly, and it directly trains the hip-extension lockout that under-fires in the RDL and squat.",
+                progression="10 clean reps, full glute lockout, no lumbar hyperextension → +2.5kg next exposure (fast-track).",
+                regression="Lumbar hyperextends at lockout → reduce load until the glutes (not the low back) are finishing the rep.",
+            ),
+            _ex(
+                name="Lat Pulldown",
+                ex_type="reps",
+                sets=3, reps=10, rest_seconds=60,
+                weight_kg=pulldown_kg,
+                mechanics="Wide or neutral grip, pull to the upper chest, squeeze the shoulder blades down and together at the bottom before controlling the return.",
+                biomechanical_focus="Scapular depression strengthening — the specific weakness flagged in the 2025 log's scapular analysis, and a well-tolerated pattern (fast-track).",
+                progression="10 clean reps, full scapular depression each rep → +2.5kg next exposure (fast-track).",
+                regression="Using momentum instead of scapular depression → reduce load.",
+            ),
+            _ex(
+                name="Single-Arm DB Row",
+                ex_type="reps",
+                laterality="unilateral",
+                sets=3, reps=10, rest_seconds=60,
+                weight_kg=row_kg,
+                mechanics="Supported on a bench, row the dumbbell to your hip, leading with the elbow, full control on the way down. Even rep count both arms.",
+                biomechanical_focus="Unilateral pulling strength and scapular retraction — complements the bilateral pulldown, fast-tracked as a well-tolerated pattern.",
+                progression="10 clean reps each arm, no trunk rotation → +2.5kg next exposure (fast-track).",
+                regression="Trunk rotates to complete the rep → reduce load.",
+            ),
+            _ex(
+                name="Dead Bug",
+                ex_type="hold_reps",
+                laterality="alternating",
+                sets=3, reps_in_set=8, hold_seconds=3, rest_seconds=45,
+                mechanics="Placed after the hinge work, deliberately — lower back flat throughout, neutral/slight-internal-rotation bias on the right leg through the ~45-degree knee-extension range. 8 reps each side, even count.",
+                biomechanical_focus="Bracing under post-hinge fatigue, and continued reinforcement of the neutral-rotation motor pattern through the supine leg-extension range (finding #4).",
+                progression="8 clean reps each side, flat back maintained, no clicking → add a 2-second hold at full extension.",
+                regression="Low back arches off the floor, or clicking → reduce leg-extension range on the right.",
+            ),
+            _ex(
+                name="Pallof Press Hold (Doorframe)",
+                ex_type="hold",
+                laterality="unilateral",
+                sets=3, hold_seconds=30, rest_seconds=45,
+                mechanics="Band or towel anchored at chest height, press straight out and hold, resisting rotation. Bodyweight/band — the lighter anti-rotation variant, done after the loaded Pallof work already appears in Session A's weekly rotation.",
+                biomechanical_focus="Anti-rotation endurance under post-hinge fatigue.",
+                progression="Rock solid at 30s → step further from the anchor.",
+                regression="Trunk rotates → step closer to the anchor.",
+            ),
+        ],
+    }
+
+
+def _s2_session_c(week: int) -> dict:
+    """Unilateral/Glute + Scapular + Core. Bulgarian Split Squat is slow-
+    track and stays bodyweight through Week 2 per the block design."""
+    bss_kg = {1: None, 2: None, 3: 2.5, 4: 2.5}[week]
+    bss_note = "bodyweight" if bss_kg is None else f"a {bss_kg}kg dumbbell in each hand"
+    bridge_hold = {1: 2, 2: 2, 3: 3, 4: 3}[week]
+    yraise_kg = {1: None, 2: None, 3: 1.0, 4: 1.0}[week]
+    band_note = "light resistance band" if week <= 2 else "medium resistance band"
+    return {
+        "objective": f"Stage 2A Week {week} — Unilateral/Glute + Scapular + Core",
+        "phase": "Stage 2A — Gym Strength Block",
+        "session_rpe_target": 5 if week < 4 else 6,
+        "exercises": [
+            UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, COXA_SALTANS_DRILL,
+            _ex(
+                name="Bulgarian Split Squat",
+                ex_type="reps",
+                laterality="unilateral",
+                sets=3, reps=8, rest_seconds=75,
+                weight_kg=bss_kg,
+                mechanics=(
+                    f"Rear foot elevated on a bench, {bss_note}. When the RIGHT leg is forward, "
+                    "the working hip crosses 60 degrees of flexion at the bottom of the rep — apply "
+                    "the same neutral/slight-internal-rotation cue as the goblet squat (Coxa Saltans). "
+                    "8 reps each leg, even count."
+                ),
+                biomechanical_focus="Single-leg strength and right-side monitoring in a loaded, hip-flexion-heavy pattern — the same mechanism as the standing coxa saltans finding, now under real single-leg load.",
+                progression="8 clean reps each leg, no click on the right, level pelvis → progress load per the block's slow-track schedule (bodyweight through Week 2, then add load).",
+                regression="Click on the right, or pelvis drops → reduce depth before reducing load.",
+            ),
+            _ex(
+                name="Single-Leg Glute Bridge",
+                ex_type="hold_reps",
+                laterality="unilateral",
+                sets=3, reps_in_set=8, hold_seconds=bridge_hold, rest_seconds=60,
+                mechanics=(
+                    "One leg extended straight, bridge on the other. The right side has been "
+                    "noticeably harder than the left in prior sessions — expect that difference, "
+                    "keep the pelvis level rather than forcing the right to match the left's range. "
+                    "8 reps each side, even count."
+                ),
+                biomechanical_focus="Unilateral glute max strength, continuing to test and train the documented right-left asymmetry, now within the loaded block.",
+                progression="Pelvis stays level both sides → increase hold duration next exposure.",
+                regression="Pelvis drops or rotates on the right → reduce hold time, prioritise level pelvis.",
+            ),
+            _ex(
+                name="Scapular Wall Slide",
+                ex_type="reps",
+                sets=2, reps=10, tempo="3-1-3", rest_seconds=45,
+                mechanics="Wrists/elbows stay in contact with the wall throughout — bodyweight-only, no external load.",
+                biomechanical_focus="Standing scapular-control requirement for the Latarjet-repaired shoulder (finding #6) — maintained every week regardless of loaded-lift progression.",
+                progression="Full contact maintained pain-free → add a 2-second hold at the top.",
+                regression="Contact lost early or shoulder discomfort → reduce range.",
+            ),
+            _ex(
+                name="Prone Y-Raise (Scapular)",
+                ex_type="hold_reps",
+                sets=2, reps_in_set=8, hold_seconds=3, rest_seconds=45,
+                weight_kg=yraise_kg,
+                mechanics="Face down, arms overhead in a Y, lift a few inches and squeeze the lower shoulder blades together, hold, lower with control. Low back stays relaxed — this is a scapular movement, not a back extension.",
+                biomechanical_focus="Lower trapezius strengthening — the specific weak link in the right shoulder's eccentric control flagged in the 2025 log.",
+                progression="Clean reps, no lumbar compensation → small load addition next exposure.",
+                regression="Low back arches to compensate → reduce lift height and/or load before adding more.",
+                warning="Stop if this produces lumbar extension discomfort — reduce lift height immediately.",
+            ),
+            _ex(
+                name="Lateral Band Walk",
+                ex_type="reps",
+                sets=2, reps=10, rest_seconds=45,
+                mechanics=f"Band around the ankles or just above the knees, athletic stance, step sideways maintaining tension throughout — {band_note}. 10 steps each direction.",
+                biomechanical_focus="Glute medius strengthening, complementing the release-then-activate sequencing — the upper glute/TFL is released pre-session, this activates glute max's synergist without letting the overactive medius take back over.",
+                progression="Full tension held, no hip hike → step up a band level.",
+                regression="Hip hikes or band tension is lost → step down a band level.",
+            ),
+            _ex(
+                name="Bird-Dog",
+                ex_type="hold_reps",
+                laterality="alternating",
+                sets=3, reps_in_set=8, hold_seconds=8, rest_seconds=45,
+                mechanics="Hands and knees, extend opposite arm and leg, neutral spine throughout, hold, return with control.",
+                biomechanical_focus="Contralateral core stability — a documented strength pattern, used here as the week's final core finisher after unilateral leg and scapular work.",
+                progression="8 clean reps each side, no lumbar rotation → add a 2-second hold.",
+                regression="Lumbar rotates or hips shift → reduce reach distance.",
+            ),
+            _ex(
+                name="Side Bridge with Hip Dip",
+                ex_type="hold_reps",
+                laterality="unilateral",
+                sets=2, reps_in_set=6, hold_seconds=3, rest_seconds=45,
+                mechanics="Side plank position, dip the hips toward the floor and lift back to the held position, controlled throughout.",
+                biomechanical_focus="Lateral core control through a small range of motion — closes out the session's core work with a dynamic (not purely static) lateral pattern.",
+                progression="Clean control both sides → add a rep.",
+                regression="Loss of control on the dip → reduce range of the dip.",
+            ),
+        ],
+    }
+
+
+for _week in (1, 2, 3, 4):
+    _base = (_week - 1) * 7
+    PLAN_STAGE2[_base + 1] = _s2_session_a(_week)
+    PLAN_STAGE2[_base + 2] = _s2_recovery_day(f"Active Recovery — Week {_week}", "A")
+    PLAN_STAGE2[_base + 3] = _s2_session_b(_week)
+    PLAN_STAGE2[_base + 4] = _s2_recovery_day(f"Active Recovery — Week {_week}", "B")
+    PLAN_STAGE2[_base + 5] = _s2_session_c(_week)
+    PLAN_STAGE2[_base + 6] = _s2_recovery_day(f"Active Recovery — Week {_week}", "A")
+    PLAN_STAGE2[_base + 7] = _s2_recovery_day(f"Active Recovery — Week {_week}", "B")
+
+# Day 14 — mid-block checkpoint. Light functional re-check, not a full
+# battery: confirms nothing has regressed under the new external load before
+# continuing into weeks 3-4, and gives an explicit place to log working
+# loads reached so far.
+PLAN_STAGE2[14] = {
+    "objective": "Mid-Block Checkpoint — Light Functional Re-Check",
+    "phase": "Stage 2A — Gym Strength Block",
+    "session_rpe_target": 2,
+    "exercises": [
+        UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF,
+        _ex(
+            name="Hip Hinge Full Range Assessment",
+            ex_type="reps",
+            sets=1, reps=10, tempo="3-1-3", rest_seconds=60,
+            mechanics="Full hip hinge to maximum comfortable range, light effort only. Compare pain-free range and any right-side sensation to before this block started.",
+            biomechanical_focus="Confirms the hinge pattern is holding up under two weeks of real external load before progressing further.",
+            progression="Pain-free, matching or better than block start → continue into Weeks 3-4 as planned.",
+            regression="Worse than block start → hold current loads for Week 3 rather than progressing, and flag to physiotherapist if it doesn't recover by Week 3.",
+        ),
+        _ex(
+            name="Single-Leg Balance (Eyes Closed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=1, hold_seconds=60, rest_seconds=45,
+            mechanics="Stand on one leg, eyes closed once stable. Compare to your Stage 1 baseline.",
+            biomechanical_focus="Proprioceptive check that loaded training hasn't degraded balance/control.",
+            progression="Matching or beating the Stage 1 baseline → no concerns.",
+            regression="Notably worse → note it and mention at the Day 28 reassessment.",
+        ),
+        _ex(
+            name="Controlled Walking",
+            ex_type="duration",
+            sets=1, duration_minutes=15, rest_seconds=0,
+            mechanics="Log working loads reached on all six primary lifts so far (Goblet Squat, Incline DB Press, RDL, Hip Thrust, Lat Pulldown, Single-Arm DB Row) during this walk's cool-down, then walk 15 minutes at a comfortable pace.",
+            biomechanical_focus="Low-impact conditioning; the walk itself is also the natural pause point to log the checkpoint data.",
+            progression="N/A — logging checkpoint.",
+            regression="N/A.",
+        ),
+    ],
+}
+
+# Day 28 — full reassessment. Mirrors Stage 1's Day 21 battery format so the
+# same functional measures are comparable across both stages, plus final
+# working-load logging on every primary lift. Output feeds two decisions
+# explicitly NOT made in this plan: running introduction, and Stage 2B vs.
+# extending Stage 2A.
+PLAN_STAGE2[28] = {
+    "objective": "Stage 2A Reassessment — Final Working Loads + Functional Screen",
+    "phase": "Stage 2A — Gym Strength Block",
+    "session_rpe_target": 4,
+    "exercises": [
+        RIGHT_HIP_CAPSULE_REVISED,
+        COXA_SALTANS_DRILL,
+        _ex(
+            name="McGill Big 3 — Quality Screen",
+            ex_type="reps",
+            sets=1, reps=8, rest_seconds=60,
+            mechanics=(
+                "One high-quality set of each: McGill Curl-Up x8 x8-second hold each, Bird-Dog "
+                "x8 each side x8-second hold, Side Bridge x40 seconds each side. Compare to the "
+                "Stage 1 Day 21 screen — four weeks of loaded training should hold this steady or "
+                "better, not worse."
+            ),
+            biomechanical_focus="Functional re-check of the foundational spinal stability system after a full block of external load.",
+            progression="Equal or better than the Stage 1 Day 21 screen → supports continued progression.",
+            regression="Worse than Day 21 → flag for physiotherapist discussion before any further loading increase.",
+        ),
+        _ex(
+            name="Single-Leg Balance (Eyes Closed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=2, hold_seconds=60, rest_seconds=45,
+            mechanics="Stand on one leg, eyes closed once stable. Compare to Day 14 of this block and to the Stage 1 baseline.",
+            biomechanical_focus="Proprioceptive re-check across the whole loaded block.",
+            progression="Matching or beating both prior checkpoints → criterion re-confirmed.",
+            regression="Notably worse → document for the physiotherapist conversation before deciding Stage 2B.",
+        ),
+        _ex(
+            name="Hip Hinge Full Range Assessment",
+            ex_type="reps",
+            sets=2, reps=10, tempo="3-1-3", rest_seconds=60,
+            mechanics="Full hip hinge, no wall, maximum comfortable range, 1-second pause at the bottom. Compare pain-free range and right-side sensation to the Day 14 checkpoint and the Stage 1 baseline.",
+            biomechanical_focus="The same functional hinge test used throughout, now with a full block of loaded RDL work behind it.",
+            progression="Full range, pain <=2/10, matching or beating prior checkpoints → supports Stage 2B / further loading.",
+            regression="Worse than prior checkpoints → discuss with physiotherapist before increasing load further.",
+        ),
+        _ex(
+            name="5-Minute Walk + Stair Assessment",
+            ex_type="duration",
+            sets=1, duration_minutes=7, rest_seconds=0,
+            mechanics=(
+                "Walk briskly 5 minutes, then up and down a flight of stairs twice at a normal "
+                "pace. Rate pain at each point. Compare to Stage 1's Day 7/14/21 scores. Also log "
+                "final working loads on all six primary lifts here (Goblet Squat, Incline DB Press, "
+                "RDL, Hip Thrust, Lat Pulldown, Single-Arm DB Row) as the new baseline — this data, "
+                "plus the screens above, is what feeds the (separate, not decided here) conversation "
+                "about running introduction and Stage 2B vs. extending Stage 2A."
+            ),
+            biomechanical_focus="Integrated functional outcome measure, now with a full loaded block's worth of trend data.",
+            progression="Pain <=2/10 throughout, matching or beating prior checkpoints → Stage 2A genuinely complete.",
+            regression="Pain >3/10 on stairs, or worse than prior checkpoints → discuss with physiotherapist before deciding next steps; do not decide Stage 2B or running introduction on this data.",
         ),
     ],
 }

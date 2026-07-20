@@ -160,3 +160,23 @@ def test_muscle_imbalance_count_against_real_patient_profile():
     # (CLAUDE.md rule 8 — updated before each new training block), this
     # documents that the count changed intentionally rather than silently.
     assert bioage.muscle_imbalance_count(patient_profile.PROFILE["imbalances"]) == 8
+
+
+# ─── Stage 2A activation — real EXERCISE_BODY_REGION, not the test's own _MAP ──
+# Demonstrates the previously-dormant pipeline (CLAUDE.md's "Strength BioAge
+# scores dormant" Known Open Issue) now activates end-to-end once a real
+# Stage 2 exercise logs non-zero weighted volume.
+
+def test_stage2_exercise_activates_lower_body_region_via_real_map():
+    import training_constants as tc
+    sessions = [_session("2026-07-20", [_exercise("Goblet Squat", 240.0)])]
+    assert bioage.has_weighted_training(sessions, "lower_body", tc.EXERCISE_BODY_REGION) is True
+    assert bioage.region_effort(sessions, "lower_body", tc.EXERCISE_BODY_REGION) == 240.0
+
+
+def test_stage1_bodyweight_exercise_still_does_not_activate_via_real_map():
+    import training_constants as tc
+    # Glute Bridge is a real, mapped Stage 1 name, but Stage 1 never logs
+    # weighted volume — total_volume_kg stays 0/None regardless of mapping.
+    sessions = [_session("2026-07-01", [_exercise("Glute Bridge", 0.0)])]
+    assert bioage.has_weighted_training(sessions, "lower_body", tc.EXERCISE_BODY_REGION) is False

@@ -46,6 +46,24 @@ st.markdown(nav.CHROME_CSS, unsafe_allow_html=True)
 # Fallback: st.query_params["page"] for direct URL access and first load.
 _page = st.session_state.get("_nav_page") or st.query_params.get("page", "home")
 
+# Keep the URL in sync with whichever page _nav_page resolved to. Nav
+# buttons (nav.py's bottom nav, training.py's two internal "back to home"
+# spots) only ever set session_state, never st.query_params — so without
+# this, the address bar goes stale the moment you navigate anywhere via a
+# button instead of a link. That's normally invisible, EXCEPT that
+# st.query_params is the fallback used whenever session_state resets (any
+# WebSocket reconnect: mobile screen lock, app backgrounding, a dropped
+# connection — none of which are rare on a phone). When that happens, the
+# user lands wherever the URL last pointed — which in practice is almost
+# always ?page=checkin, since the Check-in FAB (app.py's own '+' button) is
+# the only real <a href> link in the app, everything else being session-
+# state-only nav buttons. Diagnosed by reproducing it directly: Check-in ->
+# Training (works fine in-session, URL still said ?page=checkin) -> reload
+# -> silently back on Check-in. Syncing here, once, centrally, fixes every
+# nav path at once rather than patching each button's on_click individually.
+if st.query_params.get("page") != _page:
+    st.query_params["page"] = _page
+
 if _page == "training":
     from views import training as _v
     styles.inject_css(); _v.render(); nav.inject("training"); st.stop()

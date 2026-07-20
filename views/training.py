@@ -423,10 +423,6 @@ def _get_plan_start() -> date | None:
     return None
 
 
-def _get_day_number(plan_start: date) -> int:
-    return (date.today() - plan_start).days + 1
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 #  Exercise display / auto-logging helpers now live in services/sessions.py —
 #  _prescription_label/_type_icon/_movement_category/_planned_reps/
@@ -886,6 +882,9 @@ def _render_workout_card(day_num: int, phase_obj, today_plan: dict,
     n_ex = len(exercises)
     phase_length = phase_obj.length_days
     phase_name = phase_obj.name
+    is_loaded = any(ex.get("weight_kg") for ex in exercises)
+    equipment_icon = "🏋" if is_loaded else "🏠"
+    equipment_label = "Loaded Session" if is_loaded else "Bodyweight Only"
     st.markdown(
         f"""
 <div style='background:{_OV_BG_ELEV};border-radius:16px;padding:22px 20px;margin-bottom:22px;'>
@@ -908,8 +907,8 @@ def _render_workout_card(day_num: int, phase_obj, today_plan: dict,
           <span style='color:{_OV_TEXT_PRI};font-size:13px;'>{focus_text}</span>
         </div>
         <div style='display:flex;align-items:center;gap:7px;'>
-          <span style='font-size:13px;'>🏠</span>
-          <span style='color:{_OV_TEXT_PRI};font-size:13px;'>Bodyweight Only</span>
+          <span style='font-size:13px;'>{equipment_icon}</span>
+          <span style='color:{_OV_TEXT_PRI};font-size:13px;'>{equipment_label}</span>
         </div>
       </div>
     </div>
@@ -1013,7 +1012,7 @@ def _render_past_missed(d: date, active) -> None:
         f"margin-bottom:16px;'>NOT COMPLETED</div>",
         unsafe_allow_html=True,
     )
-    today_plan = tp.PLAN.get(day_num) if active.phase_number == 1 else None
+    today_plan = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
     if not today_plan:
         st.info(f"Day {day_num} of {active.name} has no authored content on record.")
         return
@@ -1026,7 +1025,7 @@ def _render_future_day(d: date, active) -> None:
     can't begin a day out of sequence."""
     day_num = ph.day_number_in_phase(active, d)
     _day_overline(d)
-    today_plan = tp.PLAN.get(day_num) if active.phase_number == 1 else None
+    today_plan = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
     if not today_plan:
         st.markdown(
             f"<div style='color:{_OV_TEXT_SEC};font-size:13px;margin-bottom:12px;'>"
@@ -1453,7 +1452,8 @@ def render():
     #     if this is a fresh session (e.g. the browser dropped its connection
     #     while a training session was in progress) ───────────────────────────
     plan_start = _get_plan_start()
-    day_num = _get_day_number(plan_start) if plan_start else None
+    phases, active = _seed_and_get_active_phase(plan_start)
+    day_num = ph.day_number_in_phase(active, date.today()) if active else None
     _init_state(day_num)
 
     # ── "Add Training" — floating + menu on every state below; the yoga-picker
@@ -1495,7 +1495,7 @@ def render():
         st.stop()
 
     # ── Universal weekly day strip — top of page, every state ───────────────────
-    phases, active = _seed_and_get_active_phase(plan_start)
+    # (phases, active already resolved above, before _init_state)
 
     # ── Weekly Rollup — banner + last-week verdict, above the day strip in
     #     every state (matching the day strip's own universality) ───────────
@@ -1534,14 +1534,15 @@ def render():
     # ── selected == today: existing day_num-driven flow, unchanged below ────────
 
     # ── Day-overview screen — shown until "Start" is tapped for today's session ─
-    # Upper bound is however many days are actually authored in training_plan.py
-    # (originally a hardcoded 14; extended once a 7-day rehab-extension block or
-    # any future block adds more PLAN entries) rather than a magic number.
-    _plan_days = len(tp.PLAN)
+    # Upper bound is however many days are actually authored for the active
+    # phase's plan dict (Phase 1 → tp.PLAN, Phase 2 → tp.PLAN_STAGE2, via
+    # sess.plan_dict_for_phase) rather than a magic number.
+    active_plan = sess.plan_dict_for_phase(active.phase_number) or {}
+    _plan_days = len(active_plan)
     if (1 <= day_num <= _plan_days and not st.session_state.tp_done_today
             and not st.session_state.tp_started):
         _directive = _engine_directive()
-        today_plan = tp.PLAN[day_num]
+        today_plan = active_plan[day_num]
         exercises  = today_plan["exercises"]
         _render_overview(day_num, active, today_plan, exercises, _directive, _readiness_modifier)
         nav.inject("training")
@@ -1588,13 +1589,44 @@ def render():
     # ── Plan complete ─────────────────────────────────────────────────────────
     if day_num > _plan_days:
         st.balloons()
-        st.success(
-            f"**{_plan_days}-Day Stage 1 Rehab Complete.**\n\n"
-            "Your objectives: tissue tolerance established, neural desensitisation, "
-            "gluteal activation, hip hinge pattern, and spinal stability foundation.\n\n"
-            "Open **Autoregulation** to check Stage 1 → 2 progression criteria. "
-            "If criteria are met, confirm with your physiotherapist before advancing."
-        )
+        if active.phase_number == 1:
+            st.success(
+                f"**{_plan_days}-Day Stage 1 Rehab Complete.**\n\n"
+                "Your objectives: tissue tolerance established, neural desensitisation, "
+                "gluteal activation, hip hinge pattern, and spinal stability foundation.\n\n"
+                "Open **Autoregulation** to check Stage 1 → 2 progression criteria. "
+                "If criteria are met, confirm with your physiotherapist before advancing."
+            )
+            # Advancing Phase (content/day-numbering) and Stage (ACWR/RPE/volume
+            # ceilings) must happen together — services/plan.py's Phase and
+            # services/rules.py's Stage are deliberately decoupled systems, and
+            # authoring one without the other leaves the engine enforcing the
+            # wrong ceiling against the wrong content. This writes to the live
+            # Notion config — a deliberate action the user takes by clicking,
+            # never triggered automatically just because the calendar ran out.
+            if st.button("Begin Stage 2 — 4-Week Transition Block", type="primary",
+                         use_container_width=True):
+                new_phase = ph.default_phase(
+                    date.today(), length_days=28, phase_number=2,
+                    name="Stage 2 — Transition (Work Capacity)",
+                )
+                updated_phases = sess.begin_new_phase(phases, new_phase)
+                r = repo.get_repository()
+                r.set_phases(updated_phases)
+                r.set_config("current_stage", "2")
+                st.success("Stage 2 begins today. Come back for Day 1 of your 28-day gym block.")
+                st.rerun()
+        elif active.phase_number == 2:
+            st.success(
+                f"**{_plan_days}-Day Stage 2A Gym Strength Block Complete.**\n\n"
+                "Final working loads and the Day 28 functional screen are logged. "
+                "This data feeds two decisions that are deliberately not made here: "
+                "whether to introduce running, and whether to move to Stage 2B or "
+                "extend Stage 2A. Discuss both with your physiotherapist before the "
+                "next block is authored."
+            )
+        else:
+            st.success(f"**{_plan_days}-Day {active.name} Complete.**")
         if st.button("Back to Home", type="primary", use_container_width=True):
             st.session_state["_nav_page"] = "home"
             st.rerun()
@@ -1611,7 +1643,7 @@ def render():
     # green / grey: no banner — train normally, nothing to flag
 
     # ── Active plan day ───────────────────────────────────────────────────────
-    today_plan = tp.PLAN[day_num]
+    today_plan = active_plan[day_num]
     exercises  = today_plan["exercises"]
     n_ex       = len(exercises)
 
@@ -1670,6 +1702,34 @@ def render():
                 f"All {n_ex} exercises done — save your session.</div></div>",
                 unsafe_allow_html=True,
             )
+
+            # ── Review today's exercises — time/sets/weight per exercise ────
+            # weight_kg is absent from every exercise today (Stage 1 is
+            # bodyweight-only, see training_plan.py) — shows "Bodyweight"
+            # until a weighted exercise dict actually carries the field.
+            st.markdown("**Today's Training**")
+            garmin_minutes = st.session_state.get("tp_garmin_minutes", {})
+            review_idx = st.selectbox(
+                "Review an exercise",
+                options=range(n_ex),
+                format_func=lambda i: exercises[i]["name"],
+                key="tp_review_ex_idx",
+            )
+            review_ex = exercises[review_idx]
+            garmin_actual_min = garmin_minutes.get(review_idx)
+            if garmin_actual_min:
+                time_label, time_value = "Time (Garmin-verified)", f"{garmin_actual_min:.0f} min"
+            else:
+                review_secs = sess.exercise_duration_seconds(review_ex)
+                time_label, time_value = "Time (estimated)", f"{max(1, round(review_secs / 60))} min"
+            review_weight = review_ex.get("weight_kg")
+
+            col_review_time, col_review_sets, col_review_weight = st.columns(3)
+            col_review_time.metric(time_label, time_value)
+            col_review_sets.metric("Sets", str(review_ex.get("sets", 1)))
+            col_review_weight.metric("Weight", f"{review_weight} kg" if review_weight else "Bodyweight")
+            st.divider()
+
             if st.session_state.tp_session_start_ts > 0:
                 elapsed_minutes = max(5, int((time.time() - st.session_state.tp_session_start_ts) / 60))
             else:
@@ -1712,7 +1772,7 @@ def render():
                 unsafe_allow_html=True,
             )
             if day_num < _plan_days:
-                next_plan = tp.PLAN[day_num + 1]
+                next_plan = active_plan[day_num + 1]
                 with st.expander(f"Preview: Day {day_num + 1} — {next_plan['objective']}", expanded=False):
                     for nex in next_plan["exercises"]:
                         st.markdown(f"- {sess.type_icon(nex)} **{nex['name']}** — {sess.prescription_label(nex)}")

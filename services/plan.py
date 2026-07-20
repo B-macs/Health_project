@@ -40,6 +40,12 @@ def _end(phase: Phase) -> date:
     return _start(phase) + timedelta(days=phase.length_days - 1)
 
 
+def phase_end_date(phase: Phase) -> date:
+    """Public wrapper on _end — the last day of the phase, inclusive. For
+    callers outside this module (e.g. deciding whether a phase has lapsed)."""
+    return _end(phase)
+
+
 def active_phase(phases: list[Phase], today: date) -> Phase | None:
     """The phase whose date range covers today and whose status is 'active'.
     None during a reassessment gap between phases."""

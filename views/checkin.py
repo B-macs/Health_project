@@ -3,7 +3,7 @@ views/checkin.py — Morning Check-In view.
 Call render() from the SPA router in app.py.
 """
 
-from datetime import date
+from datetime import date, timedelta
 import streamlit as st
 import repo
 from services.models import CheckInRecord
@@ -52,7 +52,32 @@ PAIN_SCALE_GUIDE = [
 
 def render() -> None:
     st.title("Morning Check-In")
-    st.caption(f"{date.today().strftime('%A, %d %B %Y')} — Stage 1: Rehab")
+
+    today = date.today()
+    # Today + the previous 3 days, for backfilling a missed entry. Always
+    # defaults to today (index=0) regardless of which of those days already
+    # has an entry — no "smart" jump to the most recent gap.
+    date_options = [today - timedelta(days=i) for i in range(4)]
+
+    def _date_label(d: date) -> str:
+        if d == today:
+            return f"Today — {d.strftime('%A, %d %B %Y')}"
+        if d == today - timedelta(days=1):
+            return f"Yesterday — {d.strftime('%A, %d %B %Y')}"
+        return d.strftime("%A, %d %B %Y")
+
+    selected_date = st.selectbox(
+        "Check-in date",
+        options=date_options,
+        index=0,
+        format_func=_date_label,
+        key="checkin_date_select",
+    )
+
+    if selected_date != today:
+        st.caption(f"⚠ Backfilling {selected_date.strftime('%A, %d %B %Y')} — Stage 1: Rehab")
+    else:
+        st.caption(f"{selected_date.strftime('%A, %d %B %Y')} — Stage 1: Rehab")
     st.divider()
 
     with st.form("morning_checkin", clear_on_submit=True):
@@ -135,8 +160,9 @@ def render() -> None:
                 key="checkin_instability",
             )
             bristol_type = st.select_slider(
-                "Bristol Stool Type", options=[1, 2, 3, 4, 5, 6, 7], value=4,
-                help="1 = severe constipation, 7 = watery/diarrhea. 3–4 = normal.",
+                "Bristol Stool Type", options=[0, 1, 2, 3, 4, 5, 6, 7], value=4,
+                help="0 = no stool passed in the last 24h. 1 = severe constipation, "
+                     "7 = watery/diarrhea. 3–4 = normal.",
                 key="checkin_bristol",
             )
             unusual_stool_colour = st.toggle(
@@ -181,7 +207,7 @@ def render() -> None:
         # No explicit "Practice Done" toggle — inferred from minutes logged.
         meditation_done = meditation_minutes > 0
         repo.get_repository().save_check_in(CheckInRecord(
-            date=str(date.today()),
+            date=str(selected_date),
             current_condition=current_condition,
             tightness_score=tightness_score,
             pain_score=pain_score,
@@ -204,9 +230,12 @@ def render() -> None:
         # Readiness (Home page) reads today's alcohol units via cached
         # get_biometric_rolling() — clear so it recomputes with this
         # check-in's value instead of serving a stale pre-checkin score.
+        # Also correct when backfilling a prior day: that day's readiness
+        # numbers change too, so the same blanket clear covers it.
         st.cache_data.clear()
+        date_note = "" if selected_date == today else f" for {selected_date.strftime('%d %b %Y')}"
         st.success(
-            f"Check-in saved — Tightness {tightness_score}/10, Pain {pain_score}/10. "
+            f"Check-in saved{date_note} — Tightness {tightness_score}/10, Pain {pain_score}/10. "
             "Head to Training Plan when ready to start your session."
         )
 
