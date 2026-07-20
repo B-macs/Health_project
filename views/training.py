@@ -1067,18 +1067,67 @@ def _render_rest_day(d: date) -> None:
             st.rerun()
 
 
+def _stage2_offer_available(phases: list) -> bool:
+    """True once Phase 1 exists, Phase 2 hasn't been created yet, and Stage 2
+    content is actually authored. Deliberately specific to the Stage 1 -> 2
+    transition (the only one authored so far), not a generic 'any phase'
+    mechanism — matches this codebase's existing pattern of hardcoding each
+    stage's own plan rather than a generalised phase-progression system."""
+    existing_numbers = {p.phase_number for p in phases}
+    return (1 in existing_numbers and 2 not in existing_numbers
+            and sess.plan_dict_for_phase(2) is not None)
+
+
+def _render_begin_stage2_button(phases: list) -> None:
+    """Offers to start Stage 2 once Phase 1 exists and Phase 2 hasn't been
+    created yet. Phase 1's length_days and its authored PLAN day count match
+    exactly, so its calendar range always lapses at the same moment its
+    content would — meaning _render_no_active_phase's reassessment-gap
+    screen is what actually fires in practice, not the 'ran out of days
+    while still in-phase' branch this was originally (and still is, for a
+    phase whose calendar outlasts its content) wired into. Called from both."""
+    if not _stage2_offer_available(phases):
+        return
+    st.caption(
+        "Confirm Stage 1 → 2 criteria are met and your physiotherapist has "
+        "signed off before beginning."
+    )
+    # Advancing Phase (content/day-numbering) and Stage (ACWR/RPE/volume
+    # ceilings) must happen together — services/plan.py's Phase and
+    # services/rules.py's Stage are deliberately decoupled systems, and
+    # authoring one without the other leaves the engine enforcing the wrong
+    # ceiling against the wrong content. This writes to the live Notion
+    # config — a deliberate action the user takes by clicking, never
+    # triggered automatically just because the calendar ran out.
+    if st.button("Begin Stage 2 — 4-Week Transition Block", type="primary",
+                 use_container_width=True, key="tp_begin_stage2"):
+        new_phase = ph.default_phase(
+            date.today(), length_days=28, phase_number=2,
+            name="Stage 2 — Transition (Work Capacity)",
+        )
+        updated_phases = sess.begin_new_phase(phases, new_phase)
+        r = repo.get_repository()
+        r.set_phases(updated_phases)
+        r.set_config("current_stage", "2")
+        st.success("Stage 2 begins today. Come back for Day 1 of your 28-day gym block.")
+        st.rerun()
+
+
 def _render_no_active_phase(phases: list) -> None:
     """Reassessment gap — no phase covers today. Never shows a placeholder workout."""
     upcoming = sorted(
         (p for p in phases if p.status == "upcoming"),
         key=lambda p: p.start_date,
     )
-    next_line = (
-        f"Next phase — <strong style='color:{_OV_TEXT_PRI};'>{upcoming[0].name}</strong> "
-        f"— starts {upcoming[0].start_date}."
-        if upcoming else
-        "No upcoming phase configured yet."
-    )
+    if upcoming:
+        next_line = (
+            f"Next phase — <strong style='color:{_OV_TEXT_PRI};'>{upcoming[0].name}</strong> "
+            f"— starts {upcoming[0].start_date}."
+        )
+    elif _stage2_offer_available(phases):
+        next_line = "Ready to begin the next block below, once you and your physiotherapist confirm."
+    else:
+        next_line = "No upcoming phase configured yet."
     st.markdown(
         f"""
 <div style='background:{_OV_BG_ELEV};border-radius:16px;padding:28px 24px;text-align:center;'>
@@ -1089,6 +1138,8 @@ def _render_no_active_phase(phases: list) -> None:
 """,
         unsafe_allow_html=True,
     )
+    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+    _render_begin_stage2_button(phases)
 
 
 def _render_day_detail(d: date, active, phases: list) -> None:
@@ -1597,25 +1648,7 @@ def render():
                 "Open **Autoregulation** to check Stage 1 → 2 progression criteria. "
                 "If criteria are met, confirm with your physiotherapist before advancing."
             )
-            # Advancing Phase (content/day-numbering) and Stage (ACWR/RPE/volume
-            # ceilings) must happen together — services/plan.py's Phase and
-            # services/rules.py's Stage are deliberately decoupled systems, and
-            # authoring one without the other leaves the engine enforcing the
-            # wrong ceiling against the wrong content. This writes to the live
-            # Notion config — a deliberate action the user takes by clicking,
-            # never triggered automatically just because the calendar ran out.
-            if st.button("Begin Stage 2 — 4-Week Transition Block", type="primary",
-                         use_container_width=True):
-                new_phase = ph.default_phase(
-                    date.today(), length_days=28, phase_number=2,
-                    name="Stage 2 — Transition (Work Capacity)",
-                )
-                updated_phases = sess.begin_new_phase(phases, new_phase)
-                r = repo.get_repository()
-                r.set_phases(updated_phases)
-                r.set_config("current_stage", "2")
-                st.success("Stage 2 begins today. Come back for Day 1 of your 28-day gym block.")
-                st.rerun()
+            _render_begin_stage2_button(phases)
         elif active.phase_number == 2:
             st.success(
                 f"**{_plan_days}-Day Stage 2A Gym Strength Block Complete.**\n\n"
