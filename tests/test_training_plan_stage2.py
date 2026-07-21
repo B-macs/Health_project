@@ -115,3 +115,67 @@ def test_all_stage2_exercise_names_are_mapped_to_a_body_region():
             assert ex["name"] in tc.EXERCISE_BODY_REGION, (
                 f"Day {day_num} exercise {ex['name']!r} missing from EXERCISE_BODY_REGION"
             )
+
+
+# ─── equipment_type / band_tier tagging (live-session steppers feature) ────
+
+_EXPECTED_EQUIPMENT_TYPE = {
+    "Goblet Squat": "dumbbell", "Incline DB Press": "dumbbell",
+    "Romanian Deadlift (DB)": "dumbbell", "Single-Arm DB Row": "dumbbell",
+    "Bulgarian Split Squat": "dumbbell", "Prone Y-Raise (Scapular)": "dumbbell",
+    "Face Pull (Cable)": "cable", "Lat Pulldown": "cable", "Pallof Press (Cable)": "cable",
+    "Hip Thrust (Loaded)": "plate",
+    "Lateral Band Walk": "band",
+}
+
+
+def test_every_weighted_exercise_has_the_expected_equipment_type():
+    for day_num, day in tp.PLAN_STAGE2.items():
+        for ex in day["exercises"]:
+            if ex["name"] in _EXPECTED_EQUIPMENT_TYPE:
+                assert ex.get("equipment_type") == _EXPECTED_EQUIPMENT_TYPE[ex["name"]], (
+                    f"Day {day_num} {ex['name']!r} equipment_type={ex.get('equipment_type')!r}"
+                )
+
+
+def test_no_unexpected_exercise_carries_equipment_type():
+    # Regression guard: catches a future _ex() call accidentally tagged
+    # equipment_type without being added to _EXPECTED_EQUIPMENT_TYPE above.
+    for day_num, day in tp.PLAN_STAGE2.items():
+        for ex in day["exercises"]:
+            if ex.get("equipment_type"):
+                assert ex["name"] in _EXPECTED_EQUIPMENT_TYPE, (
+                    f"Day {day_num} {ex['name']!r} has equipment_type={ex['equipment_type']!r} "
+                    f"but isn't in the expected-tag test list"
+                )
+
+
+def test_stage1_plan_exercises_never_have_equipment_type():
+    for day_num, day in tp.PLAN.items():
+        for ex in day["exercises"]:
+            assert ex.get("equipment_type") is None, f"Stage 1 day {day_num} {ex['name']!r} unexpectedly tagged"
+
+
+def test_band_exercise_never_carries_weight_kg():
+    for day_num, day in tp.PLAN_STAGE2.items():
+        for ex in day["exercises"]:
+            if ex.get("equipment_type") == "band":
+                assert ex.get("weight_kg") is None, f"Day {day_num} {ex['name']!r} band exercise has weight_kg"
+
+
+def test_lateral_band_walk_tier_progresses_green_to_blue():
+    # Weeks 1-2 -> Green (light), Weeks 3-4 -> Blue (medium), per the
+    # existing per-week band_note progression this field replaced.
+    for day_num in (5, 12):  # Session C, Weeks 1-2
+        walk = next(ex for ex in tp.PLAN_STAGE2[day_num]["exercises"] if ex["name"] == "Lateral Band Walk")
+        assert walk["band_tier"] == "Green"
+    for day_num in (19, 26):  # Session C, Weeks 3-4
+        walk = next(ex for ex in tp.PLAN_STAGE2[day_num]["exercises"] if ex["name"] == "Lateral Band Walk")
+        assert walk["band_tier"] == "Blue"
+
+
+def test_non_band_exercises_never_carry_a_band_tier():
+    for day_num, day in tp.PLAN_STAGE2.items():
+        for ex in day["exercises"]:
+            if ex.get("equipment_type") not in (None, "band"):
+                assert ex.get("band_tier") is None, f"Day {day_num} {ex['name']!r} unexpectedly has band_tier"

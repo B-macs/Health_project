@@ -17,6 +17,7 @@ import re
 from datetime import date
 
 import training_plan as tp
+from services import engine
 from services import plan as _plan
 from services.models import Phase
 
@@ -46,7 +47,11 @@ RELEASE_EXERCISE_NAMES = frozenset({
 CHECKPOINT_FIELDS = (
     "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
     "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
+    "tp_actuals",
 )
+
+BAND_TIERS = engine.BAND_TIERS
+BAND_TIER_LABELS = engine.BAND_TIER_LABELS
 
 
 def coach_message(directive: dict, today_plan: dict) -> tuple[str, str]:
@@ -146,23 +151,133 @@ def planned_reps(ex: dict) -> int:
 def make_sets_data(ex: dict) -> list[dict]:
     t, sets, rest = ex["type"], ex.get("sets", 1), ex.get("rest_seconds", 60)
     weight = ex.get("weight_kg") or 0.0
+    band_tier = ex.get("band_tier")
+    extra = {"band_tier": band_tier} if band_tier else {}
     out = []
     if t == "duration":
         out.append({"set_num": 1, "reps": 1, "weight": weight, "rest": 0,
-                    "tut": (ex.get("duration_minutes") or 0) * 60, "velocity": "continuous"})
+                    "tut": (ex.get("duration_minutes") or 0) * 60, "velocity": "continuous", **extra})
     elif t == "reps":
         for i in range(1, sets + 1):
             out.append({"set_num": i, "reps": ex.get("reps") or 1, "weight": weight,
-                        "rest": rest, "tut": 0, "velocity": "controlled"})
+                        "rest": rest, "tut": 0, "velocity": "controlled", **extra})
     elif t == "hold":
         for i in range(1, sets + 1):
             out.append({"set_num": i, "reps": 1, "weight": weight,
-                        "rest": rest, "tut": ex.get("hold_seconds") or 0, "velocity": "isometric"})
+                        "rest": rest, "tut": ex.get("hold_seconds") or 0, "velocity": "isometric", **extra})
     elif t == "hold_reps":
         for i in range(1, sets + 1):
             out.append({"set_num": i, "reps": ex.get("reps_in_set") or 1, "weight": weight,
-                        "rest": rest, "tut": ex.get("hold_seconds") or 0, "velocity": "isometric"})
+                        "rest": rest, "tut": ex.get("hold_seconds") or 0, "velocity": "isometric", **extra})
     return out
+
+
+# ─── Live-session reps/weight/band-tier steppers ───────────────────────────
+
+def step_reps(current_reps: int, direction: int, floor: int = 1) -> int:
+    """+/-1 rep per tap. Floored at 1 -- an exercise can't be prescribed
+    zero reps. `direction` is +1 or -1."""
+    return max(floor, int(current_reps) + direction)
+
+
+def step_weight_kg(current_weight_kg: float, direction: int,
+                    increment: float = 2.5, floor: float = 0.0) -> float:
+    """+/-one `increment` per tap -- a flat 2.5kg for every loaded
+    equipment type in this app (dumbbell, cable, plate). Snaps to the
+    nearest valid increment multiple first (protects against float drift
+    across repeated taps), then floors at 0 (can't lift negative weight)."""
+    stepped = round((current_weight_kg + direction * increment) / increment) * increment
+    return round(max(floor, stepped), 2)
+
+
+def step_band_tier(current_tier: str, direction: int) -> str:
+    """Moves one position through BAND_TIERS (Green..Black), clamped at
+    both ends -- can't go lighter than Green or heavier than Black."""
+    idx = BAND_TIERS.index(current_tier) if current_tier in BAND_TIERS else 0
+    idx = max(0, min(len(BAND_TIERS) - 1, idx + direction))
+    return BAND_TIERS[idx]
+
+
+def seed_actual_entry(
+    ex: dict,
+    last_performance: dict | None,
+    streak_label: str,
+    allow_increase: bool,
+    weight_increment: float = 2.5,
+) -> dict:
+    """Decide the starting {"reps", "weight_kg", "band_tier", "source",
+    "last_seen_date"} entry for one exercise's live-session steppers.
+
+    Seed priority: last_performance (Repository.get_last_performance's
+    shape) if present, else the exercise's own (already volume-adjusted --
+    caller passes the post apply_exercise_volume_modifier `ex`) plan
+    prescription. The readiness engine's streak_label then nudges the
+    weight/band-tier by one step on top -- reps are already readiness-
+    adjusted upstream by apply_exercise_volume_modifier, so they are NOT
+    nudged again here.
+
+    "reps" is only populated for ex_type == "reps" -- hold_reps exercises
+    (currently only Prone Y-Raise) keep their reps_in_set exactly as shown
+    by the existing live per-rep hold-timer counter; only their weight is
+    steppable, to avoid a stepper silently disagreeing with that counter.
+
+    allow_increase is forced off by the caller when there's no existing
+    load to build on (seed weight/tier absent), or on a red-signal engine-
+    directive day -- a good readiness day must never auto-introduce load
+    on an exercise the plan or history has deliberately kept bodyweight
+    (e.g. Bulgarian Split Squat, weeks 1-2). Reducing load is never
+    suppressed.
+    """
+    entry = {"reps": None, "weight_kg": None, "band_tier": None,
+              "source": "plan_default", "last_seen_date": None}
+    equip = ex.get("equipment_type")
+    if not equip:
+        return entry
+    if ex["type"] == "reps":
+        entry["reps"] = planned_reps(ex)
+    if equip == "band":
+        entry["band_tier"] = ex.get("band_tier")
+    else:
+        entry["weight_kg"] = ex.get("weight_kg") if ex.get("weight_kg") is not None else 0.0
+
+    if last_performance:
+        entry["source"] = "last_time"
+        entry["last_seen_date"] = last_performance.get("session_date")
+        if entry["reps"] is not None and last_performance.get("reps") is not None:
+            entry["reps"] = last_performance["reps"]
+        if equip == "band" and last_performance.get("band_tier"):
+            entry["band_tier"] = last_performance["band_tier"]
+        elif equip != "band" and last_performance.get("weight_kg") is not None:
+            entry["weight_kg"] = last_performance["weight_kg"]
+
+    if equip == "band" and entry["band_tier"]:
+        entry["band_tier"] = engine.suggested_band_tier(
+            entry["band_tier"], streak_label, allow_increase=allow_increase,
+        )
+    elif equip != "band" and entry["weight_kg"] is not None:
+        entry["weight_kg"] = engine.suggested_weight_kg(
+            entry["weight_kg"], streak_label, increment=weight_increment,
+            allow_increase=(allow_increase and entry["weight_kg"] > 0),
+        )
+    return entry
+
+
+def actual_caption(entry: dict) -> str:
+    """The small 'last time' / 'plan default' caption shown next to the
+    steppers -- pure so it's unit-testable without Streamlit."""
+    if entry.get("source") != "last_time":
+        return "No prior record — using plan default."
+    parts = []
+    if entry.get("reps") is not None:
+        parts.append(f"{entry['reps']} reps")
+    if entry.get("band_tier"):
+        label = BAND_TIER_LABELS.get(entry["band_tier"], "")
+        parts.append(f"{entry['band_tier']} ({label})" if label else entry["band_tier"])
+    elif entry.get("weight_kg"):
+        parts.append(f"{entry['weight_kg']} kg")
+    body = " @ ".join(parts) if parts else "logged"
+    date_part = f" ({entry['last_seen_date']})" if entry.get("last_seen_date") else ""
+    return f"Last time: {body}{date_part}"
 
 
 def exercise_duration_seconds(ex: dict) -> int:

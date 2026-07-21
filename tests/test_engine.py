@@ -426,3 +426,78 @@ def test_engine_apply_exercise_volume_modifier():
     # Missing fields are passed through untouched
     check("missing reps not added",
           "reps" not in _avm({"hold_seconds": 30}, 0.75), True)
+
+
+# ─── suggested_weight_kg ─────────────────────────────────────────────────────
+
+def test_suggested_weight_kg_high_streak_nudges_up():
+    assert engine.suggested_weight_kg(10.0, "high") == 12.5
+
+
+def test_suggested_weight_kg_low_streak_nudges_down():
+    assert engine.suggested_weight_kg(10.0, "low") == 7.5
+    assert engine.suggested_weight_kg(10.0, "below") == 7.5
+
+
+def test_suggested_weight_kg_normal_or_unknown_leaves_value_exactly_unchanged():
+    assert engine.suggested_weight_kg(10.0, "normal") == 10.0
+    assert engine.suggested_weight_kg(10.0, "unknown") == 10.0
+    # Off-grid weights (e.g. a 1kg accessory dumbbell) must NOT be snapped
+    # to the 2.5kg increment grid on a "no change" suggestion.
+    assert engine.suggested_weight_kg(1.0, "normal") == 1.0
+
+
+def test_suggested_weight_kg_allow_increase_false_suppresses_upward_nudge():
+    assert engine.suggested_weight_kg(10.0, "high", allow_increase=False) == 10.0
+
+
+def test_suggested_weight_kg_allow_increase_false_still_allows_downward_nudge():
+    assert engine.suggested_weight_kg(10.0, "low", allow_increase=False) == 7.5
+
+
+def test_suggested_weight_kg_floors_at_zero():
+    assert engine.suggested_weight_kg(2.5, "low") == 0.0
+    assert engine.suggested_weight_kg(0.0, "low") == 0.0
+
+
+def test_suggested_weight_kg_none_input_returns_none():
+    assert engine.suggested_weight_kg(None, "high") is None
+
+
+def test_suggested_weight_kg_snaps_to_increment_multiple_on_an_actual_move():
+    # Simulates float drift from a non-aligned seed -- only when actually
+    # moving (delta != 0) does the result snap to the 2.5kg grid.
+    assert engine.suggested_weight_kg(11.3, "high") == 15.0
+
+
+# ─── suggested_band_tier ─────────────────────────────────────────────────────
+
+def test_suggested_band_tier_high_streak_moves_up_one_tier():
+    assert engine.suggested_band_tier("Green", "high") == "Blue"
+    assert engine.suggested_band_tier("Yellow", "high") == "Red"
+
+
+def test_suggested_band_tier_low_streak_moves_down_one_tier():
+    assert engine.suggested_band_tier("Blue", "low") == "Green"
+    assert engine.suggested_band_tier("Red", "below") == "Yellow"
+
+
+def test_suggested_band_tier_normal_unchanged():
+    assert engine.suggested_band_tier("Yellow", "normal") == "Yellow"
+
+
+def test_suggested_band_tier_clamped_at_black():
+    assert engine.suggested_band_tier("Black", "high") == "Black"
+
+
+def test_suggested_band_tier_clamped_at_green():
+    assert engine.suggested_band_tier("Green", "low") == "Green"
+
+
+def test_suggested_band_tier_allow_increase_false_suppresses_upward_move():
+    assert engine.suggested_band_tier("Green", "high", allow_increase=False) == "Green"
+
+
+def test_suggested_band_tier_unrecognised_tier_returns_none():
+    assert engine.suggested_band_tier("Purple", "high") is None
+    assert engine.suggested_band_tier(None, "high") is None

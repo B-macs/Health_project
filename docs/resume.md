@@ -268,7 +268,9 @@ read — Sheet1/Apple Health auto-export was retired from the live pipeline
 ```
 Oura API (official)                    Garmin Connect (unofficial)
         ↓  sync_oura_all(days=2)               ↓  sync_garmin_daily_if_due(days=2)
-        ↓  [2h cache, app.py, on Home open]     ↓  [once/day, Config-DB gated,
+        ↓  [2h cache, app.py, on Home open]     ↓  [every 2h, Config-DB gated,
+        ↓                                         stops for the day once
+        ↓                                         today's check-in is in —
         ↓                                         app.py Home + training.py]
 Oura Daily / Oura Sleep Periods sheet tabs    Garmin Daily sheet tab
         └──────────────────┬──────────────────────┘

@@ -505,6 +505,11 @@ def _blend_history() -> list[dict]:
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
+def _metrics_history() -> list[dict]:
+    return repo.get_repository().get_metrics_history()
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def _strength_bioage_scores() -> dict:
     """Per-region Stage-Adjusted Recovery Scores (services/bioage.py) + hero
     average + muscle-imbalance count for the Strength BioAge detail screen.
@@ -1213,6 +1218,52 @@ def render() -> None:
                         ]
                         st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
                     elif blend_history is not None:
+                        st.info(
+                            "No persisted history yet — click \"Backfill full history now\" "
+                            "above, or wait for the automatic once-a-day sync."
+                        )
+
+                    st.divider()
+                    st.subheader("Metrics History (persisted)")
+                    st.caption(
+                        "A fixed daily record of Readiness, Sleep %, and Strain — written "
+                        "once a day (Repository.sync_metrics_history) to its own sheet tab, "
+                        "same rationale as Biometric Blend above. This is also what feeds the "
+                        "trend sparklines behind the Readiness/Sleep/Strain cards on Home "
+                        "(tap a card to see it)."
+                    )
+                    if st.button(
+                        "Backfill full history now",
+                        use_container_width=False,
+                        key="backfill_metrics_history",
+                    ):
+                        with st.spinner("Computing and persisting the full metrics history…"):
+                            try:
+                                n = repo.get_repository().sync_metrics_history(days=400)
+                                st.success(f"Persisted {n} day(s) to the Metrics History tab.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as exc:
+                                st.warning(f"Backfill failed: {exc}")
+
+                    try:
+                        metrics_history = _metrics_history()
+                    except Exception as exc:
+                        metrics_history = None
+                        st.warning(f"Could not load metrics history: {exc}")
+
+                    if metrics_history:
+                        earliest = date.fromisoformat(metrics_history[0]["date"])
+                        latest = date.fromisoformat(metrics_history[-1]["date"])
+                        col_from, col_to = st.columns(2)
+                        start_pick = col_from.date_input("From", value=earliest, key="metrics_hist_from")
+                        end_pick = col_to.date_input("To", value=latest, key="metrics_hist_to")
+                        filtered = [
+                            r for r in metrics_history
+                            if str(start_pick) <= r["date"] <= str(end_pick)
+                        ]
+                        st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
+                    elif metrics_history is not None:
                         st.info(
                             "No persisted history yet — click \"Backfill full history now\" "
                             "above, or wait for the automatic once-a-day sync."

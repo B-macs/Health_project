@@ -245,6 +245,78 @@ def apply_exercise_volume_modifier(ex: dict, volume_factor: float) -> dict:
     return m
 
 
+BAND_TIERS = ("Green", "Blue", "Yellow", "Red", "Black")
+BAND_TIER_LABELS = {
+    "Green": "Light", "Blue": "Medium", "Yellow": "Heavy",
+    "Red": "X Heavy", "Black": "XX Heavy",
+}
+
+
+def suggested_weight_kg(
+    current_weight_kg: float | None,
+    streak_label: str,
+    increment: float = 2.5,
+    allow_increase: bool = True,
+) -> float | None:
+    """
+    Deterministic next-session weight suggestion for a loaded (dumbbell/
+    cable/plate) exercise, nudging by one `increment` based on the
+    readiness engine's own streak_label (readiness_training_modifier's
+    output) -- reusing that existing signal rather than a new ad-hoc system.
+
+    streak_label -> delta:
+      "high"             -> +increment  (only if allow_increase)
+      "low" | "below"    -> -increment
+      anything else       -> unchanged
+
+    allow_increase lets the caller suppress the upward nudge (e.g. on a
+    red-signal engine-directive day, or when there's no existing load to
+    build on). It never suppresses the downward nudge.
+
+    Returns None if current_weight_kg is None. "Unchanged" returns
+    current_weight_kg exactly (floored at 0, rounded for float cleanliness)
+    -- NOT snapped to the increment grid, since some exercises legitimately
+    prescribe a weight off that grid (e.g. 1kg dumbbells for a scapular
+    accessory lift) and a "no change" suggestion must never silently alter
+    it. Only an actual +/-increment move snaps to the nearest multiple of
+    `increment` (protects against float drift across repeated moves).
+    """
+    if current_weight_kg is None:
+        return None
+    if streak_label == "high" and allow_increase:
+        delta = increment
+    elif streak_label in ("low", "below"):
+        delta = -increment
+    else:
+        return round(max(0.0, current_weight_kg), 2)
+    raw = current_weight_kg + delta
+    stepped = round(raw / increment) * increment if increment else raw
+    return round(max(0.0, stepped), 2)
+
+
+def suggested_band_tier(
+    current_tier: str | None,
+    streak_label: str,
+    allow_increase: bool = True,
+) -> str | None:
+    """
+    Band-resistance counterpart to suggested_weight_kg -- steps one
+    position through the fixed Green/Blue/Yellow/Red/Black tier scale
+    instead of a kg increment, same streak_label -> direction mapping,
+    clamped at both ends. Returns None if current_tier is None or not a
+    recognised tier.
+    """
+    if current_tier not in BAND_TIERS:
+        return None
+    idx = BAND_TIERS.index(current_tier)
+    if streak_label == "high" and allow_increase:
+        idx += 1
+    elif streak_label in ("low", "below"):
+        idx -= 1
+    idx = max(0, min(len(BAND_TIERS) - 1, idx))
+    return BAND_TIERS[idx]
+
+
 def observation_days_remaining(data_days: int) -> int:
     """Days of additional biometric logging needed before engine activates."""
     return max(0, MIN_OBSERVATION_DAYS - data_days)

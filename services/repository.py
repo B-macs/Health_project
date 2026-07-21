@@ -28,6 +28,7 @@ import uuid
 from datetime import date, datetime, timedelta
 
 from services import biometrics
+from services import dashboard
 from services import models
 from services.clients import garmin
 from services.clients import local_cache
@@ -89,6 +90,9 @@ _OURA_REST_MODE_HEADER = [
 ]
 _BIOMETRIC_BLEND_HEADER = [
     "date", "hrv_ms", "resting_heart_rate", "sleep_duration_hours", "steps", "sources_missing",
+]
+_METRICS_HISTORY_HEADER = [
+    "date", "readiness_score", "sleep_pct", "strain",
 ]
 
 
@@ -454,6 +458,52 @@ class Repository:
             )
             for d, v in sorted(by_date.items(), reverse=True)
         ]
+
+    def get_last_performance(self, movement_name: str) -> dict | None:
+        """Most recent logged performance of this exact movement name, read
+        back from the same per-set `Sets` JSON every training exercise
+        already stores (services.sessions.make_sets_data's output) — the
+        durable "last time" source for stepper seeding in the live guided
+        flow. Deliberately does NOT touch the Notes field (that feeds the
+        unrelated AI sentiment pipeline — see get_unparsed_session_notes).
+
+        Returns None if the movement has never been logged, or its most
+        recent logged page has an empty/unparseable Sets JSON."""
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Movement", "title": {"equals": movement_name}},
+            sorts=[{"property": "Session Date", "direction": "descending"}],
+        )
+        if not pages:
+            return None
+        latest = max(pages, key=lambda p: notion.get_property(p, "Session Date", "date") or "")
+        sets_raw = notion.get_property(latest, "Sets", "rich_text") or "[]"
+        try:
+            sets = json.loads(sets_raw)
+        except Exception:
+            sets = []
+        if not sets:
+            return None
+        last_set = sets[-1]
+        return {
+            "session_date": notion.get_property(latest, "Session Date", "date"),
+            "reps":         last_set.get("reps"),
+            "weight_kg":    last_set.get("weight"),
+            "band_tier":    last_set.get("band_tier"),
+            "sets_count":   len(sets),
+        }
+
+    def has_checked_in(self, d: date) -> bool:
+        """True if a Morning Check-In has already been submitted for this
+        date — used to gate the Garmin sync cadence (see
+        sync_garmin_daily_if_due): once today's check-in is in, that day's
+        readiness is already anchored, so further 2-hourly polling is
+        unnecessary until tomorrow."""
+        pages = self._query(
+            self.config.notion_db_readiness,
+            filter_={"property": "Date", "date": {"equals": str(d)}},
+        )
+        return len(pages) > 0
 
     def has_logged_session(self, d: date) -> bool:
         """True only for a logged rehab-plan session — a logged Yoga (or other
@@ -1061,6 +1111,100 @@ class Repository:
             ))
         return sorted(out, key=lambda r: r.date)
 
+    # ─────────────────────────────────────────────────────────────────────
+    #  Metrics History — persisted Readiness/Sleep/Strain trend
+    #  Readiness, Sleep %, and Strain (services.dashboard.
+    #  compute_daily_metrics_snapshot) are otherwise pure live recomputes,
+    #  same as get_biometric_rolling above — this persists each day's
+    #  result once so "look back at last month" reads a stable snapshot
+    #  instead of a re-derived value that could drift if e.g. the rehab
+    #  stage changes later (strain's CLF depends on the *current* stage;
+    #  a live recompute of an old day would silently reflect today's
+    #  stage, not the one active back then). Written by
+    #  sync_metrics_history, called once/day from app.py (rolling few-day
+    #  window) and on-demand from the Sync page's "Backfill full history"
+    #  button (wide window) — same pattern as Biometric Blend.
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _metrics_history_ws(self):
+        return sheets.get_or_create_worksheet(
+            self._sc, self.config.google_sheets_id,
+            sheets.METRICS_HISTORY_WORKSHEET, _METRICS_HISTORY_HEADER,
+        )
+
+    def _metrics_history_row(self, snapshot: dict) -> dict:
+        return {
+            "date": snapshot["date"],
+            "readiness_score": snapshot["readiness_score"] if snapshot["readiness_score"] is not None else "",
+            "sleep_pct": snapshot["sleep_pct"] if snapshot["sleep_pct"] is not None else "",
+            "strain": snapshot["strain"] if snapshot["strain"] is not None else "",
+        }
+
+    def upsert_metrics_history_row(self, snapshot: dict) -> None:
+        """snapshot: {"date": ISO str, "readiness_score", "sleep_pct", "strain"}
+        (services.dashboard.compute_daily_metrics_snapshot's shape, plus a
+        "date" key) — writes one day into the Metrics History tab, keyed by
+        date (idempotent, same upsert-by-date pattern as Biometric Blend)."""
+        row = self._metrics_history_row(snapshot)
+        values = [row.get(k, "") for k in _METRICS_HISTORY_HEADER]
+        sheets.upsert_row_by_key(
+            self._metrics_history_ws(), key_col=1, key_value=snapshot["date"], row_values=values,
+        )
+
+    def sync_metrics_history(self, days: int = 7, today: date | None = None) -> int:
+        """Computes services.dashboard.compute_daily_metrics_snapshot for
+        each of the last `days` days and persists it to the Metrics History
+        tab. Returns the number of days written. `days` controls how far
+        back to (re)persist — small (e.g. 7) for the routine sync so only
+        recent days get overwritten; large (e.g. 400) for the one-time/
+        on-demand full-history backfill.
+
+        Pulls a wider lookback window than `days` for its own inputs (60
+        extra days of biometric rows, matching app.py's own _bio_rolling,
+        to support the 56-night progressive sleep baseline and readiness
+        trend's 14-day EMA lookback; 28 extra days of session AU to support
+        the 7-day rolling-strain lookback with margin) so even the oldest
+        day in the `days` window gets a correctly-computed value, not one
+        truncated by an under-fetched window."""
+        today = today or date.today()
+        bio_rows = [dataclasses.asdict(r) for r in self.get_biometric_rolling(days=days + 60, today=today)]
+        au_rows = self.get_daily_session_au(days=days + 28, today=today)
+        stage = self.get_current_stage()
+
+        written = 0
+        for i in range(days):
+            d = today - timedelta(days=i)
+            snapshot = dashboard.compute_daily_metrics_snapshot(d, bio_rows, au_rows, stage)
+            snapshot["date"] = d.isoformat()
+            self.upsert_metrics_history_row(snapshot)
+            written += 1
+        return written
+
+    def get_metrics_history(self, start: str | None = None, end: str | None = None) -> list[dict]:
+        """Every persisted day from the Metrics History tab, optionally
+        restricted to [start, end] (inclusive, ISO date strings) —
+        unbounded by default, like get_biometric_blend_history. Sorted
+        ascending by date. Plain dicts, not a dataclass — matches this
+        file's existing convention for read-only dashboard-shaped history
+        (see module docstring: the "long tail" of newer read-only data was
+        deliberately left as dicts rather than typed)."""
+        rows = sheets.get_worksheet_records(self._metrics_history_ws())
+        out = []
+        for r in rows:
+            d = str(r.get("date") or "")
+            if not d:
+                continue
+            if start and d < start:
+                continue
+            if end and d > end:
+                continue
+            out.append({
+                "date": d,
+                "readiness_score": r.get("readiness_score") or None,
+                "sleep_pct": r.get("sleep_pct") or None,
+                "strain": r.get("strain") or None,
+            })
+        return sorted(out, key=lambda r: r["date"])
 
     # ─────────────────────────────────────────────────────────────────────
     #  Google Sheets — Weekly Rollup
@@ -1205,28 +1349,44 @@ class Repository:
             sheets.upsert_row_by_key(ws, key_col=1, key_value=str(d), row_values=values)
         return days
 
-    def sync_garmin_daily_if_due(self, days: int = 7, today: date | None = None) -> tuple[bool, str | None]:
-        """Runs sync_garmin_daily() at most once per calendar day, persisted
-        via the Config DB (garmin_daily_last_synced_date) so it survives
-        across Streamlit reruns/sessions/restarts. Now triggered on both Home
-        (app.py) and Training page open, since Garmin feeds the engine's
-        biometric blend (services/biometrics.py) and needs current-day data
-        available on open — was weekly-only when Garmin was archival-only.
-        Still throttled to once/day (not every page load): Garmin's API is
-        unofficial and rate-limit-sensitive. (True, None) if not configured or
-        already synced today (both "nothing to do", not an error) or on
-        success; (False, msg) only on an actual sync failure. Matches
+    def sync_garmin_daily_if_due(self, days: int = 7, today: date | None = None,
+                                  hours: int = 2, now: datetime | None = None) -> tuple[bool, str | None]:
+        """Runs sync_garmin_daily() at most every `hours` hours (default 2,
+        matching Oura's own oura_sync_due cadence) — but stops re-syncing for
+        the rest of the day the moment a Morning Check-In has been submitted
+        for `today` (has_checked_in), since that check-in already anchors
+        the day's readiness and further polling until tomorrow is
+        unnecessary. The 2-hour marker is persisted via the Config DB
+        (garmin_daily_last_synced_at, a full timestamp — was date-only under
+        the old once/day key garmin_daily_last_synced_date, now retired) so
+        it survives across Streamlit reruns/sessions/restarts. Triggered on
+        both Home (app.py) and Training page open, since Garmin feeds the
+        engine's biometric blend (services/biometrics.py) and needs
+        current-day data available on open. Still throttled at all (not
+        every page load) because Garmin's API is unofficial and
+        rate-limit-sensitive. (True, None) if not configured, a check-in is
+        already in for today, or the last sync was under `hours` hours ago
+        (all "nothing to do", not an error) or on sync success; (False, msg)
+        only on an actual sync failure. Matches
         services.metrics.sync_weekly_rollup's (ok, error) contract so callers
         can treat both the same way."""
         if not self.garmin_configured():
             return True, None
         today = today or date.today()
-        today_str = str(today)
+        now = now or datetime.now()
         try:
-            if self.get_config_value("garmin_daily_last_synced_date") == today_str:
+            if self.has_checked_in(today):
                 return True, None
+            raw = self.get_config_value("garmin_daily_last_synced_at")
+            if raw:
+                try:
+                    last_synced = datetime.fromisoformat(raw)
+                except ValueError:
+                    last_synced = None
+                if last_synced is not None and now - last_synced < timedelta(hours=hours):
+                    return True, None
             self.sync_garmin_daily(days=days, today=today)
-            self.set_config("garmin_daily_last_synced_date", today_str, today=today)
+            self.set_config("garmin_daily_last_synced_at", now.isoformat(), today=today)
             return True, None
         except Exception as exc:
             return False, str(exc)

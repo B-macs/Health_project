@@ -122,6 +122,16 @@ def _au_history(days: int = 28) -> list[dict]:
     return repo.get_repository().get_daily_session_au(days)
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _metrics_history_rolling(days: int = 60) -> list[dict]:
+    """Persisted Readiness/Sleep%/Strain history (Repository.
+    get_metrics_history) for the Readiness/Sleep/Strain card drill-downs'
+    trend sparklines — a fixed record, unlike the live recompute this page
+    otherwise always does for `selected_date` itself."""
+    start = (date.today() - timedelta(days=days)).isoformat()
+    return repo.get_repository().get_metrics_history(start=start)
+
+
 @st.cache_data(ttl=7200, show_spinner=False)  # 2 hours — runs on Home page open, idle in between
 def _sync_oura_cached() -> tuple[bool, str | None]:
     """Oura sync (its own Sheet tabs — see Repository.sync_oura_all), feeding
@@ -159,14 +169,17 @@ def _sync_oura_cached() -> tuple[bool, str | None]:
         return False, str(exc)
 
 
-@st.cache_data(ttl=7200, show_spinner=False)  # throttled for real by the Config-DB once/day marker below
+@st.cache_data(ttl=7200, show_spinner=False)  # throttled for real by the Config-DB marker below, not this TTL
 def _sync_garmin_cached() -> tuple[bool, str | None]:
     """Garmin sync (Garmin Daily sheet tab), feeding the engine's biometric
     blend (30% weight for HRV/RHR/sleep, 80% for steps) as well as archiving.
     Was weekly-only and Training-page-only when Garmin was archival-only;
-    now also runs on Home open like Oura, but still gated to once/day (not
-    this cache's TTL) via sync_garmin_daily_if_due's Config-DB marker —
-    Garmin's API is unofficial and rate-limit-sensitive, unlike Oura's."""
+    now also runs on Home open like Oura. Gated to at most every 2 hours
+    (matching Oura's cadence), and stops entirely for the rest of the day
+    once today's Morning Check-In is submitted — not by this cache's TTL,
+    but by sync_garmin_daily_if_due's Config-DB marker + has_checked_in
+    check. Garmin's API is unofficial and rate-limit-sensitive, unlike
+    Oura's, so this stays throttled rather than syncing every page load."""
     r = repo.get_repository()
     if not r.garmin_configured():
         return True, None
@@ -191,12 +204,29 @@ def _sync_biometric_blend_cached() -> tuple[bool, str | None]:
         return False, str(exc)
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _sync_metrics_history_cached() -> tuple[bool, str | None]:
+    """Persists the last few days of Readiness/Sleep %/Strain to the
+    Metrics History sheet tab (Repository.sync_metrics_history) — same
+    "fixed daily snapshot" rationale as Biometric Blend above, and must run
+    after it since sync_metrics_history reads the biometric rolling blend
+    (and session AU) live. Small rolling window — the on-demand "Backfill
+    full history" button in Insights → Sync covers the rest, once."""
+    try:
+        repo.get_repository().sync_metrics_history(days=7)
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
 # Oura/Garmin sync must run before _bio_rolling() below — get_biometric_rolling()
 # now reads their Sheet tabs directly, so a stale-cache page load would
 # otherwise blend yesterday's data even though the sync ran moments later.
+# Metrics History sync runs last since it derives from all three above.
 _oura_sync_ok, _oura_sync_err = _sync_oura_cached()
 _garmin_sync_ok, _garmin_sync_err = _sync_garmin_cached()
 _blend_sync_ok, _blend_sync_err = _sync_biometric_blend_cached()
+_metrics_sync_ok, _metrics_sync_err = _sync_metrics_history_cached()
 
 try:
     _bio_rows = _bio_rolling(days=60)   # 60d to support 56d sleep baseline
@@ -209,13 +239,16 @@ try:
 except Exception:
     pass
 
+_metrics_hist = []
+try:
+    _metrics_hist = _metrics_history_rolling(days=60)
+except Exception:
+    pass
+
 try:
     _current_stage = repo.get_repository().get_current_stage()
 except Exception:
     _current_stage = 1
-
-_bio_day = next((r for r in _bio_rows if r.get("date") == selected_date.isoformat()), None)
-_au_day  = next((r for r in _au_rows  if r.get("date") == selected_date.isoformat()), None)
 
 _window_start = (selected_date - timedelta(days=6)).isoformat()
 _window_end   = selected_date.isoformat()
@@ -226,23 +259,27 @@ _bio_7d = sorted(
 
 # ─── Computed values ──────────────────────────────────────────────────────────
 
-_readiness_score = readiness_model.compute_readiness_trend(selected_date, _bio_rows)
-_strain_score    = dash.au_to_strain_or_none(_au_day["total_au"] if _au_day else None, _current_stage)
-_sleep_hours     = _bio_day.get("sleep_duration_hours") if _bio_day else None
-
-# Rolling 7-day prior strain — body load already accumulated before today's session.
-# Excludes today so it always reflects pre-session state.
-_rolling_strain = dash.rolling_prior_strain(_au_rows, _current_stage, today=date.today())
-# When no session today: show rolling body load. After training: show today's strain.
-_display_strain, _strain_is_rolling = dash.display_strain(_strain_score, _rolling_strain)
-
-# Step count modifier: shift displayed strain by yesterday's non-training load.
-_display_strain = dash.apply_step_modifier(_display_strain, _bio_rows, today=date.today())
-
-# Progressive sleep baseline (7→14→28→56 nights, outliers <4h/>11h removed)
+# Progressive sleep baseline (7→14→28→56 nights, outliers <4h/>11h removed) —
+# computed once here since sleep_meta()'s description text needs the window
+# size too, not just the score; passed into the snapshot below so it isn't
+# recomputed a second time there.
 _sleep_base_hours, _sleep_base_window = readiness_model.sleep_baseline(_bio_rows)
 _sleep_need = _sleep_base_hours if _sleep_base_hours else _SLEEP_NEED_HOURS
-_sleep_pct  = dash.sleep_percent(_sleep_hours, _sleep_need)
+
+# Shared with Repository.sync_metrics_history so the persisted trend history
+# can never drift from what's actually shown here. rolling_reference_date
+# stays pinned to the real "today" (not selected_date) — the rolling-prior-
+# strain fallback and step modifier represent body load accumulated heading
+# into training right now, a concept anchored to the present even while
+# browsing a past day's card for reference.
+_snapshot = dash.compute_daily_metrics_snapshot(
+    selected_date, _bio_rows, _au_rows, _current_stage,
+    sleep_base_hours=_sleep_base_hours, rolling_reference_date=date.today(),
+)
+_readiness_score    = _snapshot["readiness_score"]
+_sleep_pct          = _snapshot["sleep_pct"]
+_display_strain     = _snapshot["strain"]
+_strain_is_rolling  = _snapshot["strain_is_rolling"]
 
 _hrv_7d = dash.fill_7day(_bio_7d, "hrv_ms", selected_date)
 _rhr_7d = dash.fill_7day(_bio_7d, "resting_heart_rate", selected_date)
@@ -395,10 +432,13 @@ def _card_html(
     return inner
 
 
-# ─── Strain drill-down ────────────────────────────────────────────────────────
+# ─── Metric drill-downs (Readiness / Sleep / Strain) ──────────────────────────
 
-def _strain_detail() -> str:
+def _metric_detail(view: str) -> str:
     def _trend_block(title: str, unit: str, values: list, color: str) -> str:
+        """7-day, day-of-week-labeled block — used for Strain's supplementary
+        HRV/RHR context (the live 7-day biometric blend, not persisted
+        history)."""
         has_data = any(v is not None for v in values)
         current  = next((v for v in reversed(values) if v is not None), None)
         val_str  = f"{current:.0f} {unit}" if current is not None else "—"
@@ -427,8 +467,55 @@ def _strain_detail() -> str:
             f'</div>'
         )
 
-    s_col, s_disp, s_lbl, _, _ = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
-    _detail_label = "STRAIN · 7D AVG" if _strain_is_rolling else f"STRAIN · {date_label}"
+    def _history_trend_block(title: str, unit: str, dates: list, values: list, color: str) -> str:
+        """30-day trend from the PERSISTED Metrics History tab (see
+        Repository.get_metrics_history) — a fixed record, unlike the 7-day
+        blocks above which recompute live from Oura/Garmin's raw tabs."""
+        has_data = any(v is not None for v in values)
+        current  = next((v for v in reversed(values) if v is not None), None)
+        val_str  = f"{current:.0f}{unit}" if current is not None else "—"
+        range_label = f"{dates[0].strftime('%d %b')} – {dates[-1].strftime('%d %b')}" if dates else ""
+        chart_or_empty = (
+            f'<div style="display:flex;justify-content:center;">'
+            + (_sparkline(values, width=290, height=68, color=color) if has_data else
+               f'<div style="width:290px;height:68px;display:flex;align-items:center;'
+               f'justify-content:center;"><span style="color:#444;font-size:12px;'
+               f'font-style:italic;">No persisted history yet — check back after a few days.</span></div>')
+            + f'</div>'
+        )
+        return (
+            f'<div style="background:#131929;border-radius:12px;padding:16px 18px;margin-bottom:10px;">'
+            f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;text-transform:uppercase;'
+            f'font-weight:600;margin-bottom:4px;">{title}</div>'
+            f'<div style="font-size:28px;font-weight:700;color:#D4DCEE;margin-bottom:4px;">{val_str}</div>'
+            f'<div style="font-size:10px;color:#555;margin-bottom:8px;">{range_label}</div>'
+            f'{chart_or_empty}'
+            f'</div>'
+        )
+
+    if view == "readiness":
+        col, disp, lbl, _, _, _ = dash.readiness_meta(_readiness_score)
+        detail_label = f"READINESS · {date_label}"
+        hist_key, hist_unit, hist_title, hist_color = "readiness_score", "", "Readiness Trend", "#6BAF8B"
+        extra_blocks = ""
+    elif view == "sleep":
+        col, disp, lbl, _, _ = dash.sleep_meta(_sleep_pct, _sleep_need, _sleep_base_window)
+        detail_label = f"SLEEP · {date_label}"
+        hist_key, hist_unit, hist_title, hist_color = "sleep_pct", "%", "Sleep % of Baseline Trend", "#4FC3F7"
+        extra_blocks = ""
+    else:
+        col, disp, lbl, _, _ = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
+        detail_label = "STRAIN · 7D AVG" if _strain_is_rolling else f"STRAIN · {date_label}"
+        hist_key, hist_unit, hist_title, hist_color = "strain", "", "Strain Trend", "#BFA06A"
+        extra_blocks = (
+            _trend_block("Heart Rate Variability", "ms",  _hrv_7d, "#6BAF8B")
+            + _trend_block("Resting Heart Rate",     "bpm", _rhr_7d, "#BFA06A")
+        )
+
+    hist_dates = [selected_date - timedelta(days=29 - i) for i in range(30)]
+    hist_by_date = {r["date"]: r.get(hist_key) for r in _metrics_hist}
+    hist_values = [hist_by_date.get(d.isoformat()) for d in hist_dates]
+
     return (
         f'<div style="padding:16px;">'
         f'<div style="display:flex;align-items:center;margin-bottom:20px;">'
@@ -436,13 +523,13 @@ def _strain_detail() -> str:
         f'text-decoration:none;margin-right:14px;line-height:1;">←</a>'
         f'<div>'
         f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;'
-        f'text-transform:uppercase;margin-bottom:2px;">{_detail_label}</div>'
-        f'<div style="font-size:30px;font-weight:800;color:{s_col};line-height:1;">{s_disp}</div>'
-        f'<div style="font-size:12px;color:#6B7A9B;margin-top:2px;">{s_lbl}</div>'
+        f'text-transform:uppercase;margin-bottom:2px;">{detail_label}</div>'
+        f'<div style="font-size:30px;font-weight:800;color:{col};line-height:1;">{disp}</div>'
+        f'<div style="font-size:12px;color:#6B7A9B;margin-top:2px;">{lbl}</div>'
         f'</div>'
         f'</div>'
-        + _trend_block("Heart Rate Variability", "ms",  _hrv_7d, "#6BAF8B")
-        + _trend_block("Resting Heart Rate",     "bpm", _rhr_7d, "#BFA06A")
+        + _history_trend_block(hist_title, hist_unit, hist_dates, hist_values, hist_color)
+        + extra_blocks
         + f'</div>'
     )
 
@@ -452,11 +539,12 @@ def _strain_detail() -> str:
 _next_style = "color:#D4DCEE;" if can_go_next else "color:#2A2A3A;pointer-events:none;"
 _next_href  = f"?d={next_date}" if can_go_next else "#"
 
-if view == "strain":
+_DETAIL_VIEW_TITLES = {"strain": "Strain History", "readiness": "Readiness History", "sleep": "Sleep History"}
+if view in _DETAIL_VIEW_TITLES:
     _header_inner = (
         f'<a href="?d={selected_date}" style="color:#6B7A9B;text-decoration:none;'
         f'font-size:22px;line-height:1;margin-right:14px;">←</a>'
-        f'<span style="color:#D4DCEE;font-weight:600;font-size:15px;">Strain History</span>'
+        f'<span style="color:#D4DCEE;font-weight:600;font-size:15px;">{_DETAIL_VIEW_TITLES[view]}</span>'
         f'<div style="width:36px;"></div>'
     )
     _header_justify = "flex-start"
@@ -515,6 +603,7 @@ _card_readiness = _card_html(
     "READINESS", _bg["readiness"],
     _arc_svg(_readiness_score, 100, r_col),
     r_disp, r_lbl, r_col, r_hdr, r_desc, r_tert,
+    click_href=f"?d={selected_date}&view=readiness",
 )
 
 s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
@@ -531,6 +620,7 @@ _card_sleep = _card_html(
     "SLEEP", _bg["sleep"],
     _arc_svg(_sleep_pct, 100, sl_col),
     sl_disp, sl_lbl, sl_col, sl_hdr, sl_desc,
+    click_href=f"?d={selected_date}&view=sleep",
 )
 
 # ─── Render ───────────────────────────────────────────────────────────────────
@@ -541,8 +631,8 @@ st.markdown(_home_css,    unsafe_allow_html=True)  # home-specific overrides (48
 st.markdown(_header_html, unsafe_allow_html=True)  # fixed date header
 st.markdown(_fab_html,    unsafe_allow_html=True)  # FAB → Check-In
 
-if view == "strain":
-    st.markdown(_strain_detail(), unsafe_allow_html=True)
+if view in ("strain", "readiness", "sleep"):
+    st.markdown(_metric_detail(view), unsafe_allow_html=True)
 else:
     st.markdown(_card_readiness + _card_strain + _card_sleep, unsafe_allow_html=True)
 if not _oura_sync_ok and _oura_sync_err:

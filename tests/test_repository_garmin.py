@@ -212,15 +212,19 @@ def test_recent_activity_minutes_ignores_unparseable_timestamps():
 # get_config_value/set_config are monkeypatched with a plain in-memory dict
 # here rather than a full fake Notion client — this is testing the due-check
 # orchestration, not Notion's config read/write mechanics (already covered
-# by tests/test_repository.py's phases-related tests). Throttle is once per
-# calendar day (garmin_daily_last_synced_date) now that Garmin feeds the
-# engine's biometric blend and is triggered on Home open, not just weekly.
+# by tests/test_repository.py's phases-related tests). Throttle is every 2
+# hours (garmin_daily_last_synced_at, a timestamp — was once/calendar-day
+# under the old date-only garmin_daily_last_synced_date key), matching
+# Oura's own cadence, and stops entirely for the rest of the day once
+# has_checked_in(today) is True (mocked here too, defaulting to False).
 
-def _repo_with_due_check(client, config_values: dict, sync_calls: list) -> Repository:
+def _repo_with_due_check(client, config_values: dict, sync_calls: list,
+                          checked_in: bool = False) -> Repository:
     repo = _repo_with_garmin(client)
     repo.get_config_value = lambda key: config_values.get(key)
     repo.set_config = lambda key, value, today=None: config_values.__setitem__(key, value)
     repo.sync_garmin_daily = lambda days=7, today=None: sync_calls.append((days, today)) or days
+    repo.has_checked_in = lambda d: checked_in
     return repo
 
 
@@ -233,38 +237,73 @@ def test_sync_if_due_skips_entirely_when_not_configured():
     assert calls == []
 
 
-def test_sync_if_due_runs_first_time_today():
+def test_sync_if_due_runs_first_time_ever():
     calls, config = [], {}
     repo = _repo_with_due_check(_FakeGarminClient(), config, calls)
-    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))
+    now = datetime(2026, 7, 13, 8, 0, 0)
+    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13), now=now)
     assert (ok, err) == (True, None)
     assert calls == [(7, date(2026, 7, 13))]
-    assert config["garmin_daily_last_synced_date"] == "2026-07-13"
+    assert config["garmin_daily_last_synced_at"] == now.isoformat()
 
 
-def test_sync_if_due_skips_when_already_synced_today():
+def test_sync_if_due_skips_within_2_hours_of_last_sync():
     calls = []
-    config = {"garmin_daily_last_synced_date": "2026-07-13"}
+    config = {"garmin_daily_last_synced_at": datetime(2026, 7, 13, 8, 0, 0).isoformat()}
     repo = _repo_with_due_check(_FakeGarminClient(), config, calls)
-    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))  # same day
+    ok, err = repo.sync_garmin_daily_if_due(
+        today=date(2026, 7, 13), now=datetime(2026, 7, 13, 9, 59, 0),  # 1h59m later
+    )
     assert (ok, err) == (True, None)
     assert calls == []
 
 
-def test_sync_if_due_runs_again_the_next_day():
+def test_sync_if_due_runs_again_after_2_hours():
     calls = []
-    config = {"garmin_daily_last_synced_date": "2026-07-12"}  # yesterday
+    config = {"garmin_daily_last_synced_at": datetime(2026, 7, 13, 8, 0, 0).isoformat()}
     repo = _repo_with_due_check(_FakeGarminClient(), config, calls)
-    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))
+    now = datetime(2026, 7, 13, 10, 0, 1)  # 2h0m1s later
+    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13), now=now)
     assert (ok, err) == (True, None)
     assert calls == [(7, date(2026, 7, 13))]
-    assert config["garmin_daily_last_synced_date"] == "2026-07-13"
+    assert config["garmin_daily_last_synced_at"] == now.isoformat()
+
+
+def test_sync_if_due_runs_again_the_next_day():
+    calls = []
+    config = {"garmin_daily_last_synced_at": datetime(2026, 7, 12, 20, 0, 0).isoformat()}
+    repo = _repo_with_due_check(_FakeGarminClient(), config, calls)
+    now = datetime(2026, 7, 13, 7, 0, 0)
+    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13), now=now)
+    assert (ok, err) == (True, None)
+    assert calls == [(7, date(2026, 7, 13))]
+    assert config["garmin_daily_last_synced_at"] == now.isoformat()
+
+
+def test_sync_if_due_skips_once_checked_in_today_even_if_2_hours_elapsed():
+    calls = []
+    config = {"garmin_daily_last_synced_at": datetime(2026, 7, 13, 6, 0, 0).isoformat()}
+    repo = _repo_with_due_check(_FakeGarminClient(), config, calls, checked_in=True)
+    ok, err = repo.sync_garmin_daily_if_due(
+        today=date(2026, 7, 13), now=datetime(2026, 7, 13, 12, 0, 0),  # well over 2h later
+    )
+    assert (ok, err) == (True, None)
+    assert calls == []
+
+
+def test_sync_if_due_skips_when_checked_in_and_never_synced_before():
+    calls, config = [], {}
+    repo = _repo_with_due_check(_FakeGarminClient(), config, calls, checked_in=True)
+    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))
+    assert (ok, err) == (True, None)
+    assert calls == []
 
 
 def test_sync_if_due_returns_error_on_sync_failure():
     repo = _repo_with_garmin(_FakeGarminClient())
     repo.get_config_value = lambda key: None
     repo.set_config = lambda key, value, today=None: None
+    repo.has_checked_in = lambda d: False
 
     def _boom(**kw):
         raise RuntimeError("garmin down")
@@ -273,3 +312,17 @@ def test_sync_if_due_returns_error_on_sync_failure():
     ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))
     assert ok is False
     assert "garmin down" in err
+
+
+# ─── has_checked_in ─────────────────────────────────────────────────────────
+
+def test_has_checked_in_true_when_a_page_exists_for_the_date():
+    repo = Repository(_config())
+    repo._query = lambda db_id, filter_=None, sorts=None: [{"id": "p1"}]
+    assert repo.has_checked_in(date(2026, 7, 13)) is True
+
+
+def test_has_checked_in_false_when_no_page_exists():
+    repo = Repository(_config())
+    repo._query = lambda db_id, filter_=None, sorts=None: []
+    assert repo.has_checked_in(date(2026, 7, 13)) is False

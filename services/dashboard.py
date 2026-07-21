@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from services import engine as _engine
+from services import readiness as _readiness
 from services.readiness import NOT_COMPUTED as _NOT_COMPUTED
 
 SLEEP_NEED_HOURS_DEFAULT = 8.0
@@ -85,6 +86,70 @@ def apply_step_modifier(strain: float | None, bio_rows: list[dict],
 
 def sleep_percent(sleep_hours: float | None, sleep_need_hours: float) -> int | None:
     return round(sleep_hours / sleep_need_hours * 100) if sleep_hours else None
+
+
+def compute_daily_metrics_snapshot(
+    d: date,
+    bio_rows: list[dict],
+    au_rows: list[dict],
+    stage: int,
+    sleep_base_hours: float | None = None,
+    rolling_reference_date: date | None = None,
+) -> dict:
+    """The exact three numbers the Home page's cards show for date `d`: the
+    smoothed readiness trend, sleep hours as a percent of the personal
+    rolling baseline, and step-modifier-adjusted strain (today's own value
+    once a session is logged that day, else the rolling 7-day prior-load
+    figure). Shared by app.py's live Home page and
+    Repository.sync_metrics_history so the persisted trend history can
+    never drift from what was actually displayed on a given day.
+
+    sleep_base_hours: pass a pre-computed baseline (readiness.sleep_baseline's
+    result) when calling this in a loop over multiple dates, so the
+    baseline — which scans the whole bio_rows window — isn't recomputed
+    once per date. Matches how the Home page already computes ONE baseline
+    from its fetched window and applies it regardless of which date is
+    selected, rather than a strictly date-scoped baseline per historical day.
+
+    rolling_reference_date: the date used for the rolling-prior-strain
+    fallback and the step-count modifier — both represent "body load
+    already accumulated heading into training," a concept the Home page
+    deliberately anchors to the real present (date.today()) even while
+    browsing a past day's card for reference, rather than to `d`. Defaults
+    to `d` itself, which is what a batch historical persistence job wants
+    instead (Repository.sync_metrics_history) — each persisted day should
+    reflect its OWN rolling context, not whatever day the sync happened to
+    run on. A live page that lets the user browse past dates (app.py's
+    Home) should pass date.today() explicitly here to preserve that framing.
+
+    Returns {"readiness_score", "sleep_pct", "strain", "strain_is_rolling"} —
+    any of the three metrics is None if there wasn't enough data to compute
+    it for this date."""
+    rolling_reference_date = rolling_reference_date or d
+    readiness_score = _readiness.compute_readiness_trend(d, bio_rows)
+    if readiness_score == _NOT_COMPUTED:
+        readiness_score = None
+
+    d_str = d.isoformat()
+    bio_day = next((r for r in bio_rows if r.get("date") == d_str), None)
+    sleep_hours = bio_day.get("sleep_duration_hours") if bio_day else None
+    if sleep_base_hours is None:
+        sleep_base_hours, _ = _readiness.sleep_baseline(bio_rows)
+    sleep_need = sleep_base_hours if sleep_base_hours else SLEEP_NEED_HOURS_DEFAULT
+    sleep_pct = sleep_percent(sleep_hours, sleep_need)
+
+    au_day = next((r for r in au_rows if r.get("date") == d_str), None)
+    today_strain = au_to_strain_or_none(au_day["total_au"] if au_day else None, stage)
+    rolling_strain = rolling_prior_strain(au_rows, stage, today=rolling_reference_date)
+    strain, strain_is_rolling = display_strain(today_strain, rolling_strain)
+    strain = apply_step_modifier(strain, bio_rows, today=rolling_reference_date)
+
+    return {
+        "readiness_score": readiness_score,
+        "sleep_pct": sleep_pct,
+        "strain": strain,
+        "strain_is_rolling": strain_is_rolling,
+    }
 
 
 # ─── Status-tier classification ─────────────────────────────────────────────

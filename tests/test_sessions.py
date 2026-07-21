@@ -151,6 +151,134 @@ def test_make_sets_data_defaults_to_zero_weight_when_absent():
     assert all(r["weight"] == 0.0 for r in rows)
 
 
+def test_make_sets_data_includes_band_tier_when_present():
+    ex = {"type": "reps", "sets": 2, "reps": 10, "rest_seconds": 45, "band_tier": "Green"}
+    rows = sessions.make_sets_data(ex)
+    assert all(r["band_tier"] == "Green" for r in rows)
+
+
+def test_make_sets_data_omits_band_tier_key_when_absent():
+    ex = {"type": "reps", "sets": 1, "reps": 10, "rest_seconds": 45}
+    rows = sessions.make_sets_data(ex)
+    assert "band_tier" not in rows[0]
+
+
+# ─── reps/weight/band-tier steppers ────────────────────────────────────────
+
+def test_step_reps_increments_and_decrements():
+    assert sessions.step_reps(8, +1) == 9
+    assert sessions.step_reps(8, -1) == 7
+
+
+def test_step_reps_floors_at_one():
+    assert sessions.step_reps(1, -1) == 1
+
+
+def test_step_weight_kg_increments_by_2_5():
+    assert sessions.step_weight_kg(10.0, +1) == 12.5
+    assert sessions.step_weight_kg(10.0, -1) == 7.5
+
+
+def test_step_weight_kg_floors_at_zero():
+    assert sessions.step_weight_kg(2.5, -1) == 0.0
+    assert sessions.step_weight_kg(0.0, -1) == 0.0
+
+
+def test_step_band_tier_moves_one_position():
+    assert sessions.step_band_tier("Green", +1) == "Blue"
+    assert sessions.step_band_tier("Blue", -1) == "Green"
+
+
+def test_step_band_tier_clamped_at_both_ends():
+    assert sessions.step_band_tier("Black", +1) == "Black"
+    assert sessions.step_band_tier("Green", -1) == "Green"
+
+
+# ─── seed_actual_entry ──────────────────────────────────────────────────────
+
+def test_seed_actual_entry_bodyweight_exercise_returns_all_none():
+    entry = sessions.seed_actual_entry({"type": "reps", "equipment_type": None}, None, "high", True)
+    assert entry == {"reps": None, "weight_kg": None, "band_tier": None,
+                      "source": "plan_default", "last_seen_date": None}
+
+
+def test_seed_actual_entry_no_last_performance_uses_plan_defaults():
+    ex = {"type": "reps", "reps": 8, "weight_kg": 10.0, "equipment_type": "dumbbell"}
+    entry = sessions.seed_actual_entry(ex, None, "normal", True)
+    assert entry["reps"] == 8 and entry["weight_kg"] == 10.0 and entry["source"] == "plan_default"
+
+
+def test_seed_actual_entry_prefers_last_performance_over_plan():
+    ex = {"type": "reps", "reps": 8, "weight_kg": 10.0, "equipment_type": "dumbbell"}
+    last = {"reps": 6, "weight_kg": 12.5, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(ex, last, "normal", True)
+    assert entry["reps"] == 6 and entry["weight_kg"] == 12.5 and entry["source"] == "last_time"
+    assert entry["last_seen_date"] == "2026-07-14"
+
+
+def test_seed_actual_entry_applies_readiness_nudge_on_top_of_last_performance():
+    ex = {"type": "reps", "reps": 8, "weight_kg": 10.0, "equipment_type": "dumbbell"}
+    last = {"reps": 6, "weight_kg": 10.0, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(ex, last, "high", True)
+    assert entry["weight_kg"] == 12.5
+
+
+def test_seed_actual_entry_suppresses_increase_from_zero_baseline():
+    # Bulgarian Split Squat weeks 1-2: bodyweight, plan/history both None/0
+    # — a good readiness day must not silently introduce load.
+    ex = {"type": "reps", "reps": 8, "weight_kg": None, "equipment_type": "dumbbell"}
+    entry = sessions.seed_actual_entry(ex, None, "high", True)
+    assert entry["weight_kg"] == 0.0
+
+
+def test_seed_actual_entry_off_grid_weight_unchanged_on_normal_readiness():
+    # Prone Y-Raise uses 1kg accessory dumbbells, not a 2.5kg multiple.
+    ex = {"type": "hold_reps", "reps_in_set": 8, "weight_kg": 1.0, "equipment_type": "dumbbell"}
+    entry = sessions.seed_actual_entry(ex, None, "normal", True)
+    assert entry["weight_kg"] == 1.0
+    assert entry["reps"] is None  # hold_reps never gets a reps stepper
+
+
+def test_seed_actual_entry_band_exercise_gets_tier_not_weight():
+    ex = {"type": "reps", "reps": 10, "equipment_type": "band", "band_tier": "Green"}
+    entry = sessions.seed_actual_entry(ex, None, "normal", True)
+    assert entry["weight_kg"] is None
+    assert entry["band_tier"] == "Green"
+
+
+def test_seed_actual_entry_band_prefers_last_performance_tier():
+    ex = {"type": "reps", "reps": 10, "equipment_type": "band", "band_tier": "Green"}
+    last = {"reps": 12, "band_tier": "Blue", "weight_kg": 999.0, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(ex, last, "normal", True)
+    assert entry["band_tier"] == "Blue"
+    assert entry["weight_kg"] is None  # never populated for a band exercise
+    assert entry["reps"] == 12
+
+
+def test_seed_actual_entry_band_applies_readiness_nudge():
+    ex = {"type": "reps", "reps": 10, "equipment_type": "band", "band_tier": "Green"}
+    entry = sessions.seed_actual_entry(ex, None, "high", True)
+    assert entry["band_tier"] == "Blue"
+
+
+# ─── actual_caption ─────────────────────────────────────────────────────────
+
+def test_actual_caption_last_time_weight():
+    entry = {"source": "last_time", "reps": 8, "weight_kg": 12.5, "band_tier": None,
+             "last_seen_date": "2026-07-14"}
+    assert sessions.actual_caption(entry) == "Last time: 8 reps @ 12.5 kg (2026-07-14)"
+
+
+def test_actual_caption_last_time_band_tier():
+    entry = {"source": "last_time", "reps": 10, "weight_kg": None, "band_tier": "Blue",
+             "last_seen_date": "2026-07-14"}
+    assert sessions.actual_caption(entry) == "Last time: 10 reps @ Blue (Medium) (2026-07-14)"
+
+
+def test_actual_caption_plan_default():
+    assert sessions.actual_caption({"source": "plan_default"}) == "No prior record — using plan default."
+
+
 def test_estimate_duration_floor_is_10_minutes():
     assert sessions.estimate_duration([]) >= 10
 
@@ -202,7 +330,7 @@ def test_exercise_duration_seconds_sums_to_estimate_duration():
 _STATE = {
     "tp_ex_idx": 2, "tp_set": 1, "tp_rep_in_set": 1, "tp_phase": "resting",
     "tp_started": True, "tp_done_today": False, "tp_session_logged": False,
-    "tp_side": "right", "tp_session_start_ts": 12345.0,
+    "tp_side": "right", "tp_session_start_ts": 12345.0, "tp_actuals": {},
 }
 
 

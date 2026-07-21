@@ -199,6 +199,72 @@ def test_get_recent_sessions_computes_actual_sets_and_volume():
     assert ex.total_volume_kg == 320.0  # 8*20 + 8*20
 
 
+# ─── get_last_performance ───────────────────────────────────────────────────
+
+def test_get_last_performance_returns_none_when_never_logged():
+    repo = _repo({"db-training": []})
+    assert repo.get_last_performance("Goblet Squat") is None
+
+
+def test_get_last_performance_parses_last_set_of_most_recent_page():
+    page = {"properties": {
+        "Movement": _title_prop("Goblet Squat"),
+        "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop(json.dumps([
+            {"set_num": 1, "reps": 8, "weight": 10.0},
+            {"set_num": 2, "reps": 8, "weight": 12.5},
+        ])),
+    }}
+    repo = _repo({"db-training": [page]})
+    result = repo.get_last_performance("Goblet Squat")
+    assert result == {
+        "session_date": "2026-07-14", "reps": 8, "weight_kg": 12.5,
+        "band_tier": None, "sets_count": 2,
+    }
+
+
+def test_get_last_performance_picks_most_recent_date_among_multiple_sessions():
+    older = {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-07"),
+        "Sets": _rich_text_prop(json.dumps([{"reps": 8, "weight": 10.0}])),
+    }}
+    newer = {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop(json.dumps([{"reps": 8, "weight": 12.5}])),
+    }}
+    repo = _repo({"db-training": [older, newer]})
+    assert repo.get_last_performance("Goblet Squat")["weight_kg"] == 12.5
+
+
+def test_get_last_performance_parses_band_tier():
+    page = {"properties": {
+        "Movement": _title_prop("Lateral Band Walk"), "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop(json.dumps([{"reps": 10, "weight": 0.0, "band_tier": "Blue"}])),
+    }}
+    repo = _repo({"db-training": [page]})
+    result = repo.get_last_performance("Lateral Band Walk")
+    assert result["band_tier"] == "Blue"
+    assert result["weight_kg"] == 0.0
+
+
+def test_get_last_performance_empty_sets_json_returns_none():
+    page = {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop("[]"),
+    }}
+    repo = _repo({"db-training": [page]})
+    assert repo.get_last_performance("Goblet Squat") is None
+
+
+def test_get_last_performance_corrupt_json_returns_none():
+    page = {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop("{not json"),
+    }}
+    repo = _repo({"db-training": [page]})
+    assert repo.get_last_performance("Goblet Squat") is None
+
+
 def test_get_recent_sessions_multiple_dates_sorted_descending():
     pages = [_exercise_page("2026-07-05", "A"), _exercise_page("2026-07-07", "B")]
     repo = _repo({"db-training": pages})

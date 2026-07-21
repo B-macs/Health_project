@@ -177,3 +177,78 @@ def test_sleep_meta_optimal_tier_with_baseline_window():
 def test_sleep_meta_no_baseline_window_uses_target_copy():
     _, _, _, _, desc = dashboard.sleep_meta(90, 8.0, None)
     assert "target" in desc
+
+
+# ─── compute_daily_metrics_snapshot ─────────────────────────────────────────
+
+def test_snapshot_returns_all_four_keys_with_minimal_data():
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=[], stage=1,
+    )
+    assert set(snap) == {"readiness_score", "sleep_pct", "strain", "strain_is_rolling"}
+
+
+def test_snapshot_no_data_everything_none():
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=[], stage=1,
+    )
+    assert snap["readiness_score"] is None
+    assert snap["sleep_pct"] is None
+    assert snap["strain"] is None
+
+
+def test_snapshot_sleep_pct_uses_sleep_hours_for_the_given_date():
+    bio_rows = [{"date": "2026-07-20", "sleep_duration_hours": 6.0}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows, au_rows=[], stage=1,
+    )
+    # no computable baseline from a single row -> falls back to the 8h default
+    assert snap["sleep_pct"] == 75
+
+
+def test_snapshot_precomputed_sleep_base_hours_is_used_directly():
+    bio_rows = [{"date": "2026-07-20", "sleep_duration_hours": 6.0}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows, au_rows=[], stage=1, sleep_base_hours=6.0,
+    )
+    assert snap["sleep_pct"] == 100
+
+
+def test_snapshot_strain_uses_todays_au_when_logged_that_day():
+    au_rows = [{"date": "2026-07-20", "total_au": 300.0}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au_rows, stage=2,
+    )
+    assert snap["strain"] is not None
+    assert snap["strain_is_rolling"] is False
+
+
+def test_snapshot_strain_falls_back_to_rolling_when_no_session_that_day():
+    au_rows = [{"date": "2026-07-13", "total_au": 700.0}]  # 7 days before, none on the target day
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au_rows, stage=1,
+    )
+    assert snap["strain_is_rolling"] is True
+
+
+def test_snapshot_rolling_reference_date_defaults_to_the_scored_date():
+    # Rolling strain looks at the 7 days BEFORE the reference date. With no
+    # default override, that's `d` itself -- so AU logged the day before `d`
+    # counts toward the rolling fallback.
+    au_rows = [{"date": "2026-07-19", "total_au": 700.0}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au_rows, stage=1,
+    )
+    assert snap["strain_is_rolling"] is True
+    assert snap["strain"] is not None
+
+
+def test_snapshot_rolling_reference_date_override_shifts_the_rolling_window():
+    # Same AU data, but the rolling window is now anchored to a date where
+    # the prior-7-days window no longer includes 07-19 -> no rolling fallback.
+    au_rows = [{"date": "2026-07-19", "total_au": 700.0}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au_rows, stage=1,
+        rolling_reference_date=date(2026, 8, 1),
+    )
+    assert snap["strain"] is None

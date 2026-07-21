@@ -30,6 +30,58 @@ from services import yoga as yg
 #  JavaScript Timer Components — all use localStorage to persist across navigation
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _audio_unlock_component() -> None:
+    """Invisible, mounted once near the top of every render() call. Attaches a
+    one-time click/touch listener on the PARENT page (window.parent.document,
+    not this iframe's own document) that creates and resumes a single
+    AudioContext living on window.parent — not window — the first time the
+    user taps anything in the app.
+
+    Why this exists: every timer below (_hold_timer/_rest_timer) renders in
+    its own components.html() iframe, torn down and rebuilt by Streamlit on
+    every rerun. A fresh AudioContext created inside one of those iframes only
+    plays sound if IT PERSONALLY was resumed as the direct result of a click
+    inside THAT SAME iframe — but the rest timer always auto-starts itself on
+    load (no click), and chained hold timers (next rep/side, via
+    tp_auto_start) do too. Their AudioContext.resume() calls get silently
+    blocked by the browser's autoplay policy, and the empty try/catch around
+    every _beep() swallows the failure with no visible symptom — sound just
+    doesn't play, specifically on auto-started timers (i.e. most of them).
+
+    Fix: put the AudioContext on window.parent instead, which is the live
+    Streamlit page and does NOT get torn down on a rerun (only individual
+    components.html iframes do). Unlock it once, from a real gesture,
+    anywhere in the app — long before the first timer ever needs it, since
+    plenty of taps (Start Training, etc.) happen first — and every timer
+    iframe's _beep() (see below) reuses that same already-running context via
+    window.parent._audioCtx, regardless of whether that particular timer
+    instance was itself clicked or auto-started.
+
+    window.parent._audioUnlockAttached guards against re-adding the listener
+    on every rerun (this component itself remounts each time render() runs,
+    same as every other components.html call) — harmless if it did stack, but
+    unnecessary."""
+    components.html("""
+<script>
+(function() {
+  try {
+    if (window.parent._audioUnlockAttached) return;
+    window.parent._audioUnlockAttached = true;
+    function unlock() {
+      try {
+        var ctx = window.parent._audioCtx ||
+          (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
+        if (ctx.state === 'suspended') { ctx.resume(); }
+      } catch(e) {}
+    }
+    window.parent.document.addEventListener('click', unlock, {once: true});
+    window.parent.document.addEventListener('touchend', unlock, {once: true});
+  } catch(e) {}
+})();
+</script>
+""", height=0)
+
+
 def _hold_timer(seconds: int, label: str = "HOLD", timer_key: str = "tp_h",
                 set_auto_start: bool = False) -> None:
     """Isometric hold countdown. Auto-completes at 0 (clicks the ✓ button in parent).
@@ -60,7 +112,8 @@ var _TKEY = "{timer_key}";
 
 function _beep(freq, dur, vol) {{
   try {{
-    var ctx = window._audioCtx || (window._audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+    var ctx = window.parent._audioCtx ||
+      (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
     if (ctx.state === 'suspended') ctx.resume();
     var o = ctx.createOscillator(), g = ctx.createGain();
     o.connect(g); g.connect(ctx.destination);
@@ -188,7 +241,8 @@ var _beeped = {{}};
 
 function _beep(freq, dur, vol) {{
   try {{
-    var ctx = window._audioCtx || (window._audioCtx = new (window.AudioContext || window.webkitAudioContext)());
+    var ctx = window.parent._audioCtx ||
+      (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
     if (ctx.state === 'suspended') ctx.resume();
     var o = ctx.createOscillator(), g = ctx.createGain();
     o.connect(g); g.connect(ctx.destination);
@@ -378,6 +432,7 @@ def _init_state(day_num: int | None = None):
         "tp_yoga_detail":      None,     # slug of the yoga being viewed (video + Complete), if any
         "tp_garmin_minutes":   {},       # {exercise_idx: actual_minutes} pulled from Garmin on Complete
         "tp_garmin_activity_detail": {}, # {exercise_idx: {avg_hr, max_hr, distance_km, calories}}
+        "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
     for k, v in defaults.items():
@@ -387,8 +442,15 @@ def _init_state(day_num: int | None = None):
         checkpoint = _load_checkpoint(day_num)
         if checkpoint:
             for k in sess.CHECKPOINT_FIELDS:
-                if k in checkpoint:
-                    st.session_state[k] = checkpoint[k]
+                if k not in checkpoint:
+                    continue
+                v = checkpoint[k]
+                # tp_actuals round-trips through JSON (Notion-backed
+                # checkpoint storage) which silently turns its int keys into
+                # strings -- cast back so exercise-index lookups still hit.
+                if k == "tp_actuals" and isinstance(v, dict):
+                    v = {int(i): entry for i, entry in v.items()}
+                st.session_state[k] = v
         # Authoritative check, independent of the checkpoint above: if a session is
         # already logged in Notion for today, never allow re-entering the exercise
         # flow — a missing/stale/lost checkpoint must not let a second session start.
@@ -435,6 +497,7 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     r = repo.get_repository()
     garmin_minutes = st.session_state.get("tp_garmin_minutes", {})
     garmin_detail = st.session_state.get("tp_garmin_activity_detail", {})
+    actuals = st.session_state.get("tp_actuals", {})
     session_info = r.create_training_session(
         session_date=date.today(),
         duration_minutes=duration_minutes,
@@ -443,10 +506,23 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     last_id = None
     for idx, ex in enumerate(exercises):
         actual_min = garmin_minutes.get(idx)
-        # Garmin-verified duration overrides the planned one for this
-        # exercise's own logged tut — a shallow copy so the shared
-        # training_plan.py PLAN dict is never mutated in place.
-        log_ex = dict(ex, duration_minutes=actual_min) if actual_min else ex
+        # Garmin-verified duration and the live reps/weight/band-tier
+        # steppers both override the planned prescription for logging — a
+        # shallow copy so the shared training_plan.py PLAN dict is never
+        # mutated in place.
+        log_ex = dict(ex, duration_minutes=actual_min) if actual_min else dict(ex)
+        actual = actuals.get(idx)
+        if actual and ex.get("equipment_type"):
+            if ex["type"] == "hold_reps":
+                if actual.get("reps") is not None:
+                    log_ex["reps_in_set"] = actual["reps"]
+            elif actual.get("reps") is not None:
+                log_ex["reps"] = actual["reps"]
+            if ex.get("equipment_type") == "band":
+                if actual.get("band_tier"):
+                    log_ex["band_tier"] = actual["band_tier"]
+            elif actual.get("weight_kg") is not None:
+                log_ex["weight_kg"] = actual["weight_kg"]
         garmin_note = (
             f"Garmin-verified duration: {actual_min:.0f} min "
             f"(planned {ex.get('duration_minutes')} min)."
@@ -474,6 +550,28 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         )
     if notes.strip() and last_id:
         r.save_session_notes(last_id, notes)
+
+
+def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
+                             directive: dict, day_num: int) -> None:
+    """Seeds st.session_state.tp_actuals[idx] the first time this exercise
+    is shown this session, from Repository.get_last_performance (if any)
+    plus the readiness engine's nudge — a live +/- stepper, not a re-seed,
+    drives every render after that. Guarded so it never re-queries Notion
+    or re-applies the nudge on subsequent reruns of the same exercise."""
+    if idx in st.session_state.tp_actuals or not ex.get("equipment_type"):
+        return
+    last = None
+    try:
+        last = repo.get_repository().get_last_performance(ex["name"])
+    except Exception:
+        pass  # never block the live flow on a lookup failure
+    entry = sess.seed_actual_entry(
+        ex, last, readiness_modifier.get("streak_label", "unknown"),
+        allow_increase=(directive.get("signal_color") != "red"),
+    )
+    st.session_state.tp_actuals[idx] = entry
+    _save_checkpoint(day_num)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -590,13 +688,14 @@ def _sync_weekly_rollup_cached() -> tuple[bool, str | None]:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _sync_garmin_daily_cached() -> tuple[bool, str | None]:
-    """Throttles the due-check itself (cheap) — the actual Garmin sync only
-    ever fires once per calendar day regardless, via Repository.
-    sync_garmin_daily_if_due (Garmin's API is rate-limit-sensitive, unlike the
-    Weekly Rollup sync above). app.py's Home page also triggers this same
-    once/day sync now that Garmin feeds the engine's biometric blend
-    (services/biometrics.py) — this call here just means it's covered on the
-    Training page too if Home wasn't visited first that day."""
+    """Throttles the due-check itself (cheap) — the actual Garmin sync fires
+    at most every 2 hours, and not at all for the rest of the day once
+    today's check-in is submitted, via Repository.sync_garmin_daily_if_due
+    (Garmin's API is rate-limit-sensitive, unlike the Weekly Rollup sync
+    above). app.py's Home page also triggers this same sync now that Garmin
+    feeds the engine's biometric blend (services/biometrics.py) — this call
+    here just means it's covered on the Training page too if Home wasn't
+    visited first that day."""
     try:
         return repo.get_repository().sync_garmin_daily_if_due()
     except Exception as exc:
@@ -1498,6 +1597,7 @@ def _render_yoga_select() -> None:
 
 def render():
     st.markdown(_PAGE_CSS, unsafe_allow_html=True)
+    _audio_unlock_component()
 
     # ── Session state initialisation — restores from a saved Notion checkpoint
     #     if this is a fresh session (e.g. the browser dropped its connection
@@ -1856,6 +1956,7 @@ def render():
 
     # Unique timer keys scoped to this exercise / set / rep / side
     _eidx = st.session_state.tp_ex_idx
+    _seed_actuals_if_needed(_eidx, ex, _readiness_modifier, _directive, day_num)
     _eset = st.session_state.tp_set
     _erep = st.session_state.tp_rep_in_set
     _side = st.session_state.tp_side
@@ -1901,6 +2002,88 @@ def render():
             height=68,
         )
 
+    # ── Reps / weight / band-tier steppers — gym/free-weight/band exercises
+    #     only (ex.get("equipment_type") truthy). Seeded once per exercise
+    #     per session by _seed_actuals_if_needed above; every tap here just
+    #     mutates the seeded entry in place and checkpoints it. ───────────────
+    _actual = st.session_state.tp_actuals.get(_eidx)
+    if _actual is not None:
+        st.caption(sess.actual_caption(_actual))
+        if ex["type"] == "reps" and _actual["reps"] is not None:
+            st.markdown(
+                "<div style='text-align:center;font-size:11px;color:#8A99A3;"
+                "font-family:monospace;letter-spacing:2px;'>REPS</div>",
+                unsafe_allow_html=True,
+            )
+            rc1, rc2, rc3 = st.columns([1, 2, 1])
+            with rc1:
+                if st.button("−", key=f"tp_reps_dec_{_eidx}", use_container_width=True):
+                    _actual["reps"] = sess.step_reps(_actual["reps"], -1)
+                    _save_checkpoint(day_num)
+                    st.rerun()
+            with rc2:
+                st.markdown(
+                    f"<div style='text-align:center;font-size:40px;font-weight:700;"
+                    f"color:#E8ECEF;'>{_actual['reps']}</div>",
+                    unsafe_allow_html=True,
+                )
+            with rc3:
+                if st.button("+", key=f"tp_reps_inc_{_eidx}", use_container_width=True):
+                    _actual["reps"] = sess.step_reps(_actual["reps"], +1)
+                    _save_checkpoint(day_num)
+                    st.rerun()
+
+        _equip = ex.get("equipment_type")
+        if _equip == "band" and _actual["band_tier"]:
+            _tier_label = sess.BAND_TIER_LABELS.get(_actual["band_tier"], "")
+            st.markdown(
+                "<div style='text-align:center;font-size:11px;color:#8A99A3;"
+                "font-family:monospace;letter-spacing:2px;margin-top:8px;'>BAND</div>",
+                unsafe_allow_html=True,
+            )
+            bc1, bc2, bc3 = st.columns([1, 2, 1])
+            with bc1:
+                if st.button("−", key=f"tp_band_dec_{_eidx}", use_container_width=True):
+                    _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], -1)
+                    _save_checkpoint(day_num)
+                    st.rerun()
+            with bc2:
+                st.markdown(
+                    f"<div style='text-align:center;font-size:28px;font-weight:700;color:#E8ECEF;'>"
+                    f"{_actual['band_tier']}<span style='font-size:14px;color:#8A99A3;'> — {_tier_label}</span>"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+            with bc3:
+                if st.button("+", key=f"tp_band_inc_{_eidx}", use_container_width=True):
+                    _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], +1)
+                    _save_checkpoint(day_num)
+                    st.rerun()
+        elif _equip and _equip != "band" and _actual["weight_kg"] is not None:
+            st.markdown(
+                "<div style='text-align:center;font-size:11px;color:#8A99A3;"
+                "font-family:monospace;letter-spacing:2px;margin-top:8px;'>WEIGHT (KG)</div>",
+                unsafe_allow_html=True,
+            )
+            wc1, wc2, wc3 = st.columns([1, 2, 1])
+            with wc1:
+                if st.button("−", key=f"tp_wt_dec_{_eidx}", use_container_width=True):
+                    _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], -1)
+                    _save_checkpoint(day_num)
+                    st.rerun()
+            with wc2:
+                st.markdown(
+                    f"<div style='text-align:center;font-size:40px;font-weight:700;"
+                    f"color:#E8ECEF;'>{_actual['weight_kg']}</div>",
+                    unsafe_allow_html=True,
+                )
+            with wc3:
+                if st.button("+", key=f"tp_wt_inc_{_eidx}", use_container_width=True):
+                    _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], +1)
+                    _save_checkpoint(day_num)
+                    st.rerun()
+        st.divider()
+
     # ── Set progress and timers ───────────────────────────────────────────────
     ex_type    = ex["type"]
     cur_set    = st.session_state.tp_set
@@ -1944,12 +2127,17 @@ def render():
                     unsafe_allow_html=True,
                 )
             if ex_type == "reps":
-                st.markdown(
-                    f"<div style='text-align:center;margin-top:8px;'>"
-                    f"<div style='font-size:11px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>REPS</div>"
-                    f"<div style='font-size:48px;font-weight:700;color:#E8ECEF;line-height:1;'>{ex['reps']}</div></div>",
-                    unsafe_allow_html=True,
-                )
+                # Static reps number only for exercises the new live-session
+                # stepper doesn't already cover (ex.get("equipment_type") is
+                # None) — for gym/band exercises the stepper block above is
+                # the adjustable, authoritative reps display instead.
+                if not ex.get("equipment_type"):
+                    st.markdown(
+                        f"<div style='text-align:center;margin-top:8px;'>"
+                        f"<div style='font-size:11px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>REPS</div>"
+                        f"<div style='font-size:48px;font-weight:700;color:#E8ECEF;line-height:1;'>{ex['reps']}</div></div>",
+                        unsafe_allow_html=True,
+                    )
                 if ex.get("tempo"):
                     ec, p, cn = (ex["tempo"].split("-") + ["?", "?", "?"])[:3]
                     st.markdown(

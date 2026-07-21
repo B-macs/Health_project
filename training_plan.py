@@ -53,6 +53,8 @@ def _ex(
     laterality: str = "bilateral",
     warning: str | None = None,
     weight_kg: float | None = None,
+    equipment_type: str | None = None,
+    band_tier: str | None = None,
 ) -> dict:
     return {
         "name": name,
@@ -71,6 +73,8 @@ def _ex(
         "regression": regression,
         "warning": warning,
         "weight_kg": weight_kg,
+        "equipment_type": equipment_type,
+        "band_tier": band_tier,
     }
 
 
@@ -1882,6 +1886,7 @@ def _s2_session_a(week: int) -> dict:
                 ex_type="reps",
                 sets=3, reps=8, tempo=squat_tempo, rest_seconds=90,
                 weight_kg=squat_kg,
+                equipment_type="dumbbell",
                 mechanics=(
                     "Hold one dumbbell vertically at your chest. Squat to a comfortable depth "
                     "with a brief pause at the bottom. At depth your right hip passes >60° "
@@ -1899,6 +1904,7 @@ def _s2_session_a(week: int) -> dict:
                 ex_type="reps",
                 sets=3, reps=10, rest_seconds=75,
                 weight_kg=press_kg,
+                equipment_type="dumbbell",
                 mechanics=(
                     "Bench set to a moderate incline. Retract the shoulder blades into the bench "
                     "before every rep. If the right shoulder wants to roll forward or sag at the "
@@ -1915,6 +1921,7 @@ def _s2_session_a(week: int) -> dict:
                 ex_type="reps",
                 sets=3, reps=12, rest_seconds=60,
                 weight_kg=face_pull_kg,
+                equipment_type="cable",
                 mechanics="Cable at upper-chest height. Pull toward your face, elbows high, squeezing the shoulder blades together and down at the end.",
                 biomechanical_focus="Scapular control and rear-delt/rotator-cuff work — always paired with pressing per finding #6, and a documented strength pattern (fast-track progression).",
                 progression="12 clean reps, full scapular squeeze → +2.5kg next exposure (fast-track).",
@@ -1926,6 +1933,7 @@ def _s2_session_a(week: int) -> dict:
                 laterality="unilateral",
                 sets=3, reps=10, rest_seconds=60,
                 weight_kg=pallof_kg,
+                equipment_type="cable",
                 mechanics="Cable at chest height, stand side-on, press the handle straight out and back in without letting the cable rotate your trunk.",
                 biomechanical_focus="Anti-rotation core control under real load — addresses finding #5 and the rotation-under-load caution with a controlled, non-rotational pattern.",
                 progression="10 reps each side with zero trunk rotation → small load increase next exposure.",
@@ -1973,6 +1981,7 @@ def _s2_session_b(week: int) -> dict:
                 ex_type="reps",
                 sets=3, reps=10, tempo=rdl_tempo, rest_seconds=90,
                 weight_kg=rdl_kg,
+                equipment_type="dumbbell",
                 mechanics=(
                     "One dumbbell in each hand, hinge from the hips keeping the DBs close to your "
                     "shins. Stop the descent the instant your lower back wants to round — depth is "
@@ -1990,6 +1999,7 @@ def _s2_session_b(week: int) -> dict:
                 ex_type="reps",
                 sets=3, reps=10, rest_seconds=75,
                 weight_kg=thrust_kg,
+                equipment_type="plate",
                 mechanics="Upper back on a bench, bar/plate across the hips. Drive through the heels, squeeze the glutes hard at lockout with a 2-second pause, don't hyperextend the lower back at the top.",
                 biomechanical_focus="A documented strength pattern (2025 log: glutes strong in isolation, 50kg+ tolerated well) — fast-tracked accordingly, and it directly trains the hip-extension lockout that under-fires in the RDL and squat.",
                 progression="10 clean reps, full glute lockout, no lumbar hyperextension → +2.5kg next exposure (fast-track).",
@@ -2000,6 +2010,7 @@ def _s2_session_b(week: int) -> dict:
                 ex_type="reps",
                 sets=3, reps=10, rest_seconds=60,
                 weight_kg=pulldown_kg,
+                equipment_type="cable",
                 mechanics="Wide or neutral grip, pull to the upper chest, squeeze the shoulder blades down and together at the bottom before controlling the return.",
                 biomechanical_focus="Scapular depression strengthening — the specific weakness flagged in the 2025 log's scapular analysis, and a well-tolerated pattern (fast-track).",
                 progression="10 clean reps, full scapular depression each rep → +2.5kg next exposure (fast-track).",
@@ -2011,6 +2022,7 @@ def _s2_session_b(week: int) -> dict:
                 laterality="unilateral",
                 sets=3, reps=10, rest_seconds=60,
                 weight_kg=row_kg,
+                equipment_type="dumbbell",
                 mechanics="Supported on a bench, row the dumbbell to your hip, leading with the elbow, full control on the way down. Even rep count both arms.",
                 biomechanical_focus="Unilateral pulling strength and scapular retraction — complements the bilateral pulldown, fast-tracked as a well-tolerated pattern.",
                 progression="10 clean reps each arm, no trunk rotation → +2.5kg next exposure (fast-track).",
@@ -2047,7 +2059,8 @@ def _s2_session_c(week: int) -> dict:
     bss_note = "bodyweight" if bss_kg is None else f"a {bss_kg}kg dumbbell in each hand"
     bridge_hold = {1: 2, 2: 2, 3: 3, 4: 3}[week]
     yraise_kg = {1: None, 2: None, 3: 1.0, 4: 1.0}[week]
-    band_note = "light resistance band" if week <= 2 else "medium resistance band"
+    band_tier = "Green" if week <= 2 else "Blue"
+    band_label = "Light" if week <= 2 else "Medium"
     return {
         "objective": f"Stage 2A Week {week} — Unilateral/Glute + Scapular + Core",
         "phase": "Stage 2A — Gym Strength Block",
@@ -2060,6 +2073,7 @@ def _s2_session_c(week: int) -> dict:
                 laterality="unilateral",
                 sets=3, reps=8, rest_seconds=75,
                 weight_kg=bss_kg,
+                equipment_type="dumbbell",
                 mechanics=(
                     f"Rear foot elevated on a bench, {bss_note}. When the RIGHT leg is forward, "
                     "the working hip crosses 60 degrees of flexion at the bottom of the rep — apply "
@@ -2099,6 +2113,7 @@ def _s2_session_c(week: int) -> dict:
                 ex_type="hold_reps",
                 sets=2, reps_in_set=8, hold_seconds=3, rest_seconds=45,
                 weight_kg=yraise_kg,
+                equipment_type="dumbbell",
                 mechanics="Face down, arms overhead in a Y, lift a few inches and squeeze the lower shoulder blades together, hold, lower with control. Low back stays relaxed — this is a scapular movement, not a back extension.",
                 biomechanical_focus="Lower trapezius strengthening — the specific weak link in the right shoulder's eccentric control flagged in the 2025 log.",
                 progression="Clean reps, no lumbar compensation → small load addition next exposure.",
@@ -2109,7 +2124,9 @@ def _s2_session_c(week: int) -> dict:
                 name="Lateral Band Walk",
                 ex_type="reps",
                 sets=2, reps=10, rest_seconds=45,
-                mechanics=f"Band around the ankles or just above the knees, athletic stance, step sideways maintaining tension throughout — {band_note}. 10 steps each direction.",
+                equipment_type="band",
+                band_tier=band_tier,
+                mechanics=f"Band around the ankles or just above the knees, athletic stance, step sideways maintaining tension throughout — {band_tier} band ({band_label}). 10 steps each direction.",
                 biomechanical_focus="Glute medius strengthening, complementing the release-then-activate sequencing — the upper glute/TFL is released pre-session, this activates glute max's synergist without letting the overactive medius take back over.",
                 progression="Full tension held, no hip hike → step up a band level.",
                 regression="Hip hikes or band tension is lost → step down a band level.",
