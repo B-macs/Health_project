@@ -28,8 +28,10 @@ import uuid
 from datetime import date, datetime, timedelta
 
 from services import biometrics
+from services import content_weighting
 from services import dashboard
 from services import models
+from services import sessions as training_sessions
 from services.clients import garmin
 from services.clients import local_cache
 from services.clients import notion
@@ -543,6 +545,77 @@ class Repository:
             if sid and sid not in seen:
                 seen.add(sid)
                 au_by_date[d] = au_by_date.get(d, 0.0) + au
+        return [{"date": d, "total_au": round(v, 1)} for d, v in sorted(au_by_date.items())]
+
+    def get_daily_session_au_weighted(self, days: int = 28, today: date | None = None) -> list[dict]:
+        """
+        Content-aware counterpart to get_daily_session_au — same
+        {"date", "total_au"} shape (a drop-in replacement for every existing
+        consumer: engine.acwr(), dashboard.rolling_prior_strain(),
+        dashboard.au_to_strain_or_none() via compute_daily_metrics_snapshot —
+        none of those need any signature change), but "total_au" here is the
+        raw Foster Session AU already scaled by that day's own content
+        multiplier (services.content_weighting.day_content_multiplier),
+        computed live from each day's actually-logged exercises' Sets JSON —
+        never from a static per-session-type lookup.
+
+        The raw "Session AU" Notion property itself is untouched by this
+        (create_training_session/save_training_exercise still write raw
+        Foster AU) — this re-derives the weighted figure at read time only,
+        mirroring how au_to_strain's CLF scaling is already applied at
+        read/display time, never at write time (see engine.au_to_strain's
+        own docstring: "The database always stores raw Foster AU ... CLF is
+        applied at display/computation time only").
+
+        Self-healing over historical data: recomputes every day's multiplier
+        fresh from that day's own persisted Sets JSON on every call, so a
+        day logged before this feature existed is weighted correctly the
+        very next time this is called — no backfill needed for this or any
+        other live read path. (The one exception is the already-persisted
+        Metrics History sheet snapshot — see sync_metrics_history's
+        docstring.)
+
+        Multiple sessions on the same date (e.g. a rehab session + a
+        same-day Yoga session) are content-weighted independently per
+        Session ID (mirroring get_daily_session_au's own dedup-by-Session-ID
+        loop) and then summed — so one session's exercise mix never dilutes
+        another's. An exercise name with no services.content_weighting entry
+        (e.g. any Yoga pose — this feature currently only has weight-table
+        coverage for training_plan.PLAN_STAGE2's exercise universe)
+        contributes at UNMAPPED_EXERCISE_WEIGHT (1.0, i.e. unchanged from
+        raw AU) — a known, visible scope boundary, not a silent bug; see
+        content_weighting.day_content_multiplier's own docstring.
+        """
+        today = today or date.today()
+        cutoff = (today - timedelta(days=days)).isoformat()
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"on_or_after": cutoff}},
+        )
+        sessions_by_id: dict[str, dict] = {}
+        for p in pages:
+            sid = notion.get_property(p, "Session ID", "rich_text") or ""
+            if not sid:
+                continue
+            bucket = sessions_by_id.setdefault(sid, {
+                "date": notion.get_property(p, "Session Date", "date") or "",
+                "au": notion.get_property(p, "Session AU", "number") or 0.0,
+                "exercise_seconds": [],
+            })
+            name = notion.get_property(p, "Movement", "title") or ""
+            sets_raw = notion.get_property(p, "Sets", "rich_text") or "[]"
+            try:
+                sets = json.loads(sets_raw)
+            except Exception:
+                sets = []
+            seconds = training_sessions.exercise_seconds_from_sets(sets)
+            bucket["exercise_seconds"].append({"name": name, "seconds": seconds})
+
+        au_by_date: dict[str, float] = {}
+        for bucket in sessions_by_id.values():
+            mult = content_weighting.day_content_multiplier(bucket["exercise_seconds"])["multiplier"]
+            au_by_date[bucket["date"]] = au_by_date.get(bucket["date"], 0.0) + bucket["au"] * mult
+
         return [{"date": d, "total_au": round(v, 1)} for d, v in sorted(au_by_date.items())]
 
     def get_unparsed_session_notes(self) -> list[dict]:
@@ -1168,7 +1241,7 @@ class Repository:
         truncated by an under-fetched window."""
         today = today or date.today()
         bio_rows = [dataclasses.asdict(r) for r in self.get_biometric_rolling(days=days + 60, today=today)]
-        au_rows = self.get_daily_session_au(days=days + 28, today=today)
+        au_rows = self.get_daily_session_au_weighted(days=days + 28, today=today)
         stage = self.get_current_stage()
 
         written = 0

@@ -219,3 +219,74 @@ EXERCISE_BODY_REGION: dict[str, str] = {
     **{name: "core" for name in _CORE_EXERCISES},
     **{name: "lower_body" for name in _LOWER_BODY_EXERCISES},
 }
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Movement-category weight table — content-aware AU weighting for Strain/ACWR
+#  (extends the movement_multiplier sketch in docs/training/Training_System.md
+#  :104-105, which was never implemented and was itself weight_kg-based --
+#  impossible for bodyweight/isometric release-protocol work with no weight_kg
+#  at all. Applied here instead as a TIME-weighting: see
+#  services/content_weighting.py for how this becomes a day-level multiplier
+#  on top of the existing raw Foster session_au, not a replacement formula.)
+#
+#  Every exercise name appearing anywhere in training_plan.PLAN_STAGE2 has an
+#  explicit entry here, including every unloaded/mobility/assessment exercise
+#  (weight 0.25) -- no fallback default, same completeness convention as
+#  EXERCISE_BODY_REGION above (see tests/test_training_plan_stage2.py::
+#  test_all_stage2_exercise_names_are_mapped_to_a_movement_weight).
+#
+#  Categories (docs/training/Training_System.md:105, extended):
+#    squat=1.3, hinge=1.0, upper_push=0.7, pull=0.7 (NEW -- the doc only
+#    covered pushing), isolation=0.3, mobility_core=0.25 (NEW -- release
+#    protocol + core/scapular finishers + walking/assessment work the doc
+#    never covered).
+#
+#  Prone Y-Raise (Scapular): fixed at mobility_core/0.25 regardless of its
+#  real weight_kg from Week 3 onward (1.0-2.5kg) -- NOT load-dependent. The
+#  load involved is trivial (still a 2x8x3s-hold scapular activation drill),
+#  a weight-based threshold has no natural physiological cliff, and it would
+#  break the table's "one name -> one static weight, always" invariant for
+#  one exercise. Update this entry directly if a future block genuinely
+#  increases this exercise's load tier.
+# ─────────────────────────────────────────────────────────────────────────────
+
+EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
+    # -- Loaded, Session A/B/C --
+    "Goblet Squat":                ("squat", 1.3),
+    "Bulgarian Split Squat":       ("squat", 1.3),
+    "Romanian Deadlift (DB)":      ("hinge", 1.0),
+    "Hip Thrust (Loaded)":         ("hinge", 1.0),
+    "Incline DB Press":            ("upper_push", 0.7),
+    "Lat Pulldown":                ("pull", 0.7),
+    "Single-Arm DB Row":           ("pull", 0.7),
+    "Face Pull (Cable)":           ("isolation", 0.3),
+    "Pallof Press (Cable)":        ("isolation", 0.3),
+    # -- Release protocol (always-include, every loaded day) --
+    "Upper Glute / TFL Self-Release":                    ("mobility_core", 0.25),
+    "Piriformis Contract-Relax (PNF)":                   ("mobility_core", 0.25),
+    "Right Posterior Hip Capsule Stretch (Revised Cue)": ("mobility_core", 0.25),
+    "Ischial Tuberosity Hamstring Release":              ("mobility_core", 0.25),
+    "Right Hip Tendon Path Drill (Coxa Saltans)":        ("mobility_core", 0.25),
+    # -- Core / scapular finishers, Session A/B/C --
+    "McGill Curl-Up (Progressed)":       ("mobility_core", 0.25),
+    "Full Side Bridge":                  ("mobility_core", 0.25),
+    "Dead Bug":                          ("mobility_core", 0.25),
+    "Pallof Press Hold (Doorframe)":     ("mobility_core", 0.25),
+    "Single-Leg Glute Bridge":           ("mobility_core", 0.25),
+    "Scapular Wall Slide":               ("mobility_core", 0.25),
+    "Prone Y-Raise (Scapular)":          ("mobility_core", 0.25),
+    "Lateral Band Walk":                 ("mobility_core", 0.25),
+    "Bird-Dog":                          ("mobility_core", 0.25),
+    "Side Bridge with Hip Dip":          ("mobility_core", 0.25),
+    # -- Active-recovery-day content (_s2_recovery_day, both templates) --
+    "Cat-Cow":                               ("mobility_core", 0.25),
+    "Thoracic Extension (Rolled Towel)":     ("mobility_core", 0.25),
+    "Thread-the-Needle (Thoracic Rotation)": ("mobility_core", 0.25),
+    "Child's Pose":                          ("mobility_core", 0.25),
+    "Controlled Walking":                    ("mobility_core", 0.25),
+    # -- Day 14 checkpoint / Day 28 reassessment (unloaded functional screens) --
+    "Hip Hinge Full Range Assessment":     ("mobility_core", 0.25),
+    "Single-Leg Balance (Eyes Closed)":    ("mobility_core", 0.25),
+    "McGill Big 3 — Quality Screen":       ("mobility_core", 0.25),
+    "5-Minute Walk + Stair Assessment":    ("mobility_core", 0.25),
+}

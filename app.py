@@ -119,7 +119,7 @@ def _bio_rolling(days: int = 32) -> list[dict]:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _au_history(days: int = 28) -> list[dict]:
-    return repo.get_repository().get_daily_session_au(days)
+    return repo.get_repository().get_daily_session_au_weighted(days)
 
 
 @st.cache_data(ttl=1800, show_spinner=False)

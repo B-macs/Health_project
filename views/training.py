@@ -583,7 +583,7 @@ def _engine_directive() -> dict:
     try:
         r        = repo.get_repository()
         bio      = [asdict(b) for b in r.get_biometric_rolling(days=28)]
-        au       = r.get_daily_session_au(28)
+        au       = r.get_daily_session_au_weighted(28)
         diag     = r.get_diagnostic_profile()
         stage    = r.get_current_stage()
         streak   = r.get_pain_free_streak()
@@ -1465,7 +1465,10 @@ def _render_add_training_fab() -> None:
 def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> None:
     """Persist a completed yoga session to Notion — mirrors _auto_log_session's
     shape (one shared session_id/AU/RPE across a row per pose) so it feeds the
-    same get_daily_session_au() aggregate the Home strain card and ACWR read from.
+    same get_daily_session_au_weighted() aggregate the Home strain card and
+    ACWR read from. Yoga pose names aren't in training_constants.
+    EXERCISE_MOVEMENT_WEIGHT, so they contribute at the unmapped fallback
+    weight (1.0, i.e. unchanged from raw AU) rather than being miscategorized.
     Tagged Type="Yoga" so repo.has_logged_session() (which gates the rehab-plan
     flow) skips it — see that method's docstring. `note` is the whole-session
     note from the completion screen, attached to the last logged pose the same

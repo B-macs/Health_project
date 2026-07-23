@@ -117,6 +117,14 @@ def test_all_stage2_exercise_names_are_mapped_to_a_body_region():
             )
 
 
+def test_all_stage2_exercise_names_are_mapped_to_a_movement_weight():
+    for day_num, day in tp.PLAN_STAGE2.items():
+        for ex in day["exercises"]:
+            assert ex["name"] in tc.EXERCISE_MOVEMENT_WEIGHT, (
+                f"Day {day_num} exercise {ex['name']!r} missing from EXERCISE_MOVEMENT_WEIGHT"
+            )
+
+
 # ─── equipment_type / band_tier tagging (live-session steppers feature) ────
 
 _EXPECTED_EQUIPMENT_TYPE = {

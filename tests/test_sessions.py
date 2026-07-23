@@ -325,6 +325,50 @@ def test_exercise_duration_seconds_sums_to_estimate_duration():
     assert sessions.estimate_duration(exercises) == max(10, round(raw_total / 60))
 
 
+# ─── exercise_seconds_from_sets ─────────────────────────────────────────────
+
+def test_exercise_seconds_from_sets_empty_list_returns_zero():
+    assert sessions.exercise_seconds_from_sets([]) == 0
+
+
+def test_exercise_seconds_from_sets_duration_type():
+    ex = {"type": "duration", "duration_minutes": 5}
+    assert sessions.exercise_seconds_from_sets(sessions.make_sets_data(ex)) == 300
+
+
+def test_exercise_seconds_from_sets_hold():
+    ex = {"type": "hold", "sets": 3, "hold_seconds": 30, "rest_seconds": 15}
+    assert sessions.exercise_seconds_from_sets(sessions.make_sets_data(ex)) == 120
+
+
+def test_exercise_seconds_from_sets_hold_reps_multiplies_tut_by_reps():
+    # Regression guard for the specific hold_reps nuance: make_sets_data's
+    # per-row "tut" is the PER-REP hold duration, not pre-multiplied.
+    ex = {"type": "hold_reps", "sets": 2, "hold_seconds": 5, "reps_in_set": 4, "rest_seconds": 20}
+    rows = sessions.make_sets_data(ex)
+    assert rows[0]["tut"] == 5 and rows[0]["reps"] == 4          # stored un-multiplied
+    assert sessions.exercise_seconds_from_sets(rows) == 60        # 2*5*4 + 1*20
+
+
+def test_exercise_seconds_from_sets_reps_uses_flat_estimate():
+    ex = {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 45}
+    assert sessions.exercise_seconds_from_sets(sessions.make_sets_data(ex)) == 150
+
+
+def test_exercise_seconds_from_sets_matches_plan_time_estimate_across_all_types_and_weeks():
+    # Locks in the identity exercise_seconds_from_sets(make_sets_data(ex))
+    # == exercise_duration_seconds(ex) across the entire real Stage 2A plan
+    # -- what makes the confirmed Session A/B/C content multipliers valid
+    # regression numbers computed from logged-shaped data, not just the
+    # plan dict directly.
+    import training_plan as tp
+    for fn in (tp._s2_session_a, tp._s2_session_b, tp._s2_session_c):
+        for week in (1, 2, 3, 4):
+            for ex in fn(week)["exercises"]:
+                assert sessions.exercise_seconds_from_sets(sessions.make_sets_data(ex)) == \
+                    sessions.exercise_duration_seconds(ex), f"week {week} {ex['name']!r}"
+
+
 # ─── checkpoint payload / restore ──────────────────────────────────────────
 
 _STATE = {

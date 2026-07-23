@@ -476,7 +476,7 @@ def _bio():
     return [asdict(r) for r in repo.get_repository().get_biometric_rolling(days=28)]
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _au():          return repo.get_repository().get_daily_session_au(28)
+def _au():          return repo.get_repository().get_daily_session_au_weighted(28)
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _streak():      return repo.get_repository().get_pain_free_streak()
@@ -1232,19 +1232,6 @@ def render() -> None:
                         "trend sparklines behind the Readiness/Sleep/Strain cards on Home "
                         "(tap a card to see it)."
                     )
-                    if st.button(
-                        "Backfill full history now",
-                        use_container_width=False,
-                        key="backfill_metrics_history",
-                    ):
-                        with st.spinner("Computing and persisting the full metrics history…"):
-                            try:
-                                n = repo.get_repository().sync_metrics_history(days=400)
-                                st.success(f"Persisted {n} day(s) to the Metrics History tab.")
-                                st.cache_data.clear()
-                                st.rerun()
-                            except Exception as exc:
-                                st.warning(f"Backfill failed: {exc}")
 
                     try:
                         metrics_history = _metrics_history()
@@ -1264,10 +1251,7 @@ def render() -> None:
                         ]
                         st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
                     elif metrics_history is not None:
-                        st.info(
-                            "No persisted history yet — click \"Backfill full history now\" "
-                            "above, or wait for the automatic once-a-day sync."
-                        )
+                        st.info("No persisted history yet — wait for the automatic once-a-day sync.")
 
                     st.divider()
                     st.caption(

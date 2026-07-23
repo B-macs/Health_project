@@ -294,6 +294,49 @@ def exercise_duration_seconds(ex: dict) -> int:
     return 0
 
 
+def exercise_seconds_from_sets(sets: list[dict]) -> int:
+    """Reconstructs one exercise's total logged/active seconds from its
+    persisted Sets JSON (make_sets_data's own per-row shape, already
+    json.loads'd by the caller) -- the read-time analog of
+    exercise_duration_seconds above, which computes the equivalent
+    planning-time estimate from a plan dict instead of logged rows.
+    Produces identical output to exercise_duration_seconds(ex) whenever
+    `sets` is exactly make_sets_data(ex)'s own output for that ex -- this
+    identity is what lets content-aware Strain/ACWR weighting
+    (services.content_weighting) be computed from live logged data rather
+    than a static per-session-type lookup.
+
+    Per-row active time:
+      velocity == "isometric"  (hold / hold_reps) -> tut * reps
+        hold_reps' tut is the PER-REP hold duration (make_sets_data does
+        NOT multiply it by reps_in_set) while its "reps" field IS
+        reps_in_set -- so this multiplication is required to recover the
+        true total. hold-type rows always have reps == 1, so the same
+        formula is a safe no-op there.
+      velocity == "continuous" (duration) -> tut
+        (single row; reps is always 1 for this type)
+      anything else (velocity == "controlled", reps-type) -> 20
+        flat per-set estimate -- reps-type rows never record a real
+        duration (tut is always 0), matching exercise_duration_seconds'
+        own `sets * 20` term exactly.
+
+    Rest: summed across every row except the last (mirrors
+    exercise_duration_seconds' `(sets - 1) * rest`)."""
+    if not sets:
+        return 0
+    active = 0
+    for row in sets:
+        velocity = row.get("velocity")
+        if velocity == "isometric":
+            active += (row.get("tut") or 0) * (row.get("reps") or 1)
+        elif velocity == "continuous":
+            active += row.get("tut") or 0
+        else:
+            active += 20
+    rest = sum((row.get("rest") or 0) for row in sets[:-1])
+    return active + rest
+
+
 def estimate_duration(exercises: list[dict]) -> int:
     total = 120 + sum(exercise_duration_seconds(ex) + 30 for ex in exercises)
     return max(10, round(total / 60))

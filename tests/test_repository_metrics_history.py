@@ -175,7 +175,7 @@ def test_sync_metrics_history_writes_one_row_per_day(monkeypatch):
     ws = _FakeMetricsHistoryWorksheet()
     repo = _repo_with_ws(ws)
     monkeypatch.setattr(repo, "get_biometric_rolling", lambda days=None, today=None: [])
-    monkeypatch.setattr(repo, "get_daily_session_au", lambda days=None, today=None: [])
+    monkeypatch.setattr(repo, "get_daily_session_au_weighted", lambda days=None, today=None: [])
     monkeypatch.setattr(repo, "get_current_stage", lambda: 1)
 
     n = repo.sync_metrics_history(days=3, today=datetime.date(2026, 7, 20))
@@ -189,7 +189,7 @@ def test_sync_metrics_history_persists_real_snapshot_values(monkeypatch):
     repo = _repo_with_ws(ws)
     au_rows = [{"date": "2026-07-20", "total_au": 300.0}]
     monkeypatch.setattr(repo, "get_biometric_rolling", lambda days=None, today=None: [])
-    monkeypatch.setattr(repo, "get_daily_session_au", lambda days=None, today=None: au_rows)
+    monkeypatch.setattr(repo, "get_daily_session_au_weighted", lambda days=None, today=None: au_rows)
     monkeypatch.setattr(repo, "get_current_stage", lambda: 2)
 
     repo.sync_metrics_history(days=1, today=datetime.date(2026, 7, 20))
@@ -201,7 +201,7 @@ def test_sync_metrics_history_uses_today_when_not_given(monkeypatch):
     ws = _FakeMetricsHistoryWorksheet()
     repo = _repo_with_ws(ws)
     monkeypatch.setattr(repo, "get_biometric_rolling", lambda days=None, today=None: [])
-    monkeypatch.setattr(repo, "get_daily_session_au", lambda days=None, today=None: [])
+    monkeypatch.setattr(repo, "get_daily_session_au_weighted", lambda days=None, today=None: [])
     monkeypatch.setattr(repo, "get_current_stage", lambda: 1)
 
     n = repo.sync_metrics_history(days=1)

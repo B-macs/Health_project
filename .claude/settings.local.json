@@ -16,7 +16,10 @@
       "Bash(ls .claude/launch.json)",
       "Bash(cat .claude/launch.json)",
       "Bash(python -m pytest tests/test_notion_client.py tests/test_repository.py -q)",
-      "Bash(python -c ' *)"
+      "Bash(python -c ' *)",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)",
+      "Bash(git check-ignore *)"
     ]
   }
 }

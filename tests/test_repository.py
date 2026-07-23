@@ -272,6 +272,76 @@ def test_get_recent_sessions_multiple_dates_sorted_descending():
     assert [s.session_date for s in sessions] == ["2026-07-07", "2026-07-05"]
 
 
+# ─── get_daily_session_au_weighted ──────────────────────────────────────────
+
+def _weighted_exercise_page(session_date, session_id, movement, sets, session_au=264.0):
+    return {"properties": {
+        "Session Date": _date_prop(session_date),
+        "Session ID":   _rich_text_prop(session_id),
+        "Session AU":   _number_prop(session_au),
+        "Movement":     _title_prop(movement),
+        "Sets":         _rich_text_prop(json.dumps(sets)),
+    }}
+
+
+def test_get_daily_session_au_weighted_applies_content_multiplier():
+    import datetime
+    # One session, one exercise: 100s of Goblet Squat (weight 1.3) -> the
+    # whole session's multiplier is 1.3, so 100 AU becomes 130.
+    pages = [_weighted_exercise_page(
+        "2026-07-20", "sid-1", "Goblet Squat",
+        [{"reps": 8, "weight": 10.0, "rest": 20, "tut": 0, "velocity": "controlled"}] * 5,
+        session_au=100.0,
+    )]
+    repo = _repo({"db-training": pages})
+    rows = repo.get_daily_session_au_weighted(days=7, today=datetime.date(2026, 7, 20))
+    assert rows == [{"date": "2026-07-20", "total_au": 130.0}]
+
+
+def test_get_daily_session_au_weighted_dedupes_by_session_id_like_the_raw_version():
+    import datetime
+    pages = [_weighted_exercise_page(
+        "2026-07-20", "sid-1", "Goblet Squat",
+        [{"reps": 8, "weight": 10.0, "rest": 20, "tut": 0, "velocity": "controlled"}],
+        session_au=100.0,
+    )] * 3
+    repo = _repo({"db-training": pages})
+    rows = repo.get_daily_session_au_weighted(days=7, today=datetime.date(2026, 7, 20))
+    assert len(rows) == 1  # not double/triple counted
+
+
+def test_get_daily_session_au_weighted_two_sessions_same_day_weighted_independently():
+    import datetime
+    pages = [
+        _weighted_exercise_page(
+            "2026-07-20", "sid-a", "Goblet Squat",
+            [{"reps": 8, "weight": 10.0, "rest": 20, "tut": 0, "velocity": "controlled"}],
+            session_au=100.0,
+        ),
+        _weighted_exercise_page(
+            "2026-07-20", "sid-b", "Bird-Dog",
+            [{"reps": 8, "weight": 0.0, "rest": 20, "tut": 8, "velocity": "isometric"}],
+            session_au=100.0,
+        ),
+    ]
+    repo = _repo({"db-training": pages})
+    rows = repo.get_daily_session_au_weighted(days=7, today=datetime.date(2026, 7, 20))
+    # sid-a: pure squat (1.3x) -> 130; sid-b: pure mobility_core (0.25x) -> 25; total 155
+    assert rows == [{"date": "2026-07-20", "total_au": 155.0}]
+
+
+def test_get_daily_session_au_weighted_unmapped_exercise_name_stays_at_full_weight():
+    import datetime
+    pages = [_weighted_exercise_page(
+        "2026-07-20", "sid-1", "Some Unknown Pose",
+        [{"reps": 8, "weight": 0.0, "rest": 20, "tut": 8, "velocity": "isometric"}],
+        session_au=100.0,
+    )]
+    repo = _repo({"db-training": pages})
+    rows = repo.get_daily_session_au_weighted(days=7, today=datetime.date(2026, 7, 20))
+    assert rows == [{"date": "2026-07-20", "total_au": 100.0}]
+
+
 # ─── has_logged_session / get_logged_session_dates ─────────────────────────
 
 def test_has_logged_session_true_when_page_exists():
