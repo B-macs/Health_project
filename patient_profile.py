@@ -502,6 +502,89 @@ PROFILE = {
                 "the thing to design around in Stage 2.",
             ],
         },
+        {
+            "date":   "2026-07-21",
+            "status": "New — monitoring",
+            "region": "Left interscapular region and base of the neck (posterior, left side)",
+            "title":  "Left Interscapular Tightness / Dull Ache (Desk-Posture Triggered)",
+
+            "mechanism": (
+                "Onset after desk work — consistent across sitting, standing, and treadmill "
+                "use (not tied to one specific posture or piece of furniture). No loading "
+                "event, no acute onset — a static ache that builds during prolonged desk time "
+                "rather than a movement-triggered strain. A ~20-minute natural-pace walk "
+                "provided relief to the interscapular tightness — but a new tightness then "
+                "appeared at the base of the neck, posterior, left side, along the same "
+                "left-sided corridor. Notably, lower back and hip symptoms have improved "
+                "markedly since Stage 2A began; this upper-back/neck pattern persists "
+                "independent of that improvement, suggesting a separate driver."
+            ),
+
+            "symptoms": {
+                "location": (
+                    "Left interscapular region (between the shoulder blades, left worse than "
+                    "right) extending to the base of the neck, posterior, left side"
+                ),
+                "painful_with":   ["Prolonged desk work generally — sitting, standing, and treadmill walking alike"],
+                "pain_free_with": ["Natural-pace walking (~20 min) — relieved the interscapular component"],
+                "neural":         "None reported — no arm symptoms, numbness, or tingling",
+            },
+
+            "assessment": {
+                "likely_tissue": [
+                    "Left rhomboid / mid-trapezius — same region flagged in finding #6's Jul 2025 "
+                    "left rhomboid strain, now presenting as a static ache rather than a loading injury",
+                    "Left levator scapulae — anatomically bridges the cervical spine (base of neck) "
+                    "and the medial scapular border, a plausible link between the two symptom sites "
+                    "given they sit along the same left-sided line",
+                ],
+                "mechanism": (
+                    "Occurring across sitting, standing, AND treadmill use (not posture-specific) "
+                    "points toward under-recruitment of the left scapular stabilizers during "
+                    "prolonged low-load positions, rather than a fresh acute strain — consistent "
+                    "with finding #6's documented weak scapular control (right eccentric control "
+                    "flagged there; this is the left side, same underlying stability deficit). "
+                    "That walking relieved the interscapular tightness (dynamic movement rhythmically "
+                    "engaging the same stabilizers that seize up under static holding) supports a "
+                    "stiffness-from-stillness pattern over a structural issue — the neck-base tightness "
+                    "appearing afterward, along the same corridor, reads as the same underlying pattern "
+                    "shifting location rather than a second, unrelated finding."
+                ),
+                "underlying_pattern": (
+                    "Finding #6 explicitly frames scapular control work as 'a STANDING requirement, "
+                    "not optional conditioning.' Current Stage 2A active-recovery day rotation only "
+                    "includes scapular-specific work (Scapular Wall Slide) within Session C (Friday), "
+                    "not in the daily active-recovery templates — a gap worth raising with physio "
+                    "given this symptom's timing."
+                ),
+            },
+
+            "plan": [
+                "No self-directed exercise changes — raise with physiotherapist at next check-in, "
+                "referencing finding #6's existing scapular-control note.",
+                "Track whether frequency/duration of desk work correlates with symptom severity "
+                "day-to-day via Morning Check-in (Body Areas / Sensations tags).",
+                "Note whether short walking breaks during desk work reduce onset/severity — "
+                "observation only, not a prescribed intervention.",
+                "Do not conflate with finding #3 (thoracic facet/sitting) — that finding is "
+                "bilateral/midline; this is left-lateralised and not sitting-specific.",
+            ],
+
+            "escalation_criteria": [
+                "No improvement after continued monitoring → raise explicitly with physio",
+                "Any radiating pain into the arm, numbness, or tingling",
+                "Sharp pain or any acute onset (as opposed to the current dull, gradual ache)",
+                "Headache, dizziness, or any symptom suggesting cervical (not just muscular) involvement",
+            ],
+
+            "notes": [
+                "Positive signal: lower back and hip symptoms have improved noticeably since "
+                "Stage 2A began — this upper-back/neck symptom is independent of that, not a "
+                "sign the current training block is causing harm.",
+                "Symptom migrated from interscapular to neck-base after a relieving walk, both "
+                "on the left side — tracking this as one evolving pattern, not two separate entries.",
+            ],
+        },
     ],
 
     # ─────────────────────────────────────────────────────────────────────────
