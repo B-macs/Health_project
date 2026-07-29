@@ -39,6 +39,14 @@ from services.clients import oura
 from services.clients import sheets
 from services.config import Config
 
+
+class PhasesCorruptError(Exception):
+    """Raised by Repository.get_phases() when the stored 'phases' config
+    value exists but fails to parse — deliberately distinct from returning
+    [], which means "nothing has ever been configured" and is safe for a
+    caller to auto-seed from. See get_phases's docstring."""
+
+
 _GARMIN_DAILY_HEADER = [
     "date", "steps", "resting_hr", "avg_stress", "sleep_score",
     "sleep_hours", "calories_total", "min_hr", "max_hr", "hrv_ms",
@@ -94,7 +102,7 @@ _BIOMETRIC_BLEND_HEADER = [
     "date", "hrv_ms", "resting_heart_rate", "sleep_duration_hours", "steps", "sources_missing",
 ]
 _METRICS_HISTORY_HEADER = [
-    "date", "readiness_score", "sleep_pct", "strain",
+    "date", "readiness_score", "sleep_pct", "sleep_score", "strain",
 ]
 
 
@@ -509,15 +517,21 @@ class Repository:
 
     def has_logged_session(self, d: date) -> bool:
         """True only for a logged rehab-plan session — a logged Yoga (or other
-        supplementary) session must never mark the plan day itself as done."""
+        supplementary) session must never mark the plan day itself as done.
+
+        Filters "Type" != "Yoga" in Python rather than in the Notion query:
+        a `select.does_not_equal` filter is validated against the property's
+        currently-configured options at query time, and 400s outright if
+        "Yoga" isn't one of them yet — which is exactly the state before the
+        very first Yoga session is ever logged (save_training_exercise's
+        Type="Yoga" write is what lazily creates that option in the first
+        place). Querying by date alone and excluding Yoga client-side works
+        regardless of whether that option exists yet."""
         pages = self._query(
             self.config.notion_db_training,
-            filter_={"and": [
-                {"property": "Session Date", "date": {"equals": str(d)}},
-                {"property": "Type", "select": {"does_not_equal": "Yoga"}},
-            ]},
+            filter_={"property": "Session Date", "date": {"equals": str(d)}},
         )
-        return len(pages) > 0
+        return any(notion.get_property(p, "Type", "select") != "Yoga" for p in pages)
 
     def get_logged_session_dates(self, start: date, end: date) -> set[str]:
         pages = self._query(
@@ -779,18 +793,34 @@ class Repository:
         return notion.get_property(page, "Value", "rich_text") if page else None
 
     def get_phases(self) -> list[models.Phase]:
+        """[] means "nothing has ever been configured" — genuinely safe for
+        a caller to treat as a first-run state. A stored value that exists
+        but fails to parse raises PhasesCorruptError instead of also
+        returning [] (as this used to): views/training.py used to treat an
+        empty list as licence to auto-create-and-persist a fresh Phase 1
+        (that seed-on-read side effect has since been removed entirely —
+        see views/training.py's _get_phases_and_active_phase — Phase 1
+        creation is now an explicit button click, same as Phase 2's), which
+        would silently overwrite real phase data (including any
+        date_overrides reschedule) on a transient read/parse glitch,
+        permanently turning a recoverable blip into real data loss. See
+        CLAUDE.md's known-issues entry on the
+        2026-07-28/29 incident this was written in response to."""
         raw = self.get_config_value("phases")
         if not raw:
             return []
         try:
             return [models.Phase(**p) for p in json.loads(raw)]
-        except Exception:
-            return []
+        except Exception as exc:
+            raise PhasesCorruptError(
+                f"stored 'phases' config exists but failed to parse: {exc!r}"
+            ) from exc
 
     def set_phases(self, phases: list[models.Phase], today: date | None = None) -> None:
         payload = [
             {"phase_number": p.phase_number, "name": p.name, "start_date": p.start_date,
-             "length_days": p.length_days, "status": p.status}
+             "length_days": p.length_days, "status": p.status,
+             "date_overrides": p.date_overrides}
             for p in phases
         ]
         self.set_config("phases", json.dumps(payload), today=today)
@@ -1016,6 +1046,16 @@ class Repository:
                 "hrv_ms": main.get("average_hrv") or None,
                 "resting_heart_rate": main.get("lowest_heart_rate") or None,
                 "sleep_duration_hours": round(duration_s / 3600, 2) if duration_s else None,
+                # Raw sleep-architecture fields — feeds
+                # services.sleep_score.compute_sleep_score. Kept raw (seconds/
+                # counts), not pre-scored; that module does its own 0-100 math.
+                "oura_sleep_efficiency": main.get("efficiency"),
+                "oura_sleep_total_seconds": duration_s,
+                "oura_sleep_deep_seconds": main.get("deep_sleep_duration"),
+                "oura_sleep_rem_seconds": main.get("rem_sleep_duration"),
+                "oura_sleep_latency_seconds": main.get("latency"),
+                "oura_sleep_restless_periods": main.get("restless_periods"),
+                "oura_sleep_bedtime_start": main.get("bedtime_start") or None,
             }
         return out
 
@@ -1066,10 +1106,12 @@ class Repository:
         before this reads them. Also the Sync page's "Engine View" preview.
 
         Oura's readiness contributor sub-scores (body temperature, recovery
-        index, previous day activity) and alcohol units from the morning
-        check-in are attached as a passthrough after blending — neither is
-        part of the Oura/Garmin weighted-average fields above (alcohol isn't
-        even a wearable reading, it's self-reported)."""
+        index, previous day activity), Oura's raw sleep-architecture fields
+        (efficiency, deep/rem seconds, latency, restless periods, bedtime —
+        feeds services.sleep_score), and alcohol units from the morning
+        check-in are attached as a passthrough after blending — none of
+        these are part of the Oura/Garmin weighted-average fields above
+        (alcohol isn't even a wearable reading, it's self-reported)."""
         today = today or date.today()
         start = (today - timedelta(days=days)).isoformat()
         end = today.isoformat()
@@ -1097,6 +1139,18 @@ class Repository:
                     oura_body_temperature=contributors.get("body_temperature"),
                     oura_recovery_index=contributors.get("recovery_index"),
                     oura_previous_day_activity=contributors.get("previous_day_activity"),
+                )
+            sleep_raw = oura_sleep.get(d)
+            if sleep_raw:
+                record = dataclasses.replace(
+                    record,
+                    oura_sleep_efficiency=sleep_raw.get("oura_sleep_efficiency"),
+                    oura_sleep_total_seconds=sleep_raw.get("oura_sleep_total_seconds"),
+                    oura_sleep_deep_seconds=sleep_raw.get("oura_sleep_deep_seconds"),
+                    oura_sleep_rem_seconds=sleep_raw.get("oura_sleep_rem_seconds"),
+                    oura_sleep_latency_seconds=sleep_raw.get("oura_sleep_latency_seconds"),
+                    oura_sleep_restless_periods=sleep_raw.get("oura_sleep_restless_periods"),
+                    oura_sleep_bedtime_start=sleep_raw.get("oura_sleep_bedtime_start"),
                 )
             if d in alcohol:
                 record = dataclasses.replace(record, alcohol_units=alcohol[d])
@@ -1195,8 +1249,14 @@ class Repository:
     #  a live recompute of an old day would silently reflect today's
     #  stage, not the one active back then). Written by
     #  sync_metrics_history, called once/day from app.py (rolling few-day
-    #  window) and on-demand from the Sync page's "Backfill full history"
-    #  button (wide window) — same pattern as Biometric Blend.
+    #  window) and on-demand with a wide `days` value for a one-time/
+    #  full-history backfill — same pattern as Biometric Blend. sleep_pct is
+    #  the retired "% of baseline" figure (services/dashboard.py's old
+    #  sleep_percent), kept only as an untouched historical column; nothing
+    #  reads it anymore. sleep_score (services/sleep_score.py) replaced it
+    #  on the Home page and was backfilled across all of history the same
+    #  way commit f37a537 backfilled Session AU weighting: a direct wide-
+    #  `days` sync_metrics_history call, not a standing UI button.
     # ─────────────────────────────────────────────────────────────────────
 
     def _metrics_history_ws(self):
@@ -1210,14 +1270,16 @@ class Repository:
             "date": snapshot["date"],
             "readiness_score": snapshot["readiness_score"] if snapshot["readiness_score"] is not None else "",
             "sleep_pct": snapshot["sleep_pct"] if snapshot["sleep_pct"] is not None else "",
+            "sleep_score": snapshot["sleep_score"] if snapshot["sleep_score"] is not None else "",
             "strain": snapshot["strain"] if snapshot["strain"] is not None else "",
         }
 
     def upsert_metrics_history_row(self, snapshot: dict) -> None:
-        """snapshot: {"date": ISO str, "readiness_score", "sleep_pct", "strain"}
-        (services.dashboard.compute_daily_metrics_snapshot's shape, plus a
-        "date" key) — writes one day into the Metrics History tab, keyed by
-        date (idempotent, same upsert-by-date pattern as Biometric Blend)."""
+        """snapshot: {"date": ISO str, "readiness_score", "sleep_pct",
+        "sleep_score", "strain"} (services.dashboard.
+        compute_daily_metrics_snapshot's shape, plus a "date" key) — writes
+        one day into the Metrics History tab, keyed by date (idempotent,
+        same upsert-by-date pattern as Biometric Blend)."""
         row = self._metrics_history_row(snapshot)
         values = [row.get(k, "") for k in _METRICS_HISTORY_HEADER]
         sheets.upsert_row_by_key(
@@ -1275,6 +1337,7 @@ class Repository:
                 "date": d,
                 "readiness_score": r.get("readiness_score") or None,
                 "sleep_pct": r.get("sleep_pct") or None,
+                "sleep_score": r.get("sleep_score") or None,
                 "strain": r.get("strain") or None,
             })
         return sorted(out, key=lambda r: r["date"])

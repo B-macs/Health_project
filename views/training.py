@@ -24,6 +24,7 @@ from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
 from services import sessions as sess
 from services import yoga as yg
+from services.repository import PhasesCorruptError
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -60,7 +61,15 @@ def _audio_unlock_component() -> None:
     window.parent._audioUnlockAttached guards against re-adding the listener
     on every rerun (this component itself remounts each time render() runs,
     same as every other components.html call) — harmless if it did stack, but
-    unnecessary."""
+    unnecessary.
+
+    Also requests Notification permission on the same one-time gesture, best-
+    effort — a completion beep can still fire while the tab is genuinely
+    backgrounded (desktop browsers keep running JS at a throttled rate; a
+    fully-locked phone screen typically does not, so this helps the "switched
+    tabs" case far more reliably than the "screen off" case). No permission
+    prompt appears at all if the browser doesn't support Notification or the
+    user already answered it previously."""
     components.html("""
 <script>
 (function() {
@@ -72,6 +81,11 @@ def _audio_unlock_component() -> None:
         var ctx = window.parent._audioCtx ||
           (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
         if (ctx.state === 'suspended') { ctx.resume(); }
+      } catch(e) {}
+      try {
+        if (window.parent.Notification && window.parent.Notification.permission === 'default') {
+          window.parent.Notification.requestPermission();
+        }
       } catch(e) {}
     }
     window.parent.document.addEventListener('click', unlock, {once: true});
@@ -114,19 +128,43 @@ function _beep(freq, dur, vol) {{
   try {{
     var ctx = window.parent._audioCtx ||
       (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
-    if (ctx.state === 'suspended') ctx.resume();
-    var o = ctx.createOscillator(), g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.type = 'sine'; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol || 0.35, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-    o.start(ctx.currentTime); o.stop(ctx.currentTime + dur);
+    var play = function() {{
+      try {{
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.type = 'sine'; o.frequency.value = freq;
+        g.gain.setValueAtTime(vol || 0.35, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+        o.start(ctx.currentTime); o.stop(ctx.currentTime + dur);
+      }} catch(e) {{}}
+    }};
+    // A long-idle session (e.g. minutes between hold timers on a slow-paced
+    // day) can leave the shared context 'suspended' by the browser. resume()
+    // is async -- scheduling the oscillator before it actually resolves can
+    // silently drop the beep on some mobile browsers, so wait for it rather
+    // than firing resume() and playing in the same tick (the previous bug:
+    // sound would work early in a session and go silent later once the
+    // context got suspended mid-session).
+    if (ctx.state === 'suspended') {{ ctx.resume().then(play).catch(play); }}
+    else {{ play(); }}
   }} catch(e) {{}}
 }}
 function _tickBeep() {{ _beep(880, 0.12, 0.35); }}
+function _notify(title, body) {{
+  // Best-effort only -- fires while the tab is hidden (switched away, not
+  // necessarily fully backgrounded/screen-locked, see _audio_unlock_component's
+  // docstring for why a locked phone screen typically won't get this at all.
+  try {{
+    if (window.parent.document.hidden && window.parent.Notification
+        && window.parent.Notification.permission === 'granted') {{
+      new window.parent.Notification(title, {{body: body}});
+    }}
+  }} catch(e) {{}}
+}}
 function _doneBeep() {{
   _beep(660, 0.18, 0.5);
   setTimeout(function() {{ _beep(880, 0.28, 0.65); }}, 220);
+  _notify('Hold complete', 'Time for the next set.');
 }}
 
 function _save(running) {{
@@ -243,19 +281,37 @@ function _beep(freq, dur, vol) {{
   try {{
     var ctx = window.parent._audioCtx ||
       (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
-    if (ctx.state === 'suspended') ctx.resume();
-    var o = ctx.createOscillator(), g = ctx.createGain();
-    o.connect(g); g.connect(ctx.destination);
-    o.type = 'sine'; o.frequency.value = freq;
-    g.gain.setValueAtTime(vol || 0.35, ctx.currentTime);
-    g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-    o.start(ctx.currentTime); o.stop(ctx.currentTime + dur);
+    var play = function() {{
+      try {{
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.type = 'sine'; o.frequency.value = freq;
+        g.gain.setValueAtTime(vol || 0.35, ctx.currentTime);
+        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+        o.start(ctx.currentTime); o.stop(ctx.currentTime + dur);
+      }} catch(e) {{}}
+    }};
+    // See _hold_timer's identical comment: wait for resume() to actually
+    // resolve rather than firing it and playing in the same tick, or the
+    // beep can be silently dropped once the shared context gets suspended
+    // mid-session.
+    if (ctx.state === 'suspended') {{ ctx.resume().then(play).catch(play); }}
+    else {{ play(); }}
   }} catch(e) {{}}
 }}
 function _tickBeep() {{ _beep(880, 0.12, 0.35); }}
+function _notify(title, body) {{
+  try {{
+    if (window.parent.document.hidden && window.parent.Notification
+        && window.parent.Notification.permission === 'granted') {{
+      new window.parent.Notification(title, {{body: body}});
+    }}
+  }} catch(e) {{}}
+}}
 function _goBeep()  {{
   _beep(660, 0.18, 0.5);
   setTimeout(function() {{ _beep(880, 0.28, 0.65); }}, 220);
+  _notify('Rest complete', 'Time for the next set.');
 }}
 
 function _autoAdvance() {{
@@ -702,16 +758,23 @@ def _sync_garmin_daily_cached() -> tuple[bool, str | None]:
         return False, str(exc)
 
 
-def _seed_and_get_active_phase(plan_start: date | None) -> tuple[list, object | None]:
-    """Reads phases from the Config DB; one-time-seeds Phase 1 from the existing
-    plan_start_date if no phases have been configured yet. Returns (phases, active)."""
-    r = repo.get_repository()
-    phases = r.get_phases()
-    if not phases:
-        seeded = sess.seed_default_phase(phases, plan_start)
-        if seeded:
-            r.set_phases(seeded)
-            phases = seeded
+def _get_phases_and_active_phase() -> tuple[list, object | None]:
+    """Reads phases from the Config DB. Returns (phases, active).
+
+    Read-only, deliberately — this used to also seed-and-persist a fresh
+    Phase 1 whenever `phases` came back empty, as a passive side effect of
+    ANY page load. That was dangerous for reasons beyond just corrupted JSON
+    (repo.PhasesCorruptError guards that specific case): a transient Notion
+    read hiccup (the config page query returning nothing, a brief
+    consistency gap after a just-completed write, ...) makes an empty read
+    indistinguishable from "nothing configured yet," and silently
+    overwriting real phase data (including a manual reschedule's
+    date_overrides) is unacceptable collateral for a retryable glitch. This
+    happened twice in one week. Phase 1's creation is now an explicit,
+    user-confirmed action tied to the "Begin 14-Day Plan" button (same
+    pattern _render_begin_stage2_button already used correctly for Stage 2)
+    — this function only ever reads."""
+    phases = repo.get_repository().get_phases()
     return phases, ph.active_phase(phases, date.today())
 
 
@@ -1606,7 +1669,17 @@ def render():
     #     if this is a fresh session (e.g. the browser dropped its connection
     #     while a training session was in progress) ───────────────────────────
     plan_start = _get_plan_start()
-    phases, active = _seed_and_get_active_phase(plan_start)
+    try:
+        phases, active = _get_phases_and_active_phase()
+    except PhasesCorruptError:
+        st.error(
+            "Couldn't read your training phases — the stored data looks "
+            "corrupted or a read just failed. Not auto-resetting your plan "
+            "to avoid losing progress. Try reloading; if this keeps "
+            "happening, the stored 'phases' config value needs a look."
+        )
+        nav.inject("training")
+        st.stop()
     day_num = ph.day_number_in_phase(active, date.today()) if active else None
     _init_state(day_num)
 
@@ -1643,7 +1716,20 @@ def render():
         start_input = st.date_input("Plan start date", value=date.today(),
                                     help="You can backdate if you've already started.")
         if st.button("Begin 14-Day Plan", type="primary", use_container_width=True):
-            repo.get_repository().set_config("plan_start_date", str(start_input))
+            r = repo.get_repository()
+            r.set_config("plan_start_date", str(start_input))
+            # Phase 1 is created here, explicitly, tied to this one confirmed
+            # click — NOT as a passive side effect of some later page load
+            # noticing "no phases" and silently seeding-and-persisting one.
+            # That passive pattern used to live in _get_phases_and_active_phase
+            # and silently destroyed a real, in-progress Phase 2 (including a
+            # manual reschedule) twice in one week whenever a transient Notion
+            # read hiccup made "phases" look empty. Explicit, user-triggered
+            # creation is the same pattern _render_begin_stage2_button already
+            # correctly uses for Stage 2 — Phase 1 now matches it.
+            seeded = sess.seed_default_phase([], start_input)
+            if seeded:
+                r.set_phases(seeded)
             st.success(f"Plan starts {start_input}. Come back each day for your session.")
             st.rerun()
         st.stop()
@@ -1682,6 +1768,11 @@ def render():
     _selected = st.session_state.tp_selected_date
     if _selected != _today:
         _render_day_detail(_selected, active, phases)
+        nav.inject("training")
+        st.stop()
+
+    if active.date_overrides.get(_today.isoformat()) == 0:
+        _render_rest_day(_today)
         nav.inject("training")
         st.stop()
 

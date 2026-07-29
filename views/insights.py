@@ -1226,7 +1226,7 @@ def render() -> None:
                     st.divider()
                     st.subheader("Metrics History (persisted)")
                     st.caption(
-                        "A fixed daily record of Readiness, Sleep %, and Strain — written "
+                        "A fixed daily record of Readiness, Sleep Score, and Strain — written "
                         "once a day (Repository.sync_metrics_history) to its own sheet tab, "
                         "same rationale as Biometric Blend above. This is also what feeds the "
                         "trend sparklines behind the Readiness/Sleep/Strain cards on Home "

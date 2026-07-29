@@ -277,7 +277,7 @@ _snapshot = dash.compute_daily_metrics_snapshot(
     sleep_base_hours=_sleep_base_hours, rolling_reference_date=date.today(),
 )
 _readiness_score    = _snapshot["readiness_score"]
-_sleep_pct          = _snapshot["sleep_pct"]
+_sleep_score        = _snapshot["sleep_score"]
 _display_strain     = _snapshot["strain"]
 _strain_is_rolling  = _snapshot["strain_is_rolling"]
 
@@ -499,9 +499,9 @@ def _metric_detail(view: str) -> str:
         hist_key, hist_unit, hist_title, hist_color = "readiness_score", "", "Readiness Trend", "#6BAF8B"
         extra_blocks = ""
     elif view == "sleep":
-        col, disp, lbl, _, _ = dash.sleep_meta(_sleep_pct, _sleep_need, _sleep_base_window)
+        col, disp, lbl, _, _ = dash.sleep_meta(_sleep_score, _sleep_need, _sleep_base_window)
         detail_label = f"SLEEP · {date_label}"
-        hist_key, hist_unit, hist_title, hist_color = "sleep_pct", "%", "Sleep % of Baseline Trend", "#4FC3F7"
+        hist_key, hist_unit, hist_title, hist_color = "sleep_score", "", "Sleep Score Trend", "#4FC3F7"
         extra_blocks = ""
     else:
         col, disp, lbl, _, _ = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
@@ -615,10 +615,10 @@ _card_strain = _card_html(
     click_href=f"?d={selected_date}&view=strain",
 )
 
-sl_col, sl_disp, sl_lbl, sl_hdr, sl_desc = dash.sleep_meta(_sleep_pct, _sleep_need, _sleep_base_window)
+sl_col, sl_disp, sl_lbl, sl_hdr, sl_desc = dash.sleep_meta(_sleep_score, _sleep_need, _sleep_base_window)
 _card_sleep = _card_html(
     "SLEEP", _bg["sleep"],
-    _arc_svg(_sleep_pct, 100, sl_col),
+    _arc_svg(_sleep_score, 100, sl_col),
     sl_disp, sl_lbl, sl_col, sl_hdr, sl_desc,
     click_href=f"?d={selected_date}&view=sleep",
 )

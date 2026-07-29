@@ -161,16 +161,16 @@ def test_strain_meta_rolling_vs_non_rolling_have_different_copy():
     assert hdr_r != hdr_nr
 
 
-def test_sleep_meta_none_pct():
+def test_sleep_meta_none_score():
     _, val, lbl, _, _ = dashboard.sleep_meta(None, 8.0, None)
     assert lbl == "No Readings"
-    assert val == "--%"
+    assert val == "--"
 
 
 def test_sleep_meta_optimal_tier_with_baseline_window():
     _, val, lbl, _, desc = dashboard.sleep_meta(90, 7.8, 28)
     assert lbl == "Optimal"
-    assert val == "90%"
+    assert val == "90"
     assert "28d avg" in desc
 
 
@@ -181,11 +181,13 @@ def test_sleep_meta_no_baseline_window_uses_target_copy():
 
 # ─── compute_daily_metrics_snapshot ─────────────────────────────────────────
 
-def test_snapshot_returns_all_four_keys_with_minimal_data():
+def test_snapshot_returns_all_five_keys_with_minimal_data():
     snap = dashboard.compute_daily_metrics_snapshot(
         date(2026, 7, 20), bio_rows=[], au_rows=[], stage=1,
     )
-    assert set(snap) == {"readiness_score", "sleep_pct", "strain", "strain_is_rolling"}
+    assert set(snap) == {
+        "readiness_score", "sleep_pct", "sleep_score", "strain", "strain_is_rolling",
+    }
 
 
 def test_snapshot_no_data_everything_none():
@@ -194,6 +196,7 @@ def test_snapshot_no_data_everything_none():
     )
     assert snap["readiness_score"] is None
     assert snap["sleep_pct"] is None
+    assert snap["sleep_score"] is None
     assert snap["strain"] is None
 
 

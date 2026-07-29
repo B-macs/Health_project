@@ -22,6 +22,10 @@ class Phase:
     start_date: str  # ISO date string, e.g. "2026-06-29"
     length_days: int
     status: str  # "active" | "completed" | "upcoming"
+    # {"YYYY-MM-DD": day_number} — wins over the start_date/length_days formula
+    # for that date. day_number 0 means forced rest (no training that date).
+    # Empty for every phase except one carrying a one-off manual reschedule.
+    date_overrides: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -112,6 +116,20 @@ class BiometricRecord:
     # Alcohol units logged via the morning check-in (Notion Readiness DB,
     # not a wearable source) — feeds compute_readiness's flat point penalty.
     alcohol_units: float | None = None
+    # Raw sleep-architecture fields from Oura's main sleep period (picked via
+    # services.biometrics.pick_main_sleep_period) — Oura-exclusive, no Garmin
+    # equivalent, straight passthrough like the oura_* readiness fields above.
+    # Feeds services.sleep_score.compute_sleep_score's 7 contributors; kept as
+    # raw values (not pre-scored) since that module does its own 0-100 math,
+    # mirroring how compute_readiness does its own math from raw hrv_ms/
+    # resting_heart_rate rather than a pre-computed ratio.
+    oura_sleep_efficiency: float | None = None
+    oura_sleep_total_seconds: float | None = None
+    oura_sleep_deep_seconds: float | None = None
+    oura_sleep_rem_seconds: float | None = None
+    oura_sleep_latency_seconds: float | None = None
+    oura_sleep_restless_periods: float | None = None
+    oura_sleep_bedtime_start: str | None = None  # ISO datetime string
 
 
 WeekStatus = Literal["ultimate", "perfect", "normal", "failed", "in_progress", "no_plan"]

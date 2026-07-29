@@ -45,7 +45,7 @@ class _FakeCell:
 
 class _FakeMetricsHistoryWorksheet:
     def __init__(self, rows=None):
-        self.header = ["date", "readiness_score", "sleep_pct", "strain"]
+        self.header = ["date", "readiness_score", "sleep_pct", "sleep_score", "strain"]
         self.rows = rows or []
         self.appended = []
         self.updates = []
@@ -97,18 +97,24 @@ def _repo_with_ws(ws: _FakeMetricsHistoryWorksheet) -> Repository:
 def test_metrics_history_row_maps_populated_snapshot():
     repo = _repo_with_ws(_FakeMetricsHistoryWorksheet())
     row = repo._metrics_history_row({
-        "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88, "strain": 9.4,
+        "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88,
+        "sleep_score": 91, "strain": 9.4,
     })
-    assert row == {"date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88, "strain": 9.4}
+    assert row == {
+        "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88,
+        "sleep_score": 91, "strain": 9.4,
+    }
 
 
 def test_metrics_history_row_blanks_none_values():
     repo = _repo_with_ws(_FakeMetricsHistoryWorksheet())
     row = repo._metrics_history_row({
-        "date": "2026-07-20", "readiness_score": None, "sleep_pct": None, "strain": None,
+        "date": "2026-07-20", "readiness_score": None, "sleep_pct": None,
+        "sleep_score": None, "strain": None,
     })
     assert row["readiness_score"] == ""
     assert row["sleep_pct"] == ""
+    assert row["sleep_score"] == ""
     assert row["strain"] == ""
 
 
@@ -118,27 +124,29 @@ def test_upsert_metrics_history_row_appends_new_date():
     ws = _FakeMetricsHistoryWorksheet()
     repo = _repo_with_ws(ws)
     repo.upsert_metrics_history_row({
-        "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88, "strain": 9.4,
+        "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88,
+        "sleep_score": 91, "strain": 9.4,
     })
-    assert ws.appended == [["2026-07-20", 72.5, 88, 9.4]]
+    assert ws.appended == [["2026-07-20", 72.5, 88, 91, 9.4]]
 
 
 def test_upsert_metrics_history_row_updates_existing_date_in_place():
-    ws = _FakeMetricsHistoryWorksheet(rows=[["2026-07-20", 60.0, 70, 5.0]])
+    ws = _FakeMetricsHistoryWorksheet(rows=[["2026-07-20", 60.0, 70, 65, 5.0]])
     repo = _repo_with_ws(ws)
     repo.upsert_metrics_history_row({
-        "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88, "strain": 9.4,
+        "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88,
+        "sleep_score": 91, "strain": 9.4,
     })
     assert len(ws.rows) == 1  # updated in place, not appended
-    assert ws.rows[0] == ["2026-07-20", 72.5, 88, 9.4]
+    assert ws.rows[0] == ["2026-07-20", 72.5, 88, 91, 9.4]
 
 
 # ─── get_metrics_history ─────────────────────────────────────────────────────
 
 def test_get_metrics_history_sorted_ascending():
     ws = _FakeMetricsHistoryWorksheet(rows=[
-        ["2026-07-20", 72.5, 88, 9.4],
-        ["2026-07-19", 65.0, 80, 7.0],
+        ["2026-07-20", 72.5, 88, 91, 9.4],
+        ["2026-07-19", 65.0, 80, 75, 7.0],
     ])
     repo = _repo_with_ws(ws)
     history = repo.get_metrics_history()
@@ -148,9 +156,9 @@ def test_get_metrics_history_sorted_ascending():
 
 def test_get_metrics_history_filters_by_start_and_end():
     ws = _FakeMetricsHistoryWorksheet(rows=[
-        ["2026-06-01", 70, 80, 8.0],
-        ["2026-07-01", 70, 80, 8.0],
-        ["2026-08-01", 70, 80, 8.0],
+        ["2026-06-01", 70, 80, 75, 8.0],
+        ["2026-07-01", 70, 80, 75, 8.0],
+        ["2026-08-01", 70, 80, 75, 8.0],
     ])
     repo = _repo_with_ws(ws)
     history = repo.get_metrics_history(start="2026-06-15", end="2026-07-15")
@@ -163,10 +171,10 @@ def test_get_metrics_history_empty_tab_returns_empty_list():
 
 
 def test_get_metrics_history_treats_blank_cells_as_none():
-    ws = _FakeMetricsHistoryWorksheet(rows=[["2026-07-20", "", "", ""]])
+    ws = _FakeMetricsHistoryWorksheet(rows=[["2026-07-20", "", "", "", ""]])
     repo = _repo_with_ws(ws)
     r = repo.get_metrics_history()[0]
-    assert (r["readiness_score"], r["sleep_pct"], r["strain"]) == (None, None, None)
+    assert (r["readiness_score"], r["sleep_pct"], r["sleep_score"], r["strain"]) == (None, None, None, None)
 
 
 # ─── sync_metrics_history ────────────────────────────────────────────────────
@@ -194,7 +202,7 @@ def test_sync_metrics_history_persists_real_snapshot_values(monkeypatch):
 
     repo.sync_metrics_history(days=1, today=datetime.date(2026, 7, 20))
     row = next(r for r in ws.appended if r[0] == "2026-07-20")
-    assert row[3] is not None and row[3] > 0  # strain computed from the AU logged that day
+    assert row[4] is not None and row[4] > 0  # strain computed from the AU logged that day
 
 
 def test_sync_metrics_history_uses_today_when_not_given(monkeypatch):

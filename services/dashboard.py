@@ -19,6 +19,7 @@ from datetime import date, timedelta
 
 from services import engine as _engine
 from services import readiness as _readiness
+from services import sleep_score as _sleep_score
 from services.readiness import NOT_COMPUTED as _NOT_COMPUTED
 
 SLEEP_NEED_HOURS_DEFAULT = 8.0
@@ -122,9 +123,12 @@ def compute_daily_metrics_snapshot(
     run on. A live page that lets the user browse past dates (app.py's
     Home) should pass date.today() explicitly here to preserve that framing.
 
-    Returns {"readiness_score", "sleep_pct", "strain", "strain_is_rolling"} —
-    any of the three metrics is None if there wasn't enough data to compute
-    it for this date."""
+    Returns {"readiness_score", "sleep_pct", "sleep_score", "strain",
+    "strain_is_rolling"} — any of the metrics is None if there wasn't enough
+    data to compute it for this date. sleep_pct is the retired "% of
+    baseline" figure, kept only because nothing has migrated off it yet;
+    sleep_score (services.sleep_score.compute_sleep_score) is what the Home
+    page's Sleep card actually shows now."""
     rolling_reference_date = rolling_reference_date or d
     readiness_score = _readiness.compute_readiness_trend(d, bio_rows)
     if readiness_score == _NOT_COMPUTED:
@@ -138,6 +142,10 @@ def compute_daily_metrics_snapshot(
     sleep_need = sleep_base_hours if sleep_base_hours else SLEEP_NEED_HOURS_DEFAULT
     sleep_pct = sleep_percent(sleep_hours, sleep_need)
 
+    sleep_score = _sleep_score.compute_sleep_score(d, bio_rows)
+    if sleep_score == _sleep_score.NOT_COMPUTED:
+        sleep_score = None
+
     au_day = next((r for r in au_rows if r.get("date") == d_str), None)
     today_strain = au_to_strain_or_none(au_day["total_au"] if au_day else None, stage)
     rolling_strain = rolling_prior_strain(au_rows, stage, today=rolling_reference_date)
@@ -147,6 +155,7 @@ def compute_daily_metrics_snapshot(
     return {
         "readiness_score": readiness_score,
         "sleep_pct": sleep_pct,
+        "sleep_score": sleep_score,
         "strain": strain,
         "strain_is_rolling": strain_is_rolling,
     }
@@ -207,14 +216,19 @@ def strain_meta(score, is_rolling: bool = False) -> tuple:
     return c, f"{s:.1f}", lbl, heads[lbl], descs[lbl]
 
 
-def sleep_meta(pct, sleep_need_hours: float, sleep_base_window: int | None) -> tuple:
-    if pct is None:
-        return "#555555", "--%", "No Readings", "Sleep data missing", \
+def sleep_meta(score, sleep_need_hours: float, sleep_base_window: int | None) -> tuple:
+    """score: services.sleep_score.compute_sleep_score's 0-100 composite
+    (or None). sleep_need_hours/sleep_base_window are still shown in the
+    description text — they're the Total Sleep contributor's own baseline,
+    not the score's full scale — even though the score itself no longer is
+    a plain percent of that baseline."""
+    if score is None:
+        return "#555555", "--", "No Readings", "Sleep data missing", \
                "No sleep data available for this day."
-    p = float(pct)
-    if p >= 85:   c, lbl = "#6BAF8B", "Optimal"
-    elif p >= 70: c, lbl = "#BFA06A", "Good"
-    elif p >= 50: c, lbl = "#BFA06A", "Pay Attention"
+    s = float(score)
+    if s >= 85:   c, lbl = "#6BAF8B", "Optimal"
+    elif s >= 70: c, lbl = "#BFA06A", "Good"
+    elif s >= 50: c, lbl = "#BFA06A", "Pay Attention"
     else:         c, lbl = "#C47878", "Insufficient"
     heads = {"Optimal": "Well rested", "Good": "Adequate rest",
              "Pay Attention": "Sleep deficit", "Insufficient": "Significant deficit"}
@@ -223,9 +237,11 @@ def sleep_meta(pct, sleep_need_hours: float, sleep_base_window: int | None) -> t
         if sleep_base_window else f"target ({sleep_need_hours:.0f} h)"
     )
     descs = {
-        "Optimal":       f"Sleep met or exceeded your personal baseline — {base_label}.",
-        "Good":          f"You reached {p:.0f}% of your baseline {base_label}. Recovery is solid.",
-        "Pay Attention": f"Only {p:.0f}% of baseline {base_label} met. Fatigue may accumulate.",
-        "Insufficient":  f"Sleep critically short ({p:.0f}% of baseline {base_label}). Recovery impaired.",
+        "Optimal":       f"Sleep score {s:.0f}/100 — total sleep, efficiency, REM/deep, "
+                          f"restfulness, latency and timing all scored well against your baseline ({base_label}).",
+        "Good":          f"Sleep score {s:.0f}/100. Recovery is solid; check the breakdown for what's holding it back.",
+        "Pay Attention": f"Sleep score {s:.0f}/100. One or more contributors (total sleep vs {base_label}, "
+                          f"efficiency, sleep stages, latency, timing) is below par.",
+        "Insufficient":  f"Sleep score {s:.0f}/100 — critically low. Recovery is impaired.",
     }
-    return c, f"{p:.0f}%", lbl, heads[lbl], descs[lbl]
+    return c, f"{s:.0f}", lbl, heads[lbl], descs[lbl]

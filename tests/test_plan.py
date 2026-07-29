@@ -52,6 +52,84 @@ def test_day_28_last_of_28_day_phase():
     assert plan.day_number_in_phase(p28, _p28_start + timedelta(days=27)) == 28
 
 
+# ─── date_overrides ──────────────────────────────────────────────────────────
+
+def test_date_override_wins_over_formula():
+    overridden = date(2026, 7, 1)
+    p = Phase(1, "Stage 1 Rehab", "2026-06-29", 14, "active",
+              date_overrides={overridden.isoformat(): 99})
+    assert plan.day_number_in_phase(p, overridden) == 99
+
+
+def test_date_override_zero_means_forced_rest():
+    rest_date = date(2026, 7, 1)
+    p = Phase(1, "Stage 1 Rehab", "2026-06-29", 14, "active",
+              date_overrides={rest_date.isoformat(): 0})
+    assert plan.day_number_in_phase(p, rest_date) == 0
+
+
+def test_date_not_in_overrides_falls_through_to_formula():
+    p = Phase(1, "Stage 1 Rehab", "2026-06-29", 14, "active",
+              date_overrides={date(2026, 7, 1).isoformat(): 99})
+    assert plan.day_number_in_phase(p, date(2026, 6, 30)) == 2
+
+
+def test_default_phase_has_no_overrides():
+    assert plan.default_phase(date(2026, 6, 29)).date_overrides == {}
+
+
+# ─── reschedule immutability guard ──────────────────────────────────────────
+# Rescheduling a single day (via date_overrides) must only ever change what
+# content shows up on specific dates — never the phase's own identity
+# (start_date, length_days) or any OTHER date's mapping. Phase is a frozen
+# dataclass, so mutation is already structurally impossible; these tests
+# document and enforce that invariant explicitly, per the 2026-07-28/29
+# incident where a plan appeared to "reset to Day 1" (the real cause was
+# repository.get_phases() silently discarding real data on a parse failure,
+# not the reschedule mechanism itself — see test_repository.py's
+# test_get_phases_raises_on_corrupt_json_rather_than_silently_emptying).
+
+def test_phase_is_frozen_start_date_cannot_be_reassigned():
+    p = Phase(2, "Stage 2", "2026-07-20", 28, "active")
+    try:
+        p.start_date = "2026-08-01"
+        assert False, "Phase.start_date must be immutable"
+    except AttributeError:
+        pass
+
+
+def test_phase_is_frozen_length_days_cannot_be_reassigned():
+    p = Phase(2, "Stage 2", "2026-07-20", 28, "active")
+    try:
+        p.length_days = 14
+        assert False, "Phase.length_days must be immutable"
+    except AttributeError:
+        pass
+
+
+def test_rescheduling_one_date_does_not_change_start_date_or_length():
+    original = Phase(2, "Stage 2", "2026-07-20", 28, "active")
+    rescheduled = Phase(2, "Stage 2", "2026-07-20", 28, "active",
+                         date_overrides={"2026-07-28": 8})
+    assert rescheduled.start_date == original.start_date
+    assert rescheduled.length_days == original.length_days
+
+
+def test_rescheduling_one_date_does_not_shift_any_other_dates_mapping():
+    baseline = Phase(2, "Stage 2", "2026-07-20", 28, "active")
+    rescheduled = Phase(2, "Stage 2", "2026-07-20", 28, "active",
+                         date_overrides={"2026-07-28": 8})
+    # Every date except the one explicit override must resolve identically
+    # on the rescheduled phase as on the untouched baseline -- a reschedule
+    # is a single-date edit, not a shift of everything after it.
+    for offset in range(0, 28):
+        d = date(2026, 7, 20) + timedelta(days=offset)
+        if d.isoformat() == "2026-07-28":
+            continue
+        assert (plan.day_number_in_phase(rescheduled, d)
+                == plan.day_number_in_phase(baseline, d))
+
+
 # ─── active_phase (reassessment gaps) ───────────────────────────────────────
 
 # Phase 1: 2026-06-29 .. 2026-07-12 (14 days). Gap. Phase 2 starts 2026-07-20.

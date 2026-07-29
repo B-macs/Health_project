@@ -11,7 +11,7 @@ import json
 import pytest
 
 from services import models
-from services.repository import Repository
+from services.repository import PhasesCorruptError, Repository
 from services.config import Config
 
 
@@ -121,12 +121,22 @@ def test_get_phases_parses_stored_json_into_dataclasses():
     assert phases == [models.Phase(1, "Stage 1 Rehab", "2026-06-29", 14, "active")]
 
 
-def test_get_phases_returns_empty_list_on_corrupt_json():
+def test_get_phases_raises_on_corrupt_json_rather_than_silently_emptying():
+    # Regression guard for the 2026-07-28/29 incident: silently returning []
+    # on a parse failure let views/training.py's old seed-and-persist-on-
+    # empty logic mistake a transient read/parse glitch for "nothing
+    # configured yet," permanently overwriting real phase data (including
+    # any reschedule date_overrides). A corrupt-but-present value must
+    # raise, never look identical to "never configured." (That seed-on-read
+    # side effect has since been removed entirely — see
+    # views/training.py's _get_phases_and_active_phase — but this
+    # distinction stays load-bearing for repo.PhasesCorruptError itself.)
     page = {"id": "cfg-1", "properties": {
         "Key": _title_prop("phases"), "Value": _rich_text_prop("{not json"),
     }}
     repo = _repo({"db-config": [page]})
-    assert repo.get_phases() == []
+    with pytest.raises(PhasesCorruptError):
+        repo.get_phases()
 
 
 def test_set_phases_creates_new_config_row_when_absent():
@@ -137,7 +147,7 @@ def test_set_phases_creates_new_config_row_when_absent():
     props = repo._notion_client.pages.created[0]["properties"]
     stored = json.loads(props["Value"]["rich_text"][0]["text"]["content"])
     assert stored == [{"phase_number": 1, "name": "Stage 1 Rehab", "start_date": "2026-06-29",
-                        "length_days": 14, "status": "active"}]
+                        "length_days": 14, "status": "active", "date_overrides": {}}]
 
 
 def test_set_phases_updates_existing_config_row():
@@ -354,6 +364,29 @@ def test_has_logged_session_false_when_no_pages():
     import datetime
     repo = _repo({"db-training": []})
     assert repo.has_logged_session(datetime.date(2026, 7, 7)) is False
+
+
+def test_has_logged_session_false_when_only_yoga_logged():
+    # A Yoga (or other supplementary) session must never mark the rehab-plan
+    # day itself as done. Regression guard: this used to be enforced via a
+    # Notion select.does_not_equal query filter, which 400s outright if
+    # "Yoga" isn't yet a configured option on the live "Type" property (true
+    # before the very first Yoga session is ever logged) -- filtering must
+    # happen in Python, not rely on the option already existing server-side.
+    import datetime
+    page = _exercise_page("2026-07-07", "Sun Salutation")
+    page["properties"]["Type"] = _select_prop("Yoga")
+    repo = _repo({"db-training": [page]})
+    assert repo.has_logged_session(datetime.date(2026, 7, 7)) is False
+
+
+def test_has_logged_session_true_when_rehab_and_yoga_both_logged():
+    import datetime
+    rehab_page = _exercise_page("2026-07-07", "Bird-Dog")
+    yoga_page = _exercise_page("2026-07-07", "Sun Salutation")
+    yoga_page["properties"]["Type"] = _select_prop("Yoga")
+    repo = _repo({"db-training": [rehab_page, yoga_page]})
+    assert repo.has_logged_session(datetime.date(2026, 7, 7)) is True
 
 
 def test_get_logged_session_dates_returns_set_of_dates():

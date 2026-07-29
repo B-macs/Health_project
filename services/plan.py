@@ -56,7 +56,11 @@ def active_phase(phases: list[Phase], today: date) -> Phase | None:
 
 
 def day_number_in_phase(phase: Phase, d: date) -> int:
-    """1-indexed day number within the phase (not global)."""
+    """1-indexed day number within the phase (not global). A date_overrides
+    entry for d wins over the formula — see Phase.date_overrides."""
+    override = phase.date_overrides.get(d.isoformat())
+    if override is not None:
+        return override
     return (d - _start(phase)).days + 1
 
 
