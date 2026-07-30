@@ -326,6 +326,46 @@ def test_upsert_weekly_rollup_row_never_appends_a_duplicate():
     assert len(ws.rows) == 1
 
 
+# ─── append_rows — batch primitive for bulk historical backfills ────────────
+
+
+class _FakeBatchWorksheet:
+    def __init__(self):
+        self.rows = []
+        self.batches = []  # one entry per append_rows() API call
+
+    def append_rows(self, values, insert_data_option=None):
+        # INSERT_ROWS is what grows the grid past its initial 200 rows.
+        assert insert_data_option == "INSERT_ROWS"
+        self.batches.append(values)
+        self.rows.extend(values)
+
+
+def test_append_rows_sends_one_batch_when_under_chunk_size():
+    ws = _FakeBatchWorksheet()
+    written = sheets_client_mod.append_rows(ws, [["a", 1], ["b", 2]])
+    assert written == 2
+    assert len(ws.batches) == 1
+    assert ws.rows == [["a", 1], ["b", 2]]
+
+
+def test_append_rows_chunks_large_batches():
+    """A multi-year Oura range is ~1,300 rows — it must not go out as one
+    oversized request, nor as one request per row."""
+    ws = _FakeBatchWorksheet()
+    rows = [[i] for i in range(1250)]
+    written = sheets_client_mod.append_rows(ws, rows, chunk_size=500)
+    assert written == 1250
+    assert [len(b) for b in ws.batches] == [500, 500, 250]
+    assert ws.rows == rows  # order preserved across chunk boundaries
+
+
+def test_append_rows_no_api_call_for_empty_input():
+    ws = _FakeBatchWorksheet()
+    assert sheets_client_mod.append_rows(ws, []) == 0
+    assert ws.batches == []
+
+
 # ─── local_cache ─────────────────────────────────────────────────────────────
 
 def test_local_cache_read_missing_file_returns_empty_dict(tmp_path):

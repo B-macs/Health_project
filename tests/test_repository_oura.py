@@ -191,8 +191,10 @@ def test_oura_sleep_period_row_maps_real_scalar_fields():
 
 
 # ─── _oura_session_row / _oura_rest_mode_row ────────────────────────────────
-# No real data available on the verified account for these two — synthetic
-# input matching Oura's documented schema.
+# rest_mode_period still has no real data on this account (synthetic input
+# below). session DOES now, from the 2026-07-30 historical backfill — and it
+# disproved the documented-schema guess: motion_count is a TimeSeries, not a
+# scalar. See test_oura_session_row_sums_real_motion_count_timeseries.
 
 def test_oura_session_row_maps_documented_fields():
     repo = Repository(_config())
@@ -209,6 +211,49 @@ def test_oura_session_row_maps_documented_fields():
     assert row["mood"] == "good"
     assert row["motion_count"] == 3
     assert "heart_rate" not in row
+
+
+def test_oura_session_row_sums_real_motion_count_timeseries():
+    """Real payload (session 7bf0c282, 2023-07-17). motion_count arrives as
+    Oura's TimeSeries struct; writing it unreduced is a Sheets 400, so the row
+    must carry a single number."""
+    repo = Repository(_config())
+    session = {
+        "id": "7bf0c282-c84d-413f-98fe-d2496cca0f4e",
+        "day": "2023-07-17", "type": "meditation", "mood": None,
+        "start_datetime": "2023-07-17T22:02:44.000+02:00",
+        "end_datetime": "2023-07-17T22:03:24.000+02:00",
+        "motion_count": {
+            "interval": 5.0, "items": [0, 19, 2, 20, 34, 0, 26, 15],
+            "timestamp": "2023-07-17T22:02:44.000+02:00",
+        },
+        "heart_rate": {"interval": 5.0, "items": [60, 61]},
+        "heart_rate_variability": {"interval": 5.0, "items": [20, 21]},
+    }
+    row = repo._oura_session_row(session)
+    assert row["motion_count"] == 116
+    assert isinstance(row["motion_count"], (int, float))
+    assert "heart_rate" not in row
+    assert "heart_rate_variability" not in row
+
+
+def test_oura_session_row_blanks_motion_count_when_null():
+    """The shape the live 7-day sync has been seeing — which is why the
+    TimeSeries bug stayed hidden until a historical range was pulled."""
+    repo = Repository(_config())
+    assert repo._oura_session_row({"id": "s-1", "motion_count": None})["motion_count"] is None
+
+
+def test_oura_session_row_survives_an_empty_timeseries():
+    repo = Repository(_config())
+    row = repo._oura_session_row({"id": "s-1", "motion_count": {"interval": 5.0, "items": []}})
+    assert row["motion_count"] is None
+
+
+def test_oura_session_row_skips_null_padding_inside_the_timeseries():
+    repo = Repository(_config())
+    row = repo._oura_session_row({"id": "s-1", "motion_count": {"items": [3, None, 4]}})
+    assert row["motion_count"] == 7
 
 
 def test_oura_rest_mode_row_maps_documented_fields():

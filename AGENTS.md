@@ -91,7 +91,7 @@ Reference data:
 
 tests/       — pytest suite (192 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
-scripts/     — one-shot CLI tools (init_notion.py)
+scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py)
 legacy/      — SQLite era, not used at runtime (init_db.py, schema.sql)
 docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
                REFACTOR_NOTES.md (services/ extraction: smells found, not fixed)

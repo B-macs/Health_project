@@ -79,6 +79,28 @@ def upsert_row_by_key(worksheet, key_col: int, key_value: str, row_values: list)
         worksheet.append_row(row_values)
 
 
+APPEND_CHUNK_SIZE = 500
+
+
+def append_rows(worksheet, rows: list[list], chunk_size: int = APPEND_CHUNK_SIZE) -> int:
+    """Batch-append `rows` in chunks — one API call per chunk, versus the two
+    (find + update/append) that upsert_row_by_key spends on every single row.
+    For a bulk historical backfill of ~1,300 rows that's the difference
+    between ~3 calls and ~2,600, i.e. between seconds and blowing through
+    Sheets' 60-writes-per-minute quota.
+
+    No key checking: the caller is responsible for having established that
+    every row is new (see Repository.backfill_oura_history, which diffs
+    against the tab's existing keys first). Returns rows written.
+
+    INSERT_ROWS rather than the API's default OVERWRITE: a tab created by
+    get_or_create_worksheet() starts at 200 rows, and a backfill of several
+    hundred would otherwise run past the end of the grid."""
+    for i in range(0, len(rows), chunk_size):
+        worksheet.append_rows(rows[i:i + chunk_size], insert_data_option="INSERT_ROWS")
+    return len(rows)
+
+
 def get_or_create_weekly_rollup_worksheet(client, sheet_id: str, header: list[str]):
     """Opens the "Weekly Rollup" tab, creating it with the given header row
     on first use if it doesn't exist yet."""

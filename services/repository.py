@@ -503,6 +503,34 @@ class Repository:
             "sets_count":   len(sets),
         }
 
+    def get_last_session_all_sets(self, movement_name: str) -> list[dict] | None:
+        """Most recent logged session's FULL per-set array for this exact
+        movement name — same Notion query as get_last_performance (filter
+        Movement==movement_name, most recent by Session Date), but returns
+        every set instead of just the last one. Needed by double progression
+        (services.engine.double_progression), which requires checking that
+        ALL prescribed sets hit the top of the rep range, not just the last
+        set logged.
+
+        Returns None if the movement has never been logged, or its most
+        recent logged page has an empty/unparseable Sets JSON."""
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Movement", "title": {"equals": movement_name}},
+            sorts=[{"property": "Session Date", "direction": "descending"}],
+        )
+        if not pages:
+            return None
+        latest = max(pages, key=lambda p: notion.get_property(p, "Session Date", "date") or "")
+        sets_raw = notion.get_property(latest, "Sets", "rich_text") or "[]"
+        try:
+            sets = json.loads(sets_raw)
+        except Exception:
+            sets = []
+        if not sets:
+            return None
+        return sets
+
     def has_checked_in(self, d: date) -> bool:
         """True if a Morning Check-In has already been submitted for this
         date — used to gate the Garmin sync cadence (see
@@ -1749,9 +1777,16 @@ class Repository:
     def _oura_session_row(self, s: dict) -> dict:
         """Scalar fields only — excludes embedded heart_rate/heart_rate_
         variability time-series, same exclusion as everywhere else here.
-        Unverified against real data (this account has no sessions logged
-        yet) — field names are Oura's documented schema; defensive .get()
-        throughout means a renamed/missing field blanks that cell only."""
+        Defensive .get() throughout means a renamed/missing field blanks that
+        cell only.
+
+        motion_count is NOT a scalar in real payloads (verified 2026-07-30
+        against 6 historical sessions): Oura returns the same TimeSeries shape
+        as heart_rate — {"interval": 5.0, "items": [...], "timestamp": ...}.
+        Writing that dict straight into a cell is a hard Sheets 400, which
+        went unnoticed only because the sessions in the live 7-day sync window
+        happened to have it null. Summed to a total-motion scalar here, per
+        this module's summary-fields-only policy."""
         return {
             "session_id": s.get("id", ""),
             "day": s.get("day", ""),
@@ -1759,7 +1794,7 @@ class Repository:
             "start_datetime": s.get("start_datetime", ""),
             "end_datetime": s.get("end_datetime", ""),
             "mood": s.get("mood", ""),
-            "motion_count": s.get("motion_count"),
+            "motion_count": _timeseries_total(s.get("motion_count")),
         }
 
     def _oura_rest_mode_row(self, r: dict) -> dict:
@@ -1783,6 +1818,33 @@ class Repository:
             values = [row.get(k, "") for k in header]
             sheets.upsert_row_by_key(worksheet, key_col=1, key_value=str(row[header[0]]), row_values=values)
         return len(entries)
+
+    def _oura_event_specs(self) -> tuple:
+        """The 4 event-based Oura endpoints, one spec per output tab:
+        (result_key, api_endpoint, worksheet_getter, header, row_mapper).
+        Shared by sync_oura_all (rolling window) and fetch_oura_history /
+        backfill_oura_history (arbitrary historical range) so the
+        endpoint→tab→header→mapper wiring lives in exactly one place."""
+        return (
+            ("workouts", "workout", self._oura_workouts_ws,
+             _OURA_WORKOUT_HEADER, self._oura_workout_row),
+            ("sleep_periods", "sleep", self._oura_sleep_periods_ws,
+             _OURA_SLEEP_PERIOD_HEADER, self._oura_sleep_period_row),
+            ("sessions", "session", self._oura_sessions_ws,
+             _OURA_SESSION_HEADER, self._oura_session_row),
+            ("rest_mode_periods", "rest_mode_period", self._oura_rest_mode_ws,
+             _OURA_REST_MODE_HEADER, self._oura_rest_mode_row),
+        )
+
+    def _oura_tab_specs(self) -> list[tuple]:
+        """Every Oura output tab as (result_key, worksheet_getter, header) —
+        the daily tab (keyed by date) plus the 4 event tabs (keyed by their
+        own id). header[0] is always the key column, by construction of every
+        _OURA_*_HEADER."""
+        return [("daily", self._oura_daily_ws, _OURA_DAILY_HEADER)] + [
+            (key, ws_getter, header)
+            for key, _endpoint, ws_getter, header, _mapper in self._oura_event_specs()
+        ]
 
     def oura_last_synced(self) -> datetime | None:
         """Last time sync_oura_all actually ran, per the local .sync_state.json
@@ -1840,30 +1902,117 @@ class Repository:
             values = [row.get(k, "") for k in _OURA_DAILY_HEADER]
             sheets.upsert_row_by_key(daily_ws, key_col=1, key_value=d, row_values=values)
 
-        return {
-            "daily": len(by_date),
-            "workouts": self._sync_oura_events(
-                token, "workout", start, end, self._oura_workouts_ws(),
-                _OURA_WORKOUT_HEADER, self._oura_workout_row,
-            ),
-            "sleep_periods": self._sync_oura_events(
-                token, "sleep", start, end, self._oura_sleep_periods_ws(),
-                _OURA_SLEEP_PERIOD_HEADER, self._oura_sleep_period_row,
-            ),
-            "sessions": self._sync_oura_events(
-                token, "session", start, end, self._oura_sessions_ws(),
-                _OURA_SESSION_HEADER, self._oura_session_row,
-            ),
-            "rest_mode_periods": self._sync_oura_events(
-                token, "rest_mode_period", start, end, self._oura_rest_mode_ws(),
-                _OURA_REST_MODE_HEADER, self._oura_rest_mode_row,
-            ),
+        result = {"daily": len(by_date)}
+        for key, endpoint, ws_getter, header, mapper in self._oura_event_specs():
+            result[key] = self._sync_oura_events(
+                token, endpoint, start, end, ws_getter(), header, mapper,
+            )
+        return result
+
+    # ─── Historical backfill (arbitrary date range) ──────────────────────
+    #  sync_oura_all covers a rolling window ending today and upserts row by
+    #  row — 2 API calls each, fine for 7 days, hopeless for a multi-year
+    #  range (Sheets allows 60 writes/minute). These two split that into a
+    #  read-only fetch and a batch-append write so a big range costs a
+    #  handful of calls, and so the fetched data can also be exported
+    #  locally without being fetched twice.
+
+    def fetch_oura_history(self, start: str, end: str) -> dict:
+        """Read-only pull of every Oura data type over an arbitrary inclusive
+        [start, end] range (ISO YYYY-MM-DD), mapped into the same row shapes
+        sync_oura_all writes — but writing nothing anywhere. Returns
+        {"rows": {tab_key: [row_dict, ...]}, "raw": {endpoint: [entry, ...]}}:
+        `rows` feeds backfill_oura_history and any CSV export, `raw` is the
+        unmapped API payload so a caller can archive the fields the Sheet
+        schema deliberately drops (embedded time-series, hypnograms) without
+        paying for a second fetch.
+
+        Dates missing an endpoint entirely — daily_resilience needs weeks of
+        prior history, vo2_max/rest_mode_period are often empty outright —
+        just leave those columns None, same defensive behaviour as
+        _oura_daily_row."""
+        token = self._oc
+        if token is None:
+            raise RuntimeError("Oura is not configured — add OURA_TOKEN to .streamlit/secrets.toml.")
+
+        raw: dict[str, list[dict]] = {}
+        by_date: dict[str, dict] = {}
+        for endpoint in _OURA_DAILY_ENDPOINTS:
+            entries = oura.get_collection(token, endpoint, start, end)
+            raw[endpoint] = entries
+            for entry in entries:
+                d = entry.get("day")
+                if d:
+                    by_date.setdefault(d, {})[endpoint] = entry
+
+        rows: dict[str, list[dict]] = {
+            "daily": [self._oura_daily_row(d, by_date[d]) for d in sorted(by_date)],
         }
+        for key, endpoint, _ws_getter, _header, mapper in self._oura_event_specs():
+            entries = oura.get_collection(token, endpoint, start, end)
+            raw[endpoint] = entries
+            rows[key] = [mapper(e) for e in entries]
+        return {"rows": rows, "raw": raw}
+
+    def backfill_oura_history(self, rows: dict[str, list[dict]]) -> dict[str, dict]:
+        """Batch-appends pre-fetched rows (fetch_oura_history()["rows"]) into
+        their Sheet tabs, skipping every key the tab already holds. Two
+        consequences worth stating: a real synced day is never overwritten by
+        a backfill, and re-running the same range is idempotent rather than
+        duplicating rows.
+
+        This appends where sync_oura_all upserts — deliberate, since the diff
+        against existing keys costs one read per tab instead of one find per
+        row. Returns {tab_key: {"written": n, "skipped": n}}."""
+        out: dict[str, dict] = {}
+        for key, ws_getter, header in self._oura_tab_specs():
+            candidates = rows.get(key) or []
+            if not candidates:
+                out[key] = {"written": 0, "skipped": 0}
+                continue
+            ws = ws_getter()
+            key_field = header[0]
+            existing = {
+                _sheet_key(r.get(key_field)) for r in sheets.get_worksheet_records(ws)
+            }
+            new_rows = [r for r in candidates if _sheet_key(r.get(key_field)) not in existing]
+            values = [
+                ["" if r.get(k) is None else r.get(k) for k in header]
+                for r in new_rows
+            ]
+            sheets.append_rows(ws, values)
+            out[key] = {"written": len(new_rows), "skipped": len(candidates) - len(new_rows)}
+        return out
 
 
 _WEEKLY_ROLLUP_HEADER = [
     "week_start", "week_end", "phase", "scheduled", "completed", "ratio", "status", "computed_at",
 ]
+
+
+def _timeseries_total(val) -> float | int | None:
+    """Collapses an Oura TimeSeries ({"interval", "items", "timestamp"}) into
+    the sum of its items, so a count-style series can occupy one cell instead
+    of being written as a dict (a Sheets 400). Nulls inside items are skipped
+    — Oura pads gaps with them. Passes an already-scalar value straight
+    through, and returns None for anything else, so this stays safe if Oura
+    changes the field's shape again."""
+    if isinstance(val, dict):
+        items = val.get("items") or []
+        nums = [v for v in items if isinstance(v, (int, float))]
+        return sum(nums) if nums else None
+    if isinstance(val, (int, float)):
+        return val
+    return None
+
+
+def _sheet_key(val) -> str:
+    """Normalises a key-column value for comparison across a round trip
+    through Sheets — a date written as "2023-07-04" can read back as
+    "2023-07-04 00:00:00" depending on the tab's cell formatting, which would
+    otherwise make Repository.backfill_oura_history think an existing date is
+    new. A no-op for the event tabs' UUID keys."""
+    return str(val or "").split(" ")[0].strip()
 
 
 def _sheet_date(val) -> str | None:
