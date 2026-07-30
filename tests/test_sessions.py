@@ -163,6 +163,96 @@ def test_make_sets_data_omits_band_tier_key_when_absent():
     assert "band_tier" not in rows[0]
 
 
+# ─── build_set_record (real per-set capture) ───────────────────────────────
+
+_TS = "2026-07-30T18:04:03"
+
+
+def test_build_set_record_captures_actual_reps_and_weight_over_prescription():
+    # The whole point of per-set capture: what the user actually did wins
+    # over what the plan prescribed.
+    ex = {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 60, "weight_kg": 10.0}
+    rec = sessions.build_set_record(ex, 2, {"reps": 8, "weight_kg": 12.5}, _TS)
+    assert rec["set_num"] == 2
+    assert rec["reps"] == 8
+    assert rec["weight"] == 12.5
+    assert rec["ts"] == _TS
+
+
+def test_build_set_record_consecutive_sets_can_differ():
+    # The exact case the old synthesized rows could not represent: a 10/9/8
+    # session read back identically to a clean 10/10/10 one.
+    ex = {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 60, "weight_kg": 12.5}
+    recs = [
+        sessions.build_set_record(ex, 1, {"reps": 10, "weight_kg": 12.5}, _TS),
+        sessions.build_set_record(ex, 2, {"reps": 9, "weight_kg": 12.5}, _TS),
+        sessions.build_set_record(ex, 3, {"reps": 8, "weight_kg": 12.5}, _TS),
+    ]
+    assert [r["reps"] for r in recs] == [10, 9, 8]
+    assert [r["set_num"] for r in recs] == [1, 2, 3]
+
+
+def test_build_set_record_falls_back_to_prescription_without_steppers():
+    # Bodyweight/release exercises never get a tp_actuals entry seeded.
+    ex = {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 60}
+    rec = sessions.build_set_record(ex, 1, None, _TS)
+    assert rec["reps"] == 10
+    assert rec["weight"] == 0.0
+
+
+def test_build_set_record_hold_reps_uses_reps_in_set():
+    ex = {"type": "hold_reps", "sets": 2, "reps_in_set": 8, "hold_seconds": 3, "rest_seconds": 45}
+    rec = sessions.build_set_record(ex, 1, None, _TS)
+    assert rec["reps"] == 8
+    assert rec["tut"] == 3
+    assert rec["velocity"] == "isometric"
+
+
+def test_build_set_record_hold_is_always_one_rep():
+    ex = {"type": "hold", "sets": 2, "hold_seconds": 30, "rest_seconds": 15}
+    rec = sessions.build_set_record(ex, 1, {"reps": 99}, _TS)
+    assert rec["reps"] == 1
+    assert rec["tut"] == 30
+
+
+def test_build_set_record_duration_carries_seconds_and_no_rest():
+    ex = {"type": "duration", "duration_minutes": 3}
+    rec = sessions.build_set_record(ex, 1, None, _TS)
+    assert rec["tut"] == 180
+    assert rec["rest"] == 0
+    assert rec["velocity"] == "continuous"
+
+
+def test_build_set_record_band_tier_from_actual_wins():
+    ex = {"type": "reps", "sets": 2, "reps": 10, "rest_seconds": 45, "band_tier": "Green"}
+    rec = sessions.build_set_record(ex, 1, {"band_tier": "Blue"}, _TS)
+    assert rec["band_tier"] == "Blue"
+
+
+def test_build_set_record_omits_band_tier_when_neither_has_one():
+    ex = {"type": "reps", "sets": 1, "reps": 10, "rest_seconds": 45}
+    assert "band_tier" not in sessions.build_set_record(ex, 1, None, _TS)
+
+
+def test_build_set_record_zero_weight_actual_is_not_treated_as_missing():
+    # 0.0 is falsy — a deliberate bodyweight logging must not fall back to
+    # the plan's prescribed weight.
+    ex = {"type": "reps", "sets": 2, "reps": 10, "rest_seconds": 45, "weight_kg": 20.0}
+    rec = sessions.build_set_record(ex, 1, {"reps": 10, "weight_kg": 0.0}, _TS)
+    assert rec["weight"] == 0.0
+
+
+def test_build_set_record_shape_matches_make_sets_data():
+    # Downstream readers (Repository.get_recent_sessions' volume math,
+    # get_last_session_all_sets, services.volume, engine.double_progression)
+    # consume both shapes interchangeably — "ts" is the only addition.
+    ex = {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 60, "weight_kg": 10.0}
+    synthesized = sessions.make_sets_data(ex)[0]
+    captured = sessions.build_set_record(ex, 1, None, _TS)
+    assert set(captured) - set(synthesized) == {"ts"}
+    assert set(synthesized) - set(captured) == set()
+
+
 # ─── reps/weight/band-tier steppers ────────────────────────────────────────
 
 def test_step_reps_increments_and_decrements():
@@ -471,7 +561,16 @@ _STATE = {
     "tp_ex_idx": 2, "tp_set": 1, "tp_rep_in_set": 1, "tp_phase": "resting",
     "tp_started": True, "tp_done_today": False, "tp_session_logged": False,
     "tp_side": "right", "tp_session_start_ts": 12345.0, "tp_actuals": {},
+    "tp_set_log": {},
 }
+
+
+def test_checkpoint_state_fixture_covers_every_checkpoint_field():
+    """Guards the fixture above against drifting out of sync with
+    CHECKPOINT_FIELDS — checkpoint_payload does a direct state[k] lookup, so
+    a field added to CHECKPOINT_FIELDS but not to a caller's state dict is a
+    KeyError at runtime, not a silently-missing key."""
+    assert set(_STATE) == set(sessions.CHECKPOINT_FIELDS)
 
 
 def test_checkpoint_payload_includes_day_num_and_all_fields():

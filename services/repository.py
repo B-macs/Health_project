@@ -386,26 +386,11 @@ class Repository:
             ["Activity Avg HR", "Activity Max HR", "Activity Distance (km)", "Activity Calories"],
         )
 
-    def save_training_set(self, training_log_id: str, set_number: int, reps_completed: int,
-                           weight_kg: float, rest_time_seconds: int,
-                           time_under_tension_seconds: int, movement_velocity: str) -> None:
-        """Append one set to the Sets JSON on an existing training log page."""
-        if not training_log_id:
-            return
-        page = self._nc.pages.retrieve(training_log_id)
-        existing_json = notion.get_property(page, "Sets", "rich_text") or "[]"
-        try:
-            existing_sets = json.loads(existing_json)
-        except Exception:
-            existing_sets = []
-        existing_sets.append({
-            "set_num": set_number, "reps": reps_completed, "weight": weight_kg,
-            "rest": rest_time_seconds, "tut": time_under_tension_seconds,
-            "velocity": movement_velocity,
-        })
-        notion.update_page(self._nc, training_log_id, properties={
-            "Sets": notion.rich_text(json.dumps(existing_sets)),
-        })
+    # save_training_set() lived here: an incremental "append one set to an
+    # existing page's Sets JSON" writer that was never called from anywhere.
+    # Per-set records are now captured in-session (services.sessions.
+    # build_set_record) and written in one shot by save_training_exercise
+    # above, so a per-set round-trip to Notion mid-session is redundant.
 
     def save_session_notes(self, training_log_id: str, raw_text: str) -> None:
         if not training_log_id or not (raw_text or "").strip():

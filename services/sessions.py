@@ -48,7 +48,7 @@ RELEASE_EXERCISE_NAMES = frozenset({
 CHECKPOINT_FIELDS = (
     "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
     "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
-    "tp_actuals",
+    "tp_actuals", "tp_set_log",
 )
 
 BAND_TIERS = engine.BAND_TIERS
@@ -149,7 +149,68 @@ def planned_reps(ex: dict) -> int:
     return 1
 
 
+def build_set_record(ex: dict, set_num: int, actual: dict | None,
+                      completed_at: str) -> dict:
+    """One ACTUALLY-COMPLETED set, captured at the moment the user taps the
+    set's completion button.
+
+    Same field shape make_sets_data() emits (so every downstream reader --
+    Repository.get_recent_sessions' volume math, get_last_session_all_sets,
+    services.volume, services.engine.double_progression -- works unchanged)
+    plus a "ts" ISO timestamp, which the synthesized rows never had.
+
+    `actual` is this exercise's live stepper entry (views/training.py's
+    st.session_state.tp_actuals[idx]) or None for exercises that have no
+    steppers at all (bodyweight/release work -- see _seed_actuals_if_needed,
+    which only seeds entries for exercises with an equipment_type). Falls
+    back to the exercise's own prescription per field, so a set is always
+    recorded with real values whether or not steppers were in play.
+
+    Contrast with make_sets_data() below, which this replaces for any
+    exercise the guided flow actually captured: that function REPLICATES the
+    plan's prescription `sets` times, so all N rows are identical by
+    construction and a 10/9/8 session was indistinguishable from 10/10/10.
+    """
+    t = ex["type"]
+    actual = actual or {}
+
+    if t == "reps":
+        reps = actual.get("reps") if actual.get("reps") is not None else (ex.get("reps") or 1)
+        velocity, tut = "controlled", 0
+    elif t == "hold_reps":
+        reps = actual.get("reps") if actual.get("reps") is not None else (ex.get("reps_in_set") or 1)
+        velocity, tut = "isometric", ex.get("hold_seconds") or 0
+    elif t == "hold":
+        reps, velocity, tut = 1, "isometric", ex.get("hold_seconds") or 0
+    else:  # duration
+        reps, velocity, tut = 1, "continuous", (ex.get("duration_minutes") or 0) * 60
+
+    weight = actual.get("weight_kg")
+    if weight is None:
+        weight = ex.get("weight_kg") or 0.0
+
+    record = {
+        "set_num": set_num,
+        "reps": reps,
+        "weight": weight,
+        "rest": 0 if t == "duration" else ex.get("rest_seconds", 60),
+        "tut": tut,
+        "velocity": velocity,
+        "ts": completed_at,
+    }
+    band_tier = actual.get("band_tier") or ex.get("band_tier")
+    if band_tier:
+        record["band_tier"] = band_tier
+    return record
+
+
 def make_sets_data(ex: dict) -> list[dict]:
+    """Synthesized fallback: the prescription replicated `sets` times, used
+    only for exercises the guided flow captured no real sets for (a session
+    logged straight from the day-overview screen, or a checkpoint restored
+    from before per-set capture existed). Every row is identical by
+    construction — prefer build_set_record() above, which records what
+    actually happened per set."""
     t, sets, rest = ex["type"], ex.get("sets", 1), ex.get("rest_seconds", 60)
     weight = ex.get("weight_kg") or 0.0
     band_tier = ex.get("band_tier")

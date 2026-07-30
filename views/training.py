@@ -13,7 +13,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import contextlib
 from dataclasses import asdict, replace
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 import json
 import time
 import nav
@@ -125,6 +125,9 @@ var _remaining = {seconds};
 var _iv;
 var _beeped = {{}};
 var _TKEY = "{timer_key}";
+// Each timer renders in its own iframe, so this is declared per-timer rather
+// than shared — see the restore block below for what it guards against.
+var _STALE_GRACE_MS = 5 * 60 * 1000;
 
 function _beep(freq, dur, vol) {{
   try {{
@@ -205,10 +208,20 @@ function _autoComplete() {{
     if (!s || s.total !== _total) return;
     var el = document.getElementById('hold-num');
     if (s.running) {{
-      _remaining = Math.max(0, s.remaining - (Date.now()-s.savedAt)/1000);
-      if (_remaining <= 0) {{ el.textContent='✓'; el.style.color='#E8ECEF'; _clear(); return; }}
-      el.textContent = Math.ceil(_remaining);
-      startHold();
+      // Same staleness guard as _rest_timer's — _TKEY
+      // ("tp_h_<ex>_<set>_<rep>_<side>") is just as deterministic and just as
+      // reused across days, so an abandoned hold strands a {{running:true}}
+      // entry that the next session restores as already-finished, painting
+      // '✓' with no countdown. Past its own duration plus the grace window
+      // it can only be that leftover.
+      if (Date.now() - s.savedAt > s.total * 1000 + _STALE_GRACE_MS) {{
+        _clear();
+      }} else {{
+        _remaining = Math.max(0, s.remaining - (Date.now()-s.savedAt)/1000);
+        if (_remaining <= 0) {{ el.textContent='✓'; el.style.color='#E8ECEF'; _clear(); return; }}
+        el.textContent = Math.ceil(_remaining);
+        startHold();
+      }}
     }} else {{
       _remaining = s.remaining;
       el.textContent = Math.ceil(_remaining);
@@ -220,24 +233,37 @@ function startHold() {{
   clearInterval(_iv); _beeped={{}}; _save(true);
   document.getElementById('btn-start').textContent = '⏸ Pause';
   document.getElementById('btn-start').onclick = pauseHold;
+  // Wall-clock deadline, not a per-tick decrement — see _rest_timer's
+  // identical comment (resumes start fractional, and setInterval drifts).
+  var _endAt = Date.now() + _remaining * 1000;
   _iv = setInterval(function() {{
-    _remaining = Math.max(0, _remaining - 1);
-    var r = Math.round(_remaining);
+    _remaining = Math.max(0, (_endAt - Date.now()) / 1000);
     var el = document.getElementById('hold-num');
     el.textContent = Math.ceil(_remaining);
-    if (_remaining <= 3) {{ el.style.color='#FF4B4B'; el.style.transform='scale(1.1)';
-      setTimeout(function(){{ el.style.transform='scale(1)'; }}, 200); }}
-    if (r >= 1 && r <= 3 && !_beeped[r]) {{ _beeped[r]=true; _tickBeep(); }}
+    if (_remaining <= 3) {{ el.style.color='#FF4B4B'; }}
+    // Threshold CROSSINGS, not an exact Math.round() match. Beyond the
+    // resume case _rest_timer hit, the old decrement-by-1 meant a hold of
+    // exactly 3s (Dead Bug's) stepped 3->2 on its very first tick and never
+    // sounded the "3" beep at all.
+    var _c = Math.ceil(_remaining), _due = false;
+    for (var _t = 3; _t >= 1; _t--) {{
+      if (_c <= _t && !_beeped[_t]) {{ _beeped[_t] = true; _due = true; }}
+    }}
+    if (_due && _remaining > 0) {{
+      _tickBeep();
+      el.style.transform='scale(1.1)';
+      setTimeout(function(){{ el.style.transform='scale(1)'; }}, 200);
+    }}
     if (_remaining <= 0) {{
       clearInterval(_iv); _clear();
-      el.textContent='✓'; el.style.color='#E8ECEF';
+      el.textContent='✓'; el.style.color='#E8ECEF'; el.style.transform='scale(1)';
       document.getElementById('btn-start').textContent='▶ Start';
       document.getElementById('btn-start').onclick=startHold;
       _doneBeep();
       {_flag_js}
       setTimeout(_autoComplete, 700);
     }}
-  }}, 1000);
+  }}, 250);
 }}
 function pauseHold() {{
   clearInterval(_iv); _save(false);
@@ -255,7 +281,17 @@ function resetHold() {{
 
 
 def _rest_timer(seconds: int, timer_key: str = "tp_r") -> None:
-    """Rest countdown. Auto-starts; beeps 3-2-1 then double-ring at 0; auto-advances to next set."""
+    """Rest countdown. Auto-starts; beeps 3-2-1 then double-ring at 0; auto-advances to next set.
+
+    seconds <= 0 renders nothing at all — an exercise explicitly configured
+    with no rest (currently only Day 7's "Week 1 Self-Assessment") would
+    otherwise get a 0-second timer that paints "GO" instantly and fires the
+    completion beep with no countdown, which is indistinguishable from the
+    stale-state skip bug below. The caller's own "→ Next Set" button still
+    renders, so the flow is unaffected.
+    """
+    if seconds <= 0:
+        return
     m, s = divmod(seconds, 60)
     label = f"{m:02d}:{s:02d}"
     components.html(f"""
@@ -332,15 +368,34 @@ function _save(running) {{
 function _clear() {{ try {{ localStorage.removeItem(_TKEY); }} catch(e) {{}} }}
 function fmt(n) {{ var m=Math.floor(n/60),s=Math.round(n%60); return (m<10?'0':'')+m+':'+(s<10?'0':'')+s; }}
 
+// A saved entry is only a resumable view of THIS rest period if it can
+// still plausibly be running. _TKEY is "tp_r_<exercise idx>_<set>", which
+// repeats every session and every day, and nothing clears it except this
+// timer completing naturally -- so bailing out of a rest early (tapping
+// "→ Next Set", closing the app, letting the phone lock) strands a
+// {{running:true}} entry under a key the next session reuses verbatim.
+// Restoring that computed an elapsed of hours-to-days, landed on
+// _rrem <= 0, and painted "GO" instantly: the intermittent "rest timer
+// skipped entirely / no countdown beeps" bug. Past its own duration plus
+// this grace window, an entry can only be that leftover, so it's discarded
+// and the countdown starts fresh. Inside the window it still resumes
+// exactly as before -- a rerun mid-rest, or coming back to a tab a moment
+// after the rest genuinely finished, both keep their real remaining time.
+var _STALE_GRACE_MS = 5 * 60 * 1000;
+
 (function() {{
   try {{
     var s = JSON.parse(localStorage.getItem(_TKEY)||'null');
     if (s && s.total === _rtotal) {{
       var el = document.getElementById('rest-num');
       if (s.running) {{
-        _rrem = Math.max(0, s.remaining - (Date.now()-s.savedAt)/1000);
-        if (_rrem <= 0) {{ el.textContent='GO'; el.style.color='#E8ECEF'; el.style.fontSize='42px'; _clear(); return; }}
-        el.textContent=fmt(_rrem); startRest(); return;
+        if (Date.now() - s.savedAt > s.total * 1000 + _STALE_GRACE_MS) {{
+          _clear();
+        }} else {{
+          _rrem = Math.max(0, s.remaining - (Date.now()-s.savedAt)/1000);
+          if (_rrem <= 0) {{ el.textContent='GO'; el.style.color='#E8ECEF'; el.style.fontSize='42px'; _clear(); return; }}
+          el.textContent=fmt(_rrem); startRest(); return;
+        }}
       }} else {{
         _rrem = s.remaining; el.textContent=fmt(_rrem);
         document.getElementById('rest-btn').textContent='▶ Resume';
@@ -355,12 +410,27 @@ function startRest() {{
   clearInterval(_riv); _beeped={{}}; _save(true);
   document.getElementById('rest-btn').textContent='⏸ Pause';
   document.getElementById('rest-btn').onclick=pauseRest;
+  // Wall-clock deadline rather than subtracting 1 per tick: a resumed timer
+  // starts on a fractional remaining, and setInterval drifts (badly, once a
+  // mobile browser throttles a backgrounded tab), so a decrementing counter
+  // silently desynced from real time.
+  var _endAt = Date.now() + _rrem * 1000;
   _riv = setInterval(function() {{
-    _rrem = Math.max(0, _rrem - 1);
-    var r = Math.round(_rrem);
+    _rrem = Math.max(0, (_endAt - Date.now()) / 1000);
     document.getElementById('rest-num').textContent = fmt(_rrem);
     if (_rrem <= 5) {{ document.getElementById('rest-num').style.color='#E8ECEF'; }}
-    if (r >= 1 && r <= 3 && !_beeped[r]) {{ _beeped[r]=true; _tickBeep(); }}
+    // Fire on threshold CROSSINGS, not on an exact Math.round() match. A
+    // resumed timer's fractional remaining meant the rounded value could
+    // step straight past a threshold (3.4 -> 2.4 never rounds to 3), so
+    // countdown beeps went missing -- every one of them on a resume under
+    // ~1s remaining, which is the "timer runs but never beeps" report.
+    // Marks every crossed threshold seen so a skipped tick can't re-fire
+    // them later, but plays at most one beep per tick.
+    var _c = Math.ceil(_rrem), _due = false;
+    for (var _t = 3; _t >= 1; _t--) {{
+      if (_c <= _t && !_beeped[_t]) {{ _beeped[_t] = true; _due = true; }}
+    }}
+    if (_due && _rrem > 0) {{ _tickBeep(); }}
     if (_rrem <= 0) {{
       clearInterval(_riv); _clear();
       var el = document.getElementById('rest-num');
@@ -370,7 +440,7 @@ function startRest() {{
       _goBeep();
       setTimeout(_autoAdvance, 900);
     }}
-  }}, 1000);
+  }}, 250);
 }}
 function pauseRest() {{
   clearInterval(_riv); _save(false);
@@ -491,6 +561,7 @@ def _init_state(day_num: int | None = None):
         "tp_garmin_minutes":   {},       # {exercise_idx: actual_minutes} pulled from Garmin on Complete
         "tp_garmin_activity_detail": {}, # {exercise_idx: {avg_hr, max_hr, distance_km, calories}}
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
+        "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
     for k, v in defaults.items():
@@ -503,10 +574,10 @@ def _init_state(day_num: int | None = None):
                 if k not in checkpoint:
                     continue
                 v = checkpoint[k]
-                # tp_actuals round-trips through JSON (Notion-backed
-                # checkpoint storage) which silently turns its int keys into
+                # tp_actuals/tp_set_log round-trip through JSON (Notion-backed
+                # checkpoint storage) which silently turns their int keys into
                 # strings -- cast back so exercise-index lookups still hit.
-                if k == "tp_actuals" and isinstance(v, dict):
+                if k in ("tp_actuals", "tp_set_log") and isinstance(v, dict):
                     v = {int(i): entry for i, entry in v.items()}
                 st.session_state[k] = v
         # Authoritative check, independent of the checkpoint above: if a session is
@@ -556,6 +627,7 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     garmin_minutes = st.session_state.get("tp_garmin_minutes", {})
     garmin_detail = st.session_state.get("tp_garmin_activity_detail", {})
     actuals = st.session_state.get("tp_actuals", {})
+    set_log = st.session_state.get("tp_set_log", {})
     session_info = r.create_training_session(
         session_date=date.today(),
         duration_minutes=duration_minutes,
@@ -588,6 +660,13 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         user_note = (st.session_state.get(f"tp_note_{idx}") or "").strip()
         note = "\n".join(n for n in (garmin_note, user_note) if n)
         detail = garmin_detail.get(idx) or {}
+        # Real per-set records captured live by _record_completed_set as each
+        # set was finished (reps/weight as actually stepped, plus a timestamp).
+        # make_sets_data is the fallback only when nothing was captured — a
+        # session logged without going through the guided flow, or a
+        # checkpoint predating per-set capture — since it can only replicate
+        # the prescription N identical times.
+        logged_sets = set_log.get(idx) or sess.make_sets_data(log_ex)
         last_id = r.save_training_exercise(
             session_id=session_info["session_id"],
             movement_name=ex["name"],
@@ -595,7 +674,7 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             planned_sets=ex.get("sets", 1),
             planned_reps=sess.planned_reps(ex),
             rpe=session_rpe,
-            sets=sess.make_sets_data(log_ex),
+            sets=logged_sets,
             note=note,
             session_date=session_info["session_date"],
             session_duration_minutes=session_info["duration_minutes"],
@@ -608,6 +687,25 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         )
     if notes.strip() and last_id:
         r.save_session_notes(last_id, notes)
+
+
+def _record_completed_set(idx: int, ex: dict) -> None:
+    """Append one real set record for exercise `idx`, captured from its live
+    stepper values at the moment its completion button was tapped.
+
+    Called from every set-completion branch of the guided flow. set_num is
+    derived from how many sets have already been recorded rather than from
+    st.session_state.tp_set, so it stays correct regardless of how the
+    caller happens to be mutating tp_set around the call.
+
+    Replaces the synthesized-at-save-time sets that services.sessions.
+    make_sets_data() used to produce for these exercises -- see
+    build_set_record's docstring."""
+    log = st.session_state.tp_set_log.setdefault(idx, [])
+    log.append(sess.build_set_record(
+        ex, len(log) + 1, st.session_state.tp_actuals.get(idx),
+        datetime.now().isoformat(timespec="seconds"),
+    ))
 
 
 def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
@@ -2405,6 +2503,7 @@ def render():
                             f"No Garmin activity today lasting {_lo}-{_hi} min — "
                             f"logged with the planned duration."
                         )
+                _record_completed_set(_eidx, ex)
                 st.session_state.tp_ex_idx += 1
                 st.session_state.tp_set = 1
                 st.session_state.tp_rep_in_set = 1
@@ -2441,6 +2540,8 @@ def render():
                     if is_uni and _side == "right":
                         st.session_state.tp_side = "left"
                     else:
+                        # Both sides done (or bilateral) — the set is complete.
+                        _record_completed_set(_eidx, ex)
                         st.session_state.tp_side = "right"
                         if cur_set >= total_sets:
                             st.session_state.tp_ex_idx += 1
@@ -2473,6 +2574,8 @@ def render():
                     if is_uni and _side == "right":
                         st.session_state.tp_side = "left"
                     else:
+                        # Both sides done (or bilateral) — the set is complete.
+                        _record_completed_set(_eidx, ex)
                         st.session_state.tp_side = "right"
                         if cur_set >= total_sets:
                             st.session_state.tp_ex_idx += 1
@@ -2511,6 +2614,8 @@ def render():
                             st.session_state.tp_side = "left"
                             st.session_state.tp_rep_in_set = 1
                         else:
+                            # Final rep of the set, both sides done — set complete.
+                            _record_completed_set(_eidx, ex)
                             st.session_state.tp_side = "right"
                             if cur_set >= total_sets:
                                 st.session_state.tp_ex_idx += 1
