@@ -26,6 +26,7 @@ import repo
 import styles
 from services import dashboard as dash
 from services import engine
+from services import hr_load as _hr_load
 from services import readiness as readiness_model
 
 # ─── Page config ─────────────────────────────────────────────────────────────
@@ -151,6 +152,38 @@ def _current_stage_cached() -> int:
     return repo.get_repository().get_current_stage()
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _session_hr_rolling(days: int = 60) -> list[dict]:
+    """Persisted per-session heart-rate load (Repository.
+    get_session_hr_history) — Edwards'-TRIMP-derived strain for any day whose
+    logged session matched a Garmin activity. Days with no row simply aren't
+    in this list, and the strain for those falls back to RPE."""
+    start = (date.today() - timedelta(days=days)).isoformat()
+    return repo.get_repository().get_session_hr_history(start=start)
+
+
+@st.cache_data(ttl=7200, show_spinner=False)  # 2h — matches the Garmin sync cadence
+def _sync_session_hr_cached() -> tuple[bool, str | None]:
+    """Match the last couple of days' logged sessions to their Garmin
+    activities and persist the HR load (services/hr_load.py).
+
+    Runs after the Garmin sync above, since it needs that day's activities to
+    already be available. Only the last 2 days: a session's Garmin activity
+    doesn't change retroactively, and each date costs several calls to
+    Garmin's unofficial API. A date that yields nothing (no session, no
+    per-set timestamps, no matching activity) is a normal fall-back-to-RPE
+    outcome, not an error."""
+    r = repo.get_repository()
+    if not r.garmin_configured():
+        return True, None
+    try:
+        for offset in (0, 1):
+            r.sync_session_hr_for_date(date.today() - timedelta(days=offset))
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
 @st.cache_data(ttl=7200, show_spinner=False)  # 2 hours — runs on Home page open, idle in between
 def _sync_oura_cached() -> tuple[bool, str | None]:
     """Oura sync (its own Sheet tabs — see Repository.sync_oura_all), feeding
@@ -245,6 +278,9 @@ def _sync_metrics_history_cached() -> tuple[bool, str | None]:
 _oura_sync_ok, _oura_sync_err = _sync_oura_cached()
 _garmin_sync_ok, _garmin_sync_err = _sync_garmin_cached()
 _blend_sync_ok, _blend_sync_err = _sync_biometric_blend_cached()
+# Must follow the Garmin sync (needs today's activities present) and precede
+# the _session_hr_rolling read below.
+_hr_sync_ok, _hr_sync_err = _sync_session_hr_cached()
 _metrics_sync_ok, _metrics_sync_err = _sync_metrics_history_cached()
 
 try:
@@ -267,6 +303,12 @@ except Exception:
 _wake_adjustments: dict[str, float] = {}
 try:
     _wake_adjustments = _wake_time_adjustments_rolling(days=60)
+except Exception:
+    pass
+
+_hr_rows: list[dict] = []
+try:
+    _hr_rows = _session_hr_rolling(days=60)
 except Exception:
     pass
 
@@ -301,6 +343,7 @@ _snapshot = dash.compute_daily_metrics_snapshot(
     selected_date, _bio_rows, _au_rows, _current_stage,
     sleep_base_hours=_sleep_base_hours, rolling_reference_date=date.today(),
     wake_time_adjustments=_wake_adjustments,
+    hr_rows=_hr_rows,
 )
 _readiness_score    = _snapshot["readiness_score"]
 _sleep_score        = _snapshot["sleep_score"]
@@ -460,6 +503,57 @@ def _card_html(
 
 # ─── Metric drill-downs (Readiness / Sleep / Strain) ──────────────────────────
 
+def _strain_source_block() -> str:
+    """Which method produced today's strain, and the HR detail behind it when
+    there was one — so a fall back to RPE-only is visible rather than silent
+    (the explicit ask in item 17)."""
+    source = _snapshot.get("strain_source")
+    label = _snapshot.get("strain_source_label") or ""
+    if not source or source == _NOT_COMPUTED:
+        return ""
+    if source == "rpe":
+        tint, icon = "#8A99A3", "○"
+    elif source == "none":
+        return ""
+    else:
+        tint, icon = "#6BAF8B", "●"
+
+    rows = ""
+    hr = _snapshot.get("hr_detail") or {}
+    if hr:
+        zones = hr.get("zone_minutes") or {}
+        zone_txt = "  ".join(
+            f"Z{z} {m:g}m" for z, m in sorted(zones.items(), key=lambda kv: str(kv[0]))
+        )
+        for name, val in (
+            ("Edwards' load", f"{hr.get('edwards_load')} zone-weighted min"),
+            ("Avg / max HR", f"{hr.get('avg_hr') or '—'} / {hr.get('max_hr') or '—'} bpm"),
+            ("HRmax used", f"{hr.get('hr_max_used') or '—'} bpm (observed)"),
+            ("Banister TRIMP", f"{hr.get('banister_trimp') or '—'}  (cross-check)"),
+            ("Time in zones", zone_txt or "—"),
+        ):
+            rows += (
+                f'<div style="display:flex;justify-content:space-between;'
+                f'font-size:11px;color:#8A99A3;margin-top:4px;">'
+                f'<span>{name}</span><span style="color:#C8CAD0;">{val}</span></div>'
+            )
+        both = (_snapshot.get("strain_hr_only"), _snapshot.get("strain_rpe_only"))
+        if all(v is not None for v in both):
+            rows += (
+                f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;">'
+                f'HR {both[0]} · RPE {both[1]} → blended at '
+                f'{int(_hr_load.HR_BLEND_WEIGHT * 100)}% HR</div>'
+            )
+
+    return (
+        f'<div style="background:#1A2026;border-radius:12px;padding:12px 14px;margin:14px 0;">'
+        f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;'
+        f'text-transform:uppercase;margin-bottom:6px;">Strain source</div>'
+        f'<div style="font-size:13px;color:{tint};font-weight:600;">{icon} {label}</div>'
+        f'{rows}</div>'
+    )
+
+
 def _metric_detail(view: str) -> str:
     def _trend_block(title: str, unit: str, values: list, color: str) -> str:
         """7-day, day-of-week-labeled block — used for Strain's supplementary
@@ -535,7 +629,8 @@ def _metric_detail(view: str) -> str:
         detail_label = "STRAIN · 7D AVG" if _strain_is_rolling else f"STRAIN · {date_label}"
         hist_key, hist_unit, hist_title, hist_color = "strain", "", "Strain Trend", "#BFA06A"
         extra_blocks = (
-            _trend_block("Heart Rate Variability", "ms",  _hrv_7d, "#6BAF8B")
+            _strain_source_block()
+            + _trend_block("Heart Rate Variability", "ms",  _hrv_7d, "#6BAF8B")
             + _trend_block("Resting Heart Rate",     "bpm", _rhr_7d, "#BFA06A")
         )
 

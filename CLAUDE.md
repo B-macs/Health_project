@@ -1,6 +1,6 @@
 # CLAUDE.md — Health Engine
 
-*Last updated: 2026-07-30 after adding readiness-based auto-shift session scheduling (`services/scheduling.py`), double-progression weight/rep tracking (`services.engine.double_progression`), weekly tonnage (`services/volume.py`), Sleep Debt scoring, and the per-night wake-time adjustment.*
+*Last updated: 2026-07-30 after adding heart-rate-derived strain (`services/hr_load.py` — Edwards' TRIMP — and `services/hr_matching.py`), true per-set training capture, readiness-based auto-shift session scheduling (`services/scheduling.py`), double-progression weight/rep tracking, weekly tonnage (`services/volume.py`), Sleep Debt scoring, and the per-night wake-time adjustment.*
 
 ---
 
@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **383/383 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **735/735 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **383/383 passed** (or higher — this count grows as tests are added;
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 383/383 (or higher if new tests were added)
+1. `python -m pytest tests/` → 735/735 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -75,7 +75,14 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     alcohol triggers a pairwise-adjacent-day swap for the
                     rest of that calendar week) ·
                     volume.py (weekly tonnage — Σ reps×weight — for Stage 2A+
-                    double-progression exercises)
+                    double-progression exercises) ·
+                    hr_load.py (Edwards' summated-HR-zone TRIMP → the 0-21
+                    strain scale; see its docstring for why Edwards' over
+                    Banister/Lucia/Stagno, and for the calibration that keeps
+                    HR-derived and RPE-derived strain on one continuous scale) ·
+                    hr_matching.py (which Garmin activity IS a logged session,
+                    by wall-clock overlap; plus per-exercise HR attribution
+                    off the per-set timestamps)
   Orchestration:    metrics.py — sync_weekly_rollup(); the one services/
                     module that both computes (via metrics_logic.py) and
                     does I/O (via repository.py) in the same call.
@@ -108,7 +115,7 @@ Reference data:
                            BioAge muscle-imbalance count, actively imported by
                            services/bioage.py (PROFILE["imbalances"])
 
-tests/       — pytest suite (192 tests), the sole deterministic gate
+tests/       — pytest suite (735 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py)
 legacy/      — SQLite era, not used at runtime (init_db.py, schema.sql)
@@ -122,6 +129,7 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 
 1. **Deterministic before AI** — implement the rule-based version first; AI layer is only added on top once the deterministic version is tested and working.
 2. **AI never controls safety** — traffic light multiplier, ACWR ceiling, stage transitions, and final prescribed volume are always deterministic. AI output is advisory only.
+2b. **ACWR stays on Foster AU; only STRAIN is heart-rate-derived.** `services/hr_load.py` feeds the displayed strain value, never `engine.acwr`. ACWR is a ratio of rolling averages, so mixing Edwards'-TRIMP days with RPE-fallback days inside one 7/28-day window would compare different units and swing the ceiling on whether a Garmin activity happened to be recorded — i.e. on watch-button behaviour rather than physiology. Unifying them requires a per-athlete conversion regressed from sessions that have BOTH signals; do not attempt it until enough paired sessions exist.
 3. **`services.rules.STAGE_CONSTRAINTS` is the single source of truth** for per-stage ACWR ceilings, RPE ceilings, and volume caps. `services/engine.py` derives from it; do not duplicate values.
 4. **Notion is the write backend; Oura + Garmin (blended) is the engine's biometric read source.** `services/biometrics.py` blends HRV/RHR/sleep duration at Oura 70% / Garmin 30%, and steps at Garmin 80% / Oura 20% — see `services.repository.Repository.get_biometric_rolling`. Google Sheets is still the intermediary (each platform's own tab, synced by `sync_oura_all`/`sync_garmin_daily_if_due`), and Sheet1/Apple Health is retired from the live pipeline — historical-only, feeding `get_sheet1_biometric_rolling` and the one-time `scripts/backfill_garmin_from_sheet1.py`. `get_biometric_rolling` itself is a **live recompute, not persisted** — the "Biometric Blend" sheet tab (`sync_biometric_blend`/`get_biometric_blend_history`) is the fixed historical record of what was actually computed on a given day, written once/day and viewable unbounded in Insights → Sync. Do not add manual biometric entry anywhere. Exception: a per-night wake-time correction for Sleep Score purposes is allowed (`services/repository.py`'s `get_wake_time_adjustment`/`set_wake_time_adjustment`) — this corrects a known, specific Oura measurement pattern (wake-time overestimation), not general manual biometric entry. Both the raw Oura reading and the adjustment are stored separately; the raw reading is never overwritten.
 5. **Training sessions are logged automatically by Training Plan.** No manual entry page.

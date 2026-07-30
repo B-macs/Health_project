@@ -64,3 +64,37 @@ def get_recent_activities(client, limit: int = 20) -> list[dict]:
     """Most recent `limit` activities, newest first (Garmin's own default sort)."""
     activities = client.get_activities(0, limit)
     return activities or []
+
+
+def get_activity_hr_zones(client, activity_id) -> list[dict]:
+    """Garmin's own per-activity time-in-heart-rate-zone summary.
+
+    Fallback source for Edwards' load when the full sample series isn't
+    available — note the zone boundaries are whatever the Garmin ACCOUNT is
+    configured with, not the observed HRmax used elsewhere (see
+    services/hr_load.py::seconds_in_zone_from_garmin_zones).
+
+    Returns [] rather than raising when the endpoint is unavailable for an
+    activity — plenty of activity types have no zone breakdown at all.
+    """
+    try:
+        return client.get_activity_hr_in_timezones(activity_id) or []
+    except Exception:
+        return []
+
+
+def get_activity_details(client, activity_id, max_points: int = 2000) -> dict:
+    """Full per-activity detail payload, including the sampled metric series
+    that carries heart rate over time.
+
+    max_points caps Garmin's own downsampling — 2000 points across a
+    60-90 minute session is roughly one sample every 2-3 seconds, ample for
+    zone bucketing and far cheaper than the raw series.
+
+    Returns {} rather than raising: this is an unofficial API and a single
+    activity failing must not take down a whole sync.
+    """
+    try:
+        return client.get_activity_details(activity_id, maxchart=max_points) or {}
+    except Exception:
+        return {}

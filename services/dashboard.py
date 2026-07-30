@@ -18,6 +18,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from services import engine as _engine
+from services import hr_load as _hr_load
 from services import readiness as _readiness
 from services import sleep_score as _sleep_score
 from services.readiness import NOT_COMPUTED as _NOT_COMPUTED
@@ -109,6 +110,7 @@ def compute_daily_metrics_snapshot(
     sleep_base_hours: float | None = None,
     rolling_reference_date: date | None = None,
     wake_time_adjustments: dict[str, float] | None = None,
+    hr_rows: list[dict] | None = None,
 ) -> dict:
     """The exact three numbers the Home page's cards show for date `d`: the
     smoothed readiness trend, sleep hours as a percent of the personal
@@ -141,12 +143,23 @@ def compute_daily_metrics_snapshot(
     minutes to subtract from that date's recorded awake time. None (the
     default) reproduces the exact prior sleep_score behavior.
 
+    hr_rows: persisted per-session heart-rate load
+    (Repository.get_session_hr_history). When this date has a row, its
+    Edwards'-TRIMP-derived strain becomes the primary signal and the RPE
+    figure is blended in at a lower weight; with no row the result is
+    bit-identical to the RPE-only strain this returned before HR load
+    existed. Passing None (the default) forces that pre-existing behaviour.
+
     Returns {"readiness_score", "sleep_pct", "sleep_score", "strain",
-    "strain_is_rolling"} — any of the metrics is None if there wasn't enough
-    data to compute it for this date. sleep_pct is the retired "% of
-    baseline" figure, kept only because nothing has migrated off it yet;
-    sleep_score (services.sleep_score.compute_sleep_score) is what the Home
-    page's Sleep card actually shows now."""
+    "strain_is_rolling", "strain_source", "strain_source_label",
+    "strain_rpe_only", "strain_hr_only", "hr_detail"} — any of the metrics is
+    None if there wasn't enough data to compute it for this date.
+    strain_source names which method produced the value (see
+    services.hr_load.SOURCE_*), so a fallback to RPE is visible rather than
+    silent. sleep_pct is the retired "% of baseline" figure, kept only
+    because nothing has migrated off it yet; sleep_score
+    (services.sleep_score.compute_sleep_score) is what the Home page's Sleep
+    card actually shows now."""
     rolling_reference_date = rolling_reference_date or d
     readiness_score = _readiness.compute_readiness_trend(d, bio_rows)
     if readiness_score == _NOT_COMPUTED:
@@ -165,10 +178,24 @@ def compute_daily_metrics_snapshot(
         sleep_score = None
 
     au_day = next((r for r in au_rows if r.get("date") == d_str), None)
-    today_strain = au_to_strain_or_none(au_day["total_au"] if au_day else None, stage)
+    rpe_strain = au_to_strain_or_none(au_day["total_au"] if au_day else None, stage)
+
+    # Heart-rate-derived strain takes priority when this date's session
+    # matched a Garmin activity; RPE is kept in the blend at a lower weight
+    # (see services.hr_load.blend_strain). With no matched activity this
+    # collapses to exactly the RPE value computed above, which is the
+    # behaviour that existed before HR load was introduced.
+    hr_row = next((r for r in (hr_rows or []) if r.get("date") == d_str), None)
+    hr_strain_value = hr_row.get("hr_strain") if hr_row else None
+    today_strain, strain_source = _hr_load.blend_strain(hr_strain_value, rpe_strain)
+
     rolling_strain = rolling_prior_strain(au_rows, stage, today=rolling_reference_date)
     strain, strain_is_rolling = display_strain(today_strain, rolling_strain)
     strain = apply_step_modifier(strain, bio_rows, today=rolling_reference_date)
+    if strain_is_rolling:
+        # A rolling stand-in isn't attributable to either source — it's the
+        # trailing average shown on days with no session at all.
+        strain_source = _hr_load.SOURCE_NONE
 
     return {
         "readiness_score": readiness_score,
@@ -176,6 +203,11 @@ def compute_daily_metrics_snapshot(
         "sleep_score": sleep_score,
         "strain": strain,
         "strain_is_rolling": strain_is_rolling,
+        "strain_source": strain_source,
+        "strain_source_label": _hr_load.SOURCE_LABELS.get(strain_source, ""),
+        "strain_rpe_only": rpe_strain,
+        "strain_hr_only": hr_strain_value,
+        "hr_detail": hr_row,
     }
 
 

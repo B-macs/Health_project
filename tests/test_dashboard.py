@@ -5,6 +5,7 @@ import ast
 from datetime import date
 
 from services import dashboard
+from services import hr_load
 
 
 def test_no_streamlit_import():
@@ -202,13 +203,65 @@ def test_sleep_meta_no_baseline_window_uses_target_copy():
 
 # ─── compute_daily_metrics_snapshot ─────────────────────────────────────────
 
-def test_snapshot_returns_all_five_keys_with_minimal_data():
+def test_snapshot_returns_all_keys_with_minimal_data():
     snap = dashboard.compute_daily_metrics_snapshot(
         date(2026, 7, 20), bio_rows=[], au_rows=[], stage=1,
     )
     assert set(snap) == {
         "readiness_score", "sleep_pct", "sleep_score", "strain", "strain_is_rolling",
+        # Added with heart-rate-derived strain — strain_source makes an RPE
+        # fallback visible instead of silent (services.hr_load.SOURCE_*).
+        "strain_source", "strain_source_label", "strain_rpe_only",
+        "strain_hr_only", "hr_detail",
     }
+
+
+def test_snapshot_strain_falls_back_to_rpe_without_hr_rows():
+    """The backup path: no Garmin activity for the day means the strain value
+    must be exactly what it was before HR load existed, and must SAY so."""
+    au = [{"date": "2026-07-20", "total_au": 360.0}]
+    baseline = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au, stage=2, hr_rows=None,
+    )
+    assert baseline["strain"] == dashboard.au_to_strain_or_none(360.0, 2)
+    assert baseline["strain_source"] == hr_load.SOURCE_RPE
+    assert "RPE only" in baseline["strain_source_label"]
+
+
+def test_snapshot_strain_uses_hr_when_the_day_matched_an_activity():
+    au = [{"date": "2026-07-20", "total_au": 360.0}]
+    hr = [{"date": "2026-07-20", "hr_strain": 19.0}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au, stage=2, hr_rows=hr,
+    )
+    rpe_only = dashboard.au_to_strain_or_none(360.0, 2)
+    assert snap["strain_source"] == hr_load.SOURCE_BLENDED
+    assert snap["strain_hr_only"] == 19.0
+    assert snap["strain_rpe_only"] == rpe_only
+    # Weighted toward HR, so it sits above the RPE-only figure.
+    assert rpe_only < snap["strain"] <= 19.0
+
+
+def test_snapshot_hr_row_for_a_different_date_is_ignored():
+    au = [{"date": "2026-07-20", "total_au": 360.0}]
+    hr = [{"date": "2026-07-19", "hr_strain": 19.0}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au, stage=2, hr_rows=hr,
+    )
+    assert snap["strain_source"] == hr_load.SOURCE_RPE
+    assert snap["strain_hr_only"] is None
+
+
+def test_snapshot_rolling_strain_day_reports_no_source():
+    """A day with no session shows the trailing-average stand-in, which isn't
+    attributable to either method."""
+    au = [{"date": "2026-07-18", "total_au": 300.0}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au, stage=2,
+        rolling_reference_date=date(2026, 7, 20),
+    )
+    assert snap["strain_is_rolling"] is True
+    assert snap["strain_source"] == hr_load.SOURCE_NONE
 
 
 def test_snapshot_no_data_everything_none():

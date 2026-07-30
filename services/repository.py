@@ -30,6 +30,8 @@ from datetime import date, datetime, timedelta
 from services import biometrics
 from services import content_weighting
 from services import dashboard
+from services import hr_load
+from services import hr_matching
 from services import models
 from services import sessions as training_sessions
 from services.clients import garmin
@@ -54,6 +56,18 @@ _GARMIN_DAILY_HEADER = [
 _GARMIN_ACTIVITY_HEADER = [
     "activity_id", "date", "name", "type", "start_time_local",
     "duration_minutes", "distance_km", "avg_hr", "max_hr", "calories",
+]
+
+# ─── Session HR — one row per training session that matched a Garmin
+#     activity, holding its Edwards'-TRIMP load and the strain derived from
+#     it (services/hr_load.py). Persisted rather than recomputed live because
+#     deriving it costs several calls to Garmin's unofficial API; a date with
+#     no row here simply falls back to RPE-only strain. ────────────────────
+_SESSION_HR_HEADER = [
+    "date", "activity_id", "activity_name", "activity_type", "start_time_local",
+    "duration_minutes", "overlap_minutes", "avg_hr", "max_hr", "hr_max_used",
+    "edwards_load", "hr_strain", "banister_trimp", "total_minutes",
+    "zone_source", "zone_minutes_json", "per_exercise_json",
 ]
 
 # ─── Oura — the 7 "daily summary score" endpoints merged into one row per
@@ -1501,6 +1515,247 @@ class Repository:
             sheets.GARMIN_ACTIVITIES_WORKSHEET, _GARMIN_ACTIVITY_HEADER,
         )
 
+    def _session_hr_ws(self):
+        return sheets.get_or_create_worksheet(
+            self._sc, self.config.google_sheets_id,
+            sheets.SESSION_HR_WORKSHEET, _SESSION_HR_HEADER,
+        )
+
+    # ── Heart-rate load (Edwards' TRIMP) ─────────────────────────────────
+
+    def garmin_activity_hr_samples(self, activity_id) -> list[tuple[float, float]]:
+        """(epoch_seconds, bpm) samples for one activity.
+
+        Garmin returns detail metrics as parallel arrays plus a
+        `metricDescriptors` list naming each column, so the HR and timestamp
+        column INDEXES have to be looked up by key rather than assumed —
+        they move between activity types and firmware versions. Anything
+        unrecognised yields [] and the caller falls back to Garmin's own
+        zone summary.
+        """
+        client = self._gc
+        if client is None:
+            return []
+        detail = garmin.get_activity_details(client, activity_id)
+        descriptors = detail.get("metricDescriptors") or []
+        metrics = detail.get("activityDetailMetrics") or []
+        if not descriptors or not metrics:
+            return []
+
+        idx_hr = idx_ts = None
+        for d in descriptors:
+            key = (d.get("key") or "").lower()
+            if key == "directheartrate":
+                idx_hr = d.get("metricsIndex")
+            elif key in ("directtimestamp", "sumelapsedduration"):
+                # directTimestamp is epoch milliseconds; sumElapsedDuration is
+                # seconds from activity start — either anchors the series.
+                if idx_ts is None or key == "directtimestamp":
+                    idx_ts, ts_key = d.get("metricsIndex"), key
+        if idx_hr is None or idx_ts is None:
+            return []
+        ts_is_epoch_ms = any(
+            (d.get("key") or "").lower() == "directtimestamp"
+            and d.get("metricsIndex") == idx_ts for d in descriptors
+        )
+        start_epoch = 0.0
+        if not ts_is_epoch_ms:
+            start_dt = hr_matching._to_dt(detail.get("summaryDTO", {}).get("startTimeLocal"))
+            start_epoch = start_dt.timestamp() if start_dt else 0.0
+
+        out: list[tuple[float, float]] = []
+        for row in metrics:
+            vals = row.get("metrics") or []
+            if idx_hr >= len(vals) or idx_ts >= len(vals):
+                continue
+            hr, ts = vals[idx_hr], vals[idx_ts]
+            if hr is None or ts is None:
+                continue
+            try:
+                epoch = float(ts) / 1000.0 if ts_is_epoch_ms else start_epoch + float(ts)
+                out.append((epoch, float(hr)))
+            except (TypeError, ValueError):
+                continue
+        return out
+
+    def get_observed_hr_max(self, days: int = 365, today: date | None = None) -> float | None:
+        """Highest plausible heart rate seen across synced Garmin data —
+        the HRmax that every Edwards' zone boundary is computed against.
+
+        Reads the already-synced Sheet tabs rather than calling Garmin, so
+        this is cheap enough to call on any render. Draws on both per-activity
+        max HR (where a real maximal effort actually shows up) and the daily
+        summary max. See services.hr_load.estimate_hr_max for why observed-max
+        is used instead of an age formula.
+        """
+        today = today or date.today()
+        cutoff = (today - timedelta(days=days)).isoformat()
+        observed: list[float | None] = []
+        for ws_getter, date_key in (
+            (self._garmin_activities_ws, "date"),
+            (self._garmin_daily_ws, "date"),
+        ):
+            try:
+                for row in ws_getter().get_all_records():
+                    if str(row.get(date_key, ""))[:10] >= cutoff:
+                        observed.append(_sheet_float(row.get("max_hr")))
+            except Exception:
+                continue
+        return hr_load.estimate_hr_max(observed)
+
+    def compute_session_hr(
+        self, session_date: date | str, set_records_by_exercise: dict,
+        duration_minutes: float = 0.0, hr_max: float | None = None,
+        hr_rest: float | None = None, activity_limit: int = 20,
+    ) -> dict | None:
+        """Match a logged session to a Garmin activity and derive its
+        heart-rate load. None when nothing matched — the caller then falls
+        back to RPE-only strain, exactly as before this existed.
+
+        `set_records_by_exercise`: {exercise_idx: [set records]} straight from
+        the Sets JSON — the per-set "ts" timestamps are what make time-window
+        matching (and per-exercise attribution) possible at all, so sessions
+        logged before per-set capture existed correctly return None here.
+        """
+        if self._gc is None:
+            return None
+        all_sets = [r for rows in (set_records_by_exercise or {}).values() for r in rows]
+        window = hr_matching.session_window(
+            all_sets, duration_minutes=duration_minutes)
+        if window is None:
+            return None
+
+        day = str(session_date)[:10]
+        candidates = [
+            self._garmin_activity_row(a)
+            for a in garmin.get_recent_activities(self._gc, limit=activity_limit)
+        ]
+        candidates = [c for c in candidates if c.get("date") == day]
+        activity, overlap = hr_matching.match_activity(candidates, window)
+        if activity is None:
+            return None
+
+        if hr_max is None:
+            hr_max = self.get_observed_hr_max()
+        if hr_max is None:
+            return None
+
+        activity_id = activity.get("activity_id")
+        samples = self.garmin_activity_hr_samples(activity_id)
+        if samples:
+            zones = hr_load.seconds_in_zone_from_samples(samples, hr_max)
+            zone_source = "samples"
+        else:
+            zones = hr_load.seconds_in_zone_from_garmin_zones(
+                garmin.get_activity_hr_zones(self._gc, activity_id))
+            zone_source = "garmin_zones"
+        if not zones:
+            return None
+
+        summary = hr_load.session_hr_summary(
+            zones,
+            avg_hr=_sheet_float(activity.get("avg_hr")),
+            max_hr=_sheet_float(activity.get("max_hr")),
+            hr_rest=hr_rest, hr_max=hr_max,
+            duration_minutes=float(activity.get("duration_minutes") or 0),
+        )
+
+        # Per-exercise attribution — only possible from a real sample series.
+        per_exercise: dict[str, dict] = {}
+        if samples:
+            for block in hr_matching.exercise_blocks(set_records_by_exercise):
+                blk = hr_matching.samples_for_block(samples, block["start"], block["end"])
+                if not blk:
+                    continue
+                blk_zones = hr_load.seconds_in_zone_from_samples(blk, hr_max)
+                hrs = [hr for _, hr in blk]
+                per_exercise[str(block["exercise_idx"])] = {
+                    "edwards_load": hr_load.edwards_load(blk_zones),
+                    "avg_hr": round(sum(hrs) / len(hrs), 1),
+                    "max_hr": max(hrs),
+                    "minutes": round(sum(blk_zones.values()) / 60.0, 1),
+                }
+
+        summary.update({
+            "date": day,
+            "activity_id": activity_id,
+            "activity_name": activity.get("name", ""),
+            "activity_type": activity.get("type", ""),
+            "start_time_local": activity.get("start_time_local", ""),
+            "duration_minutes": activity.get("duration_minutes"),
+            "overlap_minutes": round(overlap / 60.0, 1),
+            "zone_source": zone_source,
+            "per_exercise": per_exercise,
+        })
+        return summary
+
+    def save_session_hr(self, summary: dict) -> None:
+        """Persist one session's HR load to the Session HR tab, keyed by date
+        (idempotent — re-running a day overwrites rather than duplicating)."""
+        row = {
+            **summary,
+            "zone_minutes_json": json.dumps(summary.get("zone_minutes") or {}),
+            "per_exercise_json": json.dumps(summary.get("per_exercise") or {}),
+        }
+        values = [row.get(k, "") if row.get(k) is not None else "" for k in _SESSION_HR_HEADER]
+        sheets.upsert_row_by_key(
+            self._session_hr_ws(), key_col=1, key_value=row["date"], row_values=values)
+
+    def get_session_hr_history(self, start: str | None = None) -> list[dict]:
+        """Persisted per-session HR load, oldest first. `start` is an
+        inclusive ISO date filter."""
+        try:
+            records = self._session_hr_ws().get_all_records()
+        except Exception:
+            return []
+        out = []
+        for r in records:
+            d = str(r.get("date", ""))[:10]
+            if not d or (start and d < start):
+                continue
+            out.append({
+                "date": d,
+                "edwards_load": _sheet_float(r.get("edwards_load")),
+                "hr_strain": _sheet_float(r.get("hr_strain")),
+                "banister_trimp": _sheet_float(r.get("banister_trimp")),
+                "avg_hr": _sheet_float(r.get("avg_hr")),
+                "max_hr": _sheet_float(r.get("max_hr")),
+                "hr_max_used": _sheet_float(r.get("hr_max_used")),
+                "activity_name": r.get("activity_name", ""),
+                "activity_type": r.get("activity_type", ""),
+                "zone_source": r.get("zone_source", ""),
+                "overlap_minutes": _sheet_float(r.get("overlap_minutes")),
+                "zone_minutes": _json_or(r.get("zone_minutes_json"), {}),
+                "per_exercise": _json_or(r.get("per_exercise_json"), {}),
+            })
+        return sorted(out, key=lambda r: r["date"])
+
+    def sync_session_hr_for_date(self, d: date, hr_rest: float | None = None) -> bool:
+        """Compute + persist HR load for the session logged on `d`. False when
+        there's no session, no timestamps, or no matching Garmin activity —
+        all ordinary "fall back to RPE" outcomes, not errors."""
+        # Narrow window deliberately: this runs on page open, and
+        # get_recent_sessions is a full Notion query per call.
+        lookback = max(2, (date.today() - d).days + 2)
+        sessions_on_day = [
+            s for s in self.get_recent_sessions(days=lookback) if s.session_date == str(d)
+        ]
+        if not sessions_on_day:
+            return False
+        session = sessions_on_day[0]
+        by_exercise = {
+            i: (ex.sets or []) for i, ex in enumerate(session.exercises)
+        }
+        summary = self.compute_session_hr(
+            d, by_exercise,
+            duration_minutes=float(session.duration_minutes or 0),
+            hr_rest=hr_rest,
+        )
+        if not summary:
+            return False
+        self.save_session_hr(summary)
+        return True
+
     def _garmin_daily_row(self, client, d: date) -> dict:
         """Field names here are Garmin's well-known (but unofficial, and
         occasionally-shifting) daily-summary/sleep/stress JSON shape. Every
@@ -2074,6 +2329,17 @@ def _sheet_date(val) -> str | None:
         return str(val).split(" ")[0].strip() or None
     except Exception:
         return None
+
+
+def _json_or(raw, default):
+    """Parse a JSON cell, falling back to `default` on empty/corrupt values —
+    a mangled zone breakdown must degrade to "no detail", never break a read."""
+    if not raw:
+        return default
+    try:
+        return json.loads(raw)
+    except (TypeError, ValueError):
+        return default
 
 
 def _sheet_float(val) -> float | None:

@@ -85,6 +85,29 @@ def compute_session_au(rpe: int, duration_minutes: int) -> float:
 STAGE_CLF: dict[int, float] = {1: 0.04, 2: 0.40, 3: 1.0}
 
 
+# Load at which the 0-21 curve below saturates at 21.0.
+STRAIN_CURVE_ANCHOR: float = 601.0
+
+
+def load_to_strain(effective_load: float) -> float:
+    """The shared 0-21 log curve, taking a load that is ALREADY in
+    physiological-effort units (i.e. any source-specific scaling has been
+    applied by the caller).
+
+    Split out of au_to_strain so heart-rate-derived load
+    (services.hr_load.hr_strain) lands on the identical curve rather than a
+    parallel one — the two sources have to stay directly comparable, since
+    strain silently falls back from HR to RPE whenever a session has no
+    matched Garmin activity, and a curve mismatch would show up as an
+    unexplained jump in the number on exactly those days.
+    """
+    if effective_load <= 0:
+        return 0.0
+    return round(
+        min(21.0, math.log(effective_load + 1) / math.log(STRAIN_CURVE_ANCHOR) * 21.0), 1
+    )
+
+
 def au_to_strain(raw_au: float, stage: int = 1) -> float:
     """
     Convert Foster AU to a 0-21 strain score with stage-specific CLF scaling.
@@ -92,11 +115,7 @@ def au_to_strain(raw_au: float, stage: int = 1) -> float:
     The database always stores raw Foster AU (RPE × duration) so historical
     comparisons stay valid. CLF is applied at display/computation time only.
     """
-    clf          = STAGE_CLF.get(stage, 1.0)
-    effective_au = raw_au * clf
-    if effective_au <= 0:
-        return 0.0
-    return round(min(21.0, math.log(effective_au + 1) / math.log(601.0) * 21.0), 1)
+    return load_to_strain(raw_au * STAGE_CLF.get(stage, 1.0))
 
 
 def step_strain_modifier(
