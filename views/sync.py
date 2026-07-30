@@ -17,12 +17,12 @@ _VOXPLOT_APP = _VOXPLOT_ROOT / "app.py"
 _VOXPLOT_MODULE_NAME = "_health_embedded_voxplot"
 _VOXPLOT_REPO_URL = "https://github.com/B-macs/health-voice-training.git"
 
-# Health's secrets.toml namespaces every integration (voxplot_supabase,
-# google_service_account, ...) to avoid collisions -- Voxplot's own
-# storage/backend.py looks for a plain "supabase" section by default, so
-# this tells it to look under Health's name instead. Must be set before
-# module.render() below makes its first storage call, since
-# get_supabase_client() memoizes its result for the process's lifetime.
+# Voxplot's own app.py already defaults this to "voxplot_supabase" (see
+# storage/supabase.py's SECRETS_KEY), matching Health's secrets.toml
+# section below -- set explicitly anyway so this integration point doesn't
+# silently depend on Voxplot's current default staying what it is today.
+# Must be set before module.render() below makes its first storage call,
+# since app.py's _record_store() reads it on first use only.
 os.environ.setdefault("VOXPLOT_SUPABASE_SECRETS_KEY", "voxplot_supabase")
 
 
