@@ -204,6 +204,27 @@ def build_set_record(ex: dict, set_num: int, actual: dict | None,
     return record
 
 
+def upsert_set_record(rows: list[dict], record: dict) -> list[dict]:
+    """Add `record` to `rows`, replacing any existing entry with the same
+    set_num instead of appending a second one. Mutates and returns `rows`.
+
+    This is what makes the guided flow's "← Back" safe: backing out of an
+    accidental completion and redoing that set has to overwrite what was
+    logged the first time. Since the whole per-exercise list is written to
+    the Notion Sets JSON in one shot at session end, an overwrite here is
+    the only thing needed for the corrected value to reach everything
+    derived from that JSON -- weekly tonnage (services.volume) and the
+    content-weighted Session AU behind strain/ACWR both recompute from it
+    rather than storing their own copy.
+    """
+    for i, existing in enumerate(rows):
+        if existing.get("set_num") == record.get("set_num"):
+            rows[i] = record
+            return rows
+    rows.append(record)
+    return rows
+
+
 def make_sets_data(ex: dict) -> list[dict]:
     """Synthesized fallback: the prescription replicated `sets` times, used
     only for exercises the guided flow captured no real sets for (a session

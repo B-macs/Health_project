@@ -253,6 +253,46 @@ def test_build_set_record_shape_matches_make_sets_data():
     assert set(synthesized) - set(captured) == set()
 
 
+# ─── upsert_set_record ("← Back" then redo must not duplicate) ─────────────
+
+def test_upsert_set_record_appends_new_set_numbers():
+    rows = []
+    for n in (1, 2, 3):
+        sessions.upsert_set_record(rows, {"set_num": n, "reps": 10, "weight": 12.5})
+    assert [r["set_num"] for r in rows] == [1, 2, 3]
+
+
+def test_upsert_set_record_replaces_same_set_number_in_place():
+    # The "← Back", fix it, re-complete flow: set 2 is redone at 8 reps.
+    rows = [
+        {"set_num": 1, "reps": 10, "weight": 12.5},
+        {"set_num": 2, "reps": 10, "weight": 12.5},
+        {"set_num": 3, "reps": 10, "weight": 12.5},
+    ]
+    sessions.upsert_set_record(rows, {"set_num": 2, "reps": 8, "weight": 12.5})
+    assert len(rows) == 3                       # no duplicate record
+    assert [r["set_num"] for r in rows] == [1, 2, 3]   # order preserved
+    assert rows[1]["reps"] == 8                 # overwritten, not appended
+
+
+def test_upsert_set_record_repeated_redo_still_yields_one_record():
+    rows = [{"set_num": 1, "reps": 10, "weight": 12.5}]
+    for reps in (9, 8, 7):
+        sessions.upsert_set_record(rows, {"set_num": 1, "reps": reps, "weight": 12.5})
+    assert len(rows) == 1
+    assert rows[0]["reps"] == 7
+
+
+def test_upsert_set_record_overwrite_changes_derived_tonnage():
+    # The propagation guarantee: tonnage is recomputed from these rows, never
+    # stored alongside them, so a corrected set is reflected automatically.
+    tonnage = lambda rs: sum(r["reps"] * r["weight"] for r in rs)
+    rows = [{"set_num": n, "reps": 10, "weight": 12.5} for n in (1, 2, 3)]
+    assert tonnage(rows) == 375.0
+    sessions.upsert_set_record(rows, {"set_num": 3, "reps": 6, "weight": 12.5})
+    assert tonnage(rows) == 325.0
+
+
 # ─── reps/weight/band-tier steppers ────────────────────────────────────────
 
 def test_step_reps_increments_and_decrements():

@@ -33,6 +33,120 @@ from services.repository import PhasesCorruptError
 #  JavaScript Timer Components — all use localStorage to persist across navigation
 # ─────────────────────────────────────────────────────────────────────────────
 
+# Shared audio block, injected verbatim into every timer iframe below (each
+# components.html call is its own document, so this can't be loaded once and
+# reused — but keeping one copy here stops the hold/rest timers' beep code
+# from drifting apart, which it previously had).
+#
+# NOTE: written with SINGLE braces. Every timer's HTML is an f-string, so it
+# interpolates this in as {_AUDIO_JS}; the contents are inserted literally
+# and must not be brace-escaped.
+_AUDIO_JS = """
+// Shared output bus: one compressor for every tone this iframe plays. Lifts
+// perceived loudness (gym noise, headphones) well past what raising raw gain
+// alone can do before the peaks clip.
+function _bus(ctx) {
+  if (!ctx._tpBus) {
+    var comp = ctx.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-18, ctx.currentTime);
+    comp.knee.setValueAtTime(12, ctx.currentTime);
+    comp.ratio.setValueAtTime(6, ctx.currentTime);
+    comp.attack.setValueAtTime(0.002, ctx.currentTime);
+    comp.release.setValueAtTime(0.20, ctx.currentTime);
+    var master = ctx.createGain();
+    master.gain.setValueAtTime(0.9, ctx.currentTime);
+    comp.connect(master); master.connect(ctx.destination);
+    ctx._tpBus = comp;
+  }
+  return ctx._tpBus;
+}
+
+function _ctx() {
+  return window.parent._audioCtx ||
+    (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
+}
+
+// A long-idle session can leave the shared context 'suspended'. resume() is
+// async -- scheduling before it resolves silently drops the sound on some
+// mobile browsers, so wait for it rather than firing in the same tick.
+function _audio(fn) {
+  try {
+    var ctx = _ctx();
+    if (ctx.state === 'suspended') { ctx.resume().then(function(){ fn(ctx); }).catch(function(){ fn(ctx); }); }
+    else { fn(ctx); }
+  } catch(e) {}
+}
+
+// Plain tone -- the 3-2-1 countdown ticks. Deliberately thin and short so it
+// stays distinct from the bell that ends the timer.
+function _beep(freq, dur, vol) {
+  _audio(function(ctx) {
+    try {
+      var o = ctx.createOscillator(), g = ctx.createGain();
+      o.connect(g); g.connect(_bus(ctx));
+      o.type = 'sine'; o.frequency.value = freq;
+      g.gain.setValueAtTime(vol || 0.35, ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
+      o.start(ctx.currentTime); o.stop(ctx.currentTime + dur);
+    } catch(e) {}
+  });
+}
+function _tickBeep() { _beep(880, 0.12, 0.35); }
+
+// One struck-bell hit: a stack of partials, each with its own decay, under a
+// 2ms attack. The partial ratios are mildly inharmonic (2.76, 5.4 -- the
+// classic struck-metal ones) which is what reads as "bell" rather than
+// "electronic blip"; higher partials decay fastest, giving the bright strike
+// followed by a ringing fundamental.
+function _bellStrike(root, atOffset, vol, dur) {
+  _audio(function(ctx) {
+    try {
+      var t0 = ctx.currentTime + (atOffset || 0);
+      var partials = [
+        {r: 1.00, g: 1.00, d: 1.00},
+        {r: 2.00, g: 0.55, d: 0.62},
+        {r: 2.76, g: 0.38, d: 0.42},
+        {r: 4.07, g: 0.22, d: 0.28},
+        {r: 5.40, g: 0.14, d: 0.18}
+      ];
+      for (var i = 0; i < partials.length; i++) {
+        var p = partials[i];
+        var o = ctx.createOscillator(), g = ctx.createGain();
+        o.connect(g); g.connect(_bus(ctx));
+        o.type = 'sine';
+        o.frequency.setValueAtTime(root * p.r, t0);
+        var peak = (vol || 0.9) * p.g;
+        var len  = dur * p.d;
+        g.gain.setValueAtTime(0.0001, t0);
+        g.gain.linearRampToValueAtTime(peak, t0 + 0.002);   // hard strike
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + len);
+        o.start(t0); o.stop(t0 + len + 0.02);
+      }
+    } catch(e) {}
+  });
+}
+
+// The finish signal: two crisp ascending strikes, race-start style. Scheduled
+// on the audio clock (not setTimeout) so the interval between them is exact.
+function _bellDouble() {
+  _bellStrike(784.0, 0.00, 0.95, 1.5);   // G5
+  _bellStrike(1174.7, 0.16, 1.00, 1.9);  // D6 -- a fifth up, longer ring-out
+}
+
+function _notify(title, body) {
+  // Best-effort only -- fires while the tab is hidden (switched away, not
+  // necessarily fully backgrounded/screen-locked; see _audio_unlock_component's
+  // docstring for why a locked phone screen typically won't get this at all).
+  try {
+    if (window.parent.document.hidden && window.parent.Notification
+        && window.parent.Notification.permission === 'granted') {
+      new window.parent.Notification(title, {body: body});
+    }
+  } catch(e) {}
+}
+"""
+
+
 def _audio_unlock_component() -> None:
     """Invisible, mounted once near the top of every render() call. Attaches a
     one-time click/touch listener on the PARENT page (window.parent.document,
@@ -128,47 +242,9 @@ var _TKEY = "{timer_key}";
 // Each timer renders in its own iframe, so this is declared per-timer rather
 // than shared — see the restore block below for what it guards against.
 var _STALE_GRACE_MS = 5 * 60 * 1000;
-
-function _beep(freq, dur, vol) {{
-  try {{
-    var ctx = window.parent._audioCtx ||
-      (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
-    var play = function() {{
-      try {{
-        var o = ctx.createOscillator(), g = ctx.createGain();
-        o.connect(g); g.connect(ctx.destination);
-        o.type = 'sine'; o.frequency.value = freq;
-        g.gain.setValueAtTime(vol || 0.35, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-        o.start(ctx.currentTime); o.stop(ctx.currentTime + dur);
-      }} catch(e) {{}}
-    }};
-    // A long-idle session (e.g. minutes between hold timers on a slow-paced
-    // day) can leave the shared context 'suspended' by the browser. resume()
-    // is async -- scheduling the oscillator before it actually resolves can
-    // silently drop the beep on some mobile browsers, so wait for it rather
-    // than firing resume() and playing in the same tick (the previous bug:
-    // sound would work early in a session and go silent later once the
-    // context got suspended mid-session).
-    if (ctx.state === 'suspended') {{ ctx.resume().then(play).catch(play); }}
-    else {{ play(); }}
-  }} catch(e) {{}}
-}}
-function _tickBeep() {{ _beep(880, 0.12, 0.35); }}
-function _notify(title, body) {{
-  // Best-effort only -- fires while the tab is hidden (switched away, not
-  // necessarily fully backgrounded/screen-locked, see _audio_unlock_component's
-  // docstring for why a locked phone screen typically won't get this at all.
-  try {{
-    if (window.parent.document.hidden && window.parent.Notification
-        && window.parent.Notification.permission === 'granted') {{
-      new window.parent.Notification(title, {{body: body}});
-    }}
-  }} catch(e) {{}}
-}}
+{_AUDIO_JS}
 function _doneBeep() {{
-  _beep(660, 0.18, 0.5);
-  setTimeout(function() {{ _beep(880, 0.28, 0.65); }}, 220);
+  _bellDouble();
   _notify('Hold complete', 'Time for the next set.');
 }}
 
@@ -315,40 +391,9 @@ var _riv;
 var _TKEY   = "{timer_key}";
 var _beeped = {{}};
 
-function _beep(freq, dur, vol) {{
-  try {{
-    var ctx = window.parent._audioCtx ||
-      (window.parent._audioCtx = new (window.parent.AudioContext || window.parent.webkitAudioContext)());
-    var play = function() {{
-      try {{
-        var o = ctx.createOscillator(), g = ctx.createGain();
-        o.connect(g); g.connect(ctx.destination);
-        o.type = 'sine'; o.frequency.value = freq;
-        g.gain.setValueAtTime(vol || 0.35, ctx.currentTime);
-        g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-        o.start(ctx.currentTime); o.stop(ctx.currentTime + dur);
-      }} catch(e) {{}}
-    }};
-    // See _hold_timer's identical comment: wait for resume() to actually
-    // resolve rather than firing it and playing in the same tick, or the
-    // beep can be silently dropped once the shared context gets suspended
-    // mid-session.
-    if (ctx.state === 'suspended') {{ ctx.resume().then(play).catch(play); }}
-    else {{ play(); }}
-  }} catch(e) {{}}
-}}
-function _tickBeep() {{ _beep(880, 0.12, 0.35); }}
-function _notify(title, body) {{
-  try {{
-    if (window.parent.document.hidden && window.parent.Notification
-        && window.parent.Notification.permission === 'granted') {{
-      new window.parent.Notification(title, {{body: body}});
-    }}
-  }} catch(e) {{}}
-}}
+{_AUDIO_JS}
 function _goBeep()  {{
-  _beep(660, 0.18, 0.5);
-  setTimeout(function() {{ _beep(880, 0.28, 0.65); }}, 220);
+  _bellDouble();
   _notify('Rest complete', 'Time for the next set.');
 }}
 
@@ -562,6 +607,7 @@ def _init_state(day_num: int | None = None):
         "tp_garmin_activity_detail": {}, # {exercise_idx: {avg_hr, max_hr, distance_km, calories}}
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
         "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
+        "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
     for k, v in defaults.items():
@@ -689,23 +735,76 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         r.save_session_notes(last_id, notes)
 
 
-def _record_completed_set(idx: int, ex: dict) -> None:
-    """Append one real set record for exercise `idx`, captured from its live
-    stepper values at the moment its completion button was tapped.
+def _record_completed_set(idx: int, ex: dict, set_num: int) -> None:
+    """Record one real set for exercise `idx`, captured from its live stepper
+    values at the moment its completion button was tapped.
 
-    Called from every set-completion branch of the guided flow. set_num is
-    derived from how many sets have already been recorded rather than from
-    st.session_state.tp_set, so it stays correct regardless of how the
-    caller happens to be mutating tp_set around the call.
+    Called from every set-completion branch of the guided flow. UPSERTS on
+    set_num rather than appending: after "← Back", re-completing the same set
+    must overwrite what was logged the first time, not add a second record
+    for it. Since the whole tp_set_log is written to Notion in one shot at
+    session end (see _auto_log_session), an overwrite here is the only thing
+    needed for the corrected value to reach the Sets JSON -- and from there
+    both weekly tonnage and the content-weighted Session AU that feeds
+    strain/ACWR, since Repository derives both from that same JSON rather
+    than storing them separately.
 
     Replaces the synthesized-at-save-time sets that services.sessions.
     make_sets_data() used to produce for these exercises -- see
     build_set_record's docstring."""
-    log = st.session_state.tp_set_log.setdefault(idx, [])
-    log.append(sess.build_set_record(
-        ex, len(log) + 1, st.session_state.tp_actuals.get(idx),
-        datetime.now().isoformat(timespec="seconds"),
-    ))
+    sess.upsert_set_record(
+        st.session_state.tp_set_log.setdefault(idx, []),
+        sess.build_set_record(
+            ex, set_num, st.session_state.tp_actuals.get(idx),
+            datetime.now().isoformat(timespec="seconds"),
+        ),
+    )
+
+
+# The guided flow's position — everything "← Back" has to put back.
+_NAV_SNAPSHOT_FIELDS = ("tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_side")
+_NAV_STACK_MAX = 30
+
+
+def _push_nav_state() -> None:
+    """Snapshot the flow's position (and the sets captured so far) before a
+    forward transition, so "← Back" can restore it exactly.
+
+    Snapshot rather than deriving each transition's inverse: the flow
+    branches on exercise type, laterality, rep-in-set and set-vs-total, so
+    "the previous state" is genuinely different in eight or so places and an
+    inverse would have to be kept in sync with every one of them.
+
+    tp_set_log is copied alongside, so undoing a set completion also
+    un-records that set. A redo would overwrite it by set_num anyway, but
+    backing out and then skipping the exercise (or ending the session) would
+    otherwise leave a phantom set behind. The copy is two levels deep — the
+    per-exercise lists are rebuilt, and the set records inside them are only
+    ever replaced wholesale by _record_completed_set, never mutated in place.
+
+    Deliberately NOT added to sess.CHECKPOINT_FIELDS: that checkpoint is
+    written to a Notion Config value on every single transition, and a deep
+    history of set logs would bloat it badly for something only needed
+    within a live connection. Back is therefore unavailable after a
+    reconnect — the stack starts empty again.
+    """
+    snap = {k: st.session_state[k] for k in _NAV_SNAPSHOT_FIELDS}
+    snap["tp_set_log"] = {i: list(rows) for i, rows in st.session_state.tp_set_log.items()}
+    stack = st.session_state.tp_nav_stack
+    stack.append(snap)
+    del stack[:-_NAV_STACK_MAX]
+
+
+def _pop_nav_state() -> bool:
+    """Restore the most recent snapshot. False if there's nothing to undo."""
+    stack = st.session_state.tp_nav_stack
+    if not stack:
+        return False
+    snap = stack.pop()
+    for k in _NAV_SNAPSHOT_FIELDS:
+        st.session_state[k] = snap[k]
+    st.session_state.tp_set_log = snap["tp_set_log"]
+    return True
 
 
 def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
@@ -2481,6 +2580,7 @@ def render():
                 _duration_timer(ex["duration_minutes"], timer_key=_dur_key)
             if st.button("✓ Activity Complete", type="primary", use_container_width=True):
                 _mark_start()
+                _push_nav_state()
                 if _is_garmin_activity:
                     r = repo.get_repository()
                     # Matches on the ACTIVITY'S OWN duration (± buffer) rather
@@ -2503,7 +2603,7 @@ def render():
                             f"No Garmin activity today lasting {_lo}-{_hi} min — "
                             f"logged with the planned duration."
                         )
-                _record_completed_set(_eidx, ex)
+                _record_completed_set(_eidx, ex, 1)
                 st.session_state.tp_ex_idx += 1
                 st.session_state.tp_set = 1
                 st.session_state.tp_rep_in_set = 1
@@ -2516,6 +2616,7 @@ def render():
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
+                    _push_nav_state()
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
                     _save_checkpoint(day_num)
@@ -2537,11 +2638,12 @@ def render():
                 _btn_label = "✓ Right Side Done" if (is_uni and _side == "right") else f"✓ Set {cur_set} Complete"
                 if st.button(_btn_label, type="primary", use_container_width=True):
                     _mark_start()
+                    _push_nav_state()
                     if is_uni and _side == "right":
                         st.session_state.tp_side = "left"
                     else:
                         # Both sides done (or bilateral) — the set is complete.
-                        _record_completed_set(_eidx, ex)
+                        _record_completed_set(_eidx, ex, cur_set)
                         st.session_state.tp_side = "right"
                         if cur_set >= total_sets:
                             st.session_state.tp_ex_idx += 1
@@ -2557,6 +2659,7 @@ def render():
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
+                    _push_nav_state()
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
                     _save_checkpoint(day_num)
@@ -2571,11 +2674,12 @@ def render():
                 _btn_label = "✓ Right Side Done" if (is_uni and _side == "right") else f"✓ Set {cur_set} Complete"
                 if st.button(_btn_label, type="primary", use_container_width=True):
                     _mark_start()
+                    _push_nav_state()
                     if is_uni and _side == "right":
                         st.session_state.tp_side = "left"
                     else:
                         # Both sides done (or bilateral) — the set is complete.
-                        _record_completed_set(_eidx, ex)
+                        _record_completed_set(_eidx, ex, cur_set)
                         st.session_state.tp_side = "right"
                         if cur_set >= total_sets:
                             st.session_state.tp_ex_idx += 1
@@ -2592,6 +2696,7 @@ def render():
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
+                    _push_nav_state()
                     st.session_state.tp_rep_in_set = 1
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
@@ -2609,13 +2714,14 @@ def render():
                             timer_key=_hold_key, set_auto_start=_set_auto_start)
                 if st.button(f"✓ Rep {cur_rep} Done", type="primary", use_container_width=True):
                     _mark_start()
+                    _push_nav_state()
                     if cur_rep >= reps_per_set:
                         if is_uni and _side == "right":
                             st.session_state.tp_side = "left"
                             st.session_state.tp_rep_in_set = 1
                         else:
                             # Final rep of the set, both sides done — set complete.
-                            _record_completed_set(_eidx, ex)
+                            _record_completed_set(_eidx, ex, cur_set)
                             st.session_state.tp_side = "right"
                             if cur_set >= total_sets:
                                 st.session_state.tp_ex_idx += 1
@@ -2630,6 +2736,22 @@ def render():
                         st.session_state.tp_rep_in_set += 1
                     _save_checkpoint(day_num)
                     st.rerun()
+
+        # ── Undo the last transition ──────────────────────────────────────────
+        # Covers both accidental-completion cases: a set marked done by
+        # mistake, and the rest timer running out and auto-advancing when it
+        # shouldn't have (that auto-advance goes through the same "→ Next Set"
+        # handler, so it pushes a snapshot like any other forward step).
+        # Re-completing a set after backing out overwrites its record rather
+        # than adding a duplicate — see _record_completed_set.
+        if st.session_state.tp_nav_stack:
+            if st.button("← Back", key="tp_back", use_container_width=True,
+                          help="Undo the last completion and return to the previous set. "
+                               "Re-logging that set replaces its values rather than "
+                               "adding a second record."):
+                _pop_nav_state()
+                _save_checkpoint(day_num)
+                st.rerun()
 
     # ── Clinical guidance section ─────────────────────────────────────────────
     st.divider()
@@ -2661,6 +2783,7 @@ def render():
     with st.expander("Skip this exercise", expanded=False):
         st.caption("Only skip if pain prevents performance. Log the reason in session notes.")
         if st.button("Skip — move to next exercise", use_container_width=True):
+            _push_nav_state()
             st.session_state.tp_ex_idx += 1
             st.session_state.tp_set = 1
             st.session_state.tp_rep_in_set = 1
