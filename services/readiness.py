@@ -14,15 +14,21 @@ HRV / RHR  : Average of whatever history exists, up to a 28-day cap, once at
              alone dictate the score. See 2026-07-14 fix.)
 Sleep      : Progressive — 7 → 14 → 28 → 56 nights as clean data accumulates.
              Outliers <4 h or >11 h are excluded from baseline computation.
+Sleep debt : Cumulative deficit over the trailing SLEEP_DEBT_WINDOW_DAYS (7)
+             nights against the same sleep_baseline, scored 100 at zero debt
+             down to 0 at SLEEP_DEBT_THRESHOLD_HOURS (9.5h) — distinct from
+             Sleep above, which only looks at last night; this catches a
+             multi-night deficit that's individually mild each night.
 
 Weights (normalised when individual metrics are missing)
 --------------------------------------------------------
-HRV                       25%   primary autonomic recovery marker (personal-baseline ratio)
-Sleep                     20%   vs personal progressive baseline
-RHR                       15%   supporting cardiovascular indicator (personal-baseline ratio)
-Recovery Index (Oura)     20%   Oura's own overnight-recovery contributor (0-100, pre-scored)
-Body Temperature (Oura)   15%   Oura's own temperature-deviation contributor (0-100, pre-scored)
-Previous Day Activity (Oura) 5% Oura's own training-load-spillover contributor (0-100, pre-scored)
+HRV                       22.5% primary autonomic recovery marker (personal-baseline ratio)
+Sleep                     18%   last night vs personal progressive baseline
+Sleep Debt                10%   trailing 7-night cumulative deficit vs the same baseline
+RHR                       13.5% supporting cardiovascular indicator (personal-baseline ratio)
+Recovery Index (Oura)     18%   Oura's own overnight-recovery contributor (0-100, pre-scored)
+Body Temperature (Oura)   13.5% Oura's own temperature-deviation contributor (0-100, pre-scored)
+Previous Day Activity (Oura) 4.5% Oura's own training-load-spillover contributor (0-100, pre-scored)
 
 2026-07-14: added the three Oura contributor sub-scores above. HRV/Sleep/RHR
 were re-weighted down (was 40/35/25) to make room rather than bolted on
@@ -33,6 +39,11 @@ computed here) these three are Oura-exclusive and already 0-100-scored by
 Oura itself — no baseline math needed, just clamped and used directly.
 Garmin has no equivalent, so they're simply absent (None) on any day Oura
 itself didn't compute them.
+
+2026-07-30: added Sleep Debt (see above). Same-night sleep duration alone
+missed a genuine multi-night deficit that was individually "not terrible"
+each night; every other weight scaled by 0.9 (proportional, preserving
+relative importance) to make room for the new 10%.
 
 Trend (compute_readiness_trend, 2026-07-14)
 --------------------------------------------
@@ -74,6 +85,13 @@ _TREND_ALPHA         = 0.5    # weight given to each new day's raw score in the 
 _TREND_LOOKBACK_DAYS = 14     # days walked forward to seed/accumulate the trend
 
 _ALCOHOL_PENALTY_PER_UNIT = 10.0   # points deducted per unit (-5 per 0.5 units)
+
+# Cumulative sleep deficit (against this module's own sleep_baseline) over the
+# trailing window — feeds both compute_readiness's sleep_debt component below
+# and services.scheduling's auto-shift trigger (same threshold, same meaning
+# in both places: this is the debt level considered clearly bad).
+SLEEP_DEBT_THRESHOLD_HOURS = 9.5
+SLEEP_DEBT_WINDOW_DAYS = 7
 
 
 # ─── Exported baseline helpers ────────────────────────────────────────────────
@@ -126,6 +144,45 @@ def rhr_baseline(rows: list[dict]) -> float | None:
         return None
     window = min(n, _HRV_RHR_WINDOW_CAP)
     return round(sum(vals[-window:]) / window, 2)
+
+
+def sleep_debt_hours(bio_rows: list[dict], for_date: date,
+                      window_days: int = SLEEP_DEBT_WINDOW_DAYS) -> float | None:
+    """Cumulative sleep deficit over the trailing `window_days` nights ending
+    on for_date (inclusive), against the personal nightly need computed by
+    this module's own sleep_baseline.
+
+    Only rows on or before for_date feed the baseline itself, mirroring
+    compute_readiness's own "historical views stay accurate" filtering — a
+    future row must never influence a past debt figure.
+
+    Returns None when no baseline can be computed (insufficient clean sleep
+    history) — deliberately NOT 0.0, which would be indistinguishable from
+    "we checked and there's genuinely no deficit." compute_readiness relies
+    on this distinction to correctly exclude the component (not silently
+    score it as a perfect night) when there isn't enough history yet.
+    Returns 0.0 when there's simply no deficit over the window.
+
+    Moved here from services/scheduling.py (which still uses this — see its
+    own should_shift_session) so services.readiness can also use it in
+    compute_readiness without a circular import (scheduling already imports
+    readiness for sleep_baseline)."""
+    date_str = for_date.isoformat()
+    rows_to_date = [r for r in bio_rows if r.get("date") and r["date"] <= date_str]
+    baseline, _window_used = sleep_baseline(rows_to_date)
+    if baseline is None:
+        return None
+
+    by_date = {r["date"]: r for r in rows_to_date if r.get("date")}
+    debt = 0.0
+    for delta in range(window_days):
+        d = for_date - timedelta(days=delta)
+        row = by_date.get(d.isoformat())
+        actual = row.get("sleep_duration_hours") if row else None
+        if actual is None:
+            continue
+        debt += max(0.0, baseline - float(actual))
+    return round(debt, 2)
 
 
 # ─── Main computation ─────────────────────────────────────────────────────────
@@ -196,6 +253,21 @@ def compute_readiness(
     else:
         sleep_s = None
 
+    # Cumulative sleep debt (trailing SLEEP_DEBT_WINDOW_DAYS nights) — distinct
+    # from sleep_s above, which only looks at LAST NIGHT. A short single night
+    # already dents sleep_s, but a multi-night deficit (e.g. a rough weekend
+    # that's individually "not terrible" each night) needs its own component
+    # to register at all. Scored 100 at zero debt, linearly down to 0 at
+    # SLEEP_DEBT_THRESHOLD_HOURS — the same threshold services.scheduling uses
+    # to decide a session should auto-shift, so "zeroes out this component"
+    # and "would trigger a reschedule" mean the same thing. None (excluded,
+    # not scored as a perfect night) when no baseline exists yet.
+    debt = sleep_debt_hours(rows_to_date, for_date)
+    sleep_debt_s = (
+        max(0.0, 100.0 * (1.0 - debt / SLEEP_DEBT_THRESHOLD_HOURS))
+        if debt is not None else None
+    )
+
     # Oura's own contributor sub-scores — already 0-100 against Oura's own
     # personal-norm model, so no baseline computation here, just clamp.
     def _clamped100(key):
@@ -207,9 +279,14 @@ def compute_readiness(
     prev_activity_s  = _clamped100("oura_previous_day_activity")
 
     # ── Weighted average (re-normalise when metrics are missing) ──────────────
+    # Rebalanced 2026-07-30 to make room for sleep_debt_s: every prior weight
+    # scaled by 0.9 (proportional, preserves relative importance), with the
+    # freed 10% going to sleep debt -- same tier as RHR/Body Temperature, a
+    # real vote without dominating the average.
     candidates = [
-        (hrv_s, 0.25), (sleep_s, 0.20), (rhr_s, 0.15),
-        (recovery_s, 0.20), (body_temp_s, 0.15), (prev_activity_s, 0.05),
+        (hrv_s, 0.225), (sleep_s, 0.18), (rhr_s, 0.135),
+        (recovery_s, 0.18), (body_temp_s, 0.135), (prev_activity_s, 0.045),
+        (sleep_debt_s, 0.10),
     ]
     available  = [(s, w) for s, w in candidates if s is not None]
 

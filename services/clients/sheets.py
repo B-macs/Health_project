@@ -27,6 +27,7 @@ OURA_SESSIONS_WORKSHEET = "Oura Sessions"
 OURA_REST_MODE_WORKSHEET = "Oura Rest Mode"
 BIOMETRIC_BLEND_WORKSHEET = "Biometric Blend"
 METRICS_HISTORY_WORKSHEET = "Metrics History"
+WAKE_TIME_ADJUSTMENTS_WORKSHEET = "Wake Time Adjustments"
 
 
 def make_client(config: Config):

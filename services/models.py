@@ -26,6 +26,12 @@ class Phase:
     # for that date. day_number 0 means forced rest (no training that date).
     # Empty for every phase except one carrying a one-off manual reschedule.
     date_overrides: dict[str, int] = field(default_factory=dict)
+    # {"YYYY-MM-DD": human-readable reason} — populated alongside a
+    # date_overrides entry whenever that date's shift was an automatic,
+    # readiness-triggered one (services.scheduling), so the UI can explain
+    # why a session moved. Absent (not just empty-string) for manual
+    # reschedules and for every date that has never been auto-shifted.
+    shift_reasons: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -130,6 +136,14 @@ class BiometricRecord:
     oura_sleep_latency_seconds: float | None = None
     oura_sleep_restless_periods: float | None = None
     oura_sleep_bedtime_start: str | None = None  # ISO datetime string
+    # Raw awake-time seconds from the same main sleep period — feeds the
+    # per-night wake-time adjustment (services.repository.get_wake_time_
+    # adjustment / set_wake_time_adjustment, CLAUDE.md rule 4's exception):
+    # a manual correction for Oura's known wake-time-overestimation pattern.
+    # This field is always the untouched raw Oura reading; the adjustment
+    # itself lives in a separate Sheet tab and is never merged into this
+    # field or any other oura_sleep_* field above.
+    oura_sleep_awake_seconds: float | None = None
 
 
 WeekStatus = Literal["ultimate", "perfect", "normal", "failed", "in_progress", "no_plan"]

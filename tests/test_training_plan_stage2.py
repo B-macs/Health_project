@@ -164,6 +164,47 @@ def test_stage1_plan_exercises_never_have_equipment_type():
             assert ex.get("equipment_type") is None, f"Stage 1 day {day_num} {ex['name']!r} unexpectedly tagged"
 
 
+# ─── per-exercise weight increment (feature 8: machines calibrated in their
+#     own arbitrary units, not kg) ──────────────────────────────────────────
+
+_EXPECTED_UNIT_BASED = {"Face Pull (Cable)", "Pallof Press (Cable)"}
+
+
+def test_face_pull_and_pallof_press_are_unit_based_not_kg():
+    for day_num, day in tp.PLAN_STAGE2.items():
+        for ex in day["exercises"]:
+            if ex["name"] in _EXPECTED_UNIT_BASED:
+                assert ex["increment_unit"] == "unit", (
+                    f"Day {day_num} {ex['name']!r} increment_unit={ex['increment_unit']!r}"
+                )
+                assert ex["increment_size"] == 1, (
+                    f"Day {day_num} {ex['name']!r} increment_size={ex['increment_size']!r}"
+                )
+
+
+def test_no_unexpected_exercise_is_unit_based():
+    # Regression guard, same pattern as test_no_unexpected_exercise_carries_
+    # equipment_type above: catches a future _ex() call accidentally left
+    # unit-based (or a new one that should be) without updating this list.
+    for day_num, day in tp.PLAN_STAGE2.items():
+        for ex in day["exercises"]:
+            if ex.get("increment_unit") != "kg":
+                assert ex["name"] in _EXPECTED_UNIT_BASED, (
+                    f"Day {day_num} {ex['name']!r} increment_unit={ex.get('increment_unit')!r} "
+                    f"but isn't in the expected unit-based list"
+                )
+
+
+def test_every_other_weighted_exercise_defaults_to_2_5kg_increment():
+    for day_num, day in tp.PLAN_STAGE2.items():
+        for ex in day["exercises"]:
+            if ex.get("equipment_type") and ex["name"] not in _EXPECTED_UNIT_BASED:
+                assert ex["increment_size"] == 2.5, (
+                    f"Day {day_num} {ex['name']!r} increment_size={ex['increment_size']!r}"
+                )
+                assert ex["increment_unit"] == "kg"
+
+
 def test_band_exercise_never_carries_weight_kg():
     for day_num, day in tp.PLAN_STAGE2.items():
         for ex in day["exercises"]:

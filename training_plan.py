@@ -55,6 +55,10 @@ def _ex(
     weight_kg: float | None = None,
     equipment_type: str | None = None,
     band_tier: str | None = None,
+    rep_min: int | None = None,
+    rep_max: int | None = None,
+    increment_size: float = 2.5,
+    increment_unit: str = "kg",
 ) -> dict:
     return {
         "name": name,
@@ -75,6 +79,16 @@ def _ex(
         "weight_kg": weight_kg,
         "equipment_type": equipment_type,
         "band_tier": band_tier,
+        # Double-progression rep range (services/engine.py::double_progression) —
+        # None for exercises that don't auto-progress (holds, mobility, bodyweight).
+        "rep_min": rep_min,
+        "rep_max": rep_max,
+        # Per-exercise weight-stepper increment. Most equipment is a flat 2.5kg
+        # plate/dumbbell jump; some machines (Face Pull, Pallof Press) are
+        # calibrated in their own arbitrary "unit" scale, not kg — flagged via
+        # increment_unit="unit" until the real kg-per-unit conversion is measured.
+        "increment_size": increment_size,
+        "increment_unit": increment_unit,
     }
 
 
@@ -1862,6 +1876,7 @@ def _s2_recovery_day(objective: str, template: str) -> dict:
         "objective": objective,
         "phase": "Stage 2A — Gym Strength Block",
         "session_rpe_target": 3,
+        "is_gym_session": False,
         "exercises": exercises,
     }
 
@@ -1879,6 +1894,7 @@ def _s2_session_a(week: int) -> dict:
         "objective": f"Stage 2A Week {week} — Squat + Press + Core",
         "phase": "Stage 2A — Gym Strength Block",
         "session_rpe_target": 6 if week < 4 else 7,
+        "is_gym_session": True,
         "exercises": [
             UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, COXA_SALTANS_DRILL,
             _ex(
@@ -1887,6 +1903,7 @@ def _s2_session_a(week: int) -> dict:
                 sets=3, reps=8, tempo=squat_tempo, rest_seconds=90,
                 weight_kg=squat_kg,
                 equipment_type="dumbbell",
+                rep_min=8, rep_max=10,
                 mechanics=(
                     "Hold one dumbbell vertically at your chest. Squat to a comfortable depth "
                     "with a brief pause at the bottom. At depth your right hip passes >60° "
@@ -1905,6 +1922,7 @@ def _s2_session_a(week: int) -> dict:
                 sets=3, reps=10, rest_seconds=75,
                 weight_kg=press_kg,
                 equipment_type="dumbbell",
+                rep_min=10, rep_max=12,
                 mechanics=(
                     "Bench set to a moderate incline. Retract the shoulder blades into the bench "
                     "before every rep. If the right shoulder wants to roll forward or sag at the "
@@ -1922,9 +1940,11 @@ def _s2_session_a(week: int) -> dict:
                 sets=3, reps=12, rest_seconds=60,
                 weight_kg=face_pull_kg,
                 equipment_type="cable",
+                increment_size=1, increment_unit="unit",
+                rep_min=12, rep_max=15,
                 mechanics="Cable at upper-chest height. Pull toward your face, elbows high, squeezing the shoulder blades together and down at the end.",
                 biomechanical_focus="Scapular control and rear-delt/rotator-cuff work — always paired with pressing per finding #6, and a documented strength pattern (fast-track progression).",
-                progression="12 clean reps, full scapular squeeze → +2.5kg next exposure (fast-track).",
+                progression="12 clean reps, full scapular squeeze → +1 unit next exposure (fast-track). This machine's scale is arbitrary units, not kg — see increment_unit.",
                 regression="Shrugging instead of scapular squeeze → reduce load until the movement is clean.",
             ),
             _ex(
@@ -1934,9 +1954,11 @@ def _s2_session_a(week: int) -> dict:
                 sets=3, reps=10, rest_seconds=60,
                 weight_kg=pallof_kg,
                 equipment_type="cable",
+                increment_size=1, increment_unit="unit",
+                rep_min=10, rep_max=12,
                 mechanics="Cable at chest height, stand side-on, press the handle straight out and back in without letting the cable rotate your trunk.",
                 biomechanical_focus="Anti-rotation core control under real load — addresses finding #5 and the rotation-under-load caution with a controlled, non-rotational pattern.",
-                progression="10 reps each side with zero trunk rotation → small load increase next exposure.",
+                progression="10 reps each side with zero trunk rotation → +1 unit next exposure. This machine's scale is arbitrary units, not kg — see increment_unit.",
                 regression="Any trunk rotation → reduce load until the press is completely still.",
             ),
             _ex(
@@ -1974,6 +1996,7 @@ def _s2_session_b(week: int) -> dict:
         "objective": f"Stage 2A Week {week} — Hinge + Pull + Core",
         "phase": "Stage 2A — Gym Strength Block",
         "session_rpe_target": 6 if week < 4 else 7,
+        "is_gym_session": True,
         "exercises": [
             UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, ISCHIAL_RELEASE,
             _ex(
@@ -2065,6 +2088,7 @@ def _s2_session_c(week: int) -> dict:
         "objective": f"Stage 2A Week {week} — Unilateral/Glute + Scapular + Core",
         "phase": "Stage 2A — Gym Strength Block",
         "session_rpe_target": 5 if week < 4 else 6,
+        "is_gym_session": True,
         "exercises": [
             UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, COXA_SALTANS_DRILL,
             _ex(

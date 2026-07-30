@@ -113,10 +113,27 @@ def bedtime_baseline(rows: list[dict]) -> tuple[float | None, int]:
     return None, 0
 
 
-def compute_sleep_score(for_date: date | None = None, bio_rows: list[dict] | None = None) -> float | str:
+def compute_sleep_score(
+    for_date: date | None = None,
+    bio_rows: list[dict] | None = None,
+    wake_time_adjustments: dict[str, float] | None = None,
+) -> float | str:
     """
     Compute a 0-100 Sleep Score for for_date — see module docstring for the
     7-contributor design.
+
+    wake_time_adjustments: {ISO date string: minutes to subtract from
+    recorded awake time}, keyed the same way as CLAUDE.md rule 4's narrow
+    manual-entry exception (services.repository.get_wake_time_adjustment /
+    get_wake_time_adjustments) — a per-night correction for Oura's known
+    wake-time-overestimation pattern. Kept as a plain dict param (not a
+    repository read) so this function stays pure/testable. None (the
+    default) or no entry for for_date's own date behaves identically to
+    never having this parameter at all. When an entry does exist, it's
+    floored at the date's own raw oura_sleep_awake_seconds so it can never
+    subtract more awake-time than was actually recorded, and only ever
+    affects for_date's own row — never the historical rows baselines are
+    computed from.
 
     Returns:
         float        — sleep score 0-100
@@ -139,17 +156,41 @@ def compute_sleep_score(for_date: date | None = None, bio_rows: list[dict] | Non
             return None
         return float(today_row[key])
 
+    # ── Wake-time adjustment — CLAUDE.md rule 4's narrow manual-entry
+    #    exception, correcting Oura's known wake-time-overestimation
+    #    pattern. Floored at the date's own raw awake seconds so it can
+    #    never subtract more awake-time than was actually recorded. Stays
+    #    0.0 (no-op) whenever wake_time_adjustments is None or has no entry
+    #    for date_str — the default, and every pre-existing caller/test —
+    #    so this is 100% behavior-preserving in that case. ─────────────────
+    adjustment_seconds = 0.0
+    if wake_time_adjustments and today_row is not None and date_str in wake_time_adjustments:
+        adjustment_seconds = min(
+            wake_time_adjustments[date_str] * 60,
+            today_row.get("oura_sleep_awake_seconds") or 0,
+        )
+
     # ── Total Sleep — blended hours vs personal baseline, capped ─────────────
     sleep_base, _win = readiness.sleep_baseline(rows_to_date)
     today_sleep = _get("sleep_duration_hours")
+    if adjustment_seconds and today_sleep is not None:
+        today_sleep = today_sleep + adjustment_seconds / 3600.0
     total_sleep_s = (
         min(100.0, (today_sleep / sleep_base) * 100.0)
         if today_sleep is not None and sleep_base and sleep_base > 0
         else None
     )
 
-    # ── Efficiency — Oura's own raw reading, already 0-100 ────────────────────
+    # ── Efficiency — Oura's own raw reading, already 0-100. When a
+    #    wake-time adjustment applies, scaled by the same effective-total-
+    #    sleep-seconds ratio as Total Sleep above: efficiency = sleep-time /
+    #    time-in-bed, so a proportional increase in sleep seconds (time in
+    #    bed held fixed) scales efficiency by that same ratio. ───────────────
     efficiency_raw = _get("oura_sleep_efficiency")
+    raw_total_seconds = _get("oura_sleep_total_seconds")
+    if adjustment_seconds and efficiency_raw is not None and raw_total_seconds:
+        effective_total_seconds = raw_total_seconds + adjustment_seconds
+        efficiency_raw = efficiency_raw * (effective_total_seconds / raw_total_seconds)
     efficiency_s = None if efficiency_raw is None else max(0.0, min(100.0, efficiency_raw))
 
     # ── REM / Deep — % of Oura's own total sleep, ramped over an ideal band ──

@@ -11,7 +11,8 @@ explicit Exit (with confirmation) ends the session.
 
 import streamlit as st
 import streamlit.components.v1 as components
-from dataclasses import asdict
+import contextlib
+from dataclasses import asdict, replace
 from datetime import date, timedelta
 import json
 import time
@@ -22,6 +23,7 @@ from services import engine
 from services import metrics
 from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
+from services import scheduling
 from services import sessions as sess
 from services import yoga as yg
 from services.repository import PhasesCorruptError
@@ -622,9 +624,17 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
         last = repo.get_repository().get_last_performance(ex["name"])
     except Exception:
         pass  # never block the live flow on a lookup failure
+    last_session_sets = None
+    if ex.get("rep_min") is not None:
+        try:
+            last_session_sets = repo.get_repository().get_last_session_all_sets(ex["name"])
+        except Exception:
+            pass  # never block the live flow on a lookup failure
     entry = sess.seed_actual_entry(
         ex, last, readiness_modifier.get("streak_label", "unknown"),
         allow_increase=(directive.get("signal_color") != "red"),
+        weight_increment=ex.get("increment_size", 2.5),
+        last_session_sets=last_session_sets,
     )
     st.session_state.tp_actuals[idx] = entry
     _save_checkpoint(day_num)
@@ -940,6 +950,21 @@ def _render_week_status_badge(history: list, viewed_week_start) -> None:
         f"Week of {week.week_start}: <span style='color:{color};font-weight:600;'>{text}</span></div>",
         unsafe_allow_html=True,
     )
+
+
+def _render_shift_banner(active, d: date) -> None:
+    """"Session moved" notice for whatever date is currently displayed —
+    today's overview screen, or a day-strip detail view for a different
+    date. Runs regardless of whether an auto-shift just happened THIS
+    render (services.scheduling's write, above, is a separate concern) —
+    this only ever reads active.shift_reasons, already resolved by then.
+    Matches the existing engine-directive banner's st.* style (see the
+    signal-color banner further down in render())."""
+    if active is None:
+        return
+    reason = active.shift_reasons.get(d.isoformat())
+    if reason:
+        st.info(f"Session moved — {reason}")
 
 
 def _render_day_strip(active: dict | None) -> None:
@@ -1699,6 +1724,56 @@ def render():
     _readiness_modifier = engine.readiness_training_modifier(_rm_bio)
     _volume_factor = _readiness_modifier.get("volume_factor", 1.0)
 
+    # ── Dynamic scheduling — readiness-based auto-shift ─────────────────────────
+    # Reuses _rm_bio (already fetched above for the readiness modifier) as both
+    # the bio_rows and checkin_rows arguments — its rows already carry
+    # alcohol_units merged in from the Readiness DB (see
+    # Repository.get_biometric_rolling / _alcohol_units_by_date), the same
+    # per-date shape services.scheduling.should_shift_session expects for
+    # checkin_rows. No extra Notion/Sheets read is added for this feature.
+    #
+    # scheduling.should_evaluate_shift is the idempotency guard and MUST run
+    # before should_shift_session is even called — this is what stops every
+    # subsequent render this same day from re-evaluating and re-writing once
+    # a shift has already been recorded for today. This is the single most
+    # important check in this feature (see its own docstring).
+    if active is not None and day_num is not None:
+        _today_iso = date.today().isoformat()
+        _today_content = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
+        _is_gym_day = bool(_today_content and _today_content.get("is_gym_session"))
+        if scheduling.should_evaluate_shift(_is_gym_day, _today_iso, active.shift_reasons):
+            # st.rerun() must only fire once set_phases() has actually
+            # succeeded — gating on "a shift was computed" instead (the
+            # previous version of this code) reruns unconditionally even
+            # when the write itself raised, which re-enters this same
+            # unguarded branch on every subsequent render (shift_reasons
+            # was never actually persisted) — an unbounded retry loop
+            # against Notion during any outage/rate-limit window. Confirmed
+            # by adversarial review; this flag is only set on the line
+            # immediately after set_phases() returns without raising.
+            _shift_write_succeeded = False
+            try:
+                _shift, _reason = scheduling.should_shift_session(_rm_bio, _rm_bio, date.today())
+                if _shift:
+                    _plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
+                    _new_overrides = scheduling.swap_pairs_for_shift(active, date.today(), _plan_dict)
+                    _new_reasons = scheduling.shift_reason_entries(_new_overrides, _reason)
+                    _shifted_active = replace(
+                        active,
+                        date_overrides={**active.date_overrides, **_new_overrides},
+                        shift_reasons={**active.shift_reasons, **_new_reasons},
+                    )
+                    _shifted_phases = [
+                        _shifted_active if p.phase_number == active.phase_number else p
+                        for p in phases
+                    ]
+                    repo.get_repository().set_phases(_shifted_phases)
+                    _shift_write_succeeded = True
+            except Exception:
+                pass  # never let a scheduling-check failure crash the page
+            if _shift_write_succeeded:
+                st.rerun()
+
     # ─────────────────────────────────────────────────────────────────────────
     #  Main Page
     # ─────────────────────────────────────────────────────────────────────────
@@ -1766,6 +1841,7 @@ def render():
 
     _today = date.today()
     _selected = st.session_state.tp_selected_date
+    _render_shift_banner(active, _selected)
     if _selected != _today:
         _render_day_detail(_selected, active, phases)
         nav.inject("training")
@@ -2103,79 +2179,122 @@ def render():
     _actual = st.session_state.tp_actuals.get(_eidx)
     if _actual is not None:
         st.caption(sess.actual_caption(_actual))
-        if ex["type"] == "reps" and _actual["reps"] is not None:
-            st.markdown(
-                "<div style='text-align:center;font-size:11px;color:#8A99A3;"
-                "font-family:monospace;letter-spacing:2px;'>REPS</div>",
-                unsafe_allow_html=True,
-            )
-            rc1, rc2, rc3 = st.columns([1, 2, 1])
-            with rc1:
-                if st.button("−", key=f"tp_reps_dec_{_eidx}", use_container_width=True):
-                    _actual["reps"] = sess.step_reps(_actual["reps"], -1)
-                    _save_checkpoint(day_num)
-                    st.rerun()
-            with rc2:
-                st.markdown(
-                    f"<div style='text-align:center;font-size:40px;font-weight:700;"
-                    f"color:#E8ECEF;'>{_actual['reps']}</div>",
-                    unsafe_allow_html=True,
-                )
-            with rc3:
-                if st.button("+", key=f"tp_reps_inc_{_eidx}", use_container_width=True):
-                    _actual["reps"] = sess.step_reps(_actual["reps"], +1)
-                    _save_checkpoint(day_num)
-                    st.rerun()
 
-        _equip = ex.get("equipment_type")
-        if _equip == "band" and _actual["band_tier"]:
-            _tier_label = sess.BAND_TIER_LABELS.get(_actual["band_tier"], "")
-            st.markdown(
-                "<div style='text-align:center;font-size:11px;color:#8A99A3;"
-                "font-family:monospace;letter-spacing:2px;margin-top:8px;'>BAND</div>",
-                unsafe_allow_html=True,
-            )
-            bc1, bc2, bc3 = st.columns([1, 2, 1])
-            with bc1:
-                if st.button("−", key=f"tp_band_dec_{_eidx}", use_container_width=True):
-                    _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], -1)
-                    _save_checkpoint(day_num)
-                    st.rerun()
-            with bc2:
+        # Unilateral "reps" exercises share ONE tp_actuals entry across both
+        # sides (see module docstring / seed_actual_entry) — the right-side
+        # pass is where the value is actually set, the left-side pass just
+        # replays it. Showing live +/- steppers again on the left reads as
+        # "being asked again" even though nothing new is recorded, so the
+        # left pass renders a read-only mirror line instead, with the exact
+        # same steppers tucked behind an opt-in expander for the rare case
+        # a side genuinely needs a different value.
+        _mirror_left = (
+            ex["type"] == "reps"
+            and ex.get("laterality") == "unilateral"
+            and _side == "left"
+        )
+        if _mirror_left:
+            _mirror_bits = []
+            if _actual["reps"] is not None:
+                _mirror_bits.append(f"{_actual['reps']} reps")
+            _equip = ex.get("equipment_type")
+            if _equip == "band" and _actual["band_tier"]:
+                _tier_label = sess.BAND_TIER_LABELS.get(_actual["band_tier"], "")
+                _mirror_bits.append(
+                    f"{_actual['band_tier']} band ({_tier_label})" if _tier_label
+                    else f"{_actual['band_tier']} band"
+                )
+            elif _equip and _equip != "band" and _actual["weight_kg"] is not None:
+                _unit_label = "kg" if ex.get("increment_unit", "kg") == "kg" else "units"
+                _mirror_bits.append(f"{_actual['weight_kg']} {_unit_label}")
+            _mirror_summary = " @ ".join(_mirror_bits) if _mirror_bits else "same as right side"
+            st.caption(f"Left side: mirrored — {_mirror_summary}")
+            _stepper_ctx = st.expander("Edit left side")
+        else:
+            _stepper_ctx = contextlib.nullcontext()
+
+        with _stepper_ctx:
+            if ex["type"] == "reps" and _actual["reps"] is not None:
                 st.markdown(
-                    f"<div style='text-align:center;font-size:28px;font-weight:700;color:#E8ECEF;'>"
-                    f"{_actual['band_tier']}<span style='font-size:14px;color:#8A99A3;'> — {_tier_label}</span>"
-                    f"</div>",
+                    "<div style='text-align:center;font-size:11px;color:#8A99A3;"
+                    "font-family:monospace;letter-spacing:2px;'>REPS</div>",
                     unsafe_allow_html=True,
                 )
-            with bc3:
-                if st.button("+", key=f"tp_band_inc_{_eidx}", use_container_width=True):
-                    _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], +1)
-                    _save_checkpoint(day_num)
-                    st.rerun()
-        elif _equip and _equip != "band" and _actual["weight_kg"] is not None:
-            st.markdown(
-                "<div style='text-align:center;font-size:11px;color:#8A99A3;"
-                "font-family:monospace;letter-spacing:2px;margin-top:8px;'>WEIGHT (KG)</div>",
-                unsafe_allow_html=True,
-            )
-            wc1, wc2, wc3 = st.columns([1, 2, 1])
-            with wc1:
-                if st.button("−", key=f"tp_wt_dec_{_eidx}", use_container_width=True):
-                    _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], -1)
-                    _save_checkpoint(day_num)
-                    st.rerun()
-            with wc2:
+                rc1, rc2, rc3 = st.columns([1, 2, 1])
+                with rc1:
+                    if st.button("−", key=f"tp_reps_dec_{_eidx}", use_container_width=True):
+                        _actual["reps"] = sess.step_reps(_actual["reps"], -1)
+                        _save_checkpoint(day_num)
+                        st.rerun()
+                with rc2:
+                    st.markdown(
+                        f"<div style='text-align:center;font-size:40px;font-weight:700;"
+                        f"color:#E8ECEF;'>{_actual['reps']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with rc3:
+                    if st.button("+", key=f"tp_reps_inc_{_eidx}", use_container_width=True):
+                        _actual["reps"] = sess.step_reps(_actual["reps"], +1)
+                        _save_checkpoint(day_num)
+                        st.rerun()
+
+            _equip = ex.get("equipment_type")
+            if _equip == "band" and _actual["band_tier"]:
+                _tier_label = sess.BAND_TIER_LABELS.get(_actual["band_tier"], "")
                 st.markdown(
-                    f"<div style='text-align:center;font-size:40px;font-weight:700;"
-                    f"color:#E8ECEF;'>{_actual['weight_kg']}</div>",
+                    "<div style='text-align:center;font-size:11px;color:#8A99A3;"
+                    "font-family:monospace;letter-spacing:2px;margin-top:8px;'>BAND</div>",
                     unsafe_allow_html=True,
                 )
-            with wc3:
-                if st.button("+", key=f"tp_wt_inc_{_eidx}", use_container_width=True):
-                    _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], +1)
-                    _save_checkpoint(day_num)
-                    st.rerun()
+                bc1, bc2, bc3 = st.columns([1, 2, 1])
+                with bc1:
+                    if st.button("−", key=f"tp_band_dec_{_eidx}", use_container_width=True):
+                        _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], -1)
+                        _save_checkpoint(day_num)
+                        st.rerun()
+                with bc2:
+                    st.markdown(
+                        f"<div style='text-align:center;font-size:28px;font-weight:700;color:#E8ECEF;'>"
+                        f"{_actual['band_tier']}<span style='font-size:14px;color:#8A99A3;'> — {_tier_label}</span>"
+                        f"</div>",
+                        unsafe_allow_html=True,
+                    )
+                with bc3:
+                    if st.button("+", key=f"tp_band_inc_{_eidx}", use_container_width=True):
+                        _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], +1)
+                        _save_checkpoint(day_num)
+                        st.rerun()
+            elif _equip and _equip != "band" and _actual["weight_kg"] is not None:
+                _incr = ex.get("increment_size", 2.5)
+                _incr_unit = ex.get("increment_unit", "kg")
+                _wt_label = "WEIGHT (KG)" if _incr_unit == "kg" else "WEIGHT (MACHINE UNITS)"
+                st.markdown(
+                    f"<div style='text-align:center;font-size:11px;color:#8A99A3;"
+                    f"font-family:monospace;letter-spacing:2px;margin-top:8px;'>{_wt_label}</div>",
+                    unsafe_allow_html=True,
+                )
+                if _incr_unit != "kg":
+                    st.caption(
+                        "⚠ Unit-based — this machine's scale isn't calibrated to kg yet. "
+                        f"Each tap moves {_incr:g} unit on the machine's own dial."
+                    )
+                wc1, wc2, wc3 = st.columns([1, 2, 1])
+                with wc1:
+                    if st.button("−", key=f"tp_wt_dec_{_eidx}", use_container_width=True):
+                        _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], -1, increment=_incr)
+                        _save_checkpoint(day_num)
+                        st.rerun()
+                with wc2:
+                    st.markdown(
+                        f"<div style='text-align:center;font-size:40px;font-weight:700;"
+                        f"color:#E8ECEF;'>{_actual['weight_kg']}</div>",
+                        unsafe_allow_html=True,
+                    )
+                with wc3:
+                    if st.button("+", key=f"tp_wt_inc_{_eidx}", use_container_width=True):
+                        _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], +1, increment=_incr)
+                        _save_checkpoint(day_num)
+                        st.rerun()
         st.divider()
 
     # ── Set progress and timers ───────────────────────────────────────────────

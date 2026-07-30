@@ -184,6 +184,13 @@ def test_step_weight_kg_floors_at_zero():
     assert sessions.step_weight_kg(0.0, -1) == 0.0
 
 
+def test_step_weight_kg_respects_custom_increment():
+    # Face Pull / Pallof Press: a machine calibrated in its own 1-unit scale,
+    # not the default 2.5kg plate/dumbbell jump.
+    assert sessions.step_weight_kg(5.0, +1, increment=1) == 6.0
+    assert sessions.step_weight_kg(5.0, -1, increment=1) == 4.0
+
+
 def test_step_band_tier_moves_one_position():
     assert sessions.step_band_tier("Green", +1) == "Blue"
     assert sessions.step_band_tier("Blue", -1) == "Green"
@@ -223,6 +230,16 @@ def test_seed_actual_entry_applies_readiness_nudge_on_top_of_last_performance():
     assert entry["weight_kg"] == 12.5
 
 
+def test_seed_actual_entry_readiness_nudge_respects_custom_weight_increment():
+    # Same readiness-nudge path as above, but a unit-based machine (Face
+    # Pull / Pallof Press) must nudge by its own 1-unit increment, not the
+    # default 2.5kg.
+    ex = {"type": "reps", "reps": 10, "weight_kg": 5.0, "equipment_type": "cable"}
+    last = {"reps": 8, "weight_kg": 5.0, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(ex, last, "high", True, weight_increment=1)
+    assert entry["weight_kg"] == 6.0
+
+
 def test_seed_actual_entry_suppresses_increase_from_zero_baseline():
     # Bulgarian Split Squat weeks 1-2: bodyweight, plan/history both None/0
     # — a good readiness day must not silently introduce load.
@@ -259,6 +276,85 @@ def test_seed_actual_entry_band_applies_readiness_nudge():
     ex = {"type": "reps", "reps": 10, "equipment_type": "band", "band_tier": "Green"}
     entry = sessions.seed_actual_entry(ex, None, "high", True)
     assert entry["band_tier"] == "Blue"
+
+
+# ─── seed_actual_entry: double progression ─────────────────────────────────
+
+def test_seed_actual_entry_double_progression_fires_and_takes_priority():
+    # Goblet Squat shape: rep_min=8, rep_max=10, all last-session sets hit 10.
+    ex = {"type": "reps", "reps": 8, "rep_min": 8, "rep_max": 10,
+          "weight_kg": 10.0, "equipment_type": "dumbbell"}
+    last_session_sets = [{"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0},
+                          {"reps": 10, "weight": 10.0}]
+    # last_performance would otherwise seed reps=10/weight=10.0 -- double
+    # progression must win instead of being overridden by it.
+    last_performance = {"reps": 10, "weight_kg": 10.0, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(
+        ex, last_performance, "normal", True, last_session_sets=last_session_sets,
+    )
+    assert entry["weight_kg"] == 12.5
+    assert entry["reps"] == 8
+    assert entry["source"] == "double_progression"
+
+
+def test_seed_actual_entry_double_progression_does_not_fire_falls_through():
+    # One set falls short of rep_max -- double progression doesn't fire,
+    # existing last_performance/readiness-nudge behavior applies unchanged.
+    ex = {"type": "reps", "reps": 8, "rep_min": 8, "rep_max": 10,
+          "weight_kg": 10.0, "equipment_type": "dumbbell"}
+    last_session_sets = [{"reps": 10, "weight": 10.0}, {"reps": 9, "weight": 10.0},
+                          {"reps": 10, "weight": 10.0}]
+    last_performance = {"reps": 9, "weight_kg": 10.0, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(
+        ex, last_performance, "normal", True, last_session_sets=last_session_sets,
+    )
+    assert entry["source"] == "last_time"
+    assert entry["reps"] == 9
+    assert entry["weight_kg"] == 10.0
+
+
+def test_seed_actual_entry_no_last_session_sets_falls_through_unchanged():
+    # last_session_sets omitted (defaults to None) -- exact existing
+    # behavior, even though rep_min/rep_max are set on the exercise.
+    ex = {"type": "reps", "reps": 8, "rep_min": 8, "rep_max": 10,
+          "weight_kg": 10.0, "equipment_type": "dumbbell"}
+    last_performance = {"reps": 10, "weight_kg": 10.0, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(ex, last_performance, "normal", True)
+    assert entry["source"] == "last_time"
+    assert entry["reps"] == 10
+    assert entry["weight_kg"] == 10.0
+
+
+def test_seed_actual_entry_double_progression_does_not_fire_on_a_short_session():
+    # Integration-level regression guard: ex["sets"] (prescribed count) must
+    # thread through to double_progression's prescribed_sets check. Only 1
+    # of 3 prescribed sets was logged (session cut short); that one set
+    # hits rep_max, but progression must not fire from a partial session.
+    ex = {"type": "reps", "reps": 8, "rep_min": 8, "rep_max": 10, "sets": 3,
+          "weight_kg": 10.0, "equipment_type": "dumbbell"}
+    last_session_sets = [{"reps": 10, "weight": 10.0}]  # only 1 of 3 sets logged
+    last_performance = {"reps": 10, "weight_kg": 10.0, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(
+        ex, last_performance, "normal", True, last_session_sets=last_session_sets,
+    )
+    assert entry["source"] != "double_progression"
+    assert entry["weight_kg"] == 10.0
+
+
+def test_seed_actual_entry_double_progression_uses_actual_lifted_weight_not_stale_plan_weight():
+    # Integration-level regression guard for the stale-weight bug: ex's
+    # plan-authored weight_kg (10.0) is behind what was actually lifted
+    # last session (12.5, e.g. from an earlier progression) -- the seeded
+    # weight must progress from the real 12.5, not the stale plan value.
+    ex = {"type": "reps", "reps": 8, "rep_min": 8, "rep_max": 10, "sets": 3,
+          "weight_kg": 10.0, "equipment_type": "dumbbell"}
+    last_session_sets = [{"reps": 10, "weight": 12.5}] * 3
+    last_performance = {"reps": 10, "weight_kg": 12.5, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(
+        ex, last_performance, "normal", True, last_session_sets=last_session_sets,
+    )
+    assert entry["source"] == "double_progression"
+    assert entry["weight_kg"] == 15.0  # 12.5 (actually lifted) + 2.5, not 10.0 (stale) + 2.5
 
 
 # ─── actual_caption ─────────────────────────────────────────────────────────
@@ -465,6 +561,26 @@ def test_begin_new_phase_leaves_non_lapsed_phases_untouched():
                        length_days=28, status="active")
     updated = sessions.begin_new_phase([future_phase], new_phase)
     assert updated[0].status == "active"
+
+
+def test_begin_new_phase_preserves_date_overrides_and_shift_reasons_on_completion():
+    # Regression guard: begin_new_phase used to reconstruct each prior
+    # Phase field-by-field, which silently dropped date_overrides/
+    # shift_reasons back to {} (both default to {} when omitted) the
+    # moment a phase transitioned to "completed" -- erasing every manual
+    # reschedule and readiness auto-shift ever recorded on that phase.
+    lapsed_with_history = Phase(
+        phase_number=1, name="Stage 1 Rehab", start_date="2026-06-29", length_days=14,
+        status="active",
+        date_overrides={"2026-07-05": 8},
+        shift_reasons={"2026-07-05": "Sleep debt of 10.2h over the last 7 nights"},
+    )
+    new_phase = Phase(phase_number=2, name="Stage 2", start_date="2026-07-20",
+                       length_days=28, status="active")
+    updated = sessions.begin_new_phase([lapsed_with_history], new_phase)
+    assert updated[0].status == "completed"
+    assert updated[0].date_overrides == {"2026-07-05": 8}
+    assert updated[0].shift_reasons == {"2026-07-05": "Sleep debt of 10.2h over the last 7 nights"}
 
 
 # ─── day_view_state routing ─────────────────────────────────────────────────

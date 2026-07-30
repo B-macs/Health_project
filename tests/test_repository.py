@@ -147,7 +147,94 @@ def test_set_phases_creates_new_config_row_when_absent():
     props = repo._notion_client.pages.created[0]["properties"]
     stored = json.loads(props["Value"]["rich_text"][0]["text"]["content"])
     assert stored == [{"phase_number": 1, "name": "Stage 1 Rehab", "start_date": "2026-06-29",
-                        "length_days": 14, "status": "active", "date_overrides": {}}]
+                        "length_days": 14, "status": "active", "date_overrides": {},
+                        "shift_reasons": {}}]
+
+
+def test_set_phases_round_trips_shift_reasons_alongside_date_overrides():
+    # Mirrors test_set_phases_creates_new_config_row_when_absent, but for the
+    # shift_reasons field added alongside date_overrides for Feature 6
+    # (readiness-based auto-shift) — same round-trip guarantee must hold for
+    # both fields together, not just date_overrides alone.
+    repo = _repo({"db-config": []})
+    phase = models.Phase(
+        2, "Stage 2", "2026-07-20", 28, "active",
+        date_overrides={"2026-07-30": 2, "2026-07-31": 1},
+        shift_reasons={"2026-07-30": "Sleep debt of 10.2h over the last 7 nights",
+                        "2026-07-31": "Sleep debt of 10.2h over the last 7 nights"},
+    )
+    repo.set_phases([phase], today=__import__("datetime").date(2026, 7, 30))
+    props = repo._notion_client.pages.created[0]["properties"]
+    stored = json.loads(props["Value"]["rich_text"][0]["text"]["content"])
+    assert stored == [{
+        "phase_number": 2, "name": "Stage 2", "start_date": "2026-07-20",
+        "length_days": 28, "status": "active",
+        "date_overrides": {"2026-07-30": 2, "2026-07-31": 1},
+        "shift_reasons": {"2026-07-30": "Sleep debt of 10.2h over the last 7 nights",
+                           "2026-07-31": "Sleep debt of 10.2h over the last 7 nights"},
+    }]
+
+    # And it must parse straight back into the same Phase via get_phases,
+    # reading the freshly-created config page back through the fake client.
+    created_page = {"id": repo._notion_client.pages.created[0]["id"], "properties": {
+        "Key": _title_prop("phases"), "Value": _rich_text_prop(json.dumps(stored)),
+    }}
+    repo2 = _repo({"db-config": [created_page]})
+    assert repo2.get_phases() == [phase]
+
+
+def test_set_phases_preserves_prior_manual_override_alongside_new_auto_shift_entries():
+    # Realistic mixed scenario: a phase already carries a manual reschedule
+    # entry (e.g. the missed-Monday-style date_overrides), and
+    # views/training.py's auto-shift merges NEW entries on top via
+    # {**active.date_overrides, **_new_overrides} (shift_reasons gets the
+    # same treatment) before calling set_phases -- both origins must
+    # survive together through a full write + read-back round trip, not
+    # just structurally within one in-memory dict.
+    manual_override_date = "2026-07-21"  # a prior one-off manual reschedule
+    auto_shift_dates = {"2026-08-04": 15, "2026-08-05": 14}  # readiness auto-shift swap
+
+    existing_page = {"id": "cfg-existing", "properties": {
+        "Key": _title_prop("phases"), "Value": _rich_text_prop(json.dumps([{
+            "phase_number": 2, "name": "Stage 2", "start_date": "2026-07-20",
+            "length_days": 28, "status": "active",
+            "date_overrides": {manual_override_date: 8},
+            "shift_reasons": {},
+        }])),
+    }}
+    repo = _repo({"db-config": [existing_page]})
+    active = repo.get_phases()[0]
+
+    # Mirrors views/training.py's own merge pattern exactly.
+    merged = models.Phase(
+        active.phase_number, active.name, active.start_date, active.length_days, active.status,
+        date_overrides={**active.date_overrides, **auto_shift_dates},
+        shift_reasons={**active.shift_reasons, "2026-08-04": "Only 4.2h slept last night",
+                        "2026-08-05": "Only 4.2h slept last night"},
+    )
+    repo.set_phases([merged])
+
+    reread = repo2_from_update(repo)
+    assert reread.date_overrides == {manual_override_date: 8, **auto_shift_dates}
+    assert reread.shift_reasons == {"2026-08-04": "Only 4.2h slept last night",
+                                     "2026-08-05": "Only 4.2h slept last night"}
+
+
+def repo2_from_update(repo: Repository) -> models.Phase:
+    """Re-reads the just-updated config row through a fresh Repository.
+    notion.rich_text()'s write-time shape ({"text": {"content": ...}}) is
+    the outgoing request body, not the read-time shape real Notion API
+    responses use ({"plain_text": ...}, what get_property actually reads)
+    -- same distinction test_set_phases_round_trips_shift_reasons_
+    alongside_date_overrides already accounts for. Extract the written
+    JSON and re-wrap it via _rich_text_prop to simulate a fresh fetch."""
+    updated = repo._notion_client.pages.updated[-1]
+    stored_json = updated["properties"]["Value"]["rich_text"][0]["text"]["content"]
+    page = {"id": updated["page_id"], "properties": {
+        "Key": _title_prop("phases"), "Value": _rich_text_prop(stored_json),
+    }}
+    repo2 = _repo({"db-config": [page]})
+    return repo2.get_phases()[0]
 
 
 def test_set_phases_updates_existing_config_row():
@@ -273,6 +360,65 @@ def test_get_last_performance_corrupt_json_returns_none():
     }}
     repo = _repo({"db-training": [page]})
     assert repo.get_last_performance("Goblet Squat") is None
+
+
+# ─── get_last_session_all_sets ──────────────────────────────────────────────
+# Mirrors the get_last_performance tests above exactly -- same query/parse
+# path, but returns the FULL Sets array instead of just the last set.
+
+def test_get_last_session_all_sets_returns_none_when_never_logged():
+    repo = _repo({"db-training": []})
+    assert repo.get_last_session_all_sets("Goblet Squat") is None
+
+
+def test_get_last_session_all_sets_returns_full_sets_array_of_most_recent_page():
+    page = {"properties": {
+        "Movement": _title_prop("Goblet Squat"),
+        "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop(json.dumps([
+            {"set_num": 1, "reps": 10, "weight": 10.0},
+            {"set_num": 2, "reps": 10, "weight": 10.0},
+            {"set_num": 3, "reps": 9, "weight": 10.0},
+        ])),
+    }}
+    repo = _repo({"db-training": [page]})
+    result = repo.get_last_session_all_sets("Goblet Squat")
+    assert result == [
+        {"set_num": 1, "reps": 10, "weight": 10.0},
+        {"set_num": 2, "reps": 10, "weight": 10.0},
+        {"set_num": 3, "reps": 9, "weight": 10.0},
+    ]
+
+
+def test_get_last_session_all_sets_picks_most_recent_date_among_multiple_sessions():
+    older = {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-07"),
+        "Sets": _rich_text_prop(json.dumps([{"reps": 8, "weight": 10.0}])),
+    }}
+    newer = {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop(json.dumps([{"reps": 10, "weight": 12.5}])),
+    }}
+    repo = _repo({"db-training": [older, newer]})
+    assert repo.get_last_session_all_sets("Goblet Squat") == [{"reps": 10, "weight": 12.5}]
+
+
+def test_get_last_session_all_sets_empty_sets_json_returns_none():
+    page = {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop("[]"),
+    }}
+    repo = _repo({"db-training": [page]})
+    assert repo.get_last_session_all_sets("Goblet Squat") is None
+
+
+def test_get_last_session_all_sets_corrupt_json_returns_none():
+    page = {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-14"),
+        "Sets": _rich_text_prop("{not json"),
+    }}
+    repo = _repo({"db-training": [page]})
+    assert repo.get_last_session_all_sets("Goblet Squat") is None
 
 
 def test_get_recent_sessions_multiple_dates_sorted_descending():

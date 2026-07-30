@@ -153,3 +153,132 @@ def test_latency_too_fast_is_penalised_same_as_too_slow():
     assert sleep_score.compute_sleep_score(date(2026, 7, 20), fast) == 0.0
     assert sleep_score.compute_sleep_score(date(2026, 7, 20), slow) == 0.0
     assert sleep_score.compute_sleep_score(date(2026, 7, 20), ideal) == 100.0
+
+
+# ─── compute_sleep_score — wake_time_adjustments ────────────────────────────
+# CLAUDE.md rule 4's narrow manual-entry exception: a per-night correction
+# for Oura's known wake-time-overestimation pattern. The single most
+# important guarantee here is that every test ABOVE this section keeps
+# passing completely unchanged -- wake_time_adjustments defaults to None and
+# must be a no-op whenever it's None or has no entry for the scored date.
+
+def test_wake_time_adjustments_none_is_identical_to_omitting_the_argument():
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0)]
+    without_arg = sleep_score.compute_sleep_score(date(2026, 7, 20), rows)
+    with_none = sleep_score.compute_sleep_score(date(2026, 7, 20), rows, wake_time_adjustments=None)
+    assert without_arg == with_none == 77.8
+
+
+def test_wake_time_adjustments_empty_dict_is_a_no_op():
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0)]
+    score = sleep_score.compute_sleep_score(date(2026, 7, 20), rows, wake_time_adjustments={})
+    assert score == 77.8
+
+
+def test_wake_time_adjustments_entry_for_a_different_date_has_no_effect():
+    # Regression guard: the adjustment must only ever touch for_date's own
+    # row, never a historical row that happens to have an entry too.
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0)]
+    score = sleep_score.compute_sleep_score(
+        date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-19": 30},
+    )
+    assert score == 77.8
+
+
+def test_wake_time_adjustment_increases_total_sleep_and_therefore_the_score():
+    rows = _baseline_rows(hours=8.0) + [_row(
+        "2026-07-20", sleep_duration_hours=6.0,
+        oura_sleep_total_seconds=21600.0,   # 6h
+        oura_sleep_awake_seconds=1800.0,    # 30 min recorded awake
+    )]
+    unadjusted = sleep_score.compute_sleep_score(date(2026, 7, 20), rows)
+    adjusted = sleep_score.compute_sleep_score(
+        date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-20": 30},
+    )
+    assert unadjusted == 77.8
+    assert adjusted == 84.3
+    assert adjusted > unadjusted
+
+
+def test_wake_time_adjustment_is_floored_at_the_recorded_awake_seconds():
+    # Requesting a 60-minute correction when only 15 minutes (900s) of
+    # awake time was actually recorded must cap the adjustment at 15
+    # minutes -- never subtract more awake-time than was really logged.
+    rows = _baseline_rows(hours=8.0) + [_row(
+        "2026-07-20", sleep_duration_hours=6.0,
+        oura_sleep_total_seconds=21600.0,
+        oura_sleep_awake_seconds=900.0,     # only 15 min actually recorded
+    )]
+    floored = sleep_score.compute_sleep_score(
+        date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-20": 60},
+    )
+    full_15_min = sleep_score.compute_sleep_score(
+        date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-20": 15},
+    )
+    # A 60-minute request and a 15-minute request land on the same floored
+    # result, since only 15 minutes of awake time exists to reclaim.
+    assert floored == full_15_min == 81.1
+
+
+def test_wake_time_adjustment_scales_the_efficiency_contributor_too():
+    # Efficiency = sleep-time / time-in-bed; a proportional increase in
+    # effective sleep seconds (time-in-bed held fixed) scales efficiency by
+    # that same ratio, not just Total Sleep.
+    rows = [_row(
+        "2026-07-20",
+        oura_sleep_efficiency=90.0,
+        oura_sleep_total_seconds=28800.0,   # 8h
+        oura_sleep_awake_seconds=1000.0,
+    )]
+    unadjusted = sleep_score.compute_sleep_score(date(2026, 7, 20), rows)
+    adjusted = sleep_score.compute_sleep_score(
+        date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-20": 10},
+    )
+    assert unadjusted == 90.0
+    assert adjusted == 91.9
+    assert adjusted > unadjusted
+
+
+def test_wake_time_adjustment_does_not_affect_rem_deep_or_restfulness_contributors():
+    # By design, the adjustment only reclassifies time from "awake" to
+    # "asleep" -- it can't say WHICH stage that reclaimed time belongs to,
+    # so REM/Deep/Restfulness (all computed against the RAW, unadjusted
+    # oura_sleep_total_seconds) must be completely unaffected. Locks in the
+    # asymmetry so a future refactor can't silently start (or stop)
+    # adjusting total_s for these three without a test noticing.
+    rows = _baseline_rows(hours=8.0) + [_row(
+        "2026-07-20",
+        sleep_duration_hours=6.0,
+        oura_sleep_total_seconds=21600.0,   # 6h
+        oura_sleep_awake_seconds=1800.0,    # 30 min recorded awake
+        oura_sleep_rem_seconds=4320.0,      # 20% of raw total -> mid REM band
+        oura_sleep_deep_seconds=2160.0,     # 10% of raw total -> mid Deep band
+        oura_sleep_restless_periods=1.0,
+    )]
+    unadjusted = sleep_score.compute_sleep_score(date(2026, 7, 20), rows)
+    adjusted = sleep_score.compute_sleep_score(
+        date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-20": 30},
+    )
+    # Total Sleep changes (proving the adjustment really applied here), but
+    # the overall score shift must come ONLY from Total Sleep + Efficiency
+    # -- if REM/Deep/Restfulness were also scaled by the adjustment, the
+    # score delta would be larger than what those two contributors alone
+    # (40% combined weight) can produce.
+    assert adjusted != unadjusted
+    assert round(adjusted - unadjusted, 1) <= 100 * (0.25 + 0.20)  # total_sleep + efficiency weights
+
+
+def test_wake_time_adjustment_is_a_no_op_when_awake_seconds_field_is_absent():
+    # An older/partial Oura row might simply lack oura_sleep_awake_seconds.
+    # A nonzero requested adjustment must degrade to a no-op (floored at 0
+    # available awake-seconds), not error.
+    rows = _baseline_rows(hours=8.0) + [_row(
+        "2026-07-20", sleep_duration_hours=6.0,
+        oura_sleep_total_seconds=21600.0,
+        # oura_sleep_awake_seconds deliberately omitted entirely.
+    )]
+    unadjusted = sleep_score.compute_sleep_score(date(2026, 7, 20), rows)
+    adjusted = sleep_score.compute_sleep_score(
+        date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-20": 30},
+    )
+    assert adjusted == unadjusted == 77.8

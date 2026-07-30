@@ -14,6 +14,7 @@ tp_ex_idx etc.) and calls these functions with plain values pulled out of it.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from datetime import date
 
 import training_plan as tp
@@ -204,17 +205,25 @@ def seed_actual_entry(
     streak_label: str,
     allow_increase: bool,
     weight_increment: float = 2.5,
+    last_session_sets: list[dict] | None = None,
 ) -> dict:
     """Decide the starting {"reps", "weight_kg", "band_tier", "source",
     "last_seen_date"} entry for one exercise's live-session steppers.
 
-    Seed priority: last_performance (Repository.get_last_performance's
-    shape) if present, else the exercise's own (already volume-adjusted --
-    caller passes the post apply_exercise_volume_modifier `ex`) plan
-    prescription. The readiness engine's streak_label then nudges the
-    weight/band-tier by one step on top -- reps are already readiness-
-    adjusted upstream by apply_exercise_volume_modifier, so they are NOT
-    nudged again here.
+    Priority order:
+      1. Double progression (engine.double_progression) -- fires only when
+         ex has both "rep_min" and "rep_max" set AND last_session_sets is
+         given AND every set in it hit the top of the range. When it
+         fires, its (weight, reps) become the seed and everything below is
+         skipped for weight/reps -- double progression takes priority over
+         last_performance/readiness seeding, not merely a nudge on top of it.
+      2. last_performance (Repository.get_last_performance's shape) if
+         present, else the exercise's own (already volume-adjusted --
+         caller passes the post apply_exercise_volume_modifier `ex`) plan
+         prescription. The readiness engine's streak_label then nudges the
+         weight/band-tier by one step on top -- reps are already readiness-
+         adjusted upstream by apply_exercise_volume_modifier, so they are
+         NOT nudged again here.
 
     "reps" is only populated for ex_type == "reps" -- hold_reps exercises
     (currently only Prone Y-Raise) keep their reps_in_set exactly as shown
@@ -226,7 +235,7 @@ def seed_actual_entry(
     directive day -- a good readiness day must never auto-introduce load
     on an exercise the plan or history has deliberately kept bodyweight
     (e.g. Bulgarian Split Squat, weeks 1-2). Reducing load is never
-    suppressed.
+    suppressed. Also gates double progression's own upward move.
     """
     entry = {"reps": None, "weight_kg": None, "band_tier": None,
               "source": "plan_default", "last_seen_date": None}
@@ -239,6 +248,22 @@ def seed_actual_entry(
         entry["band_tier"] = ex.get("band_tier")
     else:
         entry["weight_kg"] = ex.get("weight_kg") if ex.get("weight_kg") is not None else 0.0
+
+    rep_min, rep_max = ex.get("rep_min"), ex.get("rep_max")
+    if (
+        rep_min is not None and rep_max is not None
+        and equip != "band" and entry["weight_kg"] is not None and entry["reps"] is not None
+    ):
+        progressed_weight, progressed_reps = engine.double_progression(
+            entry["weight_kg"], entry["reps"], rep_min, rep_max,
+            last_session_sets, prescribed_sets=ex.get("sets", 1),
+            increment=weight_increment, allow_increase=allow_increase,
+        )
+        if (progressed_weight, progressed_reps) != (entry["weight_kg"], entry["reps"]):
+            entry["weight_kg"] = progressed_weight
+            entry["reps"] = progressed_reps
+            entry["source"] = "double_progression"
+            return entry
 
     if last_performance:
         entry["source"] = "last_time"
@@ -383,12 +408,18 @@ def begin_new_phase(phases: list[Phase], new_phase: Phase) -> list[Phase]:
     already ended as 'completed' (a data-hygiene step — active_phase()'s own
     date check already excludes lapsed phases regardless, so this doesn't
     change behavior, just keeps stored status honest). Caller persists via
-    repo.set_phases(); this stays a pure list transform."""
+    repo.set_phases(); this stays a pure list transform.
+
+    Uses dataclasses.replace (only touching status) rather than
+    reconstructing each Phase field-by-field — the latter silently dropped
+    date_overrides/shift_reasons back to {} on every transition (both
+    default to {} when omitted), erasing a phase's entire manual-reschedule
+    and readiness-auto-shift history the moment it got marked completed.
+    Confirmed by adversarial review; regression-guarded in
+    tests/test_sessions.py."""
     today = date.today()
     updated = [
-        Phase(phase_number=p.phase_number, name=p.name, start_date=p.start_date,
-              length_days=p.length_days,
-              status="completed" if p.status == "active" and _plan.phase_end_date(p) < today else p.status)
+        replace(p, status="completed") if p.status == "active" and _plan.phase_end_date(p) < today else p
         for p in phases
     ]
     updated.append(new_phase)

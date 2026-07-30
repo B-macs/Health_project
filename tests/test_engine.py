@@ -501,3 +501,89 @@ def test_suggested_band_tier_allow_increase_false_suppresses_upward_move():
 def test_suggested_band_tier_unrecognised_tier_returns_none():
     assert engine.suggested_band_tier("Purple", "high") is None
     assert engine.suggested_band_tier(None, "high") is None
+
+
+# ─── double_progression ──────────────────────────────────────────────────────
+
+def test_double_progression_fires_when_all_sets_hit_rep_max():
+    sets = [{"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}, {"reps": 11, "weight": 10.0}]
+    weight, reps = engine.double_progression(10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets)
+    assert weight == 12.5
+    assert reps == 8
+
+
+def test_double_progression_does_not_fire_when_one_set_falls_short():
+    sets = [{"reps": 10, "weight": 10.0}, {"reps": 9, "weight": 10.0}, {"reps": 10, "weight": 10.0}]
+    weight, reps = engine.double_progression(10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets)
+    assert (weight, reps) == (10.0, 8)
+
+
+def test_double_progression_does_not_fire_when_allow_increase_is_false():
+    sets = [{"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}]
+    weight, reps = engine.double_progression(
+        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets, allow_increase=False,
+    )
+    assert (weight, reps) == (10.0, 8)
+
+
+def test_double_progression_returns_inputs_unchanged_when_last_session_sets_is_none():
+    weight, reps = engine.double_progression(10.0, 8, rep_min=8, rep_max=10, last_session_sets=None)
+    assert (weight, reps) == (10.0, 8)
+
+
+def test_double_progression_returns_inputs_unchanged_when_last_session_sets_is_empty():
+    weight, reps = engine.double_progression(10.0, 8, rep_min=8, rep_max=10, last_session_sets=[])
+    assert (weight, reps) == (10.0, 8)
+
+
+def test_double_progression_respects_custom_increment():
+    sets = [{"reps": 12, "weight": 5.0}, {"reps": 12, "weight": 5.0}, {"reps": 12, "weight": 5.0}]
+    weight, reps = engine.double_progression(
+        5.0, 12, rep_min=12, rep_max=12, last_session_sets=sets, increment=1,
+    )
+    assert weight == 6.0
+    assert reps == 12
+
+
+def test_double_progression_bases_increment_on_actual_last_weight_not_stale_current_weight():
+    # Regression guard: current_weight can be a stale, static plan-authored
+    # value (training_plan.py's per-week dicts) that no longer matches what
+    # was actually lifted last session (e.g. a prior progression already
+    # pushed the real weight above it). Progressing from the stale value
+    # would silently discard weight already earned -- the increment must be
+    # based on the actually-logged weight instead.
+    sets = [{"reps": 10, "weight": 15.0}, {"reps": 10, "weight": 15.0}, {"reps": 10, "weight": 15.0}]
+    weight, reps = engine.double_progression(
+        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets,  # current_weight=10.0 is stale
+    )
+    assert weight == 17.5  # 15.0 (actually lifted) + 2.5, not 10.0 (stale plan value) + 2.5
+    assert reps == 8
+
+
+def test_double_progression_falls_back_to_current_weight_when_logged_weight_missing():
+    sets = [{"reps": 10}, {"reps": 10}, {"reps": 10}]  # defensive: no "weight" key at all
+    weight, reps = engine.double_progression(
+        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets,
+    )
+    assert weight == 12.5  # falls back to current_weight + increment
+    assert reps == 8
+
+
+def test_double_progression_does_not_fire_when_fewer_sets_logged_than_prescribed():
+    # Regression guard: all() over a short list is vacuously true -- a
+    # session cut short after 1 of 3 prescribed sets, with that one set
+    # hitting rep_max, must not read as a clean full session.
+    sets = [{"reps": 10, "weight": 10.0}]  # only 1 set logged
+    weight, reps = engine.double_progression(
+        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets, prescribed_sets=3,
+    )
+    assert (weight, reps) == (10.0, 8)
+
+
+def test_double_progression_fires_when_logged_sets_meet_or_exceed_prescribed():
+    sets = [{"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}]
+    weight, reps = engine.double_progression(
+        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets, prescribed_sets=3,
+    )
+    assert weight == 12.5
+    assert reps == 8

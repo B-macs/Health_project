@@ -1,6 +1,6 @@
 # CLAUDE.md — Health Engine
 
-*Last updated: 2026-07-14 after adding the Strength BioAge Stage-Adjusted Recovery Score engine (`services/bioage.py`).*
+*Last updated: 2026-07-30 after adding readiness-based auto-shift session scheduling (`services/scheduling.py`), double-progression weight/rep tracking (`services.engine.double_progression`), weekly tonnage (`services/volume.py`), Sleep Debt scoring, and the per-night wake-time adjustment.*
 
 ---
 
@@ -69,7 +69,13 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     biometric source, replacing Sheet1/Apple Health) ·
                     bioage.py (Strength BioAge Stage-Adjusted Recovery Score —
                     per-region 0-100 scores stay None until a region has real
-                    logged *weighted* volume; see its module docstring)
+                    logged *weighted* volume; see its module docstring) ·
+                    scheduling.py (readiness-based auto-shift of a scheduled
+                    gym-session day — sleep debt/short sleep/consecutive-day
+                    alcohol triggers a pairwise-adjacent-day swap for the
+                    rest of that calendar week) ·
+                    volume.py (weekly tonnage — Σ reps×weight — for Stage 2A+
+                    double-progression exercises)
   Orchestration:    metrics.py — sync_weekly_rollup(); the one services/
                     module that both computes (via metrics_logic.py) and
                     does I/O (via repository.py) in the same call.
@@ -117,7 +123,7 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 1. **Deterministic before AI** — implement the rule-based version first; AI layer is only added on top once the deterministic version is tested and working.
 2. **AI never controls safety** — traffic light multiplier, ACWR ceiling, stage transitions, and final prescribed volume are always deterministic. AI output is advisory only.
 3. **`services.rules.STAGE_CONSTRAINTS` is the single source of truth** for per-stage ACWR ceilings, RPE ceilings, and volume caps. `services/engine.py` derives from it; do not duplicate values.
-4. **Notion is the write backend; Oura + Garmin (blended) is the engine's biometric read source.** `services/biometrics.py` blends HRV/RHR/sleep duration at Oura 70% / Garmin 30%, and steps at Garmin 80% / Oura 20% — see `services.repository.Repository.get_biometric_rolling`. Google Sheets is still the intermediary (each platform's own tab, synced by `sync_oura_all`/`sync_garmin_daily_if_due`), and Sheet1/Apple Health is retired from the live pipeline — historical-only, feeding `get_sheet1_biometric_rolling` and the one-time `scripts/backfill_garmin_from_sheet1.py`. `get_biometric_rolling` itself is a **live recompute, not persisted** — the "Biometric Blend" sheet tab (`sync_biometric_blend`/`get_biometric_blend_history`) is the fixed historical record of what was actually computed on a given day, written once/day and viewable unbounded in Insights → Sync. Do not add manual biometric entry anywhere.
+4. **Notion is the write backend; Oura + Garmin (blended) is the engine's biometric read source.** `services/biometrics.py` blends HRV/RHR/sleep duration at Oura 70% / Garmin 30%, and steps at Garmin 80% / Oura 20% — see `services.repository.Repository.get_biometric_rolling`. Google Sheets is still the intermediary (each platform's own tab, synced by `sync_oura_all`/`sync_garmin_daily_if_due`), and Sheet1/Apple Health is retired from the live pipeline — historical-only, feeding `get_sheet1_biometric_rolling` and the one-time `scripts/backfill_garmin_from_sheet1.py`. `get_biometric_rolling` itself is a **live recompute, not persisted** — the "Biometric Blend" sheet tab (`sync_biometric_blend`/`get_biometric_blend_history`) is the fixed historical record of what was actually computed on a given day, written once/day and viewable unbounded in Insights → Sync. Do not add manual biometric entry anywhere. Exception: a per-night wake-time correction for Sleep Score purposes is allowed (`services/repository.py`'s `get_wake_time_adjustment`/`set_wake_time_adjustment`) — this corrects a known, specific Oura measurement pattern (wake-time overestimation), not general manual biometric entry. Both the raw Oura reading and the adjustment are stored separately; the raw reading is never overwritten.
 5. **Training sessions are logged automatically by Training Plan.** No manual entry page.
 6. **Pre-session release protocol precedes every training session.** Inhibit overactive structures (glute medius, piriformis) before activating underactive ones (glute max, deep core). Preserve this order in all new training blocks.
 7. **Right-side asymmetry is a clinical finding.** All exercises involving right hip flexion >60° require a neutral/internal rotation cue. Right posterior hip capsule mobilisation is unilateral (right only).

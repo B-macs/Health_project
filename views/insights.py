@@ -13,7 +13,7 @@ import base64
 import calendar as cal_mod
 import json
 from dataclasses import asdict
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 
 import altair as alt
@@ -28,6 +28,7 @@ from services import bioage
 from services import engine
 from services import stats as stats_mod
 from services import insights as insights_svc
+from services import volume as volume_svc
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -508,6 +509,10 @@ def _blend_history() -> list[dict]:
 def _metrics_history() -> list[dict]:
     return repo.get_repository().get_metrics_history()
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _recent_sessions():
+    return repo.get_repository().get_recent_sessions(days=60)
+
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _strength_bioage_scores() -> dict:
@@ -740,6 +745,34 @@ def render() -> None:
                 pd.concat([df_c.rename("Chronic 28d"), df_a.rename("Acute 7d")], axis=1),
                 color=["#3D4F6B", "#00E874"],
             )
+
+        st.divider()
+
+        # ── Weekly Volume Load (tonnage) chart ──────────────────────────────
+        st.subheader("Weekly Volume Load")
+        st.caption(
+            "Total kg moved (Σ reps × weight) per Monday-anchored week — only "
+            "meaningful once loaded double-progression exercises are logged "
+            "(Stage 2A+). Complements ACWR (session RPE × duration) with actual "
+            "tonnage lifted."
+        )
+        recent_sessions = _recent_sessions()
+        # Monday-anchored week starts, oldest to newest, last ~8 weeks —
+        # same "Monday minus weekday()" formula as services.plan._monday.
+        today = date.today()
+        current_week_start = today - timedelta(days=today.weekday())
+        week_starts = [current_week_start - timedelta(weeks=n) for n in range(7, -1, -1)]
+        volume_by_week = [
+            volume_svc.weekly_volume_load(recent_sessions, ws) for ws in week_starts
+        ]
+        if any(v > 0 for v in volume_by_week):
+            df_vol = pd.DataFrame(
+                {"Volume (kg)": volume_by_week},
+                index=[ws.isoformat() for ws in week_starts],
+            )
+            st.bar_chart(df_vol, color=["#00E874"])
+        else:
+            st.info("No logged volume yet for loaded, countable-reps exercises in the last 8 weeks.")
 
     # =========================================================================
     #  Tab 2 — Processing Queue

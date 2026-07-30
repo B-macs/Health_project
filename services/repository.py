@@ -104,6 +104,7 @@ _BIOMETRIC_BLEND_HEADER = [
 _METRICS_HISTORY_HEADER = [
     "date", "readiness_score", "sleep_pct", "sleep_score", "strain",
 ]
+_WAKE_TIME_ADJUSTMENTS_HEADER = ["date", "adjustment_minutes"]
 
 
 class Repository:
@@ -848,7 +849,7 @@ class Repository:
         payload = [
             {"phase_number": p.phase_number, "name": p.name, "start_date": p.start_date,
              "length_days": p.length_days, "status": p.status,
-             "date_overrides": p.date_overrides}
+             "date_overrides": p.date_overrides, "shift_reasons": p.shift_reasons}
             for p in phases
         ]
         self.set_config("phases", json.dumps(payload), today=today)
@@ -1084,6 +1085,7 @@ class Repository:
                 "oura_sleep_latency_seconds": main.get("latency"),
                 "oura_sleep_restless_periods": main.get("restless_periods"),
                 "oura_sleep_bedtime_start": main.get("bedtime_start") or None,
+                "oura_sleep_awake_seconds": main.get("awake_time"),
             }
         return out
 
@@ -1179,6 +1181,7 @@ class Repository:
                     oura_sleep_latency_seconds=sleep_raw.get("oura_sleep_latency_seconds"),
                     oura_sleep_restless_periods=sleep_raw.get("oura_sleep_restless_periods"),
                     oura_sleep_bedtime_start=sleep_raw.get("oura_sleep_bedtime_start"),
+                    oura_sleep_awake_seconds=sleep_raw.get("oura_sleep_awake_seconds"),
                 )
             if d in alcohol:
                 record = dataclasses.replace(record, alcohol_units=alcohol[d])
@@ -1328,16 +1331,24 @@ class Repository:
         trend's 14-day EMA lookback; 28 extra days of session AU to support
         the 7-day rolling-strain lookback with margin) so even the oldest
         day in the `days` window gets a correctly-computed value, not one
-        truncated by an under-fetched window."""
+        truncated by an under-fetched window. Also fetches wake-time
+        adjustments (get_wake_time_adjustments) for the same `days` window
+        as a single bulk read, threaded into each day's snapshot so the
+        persisted Sleep Score reflects any per-night wake-time correction."""
         today = today or date.today()
         bio_rows = [dataclasses.asdict(r) for r in self.get_biometric_rolling(days=days + 60, today=today)]
         au_rows = self.get_daily_session_au_weighted(days=days + 28, today=today)
         stage = self.get_current_stage()
+        wake_adjustments = self.get_wake_time_adjustments(
+            start=(today - timedelta(days=days - 1)).isoformat(), end=today.isoformat(),
+        )
 
         written = 0
         for i in range(days):
             d = today - timedelta(days=i)
-            snapshot = dashboard.compute_daily_metrics_snapshot(d, bio_rows, au_rows, stage)
+            snapshot = dashboard.compute_daily_metrics_snapshot(
+                d, bio_rows, au_rows, stage, wake_time_adjustments=wake_adjustments,
+            )
             snapshot["date"] = d.isoformat()
             self.upsert_metrics_history_row(snapshot)
             written += 1
@@ -1369,6 +1380,64 @@ class Repository:
                 "strain": r.get("strain") or None,
             })
         return sorted(out, key=lambda r: r["date"])
+
+    # ─────────────────────────────────────────────────────────────────────
+    #  Wake Time Adjustments — per-night manual correction for Sleep Score
+    #  (CLAUDE.md rule 4's narrow, documented exception to "no manual
+    #  biometric entry"). Corrects a known, specific Oura measurement
+    #  pattern — wake-time overestimation — not general manual biometric
+    #  entry: the raw Oura reading (oura_sleep_awake_seconds, above) is
+    #  never touched or overwritten by this. Same tiny-tab upsert-by-date
+    #  pattern as Metrics History; services.sleep_score.compute_sleep_score
+    #  floors the adjustment at the raw recorded awake-time so it can never
+    #  subtract more than was actually logged.
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _wake_time_adjustments_ws(self):
+        return sheets.get_or_create_worksheet(
+            self._sc, self.config.google_sheets_id,
+            sheets.WAKE_TIME_ADJUSTMENTS_WORKSHEET, _WAKE_TIME_ADJUSTMENTS_HEADER,
+        )
+
+    def get_wake_time_adjustment(self, d: date) -> float:
+        """The stored adjustment_minutes for date `d`, or 0.0 if nothing has
+        ever been set for that date (the "no adjustment" default)."""
+        d_str = d.isoformat()
+        rows = sheets.get_worksheet_records(self._wake_time_adjustments_ws())
+        for r in rows:
+            if str(r.get("date") or "") == d_str:
+                minutes = r.get("adjustment_minutes")
+                return float(minutes) if minutes not in (None, "") else 0.0
+        return 0.0
+
+    def set_wake_time_adjustment(self, d: date, minutes: float) -> None:
+        """Upsert-by-date, same call shape as upsert_metrics_history_row."""
+        values = [d.isoformat(), minutes]
+        sheets.upsert_row_by_key(
+            self._wake_time_adjustments_ws(), key_col=1, key_value=d.isoformat(), row_values=values,
+        )
+
+    def get_wake_time_adjustments(self, start: str | None = None, end: str | None = None) -> dict[str, float]:
+        """Every persisted adjustment, keyed by ISO date string, optionally
+        restricted to [start, end] (inclusive) — the bulk/ranged read a
+        caller threading this into services.sleep_score.compute_sleep_score
+        over multiple dates wants, instead of one get_wake_time_adjustment
+        call per date. Dates with no stored adjustment are simply absent
+        (not zero-valued entries)."""
+        rows = sheets.get_worksheet_records(self._wake_time_adjustments_ws())
+        out: dict[str, float] = {}
+        for r in rows:
+            d = str(r.get("date") or "")
+            if not d:
+                continue
+            if start and d < start:
+                continue
+            if end and d > end:
+                continue
+            minutes = r.get("adjustment_minutes")
+            if minutes not in (None, ""):
+                out[d] = float(minutes)
+        return out
 
     # ─────────────────────────────────────────────────────────────────────
     #  Google Sheets — Weekly Rollup

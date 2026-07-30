@@ -119,6 +119,27 @@ def test_sleep_percent_zero_hours_is_none():
     assert dashboard.sleep_percent(0, 8.0) is None
 
 
+# ─── step_wake_time_adjustment ───────────────────────────────────────────────
+# The Sleep card drill-down's +/- control (CLAUDE.md rule 4's narrow
+# manual-entry exception) — mirrors services.sessions' step_reps/
+# step_weight_kg steppers.
+
+def test_step_wake_time_adjustment_increments_by_default_step():
+    assert dashboard.step_wake_time_adjustment(0.0, +1) == 5.0
+
+
+def test_step_wake_time_adjustment_decrements_by_default_step():
+    assert dashboard.step_wake_time_adjustment(10.0, -1) == 5.0
+
+
+def test_step_wake_time_adjustment_floored_at_zero():
+    assert dashboard.step_wake_time_adjustment(0.0, -1) == 0.0
+
+
+def test_step_wake_time_adjustment_capped_at_ceiling():
+    assert dashboard.step_wake_time_adjustment(120.0, +1) == 120.0
+
+
 # ─── readiness_meta / strain_meta / sleep_meta ──────────────────────────────
 
 def test_readiness_meta_optimal_tier():
@@ -255,3 +276,29 @@ def test_snapshot_rolling_reference_date_override_shifts_the_rolling_window():
         rolling_reference_date=date(2026, 8, 1),
     )
     assert snap["strain"] is None
+
+
+def test_snapshot_wake_time_adjustments_defaults_to_none_and_is_a_passthrough():
+    # None is the default -- must reproduce the exact prior sleep_score
+    # behavior when the caller doesn't pass this at all.
+    bio_rows = [{"date": f"2026-06-{i+1:02d}", "sleep_duration_hours": 8.0} for i in range(10)] + [
+        {"date": "2026-07-20", "sleep_duration_hours": 6.0,
+         "oura_sleep_total_seconds": 21600.0, "oura_sleep_awake_seconds": 1800.0},
+    ]
+    snap_default = dashboard.compute_daily_metrics_snapshot(date(2026, 7, 20), bio_rows, au_rows=[], stage=1)
+    snap_explicit_none = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows, au_rows=[], stage=1, wake_time_adjustments=None,
+    )
+    assert snap_default["sleep_score"] == snap_explicit_none["sleep_score"] == 77.8
+
+
+def test_snapshot_wake_time_adjustments_raises_the_sleep_score():
+    bio_rows = [{"date": f"2026-06-{i+1:02d}", "sleep_duration_hours": 8.0} for i in range(10)] + [
+        {"date": "2026-07-20", "sleep_duration_hours": 6.0,
+         "oura_sleep_total_seconds": 21600.0, "oura_sleep_awake_seconds": 1800.0},
+    ]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows, au_rows=[], stage=1,
+        wake_time_adjustments={"2026-07-20": 30},
+    )
+    assert snap["sleep_score"] == 84.3

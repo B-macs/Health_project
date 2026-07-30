@@ -294,6 +294,69 @@ def suggested_weight_kg(
     return round(max(0.0, stepped), 2)
 
 
+def double_progression(
+    current_weight: float,
+    current_target_reps: int,
+    rep_min: int,
+    rep_max: int,
+    last_session_sets: list[dict] | None,
+    prescribed_sets: int = 1,
+    increment: float = 2.5,
+    allow_increase: bool = True,
+) -> tuple[float, int]:
+    """
+    Standard double-progression check for one loaded, countable-reps
+    exercise (training_plan._ex's rep_min/rep_max fields).
+
+    If the last logged session hit the TOP of the rep range (>= rep_max) on
+    EVERY prescribed set, the next session progresses: weight goes up by
+    one `increment` and the target reps reset to the bottom of the range
+    (rep_min). Otherwise the inputs are returned completely unchanged --
+    the caller (services.sessions.seed_actual_entry) falls through to the
+    existing last_performance/readiness-nudge seeding path when this
+    doesn't fire.
+
+    last_session_sets: the full per-set array for the movement's most
+    recent logged session (Repository.get_last_session_all_sets's shape --
+    a list of {"reps": .., "weight": .., ...} dicts), not just the last
+    set, since "every prescribed set" must all clear rep_max.
+
+    prescribed_sets: how many sets this exercise is actually prescribed for
+    (ex["sets"]). A session logged with FEWER sets than prescribed (cut
+    short) never progresses even if every logged set hit rep_max --
+    `all()` over a short list is vacuously true, so without this check a
+    partial session would read identically to a full clean one.
+
+    The weight progression increments FROM is the actual last-lifted
+    weight (last_session_sets' own "weight" on its last set) when
+    available, not the caller-supplied current_weight -- current_weight
+    may be a static, plan-authored value (training_plan.py's per-week
+    dicts) that's gone stale once real logged history exists; basing the
+    increment on it instead of what was actually lifted would silently
+    discard weight the user already earned. Falls back to current_weight
+    only if the logged set is missing a weight value.
+
+    allow_increase gates the upward move exactly like suggested_weight_kg's
+    own allow_increase param (e.g. suppressed on a red-signal engine-
+    directive day) -- it never suppresses anything else, since this
+    function has no downward direction: it either progresses or leaves the
+    inputs untouched.
+
+    Returns (current_weight, current_target_reps) unchanged when
+    last_session_sets is None/empty, has fewer sets than prescribed_sets,
+    when any logged set fell short of rep_max, or when allow_increase is
+    False.
+    """
+    if (not last_session_sets or not allow_increase
+            or len(last_session_sets) < prescribed_sets):
+        return current_weight, current_target_reps
+    if all((s.get("reps") or 0) >= rep_max for s in last_session_sets):
+        last_weight = last_session_sets[-1].get("weight")
+        base_weight = last_weight if last_weight is not None else current_weight
+        return base_weight + increment, rep_min
+    return current_weight, current_target_reps
+
+
 def suggested_band_tier(
     current_tier: str | None,
     streak_label: str,

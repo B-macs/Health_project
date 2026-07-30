@@ -89,6 +89,18 @@ def sleep_percent(sleep_hours: float | None, sleep_need_hours: float) -> int | N
     return round(sleep_hours / sleep_need_hours * 100) if sleep_hours else None
 
 
+def step_wake_time_adjustment(current_minutes: float, direction: int,
+                               step: float = 5.0, ceiling: float = 120.0) -> float:
+    """+/-`step` minutes per tap for the Sleep card's wake-time-adjustment
+    control (CLAUDE.md rule 4's narrow manual-entry exception), mirroring
+    services.sessions' step_reps/step_weight_kg steppers. Floored at 0 — an
+    adjustment can't go negative, since that would mean *adding* awake time
+    rather than correcting Oura's overestimation of it — and capped at
+    `ceiling` (two hours) so a mis-tap can't run away. `direction` is +1 or
+    -1."""
+    return round(max(0.0, min(ceiling, current_minutes + direction * step)), 1)
+
+
 def compute_daily_metrics_snapshot(
     d: date,
     bio_rows: list[dict],
@@ -96,6 +108,7 @@ def compute_daily_metrics_snapshot(
     stage: int,
     sleep_base_hours: float | None = None,
     rolling_reference_date: date | None = None,
+    wake_time_adjustments: dict[str, float] | None = None,
 ) -> dict:
     """The exact three numbers the Home page's cards show for date `d`: the
     smoothed readiness trend, sleep hours as a percent of the personal
@@ -123,6 +136,11 @@ def compute_daily_metrics_snapshot(
     run on. A live page that lets the user browse past dates (app.py's
     Home) should pass date.today() explicitly here to preserve that framing.
 
+    wake_time_adjustments: passed straight through to services.sleep_score.
+    compute_sleep_score (see its own docstring) — keyed by ISO date string,
+    minutes to subtract from that date's recorded awake time. None (the
+    default) reproduces the exact prior sleep_score behavior.
+
     Returns {"readiness_score", "sleep_pct", "sleep_score", "strain",
     "strain_is_rolling"} — any of the metrics is None if there wasn't enough
     data to compute it for this date. sleep_pct is the retired "% of
@@ -142,7 +160,7 @@ def compute_daily_metrics_snapshot(
     sleep_need = sleep_base_hours if sleep_base_hours else SLEEP_NEED_HOURS_DEFAULT
     sleep_pct = sleep_percent(sleep_hours, sleep_need)
 
-    sleep_score = _sleep_score.compute_sleep_score(d, bio_rows)
+    sleep_score = _sleep_score.compute_sleep_score(d, bio_rows, wake_time_adjustments=wake_time_adjustments)
     if sleep_score == _sleep_score.NOT_COMPUTED:
         sleep_score = None
 

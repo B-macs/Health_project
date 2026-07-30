@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import os
+import subprocess
 import sys
 from pathlib import Path
 from types import ModuleType
@@ -14,6 +15,34 @@ import streamlit as st
 _VOXPLOT_ROOT = Path(__file__).resolve().parents[1] / "voice_training" / "voxplot"
 _VOXPLOT_APP = _VOXPLOT_ROOT / "app.py"
 _VOXPLOT_MODULE_NAME = "_health_embedded_voxplot"
+_VOXPLOT_REPO_URL = "https://github.com/B-macs/health-voice-training.git"
+
+# Health's secrets.toml namespaces every integration (voxplot_supabase,
+# google_service_account, ...) to avoid collisions -- Voxplot's own
+# storage/backend.py looks for a plain "supabase" section by default, so
+# this tells it to look under Health's name instead. Must be set before
+# module.render() below makes its first storage call, since
+# get_supabase_client() memoizes its result for the process's lifetime.
+os.environ.setdefault("VOXPLOT_SUPABASE_SECRETS_KEY", "voxplot_supabase")
+
+
+def _self_heal_voxplot_checkout() -> None:
+    """Streamlit Community Cloud clones this repo without initializing git
+    submodules (`git submodule update --init` never runs there), so
+    voice_training/voxplot/ arrives as an empty placeholder directory on
+    every deploy even though it's fully populated locally. Shallow-clone
+    the public Voxplot repo straight into that path the first time it's
+    found empty -- a few seconds of one-time cost per container start.
+    Swallows its own errors; render() re-checks _VOXPLOT_APP afterward and
+    falls back to the manual-init warning if this didn't work (e.g. no
+    outbound network, no git binary)."""
+    if _VOXPLOT_ROOT.exists() and any(_VOXPLOT_ROOT.iterdir()):
+        return  # non-empty but missing app.py -- something else is wrong; don't clobber it
+    with st.spinner("Setting up Voice Training for the first time..."):
+        subprocess.run(
+            ["git", "clone", "--depth", "1", _VOXPLOT_REPO_URL, str(_VOXPLOT_ROOT)],
+            check=True, capture_output=True, text=True, timeout=60,
+        )
 
 
 def _load_voxplot() -> ModuleType:
@@ -42,6 +71,12 @@ def _load_voxplot() -> ModuleType:
 
 def render() -> None:
     """Render Voxplot within Health while retaining its standalone entry point."""
+    if not _VOXPLOT_APP.is_file():
+        try:
+            _self_heal_voxplot_checkout()
+        except Exception:
+            pass  # fall through to the is_file() re-check below
+
     if not _VOXPLOT_APP.is_file():
         st.warning("Voice Training is not available because the Voxplot submodule is missing.")
         st.code("git submodule update --init --recursive")

@@ -132,6 +132,25 @@ def _metrics_history_rolling(days: int = 60) -> list[dict]:
     return repo.get_repository().get_metrics_history(start=start)
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _wake_time_adjustments_rolling(days: int = 60) -> dict[str, float]:
+    """Per-night wake-time corrections (Repository.get_wake_time_adjustments
+    — CLAUDE.md rule 4's narrow manual-entry exception) for the same window
+    as the Metrics History trend — threaded into
+    dash.compute_daily_metrics_snapshot below so Sleep Score reflects any
+    correction, and read again by the Sleep card drill-down for its
+    "adjusted" badge/control. Cleared (like every other cached read here)
+    by the blanket st.cache_data.clear() the drill-down's +/- control calls
+    after writing a new adjustment."""
+    start = (date.today() - timedelta(days=days)).isoformat()
+    return repo.get_repository().get_wake_time_adjustments(start=start)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _current_stage_cached() -> int:
+    return repo.get_repository().get_current_stage()
+
+
 @st.cache_data(ttl=7200, show_spinner=False)  # 2 hours — runs on Home page open, idle in between
 def _sync_oura_cached() -> tuple[bool, str | None]:
     """Oura sync (its own Sheet tabs — see Repository.sync_oura_all), feeding
@@ -245,8 +264,14 @@ try:
 except Exception:
     pass
 
+_wake_adjustments: dict[str, float] = {}
 try:
-    _current_stage = repo.get_repository().get_current_stage()
+    _wake_adjustments = _wake_time_adjustments_rolling(days=60)
+except Exception:
+    pass
+
+try:
+    _current_stage = _current_stage_cached()
 except Exception:
     _current_stage = 1
 
@@ -275,6 +300,7 @@ _sleep_need = _sleep_base_hours if _sleep_base_hours else _SLEEP_NEED_HOURS
 _snapshot = dash.compute_daily_metrics_snapshot(
     selected_date, _bio_rows, _au_rows, _current_stage,
     sleep_base_hours=_sleep_base_hours, rolling_reference_date=date.today(),
+    wake_time_adjustments=_wake_adjustments,
 )
 _readiness_score    = _snapshot["readiness_score"]
 _sleep_score        = _snapshot["sleep_score"]
@@ -500,7 +526,8 @@ def _metric_detail(view: str) -> str:
         extra_blocks = ""
     elif view == "sleep":
         col, disp, lbl, _, _ = dash.sleep_meta(_sleep_score, _sleep_need, _sleep_base_window)
-        detail_label = f"SLEEP · {date_label}"
+        _today_wake_adj = _wake_adjustments.get(selected_date.isoformat(), 0.0)
+        detail_label = f"SLEEP · {date_label}" + (" · ADJUSTED" if _today_wake_adj else "")
         hist_key, hist_unit, hist_title, hist_color = "sleep_score", "", "Sleep Score Trend", "#4FC3F7"
         extra_blocks = ""
     else:
@@ -516,6 +543,19 @@ def _metric_detail(view: str) -> str:
     hist_by_date = {r["date"]: r.get(hist_key) for r in _metrics_hist}
     hist_values = [hist_by_date.get(d.isoformat()) for d in hist_dates]
 
+    # Sleep-only: a simple marker for how many nights in this 30-day window
+    # carry a wake-time adjustment (CLAUDE.md rule 4's narrow manual-entry
+    # exception) — deliberately just a count/caption, not a per-point
+    # sparkline annotation.
+    adjusted_marker = ""
+    if view == "sleep":
+        adjusted_nights = sum(1 for d in hist_dates if _wake_adjustments.get(d.isoformat()))
+        if adjusted_nights:
+            adjusted_marker = (
+                f'<div style="font-size:10px;color:#4FC3F7;margin:-4px 0 10px;">'
+                f'⚡ {adjusted_nights} night(s) wake-time adjusted in this window</div>'
+            )
+
     return (
         f'<div style="padding:16px;">'
         f'<div style="display:flex;align-items:center;margin-bottom:20px;">'
@@ -529,9 +569,56 @@ def _metric_detail(view: str) -> str:
         f'</div>'
         f'</div>'
         + _history_trend_block(hist_title, hist_unit, hist_dates, hist_values, hist_color)
+        + adjusted_marker
         + extra_blocks
         + f'</div>'
     )
+
+
+def _render_wake_time_control(d: date) -> None:
+    """+/- stepper for the per-night wake-time adjustment (CLAUDE.md rule
+    4's narrow manual-entry exception — corrects Oura's known wake-time-
+    overestimation pattern, not general manual biometric entry). Mirrors
+    views/training.py's reps/weight stepper pattern visually: a small
+    uppercase monospace label, a [1,2,1] column row of −/value/+, real
+    st.button widgets (this can't live inside _metric_detail's plain HTML
+    string). Writes via Repository.set_wake_time_adjustment and reruns so
+    the Sleep Score/trend immediately reflect the new value — the raw Oura
+    reading itself is never touched."""
+    current = _wake_adjustments.get(d.isoformat(), 0.0)
+    st.markdown(
+        "<div style='padding:0 16px;'><div style='font-size:10px;color:#6B7A9B;"
+        "letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;'>"
+        "Adjust Wake Time</div></div>",
+        unsafe_allow_html=True,
+    )
+    wc1, wc2, wc3 = st.columns([1, 2, 1])
+    with wc1:
+        if st.button("−", key="wt_adj_dec", use_container_width=True):
+            repo.get_repository().set_wake_time_adjustment(
+                d, dash.step_wake_time_adjustment(current, -1),
+            )
+            st.cache_data.clear()
+            st.rerun()
+    with wc2:
+        label = f"−{current:.0f} min" if current else "No adjustment"
+        st.markdown(
+            f"<div style='text-align:center;font-size:22px;font-weight:700;"
+            f"color:#D4DCEE;'>{label}</div>",
+            unsafe_allow_html=True,
+        )
+    with wc3:
+        if st.button("+", key="wt_adj_inc", use_container_width=True):
+            repo.get_repository().set_wake_time_adjustment(
+                d, dash.step_wake_time_adjustment(current, +1),
+            )
+            st.cache_data.clear()
+            st.rerun()
+    if current:
+        st.caption(
+            f"Wake time corrected −{current:.0f} min for {d.isoformat()} "
+            "(known Oura wake-time-overestimation pattern)."
+        )
 
 
 # ─── Fixed UI elements ────────────────────────────────────────────────────────
@@ -633,6 +720,8 @@ st.markdown(_fab_html,    unsafe_allow_html=True)  # FAB → Check-In
 
 if view in ("strain", "readiness", "sleep"):
     st.markdown(_metric_detail(view), unsafe_allow_html=True)
+    if view == "sleep":
+        _render_wake_time_control(selected_date)
 else:
     st.markdown(_card_readiness + _card_strain + _card_sleep, unsafe_allow_html=True)
 if not _oura_sync_ok and _oura_sync_err:

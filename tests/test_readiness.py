@@ -66,6 +66,179 @@ def test_rhr_baseline_ignores_none_entries_and_respects_minimum():
     assert readiness.rhr_baseline(rows) == 56.0  # (55+57+56)/3
 
 
+# ─── sleep_debt_hours ───────────────────────────────────────────────────────
+# Moved here from services/scheduling.py 2026-07-30, alongside its constants
+# (SLEEP_DEBT_THRESHOLD_HOURS/SLEEP_DEBT_WINDOW_DAYS) — compute_readiness now
+# uses this as its own sleep_debt component, and services.scheduling already
+# imports readiness for sleep_baseline, so having readiness depend back on
+# scheduling would be circular.
+
+def test_sleep_debt_hours_sums_trailing_window_shortfall_against_baseline():
+    # 7 clean nights ending at for_date: three short (4.0h) nights and four
+    # long (11.0h) nights -> baseline (mean) = (3*4 + 4*11)/7 = 8.0h. Debt =
+    # sum of shortfalls below the mean only (overages don't offset it)
+    # = 3 * (8.0 - 4.0) = 12.0.
+    rows = [
+        {"date": "2026-07-01", "sleep_duration_hours": 4.0},
+        {"date": "2026-07-02", "sleep_duration_hours": 4.0},
+        {"date": "2026-07-03", "sleep_duration_hours": 4.0},
+        {"date": "2026-07-04", "sleep_duration_hours": 11.0},
+        {"date": "2026-07-05", "sleep_duration_hours": 11.0},
+        {"date": "2026-07-06", "sleep_duration_hours": 11.0},
+        {"date": "2026-07-07", "sleep_duration_hours": 11.0},
+    ]
+    for_date = date(2026, 7, 7)
+    assert readiness.sleep_debt_hours(rows, for_date) == 12.0
+
+
+def test_sleep_debt_hours_reuses_sleep_baseline_not_a_duplicate_computation():
+    # Same rows sleep_baseline would compute a baseline from directly --
+    # sleep_debt_hours must agree with it exactly, not some separately-
+    # derived figure.
+    rows = [
+        {"date": f"2026-06-{d:02d}", "sleep_duration_hours": h}
+        for d, h in zip(range(1, 8), [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0])
+    ]
+    for_date = date(2026, 6, 7)
+    baseline, _window = readiness.sleep_baseline(rows)
+    expected_debt = round(sum(max(0.0, baseline - h) for h in [6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0]), 2)
+    assert readiness.sleep_debt_hours(rows, for_date) == expected_debt
+
+
+def test_sleep_debt_hours_none_when_baseline_cannot_be_computed():
+    # Only 3 clean nights -- sleep_baseline needs >= 7 to trust a baseline.
+    # None (not 0.0!) -- a "can't compute" state must never look identical
+    # to "we checked and there's genuinely no deficit," since compute_
+    # readiness relies on that distinction to exclude (not fake-perfect-
+    # score) this component when there isn't enough history yet.
+    rows = [
+        {"date": "2026-07-05", "sleep_duration_hours": 4.0},
+        {"date": "2026-07-06", "sleep_duration_hours": 4.0},
+        {"date": "2026-07-07", "sleep_duration_hours": 4.0},
+    ]
+    assert readiness.sleep_debt_hours(rows, date(2026, 7, 7)) is None
+
+
+def test_sleep_debt_hours_ignores_rows_after_for_date():
+    # A future row (relative to for_date) must never inflate/deflate a past
+    # debt figure -- mirrors compute_readiness's own "rows on or before
+    # for_date only" filtering.
+    rows = [
+        {"date": "2026-07-01", "sleep_duration_hours": 4.0},
+        {"date": "2026-07-02", "sleep_duration_hours": 4.0},
+        {"date": "2026-07-03", "sleep_duration_hours": 4.0},
+        {"date": "2026-07-04", "sleep_duration_hours": 11.0},
+        {"date": "2026-07-05", "sleep_duration_hours": 11.0},
+        {"date": "2026-07-06", "sleep_duration_hours": 11.0},
+        {"date": "2026-07-07", "sleep_duration_hours": 11.0},
+        {"date": "2026-07-08", "sleep_duration_hours": 1.0},  # after for_date
+    ]
+    assert readiness.sleep_debt_hours(rows, date(2026, 7, 7)) == 12.0
+
+
+def test_sleep_debt_hours_skips_missing_nights_in_the_window():
+    # 7 clean nights (all 8.0h -> baseline 8.0) with one calendar date inside
+    # the trailing 7-day window (07-05) having no row at all. A missing night
+    # must be skipped, not treated as 0h -- if it were, this would report an
+    # 8.0h debt (max(0, 8.0 - 0)) instead of the correct 0.0.
+    rows = [
+        {"date": "2026-06-30", "sleep_duration_hours": 8.0},
+        {"date": "2026-07-01", "sleep_duration_hours": 8.0},
+        {"date": "2026-07-02", "sleep_duration_hours": 8.0},
+        {"date": "2026-07-03", "sleep_duration_hours": 8.0},
+        {"date": "2026-07-04", "sleep_duration_hours": 8.0},
+        # 2026-07-05 missing entirely.
+        {"date": "2026-07-06", "sleep_duration_hours": 8.0},
+        {"date": "2026-07-07", "sleep_duration_hours": 8.0},
+    ]
+    assert readiness.sleep_debt_hours(rows, date(2026, 7, 7)) == 0.0
+
+
+# ─── compute_readiness: sleep_debt component (2026-07-30) ─────────────────────
+# Added because same-night sleep_s alone missed a genuine multi-night
+# deficit that was individually "not terrible" each night -- e.g. a weekend
+# of 5-6h nights, none short enough to trip sleep_s's own floor, that still
+# adds up to real accumulated debt.
+
+def test_compute_readiness_high_sleep_debt_drags_score_down():
+    # 7 nights at baseline (8.0h), then today itself also logs a poor-but-
+    # not-catastrophic night -- isolate sleep_debt_s's effect by comparing
+    # against the same setup with a full night's sleep instead.
+    good_rows = [_day(n, 30.0, 55.0, 8.0) for n in range(1, 8)]
+    good_rows.append(_day(8, 30.0, 55.0, 8.0))
+    today = date(2026, 6, 8)
+    good_score = readiness.compute_readiness(today, good_rows)
+
+    debt_rows = [_day(n, 30.0, 55.0, 8.0) for n in range(1, 8)]
+    debt_rows.append(_day(8, 30.0, 55.0, 4.5))  # today: short night
+    debt_score = readiness.compute_readiness(today, debt_rows)
+
+    assert debt_score < good_score
+
+
+def test_compute_readiness_sleep_debt_none_is_excluded_not_defaulted():
+    # Only 3 nights of history -- sleep_baseline (and therefore sleep_debt_
+    # hours) can't be trusted yet. The component must be excluded from the
+    # weighted average (renormalised away), not silently treated as a
+    # perfect 100 or a zero.
+    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 4)]
+    today = date(2026, 6, 3)
+    assert readiness.sleep_debt_hours(rows, today) is None
+    score = readiness.compute_readiness(today, rows)
+    assert score != readiness.NOT_COMPUTED
+    # HRV/RHR baselines also can't be trusted yet with only 3 days below
+    # _MIN_DAYS... actually 3 == _MIN_DAYS, so those ARE trusted; sleep_s
+    # itself needs >= 7 clean nights same as sleep_debt, so both are
+    # excluded here -- a perfect HRV/RHR-only day still scores high.
+    assert score > 90.0
+
+
+def _rows_with_trailing_short_nights(n_good: int, n_short: int, short_hours: float) -> tuple[list[dict], date]:
+    """n_good nights at an 8.0h baseline (days 1..n_good of June 2026),
+    followed immediately by n_short nights at short_hours -- a good-night
+    pool large enough that the short nights don't drag the baseline itself
+    down to meet them (unlike a small pool, where "debt" and "baseline"
+    chase each other and a hand-predicted debt figure becomes unreliable).
+    Returns (rows, last_date) -- last_date is the final short night, i.e.
+    "today" for a caller evaluating debt/readiness as of that point.
+    n_good + n_short must stay <= 28 to keep every date inside June."""
+    rows = [_day(n, 30.0, 55.0, 8.0) for n in range(1, n_good + 1)]
+    rows += [_day(n_good + n, 30.0, 55.0, short_hours) for n in range(1, n_short + 1)]
+    return rows, date(2026, 6, n_good + n_short)
+
+
+def test_compute_readiness_sleep_debt_clamps_at_zero_beyond_the_threshold():
+    # Once cumulative debt reaches SLEEP_DEBT_THRESHOLD_HOURS, sleep_debt_s
+    # bottoms out at 0 -- verified by manually reproducing compute_
+    # readiness's weighted average with sleep_debt_s forced to 0.0 and
+    # confirming it matches exactly (rather than comparing two black-box
+    # scenarios, where sleep_s -- a different component, same 30.0/55.0/
+    # 8.0-baseline family but its OWN baseline shifts with the fixture --
+    # would also legitimately differ and make the comparison unreliable).
+    # 25 good nights keep the baseline close to 8.0h despite 3 trailing
+    # short (4.0h) nights inside the 28-night window sleep_baseline uses.
+    rows, today = _rows_with_trailing_short_nights(25, 3, 4.0)
+    debt = readiness.sleep_debt_hours(rows, today)
+    assert debt is not None and debt >= readiness.SLEEP_DEBT_THRESHOLD_HOURS
+
+    score = readiness.compute_readiness(today, rows)
+
+    hrv_base = readiness.hrv_baseline(rows)
+    rhr_base = readiness.rhr_baseline(rows)
+    sleep_base, _ = readiness.sleep_baseline(rows)
+    hrv_s   = min(100.0, (30.0 / hrv_base) * 100.0)
+    rhr_s   = min(100.0, (rhr_base / 55.0) * 100.0)
+    sleep_s = min(100.0, (4.0 / sleep_base) * 100.0)  # today's own short night
+    sleep_debt_s = 0.0  # clamped -- debt is well past the threshold
+
+    total_w = 0.225 + 0.18 + 0.135 + 0.10
+    expected = round(
+        (hrv_s * 0.225 + sleep_s * 0.18 + rhr_s * 0.135 + sleep_debt_s * 0.10) / total_w,
+        1,
+    )
+    assert score == expected
+
+
 # ─── compute_readiness: HRV must not be silently dropped with thin history ────
 
 def test_compute_readiness_includes_degraded_hrv_even_with_thin_history():
@@ -220,7 +393,7 @@ def test_compute_readiness_pulled_down_by_low_recovery_index_alone():
     assert score < 90.0
 
 
-def test_compute_readiness_matches_manual_six_component_weighted_average():
+def test_compute_readiness_matches_manual_seven_component_weighted_average():
     rows = _rows_with_contributors(10, {
         "oura_recovery_index": 40.0,
         "oura_body_temperature": 60.0,
@@ -235,10 +408,17 @@ def test_compute_readiness_matches_manual_six_component_weighted_average():
     hrv_s   = min(100.0, (30.0 / hrv_base) * 100.0)
     rhr_s   = min(100.0, (rhr_base / 55.0) * 100.0)
     sleep_s = min(100.0, (7.5 / sleep_base) * 100.0)
+    # Every row in this fixture (including "today") sleeps exactly 7.5h --
+    # matches the baseline exactly, so trailing 7-night debt is 0.0 and
+    # sleep_debt_s scores a perfect 100.
+    debt = readiness.sleep_debt_hours(rows, today)
+    assert debt == 0.0
+    sleep_debt_s = 100.0
 
     expected = round(
-        hrv_s * 0.25 + sleep_s * 0.20 + rhr_s * 0.15
-        + 40.0 * 0.20 + 60.0 * 0.15 + 80.0 * 0.05,
+        hrv_s * 0.225 + sleep_s * 0.18 + rhr_s * 0.135
+        + 40.0 * 0.18 + 60.0 * 0.135 + 80.0 * 0.045
+        + sleep_debt_s * 0.10,
         1,
     )
     assert score == expected
@@ -270,7 +450,10 @@ def test_compute_readiness_computable_from_oura_contributors_alone():
     }]
     score = readiness.compute_readiness(date(2026, 6, 1), rows)
     assert score != readiness.NOT_COMPUTED
-    expected = round((70.0 * 0.20 + 90.0 * 0.15 + 85.0 * 0.05) / (0.20 + 0.15 + 0.05), 1)
+    # No sleep history at all (single row) -> sleep_debt_s is also None/
+    # excluded here, same as the legacy HRV/RHR/Sleep baselines -- only the
+    # three Oura contributors renormalise against each other.
+    expected = round((70.0 * 0.18 + 90.0 * 0.135 + 85.0 * 0.045) / (0.18 + 0.135 + 0.045), 1)
     assert score == expected
 
 

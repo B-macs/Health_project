@@ -199,3 +199,19 @@ def test_blend_alcohol_units_none_when_no_checkin_logged():
     repo = _repo_with_tabs(oura_daily=[{"date": "2026-07-13", "steps": 2000}])
     rows = repo.get_biometric_rolling(days=7, today=datetime.date(2026, 7, 13))
     assert rows[0].alcohol_units is None
+
+
+def test_blend_passes_through_raw_oura_sleep_awake_seconds():
+    # Feeds the wake-time-adjustment feature (CLAUDE.md rule 4's narrow
+    # manual-entry exception, services.sleep_score.compute_sleep_score) --
+    # a straight passthrough of Oura's raw awake_time reading, same as its
+    # oura_sleep_efficiency/oura_sleep_total_seconds siblings.
+    repo = _repo_with_tabs(
+        oura_sleep=[{
+            "sleep_id": "s1", "day": "2026-07-13", "type": "long_sleep",
+            "total_sleep_duration": 28800, "average_hrv": 40, "lowest_heart_rate": 50,
+            "awake_time": 1800,
+        }],
+    )
+    rows = repo.get_biometric_rolling(days=7, today=datetime.date(2026, 7, 13))
+    assert rows[0].oura_sleep_awake_seconds == 1800
