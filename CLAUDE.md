@@ -161,6 +161,61 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 
 ---
 
+## Garmin 645 → 265 upgrade — what to re-test
+
+*Recorded 2026-07-31, before the upgrade. Every "645" figure below is measured
+from the 53 archived nights in `Input_files/garmin_export/`, not assumed.*
+
+Several findings that currently read as "the data does not exist" are **limits
+of the Forerunner 645, not of the Garmin API**. Re-test each after the 265 is
+worn for ~2 weeks. The measured 645 baseline is given so the comparison is
+real rather than impressionistic.
+
+| Capability | 645, measured | Expect on 265 | What it unblocks |
+|---|---|---|---|
+| SpO2 / Pulse Ox | `averageSpO2Value` null on **0/53** nights | present | A Garmin cross-check on Oura's `spo2_average`; currently the Vitals panel's blood-oxygen row is Oura-only |
+| Respiration rate | `averageRespirationValue` null on **0/53**; `get_respiration_data` returns empty arrays | present | Same — respiration is Oura-only today |
+| HRV | `get_hrv_data` returns `{}` | HRV Status supported | `services/biometrics.py`'s documented Oura-70/**Garmin-30** HRV blend, which has silently been 100% Oura (see the column-drop row below — that half is already repaired) |
+| Skin temperature | `skinTempDataExists` **False on 53/53** | present | A second temperature signal beside Oura's `readiness_temperature_deviation` |
+| REM staging | `deviceRemCapable`, `remSleepData: True` on **53/53** | unchanged | Already working — this is why fusion works at all |
+| Overnight HR resolution | 120 s (`sleepHeartRate`), and `get_heart_rates` is also 120 s | **probably unchanged** — 120 s looks like a Connect API storage decision, not a sensor one | Verify before assuming the quiet-wake rule is revived; see below |
+
+**Two things that do NOT automatically improve, and one real hazard:**
+
+1. **The quiet-wakefulness rule stays blocked even if HR resolution improves.**
+   Its decisive objection was never resolution — it is that there is no ground
+   truth (validation uses the hypnogram's own Awake labels, but the rule
+   exists to find minutes the hypnogram did *not* label Awake). A better watch
+   does not supply PSG. Read `services/sleep_fusion.py`'s docstring before
+   re-attempting.
+2. **Coverage is worn-device-limited.** The 38% → 76% gain came from wearing
+   the watch more often than the ring, not from sensor quality. A better watch
+   does not reach the 17 nights neither device recorded.
+3. **⚠ REFIT the movement calibration, and do NOT pool 645 and 265 nights.**
+   `Repository.sleep_movement_cutpoints` quantile-maps Garmin's undocumented
+   `activityLevel` float onto Oura's 1-4 alphabet. The current cut points
+   (**1.450, 2.430, 5.630**, fitted on 26 paired 645 nights) are specific to
+   the 645's accelerometer and its scale. Elevate Gen 5 may well report a
+   different distribution, and pooling two devices into one fit is exactly the
+   units error that made an early version map a real night to 94.7% "still"
+   with zero postural shifts. Every stored night records the calibration it
+   was produced under in `movement_cutpoints`, which is what makes a refit
+   auditable — check whether the 265's fitted values diverge before
+   backfilling, and re-derive history with `sync_sleep_fusion(days=1500)`.
+
+**Re-test procedure** (all of it costs one probe plus a rebuild):
+
+```
+python scripts/backfill_garmin_sleep_stages.py --probe          # confirm data exists
+python scripts/backfill_garmin_sleep_stages.py --apply --limit 20
+python -c "...; repo.sync_sleep_fusion(days=1500)"              # refit + re-derive
+```
+Then re-run the by-stage HR/HRV/stress separation measurement that killed the
+quiet-wake rule, and compare against the recorded 645 figures in
+`services/sleep_fusion.py`'s docstring.
+
+---
+
 ## Known Open Issues
 
 | Issue | Status |

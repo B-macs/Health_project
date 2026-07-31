@@ -112,6 +112,22 @@ HIGH_AMPLITUDE_WEIGHTS: dict[str, float] = {"oura": 0.30, "garmin": 0.70}
 # missing calibration must read as missing, never as a fabricated default.
 MIN_CALIBRATION_NIGHTS = 14
 
+# ─── The calibration is PER DEVICE. Do not pool two watches. ────────────────
+#  activityLevel is an undocumented float on a scale the hardware defines, so
+#  cut points fitted on one watch do not transfer to another. As of 2026-07-31
+#  they are (1.450, 2.430, 5.630), fitted on 26 paired nights from a Forerunner
+#  645; a 265 upgrade is planned and its Elevate Gen 5 accelerometer may well
+#  report a different distribution.
+#
+#  Mixing both watches into one fit is the same units error that, in an early
+#  version of this module, mapped a real night to 94.7% STILL with zero
+#  postural shifts — see garmin_values_on_grid. Every persisted night records
+#  the calibration it was produced under in the movement_cutpoints column,
+#  which is what makes a refit auditable rather than a silent change of
+#  meaning. On a device change: refit, compare, then re-derive history with
+#  Repository.sync_sleep_fusion(days=1500). CLAUDE.md's "Garmin 645 -> 265
+#  upgrade" section holds the full checklist.
+
 # Oura reports movement every 30s; Garmin every 60s. Fusion runs on the FINER
 # grid — downsampling Oura to match Garmin would destroy real resolution to
 # accommodate the coarser device, which is the same argument
