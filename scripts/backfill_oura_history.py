@@ -16,11 +16,19 @@ blank rather than dropping the date, matching sync_oura_all's behaviour.
 The default ranges are the two the ring has data for outside the live sync
 window; override with --range as needed.
 
+--rebuild is the schema-migration mode. Appending can only ever fill the
+columns a tab already has, so when _OURA_DAILY_HEADER/_OURA_SLEEP_PERIOD_HEADER
+gain columns, every pre-existing row is left short. --rebuild re-fetches the
+range and rewrites each tab in full against the current header, carrying
+through (never dropping) any row the fetch doesn't cover. It snapshots each
+tab to Input_files/oura_export/backup/ first.
+
 Usage:
     python scripts/backfill_oura_history.py                    # dry run (default)
     python scripts/backfill_oura_history.py --apply            # Sheets + local export
     python scripts/backfill_oura_history.py --export-only      # local files, no Sheet writes
     python scripts/backfill_oura_history.py --apply --range 2025-06-01:2025-06-30
+    python scripts/backfill_oura_history.py --rebuild --apply  # migrate to a widened schema
 
 Reads credentials from .streamlit/secrets.toml (the same file the Streamlit
 app uses) or environment variables, via services.config.load_config — nothing
@@ -33,6 +41,7 @@ import csv
 import json
 import sys
 import tomllib
+from datetime import date, datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -51,6 +60,11 @@ ROOT = Path(__file__).resolve().parent.parent
 EXPORT_DIR = ROOT / "Input_files" / "oura_export"
 
 DEFAULT_RANGES = [("2023-07-04", "2024-07-16"), ("2025-01-08", "2025-03-14")]
+
+# Earliest date the ring has any data for -- probed 2026-07-30 across
+# daily_sleep/readiness/activity/sleep/workout back to 2019: all empty before
+# this. The lower bound for a --rebuild, which must span every stored row.
+FIRST_RING_DAY = "2023-07-04"
 
 # tab_key -> (csv filename, header) — the header doubles as the CSV column
 # order, so a CSV column always means the same thing as its Sheet column.
@@ -72,7 +86,7 @@ def _load_repo() -> Repository:
     return Repository(load_config(overrides))
 
 
-def _parse_ranges(argv: list[str]) -> list[tuple[str, str]]:
+def _parse_ranges(argv: list[str], rebuild: bool = False) -> list[tuple[str, str]]:
     ranges = []
     for i, arg in enumerate(argv):
         if arg == "--range" and i + 1 < len(argv):
@@ -80,7 +94,11 @@ def _parse_ranges(argv: list[str]) -> list[tuple[str, str]]:
             if not start or not end:
                 raise SystemExit(f"--range needs START:END (got {argv[i + 1]!r})")
             ranges.append((start.strip(), end.strip()))
-    return ranges or DEFAULT_RANGES
+    if ranges:
+        return ranges
+    # A rebuild has to cover every date the tabs hold, or rows outside the
+    # range get carried through with the new columns left blank.
+    return [(FIRST_RING_DAY, date.today().isoformat())] if rebuild else DEFAULT_RANGES
 
 
 def _write_csv(path: Path, header: list[str], rows: list[dict]) -> None:
@@ -94,8 +112,9 @@ def _write_csv(path: Path, header: list[str], rows: list[dict]) -> None:
 def main() -> None:
     argv = sys.argv[1:]
     export_only = "--export-only" in argv
+    rebuild = "--rebuild" in argv
     apply = "--apply" in argv or export_only
-    ranges = _parse_ranges(argv)
+    ranges = _parse_ranges(argv, rebuild=rebuild)
     repo = _load_repo()
 
     if not repo.oura_configured():
@@ -150,8 +169,27 @@ def main() -> None:
         print("\n--export-only: Google Sheets left untouched.")
         return
 
+    payload = {k: list(v.values()) for k, v in merged.items()}
+
+    if rebuild:
+        backup_dir = EXPORT_DIR / "backup"
+        backup_dir.mkdir(exist_ok=True)
+        stamp = datetime.now().strftime("%Y%m%dT%H%M%S")
+        print("\nSnapshotting current tabs before rewrite ...")
+        for tab, records in repo.export_oura_tabs().items():
+            path = backup_dir / f"{tab}_{stamp}.json"
+            path.write_text(json.dumps(records, indent=2), encoding="utf-8")
+            print(f"  {tab:20s} {len(records):5d} rows -> {path.relative_to(ROOT)}")
+
+        print("\nRewriting Google Sheets against the current header ...")
+        result = repo.rebuild_oura_tabs(ranges[0][0], ranges[-1][1], rows=payload)
+        for key, c in result.items():
+            print(f"  {key:20s} total={c['total']:5d}  refreshed={c['refreshed']:5d}"
+                  f"  carried={c['carried']:5d}  added={c['added']:5d}")
+        return
+
     print("\nAppending to Google Sheets (existing dates/ids are skipped) ...")
-    result = repo.backfill_oura_history({k: list(v.values()) for k, v in merged.items()})
+    result = repo.backfill_oura_history(payload)
     for key, counts in result.items():
         print(f"  {key:20s} written={counts['written']:5d}  skipped={counts['skipped']:5d}")
 

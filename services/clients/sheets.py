@@ -103,6 +103,36 @@ def append_rows(worksheet, rows: list[list], chunk_size: int = APPEND_CHUNK_SIZE
     return len(rows)
 
 
+def rewrite_worksheet(worksheet, header: list[str], rows: list[list],
+                      chunk_size: int = APPEND_CHUNK_SIZE) -> int:
+    """Replaces the tab's header row and every data row in one batched pass.
+
+    The only way to widen a tab: adding a column means rewriting the header
+    AND every existing row, which upsert_row_by_key can't express (it only
+    overwrites the first len(row_values) columns of one row at a time).
+
+    Deliberately does NOT clear() first — a clear-then-write pairing would
+    leave the tab empty if the write half failed. Instead every cell in the
+    block is overwritten in place, which is equivalent as long as the caller
+    passes back at least as many rows as the tab already had (see
+    Repository.rebuild_oura_tabs, which carries unmatched existing rows
+    through rather than dropping them). Grows the grid first when the new
+    block is taller or wider than the current one."""
+    needed_rows, needed_cols = len(rows) + 1, len(header)
+    if worksheet.row_count < needed_rows or worksheet.col_count < needed_cols:
+        worksheet.resize(
+            rows=max(worksheet.row_count, needed_rows),
+            cols=max(worksheet.col_count, needed_cols),
+        )
+    end_col = gspread.utils.rowcol_to_a1(1, len(header)).rstrip("0123456789")
+    worksheet.update([header], f"A1:{end_col}1")
+    for i in range(0, len(rows), chunk_size):
+        block = rows[i:i + chunk_size]
+        first = i + 2  # +1 for the header row, +1 for 1-indexing
+        worksheet.update(block, f"A{first}:{end_col}{first + len(block) - 1}")
+    return len(rows)
+
+
 def get_or_create_weekly_rollup_worksheet(client, sheet_id: str, header: list[str]):
     """Opens the "Weekly Rollup" tab, creating it with the given header row
     on first use if it doesn't exist yet."""

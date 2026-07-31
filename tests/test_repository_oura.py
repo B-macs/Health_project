@@ -138,6 +138,66 @@ def test_oura_daily_row_maps_real_fields():
     assert row["vo2_max"] is None
 
 
+def test_oura_daily_row_captures_temperature_in_degrees_not_just_the_score():
+    """readiness_body_temperature is a 0-100 contributor score; the actual
+    deviation in degrees is a separate top-level field. Both are kept — the
+    degrees one is Oura's only published temperature signal."""
+    repo = Repository(_config())
+    readiness = dict(_REAL_DAILY_READINESS,
+                     temperature_deviation=-0.11, temperature_trend_deviation=23.29)
+    row = repo._oura_daily_row("2026-07-05", {"daily_readiness": readiness})
+    assert row["readiness_temperature_deviation"] == -0.11
+    assert row["readiness_temperature_trend_deviation"] == 23.29
+    assert row["readiness_body_temperature"] == 85  # the contributor score, unchanged
+
+
+def test_oura_daily_row_captures_remaining_readiness_contributors():
+    repo = Repository(_config())
+    row = repo._oura_daily_row("2026-07-05", {"daily_readiness": _REAL_DAILY_READINESS})
+    assert row["readiness_previous_night"] == 45
+    assert row["readiness_sleep_regularity"] == 86
+
+
+def test_oura_daily_row_captures_activity_met_minute_breakdown_and_contributors():
+    repo = Repository(_config())
+    activity = dict(
+        _REAL_DAILY_ACTIVITY,
+        high_activity_met_minutes=0, medium_activity_met_minutes=574,
+        low_activity_met_minutes=232, sedentary_met_minutes=8,
+        non_wear_time=3060, inactivity_alerts=0,
+        equivalent_walking_distance=19109, meters_to_target=-7900, target_meters=12000,
+    )
+    row = repo._oura_daily_row("2026-07-05", {"daily_activity": activity})
+    assert row["activity_medium_met_minutes"] == 574
+    assert row["activity_sedentary_met_minutes"] == 8
+    assert row["activity_non_wear_time"] == 3060
+    assert row["activity_equivalent_walking_distance"] == 19109
+    assert row["activity_meters_to_target"] == -7900
+    # contributors sub-scores, previously dropped entirely
+    assert row["activity_meet_daily_targets"] == 100
+    assert row["activity_move_every_hour"] == 95
+    assert row["activity_training_volume"] == 99
+    assert row["activity_stay_active"] == 76
+
+
+def test_oura_daily_header_and_row_stay_in_lockstep():
+    """A column added to one and not the other silently writes blanks, or
+    drops data into a cell nobody reads."""
+    from services.repository import _OURA_DAILY_HEADER
+    repo = Repository(_config())
+    row = repo._oura_daily_row("2026-07-05", {})
+    assert set(row) == set(_OURA_DAILY_HEADER)
+    assert len(_OURA_DAILY_HEADER) == len(set(_OURA_DAILY_HEADER))  # no dupes
+
+
+def test_oura_sleep_period_header_and_row_stay_in_lockstep():
+    from services.repository import _OURA_SLEEP_PERIOD_HEADER
+    repo = Repository(_config())
+    row = repo._oura_sleep_period_row({})
+    assert set(row) == set(_OURA_SLEEP_PERIOD_HEADER)
+    assert len(_OURA_SLEEP_PERIOD_HEADER) == len(set(_OURA_SLEEP_PERIOD_HEADER))
+
+
 def test_oura_daily_row_handles_completely_empty_group():
     repo = Repository(_config())
     row = repo._oura_daily_row("2026-07-01", {})
@@ -188,6 +248,35 @@ def test_oura_sleep_period_row_maps_real_scalar_fields():
     assert row["deep_sleep_duration"] == 2610
     assert row["efficiency"] == 84
     assert "heart_rate" not in row  # embedded time-series excluded, by design
+
+
+def test_oura_sleep_period_row_captures_per_period_readiness_and_deltas():
+    """A nap's readiness genuinely differs from the day-level daily_readiness
+    row, so this is extra signal rather than a duplicate of it."""
+    repo = Repository(_config())
+    sleep = {
+        "id": "87d8bf41", "day": "2026-07-07", "type": "long_sleep", "period": 0,
+        "sleep_score_delta": 0, "readiness_score_delta": -2,
+        "sleep_algorithm_version": "v2", "sleep_analysis_reason": "bedtime_edit",
+        "low_battery_alert": False,
+        "readiness": {"score": 84, "temperature_deviation": -0.13,
+                      "contributors": {"body_temperature": 99}},
+    }
+    row = repo._oura_sleep_period_row(sleep)
+    assert row["period"] == 0
+    assert row["readiness_score"] == 84
+    assert row["readiness_temperature_deviation"] == -0.13
+    assert row["readiness_score_delta"] == -2
+    assert row["sleep_algorithm_version"] == "v2"
+    assert row["low_battery_alert"] is False
+    assert "readiness" not in row  # flattened, not stored as a dict
+
+
+def test_oura_sleep_period_row_blanks_missing_readiness_block():
+    repo = Repository(_config())
+    row = repo._oura_sleep_period_row({"id": "x"})
+    assert row["readiness_score"] is None
+    assert row["readiness_temperature_deviation"] is None
 
 
 # ─── _oura_session_row / _oura_rest_mode_row ────────────────────────────────

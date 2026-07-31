@@ -248,6 +248,138 @@ def test_backfill_reports_zero_for_tabs_with_no_data_without_opening_them(monkey
     assert tabs == {}  # no tab was opened
 
 
+# ─── rebuild_oura_tabs — the widened-schema migration path ──────────────────
+
+
+class _FakeRewritableTab(_FakeTab):
+    def __init__(self, records=None, row_count=200, col_count=43):
+        super().__init__(records)
+        self.row_count = row_count
+        self.col_count = col_count
+        self.written_header = None
+        self.written_rows: list[list] = []
+        self.resized = None
+        self.cleared = False
+
+    def clear(self):
+        self.cleared = True
+
+    def resize(self, rows, cols):
+        self.resized = (rows, cols)
+        self.row_count, self.col_count = rows, cols
+
+
+def _patch_rewrite(monkeypatch, tabs):
+    _patch_sheets(monkeypatch, tabs)
+
+    def rewrite(ws, header, rows, chunk_size=500):
+        ws.written_header = header
+        ws.written_rows = rows
+        return len(rows)
+
+    monkeypatch.setattr(repo_mod.sheets, "rewrite_worksheet", rewrite)
+
+
+def test_rebuild_replaces_covered_rows_so_new_columns_get_populated(monkeypatch):
+    tabs = {repo_mod.sheets.OURA_DAILY_WORKSHEET: _FakeRewritableTab(
+        records=[{"date": "2023-07-04", "sleep_score": 64}],  # old, narrow header
+    )}
+    _patch_rewrite(monkeypatch, tabs)
+
+    result = Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-05", rows={
+        "daily": [{"date": "2023-07-04", "sleep_score": 64,
+                   "readiness_temperature_deviation": -0.11}],
+    })
+
+    ws = tabs[repo_mod.sheets.OURA_DAILY_WORKSHEET]
+    assert ws.written_header == repo_mod._OURA_DAILY_HEADER
+    col = repo_mod._OURA_DAILY_HEADER.index("readiness_temperature_deviation")
+    assert ws.written_rows[0][col] == -0.11
+    assert result["daily"] == {"total": 1, "refreshed": 1, "carried": 0, "added": 0}
+
+
+def test_rebuild_carries_rows_the_fetch_does_not_cover(monkeypatch):
+    """The no-data-loss guarantee: a date outside the refetched range keeps
+    its old values and just gets blanks in the new columns."""
+    tabs = {repo_mod.sheets.OURA_DAILY_WORKSHEET: _FakeRewritableTab(
+        records=[{"date": "2020-01-01", "sleep_score": 55}],
+    )}
+    _patch_rewrite(monkeypatch, tabs)
+
+    result = Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-05", rows={"daily": []})
+
+    ws = tabs[repo_mod.sheets.OURA_DAILY_WORKSHEET]
+    row = ws.written_rows[0]
+    assert row[repo_mod._OURA_DAILY_HEADER.index("date")] == "2020-01-01"
+    assert row[repo_mod._OURA_DAILY_HEADER.index("sleep_score")] == 55
+    assert row[repo_mod._OURA_DAILY_HEADER.index("readiness_temperature_deviation")] == ""
+    assert result["daily"] == {"total": 1, "refreshed": 0, "carried": 1, "added": 0}
+
+
+def test_rebuild_adds_dates_the_tab_was_missing(monkeypatch):
+    tabs = {repo_mod.sheets.OURA_DAILY_WORKSHEET: _FakeRewritableTab(
+        records=[{"date": "2023-07-04"}],
+    )}
+    _patch_rewrite(monkeypatch, tabs)
+
+    result = Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-06", rows={
+        "daily": [{"date": "2023-07-04"}, {"date": "2023-07-06"}],
+    })
+
+    ws = tabs[repo_mod.sheets.OURA_DAILY_WORKSHEET]
+    assert [r[0] for r in ws.written_rows] == ["2023-07-04", "2023-07-06"]
+    assert result["daily"] == {"total": 2, "refreshed": 1, "carried": 0, "added": 1}
+
+
+def test_rebuild_output_is_always_a_superset_of_what_was_there(monkeypatch):
+    tabs = {repo_mod.sheets.OURA_DAILY_WORKSHEET: _FakeRewritableTab(
+        records=[{"date": d} for d in ("2023-07-04", "2020-01-01", "2026-07-30")],
+    )}
+    _patch_rewrite(monkeypatch, tabs)
+
+    Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-04", rows={
+        "daily": [{"date": "2023-07-04"}, {"date": "2023-07-05"}],
+    })
+
+    written = {r[0] for r in tabs[repo_mod.sheets.OURA_DAILY_WORKSHEET].written_rows}
+    assert {"2020-01-01", "2023-07-04", "2026-07-30"} <= written
+
+
+def test_rebuild_sorts_chronologically(monkeypatch):
+    tabs = {repo_mod.sheets.OURA_DAILY_WORKSHEET: _FakeRewritableTab(
+        records=[{"date": d} for d in ("2026-07-30", "2023-07-04", "2025-01-08")],
+    )}
+    _patch_rewrite(monkeypatch, tabs)
+
+    Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-04", rows={"daily": []})
+
+    rows = tabs[repo_mod.sheets.OURA_DAILY_WORKSHEET].written_rows
+    assert [r[0] for r in rows] == ["2023-07-04", "2025-01-08", "2026-07-30"]
+
+
+def test_rebuild_drops_duplicate_keys_already_in_the_tab(monkeypatch):
+    tabs = {repo_mod.sheets.OURA_DAILY_WORKSHEET: _FakeRewritableTab(
+        records=[{"date": "2023-07-04"}, {"date": "2023-07-04"}],
+    )}
+    _patch_rewrite(monkeypatch, tabs)
+
+    result = Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-04", rows={"daily": []})
+    assert result["daily"]["total"] == 1
+
+
+def test_export_oura_tabs_snapshots_every_tab(monkeypatch):
+    tabs = {
+        repo_mod.sheets.OURA_DAILY_WORKSHEET: _FakeTab(records=[{"date": "2023-07-04"}]),
+        repo_mod.sheets.OURA_WORKOUTS_WORKSHEET: _FakeTab(records=[{"workout_id": "w-1"}]),
+    }
+    _patch_sheets(monkeypatch, tabs)
+
+    snap = Repository(_config()).export_oura_tabs()
+    assert set(snap) == {"daily", "workouts", "sleep_periods", "sessions", "rest_mode_periods"}
+    assert snap["daily"] == [{"date": "2023-07-04"}]
+    assert snap["workouts"] == [{"workout_id": "w-1"}]
+
+
 # ─── shared endpoint→tab wiring (used by both sync_oura_all and the backfill) ─
 
 def test_oura_tab_specs_cover_every_result_key_sync_oura_all_returns():

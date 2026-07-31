@@ -366,6 +366,63 @@ def test_append_rows_no_api_call_for_empty_input():
     assert ws.batches == []
 
 
+# ─── rewrite_worksheet — the only way to widen a tab ────────────────────────
+
+
+class _FakeResizableWorksheet(_FakeBatchWorksheet):
+    def __init__(self, row_count=200, col_count=43):
+        super().__init__()
+        self.row_count, self.col_count = row_count, col_count
+        self.updates = []
+        self.resized = None
+        self.cleared = False
+
+    def clear(self):
+        self.cleared = True
+
+    def resize(self, rows, cols):
+        self.resized = (rows, cols)
+        self.row_count, self.col_count = rows, cols
+
+    def update(self, values, range_name):
+        self.updates.append((range_name, values))
+
+
+def test_rewrite_worksheet_grows_the_grid_before_writing_a_wider_block():
+    ws = _FakeResizableWorksheet(row_count=200, col_count=43)
+    header = [f"c{i}" for i in range(60)]
+    sheets_client_mod.rewrite_worksheet(ws, header, [[i] * 60 for i in range(400)])
+    assert ws.resized == (401, 60)
+
+
+def test_rewrite_worksheet_leaves_the_grid_alone_when_it_already_fits():
+    ws = _FakeResizableWorksheet(row_count=1000, col_count=80)
+    sheets_client_mod.rewrite_worksheet(ws, ["a", "b"], [[1, 2]])
+    assert ws.resized is None
+
+
+def test_rewrite_worksheet_writes_header_then_rows_at_the_right_offsets():
+    ws = _FakeResizableWorksheet(row_count=1000, col_count=10)
+    sheets_client_mod.rewrite_worksheet(ws, ["a", "b", "c"], [[1, 2, 3], [4, 5, 6]])
+    assert ws.updates[0] == ("A1:C1", [["a", "b", "c"]])
+    assert ws.updates[1] == ("A2:C3", [[1, 2, 3], [4, 5, 6]])
+
+
+def test_rewrite_worksheet_chunks_and_keeps_row_offsets_contiguous():
+    ws = _FakeResizableWorksheet(row_count=2000, col_count=10)
+    rows = [[i] for i in range(1200)]
+    sheets_client_mod.rewrite_worksheet(ws, ["a"], rows, chunk_size=500)
+    ranges = [r for r, _v in ws.updates[1:]]
+    assert ranges == ["A2:A501", "A502:A1001", "A1002:A1201"]
+
+
+def test_rewrite_worksheet_never_clears_first():
+    """clear()-then-write would empty the tab if the write half failed."""
+    ws = _FakeResizableWorksheet()
+    sheets_client_mod.rewrite_worksheet(ws, ["a"], [[1]])
+    assert ws.cleared is False
+
+
 # ─── local_cache ─────────────────────────────────────────────────────────────
 
 def test_local_cache_read_missing_file_returns_empty_dict(tmp_path):

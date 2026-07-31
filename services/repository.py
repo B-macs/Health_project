@@ -83,8 +83,22 @@ _OURA_DAILY_HEADER = [
     "readiness_score", "readiness_resting_heart_rate", "readiness_hrv_balance",
     "readiness_body_temperature", "readiness_recovery_index", "readiness_sleep_balance",
     "readiness_activity_balance", "readiness_previous_day_activity",
+    "readiness_previous_night", "readiness_sleep_regularity",
+    # Temperature in DEGREES, against the wearer's own baseline — distinct
+    # from readiness_body_temperature above, which is the 0-100 contributor
+    # score derived from it. Oura's only published temperature signal: it is
+    # nightly, and has no per-session equivalent.
+    "readiness_temperature_deviation", "readiness_temperature_trend_deviation",
     "activity_score", "steps", "activity_high_time", "activity_medium_time",
     "activity_low_time", "activity_sedentary_time", "activity_met_minutes",
+    "activity_high_met_minutes", "activity_medium_met_minutes",
+    "activity_low_met_minutes", "activity_sedentary_met_minutes",
+    "activity_non_wear_time", "activity_inactivity_alerts",
+    "activity_equivalent_walking_distance", "activity_meters_to_target",
+    "activity_target_meters",
+    "activity_meet_daily_targets", "activity_move_every_hour",
+    "activity_recovery_time", "activity_stay_active",
+    "activity_training_frequency", "activity_training_volume",
     "total_calories", "active_calories", "target_calories", "resting_time",
     "stress_high_duration", "stress_recovery_duration", "stress_day_summary",
     "resilience_level", "resilience_sleep_recovery", "resilience_daytime_recovery", "resilience_stress",
@@ -100,11 +114,16 @@ _OURA_WORKOUT_HEADER = [
     "start_datetime", "end_datetime", "source",
 ]
 _OURA_SLEEP_PERIOD_HEADER = [
-    "sleep_id", "day", "type", "bedtime_start", "bedtime_end",
+    "sleep_id", "day", "type", "period", "bedtime_start", "bedtime_end",
     "total_sleep_duration", "time_in_bed", "awake_time", "deep_sleep_duration",
     "light_sleep_duration", "rem_sleep_duration", "efficiency", "latency",
     "average_heart_rate", "lowest_heart_rate", "average_hrv", "average_breath",
     "restless_periods",
+    # Per-period readiness — for a nap or a split night this genuinely differs
+    # from the day-level daily_readiness row, so it isn't a duplicate of it.
+    "readiness_score", "readiness_temperature_deviation",
+    "sleep_score_delta", "readiness_score_delta",
+    "sleep_algorithm_version", "sleep_analysis_reason", "low_battery_alert",
 ]
 _OURA_SESSION_HEADER = [
     "session_id", "day", "type", "start_datetime", "end_datetime", "mood", "motion_count",
@@ -1990,6 +2009,7 @@ class Repository:
         readiness = group.get("daily_readiness") or {}
         readiness_c = readiness.get("contributors") or {}
         activity = group.get("daily_activity") or {}
+        activity_c = activity.get("contributors") or {}
         stress = group.get("daily_stress") or {}
         resilience = group.get("daily_resilience") or {}
         resilience_c = resilience.get("contributors") or {}
@@ -2016,6 +2036,10 @@ class Repository:
             "readiness_sleep_balance": readiness_c.get("sleep_balance"),
             "readiness_activity_balance": readiness_c.get("activity_balance"),
             "readiness_previous_day_activity": readiness_c.get("previous_day_activity"),
+            "readiness_previous_night": readiness_c.get("previous_night"),
+            "readiness_sleep_regularity": readiness_c.get("sleep_regularity"),
+            "readiness_temperature_deviation": readiness.get("temperature_deviation"),
+            "readiness_temperature_trend_deviation": readiness.get("temperature_trend_deviation"),
             "activity_score": activity.get("score"),
             "steps": activity.get("steps"),
             "activity_high_time": activity.get("high_activity_time"),
@@ -2023,6 +2047,21 @@ class Repository:
             "activity_low_time": activity.get("low_activity_time"),
             "activity_sedentary_time": activity.get("sedentary_time"),
             "activity_met_minutes": activity.get("average_met_minutes"),
+            "activity_high_met_minutes": activity.get("high_activity_met_minutes"),
+            "activity_medium_met_minutes": activity.get("medium_activity_met_minutes"),
+            "activity_low_met_minutes": activity.get("low_activity_met_minutes"),
+            "activity_sedentary_met_minutes": activity.get("sedentary_met_minutes"),
+            "activity_non_wear_time": activity.get("non_wear_time"),
+            "activity_inactivity_alerts": activity.get("inactivity_alerts"),
+            "activity_equivalent_walking_distance": activity.get("equivalent_walking_distance"),
+            "activity_meters_to_target": activity.get("meters_to_target"),
+            "activity_target_meters": activity.get("target_meters"),
+            "activity_meet_daily_targets": activity_c.get("meet_daily_targets"),
+            "activity_move_every_hour": activity_c.get("move_every_hour"),
+            "activity_recovery_time": activity_c.get("recovery_time"),
+            "activity_stay_active": activity_c.get("stay_active"),
+            "activity_training_frequency": activity_c.get("training_frequency"),
+            "activity_training_volume": activity_c.get("training_volume"),
             "total_calories": activity.get("total_calories"),
             "active_calories": activity.get("active_calories"),
             "target_calories": activity.get("target_calories"),
@@ -2062,10 +2101,12 @@ class Repository:
         """Scalar fields only — deliberately excludes the embedded heart_rate/
         hrv/movement_30_sec time-series and the sleep_phase_5_min hypnogram
         string (same high-volume exclusion as the top-level heartrate endpoint)."""
+        readiness = s.get("readiness") or {}
         return {
             "sleep_id": s.get("id", ""),
             "day": s.get("day", ""),
             "type": s.get("type", ""),
+            "period": s.get("period"),
             "bedtime_start": s.get("bedtime_start", ""),
             "bedtime_end": s.get("bedtime_end", ""),
             "total_sleep_duration": s.get("total_sleep_duration"),
@@ -2081,6 +2122,13 @@ class Repository:
             "average_hrv": s.get("average_hrv"),
             "average_breath": s.get("average_breath"),
             "restless_periods": s.get("restless_periods"),
+            "readiness_score": readiness.get("score"),
+            "readiness_temperature_deviation": readiness.get("temperature_deviation"),
+            "sleep_score_delta": s.get("sleep_score_delta"),
+            "readiness_score_delta": s.get("readiness_score_delta"),
+            "sleep_algorithm_version": s.get("sleep_algorithm_version", ""),
+            "sleep_analysis_reason": s.get("sleep_analysis_reason", ""),
+            "low_battery_alert": s.get("low_battery_alert"),
         }
 
     def _oura_session_row(self, s: dict) -> dict:
@@ -2291,6 +2339,68 @@ class Repository:
             ]
             sheets.append_rows(ws, values)
             out[key] = {"written": len(new_rows), "skipped": len(candidates) - len(new_rows)}
+        return out
+
+    def export_oura_tabs(self) -> dict[str, list[dict]]:
+        """Every Oura tab's current contents, {tab_key: [row_dict, ...]} —
+        read-only, and read through the tab's OWN header rather than the
+        current _OURA_*_HEADER, so it stays a faithful snapshot even when the
+        two have diverged. Exists so a caller can back a tab up before
+        rebuild_oura_tabs() rewrites it."""
+        return {
+            key: sheets.get_worksheet_records(ws_getter())
+            for key, ws_getter, _header in self._oura_tab_specs()
+        }
+
+    def rebuild_oura_tabs(self, start: str, end: str,
+                          rows: dict[str, list[dict]] | None = None) -> dict[str, dict]:
+        """Rewrites every Oura tab against the CURRENT header — the migration
+        path for a schema that has gained columns, which neither sync_oura_all
+        nor backfill_oura_history can perform (both only ever write the first
+        len(header) columns of individual rows, so a widened header leaves
+        every pre-existing row short).
+
+        Re-fetches [start, end] unless `rows` is supplied, then merges: a row
+        the fetch covers is replaced with the freshly-mapped version (this is
+        what populates the new columns), and a row it does NOT cover is
+        carried through untouched, with the new columns simply blank. Nothing
+        is ever dropped — the output is always a superset of what was there.
+
+        Returns {tab_key: {"total", "refreshed", "carried", "added"}}."""
+        data = rows if rows is not None else self.fetch_oura_history(start, end)["rows"]
+        out: dict[str, dict] = {}
+        for key, ws_getter, header in self._oura_tab_specs():
+            ws = ws_getter()
+            key_field = header[0]
+            fresh = {
+                _sheet_key(r.get(key_field)): r for r in (data.get(key) or [])
+                if _sheet_key(r.get(key_field))
+            }
+            merged, seen = [], set()
+            for old in sheets.get_worksheet_records(ws):
+                k = _sheet_key(old.get(key_field))
+                if not k or k in seen:
+                    continue
+                seen.add(k)
+                merged.append(fresh.get(k, old))
+            added = [r for k, r in fresh.items() if k not in seen]
+            merged.extend(added)
+            # Chronological, so a rebuilt tab reads the same way a freshly
+            # synced one would; the id key is the tiebreak within a day.
+            merged.sort(key=lambda r: (
+                _sheet_key(r.get("date") or r.get("day") or r.get("start_day")),
+                _sheet_key(r.get(key_field)),
+            ))
+            values = [
+                ["" if r.get(c) is None else r.get(c) for c in header]
+                for r in merged
+            ]
+            sheets.rewrite_worksheet(ws, header, values)
+            refreshed = sum(1 for k in seen if k in fresh)
+            out[key] = {
+                "total": len(merged), "refreshed": refreshed,
+                "carried": len(seen) - refreshed, "added": len(added),
+            }
         return out
 
 
