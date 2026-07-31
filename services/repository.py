@@ -124,7 +124,26 @@ _OURA_SLEEP_PERIOD_HEADER = [
     "readiness_score", "readiness_temperature_deviation",
     "sleep_score_delta", "readiness_score_delta",
     "sleep_algorithm_version", "sleep_analysis_reason", "low_battery_alert",
+    # Hypnograms — the per-night stage sequence, one digit per block
+    # (1=deep, 2=light, 3=REM, 4=awake). The scalar *_duration columns above
+    # are these summed; what only these preserve is the ORDER, i.e. sleep
+    # architecture (when deep sleep landed, how fragmented the night was).
+    # One cell per night, ~180 and ~1,800 chars — nothing like the row
+    # explosion that keeps heart_rate.items/met.items excluded.
+    # RING-derived only: Oura also returns app_sleep_phase_5_min, which
+    # differs on 769 of 781 nights because it reflects user bedtime edits.
+    # These columns are digit-coded TEXT — see _OURA_NUMERICISE_IGNORE.
+    "sleep_phase_5_min", "sleep_phase_30_sec",
 ]
+# Columns whose values are digit strings, not numbers. gspread numericises by
+# default, which would turn a hypnogram into a 1,800-digit int and, on the
+# next write, a JSON number that no float64 spreadsheet cell can represent.
+_OURA_NUMERICISE_IGNORE = {
+    "sleep_periods": [
+        _OURA_SLEEP_PERIOD_HEADER.index("sleep_phase_5_min") + 1,
+        _OURA_SLEEP_PERIOD_HEADER.index("sleep_phase_30_sec") + 1,
+    ],
+}
 _OURA_SESSION_HEADER = [
     "session_id", "day", "type", "start_datetime", "end_datetime", "mood", "motion_count",
 ]
@@ -1076,7 +1095,7 @@ class Repository:
         }
 
     def _oura_sleep_metrics_by_date(self, start: str, end: str) -> dict[str, dict]:
-        rows = sheets.get_worksheet_records(self._oura_sleep_periods_ws())
+        rows = self._oura_tab_records("sleep_periods", self._oura_sleep_periods_ws())
         by_day: dict[str, list[dict]] = {}
         for r in rows:
             day = str(r.get("day") or "")
@@ -2098,9 +2117,11 @@ class Repository:
         }
 
     def _oura_sleep_period_row(self, s: dict) -> dict:
-        """Scalar fields only — deliberately excludes the embedded heart_rate/
-        hrv/movement_30_sec time-series and the sleep_phase_5_min hypnogram
-        string (same high-volume exclusion as the top-level heartrate endpoint)."""
+        """Scalars plus the two ring hypnograms. Still excludes the embedded
+        heart_rate/hrv/movement_30_sec time-series (same high-volume exclusion
+        as the top-level heartrate endpoint) — but NOT the hypnograms, which
+        are one string per night rather than a per-sample series, so they cost
+        a column instead of the rows those series would add."""
         readiness = s.get("readiness") or {}
         return {
             "sleep_id": s.get("id", ""),
@@ -2129,6 +2150,11 @@ class Repository:
             "sleep_algorithm_version": s.get("sleep_algorithm_version", ""),
             "sleep_analysis_reason": s.get("sleep_analysis_reason", ""),
             "low_battery_alert": s.get("low_battery_alert"),
+            # Ring-derived hypnograms. app_sleep_phase_5_min is deliberately
+            # NOT stored — it is the same night after the user's own bedtime
+            # edits, so it describes the UI, not the measurement.
+            "sleep_phase_5_min": s.get("sleep_phase_5_min", ""),
+            "sleep_phase_30_sec": s.get("sleep_phase_30_sec", ""),
         }
 
     def _oura_session_row(self, s: dict) -> dict:
@@ -2191,6 +2217,14 @@ class Repository:
              _OURA_SESSION_HEADER, self._oura_session_row),
             ("rest_mode_periods", "rest_mode_period", self._oura_rest_mode_ws,
              _OURA_REST_MODE_HEADER, self._oura_rest_mode_row),
+        )
+
+    def _oura_tab_records(self, key: str, ws) -> list[dict]:
+        """Reads an Oura tab with that tab's digit-string columns exempted
+        from gspread's numericising (see _OURA_NUMERICISE_IGNORE) — the only
+        safe way to read a tab holding hypnograms."""
+        return sheets.get_worksheet_records(
+            ws, numericise_ignore=_OURA_NUMERICISE_IGNORE.get(key),
         )
 
     def _oura_tab_specs(self) -> list[tuple]:
@@ -2330,7 +2364,7 @@ class Repository:
             ws = ws_getter()
             key_field = header[0]
             existing = {
-                _sheet_key(r.get(key_field)) for r in sheets.get_worksheet_records(ws)
+                _sheet_key(r.get(key_field)) for r in self._oura_tab_records(key, ws)
             }
             new_rows = [r for r in candidates if _sheet_key(r.get(key_field)) not in existing]
             values = [
@@ -2348,7 +2382,7 @@ class Repository:
         two have diverged. Exists so a caller can back a tab up before
         rebuild_oura_tabs() rewrites it."""
         return {
-            key: sheets.get_worksheet_records(ws_getter())
+            key: self._oura_tab_records(key, ws_getter())
             for key, ws_getter, _header in self._oura_tab_specs()
         }
 
@@ -2377,7 +2411,7 @@ class Repository:
                 if _sheet_key(r.get(key_field))
             }
             merged, seen = [], set()
-            for old in sheets.get_worksheet_records(ws):
+            for old in self._oura_tab_records(key, ws):
                 k = _sheet_key(old.get(key_field))
                 if not k or k in seen:
                     continue

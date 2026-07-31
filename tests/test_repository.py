@@ -655,7 +655,7 @@ class _FakeWorksheet:
     def __init__(self, rows):
         self._rows = rows
 
-    def get_all_records(self):
+    def get_all_records(self, numericise_ignore=None):
         return self._rows
 
 
@@ -762,7 +762,7 @@ class _FakeWeeklyRollupWorksheet:
         self.updates = []
         self.appended = []
 
-    def get_all_records(self):
+    def get_all_records(self, numericise_ignore=None):
         return [dict(zip(self.header, r)) for r in self.rows]
 
     def find(self, query, in_column=None):

@@ -207,7 +207,7 @@ def test_create_page_and_update_page():
 
 def test_get_all_records():
     class _Worksheet:
-        def get_all_records(self):
+        def get_all_records(self, numericise_ignore=None):
             return [{"Date/Time": "2026-07-01 08:00", "Heart Rate Variability (ms)": "45.2"}]
 
     class _Sheet:
@@ -238,7 +238,7 @@ class _FakeWeeklyRollupWorksheet:
         self.appended = []
         self.header_written = None
 
-    def get_all_records(self):
+    def get_all_records(self, numericise_ignore=None):
         return [dict(zip(self.header_written or [], r)) for r in self.rows]
 
     def find(self, query, in_column=None):

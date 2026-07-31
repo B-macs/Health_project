@@ -143,7 +143,12 @@ def _patch_sheets(monkeypatch, tabs: dict[str, _FakeTab]):
         repo_mod.sheets, "get_or_create_worksheet",
         lambda client, sheet_id, title, header: tabs.setdefault(title, _FakeTab()),
     )
-    monkeypatch.setattr(repo_mod.sheets, "get_worksheet_records", lambda ws: ws.records)
+
+    def get_records(ws, numericise_ignore=None):
+        ws.numericise_ignore = numericise_ignore
+        return ws.records
+
+    monkeypatch.setattr(repo_mod.sheets, "get_worksheet_records", get_records)
 
     def append_rows(ws, rows, chunk_size=500):
         ws.appended.extend(rows)
@@ -365,6 +370,46 @@ def test_rebuild_drops_duplicate_keys_already_in_the_tab(monkeypatch):
 
     result = Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-04", rows={"daily": []})
     assert result["daily"]["total"] == 1
+
+
+def test_sleep_period_reads_exempt_the_hypnogram_columns(monkeypatch):
+    """Every read path into the sleep-periods tab must pass the exemption, or
+    gspread turns a hypnogram into an int on the way in and a lossy JSON
+    number on the way back out."""
+    tabs: dict[str, _FakeTab] = {}
+    _patch_rewrite(monkeypatch, tabs)
+    repo = Repository(_config())
+
+    repo.rebuild_oura_tabs("2023-07-04", "2023-07-04", rows={"sleep_periods": [{"sleep_id": "s-1"}]})
+    assert tabs[repo_mod.sheets.OURA_SLEEP_PERIODS_WORKSHEET].numericise_ignore == \
+        repo_mod._OURA_NUMERICISE_IGNORE["sleep_periods"]
+
+
+def test_other_tabs_are_not_exempted(monkeypatch):
+    """Blanket-exempting would turn every numeric column into a string and
+    break the arithmetic downstream of them."""
+    tabs: dict[str, _FakeTab] = {}
+    _patch_rewrite(monkeypatch, tabs)
+
+    Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-04", rows={"daily": [{"date": "2023-07-04"}]})
+    assert tabs[repo_mod.sheets.OURA_DAILY_WORKSHEET].numericise_ignore is None
+
+
+def test_hypnogram_survives_a_carry_through_rebuild(monkeypatch):
+    """The corruption path that matters: a row the refetch does not cover is
+    read from the sheet and written straight back."""
+    hypno = "4" * 900 + "2" * 900
+    tabs = {repo_mod.sheets.OURA_SLEEP_PERIODS_WORKSHEET: _FakeRewritableTab(
+        records=[{"sleep_id": "s-1", "sleep_phase_30_sec": hypno}],
+    )}
+    _patch_rewrite(monkeypatch, tabs)
+
+    Repository(_config()).rebuild_oura_tabs("2023-07-04", "2023-07-04", rows={"sleep_periods": []})
+
+    col = repo_mod._OURA_SLEEP_PERIOD_HEADER.index("sleep_phase_30_sec")
+    written = tabs[repo_mod.sheets.OURA_SLEEP_PERIODS_WORKSHEET].written_rows[0][col]
+    assert written == hypno
+    assert isinstance(written, str)
 
 
 def test_export_oura_tabs_snapshots_every_tab(monkeypatch):

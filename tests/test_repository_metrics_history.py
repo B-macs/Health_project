@@ -50,7 +50,7 @@ class _FakeMetricsHistoryWorksheet:
         self.appended = []
         self.updates = []
 
-    def get_all_records(self):
+    def get_all_records(self, numericise_ignore=None):
         return [dict(zip(self.header, r)) for r in self.rows]
 
     def find(self, query, in_column=None):

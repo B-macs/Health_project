@@ -37,7 +37,7 @@ class _FakeWorksheet:
     def __init__(self, rows):
         self._rows = rows
 
-    def get_all_records(self):
+    def get_all_records(self, numericise_ignore=None):
         return self._rows
 
 

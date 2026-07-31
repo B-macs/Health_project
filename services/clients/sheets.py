@@ -46,11 +46,19 @@ def get_all_records(client, sheet_id: str) -> list[dict]:
 # same generic get_or_create_worksheet()/upsert_row_by_key() underneath.
 
 
-def get_worksheet_records(worksheet) -> list[dict]:
+def get_worksheet_records(worksheet, numericise_ignore: list | None = None) -> list[dict]:
     """Every row in an arbitrary already-opened worksheet, gspread's own
     dict-per-row parsing, unmapped — the generic counterpart to
     get_all_records() (which is hardcoded to Sheet1) for the Oura/Garmin
-    tabs, which until now were write-only from the app's perspective."""
+    tabs, which until now were write-only from the app's perspective.
+
+    numericise_ignore: 1-based column indices to leave as text. gspread
+    coerces anything that looks numeric, which silently destroys digit-coded
+    string columns — an Oura hypnogram ("4424211...") becomes a 1,800-digit
+    int, and writing that back sends a JSON number no float64 cell can hold.
+    Callers that store such a column must exempt it here."""
+    if numericise_ignore:
+        return worksheet.get_all_records(numericise_ignore=numericise_ignore)
     return worksheet.get_all_records()
 
 

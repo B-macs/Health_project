@@ -272,6 +272,49 @@ def test_oura_sleep_period_row_captures_per_period_readiness_and_deltas():
     assert "readiness" not in row  # flattened, not stored as a dict
 
 
+def test_oura_sleep_period_row_stores_ring_hypnograms_not_the_app_variant():
+    """app_sleep_phase_5_min is the same night after the user's own bedtime
+    edits — it describes the UI, not the measurement, and differs from the
+    ring on 769 of 781 real nights."""
+    repo = Repository(_config())
+    row = repo._oura_sleep_period_row({
+        "id": "s-1",
+        "sleep_phase_5_min": "4424211111122242",
+        "app_sleep_phase_5_min": "9999999999999999",
+        "sleep_phase_30_sec": "444444444444444444444444222222",
+    })
+    assert row["sleep_phase_5_min"] == "4424211111122242"
+    assert row["sleep_phase_30_sec"] == "444444444444444444444444222222"
+    assert "app_sleep_phase_5_min" not in row
+    assert "9999999999999999" not in row.values()
+
+
+def test_hypnograms_stay_strings_not_numbers():
+    """A hypnogram is digit-coded text. If it ever became an int, the 30-sec
+    variant (up to 1,800 digits) would be written back as a JSON number that
+    no float64 cell can hold."""
+    repo = Repository(_config())
+    row = repo._oura_sleep_period_row({"id": "s-1", "sleep_phase_5_min": "4424211111122242"})
+    assert isinstance(row["sleep_phase_5_min"], str)
+
+
+def test_numericise_ignore_covers_exactly_the_hypnogram_columns():
+    """The indices are 1-based column positions — an off-by-one here silently
+    exempts the wrong column and corrupts the hypnogram anyway."""
+    from services.repository import _OURA_NUMERICISE_IGNORE, _OURA_SLEEP_PERIOD_HEADER
+    ignored = _OURA_NUMERICISE_IGNORE["sleep_periods"]
+    assert [_OURA_SLEEP_PERIOD_HEADER[i - 1] for i in ignored] == [
+        "sleep_phase_5_min", "sleep_phase_30_sec",
+    ]
+
+
+def test_oura_sleep_period_row_blanks_missing_hypnograms():
+    repo = Repository(_config())
+    row = repo._oura_sleep_period_row({"id": "s-1"})
+    assert row["sleep_phase_5_min"] == ""
+    assert row["sleep_phase_30_sec"] == ""
+
+
 def test_oura_sleep_period_row_blanks_missing_readiness_block():
     repo = Repository(_config())
     row = repo._oura_sleep_period_row({"id": "x"})
