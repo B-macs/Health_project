@@ -46,9 +46,48 @@ to RULES_VERSION 1 but never relative to Oura.
 The first rule that WOULD break that invariant is quiet-wakefulness detection
 — a long motionless run that both devices call sleep but where heart rate is
 elevated against the night's own sleeping baseline. That is the actigraphy
-blind spot proper (Marino et al. 2013 measure wake specificity at 0.34), it
-needs the overnight HR series rather than movement, and it is deliberately
-not implemented here yet.
+blind spot proper (Marino et al. 2013 measure wake specificity at 0.34).
+
+IT WAS BUILT AS FAR AS MEASUREMENT AND THEN ABANDONED. Do not re-attempt it
+without reading this first — the data does not support it, and the reasons
+are not the obvious ones.
+
+Measured over the 26 fused nights, on still minutes only, using Garmin's
+120-second overnight HR:
+
+    HR minus the night's own low-quartile baseline
+      Deep  med +3.0    Light med +1.0    REM med +3.0    AWAKE med +3.0
+    HR minus a LOCAL (+/-30 min) rolling median   <- removes the
+      Deep  med  0.0    Light med  0.0    REM med +1.0    AWAKE med +1.0
+                                                     time-of-night trend
+
+    Best precision at any threshold: ~12% (base rate 1.9%). So ~88% of the
+    minutes such a rule converted to Awake would be wrong.
+
+Three reasons, in increasing order of how fatal they are:
+
+  1. Sampling is too coarse. Garmin overnight HR is 120s, Oura's is 300s.
+     Probing get_heart_rates, get_respiration_data and get_all_day_stress
+     (2026-07-31) found NOTHING finer: get_heart_rates is also 120s and
+     covers less of the sleep window, respiration returns empty arrays, and
+     all_day_stress is 180s. get_hrv_data returns {} outright. There is no
+     better data available from this account, so this is not a "wait for a
+     bigger sample" problem.
+  2. The positive class is tiny — 123 still-awake minutes across 26 nights.
+     Any threshold fitted on that is fitting noise.
+  3. THE DECISIVE ONE: there is no ground truth. Validation here uses the
+     hypnogram's own Awake labels, but the minutes such a rule exists to FIND
+     are by definition the ones the hypnogram did NOT label Awake. Even a
+     clean signal could not be validated without PSG. This does not improve
+     with more nights or better sensors.
+
+And the physiology says the same thing independently: REM is elevated-and-
+motionless, which is exactly the signature quiet wakefulness would present.
+The local-baseline rows above show REM and Awake are indistinguishable.
+
+What would change the answer: a ground-truth source (a few nights against an
+EEG headband or PSG), which would address (3), together with beat-to-beat
+intervals rather than 120-second averages, which would address (1).
 
 It is tempting to conclude that wiring this in would simply loosen every
 safety constraint. It would not, and the real shadow report (2026-07-31, 26

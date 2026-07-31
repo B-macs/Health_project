@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1027/1027 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1029/1029 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1027/1027 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1027/1027 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1029/1029 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -131,7 +131,7 @@ Reference data:
                            BioAge muscle-imbalance count, actively imported by
                            services/bioage.py (PROFILE["imbalances"])
 
-tests/       — pytest suite (1027 tests), the sole deterministic gate
+tests/       — pytest suite (1029 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py,
                backfill_garmin_sleep_stages.py — probe before spending calls)
@@ -164,10 +164,11 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 |-------|--------|
 | `Training plan/` folder at root | Stale duplicate of `docs/training/` — delete manually (`Remove-Item -Recurse "Training plan"`) |
 | Stage 2 training plan | Not yet built — begins after Day 14 physiotherapist sign-off |
-| Garmin HRV field mapping | Unverified against a live payload — `hrvSummary.lastNightAvg` is the commonly-documented shape; confirm with `scripts/garmin_login_test.py` and fix `Repository._garmin_daily_row` if it doesn't match |
+| Garmin HRV is absent, two independent causes | RESOLVED-as-empty (probed 2026-07-31): `get_hrv_data` returns `{}` for this account, so `hrvSummary.lastNightAvg` has nothing to map. Separately, the Garmin Daily tab had been created before `hrv_ms` joined `_GARMIN_DAILY_HEADER`, so every sync wrote it into an unheadered column that `get_all_records` discarded — `services/biometrics.py`'s documented Oura-70/Garmin-30 HRV blend has silently been 100% Oura. The column is repaired (`Repository.rebuild_garmin_daily`); the endpoint may start returning data with a watch that supports HRV status. |
 | Garmin backfill | Run `scripts/backfill_garmin_from_sheet1.py` (dry-run first, then `--apply`) once to backfill pre-wearable history into the Garmin Daily tab so readiness baselines aren't starting from empty |
-| Quiet-wakefulness rule not built | The one rule that would fix actigraphy's real blind spot (still body + elevated HR = awake; wake specificity ≈0.34, Marino 2013). Needs the overnight HR series, which IS now captured (`sleep_hr_series` / `sleep_hr_json`) but not yet aligned onto the fusion grid. It would be the FIRST rule to break `sleep_fusion`'s "fused sleep ≥ Oura alone" invariant — see that module's docstring before starting. |
+| Quiet-wakefulness rule — measured, then abandoned | **Do not re-attempt without reading `services/sleep_fusion.py`'s docstring.** Best precision ~12% against a 1.9% base rate, i.e. ~88% of flagged minutes would be wrong, and REM is indistinguishable from Awake (both elevated-and-motionless). Probing found no finer HR exists on this account. The blocking problem is not sample size — it is that there is **no ground truth**: validation uses the hypnogram's own Awake labels, but the rule exists to find minutes the hypnogram did *not* label Awake. Needs PSG/EEG ground truth plus beat-to-beat intervals. |
 | Movement calibration is n=26 | `Repository.sleep_movement_cutpoints` quantile-maps Garmin's undocumented float onto Oura's 1-4 alphabet from paired nights only; currently 26, floor is 14. The ACTIVE boundary sits far into the tail and is the least stable of the three, which is why rule 7 treats class 4 as corroboration rather than proof. Re-check the fitted values as paired nights accumulate. |
+| Sheets tabs silently drop newly-added columns | Any tab created before a column joined its `_HEADER` keeps the old header forever — `get_or_create_worksheet` writes row 1 only on creation and `upsert_row_by_key` never touches it, so values land in an unheadered column and `get_all_records` discards them. Bit `hrv_ms` (above) and would have bit the movement columns. `Repository.rebuild_tab(worksheet, header, ...)` re-heads a tab and carries every existing row through; call it after adding any column. |
 | Cold app start renders empty for ~60s | First page load runs the Oura/Garmin sync inline before `_bio_rolling`, so the drill-down shows its empty states until it finishes. Pre-existing, unrelated to fusion; the fix is to make that sync non-blocking. |
 | Biomechanical review due | 2026-07-19 — update `patient_profile.py` before Stage 2 |
 | Strength BioAge scores dormant | By design (`services/bioage.py`) until weighted training begins — training is still Stage 1 bodyweight-only, so all 3 region scores + the hero value show "—". Muscle-imbalance count is unaffected (reads `patient_profile.py` directly) and already shows a real number. |

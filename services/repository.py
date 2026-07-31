@@ -2386,36 +2386,52 @@ class Repository:
         sheets.upsert_row_by_key(
             self._garmin_sleep_stages_ws(), key_col=1, key_value=str(row["date"]), row_values=values)
 
-    def rebuild_garmin_sleep_stages(self, fresh: dict[str, dict]) -> int:
-        """Rewrite the whole Garmin Sleep Stages tab, merging `fresh` over
-        whatever is already stored.
+    def rebuild_tab(self, worksheet, header: list[str], fresh: dict[str, dict] | None = None,
+                    key: str = "date", numericise_ignore: list | None = None) -> int:
+        """Rewrite a whole date-keyed tab against the CURRENT header, merging
+        `fresh` over whatever is already stored.
 
-        The only way to WIDEN the tab. upsert_row_by_key overwrites just the
-        first len(row_values) columns of one row and never touches the header,
-        so adding the movement columns through it would write values under no
-        header at all and every later read would mis-map them.
+        The only way to WIDEN a tab, and the fix for a specific recurring bug:
+        get_or_create_worksheet writes the header ONLY when it creates the tab,
+        and upsert_row_by_key overwrites just the first len(row_values) columns
+        of one row and never touches row 1. So adding a column to a _HEADER
+        constant writes values into an unheadered column from then on, and
+        gspread's get_all_records — which maps by header — silently drops them.
 
-        Batched for the same reason sync_sleep_fusion is: 53 upserts cost two
-        API calls each, which walks straight into Sheets' 60-writes-per-minute
-        quota. Rows already present and not in `fresh` are carried through, so
-        the output is always a superset of what was there.
+        That is not hypothetical. It had already happened to hrv_ms on the
+        Garmin Daily tab: the column was added to _GARMIN_DAILY_HEADER, every
+        sync since has written a value into column J, and every read has
+        discarded it, so services/biometrics.py's documented Oura-70/Garmin-30
+        HRV blend has silently been 100% Oura.
+
+        Rows present and not in `fresh` are carried through, so the output is
+        always a superset. Batched for the same reason sync_sleep_fusion is:
+        per-row upserts cost two API calls each and walk into Sheets'
+        60-writes-per-minute quota.
         """
         merged = {
-            _sheet_key(r.get("date")): r
-            for r in self._read_records(
-                self._garmin_sleep_stages_ws(),
-                numericise_ignore=_GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE)
-            if _sheet_key(r.get("date"))
+            _sheet_key(r.get(key)): r
+            for r in self._read_records(worksheet, numericise_ignore=numericise_ignore)
+            if _sheet_key(r.get(key))
         }
-        merged.update(fresh)
+        merged.update(fresh or {})
         rows = [
-            ["" if merged[d].get(c) is None else merged[d].get(c, "")
-             for c in _GARMIN_SLEEP_STAGES_HEADER]
+            ["" if merged[d].get(c) is None else merged[d].get(c, "") for c in header]
             for d in sorted(merged)
         ]
-        sheets.rewrite_worksheet(
-            self._garmin_sleep_stages_ws(), _GARMIN_SLEEP_STAGES_HEADER, rows)
+        sheets.rewrite_worksheet(worksheet, header, rows)
         return len(rows)
+
+    def rebuild_garmin_sleep_stages(self, fresh: dict[str, dict] | None = None) -> int:
+        return self.rebuild_tab(
+            self._garmin_sleep_stages_ws(), _GARMIN_SLEEP_STAGES_HEADER, fresh,
+            numericise_ignore=_GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE)
+
+    def rebuild_garmin_daily(self, fresh: dict[str, dict] | None = None) -> int:
+        """Re-header the Garmin Daily tab so hrv_ms stops being written into a
+        column no read can see. Existing rows keep their values; the recovered
+        column simply becomes readable for future syncs."""
+        return self.rebuild_tab(self._garmin_daily_ws(), _GARMIN_DAILY_HEADER, fresh)
 
     def get_garmin_sleep_stages_dates(self) -> set[str]:
         """Dates the Garmin Sleep Stages tab already holds — lets the backfill

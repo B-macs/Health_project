@@ -810,3 +810,46 @@ def test_get_garmin_sleep_stages_survives_a_row_with_no_movement(monkeypatch):
     got = Repository(_config()).get_garmin_sleep_stages()["2026-05-01"]["movement"]
     assert got["levels"] == []
     assert got["start_utc"] is None
+
+
+# ─── Tab re-heading (the silent column-drop bug) ────────────────────────────
+
+def test_rebuild_tab_rewrites_the_header_so_a_new_column_becomes_readable(monkeypatch):
+    """The bug this exists for: get_or_create_worksheet writes the header ONLY
+    on creation, and upsert_row_by_key never touches row 1. Adding a column to
+    a _HEADER constant therefore writes values into an unheadered column that
+    gspread's get_all_records silently drops.
+
+    Real instance: hrv_ms on the Garmin Daily tab.
+    """
+    tab = _FakeTab(records=[{"date": "2026-07-01", "steps": 9000}])
+    _patch_sheets(monkeypatch, {})
+    repo = Repository(_config())
+
+    written = {}
+    monkeypatch.setattr(
+        repo_mod.sheets, "rewrite_worksheet",
+        lambda ws, header, rows: written.update(header=header, rows=rows) or len(rows))
+
+    repo.rebuild_tab(tab, ["date", "steps", "hrv_ms"],
+                     {"2026-07-02": {"date": "2026-07-02", "steps": 100, "hrv_ms": 44}})
+
+    assert written["header"] == ["date", "steps", "hrv_ms"]
+    # The pre-existing row is carried through, blank in the new column.
+    assert written["rows"][0] == ["2026-07-01", 9000, ""]
+    assert written["rows"][1] == ["2026-07-02", 100, 44]
+
+
+def test_rebuild_tab_never_drops_rows_outside_the_fresh_set(monkeypatch):
+    """Output must always be a superset — a rewrite that lost history would be
+    unrecoverable, and sync_sleep_fusion relies on this."""
+    tab = _FakeTab(records=[{"date": d} for d in ("2026-06-01", "2026-06-02", "2026-06-03")])
+    _patch_sheets(monkeypatch, {})
+    repo = Repository(_config())
+    written = {}
+    monkeypatch.setattr(
+        repo_mod.sheets, "rewrite_worksheet",
+        lambda ws, header, rows: written.update(rows=rows) or len(rows))
+
+    repo.rebuild_tab(tab, ["date"], {"2026-06-02": {"date": "2026-06-02"}})
+    assert [r[0] for r in written["rows"]] == ["2026-06-01", "2026-06-02", "2026-06-03"]
