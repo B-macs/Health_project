@@ -29,7 +29,7 @@
 1. Update `patient_profile.py` with post-assessment findings (new tightness areas, cleared areas)
 2. Build Stage 2 training plan in `training_plan.py` (higher RPE / volume / bilateral loading)
 3. Run `python tests.py` — still must be 141/141 (or higher with new Stage 2 tests)
-4. Update biomechanical review date in `legacy/init_db.py` (`BIOMECHANICAL_REVIEW_DATE`)
+4. Update biomechanical review date tracked in `patient_profile.py` / CLAUDE.md's Known Open Issues table
 5. Update this file: Stage → 2, next action → Day 28 assessment
 
 ---

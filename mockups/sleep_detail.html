@@ -1,0 +1,546 @@
+<title>Sleep detail — mockup</title>
+
+<style>
+  :root {
+    color-scheme: light dark;
+    --chrome-bg: #F2F3F6;
+    --chrome-panel: #FFFFFF;
+    --chrome-ink: #1B1E27;
+    --chrome-mute: #666D80;
+    --chrome-line: #DDE0E8;
+    --chrome-accent: #3E5C8A;
+
+    /* The app's own tokens — styles.py OURA palette + app.py detail blocks.
+       These are NOT design choices here; they are what the app already uses. */
+    --bg: #0B0F1E;
+    --surface: #131929;
+    --surface-hi: #1A2238;
+    --text: #D4DCEE;
+    --subtext: #6B7A9B;
+    --line: #1E2840;
+    --good: #6BAF8B;
+    --warn: #BFA06A;
+    --bad: #C47878;
+    --dim: #4A5568;
+    --track: rgba(255,255,255,0.08);
+
+    /* Stage palette — APPROVED: Oura-like. Blues for the three sleep stages,
+       cream for awake. The old _STAGE_BAND used coral for awake, which made
+       normal wakefulness rhyme with the coral this screen already spends on
+       "Pay attention" and the HIGH sleep-debt pill. */
+    --deep: #1E4D7B;
+    --light: #3C8FD4;
+    --rem: #8FCDF0;
+    --awake: #EFE9DD;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --chrome-bg: #0F1116;
+      --chrome-panel: #171A21;
+      --chrome-ink: #E6E8EE;
+      --chrome-mute: #8A90A0;
+      --chrome-line: #262A34;
+      --chrome-accent: #7FA6DC;
+    }
+  }
+  :root[data-theme="dark"] {
+    --chrome-bg: #0F1116; --chrome-panel: #171A21; --chrome-ink: #E6E8EE;
+    --chrome-mute: #8A90A0; --chrome-line: #262A34; --chrome-accent: #7FA6DC;
+  }
+  :root[data-theme="light"] {
+    --chrome-bg: #F2F3F6; --chrome-panel: #FFFFFF; --chrome-ink: #1B1E27;
+    --chrome-mute: #666D80; --chrome-line: #DDE0E8; --chrome-accent: #3E5C8A;
+  }
+  /* The superseded palette, kept only so the comparison is still checkable. */
+  body.pal-app {
+    --deep: #3E5C8A; --light: #6E8FC7; --rem: #8B6FB5; --awake: #C47878;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 0;
+    background: var(--chrome-bg); color: var(--chrome-ink);
+    font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 20px 80px; }
+
+  header.rv { border-bottom: 1px solid var(--chrome-line); padding-bottom: 20px; margin-bottom: 28px; }
+  header.rv h1 { margin: 0 0 6px; font-size: 24px; letter-spacing: -0.015em; text-wrap: balance; }
+  header.rv p { margin: 0; max-width: 62ch; color: var(--chrome-mute); font-size: 14px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+  .controls button {
+    font: 600 11px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    padding: 9px 14px; border-radius: 6px; cursor: pointer;
+    background: var(--chrome-panel); color: var(--chrome-ink);
+    border: 1px solid var(--chrome-line);
+  }
+  .controls button[aria-pressed="true"] {
+    background: var(--chrome-accent); border-color: var(--chrome-accent); color: #fff;
+  }
+  .controls button:focus-visible { outline: 2px solid var(--chrome-accent); outline-offset: 2px; }
+
+  .stage { display: grid; grid-template-columns: 420px minmax(0, 1fr); gap: 36px; align-items: start; }
+  @media (max-width: 900px) { .stage { grid-template-columns: 1fr; } }
+
+  /* ─── the phone screen — deliberately single-theme, because the app is ─── */
+  .phone {
+    width: 420px; max-width: 100%;
+    background: var(--bg); border-radius: 20px; overflow: hidden;
+    border: 1px solid var(--line);
+    box-shadow: 0 18px 50px rgba(0,0,0,0.30);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text);
+  }
+  .scr { padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+
+  .dhead { display: flex; align-items: center; margin-bottom: 6px; }
+  .dhead a { color: var(--subtext); font-size: 22px; text-decoration: none; margin-right: 14px; line-height: 1; }
+  .ovl { font-size: 10px; color: var(--subtext); letter-spacing: 2px; text-transform: uppercase; font-weight: 600; }
+  .dhead .big { font-size: 30px; font-weight: 800; line-height: 1; }
+  .dhead .tier { font-size: 12px; color: var(--subtext); margin-top: 2px; }
+
+  .blk { background: var(--surface); border-radius: 12px; padding: 16px 18px; }
+  .blk > .ovl { margin-bottom: 10px; display: block; }
+  .hero { font-size: 28px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+  .hero small { font-size: 15px; font-weight: 600; color: var(--subtext); margin-left: 1px; }
+  .sub { font-size: 11px; color: var(--subtext); margin-top: 2px; }
+
+  /* contributor rows: label left, RAW value right, bar = the sub-score */
+  .crow { padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+  .crow:last-of-type { border-bottom: 0; }
+  .crow .top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .crow .lbl { font-size: 13px; color: #B9C2D6; }
+  .crow .val { font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .bar { height: 4px; border-radius: 2px; background: var(--track); margin-top: 7px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; border-radius: 2px; }
+  .crow.off .lbl { color: var(--dim); }
+  .crow.off .val { color: var(--dim); font-weight: 500; }
+
+  .cap { font-size: 10px; color: var(--subtext); margin-top: 10px; line-height: 1.5; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .kcell { background: var(--surface); border-radius: 12px; padding: 14px; }
+  .kcell .ovl { display: block; margin-bottom: 6px; }
+  .kcell .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .debt { display: flex; align-items: baseline; gap: 10px; }
+  .debt .pill { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; color: var(--bad); }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 12px 0 5px; }
+  .seg > span { height: 3px; border-radius: 2px; background: var(--track); position: relative; }
+  .seg > span.on { background: var(--bad); }
+  .seg > span.on::after {
+    content: ""; position: absolute; right: -4px; top: -3.5px;
+    width: 10px; height: 10px; border-radius: 50%; background: var(--bad);
+    border: 2px solid var(--surface);
+  }
+  .segl { display: flex; justify-content: space-between; font-size: 10px; color: var(--subtext); }
+
+  .axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--subtext); margin-top: 6px; font-variant-numeric: tabular-nums; }
+  .lg { display: flex; align-items: center; gap: 9px; padding: 5px 0; font-size: 12px; }
+  .lg .sw { width: 26px; height: 6px; border-radius: 3px; flex: none; }
+  .lg .nm { color: #B9C2D6; width: 52px; }
+  .lg .du { color: var(--text); font-variant-numeric: tabular-nums; }
+  .lg .pc { color: var(--subtext); margin-left: auto; font-variant-numeric: tabular-nums; }
+
+  .prov { font-size: 10px; color: var(--subtext); margin-top: 10px; line-height: 1.5; }
+  .prov b { color: #8FCDF0; font-weight: 600; }
+
+  .rows .r { display: flex; justify-content: space-between; font-size: 11px; color: #8A99A3; padding: 4px 0; }
+  .rows .r span:last-child { color: #C8CAD0; font-variant-numeric: tabular-nums; }
+
+  .empty { color: #444; font-size: 12px; font-style: italic; padding: 14px 0; text-align: center; }
+
+  .stepper { display: grid; grid-template-columns: 1fr 2fr 1fr; gap: 8px; align-items: center; margin-top: 4px; }
+  .stepper button {
+    background: var(--surface-hi); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 9px 0; font-size: 16px; cursor: pointer;
+  }
+  .stepper .mid { text-align: center; font-size: 18px; font-weight: 700; }
+
+  /* ─── review gutter ─── */
+  .notes { position: sticky; top: 24px; display: flex; flex-direction: column; gap: 14px; }
+  .note {
+    background: var(--chrome-panel); border: 1px solid var(--chrome-line);
+    border-radius: 8px; padding: 13px 15px;
+  }
+  .note h3 {
+    margin: 0 0 5px; font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--chrome-accent);
+  }
+  .note p { margin: 0; font-size: 13px; color: var(--chrome-mute); line-height: 1.5; }
+  .note p + p { margin-top: 7px; }
+  .note code {
+    font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+    background: var(--chrome-bg); padding: 1px 5px; border-radius: 3px;
+  }
+
+  h2.sec {
+    margin: 46px 0 18px; font-size: 17px; letter-spacing: -0.01em;
+    padding-bottom: 9px; border-bottom: 1px solid var(--chrome-line);
+  }
+  .states { display: flex; flex-wrap: wrap; gap: 20px; align-items: start; }
+  .state { width: 300px; }
+  .state .cardtitle {
+    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: 0.1em; text-transform: uppercase; color: var(--chrome-mute);
+    margin-bottom: 9px;
+  }
+  .mini { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 14px; color: var(--text);
+          font: 15px/1.5 system-ui, -apple-system, sans-serif; }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="rv">
+    <h1>Sleep detail — mockup</h1>
+    <p>Fabricated data throughout. This is the Home page Sleep drill-down (<code>?d=…&amp;view=sleep</code>) at its real
+       width, rendered in the app's existing tokens from <code>styles.py</code> and <code>app.py</code>. Nothing here is
+       wired to the Sheets. Two things to settle: the stage palette, and whether twelve sections is too long a scroll.</p>
+    <div class="controls">
+      <button id="palB" aria-pressed="true">Stage palette — Oura-like ✓</button>
+      <button id="palA" aria-pressed="false">Stage palette — old</button>
+      <button id="cov" aria-pressed="false">Show thin-coverage variant</button>
+    </div>
+  </header>
+
+  <div class="stage">
+    <div class="phone">
+      <div class="scr">
+
+        <!-- header -->
+        <div class="dhead">
+          <a href="#" aria-label="Back">←</a>
+          <div>
+            <div class="ovl">Sleep · Today</div>
+            <div class="big" style="color:var(--warn)">80</div>
+            <div class="tier">Good</div>
+          </div>
+        </div>
+
+        <!-- §1 contributors -->
+        <div class="blk">
+          <span class="ovl">Contributors</span>
+          <div id="contribs"></div>
+          <div class="cap" id="coverage" hidden></div>
+        </div>
+
+        <!-- §2 key metrics -->
+        <div class="grid2">
+          <div class="kcell"><span class="ovl">Total sleep</span><div class="v">5h 59m</div></div>
+          <div class="kcell"><span class="ovl">Time in bed</span><div class="v">8h 3m</div></div>
+          <div class="kcell"><span class="ovl">Efficiency</span><div class="v">74 %</div></div>
+          <div class="kcell"><span class="ovl">Resting HR</span><div class="v">60 bpm</div></div>
+        </div>
+
+        <!-- §3 sleep debt -->
+        <div class="blk">
+          <span class="ovl">Sleep debt</span>
+          <div class="debt"><span class="hero">6h 30m</span><span class="pill">HIGH</span></div>
+          <div class="seg"><span></span><span></span><span></span><span class="on"></span></div>
+          <div class="segl"><span>None</span><span>High</span></div>
+          <div class="cap">Against a 7.9 h baseline over 28 nights. Rest is triggered at 9.5 h.</div>
+        </div>
+
+        <!-- §4 hypnogram + §5 legend -->
+        <div class="blk">
+          <span class="ovl">Time asleep</span>
+          <div class="hero">5<small>h</small> 59<small>m</small></div>
+          <div class="sub">Total duration 8h 3m</div>
+          <div style="margin-top:14px" id="hyp"></div>
+          <div class="axis"><span>22:42</span><span>00</span><span>02</span><span>04</span><span>06:44</span></div>
+          <div style="margin-top:12px">
+            <div class="lg"><span class="sw" style="background:var(--awake)"></span><span class="nm">Awake</span><span class="du">2h 4m</span><span class="pc">—</span></div>
+            <div class="lg"><span class="sw" style="background:var(--rem)"></span><span class="nm">REM</span><span class="du">1h 24m</span><span class="pc">23 %</span></div>
+            <div class="lg"><span class="sw" style="background:var(--light)"></span><span class="nm">Light</span><span class="du">3h 47m</span><span class="pc">63 %</span></div>
+            <div class="lg"><span class="sw" style="background:var(--deep)"></span><span class="nm">Deep</span><span class="du">0h 49m</span><span class="pc">14 %</span></div>
+          </div>
+          <div class="prov"><b>Fused (Oura + Garmin)</b> · 88 min of Oura wake reclassified as sleep — Garmin saw no
+            movement. Display only; the score above uses Oura.</div>
+        </div>
+
+        <!-- §6 spo2 / breathing -->
+        <div class="blk rows">
+          <span class="ovl">Breathing</span>
+          <div class="r"><span>Average oxygen saturation</span><span>98 %</span></div>
+          <div class="r"><span>Breathing disturbance index</span><span>2 · Steady</span></div>
+          <div class="r"><span>Average respiratory rate</span><span>14.2 /min</span></div>
+        </div>
+
+        <!-- §7 overnight HR -->
+        <div class="blk">
+          <span class="ovl">Lowest heart rate</span>
+          <div class="hero">60<small> bpm</small></div>
+          <div class="sub">Average 63 bpm</div>
+          <div style="margin-top:12px" id="hrchart"></div>
+          <div class="axis"><span>22:42</span><span>06:44</span></div>
+        </div>
+
+        <!-- §8 overnight HRV -->
+        <div class="blk">
+          <span class="ovl">Average HRV</span>
+          <div class="hero">18<small> ms</small></div>
+          <div class="sub">Max 44 ms</div>
+          <div style="margin-top:12px" id="hrvchart"></div>
+          <div class="axis"><span>22:42</span><span>06:44</span></div>
+        </div>
+
+        <!-- §9 existing trend -->
+        <div class="blk">
+          <span class="ovl">Sleep score trend</span>
+          <div class="hero">80</div>
+          <div class="sub">02 Jul – 31 Jul</div>
+          <div style="margin-top:10px" id="trend"></div>
+        </div>
+
+        <!-- §11 + §12 -->
+        <div class="blk">
+          <span class="ovl">Adjust wake time</span>
+          <div class="stepper">
+            <button type="button">−</button>
+            <div class="mid">−15 min</div>
+            <button type="button">+</button>
+          </div>
+          <div class="cap">Fusion supplied this night's correction (88 min), so the manual adjustment is not applied.
+            ⚡ 6 nights wake-time adjusted in this window.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="notes">
+      <div class="note">
+        <h3>Settled — stage palette</h3>
+        <p><strong>Oura-like</strong> is now the default: blues for the three sleep stages, cream for awake. Toggle to
+           the old <code>_STAGE_BAND</code> to compare.</p>
+        <p>Coral for awake made normal wakefulness rhyme with the coral this screen already spends on "Pay attention"
+           and the HIGH sleep-debt pill. Changing <code>_STAGE_BAND</code> also updates the Insights Sleep Architecture
+           tab, which reads the same constant — consistently.</p>
+      </div>
+      <div class="note">
+        <h3>Coverage — measured, not assumed</h3>
+        <p>All seven contributors are at <strong>100 %</strong> across 361 nights. Time in bed, light sleep, awake time,
+           bedtime end and the hypnogram are 100 % too; HR, HRV, respiratory rate, SpO2 and temperature deviation all
+           sit at 96–99 %.</p>
+        <p>So the gap isn't missing <em>fields</em> — it's missing <em>nights</em>. Only 361 of 1,124 calendar days have
+           a sleep period at all. <strong>"No sleep period" is the empty state that will actually be seen</strong>;
+           thin-coverage is a guard that should almost never fire.</p>
+      </div>
+      <div class="note">
+        <h3>Contributor rows</h3>
+        <p>Raw value on the right, bar encodes the sub-score — Oura's own pattern, and better than showing both numbers.
+           Qualitative labels ("Pay attention", "Optimal") where a number isn't meaningful.</p>
+        <p>Weight is deliberately not shown per row; coverage goes in the caption instead.</p>
+      </div>
+      <div class="note">
+        <h3>Not reproduced</h3>
+        <p>Oura's <strong>Body Clock</strong> chronotype arc is proprietary — we hold a bedtime baseline but no
+           chronotype model. The <strong>movement tick strip</strong> needs <code>movement_30_sec</code>, which isn't
+           captured. Both omitted rather than approximated.</p>
+      </div>
+      <div class="note">
+        <h3>Scroll length</h3>
+        <p>Twelve sections. If it drags, Breathing (§6) or HRV (§8) move to Insights — that's the intended release
+           valve, and both are the least glanceable.</p>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sec">Empty states</h2>
+  <div class="states">
+    <div class="state">
+      <div class="cardtitle">No sleep period</div>
+      <div class="mini">
+        <div class="ovl" style="margin-bottom:8px">Sleep · 12 Mar</div>
+        <div style="font-size:30px;font-weight:800;color:#555;line-height:1">--</div>
+        <div style="font-size:12px;color:var(--subtext);margin:2px 0 12px">No readings</div>
+        <div class="blk" style="padding:14px">
+          <div style="font-size:12px;color:#8A99A3;line-height:1.5">Oura recorded no sleep period for this night.</div>
+        </div>
+        <div style="font-size:10px;color:var(--subtext);margin-top:10px">Sections 1–8 are skipped entirely — one
+          sentence beats twenty em-dashes.</div>
+      </div>
+    </div>
+
+    <div class="state">
+      <div class="cardtitle">No stage timeline</div>
+      <div class="mini">
+        <div class="blk" style="padding:14px">
+          <span class="ovl">Time asleep</span>
+          <div class="hero" style="font-size:24px">6<small>h</small> 41<small>m</small></div>
+          <div class="sub">Total duration 7h 12m</div>
+          <div class="empty">No stage timeline recorded for this night.</div>
+          <div class="prov">Durations still shown — only the strip is missing.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="state">
+      <div class="cardtitle">Thin coverage</div>
+      <div class="mini">
+        <div class="blk" style="padding:14px">
+          <span class="ovl">Contributors</span>
+          <div class="crow"><div class="top"><span class="lbl">Total sleep</span><span class="val" style="color:var(--warn)">6h 10m</span></div><div class="bar"><i style="width:76%;background:var(--warn)"></i></div></div>
+          <div class="crow off"><div class="top"><span class="lbl">Efficiency</span><span class="val">not scored</span></div><div class="bar"></div></div>
+          <div class="crow off"><div class="top"><span class="lbl">Restfulness</span><span class="val">not scored</span></div><div class="bar"></div></div>
+          <div class="cap">Scored on 1 of 7 contributors; remaining weights renormalised.</div>
+        </div>
+        <div style="font-size:10px;color:var(--subtext);margin-top:10px">This night reads a confident score today.
+          The caption is the whole point of the exercise.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ─── fabricated night, matching the supplied screenshots ───
+  var CONTRIBUTORS = [
+    { label: "Total sleep",  value: "5h 59m",        score: 74,  tone: "warn" },
+    { label: "Efficiency",   value: "74 %",          score: 74,  tone: "warn" },
+    { label: "Restfulness",  value: "Pay attention", score: 35,  tone: "bad"  },
+    { label: "REM sleep",    value: "1h 24m, 23 %",  score: 100, tone: "good" },
+    { label: "Deep sleep",   value: "0h 49m, 14 %",  score: 90,  tone: "good" },
+    { label: "Latency",      value: "12m",           score: 100, tone: "good" },
+    { label: "Timing",       value: "Optimal",       score: 100, tone: "good" }
+  ];
+  var TONE = { good: "var(--good)", warn: "var(--warn)", bad: "var(--bad)" };
+
+  function renderContributors(thin) {
+    var host = document.getElementById("contribs");
+    host.textContent = "";
+    CONTRIBUTORS.forEach(function (c, i) {
+      var missing = thin && i > 0;
+      var row = document.createElement("div");
+      row.className = "crow" + (missing ? " off" : "");
+      var top = document.createElement("div");
+      top.className = "top";
+      var lbl = document.createElement("span");
+      lbl.className = "lbl"; lbl.textContent = c.label;
+      var val = document.createElement("span");
+      val.className = "val";
+      val.textContent = missing ? "not scored" : c.value;
+      if (!missing) { val.style.color = TONE[c.tone]; }
+      top.appendChild(lbl); top.appendChild(val);
+      var bar = document.createElement("div");
+      bar.className = "bar";
+      if (!missing) {
+        var fill = document.createElement("i");
+        fill.style.width = c.score + "%";
+        fill.style.background = TONE[c.tone];
+        bar.appendChild(fill);
+      }
+      row.appendChild(top); row.appendChild(bar);
+      host.appendChild(row);
+    });
+    var cap = document.getElementById("coverage");
+    cap.hidden = !thin;
+    cap.textContent = "Scored on 1 of 7 contributors; remaining weights renormalised to 100%.";
+  }
+
+  // ─── hypnogram: run-length merged rects, awake on top (matches _STAGE_ROW) ───
+  var STAGE_ROW = { 4: 0, 3: 1, 2: 2, 1: 3 };
+  var STAGE_VAR = { 1: "--deep", 2: "--light", 3: "--rem", 4: "--awake" };
+
+  function buildNight() {
+    // Plausible architecture: fragmented early, REM-heavy late. 483 minutes.
+    var seq = [], i;
+    function push(stage, mins) { for (i = 0; i < mins; i++) { seq.push(stage); } }
+    push(4, 6); push(2, 14); push(4, 3); push(1, 18); push(2, 9); push(4, 2);
+    push(1, 16); push(2, 22); push(4, 4); push(3, 11); push(2, 18); push(4, 2);
+    push(1, 15); push(2, 26); push(3, 17); push(4, 5); push(2, 31); push(4, 3);
+    push(3, 14); push(2, 24); push(4, 6); push(2, 19); push(3, 21); push(4, 4);
+    push(2, 28); push(3, 16); push(4, 7); push(2, 23); push(3, 13); push(4, 9);
+    push(2, 21); push(3, 12); push(4, 11); push(2, 17); push(4, 26);
+    return seq;
+  }
+
+  function hypnogramSVG(seq, height) {
+    var n = seq.length, rowH = height / 4, out = [], i = 0, j, css;
+    while (i < n) {
+      j = i;
+      while (j < n && seq[j] === seq[i]) { j++; }
+      css = STAGE_VAR[seq[i]];
+      if (css) {
+        out.push('<rect x="' + (i / n * 100).toFixed(3) + '%" y="' + (STAGE_ROW[seq[i]] * rowH).toFixed(1) +
+                 '" width="' + ((j - i) / n * 100).toFixed(3) + '%" height="' + rowH.toFixed(1) +
+                 '" fill="var(' + css + ')" />');
+      }
+      i = j;
+    }
+    return '<svg viewBox="0 0 100 ' + height + '" preserveAspectRatio="none" role="img" ' +
+           'aria-label="Sleep stage timeline" style="width:100%;height:' + height +
+           'px;display:block;border-radius:4px;background:#0E1220;">' + out.join("") + '</svg>';
+  }
+
+  // ─── overnight line charts — the shape _sparkline already emits, plus a baseline ───
+  function series(n, base, amp, seed) {
+    var out = [], s = seed, i, v;
+    for (i = 0; i < n; i++) {
+      s = (s * 1103515245 + 12345) % 2147483648;
+      v = base + ((s / 2147483648) - 0.5) * amp + Math.sin(i / 7) * amp * 0.18;
+      out.push(v);
+    }
+    return out;
+  }
+
+  function lineChart(vals, mean, colour, height) {
+    var w = 100, pad = 6, lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    var span = (hi - lo) || 1;
+    var pts = vals.map(function (v, i) {
+      var x = (i / (vals.length - 1)) * w;
+      var y = height - pad - ((v - lo) / span) * (height - pad * 2);
+      return x.toFixed(2) + "," + y.toFixed(2);
+    }).join(" ");
+    var my = height - pad - ((mean - lo) / span) * (height - pad * 2);
+    return '<svg viewBox="0 0 100 ' + height + '" preserveAspectRatio="none" role="img" ' +
+           'aria-label="Overnight trace" style="width:100%;height:' + height + 'px;display:block;">' +
+           '<line x1="0" y1="' + my.toFixed(2) + '" x2="100" y2="' + my.toFixed(2) +
+           '" stroke="rgba(255,255,255,0.22)" stroke-width="0.4" stroke-dasharray="1.5 1.5" />' +
+           '<polyline fill="none" stroke="' + colour + '" stroke-width="0.9" stroke-linejoin="round" ' +
+           'vector-effect="non-scaling-stroke" points="' + pts + '" /></svg>';
+  }
+
+  function sparkline(vals, colour, height) {
+    var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals), span = (hi - lo) || 1, pad = 8;
+    var pts = vals.map(function (v, i) {
+      return ((i / (vals.length - 1)) * 100).toFixed(2) + "," +
+             (height - pad - ((v - lo) / span) * (height - pad * 2)).toFixed(2);
+    }).join(" ");
+    var last = pts.split(" ").pop().split(",");
+    return '<svg viewBox="0 0 100 ' + height + '" preserveAspectRatio="none" role="img" ' +
+           'aria-label="30 day trend" style="width:100%;height:' + height + 'px;display:block;">' +
+           '<polyline fill="none" stroke="' + colour + '" stroke-width="1" stroke-linejoin="round" ' +
+           'vector-effect="non-scaling-stroke" points="' + pts + '" />' +
+           '<circle cx="' + last[0] + '" cy="' + last[1] + '" r="1.6" fill="' + colour + '" /></svg>';
+  }
+
+  document.getElementById("hyp").innerHTML = hypnogramSVG(buildNight(), 56);
+  document.getElementById("hrchart").innerHTML = lineChart(series(96, 63, 9, 7), 63, "#C8CAD0", 58);
+  document.getElementById("hrvchart").innerHTML = lineChart(series(96, 20, 22, 31), 18, "#C8CAD0", 58);
+  document.getElementById("trend").innerHTML = sparkline(series(30, 74, 26, 5), "#4FC3F7", 58);
+
+  // ─── controls ───
+  var palA = document.getElementById("palA"), palB = document.getElementById("palB"), cov = document.getElementById("cov");
+  function setPalette(oura) {
+    document.body.classList.toggle("pal-app", !oura);
+    palA.setAttribute("aria-pressed", String(!oura));
+    palB.setAttribute("aria-pressed", String(oura));
+  }
+  palA.addEventListener("click", function () { setPalette(false); });
+  palB.addEventListener("click", function () { setPalette(true); });
+
+  var thin = false;
+  cov.addEventListener("click", function () {
+    thin = !thin;
+    cov.setAttribute("aria-pressed", String(thin));
+    cov.textContent = thin ? "Show full-coverage variant" : "Show thin-coverage variant";
+    renderContributors(thin);
+  });
+
+  renderContributors(false);
+}());
+</script>

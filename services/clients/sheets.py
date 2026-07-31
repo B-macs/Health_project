@@ -20,6 +20,8 @@ WORKSHEET = "Sheet1"
 WEEKLY_ROLLUP_WORKSHEET = "Weekly Rollup"
 GARMIN_DAILY_WORKSHEET = "Garmin Daily"
 GARMIN_ACTIVITIES_WORKSHEET = "Garmin Activities"
+GARMIN_SLEEP_STAGES_WORKSHEET = "Garmin Sleep Stages"
+SLEEP_FUSION_WORKSHEET = "Sleep Fusion"
 OURA_DAILY_WORKSHEET = "Oura Daily"
 OURA_WORKOUTS_WORKSHEET = "Oura Workouts"
 OURA_SLEEP_PERIODS_WORKSHEET = "Oura Sleep Periods"
@@ -36,14 +38,47 @@ def make_client(config: Config):
 
 
 def get_all_records(client, sheet_id: str) -> list[dict]:
-    """Every row in the worksheet, gspread's own dict-per-row parsing, unmapped."""
-    return client.open_by_key(sheet_id).worksheet(WORKSHEET).get_all_records()
+    """Every row in the worksheet, gspread's own dict-per-row parsing,
+    unmapped. Falls back to an explicit deduped header list if the sheet's
+    header row itself has a blank/duplicate cell -- gspread refuses to
+    guess in that case (known to happen on this legacy tab's stray
+    trailing column). Safe: gspread builds each record by zipping the RAW
+    header row against the row values regardless of `expected_headers`, so
+    a duplicate/blank name still collapses to one key exactly as before --
+    this only bypasses the validation, and nothing here ever reads a blank
+    or duplicated column name anyway."""
+    worksheet = client.open_by_key(sheet_id).worksheet(WORKSHEET)
+    try:
+        return worksheet.get_all_records()
+    except gspread.exceptions.GSpreadException:
+        headers = worksheet.row_values(1)
+        deduped = list(dict.fromkeys(h for h in headers if h))
+        return worksheet.get_all_records(expected_headers=deduped)
 
 
 # ─── Writable worksheets — raw primitives, no column-name knowledge ─────────
 # (that lives in services/repository.py). Weekly Rollup was the first
 # writable tab; Garmin Daily/Activities (services/repository.py) reuse the
 # same generic get_or_create_worksheet()/upsert_row_by_key() underneath.
+
+
+# ─── Write generation ───────────────────────────────────────────────────────
+#  Bumped by every write in this module. services/repository.py keys its
+#  short-lived read cache on this, so ANY write anywhere invalidates ANY
+#  cached read without each call site having to remember to say so. Cheap
+#  insurance against the classic stale-cache bug where a sync writes a tab
+#  and a read later in the same render serves the pre-write rows.
+
+_WRITE_GENERATION = 0
+
+
+def write_generation() -> int:
+    return _WRITE_GENERATION
+
+
+def _bump_write_generation() -> None:
+    global _WRITE_GENERATION
+    _WRITE_GENERATION += 1
 
 
 def get_worksheet_records(worksheet, numericise_ignore: list | None = None) -> list[dict]:
@@ -81,6 +116,7 @@ def upsert_row_by_key(worksheet, key_col: int, key_value: str, row_values: list)
     (1-indexed); otherwise append a new row. Only overwrites the first
     len(row_values) columns, so any extra columns to the right stay
     untouched on update."""
+    _bump_write_generation()
     cell = worksheet.find(key_value, in_column=key_col)
     if cell is not None:
         end_col_letter = gspread.utils.rowcol_to_a1(1, len(row_values)).rstrip("0123456789")
@@ -106,6 +142,8 @@ def append_rows(worksheet, rows: list[list], chunk_size: int = APPEND_CHUNK_SIZE
     INSERT_ROWS rather than the API's default OVERWRITE: a tab created by
     get_or_create_worksheet() starts at 200 rows, and a backfill of several
     hundred would otherwise run past the end of the grid."""
+    if rows:
+        _bump_write_generation()
     for i in range(0, len(rows), chunk_size):
         worksheet.append_rows(rows[i:i + chunk_size], insert_data_option="INSERT_ROWS")
     return len(rows)
@@ -126,6 +164,7 @@ def rewrite_worksheet(worksheet, header: list[str], rows: list[list],
     Repository.rebuild_oura_tabs, which carries unmatched existing rows
     through rather than dropping them). Grows the grid first when the new
     block is taller or wider than the current one."""
+    _bump_write_generation()
     needed_rows, needed_cols = len(rows) + 1, len(header)
     if worksheet.row_count < needed_rows or worksheet.col_count < needed_cols:
         worksheet.resize(

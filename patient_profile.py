@@ -585,6 +585,90 @@ PROFILE = {
                 "on the left side — tracking this as one evolving pattern, not two separate entries.",
             ],
         },
+        {
+            "date":   "2026-07-31",
+            "status": "New — monitoring",
+            "region": "Cervical spine — left mid-to-lower cervical (flexion)",
+            "title":  "Cervical Spine Assessment — Asymmetric Flexion Tightness (Left) + Mechanical Crepitus",
+
+            "mechanism": (
+                "Formal range-of-motion self-assessment across cervical movements. "
+                "Lateral rotation (right-to-left): 4-5/10 moderate tightness, centralized at "
+                "mid-cervical spine. Flexion (chin to chest): strongest tightness/soreness, "
+                "markedly asymmetric — significantly stronger on the LEFT, localized "
+                "immediately lateral to the spine. Circumduction: variable, with frequent "
+                "audible crepitus (crackling/popping) throughout."
+            ),
+
+            "symptoms": {
+                "location": (
+                    "Left mid-to-lower cervical spine (flexion, dominant finding); "
+                    "mid-cervical spine centrally (lateral rotation)"
+                ),
+                "painful_with": [
+                    "Cervical flexion (chin to chest) — left side, high intensity, immediately lateral to spine",
+                    "Lateral rotation (right-to-left) — centralized mid-cervical, moderate (4-5/10)",
+                    "Circumduction — frequent mechanical crepitus, intensity variable",
+                ],
+                "pain_free_with": None,
+                "neural": (
+                    "None reported — no radiating pain, numbness, or tingling. Crepitus is "
+                    "painless/mechanical (gas cavitation in facet-joint synovial fluid, or "
+                    "tendon/ligament gliding over bony prominences) and, absent sharp or "
+                    "radiating pain, is treated as benign per standard interpretation."
+                ),
+            },
+
+            "assessment": {
+                "likely_tissue": [
+                    "Left posterior cervical extensors/paraspinals, or left levator scapulae — "
+                    "flexion tightness lateral to the spine on the left matches the same "
+                    "left-sided corridor already flagged in the 2026-07-21 entry above "
+                    "(levator scapulae bridges the cervical spine base and the medial "
+                    "scapular border)",
+                ],
+                "mechanism": (
+                    "The left-sided flexion pull points to tightness/strain in the posterior "
+                    "cervical extensors/paraspinals or levator scapulae on the left."
+                ),
+                "underlying_pattern": (
+                    "Extends the 2026-07-21 entry (left interscapular region and base of neck, "
+                    "desk-posture triggered) with a formal ROM breakdown — this confirms that "
+                    "entry's left-sided flexion/tightness component in more detail, consistent "
+                    "with finding #6's documented left scapular-stabilizer under-recruitment "
+                    "(levator scapulae link)."
+                ),
+            },
+
+            "plan": [
+                "No self-directed exercise changes — raise with physiotherapist at next check-in, "
+                "presenting this ROM breakdown together with the 2026-07-21 entry as one "
+                "evolving cervical/upper-back pattern, not two unrelated findings.",
+                "Continue monitoring whether desk-work load correlates with the left flexion "
+                "tightness specifically, as already being tracked for the interscapular/neck-base "
+                "pattern.",
+                "Track crepitus frequency/location day-to-day if useful, alongside the existing "
+                "left-side tracking.",
+            ],
+
+            "escalation_criteria": [
+                "Crepitus accompanied by sharp or radiating pain (as opposed to the current "
+                "painless mechanical crackling)",
+                "Any numbness, tingling, or radiating pain into the arm",
+                "Headache, dizziness, or vertigo associated with neck movement",
+                "No improvement after continued monitoring → raise explicitly with physio",
+            ],
+
+            "notes": [
+                "Same left-sided corridor as the 2026-07-21 entry (interscapular -> neck base), "
+                "now documented with a formal flexion/rotation/circumduction breakdown.",
+                "Crepitus during circumduction is common and, in the absence of sharp or "
+                "radiating pain, is not itself a red flag.",
+                "Right-sided extension discomfort at the base of the neck was initially noted "
+                "on 2026-07-31 but had resolved by the time this entry was finalized — not "
+                "included above as an active finding.",
+            ],
+        },
     ],
 
     # ─────────────────────────────────────────────────────────────────────────

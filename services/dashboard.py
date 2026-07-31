@@ -295,3 +295,280 @@ def sleep_meta(score, sleep_need_hours: float, sleep_base_window: int | None) ->
         "Insufficient":  f"Sleep score {s:.0f}/100 — critically low. Recovery is impaired.",
     }
     return c, f"{s:.0f}", lbl, heads[lbl], descs[lbl]
+
+
+# ─── Sleep-fusion shadow report ─────────────────────────────────────────────
+#  The fused hypnogram is deliberately NOT wired into the engine (see
+#  services/sleep_fusion.py's module docstring). This answers the question
+#  that decision defers: what WOULD change if it were?
+#
+#  Every fusion rule only removes phantom wake, so fused sleep is always >=
+#  Oura's — and each of the three safety paths below loosens as sleep rises.
+#  Quantifying that before wiring is the whole point.
+
+
+def sleep_fusion_shadow_report(bio_rows: list[dict], fused_by_date: dict[str, float],
+                                today: date | None = None) -> dict:
+    """Re-runs traffic_light and readiness over a copy of `bio_rows` whose
+    sleep_duration_hours has been replaced by the fused value, and reports
+    what differs.
+
+    `fused_by_date` is {date: master_sleep_hours}. Rows without a fused value
+    are left exactly as they are, so an un-backfilled night contributes
+    nothing rather than a false "no change".
+
+    Returns counts and deltas only — it changes nothing and is read by
+    views/insights.py for display.
+    """
+    fused_rows = []
+    for r in bio_rows:
+        fused_hours = fused_by_date.get(str(r.get("date")))
+        fused_rows.append({**r, "sleep_duration_hours": fused_hours}
+                          if fused_hours is not None else dict(r))
+
+    covered = [r for r in bio_rows if str(r.get("date")) in fused_by_date]
+    out = {
+        "nights_compared": len(covered),
+        "traffic_light_now": None, "traffic_light_fused": None,
+        "traffic_light_would_flip": False,
+        "readiness_deltas": [], "readiness_median_delta": None,
+        "readiness_max_delta": None,
+        "sleep_debt_now": None, "sleep_debt_fused": None,
+        "rest_trigger_now": False, "rest_trigger_fused": False,
+    }
+    if not covered:
+        return out
+
+    now_light = _engine.traffic_light(bio_rows)
+    fused_light = _engine.traffic_light(fused_rows)
+    out["traffic_light_now"] = now_light.get("overall")
+    out["traffic_light_fused"] = fused_light.get("overall")
+    out["traffic_light_would_flip"] = out["traffic_light_now"] != out["traffic_light_fused"]
+
+    today = today or date.today()
+    deltas = []
+    for r in covered:
+        try:
+            d = date.fromisoformat(str(r["date"]))
+        except (ValueError, TypeError, KeyError):
+            continue
+        before = _readiness.compute_readiness(for_date=d, bio_rows=bio_rows)
+        after = _readiness.compute_readiness(for_date=d, bio_rows=fused_rows)
+        if isinstance(before, (int, float)) and isinstance(after, (int, float)):
+            deltas.append(round(float(after) - float(before), 1))
+    if deltas:
+        ordered = sorted(deltas)
+        out["readiness_deltas"] = deltas
+        out["readiness_median_delta"] = ordered[len(ordered) // 2]
+        out["readiness_max_delta"] = max(deltas, key=abs)
+
+    debt_now = _readiness.sleep_debt_hours(bio_rows, today, window_days=7)
+    debt_fused = _readiness.sleep_debt_hours(fused_rows, today, window_days=7)
+    out["sleep_debt_now"] = debt_now
+    out["sleep_debt_fused"] = debt_fused
+    if debt_now is not None:
+        out["rest_trigger_now"] = debt_now >= 9.5
+    if debt_fused is not None:
+        out["rest_trigger_fused"] = debt_fused >= 9.5
+    return out
+
+
+# ─── Sleep drill-down formatting (2026-07-31) ───────────────────────────────
+#  Copy, units and colour for the Home page's Sleep detail. Pure: the score
+#  math lives in services/sleep_score.py, the HTML in app.py. This is the
+#  layer that decides "5h 59m" over "5.98" and which of those numbers is
+#  worth showing at all.
+#
+#  One colour scale governs the whole screen — the same thresholds sleep_meta
+#  uses for the card and the tier label, reused here for every contributor
+#  bar, so a coral bar and a coral tier always mean the same thing.
+
+SLEEP_TIERS = ((85.0, "#6BAF8B", "Optimal"),
+               (70.0, "#BFA06A", "Good"),
+               (50.0, "#BFA06A", "Pay attention"))
+_SLEEP_TIER_FLOOR = ("#C47878", "Poor")
+
+
+def sleep_tier(score: float | None) -> tuple[str, str]:
+    """(colour, qualitative label) for a 0-100 sub-score."""
+    if score is None:
+        return "#4A5568", "not scored"
+    for threshold, colour, label in SLEEP_TIERS:
+        if score >= threshold:
+            return colour, label
+    return _SLEEP_TIER_FLOOR
+
+
+def format_duration(seconds: float | None) -> str | None:
+    """`5h 59m` — Oura's own shape. Hours are never dropped, so the values
+    stay column-comparable down a list."""
+    if seconds is None:
+        return None
+    total = int(round(seconds / 60.0))
+    return f"{total // 60}h {total % 60:02d}m"
+
+
+def format_hours(hours: float | None) -> str | None:
+    return None if hours is None else format_duration(hours * 3600.0)
+
+
+def _contributor_value(key: str, raw, score, total_seconds) -> str:
+    """The right-hand value on a contributor row.
+
+    Absolute where a number means something to a person (durations, percent,
+    minutes-to-sleep); qualitative where it doesn't. Restfulness is
+    deliberately qualitative: services/sleep_score.py's docstring flags
+    restless_periods' UNIT as an unverified guess, so printing "3.2 / h"
+    would state a fact we can't stand behind.
+    """
+    if raw is None:
+        return "not scored"
+    if key == "total_sleep":
+        return format_hours(raw) or "—"
+    if key == "efficiency":
+        return f"{raw:.0f} %"
+    if key in ("rem", "deep"):
+        if total_seconds:
+            return f"{format_duration(total_seconds * raw / 100.0)}, {raw:.0f} %"
+        return f"{raw:.0f} %"
+    if key == "latency":
+        return f"{raw:.0f}m"
+    if key == "restfulness":
+        return sleep_tier(score)[1]
+    if key == "timing":
+        return "Optimal" if raw <= 30 else f"{raw:.0f}m off usual"
+    return f"{raw:.0f}"
+
+
+def sleep_breakdown_rows(breakdown: dict) -> list[dict]:
+    """One display row per contributor, always all seven, in the breakdown's
+    own order. `bar_pct` is the sub-score; the right-hand value is the RAW
+    reading — Oura's pattern, and it avoids putting two numbers on one row
+    that a reader then has to reconcile."""
+    rows = []
+    total_seconds = breakdown.get("total_seconds")
+    for c in breakdown.get("contributors", []):
+        colour, _ = sleep_tier(c["score"])
+        rows.append({
+            "key": c["key"],
+            "label": c["label"],
+            "scored": c["score"] is not None,
+            "value_display": _contributor_value(c["key"], c["raw"], c["score"], total_seconds),
+            "bar_pct": c["score"] if c["score"] is not None else 0.0,
+            "colour": colour,
+        })
+    return rows
+
+
+def sleep_coverage_caption(breakdown: dict) -> str:
+    """Renormalisation, said out loud. Empty when every contributor scored —
+    a caption that always shows is a caption nobody reads.
+
+    This is the first time the app admits that a night scored on one
+    contributor and a night scored on seven both render as a confident
+    number.
+    """
+    missing = breakdown.get("missing") or []
+    if not missing:
+        return ""
+    scored = 7 - len(missing)
+    return (f"Scored on {scored} of 7 contributors; "
+            f"remaining weights renormalised to 100%.")
+
+
+SLEEP_DEBT_BANDS = ("None", "Low", "Moderate", "High")
+
+
+def sleep_debt_display(debt_hours: float | None,
+                       threshold: float = _readiness.SLEEP_DEBT_THRESHOLD_HOURS) -> dict:
+    """The debt figure plus which of four bands it falls in.
+
+    Banded against readiness.SLEEP_DEBT_THRESHOLD_HOURS — the same 9.5 h that
+    makes scheduling.should_shift_session move a gym day — so the gauge on
+    screen and the rule that actually reschedules training agree. `filled` is
+    how many of the four segments to light.
+    """
+    if debt_hours is None:
+        return {"value_display": None, "band": None, "filled": 0, "colour": "#4A5568"}
+    frac = max(0.0, min(1.0, debt_hours / threshold)) if threshold else 0.0
+    filled = min(4, int(frac * 4) + (1 if frac > 0 else 0))
+    band = SLEEP_DEBT_BANDS[max(0, filled - 1)]
+    colour = "#C47878" if frac >= 0.75 else ("#BFA06A" if frac >= 0.4 else "#6BAF8B")
+    return {
+        "value_display": format_hours(debt_hours),
+        "band": band, "filled": filled, "colour": colour,
+        "hours": debt_hours, "threshold": threshold,
+    }
+
+
+def sleep_key_metrics(detail: dict | None) -> list[dict]:
+    """The 2x2 grid — a fixed set, so a missing reading shows a dash rather
+    than collapsing the grid and moving everything else around."""
+    d = detail or {}
+    return [
+        {"label": "Total sleep", "value": format_duration(d.get("total_seconds")) or "—"},
+        {"label": "Time in bed", "value": format_duration(d.get("time_in_bed_seconds")) or "—"},
+        {"label": "Efficiency",
+         "value": f"{d['efficiency']:.0f} %" if d.get("efficiency") is not None else "—"},
+        {"label": "Resting HR",
+         "value": f"{d['lowest_heart_rate']:.0f} bpm" if d.get("lowest_heart_rate") is not None else "—"},
+    ]
+
+
+def sleep_stage_legend(detail: dict | None, stage_minutes: dict | None = None) -> list[dict]:
+    """Awake / REM / Light / Deep with duration and share of total sleep.
+
+    `stage_minutes` (from the fused hypnogram) wins when supplied, so the
+    legend always describes the SAME sequence the strip above it draws —
+    otherwise a fused night would show a strip and a set of numbers that
+    disagree. Falls back to Oura's stored scalars.
+
+    Percentages are of total SLEEP, not time in bed, so the three sleep
+    stages sum to 100 and Awake is deliberately excluded from that sum.
+    """
+    d = detail or {}
+    if stage_minutes:
+        secs = {k: v * 60.0 for k, v in stage_minutes.items()}
+    else:
+        secs = {"awake": d.get("awake_seconds"), "rem": d.get("rem_seconds"),
+                "light": d.get("light_seconds"), "deep": d.get("deep_seconds")}
+    asleep = sum(v for k, v in secs.items() if k != "awake" and v) or None
+    rows = []
+    for key, label in (("awake", "Awake"), ("rem", "REM"), ("light", "Light"), ("deep", "Deep")):
+        v = secs.get(key)
+        pct = (f"{v / asleep * 100:.0f} %"
+               if v is not None and asleep and key != "awake" else "—")
+        rows.append({"key": key, "label": label,
+                     "duration": format_duration(v) or "—", "pct": pct})
+    return rows
+
+
+def sleep_vitals_rows(detail: dict | None, context: dict | None = None) -> list[dict]:
+    """An OPEN list — rows with no reading are omitted rather than rendered
+    as dashes. average_breath is absent on older nights, and a wall of
+    em-dashes is noise where a fixed set would have been signal."""
+    d, c = detail or {}, context or {}
+    candidates = [
+        ("Average HR", d.get("average_heart_rate"), "{:.0f} bpm"),
+        ("Lowest HR", d.get("lowest_heart_rate"), "{:.0f} bpm"),
+        ("Average HRV", d.get("average_hrv"), "{:.0f} ms"),
+        ("Respiratory rate", d.get("average_breath"), "{:.1f} /min"),
+        ("Blood oxygen", c.get("spo2_average"), "{:.0f} %"),
+        ("Breathing disturbance", c.get("breathing_disturbance_index"), "{:.0f}"),
+        ("Temperature deviation", d.get("temperature_deviation"), "{:+.2f} °C"),
+    ]
+    return [{"label": lbl, "value": fmt.format(v)}
+            for lbl, v, fmt in candidates if v is not None]
+
+
+def format_clock(iso_datetime: str | None) -> str:
+    """`22:42` from an ISO timestamp — the hypnogram's time axis. Returns ""
+    rather than raising on a blank or malformed value, since older nights
+    carry both."""
+    if not iso_datetime:
+        return ""
+    try:
+        from datetime import datetime as _dt
+        return _dt.fromisoformat(str(iso_datetime)).strftime("%H:%M")
+    except (ValueError, TypeError):
+        return ""

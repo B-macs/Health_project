@@ -298,14 +298,34 @@ def test_hypnograms_stay_strings_not_numbers():
     assert isinstance(row["sleep_phase_5_min"], str)
 
 
-def test_numericise_ignore_covers_exactly_the_hypnogram_columns():
+def test_numericise_ignore_covers_exactly_the_digit_string_columns():
     """The indices are 1-based column positions — an off-by-one here silently
-    exempts the wrong column and corrupts the hypnogram anyway."""
+    exempts the wrong column and corrupts the hypnogram anyway.
+
+    movement_30_sec joined the list for the same reason as the hypnograms: it
+    is a pure digit string (Oura's 1-4 movement alphabet) that gspread would
+    otherwise read back as a 1,000-digit int. The two series columns are JSON
+    objects and so are not numeric today, but are exempted defensively — see
+    _OURA_NUMERICISE_IGNORE's own comment."""
     from services.repository import _OURA_NUMERICISE_IGNORE, _OURA_SLEEP_PERIOD_HEADER
     ignored = _OURA_NUMERICISE_IGNORE["sleep_periods"]
     assert [_OURA_SLEEP_PERIOD_HEADER[i - 1] for i in ignored] == [
-        "sleep_phase_5_min", "sleep_phase_30_sec",
+        "sleep_phase_5_min", "sleep_phase_30_sec", "movement_30_sec",
+        "sleep_hr_series", "sleep_hrv_series",
     ]
+
+
+def test_garmin_sleep_stages_numericise_ignore_resolves_to_the_named_columns():
+    """Same 1-based-index hazard on the Garmin tab. movement_levels is the
+    one that matters: a single-minute night encodes as "1.13", which gspread
+    would read as a float while a full night reads as text — making the
+    column's type depend on the length of the night."""
+    from services.repository import (
+        _GARMIN_SLEEP_STAGES_HEADER, _GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE)
+    resolved = [_GARMIN_SLEEP_STAGES_HEADER[i - 1]
+                for i in _GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE]
+    assert set(resolved) == {
+        "movement_levels", "sleep_levels_json", "sleep_hr_json", "sleep_stress_json"}
 
 
 def test_oura_sleep_period_row_blanks_missing_hypnograms():

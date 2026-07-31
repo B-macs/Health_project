@@ -125,6 +125,13 @@ def update_page(client: Client, page_id: str, properties: dict) -> dict:
     return client.pages.update(page_id=page_id, properties=properties)
 
 
+def archive_page(client: Client, page_id: str) -> dict:
+    """Soft-deletes a page (Notion's own trash, restorable there from the
+    Notion UI) — never a hard delete. Used to retire a duplicate row after
+    its fields have been folded into a surviving one."""
+    return client.pages.update(page_id=page_id, archived=True)
+
+
 def ensure_properties(client: Client, database_id: str, properties: dict[str, dict]) -> list[str]:
     """Adds any property in `properties` (name -> Notion property-type
     payload, e.g. {"number": {}}, {"checkbox": {}}, or

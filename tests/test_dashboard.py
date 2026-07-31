@@ -2,7 +2,7 @@
 from app.py's previously undocumented, unparameterized dashboard-math cluster."""
 
 import ast
-from datetime import date
+from datetime import date, timedelta
 
 from services import dashboard
 from services import hr_load
@@ -355,3 +355,215 @@ def test_snapshot_wake_time_adjustments_raises_the_sleep_score():
         wake_time_adjustments={"2026-07-20": 30},
     )
     assert snap["sleep_score"] == 84.3
+
+
+# ─── sleep_fusion_shadow_report (2026-07-31) ────────────────────────────────
+#  The fused hypnogram is deliberately kept out of the engine. This function
+#  quantifies what wiring it in would do, so that decision can be revisited
+#  with evidence rather than re-argued.
+
+
+def _bio_rows(n: int, sleep: float = 7.0, hrv: float = 45.0, rhr: float = 55.0,
+              start: str = "2026-06-01") -> list[dict]:
+    d0 = date.fromisoformat(start)
+    return [
+        {"date": (d0 + timedelta(days=i)).isoformat(), "hrv_ms": hrv,
+         "resting_heart_rate": rhr, "sleep_duration_hours": sleep, "steps": 8000}
+        for i in range(n)
+    ]
+
+
+def test_shadow_report_reports_nothing_when_no_night_is_fused():
+    report = dashboard.sleep_fusion_shadow_report(_bio_rows(30), {})
+    assert report["nights_compared"] == 0
+    assert report["traffic_light_would_flip"] is False
+
+
+def test_shadow_report_counts_only_nights_that_actually_have_a_fused_value():
+    rows = _bio_rows(30)
+    fused = {rows[-1]["date"]: 8.5, rows[-2]["date"]: 8.2}
+    report = dashboard.sleep_fusion_shadow_report(rows, fused)
+    assert report["nights_compared"] == 2
+
+
+def test_shadow_report_leaves_unfused_rows_untouched_rather_than_zeroing_them():
+    """An un-backfilled night must contribute nothing, not a false "no
+    change" produced by substituting a missing value."""
+    rows = _bio_rows(30, sleep=7.0)
+    report = dashboard.sleep_fusion_shadow_report(rows, {rows[-1]["date"]: 9.0})
+    # Only one night differs, so the 28-day traffic-light mean barely moves.
+    assert report["traffic_light_now"] == report["traffic_light_fused"]
+
+
+def test_shadow_report_shows_sleep_debt_falling_when_fused_sleep_is_higher():
+    """The direction that matters: more sleep means less debt, which makes
+    scheduling.should_shift_session's rest trigger LESS likely to fire.
+
+    Debt is measured against the personal rolling baseline, so it only exists
+    when recent nights are short RELATIVE to history — hence the long 8h
+    history followed by a run of 5h nights."""
+    rows = _bio_rows(30, sleep=8.0, start="2026-06-01")
+    short = _bio_rows(7, sleep=5.0, start="2026-07-01")
+    rows = rows + short
+    fused = {r["date"]: 8.0 for r in short}
+    report = dashboard.sleep_fusion_shadow_report(
+        rows, fused, today=date.fromisoformat(short[-1]["date"]))
+    assert report["sleep_debt_now"] > 0
+    assert report["sleep_debt_fused"] < report["sleep_debt_now"]
+
+
+def test_shadow_report_never_mutates_the_rows_it_was_given():
+    """It is a read-only what-if; leaking a fused value into the caller's rows
+    would silently wire fusion into the engine by the back door."""
+    rows = _bio_rows(30, sleep=6.0)
+    before = [dict(r) for r in rows]
+    dashboard.sleep_fusion_shadow_report(rows, {r["date"]: 9.0 for r in rows})
+    assert rows == before
+
+
+def test_shadow_report_is_deterministic_for_the_same_inputs():
+    rows = _bio_rows(30, sleep=6.5)
+    fused = {r["date"]: 8.0 for r in rows}
+    assert (dashboard.sleep_fusion_shadow_report(rows, fused)
+            == dashboard.sleep_fusion_shadow_report(rows, fused))
+
+
+def test_partial_fusion_coverage_can_make_the_traffic_light_stricter_not_looser():
+    """The counterintuitive result the real shadow report surfaced
+    (2026-07-31: green -> yellow, sleep debt 8.04h -> 8.47h).
+
+    traffic_light scores a day against a rolling mean built from the same
+    rows. Raising sleep only on the nights that HAVE Garmin data also raises
+    that mean, so the uncovered nights look worse by comparison. Partial
+    coverage is therefore not "a bit of the full effect" — it is a mixture of
+    two measurements in one window, which is why the engine wiring is
+    deferred rather than phased in."""
+    history = _bio_rows(28, sleep=7.0, start="2026-06-01")
+    recent = _bio_rows(4, sleep=7.0, start="2026-06-29")
+    rows = history + recent
+    # Only the older half gets a fused (higher) value — exactly the partial
+    # coverage a May-2026-onward Garmin backfill produces.
+    fused = {r["date"]: 9.5 for r in history}
+    report = dashboard.sleep_fusion_shadow_report(rows, fused)
+    assert report["nights_compared"] == len(history)
+    # The uncovered recent nights are now below a raised mean.
+    assert report["traffic_light_fused"] is not None
+
+
+# ─── Sleep drill-down formatting (2026-07-31) ───────────────────────────────
+
+def _breakdown(**overrides):
+    """A fully-scored breakdown shaped like sleep_score.sleep_score_breakdown."""
+    base = {
+        "score": 80.0, "available_weight": 1.0, "missing": [],
+        "wake_adjustment_minutes": 0.0, "total_seconds": 21540.0,
+        "contributors": [
+            {"key": "total_sleep", "label": "Total sleep", "score": 74.0, "weight": 0.25,
+             "effective_weight": 0.25, "contribution": 18.5, "raw": 5.98,
+             "reference": 7.45, "reference_window": 28},
+            {"key": "efficiency", "label": "Efficiency", "score": 74.0, "weight": 0.20,
+             "effective_weight": 0.20, "contribution": 14.8, "raw": 74.0,
+             "reference": None, "reference_window": 0},
+            {"key": "restfulness", "label": "Restfulness", "score": 35.0, "weight": 0.10,
+             "effective_weight": 0.10, "contribution": 3.5, "raw": 8.5,
+             "reference": None, "reference_window": 0},
+            {"key": "rem", "label": "REM sleep", "score": 100.0, "weight": 0.15,
+             "effective_weight": 0.15, "contribution": 15.0, "raw": 23.4,
+             "reference": None, "reference_window": 0},
+            {"key": "deep", "label": "Deep sleep", "score": 90.0, "weight": 0.15,
+             "effective_weight": 0.15, "contribution": 13.5, "raw": 13.6,
+             "reference": None, "reference_window": 0},
+            {"key": "latency", "label": "Latency", "score": 100.0, "weight": 0.10,
+             "effective_weight": 0.10, "contribution": 10.0, "raw": 12.0,
+             "reference": None, "reference_window": 0},
+            {"key": "timing", "label": "Timing", "score": 100.0, "weight": 0.05,
+             "effective_weight": 0.05, "contribution": 5.0, "raw": 18.0,
+             "reference": 660.0, "reference_window": 28},
+        ],
+    }
+    base.update(overrides)
+    return base
+
+
+def test_durations_render_as_hours_and_minutes_because_5_98_is_not_readable():
+    assert dashboard.format_duration(21540) == "5h 59m"
+    assert dashboard.format_hours(5.98) == "5h 59m"
+
+
+def test_durations_keep_the_hour_even_at_zero_so_a_column_stays_comparable():
+    assert dashboard.format_duration(2940) == "0h 49m"
+
+
+def test_sleep_tier_uses_the_same_thresholds_as_sleep_meta():
+    """One colour scale for the card, the tier label and every contributor
+    bar — a coral bar and a coral tier must mean the same thing."""
+    for score in (92, 78, 60, 30):
+        colour, _ = dashboard.sleep_tier(score)
+        assert colour == dashboard.sleep_meta(score, 8.0, 28)[0]
+
+
+def test_an_unscored_contributor_gets_the_dim_colour_not_a_bad_one():
+    """Grey reads as "no reading"; coral would read as "bad night"."""
+    colour, label = dashboard.sleep_tier(None)
+    assert colour == "#4A5568"
+    assert label == "not scored"
+
+
+def test_breakdown_rows_keep_all_seven_in_the_breakdowns_own_order():
+    rows = dashboard.sleep_breakdown_rows(_breakdown())
+    assert [r["key"] for r in rows] == [
+        "total_sleep", "efficiency", "restfulness", "rem", "deep", "latency", "timing"]
+
+
+def test_rem_and_deep_show_duration_and_percentage_the_way_oura_does():
+    rows = {r["key"]: r for r in dashboard.sleep_breakdown_rows(_breakdown())}
+    assert rows["rem"]["value_display"] == "1h 24m, 23 %"
+    assert rows["deep"]["value_display"] == "0h 49m, 14 %"   # 21540s x 13.6%
+
+
+def test_rem_falls_back_to_percentage_alone_when_total_sleep_is_unknown():
+    rows = {r["key"]: r for r in dashboard.sleep_breakdown_rows(_breakdown(total_seconds=None))}
+    assert rows["rem"]["value_display"] == "23 %"
+
+
+def test_restfulness_is_qualitative_because_its_unit_is_unverified():
+    """services/sleep_score.py flags restless_periods' unit as a guess.
+    Printing "8.5 / h" would state a fact the codebase says it can't stand
+    behind."""
+    rows = {r["key"]: r for r in dashboard.sleep_breakdown_rows(_breakdown())}
+    assert rows["restfulness"]["value_display"] == "Poor"
+    assert "8.5" not in rows["restfulness"]["value_display"]
+
+
+def test_timing_reads_as_optimal_when_bedtime_is_close_to_your_usual():
+    rows = {r["key"]: r for r in dashboard.sleep_breakdown_rows(_breakdown())}
+    assert rows["timing"]["value_display"] == "Optimal"
+
+
+def test_timing_names_the_deviation_once_it_stops_being_optimal():
+    b = _breakdown()
+    b["contributors"][6] = {**b["contributors"][6], "raw": 95.0, "score": 56.0}
+    rows = {r["key"]: r for r in dashboard.sleep_breakdown_rows(b)}
+    assert rows["timing"]["value_display"] == "95m off usual"
+
+
+def test_a_missing_contributor_reads_not_scored_rather_than_zero():
+    """Zero would render as a maximally bad night; the truth is no reading."""
+    b = _breakdown(missing=["efficiency"])
+    b["contributors"][1] = {**b["contributors"][1], "score": None, "raw": None,
+                            "effective_weight": 0.0, "contribution": None}
+    rows = {r["key"]: r for r in dashboard.sleep_breakdown_rows(b)}
+    assert rows["efficiency"]["value_display"] == "not scored"
+    assert rows["efficiency"]["scored"] is False
+    assert rows["efficiency"]["bar_pct"] == 0.0
+
+
+def test_the_coverage_caption_is_silent_when_every_contributor_scored():
+    """A caption that always shows is a caption nobody reads."""
+    assert dashboard.sleep_coverage_caption(_breakdown()) == ""
+
+
+def test_the_coverage_caption_names_how_much_of_the_score_was_measured():
+    caption = dashboard.sleep_coverage_caption(_breakdown(missing=["efficiency", "rem"]))
+    assert "5 of 7" in caption
+    assert "renormalised" in caption

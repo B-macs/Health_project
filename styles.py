@@ -316,3 +316,130 @@ hr {{ border-color:{W['border']} !important; margin:10px 0 !important; }}
     [data-testid="stTabs"] [role="tab"] {{ font-size:14px !important; padding:10px !important; }}
 }}
 </style>"""
+
+
+# ─── Sleep-stage rendering (2026-07-31) ─────────────────────────────────────
+#  Moved here from views/insights.py now that app.py's Sleep drill-down needs
+#  it too. This file is already the home for HTML string builders
+#  (oura_ring/oura_card/whoop_stat) and already owns the palettes.
+#
+#  Colours: blues for the three sleep stages, cream for awake. The earlier
+#  palette used coral for awake, which made ordinary wakefulness rhyme with
+#  the coral this app spends on "pay attention" and a HIGH sleep-debt band —
+#  reading a normal part of every night as a fault. Cream separates "awake"
+#  from "problem".
+
+STAGE_BAND: dict[str, tuple[str, str]] = {
+    "1": ("#1E4D7B", "Deep"),
+    "2": ("#3C8FD4", "Light"),
+    "3": ("#8FCDF0", "REM"),
+    "4": ("#EFE9DD", "Awake"),
+    "0": ("#2A2E37", "No data"),
+}
+# Awake on top descending to deep — the vertical order a clinical hypnogram
+# uses, so the shape reads the way a sleep chart is expected to.
+STAGE_ROW: dict[str, int] = {"4": 0, "3": 1, "2": 2, "1": 3}
+
+
+def hypnogram_svg(codes: str, height: int = 52) -> str:
+    """One night's stage sequence as a stacked band chart.
+
+    `codes` is the digit-per-interval string Oura and services/sleep_fusion.py
+    both use (1=deep 2=light 3=REM 4=awake). Consecutive identical intervals
+    are merged into one rect, so a 500-minute night renders as a few dozen
+    elements rather than 500."""
+    if not codes:
+        return ""
+    n = len(codes)
+    row_h = height / 4
+    parts, i = [], 0
+    while i < n:
+        j = i
+        while j < n and codes[j] == codes[i]:
+            j += 1
+        colour, _ = STAGE_BAND.get(codes[i], STAGE_BAND["0"])
+        row = STAGE_ROW.get(codes[i])
+        if row is not None:
+            parts.append(
+                f'<rect x="{i / n * 100:.3f}%" y="{row * row_h:.1f}" '
+                f'width="{(j - i) / n * 100:.3f}%" height="{row_h:.1f}" fill="{colour}" />'
+            )
+        i = j
+    return (f'<svg viewBox="0 0 100 {height}" preserveAspectRatio="none" role="img" '
+            f'aria-label="Sleep stage timeline" '
+            f'style="width:100%;height:{height}px;display:block;border-radius:4px;'
+            f'background:#0E1220;">{"".join(parts)}</svg>')
+
+
+def stage_legend_html() -> str:
+    items = "".join(
+        f'<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;">'
+        f'<span style="width:10px;height:10px;border-radius:2px;background:{c};'
+        f'display:inline-block;"></span>'
+        f'<span style="color:#9AA3B2;font-size:11px;">{label}</span></span>'
+        for c, label in (STAGE_BAND[k] for k in ("1", "2", "3", "4"))
+    )
+    return f'<div style="margin:6px 0 10px 0;">{items}</div>'
+
+
+# ─── Movement rendering ─────────────────────────────────────────────────────
+#  Deliberately ONE hue at four opacities, not four colours. The hypnogram
+#  above already spends the page's colour budget, and the two strips sit on a
+#  shared time axis directly beneath one another — a second multi-colour band
+#  would read as a competing categorical scale rather than as the intensity
+#  scale movement actually is. Opacity encodes magnitude, which is what an
+#  ordinal 1-4 class means.
+MOVEMENT_HUE = "#8FCDF0"
+MOVEMENT_LABELS: dict[str, str] = {
+    "1": "No motion", "2": "Restless", "3": "Tossing", "4": "Active",
+}
+MOVEMENT_OPACITY: dict[str, float] = {"1": 0.16, "2": 0.42, "3": 0.72, "4": 1.0}
+
+
+def movement_svg(codes: str, height: int = 26) -> str:
+    """One night's fused movement as a tick strip, drawn to share the
+    hypnogram's time axis exactly.
+
+    `codes` is the digit-per-slot string from services/sleep_movement.py
+    (1=still 2=restless 3=tossing 4=active), on the 30-SECOND grid — twice the
+    hypnogram's resolution but anchored at the same window_start, so equal
+    x-fractions are the same instant in both. Both are drawn full-width with
+    the same percentage arithmetic, which is what keeps them aligned without
+    either needing to know the other's length.
+
+    Ticks grow upward from the baseline so the strip reads as intensity over
+    time; uncovered slots render as nothing at all rather than as a zero-height
+    tick, because "not measured" and "did not move" are different claims.
+    """
+    if not codes:
+        return ""
+    n = len(codes)
+    parts, i = [], 0
+    while i < n:
+        j = i
+        while j < n and codes[j] == codes[i]:
+            j += 1
+        opacity = MOVEMENT_OPACITY.get(codes[i])
+        if opacity is not None:
+            tick_h = height * (0.25 + 0.75 * (int(codes[i]) - 1) / 3)
+            parts.append(
+                f'<rect x="{i / n * 100:.3f}%" y="{height - tick_h:.1f}" '
+                f'width="{(j - i) / n * 100:.3f}%" height="{tick_h:.1f}" '
+                f'fill="{MOVEMENT_HUE}" fill-opacity="{opacity}" />'
+            )
+        i = j
+    return (f'<svg viewBox="0 0 100 {height}" preserveAspectRatio="none" role="img" '
+            f'aria-label="Movement timeline" '
+            f'style="width:100%;height:{height}px;display:block;border-radius:4px;'
+            f'background:#0E1220;">{"".join(parts)}</svg>')
+
+
+def movement_legend_html() -> str:
+    items = "".join(
+        f'<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;">'
+        f'<span style="width:10px;height:10px;border-radius:2px;background:{MOVEMENT_HUE};'
+        f'opacity:{MOVEMENT_OPACITY[k]};display:inline-block;"></span>'
+        f'<span style="color:#9AA3B2;font-size:11px;">{MOVEMENT_LABELS[k]}</span></span>'
+        for k in ("1", "2", "3", "4")
+    )
+    return f'<div style="margin:6px 0 10px 0;">{items}</div>'

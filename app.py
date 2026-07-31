@@ -28,6 +28,7 @@ from services import dashboard as dash
 from services import engine
 from services import hr_load as _hr_load
 from services import readiness as readiness_model
+from services import sleep_score as sleep_score_model
 
 # ─── Page config ─────────────────────────────────────────────────────────────
 
@@ -135,16 +136,61 @@ def _metrics_history_rolling(days: int = 60) -> list[dict]:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _wake_time_adjustments_rolling(days: int = 60) -> dict[str, float]:
-    """Per-night wake-time corrections (Repository.get_wake_time_adjustments
-    — CLAUDE.md rule 4's narrow manual-entry exception) for the same window
-    as the Metrics History trend — threaded into
-    dash.compute_daily_metrics_snapshot below so Sleep Score reflects any
-    correction, and read again by the Sleep card drill-down for its
-    "adjusted" badge/control. Cleared (like every other cached read here)
-    by the blanket st.cache_data.clear() the drill-down's +/- control calls
-    after writing a new adjustment."""
+    """Per-night wake-time corrections for the same window as the Metrics
+    History trend — threaded into dash.compute_daily_metrics_snapshot below
+    so Sleep Score reflects any correction, and read again by the Sleep card
+    drill-down for its "adjusted" badge/control. Cleared (like every other
+    cached read here) by the blanket st.cache_data.clear() the drill-down's
+    +/- control calls after writing a new adjustment.
+
+    Resolves the manual correction (CLAUDE.md rule 4's narrow manual-entry
+    exception) against the Oura+Garmin fusion's own phantom-wake figure —
+    both subtract the same minutes, so exactly one wins per night. See
+    services/sleep_fusion.py::effective_wake_adjustments."""
     start = (date.today() - timedelta(days=days)).isoformat()
-    return repo.get_repository().get_wake_time_adjustments(start=start)
+    adjustments, _sources = repo.get_repository().get_effective_wake_adjustments(start=start)
+    return adjustments
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _sleep_night_details(start: str, end: str) -> dict[str, dict]:
+    """Per-night sleep detail for the drill-down. Deliberately NOT part of
+    _bio_rolling: these fields (hypnogram, breathing rate, bedtime end) are
+    display-only, and threading them through the engine's biometric rows
+    would carry a 1,800-character string per row through readiness, traffic
+    light and the metrics-history backfill for no engine benefit.
+
+    Only called when the Sleep drill-down is actually open — see the
+    `view == "sleep"` guard at the fetch site — so the ordinary three-card
+    Home stream pays nothing for it."""
+    return repo.get_repository().get_sleep_night_details(start, end)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _sleep_fusion_by_date(start: str, end: str) -> dict[str, dict]:
+    """Fused hypnograms for the window, keyed by date. The strip prefers the
+    fused master; nights without a row fall back to Oura's own sequence."""
+    return {
+        r["date"]: r
+        for r in repo.get_repository().get_sleep_fusion_history(start, end)
+    }
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _sleep_daily_context(start: str, end: str) -> dict[str, dict]:
+    """Blood oxygen and breathing from the Oura Daily tab — stored since the
+    schema widened, surfaced nowhere until now."""
+    return repo.get_repository().get_oura_daily_sleep_context(start, end)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _wake_adjustment_sources(days: int = 60) -> dict[str, str]:
+    """{date: "fusion"|"manual"} for the same window — lets the Sleep card
+    say which correction it applied rather than showing an unexplained
+    number."""
+    start = (date.today() - timedelta(days=days)).isoformat()
+    _adjustments, sources = repo.get_repository().get_effective_wake_adjustments(start=start)
+    return sources
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -287,6 +333,32 @@ try:
     _bio_rows = _bio_rolling(days=60)   # 60d to support 56d sleep baseline
 except Exception:
     _bio_rows = []
+
+# Sleep drill-down data — fetched ONLY when that view is open. These are two
+# extra Sheet reads; paying them on every Home render to populate a screen
+# most visits never reach would be the wrong trade.
+_sleep_details: dict[str, dict] = {}
+_sleep_details_loaded = False
+_sleep_context: dict[str, dict] = {}
+_sleep_fusion_rows: dict[str, dict] = {}
+_sleep_fusion_loaded = False
+if view == "sleep":
+    _sleep_window_start = (selected_date - timedelta(days=7)).isoformat()
+    _sleep_window_end = selected_date.isoformat()
+    try:
+        _sleep_details = _sleep_night_details(_sleep_window_start, _sleep_window_end)
+        _sleep_details_loaded = True
+    except Exception:
+        pass
+    try:
+        _sleep_context = _sleep_daily_context(_sleep_window_start, _sleep_window_end)
+    except Exception:
+        pass
+    try:
+        _sleep_fusion_rows = _sleep_fusion_by_date(_sleep_window_start, _sleep_window_end)
+        _sleep_fusion_loaded = True
+    except Exception:
+        pass
 
 _au_rows = []
 try:
@@ -503,6 +575,259 @@ def _card_html(
 
 # ─── Metric drill-downs (Readiness / Sleep / Strain) ──────────────────────────
 
+def _panel(overline: str, body: str, caption: str = "") -> str:
+    """The detail-view panel every block on this screen sits in — same
+    #131929 / 12px surface _trend_block and _history_trend_block already use,
+    factored out so a new section can't drift from them."""
+    cap = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:10px;line-height:1.5;">{caption}</div>'
+           if caption else "")
+    return (
+        f'<div style="background:#131929;border-radius:12px;padding:16px 18px;margin-bottom:10px;">'
+        f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;text-transform:uppercase;'
+        f'font-weight:600;margin-bottom:10px;">{overline}</div>'
+        f'{body}{cap}</div>'
+    )
+
+
+def _contributor_row(row: dict) -> str:
+    """Label left, RAW value right, a 4px bar underneath carrying the
+    sub-score — Oura's own pattern. Showing sub-score AND raw AND weight on
+    one row was tested in the mockup and read as noise at phone width.
+
+    An unscored contributor keeps its row, dimmed with an empty track: on
+    this panel the gap is the most informative thing on screen, so it must
+    not be silently dropped."""
+    scored = row["scored"]
+    lbl_col = "#B9C2D6" if scored else "#4A5568"
+    val_col = row["colour"] if scored else "#4A5568"
+    fill = (f'<i style="display:block;height:100%;border-radius:2px;'
+            f'width:{max(0.0, min(100.0, row["bar_pct"])):.1f}%;background:{row["colour"]};"></i>'
+            if scored else "")
+    return (
+        f'<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
+        f'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;">'
+        f'<span style="font-size:13px;color:{lbl_col};">{row["label"]}</span>'
+        f'<span style="font-size:13px;font-weight:600;color:{val_col};">{row["value_display"]}</span>'
+        f'</div>'
+        f'<div style="height:4px;border-radius:2px;background:rgba(255,255,255,0.08);'
+        f'margin-top:7px;overflow:hidden;">{fill}</div>'
+        f'</div>'
+    )
+
+
+def _sleep_contributors_block() -> str:
+    """The seven contributors behind the Sleep Score.
+
+    dashboard.sleep_meta's copy has told users to "check the breakdown for
+    what's holding it back" since it was written, while no breakdown existed
+    anywhere in the app. This is it."""
+    # Computed inline rather than cached: it is pure math over _bio_rows,
+    # which is already loaded and cached. Hashing 60 rows to memoise a
+    # microsecond of arithmetic would cost more than it saves.
+    breakdown = sleep_score_model.sleep_score_breakdown(
+        selected_date, _bio_rows, wake_time_adjustments=_wake_adjustments,
+    )
+    if breakdown["score"] == _NOT_COMPUTED:
+        return _panel(
+            "Contributors",
+            '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
+            'Oura recorded no sleep period for this night.</div>',
+        )
+    rows = "".join(_contributor_row(r) for r in dash.sleep_breakdown_rows(breakdown))
+    caption = dash.sleep_coverage_caption(breakdown)
+
+    # Total sleep and Efficiency here are the ADJUSTED figures the score was
+    # computed from; Key metrics below shows Oura's raw readings. Without
+    # this line the screen carries two different "total sleep" numbers a few
+    # centimetres apart with nothing explaining the gap.
+    adj = breakdown.get("wake_adjustment_minutes") or 0
+    if adj:
+        note = (f"Total sleep and Efficiency include a {adj:.0f} min wake-time "
+                f"correction; Key metrics below shows Oura's raw readings.")
+        caption = f"{caption} {note}".strip()
+    return _panel("Contributors", rows, caption)
+
+
+def _kv_rows(rows: list[dict], label_key: str = "label", value_key: str = "value") -> str:
+    """The label/value row shape _strain_source_block established."""
+    return "".join(
+        f'<div style="display:flex;justify-content:space-between;'
+        f'font-size:11px;color:#8A99A3;padding:4px 0;">'
+        f'<span>{r[label_key]}</span><span style="color:#C8CAD0;">{r[value_key]}</span></div>'
+        for r in rows
+    )
+
+
+def _key_metric_grid(cells: list[dict]) -> str:
+    """The 2x2 of headline numbers. A fixed set, so a missing reading shows a
+    dash instead of collapsing the grid and shifting everything under it."""
+    def cell(c):
+        return (
+            f'<div style="background:#131929;border-radius:12px;padding:14px;">'
+            f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;'
+            f'text-transform:uppercase;font-weight:600;margin-bottom:6px;">{c["label"]}</div>'
+            f'<div style="font-size:20px;font-weight:700;color:#D4DCEE;">{c["value"]}</div>'
+            f'</div>'
+        )
+    return ('<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;'
+            'margin-bottom:10px;">' + "".join(cell(c) for c in cells) + '</div>')
+
+
+def _sleep_debt_block(debt: dict) -> str:
+    """Debt against the 9.5 h threshold that actually reschedules training
+    (scheduling.should_shift_session), so the gauge and the rule agree."""
+    if debt["value_display"] is None:
+        return ""
+    segs = "".join(
+        f'<span style="height:3px;border-radius:2px;background:'
+        f'{debt["colour"] if i < debt["filled"] else "rgba(255,255,255,0.08)"};"></span>'
+        for i in range(4)
+    )
+    body = (
+        f'<div style="display:flex;align-items:baseline;gap:10px;">'
+        f'<span style="font-size:28px;font-weight:700;color:#D4DCEE;">{debt["value_display"]}</span>'
+        f'<span style="font-size:10px;font-weight:700;letter-spacing:0.08em;'
+        f'color:{debt["colour"]};text-transform:uppercase;">{debt["band"]}</span></div>'
+        f'<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:12px 0 5px;">'
+        f'{segs}</div>'
+        f'<div style="display:flex;justify-content:space-between;font-size:10px;color:#6B7A9B;">'
+        f'<span>None</span><span>High</span></div>'
+    )
+    return _panel("Sleep debt", body,
+                  f'Rest is triggered at {debt["threshold"]:.1f} h.')
+
+
+_SLEEP_SOURCE_TITLES = {
+    "fused": "Fused (Oura + Garmin)",
+    "oura_only": "Oura",
+    "garmin_only": "Garmin",
+}
+
+
+def _hypnogram_strip(detail: dict) -> str:
+    """One strip, named for whatever actually produced it.
+
+    Prefers the fused master, falling back to Oura's own sequence. This is
+    honest by construction: services/sleep_fusion.py::fuse guarantees a
+    Garmin-less night returns Oura's sequence bit-identically, so an
+    `oura_only` row really IS Oura's hypnogram — the label just stops
+    implying a correction that never happened."""
+    fused = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
+    codes = str(fused.get("master_hypnogram") or "") or detail.get("hypnogram_30sec") or ""
+    if not codes:
+        return ('<div style="color:#444;font-size:12px;font-style:italic;padding:14px 0;'
+                'text-align:center;">No stage timeline recorded for this night.</div>')
+
+    if fused.get("master_hypnogram"):
+        source = str(fused.get("source") or "oura_only")
+        title = _SLEEP_SOURCE_TITLES.get(source, "Oura")
+    else:
+        # Fell back to Oura's own column. Distinguish "this night genuinely
+        # has no fusion row" from "the fusion read failed" — labelling a
+        # failed read as plain Oura would quietly misattribute the strip.
+        source = "oura_only"
+        title = "Oura" if _sleep_fusion_loaded else "Oura (fusion unavailable)"
+
+    phantom = fused.get("phantom_wake_minutes")
+    if source == "fused" and phantom:
+        note = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;line-height:1.5;">'
+                f'<b style="color:#8FCDF0;">{title}</b> · {phantom} min of Oura wake '
+                f'reclassified as sleep — Garmin saw no movement. Display only; the score '
+                f'above uses Oura.</div>')
+    else:
+        note = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;">'
+                f'Stage timeline from <b style="color:#8FCDF0;">{title}</b>.</div>')
+
+    start = dash.format_clock(detail.get("bedtime_start"))
+    end = dash.format_clock(detail.get("bedtime_end"))
+    axis = (f'<div style="display:flex;justify-content:space-between;font-size:10px;'
+            f'color:#6B7A9B;margin-top:6px;"><span>{start}</span><span>{end}</span></div>'
+            if start and end else "")
+    # The movement strip sits between the hypnogram and the single shared
+    # axis, so "same time axis" is literally true on screen rather than a
+    # claim two separately-labelled charts are asking to be believed.
+    movement, movement_note = _movement_strip(fused)
+    return (f'<div style="margin-top:14px;">{styles.hypnogram_svg(codes, height=56)}</div>'
+            f'{movement}{axis}{styles.stage_legend_html()}{note}{movement_note}')
+
+
+def _movement_strip(fused: dict) -> tuple[str, str]:
+    """The fused movement tick strip, or ("", "") when the night has none.
+
+    Returns the strip and its caption separately because the caller sandwiches
+    the strip above the shared time axis while the captions collect below —
+    keeping both charts on one axis instead of giving each its own.
+    """
+    codes = str(fused.get("master_movement") or "")
+    if not codes:
+        return "", ""
+
+    source = str(fused.get("movement_source") or "")
+    title = _SLEEP_SOURCE_TITLES.get(source, "Movement")
+    shifts = fused.get("movement_position_shifts")
+    detail_bits = []
+    if source == "fused":
+        detail_bits.append("ring resolves small motion, watch confirms whole-body")
+    if shifts not in (None, ""):
+        detail_bits.append(f"{shifts} position shift{'s' if shifts != 1 else ''}")
+    suffix = f" · {' · '.join(detail_bits)}" if detail_bits else ""
+
+    strip = (f'<div style="margin-top:4px;">{styles.movement_svg(codes, height=26)}</div>')
+    note = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:6px;line-height:1.5;">'
+            f'Movement — <b style="color:#8FCDF0;">{title}</b>{suffix}.</div>'
+            f'{styles.movement_legend_html()}')
+    return strip, note
+
+
+def _sleep_night_blocks() -> str:
+    """Key metrics, sleep debt, architecture and vitals for the selected
+    night. Everything here reads the Oura values the score itself used, so
+    the numbers under the score always explain that score."""
+    detail = _sleep_details.get(selected_date.isoformat())
+    context = _sleep_context.get(selected_date.isoformat(), {})
+    if detail is None:
+        if not _sleep_details_loaded:
+            # The read failed. Silently rendering nothing here would be
+            # indistinguishable from "this night has no sleep data", which is
+            # a different and much more alarming statement.
+            return _panel(
+                "Night detail",
+                '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
+                'Could not load this night&rsquo;s detail — try again shortly.</div>')
+        return ""
+
+    out = _key_metric_grid(dash.sleep_key_metrics(detail))
+
+    debt = dash.sleep_debt_display(
+        readiness_model.sleep_debt_hours(_bio_rows, selected_date))
+    out += _sleep_debt_block(debt)
+
+    legend = dash.sleep_stage_legend(detail)
+    stage_rows = "".join(
+        f'<div style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;">'
+        f'<span style="width:26px;height:6px;border-radius:3px;flex:none;'
+        f'background:{styles.STAGE_BAND[k][0]};"></span>'
+        f'<span style="color:#B9C2D6;width:52px;">{r["label"]}</span>'
+        f'<span style="color:#D4DCEE;">{r["duration"]}</span>'
+        f'<span style="color:#6B7A9B;margin-left:auto;">{r["pct"]}</span></div>'
+        for r, k in zip(legend, ("4", "3", "2", "1"))
+    )
+    asleep = dash.format_duration(detail.get("total_seconds")) or "—"
+    in_bed = dash.format_duration(detail.get("time_in_bed_seconds")) or "—"
+    out += _panel(
+        "Time asleep",
+        f'<div style="font-size:28px;font-weight:700;color:#D4DCEE;">{asleep}</div>'
+        f'<div style="font-size:11px;color:#6B7A9B;margin-top:2px;">Total duration {in_bed}</div>'
+        + _hypnogram_strip(detail)
+        + f'<div style="margin-top:12px;">{stage_rows}</div>',
+    )
+
+    vitals = dash.sleep_vitals_rows(detail, context)
+    if vitals:
+        out += _panel("Vitals while asleep", _kv_rows(vitals))
+    return out
+
+
 def _strain_source_block() -> str:
     """Which method produced today's strain, and the HR detail behind it when
     there was one — so a fall back to RPE-only is visible rather than silent
@@ -613,6 +938,10 @@ def _metric_detail(view: str) -> str:
             f'</div>'
         )
 
+    # pre_blocks render BEFORE the 30-day trend, extra_blocks after. Sleep's
+    # contributor breakdown has to lead — it explains the number in the
+    # header — whereas strain's supplementary context reads as a footnote.
+    pre_blocks = ""
     if view == "readiness":
         col, disp, lbl, _, _, _ = dash.readiness_meta(_readiness_score)
         detail_label = f"READINESS · {date_label}"
@@ -623,6 +952,7 @@ def _metric_detail(view: str) -> str:
         _today_wake_adj = _wake_adjustments.get(selected_date.isoformat(), 0.0)
         detail_label = f"SLEEP · {date_label}" + (" · ADJUSTED" if _today_wake_adj else "")
         hist_key, hist_unit, hist_title, hist_color = "sleep_score", "", "Sleep Score Trend", "#4FC3F7"
+        pre_blocks = _sleep_contributors_block() + _sleep_night_blocks()
         extra_blocks = ""
     else:
         col, disp, lbl, _, _ = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
@@ -663,6 +993,7 @@ def _metric_detail(view: str) -> str:
         f'<div style="font-size:12px;color:#6B7A9B;margin-top:2px;">{lbl}</div>'
         f'</div>'
         f'</div>'
+        + pre_blocks
         + _history_trend_block(hist_title, hist_unit, hist_dates, hist_values, hist_color)
         + adjusted_marker
         + extra_blocks

@@ -224,6 +224,36 @@ def test_get_all_records():
     assert out == [{"Date/Time": "2026-07-01 08:00", "Heart Rate Variability (ms)": "45.2"}]
 
 
+def test_get_all_records_falls_back_when_header_row_has_a_blank_duplicate_cell():
+    """Real-world case: Sheet1's legacy header row has a stray trailing
+    blank column, which gspread's own get_all_records() refuses to guess
+    at (raises GSpreadException). The fallback re-reads row 1 directly and
+    retries with a deduped expected_headers list -- the real, named columns
+    still come through unaffected."""
+    class _Worksheet:
+        def get_all_records(self, numericise_ignore=None, expected_headers=None):
+            if expected_headers is None:
+                raise gspread.exceptions.GSpreadException(
+                    "the header row in the worksheet contains duplicates: ['']"
+                )
+            return [{"Date/Time": "2026-07-01 08:00", "Heart Rate Variability (ms)": "45.2"}]
+
+        def row_values(self, row):
+            assert row == 1
+            return ["Date/Time", "Heart Rate Variability (ms)", "", ""]
+
+    class _Sheet:
+        def worksheet(self, name):
+            return _Worksheet()
+
+    class _Client:
+        def open_by_key(self, sheet_id):
+            return _Sheet()
+
+    out = sheets_client_mod.get_all_records(_Client(), "sheet-xyz")
+    assert out == [{"Date/Time": "2026-07-01 08:00", "Heart Rate Variability (ms)": "45.2"}]
+
+
 # ─── Weekly Rollup worksheet primitives ─────────────────────────────────────
 
 class _FakeCell:
@@ -458,3 +488,55 @@ def test_no_streamlit_import(mod):
             assert not any(a.name.split(".")[0] == "streamlit" for a in node.names)
         if isinstance(node, ast.ImportFrom):
             assert node.module is None or node.module.split(".")[0] != "streamlit"
+
+
+# ─── Garmin rate-limit handling (2026-07-31) ────────────────────────────────
+
+from services.clients import garmin as garmin_client_mod   # noqa: E402
+
+
+def test_a_rate_limit_is_converted_immediately_without_sleeping():
+    """A 429 means "stop calling", not "try again in a moment". Retrying it
+    inside a page render added seconds of blocking sleep to every cold start
+    against a throttled account, for calls that were never going to succeed.
+    The hours-long circuit breaker in the repository is the real backoff."""
+    calls = []
+
+    def always_throttled():
+        calls.append(1)
+        raise RuntimeError("Mobile login returned 429 - IP rate limited by Garmin")
+
+    with pytest.raises(garmin_client_mod.RateLimited):
+        garmin_client_mod._retrying(always_throttled)
+    assert len(calls) == 1
+
+
+def test_a_transient_failure_is_still_retried_because_it_may_actually_succeed():
+    calls = []
+
+    def flaky():
+        calls.append(1)
+        if len(calls) < 2:
+            raise RuntimeError("connection reset")
+        return "ok"
+
+    assert garmin_client_mod._retrying(flaky) == "ok"
+    assert len(calls) == 2
+
+
+def test_a_persistent_non_rate_limit_error_surfaces_as_itself():
+    """Bad credentials must not be disguised as a rate limit — the two need
+    completely different responses."""
+    def broken():
+        raise ValueError("bad credentials")
+
+    with pytest.raises(ValueError):
+        garmin_client_mod._retrying(broken)
+
+
+def test_rate_limits_are_recognised_from_the_message_not_just_the_exception_type():
+    """The live 2026-07-31 failure arrived as a bare error whose text carried
+    the status, not as garminconnect's typed exception."""
+    assert garmin_client_mod._is_rate_limit(RuntimeError("returned 429")) is True
+    assert garmin_client_mod._is_rate_limit(RuntimeError("Too Many Requests")) is True
+    assert garmin_client_mod._is_rate_limit(RuntimeError("404 not found")) is False
