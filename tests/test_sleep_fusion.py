@@ -491,8 +491,34 @@ def test_a_short_garmin_array_is_padded_rather_than_truncating_the_night():
     assert len(master) == 10
 
 
-def test_no_oura_data_yields_no_master_at_all():
-    assert sf.fuse([], _arr((L, 5))) == ([], [], sf.SOURCE_NONE)
+def test_neither_device_yields_no_master_at_all():
+    assert sf.fuse([], None) == ([], [], sf.SOURCE_NONE)
+    assert sf.fuse([], [sf.UNCOVERED] * 5) == ([], [], sf.SOURCE_NONE)
+
+
+def test_no_oura_reading_falls_back_to_the_watch_alone():
+    """Replaces an earlier test that asserted this produced nothing, which
+    pinned a real bug: SOURCE_GARMIN_ONLY was unreachable, so nights the watch
+    recorded and the ring did not produced no row at all.
+
+    That is not an edge case here — over the 71 nights of the Garmin era the
+    ring recorded 27 and the watch 53, so 27 nights (216 hours of sleep) were
+    being discarded. Garmin's staging is the weaker of the two, so the label
+    matters as much as the data.
+    """
+    master, reasons, source = sf.fuse([], _arr((L, 5)))
+    assert master == _arr((L, 5))
+    assert source == sf.SOURCE_GARMIN_ONLY
+    assert set(reasons) == {sf.REASON_GARMIN_ONLY}
+
+
+def test_a_garmin_only_night_contributes_no_phantom_wake():
+    """phantom_wake_minutes feeds the Sleep Score through
+    effective_wake_adjustments. A night with no Oura reading has no Oura wake
+    to reclassify, so it must contribute exactly nothing — the watch must not
+    become a backdoor into a score built entirely from ring measurements."""
+    master, _, _ = sf.fuse([], _arr((L, 3), (A, 2)))
+    assert sf.phantom_wake_minutes([], master) == 0
 
 
 # ─── invariants ─────────────────────────────────────────────────────────────

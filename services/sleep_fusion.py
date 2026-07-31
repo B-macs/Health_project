@@ -242,6 +242,7 @@ REASON_WAKE_CONFIRMED = "w"
 REASON_GARMIN_WAKE = "g"
 REASON_SMOOTHED = "s"
 REASON_OURA_PASSTHROUGH = "-"
+REASON_GARMIN_ONLY = "G"
 REASON_NO_DATA = "?"
 # Version 2, movement-aware.
 REASON_STILL_ASLEEP = "z"
@@ -256,6 +257,7 @@ REASON_LABELS: dict[str, str] = {
     REASON_GARMIN_WAKE: "Garmin awake, Oura asleep — isolated limb movement",
     REASON_SMOOTHED: "Isolated one-minute awake, smoothed",
     REASON_OURA_PASSTHROUGH: "No Garmin coverage — Oura unchanged",
+    REASON_GARMIN_ONLY: "No Oura reading — Garmin's own staging",
     REASON_NO_DATA: "Neither device covered this minute",
     REASON_STILL_ASLEEP: "Oura awake, Garmin asleep, body still — asleep",
     REASON_MOTION_AWAKE: "Oura awake, sustained motion — awakening kept",
@@ -586,9 +588,24 @@ def fuse(oura: list[int], garmin: list[int] | None,
     required Garmin's stage opinion, so a night with movement but no Garmin
     stages still passes Oura straight through.
     """
+    has_garmin = bool(garmin) and any(g != UNCOVERED for g in garmin)
     if not oura:
+        # The watch alone. Worth having because the two devices are not worn
+        # equally: over the 71 nights of the Garmin era the ring recorded 27
+        # and the watch 53, so 27 nights had watch stage data and NO ring
+        # reading at all — 216 hours of sleep that produced no row whatsoever
+        # while this branch returned SOURCE_NONE and made SOURCE_GARMIN_ONLY
+        # dead code.
+        #
+        # Garmin's staging is the weaker of the two (it mislabels REM as
+        # Light, see this module's header), so this is explicitly a
+        # second-best reading and is labelled as such everywhere it surfaces.
+        # A worse hypnogram is still strictly more than no hypnogram; what
+        # would NOT be acceptable is letting it pass as the same thing.
+        if has_garmin:
+            return list(garmin), [REASON_GARMIN_ONLY] * len(garmin), SOURCE_GARMIN_ONLY
         return [], [], SOURCE_NONE
-    if not garmin or all(g == UNCOVERED for g in garmin):
+    if not has_garmin:
         return list(oura), [REASON_OURA_PASSTHROUGH] * len(oura), SOURCE_OURA_ONLY
 
     padded = list(garmin[:len(oura)]) + [UNCOVERED] * max(0, len(oura) - len(garmin))

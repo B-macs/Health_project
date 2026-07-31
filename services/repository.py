@@ -2673,15 +2673,19 @@ class Repository:
                                        garmin_by_date: dict[str, dict],
                                        movement_cutpoints: tuple[float, float, float] | None = None,
                                        ) -> dict | None:
-        """One night's fused hypnogram, or None when there's no Oura night to
-        anchor on. Pure lookup + services/sleep_fusion.py math — no I/O."""
+        """One night's fused hypnogram, or None when neither device has one.
+        Pure lookup + services/sleep_fusion.py math — no I/O."""
         main = oura_by_date.get(day)
-        if main is None:
-            return None
+        oura_min = sleep_fusion.oura_minutes(main.get("sleep_phase_30_sec")) if main else []
 
-        oura_min = sleep_fusion.oura_minutes(main.get("sleep_phase_30_sec"))
         if not oura_min:
-            return None
+            # No ring reading. Fall back to the watch alone rather than
+            # returning nothing: the two devices are not worn equally, and
+            # over the Garmin era 27 of 71 nights had watch stage data and no
+            # ring reading at all. Anchored on Garmin's OWN window, since
+            # there is no bedtime_start to anchor on.
+            return self._garmin_only_night(day, garmin_by_date, movement_cutpoints)
+
         window_start = sleep_fusion.utc_from_iso_offset(main.get("bedtime_start"))
         window_end = (window_start + timedelta(minutes=len(oura_min))) if window_start else None
 
@@ -2707,6 +2711,69 @@ class Repository:
             overlap_fraction=best_overlap if garmin_min else 0.0,
             # Reduced 30s -> 60s by max, onto the hypnogram's own grid.
             movement=sleep_movement.to_minutes(fused_slots) if fused_slots else None,
+        )
+        return {**summary, **movement_cols}
+
+    def _matched_garmin_date(self, day: str, main: dict,
+                             garmin_by_date: dict[str, dict]) -> str | None:
+        """Which Garmin date a paired night consumed — Oura keys a night by
+        its wake date and Garmin by its own, so the two are often a day apart.
+
+        Recomputes the window rather than threading the answer back out of
+        compute_sleep_fusion_for_date, whose return value maps 1:1 onto the
+        Sheet header and must not grow a key that is not a column. Costs
+        nothing: it is pure lookup over dicts already in memory, for the ~26
+        fused nights only."""
+        oura_min = sleep_fusion.oura_minutes(main.get("sleep_phase_30_sec"))
+        window_start = sleep_fusion.utc_from_iso_offset(main.get("bedtime_start"))
+        if not oura_min or window_start is None:
+            return None
+        best, _overlap = self._match_garmin_night(
+            day, window_start, window_start + timedelta(minutes=len(oura_min)), garmin_by_date)
+        return _sheet_key(best.get("date")) if best else None
+
+    def _garmin_only_night(self, day: str, garmin_by_date: dict[str, dict],
+                           movement_cutpoints: tuple[float, float, float] | None,
+                           ) -> dict | None:
+        """A night the watch recorded and the ring did not.
+
+        Anchored on Garmin's own sleepStartTimestampGMT rather than a
+        bedtime_start that does not exist. Keyed by Garmin's own date, which
+        is safe from double-counting because sync_sleep_fusion only asks for
+        this on days no Oura night claimed — see its `claimed` set.
+
+        Deliberately still goes through sleep_fusion.night_summary with an
+        empty Oura array rather than hand-building a row: the totals, the
+        encoding and the persisted shape then come from exactly one place, and
+        `source` comes out as SOURCE_GARMIN_ONLY by the same rule that decides
+        it everywhere else.
+        """
+        night = garmin_by_date.get(day)
+        if not night or not night.get("segments"):
+            return None
+        if str(night.get("totals_match")).strip().lower() not in ("true", "1"):
+            # Same refusal as the paired path: an unverifiable activityLevel
+            # -> stage mapping must not become a plausible-looking hypnogram.
+            return None
+
+        starts = [s for s in (sleep_fusion.utc_from_gmt_string(x.get("startGMT"))
+                              for x in night["segments"]) if s]
+        ends = [e for e in (sleep_fusion.utc_from_gmt_string(x.get("endGMT"))
+                            for x in night["segments"]) if e]
+        if not starts or not ends:
+            return None
+        window_start = min(starts)
+        minutes = max(1, int(round((max(ends) - window_start).total_seconds() / 60)))
+        garmin_min, diag = sleep_fusion.garmin_minutes(night["segments"], window_start, minutes)
+        if not any(m != sleep_fusion.UNCOVERED for m in garmin_min):
+            return None
+
+        movement_cols, _slots = self._fuse_movement_for_night(
+            {}, night, 1.0, window_start, minutes, movement_cutpoints)
+        summary = sleep_fusion.night_summary(
+            day=day, window_start=window_start, oura=[], garmin=garmin_min,
+            offset_minutes=_float_or_none(night.get("utc_offset_minutes")),
+            oura_periods_on_day=0, garmin_diagnostics=diag, overlap_fraction=0.0,
         )
         return {**summary, **movement_cols}
 
@@ -2791,9 +2858,32 @@ class Repository:
         fresh: dict[str, dict] = {}
         counts: dict[str, int] = {}
         stamp = datetime.now().isoformat(timespec="seconds")
+
+        # Ring nights first. Each one may consume a Garmin night keyed up to a
+        # day either side, which is then off-limits to the watch-only pass —
+        # otherwise a paired night would be emitted twice, once under Oura's
+        # wake date and once under Garmin's own, and the same sleep would be
+        # counted as two nights.
+        claimed: set[str] = set()
         for day in sorted(oura_by_date):
             summary = self.compute_sleep_fusion_for_date(
                 day, oura_by_date, garmin_by_date, movement_cutpoints=cutpoints)
+            if summary is None:
+                continue
+            fresh[day] = {**summary, "computed_at": stamp}
+            counts[summary["source"]] = counts.get(summary["source"], 0) + 1
+            if summary["source"] == sleep_fusion.SOURCE_FUSED:
+                matched = self._matched_garmin_date(day, oura_by_date[day], garmin_by_date)
+                if matched:
+                    claimed.add(matched)
+            claimed.add(day)
+
+        # Then nights only the watch recorded. Strictly additive: every day
+        # here had no usable ring hypnogram, so nothing above is overwritten.
+        for day in sorted(garmin_by_date):
+            if day in claimed or day in fresh or not (start <= day <= end):
+                continue
+            summary = self._garmin_only_night(day, garmin_by_date, cutpoints)
             if summary is None:
                 continue
             fresh[day] = {**summary, "computed_at": stamp}

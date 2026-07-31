@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1029/1029 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1031/1031 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1029/1029 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1029/1029 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1031/1031 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -87,7 +87,10 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     hypnograms into one master sequence — Oura supplies stage,
                     Garmin supplies permission-to-call-Awake. RULES_VERSION 2
                     adds movement-aware rules 5-7 on top, degrading exactly to
-                    version 1 on a night with no movement data. DISPLAY-ONLY:
+                    version 1 on a night with no movement data. Also emits
+                    SOURCE_GARMIN_ONLY for nights the ring was not worn: the
+                    watch is worn ~2x as often, so this is where most of the
+                    coverage gain over Oura alone comes from. DISPLAY-ONLY:
                     read its module docstring before wiring any of it into the
                     engine, the shadow report showed partial coverage makes
                     the traffic light STRICTER, not looser) ·
@@ -131,7 +134,7 @@ Reference data:
                            BioAge muscle-imbalance count, actively imported by
                            services/bioage.py (PROFILE["imbalances"])
 
-tests/       — pytest suite (1029 tests), the sole deterministic gate
+tests/       — pytest suite (1031 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py,
                backfill_garmin_sleep_stages.py — probe before spending calls)
@@ -168,6 +171,7 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 | Garmin backfill | Run `scripts/backfill_garmin_from_sheet1.py` (dry-run first, then `--apply`) once to backfill pre-wearable history into the Garmin Daily tab so readiness baselines aren't starting from empty |
 | Quiet-wakefulness rule — measured, then abandoned | **Do not re-attempt without reading `services/sleep_fusion.py`'s docstring.** Best precision ~12% against a 1.9% base rate, i.e. ~88% of flagged minutes would be wrong, and REM is indistinguishable from Awake (both elevated-and-motionless). Probing found no finer HR exists on this account. The blocking problem is not sample size — it is that there is **no ground truth**: validation uses the hypnogram's own Awake labels, but the rule exists to find minutes the hypnogram did *not* label Awake. Needs PSG/EEG ground truth plus beat-to-beat intervals. |
 | Movement calibration is n=26 | `Repository.sleep_movement_cutpoints` quantile-maps Garmin's undocumented float onto Oura's 1-4 alphabet from paired nights only; currently 26, floor is 14. The ACTIVE boundary sits far into the tail and is the least stable of the three, which is why rule 7 treats class 4 as corroboration rather than proof. Re-check the fitted values as paired nights accumulate. |
+| Sleep coverage is worn-device-limited, not sensor-limited | Over the 71 nights of the Garmin era the ring recorded 27 nights and the watch 53. Fusing them plus emitting `garmin_only` nights takes stage coverage from 38% to 76% of calendar nights (+217h of sleep Oura never saw). The remaining gap is the 17 nights neither device recorded — no code change reaches those. |
 | Sheets tabs silently drop newly-added columns | Any tab created before a column joined its `_HEADER` keeps the old header forever — `get_or_create_worksheet` writes row 1 only on creation and `upsert_row_by_key` never touches it, so values land in an unheadered column and `get_all_records` discards them. Bit `hrv_ms` (above) and would have bit the movement columns. `Repository.rebuild_tab(worksheet, header, ...)` re-heads a tab and carries every existing row through; call it after adding any column. |
 | Cold app start renders empty for ~60s | First page load runs the Oura/Garmin sync inline before `_bio_rolling`, so the drill-down shows its empty states until it finishes. Pre-existing, unrelated to fusion; the fix is to make that sync non-blocking. |
 | Biomechanical review due | 2026-07-19 — update `patient_profile.py` before Stage 2 |

@@ -572,3 +572,21 @@ def format_clock(iso_datetime: str | None) -> str:
         return _dt.fromisoformat(str(iso_datetime)).strftime("%H:%M")
     except (ValueError, TypeError):
         return ""
+
+
+def format_clock_offset(iso_datetime: str | None, minutes) -> str:
+    """`06:21` from a start timestamp plus a duration in minutes.
+
+    The hypnogram axis normally ends at Oura's bedtime_end, but a garmin_only
+    night has no Oura sleep period at all — only the fusion row's own
+    window_start_utc and minute count. Same blank-on-bad-input contract as
+    format_clock, so an unparseable window costs the axis label and not the
+    strip."""
+    if not iso_datetime:
+        return ""
+    try:
+        from datetime import datetime as _dt, timedelta as _td
+        start = _dt.fromisoformat(str(iso_datetime))
+        return (start + _td(minutes=float(minutes))).strftime("%H:%M")
+    except (ValueError, TypeError):
+        return ""

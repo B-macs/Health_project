@@ -704,14 +704,19 @@ _SLEEP_SOURCE_TITLES = {
 }
 
 
-def _hypnogram_strip(detail: dict) -> str:
+def _hypnogram_strip(detail: dict | None) -> str:
     """One strip, named for whatever actually produced it.
 
     Prefers the fused master, falling back to Oura's own sequence. This is
     honest by construction: services/sleep_fusion.py::fuse guarantees a
     Garmin-less night returns Oura's sequence bit-identically, so an
     `oura_only` row really IS Oura's hypnogram — the label just stops
-    implying a correction that never happened."""
+    implying a correction that never happened.
+
+    `detail` may be None on a garmin_only night: the ring was not worn, so
+    there is no Oura sleep period to describe, but the watch still has a
+    timeline worth drawing."""
+    detail = detail or {}
     fused = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
     codes = str(fused.get("master_hypnogram") or "") or detail.get("hypnogram_30sec") or ""
     if not codes:
@@ -734,12 +739,26 @@ def _hypnogram_strip(detail: dict) -> str:
                 f'<b style="color:#8FCDF0;">{title}</b> · {phantom} min of Oura wake '
                 f'reclassified as sleep — Garmin saw no movement. Display only; the score '
                 f'above uses Oura.</div>')
+    elif source == "garmin_only":
+        # Say plainly that this is the weaker sensor. Garmin mislabels REM as
+        # Light, so presenting its hypnogram as equivalent to a ring night
+        # would overstate it — and the stage percentages below are the ones
+        # most affected.
+        note = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;line-height:1.5;">'
+                f'Stage timeline from <b style="color:#8FCDF0;">{title}</b> — the ring '
+                f'recorded nothing this night. Garmin under-reports REM, so treat the '
+                f'stage split as approximate.</div>')
     else:
         note = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;">'
                 f'Stage timeline from <b style="color:#8FCDF0;">{title}</b>.</div>')
 
-    start = dash.format_clock(detail.get("bedtime_start"))
+    start = dash.format_clock(detail.get("bedtime_start")) or dash.format_clock(
+        fused.get("window_start_utc"))
     end = dash.format_clock(detail.get("bedtime_end"))
+    if not end and start and fused.get("minutes"):
+        # garmin_only: no Oura bedtime_end, so derive the axis end from the
+        # fusion row's own window rather than leaving the strip unlabelled.
+        end = dash.format_clock_offset(fused.get("window_start_utc"), fused.get("minutes"))
     axis = (f'<div style="display:flex;justify-content:space-between;font-size:10px;'
             f'color:#6B7A9B;margin-top:6px;"><span>{start}</span><span>{end}</span></div>'
             if start and end else "")
@@ -779,12 +798,44 @@ def _movement_strip(fused: dict) -> tuple[str, str]:
     return strip, note
 
 
+def _garmin_only_stage_rows(fused: dict) -> str:
+    """Stage legend for a night with no Oura period, read straight off the
+    fusion row's own master_* minute counts.
+
+    dashboard.sleep_stage_legend can't serve here — it takes Oura's per-stage
+    seconds, which is exactly what a garmin_only night does not have. Same
+    visual shape so the two paths look identical on screen even though they
+    are sourced differently."""
+    total = sum(_float_or_zero(fused.get(f"master_{k}_minutes"))
+                for k in ("deep", "light", "rem"))
+    rows = []
+    for key, code in (("awake", "4"), ("rem", "3"), ("light", "2"), ("deep", "1")):
+        mins = _float_or_zero(fused.get(f"master_{key}_minutes"))
+        pct = f"{mins / total * 100:.0f} %" if total and key != "awake" else "—"
+        rows.append(
+            f'<div style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;">'
+            f'<span style="width:26px;height:6px;border-radius:3px;flex:none;'
+            f'background:{styles.STAGE_BAND[code][0]};"></span>'
+            f'<span style="color:#B9C2D6;width:52px;">{styles.STAGE_BAND[code][1]}</span>'
+            f'<span style="color:#D4DCEE;">{dash.format_duration(mins * 60)}</span>'
+            f'<span style="color:#6B7A9B;margin-left:auto;">{pct}</span></div>')
+    return "".join(rows)
+
+
+def _float_or_zero(v) -> float:
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _sleep_night_blocks() -> str:
     """Key metrics, sleep debt, architecture and vitals for the selected
     night. Everything here reads the Oura values the score itself used, so
     the numbers under the score always explain that score."""
     detail = _sleep_details.get(selected_date.isoformat())
     context = _sleep_context.get(selected_date.isoformat(), {})
+    fused = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
     if detail is None:
         if not _sleep_details_loaded:
             # The read failed. Silently rendering nothing here would be
@@ -794,6 +845,20 @@ def _sleep_night_blocks() -> str:
                 "Night detail",
                 '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
                 'Could not load this night&rsquo;s detail — try again shortly.</div>')
+        if str(fused.get("source")) == "garmin_only" and fused.get("master_hypnogram"):
+            # The ring was not worn but the watch has this night. Everything
+            # below is built from Oura fields and genuinely does not exist, so
+            # show the architecture the watch DOES have rather than nothing —
+            # and say why the score above is blank, which is otherwise the
+            # most confusing part of the screen.
+            return _panel(
+                "Time asleep",
+                '<div style="font-size:11px;color:#6B7A9B;line-height:1.5;">'
+                'No Oura ring reading for this night, so there is no Sleep Score — '
+                'every contributor it is built from is an Oura measurement. '
+                'Garmin recorded the night, so the stage timeline below is real.</div>'
+                + _hypnogram_strip(None)
+                + f'<div style="margin-top:12px;">{_garmin_only_stage_rows(fused)}</div>')
         return ""
 
     out = _key_metric_grid(dash.sleep_key_metrics(detail))
