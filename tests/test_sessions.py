@@ -91,6 +91,75 @@ def test_movement_category_defaults_to_mobility():
     assert sessions.movement_category({"name": "Cat-Cow"}) == "Mobility"
 
 
+# ─── movement_category — 2026-08-01 mislabelling fix ────────────────────────
+#
+# The cascade's final `return "Mobility"` used to swallow every upper-body
+# lift in the Stage 2 plan. All five names below were logged and displayed
+# as "Mobility"; three of them were logged that way on 2026-07-30 alongside
+# 4,350 kg of tonnage.
+
+def test_loaded_upper_body_lifts_are_not_labelled_mobility():
+    for name, expected in [
+        ("Lat Pulldown",      "Upper Body Pull"),
+        ("Single-Arm DB Row", "Upper Body Pull"),
+        ("Face Pull (Cable)", "Upper Body Pull"),
+        ("Incline DB Press",  "Upper Body Push"),
+        ("Hip Thrust (Loaded)", "Hip Hinge"),
+    ]:
+        assert sessions.movement_category({"name": name}) == expected
+
+
+def test_pallof_press_stays_core_stability_despite_the_press_keyword():
+    """Order dependency worth pinning: the core check must run before the
+    push check, or anti-rotation core work becomes Upper Body Push."""
+    assert sessions.movement_category({"name": "Pallof Press (Cable)"}) == "Core Stability"
+    assert sessions.movement_category(
+        {"name": "Pallof Press Hold (Doorframe)"}) == "Core Stability"
+
+
+def test_side_lying_hip_abduction_is_isolation_not_core():
+    """Distinct from the Side Bridge family, which the 'side bridge'/'side
+    lying' keywords are actually for."""
+    assert sessions.movement_category({"name": "Side-Lying Hip Abduction"}) == "Isolation"
+    assert sessions.movement_category(
+        {"name": "Side Bridge (Modified — Bent Knee)"}) == "Core Stability"
+
+
+def test_band_and_step_walks_are_not_conditioning():
+    """A Lateral Band Walk is a banded glute activation drill done on the
+    spot; only actual locomotion is conditioning."""
+    assert sessions.movement_category({"name": "Lateral Band Walk"}) == "Mobility"
+    assert sessions.movement_category({"name": "Controlled Walking"}) == "Conditioning"
+
+
+def test_bodyweight_squat_patterns_are_labelled_by_pattern():
+    for name in ("Chair Sit-to-Stand", "Forward Step-Up (Stair)",
+                 "Reverse Lunge", "Wall Sit (Extended Duration)"):
+        assert sessions.movement_category({"name": name}) == "Squat Pattern"
+
+
+def test_unknown_name_falls_back_to_the_movement_weight_table_category():
+    """A name absent from every keyword branch is only called Mobility when
+    the weight table agrees it is mobility work."""
+    assert sessions.movement_category({"name": "Clamshell"}) == "Isolation"
+    assert sessions.movement_category({"name": "Sciatic Nerve Floss"}) == "Mobility"
+    assert sessions.movement_category({"name": "Entirely Invented Move"}) == "Mobility"
+
+
+def test_no_planned_exercise_is_silently_labelled_mobility_while_carrying_load():
+    """The invariant behind the fix: nothing weighted above the isolation
+    tier may be displayed as Mobility."""
+    import training_constants as tc
+    mobility_weight = dict(tc.EXERCISE_MOVEMENT_WEIGHT.values())["mobility_core"]
+    isolation_weight = dict(tc.EXERCISE_MOVEMENT_WEIGHT.values())["isolation"]
+    for name, (_category, weight) in tc.EXERCISE_MOVEMENT_WEIGHT.items():
+        if weight > isolation_weight:
+            assert sessions.movement_category({"name": name}) != "Mobility", (
+                f"{name!r} is weighted {weight} but displays as Mobility"
+            )
+        assert mobility_weight <= weight
+
+
 def test_focus_areas_deduplicates_preserving_order():
     exercises = [{"name": "Bird-Dog"}, {"name": "Glute Bridge"}, {"name": "Dead Bug"}]
     assert sessions.focus_areas(exercises) == ["Core Stability", "Hip Hinge"]

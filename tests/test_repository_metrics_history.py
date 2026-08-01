@@ -21,6 +21,7 @@ import datetime
 import pytest
 
 from services.config import Config
+from services import readiness
 from services.repository import Repository
 
 
@@ -103,6 +104,9 @@ def test_metrics_history_row_maps_populated_snapshot():
     assert row == {
         "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88,
         "sleep_score": 91, "strain": 9.4,
+        # Stamped so a stored readiness figure is traceable to the model that
+        # produced it — see readiness.MODEL_VERSION.
+        "readiness_model_version": readiness.MODEL_VERSION,
     }
 
 
@@ -127,7 +131,7 @@ def test_upsert_metrics_history_row_appends_new_date():
         "date": "2026-07-20", "readiness_score": 72.5, "sleep_pct": 88,
         "sleep_score": 91, "strain": 9.4,
     })
-    assert ws.appended == [["2026-07-20", 72.5, 88, 91, 9.4]]
+    assert ws.appended == [["2026-07-20", 72.5, 88, 91, 9.4, readiness.MODEL_VERSION]]
 
 
 def test_upsert_metrics_history_row_updates_existing_date_in_place():
@@ -138,14 +142,14 @@ def test_upsert_metrics_history_row_updates_existing_date_in_place():
         "sleep_score": 91, "strain": 9.4,
     })
     assert len(ws.rows) == 1  # updated in place, not appended
-    assert ws.rows[0] == ["2026-07-20", 72.5, 88, 91, 9.4]
+    assert ws.rows[0] == ["2026-07-20", 72.5, 88, 91, 9.4, readiness.MODEL_VERSION]
 
 
 # ─── get_metrics_history ─────────────────────────────────────────────────────
 
 def test_get_metrics_history_sorted_ascending():
     ws = _FakeMetricsHistoryWorksheet(rows=[
-        ["2026-07-20", 72.5, 88, 91, 9.4],
+        ["2026-07-20", 72.5, 88, 91, 9.4, readiness.MODEL_VERSION],
         ["2026-07-19", 65.0, 80, 75, 7.0],
     ])
     repo = _repo_with_ws(ws)

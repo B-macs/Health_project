@@ -92,7 +92,6 @@ Reference data:
 tests/       — pytest suite (192 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py)
-legacy/      — SQLite era, not used at runtime (init_db.py, schema.sql)
 docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
                REFACTOR_NOTES.md (services/ extraction: smells found, not fixed)
 ```
@@ -121,6 +120,6 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 | `Training plan/` folder at root | Stale duplicate of `docs/training/` — delete manually (`Remove-Item -Recurse "Training plan"`) |
 | Stage 2 training plan | Not yet built — begins after Day 14 physiotherapist sign-off |
 | Apple Health direct sync | Pending — would replace Google Sheets intermediary |
-| Biomechanical review due | 2026-07-19 — update `patient_profile.py` and `init_db.py` seed before Stage 2 |
+| Biomechanical review due | 2026-07-19 — update `patient_profile.py` before Stage 2 |
 | `patient_profile.py` not imported | Informational reference only — not wired into active code |
 | See `docs/REFACTOR_NOTES.md` | Smells/bugs found during the services/ extraction, noted but not fixed beyond what the extraction itself required |

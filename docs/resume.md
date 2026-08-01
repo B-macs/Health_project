@@ -100,8 +100,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 |---|---|
 | `views/` | `checkin.py`, `training.py`, `insights.py`, `sync.py` — SPA view modules |
 | `_pages/` | **Deleted** — triggered Streamlit 1.36+ auto top-nav; all routing is in `app.py` SPA router |
-| `scripts/` | `init_notion.py` — one-shot CLI setup for Notion databases |
-| `legacy/` | `init_db.py` + `schema.sql` — SQLite era, not used at runtime |
+| `scripts/` | `init_notion.py` — one-shot CLI setup for Notion databases; `build_datastore.py` — rebuilds the project's consolidated database (`services/datastore.py`), a full copy of live Notion+Sheets data and the target of the move off them |
 | `docs/` | `INVENTORY.md`, `resume.md`, `focus.md`, `playbook.md`, `progress.json`, `training/*.md` |
 | `voice_training/voxplot` | Git submodule — standalone Voxplot voice-analysis source; Health pins its commit and embeds its renderer |
 

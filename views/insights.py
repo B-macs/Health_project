@@ -22,9 +22,11 @@ import pandas as pd
 
 import patient_profile
 import repo
+import styles
 import training_constants
 from services import ai
 from services import bioage
+from services import dashboard as dash
 from services import engine
 from services import stats as stats_mod
 from services import insights as insights_svc
@@ -477,6 +479,17 @@ def _bio():
     return [asdict(r) for r in repo.get_repository().get_biometric_rolling(days=28)]
 
 @st.cache_data(ttl=1800, show_spinner=False)
+def _bio_drift():
+    """Wide history feeding ONLY engine.traffic_light's baseline-drift guard.
+    Kept separate from _bio() because the same list is handed to
+    readiness.compute_readiness elsewhere on this page, whose sleep_baseline
+    silently widens from a 28- to a 56-night window on a longer list — see
+    engine.traffic_light's drift_rows docstring."""
+    records = repo.get_repository().get_biometric_rolling(
+        days=engine.DRIFT_RECOMMENDED_FETCH_DAYS)
+    return [asdict(r) for r in records]
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def _au():          return repo.get_repository().get_daily_session_au_weighted(28)
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -508,6 +521,15 @@ def _blend_history() -> list[dict]:
 @st.cache_data(ttl=1800, show_spinner=False)
 def _metrics_history() -> list[dict]:
     return repo.get_repository().get_metrics_history()
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _sleep_fusion_history() -> list[dict]:
+    return repo.get_repository().get_sleep_fusion_history()
+
+
+# Sleep-stage rendering moved to styles.py (shared with app.py's Sleep
+# drill-down) — see styles.STAGE_BAND / hypnogram_svg / stage_legend_html.
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _recent_sessions():
@@ -563,12 +585,13 @@ def render() -> None:
 
     (
         tab_bioage, tab_engine, tab_queue,
-        tab_tightness, tab_sync,
+        tab_tightness, tab_sleep, tab_sync,
     ) = st.tabs([
         "BioAge",
         "Engine Data",
         "Processing Queue",
         "Macro Trends",
+        "Sleep Architecture",
         "Sync",
     ])
 
@@ -623,7 +646,7 @@ def render() -> None:
             current_stage = _stage()
             lambda_val    = float(diagnostic.get("injury_weight_decay_lambda") or 0.05)
 
-            tl          = engine.traffic_light(bio_rows)
+            tl          = engine.traffic_light(bio_rows, drift_rows=_bio_drift())
             acwr_result = engine.acwr(au_rows, current_stage)
             inj_weight  = engine.injury_weight(lambda_val, pain_streak)
             obs_rem     = engine.observation_days_remaining(tl["data_days"])
@@ -676,7 +699,7 @@ def render() -> None:
             )
             st.write("")
             metrics = tl.get("metrics", {})
-            c_hrv, c_rhr, c_sleep = st.columns(3)
+            c_hrv, c_rhr, c_sleep, c_temp = st.columns(4)
 
             # Which source (if any) was missing for today's blended reading —
             # populated by services/biometrics.py's blend_biometric_day().
@@ -694,6 +717,18 @@ def render() -> None:
                 val_str   = f"{val} {unit}" if val is not None else "—"
                 base_str  = f"28d avg: {baseline} {unit}" if baseline else "No baseline"
                 delta_str = insights_svc.metric_delta_str(delta)
+                # Temperature deviation is scored against fixed cut points, not
+                # a rolling baseline — "No baseline" would read as missing data
+                # when it actually means "this metric doesn't use one".
+                thresholds = m.get("absolute_thresholds")
+                if thresholds:
+                    val_str  = f"{val:+.2f} {unit}" if val is not None else "—"
+                    base_str = f"vs personal norm · red ≥ +{thresholds['red']:.2f}"
+                    delta_str = {
+                        "red":    "Possible illness onset",
+                        "yellow": "Elevated — re-check tomorrow",
+                        "green":  "Normal range",
+                    }.get(sig_k, "No reading")
                 col.markdown(
                     f"<div style='background:#1A1F2E;border-left:4px solid {color};"
                     f"border-radius:6px;padding:12px 14px;'>"
@@ -715,6 +750,42 @@ def render() -> None:
             _metric_card(c_hrv,   "hrv_ms",              "HRV")
             _metric_card(c_rhr,   "resting_heart_rate",   "RHR")
             _metric_card(c_sleep, "sleep_duration_hours", "SLEEP")
+            _metric_card(c_temp,  "oura_temperature_deviation", "BODY TEMP")
+
+            # ── Baseline-drift guard ──────────────────────────────────────
+            # Shown whenever drift is detected, not only when it changed the
+            # light: "your baseline is sliding" is worth reading on a day the
+            # light was already yellow for other reasons.
+            _drift = tl.get("drift", {})
+            if _drift.get("drifted"):
+                _dc = engine.SIGNAL_COLORS["yellow"]
+                _applied_line = (
+                    "<div style='font-size:11px;color:#9AA3B2;margin-top:4px;'>"
+                    "Light downgraded green → yellow.</div>"
+                    if tl.get("drift_applied") else ""
+                )
+                st.write("")
+                st.markdown(
+                    f"<div style='background:{_dc}18;border-left:4px solid {_dc};"
+                    f"border-radius:6px;padding:10px 14px;'>"
+                    f"<div style='font-size:10px;color:{_dc};font-family:monospace;"
+                    f"letter-spacing:2px;'>BASELINE DRIFT — "
+                    f"{_drift.get('severity','').upper()}</div>"
+                    f"<div style='font-size:12px;color:#C8CEDA;margin-top:4px;'>"
+                    f"{_drift.get('message','')}</div>"
+                    f"{_applied_line}"
+                    f"</div>",
+                    unsafe_allow_html=True,
+                )
+                with st.expander("Drift detail", expanded=False):
+                    for _k, _v in _drift.get("metrics", {}).items():
+                        _lbl = metrics.get(_k, {}).get("label", _k)
+                        st.caption(
+                            f"**{_lbl}** — last {engine.DRIFT_RECENT_DAYS} readings "
+                            f"{_v['recent']} vs prior {_drift['prior_days']} "
+                            f"{_v['prior']} ({_v['delta_pct']:+.1f}%)"
+                            + ("  ⚠ adverse" if _v["adverse"] else "")
+                        )
 
         st.divider()
 
@@ -1151,7 +1222,124 @@ def render() -> None:
                     st.markdown(f"- {rec_item}")
 
     # =========================================================================
-    #  Tab 4 — Sync
+    #  Tab 4 — Sleep Architecture
+    # =========================================================================
+
+    with tab_sleep:
+        st.caption(
+            "Oura reads sleep stage well but over-reports Awake — a ring registers "
+            "micro-movement and autonomic spikes as waking. Garmin's wrist sensor "
+            "needs real rotational motion, so its Awake is a strict filter, but it "
+            "mislabels REM as Light. Fusion takes stage from Oura and "
+            "permission-to-call-Awake from Garmin."
+        )
+
+        # get_sleep_fusion_history RAISES on a read failure by design, so that
+        # a broken read cannot masquerade as "no fused nights" (and, wrapped in
+        # @st.cache_data, stay wrong for 30 minutes). Catching it here is what
+        # turns that distinction into two different messages on screen.
+        try:
+            fusion_rows = _sleep_fusion_history()
+            fusion_loaded = True
+        except Exception:
+            fusion_rows, fusion_loaded = [], False
+        fused_only = [r for r in fusion_rows if r.get("source") == "fused"]
+
+        if not fusion_loaded:
+            st.warning(
+                "Could not read the Sleep Fusion tab — this is a read failure, "
+                "not an absence of fused nights. Try again shortly."
+            )
+        elif not fusion_rows:
+            st.info(
+                "No fused nights yet. Run **Rebuild Sleep Fusion** on the Sync tab. "
+                "Fusion needs both an Oura hypnogram and a matching Garmin night."
+            )
+        else:
+            oura_only_n = len(fusion_rows) - len(fused_only)
+            c1, c2, c3 = st.columns(3, gap="small")
+            c1.metric("Nights fused", len(fused_only))
+            c2.metric("Oura only", oura_only_n)
+            if fused_only:
+                phantom = [float(r.get("phantom_wake_minutes") or 0) for r in fused_only]
+                c3.metric("Median phantom wake removed", f"{sorted(phantom)[len(phantom) // 2]:.0f} min")
+            st.caption(
+                f"{oura_only_n} night(s) have no matching Garmin stage data and pass "
+                "Oura through unchanged — Garmin only began returning stage segments "
+                "in May 2026."
+            )
+
+            if fused_only:
+                st.divider()
+                st.subheader("Nightly hypnograms")
+                options = [r["date"] for r in reversed(fused_only)]
+                chosen = st.selectbox("Night", options, key="fusion_night")
+                row = next(r for r in fused_only if r["date"] == chosen)
+
+                st.markdown(styles.stage_legend_html(), unsafe_allow_html=True)
+                for label, key in (
+                    ("Oura (as recorded)", "oura_hypnogram"),
+                    ("Master (fused)", "master_hypnogram"),
+                    ("Garmin (as recorded)", "garmin_hypnogram"),
+                ):
+                    st.markdown(
+                        f'<div style="color:#9AA3B2;font-size:12px;margin:8px 0 3px;">{label}</div>'
+                        + styles.hypnogram_svg(str(row.get(key) or "")),
+                        unsafe_allow_html=True,
+                    )
+
+                m1, m2, m3, m4 = st.columns(4, gap="small")
+                m1.metric("Oura sleep", f"{row.get('oura_sleep_hours')} h")
+                m2.metric("Fused sleep", f"{row.get('master_sleep_hours')} h")
+                m3.metric("Phantom wake removed", f"{row.get('phantom_wake_minutes')} min")
+                m4.metric("Window overlap", f"{row.get('window_overlap_pct')}%")
+
+                st.caption(
+                    f"Device agreement {row.get('agreement_pct')}% "
+                    f"(Cohen's κ {row.get('cohen_kappa')}). κ corrects for the agreement "
+                    "two devices reach by chance — both spend most of the night in "
+                    "Light, which flatters raw percent agreement. Garmin covered "
+                    f"{row.get('garmin_covered_minutes')} of {row.get('minutes')} minutes."
+                )
+
+            st.divider()
+            st.subheader("Shadow report — what wiring this into the engine would change")
+            st.caption(
+                "Fusion is display-only by design. Per night, fused sleep is always "
+                "≥ Oura's — but that does **not** simply loosen every constraint. "
+                "The traffic light and sleep debt both score a day against a rolling "
+                "baseline built from the same rows, so raising the nights that have "
+                "Garmin data also raises the bar the rest are judged against. With "
+                "partial coverage the window mixes two different measurements and the "
+                "effect is not directional — the same argument that keeps ACWR off "
+                "heart-rate-derived strain."
+            )
+            fused_hours = {
+                r["date"]: float(r["master_sleep_hours"])
+                for r in fused_only if str(r.get("master_sleep_hours") or "").strip() != ""
+            }
+            shadow = dash.sleep_fusion_shadow_report(_bio(), fused_hours)
+            if not shadow["nights_compared"]:
+                st.info("No fused night overlaps the current biometric window yet.")
+            else:
+                s1, s2, s3 = st.columns(3, gap="small")
+                s1.metric("Traffic light now", str(shadow["traffic_light_now"]).title())
+                s2.metric("If fused", str(shadow["traffic_light_fused"]).title(),
+                          delta="would flip" if shadow["traffic_light_would_flip"] else "no change",
+                          delta_color="inverse" if shadow["traffic_light_would_flip"] else "off")
+                if shadow["readiness_median_delta"] is not None:
+                    s3.metric("Readiness delta (median)",
+                              f"{shadow['readiness_median_delta']:+.1f}")
+                st.caption(
+                    f"Compared over {shadow['nights_compared']} fused night(s). "
+                    f"7-day sleep debt {shadow['sleep_debt_now']} h → "
+                    f"{shadow['sleep_debt_fused']} h; rest trigger "
+                    f"{'ON' if shadow['rest_trigger_now'] else 'off'} → "
+                    f"{'ON' if shadow['rest_trigger_fused'] else 'off'}."
+                )
+
+    # =========================================================================
+    #  Tab 5 — Sync
     # =========================================================================
 
     with tab_sync:
@@ -1337,6 +1525,34 @@ def render() -> None:
                                         )
                                     except Exception as exc:
                                         st.warning(f"Garmin activity sync failed: {exc}")
+
+                    st.divider()
+                    st.subheader("Sleep Fusion")
+                    st.caption(
+                        "Merges Oura's stage sequence with Garmin's into one master "
+                        "hypnogram — Oura reads stage well but over-reports Awake; "
+                        "Garmin's wrist sensor needs real rotational movement, so its "
+                        "Awake acts as a strict filter. Reads only the already-synced "
+                        "Sheet tabs, so it never calls a device API and is safe to "
+                        "re-run while Garmin is rate-limited. Display-only: the engine "
+                        "still reads the Oura/Garmin biometric blend."
+                    )
+                    if st.button(
+                        "Rebuild Sleep Fusion (full history)",
+                        use_container_width=True,
+                        key="sync_sleep_fusion",
+                    ):
+                        with st.spinner("Recomputing fused hypnograms…"):
+                            try:
+                                counts = sync_repo.sync_sleep_fusion(days=1200)
+                                st.cache_data.clear()
+                                st.success(
+                                    f"Fused {counts.get('fused', 0)} night(s); "
+                                    f"{counts.get('oura_only', 0)} had no Garmin match "
+                                    "and pass Oura through unchanged."
+                                )
+                            except Exception as exc:
+                                st.warning(f"Sleep fusion rebuild failed: {exc}")
 
                     st.divider()
                     st.subheader("Oura")

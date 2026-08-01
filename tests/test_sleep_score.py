@@ -58,6 +58,50 @@ def _baseline_rows(n: int = 10, hours: float = 8.0) -> list[dict]:
     return [_row(f"2026-06-{i+1:02d}", sleep_duration_hours=hours) for i in range(n)]
 
 
+# ─── Bit-identity regression (2026-07-31, before the breakdown refactor) ─────
+#  compute_sleep_score was split into _contributor_scores + _composite so
+#  sleep_score_breakdown could expose the seven sub-scores without changing
+#  the public float. These three values were captured from the PRE-refactor
+#  implementation and must never move. Float summation order is load-bearing:
+#  _composite keeps the literal `sum(s * (w / total_w) ...)` rather than the
+#  algebraically-equal `sum(s * w ...) / total_w`, which rounds differently.
+
+
+def _full_night_rows() -> list[dict]:
+    """28 nights of history plus one fully-populated night — enough for both
+    the sleep and bedtime baselines, so all seven contributors score."""
+    rows = [
+        _row(f"2026-06-{i+1:02d}", sleep_duration_hours=7.5,
+             oura_sleep_bedtime_start=f"2026-06-{i+1:02d}T23:00:00+00:00")
+        for i in range(28)
+    ]
+    rows.append(_row(
+        "2026-07-01",
+        sleep_duration_hours=5.98, oura_sleep_efficiency=74.0,
+        oura_sleep_total_seconds=21540, oura_sleep_rem_seconds=5040,
+        oura_sleep_deep_seconds=2940, oura_sleep_restless_periods=18,
+        oura_sleep_latency_seconds=720, oura_sleep_awake_seconds=7440,
+        oura_sleep_bedtime_start="2026-06-30T22:42:00+00:00",
+    ))
+    return rows
+
+
+def test_compute_sleep_score_is_unchanged_for_a_fixed_fully_scored_night():
+    assert sleep_score.compute_sleep_score(date(2026, 7, 1), _full_night_rows()) == 86.8
+
+
+def test_compute_sleep_score_is_unchanged_for_a_night_with_a_wake_time_adjustment():
+    assert sleep_score.compute_sleep_score(
+        date(2026, 7, 1), _full_night_rows(), {"2026-07-01": 30.0}) == 89.7
+
+
+def test_compute_sleep_score_is_unchanged_when_renormalising_a_single_contributor():
+    """The path where `total_w` renormalisation actually bites — one
+    contributor carrying the whole score."""
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2)]
+    assert sleep_score.compute_sleep_score(date(2026, 7, 1), rows) == 83.2
+
+
 def test_no_bio_rows_is_not_computed():
     assert sleep_score.compute_sleep_score(date(2026, 7, 20), []) == sleep_score.NOT_COMPUTED
 
@@ -282,3 +326,134 @@ def test_wake_time_adjustment_is_a_no_op_when_awake_seconds_field_is_absent():
         date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-20": 30},
     )
     assert adjusted == unadjusted == 77.8
+
+
+# ─── sleep_score_breakdown (2026-07-31) ─────────────────────────────────────
+#  Exposes the seven sub-scores the composite has always computed and thrown
+#  away. dashboard.sleep_meta's copy has told users to "check the breakdown"
+#  since it was written; this is that breakdown.
+
+
+def test_breakdown_score_equals_compute_sleep_score_because_both_share_one_composite():
+    """The load-bearing equality. If these ever diverge, the screen is
+    explaining a number the engine did not produce."""
+    rows = _full_night_rows()
+    for adj in (None, {"2026-07-01": 30.0}):
+        assert (sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows, adj)["score"]
+                == sleep_score.compute_sleep_score(date(2026, 7, 1), rows, adj))
+
+
+def test_breakdown_lists_all_seven_contributors_in_ouras_reading_order():
+    """Not weight order — the screen should read the way the user's other
+    sleep app reads."""
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), _full_night_rows())
+    assert [c["key"] for c in b["contributors"]] == [
+        "total_sleep", "efficiency", "restfulness", "rem", "deep", "latency", "timing",
+    ]
+
+
+def test_all_seven_rows_are_present_even_when_only_one_contributor_has_data():
+    """Absence is the most informative thing on this panel, so the UI needs a
+    row for every contributor, not just the ones that scored."""
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2)]
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
+    assert len(b["contributors"]) == 7
+    assert sum(1 for c in b["contributors"] if c["score"] is not None) == 1
+    assert set(b["missing"]) == {"efficiency", "restfulness", "rem", "deep", "latency", "timing"}
+
+
+def test_a_missing_contributor_has_no_score_and_zero_effective_weight():
+    """Zero effective weight is what makes it impossible for a missing
+    contributor to contribute silently."""
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2)]
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
+    missing = [c for c in b["contributors"] if c["key"] == "efficiency"][0]
+    assert missing["score"] is None
+    assert missing["effective_weight"] == 0.0
+    assert missing["contribution"] is None
+
+
+def test_effective_weights_sum_to_one_because_missing_weights_are_renormalised():
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2,
+                                           oura_sleep_efficiency=80.0)]
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
+    total = sum(c["effective_weight"] for c in b["contributors"])
+    assert abs(total - 1.0) < 1e-6
+
+
+def test_contributions_sum_to_the_composite_within_rounding_tolerance():
+    """Tolerance, not equality: the composite rounds once, the parts don't.
+    The UI must present these as contributions, never as exact arithmetic."""
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), _full_night_rows())
+    total = sum(c["contribution"] for c in b["contributors"] if c["contribution"] is not None)
+    assert abs(total - b["score"]) < 0.5
+
+
+def test_available_weight_reports_how_much_of_the_score_was_actually_measured():
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2)]
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
+    assert b["available_weight"] == 0.25          # total_sleep alone
+
+
+def test_breakdown_reports_the_raw_value_each_sub_score_came_from():
+    """So the UI shows Oura's own number rather than re-deriving it and
+    risking a different rounding."""
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), _full_night_rows())
+    by = {c["key"]: c for c in b["contributors"]}
+    assert by["total_sleep"]["raw"] == 5.98             # hours
+    assert by["efficiency"]["raw"] == 74.0              # percent
+    assert abs(by["rem"]["raw"] - 5040 / 21540 * 100) < 1e-9   # percent of total
+    assert abs(by["latency"]["raw"] - 12.0) < 1e-9      # minutes
+
+
+def test_breakdown_reports_the_baseline_a_relative_contributor_was_scored_against():
+    """Total sleep and Timing are relative; the caption needs to say what to.
+
+    7.45, not 7.5: tonight's own 5.98 h is inside its own 28-night baseline
+    window, matching readiness.sleep_baseline's documented behaviour. The
+    breakdown must report the baseline the score ACTUALLY used, not a tidier
+    one, or the caption would explain a comparison that never happened."""
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), _full_night_rows())
+    by = {c["key"]: c for c in b["contributors"]}
+    assert by["total_sleep"]["reference"] == 7.45
+    assert by["total_sleep"]["reference_window"] == 28
+    assert by["timing"]["reference"] is not None
+    assert by["timing"]["reference_window"] == 28
+
+
+def test_the_wake_adjustment_moves_total_sleep_and_efficiency_and_nothing_else():
+    """Exactly the two contributors compute_sleep_score adjusts — see its
+    wake-time block. A third moving would mean the breakdown and the score
+    disagree about what the correction did."""
+    rows = _full_night_rows()
+    plain = {c["key"]: c["score"] for c in
+             sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)["contributors"]}
+    adj = {c["key"]: c["score"] for c in
+           sleep_score.sleep_score_breakdown(
+               date(2026, 7, 1), rows, {"2026-07-01": 30.0})["contributors"]}
+    assert adj["total_sleep"] > plain["total_sleep"]
+    assert adj["efficiency"] > plain["efficiency"]
+    for key in ("restfulness", "rem", "deep", "latency", "timing"):
+        assert adj[key] == plain[key], key
+
+
+def test_breakdown_reports_the_adjustment_it_applied_so_the_ui_can_disclose_it():
+    b = sleep_score.sleep_score_breakdown(
+        date(2026, 7, 1), _full_night_rows(), {"2026-07-01": 30.0})
+    assert b["wake_adjustment_minutes"] == 30.0
+
+
+def test_breakdown_with_no_rows_is_not_computed_but_still_lists_seven_rows():
+    """The empty state still needs a row per contributor to render dashes
+    against."""
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), [])
+    assert b["score"] == sleep_score.NOT_COMPUTED
+    assert len(b["contributors"]) == 7
+    assert b["available_weight"] == 0.0
+    assert len(b["missing"]) == 7
+
+
+def test_breakdown_is_deterministic_for_the_same_inputs():
+    rows = _full_night_rows()
+    assert (sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
+            == sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows))

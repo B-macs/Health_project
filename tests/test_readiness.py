@@ -181,16 +181,15 @@ def test_compute_readiness_sleep_debt_none_is_excluded_not_defaulted():
     # hours) can't be trusted yet. The component must be excluded from the
     # weighted average (renormalised away), not silently treated as a
     # perfect 100 or a zero.
-    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 4)]
+    rows = [{**_day(n, 30.0, 55.0, 7.5), **_contrib(80.0)} for n in range(1, 4)]
     today = date(2026, 6, 3)
     assert readiness.sleep_debt_hours(rows, today) is None
     score = readiness.compute_readiness(today, rows)
     assert score != readiness.NOT_COMPUTED
-    # HRV/RHR baselines also can't be trusted yet with only 3 days below
-    # _MIN_DAYS... actually 3 == _MIN_DAYS, so those ARE trusted; sleep_s
-    # itself needs >= 7 clean nights same as sleep_debt, so both are
-    # excluded here -- a perfect HRV/RHR-only day still scores high.
-    assert score > 90.0
+    # Every Oura contributor sits at 80 and Sleep Debt is excluded, so the
+    # renormalised average is exactly 80 -- not pulled toward 100 (defaulted
+    # to a perfect night) nor toward 0 (scored as maximum debt).
+    assert score == 80.0
 
 
 def _rows_with_trailing_short_nights(n_good: int, n_short: int, short_hours: float) -> tuple[list[dict], date]:
@@ -218,55 +217,39 @@ def test_compute_readiness_sleep_debt_clamps_at_zero_beyond_the_threshold():
     # 25 good nights keep the baseline close to 8.0h despite 3 trailing
     # short (4.0h) nights inside the 28-night window sleep_baseline uses.
     rows, today = _rows_with_trailing_short_nights(25, 3, 4.0)
+    for r in rows:
+        r.update(_contrib(80.0))
     debt = readiness.sleep_debt_hours(rows, today)
     assert debt is not None and debt >= readiness.SLEEP_DEBT_THRESHOLD_HOURS
 
     score = readiness.compute_readiness(today, rows)
-
-    hrv_base = readiness.hrv_baseline(rows)
-    rhr_base = readiness.rhr_baseline(rows)
-    sleep_base, _ = readiness.sleep_baseline(rows)
-    hrv_s   = min(100.0, (30.0 / hrv_base) * 100.0)
-    rhr_s   = min(100.0, (rhr_base / 55.0) * 100.0)
-    sleep_s = min(100.0, (4.0 / sleep_base) * 100.0)  # today's own short night
-    sleep_debt_s = 0.0  # clamped -- debt is well past the threshold
-
-    total_w = 0.225 + 0.18 + 0.135 + 0.10
-    expected = round(
-        (hrv_s * 0.225 + sleep_s * 0.18 + rhr_s * 0.135 + sleep_debt_s * 0.10) / total_w,
-        1,
-    )
-    assert score == expected
+    values = {k: 80.0 for k in readiness.COMPONENT_ORDER}
+    values["sleep_debt"] = 0.0  # clamped -- debt is well past the threshold
+    assert score == _expected(values)
 
 
 # ─── compute_readiness: HRV must not be silently dropped with thin history ────
 
-def test_compute_readiness_includes_degraded_hrv_even_with_thin_history():
-    """Regression for the exact bug: 6 days of HRV history, today's HRV well
-    below baseline. Previously hrv_baseline() returned None (needed 14 days),
-    so HRV's 40% weight was silently reassigned to RHR/Sleep, which looked
-    fine, inflating the score to ~97 even though HRV had dropped ~14%. It
-    must now be included and pull the score down."""
-    rows = _rows([24.0, 19.0, 21.0, 19.0, 24.0, 18.0], rhr=57.0, sleep=7.1)
-    # Make RHR/sleep baseline rows match "today" almost exactly (near-perfect
-    # on their own), isolating HRV's degradation as the only signal.
-    for r in rows[:-1]:
-        r["resting_heart_rate"] = 57.0
-        r["sleep_duration_hours"] = 7.1
-    today = date(2026, 6, 6)
+def test_degraded_hrv_registers_immediately_with_no_history_at_all():
+    """Carries forward the 2026-07-14 regression's intent under MODEL_VERSION 2.
 
-    score = readiness.compute_readiness(today, rows)
-    assert score != readiness.NOT_COMPUTED
+    That bug was structural: hrv_baseline() demanded 14 observations, so thin
+    history silently reassigned HRV's weight to the other components and the
+    score read ~97 on a day HRV had dropped 14%. v2 takes HRV from Oura's own
+    hrv_balance contributor, which needs no history whatsoever -- so the bug
+    cannot recur by construction, and a single day with a degraded balance
+    must move the score by its full weight."""
+    rows = [{"date": "2026-06-01", **_contrib(90.0)}]
+    good = readiness.compute_readiness(date(2026, 6, 1), rows)
+    rows[0]["oura_hrv_balance"] = 20.0
+    degraded = readiness.compute_readiness(date(2026, 6, 1), rows)
 
-    hrv_base = readiness.hrv_baseline(rows)
-    assert hrv_base is not None
-    expected_hrv_component = min(100.0, (18.0 / hrv_base) * 100.0)
-    assert expected_hrv_component < 100.0  # today's HRV (18.0) is below the 6-day baseline
-
-    # With RHR/Sleep both at ~100 and HRV degraded, weighted average must
-    # land below what a HRV-excluded score would give (which would be ~100
-    # since RHR/Sleep alone are perfect).
-    assert score < 97.0
+    assert degraded < good
+    # Sleep Debt is unscorable here, so the eight Oura weights renormalise to
+    # 1.0 and HRV balance carries 0.21/0.91 of the composite.
+    w = readiness._WEIGHTS
+    expected_drop = 70.0 * (w["hrv_balance"] / (1.0 - w["sleep_debt"]))
+    assert abs((good - degraded) - expected_drop) < 0.2
 
 
 def test_compute_readiness_not_computed_with_no_rows():
@@ -277,6 +260,33 @@ def test_compute_readiness_deterministic_for_same_inputs():
     rows = _rows([40.0, 42.0, 44.0, 41.0])
     today = date(2026, 6, 4)
     assert readiness.compute_readiness(today, rows) == readiness.compute_readiness(today, rows)
+
+
+
+# ─── MODEL_VERSION 2 fixtures ────────────────────────────────────────────────
+# v2 scores from Oura's eight contributors plus our own Sleep Debt, so a
+# fixture carrying only hrv_ms/resting_heart_rate/sleep_duration_hours now
+# scores on Sleep Debt alone. These helpers supply the contributors.
+
+_OURA_KEYS = ("oura_hrv_balance", "oura_recovery_index", "oura_previous_night",
+              "oura_resting_heart_rate_score", "oura_body_temperature",
+              "oura_previous_day_activity", "oura_sleep_regularity",
+              "oura_activity_balance")
+
+
+def _contrib(level: float) -> dict:
+    """All eight Oura contributors at one level."""
+    return {k: level for k in _OURA_KEYS}
+
+
+def _expected(values: dict) -> float:
+    """compute_readiness reproduced by hand, walking readiness._SUM_ORDER so
+    the floating-point addition order matches exactly — the composite is
+    rounded to 1dp and term order can move that digit."""
+    w = readiness._WEIGHTS
+    present = [k for k in readiness._SUM_ORDER if values.get(k) is not None]
+    total_w = sum(w[k] for k in present)
+    return round(sum(values[k] * (w[k] / total_w) for k in present), 1)
 
 
 # ─── compute_readiness_trend ───────────────────────────────────────────────────
@@ -330,12 +340,12 @@ def test_compute_readiness_trend_does_not_fully_recover_after_one_good_day():
     # The user's exact scenario: two bad days, one recovery day, then
     # another bad night. Today's trend must stay well below the recovery
     # day's own raw score — recovery debt shouldn't clear in a single day.
-    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 11)]
+    rows = [{**_day(n, 30.0, 55.0, 7.5), **_contrib(90.0)} for n in range(1, 11)]
     rows += [
-        _day(11, 15.0, 65.0, 5.0),
-        _day(12, 14.0, 66.0, 4.8),
-        _day(13, 32.0, 54.0, 8.5),
-        _day(14, 16.0, 64.0, 5.2),
+        {**_day(11, 15.0, 65.0, 5.0), **_contrib(25.0)},
+        {**_day(12, 14.0, 66.0, 4.8), **_contrib(25.0)},
+        {**_day(13, 32.0, 54.0, 8.5), **_contrib(95.0)},
+        {**_day(14, 16.0, 64.0, 5.2), **_contrib(25.0)},
     ]
     raw_recovery_day = readiness.compute_readiness(date(2026, 6, 13), rows)
     trend_today       = readiness.compute_readiness_trend(date(2026, 6, 14), rows, lookback_days=13)
@@ -345,9 +355,9 @@ def test_compute_readiness_trend_does_not_fully_recover_after_one_good_day():
 
 
 def test_compute_readiness_trend_skips_days_with_no_data_without_resetting():
-    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 6)]
+    rows = [{**_day(n, 30.0, 55.0, 7.5), **_contrib(95.0)} for n in range(1, 6)]
     # Gap: days 6-9 have no rows at all (e.g. wearable not worn).
-    rows += [_day(10, 31.0, 55.0, 7.4)]
+    rows += [{**_day(10, 31.0, 55.0, 7.4), **_contrib(95.0)}]
     trend = readiness.compute_readiness_trend(date(2026, 6, 10), rows, lookback_days=9)
     # Should equal the plain EMA of day-5 baseline reading folded with day 10
     # (the gap days contribute nothing, they don't zero the trend out).
@@ -393,35 +403,27 @@ def test_compute_readiness_pulled_down_by_low_recovery_index_alone():
     assert score < 90.0
 
 
-def test_compute_readiness_matches_manual_seven_component_weighted_average():
+def test_compute_readiness_matches_manual_nine_component_weighted_average():
+    """Every component present, reproduced by hand. Uses the real 2026-08-01
+    contributor values so the fixture is a day that actually happened."""
     rows = _rows_with_contributors(10, {
-        "oura_recovery_index": 40.0,
-        "oura_body_temperature": 60.0,
-        "oura_previous_day_activity": 80.0,
+        "oura_hrv_balance": 42.0, "oura_recovery_index": 100.0,
+        "oura_previous_night": 45.0, "oura_resting_heart_rate_score": 46.0,
+        "oura_body_temperature": 51.0, "oura_previous_day_activity": 87.0,
+        "oura_sleep_regularity": 71.0, "oura_activity_balance": 80.0,
     })
     today = date(2026, 6, 11)
     score = readiness.compute_readiness(today, rows)
 
-    hrv_base = readiness.hrv_baseline(rows)
-    rhr_base = readiness.rhr_baseline(rows)
-    sleep_base, _ = readiness.sleep_baseline(rows)
-    hrv_s   = min(100.0, (30.0 / hrv_base) * 100.0)
-    rhr_s   = min(100.0, (rhr_base / 55.0) * 100.0)
-    sleep_s = min(100.0, (7.5 / sleep_base) * 100.0)
-    # Every row in this fixture (including "today") sleeps exactly 7.5h --
-    # matches the baseline exactly, so trailing 7-night debt is 0.0 and
-    # sleep_debt_s scores a perfect 100.
-    debt = readiness.sleep_debt_hours(rows, today)
-    assert debt == 0.0
-    sleep_debt_s = 100.0
-
-    expected = round(
-        hrv_s * 0.225 + sleep_s * 0.18 + rhr_s * 0.135
-        + 40.0 * 0.18 + 60.0 * 0.135 + 80.0 * 0.045
-        + sleep_debt_s * 0.10,
-        1,
-    )
-    assert score == expected
+    # Every row (including "today") sleeps exactly 7.5h -- matches the
+    # baseline exactly, so trailing 7-night debt is 0.0 and Sleep Debt scores
+    # a perfect 100.
+    assert readiness.sleep_debt_hours(rows, today) == 0.0
+    assert score == _expected({
+        "hrv_balance": 42.0, "recovery": 100.0, "prev_night": 45.0,
+        "rhr": 46.0, "body_temp": 51.0, "prev_activity": 87.0,
+        "sleep_reg": 71.0, "activity_bal": 80.0, "sleep_debt": 100.0,
+    })
 
 
 def test_compute_readiness_renormalises_when_only_some_contributors_present():
@@ -453,8 +455,8 @@ def test_compute_readiness_computable_from_oura_contributors_alone():
     # No sleep history at all (single row) -> sleep_debt_s is also None/
     # excluded here, same as the legacy HRV/RHR/Sleep baselines -- only the
     # three Oura contributors renormalise against each other.
-    expected = round((70.0 * 0.18 + 90.0 * 0.135 + 85.0 * 0.045) / (0.18 + 0.135 + 0.045), 1)
-    assert score == expected
+    assert score == _expected({
+        "recovery": 70.0, "body_temp": 90.0, "prev_activity": 85.0})
 
 
 def test_compute_readiness_backward_compatible_without_oura_fields():
@@ -467,63 +469,185 @@ def test_compute_readiness_backward_compatible_without_oura_fields():
     assert score > 90.0  # perfect baseline-matching day, no degraded contributors
 
 
-# ─── Alcohol penalty (2026-07-14) ──────────────────────────────────────────────
-# -5 points per 0.5 units (-10/unit), applied as a flat deduction after the
-# weighted average — not folded in as another weighted component.
+# --- Alcohol is NOT scored (MODEL_VERSION 2) ---------------------------------
+# It was -10 points per unit until 2026-08-01. Removed because it is
+# self-reported and the one input Oura cannot see, which made our score and
+# Oura's incomparable on exactly the days most worth comparing. These are the
+# old penalty tests inverted: the point is that the removal is deliberate and
+# total, not that alcohol has stopped mattering to the system.
 
-def test_alcohol_penalty_five_points_per_half_unit():
-    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 10)]
-    today_row = _day(10, 30.0, 55.0, 7.5)
+def test_alcohol_is_not_deducted_from_the_score():
+    rows = [{**_day(n, 30.0, 55.0, 7.5), **_contrib(80.0)} for n in range(1, 10)]
+    today_row = {**_day(10, 30.0, 55.0, 7.5), **_contrib(80.0)}
     rows.append(today_row)
     today = date(2026, 6, 10)
 
-    baseline_score = readiness.compute_readiness(today, rows)
-
-    today_row["alcohol_units"] = 0.5
-    score_half_unit = readiness.compute_readiness(today, rows)
-    assert score_half_unit == round(baseline_score - 5.0, 1)
-
-    today_row["alcohol_units"] = 2.0
-    score_two_units = readiness.compute_readiness(today, rows)
-    assert score_two_units == round(baseline_score - 20.0, 1)
+    sober = readiness.compute_readiness(today, rows)
+    for units in (0.5, 2.0, 20.0):
+        today_row["alcohol_units"] = units
+        assert readiness.compute_readiness(today, rows) == sober
 
 
-def test_alcohol_penalty_floors_at_zero_not_negative():
-    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 10)]
-    today_row = _day(10, 30.0, 55.0, 7.5)
-    today_row["alcohol_units"] = 20.0  # far more than enough to blow past 0
-    rows.append(today_row)
+def test_alcohol_units_are_still_carried_for_display():
+    """Removed from the SCORE, not from the app: the drill-down still shows
+    the units as context, because they explain a poor HRV balance or previous
+    night far better than the components alone do."""
+    rows = [{**_day(n, 30.0, 55.0, 7.5), **_contrib(80.0)} for n in range(1, 10)]
+    rows.append({**_day(10, 30.0, 55.0, 7.5), **_contrib(80.0), "alcohol_units": 1.5})
+    b = readiness.readiness_breakdown(date(2026, 6, 10), rows)
+    assert b["alcohol_units"] == 1.5
+
+
+def test_alcohol_does_not_suppress_the_trend():
+    """The old penalty flowed into the EMA because the trend recomputes each
+    day's raw score. Removing it must remove that too, or the trend and the
+    score would disagree about whether drinking counts."""
+    rows = [{**_day(n, 30.0, 55.0, 7.5), **_contrib(80.0)} for n in range(1, 10)]
+    rows.append({**_day(10, 30.0, 55.0, 7.5), **_contrib(80.0), "alcohol_units": 4.0})
     today = date(2026, 6, 10)
 
-    score = readiness.compute_readiness(today, rows)
-    assert score == 0.0
+    sober_rows = [{**_day(n, 30.0, 55.0, 7.5), **_contrib(80.0)} for n in range(1, 11)]
+    assert (readiness.compute_readiness_trend(today, rows, lookback_days=9)
+            == readiness.compute_readiness_trend(today, sober_rows, lookback_days=9))
 
 
-def test_alcohol_penalty_zero_units_is_a_no_op():
-    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 10)]
-    today_row = _day(10, 30.0, 55.0, 7.5)
-    rows.append(today_row)
-    today = date(2026, 6, 10)
-    baseline_score = readiness.compute_readiness(today, rows)
-
-    today_row["alcohol_units"] = 0.0
-    score = readiness.compute_readiness(today, rows)
-    assert score == baseline_score
+def test_no_alcohol_penalty_constant_survives():
+    """A dead constant is an invitation to quietly re-wire it. Its value lives
+    in the module docstring's version-1 record instead."""
+    assert not hasattr(readiness, "_ALCOHOL_PENALTY_PER_UNIT")
 
 
-def test_alcohol_penalty_flows_into_trend():
-    # Since compute_readiness_trend() recomputes each day's raw score via
-    # compute_readiness(), a boozy night must suppress the EMA trend too,
-    # not just that single day's raw snapshot.
-    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 10)]
-    heavy_night = _day(10, 30.0, 55.0, 7.5)
-    heavy_night["alcohol_units"] = 4.0
-    rows.append(heavy_night)
-    today = date(2026, 6, 10)
+# ─── readiness_breakdown — every component made visible ────────────────────
 
-    trend_with_alcohol = readiness.compute_readiness_trend(today, rows, lookback_days=9)
+def _full_rows(n: int = 30) -> list[dict]:
+    """Ascending rows where every component is scorable."""
+    return [{
+        "date": f"2026-07-{i + 1:02d}",
+        "hrv_ms": 40.0, "resting_heart_rate": 55.0, "sleep_duration_hours": 7.5,
+        **_contrib(80.0),
+    } for i in range(n)]
 
-    rows_sober = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 11)]
-    trend_sober = readiness.compute_readiness_trend(today, rows_sober, lookback_days=9)
 
-    assert trend_with_alcohol < trend_sober - 15
+def test_weights_sum_to_one():
+    """If they ever don't, renormalisation quietly changes meaning: a day with
+    every component present would no longer be scored on the full weight."""
+    assert abs(sum(readiness._WEIGHTS.values()) - 1.0) < 1e-9
+
+
+def test_display_order_and_summation_order_hold_the_same_components():
+    """They are deliberately different orders (see _SUM_ORDER's comment) but
+    must never drift into different SETS."""
+    assert set(readiness.COMPONENT_ORDER) == set(readiness._SUM_ORDER)
+    assert set(readiness.COMPONENT_ORDER) == set(readiness._WEIGHTS)
+    assert set(readiness.COMPONENT_ORDER) == set(readiness.COMPONENT_LABELS)
+    assert len(readiness.COMPONENT_ORDER) == 9
+
+
+def test_summation_order_is_not_display_order():
+    """Pins the thing most likely to be 'tidied' by a future reader. Float
+    addition is not associative, so aligning these would risk moving the
+    composite in its last decimal — which is user-visible and feeds
+    engine.traffic_light."""
+    assert readiness._SUM_ORDER != readiness.COMPONENT_ORDER
+
+
+def test_breakdown_score_equals_compute_readiness():
+    rows = _full_rows()
+    d = date(2026, 7, 30)
+    assert readiness.readiness_breakdown(d, rows)["score"] == readiness.compute_readiness(d, rows)
+
+
+def test_breakdown_always_reports_every_component():
+    """A component that could not be computed keeps its row — on that panel
+    the gap is the most informative thing on screen."""
+    rows = [{"date": "2026-07-01", "oura_recovery_index": 80.0}]
+    b = readiness.readiness_breakdown(date(2026, 7, 1), rows)
+    assert len(b["components"]) == len(readiness.COMPONENT_ORDER)
+    assert [c["key"] for c in b["components"]] == list(readiness.COMPONENT_ORDER)
+
+
+def test_an_unscorable_component_contributes_nothing_and_is_listed_missing():
+    rows = [{"date": "2026-07-01", "oura_recovery_index": 80.0}]
+    b = readiness.readiness_breakdown(date(2026, 7, 1), rows)
+    hrv = next(c for c in b["components"] if c["key"] == "hrv_balance")
+    assert hrv["score"] is None
+    assert hrv["effective_weight"] == 0.0
+    assert hrv["contribution"] is None
+    assert "hrv_balance" in b["missing"]
+
+
+def test_available_weight_reflects_only_scored_components():
+    rows = [{"date": "2026-07-01", "oura_recovery_index": 80.0,
+             "oura_body_temperature": 90.0}]
+    b = readiness.readiness_breakdown(date(2026, 7, 1), rows)
+    w = readiness._WEIGHTS
+    assert abs(b["available_weight"] - (w["recovery"] + w["body_temp"])) < 1e-9
+
+
+def test_effective_weights_of_scored_components_sum_to_one():
+    """Renormalisation is what lets a partial day still produce a 0-100."""
+    rows = [{"date": "2026-07-01", "oura_recovery_index": 80.0,
+             "oura_body_temperature": 90.0}]
+    b = readiness.readiness_breakdown(date(2026, 7, 1), rows)
+    eff = sum(c["effective_weight"] for c in b["components"] if c["score"] is not None)
+    assert abs(eff - 1.0) < 1e-4
+
+
+def test_no_data_returns_every_component_unscored_rather_than_an_empty_list():
+    b = readiness.readiness_breakdown(date(2026, 7, 1), [])
+    assert b["score"] == readiness.NOT_COMPUTED
+    assert len(b["components"]) == len(readiness.COMPONENT_ORDER)
+    assert b["missing"] == list(readiness.COMPONENT_ORDER)
+    assert b["available_weight"] == 0.0
+
+
+# ─── Alcohol is reported, never rendered as a component ──────────────────────
+
+def test_alcohol_is_not_one_of_the_components():
+    rows = _full_rows()
+    for r in rows:
+        r["alcohol_units"] = 2.0
+    b = readiness.readiness_breakdown(date(2026, 7, 30), rows)
+    assert len(b["components"]) == len(readiness.COMPONENT_ORDER)
+    assert all("alcohol" not in c["key"] for c in b["components"])
+
+
+def test_no_alcohol_penalty_is_reported_because_none_is_applied():
+    """Reporting a penalty that is no longer applied would be worse than
+    reporting nothing at all."""
+    rows = _full_rows()
+    for r in rows:
+        r["alcohol_units"] = 1.5
+    b = readiness.readiness_breakdown(date(2026, 7, 30), rows)
+    assert "alcohol_penalty_points" not in b
+    assert b["alcohol_units"] == 1.5
+
+
+def test_contributions_reconcile_with_the_score():
+    """With nothing deducted afterwards, the components now fully explain the
+    number above them -- the reconciliation the old alcohol caption existed to
+    patch over."""
+    b = readiness.readiness_breakdown(date(2026, 7, 30), _full_rows())
+    total = sum(c["contribution"] for c in b["components"] if c["contribution"] is not None)
+    assert abs(total - b["score"]) < 0.15
+
+
+def test_breakdown_records_the_model_version_that_produced_it():
+    """A stored readiness figure has to be traceable to the model behind it --
+    the same auditability sleep_fusion.RULES_VERSION gives."""
+    b = readiness.readiness_breakdown(date(2026, 7, 30), _full_rows())
+    assert b["model_version"] == readiness.MODEL_VERSION
+
+
+# ─── The refactor must not have moved compute_readiness ──────────────────────
+
+def test_component_scores_and_compute_readiness_agree_on_a_partial_day():
+    """_component_scores was split out of compute_readiness; this pins that
+    both still walk the same seven in the same order."""
+    rows = _full_rows()
+    rows[-1]["oura_hrv_balance"] = None
+    rows[-1]["oura_body_temperature"] = None
+    d = date(2026, 7, 30)
+    b = readiness.readiness_breakdown(d, rows)
+    assert b["score"] == readiness.compute_readiness(d, rows)
+    assert set(b["missing"]) == {"hrv_balance", "body_temp"}

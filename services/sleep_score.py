@@ -66,6 +66,23 @@ _WEIGHTS = {
     "timing":      0.05,
 }
 
+# Display order for the breakdown — Oura's own ordering on its sleep screen,
+# which is not weight order. Deliberate: the UI should read the way the user's
+# other sleep app reads, and weight is disclosed in the coverage caption
+# rather than per row.
+CONTRIBUTOR_ORDER = (
+    "total_sleep", "efficiency", "restfulness", "rem", "deep", "latency", "timing",
+)
+CONTRIBUTOR_LABELS = {
+    "total_sleep": "Total sleep",
+    "efficiency":  "Efficiency",
+    "restfulness": "Restfulness",
+    "rem":         "REM sleep",
+    "deep":        "Deep sleep",
+    "latency":     "Latency",
+    "timing":      "Timing",
+}
+
 
 def _interp(value: float, points: tuple[tuple[float, float], ...]) -> float:
     """Piecewise-linear interpolation over sorted (x, y) knots; clamps to
@@ -140,14 +157,52 @@ def compute_sleep_score(
         NOT_COMPUTED — no contributor could be computed for this day
                        (no Oura sleep-period reading)
     """
-    if not bio_rows:
+    scored = _contributor_scores(for_date, bio_rows, wake_time_adjustments)
+    if scored is None:
         return NOT_COMPUTED
+    return _composite([
+        (c["score"], c["weight"]) for c in scored["contributors"].values()
+        if c["score"] is not None
+    ])
+
+
+def _composite(available: list[tuple[float, float]]) -> float | str:
+    """Weighted mean of the contributors that could be scored, with the
+    missing ones' weights renormalised away.
+
+    The expression below is deliberately `sum(s * (w / total_w))` and NOT the
+    algebraically-equal `sum(s * w) / total_w`. Those differ in IEEE 754, and
+    the round(..., 1) at the end occasionally exposes the difference — which
+    would silently move a user-visible score. Moved verbatim out of
+    compute_sleep_score; see the bit-identity tests in tests/test_sleep_score.py.
+    """
+    if not available:
+        return NOT_COMPUTED
+    total_w = sum(w for _, w in available)
+    weighted_sum = sum(s * (w / total_w) for s, w in available)
+    return round(weighted_sum, 1)
+
+
+def _contributor_scores(
+    for_date: date | None,
+    bio_rows: list[dict] | None,
+    wake_time_adjustments: dict[str, float] | None,
+) -> dict | None:
+    """Every sub-score, plus the raw value and baseline each was scored
+    against. None when there is no usable row at all — the two cases that
+    previously returned NOT_COMPUTED before any contributor was computed.
+
+    Split out of compute_sleep_score so sleep_score_breakdown can show the
+    seven contributors without that function's public float changing.
+    """
+    if not bio_rows:
+        return None
 
     for_date = for_date or date.today()
     date_str = str(for_date)
     rows_to_date = [r for r in bio_rows if r.get("date") and r["date"] <= date_str]
     if not rows_to_date:
-        return NOT_COMPUTED
+        return None
 
     today_row = next((r for r in rows_to_date if r["date"] == date_str), None)
 
@@ -219,19 +274,108 @@ def compute_sleep_score(
         if today_bedtime is not None and bedtime_base is not None else None
     )
 
-    candidates = [
-        (total_sleep_s, _WEIGHTS["total_sleep"]),
-        (efficiency_s,  _WEIGHTS["efficiency"]),
-        (rem_s,         _WEIGHTS["rem"]),
-        (deep_s,        _WEIGHTS["deep"]),
-        (restfulness_s, _WEIGHTS["restfulness"]),
-        (latency_s,     _WEIGHTS["latency"]),
-        (timing_s,      _WEIGHTS["timing"]),
-    ]
-    available = [(s, w) for s, w in candidates if s is not None]
-    if not available:
-        return NOT_COMPUTED
+    # raw = the value the sub-score was computed FROM, in the unit the UI
+    # shows. reference = what it was compared against, where the sub-score is
+    # relative rather than absolute. Both carried so the UI never recomputes.
+    rem_pct = rem_raw / total_s * 100.0 if rem_raw is not None and total_s else None
+    deep_pct = deep_raw / total_s * 100.0 if deep_raw is not None and total_s else None
+    built = {
+        "total_sleep": (total_sleep_s, today_sleep, sleep_base, _win),
+        "efficiency":  (efficiency_s, efficiency_raw, None, 0),
+        "restfulness": (restfulness_s,
+                        restless_raw / (total_s / 3600.0)
+                        if restless_raw is not None and total_s else None, None, 0),
+        "rem":         (rem_s, rem_pct, None, 0),
+        "deep":        (deep_s, deep_pct, None, 0),
+        "latency":     (latency_s, latency_raw / 60.0 if latency_raw is not None else None, None, 0),
+        "timing":      (timing_s,
+                        abs(today_bedtime - bedtime_base)
+                        if today_bedtime is not None and bedtime_base is not None else None,
+                        bedtime_base, _bwin),
+    }
+    if all(v[0] is None for v in built.values()):
+        return None
 
-    total_w = sum(w for _, w in available)
-    weighted_sum = sum(s * (w / total_w) for s, w in available)
-    return round(weighted_sum, 1)
+    contributors = {
+        key: {
+            "key": key,
+            "label": CONTRIBUTOR_LABELS[key],
+            "score": built[key][0],
+            "weight": _WEIGHTS[key],
+            "raw": built[key][1],
+            "reference": built[key][2],
+            "reference_window": built[key][3],
+        }
+        for key in CONTRIBUTOR_ORDER
+    }
+    return {
+        "contributors": contributors,
+        "wake_adjustment_minutes": adjustment_seconds / 60.0,
+        "total_seconds": total_s,
+    }
+
+
+def sleep_score_breakdown(
+    for_date: date | None = None,
+    bio_rows: list[dict] | None = None,
+    wake_time_adjustments: dict[str, float] | None = None,
+) -> dict:
+    """The composite plus the seven sub-scores that produced it.
+
+    `score` is identical to compute_sleep_score(...) for the same inputs —
+    both go through _composite over the same contributor set. Exists because
+    services/dashboard.py::sleep_meta's own copy has always told the user to
+    "check the breakdown for what's holding it back", while no breakdown was
+    exposed anywhere.
+
+    Contributors are always all seven, in CONTRIBUTOR_ORDER, so the UI can
+    show what is MISSING as readily as what scored. A contributor that could
+    not be computed has score None and effective_weight 0.0 — it cannot
+    silently contribute.
+
+    `contribution` is that contributor's share of the composite after
+    renormalisation. The contributions will not sum exactly to `score` (the
+    composite is rounded once, the parts are not), so present it as a
+    contribution, never as exact arithmetic.
+    """
+    scored = _contributor_scores(for_date, bio_rows, wake_time_adjustments)
+    if scored is None:
+        return {
+            "score": NOT_COMPUTED,
+            "contributors": [
+                {"key": k, "label": CONTRIBUTOR_LABELS[k], "score": None,
+                 "weight": _WEIGHTS[k], "effective_weight": 0.0, "contribution": None,
+                 "raw": None, "reference": None, "reference_window": 0}
+                for k in CONTRIBUTOR_ORDER
+            ],
+            "available_weight": 0.0,
+            "missing": list(CONTRIBUTOR_ORDER),
+            "wake_adjustment_minutes": 0.0,
+        }
+
+    by_key = scored["contributors"]
+    available = [(c["score"], c["weight"]) for c in by_key.values() if c["score"] is not None]
+    total_w = sum(w for _, w in available) or 1.0
+
+    contributors = []
+    for key in CONTRIBUTOR_ORDER:
+        c = by_key[key]
+        scored_ok = c["score"] is not None
+        eff = (c["weight"] / total_w) if scored_ok else 0.0
+        contributors.append({
+            **c,
+            "effective_weight": round(eff, 4),
+            "contribution": round(c["score"] * eff, 2) if scored_ok else None,
+        })
+
+    return {
+        "score": _composite(available),
+        "contributors": contributors,
+        "available_weight": round(sum(w for _, w in available), 4),
+        "missing": [c["key"] for c in contributors if c["score"] is None],
+        "wake_adjustment_minutes": scored["wake_adjustment_minutes"],
+        # Lets a formatter turn REM/deep's percentage back into a duration
+        # ("1h 24m, 23 %") without re-reading the row and risking a different
+        # rounding than the one the score used.
+        "total_seconds": scored["total_seconds"],
+    }

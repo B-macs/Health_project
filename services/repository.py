@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import time
 import uuid
 from datetime import date, datetime, timedelta
 
@@ -33,7 +34,11 @@ from services import dashboard
 from services import hr_load
 from services import hr_matching
 from services import models
+from services import readiness
 from services import sessions as training_sessions
+from services import sleep_fusion
+from services import sleep_movement
+from services.clients import datastore_reader
 from services.clients import garmin
 from services.clients import local_cache
 from services.clients import notion
@@ -49,6 +54,35 @@ class PhasesCorruptError(Exception):
     caller to auto-seed from. See get_phases's docstring."""
 
 
+# ─── Check-In merge-upsert — CheckInRecord field -> (Notion property name,
+#     get_property kind, that field's untouched-widget default in
+#     views/checkin.py). save_check_in() uses this to decide, field by
+#     field, whether a second same-day submission is "new information" (not
+#     equal to its default — the value wins) or "still at the default"
+#     (nothing entered — the prior page's value is kept, so a forgotten
+#     field on a follow-up check-in doesn't blank out an earlier real
+#     entry). Keep in sync with the widget defaults in views/checkin.py. ───
+_CHECKIN_FIELD_MAP: dict[str, tuple[str, str, object]] = {
+    "current_condition":    ("Condition", "select", "Excellent"),
+    "tightness_score":      ("Tightness", "number", 0),
+    "pain_score":            ("Pain", "number", 0),
+    "anatomical_locations":  ("Body Areas", "multi_select", []),
+    "sensation_tags":        ("Sensations", "multi_select", []),
+    "subjective_tightness":  ("Note", "rich_text", ""),
+    "alcohol_units":         ("Alcohol Units", "number", 0.0),
+    "travel_flag":           ("Travel", "checkbox", False),
+    "psych_stress_score":    ("Stress Level", "number", 1),
+    "instability_events":    ("Instability Events", "number", 0),
+    "bristol_type":          ("Bristol Type", "number", 4),
+    "unusual_stool_colour":  ("Unusual Stool Colour", "checkbox", False),
+    "hunger_deviation":      ("Hunger Deviation", "number", 0),
+    "thirst_intensity":      ("Thirst Intensity", "number", 1),
+    "electrolytes_taken":    ("Electrolytes Taken", "checkbox", False),
+    "meditation_minutes":    ("Meditation Minutes", "number", 0.0),
+    "relaxation_depth":      ("Relaxation Depth", "number", 1),
+}
+
+
 _GARMIN_DAILY_HEADER = [
     "date", "steps", "resting_hr", "avg_stress", "sleep_score",
     "sleep_hours", "calories_total", "min_hr", "max_hr", "hrv_ms",
@@ -56,6 +90,94 @@ _GARMIN_DAILY_HEADER = [
 _GARMIN_ACTIVITY_HEADER = [
     "activity_id", "date", "name", "type", "start_time_local",
     "duration_minutes", "distance_km", "avg_hr", "max_hr", "calories",
+]
+
+# ─── Garmin sleep stages — the sleepLevels segment list that _garmin_daily_row
+#     has always fetched and always thrown away. Stored LOSSLESSLY as JSON
+#     (variable-length {startGMT,endGMT,activityLevel} segments, 19-38 a
+#     night) rather than as a derived minute-string: baking the resampling
+#     choice into storage would mean a services/sleep_fusion.py RULES_VERSION
+#     bump could never be recomputed without re-calling Garmin.
+#     The dto_* columns are Garmin's OWN per-stage totals, kept so
+#     totals_match can verify our activityLevel->stage mapping on every single
+#     night instead of on the one night it was originally verified against. ──
+_GARMIN_SLEEP_STAGES_HEADER = [
+    "date", "sleep_start_gmt", "sleep_end_gmt", "utc_offset_minutes",
+    "segment_count", "deep_seconds", "light_seconds", "rem_seconds",
+    "awake_seconds", "dto_deep_seconds", "dto_light_seconds",
+    "dto_rem_seconds", "dto_awake_seconds", "totals_match",
+    "sleep_levels_json",
+    # ── Movement (sleepMovement), stored as a REDUCED regular grid rather
+    #    than losslessly like sleep_levels_json above. Not a preference: raw
+    #    sleepMovement is ~78-84k chars a night (707 per-minute segments,
+    #    measured across 53 archived nights) against Sheets' 50,000-char cell
+    #    limit, so the lossless form simply does not fit. start + interval +
+    #    levels[] is equivalent AT 2DP, and ~3.5k chars.
+    #
+    #    movement_levels is gap-FILLED, with an empty slot for any minute no
+    #    segment covered, so every later value keeps its true position. That
+    #    matters: 2 of those 53 nights carry real time gaps (4 minutes on
+    #    2026-05-27, 1 minute on 2026-06-02), and packing the survivors
+    #    end-to-end would shift the rest of the night and produce a plausible,
+    #    silently wrong series.
+    #
+    #    movement_contiguous therefore records whether filling was NEEDED —
+    #    a diagnostic, the same way totals_match turns the activityLevel ->
+    #    stage mapping from an assumption into a stored, checkable fact.
+    "movement_start_gmt", "movement_interval_seconds", "movement_slot_count",
+    "movement_contiguous", "movement_gap_slots", "movement_levels",
+    # Overnight HR and stress, from the same payload. ~12k and ~8k chars —
+    # both comfortably inside one cell, so these stay lossless JSON.
+    "sleep_hr_json", "sleep_stress_json",
+]
+# movement_levels is a comma-joined numeric string; gspread would happily read
+# "1.13,0.75,..." as text but a SINGLE-minute night ("1.13") as a float, so the
+# column's type would depend on the length of the night. Same hazard class as
+# the hypnogram columns, same fix.
+_GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE = [
+    _GARMIN_SLEEP_STAGES_HEADER.index(c) + 1
+    for c in ("movement_levels", "sleep_levels_json", "sleep_hr_json", "sleep_stress_json")
+]
+
+# ─── Sleep Fusion — one row per night, the merged Oura+Garmin hypnogram
+#     (services/sleep_fusion.py). A DERIVED artefact, deliberately in its own
+#     tab rather than as columns on Oura Sleep Periods: rebuild_oura_tabs()
+#     refreshes that tab from the Oura API and would clobber anything derived
+#     stored there. Deliberately NOT read by the engine — see the module
+#     docstring in services/sleep_fusion.py for why. ─────────────────────────
+_SLEEP_FUSION_HEADER = [
+    "date", "source", "rules_version", "computed_at",
+    "window_start_utc", "utc_offset_minutes", "minutes",
+    "master_hypnogram", "oura_hypnogram", "garmin_hypnogram", "reason_codes",
+    "master_deep_minutes", "master_light_minutes", "master_rem_minutes",
+    "master_awake_minutes",
+    "master_sleep_hours", "oura_sleep_hours", "garmin_sleep_hours",
+    "phantom_wake_minutes", "window_overlap_pct", "agreement_pct",
+    "cohen_kappa", "garmin_covered_minutes", "garmin_gap_minutes",
+    "garmin_outside_window_minutes", "oura_periods_on_day",
+    # ── Movement (services/sleep_movement.py). On the 30-SECOND grid, twice
+    #    the resolution of the hypnogram columns above and anchored at the
+    #    same window_start, so the two strips share one time axis.
+    #    movement_cutpoints records the calibration each series was produced
+    #    under — the movement counterpart of rules_version, without which a
+    #    re-fit would silently change what a stored "restless" meant.
+    "movement_source", "movement_slots", "movement_covered_slots",
+    "movement_still_slots", "movement_restless_slots",
+    "movement_tossing_slots", "movement_active_slots",
+    "movement_position_shifts", "movement_mean_class",
+    "master_movement", "oura_movement", "garmin_movement", "movement_cutpoints",
+]
+# Same hazard as _OURA_NUMERICISE_IGNORE: these are digit-coded strings, and
+# gspread would read a 450-digit hypnogram back as an int, then write it out
+# as a JSON number no float64 cell can represent.
+_SLEEP_FUSION_NUMERICISE_IGNORE = [
+    _SLEEP_FUSION_HEADER.index(c) + 1
+    for c in ("master_hypnogram", "oura_hypnogram", "garmin_hypnogram", "reason_codes",
+              "master_movement", "oura_movement", "garmin_movement",
+              # Comma-joined floats: a full night reads as text but a
+              # single-cutpoint value would read as a float, making the
+              # column's type depend on its content.
+              "movement_cutpoints")
 ]
 
 # ─── Session HR — one row per training session that matched a Garmin
@@ -134,14 +256,34 @@ _OURA_SLEEP_PERIOD_HEADER = [
     # differs on 769 of 781 nights because it reflects user bedtime edits.
     # These columns are digit-coded TEXT — see _OURA_NUMERICISE_IGNORE.
     "sleep_phase_5_min", "sleep_phase_30_sec",
+    # Movement — Oura's published 1-4 alphabet (1 no motion, 2 restless,
+    # 3 tossing and turning, 4 active), one digit per 30 seconds. Present on
+    # 414/414 archived nights, at most 1,800 chars, so it costs a column on
+    # the same terms as the hypnograms above.
+    #
+    # NOT always the same length as sleep_phase_30_sec: both are anchored at
+    # bedtime_start, but on 216 of 414 nights the HYPNOGRAM is one 30-second
+    # block shorter (movement matches time_in_bed exactly). Consumers align at
+    # index 0 and truncate to the shorter — see sleep_movement.oura_movement.
+    "movement_30_sec",
+    # Overnight HR and HRV — {"interval": 300.0, "items": [...]} as JSON,
+    # ~109 samples and ~730 chars each. Small enough to store per night,
+    # unlike the top-level heartrate endpoint's full series.
+    "sleep_hr_series", "sleep_hrv_series",
 ]
 # Columns whose values are digit strings, not numbers. gspread numericises by
 # default, which would turn a hypnogram into a 1,800-digit int and, on the
 # next write, a JSON number that no float64 spreadsheet cell can represent.
 _OURA_NUMERICISE_IGNORE = {
     "sleep_periods": [
-        _OURA_SLEEP_PERIOD_HEADER.index("sleep_phase_5_min") + 1,
-        _OURA_SLEEP_PERIOD_HEADER.index("sleep_phase_30_sec") + 1,
+        _OURA_SLEEP_PERIOD_HEADER.index(c) + 1
+        for c in ("sleep_phase_5_min", "sleep_phase_30_sec", "movement_30_sec",
+                  # The two series are JSON objects and so are not numeric
+                  # today, but they are exempted anyway: if Oura ever returned
+                  # a bare array of digits, silent numericising would be the
+                  # same unrecoverable corruption, and the cost of exempting
+                  # a non-numeric column is nil.
+                  "sleep_hr_series", "sleep_hrv_series")
     ],
 }
 _OURA_SESSION_HEADER = [
@@ -155,8 +297,46 @@ _BIOMETRIC_BLEND_HEADER = [
 ]
 _METRICS_HISTORY_HEADER = [
     "date", "readiness_score", "sleep_pct", "sleep_score", "strain",
+    # Which readiness model produced this row's readiness_score. Added with
+    # MODEL_VERSION 2 (which rescored from Oura's contributors and dropped the
+    # alcohol deduction), so a stored figure is always traceable to the maths
+    # behind it -- the same reason sleep_fusion rows carry rules_version and
+    # movement_cutpoints. A blank value means version 1.
+    "readiness_model_version",
 ]
 _WAKE_TIME_ADJUSTMENTS_HEADER = ["date", "adjustment_minutes"]
+
+
+# ─── Offline mode — Sheets tab title -> datastore table name.
+#
+#     The tab titles live in services/clients/sheets.py and the table names
+#     in services/datastore_schema.sql; this is the one place the two are
+#     tied together, for the same reason every other Sheets column name is
+#     confined to this module. Adding a tab means adding a row here AND a
+#     table to the schema, or offline reads of it silently return [] (see
+#     OfflineWorksheet.get_all_records on why empty rather than raising).
+#
+#     Sheet1 is absent on purpose: the datastore holds it MAPPED
+#     (sheet1_legacy_biometrics, models.BiometricRecord's field names), not
+#     under its raw Apple Health export headers, so it cannot be served
+#     through this generic path. _sheets_biometric_records handles it
+#     directly instead. ────────────────────────────────────────────────────
+_DATASTORE_TABLE_BY_TAB = {
+    sheets.GARMIN_DAILY_WORKSHEET: "garmin_daily",
+    sheets.GARMIN_ACTIVITIES_WORKSHEET: "garmin_activities",
+    sheets.GARMIN_SLEEP_STAGES_WORKSHEET: "garmin_sleep_stages",
+    sheets.SLEEP_FUSION_WORKSHEET: "sleep_fusion",
+    sheets.SESSION_HR_WORKSHEET: "session_hr",
+    sheets.OURA_DAILY_WORKSHEET: "oura_daily",
+    sheets.OURA_WORKOUTS_WORKSHEET: "oura_workouts",
+    sheets.OURA_SLEEP_PERIODS_WORKSHEET: "oura_sleep_periods",
+    sheets.OURA_SESSIONS_WORKSHEET: "oura_sessions",
+    sheets.OURA_REST_MODE_WORKSHEET: "oura_rest_mode",
+    sheets.BIOMETRIC_BLEND_WORKSHEET: "biometric_blend",
+    sheets.METRICS_HISTORY_WORKSHEET: "metrics_history",
+    sheets.WAKE_TIME_ADJUSTMENTS_WORKSHEET: "wake_time_adjustments",
+    sheets.WEEKLY_ROLLUP_WORKSHEET: "weekly_rollup",
+}
 
 
 class Repository:
@@ -167,6 +347,9 @@ class Repository:
         self._garmin_client_obj = None
         self._garmin_login_attempted = False
         self._oura_token_obj = None
+        self._datastore_conn = None
+        # {(tab_title, ignore_cols): (write_generation, monotonic_ts, rows)}
+        self._read_cache: dict = {}
 
     @property
     def _nc(self):
@@ -179,6 +362,58 @@ class Repository:
         if self._sheets_client is None:
             self._sheets_client = sheets.make_client(self.config)
         return self._sheets_client
+
+    @property
+    def offline(self) -> bool:
+        """True when this Repository serves Sheets reads from a local
+        datastore instead of the Google Sheets API. Public because the Sync
+        page has to be able to say so on screen — a page that looks live but
+        is reading a snapshot is the failure mode this whole thing has to
+        avoid."""
+        return bool(self.config.datastore_path)
+
+    @property
+    def _ds(self):
+        """Lazy read-only connection to the datastore. Opened once per
+        Repository lifetime, like every other client here."""
+        if self._datastore_conn is None:
+            self._datastore_conn = datastore_reader.connect(self.config.datastore_path)
+        return self._datastore_conn
+
+    def datastore_built_at(self) -> str | None:
+        """When the offline snapshot was built (datastore_meta.built_at), or
+        None if not offline / the marker is absent. The age of the snapshot
+        is the single most important thing to show alongside any offline
+        reading — "yesterday's data" and "a month-old copy" look identical
+        on screen otherwise."""
+        if not self.offline:
+            return None
+        try:
+            row = self._ds.execute(
+                "SELECT value FROM datastore_meta WHERE key='built_at'").fetchone()
+        except Exception:
+            return None
+        return row[0] if row else None
+
+    def _ws(self, title: str, header: list[str]):
+        """A worksheet for `title` — the real Google Sheets tab, or an
+        OfflineWorksheet over the datastore when offline. Every _*_ws()
+        getter below goes through here, which is what makes offline mode one
+        seam rather than fourteen.
+
+        Deliberately an EITHER/OR on config, never a fallback: offline mode
+        is not "use the datastore when Sheets fails". Silently serving a
+        snapshot to someone who believes they are looking at last night's
+        sleep is a worse outcome than an error, so a live read that fails
+        keeps failing.
+
+        `header` is unused offline — creating a tab is a write, and the
+        datastore's schema is fixed by datastore_schema.sql."""
+        if self.offline:
+            return datastore_reader.OfflineWorksheet(
+                self._ds, title, _DATASTORE_TABLE_BY_TAB[title])
+        return sheets.get_or_create_worksheet(
+            self._sc, self.config.google_sheets_id, title, header)
 
     @property
     def _gc(self):
@@ -226,32 +461,174 @@ class Repository:
             "Relaxation Depth":     {"number": {}},
         })
 
-    def save_check_in(self, record: models.CheckInRecord) -> None:
-        notion.create_page(
-            self._nc, self.config.notion_db_readiness,
-            properties={
-                "Entry":         notion.title(f"{record.date} Morning Check-In"),
-                "Date":          notion.date_prop(record.date),
-                "Condition":     notion.select(record.current_condition),
-                "Tightness":     notion.number(record.tightness_score),
-                "Pain":          notion.number(record.pain_score),
-                "Body Areas":    notion.multi_select(record.anatomical_locations),
-                "Sensations":    notion.multi_select(record.sensation_tags),
-                "Note":          notion.rich_text(record.subjective_tightness or ""),
-                "Alcohol Units": notion.number(record.alcohol_units or 0),
-                "Travel":        notion.checkbox(record.travel_flag),
-                "Stress Level":  notion.number(record.psych_stress_score),
-                "Instability Events":   notion.number(record.instability_events),
-                "Bristol Type":         notion.number(record.bristol_type),
-                "Unusual Stool Colour": notion.checkbox(record.unusual_stool_colour),
-                "Hunger Deviation":     notion.number(record.hunger_deviation),
-                "Thirst Intensity":     notion.number(record.thirst_intensity),
-                "Electrolytes Taken":   notion.checkbox(record.electrolytes_taken),
-                "Meditation Done":      notion.checkbox(record.meditation_done),
-                "Meditation Minutes":   notion.number(record.meditation_minutes),
-                "Relaxation Depth":     notion.number(record.relaxation_depth),
-            },
+    def _check_in_properties(self, record: models.CheckInRecord) -> dict:
+        return {
+            "Entry":         notion.title(f"{record.date} Morning Check-In"),
+            "Date":          notion.date_prop(record.date),
+            "Condition":     notion.select(record.current_condition),
+            "Tightness":     notion.number(record.tightness_score),
+            "Pain":          notion.number(record.pain_score),
+            "Body Areas":    notion.multi_select(record.anatomical_locations),
+            "Sensations":    notion.multi_select(record.sensation_tags),
+            "Note":          notion.rich_text(record.subjective_tightness or ""),
+            "Alcohol Units": notion.number(record.alcohol_units or 0),
+            "Travel":        notion.checkbox(record.travel_flag),
+            "Stress Level":  notion.number(record.psych_stress_score),
+            "Instability Events":   notion.number(record.instability_events),
+            "Bristol Type":         notion.number(record.bristol_type),
+            "Unusual Stool Colour": notion.checkbox(record.unusual_stool_colour),
+            "Hunger Deviation":     notion.number(record.hunger_deviation),
+            "Thirst Intensity":     notion.number(record.thirst_intensity),
+            "Electrolytes Taken":   notion.checkbox(record.electrolytes_taken),
+            "Meditation Done":      notion.checkbox(record.meditation_done),
+            "Meditation Minutes":   notion.number(record.meditation_minutes),
+            "Relaxation Depth":     notion.number(record.relaxation_depth),
+        }
+
+    def _find_check_in_page(self, iso_date: str) -> dict | None:
+        """The existing Readiness-DB page for this date, if any. Notion's
+        "equals" date filter matches on the day only, so this is exact —
+        not a range. Assumes at most one page per date; if duplicates exist
+        from before this upsert behavior existed, returns whichever one
+        Notion's default (unsorted) query order returns first, and leaves
+        the other(s) alone."""
+        pages = self._query(
+            self.config.notion_db_readiness,
+            filter_={"property": "Date", "date": {"equals": iso_date}},
         )
+        return pages[0] if pages else None
+
+    def _merge_check_in(self, new: models.CheckInRecord, existing_page: dict) -> tuple[models.CheckInRecord, bool]:
+        """Field-by-field upsert: a field on `new` only overwrites the
+        existing page's value if it was actually filled in (i.e. it's not
+        still sitting at that field's untouched-widget default). A
+        follow-up check-in that only sets, say, meditation minutes leaves
+        every other already-recorded field on that day's entry untouched
+        rather than blanking it back to defaults. Returns (merged record,
+        whether the note text changed — a previously-parsed note that just
+        changed needs the AI parser to see it again, see
+        get_unparsed_readiness's Parsed filter)."""
+        changes: dict[str, object] = {}
+        note_changed = False
+        for field, (prop_name, kind, default) in _CHECKIN_FIELD_MAP.items():
+            new_val = getattr(new, field)
+            if new_val != default:
+                changes[field] = new_val
+                if field == "subjective_tightness":
+                    old_val = notion.get_property(existing_page, prop_name, kind)
+                    note_changed = new_val != (old_val or "")
+            else:
+                old_val = notion.get_property(existing_page, prop_name, kind)
+                changes[field] = old_val if old_val is not None else default
+        changes["meditation_done"] = bool(changes["meditation_minutes"])
+        return dataclasses.replace(new, **changes), note_changed
+
+    def save_check_in(self, record: models.CheckInRecord) -> None:
+        existing_page = self._find_check_in_page(record.date)
+        if existing_page is None:
+            notion.create_page(
+                self._nc, self.config.notion_db_readiness,
+                properties=self._check_in_properties(record),
+            )
+            return
+
+        merged, note_changed = self._merge_check_in(record, existing_page)
+        properties = self._check_in_properties(merged)
+        if note_changed:
+            properties["Parsed"] = notion.checkbox(False)
+        notion.update_page(self._nc, existing_page["id"], properties=properties)
+
+    # ─── One-off cleanup: pre-upsert same-day duplicate check-ins ─────────
+    # (scripts/merge_duplicate_checkins.py) — save_check_in() above is now
+    # an upsert going forward, but it can't retroactively fix duplicate
+    # pages created before that behavior existed. These three methods fold
+    # a date's duplicate pages into one, generalizing _merge_check_in's
+    # "an untouched widget default loses to a real value" rule to N pages,
+    # plus: list fields and the Note are combined across all of that date's
+    # pages rather than one replacing another, since two separate check-ins
+    # can each carry real, non-overlapping information there.
+
+    def find_duplicate_check_in_dates(self) -> dict[str, list[dict]]:
+        """Every date in the Readiness DB with more than one page, raw
+        pages keyed by ISO date — input for merge_check_in_group()."""
+        pages = self._query(self.config.notion_db_readiness)
+        by_date: dict[str, list[dict]] = {}
+        for p in pages:
+            d = notion.get_property(p, "Date", "date")
+            if d:
+                by_date.setdefault(d, []).append(p)
+        return {d: ps for d, ps in by_date.items() if len(ps) > 1}
+
+    def merge_check_in_group(self, pages: list[dict]) -> tuple[str, dict, list[str]] | None:
+        """Folds >= 2 same-day check-in pages into one.
+
+        Scalar fields (Tightness, Pain, Condition, ...): if only one page
+        has a value that differs from that field's untouched-widget
+        default, it wins; if every page is still at the default, the
+        default is kept; if two pages disagree with two DIFFERENT real
+        values, this is a genuine conflict that can't be resolved by a
+        rule — returns None so the caller can flag that date for manual
+        cleanup in Notion instead of silently guessing.
+
+        List fields (Body Areas, Sensations) are unioned rather than one
+        page's selection replacing another's, and the Note field is
+        concatenated across every page that has one — both cover the case
+        where two check-ins each recorded real, distinct information
+        rather than one being a strict superset of the other.
+
+        Returns (primary_page_id, merged_properties, [page ids to
+        archive]) — the oldest page (by created_time) is kept as the
+        surviving primary; apply_check_in_merge() writes this out."""
+        pages_sorted = sorted(pages, key=lambda p: p.get("created_time", ""))
+        primary = pages_sorted[0]
+        properties: dict = {}
+
+        for field, (prop_name, kind, default) in _CHECKIN_FIELD_MAP.items():
+            values = [notion.get_property(p, prop_name, kind) for p in pages_sorted]
+
+            if kind == "multi_select":
+                union: list[str] = []
+                for v in values:
+                    for name in (v or []):
+                        if name not in union:
+                            union.append(name)
+                properties[prop_name] = notion.multi_select(union)
+                continue
+
+            if prop_name == "Note":
+                parts = [v for v in values if v]
+                properties[prop_name] = notion.rich_text(" / ".join(dict.fromkeys(parts)))
+                continue
+
+            non_default = {v for v in values if v is not None and v != default}
+            if not non_default:
+                merged_val = default
+            elif len(non_default) == 1:
+                merged_val = next(iter(non_default))
+            else:
+                return None  # two different real values — needs a human
+            if kind == "number":
+                properties[prop_name] = notion.number(merged_val)
+            elif kind == "select":
+                properties[prop_name] = notion.select(merged_val)
+            else:
+                properties[prop_name] = notion.checkbox(merged_val)
+
+        properties["Meditation Done"] = notion.checkbox(bool(properties["Meditation Minutes"]["number"]))
+        old_note = notion.get_property(primary, "Note", "rich_text") or ""
+        if properties["Note"]["rich_text"][0]["text"]["content"] != old_note:
+            properties["Parsed"] = notion.checkbox(False)
+
+        return primary["id"], properties, [p["id"] for p in pages_sorted[1:]]
+
+    def apply_check_in_merge(self, primary_page_id: str, properties: dict, archive_ids: list[str]) -> None:
+        """Writes merge_check_in_group()'s result: updates the surviving
+        page with the merged fields, then archives the now-redundant
+        duplicate(s). Notion's archive is a soft-delete (restorable from
+        its own trash), never a hard delete."""
+        notion.update_page(self._nc, primary_page_id, properties=properties)
+        for page_id in archive_ids:
+            notion.archive_page(self._nc, page_id)
 
     def get_recent_readiness(self, days: int = 60, today: date | None = None) -> list[dict]:
         today = today or date.today()
@@ -284,6 +661,44 @@ class Repository:
                 "meditation_done":       1 if g("Meditation Done", "checkbox") else 0,
                 "meditation_minutes":    g("Meditation Minutes", "number"),
                 "relaxation_depth":      g("Relaxation Depth", "number"),
+            })
+        return out
+
+    def get_all_readiness_checkins_raw(self) -> list[dict]:
+        """Every check-in page ever logged, unwindowed (no Date filter) —
+        get_recent_readiness's fields PLUS the AI note-parsing pipeline's
+        output (parsed/parsed_severity/parsed_areas/parsed_sensations/
+        warning_level — see update_readiness_ai), which get_recent_readiness
+        doesn't expose. For services.datastore's readiness_checkins table."""
+        pages = self._query(self.config.notion_db_readiness)
+        out = []
+        for p in pages:
+            g = lambda name, kind: notion.get_property(p, name, kind)
+            out.append({
+                "date":                  g("Date", "date"),
+                "current_condition":     g("Condition", "select"),
+                "tightness_score":       g("Tightness", "number"),
+                "pain_score":            g("Pain", "number"),
+                "anatomical_locations":  json.dumps(g("Body Areas", "multi_select") or []),
+                "sensation_tags":        json.dumps(g("Sensations", "multi_select") or []),
+                "subjective_tightness":  g("Note", "rich_text"),
+                "alcohol_units":         g("Alcohol Units", "number"),
+                "travel_flag":           1 if g("Travel", "checkbox") else 0,
+                "psych_stress_score":    g("Stress Level", "number"),
+                "instability_events":    g("Instability Events", "number"),
+                "bristol_type":          g("Bristol Type", "number"),
+                "unusual_stool_colour":  1 if g("Unusual Stool Colour", "checkbox") else 0,
+                "hunger_deviation":      g("Hunger Deviation", "number"),
+                "thirst_intensity":      g("Thirst Intensity", "number"),
+                "electrolytes_taken":    1 if g("Electrolytes Taken", "checkbox") else 0,
+                "meditation_done":       1 if g("Meditation Done", "checkbox") else 0,
+                "meditation_minutes":    g("Meditation Minutes", "number"),
+                "relaxation_depth":      g("Relaxation Depth", "number"),
+                "parsed":                1 if g("Parsed", "checkbox") else 0,
+                "parsed_severity":       g("Parsed Severity", "number"),
+                "parsed_areas":          g("Parsed Areas", "rich_text"),
+                "parsed_sensations":     g("Parsed Sensations", "rich_text"),
+                "warning_level":         g("Warning", "select"),
             })
         return out
 
@@ -568,6 +983,67 @@ class Repository:
         if not sets:
             return None
         return sets
+
+    def get_all_training_exercises_raw(self) -> list[dict]:
+        """Every exercise row ever logged in the Training DB, unwindowed (no
+        Session Date filter) — the full historical per-set detail that
+        get_recent_sessions/get_last_session_all_sets deliberately don't
+        expose (windowed by days, and/or collapsed to session-date-keyed
+        aggregates). Built for services.datastore's normalized
+        training_sessions/training_exercises/training_sets tables.
+
+        One dict per Notion page (= one logged exercise):
+          exercise_id, session_id, session_date, movement_name,
+          movement_type, planned_sets, planned_reps, exercise_rpe,
+          actual_sets, total_volume_kg (same len(sets)/sum(reps*weight)
+          math get_recent_sessions already uses), session_duration_minutes,
+          session_rpe, session_au, notes, note_summary, sentiment_score,
+          flagged_body_parts (raw JSON string, as stored), warning_level,
+          garmin_avg_hr, garmin_max_hr, garmin_distance_km, garmin_calories,
+          and sets — json.loads("Sets" rich_text), a list of
+          {set_num, reps, weight, rest, tut, velocity, band_tier?, ts?} dicts
+          (band_tier/ts are only present on rows that have them — optional
+          per services.sessions.build_set_record/make_sets_data).
+
+        A page whose Sets JSON fails to parse gets sets=[] (and therefore
+        actual_sets=0, total_volume_kg=0.0) rather than raising — the same
+        defensive fallback get_recent_sessions/get_last_session_all_sets
+        already use."""
+        pages = self._query(self.config.notion_db_training)
+        out = []
+        for p in pages:
+            g = lambda name, kind: notion.get_property(p, name, kind)
+            sets_raw = g("Sets", "rich_text") or "[]"
+            try:
+                sets = json.loads(sets_raw)
+            except Exception:
+                sets = []
+            out.append({
+                "exercise_id": p["id"],
+                "session_id": g("Session ID", "rich_text") or "",
+                "session_date": g("Session Date", "date"),
+                "movement_name": g("Movement", "title"),
+                "movement_type": g("Type", "select"),
+                "planned_sets": g("Planned Sets", "number"),
+                "planned_reps": g("Planned Reps", "number"),
+                "exercise_rpe": g("Exercise RPE", "number"),
+                "actual_sets": len(sets),
+                "total_volume_kg": round(sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in sets), 1),
+                "session_duration_minutes": g("Session Duration", "number"),
+                "session_rpe": g("Session RPE", "number"),
+                "session_au": g("Session AU", "number"),
+                "notes": g("Notes", "rich_text"),
+                "note_summary": g("Note Summary", "rich_text"),
+                "sentiment_score": g("Sentiment", "number"),
+                "flagged_body_parts": g("Flagged Areas", "rich_text"),
+                "warning_level": g("Warning", "select"),
+                "garmin_avg_hr": g("Activity Avg HR", "number"),
+                "garmin_max_hr": g("Activity Max HR", "number"),
+                "garmin_distance_km": g("Activity Distance (km)", "number"),
+                "garmin_calories": g("Activity Calories", "number"),
+                "sets": sets,
+            })
+        return out
 
     def has_checked_in(self, d: date) -> bool:
         """True if a Morning Check-In has already been submitted for this
@@ -922,6 +1398,21 @@ class Repository:
                 pass
         return {}
 
+    def get_all_config_rows(self) -> list[dict]:
+        """Every key/value row in the Config DB, unwindowed — for
+        services.datastore's config table. A faithful copy rather than a
+        per-key parse: `value` is whatever raw string is stored (JSON blob
+        for phases/diagnostic_profile/latest_movement_risk, a plain string
+        for current_stage/garmin_daily_last_synced_at) — interpreting each
+        key's own shape is a job for whatever reads the datastore later,
+        not for this passthrough."""
+        pages = self._query(self.config.notion_db_config)
+        return [{
+            "key": notion.get_property(p, "Key", "title"),
+            "value": notion.get_property(p, "Value", "rich_text"),
+            "updated": notion.get_property(p, "Updated", "date"),
+        } for p in pages]
+
     # ─────────────────────────────────────────────────────────────────────
     #  Macro Trend Data
     # ─────────────────────────────────────────────────────────────────────
@@ -1017,7 +1508,20 @@ class Repository:
 
     def get_raw_sheet_rows(self) -> list[dict]:
         """Every row in Sheet1, completely unmapped (gspread's own header-row
-        dict keys) — the Sync page's raw-passthrough preview table."""
+        dict keys) — the Sync page's raw-passthrough preview table.
+
+        Raises offline: the datastore stores Sheet1 already MAPPED (see
+        _sheets_biometric_records), so there is nothing here to pass through
+        raw. Returning the mapped columns under this method's name would be
+        a lie about what "raw passthrough" means, and returning [] would
+        read as "the legacy export is empty"."""
+        if self.offline:
+            raise datastore_reader.DatastoreReadOnlyError(
+                "get_raw_sheet_rows() has no offline equivalent — the "
+                "datastore holds Sheet1 mapped (sheet1_legacy_biometrics), "
+                "not under its raw Apple Health export headers. Use "
+                "get_all_sheet1_biometric_records() instead."
+            )
         return sheets.get_all_records(self._sc, self.config.google_sheets_id)
 
     def _sheets_biometric_records(self) -> list[models.BiometricRecord]:
@@ -1027,7 +1531,27 @@ class Repository:
         own preview-table loop (field name `sleep_hours` for the same data —
         the two had already drifted; see REFACTOR_NOTES.md). Consolidated here
         and standardized on `sleep_duration_hours`, matching what the engine
-        actually consumes."""
+        actually consumes.
+
+        Offline this reads sheet1_legacy_biometrics directly rather than
+        going through _ws(): the datastore already holds this table in
+        BiometricRecord's own field names (services/datastore.py's
+        _populate_sheet1_legacy wrote it from this very method), so the
+        mapping below has already been applied and re-applying it to the
+        mapped names would map everything to None."""
+        if self.offline:
+            rows = datastore_reader.OfflineWorksheet(
+                self._ds, sheets.WORKSHEET, "sheet1_legacy_biometrics").get_all_records()
+            return [models.BiometricRecord(
+                date=str(r.get("date") or ""),
+                hrv_ms=_sheet_float(r.get("hrv_ms")),
+                resting_heart_rate=_sheet_int(r.get("resting_heart_rate")),
+                sleep_duration_hours=_sheet_float(r.get("sleep_duration_hours")),
+                sleep_deep_hours=_sheet_float(r.get("sleep_deep_hours")),
+                active_kcal=_sheet_float(r.get("active_kcal")),
+                weight_kg=_sheet_float(r.get("weight_kg")),
+                steps=_sheet_int(r.get("steps")),
+            ) for r in rows if r.get("date")]
         raw_rows = self.get_raw_sheet_rows()
         out = []
         for row in raw_rows:
@@ -1067,7 +1591,7 @@ class Repository:
         """Every date already present in the Garmin Daily sheet tab — used by
         scripts/backfill_garmin_from_sheet1.py so it only fills dates Garmin
         doesn't already have, never overwriting a real Garmin-synced day."""
-        rows = sheets.get_worksheet_records(self._garmin_daily_ws())
+        rows = self._read_records(self._garmin_daily_ws())
         return {str(r["date"]) for r in rows if r.get("date")}
 
     def upsert_garmin_daily_row(self, row: dict) -> None:
@@ -1088,7 +1612,7 @@ class Repository:
     # above for the retired pipeline.
 
     def _oura_daily_steps_by_date(self, start: str, end: str) -> dict[str, int | None]:
-        rows = sheets.get_worksheet_records(self._oura_daily_ws())
+        rows = self._read_records(self._oura_daily_ws())
         return {
             str(r["date"]): (r.get("steps") or None)
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
@@ -1127,7 +1651,7 @@ class Repository:
         return out
 
     def _garmin_metrics_by_date(self, start: str, end: str) -> dict[str, dict]:
-        rows = sheets.get_worksheet_records(self._garmin_daily_ws())
+        rows = self._read_records(self._garmin_daily_ws())
         return {
             str(r["date"]): {
                 "hrv_ms": r.get("hrv_ms") or None,
@@ -1142,16 +1666,145 @@ class Repository:
         """Oura's own daily_readiness contributor sub-scores (0-100), from
         the Oura Daily tab — Oura-exclusive, no Garmin equivalent, so this
         is a straight passthrough rather than a blend. Feeds
-        services.readiness.compute_readiness alongside HRV/RHR/Sleep."""
-        rows = sheets.get_worksheet_records(self._oura_daily_ws())
+        services.readiness.compute_readiness alongside HRV/RHR/Sleep.
+
+        temperature_deviation is the odd one out: the RAW °C figure, not a
+        0-100 sub-score, carried alongside body_temperature (Oura's scored
+        version of the same reading) because engine.traffic_light applies
+        absolute thresholds to it. `or None` is wrong for it — a genuine
+        0.0 deviation is a real reading and must not collapse to None the
+        way an empty cell does, so it goes through _float_or_none."""
+        rows = self._read_records(self._oura_daily_ws())
         return {
             str(r["date"]): {
                 "body_temperature":      r.get("readiness_body_temperature") or None,
                 "recovery_index":        r.get("readiness_recovery_index") or None,
                 "previous_day_activity": r.get("readiness_previous_day_activity") or None,
+                "temperature_deviation": _float_or_none(r.get("readiness_temperature_deviation")),
+                # Promoted from display-only to engine inputs by readiness
+                # MODEL_VERSION 2. `resting_heart_rate` here is Oura's 0-100
+                # CONTRIBUTOR, not the bpm — see BiometricRecord's warning on
+                # oura_resting_heart_rate_score.
+                "hrv_balance":            r.get("readiness_hrv_balance") or None,
+                "previous_night":         r.get("readiness_previous_night") or None,
+                "sleep_regularity":       r.get("readiness_sleep_regularity") or None,
+                "activity_balance":       r.get("readiness_activity_balance") or None,
+                "resting_heart_rate":     r.get("readiness_resting_heart_rate") or None,
             }
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
         }
+
+    # ── Oura's own readiness contributors — DISPLAY/AUDIT ONLY ───────────────
+    #  Oura publishes nine readiness contributors and all nine are already in
+    #  the Oura Daily tab; _oura_readiness_contributors_by_date above lifts
+    #  only the three services.readiness actually scores with (plus the raw
+    #  temperature deviation engine.traffic_light needs). The other six are
+    #  synced and unused.
+    #
+    #  This is deliberately a SEPARATE read rather than more fields on
+    #  BiometricRecord: they are display and model-audit material, not engine
+    #  inputs, and threading them through the biometric rows would carry them
+    #  into readiness, the traffic light and the metrics-history backfill for
+    #  no engine benefit. Same reasoning as get_sleep_night_details, whose
+    #  docstring makes the argument at length.
+    # ────────────────────────────────────────────────────────────────────────
+
+    _OURA_READINESS_CONTRIBUTORS = (
+        ("resting_heart_rate",    "Resting heart rate"),
+        ("hrv_balance",           "HRV balance"),
+        ("body_temperature",      "Body temperature"),
+        ("recovery_index",        "Recovery index"),
+        ("previous_night",        "Previous night"),
+        ("sleep_balance",         "Sleep balance"),
+        ("sleep_regularity",      "Sleep regularity"),
+        ("previous_day_activity", "Previous day activity"),
+        ("activity_balance",      "Activity balance"),
+    )
+
+    def get_oura_readiness_detail(self, start: str, end: str) -> dict[str, dict]:
+        """Oura's own readiness score and all nine of its contributors, keyed
+        by ISO date.
+
+        ⚠ NO UI CONSUMER. The "Oura says" comparison panel this was written
+        for was removed once readiness MODEL_VERSION 2 landed: the drill-down
+        shows ONE row per metric, not one per source, and that stays true when
+        Garmin joins. Kept because it is the only way to read Oura's own
+        composite `readiness_score` — the nine contributors reach the engine
+        via BiometricRecord, but the composite does not — and that composite
+        is the anchor for checking whether our model has drifted (it is what
+        produced the r=0.992 agreement figure, and it is what the Garmin 265
+        re-test will need). Same reasoning that keeps readiness.hrv_baseline
+        alive with no scoring consumer.
+
+        Contributors come back as {key: 0-100 or None} under `contributors`,
+        in _OURA_READINESS_CONTRIBUTORS order (Oura's own screen order), with
+        `labels` alongside so the caller needs no column-name knowledge —
+        this module stays the only place Sheets column names live.
+
+        Scores are Oura's raw 0-100 numbers, NOT its tier words. Oura's app
+        shows "Optimal"/"Good"/"Fair"/"Pay attention", but those thresholds
+        are unpublished and demonstrably differ per contributor (45 renders
+        as "Fair" while 42 renders as "Pay attention"), so reproducing them
+        would mean inventing a mapping and presenting it as Oura's.
+
+        A date with no Oura Daily row is simply absent from the result."""
+        rows = self._read_records(self._oura_daily_ws())
+        out: dict[str, dict] = {}
+        for r in rows:
+            d = _sheet_key(r.get("date"))
+            if not d or d < start or d > end:
+                continue
+            out[d] = {
+                "readiness_score": _float_or_none(r.get("readiness_score")),
+                "temperature_deviation": _float_or_none(
+                    r.get("readiness_temperature_deviation")),
+                "temperature_trend_deviation": _float_or_none(
+                    r.get("readiness_temperature_trend_deviation")),
+                "contributors": {
+                    key: _float_or_none(r.get(f"readiness_{key}"))
+                    for key, _label in self._OURA_READINESS_CONTRIBUTORS
+                },
+                "labels": {key: label for key, label in self._OURA_READINESS_CONTRIBUTORS},
+            }
+        return out
+
+    def hrv_blend_status(self, days: int = 60, today: date | None = None) -> dict:
+        """Where the Oura/Garmin HRV comparison stands, and therefore whether
+        services.biometrics.HRV_GARMIN_HOLD can be lifted.
+
+        Reads both platforms' already-synced tabs (no device calls) and pairs
+        the nights where BOTH reported an HRV, then hands them to the pure
+        biometrics.hrv_agreement. Returns its stats plus `held` (is the hold
+        currently on) and `garmin_nights` (how many nights Garmin reported
+        HRV at all — which is 0 for the whole Forerunner 645 era, and is the
+        first number that will move when a watch supporting HRV Status
+        arrives).
+
+        Existence of this method is the point: the hold is meant to be lifted
+        on a measurement, and a measurement nobody can run is a measurement
+        nobody will make."""
+        today = today or date.today()
+        start = (today - timedelta(days=days)).isoformat()
+        end = today.isoformat()
+
+        oura_hrv = {
+            d: m.get("hrv_ms")
+            for d, m in self._oura_sleep_metrics_by_date(start, end).items()
+            if m.get("hrv_ms") is not None
+        }
+        garmin_hrv = {
+            d: m.get("hrv_ms")
+            for d, m in self._garmin_metrics_by_date(start, end).items()
+            if m.get("hrv_ms") is not None
+        }
+        paired = [(oura_hrv[d], garmin_hrv[d]) for d in sorted(oura_hrv) if d in garmin_hrv]
+
+        status = biometrics.hrv_agreement(paired)
+        status["held"] = biometrics.HRV_GARMIN_HOLD
+        status["garmin_nights"] = len(garmin_hrv)
+        status["oura_nights"] = len(oura_hrv)
+        status["window_days"] = days
+        return status
 
     def _alcohol_units_by_date(self, days: int, today: date) -> dict[str, float]:
         """Alcohol units logged via the morning check-in (Notion Readiness
@@ -1206,6 +1859,12 @@ class Repository:
                     oura_body_temperature=contributors.get("body_temperature"),
                     oura_recovery_index=contributors.get("recovery_index"),
                     oura_previous_day_activity=contributors.get("previous_day_activity"),
+                    oura_temperature_deviation=contributors.get("temperature_deviation"),
+                    oura_hrv_balance=contributors.get("hrv_balance"),
+                    oura_previous_night=contributors.get("previous_night"),
+                    oura_sleep_regularity=contributors.get("sleep_regularity"),
+                    oura_activity_balance=contributors.get("activity_balance"),
+                    oura_resting_heart_rate_score=contributors.get("resting_heart_rate"),
                 )
             sleep_raw = oura_sleep.get(d)
             if sleep_raw:
@@ -1238,10 +1897,7 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def _biometric_blend_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.BIOMETRIC_BLEND_WORKSHEET, _BIOMETRIC_BLEND_HEADER,
-        )
+        return self._ws(sheets.BIOMETRIC_BLEND_WORKSHEET, _BIOMETRIC_BLEND_HEADER)
 
     def _biometric_blend_row(self, record: models.BiometricRecord) -> dict:
         return {
@@ -1281,7 +1937,7 @@ class Repository:
         restricted to [start, end] (inclusive, ISO date strings) — unbounded
         by default, unlike get_biometric_rolling's rolling window. Sorted
         ascending by date."""
-        rows = sheets.get_worksheet_records(self._biometric_blend_ws())
+        rows = self._read_records(self._biometric_blend_ws())
         out = []
         for r in rows:
             d = str(r.get("date") or "")
@@ -1328,10 +1984,7 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def _metrics_history_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.METRICS_HISTORY_WORKSHEET, _METRICS_HISTORY_HEADER,
-        )
+        return self._ws(sheets.METRICS_HISTORY_WORKSHEET, _METRICS_HISTORY_HEADER)
 
     def _metrics_history_row(self, snapshot: dict) -> dict:
         return {
@@ -1340,6 +1993,7 @@ class Repository:
             "sleep_pct": snapshot["sleep_pct"] if snapshot["sleep_pct"] is not None else "",
             "sleep_score": snapshot["sleep_score"] if snapshot["sleep_score"] is not None else "",
             "strain": snapshot["strain"] if snapshot["strain"] is not None else "",
+            "readiness_model_version": readiness.MODEL_VERSION,
         }
 
     def upsert_metrics_history_row(self, snapshot: dict) -> None:
@@ -1353,6 +2007,13 @@ class Repository:
         sheets.upsert_row_by_key(
             self._metrics_history_ws(), key_col=1, key_value=snapshot["date"], row_values=values,
         )
+
+    def rebuild_metrics_history(self, fresh: dict[str, dict] | None = None) -> int:
+        """Re-head the Metrics History tab so readiness_model_version stops
+        being written into a column no read can see, carrying every existing
+        row through. Call once after adding the column; see rebuild_tab for
+        why any tab created before a column joined its header needs this."""
+        return self.rebuild_tab(self._metrics_history_ws(), _METRICS_HISTORY_HEADER, fresh)
 
     def sync_metrics_history(self, days: int = 7, today: date | None = None) -> int:
         """Computes services.dashboard.compute_daily_metrics_snapshot for
@@ -1376,7 +2037,7 @@ class Repository:
         bio_rows = [dataclasses.asdict(r) for r in self.get_biometric_rolling(days=days + 60, today=today)]
         au_rows = self.get_daily_session_au_weighted(days=days + 28, today=today)
         stage = self.get_current_stage()
-        wake_adjustments = self.get_wake_time_adjustments(
+        wake_adjustments, _sources = self.get_effective_wake_adjustments(
             start=(today - timedelta(days=days - 1)).isoformat(), end=today.isoformat(),
         )
 
@@ -1399,7 +2060,7 @@ class Repository:
         file's existing convention for read-only dashboard-shaped history
         (see module docstring: the "long tail" of newer read-only data was
         deliberately left as dicts rather than typed)."""
-        rows = sheets.get_worksheet_records(self._metrics_history_ws())
+        rows = self._read_records(self._metrics_history_ws())
         out = []
         for r in rows:
             d = str(r.get("date") or "")
@@ -1415,6 +2076,12 @@ class Repository:
                 "sleep_pct": r.get("sleep_pct") or None,
                 "sleep_score": r.get("sleep_score") or None,
                 "strain": r.get("strain") or None,
+                # Which readiness model produced this row. Blank/absent means
+                # version 1 — rows written before the column existed. Mapped
+                # here as well as stored: this getter lists its keys
+                # explicitly, so a column added to the header alone would sit
+                # in the sheet and never reach a caller.
+                "readiness_model_version": r.get("readiness_model_version") or None,
             })
         return sorted(out, key=lambda r: r["date"])
 
@@ -1431,16 +2098,13 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def _wake_time_adjustments_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.WAKE_TIME_ADJUSTMENTS_WORKSHEET, _WAKE_TIME_ADJUSTMENTS_HEADER,
-        )
+        return self._ws(sheets.WAKE_TIME_ADJUSTMENTS_WORKSHEET, _WAKE_TIME_ADJUSTMENTS_HEADER)
 
     def get_wake_time_adjustment(self, d: date) -> float:
         """The stored adjustment_minutes for date `d`, or 0.0 if nothing has
         ever been set for that date (the "no adjustment" default)."""
         d_str = d.isoformat()
-        rows = sheets.get_worksheet_records(self._wake_time_adjustments_ws())
+        rows = self._read_records(self._wake_time_adjustments_ws())
         for r in rows:
             if str(r.get("date") or "") == d_str:
                 minutes = r.get("adjustment_minutes")
@@ -1461,7 +2125,7 @@ class Repository:
         over multiple dates wants, instead of one get_wake_time_adjustment
         call per date. Dates with no stored adjustment are simply absent
         (not zero-valued entries)."""
-        rows = sheets.get_worksheet_records(self._wake_time_adjustments_ws())
+        rows = self._read_records(self._wake_time_adjustments_ws())
         out: dict[str, float] = {}
         for r in rows:
             d = str(r.get("date") or "")
@@ -1476,14 +2140,35 @@ class Repository:
                 out[d] = float(minutes)
         return out
 
+    def get_effective_wake_adjustments(self, start: str | None = None,
+                                        end: str | None = None,
+                                        ) -> tuple[dict[str, float], dict[str, str]]:
+        """The manual per-night wake correction and the fusion-derived one,
+        resolved to exactly one value per night.
+
+        Both mechanisms subtract phantom Oura wake, so applying both would
+        double-count. Precedence lives in the pure
+        sleep_fusion.effective_wake_adjustments; this method only supplies the
+        two inputs. services/sleep_score.py is deliberately untouched by any
+        of this — it still receives a plain {date: minutes} dict and behaves
+        exactly as before.
+
+        Returns (adjustments, sources) so the UI can name which one won."""
+        manual = self.get_wake_time_adjustments(start=start, end=end)
+        try:
+            fused = self.get_fused_wake_adjustments(start=start, end=end)
+        except Exception:
+            # The Sleep Fusion tab may not exist yet. Falling back to manual
+            # alone keeps Sleep Score behaving exactly as it did before.
+            fused = {}
+        return sleep_fusion.effective_wake_adjustments(manual, fused)
+
     # ─────────────────────────────────────────────────────────────────────
     #  Google Sheets — Weekly Rollup
     # ─────────────────────────────────────────────────────────────────────
 
     def _weekly_rollup_ws(self):
-        return sheets.get_or_create_weekly_rollup_worksheet(
-            self._sc, self.config.google_sheets_id, _WEEKLY_ROLLUP_HEADER,
-        )
+        return self._ws(sheets.WEEKLY_ROLLUP_WORKSHEET, _WEEKLY_ROLLUP_HEADER)
 
     def get_weekly_rollup_history(self) -> list[models.WeekScore]:
         """Every row in the Weekly Rollup tab, mapped back to WeekScore.
@@ -1542,22 +2227,19 @@ class Repository:
         return bool(self.config.garmin_email and self.config.garmin_password)
 
     def _garmin_daily_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.GARMIN_DAILY_WORKSHEET, _GARMIN_DAILY_HEADER,
-        )
+        return self._ws(sheets.GARMIN_DAILY_WORKSHEET, _GARMIN_DAILY_HEADER)
 
     def _garmin_activities_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.GARMIN_ACTIVITIES_WORKSHEET, _GARMIN_ACTIVITY_HEADER,
-        )
+        return self._ws(sheets.GARMIN_ACTIVITIES_WORKSHEET, _GARMIN_ACTIVITY_HEADER)
+
+    def _garmin_sleep_stages_ws(self):
+        return self._ws(sheets.GARMIN_SLEEP_STAGES_WORKSHEET, _GARMIN_SLEEP_STAGES_HEADER)
+
+    def _sleep_fusion_ws(self):
+        return self._ws(sheets.SLEEP_FUSION_WORKSHEET, _SLEEP_FUSION_HEADER)
 
     def _session_hr_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.SESSION_HR_WORKSHEET, _SESSION_HR_HEADER,
-        )
+        return self._ws(sheets.SESSION_HR_WORKSHEET, _SESSION_HR_HEADER)
 
     # ── Heart-rate load (Edwards' TRIMP) ─────────────────────────────────
 
@@ -1768,6 +2450,18 @@ class Repository:
             })
         return sorted(out, key=lambda r: r["date"])
 
+    def get_all_session_hr_rows(self) -> list[dict]:
+        """Every column of every persisted Session HR row, unmapped (unlike
+        get_session_hr_history, which narrows to the subset services/hr_load
+        consumers need and drops activity_id/start_time_local/
+        duration_minutes/total_minutes) — for services.datastore's session_hr
+        table. zone_minutes_json/per_exercise_json stay undecoded (opaque
+        TEXT), same as the live tab."""
+        try:
+            return self._read_records(self._session_hr_ws())
+        except Exception:
+            return []
+
     def sync_session_hr_for_date(self, d: date, hr_rest: float | None = None) -> bool:
         """Compute + persist HR load for the session logged on `d`. False when
         there's no session, no timestamps, or no matching Garmin activity —
@@ -1794,15 +2488,34 @@ class Repository:
         self.save_session_hr(summary)
         return True
 
+    def _garmin_raw_day(self, client, d: date) -> dict:
+        """The four Garmin fetches for one day, done ONCE. Split out from
+        _garmin_daily_row so the same payloads feed both the Garmin Daily row
+        and the Garmin Sleep Stages row — capturing sleep stages therefore
+        costs zero additional API calls, which matters on an unofficial API
+        that rate-limits by IP."""
+        return {
+            "summary": garmin.get_daily_summary(client, d),
+            "sleep": garmin.get_sleep_data(client, d),
+            "stress": garmin.get_stress_data(client, d),
+            "hrv": garmin.get_hrv_data(client, d),
+        }
+
     def _garmin_daily_row(self, client, d: date) -> dict:
+        """Unchanged public behaviour — fetches, then extracts. Kept as a thin
+        wrapper so existing callers and tests are unaffected by the
+        _garmin_raw_day split."""
+        return self._garmin_daily_row_from_raw(self._garmin_raw_day(client, d), d)
+
+    def _garmin_daily_row_from_raw(self, raw: dict, d: date) -> dict:
         """Field names here are Garmin's well-known (but unofficial, and
         occasionally-shifting) daily-summary/sleep/stress JSON shape. Every
         lookup is defensive — a missing/renamed key yields a blank cell
         rather than breaking the whole sync."""
-        summary = garmin.get_daily_summary(client, d)
-        sleep = garmin.get_sleep_data(client, d)
-        stress = garmin.get_stress_data(client, d)
-        hrv = garmin.get_hrv_data(client, d)
+        summary = raw.get("summary") or {}
+        sleep = raw.get("sleep") or {}
+        stress = raw.get("stress") or {}
+        hrv = raw.get("hrv") or {}
 
         # Unverified against a live payload — hrvSummary.lastNightAvg matches
         # garminconnect's commonly-documented /hrv-service/hrv/{date} shape.
@@ -1839,12 +2552,713 @@ class Repository:
             "hrv_ms": hrv_ms,
         }
 
-    def sync_garmin_daily(self, days: int = 7, today: date | None = None) -> int:
+    def _garmin_sleep_stages_row(self, raw: dict, d: date) -> dict:
+        """One night's sleepLevels segments, from the SAME payload
+        _garmin_daily_row_from_raw consumes — so capturing stage data costs no
+        extra Garmin calls.
+
+        Segments are stored losslessly as JSON. The derived per-stage seconds
+        alongside them exist purely so totals_match can compare them against
+        dailySleepDTO's own totals: the activityLevel->stage mapping was
+        confirmed on a single night, and this turns a future Garmin schema
+        drift into a visible flag rather than a quietly wrong hypnogram.
+        services/sleep_fusion.py refuses any night where it is false.
+
+        Movement (sleepMovement) rides in this same payload, so capturing it
+        costs no extra calls either — which matters against an unofficial API
+        that rate-limits by IP. Unlike the stage segments it CANNOT be stored
+        losslessly (~78-84k chars against a 50,000-char cell limit), so it is
+        reduced to a gap-filled regular grid by
+        services/sleep_movement.py::parse_garmin_movement. See
+        _GARMIN_SLEEP_STAGES_HEADER for why gap-FILLING rather than
+        gap-flagging is the load-bearing part."""
+        sleep = raw.get("sleep") or {}
+        dto = sleep.get("dailySleepDTO") or {}
+        segments = sleep.get("sleepLevels") or []
+        movement = sleep_movement.parse_garmin_movement(sleep.get("sleepMovement"))
+
+        derived = {sleep_fusion.DEEP: 0.0, sleep_fusion.LIGHT: 0.0,
+                   sleep_fusion.REM: 0.0, sleep_fusion.AWAKE: 0.0}
+        for seg in segments:
+            stage = sleep_fusion.GARMIN_LEVEL_TO_STAGE.get(_float_or_none(seg.get("activityLevel")))
+            start = sleep_fusion.utc_from_gmt_string(seg.get("startGMT"))
+            end = sleep_fusion.utc_from_gmt_string(seg.get("endGMT"))
+            if stage is None or start is None or end is None:
+                continue
+            derived[stage] += abs((end - start).total_seconds())
+
+        dto_totals = {
+            sleep_fusion.DEEP: dto.get("deepSleepSeconds"),
+            sleep_fusion.LIGHT: dto.get("lightSleepSeconds"),
+            sleep_fusion.REM: dto.get("remSleepSeconds"),
+            sleep_fusion.AWAKE: dto.get("awakeSleepSeconds"),
+        }
+        # 180s tolerance. Segment bounds are minute-rounded, so exact equality
+        # flags healthy nights — the real 2026-07-28 payload lands 60s out on
+        # light sleep alone. A genuinely wrong mapping (two stages swapped)
+        # would be out by hundreds of minutes, so this stays a real check.
+        totals_match = bool(segments) and all(
+            v is not None and abs(derived[k] - float(v)) <= 180.0
+            for k, v in dto_totals.items()
+        )
+
+        return {
+            "date": str(d),
+            "sleep_start_gmt": dto.get("sleepStartTimestampGMT", ""),
+            "sleep_end_gmt": dto.get("sleepEndTimestampGMT", ""),
+            "utc_offset_minutes": sleep_fusion.utc_offset_minutes(
+                dto.get("sleepStartTimestampGMT"), dto.get("sleepStartTimestampLocal")),
+            "segment_count": len(segments),
+            "deep_seconds": int(derived[sleep_fusion.DEEP]),
+            "light_seconds": int(derived[sleep_fusion.LIGHT]),
+            "rem_seconds": int(derived[sleep_fusion.REM]),
+            "awake_seconds": int(derived[sleep_fusion.AWAKE]),
+            "dto_deep_seconds": dto_totals[sleep_fusion.DEEP],
+            "dto_light_seconds": dto_totals[sleep_fusion.LIGHT],
+            "dto_rem_seconds": dto_totals[sleep_fusion.REM],
+            "dto_awake_seconds": dto_totals[sleep_fusion.AWAKE],
+            "totals_match": totals_match,
+            "sleep_levels_json": json.dumps(segments),
+            "movement_start_gmt": (
+                movement["start_utc"].isoformat() if movement["start_utc"] else ""),
+            "movement_interval_seconds": movement["interval_seconds"],
+            "movement_slot_count": len(movement["levels"]),
+            "movement_contiguous": movement["contiguous"],
+            "movement_gap_slots": movement["gap_slots"],
+            "movement_levels": sleep_movement.encode_levels(movement["levels"]),
+            "sleep_hr_json": _json_or_blank(sleep.get("sleepHeartRate")),
+            "sleep_stress_json": _json_or_blank(sleep.get("sleepStress")),
+        }
+
+    def upsert_garmin_sleep_stages_row(self, row: dict) -> None:
+        values = [row.get(k, "") if row.get(k) is not None else "" for k in _GARMIN_SLEEP_STAGES_HEADER]
+        sheets.upsert_row_by_key(
+            self._garmin_sleep_stages_ws(), key_col=1, key_value=str(row["date"]), row_values=values)
+
+    def rebuild_tab(self, worksheet, header: list[str], fresh: dict[str, dict] | None = None,
+                    key: str = "date", numericise_ignore: list | None = None) -> int:
+        """Rewrite a whole date-keyed tab against the CURRENT header, merging
+        `fresh` over whatever is already stored.
+
+        The only way to WIDEN a tab, and the fix for a specific recurring bug:
+        get_or_create_worksheet writes the header ONLY when it creates the tab,
+        and upsert_row_by_key overwrites just the first len(row_values) columns
+        of one row and never touches row 1. So adding a column to a _HEADER
+        constant writes values into an unheadered column from then on, and
+        gspread's get_all_records — which maps by header — silently drops them.
+
+        That is not hypothetical. It had already happened to hrv_ms on the
+        Garmin Daily tab: the column was added to _GARMIN_DAILY_HEADER, every
+        sync since has written a value into column J, and every read has
+        discarded it, so services/biometrics.py's documented Oura-70/Garmin-30
+        HRV blend has silently been 100% Oura.
+
+        Rows present and not in `fresh` are carried through, so the output is
+        always a superset. Batched for the same reason sync_sleep_fusion is:
+        per-row upserts cost two API calls each and walk into Sheets'
+        60-writes-per-minute quota.
+        """
+        merged = {
+            _sheet_key(r.get(key)): r
+            for r in self._read_records(worksheet, numericise_ignore=numericise_ignore)
+            if _sheet_key(r.get(key))
+        }
+        merged.update(fresh or {})
+        rows = [
+            ["" if merged[d].get(c) is None else merged[d].get(c, "") for c in header]
+            for d in sorted(merged)
+        ]
+        sheets.rewrite_worksheet(worksheet, header, rows)
+        return len(rows)
+
+    def rebuild_garmin_sleep_stages(self, fresh: dict[str, dict] | None = None) -> int:
+        return self.rebuild_tab(
+            self._garmin_sleep_stages_ws(), _GARMIN_SLEEP_STAGES_HEADER, fresh,
+            numericise_ignore=_GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE)
+
+    def rebuild_garmin_daily(self, fresh: dict[str, dict] | None = None) -> int:
+        """Re-header the Garmin Daily tab so hrv_ms stops being written into a
+        column no read can see. Existing rows keep their values; the recovered
+        column simply becomes readable for future syncs."""
+        return self.rebuild_tab(self._garmin_daily_ws(), _GARMIN_DAILY_HEADER, fresh)
+
+    def get_all_garmin_sleep_stages_rows(self) -> list[dict]:
+        """Every row in the Garmin Sleep Stages tab, unmapped and undecoded
+        (sleep_levels_json/movement_levels stay opaque TEXT, exactly as the
+        tab holds them) — for services.datastore's garmin_sleep_stages
+        table. Unlike get_garmin_sleep_stages above, this must NOT decode:
+        the datastore is a faithful copy, and decoding here would bake a
+        parsing choice into storage — the same reason the tab stores
+        sleep_levels_json losslessly instead of a derived minute-string."""
+        return self._read_records(
+            self._garmin_sleep_stages_ws(),
+            numericise_ignore=_GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE)
+
+    def get_all_sleep_fusion_rows(self) -> list[dict]:
+        """Every row in the Sleep Fusion tab, unmapped — for
+        services.datastore's sleep_fusion table. Goes through the same
+        numericise_ignore as every other read of this tab, so the hypnogram
+        and movement strings arrive as strings."""
+        return self._read_records(
+            self._sleep_fusion_ws(), numericise_ignore=_SLEEP_FUSION_NUMERICISE_IGNORE)
+
+    def get_garmin_sleep_stages_dates(self) -> set[str]:
+        """Dates the Garmin Sleep Stages tab already holds — lets the backfill
+        script resume, mirroring get_garmin_daily_dates."""
+        try:
+            rows = self._read_records(
+                self._garmin_sleep_stages_ws(),
+                numericise_ignore=_GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE)
+        except Exception:
+            return set()
+        return {_sheet_key(r.get("date")) for r in rows if _sheet_key(r.get("date"))}
+
+    def get_garmin_sleep_stages(self, start: str | None = None,
+                                 end: str | None = None) -> dict[str, dict]:
+        """{date: row} from the Garmin Sleep Stages tab, with `segments`
+        decoded back out of JSON and `movement` decoded back into a gap-filled
+        level grid. Read-only, no Garmin API calls."""
+        try:
+            rows = self._read_records(
+                self._garmin_sleep_stages_ws(),
+                numericise_ignore=_GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE)
+        except Exception:
+            return {}
+        out: dict[str, dict] = {}
+        for r in rows:
+            d = _sheet_key(r.get("date"))
+            if not d or (start and d < start) or (end and d > end):
+                continue
+            row = dict(r)
+            try:
+                row["segments"] = json.loads(r.get("sleep_levels_json") or "[]")
+            except (ValueError, TypeError):
+                row["segments"] = []
+            # Rebuilt into the same shape parse_garmin_movement returns, so a
+            # caller cannot tell whether the night came from a live payload or
+            # from storage — the round trip is the point of encode_levels.
+            row["movement"] = {
+                "start_utc": sleep_fusion.utc_from_gmt_string(r.get("movement_start_gmt")),
+                "interval_seconds": int(
+                    _float_or_none(r.get("movement_interval_seconds"))
+                    or sleep_movement.GARMIN_INTERVAL_SECONDS),
+                "levels": sleep_movement.decode_levels(r.get("movement_levels")),
+                "contiguous": str(r.get("movement_contiguous", "")).upper() != "FALSE",
+                "gap_slots": int(_float_or_none(r.get("movement_gap_slots")) or 0),
+            }
+            out[d] = row
+        return out
+
+    # ─────────────────────────────────────────────────────────────────────
+    #  Sleep Fusion — merged Oura+Garmin hypnogram (services/sleep_fusion.py)
+    #
+    #  Reads ONLY the two already-synced Sheet tabs. No Garmin or Oura API
+    #  calls, which means fusion is immune to the Garmin 429 problem and can
+    #  be recomputed freely whenever sleep_fusion.RULES_VERSION changes.
+    #  Display-only by design: nothing here feeds services/engine.py.
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _oura_hypnograms_by_date(self, start: str, end: str) -> dict[str, dict]:
+        """{day: main sleep period} for nights carrying a 30-second hypnogram.
+        Uses the same biometrics.pick_main_sleep_period gate as
+        _oura_sleep_metrics_by_date, so fusion describes exactly the period
+        the rest of the engine already treats as the night."""
+        rows = self._oura_tab_records("sleep_periods", self._oura_sleep_periods_ws())
+        by_day: dict[str, list[dict]] = {}
+        for r in rows:
+            day = str(r.get("day") or "")
+            if day and start <= day <= end:
+                by_day.setdefault(day, []).append(r)
+        out: dict[str, dict] = {}
+        for day, entries in by_day.items():
+            main = biometrics.pick_main_sleep_period(entries)
+            if main is None or not str(main.get("sleep_phase_30_sec") or "").strip():
+                continue
+            out[day] = {**main, "periods_on_day": len(entries)}
+        return out
+
+    def get_sleep_night_details(self, start: str, end: str) -> dict[str, dict]:
+        """{day: night detail} for the Home page's Sleep drill-down — every
+        field it displays that the ENGINE does not read.
+
+        Deliberately separate from _oura_sleep_metrics_by_date rather than
+        widening it: BiometricRecord is asdict()-ed into 60+ rows held in
+        st.cache_data and walked by compute_readiness / traffic_light /
+        sync_metrics_history, so carrying a 1,800-char hypnogram through that
+        hot path to render one strip would be pure dead weight. This is read
+        only when the drill-down is actually open.
+
+        Uses the same biometrics.pick_main_sleep_period gate, so it describes
+        exactly the period the engine already treats as the night."""
+        rows = self._oura_tab_records("sleep_periods", self._oura_sleep_periods_ws())
+        by_day: dict[str, list[dict]] = {}
+        for r in rows:
+            day = str(r.get("day") or "")
+            if day and start <= day <= end:
+                by_day.setdefault(day, []).append(r)
+
+        out: dict[str, dict] = {}
+        for day, entries in by_day.items():
+            main = biometrics.pick_main_sleep_period(entries)
+            if main is None:
+                continue
+            out[day] = {
+                "period_type": main.get("type") or "",
+                "period_index": _float_or_none(main.get("period")),
+                "periods_on_day": len(entries),
+                "bedtime_start": main.get("bedtime_start") or "",
+                "bedtime_end": main.get("bedtime_end") or "",
+                "total_seconds": _float_or_none(main.get("total_sleep_duration")),
+                "time_in_bed_seconds": _float_or_none(main.get("time_in_bed")),
+                "awake_seconds": _float_or_none(main.get("awake_time")),
+                "deep_seconds": _float_or_none(main.get("deep_sleep_duration")),
+                "light_seconds": _float_or_none(main.get("light_sleep_duration")),
+                "rem_seconds": _float_or_none(main.get("rem_sleep_duration")),
+                "efficiency": _float_or_none(main.get("efficiency")),
+                "latency_seconds": _float_or_none(main.get("latency")),
+                "restless_periods": _float_or_none(main.get("restless_periods")),
+                "average_heart_rate": _float_or_none(main.get("average_heart_rate")),
+                "lowest_heart_rate": _float_or_none(main.get("lowest_heart_rate")),
+                "average_hrv": _float_or_none(main.get("average_hrv")),
+                "average_breath": _float_or_none(main.get("average_breath")),
+                "oura_readiness_score": _float_or_none(main.get("readiness_score")),
+                "temperature_deviation": _float_or_none(main.get("readiness_temperature_deviation")),
+                "hypnogram_30sec": str(main.get("sleep_phase_30_sec") or ""),
+                # Overnight series, captured with the movement columns. Oura
+                # ships these as {"interval": 300.0, "items": [...],
+                # "timestamp": ...} — ~109 samples and ~730 chars, so they
+                # ride along in the same read rather than costing another.
+                "hr_series": _json_or(main.get("sleep_hr_series"), {}),
+                "hrv_series": _json_or(main.get("sleep_hrv_series"), {}),
+                "movement_30sec": str(main.get("movement_30_sec") or ""),
+            }
+        return out
+
+    def get_oura_daily_sleep_context(self, start: str, end: str) -> dict[str, dict]:
+        """The sleep-adjacent Oura Daily columns the engine never reads —
+        blood-oxygen and breathing. Stored since the schema widened; nothing
+        has surfaced them until now."""
+        try:
+            rows = self._read_records(self._oura_daily_ws())
+        except Exception:
+            return {}
+        out: dict[str, dict] = {}
+        for r in rows:
+            d = _sheet_key(r.get("date"))
+            if not d or not (start <= d <= end):
+                continue
+            out[d] = {
+                "spo2_average": _float_or_none(r.get("spo2_average")),
+                "breathing_disturbance_index": _float_or_none(
+                    r.get("spo2_breathing_disturbance_index")),
+                "optimal_bedtime": r.get("sleep_time_optimal_bedtime") or "",
+            }
+        return out
+
+    def _match_garmin_night(self, day: str, window_start, window_end,
+                            garmin_by_date: dict[str, dict]) -> tuple[dict | None, float]:
+        """Which Garmin night IS this Oura night, and how well do they overlap.
+
+        Oura keys a night by its wake date, Garmin by its own — never assume
+        they agree. Searches the neighbouring days and takes the best genuine
+        overlap; a silent one-day mismatch would produce a completely wrong
+        but entirely plausible-looking hypnogram, the worst failure available
+        here.
+
+        Extracted so the movement calibration pairs nights by exactly the same
+        rule the hypnogram fusion does. Two copies of this logic that drifted
+        apart would calibrate the movement mapping against different nights
+        than it is then applied to, which is the one way quantile mapping
+        silently produces a biased result.
+        """
+        best, best_overlap = None, 0.0
+        if window_start is None:
+            return best, best_overlap
+        for offset in (-1, 0, 1):
+            candidate = garmin_by_date.get(str(date.fromisoformat(day) + timedelta(days=offset)))
+            if not candidate or not candidate.get("segments"):
+                continue
+            if str(candidate.get("totals_match")).strip().lower() not in ("true", "1"):
+                # Our activityLevel->stage mapping didn't reproduce Garmin's
+                # own totals for this night — refuse rather than fuse against
+                # a mapping we can't verify.
+                continue
+            segs = candidate["segments"]
+            starts = [s for s in (sleep_fusion.utc_from_gmt_string(x.get("startGMT")) for x in segs) if s]
+            ends = [e for e in (sleep_fusion.utc_from_gmt_string(x.get("endGMT")) for x in segs) if e]
+            if not starts or not ends:
+                continue
+            frac = sleep_fusion.window_overlap_fraction(
+                window_start, window_end, min(starts), max(ends))
+            if frac > best_overlap:
+                best, best_overlap = candidate, frac
+        return best, best_overlap
+
+    def sleep_movement_cutpoints(self, oura_by_date: dict[str, dict],
+                                 garmin_by_date: dict[str, dict]
+                                 ) -> tuple[float, float, float] | None:
+        """Fit Garmin's movement scale onto Oura's published 1-4 alphabet.
+
+        Oura reports an ordinal class, Garmin an undocumented float — see
+        services/sleep_movement.py's docstring for why quantile mapping onto
+        Oura is the only defensible direction. Fitted ONCE over the whole
+        paired history and passed down to every night, never per night: a
+        per-night fit would make a calm night's "restless" mean something
+        different from a rough night's, and the classes would stop being
+        comparable across the very series the UI plots.
+
+        Returns None when there is too little paired history
+        (sleep_movement.MIN_CALIBRATION_NIGHTS), so callers fall back to
+        Oura-only movement rather than to an invented scale.
+        """
+        garmin_values: list[float] = []
+        oura_classes: list[int] = []
+        nights = 0
+        for day, main in oura_by_date.items():
+            classes = sleep_movement.oura_movement(main.get("movement_30_sec"))
+            if not classes:
+                continue
+            window_start = sleep_fusion.utc_from_iso_offset(main.get("bedtime_start"))
+            if window_start is None:
+                continue
+            window_end = window_start + timedelta(seconds=len(classes) * sleep_movement.SLOT_SECONDS)
+            best, overlap = self._match_garmin_night(
+                day, window_start, window_end, garmin_by_date)
+            if best is None or overlap < sleep_fusion.MIN_WINDOW_OVERLAP_FRACTION:
+                continue
+            parsed = best.get("movement") or {}
+            if not parsed.get("levels"):
+                continue
+            # Aligned to the SAME window and grid fusion will use — not the
+            # raw level array. Garmin's movement series is ~2.7x wider than
+            # the Oura sleep period, so calibrating on the raw array matches
+            # Oura's sleep-period classes against Garmin's whole evening and
+            # pushes every boundary too high. See
+            # sleep_movement.garmin_values_on_grid for the measured effect.
+            aligned, _diag = sleep_movement.garmin_values_on_grid(
+                parsed, window_start, len(classes))
+            paired = [(v, c) for v, c in zip(aligned, classes) if v is not None]
+            if not paired:
+                continue
+            nights += 1
+            garmin_values.extend(v for v, _ in paired)
+            oura_classes.extend(c for _, c in paired)
+        return sleep_movement.quantile_cutpoints(garmin_values, oura_classes, nights=nights)
+
+    def compute_sleep_fusion_for_date(self, day: str, oura_by_date: dict[str, dict],
+                                       garmin_by_date: dict[str, dict],
+                                       movement_cutpoints: tuple[float, float, float] | None = None,
+                                       ) -> dict | None:
+        """One night's fused hypnogram, or None when neither device has one.
+        Pure lookup + services/sleep_fusion.py math — no I/O."""
+        main = oura_by_date.get(day)
+        oura_min = sleep_fusion.oura_minutes(main.get("sleep_phase_30_sec")) if main else []
+
+        if not oura_min:
+            # No ring reading. Fall back to the watch alone rather than
+            # returning nothing: the two devices are not worn equally, and
+            # over the Garmin era 27 of 71 nights had watch stage data and no
+            # ring reading at all. Anchored on Garmin's OWN window, since
+            # there is no bedtime_start to anchor on.
+            return self._garmin_only_night(day, garmin_by_date, movement_cutpoints)
+
+        window_start = sleep_fusion.utc_from_iso_offset(main.get("bedtime_start"))
+        window_end = (window_start + timedelta(minutes=len(oura_min))) if window_start else None
+
+        best, best_overlap = self._match_garmin_night(
+            day, window_start, window_end, garmin_by_date)
+        best_diag: dict = {}
+
+        garmin_min = None
+        if best is not None and best_overlap >= sleep_fusion.MIN_WINDOW_OVERLAP_FRACTION:
+            garmin_min, best_diag = sleep_fusion.garmin_minutes(
+                best["segments"], window_start, len(oura_min))
+
+        # Movement is fused FIRST: RULES_VERSION 2's staging rules read it, so
+        # the motion series has to exist before the hypnogram is decided.
+        movement_cols, fused_slots = self._fuse_movement_for_night(
+            main, best, best_overlap, window_start, len(oura_min), movement_cutpoints)
+
+        summary = sleep_fusion.night_summary(
+            day=day, window_start=window_start, oura=oura_min, garmin=garmin_min,
+            offset_minutes=_float_or_none(best.get("utc_offset_minutes")) if best else None,
+            oura_periods_on_day=main.get("periods_on_day", 1),
+            garmin_diagnostics=best_diag,
+            overlap_fraction=best_overlap if garmin_min else 0.0,
+            # Reduced 30s -> 60s by max, onto the hypnogram's own grid.
+            movement=sleep_movement.to_minutes(fused_slots) if fused_slots else None,
+        )
+        return {**summary, **movement_cols}
+
+    def _matched_garmin_date(self, day: str, main: dict,
+                             garmin_by_date: dict[str, dict]) -> str | None:
+        """Which Garmin date a paired night consumed — Oura keys a night by
+        its wake date and Garmin by its own, so the two are often a day apart.
+
+        Recomputes the window rather than threading the answer back out of
+        compute_sleep_fusion_for_date, whose return value maps 1:1 onto the
+        Sheet header and must not grow a key that is not a column. Costs
+        nothing: it is pure lookup over dicts already in memory, for the ~26
+        fused nights only."""
+        oura_min = sleep_fusion.oura_minutes(main.get("sleep_phase_30_sec"))
+        window_start = sleep_fusion.utc_from_iso_offset(main.get("bedtime_start"))
+        if not oura_min or window_start is None:
+            return None
+        best, _overlap = self._match_garmin_night(
+            day, window_start, window_start + timedelta(minutes=len(oura_min)), garmin_by_date)
+        return _sheet_key(best.get("date")) if best else None
+
+    def _garmin_only_night(self, day: str, garmin_by_date: dict[str, dict],
+                           movement_cutpoints: tuple[float, float, float] | None,
+                           ) -> dict | None:
+        """A night the watch recorded and the ring did not.
+
+        Anchored on Garmin's own sleepStartTimestampGMT rather than a
+        bedtime_start that does not exist. Keyed by Garmin's own date, which
+        is safe from double-counting because sync_sleep_fusion only asks for
+        this on days no Oura night claimed — see its `claimed` set.
+
+        Deliberately still goes through sleep_fusion.night_summary with an
+        empty Oura array rather than hand-building a row: the totals, the
+        encoding and the persisted shape then come from exactly one place, and
+        `source` comes out as SOURCE_GARMIN_ONLY by the same rule that decides
+        it everywhere else.
+        """
+        night = garmin_by_date.get(day)
+        if not night or not night.get("segments"):
+            return None
+        if str(night.get("totals_match")).strip().lower() not in ("true", "1"):
+            # Same refusal as the paired path: an unverifiable activityLevel
+            # -> stage mapping must not become a plausible-looking hypnogram.
+            return None
+
+        starts = [s for s in (sleep_fusion.utc_from_gmt_string(x.get("startGMT"))
+                              for x in night["segments"]) if s]
+        ends = [e for e in (sleep_fusion.utc_from_gmt_string(x.get("endGMT"))
+                            for x in night["segments"]) if e]
+        if not starts or not ends:
+            return None
+        window_start = min(starts)
+        minutes = max(1, int(round((max(ends) - window_start).total_seconds() / 60)))
+        garmin_min, diag = sleep_fusion.garmin_minutes(night["segments"], window_start, minutes)
+        if not any(m != sleep_fusion.UNCOVERED for m in garmin_min):
+            return None
+
+        movement_cols, _slots = self._fuse_movement_for_night(
+            {}, night, 1.0, window_start, minutes, movement_cutpoints)
+        summary = sleep_fusion.night_summary(
+            day=day, window_start=window_start, oura=[], garmin=garmin_min,
+            offset_minutes=_float_or_none(night.get("utc_offset_minutes")),
+            oura_periods_on_day=0, garmin_diagnostics=diag, overlap_fraction=0.0,
+        )
+        return {**summary, **movement_cols}
+
+    def _fuse_movement_for_night(self, main: dict, garmin_night: dict | None,
+                                 overlap: float, window_start, stage_minutes: int,
+                                 cutpoints: tuple[float, float, float] | None,
+                                 ) -> tuple[dict, list[int]]:
+        """The movement half of one night, on the SAME window_start as the
+        hypnogram so the two strips share a time axis and can never disagree
+        on screen about when the night began.
+
+        Runs on the 30-second grid — the finer of the two devices' — because
+        downsampling Oura to Garmin's minute would discard real resolution to
+        accommodate the coarser sensor. Oura's own movement string sets the
+        slot count where it exists; only when it doesn't do we fall back to
+        the stage grid's own span.
+
+        Returns (columns, fused_slots). The slots come back separately because
+        the staging rules consume them at minute resolution while the stored
+        column keeps the full 30-second series — reducing once, at the point
+        of use, rather than storing the reduced form and losing the detail the
+        tick strip draws.
+        """
+        oura_slots = sleep_movement.oura_movement(main.get("movement_30_sec"))
+        slot_count = len(oura_slots) or stage_minutes * 2
+
+        garmin_slots: list[int] | None = None
+        if (garmin_night is not None
+                and overlap >= sleep_fusion.MIN_WINDOW_OVERLAP_FRACTION
+                and cutpoints is not None):
+            parsed = garmin_night.get("movement") or {}
+            if parsed.get("levels"):
+                garmin_slots, _diag = sleep_movement.garmin_slots(
+                    parsed, cutpoints, window_start, slot_count)
+
+        fused, source = sleep_movement.fuse_movement(oura_slots, garmin_slots)
+        return {
+            **sleep_movement.movement_summary(fused, source),
+            "master_movement": sleep_fusion.encode(fused),
+            "oura_movement": sleep_fusion.encode(oura_slots),
+            "garmin_movement": sleep_fusion.encode(garmin_slots or []),
+            # Persisted per night so a stored series always says which
+            # calibration produced it — the movement counterpart of
+            # rules_version, and the thing that makes a re-fit auditable
+            # rather than a silent change of meaning.
+            "movement_cutpoints": (
+                ",".join(f"{c:.3f}" for c in cutpoints) if cutpoints else ""),
+        }, fused
+
+    def save_sleep_fusion(self, summary: dict) -> None:
+        row = {**summary, "computed_at": datetime.now().isoformat(timespec="seconds")}
+        values = [row.get(k, "") if row.get(k) is not None else "" for k in _SLEEP_FUSION_HEADER]
+        sheets.upsert_row_by_key(
+            self._sleep_fusion_ws(), key_col=1, key_value=str(row["date"]), row_values=values)
+
+    def sync_sleep_fusion(self, days: int = 7, today: date | None = None) -> dict:
+        """Recompute and persist fused hypnograms for the last `days` days.
+
+        Writes as ONE batched rewrite rather than a row-per-night upsert: a
+        full-history rebuild is ~400 nights, and upserting costs two API calls
+        each, which would blow straight through Sheets' 60-writes-per-minute
+        quota. Batched, sync_sleep_fusion(days=1000) is a handful of calls and
+        is the intended way to re-derive everything after a
+        sleep_fusion.RULES_VERSION bump.
+
+        Nights outside the window keep their existing rows — the output is
+        always a superset of what was there. Reads only Sheets, never a device
+        API. Returns {source: count} for the nights recomputed."""
+        today = today or date.today()
+        start = (today - timedelta(days=days - 1)).isoformat()
+        end = today.isoformat()
+        oura_by_date = self._oura_hypnograms_by_date(start, end)
+        garmin_by_date = self.get_garmin_sleep_stages()
+
+        # Fitted over the WHOLE paired history, not just this sync's window,
+        # and over the same nights the mapping is then applied to. A window
+        # narrower than the history would refit the scale on every sync and
+        # make yesterday's "restless" incomparable with last month's.
+        cutpoints = self.sleep_movement_cutpoints(
+            self._oura_hypnograms_by_date("0000-01-01", end), garmin_by_date)
+
+        fresh: dict[str, dict] = {}
+        counts: dict[str, int] = {}
+        stamp = datetime.now().isoformat(timespec="seconds")
+
+        # Ring nights first. Each one may consume a Garmin night keyed up to a
+        # day either side, which is then off-limits to the watch-only pass —
+        # otherwise a paired night would be emitted twice, once under Oura's
+        # wake date and once under Garmin's own, and the same sleep would be
+        # counted as two nights.
+        claimed: set[str] = set()
+        for day in sorted(oura_by_date):
+            summary = self.compute_sleep_fusion_for_date(
+                day, oura_by_date, garmin_by_date, movement_cutpoints=cutpoints)
+            if summary is None:
+                continue
+            fresh[day] = {**summary, "computed_at": stamp}
+            counts[summary["source"]] = counts.get(summary["source"], 0) + 1
+            if summary["source"] == sleep_fusion.SOURCE_FUSED:
+                matched = self._matched_garmin_date(day, oura_by_date[day], garmin_by_date)
+                if matched:
+                    claimed.add(matched)
+            claimed.add(day)
+
+        # Then nights only the watch recorded. Strictly additive: every day
+        # here had no usable ring hypnogram, so nothing above is overwritten.
+        for day in sorted(garmin_by_date):
+            if day in claimed or day in fresh or not (start <= day <= end):
+                continue
+            summary = self._garmin_only_night(day, garmin_by_date, cutpoints)
+            if summary is None:
+                continue
+            fresh[day] = {**summary, "computed_at": stamp}
+            counts[summary["source"]] = counts.get(summary["source"], 0) + 1
+
+        ws = self._sleep_fusion_ws()
+        merged = {
+            _sheet_key(r.get("date")): r
+            for r in self.get_sleep_fusion_history()
+            if _sheet_key(r.get("date"))
+        }
+        merged.update(fresh)
+        rows = [
+            ["" if merged[d].get(c) is None else merged[d].get(c, "") for c in _SLEEP_FUSION_HEADER]
+            for d in sorted(merged)
+        ]
+        sheets.rewrite_worksheet(ws, _SLEEP_FUSION_HEADER, rows)
+        return counts
+
+    def get_sleep_fusion_history(self, start: str | None = None,
+                                  end: str | None = None) -> list[dict]:
+        """Persisted fused nights, oldest first. Reads with the hypnogram
+        columns exempted from numericising — mandatory, see
+        _SLEEP_FUSION_NUMERICISE_IGNORE.
+
+        RAISES on a read failure rather than returning []. It used to swallow
+        the exception, and that produced two bad outcomes that were extremely
+        hard to trace:
+
+          - app.py wraps this in @st.cache_data(ttl=1800). A transient Sheets
+            error returned [], which cached as "this night has no fusion" for
+            THIRTY MINUTES — the drill-down then labelled a genuinely fused
+            night "Stage timeline from Oura" long after the error had passed,
+            with nothing anywhere reporting a failure. An exception is not
+            cached, so the next render simply retries.
+          - sync_sleep_fusion merges THIS result with freshly computed nights
+            before a full-tab rewrite. An empty read there would have silently
+            dropped every night outside the sync window from the tab.
+
+        Callers that genuinely want "no data on failure" must say so
+        themselves; the distinction between empty and broken is not this
+        method's to erase.
+        """
+        rows = self._read_records(
+            self._sleep_fusion_ws(), numericise_ignore=_SLEEP_FUSION_NUMERICISE_IGNORE)
+        out = []
+        for r in rows:
+            d = _sheet_key(r.get("date"))
+            if not d or (start and d < start) or (end and d > end):
+                continue
+            out.append({**r, "date": d})
+        return sorted(out, key=lambda r: r["date"])
+
+    def get_fused_wake_adjustments(self, start: str | None = None,
+                                    end: str | None = None) -> dict[str, float]:
+        """{date: minutes} of Oura wake the fusion reclassified as sleep —
+        already in the manual wake_time_adjustments unit, which is what lets
+        sleep_fusion.effective_wake_adjustments treat them as interchangeable.
+        Only genuinely fused nights contribute; an oura_only night has nothing
+        to say and must not override a manual correction."""
+        out: dict[str, float] = {}
+        for r in self.get_sleep_fusion_history(start, end):
+            if str(r.get("source")) != sleep_fusion.SOURCE_FUSED:
+                continue
+            minutes = _float_or_none(r.get("phantom_wake_minutes"))
+            if minutes:
+                out[r["date"]] = minutes
+        return out
+
+    def _garmin_daily_complete_dates(self) -> set[str]:
+        """Past dates already fully captured in BOTH Garmin tabs. A completed
+        past day never changes, so re-fetching it is 4 wasted API calls
+        against an endpoint that rate-limits by IP."""
+        stages = self.get_garmin_sleep_stages_dates()
+        try:
+            rows = self._read_records(self._garmin_daily_ws())
+        except Exception:
+            return set()
+        daily = {
+            _sheet_key(r.get("date")) for r in rows
+            if _sheet_key(r.get("date")) and str(r.get("sleep_hours", "")).strip() != ""
+        }
+        return daily & stages
+
+    def sync_garmin_daily(self, days: int = 7, today: date | None = None,
+                          force: bool = False) -> int:
         """Pull the last `days` days of Garmin daily wellness metrics and
-        upsert each into the Garmin Daily sheet tab, keyed by date. Returns
-        the number of days synced. Raises RuntimeError if Garmin isn't
-        configured, or whatever garminconnect raises on a real login/API
-        failure — the caller (views/sync.py) surfaces that as an error."""
+        upsert each into the Garmin Daily sheet tab, keyed by date. Also
+        captures that day's sleep-stage segments from the same payload, at no
+        extra API cost. Returns the number of days actually fetched.
+
+        Skips past days already complete in both tabs (`force` overrides).
+        Before this, a days=7 sync spent 28 API calls every 2 hours almost
+        entirely on re-fetching immutable history — the likeliest cause of the
+        429 IP rate-limits this account has been hitting.
+
+        Raises RuntimeError if Garmin isn't configured, or whatever
+        garminconnect raises on a real login/API failure — the caller
+        (views/sync.py) surfaces that as an error."""
         client = self._gc
         if client is None:
             raise RuntimeError(
@@ -1852,13 +3266,22 @@ class Repository:
                 "to .streamlit/secrets.toml."
             )
         today = today or date.today()
+        complete = set() if force else self._garmin_daily_complete_dates()
         ws = self._garmin_daily_ws()
+        fetched = 0
         for delta in range(days):
             d = today - timedelta(days=delta)
-            row = self._garmin_daily_row(client, d)
+            # Today and yesterday are still mutable — Garmin backfills sleep
+            # and stress well after midnight — so they always re-sync.
+            if delta > 1 and str(d) in complete:
+                continue
+            raw = self._garmin_raw_day(client, d)
+            row = self._garmin_daily_row_from_raw(raw, d)
             values = [row.get(k, "") for k in _GARMIN_DAILY_HEADER]
             sheets.upsert_row_by_key(ws, key_col=1, key_value=str(d), row_values=values)
-        return days
+            self.upsert_garmin_sleep_stages_row(self._garmin_sleep_stages_row(raw, d))
+            fetched += 1
+        return fetched
 
     def sync_garmin_daily_if_due(self, days: int = 7, today: date | None = None,
                                   hours: int = 2, now: datetime | None = None) -> tuple[bool, str | None]:
@@ -1888,6 +3311,11 @@ class Repository:
         try:
             if self.has_checked_in(today):
                 return True, None
+            if self.garmin_rate_limited(now=now):
+                # Circuit breaker open. Retrying a throttled endpoint on every
+                # page load is exactly how a transient 429 becomes a
+                # persistent one, so this is "nothing to do", not an error.
+                return True, None
             raw = self.get_config_value("garmin_daily_last_synced_at")
             if raw:
                 try:
@@ -1899,8 +3327,34 @@ class Repository:
             self.sync_garmin_daily(days=days, today=today)
             self.set_config("garmin_daily_last_synced_at", now.isoformat(), today=today)
             return True, None
+        except garmin.RateLimited as exc:
+            self.open_garmin_rate_limit_breaker(now=now, today=today)
+            return True, f"Garmin rate-limited — backing off until {self.get_config_value('garmin_rate_limited_until')}. ({exc})"
         except Exception as exc:
             return False, str(exc)
+
+    # ─── Garmin 429 circuit breaker ──────────────────────────────────────
+    #  Garmin's API is unofficial and throttles by IP. Without a breaker every
+    #  page open retries a throttled endpoint, which sustains the limit
+    #  indefinitely — the failure mode observed 2026-07-31.
+
+    GARMIN_RATE_LIMIT_BACKOFF_HOURS = 6
+
+    def garmin_rate_limited(self, now: datetime | None = None) -> bool:
+        raw = self.get_config_value("garmin_rate_limited_until")
+        if not raw:
+            return False
+        try:
+            until = datetime.fromisoformat(raw)
+        except ValueError:
+            return False
+        return (now or datetime.now()) < until
+
+    def open_garmin_rate_limit_breaker(self, now: datetime | None = None,
+                                        today: date | None = None) -> str:
+        until = (now or datetime.now()) + timedelta(hours=self.GARMIN_RATE_LIMIT_BACKOFF_HOURS)
+        self.set_config("garmin_rate_limited_until", until.isoformat(), today=today)
+        return until.isoformat()
 
     def _garmin_activity_row(self, act: dict) -> dict:
         activity_type = (act.get("activityType") or {}).get("typeKey", "")
@@ -1975,6 +3429,15 @@ class Repository:
                 return round(duration_min, 1), [act]
         return 0.0, []
 
+    def get_all_garmin_daily_rows(self) -> list[dict]:
+        """Every row in the Garmin Daily tab, unmapped (gspread's own
+        dict-per-row parsing) — for services.datastore's garmin_daily table."""
+        return self._read_records(self._garmin_daily_ws())
+
+    def get_all_garmin_activities_rows(self) -> list[dict]:
+        """Every row in the Garmin Activities tab, unmapped — for
+        services.datastore's garmin_activities table."""
+        return self._read_records(self._garmin_activities_ws())
 
     # ─────────────────────────────────────────────────────────────────────
     #  Oura — daily summary scores + workouts/sleep periods/sessions/rest
@@ -1993,29 +3456,19 @@ class Repository:
         return bool(self.config.oura_token)
 
     def _oura_daily_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_DAILY_WORKSHEET, _OURA_DAILY_HEADER,
-        )
+        return self._ws(sheets.OURA_DAILY_WORKSHEET, _OURA_DAILY_HEADER)
 
     def _oura_workouts_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_WORKOUTS_WORKSHEET, _OURA_WORKOUT_HEADER,
-        )
+        return self._ws(sheets.OURA_WORKOUTS_WORKSHEET, _OURA_WORKOUT_HEADER)
 
     def _oura_sleep_periods_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_SLEEP_PERIODS_WORKSHEET, _OURA_SLEEP_PERIOD_HEADER,
-        )
+        return self._ws(sheets.OURA_SLEEP_PERIODS_WORKSHEET, _OURA_SLEEP_PERIOD_HEADER)
 
     def _oura_sessions_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_SESSIONS_WORKSHEET, _OURA_SESSION_HEADER,
-        )
+        return self._ws(sheets.OURA_SESSIONS_WORKSHEET, _OURA_SESSION_HEADER)
 
     def _oura_rest_mode_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_REST_MODE_WORKSHEET, _OURA_REST_MODE_HEADER,
-        )
+        return self._ws(sheets.OURA_REST_MODE_WORKSHEET, _OURA_REST_MODE_HEADER)
 
     def _oura_daily_row(self, date_str: str, group: dict) -> dict:
         """group: {endpoint_name: entry_dict} for ONE date — see
@@ -2117,11 +3570,19 @@ class Repository:
         }
 
     def _oura_sleep_period_row(self, s: dict) -> dict:
-        """Scalars plus the two ring hypnograms. Still excludes the embedded
-        heart_rate/hrv/movement_30_sec time-series (same high-volume exclusion
-        as the top-level heartrate endpoint) — but NOT the hypnograms, which
-        are one string per night rather than a per-sample series, so they cost
-        a column instead of the rows those series would add."""
+        """Scalars, the two ring hypnograms, the movement series, and the
+        overnight HR/HRV series.
+
+        The old blanket exclusion of every embedded time-series was too coarse.
+        What actually justifies excluding the top-level heartrate endpoint is
+        its ROW COUNT, not the fact that it is a series: these three are one
+        cell per night each (movement ~1.8k chars, HR and HRV ~730 chars as
+        JSON at a 300-second interval), so they cost a column on exactly the
+        same terms as the hypnograms rather than the rows a per-sample table
+        would add. Measured against 414 archived nights.
+
+        Still excluded: the top-level heartrate and met endpoints, which are
+        genuinely per-sample across the whole day."""
         readiness = s.get("readiness") or {}
         return {
             "sleep_id": s.get("id", ""),
@@ -2155,6 +3616,9 @@ class Repository:
             # edits, so it describes the UI, not the measurement.
             "sleep_phase_5_min": s.get("sleep_phase_5_min", ""),
             "sleep_phase_30_sec": s.get("sleep_phase_30_sec", ""),
+            "movement_30_sec": s.get("movement_30_sec", ""),
+            "sleep_hr_series": _json_or_blank(s.get("heart_rate")),
+            "sleep_hrv_series": _json_or_blank(s.get("hrv")),
         }
 
     def _oura_session_row(self, s: dict) -> dict:
@@ -2219,13 +3683,69 @@ class Repository:
              _OURA_REST_MODE_HEADER, self._oura_rest_mode_row),
         )
 
+    # ─────────────────────────────────────────────────────────────────────
+    #  Short-lived worksheet read cache
+    #
+    #  One Sleep drill-down render was reading Oura Daily 3x, Oura Sleep
+    #  Periods 2x and Sleep Fusion 2x — 10 tab reads where 6 would do,
+    #  because get_biometric_rolling, get_effective_wake_adjustments and the
+    #  drill-down's own fetches each open the same tabs independently.
+    #
+    #  Correctness rests on two things: the cache is keyed on
+    #  sheets.write_generation(), so ANY write anywhere in the process
+    #  invalidates every cached read (no call site has to remember to
+    #  invalidate); and it expires after _READ_CACHE_TTL_SECONDS, which
+    #  bounds staleness from writes made OUTSIDE this process. That TTL is
+    #  far tighter than the 30-minute @st.cache_data the pages already wrap
+    #  these reads in, so nothing gets staler than it was before.
+    # ─────────────────────────────────────────────────────────────────────
+
+    _READ_CACHE_TTL_SECONDS = 30.0
+
+    def _read_records(self, ws, numericise_ignore: list | None = None) -> list[dict]:
+        key = (getattr(ws, "title", id(ws)), tuple(numericise_ignore or ()))
+        entry = self._read_cache.get(key)
+        now = time.monotonic()
+        if (entry is not None
+                and entry[0] == sheets.write_generation()
+                and now - entry[1] < self._READ_CACHE_TTL_SECONDS):
+            return entry[2]
+        rows = sheets.get_worksheet_records(ws, numericise_ignore=numericise_ignore)
+        self._read_cache[key] = (sheets.write_generation(), now, rows)
+        return rows
+
     def _oura_tab_records(self, key: str, ws) -> list[dict]:
         """Reads an Oura tab with that tab's digit-string columns exempted
         from gspread's numericising (see _OURA_NUMERICISE_IGNORE) — the only
         safe way to read a tab holding hypnograms."""
-        return sheets.get_worksheet_records(
-            ws, numericise_ignore=_OURA_NUMERICISE_IGNORE.get(key),
-        )
+        return self._read_records(ws, numericise_ignore=_OURA_NUMERICISE_IGNORE.get(key))
+
+    def get_all_oura_daily_rows(self) -> list[dict]:
+        """Every row in the Oura Daily tab, unmapped — for services.datastore's
+        oura_daily table."""
+        return self._read_records(self._oura_daily_ws())
+
+    def get_all_oura_workouts_rows(self) -> list[dict]:
+        """Every row in the Oura Workouts tab — for services.datastore's
+        oura_workouts table."""
+        return self._oura_tab_records("workouts", self._oura_workouts_ws())
+
+    def get_all_oura_sleep_periods_rows(self) -> list[dict]:
+        """Every row in the Oura Sleep Periods tab, via _oura_tab_records so
+        the hypnogram columns (sleep_phase_5_min/sleep_phase_30_sec) stay
+        exempted from gspread's numericising — for services.datastore's
+        oura_sleep_periods table."""
+        return self._oura_tab_records("sleep_periods", self._oura_sleep_periods_ws())
+
+    def get_all_oura_sessions_rows(self) -> list[dict]:
+        """Every row in the Oura Sessions tab — for services.datastore's
+        oura_sessions table."""
+        return self._oura_tab_records("sessions", self._oura_sessions_ws())
+
+    def get_all_oura_rest_mode_rows(self) -> list[dict]:
+        """Every row in the Oura Rest Mode tab — for services.datastore's
+        oura_rest_mode table."""
+        return self._oura_tab_records("rest_mode_periods", self._oura_rest_mode_ws())
 
     def _oura_tab_specs(self) -> list[tuple]:
         """Every Oura output tab as (result_key, worksheet_getter, header) —
@@ -2459,6 +3979,13 @@ def _timeseries_total(val) -> float | int | None:
     return None
 
 
+def _float_or_none(val) -> float | None:
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
 def _sheet_key(val) -> str:
     """Normalises a key-column value for comparison across a round trip
     through Sheets — a date written as "2023-07-04" can read back as
@@ -2484,6 +4011,22 @@ def _json_or(raw, default):
         return json.loads(raw)
     except (TypeError, ValueError):
         return default
+
+
+def _json_or_blank(value) -> str:
+    """Serialise a nested structure for a single cell, blank when there is
+    nothing to store. The write-direction counterpart to _json_or.
+
+    Writing a dict or list straight into a cell is a hard Sheets 400 — the
+    failure _oura_session_row's motion_count hit in production. Anything that
+    will not serialise degrades to blank rather than raising, so one odd field
+    costs a cell and not the whole night's row."""
+    if value is None or value == "" or value == [] or value == {}:
+        return ""
+    try:
+        return json.dumps(value, separators=(",", ":"))
+    except (TypeError, ValueError):
+        return ""
 
 
 def _sheet_float(val) -> float | None:

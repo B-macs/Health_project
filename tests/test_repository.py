@@ -38,8 +38,8 @@ class _FakePages:
         self.created.append({"parent": parent, "properties": properties, "id": page_id})
         return {"id": page_id}
 
-    def update(self, page_id, properties):
-        self.updated.append({"page_id": page_id, "properties": properties})
+    def update(self, page_id, properties=None, archived=None):
+        self.updated.append({"page_id": page_id, "properties": properties, "archived": archived})
         return {"id": page_id}
 
     def retrieve(self, page_id):
@@ -294,6 +294,76 @@ def test_get_recent_sessions_computes_actual_sets_and_volume():
     ex = sessions[0].exercises[0]
     assert ex.actual_sets == 2
     assert ex.total_volume_kg == 320.0  # 8*20 + 8*20
+
+
+# ─── get_all_training_exercises_raw (services.mirror's training source) ────
+
+def test_get_all_training_exercises_raw_computes_actual_sets_and_total_volume():
+    page = {"id": "page-ex-1", "properties": {
+        "Session Date": _date_prop("2026-07-07"), "Session ID": _rich_text_prop("2026-07-07-abcd1234"),
+        "Session Duration": _number_prop(30), "Session RPE": _number_prop(5), "Session AU": _number_prop(150),
+        "Movement": _title_prop("RDL"), "Type": _select_prop("Hip Hinge"),
+        "Planned Sets": _number_prop(3), "Planned Reps": _number_prop(8), "Exercise RPE": _number_prop(5),
+        "Sets": _rich_text_prop(json.dumps([{"reps": 8, "weight": 20.0}, {"reps": 8, "weight": 20.0}])),
+    }}
+    repo = _repo({"db-training": [page]})
+    rows = repo.get_all_training_exercises_raw()
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["exercise_id"] == "page-ex-1"
+    assert row["session_id"] == "2026-07-07-abcd1234"
+    assert row["actual_sets"] == 2
+    assert row["total_volume_kg"] == 320.0
+    assert row["sets"] == [{"reps": 8, "weight": 20.0}, {"reps": 8, "weight": 20.0}]
+
+
+def test_get_all_training_exercises_raw_falls_back_to_empty_sets_on_malformed_json():
+    page = {"id": "page-ex-2", "properties": {
+        "Session Date": _date_prop("2026-07-07"), "Movement": _title_prop("RDL"),
+        "Sets": _rich_text_prop("not valid json"),
+    }}
+    repo = _repo({"db-training": [page]})
+    row = repo.get_all_training_exercises_raw()[0]
+    assert row["sets"] == []
+    assert row["actual_sets"] == 0
+    assert row["total_volume_kg"] == 0.0
+
+
+def test_get_all_training_exercises_raw_is_unwindowed():
+    repo = _repo({"db-training": []})
+    repo.get_all_training_exercises_raw()
+    query = repo._notion_client.databases.queries[-1]
+    assert "filter" not in query
+    assert "sorts" not in query
+
+
+def test_get_all_training_exercises_raw_includes_optional_garmin_and_ai_fields_when_present():
+    page = {"id": "page-ex-3", "properties": {
+        "Session Date": _date_prop("2026-07-07"), "Movement": _title_prop("Row"),
+        "Sets": _rich_text_prop("[]"),
+        "Activity Avg HR": _number_prop(128), "Activity Max HR": _number_prop(150),
+        "Activity Distance (km)": _number_prop(5.2), "Activity Calories": _number_prop(300),
+        "Note Summary": _rich_text_prop("felt strong"), "Sentiment": _number_prop(0.8),
+        "Flagged Areas": _rich_text_prop(json.dumps(["lower_back"])), "Warning": _select_prop("monitor"),
+    }}
+    repo = _repo({"db-training": [page]})
+    row = repo.get_all_training_exercises_raw()[0]
+    assert row["garmin_avg_hr"] == 128.0
+    assert row["garmin_max_hr"] == 150.0
+    assert row["garmin_distance_km"] == 5.2
+    assert row["garmin_calories"] == 300.0
+    assert row["note_summary"] == "felt strong"
+    assert row["sentiment_score"] == 0.8
+    assert row["flagged_body_parts"] == json.dumps(["lower_back"])
+    assert row["warning_level"] == "monitor"
+
+
+def test_get_all_training_exercises_raw_defaults_blank_session_id_to_empty_string():
+    page = {"id": "page-ex-4", "properties": {
+        "Session Date": _date_prop("2026-07-07"), "Movement": _title_prop("Plank"), "Sets": _rich_text_prop("[]"),
+    }}
+    repo = _repo({"db-training": [page]})
+    assert repo.get_all_training_exercises_raw()[0]["session_id"] == ""
 
 
 # ─── get_last_performance ───────────────────────────────────────────────────
@@ -580,6 +650,191 @@ def test_save_check_in_maps_hsd_gut_hydration_meditation_fields():
     assert props["Meditation Done"] == {"checkbox": True}
     assert props["Meditation Minutes"] == {"number": 10.0}
     assert props["Relaxation Depth"] == {"number": 4.0}
+
+
+# ─── Check-In merge-upsert (second same-day submission) ─────────────────
+
+def _existing_check_in_page(page_id="page-1", **overrides):
+    props = {
+        "Date": _date_prop("2026-07-31"), "Condition": _select_prop("Good"),
+        "Tightness": _number_prop(3), "Pain": _number_prop(1),
+        "Body Areas": {"multi_select": [{"name": "Glute — Right"}]},
+        "Sensations": {"multi_select": [{"name": "Tight"}]},
+        "Note": _rich_text_prop("Old note"), "Alcohol Units": _number_prop(0),
+        "Travel": _checkbox_prop(False), "Stress Level": _number_prop(2),
+        "Instability Events": _number_prop(0), "Bristol Type": _number_prop(4),
+        "Unusual Stool Colour": _checkbox_prop(False),
+        "Hunger Deviation": _number_prop(0), "Thirst Intensity": _number_prop(1),
+        "Electrolytes Taken": _checkbox_prop(False),
+        "Meditation Minutes": _number_prop(0), "Relaxation Depth": _number_prop(1),
+        "Parsed": _checkbox_prop(True),
+    }
+    props.update(overrides)
+    return {"id": page_id, "properties": props}
+
+
+def test_save_check_in_upsert_fills_blank_field_without_erasing_others():
+    """A same-day follow-up that only sets meditation minutes (everything
+    else left at its untouched-widget default) updates the existing page
+    in place rather than creating a duplicate, and doesn't blank out the
+    real values already recorded on it."""
+    repo = _repo({"db-readiness": [_existing_check_in_page()]})
+    record = models.CheckInRecord(
+        date="2026-07-31", current_condition="Excellent", tightness_score=0, pain_score=0,
+        meditation_done=True, meditation_minutes=10,
+    )
+    repo.save_check_in(record)
+    assert repo._notion_client.pages.created == []
+    update = repo._notion_client.pages.updated[0]
+    assert update["page_id"] == "page-1"
+    props = update["properties"]
+    assert props["Condition"] == {"select": {"name": "Good"}}
+    assert props["Tightness"] == {"number": 3.0}
+    assert props["Pain"] == {"number": 1.0}
+    assert props["Meditation Minutes"] == {"number": 10.0}
+    assert props["Meditation Done"] == {"checkbox": True}
+
+
+def test_save_check_in_upsert_explicit_new_value_overwrites_old_value():
+    """A field that IS filled in on the follow-up (differs from its
+    default) is treated as an intentional correction and wins, even though
+    the existing page already had a different, non-default value there."""
+    repo = _repo({"db-readiness": [_existing_check_in_page()]})
+    record = models.CheckInRecord(
+        date="2026-07-31", current_condition="Excellent", tightness_score=6, pain_score=0,
+    )
+    repo.save_check_in(record)
+    props = repo._notion_client.pages.updated[0]["properties"]
+    assert props["Tightness"] == {"number": 6.0}
+
+
+def test_save_check_in_upsert_resets_parsed_when_note_text_changes():
+    repo = _repo({"db-readiness": [_existing_check_in_page()]})
+    record = models.CheckInRecord(
+        date="2026-07-31", current_condition="Excellent", tightness_score=0, pain_score=0,
+        subjective_tightness="New note text",
+    )
+    repo.save_check_in(record)
+    props = repo._notion_client.pages.updated[0]["properties"]
+    assert props["Note"] == {"rich_text": [{"text": {"content": "New note text"}}]}
+    assert props["Parsed"] == {"checkbox": False}
+
+
+def test_save_check_in_upsert_keeps_parsed_when_note_unchanged():
+    repo = _repo({"db-readiness": [_existing_check_in_page()]})
+    record = models.CheckInRecord(
+        date="2026-07-31", current_condition="Excellent", tightness_score=0, pain_score=0,
+    )
+    repo.save_check_in(record)
+    props = repo._notion_client.pages.updated[0]["properties"]
+    assert "Parsed" not in props
+
+
+def test_save_check_in_creates_new_page_when_no_existing_entry_for_date():
+    repo = _repo({"db-readiness": []})
+    record = models.CheckInRecord(
+        date="2026-07-31", current_condition="Excellent", tightness_score=0, pain_score=0,
+    )
+    repo.save_check_in(record)
+    assert repo._notion_client.pages.updated == []
+    assert len(repo._notion_client.pages.created) == 1
+
+
+# ─── One-off historical duplicate cleanup (scripts/merge_duplicate_checkins.py) ──
+
+def _dupe_page(page_id, created_time, **prop_overrides):
+    props = {
+        "Date": _date_prop("2026-07-31"), "Condition": _select_prop("Excellent"),
+        "Tightness": _number_prop(0), "Pain": _number_prop(0),
+        "Body Areas": {"multi_select": []}, "Sensations": {"multi_select": []},
+        "Note": _rich_text_prop(""), "Alcohol Units": _number_prop(0),
+        "Travel": _checkbox_prop(False), "Stress Level": _number_prop(1),
+        "Instability Events": _number_prop(0), "Bristol Type": _number_prop(4),
+        "Unusual Stool Colour": _checkbox_prop(False),
+        "Hunger Deviation": _number_prop(0), "Thirst Intensity": _number_prop(1),
+        "Electrolytes Taken": _checkbox_prop(False),
+        "Meditation Minutes": _number_prop(0), "Relaxation Depth": _number_prop(1),
+        "Parsed": _checkbox_prop(False),
+    }
+    props.update(prop_overrides)
+    return {"id": page_id, "created_time": created_time, "properties": props}
+
+
+def test_find_duplicate_check_in_dates_groups_by_date():
+    same_day = [
+        _dupe_page("page-1", "2026-07-31T07:00:00.000Z"),
+        _dupe_page("page-2", "2026-07-31T07:10:00.000Z"),
+    ]
+    single = [_dupe_page("page-3", "2026-07-30T07:00:00.000Z", **{"Date": _date_prop("2026-07-30")})]
+    repo = _repo({"db-readiness": same_day + single})
+    dupes = repo.find_duplicate_check_in_dates()
+    assert set(dupes) == {"2026-07-31"}
+    assert {p["id"] for p in dupes["2026-07-31"]} == {"page-1", "page-2"}
+
+
+def test_merge_check_in_group_fills_blank_field_from_the_other_page():
+    """Mirrors this morning's real case: a full first check-in, and a
+    second submission (later created_time) that only set meditation
+    minutes, everything else left at defaults."""
+    first = _dupe_page(
+        "page-1", "2026-07-31T07:00:00.000Z",
+        **{"Condition": _select_prop("Good"), "Tightness": _number_prop(3), "Pain": _number_prop(1)},
+    )
+    second = _dupe_page(
+        "page-2", "2026-07-31T07:10:00.000Z",
+        **{"Meditation Minutes": _number_prop(10)},
+    )
+    repo = _repo({})
+    result = repo.merge_check_in_group([first, second])
+    assert result is not None
+    primary_id, properties, archive_ids = result
+    assert primary_id == "page-1"
+    assert archive_ids == ["page-2"]
+    assert properties["Condition"] == {"select": {"name": "Good"}}
+    assert properties["Tightness"] == {"number": 3.0}
+    assert properties["Meditation Minutes"] == {"number": 10.0}
+    assert properties["Meditation Done"] == {"checkbox": True}
+
+
+def test_merge_check_in_group_unions_multi_select_fields():
+    first = _dupe_page("page-1", "2026-07-31T07:00:00.000Z",
+                        **{"Body Areas": {"multi_select": [{"name": "Glute — Right"}]}})
+    second = _dupe_page("page-2", "2026-07-31T07:10:00.000Z",
+                         **{"Body Areas": {"multi_select": [{"name": "Lower Back"}]}})
+    repo = _repo({})
+    _, properties, _ = repo.merge_check_in_group([first, second])
+    assert properties["Body Areas"] == {
+        "multi_select": [{"name": "Glute — Right"}, {"name": "Lower Back"}]
+    }
+
+
+def test_merge_check_in_group_concatenates_distinct_notes_and_resets_parsed():
+    first = _dupe_page("page-1", "2026-07-31T07:00:00.000Z",
+                        **{"Note": _rich_text_prop("mild ache"), "Parsed": _checkbox_prop(True)})
+    second = _dupe_page("page-2", "2026-07-31T07:10:00.000Z",
+                         **{"Note": _rich_text_prop("also stiff after sitting")})
+    repo = _repo({})
+    _, properties, _ = repo.merge_check_in_group([first, second])
+    assert properties["Note"] == {
+        "rich_text": [{"text": {"content": "mild ache / also stiff after sitting"}}]
+    }
+    assert properties["Parsed"] == {"checkbox": False}
+
+
+def test_merge_check_in_group_returns_none_on_genuine_scalar_conflict():
+    first = _dupe_page("page-1", "2026-07-31T07:00:00.000Z", **{"Tightness": _number_prop(3)})
+    second = _dupe_page("page-2", "2026-07-31T07:10:00.000Z", **{"Tightness": _number_prop(6)})
+    repo = _repo({})
+    assert repo.merge_check_in_group([first, second]) is None
+
+
+def test_apply_check_in_merge_updates_primary_and_archives_extras():
+    repo = _repo({})
+    repo.apply_check_in_merge("page-1", {"Tightness": {"number": 3.0}}, ["page-2", "page-3"])
+    updates = repo._notion_client.pages.updated
+    assert updates[0] == {"page_id": "page-1", "properties": {"Tightness": {"number": 3.0}}, "archived": None}
+    assert updates[1] == {"page_id": "page-2", "properties": None, "archived": True}
+    assert updates[2] == {"page_id": "page-3", "properties": None, "archived": True}
 
 
 def test_get_recent_readiness_maps_fields_and_json_encodes_lists():

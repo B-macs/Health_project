@@ -416,6 +416,65 @@ _SIGNAL_PRIORITY = {"red": 0, "yellow": 1, "grey": 2, "green": 3}
 YELLOW_THRESHOLD = 0.10   # >10% degradation → yellow
 RED_THRESHOLD    = 0.25   # >25% degradation → red
 
+# ── Body-temperature deviation (°C, Oura's raw figure vs its own personal
+#    norm) — an ABSOLUTE-threshold metric, unlike the three ratio-to-baseline
+#    metrics above, for two independent reasons:
+#
+#    1. It is already a deviation. Dividing a deviation by the mean of other
+#       deviations is meaningless, and the mean sits near zero (measured:
+#       0.034 °C over 357 nights), so the ratio explodes on ordinary days.
+#    2. A ratio metric is definitionally relative to recent history, which is
+#       exactly the property you do NOT want for a fever signal — a week of
+#       elevated temperature would raise the baseline and hide the eighth day.
+#
+#    Cut points are calibrated on 357 nights of this athlete's own history:
+#    +0.35 °C fires on 8.7% of nights, +0.60 °C on 2.0%. Deliberately
+#    one-sided — a NEGATIVE deviation (cooler than norm) is not a training
+#    risk and stays green, so this metric can only ever make the light
+#    stricter, never looser.
+TEMP_DEVIATION_YELLOW_C = 0.35
+TEMP_DEVIATION_RED_C    = 0.60
+
+# ── Baseline-drift guard ────────────────────────────────────────────────────
+# The three ratio metrics score today against a 28-day rolling mean, so a
+# slow decline is invisible to them: the baseline follows you down and
+# "green" quietly comes to mean "consistently as bad as recently" rather
+# than "well". This guard compares the recent window against the window
+# BEFORE it (disjoint, not nested — overlapping windows dampen exactly the
+# signal being measured) and reports adverse movement in the baseline itself.
+#
+# It can only ever downgrade green → yellow, never yellow → green and never
+# green → red. Drift is chronic context, not an acute reading; it justifies
+# holding volume, not prescribing rest.
+#
+# Self-clearing by construction: the comparison window rolls forward, so a
+# decline that becomes the new normal stops registering as drift after
+# roughly DRIFT_PRIOR_DAYS. That is intended — this detects "you have
+# changed recently", not "you are worse than your all-time best".
+DRIFT_RECENT_DAYS      = 28
+DRIFT_PRIOR_DAYS       = 62   # days 29-90 back: disjoint from the recent window
+DRIFT_MIN_PRIOR_DAYS   = 21   # below this the prior window is too thin to trust
+DRIFT_SEVERE_PCT       = 10.0  # one metric this far adverse → downgrade
+DRIFT_MODERATE_PCT     = 5.0   # ...or two metrics this far adverse
+
+# What a caller should pass to get_biometric_rolling() to feed the guard.
+# The windows above count ROWS, not calendar days, because a biometric row
+# only exists for a day a device was actually worn — so a calendar-day
+# window would silently shrink to nothing during a sparse stretch. This
+# figure is calendar days and is deliberately generous: measured against
+# this athlete's own history, 400 calendar days yields 97 rows, where 90
+# days yields only 39 (the ring was worn intermittently before mid-2026).
+# Over-fetching costs nothing — get_biometric_rolling reads whole tabs and
+# filters in Python either way.
+DRIFT_RECOMMENDED_FETCH_DAYS = 400
+
+# Metrics the drift guard watches: key → higher_is_better.
+_DRIFT_METRICS = {
+    "hrv_ms":               True,
+    "resting_heart_rate":   False,
+    "sleep_duration_hours": True,
+}
+
 
 def _metric_signal(value, baseline, higher_is_better: bool) -> str:
     if value is None or baseline is None or baseline == 0:
@@ -431,6 +490,20 @@ def _metric_signal(value, baseline, higher_is_better: bool) -> str:
         return "red"
 
 
+def _temperature_signal(deviation) -> str:
+    """Signal for a raw °C temperature deviation against absolute cut points.
+
+    Separate from _metric_signal because this metric carries no baseline —
+    see the TEMP_DEVIATION_* comment above for why a ratio is the wrong
+    shape here. One-sided: only warmth counts against you.
+    """
+    if deviation is None:
+        return "grey"
+    if deviation >= TEMP_DEVIATION_RED_C:    return "red"
+    if deviation >= TEMP_DEVIATION_YELLOW_C: return "yellow"
+    return "green"
+
+
 def _worst_signal(*signals) -> str:
     return min(signals, key=lambda s: _SIGNAL_PRIORITY.get(s, 2))
 
@@ -440,7 +513,104 @@ def _safe_avg(rows: list[dict], key: str):
     return sum(vals) / len(vals) if vals else None
 
 
-def traffic_light(biometric_rows: list[dict]) -> dict:
+def baseline_drift(biometric_rows: list[dict]) -> dict:
+    """Has the 28-day baseline itself moved adversely against the window
+    before it?
+
+    Returns dict with keys:
+        status        : "ok" | "insufficient_data"
+        drifted       : bool  — True when the movement is material enough to
+                        justify downgrading an otherwise-green light
+        severity      : "none" | "moderate" | "severe"
+        metrics       : per-metric {recent, prior, delta_pct, adverse_pct,
+                        adverse} — adverse_pct is signed so that POSITIVE
+                        always means "worse", whichever direction the raw
+                        metric moves in
+        prior_days    : int — how many rows backed the prior window
+        message       : str
+
+    Pure and windowless-by-index: operates on however many rows it is
+    handed, taking the last DRIFT_RECENT_DAYS as "recent" and the
+    DRIFT_PRIOR_DAYS before those as "prior". A caller passing only 28
+    rows gets status "insufficient_data" and drifted False — the guard
+    degrades to a no-op rather than guessing, which is why adding it to
+    traffic_light cannot change behaviour for any existing caller that
+    hasn't widened its window.
+    """
+    recent = biometric_rows[-DRIFT_RECENT_DAYS:]
+    prior  = biometric_rows[-(DRIFT_RECENT_DAYS + DRIFT_PRIOR_DAYS):-DRIFT_RECENT_DAYS]
+
+    if len(prior) < DRIFT_MIN_PRIOR_DAYS:
+        return {
+            "status": "insufficient_data",
+            "drifted": False,
+            "severity": "none",
+            "metrics": {},
+            "prior_days": len(prior),
+            "message": (
+                f"Need {DRIFT_MIN_PRIOR_DAYS} days of history before the current "
+                f"28-day window to detect baseline drift. Have {len(prior)}."
+            ),
+        }
+
+    metrics: dict[str, dict] = {}
+    severe = moderate = 0
+    for key, higher_is_better in _DRIFT_METRICS.items():
+        recent_avg = _safe_avg(recent, key)
+        prior_avg  = _safe_avg(prior, key)
+        if recent_avg is None or not prior_avg:
+            continue
+        delta_pct = (recent_avg - prior_avg) / prior_avg * 100.0
+        # Flip sign for lower-is-better metrics so positive always means worse
+        adverse_pct = -delta_pct if higher_is_better else delta_pct
+        if adverse_pct >= DRIFT_SEVERE_PCT:
+            severe += 1
+        elif adverse_pct >= DRIFT_MODERATE_PCT:
+            moderate += 1
+        metrics[key] = {
+            "recent":      round(recent_avg, 2),
+            "prior":       round(prior_avg, 2),
+            "delta_pct":   round(delta_pct, 1),
+            "adverse_pct": round(adverse_pct, 1),
+            "adverse":     adverse_pct >= DRIFT_MODERATE_PCT,
+        }
+
+    if severe >= 1:
+        severity = "severe"
+    elif (moderate + severe) >= 2:
+        severity = "severe" if severe else "moderate"
+    elif moderate >= 1:
+        severity = "moderate"
+    else:
+        severity = "none"
+
+    # One severe metric, or any two adverse metrics, is enough to act on.
+    drifted = severe >= 1 or (moderate + severe) >= 2
+
+    worst = sorted(metrics.items(), key=lambda kv: -kv[1]["adverse_pct"])
+    if drifted and worst:
+        detail = ", ".join(
+            f"{k} {v['delta_pct']:+.1f}%" for k, v in worst if v["adverse"]
+        )
+        message = (
+            f"Your 28-day baseline has moved against you vs the previous "
+            f"{len(prior)} days ({detail}). Today reads 'normal' against a "
+            f"baseline that is itself declining."
+        )
+    else:
+        message = "28-day baseline is stable against the preceding window."
+
+    return {
+        "status": "ok",
+        "drifted": drifted,
+        "severity": severity,
+        "metrics": metrics,
+        "prior_days": len(prior),
+        "message": message,
+    }
+
+
+def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = None) -> dict:
     """
     Evaluate daily biometrics against rolling baselines.
 
@@ -448,12 +618,37 @@ def traffic_light(biometric_rows: list[dict]) -> dict:
         biometric_rows: list of dicts from get_biometric_rolling(), sorted
                         ascending by date. Must include: hrv_ms,
                         resting_heart_rate, sleep_duration_hours.
+                        oura_temperature_deviation is optional — absent or
+                        None simply greys that one metric, exactly as a
+                        missing HRV reading already does.
+
+        drift_rows:     longer history for the baseline-drift guard, which
+                        needs rows from BEFORE the current 28-day baseline
+                        window to have anything to compare against. Fetch it
+                        with get_biometric_rolling(days=
+                        DRIFT_RECOMMENDED_FETCH_DAYS).
+
+                        A separate parameter rather than "just pass a longer
+                        biometric_rows" on purpose: callers routinely hand
+                        the SAME list to readiness.compute_readiness, whose
+                        sleep_baseline widens from a 28- to a 56-night window
+                        once enough rows are present — so silently lengthening
+                        the shared list would move readiness scores as a side
+                        effect of enabling a traffic-light feature. Opting in
+                        explicitly keeps the two independent.
+
+                        None (the default) falls back to biometric_rows, under
+                        which a typical 28-row list yields status
+                        "insufficient_data" and the guard is a no-op. Existing
+                        callers therefore see no behaviour change.
 
     Returns dict with keys:
         overall         : "green" | "yellow" | "red" | "grey"
         status          : "ok" | "insufficient_data"
         volume_multiplier_from_traffic : float
         metrics         : dict per metric with value/baseline/signal/delta_pct
+        drift           : baseline_drift() result (see that function)
+        drift_applied   : bool — True when drift actually downgraded `overall`
         data_days       : int
         message         : str
     """
@@ -465,6 +660,8 @@ def traffic_light(biometric_rows: list[dict]) -> dict:
             "status": "insufficient_data",
             "volume_multiplier_from_traffic": 1.0,
             "metrics": {},
+            "drift": baseline_drift(drift_rows if drift_rows is not None else biometric_rows),
+            "drift_applied": False,
             "data_days": len(biometric_rows),
             "message": f"Need {MIN_DAYS} days of biometric data to activate. "
                        f"Currently have {len(biometric_rows)}.",
@@ -497,7 +694,46 @@ def traffic_light(biometric_rows: list[dict]) -> dict:
             "higher_is_better": higher,
         }
 
+    # Fourth metric: body-temperature deviation. Absolute cut points, no
+    # baseline — see the TEMP_DEVIATION_* block for why. Shaped identically
+    # to the three above so every existing consumer that iterates
+    # `metrics` renders it without a change; baseline_28d is None because
+    # the reading is ALREADY a deviation from Oura's own personal norm.
+    temp_dev = today.get("oura_temperature_deviation")
+    temp_sig = _temperature_signal(temp_dev)
+    # Unlike the three required metrics, a MISSING temperature reading does
+    # not grey the overall light. Temperature is Oura-exclusive (the Garmin
+    # 645 reports skinTempDataExists False on 53/53 archived nights), so
+    # folding a grey into _worst_signal would turn every ring-off night grey
+    # — degrading the light for a device gap rather than a physiological
+    # one. Contributes only when it has something to say, which keeps the
+    # one-way-stricter property intact.
+    if temp_sig != "grey":
+        signals.append(temp_sig)
+    metrics["oura_temperature_deviation"] = {
+        "label":        "Body temp",
+        "unit":         "°C",
+        "value":        temp_dev,
+        "baseline_28d": None,
+        "signal":       temp_sig,
+        "delta_pct":    None,
+        "higher_is_better": False,
+        "absolute_thresholds": {
+            "yellow": TEMP_DEVIATION_YELLOW_C,
+            "red":    TEMP_DEVIATION_RED_C,
+        },
+    }
+
     overall = _worst_signal(*signals)
+
+    # Baseline-drift guard — strictly one-directional: green → yellow only.
+    # Never touches yellow or red (already at-or-below where drift would put
+    # it) and never upgrades anything, so it cannot loosen a guardrail.
+    drift = baseline_drift(drift_rows if drift_rows is not None else biometric_rows)
+    drift_applied = drift["drifted"] and overall == "green"
+    if drift_applied:
+        overall = "yellow"
+
     vol_mult = {"green": 1.0, "yellow": 0.75, "red": 0.0, "grey": 1.0}[overall]
 
     messages = {
@@ -506,14 +742,24 @@ def traffic_light(biometric_rows: list[dict]) -> dict:
         "red":    "Biometrics significantly degraded. Rest or mobility only.",
         "grey":   "Some metrics unavailable. Engine using available data.",
     }
+    message = drift["message"] if drift_applied else messages[overall]
+    if temp_sig in ("yellow", "red") and overall == temp_sig:
+        message = (
+            f"Body temperature {temp_dev:+.2f} °C vs your personal norm. "
+            + ("Possible illness onset — no loaded training today."
+               if temp_sig == "red" else
+               "Elevated. Hold volume and re-check tomorrow.")
+        )
 
     return {
         "overall":  overall,
         "status":   "ok",
         "volume_multiplier_from_traffic": vol_mult,
         "metrics":  metrics,
+        "drift":    drift,
+        "drift_applied": drift_applied,
         "data_days": len(biometric_rows),
-        "message":  messages[overall],
+        "message":  message,
     }
 
 

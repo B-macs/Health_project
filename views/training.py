@@ -846,13 +846,19 @@ def _engine_directive() -> dict:
     try:
         r        = repo.get_repository()
         bio      = [asdict(b) for b in r.get_biometric_rolling(days=28)]
+        # Separate, deliberately wide fetch feeding ONLY the baseline-drift
+        # guard — see engine.traffic_light's drift_rows docstring for why this
+        # can't just be a longer `bio`. Same underlying Sheets reads either
+        # way (get_biometric_rolling reads whole tabs and filters in Python).
+        drift    = [asdict(b) for b in
+                    r.get_biometric_rolling(days=engine.DRIFT_RECOMMENDED_FETCH_DAYS)]
         au       = r.get_daily_session_au_weighted(28)
         diag     = r.get_diagnostic_profile()
         stage    = r.get_current_stage()
         streak   = r.get_pain_free_streak()
         tight    = r.get_avg_tightness(14)
         lam      = float(diag.get("injury_weight_decay_lambda") or 0.05)
-        tl       = engine.traffic_light(bio)
+        tl       = engine.traffic_light(bio, drift_rows=drift)
         acwr_r   = engine.acwr(au, stage)
         inj_w    = engine.injury_weight(lam, streak)
         obs_rem  = engine.observation_days_remaining(tl["data_days"])
