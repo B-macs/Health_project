@@ -42,6 +42,22 @@ st.set_page_config(
 # so the sidebar never becomes visible during load.
 st.markdown(nav.CHROME_CSS, unsafe_allow_html=True)
 
+# ─── Offline-datastore banner ─────────────────────────────────────────────────
+# HEALTH_DATASTORE_PATH makes every Sheets read come from a local snapshot
+# (services/clients/datastore_reader.py) — for iterating without spending the
+# 60-per-minute Sheets quota. It is deliberately unmissable and rendered
+# BEFORE the router, so it appears at the top of every page: an app that
+# looks live while serving a snapshot of last night's sleep is the one
+# failure this mode must never produce silently. Costs nothing when unset.
+if repo.get_repository().offline:
+    _built = repo.get_repository().datastore_built_at() or "unknown"
+    st.warning(
+        f"**Offline** — reading the local datastore, not Google Sheets. "
+        f"Snapshot built {_built}. Writes are disabled and today's data may "
+        f"be missing. Unset `HEALTH_DATASTORE_PATH` to go live.",
+        icon="🗄️",
+    )
+
 # ─── SPA Router ───────────────────────────────────────────────────────────────
 # Primary: session_state["_nav_page"] set by nav trigger buttons (WebSocket rerun,
 #          no page reload, same connection).

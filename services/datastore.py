@@ -75,6 +75,9 @@ def rebuild(repo: Repository, conn: sqlite3.Connection, now: datetime | None = N
          counts["training_sets"]) = _populate_training(repo, conn)
         counts["garmin_daily"] = _insert_rows(conn, "garmin_daily", repo.get_all_garmin_daily_rows())
         counts["garmin_activities"] = _insert_rows(conn, "garmin_activities", repo.get_all_garmin_activities_rows())
+        counts["garmin_sleep_stages"] = _insert_rows(
+            conn, "garmin_sleep_stages", repo.get_all_garmin_sleep_stages_rows())
+        counts["sleep_fusion"] = _insert_rows(conn, "sleep_fusion", repo.get_all_sleep_fusion_rows())
         counts["session_hr"] = _insert_rows(conn, "session_hr", repo.get_all_session_hr_rows())
         counts["oura_daily"] = _insert_rows(conn, "oura_daily", repo.get_all_oura_daily_rows())
         counts["oura_workouts"] = _insert_rows(conn, "oura_workouts", repo.get_all_oura_workouts_rows())

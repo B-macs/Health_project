@@ -37,6 +37,7 @@ from services import models
 from services import sessions as training_sessions
 from services import sleep_fusion
 from services import sleep_movement
+from services.clients import datastore_reader
 from services.clients import garmin
 from services.clients import local_cache
 from services.clients import notion
@@ -299,6 +300,38 @@ _METRICS_HISTORY_HEADER = [
 _WAKE_TIME_ADJUSTMENTS_HEADER = ["date", "adjustment_minutes"]
 
 
+# ─── Offline mode — Sheets tab title -> datastore table name.
+#
+#     The tab titles live in services/clients/sheets.py and the table names
+#     in services/datastore_schema.sql; this is the one place the two are
+#     tied together, for the same reason every other Sheets column name is
+#     confined to this module. Adding a tab means adding a row here AND a
+#     table to the schema, or offline reads of it silently return [] (see
+#     OfflineWorksheet.get_all_records on why empty rather than raising).
+#
+#     Sheet1 is absent on purpose: the datastore holds it MAPPED
+#     (sheet1_legacy_biometrics, models.BiometricRecord's field names), not
+#     under its raw Apple Health export headers, so it cannot be served
+#     through this generic path. _sheets_biometric_records handles it
+#     directly instead. ────────────────────────────────────────────────────
+_DATASTORE_TABLE_BY_TAB = {
+    sheets.GARMIN_DAILY_WORKSHEET: "garmin_daily",
+    sheets.GARMIN_ACTIVITIES_WORKSHEET: "garmin_activities",
+    sheets.GARMIN_SLEEP_STAGES_WORKSHEET: "garmin_sleep_stages",
+    sheets.SLEEP_FUSION_WORKSHEET: "sleep_fusion",
+    sheets.SESSION_HR_WORKSHEET: "session_hr",
+    sheets.OURA_DAILY_WORKSHEET: "oura_daily",
+    sheets.OURA_WORKOUTS_WORKSHEET: "oura_workouts",
+    sheets.OURA_SLEEP_PERIODS_WORKSHEET: "oura_sleep_periods",
+    sheets.OURA_SESSIONS_WORKSHEET: "oura_sessions",
+    sheets.OURA_REST_MODE_WORKSHEET: "oura_rest_mode",
+    sheets.BIOMETRIC_BLEND_WORKSHEET: "biometric_blend",
+    sheets.METRICS_HISTORY_WORKSHEET: "metrics_history",
+    sheets.WAKE_TIME_ADJUSTMENTS_WORKSHEET: "wake_time_adjustments",
+    sheets.WEEKLY_ROLLUP_WORKSHEET: "weekly_rollup",
+}
+
+
 class Repository:
     def __init__(self, config: Config):
         self.config = config
@@ -307,6 +340,7 @@ class Repository:
         self._garmin_client_obj = None
         self._garmin_login_attempted = False
         self._oura_token_obj = None
+        self._datastore_conn = None
         # {(tab_title, ignore_cols): (write_generation, monotonic_ts, rows)}
         self._read_cache: dict = {}
 
@@ -321,6 +355,58 @@ class Repository:
         if self._sheets_client is None:
             self._sheets_client = sheets.make_client(self.config)
         return self._sheets_client
+
+    @property
+    def offline(self) -> bool:
+        """True when this Repository serves Sheets reads from a local
+        datastore instead of the Google Sheets API. Public because the Sync
+        page has to be able to say so on screen — a page that looks live but
+        is reading a snapshot is the failure mode this whole thing has to
+        avoid."""
+        return bool(self.config.datastore_path)
+
+    @property
+    def _ds(self):
+        """Lazy read-only connection to the datastore. Opened once per
+        Repository lifetime, like every other client here."""
+        if self._datastore_conn is None:
+            self._datastore_conn = datastore_reader.connect(self.config.datastore_path)
+        return self._datastore_conn
+
+    def datastore_built_at(self) -> str | None:
+        """When the offline snapshot was built (datastore_meta.built_at), or
+        None if not offline / the marker is absent. The age of the snapshot
+        is the single most important thing to show alongside any offline
+        reading — "yesterday's data" and "a month-old copy" look identical
+        on screen otherwise."""
+        if not self.offline:
+            return None
+        try:
+            row = self._ds.execute(
+                "SELECT value FROM datastore_meta WHERE key='built_at'").fetchone()
+        except Exception:
+            return None
+        return row[0] if row else None
+
+    def _ws(self, title: str, header: list[str]):
+        """A worksheet for `title` — the real Google Sheets tab, or an
+        OfflineWorksheet over the datastore when offline. Every _*_ws()
+        getter below goes through here, which is what makes offline mode one
+        seam rather than fourteen.
+
+        Deliberately an EITHER/OR on config, never a fallback: offline mode
+        is not "use the datastore when Sheets fails". Silently serving a
+        snapshot to someone who believes they are looking at last night's
+        sleep is a worse outcome than an error, so a live read that fails
+        keeps failing.
+
+        `header` is unused offline — creating a tab is a write, and the
+        datastore's schema is fixed by datastore_schema.sql."""
+        if self.offline:
+            return datastore_reader.OfflineWorksheet(
+                self._ds, title, _DATASTORE_TABLE_BY_TAB[title])
+        return sheets.get_or_create_worksheet(
+            self._sc, self.config.google_sheets_id, title, header)
 
     @property
     def _gc(self):
@@ -1415,7 +1501,20 @@ class Repository:
 
     def get_raw_sheet_rows(self) -> list[dict]:
         """Every row in Sheet1, completely unmapped (gspread's own header-row
-        dict keys) — the Sync page's raw-passthrough preview table."""
+        dict keys) — the Sync page's raw-passthrough preview table.
+
+        Raises offline: the datastore stores Sheet1 already MAPPED (see
+        _sheets_biometric_records), so there is nothing here to pass through
+        raw. Returning the mapped columns under this method's name would be
+        a lie about what "raw passthrough" means, and returning [] would
+        read as "the legacy export is empty"."""
+        if self.offline:
+            raise datastore_reader.DatastoreReadOnlyError(
+                "get_raw_sheet_rows() has no offline equivalent — the "
+                "datastore holds Sheet1 mapped (sheet1_legacy_biometrics), "
+                "not under its raw Apple Health export headers. Use "
+                "get_all_sheet1_biometric_records() instead."
+            )
         return sheets.get_all_records(self._sc, self.config.google_sheets_id)
 
     def _sheets_biometric_records(self) -> list[models.BiometricRecord]:
@@ -1425,7 +1524,27 @@ class Repository:
         own preview-table loop (field name `sleep_hours` for the same data —
         the two had already drifted; see REFACTOR_NOTES.md). Consolidated here
         and standardized on `sleep_duration_hours`, matching what the engine
-        actually consumes."""
+        actually consumes.
+
+        Offline this reads sheet1_legacy_biometrics directly rather than
+        going through _ws(): the datastore already holds this table in
+        BiometricRecord's own field names (services/datastore.py's
+        _populate_sheet1_legacy wrote it from this very method), so the
+        mapping below has already been applied and re-applying it to the
+        mapped names would map everything to None."""
+        if self.offline:
+            rows = datastore_reader.OfflineWorksheet(
+                self._ds, sheets.WORKSHEET, "sheet1_legacy_biometrics").get_all_records()
+            return [models.BiometricRecord(
+                date=str(r.get("date") or ""),
+                hrv_ms=_sheet_float(r.get("hrv_ms")),
+                resting_heart_rate=_sheet_int(r.get("resting_heart_rate")),
+                sleep_duration_hours=_sheet_float(r.get("sleep_duration_hours")),
+                sleep_deep_hours=_sheet_float(r.get("sleep_deep_hours")),
+                active_kcal=_sheet_float(r.get("active_kcal")),
+                weight_kg=_sheet_float(r.get("weight_kg")),
+                steps=_sheet_int(r.get("steps")),
+            ) for r in rows if r.get("date")]
         raw_rows = self.get_raw_sheet_rows()
         out = []
         for row in raw_rows:
@@ -1636,10 +1755,7 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def _biometric_blend_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.BIOMETRIC_BLEND_WORKSHEET, _BIOMETRIC_BLEND_HEADER,
-        )
+        return self._ws(sheets.BIOMETRIC_BLEND_WORKSHEET, _BIOMETRIC_BLEND_HEADER)
 
     def _biometric_blend_row(self, record: models.BiometricRecord) -> dict:
         return {
@@ -1726,10 +1842,7 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def _metrics_history_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.METRICS_HISTORY_WORKSHEET, _METRICS_HISTORY_HEADER,
-        )
+        return self._ws(sheets.METRICS_HISTORY_WORKSHEET, _METRICS_HISTORY_HEADER)
 
     def _metrics_history_row(self, snapshot: dict) -> dict:
         return {
@@ -1829,10 +1942,7 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def _wake_time_adjustments_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.WAKE_TIME_ADJUSTMENTS_WORKSHEET, _WAKE_TIME_ADJUSTMENTS_HEADER,
-        )
+        return self._ws(sheets.WAKE_TIME_ADJUSTMENTS_WORKSHEET, _WAKE_TIME_ADJUSTMENTS_HEADER)
 
     def get_wake_time_adjustment(self, d: date) -> float:
         """The stored adjustment_minutes for date `d`, or 0.0 if nothing has
@@ -1902,9 +2012,7 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def _weekly_rollup_ws(self):
-        return sheets.get_or_create_weekly_rollup_worksheet(
-            self._sc, self.config.google_sheets_id, _WEEKLY_ROLLUP_HEADER,
-        )
+        return self._ws(sheets.WEEKLY_ROLLUP_WORKSHEET, _WEEKLY_ROLLUP_HEADER)
 
     def get_weekly_rollup_history(self) -> list[models.WeekScore]:
         """Every row in the Weekly Rollup tab, mapped back to WeekScore.
@@ -1963,34 +2071,19 @@ class Repository:
         return bool(self.config.garmin_email and self.config.garmin_password)
 
     def _garmin_daily_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.GARMIN_DAILY_WORKSHEET, _GARMIN_DAILY_HEADER,
-        )
+        return self._ws(sheets.GARMIN_DAILY_WORKSHEET, _GARMIN_DAILY_HEADER)
 
     def _garmin_activities_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.GARMIN_ACTIVITIES_WORKSHEET, _GARMIN_ACTIVITY_HEADER,
-        )
+        return self._ws(sheets.GARMIN_ACTIVITIES_WORKSHEET, _GARMIN_ACTIVITY_HEADER)
 
     def _garmin_sleep_stages_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.GARMIN_SLEEP_STAGES_WORKSHEET, _GARMIN_SLEEP_STAGES_HEADER,
-        )
+        return self._ws(sheets.GARMIN_SLEEP_STAGES_WORKSHEET, _GARMIN_SLEEP_STAGES_HEADER)
 
     def _sleep_fusion_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.SLEEP_FUSION_WORKSHEET, _SLEEP_FUSION_HEADER,
-        )
+        return self._ws(sheets.SLEEP_FUSION_WORKSHEET, _SLEEP_FUSION_HEADER)
 
     def _session_hr_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id,
-            sheets.SESSION_HR_WORKSHEET, _SESSION_HR_HEADER,
-        )
+        return self._ws(sheets.SESSION_HR_WORKSHEET, _SESSION_HR_HEADER)
 
     # ── Heart-rate load (Edwards' TRIMP) ─────────────────────────────────
 
@@ -2432,6 +2525,26 @@ class Repository:
         column no read can see. Existing rows keep their values; the recovered
         column simply becomes readable for future syncs."""
         return self.rebuild_tab(self._garmin_daily_ws(), _GARMIN_DAILY_HEADER, fresh)
+
+    def get_all_garmin_sleep_stages_rows(self) -> list[dict]:
+        """Every row in the Garmin Sleep Stages tab, unmapped and undecoded
+        (sleep_levels_json/movement_levels stay opaque TEXT, exactly as the
+        tab holds them) — for services.datastore's garmin_sleep_stages
+        table. Unlike get_garmin_sleep_stages above, this must NOT decode:
+        the datastore is a faithful copy, and decoding here would bake a
+        parsing choice into storage — the same reason the tab stores
+        sleep_levels_json losslessly instead of a derived minute-string."""
+        return self._read_records(
+            self._garmin_sleep_stages_ws(),
+            numericise_ignore=_GARMIN_SLEEP_STAGES_NUMERICISE_IGNORE)
+
+    def get_all_sleep_fusion_rows(self) -> list[dict]:
+        """Every row in the Sleep Fusion tab, unmapped — for
+        services.datastore's sleep_fusion table. Goes through the same
+        numericise_ignore as every other read of this tab, so the hypnogram
+        and movement strings arrive as strings."""
+        return self._read_records(
+            self._sleep_fusion_ws(), numericise_ignore=_SLEEP_FUSION_NUMERICISE_IGNORE)
 
     def get_garmin_sleep_stages_dates(self) -> set[str]:
         """Dates the Garmin Sleep Stages tab already holds — lets the backfill
@@ -3187,29 +3300,19 @@ class Repository:
         return bool(self.config.oura_token)
 
     def _oura_daily_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_DAILY_WORKSHEET, _OURA_DAILY_HEADER,
-        )
+        return self._ws(sheets.OURA_DAILY_WORKSHEET, _OURA_DAILY_HEADER)
 
     def _oura_workouts_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_WORKOUTS_WORKSHEET, _OURA_WORKOUT_HEADER,
-        )
+        return self._ws(sheets.OURA_WORKOUTS_WORKSHEET, _OURA_WORKOUT_HEADER)
 
     def _oura_sleep_periods_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_SLEEP_PERIODS_WORKSHEET, _OURA_SLEEP_PERIOD_HEADER,
-        )
+        return self._ws(sheets.OURA_SLEEP_PERIODS_WORKSHEET, _OURA_SLEEP_PERIOD_HEADER)
 
     def _oura_sessions_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_SESSIONS_WORKSHEET, _OURA_SESSION_HEADER,
-        )
+        return self._ws(sheets.OURA_SESSIONS_WORKSHEET, _OURA_SESSION_HEADER)
 
     def _oura_rest_mode_ws(self):
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, sheets.OURA_REST_MODE_WORKSHEET, _OURA_REST_MODE_HEADER,
-        )
+        return self._ws(sheets.OURA_REST_MODE_WORKSHEET, _OURA_REST_MODE_HEADER)
 
     def _oura_daily_row(self, date_str: str, group: dict) -> dict:
         """group: {endpoint_name: entry_dict} for ONE date — see

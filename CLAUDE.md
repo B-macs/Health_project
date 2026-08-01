@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1031/1031 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1052/1052 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1031/1031 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1031/1031 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1052/1052 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -111,7 +111,9 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
   I/O clients:      clients/notion.py, clients/sheets.py (generic primitives
                     only, no column/property names), clients/local_cache.py
                     (local JSON file — Oura sync-throttle marker, survives
-                    process restarts unlike st.cache_data)
+                    process restarts unlike st.cache_data),
+                    clients/datastore_reader.py (read-only SQLite stand-in
+                    for a Sheets worksheet — see "Offline mode" below)
   Data access:      repository.py — the ONLY place Notion property names /
                     Sheet column names live; ~40 methods, wraps clients/
   Config:           config.py — Config dataclass + load_config(overrides),
@@ -143,6 +145,49 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 ```
 
 ---
+
+## Offline mode — test against the datastore, not Google Sheets
+
+*Added 2026-08-01. Google Sheets allows 60 reads+writes per minute per user;
+an afternoon of iterating on one page exhausts it, and a throttled read does
+not look like an error — it looks like missing data. That already produced
+one wrong finding (a "Metrics History sleep_score is unpopulated" conclusion
+that was really a 429; 21 of 34 rows are populated, and the gap is a bounded
+2026-06-29 → 2026-07-11 window).*
+
+Set **`HEALTH_DATASTORE_PATH=datastore.db`** and every Google Sheets READ is
+served from the local snapshot instead. Not fewer API calls — **zero**,
+including the service-account auth handshake.
+
+```
+python scripts/build_datastore.py          # refresh the snapshot (one full read pass)
+HEALTH_DATASTORE_PATH=datastore.db python -m pytest tests/
+HEALTH_DATASTORE_PATH=datastore.db python -m streamlit run app.py
+```
+
+- **One seam.** All 14 tab getters go through `Repository._ws()`, which
+  returns a `datastore_reader.OfflineWorksheet` — duck-typed against
+  gspread, so `_read_records` and every call site work unmodified.
+  `tests/test_repository_offline_datastore.py` asserts all 14 route through
+  it; a getter that opens a tab directly fails that test.
+- **Writes raise**, they never silently no-op — a caller believing a sync
+  persisted is worse than a crash. The file is opened `mode=ro` as well.
+- **Either/or, never a fallback.** A failed live read keeps failing rather
+  than quietly serving a snapshot. `app.py` shows an unmissable banner with
+  the snapshot's build time on every page when offline.
+- **Fidelity is the point**, and is what the tests actually pin: blank cells
+  read back as `""` (not `None`), digit-coded hypnograms stay `str`,
+  gspread's `'TRUE'`/`'FALSE'` stay verbatim, and every header column is
+  present even when empty. Verified end-to-end against 2026-07-28: score,
+  contributors, hypnogram, movement strip, κ, cut points and vitals all
+  identical to the live values.
+- **Not covered: Notion.** `readiness_checkins`/`training_*` are in the
+  datastore but reshaped, so Notion-backed getters still hit the network.
+  Sleep/biometrics work is 100% Sheets, which is why this was worth doing
+  without solving Notion too. `get_raw_sheet_rows()` (Sheet1 raw
+  passthrough) also raises offline — the datastore holds Sheet1 mapped.
+- **Adding a tab means adding a row to `_DATASTORE_TABLE_BY_TAB` AND a table
+  to `datastore_schema.sql`**, or offline reads of it return `[]` forever.
 
 ## Key Rules (non-negotiable)
 
@@ -226,6 +271,7 @@ quiet-wake rule, and compare against the recorded 645 figures in
 | Garmin backfill | Run `scripts/backfill_garmin_from_sheet1.py` (dry-run first, then `--apply`) once to backfill pre-wearable history into the Garmin Daily tab so readiness baselines aren't starting from empty |
 | Quiet-wakefulness rule — measured, then abandoned | **Do not re-attempt without reading `services/sleep_fusion.py`'s docstring.** Best precision ~12% against a 1.9% base rate, i.e. ~88% of flagged minutes would be wrong, and REM is indistinguishable from Awake (both elevated-and-motionless). Probing found no finer HR exists on this account. The blocking problem is not sample size — it is that there is **no ground truth**: validation uses the hypnogram's own Awake labels, but the rule exists to find minutes the hypnogram did *not* label Awake. Needs PSG/EEG ground truth plus beat-to-beat intervals. |
 | Movement calibration is n=26 | `Repository.sleep_movement_cutpoints` quantile-maps Garmin's undocumented float onto Oura's 1-4 alphabet from paired nights only; currently 26, floor is 14. The ACTIVE boundary sits far into the tail and is the least stable of the three, which is why rule 7 treats class 4 as corroboration rather than proof. Re-check the fitted values as paired nights accumulate. |
+| Metrics History `sleep_score` gap | NOT a population failure — corrected 2026-08-01 by querying the datastore offline. 21 of 34 rows carry a score; exactly 13 consecutive dates are blank, **2026-06-29 → 2026-07-11**, and everything from 2026-07-12 on is populated. An earlier reading of "33 rows, all None" was a throttled Sheets read (429) misread as absent data — the exact failure the offline datastore now prevents. The 13 dates predate the column and would need a `sync_metrics_history` backfill over that window if wanted. |
 | Sleep coverage is worn-device-limited, not sensor-limited | Over the 71 nights of the Garmin era the ring recorded 27 nights and the watch 53. Fusing them plus emitting `garmin_only` nights takes stage coverage from 38% to 76% of calendar nights (+217h of sleep Oura never saw). The remaining gap is the 17 nights neither device recorded — no code change reaches those. |
 | Sheets tabs silently drop newly-added columns | Any tab created before a column joined its `_HEADER` keeps the old header forever — `get_or_create_worksheet` writes row 1 only on creation and `upsert_row_by_key` never touches it, so values land in an unheadered column and `get_all_records` discards them. Bit `hrv_ms` (above) and would have bit the movement columns. `Repository.rebuild_tab(worksheet, header, ...)` re-heads a tab and carries every existing row through; call it after adding any column. |
 | Cold app start latency | FIXED 2026-08-01. The startup sync ran before `_bio_rolling`, so every cold load spent ~77s (`sync_oura_all` 50s + `sync_garmin_daily_if_due` 27s) showing "No Readings" to avoid displaying data a couple of hours old — buying freshness with total unavailability. `app.py::_run_startup_sync()` now runs last and reruns once; first paint of real sleep data is **18.5s**. Remaining latency is the Sheets reads themselves. |

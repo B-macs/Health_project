@@ -27,8 +27,11 @@ class _StubRepository:
         oura_workouts=None, oura_sleep_periods=None, oura_sessions=None,
         oura_rest_mode=None, biometric_blend=None, metrics_history=None,
         wake_time_adjustments=None, weekly_rollup=None, sheet1=None,
-        config_rows=None, fail_on=None,
+        config_rows=None, garmin_sleep_stages=None, sleep_fusion=None,
+        fail_on=None,
     ):
+        self._garmin_sleep_stages = garmin_sleep_stages or []
+        self._sleep_fusion = sleep_fusion or []
         self._readiness = readiness or []
         self._training_exercises = training_exercises or []
         self._garmin_daily = garmin_daily or []
@@ -68,6 +71,14 @@ class _StubRepository:
     def get_all_garmin_activities_rows(self):
         self._maybe_fail("get_all_garmin_activities_rows")
         return self._garmin_activities
+
+    def get_all_garmin_sleep_stages_rows(self):
+        self._maybe_fail("get_all_garmin_sleep_stages_rows")
+        return self._garmin_sleep_stages
+
+    def get_all_sleep_fusion_rows(self):
+        self._maybe_fail("get_all_sleep_fusion_rows")
+        return self._sleep_fusion
 
     def get_all_session_hr_rows(self):
         self._maybe_fail("get_all_session_hr_rows")
@@ -120,7 +131,8 @@ class _StubRepository:
 
 _ALL_TABLES = [
     "readiness_checkins", "training_sessions", "training_exercises", "training_sets",
-    "garmin_daily", "garmin_activities", "session_hr", "oura_daily", "oura_workouts",
+    "garmin_daily", "garmin_activities", "garmin_sleep_stages", "sleep_fusion",
+    "session_hr", "oura_daily", "oura_workouts",
     "oura_sleep_periods", "oura_sessions", "oura_rest_mode", "biometric_blend",
     "metrics_history", "wake_time_adjustments", "weekly_rollup",
     "sheet1_legacy_biometrics", "config", "datastore_meta",

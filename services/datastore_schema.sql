@@ -261,6 +261,92 @@ CREATE TABLE oura_sleep_periods (
 );
 CREATE INDEX idx_oura_sleep_periods_day ON oura_sleep_periods(day);
 
+-- ── Garmin sleep stages + the derived fusion. Both arrived after the first
+--    datastore build and were the two tabs the Sleep drill-down reads most,
+--    which is exactly why offline reads (services/repository.py's
+--    _OfflineWorksheet) needed them here. Every digit-coded/JSON column is
+--    TEXT and flagged below for the same reason it is exempted from gspread's
+--    numericising upstream: read back as a number it is unrecoverable.
+
+DROP TABLE IF EXISTS garmin_sleep_stages;
+CREATE TABLE garmin_sleep_stages (
+    date                       TEXT PRIMARY KEY,
+    sleep_start_gmt            TEXT,
+    sleep_end_gmt              TEXT,
+    utc_offset_minutes         REAL,
+    segment_count              INTEGER,
+    deep_seconds               REAL,
+    light_seconds              REAL,
+    rem_seconds                REAL,
+    awake_seconds              REAL,
+    -- Garmin's OWN per-stage totals, kept so totals_match can verify our
+    -- activityLevel->stage mapping on every night, not just the one it was
+    -- originally checked against.
+    dto_deep_seconds           REAL,
+    dto_light_seconds          REAL,
+    dto_rem_seconds            REAL,
+    dto_awake_seconds          REAL,
+    totals_match               INTEGER,
+    sleep_levels_json          TEXT,    -- lossless segment list, JSON, NOT numeric
+    movement_start_gmt         TEXT,
+    movement_interval_seconds  REAL,
+    movement_slot_count        INTEGER,
+    movement_contiguous        INTEGER, -- False = the series needed gap-filling
+    movement_gap_slots         INTEGER,
+    movement_levels            TEXT,    -- comma-joined floats, NOT numeric
+    sleep_hr_json              TEXT,    -- JSON, NOT numeric
+    sleep_stress_json          TEXT     -- JSON, NOT numeric
+);
+
+DROP TABLE IF EXISTS sleep_fusion;
+CREATE TABLE sleep_fusion (
+    date                            TEXT PRIMARY KEY,
+    source                          TEXT,  -- fused / oura_only / garmin_only / none
+    rules_version                   INTEGER,
+    computed_at                     TEXT,
+    window_start_utc                TEXT,
+    utc_offset_minutes              REAL,
+    minutes                         INTEGER,
+    master_hypnogram                TEXT,  -- digit-coded string, NOT numeric
+    oura_hypnogram                  TEXT,  -- digit-coded string, NOT numeric
+    garmin_hypnogram                TEXT,  -- digit-coded string, NOT numeric
+    reason_codes                    TEXT,  -- one char per minute, NOT numeric
+    master_deep_minutes             REAL,
+    master_light_minutes            REAL,
+    master_rem_minutes              REAL,
+    master_awake_minutes            REAL,
+    master_sleep_hours              REAL,
+    oura_sleep_hours                REAL,
+    garmin_sleep_hours              REAL,
+    phantom_wake_minutes            REAL,
+    window_overlap_pct              REAL,
+    agreement_pct                   REAL,
+    cohen_kappa                     REAL,
+    garmin_covered_minutes          REAL,
+    garmin_gap_minutes              REAL,
+    garmin_outside_window_minutes   REAL,
+    oura_periods_on_day             INTEGER,
+    -- Movement, on the 30-SECOND grid (twice the hypnogram's resolution),
+    -- anchored at the same window_start_utc so the two share one time axis.
+    movement_source                 TEXT,
+    movement_slots                  INTEGER,
+    movement_covered_slots          INTEGER,
+    movement_still_slots            INTEGER,
+    movement_restless_slots         INTEGER,
+    movement_tossing_slots          INTEGER,
+    movement_active_slots           INTEGER,
+    movement_position_shifts        INTEGER,
+    movement_mean_class             REAL,
+    master_movement                 TEXT,  -- digit-coded string, NOT numeric
+    oura_movement                   TEXT,  -- digit-coded string, NOT numeric
+    garmin_movement                 TEXT,  -- digit-coded string, NOT numeric
+    -- The calibration each movement series was produced under -- the
+    -- movement counterpart of rules_version. Without it a re-fit would
+    -- silently change what a stored "restless" meant.
+    movement_cutpoints              TEXT   -- comma-joined floats, NOT numeric
+);
+CREATE INDEX idx_sleep_fusion_source ON sleep_fusion(source);
+
 DROP TABLE IF EXISTS oura_sessions;
 CREATE TABLE oura_sessions (
     session_id      TEXT PRIMARY KEY,

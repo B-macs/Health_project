@@ -32,6 +32,13 @@ class Config:
     garmin_password: str = ""
     # Optional — Oura sync is disabled (not an error) when blank.
     oura_token: str = ""
+    # Optional — path to a locally-built datastore.db (scripts/build_datastore.py).
+    # When set, Repository serves every Google Sheets READ from it and makes no
+    # Google API call at all; writes raise. For testing and offline iteration
+    # against real data without spending the 60-per-minute Sheets quota. Blank
+    # (the default, and what the deployed app runs with) means live Sheets.
+    # Deliberately NOT a fallback for a failed live read — see Repository._ws.
+    datastore_path: str = ""
 
 
 _STR_KEYS = (
@@ -90,4 +97,5 @@ def load_config(overrides: dict | None = None) -> Config:
         garmin_email=_resolve_optional_str("GARMIN_EMAIL", overrides),
         garmin_password=_resolve_optional_str("GARMIN_PASSWORD", overrides),
         oura_token=_resolve_optional_str("OURA_TOKEN", overrides),
+        datastore_path=_resolve_optional_str("HEALTH_DATASTORE_PATH", overrides),
     )
