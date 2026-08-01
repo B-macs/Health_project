@@ -643,19 +643,19 @@ def test_the_two_unscored_reasons_are_never_the_same_text():
 
 # ─── Readiness drill-down helpers ────────────────────────────────────────────
 
-def _rb(components=None, missing=None, available=1.0, units=None, points=0.0):
+def _rb(components=None, missing=None, available=1.0, units=None):
     return {
         "score": 84.8,
         "components": components if components is not None else [
-            {"key": "hrv", "label": "HRV", "score": 100.0, "weight": 0.225,
-             "effective_weight": 0.225, "contribution": 22.5, "raw": 20.0, "reference": 18.46},
-            {"key": "sleep_debt", "label": "Sleep Debt", "score": 36.2, "weight": 0.10,
-             "effective_weight": 0.10, "contribution": 3.62, "raw": 6.06, "reference": 9.5},
+            {"key": "hrv_balance", "label": "HRV Balance", "score": 42.0, "weight": 0.21,
+             "effective_weight": 0.21, "contribution": 8.82, "raw": 42.0, "reference": None},
+            {"key": "sleep_debt", "label": "Sleep Debt", "score": 36.2, "weight": 0.09,
+             "effective_weight": 0.09, "contribution": 3.26, "raw": 6.06, "reference": 9.5},
         ],
         "missing": missing or [],
         "available_weight": available,
         "alcohol_units": units,
-        "alcohol_penalty_points": points,
+        "model_version": 2,
         "sleep_baseline_window": 28,
     }
 
@@ -664,13 +664,17 @@ def test_readiness_rows_carry_the_weight_on_the_row():
     """Readiness weights span 4.5%-22.5%, so 'this one is red' means very
     different things at either end — unlike sleep's near-equal seven."""
     rows = dashboard.readiness_breakdown_rows(_rb())
-    assert rows[0]["weight_display"] == "22.5%"
-    assert rows[1]["weight_display"] == "10.0%"
+    assert rows[0]["weight_display"] == "21.0%"
+    assert rows[1]["weight_display"] == "9.0%"
 
 
-def test_readiness_rows_use_real_units_not_bare_scores():
+def test_only_sleep_debt_carries_a_unit_the_rest_are_ouras_scores():
+    """Under MODEL_VERSION 2 every component except Sleep Debt is one of
+    Oura's pre-scored 0-100 contributors, where we hold no underlying raw
+    unit at all. Printing the bare score is honest; inventing "ms" or "bpm"
+    for it would not be."""
     rows = dashboard.readiness_breakdown_rows(_rb())
-    assert rows[0]["value_display"] == "20 ms"
+    assert rows[0]["value_display"] == "42"
     assert rows[1]["value_display"] == "6h 04m"
 
 
@@ -690,25 +694,40 @@ def test_readiness_coverage_caption_is_empty_when_all_seven_scored():
 
 
 def test_readiness_coverage_caption_names_the_lost_weight_not_just_the_count():
-    """Losing HRV (22.5%) and losing Previous Day Activity (4.5%) both read as
-    '6 of 7' — the weight is what distinguishes them."""
-    cap = dashboard.readiness_coverage_caption(_rb(missing=["hrv"], available=0.775))
-    assert "6 of 7" in cap
-    assert "78%" in cap or "77%" in cap
+    """Losing HRV Balance (21%) and losing Activity Balance (3%) would read
+    identically as a count — the weight is what distinguishes them."""
+    cap = dashboard.readiness_coverage_caption(_rb(missing=["hrv_balance"], available=0.79))
+    assert "1 of 2" in cap          # the fixture carries two components
+    assert "79%" in cap
+
+
+def test_coverage_caption_denominator_tracks_the_real_component_count():
+    """It was a hardcoded 7 until the component set grew to 9. A literal
+    denominator goes quietly wrong rather than failing."""
+    nine = [{"key": f"c{i}", "label": f"C{i}", "score": None if i else 50.0,
+             "weight": 0.1, "effective_weight": 0.0, "contribution": None,
+             "raw": None, "reference": None} for i in range(9)]
+    cap = dashboard.readiness_coverage_caption(
+        _rb(components=nine, missing=["c0"], available=0.9))
+    assert "8 of 9" in cap
 
 
 def test_readiness_alcohol_caption_is_empty_on_a_dry_day():
     assert dashboard.readiness_alcohol_caption(_rb()) == ""
 
 
-def test_readiness_alcohol_caption_explains_why_the_rows_do_not_sum():
-    cap = dashboard.readiness_alcohol_caption(_rb(units=1.5, points=15.0))
-    assert "15" in cap and "1.5 units" in cap
-    assert "after the weighted average" in cap
+def test_readiness_alcohol_caption_reports_units_without_claiming_a_deduction():
+    """MODEL_VERSION 2 stopped scoring alcohol. The caption must say the
+    units were logged AND that they are not in the score — stating one
+    without the other is how a reader concludes the wrong thing."""
+    cap = dashboard.readiness_alcohol_caption(_rb(units=1.5))
+    assert "1.5 units" in cap
+    assert "Not deducted" in cap
+    assert "deducted from the score" not in cap.replace("Not deducted from the", "")
 
 
 def test_readiness_alcohol_caption_uses_the_singular_for_one_unit():
-    assert "1 unit of alcohol" in dashboard.readiness_alcohol_caption(_rb(units=1.0, points=10.0))
+    assert "1 unit of alcohol" in dashboard.readiness_alcohol_caption(_rb(units=1.0))
 
 
 def test_readiness_unscored_reason_separates_a_failed_read_from_no_data():

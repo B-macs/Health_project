@@ -119,6 +119,20 @@ class BiometricRecord:
     oura_body_temperature: float | None = None
     oura_recovery_index: float | None = None
     oura_previous_day_activity: float | None = None
+    # The rest of Oura's nine, promoted from display-only to engine inputs by
+    # readiness MODEL_VERSION 2 (which scores from Oura's contributors instead
+    # of deriving its own saturating HRV/RHR ratios — see
+    # services/readiness.py's header).
+    oura_hrv_balance: float | None = None
+    oura_previous_night: float | None = None
+    oura_sleep_regularity: float | None = None
+    oura_activity_balance: float | None = None
+    # ⚠ Oura's 0-100 CONTRIBUTOR score for resting heart rate — deliberately
+    # NOT named oura_resting_heart_rate, which sits one character from
+    # `resting_heart_rate` above (the blended bpm reading). They are different
+    # quantities on different scales and confusing them would be silent: 46
+    # is a poor contributor score and a superb heart rate.
+    oura_resting_heart_rate_score: float | None = None
     # Raw temperature deviation in °C against Oura's own personal norm —
     # NOT a 0-100 contributor like oura_body_temperature above, which is
     # Oura's already-scored version of the same signal. Both are carried:

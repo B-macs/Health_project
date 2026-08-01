@@ -506,21 +506,17 @@ def sleep_unscored_reason(read_failed: bool) -> str:
 def _readiness_component_value(key: str, raw, score, baseline_window: int = 0) -> str:
     """The right-hand value on a readiness component row.
 
-    Absolute where a number means something to a person (ms, bpm, hours);
-    Oura's own 0-100 for the three contributors Oura pre-scores, because
-    there is no underlying raw unit we hold — printing a bare number is
-    honest, inventing a unit is not.
+    Sleep Debt is shown in hours because that is what it physically is, and
+    because its threshold (9.5 h) is the same one that reschedules training —
+    a number the reader can act on. Every other component under readiness
+    MODEL_VERSION 2 is one of Oura's pre-scored 0-100 contributors, where we
+    hold no underlying raw unit at all: printing the bare score is honest,
+    inventing a unit for it would not be.
     """
     if raw is None:
         return "not scored"
-    if key == "hrv":
-        return f"{raw:.0f} ms"
-    if key == "rhr":
-        return f"{raw:.0f} bpm"
-    if key in ("sleep", "sleep_debt"):
+    if key == "sleep_debt":
         return format_hours(raw) or "—"
-    if key == "body_temp":
-        return f"{raw:.0f}"
     return f"{raw:.0f}"
 
 
@@ -561,27 +557,36 @@ def readiness_coverage_caption(breakdown: dict) -> str:
     missing = breakdown.get("missing") or []
     if not missing:
         return ""
-    scored = 7 - len(missing)
+    # Total comes from the breakdown, never a literal: the component count
+    # changed from 7 to 9 with readiness MODEL_VERSION 2, and a hardcoded
+    # denominator would have gone quietly wrong rather than failing.
+    total = len(breakdown.get("components") or []) or len(missing)
+    scored = total - len(missing)
     pct = (breakdown.get("available_weight") or 0.0) * 100
-    return (f"Scored on {scored} of 7 components ({pct:.0f}% of the weight); "
+    return (f"Scored on {scored} of {total} components ({pct:.0f}% of the weight); "
             f"the rest is renormalised away.")
 
 
 def readiness_alcohol_caption(breakdown: dict) -> str:
-    """The alcohol deduction, stated. Empty on a day with no units logged.
+    """Alcohol as CONTEXT, not as a deduction. Empty on a dry day.
 
-    Load-bearing, not a nicety: the penalty is a flat post-hoc subtraction,
-    not a weighted component, so on a drinking day the seven contributions
-    above CANNOT be reconciled with the score without this line. Same class
-    of problem as the Sleep drill-down's wake-time note."""
+    readiness MODEL_VERSION 2 stopped deducting points for alcohol: it is
+    self-reported and the one input Oura cannot see, so scoring it made our
+    number and Oura's incomparable on exactly the days most worth comparing.
+    The units are still worth showing — they explain a low HRV balance or a
+    poor previous night far better than the components alone do — so this
+    reports them while being explicit that the score does not include them.
+
+    services.scheduling still acts on alcohol independently (consecutive-day
+    trigger, straight from the check-in), so nothing safety-relevant rests on
+    this caption."""
     units = breakdown.get("alcohol_units")
-    points = breakdown.get("alcohol_penalty_points") or 0.0
-    if not units or not points:
+    if not units:
         return ""
     unit_word = "unit" if abs(units - 1.0) < 1e-9 else "units"
-    return (f"{points:.0f} points deducted for {units:g} {unit_word} of alcohol, "
-            f"applied after the weighted average — so the components above "
-            f"sum to {points:.0f} more than the score.")
+    return (f"{units:g} {unit_word} of alcohol logged. Not deducted from the "
+            f"score — it is self-reported and Oura cannot see it, so leaving "
+            f"it out keeps this number comparable with Oura's.")
 
 
 def readiness_unscored_reason(read_failed: bool) -> str:

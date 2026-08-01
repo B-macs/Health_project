@@ -34,6 +34,7 @@ from services import dashboard
 from services import hr_load
 from services import hr_matching
 from services import models
+from services import readiness
 from services import sessions as training_sessions
 from services import sleep_fusion
 from services import sleep_movement
@@ -296,6 +297,12 @@ _BIOMETRIC_BLEND_HEADER = [
 ]
 _METRICS_HISTORY_HEADER = [
     "date", "readiness_score", "sleep_pct", "sleep_score", "strain",
+    # Which readiness model produced this row's readiness_score. Added with
+    # MODEL_VERSION 2 (which rescored from Oura's contributors and dropped the
+    # alcohol deduction), so a stored figure is always traceable to the maths
+    # behind it -- the same reason sleep_fusion rows carry rules_version and
+    # movement_cutpoints. A blank value means version 1.
+    "readiness_model_version",
 ]
 _WAKE_TIME_ADJUSTMENTS_HEADER = ["date", "adjustment_minutes"]
 
@@ -1674,6 +1681,15 @@ class Repository:
                 "recovery_index":        r.get("readiness_recovery_index") or None,
                 "previous_day_activity": r.get("readiness_previous_day_activity") or None,
                 "temperature_deviation": _float_or_none(r.get("readiness_temperature_deviation")),
+                # Promoted from display-only to engine inputs by readiness
+                # MODEL_VERSION 2. `resting_heart_rate` here is Oura's 0-100
+                # CONTRIBUTOR, not the bpm — see BiometricRecord's warning on
+                # oura_resting_heart_rate_score.
+                "hrv_balance":            r.get("readiness_hrv_balance") or None,
+                "previous_night":         r.get("readiness_previous_night") or None,
+                "sleep_regularity":       r.get("readiness_sleep_regularity") or None,
+                "activity_balance":       r.get("readiness_activity_balance") or None,
+                "resting_heart_rate":     r.get("readiness_resting_heart_rate") or None,
             }
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
         }
@@ -1834,6 +1850,11 @@ class Repository:
                     oura_recovery_index=contributors.get("recovery_index"),
                     oura_previous_day_activity=contributors.get("previous_day_activity"),
                     oura_temperature_deviation=contributors.get("temperature_deviation"),
+                    oura_hrv_balance=contributors.get("hrv_balance"),
+                    oura_previous_night=contributors.get("previous_night"),
+                    oura_sleep_regularity=contributors.get("sleep_regularity"),
+                    oura_activity_balance=contributors.get("activity_balance"),
+                    oura_resting_heart_rate_score=contributors.get("resting_heart_rate"),
                 )
             sleep_raw = oura_sleep.get(d)
             if sleep_raw:
@@ -1962,6 +1983,7 @@ class Repository:
             "sleep_pct": snapshot["sleep_pct"] if snapshot["sleep_pct"] is not None else "",
             "sleep_score": snapshot["sleep_score"] if snapshot["sleep_score"] is not None else "",
             "strain": snapshot["strain"] if snapshot["strain"] is not None else "",
+            "readiness_model_version": readiness.MODEL_VERSION,
         }
 
     def upsert_metrics_history_row(self, snapshot: dict) -> None:
@@ -1975,6 +1997,13 @@ class Repository:
         sheets.upsert_row_by_key(
             self._metrics_history_ws(), key_col=1, key_value=snapshot["date"], row_values=values,
         )
+
+    def rebuild_metrics_history(self, fresh: dict[str, dict] | None = None) -> int:
+        """Re-head the Metrics History tab so readiness_model_version stops
+        being written into a column no read can see, carrying every existing
+        row through. Call once after adding the column; see rebuild_tab for
+        why any tab created before a column joined its header needs this."""
+        return self.rebuild_tab(self._metrics_history_ws(), _METRICS_HISTORY_HEADER, fresh)
 
     def sync_metrics_history(self, days: int = 7, today: date | None = None) -> int:
         """Computes services.dashboard.compute_daily_metrics_snapshot for
@@ -2037,6 +2066,12 @@ class Repository:
                 "sleep_pct": r.get("sleep_pct") or None,
                 "sleep_score": r.get("sleep_score") or None,
                 "strain": r.get("strain") or None,
+                # Which readiness model produced this row. Blank/absent means
+                # version 1 — rows written before the column existed. Mapped
+                # here as well as stored: this getter lists its keys
+                # explicitly, so a column added to the header alone would sit
+                # in the sheet and never reach a caller.
+                "readiness_model_version": r.get("readiness_model_version") or None,
             })
         return sorted(out, key=lambda r: r["date"])
 

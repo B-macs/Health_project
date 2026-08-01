@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1140/1140 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1141/1141 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1140/1140 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1140/1140 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1141/1141 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -305,7 +305,7 @@ quiet-wake rule, and compare against the recorded 645 figures in
 | `bodyweight_compound` is a new weight tier (0.5) | Added for Stage 1's unloaded multi-joint work (Chair Sit-to-Stand, step-ups, lunges, wall sits, Single-Leg RDL). Sits between `isolation` 0.3 and `pull`/`upper_push` 0.7 — scoring a bodyweight sit-to-stand at `squat` 1.3 would be as wrong as the 1.0 default it replaced. `tests/test_movement_weight_coverage.py` pins the ordering and the one-category-one-weight invariant. |
 | Baseline-drift guard is dormant until ~mid-Sept 2026 | `engine.baseline_drift` needs `DRIFT_MIN_PRIOR_DAYS` (21) rows *before* the current 28-row window. The ring was worn intermittently before mid-2026, so a 90-day fetch yields only 11 prior rows; `DRIFT_RECOMMENDED_FETCH_DAYS` (400) yields 62 and does fire (HRV −18.7%, sleep −11.4%, severity `severe`). Windows count ROWS not calendar days, deliberately — a calendar window shrinks to nothing across a sparse stretch. Both UI call sites already pass the wide fetch. |
 | Historical Notion rows keep their old `movement_type` label | `sessions.movement_category`'s fallback used to swallow every unrecognised name into "Mobility", so Lat Pulldown / Incline DB Press / Single-Arm DB Row / Face Pull / Hip Thrust (Loaded) were all *written* to Notion as "Mobility". Fixed for new writes only — rows logged before 2026-08-01 keep the wrong string. Display-only (nothing computes from it; Strain/ACWR weighting reads `EXERCISE_MOVEMENT_WEIGHT` by exercise NAME), so this is cosmetic and needs a backfill only if the history's labels matter. |
-| Our readiness reads 28 pts above Oura's | **Stage B of the readiness plan, not yet built.** On 2026-08-01 we score 84.8, Oura 57. The three Oura contributors we import match *exactly* (Recovery Index 100, Body Temperature 51, Previous Day Activity 87), so this is not an import bug. Two causes: (a) our HRV and RHR components are `min(100, ratio*100)` — **one-sided and saturating**, so any day at/above baseline scores a flat 100 and they can only ever penalise; (b) we ignore four contributors Oura uses (`hrv_balance` 42, `sleep_balance` 58, `sleep_regularity` 71, `activity_balance` 80), all already synced. Both sets are now visible side by side on the Readiness drill-down. |
+| Readiness rebuilt as `MODEL_VERSION 2` | **RESOLVED 2026-08-01.** v1 read 84.8 where Oura read 57. Cause was not the imported contributors (those matched exactly) but v1's own HRV and RHR components, `min(100, ratio*100)` — **one-sided and saturating**, so any day at/above baseline scored a flat 100 — plus four Oura contributors that were synced and ignored. v2 scores from Oura's eight contributors plus our own Sleep Debt, with our weights and our composite (**not** Oura's score taken directly). Measured over a year: **r = 0.992** with Oura, mean bias −0.9, sd 2.8, 91% within 5 points; v1 ran ~15 points high. Alcohol is no longer deducted — self-reported and invisible to Oura, so scoring it made the two incomparable; `services/scheduling.py` still shifts sessions on consecutive-day alcohol independently. All 52 Metrics History rows re-derived and stamped `readiness_model_version`. |
 | Naps are discarded from `sleep_duration_hours` | **Measured, not yet fixed.** `biometrics.pick_main_sleep_period` returns only the `long_sleep` entry, so 57 nap periods across 50 days — **34.1 h of sleep, largest nap 217 min** — never count. 2026-07-19 scores 3.70 h against an actual ~6.0 h. Feeds readiness Sleep (18%) + Sleep Debt (10%), sleep_score Total Sleep (25%), the sleep baseline, `traffic_light` and `scheduling`. Two questions are conflated: which period's *architecture* to display (rightly the main night) vs the day's *total duration* (the actual bug). Needs explicit approval — it moves historical scores. |
 | Biomechanical review due | 2026-07-19 — update `patient_profile.py` before Stage 2 |
 | Strength BioAge scores dormant | By design (`services/bioage.py`) until weighted training begins — training is still Stage 1 bodyweight-only, so all 3 region scores + the hero value show "—". Muscle-imbalance count is unaffected (reads `patient_profile.py` directly) and already shows a real number. |

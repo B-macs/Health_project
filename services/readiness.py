@@ -6,44 +6,77 @@ baselines. Returns NOT_COMPUTED when insufficient data exists.
 
 Baseline logic
 --------------
-HRV / RHR  : Average of whatever history exists, up to a 28-day cap, once at
-             least 3 observations are available. (Previously required 14
-             observations before trusting a baseline at all — with sparse
-             wearable history this silently dropped HRV out of
-             compute_readiness's weighted average entirely, letting RHR/Sleep
-             alone dictate the score. See 2026-07-14 fix.)
 Sleep      : Progressive — 7 → 14 → 28 → 56 nights as clean data accumulates.
              Outliers <4 h or >11 h are excluded from baseline computation.
 Sleep debt : Cumulative deficit over the trailing SLEEP_DEBT_WINDOW_DAYS (7)
-             nights against the same sleep_baseline, scored 100 at zero debt
-             down to 0 at SLEEP_DEBT_THRESHOLD_HOURS (9.5h) — distinct from
-             Sleep above, which only looks at last night; this catches a
-             multi-night deficit that's individually mild each night.
+             nights against that sleep_baseline, scored 100 at zero debt down
+             to 0 at SLEEP_DEBT_THRESHOLD_HOURS (9.5h). The only component
+             this module still computes itself.
+HRV / RHR  : hrv_baseline() and rhr_baseline() remain exported and tested but
+             NO LONGER feed compute_readiness — MODEL_VERSION 2 takes both
+             from Oura's own trend-aware contributors instead of deriving a
+             saturating ratio here (see below). They are kept because they are
+             the natural tool for measuring a device changeover, which is
+             exactly what the Garmin 265 will need.
 
+MODEL_VERSION 2 (2026-08-01) — scored from Oura's contributors
+--------------------------------------------------------------
 Weights (normalised when individual metrics are missing)
---------------------------------------------------------
-HRV                       22.5% primary autonomic recovery marker (personal-baseline ratio)
-Sleep                     18%   last night vs personal progressive baseline
-Sleep Debt                10%   trailing 7-night cumulative deficit vs the same baseline
-RHR                       13.5% supporting cardiovascular indicator (personal-baseline ratio)
-Recovery Index (Oura)     18%   Oura's own overnight-recovery contributor (0-100, pre-scored)
-Body Temperature (Oura)   13.5% Oura's own temperature-deviation contributor (0-100, pre-scored)
-Previous Day Activity (Oura) 4.5% Oura's own training-load-spillover contributor (0-100, pre-scored)
 
-2026-07-14: added the three Oura contributor sub-scores above. HRV/Sleep/RHR
-were re-weighted down (was 40/35/25) to make room rather than bolted on
-alongside unchanged — Recovery Index in particular tracked a real same-day
-crash (Oura readiness_score 49) that HRV/RHR/Sleep alone missed entirely
-because HRV data was absent that day. Unlike HRV/RHR (ratio-to-baseline,
-computed here) these three are Oura-exclusive and already 0-100-scored by
-Oura itself — no baseline math needed, just clamped and used directly.
-Garmin has no equivalent, so they're simply absent (None) on any day Oura
-itself didn't compute them.
+HRV Balance (Oura)         21%  primary autonomic recovery marker
+Recovery Index (Oura)      17%  Oura's own overnight-recovery contributor
+Previous Night (Oura)      16%  last night's sleep, quality-aware
+Resting Heart Rate (Oura)  13%  supporting cardiovascular indicator
+Body Temperature (Oura)    12%  thermal load against personal norm
+Sleep Debt (OURS)           9%  trailing 7-night cumulative deficit
+Previous Day Activity (Oura) 5% training-load spillover
+Sleep Regularity (Oura)     4%  circadian consistency
+Activity Balance (Oura)     3%  accumulated training load
 
-2026-07-30: added Sleep Debt (see above). Same-night sleep duration alone
-missed a genuine multi-night deficit that was individually "not terrible"
-each night; every other weight scaled by 0.9 (proportional, preserving
-relative importance) to make room for the new 10%.
+Version 1 derived its own HRV and RHR components as ratios against a 28-day
+personal mean: `min(100, today/baseline*100)` for HRV and
+`min(100, baseline/today*100)` for RHR. Both were **one-sided and
+saturating** — any day at or above baseline scored a flat 100, so they could
+only ever penalise and never distinguish among good days. Measured on
+2026-08-01: HRV 20.0 ms against an 18.46 baseline is 108%, clipped to 100.
+That was a large part of why version 1 read 84.8 on a day Oura read 57.
+
+Both are now taken from Oura's own hrv_balance and resting_heart_rate
+contributors, which are trend-aware and not clipped. This is not a loss of
+independence: the underlying HRV and RHR readings were ALWAYS Oura's (see
+services/biometrics.py — the documented Oura-70/Garmin-30 blend has been
+100% Oura for every night of this app's history, and is deliberately held
+there by HRV_GARMIN_HOLD), so version 1 was deriving a worse-conditioned
+score from the same sensor rather than adding a second opinion.
+
+Four contributors Oura publishes were being synced and ignored entirely —
+hrv_balance, sleep_regularity, activity_balance and previous_night. They are
+now used.
+
+**This is deliberately NOT "take Oura's readiness score".** Every input is
+Oura's, but the weighting and the composite are ours, which is what makes
+the score tunable — most immediately for the Garmin 265, whose HRV will need
+its own weight once biometrics.HRV_GARMIN_HOLD lifts.
+
+Sleep Debt stays OURS rather than using Oura's sleep_balance, which measures
+roughly the same thing: ours is computed here against this module's own
+progressive baseline, and services.scheduling's auto-shift shares its exact
+threshold (SLEEP_DEBT_THRESHOLD_HOURS), so "zeroes out this component" and
+"would trigger a reschedule" continue to mean the same thing.
+
+Alcohol is NO LONGER deducted (removed 2026-08-01). It was a flat
+-10 points/unit applied after the weighted average — self-reported, and the
+one input Oura cannot see, which made our score and Oura's incomparable on
+exactly the days most worth comparing. The units are still read and still
+displayed alongside the score as context; they are simply not scored here.
+Nothing safety-relevant was lost: services.scheduling reads alcohol
+independently from the check-in rows and still triggers a session shift on
+CONSECUTIVE_ALCOHOL_DAYS.
+
+Version 1, for the record (weights that no longer apply):
+HRV 22.5% · Sleep 18% · Recovery Index 18% · RHR 13.5% · Body Temperature
+13.5% · Sleep Debt 10% · Previous Day Activity 4.5%, less 10 points per
+alcohol unit.
 
 Trend (compute_readiness_trend, 2026-07-14)
 --------------------------------------------
@@ -54,19 +87,6 @@ smoothing (same e^(-lambda*t)-style decay used for injury_weight in
 engine.py): trend = alpha*today's raw score + (1-alpha)*yesterday's trend.
 One good day only partially repays a multi-day deficit.
 
-Alcohol penalty (2026-07-14)
------------------------------
-Self-reported alcohol units from the morning check-in apply a flat point
-deduction AFTER the weighted average above, rather than being folded in as
-another weighted component: -5 points per 0.5 units (-10/unit), floored at
-0. A flat subtraction rather than a component keeps the penalty's size
-exact and undiluted — a weighted component would get re-normalised away
-(or amplified) depending on how many other metrics are missing that day,
-which a fixed "you drank, this costs you N points" rule shouldn't do.
-Because this lives inside compute_readiness(), it automatically flows into
-compute_readiness_trend() (the EMA walk recomputes each day's raw score,
-alcohol penalty included) and engine.readiness_training_modifier() without
-either needing its own change.
 """
 
 from __future__ import annotations
@@ -84,7 +104,9 @@ _SLEEP_WINDOWS  = (7, 14, 28, 56)
 _TREND_ALPHA         = 0.5    # weight given to each new day's raw score in the EMA
 _TREND_LOOKBACK_DAYS = 14     # days walked forward to seed/accumulate the trend
 
-_ALCOHOL_PENALTY_PER_UNIT = 10.0   # points deducted per unit (-5 per 0.5 units)
+# Removed with MODEL_VERSION 2: alcohol is no longer deducted from readiness
+# (it was 10 points per unit). Kept as a comment rather than a dead constant
+# so the history of the number is not lost — see this module's header.
 
 # Cumulative sleep deficit (against this module's own sleep_baseline) over the
 # trailing window — feeds both compute_readiness's sleep_debt component below
@@ -95,19 +117,31 @@ SLEEP_DEBT_WINDOW_DAYS = 7
 
 
 # ─── Component weights — the single source of truth ───────────────────────────
-#  Hoisted out of compute_readiness's inline `candidates` list, which was the
-#  only place these numbers existed and was unreachable from the UI. Same shape
-#  as services/sleep_score.py's _WEIGHTS, for the same reason: the drill-down
-#  has to show a weight beside every component, and a second copy would drift.
-#  Values and their rationale are unchanged — see this module's header.
+#  Same shape as services/sleep_score.py's _WEIGHTS, and for the same reason:
+#  the drill-down shows a weight beside every component, and a second copy of
+#  these numbers anywhere would drift. See this module's header for the
+#  rationale behind each value.
+#
+#  Bumped whenever these weights or the component set change, so a stored
+#  readiness figure can be traced to the model that produced it — the same
+#  auditability sleep_fusion.RULES_VERSION and the movement cut points give.
+MODEL_VERSION = 2
+
+#  Tiers, so the numbers are reviewable rather than arbitrary:
+#    autonomic recovery      0.38  (hrv_balance + recovery_index)
+#    sleep                   0.29  (previous_night + sleep_debt + regularity)
+#    cardiovascular/thermal  0.25  (resting HR + body temperature)
+#    training-load spillover 0.08  (previous day activity + activity balance)
 _WEIGHTS = {
-    "hrv":           0.225,
-    "sleep":         0.18,
-    "recovery":      0.18,
-    "rhr":           0.135,
-    "body_temp":     0.135,
-    "sleep_debt":    0.10,
-    "prev_activity": 0.045,
+    "hrv_balance":   0.21,
+    "recovery":      0.17,
+    "prev_night":    0.16,
+    "rhr":           0.13,
+    "body_temp":     0.12,
+    "sleep_debt":    0.09,
+    "prev_activity": 0.05,
+    "sleep_reg":     0.04,
+    "activity_bal":  0.03,
 }
 
 # ⚠ SUMMATION order — the order compute_readiness adds the weighted terms in,
@@ -119,30 +153,35 @@ _WEIGHTS = {
 #   which is why the two are separate constants rather than one shared tuple.
 #   See services/sleep_score.py::_composite for the same hazard written up.
 _SUM_ORDER = (
-    "hrv", "sleep", "rhr", "recovery", "body_temp", "prev_activity", "sleep_debt",
+    "hrv_balance", "prev_night", "rhr", "recovery", "body_temp",
+    "prev_activity", "sleep_reg", "activity_bal", "sleep_debt",
 )
 
 # DISPLAY order for the breakdown — descending weight, so the row that moves
 # the score most is read first. Deliberately NOT Oura's own contributor order
 # (which sleep_score.CONTRIBUTOR_ORDER does follow): Oura's readiness screen
-# lists nine contributors that are not ours and carry no visible weights, so
-# matching its sequence here would imply a correspondence that does not exist.
+# carries no visible weights, and weight is the whole point of this panel.
 COMPONENT_ORDER = (
-    "hrv", "sleep", "recovery", "rhr", "body_temp", "sleep_debt", "prev_activity",
+    "hrv_balance", "recovery", "prev_night", "rhr", "body_temp",
+    "sleep_debt", "prev_activity", "sleep_reg", "activity_bal",
 )
 COMPONENT_LABELS = {
-    "hrv":           "HRV",
-    "sleep":         "Sleep",
+    "hrv_balance":   "HRV Balance",
     "recovery":      "Recovery Index",
+    "prev_night":    "Previous Night",
     "rhr":           "Resting Heart Rate",
     "body_temp":     "Body Temperature",
     "sleep_debt":    "Sleep Debt",
     "prev_activity": "Previous Day Activity",
+    "sleep_reg":     "Sleep Regularity",
+    "activity_bal":  "Activity Balance",
 }
-# Which of the three Oura-supplied components are passed through already
-# scored by Oura (no baseline of ours behind them) — the breakdown shows no
-# `reference` for these, because there isn't one to show.
-OURA_PASSTHROUGH = frozenset({"recovery", "body_temp", "prev_activity"})
+# Components passed through already scored 0-100 by Oura, against Oura's own
+# personal-norm model. The breakdown shows no `reference` for these because
+# there isn't one to show — the baseline lives inside Oura, not here.
+# Sleep Debt is the only component we still compute ourselves, and the only
+# one with a reference (SLEEP_DEBT_THRESHOLD_HOURS).
+OURA_PASSTHROUGH = frozenset(_WEIGHTS) - {"sleep_debt"}
 
 
 # ─── Exported baseline helpers ────────────────────────────────────────────────
@@ -268,11 +307,11 @@ def compute_readiness(
     total_w      = sum(w for _, w in available)
     weighted_sum = sum(s * (w / total_w) for s, w in available)
 
-    # ── Alcohol penalty — flat deduction, not a weighted component ────────────
-    if scored["alcohol_units"]:
-        weighted_sum = max(
-            0.0, weighted_sum - scored["alcohol_units"] * _ALCOHOL_PENALTY_PER_UNIT)
-
+    # No alcohol deduction as of MODEL_VERSION 2 — see this module's header.
+    # The units are still read and still shown beside the score; they are just
+    # not scored, so this number is comparable with Oura's, which cannot see
+    # them. services.scheduling still shifts sessions on consecutive-day
+    # alcohol, reading the check-in rows directly.
     return round(weighted_sum, 1)
 
 
@@ -290,10 +329,9 @@ def _component_scores(
     services.scheduling, so the split is deliberately mechanical. Mirrors
     services/sleep_score.py::_contributor_scores.
 
-    `alcohol_units` is returned alongside rather than folded in: the penalty
-    is a flat post-hoc deduction, NOT a weighted component (see this module's
-    header for why), so it must not appear in `components` where the UI would
-    render it as one.
+    `alcohol_units` is returned alongside but is NOT scored — see this
+    module's header. It is carried so the drill-down can show it as context
+    beside the score; it must never appear in `components`.
     """
     if not bio_rows:
         return None
@@ -308,47 +346,39 @@ def _component_scores(
 
     today_row = next((r for r in rows_to_date if r["date"] == date_str), None)
 
-    # ── Baselines ─────────────────────────────────────────────────────────────
-    hrv_base            = hrv_baseline(rows_to_date)
-    rhr_base            = rhr_baseline(rows_to_date)
-    sleep_base, _win    = sleep_baseline(rows_to_date)
+    # sleep_baseline is still needed: sleep_debt_hours scores against it, and
+    # the drill-down reports which window it used. HRV/RHR baselines are gone
+    # with MODEL_VERSION 2's ratio components.
+    _sleep_base, _win = sleep_baseline(rows_to_date)
 
-    # No early bail-out on baselines alone: the Oura contributor sub-scores
-    # below need no baseline at all, so a day could still be computable from
-    # those even with hrv_base/rhr_base/sleep_base all None. The bottom
-    # `if not available` check is the real gate — covers all 6 candidates.
+    # No early bail-out on baselines: every Oura contributor below needs none,
+    # so a day is computable from those alone. compute_readiness's `available`
+    # check is the real gate.
 
-    # ── Today's readings ──────────────────────────────────────────────────────
     def _get(key):
         if today_row is None or today_row.get(key) is None:
             return None
         return float(today_row[key])
 
-    today_hrv   = _get("hrv_ms")
-    today_rhr   = _get("resting_heart_rate")
-    today_sleep = _get("sleep_duration_hours")
+    # Oura's contributor sub-scores — already 0-100 against Oura's own
+    # personal-norm model, so no baseline computation here, just clamp.
+    def _clamped100(key):
+        v = _get(key)
+        return None if v is None else max(0.0, min(100.0, v))
 
-    # ── Per-metric 0–100 component scores ─────────────────────────────────────
-    hrv_s = (
-        min(100.0, (today_hrv / hrv_base) * 100.0)
-        if today_hrv is not None and hrv_base and hrv_base > 0
-        else None
-    )
-    rhr_s = (
-        # Lower RHR = better; elevated RHR compresses the score proportionally
-        min(100.0, (rhr_base / today_rhr) * 100.0)
-        if today_rhr is not None and rhr_base and rhr_base > 0
-        else None
-    )
-    if today_sleep is not None and sleep_base and sleep_base > 0:
-        sleep_s = 0.0 if today_sleep < _SLEEP_MIN_H else min(100.0, (today_sleep / sleep_base) * 100.0)
-    else:
-        sleep_s = None
+    hrv_balance_s    = _clamped100("oura_hrv_balance")
+    recovery_s       = _clamped100("oura_recovery_index")
+    prev_night_s     = _clamped100("oura_previous_night")
+    rhr_s            = _clamped100("oura_resting_heart_rate_score")
+    body_temp_s      = _clamped100("oura_body_temperature")
+    prev_activity_s  = _clamped100("oura_previous_day_activity")
+    sleep_reg_s      = _clamped100("oura_sleep_regularity")
+    activity_bal_s   = _clamped100("oura_activity_balance")
 
-    # Cumulative sleep debt (trailing SLEEP_DEBT_WINDOW_DAYS nights) — distinct
-    # from sleep_s above, which only looks at LAST NIGHT. A short single night
-    # already dents sleep_s, but a multi-night deficit (e.g. a rough weekend
-    # that's individually "not terrible" each night) needs its own component
+    # Cumulative sleep debt (trailing SLEEP_DEBT_WINDOW_DAYS nights) — the one
+    # component still computed here rather than taken from Oura. Distinct from
+    # prev_night above, which only looks at LAST NIGHT: a multi-night deficit
+    # that is individually "not terrible" each night needs its own component
     # to register at all. Scored 100 at zero debt, linearly down to 0 at
     # SLEEP_DEBT_THRESHOLD_HOURS — the same threshold services.scheduling uses
     # to decide a session should auto-shift, so "zeroes out this component"
@@ -360,29 +390,20 @@ def _component_scores(
         if debt is not None else None
     )
 
-    # Oura's own contributor sub-scores — already 0-100 against Oura's own
-    # personal-norm model, so no baseline computation here, just clamp.
-    def _clamped100(key):
-        v = _get(key)
-        return None if v is None else max(0.0, min(100.0, v))
-
-    recovery_s       = _clamped100("oura_recovery_index")
-    body_temp_s      = _clamped100("oura_body_temperature")
-    prev_activity_s  = _clamped100("oura_previous_day_activity")
-
     # ── Assemble, in _SUM_ORDER ───────────────────────────────────────────────
-    # Weights are _WEIGHTS (rebalanced 2026-07-30 to make room for sleep_debt:
-    # every prior weight scaled by 0.9, proportional, preserving relative
-    # importance, with the freed 10% going to sleep debt -- same tier as
-    # RHR/Body Temperature, a real vote without dominating the average).
+    # (score, raw, reference). Oura's pre-scored contributors have no reference
+    # of ours to show — their baseline lives inside Oura — so raw IS the score
+    # for those, and reference is None.
     built = {
-        "hrv":           (hrv_s,           today_hrv,   hrv_base),
-        "sleep":         (sleep_s,         today_sleep, sleep_base),
+        "hrv_balance":   (hrv_balance_s,   hrv_balance_s,   None),
         "recovery":      (recovery_s,      recovery_s,      None),
-        "rhr":           (rhr_s,           today_rhr,   rhr_base),
+        "prev_night":    (prev_night_s,    prev_night_s,    None),
+        "rhr":           (rhr_s,           rhr_s,           None),
         "body_temp":     (body_temp_s,     body_temp_s,     None),
-        "sleep_debt":    (sleep_debt_s,    debt,        SLEEP_DEBT_THRESHOLD_HOURS),
+        "sleep_debt":    (sleep_debt_s,    debt,            SLEEP_DEBT_THRESHOLD_HOURS),
         "prev_activity": (prev_activity_s, prev_activity_s, None),
+        "sleep_reg":     (sleep_reg_s,     sleep_reg_s,     None),
+        "activity_bal":  (activity_bal_s,  activity_bal_s,  None),
     }
     components = {
         key: {
@@ -406,29 +427,27 @@ def readiness_breakdown(
     for_date: date | None = None,
     bio_rows: list[dict] | None = None,
 ) -> dict:
-    """The composite plus the seven component sub-scores that produced it.
+    """The composite plus every component sub-score that produced it.
 
     `score` is identical to compute_readiness(...) for the same inputs — both
     walk _component_scores' dict in the same order and apply the same
-    renormalisation and alcohol deduction.
+    renormalisation.
 
-    Components are always all seven, in COMPONENT_ORDER, so the UI can show
-    what is MISSING as readily as what scored. A component that could not be
-    computed has score None and effective_weight 0.0 — it cannot silently
-    contribute, and it must not be dropped from the list: on that panel the
-    gap is the most informative thing on screen.
+    Components are always all of COMPONENT_ORDER, so the UI can show what is
+    MISSING as readily as what scored. A component that could not be computed
+    has score None and effective_weight 0.0 — it cannot silently contribute,
+    and it must not be dropped from the list: on that panel the gap is the
+    most informative thing on screen.
 
-    `alcohol_penalty_points` is reported SEPARATELY from the components and
-    is never one of them. It is a flat post-hoc deduction (see this module's
-    header), so without it the contributions cannot be reconciled with the
-    score — which is exactly the "two numbers a few centimetres apart"
-    problem the Sleep drill-down's wake-time note already solves.
+    `alcohol_units` is carried for display only and is NOT scored (see this
+    module's header). There is deliberately no `alcohol_penalty_points`:
+    reporting a penalty that is no longer applied would be worse than
+    reporting nothing.
 
     `contribution` is a component's share of the composite after
     renormalisation. Contributions will not sum exactly to `score` (the
-    composite is rounded once, the parts are not, and the alcohol penalty
-    lands outside them entirely), so present it as a contribution, never as
-    exact arithmetic.
+    composite is rounded once, the parts are not), so present it as a
+    contribution, never as exact arithmetic.
     """
     scored = _component_scores(for_date, bio_rows)
     if scored is None:
@@ -443,7 +462,7 @@ def readiness_breakdown(
             "available_weight": 0.0,
             "missing": list(COMPONENT_ORDER),
             "alcohol_units": None,
-            "alcohol_penalty_points": 0.0,
+            "model_version": MODEL_VERSION,
             "sleep_baseline_window": 0,
         }
 
@@ -462,14 +481,13 @@ def readiness_breakdown(
             "contribution": round(c["score"] * eff, 2) if ok else None,
         })
 
-    units = scored["alcohol_units"] or 0.0
     return {
         "score": compute_readiness(for_date, bio_rows),
         "components": components,
         "available_weight": round(sum(w for _, w in available), 4),
         "missing": [k for k in COMPONENT_ORDER if by_key[k]["score"] is None],
         "alcohol_units": scored["alcohol_units"],
-        "alcohol_penalty_points": round(units * _ALCOHOL_PENALTY_PER_UNIT, 1),
+        "model_version": MODEL_VERSION,
         "sleep_baseline_window": scored["sleep_baseline_window"],
     }
 
