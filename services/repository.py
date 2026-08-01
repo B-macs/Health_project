@@ -1678,6 +1678,70 @@ class Repository:
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
         }
 
+    # ── Oura's own readiness contributors — DISPLAY/AUDIT ONLY ───────────────
+    #  Oura publishes nine readiness contributors and all nine are already in
+    #  the Oura Daily tab; _oura_readiness_contributors_by_date above lifts
+    #  only the three services.readiness actually scores with (plus the raw
+    #  temperature deviation engine.traffic_light needs). The other six are
+    #  synced and unused.
+    #
+    #  This is deliberately a SEPARATE read rather than more fields on
+    #  BiometricRecord: they are display and model-audit material, not engine
+    #  inputs, and threading them through the biometric rows would carry them
+    #  into readiness, the traffic light and the metrics-history backfill for
+    #  no engine benefit. Same reasoning as get_sleep_night_details, whose
+    #  docstring makes the argument at length.
+    # ────────────────────────────────────────────────────────────────────────
+
+    _OURA_READINESS_CONTRIBUTORS = (
+        ("resting_heart_rate",    "Resting heart rate"),
+        ("hrv_balance",           "HRV balance"),
+        ("body_temperature",      "Body temperature"),
+        ("recovery_index",        "Recovery index"),
+        ("previous_night",        "Previous night"),
+        ("sleep_balance",         "Sleep balance"),
+        ("sleep_regularity",      "Sleep regularity"),
+        ("previous_day_activity", "Previous day activity"),
+        ("activity_balance",      "Activity balance"),
+    )
+
+    def get_oura_readiness_detail(self, start: str, end: str) -> dict[str, dict]:
+        """Oura's own readiness score and all nine of its contributors, keyed
+        by ISO date — for the Readiness drill-down's comparison panel and the
+        model audit behind it.
+
+        Contributors come back as {key: 0-100 or None} under `contributors`,
+        in _OURA_READINESS_CONTRIBUTORS order (Oura's own screen order), with
+        `labels` alongside so the caller needs no column-name knowledge —
+        this module stays the only place Sheets column names live.
+
+        Scores are Oura's raw 0-100 numbers, NOT its tier words. Oura's app
+        shows "Optimal"/"Good"/"Fair"/"Pay attention", but those thresholds
+        are unpublished and demonstrably differ per contributor (45 renders
+        as "Fair" while 42 renders as "Pay attention"), so reproducing them
+        would mean inventing a mapping and presenting it as Oura's.
+
+        A date with no Oura Daily row is simply absent from the result."""
+        rows = self._read_records(self._oura_daily_ws())
+        out: dict[str, dict] = {}
+        for r in rows:
+            d = _sheet_key(r.get("date"))
+            if not d or d < start or d > end:
+                continue
+            out[d] = {
+                "readiness_score": _float_or_none(r.get("readiness_score")),
+                "temperature_deviation": _float_or_none(
+                    r.get("readiness_temperature_deviation")),
+                "temperature_trend_deviation": _float_or_none(
+                    r.get("readiness_temperature_trend_deviation")),
+                "contributors": {
+                    key: _float_or_none(r.get(f"readiness_{key}"))
+                    for key, _label in self._OURA_READINESS_CONTRIBUTORS
+                },
+                "labels": {key: label for key, label in self._OURA_READINESS_CONTRIBUTORS},
+            }
+        return out
+
     def hrv_blend_status(self, days: int = 60, today: date | None = None) -> dict:
         """Where the Oura/Garmin HRV comparison stands, and therefore whether
         services.biometrics.HRV_GARMIN_HOLD can be lifted.

@@ -94,6 +94,57 @@ SLEEP_DEBT_THRESHOLD_HOURS = 9.5
 SLEEP_DEBT_WINDOW_DAYS = 7
 
 
+# ─── Component weights — the single source of truth ───────────────────────────
+#  Hoisted out of compute_readiness's inline `candidates` list, which was the
+#  only place these numbers existed and was unreachable from the UI. Same shape
+#  as services/sleep_score.py's _WEIGHTS, for the same reason: the drill-down
+#  has to show a weight beside every component, and a second copy would drift.
+#  Values and their rationale are unchanged — see this module's header.
+_WEIGHTS = {
+    "hrv":           0.225,
+    "sleep":         0.18,
+    "recovery":      0.18,
+    "rhr":           0.135,
+    "body_temp":     0.135,
+    "sleep_debt":    0.10,
+    "prev_activity": 0.045,
+}
+
+# ⚠ SUMMATION order — the order compute_readiness adds the weighted terms in,
+#   preserved EXACTLY from the `candidates` list this replaced. Not cosmetic:
+#   floating-point addition is not associative, so reordering these terms can
+#   move the composite in the last decimal, and that decimal is user-visible
+#   and feeds engine.traffic_light / scheduling. It differs from
+#   COMPONENT_ORDER below (rhr and recovery are swapped, sleep_debt sits last),
+#   which is why the two are separate constants rather than one shared tuple.
+#   See services/sleep_score.py::_composite for the same hazard written up.
+_SUM_ORDER = (
+    "hrv", "sleep", "rhr", "recovery", "body_temp", "prev_activity", "sleep_debt",
+)
+
+# DISPLAY order for the breakdown — descending weight, so the row that moves
+# the score most is read first. Deliberately NOT Oura's own contributor order
+# (which sleep_score.CONTRIBUTOR_ORDER does follow): Oura's readiness screen
+# lists nine contributors that are not ours and carry no visible weights, so
+# matching its sequence here would imply a correspondence that does not exist.
+COMPONENT_ORDER = (
+    "hrv", "sleep", "recovery", "rhr", "body_temp", "sleep_debt", "prev_activity",
+)
+COMPONENT_LABELS = {
+    "hrv":           "HRV",
+    "sleep":         "Sleep",
+    "recovery":      "Recovery Index",
+    "rhr":           "Resting Heart Rate",
+    "body_temp":     "Body Temperature",
+    "sleep_debt":    "Sleep Debt",
+    "prev_activity": "Previous Day Activity",
+}
+# Which of the three Oura-supplied components are passed through already
+# scored by Oura (no baseline of ours behind them) — the breakdown shows no
+# `reference` for these, because there isn't one to show.
+OURA_PASSTHROUGH = frozenset({"recovery", "body_temp", "prev_activity"})
+
+
 # ─── Exported baseline helpers ────────────────────────────────────────────────
 
 def sleep_baseline(rows: list[dict]) -> tuple[float | None, int]:
@@ -203,8 +254,49 @@ def compute_readiness(
         float        — readiness score 0–100
         NOT_COMPUTED — insufficient data for any calculation
     """
-    if not bio_rows:
+    scored = _component_scores(for_date, bio_rows)
+    if scored is None:
         return NOT_COMPUTED
+
+    available = [
+        (c["score"], c["weight"])
+        for c in scored["components"].values() if c["score"] is not None
+    ]
+    if not available:
+        return NOT_COMPUTED
+
+    total_w      = sum(w for _, w in available)
+    weighted_sum = sum(s * (w / total_w) for s, w in available)
+
+    # ── Alcohol penalty — flat deduction, not a weighted component ────────────
+    if scored["alcohol_units"]:
+        weighted_sum = max(
+            0.0, weighted_sum - scored["alcohol_units"] * _ALCOHOL_PENALTY_PER_UNIT)
+
+    return round(weighted_sum, 1)
+
+
+def _component_scores(
+    for_date: date | None,
+    bio_rows: list[dict] | None,
+) -> dict | None:
+    """Every component sub-score, plus the raw value and baseline each was
+    scored against. None when there is no usable row at all — the two cases
+    that returned NOT_COMPUTED before any component was computed.
+
+    Split out of compute_readiness so readiness_breakdown can show the seven
+    components without that function's public float changing by a decimal —
+    it feeds engine.traffic_light, engine.readiness_training_modifier and
+    services.scheduling, so the split is deliberately mechanical. Mirrors
+    services/sleep_score.py::_contributor_scores.
+
+    `alcohol_units` is returned alongside rather than folded in: the penalty
+    is a flat post-hoc deduction, NOT a weighted component (see this module's
+    header for why), so it must not appear in `components` where the UI would
+    render it as one.
+    """
+    if not bio_rows:
+        return None
 
     for_date = for_date or date.today()
     date_str  = str(for_date)
@@ -212,7 +304,7 @@ def compute_readiness(
     # Only use rows on or before for_date so historical views are accurate
     rows_to_date = [r for r in bio_rows if r.get("date") and r["date"] <= date_str]
     if not rows_to_date:
-        return NOT_COMPUTED
+        return None
 
     today_row = next((r for r in rows_to_date if r["date"] == date_str), None)
 
@@ -278,30 +370,108 @@ def compute_readiness(
     body_temp_s      = _clamped100("oura_body_temperature")
     prev_activity_s  = _clamped100("oura_previous_day_activity")
 
-    # ── Weighted average (re-normalise when metrics are missing) ──────────────
-    # Rebalanced 2026-07-30 to make room for sleep_debt_s: every prior weight
-    # scaled by 0.9 (proportional, preserves relative importance), with the
-    # freed 10% going to sleep debt -- same tier as RHR/Body Temperature, a
-    # real vote without dominating the average.
-    candidates = [
-        (hrv_s, 0.225), (sleep_s, 0.18), (rhr_s, 0.135),
-        (recovery_s, 0.18), (body_temp_s, 0.135), (prev_activity_s, 0.045),
-        (sleep_debt_s, 0.10),
-    ]
-    available  = [(s, w) for s, w in candidates if s is not None]
+    # ── Assemble, in _SUM_ORDER ───────────────────────────────────────────────
+    # Weights are _WEIGHTS (rebalanced 2026-07-30 to make room for sleep_debt:
+    # every prior weight scaled by 0.9, proportional, preserving relative
+    # importance, with the freed 10% going to sleep debt -- same tier as
+    # RHR/Body Temperature, a real vote without dominating the average).
+    built = {
+        "hrv":           (hrv_s,           today_hrv,   hrv_base),
+        "sleep":         (sleep_s,         today_sleep, sleep_base),
+        "recovery":      (recovery_s,      recovery_s,      None),
+        "rhr":           (rhr_s,           today_rhr,   rhr_base),
+        "body_temp":     (body_temp_s,     body_temp_s,     None),
+        "sleep_debt":    (sleep_debt_s,    debt,        SLEEP_DEBT_THRESHOLD_HOURS),
+        "prev_activity": (prev_activity_s, prev_activity_s, None),
+    }
+    components = {
+        key: {
+            "key": key,
+            "label": COMPONENT_LABELS[key],
+            "score": built[key][0],
+            "weight": _WEIGHTS[key],
+            "raw": built[key][1],
+            "reference": built[key][2],
+        }
+        for key in _SUM_ORDER
+    }
+    return {
+        "components": components,
+        "alcohol_units": _get("alcohol_units"),
+        "sleep_baseline_window": _win,
+    }
 
-    if not available:
-        return NOT_COMPUTED
 
-    total_w      = sum(w for _, w in available)
-    weighted_sum = sum(s * (w / total_w) for s, w in available)
+def readiness_breakdown(
+    for_date: date | None = None,
+    bio_rows: list[dict] | None = None,
+) -> dict:
+    """The composite plus the seven component sub-scores that produced it.
 
-    # ── Alcohol penalty — flat deduction, not a weighted component ────────────
-    today_alcohol = _get("alcohol_units")
-    if today_alcohol:
-        weighted_sum = max(0.0, weighted_sum - today_alcohol * _ALCOHOL_PENALTY_PER_UNIT)
+    `score` is identical to compute_readiness(...) for the same inputs — both
+    walk _component_scores' dict in the same order and apply the same
+    renormalisation and alcohol deduction.
 
-    return round(weighted_sum, 1)
+    Components are always all seven, in COMPONENT_ORDER, so the UI can show
+    what is MISSING as readily as what scored. A component that could not be
+    computed has score None and effective_weight 0.0 — it cannot silently
+    contribute, and it must not be dropped from the list: on that panel the
+    gap is the most informative thing on screen.
+
+    `alcohol_penalty_points` is reported SEPARATELY from the components and
+    is never one of them. It is a flat post-hoc deduction (see this module's
+    header), so without it the contributions cannot be reconciled with the
+    score — which is exactly the "two numbers a few centimetres apart"
+    problem the Sleep drill-down's wake-time note already solves.
+
+    `contribution` is a component's share of the composite after
+    renormalisation. Contributions will not sum exactly to `score` (the
+    composite is rounded once, the parts are not, and the alcohol penalty
+    lands outside them entirely), so present it as a contribution, never as
+    exact arithmetic.
+    """
+    scored = _component_scores(for_date, bio_rows)
+    if scored is None:
+        return {
+            "score": NOT_COMPUTED,
+            "components": [
+                {"key": k, "label": COMPONENT_LABELS[k], "score": None,
+                 "weight": _WEIGHTS[k], "effective_weight": 0.0, "contribution": None,
+                 "raw": None, "reference": None}
+                for k in COMPONENT_ORDER
+            ],
+            "available_weight": 0.0,
+            "missing": list(COMPONENT_ORDER),
+            "alcohol_units": None,
+            "alcohol_penalty_points": 0.0,
+            "sleep_baseline_window": 0,
+        }
+
+    by_key = scored["components"]
+    available = [(c["score"], c["weight"]) for c in by_key.values() if c["score"] is not None]
+    total_w = sum(w for _, w in available) or 1.0
+
+    components = []
+    for key in COMPONENT_ORDER:
+        c = by_key[key]
+        ok = c["score"] is not None
+        eff = (c["weight"] / total_w) if ok else 0.0
+        components.append({
+            **c,
+            "effective_weight": round(eff, 4),
+            "contribution": round(c["score"] * eff, 2) if ok else None,
+        })
+
+    units = scored["alcohol_units"] or 0.0
+    return {
+        "score": compute_readiness(for_date, bio_rows),
+        "components": components,
+        "available_weight": round(sum(w for _, w in available), 4),
+        "missing": [k for k in COMPONENT_ORDER if by_key[k]["score"] is None],
+        "alcohol_units": scored["alcohol_units"],
+        "alcohol_penalty_points": round(units * _ALCOHOL_PENALTY_PER_UNIT, 1),
+        "sleep_baseline_window": scored["sleep_baseline_window"],
+    }
 
 
 # ─── Trend — carries recovery debt forward across days ────────────────────────

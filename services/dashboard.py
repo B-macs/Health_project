@@ -497,6 +497,158 @@ def sleep_unscored_reason(read_failed: bool) -> str:
     return "Oura recorded no sleep period for this night."
 
 
+# ─── Readiness drill-down ────────────────────────────────────────────────────
+#  Counterparts of the sleep helpers above, reusing sleep_tier's colour bands
+#  deliberately: the two drill-downs sit one tap apart and a 51 that is amber
+#  on one screen must not be green on the other. The bands are about a 0-100
+#  sub-score, not about sleep.
+
+def _readiness_component_value(key: str, raw, score, baseline_window: int = 0) -> str:
+    """The right-hand value on a readiness component row.
+
+    Absolute where a number means something to a person (ms, bpm, hours);
+    Oura's own 0-100 for the three contributors Oura pre-scores, because
+    there is no underlying raw unit we hold — printing a bare number is
+    honest, inventing a unit is not.
+    """
+    if raw is None:
+        return "not scored"
+    if key == "hrv":
+        return f"{raw:.0f} ms"
+    if key == "rhr":
+        return f"{raw:.0f} bpm"
+    if key in ("sleep", "sleep_debt"):
+        return format_hours(raw) or "—"
+    if key == "body_temp":
+        return f"{raw:.0f}"
+    return f"{raw:.0f}"
+
+
+def readiness_breakdown_rows(breakdown: dict) -> list[dict]:
+    """One display row per component, always all seven, in the breakdown's own
+    order. `bar_pct` is the sub-score; the right-hand value is the RAW reading,
+    matching sleep_breakdown_rows so the two panels read identically.
+
+    `weight_display` is carried here rather than composed in the view: the
+    weight is the single most useful thing for judging whether a low component
+    actually matters, and it is the one number the Sleep panel does not have
+    to show (its weights are fixed and equal-ish; readiness' span 4.5%-22.5%).
+    """
+    rows = []
+    window = breakdown.get("sleep_baseline_window") or 0
+    for c in breakdown.get("components", []):
+        colour, _ = sleep_tier(c["score"])
+        rows.append({
+            "key": c["key"],
+            "label": c["label"],
+            "scored": c["score"] is not None,
+            "value_display": _readiness_component_value(c["key"], c["raw"], c["score"], window),
+            "weight_display": f"{c['weight'] * 100:.1f}%",
+            "bar_pct": c["score"] if c["score"] is not None else 0.0,
+            "colour": colour,
+        })
+    return rows
+
+
+def readiness_coverage_caption(breakdown: dict) -> str:
+    """Renormalisation, said out loud — the readiness twin of
+    sleep_coverage_caption. Empty when all seven scored.
+
+    Readiness needs this more than sleep does, not less: its weights are
+    uneven, so losing HRV (22.5%) and losing Previous Day Activity (4.5%)
+    leave very differently-supported numbers behind, and both currently
+    render as an equally confident score."""
+    missing = breakdown.get("missing") or []
+    if not missing:
+        return ""
+    scored = 7 - len(missing)
+    pct = (breakdown.get("available_weight") or 0.0) * 100
+    return (f"Scored on {scored} of 7 components ({pct:.0f}% of the weight); "
+            f"the rest is renormalised away.")
+
+
+def readiness_alcohol_caption(breakdown: dict) -> str:
+    """The alcohol deduction, stated. Empty on a day with no units logged.
+
+    Load-bearing, not a nicety: the penalty is a flat post-hoc subtraction,
+    not a weighted component, so on a drinking day the seven contributions
+    above CANNOT be reconciled with the score without this line. Same class
+    of problem as the Sleep drill-down's wake-time note."""
+    units = breakdown.get("alcohol_units")
+    points = breakdown.get("alcohol_penalty_points") or 0.0
+    if not units or not points:
+        return ""
+    unit_word = "unit" if abs(units - 1.0) < 1e-9 else "units"
+    return (f"{points:.0f} points deducted for {units:g} {unit_word} of alcohol, "
+            f"applied after the weighted average — so the components above "
+            f"sum to {points:.0f} more than the score.")
+
+
+def readiness_unscored_reason(read_failed: bool) -> str:
+    """What to say when readiness could not be computed at all — the readiness
+    twin of sleep_unscored_reason, and here from the first commit rather than
+    added after the fact.
+
+    Two causes produce an identical empty result and must not produce an
+    identical message: a genuine absence of biometric readings, versus a
+    failed Google Sheets read. Asserting the first when the second happened
+    sends the reader to check their ring instead of reloading."""
+    if read_failed:
+        return ("Could not load your biometric readings — this is a loading "
+                "problem, not missing data. Try again shortly.")
+    return "No biometric readings for this day, so readiness could not be scored."
+
+
+def oura_readiness_rows(detail: dict | None) -> list[dict]:
+    """Oura's own nine contributors as display rows, in Oura's screen order.
+
+    Values are Oura's raw 0-100 scores, NOT its tier words — see
+    Repository.get_oura_readiness_detail for why reproducing the words would
+    mean inventing thresholds Oura has never published. The colour still
+    comes from sleep_tier, so the row reads at a glance without claiming to
+    be Oura's own label."""
+    if not detail:
+        return []
+    contributors = detail.get("contributors") or {}
+    labels = detail.get("labels") or {}
+    rows = []
+    for key, value in contributors.items():
+        colour, _ = sleep_tier(value)
+        rows.append({
+            "key": key,
+            "label": labels.get(key, key),
+            "scored": value is not None,
+            "value_display": "—" if value is None else f"{value:.0f}",
+            "weight_display": "",
+            "bar_pct": value if value is not None else 0.0,
+            "colour": colour,
+        })
+    return rows
+
+
+def readiness_divergence_caption(ours: float | str | None,
+                                 oura: float | None) -> str:
+    """States the gap between the two models, and that neither settles it.
+
+    Deliberately reports the difference without adjudicating: Oura's model is
+    proprietary and has never been validated against any external standard,
+    and we have no labelled outcome to score either against. Same stance as
+    sleep_fusion's agreement_pct/cohen_kappa — measured, shown, never
+    decisive."""
+    if ours is None or ours == _NOT_COMPUTED or oura is None:
+        return ("Oura's own nine contributors, for comparison. Neither model is "
+                "ground truth.")
+    gap = float(ours) - float(oura)
+    if abs(gap) < 0.5:
+        return ("Oura's own nine contributors. Both models agree on this day — "
+                "neither is ground truth, so agreement is reassurance, not proof.")
+    direction = "higher" if gap > 0 else "lower"
+    return (f"Oura scores this day {oura:.0f}; we score it {float(ours):.0f} — "
+            f"{abs(gap):.0f} points {direction}. Neither model is ground truth: "
+            f"Oura's is proprietary and unvalidated, and ours weights different "
+            f"inputs.")
+
+
 SLEEP_DEBT_BANDS = ("None", "Low", "Moderate", "High")
 
 

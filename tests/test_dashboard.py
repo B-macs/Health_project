@@ -639,3 +639,128 @@ def test_the_two_unscored_reasons_are_never_the_same_text():
     they must not produce an identical message."""
     assert (dashboard.sleep_unscored_reason(True)
             != dashboard.sleep_unscored_reason(False))
+
+
+# ─── Readiness drill-down helpers ────────────────────────────────────────────
+
+def _rb(components=None, missing=None, available=1.0, units=None, points=0.0):
+    return {
+        "score": 84.8,
+        "components": components if components is not None else [
+            {"key": "hrv", "label": "HRV", "score": 100.0, "weight": 0.225,
+             "effective_weight": 0.225, "contribution": 22.5, "raw": 20.0, "reference": 18.46},
+            {"key": "sleep_debt", "label": "Sleep Debt", "score": 36.2, "weight": 0.10,
+             "effective_weight": 0.10, "contribution": 3.62, "raw": 6.06, "reference": 9.5},
+        ],
+        "missing": missing or [],
+        "available_weight": available,
+        "alcohol_units": units,
+        "alcohol_penalty_points": points,
+        "sleep_baseline_window": 28,
+    }
+
+
+def test_readiness_rows_carry_the_weight_on_the_row():
+    """Readiness weights span 4.5%-22.5%, so 'this one is red' means very
+    different things at either end — unlike sleep's near-equal seven."""
+    rows = dashboard.readiness_breakdown_rows(_rb())
+    assert rows[0]["weight_display"] == "22.5%"
+    assert rows[1]["weight_display"] == "10.0%"
+
+
+def test_readiness_rows_use_real_units_not_bare_scores():
+    rows = dashboard.readiness_breakdown_rows(_rb())
+    assert rows[0]["value_display"] == "20 ms"
+    assert rows[1]["value_display"] == "6h 04m"
+
+
+def test_an_unscored_readiness_row_is_kept_and_flagged():
+    rows = dashboard.readiness_breakdown_rows(_rb(components=[
+        {"key": "hrv", "label": "HRV", "score": None, "weight": 0.225,
+         "effective_weight": 0.0, "contribution": None, "raw": None, "reference": None},
+    ]))
+    assert len(rows) == 1
+    assert rows[0]["scored"] is False
+    assert rows[0]["value_display"] == "not scored"
+    assert rows[0]["bar_pct"] == 0.0
+
+
+def test_readiness_coverage_caption_is_empty_when_all_seven_scored():
+    assert dashboard.readiness_coverage_caption(_rb()) == ""
+
+
+def test_readiness_coverage_caption_names_the_lost_weight_not_just_the_count():
+    """Losing HRV (22.5%) and losing Previous Day Activity (4.5%) both read as
+    '6 of 7' — the weight is what distinguishes them."""
+    cap = dashboard.readiness_coverage_caption(_rb(missing=["hrv"], available=0.775))
+    assert "6 of 7" in cap
+    assert "78%" in cap or "77%" in cap
+
+
+def test_readiness_alcohol_caption_is_empty_on_a_dry_day():
+    assert dashboard.readiness_alcohol_caption(_rb()) == ""
+
+
+def test_readiness_alcohol_caption_explains_why_the_rows_do_not_sum():
+    cap = dashboard.readiness_alcohol_caption(_rb(units=1.5, points=15.0))
+    assert "15" in cap and "1.5 units" in cap
+    assert "after the weighted average" in cap
+
+
+def test_readiness_alcohol_caption_uses_the_singular_for_one_unit():
+    assert "1 unit of alcohol" in dashboard.readiness_alcohol_caption(_rb(units=1.0, points=10.0))
+
+
+def test_readiness_unscored_reason_separates_a_failed_read_from_no_data():
+    """Same lesson as sleep_unscored_reason, built in from the first commit
+    this time rather than after a false claim reached the screen."""
+    failed = dashboard.readiness_unscored_reason(read_failed=True)
+    absent = dashboard.readiness_unscored_reason(read_failed=False)
+    assert failed != absent
+    assert "loading problem" in failed
+    assert "No biometric readings" in absent
+
+
+def test_oura_rows_show_numbers_because_ouras_tier_words_are_unpublished():
+    """Oura renders 45 as 'Fair' but 42 as 'Pay attention'; the thresholds are
+    not published and clearly differ per contributor, so reproducing the words
+    would mean inventing a mapping and attributing it to Oura."""
+    rows = dashboard.oura_readiness_rows({
+        "contributors": {"hrv_balance": 42.0, "recovery_index": 100.0},
+        "labels": {"hrv_balance": "HRV balance", "recovery_index": "Recovery index"},
+    })
+    assert [r["value_display"] for r in rows] == ["42", "100"]
+
+
+def test_oura_rows_keep_a_null_contributor_visible():
+    rows = dashboard.oura_readiness_rows({
+        "contributors": {"hrv_balance": None},
+        "labels": {"hrv_balance": "HRV balance"},
+    })
+    assert rows[0]["scored"] is False and rows[0]["value_display"] == "—"
+
+
+def test_oura_rows_on_missing_detail_is_empty_not_an_error():
+    assert dashboard.oura_readiness_rows(None) == []
+    assert dashboard.oura_readiness_rows({}) == []
+
+
+def test_divergence_caption_states_the_gap_and_its_direction():
+    cap = dashboard.readiness_divergence_caption(84.8, 57.0)
+    assert "57" in cap and "85" in cap and "28" in cap
+    assert "higher" in cap
+
+
+def test_divergence_caption_never_declares_a_winner():
+    """Oura's model is proprietary and unvalidated; ours has no labelled
+    outcome to score against. The caption may report, not adjudicate."""
+    for ours, oura in ((84.8, 57.0), (50.0, 80.0), (57.0, 57.0)):
+        cap = dashboard.readiness_divergence_caption(ours, oura)
+        assert "ground truth" in cap
+        assert "correct" not in cap and "accurate" not in cap
+
+
+def test_divergence_caption_survives_a_missing_score_on_either_side():
+    from services.readiness import NOT_COMPUTED
+    for ours, oura in ((None, 57.0), (NOT_COMPUTED, 57.0), (84.8, None)):
+        assert "ground truth" in dashboard.readiness_divergence_caption(ours, oura)

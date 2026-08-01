@@ -527,3 +527,137 @@ def test_alcohol_penalty_flows_into_trend():
     trend_sober = readiness.compute_readiness_trend(today, rows_sober, lookback_days=9)
 
     assert trend_with_alcohol < trend_sober - 15
+
+
+# ─── readiness_breakdown — the seven components made visible ─────────────────
+
+def _full_rows(n: int = 30) -> list[dict]:
+    """Ascending rows where every component is scorable."""
+    return [{
+        "date": f"2026-07-{i + 1:02d}",
+        "hrv_ms": 40.0, "resting_heart_rate": 55.0, "sleep_duration_hours": 7.5,
+        "oura_recovery_index": 80.0, "oura_body_temperature": 90.0,
+        "oura_previous_day_activity": 70.0,
+    } for i in range(n)]
+
+
+def test_weights_sum_to_one():
+    """If they ever don't, renormalisation quietly changes meaning: a day with
+    every component present would no longer be scored on the full weight."""
+    assert abs(sum(readiness._WEIGHTS.values()) - 1.0) < 1e-9
+
+
+def test_display_order_and_summation_order_hold_the_same_seven():
+    """They are deliberately different orders (see _SUM_ORDER's comment) but
+    must never drift into different SETS."""
+    assert set(readiness.COMPONENT_ORDER) == set(readiness._SUM_ORDER)
+    assert set(readiness.COMPONENT_ORDER) == set(readiness._WEIGHTS)
+    assert set(readiness.COMPONENT_ORDER) == set(readiness.COMPONENT_LABELS)
+    assert len(readiness.COMPONENT_ORDER) == 7
+
+
+def test_summation_order_is_not_display_order():
+    """Pins the thing most likely to be 'tidied' by a future reader. Float
+    addition is not associative, so aligning these would risk moving the
+    composite in its last decimal — which is user-visible and feeds
+    engine.traffic_light."""
+    assert readiness._SUM_ORDER != readiness.COMPONENT_ORDER
+
+
+def test_breakdown_score_equals_compute_readiness():
+    rows = _full_rows()
+    d = date(2026, 7, 30)
+    assert readiness.readiness_breakdown(d, rows)["score"] == readiness.compute_readiness(d, rows)
+
+
+def test_breakdown_always_reports_all_seven_components():
+    """A component that could not be computed keeps its row — on that panel
+    the gap is the most informative thing on screen."""
+    rows = [{"date": "2026-07-01", "oura_recovery_index": 80.0}]
+    b = readiness.readiness_breakdown(date(2026, 7, 1), rows)
+    assert len(b["components"]) == 7
+    assert [c["key"] for c in b["components"]] == list(readiness.COMPONENT_ORDER)
+
+
+def test_an_unscorable_component_contributes_nothing_and_is_listed_missing():
+    rows = [{"date": "2026-07-01", "oura_recovery_index": 80.0}]
+    b = readiness.readiness_breakdown(date(2026, 7, 1), rows)
+    hrv = next(c for c in b["components"] if c["key"] == "hrv")
+    assert hrv["score"] is None
+    assert hrv["effective_weight"] == 0.0
+    assert hrv["contribution"] is None
+    assert "hrv" in b["missing"]
+
+
+def test_available_weight_reflects_only_scored_components():
+    rows = [{"date": "2026-07-01", "oura_recovery_index": 80.0,
+             "oura_body_temperature": 90.0}]
+    b = readiness.readiness_breakdown(date(2026, 7, 1), rows)
+    assert abs(b["available_weight"] - (0.18 + 0.135)) < 1e-9
+
+
+def test_effective_weights_of_scored_components_sum_to_one():
+    """Renormalisation is what lets a partial day still produce a 0-100."""
+    rows = [{"date": "2026-07-01", "oura_recovery_index": 80.0,
+             "oura_body_temperature": 90.0}]
+    b = readiness.readiness_breakdown(date(2026, 7, 1), rows)
+    eff = sum(c["effective_weight"] for c in b["components"] if c["score"] is not None)
+    assert abs(eff - 1.0) < 1e-4
+
+
+def test_no_data_returns_all_seven_unscored_rather_than_an_empty_list():
+    b = readiness.readiness_breakdown(date(2026, 7, 1), [])
+    assert b["score"] == readiness.NOT_COMPUTED
+    assert len(b["components"]) == 7
+    assert b["missing"] == list(readiness.COMPONENT_ORDER)
+    assert b["available_weight"] == 0.0
+
+
+# ─── Alcohol is reported, never rendered as a component ──────────────────────
+
+def test_alcohol_is_not_one_of_the_components():
+    rows = _full_rows()
+    for r in rows:
+        r["alcohol_units"] = 2.0
+    b = readiness.readiness_breakdown(date(2026, 7, 30), rows)
+    assert len(b["components"]) == 7
+    assert all("alcohol" not in c["key"] for c in b["components"])
+
+
+def test_alcohol_penalty_points_are_reported_separately():
+    rows = _full_rows()
+    for r in rows:
+        r["alcohol_units"] = 1.5
+    b = readiness.readiness_breakdown(date(2026, 7, 30), rows)
+    assert b["alcohol_units"] == 1.5
+    assert b["alcohol_penalty_points"] == 15.0
+
+
+def test_contributions_exceed_the_score_by_exactly_the_alcohol_penalty():
+    """The reason the caption exists: without it the seven rows cannot be
+    reconciled with the number above them."""
+    rows = _full_rows()
+    for r in rows:
+        r["alcohol_units"] = 1.0
+    b = readiness.readiness_breakdown(date(2026, 7, 30), rows)
+    total = sum(c["contribution"] for c in b["components"] if c["contribution"] is not None)
+    assert abs((total - b["alcohol_penalty_points"]) - b["score"]) < 0.15
+
+
+def test_a_dry_day_reports_no_penalty():
+    b = readiness.readiness_breakdown(date(2026, 7, 30), _full_rows())
+    assert b["alcohol_penalty_points"] == 0.0
+
+
+# ─── The refactor must not have moved compute_readiness ──────────────────────
+
+def test_component_scores_and_compute_readiness_agree_on_a_partial_day():
+    """_component_scores was split out of compute_readiness; this pins that
+    both still walk the same seven in the same order."""
+    rows = _full_rows()
+    rows[-1]["hrv_ms"] = None
+    rows[-1]["oura_body_temperature"] = None
+    d = date(2026, 7, 30)
+    b = readiness.readiness_breakdown(d, rows)
+    assert b["score"] == readiness.compute_readiness(d, rows)
+    assert set(b["missing"]) == {"hrv", "body_temp"}

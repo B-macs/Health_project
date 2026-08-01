@@ -183,6 +183,19 @@ def _sleep_night_details(start: str, end: str) -> dict[str, dict]:
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
+def _oura_readiness_detail(start: str, end: str) -> dict[str, dict]:
+    """Oura's own readiness score and its nine contributors, for the Readiness
+    drill-down's comparison panel.
+
+    Deliberately NOT part of _bio_rolling: six of these nine are display and
+    model-audit material with no engine consumer, and threading them through
+    the biometric rows would carry them into readiness, the traffic light and
+    the metrics-history backfill for nothing. Same argument
+    _sleep_night_details makes for the hypnogram."""
+    return repo.get_repository().get_oura_readiness_detail(start, end)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def _sleep_fusion_by_date(start: str, end: str) -> dict[str, dict]:
     """Fused hypnograms for the window, keyed by date. The strip prefers the
     fused master; nights without a row fall back to Oura's own sequence."""
@@ -412,6 +425,27 @@ if view == "sleep":
     try:
         _sleep_fusion_rows = _sleep_fusion_by_date(_sleep_window_start, _sleep_window_end)
         _sleep_fusion_loaded = True
+    except Exception:
+        pass
+
+# Readiness drill-down data — same guard-and-only-when-open pattern as the
+# sleep block above. _sleep_details is fetched here too: the Readiness screen's
+# respiratory-rate tile and its two overnight charts all come from the night's
+# sleep detail, which is the same read, so opening Readiness costs the same
+# two reads Sleep does rather than a third.
+_oura_readiness: dict[str, dict] = {}
+_oura_readiness_loaded = False
+if view == "readiness":
+    _r_window_start = (selected_date - timedelta(days=7)).isoformat()
+    _r_window_end = selected_date.isoformat()
+    try:
+        _oura_readiness = _oura_readiness_detail(_r_window_start, _r_window_end)
+        _oura_readiness_loaded = True
+    except Exception:
+        pass
+    try:
+        _sleep_details = _sleep_night_details(_r_window_start, _r_window_end)
+        _sleep_details_loaded = True
     except Exception:
         pass
 
@@ -658,10 +692,17 @@ def _contributor_row(row: dict) -> str:
     fill = (f'<i style="display:block;height:100%;border-radius:2px;'
             f'width:{max(0.0, min(100.0, row["bar_pct"])):.1f}%;background:{row["colour"]};"></i>'
             if scored else "")
+    # Optional weight, shown only where the rows carry one. Sleep's seven
+    # weights are near-equal and disclosed in its caption; readiness' span
+    # 4.5%-22.5%, where "this component is red" means very different things
+    # at either end, so the weight belongs on the row itself.
+    weight = row.get("weight_display")
+    wt = (f'<span style="font-size:10px;color:#4A5568;margin-left:6px;">{weight}</span>'
+          if weight else "")
     return (
         f'<div style="padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.05);">'
         f'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;">'
-        f'<span style="font-size:13px;color:{lbl_col};">{row["label"]}</span>'
+        f'<span style="font-size:13px;color:{lbl_col};">{row["label"]}{wt}</span>'
         f'<span style="font-size:13px;font-weight:600;color:{val_col};">{row["value_display"]}</span>'
         f'</div>'
         f'<div style="height:4px;border-radius:2px;background:rgba(255,255,255,0.08);'
@@ -701,6 +742,82 @@ def _sleep_contributors_block() -> str:
                 f"correction; Key metrics below shows Oura's raw readings.")
         caption = f"{caption} {note}".strip()
     return _panel("Contributors", rows, caption)
+
+
+# ─── Readiness drill-down blocks ─────────────────────────────────────────────
+#  The Readiness card opened to a score arc and a sparkline and nothing else,
+#  while compute_readiness is a seven-component weighted average with
+#  renormalisation plus a post-hoc alcohol deduction — none of it visible.
+#  Structured to match the Sleep drill-down block-for-block; every panel here
+#  reuses _panel/_contributor_row/_key_metric_grid/_overnight_panel unchanged.
+
+def _readiness_contributors_block() -> str:
+    """The seven components behind our Readiness Score, with weights.
+
+    Pure math over _bio_rows, which is already loaded and cached — computed
+    inline for the same reason _sleep_contributors_block is."""
+    breakdown = readiness_model.readiness_breakdown(selected_date, _bio_rows)
+    if breakdown["score"] == _NOT_COMPUTED:
+        return _panel(
+            "Contributors",
+            '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
+            f'{dash.readiness_unscored_reason(_bio_rows_failed)}</div>',
+        )
+    rows = "".join(_contributor_row(r) for r in dash.readiness_breakdown_rows(breakdown))
+    caption = " ".join(c for c in (
+        dash.readiness_coverage_caption(breakdown),
+        dash.readiness_alcohol_caption(breakdown),
+    ) if c)
+    return _panel("Contributors", rows, caption)
+
+
+def _readiness_oura_block() -> str:
+    """Oura's own nine contributors, beneath ours.
+
+    Not decoration — this is the audit surface. Our model imports three of
+    these nine and computes two more itself from personal baselines; showing
+    all nine is what makes a divergence attributable to a component rather
+    than just visible as a different number."""
+    detail = _oura_readiness.get(selected_date.isoformat())
+    if not detail:
+        if not _oura_readiness_loaded:
+            # Distinguishing a failed read from an absent day, per the same
+            # rule _sleep_night_blocks follows.
+            return _panel(
+                "Oura says",
+                '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
+                'Could not load Oura&rsquo;s own contributors &mdash; try again shortly.</div>')
+        return ""
+    rows = "".join(_contributor_row(r) for r in dash.oura_readiness_rows(detail))
+    if not rows:
+        return ""
+    breakdown = readiness_model.readiness_breakdown(selected_date, _bio_rows)
+    caption = dash.readiness_divergence_caption(
+        breakdown["score"], detail.get("readiness_score"))
+    score = detail.get("readiness_score")
+    overline = "Oura says" if score is None else f"Oura says &middot; {score:.0f}"
+    return _panel(overline, rows, caption)
+
+
+def _readiness_key_metrics_block() -> str:
+    """The 2x2 Oura puts on its own Readiness screen: RHR, HRV, body
+    temperature deviation, respiratory rate. All four are already stored —
+    the first two from the blend, the last two Oura-only."""
+    detail = _sleep_details.get(selected_date.isoformat()) or {}
+    row = next((r for r in _bio_rows if r.get("date") == selected_date.isoformat()), {})
+
+    def num(v, fmt, suffix=""):
+        return "—" if v is None else f"{fmt.format(v)}{suffix}"
+
+    dev = row.get("oura_temperature_deviation")
+    return _key_metric_grid([
+        {"label": "Resting Heart Rate", "value": num(row.get("resting_heart_rate"), "{:.0f}", " bpm")},
+        {"label": "Heart Rate Variability", "value": num(row.get("hrv_ms"), "{:.0f}", " ms")},
+        # Signed deliberately: +0.4 and -0.4 are physiologically opposite and
+        # an unsigned "0.4 °C" would read as the same reading.
+        {"label": "Body Temperature", "value": "—" if dev is None else f"{dev:+.2f} °C"},
+        {"label": "Respiratory Rate", "value": num(detail.get("average_breath"), "{:.1f}", " /min")},
+    ])
 
 
 def _kv_rows(rows: list[dict], label_key: str = "label", value_key: str = "value") -> str:
@@ -1110,6 +1227,23 @@ def _metric_detail(view: str) -> str:
         col, disp, lbl, _, _, _ = dash.readiness_meta(_readiness_score)
         detail_label = f"READINESS · {date_label}"
         hist_key, hist_unit, hist_title, hist_color = "readiness_score", "", "Readiness Trend", "#6BAF8B"
+        # Order mirrors Oura's own Readiness screen: contributors, then key
+        # metrics, then the overnight autonomic series. The HR/HRV panels are
+        # the same _overnight_panel the Sleep drill-down uses — Oura puts them
+        # on Readiness, and they are autonomic-recovery signals, so they earn
+        # a place on both rather than being moved off Sleep.
+        _r_detail = _sleep_details.get(selected_date.isoformat()) or {}
+        pre_blocks = (
+            _readiness_contributors_block()
+            + _readiness_oura_block()
+            + _readiness_key_metrics_block()
+            + _overnight_panel("Lowest heart rate", _r_detail.get("hr_series"), "bpm",
+                               headline="low", secondary="average",
+                               colour="#8FCDF0", detail=_r_detail)
+            + _overnight_panel("Average HRV", _r_detail.get("hrv_series"), "ms",
+                               headline="average", secondary="high",
+                               colour="#6BAF8B", detail=_r_detail)
+        )
         extra_blocks = ""
     elif view == "sleep":
         col, disp, lbl, _, _ = dash.sleep_meta(_sleep_score, _sleep_need, _sleep_base_window)
