@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1093/1093 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1111/1111 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1093/1093 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1093/1093 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1111/1111 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -247,6 +247,32 @@ real rather than impressionistic.
    was produced under in `movement_cutpoints`, which is what makes a refit
    auditable — check whether the 265's fitted values diverge before
    backfilling, and re-derive history with `sync_sleep_fusion(days=1500)`.
+4. **⚠ HRV is HELD at Oura-only, on purpose** — `biometrics.HRV_GARMIN_HOLD`.
+   The documented Oura-70/Garmin-30 HRV blend has never actually run (the
+   645 has no HRV Status), so a watch that supports it would flip the blend
+   to a real 70/30 on the day the hardware changed and step the HRV series
+   readiness baselines are built from — a device artefact, not physiology.
+   Wrist and finger PPG do not agree on HRV: it comes from beat-to-beat
+   intervals, where a few ms of beat-detection error swamps RMSSD.
+   While held, HRV is Oura's **or nothing** — a night with only Garmin HRV
+   yields `None` rather than a wrist value silently rescaling a
+   finger-baselined series. **Lift it on a measurement, not a date:** run
+   `Repository.hrv_blend_status()`, confirm `ready` (≥14 paired nights),
+   look at `mean_bias` (signed garmin−oura; negative = Garmin lower =
+   readiness would quietly drop) and `sd_bias` (wide spread means the offset
+   is not constant and no single weighting fixes it), then set
+   `HRV_GARMIN_HOLD = False`. Two tests pin that the 70/30 returns intact.
+
+**Which device is more accurate, for the record.** HRV: **Oura**, and not
+close — finger PPG, measured during stillness, all night. HR: **Oura**
+overnight/at rest, **265** for running and daytime; for resistance training
+neither is trustworthy (wrist flexion and grip wreck wrist PPG) and a chest
+strap beats both. Measured baseline to re-test against, from 24 paired
+nights on the 645: Garmin RHR − Oura lowest HR = **mean +2.6, median +3.5,
+sd 3.4**; Garmin min HR − Oura lowest = **mean −4.4, sd 3.9**. Note that is
+partly definitional (Garmin's RHR is a smoothed daily figure, min_hr a
+single sample, Oura's is the sleep-period low) — the **sd ≈3.4 bpm** is the
+real disagreement. HRV could not be compared at all: 0 Garmin nights.
 
 **Re-test procedure** (all of it costs one probe plus a rebuild):
 
