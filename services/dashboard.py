@@ -604,56 +604,6 @@ def readiness_unscored_reason(read_failed: bool) -> str:
     return "No biometric readings for this day, so readiness could not be scored."
 
 
-def oura_readiness_rows(detail: dict | None) -> list[dict]:
-    """Oura's own nine contributors as display rows, in Oura's screen order.
-
-    Values are Oura's raw 0-100 scores, NOT its tier words — see
-    Repository.get_oura_readiness_detail for why reproducing the words would
-    mean inventing thresholds Oura has never published. The colour still
-    comes from sleep_tier, so the row reads at a glance without claiming to
-    be Oura's own label."""
-    if not detail:
-        return []
-    contributors = detail.get("contributors") or {}
-    labels = detail.get("labels") or {}
-    rows = []
-    for key, value in contributors.items():
-        colour, _ = sleep_tier(value)
-        rows.append({
-            "key": key,
-            "label": labels.get(key, key),
-            "scored": value is not None,
-            "value_display": "—" if value is None else f"{value:.0f}",
-            "weight_display": "",
-            "bar_pct": value if value is not None else 0.0,
-            "colour": colour,
-        })
-    return rows
-
-
-def readiness_divergence_caption(ours: float | str | None,
-                                 oura: float | None) -> str:
-    """States the gap between the two models, and that neither settles it.
-
-    Deliberately reports the difference without adjudicating: Oura's model is
-    proprietary and has never been validated against any external standard,
-    and we have no labelled outcome to score either against. Same stance as
-    sleep_fusion's agreement_pct/cohen_kappa — measured, shown, never
-    decisive."""
-    if ours is None or ours == _NOT_COMPUTED or oura is None:
-        return ("Oura's own nine contributors, for comparison. Neither model is "
-                "ground truth.")
-    gap = float(ours) - float(oura)
-    if abs(gap) < 0.5:
-        return ("Oura's own nine contributors. Both models agree on this day — "
-                "neither is ground truth, so agreement is reassurance, not proof.")
-    direction = "higher" if gap > 0 else "lower"
-    return (f"Oura scores this day {oura:.0f}; we score it {float(ours):.0f} — "
-            f"{abs(gap):.0f} points {direction}. Neither model is ground truth: "
-            f"Oura's is proprietary and unvalidated, and ours weights different "
-            f"inputs.")
-
-
 SLEEP_DEBT_BANDS = ("None", "Low", "Moderate", "High")
 
 

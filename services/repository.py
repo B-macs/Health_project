@@ -1723,8 +1723,18 @@ class Repository:
 
     def get_oura_readiness_detail(self, start: str, end: str) -> dict[str, dict]:
         """Oura's own readiness score and all nine of its contributors, keyed
-        by ISO date — for the Readiness drill-down's comparison panel and the
-        model audit behind it.
+        by ISO date.
+
+        ⚠ NO UI CONSUMER. The "Oura says" comparison panel this was written
+        for was removed once readiness MODEL_VERSION 2 landed: the drill-down
+        shows ONE row per metric, not one per source, and that stays true when
+        Garmin joins. Kept because it is the only way to read Oura's own
+        composite `readiness_score` — the nine contributors reach the engine
+        via BiometricRecord, but the composite does not — and that composite
+        is the anchor for checking whether our model has drifted (it is what
+        produced the r=0.992 agreement figure, and it is what the Garmin 265
+        re-test will need). Same reasoning that keeps readiness.hrv_baseline
+        alive with no scoring consumer.
 
         Contributors come back as {key: 0-100 or None} under `contributors`,
         in _OURA_READINESS_CONTRIBUTORS order (Oura's own screen order), with

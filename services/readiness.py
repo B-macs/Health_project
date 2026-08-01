@@ -58,6 +58,15 @@ Oura's, but the weighting and the composite are ours, which is what makes
 the score tunable — most immediately for the Garmin 265, whose HRV will need
 its own weight once biometrics.HRV_GARMIN_HOLD lifts.
 
+**One row per metric, never one per source.** The drill-down briefly showed
+our components beside Oura's nine as a side-by-side comparison; that was
+removed once this model landed. A reader should see a single authoritative
+number for HRV, and the blend behind it is the model's business, not the
+screen's. This holds when Garmin joins: a second device widens the input to
+a component, it does not add a second row. The comparison remains available
+for auditing via Repository.get_oura_readiness_detail — it is just not a
+thing the page shows.
+
 Sleep Debt stays OURS rather than using Oura's sleep_balance, which measures
 roughly the same thing: ours is computed here against this module's own
 progressive baseline, and services.scheduling's auto-shift shares its exact

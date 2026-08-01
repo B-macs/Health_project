@@ -183,19 +183,6 @@ def _sleep_night_details(start: str, end: str) -> dict[str, dict]:
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _oura_readiness_detail(start: str, end: str) -> dict[str, dict]:
-    """Oura's own readiness score and its nine contributors, for the Readiness
-    drill-down's comparison panel.
-
-    Deliberately NOT part of _bio_rolling: six of these nine are display and
-    model-audit material with no engine consumer, and threading them through
-    the biometric rows would carry them into readiness, the traffic light and
-    the metrics-history backfill for nothing. Same argument
-    _sleep_night_details makes for the hypnogram."""
-    return repo.get_repository().get_oura_readiness_detail(start, end)
-
-
-@st.cache_data(ttl=1800, show_spinner=False)
 def _sleep_fusion_by_date(start: str, end: str) -> dict[str, dict]:
     """Fused hypnograms for the window, keyed by date. The strip prefers the
     fused master; nights without a row fall back to Oura's own sequence."""
@@ -429,20 +416,12 @@ if view == "sleep":
         pass
 
 # Readiness drill-down data — same guard-and-only-when-open pattern as the
-# sleep block above. _sleep_details is fetched here too: the Readiness screen's
+# sleep block above. Only _sleep_details is needed: the Readiness screen's
 # respiratory-rate tile and its two overnight charts all come from the night's
-# sleep detail, which is the same read, so opening Readiness costs the same
-# two reads Sleep does rather than a third.
-_oura_readiness: dict[str, dict] = {}
-_oura_readiness_loaded = False
+# sleep detail, and everything else it shows is already in _bio_rows.
 if view == "readiness":
     _r_window_start = (selected_date - timedelta(days=7)).isoformat()
     _r_window_end = selected_date.isoformat()
-    try:
-        _oura_readiness = _oura_readiness_detail(_r_window_start, _r_window_end)
-        _oura_readiness_loaded = True
-    except Exception:
-        pass
     try:
         _sleep_details = _sleep_night_details(_r_window_start, _r_window_end)
         _sleep_details_loaded = True
@@ -769,34 +748,6 @@ def _readiness_contributors_block() -> str:
         dash.readiness_alcohol_caption(breakdown),
     ) if c)
     return _panel("Contributors", rows, caption)
-
-
-def _readiness_oura_block() -> str:
-    """Oura's own nine contributors, beneath ours.
-
-    Not decoration — this is the audit surface. Our model imports three of
-    these nine and computes two more itself from personal baselines; showing
-    all nine is what makes a divergence attributable to a component rather
-    than just visible as a different number."""
-    detail = _oura_readiness.get(selected_date.isoformat())
-    if not detail:
-        if not _oura_readiness_loaded:
-            # Distinguishing a failed read from an absent day, per the same
-            # rule _sleep_night_blocks follows.
-            return _panel(
-                "Oura says",
-                '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
-                'Could not load Oura&rsquo;s own contributors &mdash; try again shortly.</div>')
-        return ""
-    rows = "".join(_contributor_row(r) for r in dash.oura_readiness_rows(detail))
-    if not rows:
-        return ""
-    breakdown = readiness_model.readiness_breakdown(selected_date, _bio_rows)
-    caption = dash.readiness_divergence_caption(
-        breakdown["score"], detail.get("readiness_score"))
-    score = detail.get("readiness_score")
-    overline = "Oura says" if score is None else f"Oura says &middot; {score:.0f}"
-    return _panel(overline, rows, caption)
 
 
 def _readiness_key_metrics_block() -> str:
@@ -1235,7 +1186,6 @@ def _metric_detail(view: str) -> str:
         _r_detail = _sleep_details.get(selected_date.isoformat()) or {}
         pre_blocks = (
             _readiness_contributors_block()
-            + _readiness_oura_block()
             + _readiness_key_metrics_block()
             + _overnight_panel("Lowest heart rate", _r_detail.get("hr_series"), "bpm",
                                headline="low", secondary="average",
