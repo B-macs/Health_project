@@ -1678,6 +1678,44 @@ class Repository:
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
         }
 
+    def hrv_blend_status(self, days: int = 60, today: date | None = None) -> dict:
+        """Where the Oura/Garmin HRV comparison stands, and therefore whether
+        services.biometrics.HRV_GARMIN_HOLD can be lifted.
+
+        Reads both platforms' already-synced tabs (no device calls) and pairs
+        the nights where BOTH reported an HRV, then hands them to the pure
+        biometrics.hrv_agreement. Returns its stats plus `held` (is the hold
+        currently on) and `garmin_nights` (how many nights Garmin reported
+        HRV at all — which is 0 for the whole Forerunner 645 era, and is the
+        first number that will move when a watch supporting HRV Status
+        arrives).
+
+        Existence of this method is the point: the hold is meant to be lifted
+        on a measurement, and a measurement nobody can run is a measurement
+        nobody will make."""
+        today = today or date.today()
+        start = (today - timedelta(days=days)).isoformat()
+        end = today.isoformat()
+
+        oura_hrv = {
+            d: m.get("hrv_ms")
+            for d, m in self._oura_sleep_metrics_by_date(start, end).items()
+            if m.get("hrv_ms") is not None
+        }
+        garmin_hrv = {
+            d: m.get("hrv_ms")
+            for d, m in self._garmin_metrics_by_date(start, end).items()
+            if m.get("hrv_ms") is not None
+        }
+        paired = [(oura_hrv[d], garmin_hrv[d]) for d in sorted(oura_hrv) if d in garmin_hrv]
+
+        status = biometrics.hrv_agreement(paired)
+        status["held"] = biometrics.HRV_GARMIN_HOLD
+        status["garmin_nights"] = len(garmin_hrv)
+        status["oura_nights"] = len(oura_hrv)
+        status["window_days"] = days
+        return status
+
     def _alcohol_units_by_date(self, days: int, today: date) -> dict[str, float]:
         """Alcohol units logged via the morning check-in (Notion Readiness
         DB — not a wearable source), keyed by date. Feeds
