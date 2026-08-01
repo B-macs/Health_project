@@ -574,6 +574,41 @@ def format_clock(iso_datetime: str | None) -> str:
         return ""
 
 
+def overnight_series(payload, max_points: int = 180) -> dict:
+    """An Oura TimeSeries ({"interval", "items", "timestamp"}) → the shape the
+    overnight HR/HRV charts need: {values, low, high, average, count}.
+
+    Nulls are PRESERVED in `values` (the chart breaks its line across them)
+    but excluded from the statistics — Oura pads the start of a night with
+    them, and averaging a gap as zero would drag the reported mean down by an
+    amount that varies with how long the pad happened to be.
+
+    Returns count 0 rather than raising on anything unexpected, so a malformed
+    cell costs one panel instead of the page.
+    """
+    items = (payload or {}).get("items") if isinstance(payload, dict) else None
+    if not items:
+        return {"values": [], "low": None, "high": None, "average": None, "count": 0}
+
+    values = [v if isinstance(v, (int, float)) else None for v in items]
+    # Downsample by striding, never by averaging: a mean would smooth away the
+    # dips and excursions that are the entire reason to plot the night.
+    if len(values) > max_points:
+        step = len(values) / max_points
+        values = [values[int(i * step)] for i in range(max_points)]
+
+    real = [v for v in values if v is not None]
+    if not real:
+        return {"values": values, "low": None, "high": None, "average": None, "count": 0}
+    return {
+        "values": values,
+        "low": min(real),
+        "high": max(real),
+        "average": round(sum(real) / len(real), 1),
+        "count": len(real),
+    }
+
+
 def format_clock_offset(iso_datetime: str | None, minutes) -> str:
     """`06:21` from a start timestamp plus a duration in minutes.
 

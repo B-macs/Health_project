@@ -2555,6 +2555,13 @@ class Repository:
                 "oura_readiness_score": _float_or_none(main.get("readiness_score")),
                 "temperature_deviation": _float_or_none(main.get("readiness_temperature_deviation")),
                 "hypnogram_30sec": str(main.get("sleep_phase_30_sec") or ""),
+                # Overnight series, captured with the movement columns. Oura
+                # ships these as {"interval": 300.0, "items": [...],
+                # "timestamp": ...} — ~109 samples and ~730 chars, so they
+                # ride along in the same read rather than costing another.
+                "hr_series": _json_or(main.get("sleep_hr_series"), {}),
+                "hrv_series": _json_or(main.get("sleep_hrv_series"), {}),
+                "movement_30sec": str(main.get("movement_30_sec") or ""),
             }
         return out
 

@@ -567,3 +567,51 @@ def test_the_coverage_caption_names_how_much_of_the_score_was_measured():
     caption = dashboard.sleep_coverage_caption(_breakdown(missing=["efficiency", "rem"]))
     assert "5 of 7" in caption
     assert "renormalised" in caption
+
+
+# ─── overnight_series — the HR/HRV chart feed ───────────────────────────────
+
+def test_overnight_series_preserves_gaps_in_values_but_excludes_them_from_stats():
+    """Oura pads the start of a night with nulls. The chart must break its
+    line across them, but averaging a gap as zero would drag the reported mean
+    down by an amount that varies with how long the pad happened to be."""
+    s = dashboard.overnight_series(
+        {"interval": 300.0, "items": [None, None, 60, 58, 62], "timestamp": "x"})
+    assert s["values"] == [None, None, 60, 58, 62]
+    assert s["count"] == 3
+    assert s["low"] == 58 and s["high"] == 62
+    assert s["average"] == 60.0
+
+
+def test_overnight_series_downsamples_by_striding_not_averaging():
+    """A mean would smooth away the dips and excursions that are the entire
+    reason to plot the night."""
+    items = list(range(1000))
+    s = dashboard.overnight_series({"items": items}, max_points=50)
+    assert len(s["values"]) == 50
+    assert s["high"] == max(s["values"])          # a real sample, not a mean
+    assert all(v in items for v in s["values"])
+
+
+def test_overnight_series_reports_count_zero_rather_than_raising_on_junk():
+    """A malformed cell must cost one panel, not the page."""
+    for junk in (None, {}, {"items": []}, {"items": [None, None]}, "not-a-dict", 42):
+        assert dashboard.overnight_series(junk)["count"] == 0
+
+
+def test_overnight_series_of_an_all_null_night_still_returns_its_values():
+    s = dashboard.overnight_series({"items": [None, None, None]})
+    assert s["count"] == 0
+    assert s["average"] is None
+    assert len(s["values"]) == 3
+
+
+def test_format_clock_offset_derives_an_axis_end_from_a_duration():
+    """garmin_only nights have no Oura bedtime_end to label the axis with."""
+    assert dashboard.format_clock_offset("2026-07-27T19:38:00+00:00", 529) == "04:27"
+
+
+def test_format_clock_offset_is_blank_on_bad_input():
+    assert dashboard.format_clock_offset(None, 10) == ""
+    assert dashboard.format_clock_offset("nonsense", 10) == ""
+    assert dashboard.format_clock_offset("2026-07-27T19:38:00+00:00", "x") == ""

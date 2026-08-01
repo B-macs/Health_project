@@ -434,6 +434,66 @@ def movement_svg(codes: str, height: int = 26) -> str:
             f'background:#0E1220;">{"".join(parts)}</svg>')
 
 
+def overnight_chart_svg(values: list, height: int = 60, colour: str = "#8FCDF0",
+                        baseline: float | None = None) -> str:
+    """An overnight HR or HRV series as a filled line chart.
+
+    `values` is one number per sample with None for gaps — Oura pads the
+    start of the night with nulls, so gaps are normal and must break the line
+    rather than being drawn through as if measured. The path is emitted as
+    separate segments per contiguous run for exactly that reason.
+
+    Scaled to the night's own min/max rather than an absolute axis: the point
+    of these charts is the SHAPE of the night (the descent into deep sleep,
+    the REM excursions), and a fixed axis would flatten a calm night into a
+    straight line. The absolute numbers are stated beside the chart, so
+    nothing is lost by relativising the plot.
+    """
+    nums = [v for v in values if isinstance(v, (int, float))]
+    if len(nums) < 2:
+        return ""
+    lo, hi = min(nums), max(nums)
+    span = (hi - lo) or 1.0
+    n = len(values)
+    pad = 4
+
+    def xy(i, v):
+        x = i / (n - 1) * 100 if n > 1 else 0
+        y = pad + (1 - (v - lo) / span) * (height - 2 * pad)
+        return x, y
+
+    segments, run = [], []
+    for i, v in enumerate(values):
+        if isinstance(v, (int, float)):
+            run.append(xy(i, v))
+        elif run:
+            segments.append(run); run = []
+    if run:
+        segments.append(run)
+
+    parts = []
+    for seg in segments:
+        if len(seg) < 2:
+            continue
+        d = "M" + " L".join(f"{x:.2f},{y:.2f}" for x, y in seg)
+        area = (d + f" L{seg[-1][0]:.2f},{height} L{seg[0][0]:.2f},{height} Z")
+        parts.append(f'<path d="{area}" fill="{colour}" fill-opacity="0.13" />')
+        parts.append(f'<path d="{d}" fill="none" stroke="{colour}" '
+                     f'stroke-width="1.6" stroke-linejoin="round" '
+                     f'stroke-linecap="round" vector-effect="non-scaling-stroke" />')
+
+    if baseline is not None and lo <= baseline <= hi:
+        # Drawn FIRST so the series sits on top of it, and dashed so it reads
+        # as a reference rather than a second measured series.
+        _, by = xy(0, baseline)
+        parts.insert(0, f'<line x1="0" y1="{by:.2f}" x2="100" y2="{by:.2f}" '
+                        f'stroke="#3A4356" stroke-width="1" stroke-dasharray="3 3" />')
+
+    return (f'<svg viewBox="0 0 100 {height}" preserveAspectRatio="none" role="img" '
+            f'aria-label="Overnight trend" '
+            f'style="width:100%;height:{height}px;display:block;">{"".join(parts)}</svg>')
+
+
 def movement_legend_html() -> str:
     items = "".join(
         f'<span style="display:inline-flex;align-items:center;gap:5px;margin-right:14px;">'

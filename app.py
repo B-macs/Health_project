@@ -303,6 +303,28 @@ def _sync_biometric_blend_cached() -> tuple[bool, str | None]:
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
+def _sync_sleep_fusion_cached() -> tuple[bool, str | None]:
+    """Re-derive fused hypnograms for the recent window.
+
+    Was manual-only — a button in Insights → Sync — which meant every new
+    night had NO fusion row until someone remembered to press it. The
+    drill-down then fell back to Oura's own hypnogram and silently dropped the
+    movement tick strip, so the most recent night, the one actually being
+    looked at, was the one least likely to show the fused view.
+
+    Reads only the already-synced Sheet tabs (no Oura or Garmin API calls), so
+    it is immune to the Garmin 429 problem and safe to run on every open. A
+    short window: the full re-derive after a RULES_VERSION bump is still the
+    manual button's job, since that is ~400 nights and a different cost.
+    """
+    try:
+        repo.get_repository().sync_sleep_fusion(days=14)
+        return True, None
+    except Exception as exc:
+        return False, str(exc)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def _sync_metrics_history_cached() -> tuple[bool, str | None]:
     """Persists the last few days of Readiness/Sleep %/Strain to the
     Metrics History sheet tab (Repository.sync_metrics_history) — same
@@ -891,10 +913,54 @@ def _sleep_night_blocks() -> str:
         + f'<div style="margin-top:12px;">{stage_rows}</div>',
     )
 
+    out += _overnight_panel(
+        "Lowest heart rate", detail.get("hr_series"), "bpm",
+        headline="low", secondary="average", colour="#8FCDF0", detail=detail)
+    out += _overnight_panel(
+        "Average HRV", detail.get("hrv_series"), "ms",
+        headline="average", secondary="high", colour="#6BAF8B", detail=detail)
+
     vitals = dash.sleep_vitals_rows(detail, context)
     if vitals:
         out += _panel("Vitals while asleep", _kv_rows(vitals))
     return out
+
+
+_OVERNIGHT_LABELS = {"low": "Lowest", "high": "Max", "average": "Average"}
+
+
+def _overnight_panel(overline: str, payload, unit: str, headline: str,
+                     secondary: str, colour: str, detail: dict) -> str:
+    """One overnight series as a headline figure plus its shape over the night.
+
+    Omitted entirely when the series is absent rather than drawn as an empty
+    box: these columns were only added on 2026-07-31, so every night before
+    the Oura tabs were rebuilt genuinely has nothing to plot, and an empty
+    chart would imply a flat night rather than no measurement.
+    """
+    series = dash.overnight_series(payload)
+    if not series["count"]:
+        return ""
+    chart = styles.overnight_chart_svg(
+        series["values"], colour=colour, baseline=series["average"])
+    if not chart:
+        return ""
+
+    big = series[headline]
+    small = series[secondary]
+    axis_start = dash.format_clock(detail.get("bedtime_start"))
+    axis_end = dash.format_clock(detail.get("bedtime_end"))
+    axis = (f'<div style="display:flex;justify-content:space-between;font-size:10px;'
+            f'color:#6B7A9B;margin-top:4px;"><span>{axis_start}</span>'
+            f'<span>{axis_end}</span></div>' if axis_start and axis_end else "")
+    return _panel(
+        overline,
+        f'<div style="display:flex;align-items:baseline;gap:10px;">'
+        f'<span style="font-size:28px;font-weight:700;color:#D4DCEE;">{big:g}</span>'
+        f'<span style="font-size:12px;color:#6B7A9B;">{unit}</span>'
+        f'<span style="font-size:11px;color:#6B7A9B;margin-left:auto;">'
+        f'{_OVERNIGHT_LABELS[secondary]} {small:g} {unit}</span></div>'
+        f'<div style="margin-top:10px;">{chart}</div>{axis}')
 
 
 def _strain_source_block() -> str:
@@ -1252,17 +1318,24 @@ def _run_startup_sync() -> None:
     _sync_biometric_blend_cached()
     _sync_session_hr_cached()
     _sync_metrics_history_cached()
+    _sync_sleep_fusion_cached()
 
-    # The reads above this point ran against pre-sync data. Drop their cached
-    # results so the rerun genuinely re-reads, rather than repainting exactly
-    # what was already on screen.
-    for cached in (_bio_rolling, _sleep_night_details, _sleep_fusion_by_date,
-                   _sleep_daily_context, _metrics_history_rolling):
-        try:
-            cached.clear()
-        except Exception:
-            pass
-    st.rerun()
+    # Deliberately NO cache-clear and NO st.rerun() here.
+    #
+    # The first version did both, on the reasoning that the page above had
+    # rendered against pre-sync data and should be refreshed. It made things
+    # strictly worse and the screenshots showed it: the page painted
+    # correctly, then the rerun replaced it with "No Readings" and "Could not
+    # load this night's detail". Clearing every cached read forces a full
+    # re-read of six tabs at the exact moment the sync has just spent a burst
+    # of writes, which walks into Sheets' 60-operations-per-minute quota — so
+    # the rerun reliably re-read into failure.
+    #
+    # Nothing is lost by leaving it out. The syncs' purpose is to have the
+    # data ready, and the caches expire on their own TTL, so the freshly
+    # written night appears on the next visit rather than a few seconds later.
+    # That is the same trade this whole function already makes: briefly stale
+    # beats briefly absent.
 
 
 _run_startup_sync()
