@@ -615,3 +615,27 @@ def test_format_clock_offset_is_blank_on_bad_input():
     assert dashboard.format_clock_offset(None, 10) == ""
     assert dashboard.format_clock_offset("nonsense", 10) == ""
     assert dashboard.format_clock_offset("2026-07-27T19:38:00+00:00", "x") == ""
+
+
+# ─── Unscored-sleep reason: a failed read must not claim the ring saw nothing ──
+
+def test_sleep_unscored_reason_blames_loading_when_the_read_failed():
+    """The bug this exists for: a transient Sheets read failure rendered as
+    "Oura recorded no sleep period for this night" on a night whose data was
+    complete (all 7 contributors present, score 76.8). That sends the reader
+    to check their ring instead of reloading."""
+    msg = dashboard.sleep_unscored_reason(read_failed=True)
+    assert "Oura recorded no sleep period" not in msg
+    assert "not because" in msg or "loading problem" in msg
+
+
+def test_sleep_unscored_reason_blames_the_ring_only_when_the_read_succeeded():
+    assert dashboard.sleep_unscored_reason(read_failed=False) == (
+        "Oura recorded no sleep period for this night.")
+
+
+def test_the_two_unscored_reasons_are_never_the_same_text():
+    """Both causes produce an identical empty score; the whole point is that
+    they must not produce an identical message."""
+    assert (dashboard.sleep_unscored_reason(True)
+            != dashboard.sleep_unscored_reason(False))

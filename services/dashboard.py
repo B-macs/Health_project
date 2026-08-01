@@ -476,6 +476,27 @@ def sleep_coverage_caption(breakdown: dict) -> str:
             f"remaining weights renormalised to 100%.")
 
 
+def sleep_unscored_reason(read_failed: bool) -> str:
+    """What to say when the Sleep Score could not be computed at all.
+
+    Two causes produce an identical empty result and must not produce an
+    identical message. "Oura recorded no sleep period for this night" is a
+    claim about the ring; asserting it after a failed Google Sheets read is
+    simply false, and it sends the reader to check their ring instead of
+    reloading. Observed in the wild on a night whose data was complete —
+    every contributor present, score 76.8 — which is the whole reason this
+    distinction is now a function rather than a hardcoded string.
+
+    The same asymmetry the fusion work kept running into: a read that fails
+    looks exactly like data that is absent, and only the caller knows which
+    happened.
+    """
+    if read_failed:
+        return ("Could not load your biometric readings — this is a "
+                "loading problem, not missing sleep data. Try again shortly.")
+    return "Oura recorded no sleep period for this night."
+
+
 SLEEP_DEBT_BANDS = ("None", "Low", "Moderate", "High")
 
 

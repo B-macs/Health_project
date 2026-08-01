@@ -371,10 +371,23 @@ def _sync_metrics_history_cached() -> tuple[bool, str | None]:
 _oura_sync_ok, _oura_sync_err = st.session_state.get("_sync_status_oura", (True, None))
 _garmin_sync_ok, _garmin_sync_err = st.session_state.get("_sync_status_garmin", (True, None))
 
+# _bio_rows_failed distinguishes "the read failed" from "there is no data",
+# which the bare `except: _bio_rows = []` here could not. Every screen
+# downstream renders an empty _bio_rows as absence — the Sleep drill-down
+# said "Oura recorded no sleep period for this night", which is a statement
+# of fact about the ring, and it was false whenever the real cause was a
+# failed Sheets read. That is not hypothetical: a transient read failure
+# produced exactly that screen on a night whose data was complete (all seven
+# contributors present, score 76.8), and the same read-failure-looks-like-
+# missing-data confusion had already caused one wrong conclusion about
+# Metrics History. _sleep_night_blocks() has always drawn this distinction;
+# the biometric rows now do too.
+_bio_rows_failed = False
 try:
     _bio_rows = _bio_rolling(days=60)   # 60d to support 56d sleep baseline
 except Exception:
     _bio_rows = []
+    _bio_rows_failed = True
 
 # Sleep drill-down data — fetched ONLY when that view is open. These are two
 # extra Sheet reads; paying them on every Home render to populate a screen
@@ -673,7 +686,7 @@ def _sleep_contributors_block() -> str:
         return _panel(
             "Contributors",
             '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
-            'Oura recorded no sleep period for this night.</div>',
+            f'{dash.sleep_unscored_reason(_bio_rows_failed)}</div>',
         )
     rows = "".join(_contributor_row(r) for r in dash.sleep_breakdown_rows(breakdown))
     caption = dash.sleep_coverage_caption(breakdown)
@@ -1294,6 +1307,19 @@ styles.inject_css()                                # base styles (same as other 
 st.markdown(_home_css,    unsafe_allow_html=True)  # home-specific overrides (480px max-width etc.)
 st.markdown(_header_html, unsafe_allow_html=True)  # fixed date header
 st.markdown(_fab_html,    unsafe_allow_html=True)  # FAB → Check-In
+
+# A failed biometric read blanks every card on this page — the arcs go grey
+# and read "No Readings", which is indistinguishable from a night you simply
+# did not wear the ring. Say which one it is, once, at the top. Most likely
+# cause is Sheets' 60-operations-per-minute quota during the startup sync's
+# write burst (see _run_startup_sync's note); reloading in a moment fixes it.
+if _bio_rows_failed:
+    st.warning(
+        "**Could not load your biometric readings.** The scores below are "
+        "blank because the read failed, not because the data is missing — "
+        "reload in a moment.",
+        icon="⚠️",
+    )
 
 if view in ("strain", "readiness", "sleep"):
     st.markdown(_metric_detail(view), unsafe_allow_html=True)
