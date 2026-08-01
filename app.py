@@ -317,17 +317,21 @@ def _sync_metrics_history_cached() -> tuple[bool, str | None]:
         return False, str(exc)
 
 
-# Oura/Garmin sync must run before _bio_rolling() below — get_biometric_rolling()
-# now reads their Sheet tabs directly, so a stale-cache page load would
-# otherwise blend yesterday's data even though the sync ran moments later.
-# Metrics History sync runs last since it derives from all three above.
-_oura_sync_ok, _oura_sync_err = _sync_oura_cached()
-_garmin_sync_ok, _garmin_sync_err = _sync_garmin_cached()
-_blend_sync_ok, _blend_sync_err = _sync_biometric_blend_cached()
-# Must follow the Garmin sync (needs today's activities present) and precede
-# the _session_hr_rolling read below.
-_hr_sync_ok, _hr_sync_err = _sync_session_hr_cached()
-_metrics_sync_ok, _metrics_sync_err = _sync_metrics_history_cached()
+# ─── Device sync runs AFTER the page paints — see _run_startup_sync() at the
+#     bottom of this file. It used to run here, before _bio_rolling(), so that
+#     a page load could never blend data the sync was about to refresh.
+#
+#     That trade was backwards, and measurably so: sync_oura_all takes ~50s
+#     and sync_garmin_daily_if_due ~27s, against 4.3s to read what is already
+#     in Sheets. Every cold start therefore spent ~77 seconds rendering "No
+#     Readings" — a blank screen — purely to avoid showing data up to a couple
+#     of hours old. Freshness was being bought with total unavailability.
+#
+#     Now the page renders from stored data immediately and reruns once when
+#     the sync finishes, so the worst case is briefly-stale rather than
+#     briefly-absent. ─────────────────────────────────────────────────────────
+_oura_sync_ok, _oura_sync_err = st.session_state.get("_sync_status_oura", (True, None))
+_garmin_sync_ok, _garmin_sync_err = st.session_state.get("_sync_status_garmin", (True, None))
 
 try:
     _bio_rows = _bio_rolling(days=60)   # 60d to support 56d sleep baseline
@@ -1220,3 +1224,45 @@ if not _oura_sync_ok and _oura_sync_err:
 if not _garmin_sync_ok and _garmin_sync_err:
     st.caption("Garmin sync unavailable — will retry next visit.")
 nav.inject("home")
+
+
+def _run_startup_sync() -> None:
+    """Refresh the device tabs, then rerun once so the page picks it up.
+
+    Deliberately the LAST thing in the script. Streamlit streams each widget
+    as it executes, so everything above is already on screen by the time this
+    runs — the user sees their night in ~5s and this tops it up behind them,
+    instead of staring at "No Readings" for ~77s while it finishes.
+
+    Ordering between the five is still load-bearing and unchanged: the blend
+    derives from the Oura and Garmin tabs, session HR needs today's Garmin
+    activities, and metrics history derives from all of the above.
+
+    Runs at most once per session. Each call is individually throttled anyway
+    (Repository.oura_sync_due's local marker, and Garmin's own 2-hour gate),
+    so this guard is about not paying the rerun repeatedly, not about
+    preventing duplicate API calls.
+    """
+    if st.session_state.get("_startup_sync_done"):
+        return
+    st.session_state["_startup_sync_done"] = True
+
+    st.session_state["_sync_status_oura"] = _sync_oura_cached()
+    st.session_state["_sync_status_garmin"] = _sync_garmin_cached()
+    _sync_biometric_blend_cached()
+    _sync_session_hr_cached()
+    _sync_metrics_history_cached()
+
+    # The reads above this point ran against pre-sync data. Drop their cached
+    # results so the rerun genuinely re-reads, rather than repainting exactly
+    # what was already on screen.
+    for cached in (_bio_rolling, _sleep_night_details, _sleep_fusion_by_date,
+                   _sleep_daily_context, _metrics_history_rolling):
+        try:
+            cached.clear()
+        except Exception:
+            pass
+    st.rerun()
+
+
+_run_startup_sync()
