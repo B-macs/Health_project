@@ -289,4 +289,75 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Single-Leg Balance (Eyes Closed)":    ("mobility_core", 0.25),
     "McGill Big 3 — Quality Screen":       ("mobility_core", 0.25),
     "5-Minute Walk + Stair Assessment":    ("mobility_core", 0.25),
+
+    # ── Stage 1 (training_plan.PLAN) ────────────────────────────────────────
+    # Added 2026-08-01. These 46 names were previously ABSENT from this table
+    # and therefore scored at content_weighting.UNMAPPED_EXERCISE_WEIGHT (1.0)
+    # -- i.e. every Supine Knee-to-Chest and Diaphragmatic Breathing drill was
+    # counted as fully-loaded barbell work. 34 of the 63 exercise names in the
+    # logged history were affected, all of them Stage 1 rehab content, which
+    # inflated Strain and the ACWR chronic term for the entire Stage 1 era.
+    # The 1.0 default is the safe direction for an UNKNOWN name (never
+    # silently suppress load) but it is simply wrong for a KNOWN mobility
+    # drill; the fix is coverage, not a smaller default.
+    # bodyweight_compound (0.5) -- NEW tier. Multi-joint, bearing
+    # bodyweight, genuinely fatiguing, but nowhere near a loaded lift.
+    # Sits between isolation (0.3) and pull/upper_push (0.7): scoring a
+    # bodyweight chair sit-to-stand at squat=1.3 would be as wrong in
+    # the other direction as the 1.0 default it replaces.
+    "Chair Sit-to-Stand":                       ("bodyweight_compound", 0.5),
+    "Forward Step-Up (Stair)":                  ("bodyweight_compound", 0.5),
+    "Glute Bridge (Eccentric Single Load)":     ("bodyweight_compound", 0.5),
+    "Lateral Lunge":                            ("bodyweight_compound", 0.5),
+    "Lateral Step-Up (Single Stair)":           ("bodyweight_compound", 0.5),
+    "Reverse Lunge":                            ("bodyweight_compound", 0.5),
+    "Single-Leg RDL (Wall Support)":            ("bodyweight_compound", 0.5),
+    "Wall Sit":                                 ("bodyweight_compound", 0.5),
+    "Wall Sit (Extended Duration)":             ("bodyweight_compound", 0.5),
+    "Wall Sit (Isometric Quad)":                ("bodyweight_compound", 0.5),
+
+    # isolation (0.3) -- single-joint activation work, banded or lightly
+    # loaded.
+    "Clamshell":                                ("isolation", 0.3),
+    "Glute Bridge":                             ("isolation", 0.3),
+    "Glute Bridge March":                       ("isolation", 0.3),
+    "Prone Hip Extension (Single Leg)":         ("isolation", 0.3),
+    "Prone Hip Extension (Slow Tempo — 4-3-5)": ("isolation", 0.3),
+    "Side-Lying Hip Abduction":                 ("isolation", 0.3),
+    "Standing Calf Raise (Eccentric Focus)":    ("isolation", 0.3),
+    "Supine Glute Bridge (Bilateral)":          ("isolation", 0.3),
+
+    # mobility_core (0.25) -- release, stretch, breathing, balance,
+    # assessment, and core-stability holds. Stage 1 variants are pinned to
+    # the same 0.25 as their already-mapped Stage 2 counterparts (Bird-Dog,
+    # Dead Bug, McGill Curl-Up, Full Side Bridge) so the same movement never
+    # changes weight just because the block changed.
+    "90/90 Hip Flexor Hold":                    ("mobility_core", 0.25),
+    "Assessment Walk + Stair Check":            ("mobility_core", 0.25),
+    "Bird-Dog (Extended Hold)":                 ("mobility_core", 0.25),
+    "Bird-Dog with Full Reach":                 ("mobility_core", 0.25),
+    "Cat-Cow (Slow Flow)":                      ("mobility_core", 0.25),
+    "Dead Bug (Progression — 3s Hold)":         ("mobility_core", 0.25),
+    "Diaphragmatic Breathing":                  ("mobility_core", 0.25),
+    "Forearm Plank":                            ("mobility_core", 0.25),
+    "Hip 90/90 Flow":                           ("mobility_core", 0.25),
+    "Lateral Step Walk":                        ("mobility_core", 0.25),
+    "McGill Modified Curl-Up":                  ("mobility_core", 0.25),
+    "Prone Decompression Breathing":            ("mobility_core", 0.25),
+    "RDL Hip Hinge to Wall":                    ("mobility_core", 0.25),
+    "Right Posterior Hip Capsule Stretch":      ("mobility_core", 0.25),
+    "Sciatic Nerve Floss":                      ("mobility_core", 0.25),
+    "Side Bridge (Modified — Bent Knee)":       ("mobility_core", 0.25),
+    "Single-Leg Balance":                       ("mobility_core", 0.25),
+    "Standing Hip Flexor Release":              ("mobility_core", 0.25),
+    "Standing Hip Hinge (Wall Glute Touch)":    ("mobility_core", 0.25),
+    "Supine Full-Body Stretch":                 ("mobility_core", 0.25),
+    "Supine Hip Flexion (Marching)":            ("mobility_core", 0.25),
+    "Supine Knee Fallout (Butterfly)":          ("mobility_core", 0.25),
+    "Supine Knee-to-Chest":                     ("mobility_core", 0.25),
+    "Supine Knee-to-Chest (Bilateral)":         ("mobility_core", 0.25),
+    "Supine Knees-to-Chest (Bilateral Rock)":   ("mobility_core", 0.25),
+    "Walking — Gait Focus":                     ("mobility_core", 0.25),
+    "Wall-Supported Hip Hinge":                 ("mobility_core", 0.25),
+    "Week 1 Self-Assessment":                   ("mobility_core", 0.25),
 }

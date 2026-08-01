@@ -1659,13 +1659,21 @@ class Repository:
         """Oura's own daily_readiness contributor sub-scores (0-100), from
         the Oura Daily tab — Oura-exclusive, no Garmin equivalent, so this
         is a straight passthrough rather than a blend. Feeds
-        services.readiness.compute_readiness alongside HRV/RHR/Sleep."""
+        services.readiness.compute_readiness alongside HRV/RHR/Sleep.
+
+        temperature_deviation is the odd one out: the RAW °C figure, not a
+        0-100 sub-score, carried alongside body_temperature (Oura's scored
+        version of the same reading) because engine.traffic_light applies
+        absolute thresholds to it. `or None` is wrong for it — a genuine
+        0.0 deviation is a real reading and must not collapse to None the
+        way an empty cell does, so it goes through _float_or_none."""
         rows = self._read_records(self._oura_daily_ws())
         return {
             str(r["date"]): {
                 "body_temperature":      r.get("readiness_body_temperature") or None,
                 "recovery_index":        r.get("readiness_recovery_index") or None,
                 "previous_day_activity": r.get("readiness_previous_day_activity") or None,
+                "temperature_deviation": _float_or_none(r.get("readiness_temperature_deviation")),
             }
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
         }
@@ -1723,6 +1731,7 @@ class Repository:
                     oura_body_temperature=contributors.get("body_temperature"),
                     oura_recovery_index=contributors.get("recovery_index"),
                     oura_previous_day_activity=contributors.get("previous_day_activity"),
+                    oura_temperature_deviation=contributors.get("temperature_deviation"),
                 )
             sleep_raw = oura_sleep.get(d)
             if sleep_raw:

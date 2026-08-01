@@ -18,6 +18,7 @@ from dataclasses import replace
 from datetime import date
 
 import training_plan as tp
+from training_constants import EXERCISE_MOVEMENT_WEIGHT as _EXERCISE_MOVEMENT_WEIGHT
 from services import engine
 from services import plan as _plan
 from services.models import Phase
@@ -92,17 +93,68 @@ def summarize_garmin_activities(matched: list[dict]) -> dict:
     }
 
 
+# training_constants.EXERCISE_MOVEMENT_WEIGHT category -> display label.
+# Only consulted as a FALLBACK, after the keyword cascade below: the two
+# answer different questions and must not be collapsed into one. The weight
+# table asks "how much load does this cost?" (Pallof Press is isolation,
+# 0.3); the label asks "what pattern is this?" (Pallof Press is anti-rotation
+# core work). Where they disagree, the pattern answer is the one to display.
+_WEIGHT_CATEGORY_LABELS = {
+    "squat":               "Squat Pattern",
+    "hinge":               "Hip Hinge",
+    "pull":                "Upper Body Pull",
+    "upper_push":          "Upper Body Push",
+    "bodyweight_compound": "Bodyweight Compound",
+    "isolation":           "Isolation",
+    "mobility_core":       "Mobility",
+}
+
+
 def movement_category(ex: dict) -> str:
+    """Display label for an exercise's movement pattern.
+
+    Order matters. Core work is checked BEFORE pushing so "Pallof Press
+    Hold" doesn't match the "press" keyword and land in Upper Body Push,
+    and pulling is checked before pushing for the same reason in reverse.
+
+    2026-08-01: previously this was a 4-branch cascade whose final `return
+    "Mobility"` swallowed everything it didn't recognise -- which meant every
+    upper-body lift in the Stage 2 plan (Lat Pulldown, Incline DB Press,
+    Single-Arm DB Row, Face Pull) plus Hip Thrust (Loaded) was logged and
+    displayed as "Mobility". Fixed by adding the missing patterns and by
+    falling back to the movement-weight table's own category before
+    defaulting, so an unrecognised name is only ever called Mobility when
+    the weight table agrees it is mobility work.
+
+    Display-only: nothing downstream computes from this string (Strain/ACWR
+    weighting reads EXERCISE_MOVEMENT_WEIGHT by exercise NAME, never this).
+    Historical Notion rows keep whatever label they were written with.
+    """
     name = ex["name"].lower()
-    if any(k in name for k in ("walk", "breath", "diaphragm")):
+    # "walk" alone over-matches: a Lateral Band Walk is a banded glute
+    # activation drill done on the spot, not conditioning.
+    if any(k in name for k in ("walk", "breath", "diaphragm")) and not any(
+            k in name for k in ("band walk", "step walk")):
         return "Conditioning"
-    if any(k in name for k in ("glute bridge", "rdl", "hinge", "deadlift")):
+    if any(k in name for k in ("glute bridge", "rdl", "hinge", "deadlift",
+                                "hip thrust", "hip extension")):
         return "Hip Hinge"
+    # "side lying"/"side bridge" catch the side-plank family. Deliberately NOT
+    # "side-lying", which would also swallow Side-Lying Hip Abduction — an
+    # abductor isolation exercise, not core stability.
     if any(k in name for k in ("bird", "plank", "curl-up", "curl up", "side lying",
-                                "dead bug", "pallof")):
+                                "dead bug", "pallof", "side bridge", "mcgill")):
         return "Core Stability"
-    if any(k in name for k in ("squat", "lunge", "step")):
+    if any(k in name for k in ("squat", "lunge", "step-up", "step up",
+                                "sit-to-stand", "wall sit")):
         return "Squat Pattern"
+    if any(k in name for k in ("pulldown", "row", "pull-up", "chin-up", "face pull")):
+        return "Upper Body Pull"
+    if any(k in name for k in ("press", "push-up", "push up", "dip", "overhead")):
+        return "Upper Body Push"
+    entry = _EXERCISE_MOVEMENT_WEIGHT.get(ex["name"])
+    if entry is not None:
+        return _WEIGHT_CATEGORY_LABELS.get(entry[0], "Mobility")
     return "Mobility"
 
 

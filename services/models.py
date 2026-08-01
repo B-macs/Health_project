@@ -119,6 +119,15 @@ class BiometricRecord:
     oura_body_temperature: float | None = None
     oura_recovery_index: float | None = None
     oura_previous_day_activity: float | None = None
+    # Raw temperature deviation in °C against Oura's own personal norm —
+    # NOT a 0-100 contributor like oura_body_temperature above, which is
+    # Oura's already-scored version of the same signal. Both are carried:
+    # the scored one feeds services.readiness.compute_readiness's weighted
+    # average, the raw one feeds engine.traffic_light, which needs the
+    # physical units to apply absolute thresholds (a fever is a fever
+    # regardless of where the rest of the week sat). Positive = warmer
+    # than personal baseline.
+    oura_temperature_deviation: float | None = None
     # Alcohol units logged via the morning check-in (Notion Readiness DB,
     # not a wearable source) — feeds compute_readiness's flat point penalty.
     alcohol_units: float | None = None
