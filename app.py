@@ -924,9 +924,12 @@ def _hypnogram_strip(detail: dict | None) -> str:
     # theme's monospace face where "100" measures 18. Sized to that label
     # rather than left at the default, which pushed it out through the panel's
     # own padding.
+    # strip_detail sits directly under the frame, ahead of the legends and
+    # source notes — same placement the value charts give it, and the thing a
+    # tap opens should be next to what was tapped.
     return (f'<div style="margin-top:14px;">'
             f'{styles.chart_frame(plots, x_labels=x_labels, gutter_px=58)}</div>'
-            f'{styles.stage_legend_html()}{note}{movement_note}{strip_detail}')
+            f'{strip_detail}{styles.stage_legend_html()}{note}{movement_note}')
 
 
 def _strip_hits(chart: str, codes: str, start_iso, total_minutes,

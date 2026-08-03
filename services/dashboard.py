@@ -913,14 +913,22 @@ def value_axis(values, ticks: int = 4, floor: float | None = None,
             break
         step = _tick_step(step * 1.5, 1)
 
-    if floor is not None:
-        lo = max(lo, floor)
-    if cap is not None:
-        hi = min(hi, cap)
+    # Clamp ONLY where doing so does not exclude a real reading. `floor`/`cap`
+    # describe the scale, and the data is the more authoritative of the two: if
+    # a value ever lands outside the nominal limits, the axis must widen to
+    # show it rather than quietly plotting it off the edge of the chart.
+    if floor is not None and lo < floor <= lo_raw:
+        lo = floor
+    if cap is not None and hi > cap >= hi_raw:
+        hi = cap
     if hi <= lo:
         hi = lo + step
 
-    out, v, guard = [], lo, 0
+    # Ticks are multiples of `step`, anchored to the grid rather than to `lo`.
+    # A clamped bound need not be on the grid (strain's cap of 21 is not a
+    # multiple of 5), and starting the sequence at `lo` would drag every tick
+    # off round numbers to preserve one that was never round to begin with.
+    out, v, guard = [], math.ceil(lo / step - 1e-9) * step, 0
     while v <= hi + step * 1e-9 and guard < 64:
         out.append(round(v, 6))
         v += step
@@ -1224,18 +1232,20 @@ def overnight_point_detail(series: dict | None, index: int, *, unit: str,
         return None
     value = values[index]
 
-    rows = []
+    # The sample's clock time is the panel's TITLE, not a row — it is what
+    # identifies the point, exactly as the date identifies a point on a trend.
+    clock = ""
     indices = series.get("indices") or []
     interval, timestamp = series.get("interval"), series.get("timestamp")
     if index < len(indices) and interval and timestamp:
         clock = format_clock_offset(
             timestamp, float(indices[index]) * float(interval) / 60.0)
-        if clock:
-            rows.append({"label": "Time", "value": clock})
+    title = clock or "Sample"
 
+    rows = []
     if value is None:
         rows.append({"label": "Reading", "value": "Not measured"})
-        return {"title": "Sample", "rows": rows, "open_date": None}
+        return {"title": title, "rows": rows, "open_date": None}
 
     rows.append({"label": "Reading", "value": _fmt_number(value, decimals, unit)})
     avg = series.get("average")
@@ -1246,7 +1256,7 @@ def overnight_point_detail(series: dict | None, index: int, *, unit: str,
     if lo is not None and hi is not None:
         rows.append({"label": "Night low / high",
                      "value": f"{_fmt_number(lo, decimals)} – {_fmt_number(hi, decimals, unit)}"})
-    return {"title": "Sample", "rows": rows, "open_date": None}
+    return {"title": title, "rows": rows, "open_date": None}
 
 
 def segment_point_detail(codes: str, index: int, *, start_iso: str | None,
@@ -1281,7 +1291,9 @@ def segment_point_detail(codes: str, index: int, *, start_iso: str | None,
         rows.append({"label": "Duration",
                      "value": format_duration(duration * 60) or "—"})
         same = sum(e - s for s, e, c in merge_runs(codes) if c == code)
-        rows.append({"label": f"Total {labels.get(code, 'this class').lower()} tonight",
+        # Label keeps the class name's own casing — lower-casing it read as
+        # "Total rem tonight", and REM is an acronym.
+        rows.append({"label": f"Total {labels.get(code, 'this class')} tonight",
                      "value": format_duration(same * per_slot * 60) or "—"})
     rows.append({"label": "Share of night",
                  "value": f"{(end - start) / n * 100:.1f} %"})

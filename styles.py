@@ -504,24 +504,42 @@ def chart_points(points: list[dict]) -> str:
 #
 #  There is no Streamlit-level opt-out, and st.markdown strips <script>, so the
 #  only route is a components iframe — which is same-origin and can therefore
-#  reach window.parent. It installs ONE capture-phase click listener, guarded by
-#  a flag on the parent window so reruns cannot stack duplicates, and it matches
-#  ONLY this feature's own classes. Every other link in the app keeps whatever
+#  reach window.parent.
+#
+#  It removes the injected target attribute rather than intercepting the click
+#  and assigning parent.location. That was the first attempt and it does not
+#  work: Streamlit's component iframe is sandboxed WITHOUT allow-top-navigation,
+#  so a top-level navigation initiated by script inside it is silently dropped —
+#  the click was swallowed and nothing happened, which is worse than the extra
+#  tab. Stripping the attribute leaves the navigation to the parent document's
+#  own default click handling, which is not sandboxed and simply works.
+#
+#  The MutationObserver is required, not defensive: Streamlit re-renders the
+#  markdown block on every rerun and re-adds target each time. Patching is
+#  self-terminating — the selector matches only anchors that still HAVE a
+#  target, so the observer's own edits cannot retrigger it into a loop. Matches
+#  ONLY this feature's two classes; every other link in the app keeps whatever
 #  behaviour it already had.
 _CHART_LINK_JS = """
 <script>
 (function () {
-  var p = window.parent;
-  if (!p || !p.document || p.__healthChartNav) { return; }
-  p.__healthChartNav = true;
-  p.document.addEventListener('click', function (e) {
-    var el = e.target;
-    var a = (el && el.closest) ? el.closest('a.hp-hit, a.hp-link') : null;
-    if (!a || !a.href) { return; }
-    e.preventDefault();
-    e.stopPropagation();
-    p.location.href = a.href;
-  }, true);
+  try {
+    var p = window.parent;
+    if (!p || !p.document || p.__healthChartNav) { return; }
+    p.__healthChartNav = true;
+    var patch = function () {
+      var links = p.document.querySelectorAll(
+        'a.hp-hit[target], a.hp-link[target]');
+      for (var i = 0; i < links.length; i++) {
+        links[i].removeAttribute('target');
+      }
+    };
+    patch();
+    new p.MutationObserver(patch).observe(p.document.body, {
+      childList: true, subtree: true,
+      attributes: true, attributeFilter: ['target']
+    });
+  } catch (err) { /* cross-origin or no parent: links keep opening a tab */ }
 })();
 </script>
 """
