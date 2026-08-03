@@ -42,6 +42,13 @@ from datetime import date, datetime
 from services.config import Config
 from services.repository import Repository
 
+# How long the foreground path will wait for an already-running background
+# sync before giving up and rendering with what it has. Generous, because the
+# full chain legitimately takes ~77s on a cold run and waiting is the whole
+# point of that path — but finite, because a worker stuck on a socket must
+# not be able to freeze the page forever.
+_FOREGROUND_WAIT_SECONDS = 120.0
+
 
 class BackgroundSyncRunner:
     """One per process (repo.py holds it in st.cache_resource)."""
@@ -89,7 +96,19 @@ class BackgroundSyncRunner:
         gained by not waiting. Takes the same one-at-a-time lock, so it can
         never overlap a worker that is already going.
         """
-        if not self._lock.acquire(blocking=False):
+        # WAIT for an in-flight run rather than skipping it. Skipping broke
+        # the guarantee this method exists for: the caller takes this path
+        # precisely because today's numbers aren't on screen yet, so
+        # returning the previous run's stale results immediately is the one
+        # outcome it must not produce. An in-flight worker is already doing
+        # the work being waited for, so joining it is also the cheap answer.
+        #
+        # Bounded, because a worker blocked on a socket would otherwise
+        # freeze the page indefinitely — gspread, garminconnect and
+        # notion-client are all built here without an explicit HTTP timeout,
+        # so "hung forever" is reachable. On timeout we fall back to the old
+        # behaviour and let the page render with what we have.
+        if not self._lock.acquire(timeout=_FOREGROUND_WAIT_SECONDS):
             return self.results()
         try:
             return self._execute(today)

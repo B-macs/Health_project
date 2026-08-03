@@ -341,3 +341,35 @@ def test_explicit_none_existing_means_write_without_a_lookup():
     )
     assert len(ws.writes) == 1
     assert ws.reads == 0
+
+
+# ─── A stored 0 is a score, not a blank ─────────────────────────────────────
+# dashboard.snapshot_is_complete tests these for None to decide whether today
+# is settled. Collapsing a genuine 0 to None would report the day unsettled
+# and pin Home to the blocking foreground sync for the rest of that day.
+
+def test_get_metrics_history_keeps_a_genuine_zero():
+    stored = [{"date": "2026-08-01", "readiness_score": 0, "sleep_pct": 0,
+               "sleep_score": 0, "strain": 0}]
+    repo, _ws = _repo_with(METRICS, stored)
+    row = repo.get_metrics_history()[0]
+    assert row["readiness_score"] == 0.0
+    assert row["sleep_score"] == 0.0
+    assert row["strain"] == 0.0
+
+
+def test_get_metrics_history_maps_a_blank_to_none():
+    stored = [{"date": "2026-08-01", "readiness_score": "", "sleep_pct": "",
+               "sleep_score": "", "strain": ""}]
+    repo, _ws = _repo_with(METRICS, stored)
+    row = repo.get_metrics_history()[0]
+    assert row["readiness_score"] is None
+    assert row["sleep_score"] is None
+
+
+def test_a_zero_scored_day_still_counts_as_settled():
+    from services import dashboard
+    stored = [{"date": "2026-08-01", "readiness_score": 0, "sleep_pct": 0,
+               "sleep_score": 0, "strain": ""}]
+    repo, _ws = _repo_with(METRICS, stored)
+    assert dashboard.snapshot_is_complete(repo.get_metrics_history()[0]) is True

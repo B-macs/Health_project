@@ -1413,6 +1413,12 @@ if not _oura_sync_ok and _oura_sync_err:
     st.caption("Oura sync unavailable — will retry next visit.")
 if not _garmin_sync_ok and _garmin_sync_err:
     st.caption("Garmin sync unavailable — will retry next visit.")
+# A per-step failure surfaces above. This is the case those two can't cover:
+# the whole chain blew up before any step reported, so every status is still
+# its (True, None) default and the page would claim everything is fine.
+_sync_run_error = repo.get_sync_runner().last_error()
+if _sync_run_error:
+    st.caption("Device sync failed to run — will retry next visit.")
 nav.inject("home")
 
 

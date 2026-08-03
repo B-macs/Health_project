@@ -46,12 +46,16 @@ class _FakeRepo:
         self._delay = delay
         self._boom = boom
         self.calls = []
+        self.started_at = None
+        self.finished_at = None
         _FakeRepo.instances.append(self)
 
     def run_home_syncs(self, today=None, now=None, hours=2):
         self.calls.append(today)
+        self.started_at = time.monotonic()
         if self._delay:
             time.sleep(self._delay)
+        self.finished_at = time.monotonic()
         if self._boom:
             raise self._boom
         return self._results
@@ -118,11 +122,21 @@ def test_start_works_again_once_the_previous_run_finished():
 
 
 def test_run_now_does_not_overlap_an_in_flight_background_run():
-    runner = _runner(delay=0.4)
+    """The invariant is that two chains never run AT THE SAME TIME — they
+    would be two sets of clients writing the same Sheets tabs. run_now waits
+    for the in-flight one and then proceeds, so asserting "only one ran" would
+    pin the old skip-instead-of-wait behaviour rather than the guarantee.
+    Assert the guarantee: no temporal overlap."""
+    runner = _runner(delay=0.3)
     runner.start()
-    runner.run_now()                       # must not start a second chain
+    runner.run_now()
     _join(runner)
-    assert len(_FakeRepo.instances) == 1
+
+    ran = [r for r in _FakeRepo.instances if r.started_at is not None]
+    assert len(ran) >= 1
+    ran.sort(key=lambda r: r.started_at)
+    for earlier, later in zip(ran, ran[1:]):
+        assert earlier.finished_at <= later.started_at, "two chains overlapped"
 
 
 def test_concurrent_starts_from_many_threads_still_yield_one_run():
@@ -238,3 +252,30 @@ def test_a_thread_that_fails_to_start_does_not_wedge_the_runner():
     assert runner.start() is True      # still usable
     _join(runner)
     assert runner.results() == OK
+
+
+def test_run_now_waits_for_an_in_flight_run_instead_of_skipping_it():
+    """The foreground path exists to WAIT — today's numbers aren't on screen
+    yet. Returning the previous run's stale results immediately is the one
+    outcome it must not produce."""
+    runner = _runner(delay=0.5)
+    runner.start()
+    t0 = time.time()
+    runner.run_now()
+    waited = time.time() - t0
+    _join(runner)
+    assert waited >= 0.4, f"returned after {waited:.2f}s without waiting"
+
+
+def test_run_now_gives_up_rather_than_hanging_forever(monkeypatch):
+    """A worker stuck on a socket must not freeze the page indefinitely —
+    none of the HTTP clients are built with an explicit timeout."""
+    import services.background_sync as bs
+    monkeypatch.setattr(bs, "_FOREGROUND_WAIT_SECONDS", 0.2)
+    runner = _runner(delay=1.5)
+    runner.start()
+    t0 = time.time()
+    runner.run_now()
+    waited = time.time() - t0
+    assert waited < 1.0, f"waited {waited:.2f}s, should have bailed at 0.2s"
+    _join(runner)

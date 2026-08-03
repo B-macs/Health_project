@@ -359,6 +359,23 @@ def _cell_eq(a, b) -> bool:
         return str(a).strip() == str(b).strip()
 
 
+def _blank_or_number(val) -> float | None:
+    """None for a blank cell, the number otherwise — keeping a genuine 0.
+
+    Distinct from _sheet_float, which maps 0.0 to None as well. That is right
+    for the Apple Health rows it was written for, where 0 means "no reading",
+    and wrong for a score, where 0 is a reading.
+    """
+    if val is None:
+        return None
+    if isinstance(val, str) and not val.strip():
+        return None
+    try:
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
 def _row_unchanged(new_values: list, existing: dict | None, header: list[str]) -> bool:
     """True when every cell of `new_values` already holds that value in the
     existing row, so the write can be skipped entirely."""
@@ -2184,10 +2201,19 @@ class Repository:
                 continue
             out.append({
                 "date": d,
-                "readiness_score": r.get("readiness_score") or None,
-                "sleep_pct": r.get("sleep_pct") or None,
-                "sleep_score": r.get("sleep_score") or None,
-                "strain": r.get("strain") or None,
+                # _blank_or_number, not `or None`: `or` maps a stored 0 to
+                # None, and 0 is a real score here — a heavy-alcohol night
+                # floors readiness at 0, and a logged session with no load
+                # gives strain 0. That mattered little while these only fed
+                # sparklines, but dashboard.snapshot_is_complete now reads
+                # them to decide whether today is settled, and it tests for
+                # None specifically. A genuine 0 read back as None would
+                # report the day unsettled and pin Home to the blocking
+                # foreground sync on every open for the rest of that day.
+                "readiness_score": _blank_or_number(r.get("readiness_score")),
+                "sleep_pct": _blank_or_number(r.get("sleep_pct")),
+                "sleep_score": _blank_or_number(r.get("sleep_score")),
+                "strain": _blank_or_number(r.get("strain")),
                 # Which readiness model produced this row. Blank/absent means
                 # version 1 — rows written before the column existed. Mapped
                 # here as well as stored: this getter lists its keys
@@ -4091,12 +4117,17 @@ class Repository:
         now = now or datetime.now()
         if not self.sync_due(key, hours=hours, cooldown_minutes=cooldown_minutes, now=now):
             return True, None
-        self.mark_sync_attempted(key, when=now)
+        # The marker writes are inside the try too. They touch the
+        # filesystem, so they can fail (disk full, the file made read-only,
+        # a locked directory) — and with them outside, this method could
+        # raise despite documenting that it never does, taking the whole
+        # sync chain and the page down with it.
         try:
+            self.mark_sync_attempted(key, when=now)
             work()
+            self.mark_synced(key, when=now)
         except Exception as exc:
             return False, str(exc)
-        self.mark_synced(key, when=now)
         return True, None
 
     def run_home_syncs(self, today: date | None = None, now: datetime | None = None,
