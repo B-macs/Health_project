@@ -144,7 +144,12 @@ def test_blend_oura_missing_falls_back_to_garmin_and_flags_it():
     }
 
 
-def test_blend_picks_long_sleep_over_naps_for_the_same_day():
+def test_blend_takes_vitals_from_long_sleep_but_duration_from_the_whole_day():
+    """The split nap support turns on: the main night alone supplies HRV and
+    resting HR (a nap's are measured over minutes of an awake, upright body),
+    while the day's total sleep counts the nap too — it is sleep that
+    happened. Before 2026-08-03 the 30-minute nap here was discarded
+    entirely and this day read 7.0 h. See services/biometrics.py."""
     repo = _repo_with_tabs(
         oura_sleep=[
             {"sleep_id": "nap", "day": "2026-07-13", "type": "nap",
@@ -156,7 +161,8 @@ def test_blend_picks_long_sleep_over_naps_for_the_same_day():
     rows = repo.get_biometric_rolling(days=7, today=datetime.date(2026, 7, 13))
     r = rows[0]
     assert r.hrv_ms == 42
-    assert r.sleep_duration_hours == 7.0
+    assert r.resting_heart_rate == 48
+    assert r.sleep_duration_hours == 7.5
 
 
 def test_blend_empty_range_returns_empty_list():

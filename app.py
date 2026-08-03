@@ -701,6 +701,36 @@ def _sleep_debt_block(debt: dict) -> str:
                   f'Rest is triggered at {debt["threshold"]:.1f} h.')
 
 
+def _naps_block(naps: dict | None) -> str:
+    """Naps Oura recorded beside the main night, and the day total that
+    includes them.
+
+    Rendered only on days that actually have one. The day total is stated
+    explicitly because it is the figure readiness and the Sleep Score were
+    built from, while every other panel on this screen describes the night
+    alone — see dashboard.sleep_naps_display."""
+    if naps is None:
+        return ""
+    rows = "".join(
+        f'<div style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;">'
+        f'<span style="color:#B9C2D6;">{r["label"]}</span>'
+        f'<span style="color:#D4DCEE;margin-left:auto;">{r["duration"]}</span>'
+        f'<span style="color:#6B7A9B;width:42px;text-align:right;">{r["efficiency"]}</span></div>'
+        for r in naps["rows"]
+    )
+    noun = "nap" if naps["count"] == 1 else "naps"
+    body = (
+        f'<div style="font-size:28px;font-weight:700;color:#D4DCEE;">{naps["day_total"]}</div>'
+        f'<div style="font-size:11px;color:#6B7A9B;margin-top:2px;">'
+        f'{naps["night_total"]} at night plus {naps["nap_total"]} '
+        f'across {naps["count"]} {noun}</div>'
+        f'<div style="margin-top:12px;">{rows}</div>'
+    )
+    return _panel("Day total", body,
+                  "Readiness and Sleep Score use this total. The stages, "
+                  "vitals and efficiency above describe the night only.")
+
+
 _SLEEP_SOURCE_TITLES = {
     "fused": "Fused (Oura + Garmin)",
     "oura_only": "Oura",
@@ -890,6 +920,8 @@ def _sleep_night_blocks() -> str:
         + _hypnogram_strip(detail)
         + f'<div style="margin-top:12px;">{stage_rows}</div>',
     )
+
+    out += _naps_block(dash.sleep_naps_display(detail))
 
     out += _overnight_panel(
         "Lowest heart rate", detail.get("hr_series"), "bpm",

@@ -576,8 +576,15 @@ def test_night_details_read_the_hypnogram_as_text_not_a_number(monkeypatch):
 
 def test_night_details_describe_the_main_period_not_a_nap(monkeypatch):
     """Same pick_main_sleep_period gate the engine uses, so the drill-down
-    always explains the same night the score was computed from."""
+    always explains the same night the score was computed from.
+
+    The nap carries its own afternoon window rather than inheriting the
+    night's: two periods sharing one set of timestamps are a re-analysis of
+    the same sleep, not two sleeps, and biometrics.dedupe_sleep_periods
+    would rightly collapse them (see tests/test_sleep_naps.py)."""
     nap = {**_DETAIL_ROW, "sleep_id": "nap", "type": "late_nap",
+           "bedtime_start": "2026-07-27T16:10:00.000+02:00",
+           "bedtime_end": "2026-07-27T16:40:00.000+02:00",
            "total_sleep_duration": 900, "average_breath": 99.0}
     tabs = {repo_mod.sheets.OURA_SLEEP_PERIODS_WORKSHEET: _FakeTab(records=[nap, _DETAIL_ROW])}
     _patch_sheets(monkeypatch, tabs)

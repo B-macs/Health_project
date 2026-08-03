@@ -666,6 +666,44 @@ def sleep_key_metrics(detail: dict | None) -> list[dict]:
     ]
 
 
+_NAP_TYPE_LABELS = {"late_nap": "Late nap", "sleep": "Nap", "long_sleep": "Second sleep"}
+
+
+def sleep_naps_display(detail: dict | None) -> dict | None:
+    """The nap panel: one row per nap, plus the day total the engine actually
+    scored. None when the day has no qualifying nap, which is the overwhelming
+    majority of days — the panel should not appear at all rather than appear
+    empty.
+
+    This exists because the Sleep drill-down otherwise contradicts itself the
+    moment a nap is involved: every other number on that screen describes the
+    main night (it has to — the hypnogram, the stage shares and the vitals all
+    come from one continuous period), while readiness and Sleep Score were
+    computed from the day total. Stating both, and labelling which is which,
+    is the only version that isn't quietly wrong."""
+    d = detail or {}
+    naps = d.get("naps") or []
+    if not naps:
+        return None
+    rows = []
+    for n in naps:
+        label = _NAP_TYPE_LABELS.get(str(n.get("type") or ""), "Nap")
+        start = format_clock(n.get("bedtime_start"))
+        rows.append({
+            "label": label if not start else f"{label} · {start}",
+            "duration": format_duration(n.get("total_seconds")) or "—",
+            "efficiency": (f"{n['efficiency']:.0f} %"
+                           if n.get("efficiency") is not None else ""),
+        })
+    return {
+        "rows": rows,
+        "nap_total": format_duration(d.get("nap_seconds")) or "—",
+        "day_total": format_duration(d.get("day_total_seconds")) or "—",
+        "night_total": format_duration(d.get("total_seconds")) or "—",
+        "count": len(rows),
+    }
+
+
 def sleep_stage_legend(detail: dict | None, stage_minutes: dict | None = None) -> list[dict]:
     """Awake / REM / Light / Deep with duration and share of total sleep.
 

@@ -17,6 +17,8 @@ itself ever branching on it.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from services import models
 
 OURA_WEIGHT_RECOVERY_SLEEP = 0.70
@@ -156,17 +158,144 @@ def hrv_agreement(paired: list[tuple[float, float]]) -> dict:
     }
 
 
+# ─── Sleep periods — the day's main night, and its naps ──────────────────────
+#
+# Oura reports 0-N sleep periods per day. Normally one is the night (typed
+# "long_sleep"); the rest are naps, typed "sleep" (a period under 3 h) or
+# "late_nap". Two properties of that list drive everything below, and both
+# were measured against three years of this athlete's own history rather
+# than assumed.
+#
+# 1. PERIODS CAN BE DUPLICATED. Eight nights in April 2024 carry the same
+#    physical sleep twice under different sleep_ids — identical bedtime
+#    window and time_in_bed, total_sleep_duration differing by a minute or
+#    two, and one of each pair often carrying a sentinel lowest_heart_rate
+#    of 255. Picking a single period hid this entirely; summing does not.
+#    Un-deduplicated, 2024-04-19 reads 14.78 h of sleep instead of 7.42 h.
+#    So overlapping windows collapse to their longest member BEFORE any
+#    total is taken. This is also why the main-period pick below is written
+#    as a max() rather than a first-match: it must not depend on the order
+#    rows happen to sit in the sheet.
+#
+# 2. MOST NAPS ARE NOT NAPS. Of 57 non-main periods across the history,
+#    more than half run 1-13 minutes at 2-38% efficiency — the ring
+#    registering stillness, not sleep. Counting those would add 11 days of
+#    movement for 2.8 h of "sleep". NAP_MIN_SECONDS is the floor that keeps
+#    them out; at 15 minutes, 22 days move and 14.6 h of real napping is
+#    recovered.
+#
+# The split this module draws is duration vs architecture, and it is the
+# whole design. A nap adds to the day's total SLEEP TIME, which is what
+# readiness, Sleep Debt and the Sleep Score's Total Sleep contributor read.
+# It does not touch the night's ARCHITECTURE — efficiency, REM/deep shares,
+# latency, restless periods, HRV and resting HR all stay main-period-only,
+# because those describe one continuous sleep and a nap's own figures are
+# both differently-shaped and (see the efficiency values above) frequently
+# garbage. services/sleep_score.py depends on exactly this: it divides REM
+# and deep seconds by oura_sleep_total_seconds, which must therefore remain
+# the main night's total and never the day's.
+
+NAP_MIN_SECONDS = 900
+
+
+def _duration_seconds(entry: dict | None) -> float:
+    """total_sleep_duration as a float, 0.0 when absent or unparseable."""
+    if not entry:
+        return 0.0
+    try:
+        return float(entry.get("total_sleep_duration") or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _period_span(entry: dict) -> tuple[float, float] | None:
+    """(start, end) as epoch seconds, or None when the period cannot be
+    placed on a timeline — a missing, unparseable or timezone-naive bound.
+    Unplaceable periods are never merged with anything: a wrong merge
+    silently deletes real sleep, while a missed merge only leaves a
+    duplicate that the nap floor and the main-period pick already tolerate.
+
+    Epoch seconds rather than datetimes because Oura stamps each period in
+    the local offset in force at the time (the same night appears as
+    +01:00 and +02:00 across a DST change), and only an absolute instant
+    compares correctly across those."""
+    bounds = []
+    for key in ("bedtime_start", "bedtime_end"):
+        raw = str(entry.get(key) or "").strip()
+        if not raw:
+            return None
+        try:
+            parsed = datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+        if parsed.tzinfo is None:
+            return None
+        bounds.append(parsed.timestamp())
+    start, end = bounds
+    return (start, end) if end > start else None
+
+
+def dedupe_sleep_periods(entries: list[dict]) -> list[dict]:
+    """DETERMINISTIC. Collapses periods whose bedtime windows overlap down to
+    the longest member of each overlapping group — Oura's re-analysis of a
+    night arrives as a second row rather than an update to the first (see
+    this section's note 1). Idempotent, so it is safe to call on a list that
+    has already been through it. Input order of the surviving periods is
+    preserved."""
+    groups: list[dict] = []
+    for entry in entries:
+        span = _period_span(entry)
+        merged_into = None
+        if span is not None:
+            for group in groups:
+                gs = group["span"]
+                if gs is not None and span[0] < gs[1] and gs[0] < span[1]:
+                    group["span"] = (min(gs[0], span[0]), max(gs[1], span[1]))
+                    group["members"].append(entry)
+                    merged_into = group
+                    break
+        if merged_into is None:
+            groups.append({"span": span, "members": [entry]})
+    return [max(g["members"], key=_duration_seconds) for g in groups]
+
+
+def split_sleep_periods(
+    entries: list[dict], nap_min_seconds: float = NAP_MIN_SECONDS,
+) -> tuple[dict | None, list[dict]]:
+    """DETERMINISTIC. (main sleep period, qualifying naps) for one day.
+
+    The main period is the longest one typed "long_sleep", or — on the 11
+    days in this history where Oura recorded no long_sleep at all, because
+    the whole night ran under 3 h — simply the longest period there is.
+    That fallback is why a nap-only day still reports a night rather than
+    nothing. Naps are every other surviving period reaching
+    `nap_min_seconds`; ordering is by when they started, so a caller can
+    list them down the day.
+
+    (None, []) when there are no periods."""
+    unique = dedupe_sleep_periods(entries)
+    if not unique:
+        return None, []
+    long_sleeps = [e for e in unique if e.get("type") == "long_sleep"]
+    main = max(long_sleeps or unique, key=_duration_seconds)
+    naps = [e for e in unique
+            if e is not main and _duration_seconds(e) >= nap_min_seconds]
+    naps.sort(key=lambda e: (_period_span(e) or (float("inf"), 0))[0])
+    return main, naps
+
+
+def day_total_sleep_seconds(main: dict | None, naps: list[dict]) -> float:
+    """The day's total sleep — main night plus qualifying naps — in seconds.
+    0.0 when there is nothing; callers turn that into None, matching how a
+    zero-duration period has always been treated as no reading."""
+    return _duration_seconds(main) + sum(_duration_seconds(n) for n in naps)
+
+
 def pick_main_sleep_period(entries: list[dict]) -> dict | None:
-    """DETERMINISTIC. Oura returns 0-N sleep periods per day (naps + main
-    sleep). Prefers the entry typed "long_sleep"; falls back to whichever
-    entry has the longest total_sleep_duration if none is so typed (or
-    multiple naps only). None if the list is empty."""
-    if not entries:
-        return None
-    long_sleep = next((e for e in entries if e.get("type") == "long_sleep"), None)
-    if long_sleep is not None:
-        return long_sleep
-    return max(entries, key=lambda e: e.get("total_sleep_duration") or 0)
+    """DETERMINISTIC. The day's main sleep period — see split_sleep_periods,
+    which this delegates to. Kept as its own name because the hypnogram and
+    drill-down readers want only the night, never the naps."""
+    return split_sleep_periods(entries)[0]
 
 
 def blend_biometric_day(date_str: str, oura: dict, garmin: dict) -> models.BiometricRecord:

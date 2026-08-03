@@ -1730,14 +1730,26 @@ class Repository:
 
         out: dict[str, dict] = {}
         for day, entries in by_day.items():
-            main = biometrics.pick_main_sleep_period(entries)
+            main, naps = biometrics.split_sleep_periods(entries)
             if main is None:
                 continue
             duration_s = main.get("total_sleep_duration")
+            # DURATION counts the naps; ARCHITECTURE does not. See the sleep-
+            # period section of services/biometrics.py for why the two part
+            # company here. The practical consequence is that
+            # sleep_duration_hours and oura_sleep_total_seconds below are
+            # deliberately NOT the same quantity on a day with a nap, and
+            # services/sleep_score.py relies on that: the former is its Total
+            # Sleep contributor, the latter its REM/deep denominator.
+            day_total_s = biometrics.day_total_sleep_seconds(main, naps)
             out[day] = {
+                # HRV and resting HR stay main-period-only. A nap's average_hrv
+                # is measured over a few minutes of a body that has been awake
+                # and upright all day, which is not the same measurement as an
+                # overnight average and must not be averaged into one.
                 "hrv_ms": main.get("average_hrv") or None,
                 "resting_heart_rate": main.get("lowest_heart_rate") or None,
-                "sleep_duration_hours": round(duration_s / 3600, 2) if duration_s else None,
+                "sleep_duration_hours": round(day_total_s / 3600, 2) if day_total_s else None,
                 # Raw sleep-architecture fields — feeds
                 # services.sleep_score.compute_sleep_score. Kept raw (seconds/
                 # counts), not pre-scored; that module does its own 0-100 math.
@@ -2952,10 +2964,11 @@ class Repository:
                 by_day.setdefault(day, []).append(r)
         out: dict[str, dict] = {}
         for day, entries in by_day.items():
-            main = biometrics.pick_main_sleep_period(entries)
+            unique = biometrics.dedupe_sleep_periods(entries)
+            main = biometrics.pick_main_sleep_period(unique)
             if main is None or not str(main.get("sleep_phase_30_sec") or "").strip():
                 continue
-            out[day] = {**main, "periods_on_day": len(entries)}
+            out[day] = {**main, "periods_on_day": len(unique)}
         return out
 
     def get_sleep_night_details(self, start: str, end: str) -> dict[str, dict]:
@@ -2980,13 +2993,32 @@ class Repository:
 
         out: dict[str, dict] = {}
         for day, entries in by_day.items():
-            main = biometrics.pick_main_sleep_period(entries)
+            unique = biometrics.dedupe_sleep_periods(entries)
+            main, naps = biometrics.split_sleep_periods(unique)
             if main is None:
                 continue
             out[day] = {
                 "period_type": main.get("type") or "",
                 "period_index": _float_or_none(main.get("period")),
-                "periods_on_day": len(entries),
+                "periods_on_day": len(unique),
+                # Naps, so the drill-down can account for the difference
+                # between the night the architecture describes and the day
+                # total the engine scored. Sub-threshold periods are absent
+                # by construction (biometrics.NAP_MIN_SECONDS) — showing a
+                # 2-minute 3%-efficiency period as a "nap" the score ignored
+                # would raise a question about a non-event.
+                "naps": [
+                    {
+                        "type": n.get("type") or "",
+                        "bedtime_start": n.get("bedtime_start") or "",
+                        "bedtime_end": n.get("bedtime_end") or "",
+                        "total_seconds": _float_or_none(n.get("total_sleep_duration")),
+                        "efficiency": _float_or_none(n.get("efficiency")),
+                    }
+                    for n in naps
+                ],
+                "nap_seconds": biometrics.day_total_sleep_seconds(None, naps) or None,
+                "day_total_seconds": biometrics.day_total_sleep_seconds(main, naps) or None,
                 "bedtime_start": main.get("bedtime_start") or "",
                 "bedtime_end": main.get("bedtime_end") or "",
                 "total_seconds": _float_or_none(main.get("total_sleep_duration")),
