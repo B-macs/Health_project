@@ -328,6 +328,47 @@ _WAKE_TIME_ADJUSTMENTS_HEADER = ["date", "adjustment_minutes"]
 # every single page load.
 _SYNC_FAILURE_COOLDOWN_MINUTES = 15
 
+# Distinguishes "the caller supplied None because there is no such row"
+# from "the caller supplied nothing, look it up yourself". A plain None
+# default would conflate the two and silently re-read the tab per row.
+_UNSET = object()
+
+
+def _cell_eq(a, b) -> bool:
+    """Would writing `a` over `b` actually change the cell?
+
+    Compares the way a spreadsheet does, not the way Python does. gspread
+    numericises on read, so a value this code wrote as the float 71.0 comes
+    back as the int 71, and a blank comes back as "" rather than None. A
+    naive != therefore reports "changed" for every row on every sync, which
+    is precisely the churn the no-op skip exists to avoid.
+    """
+    if a is None:
+        a = ""
+    if b is None:
+        b = ""
+    if a == b:
+        return True
+    a_blank = isinstance(a, str) and not a.strip()
+    b_blank = isinstance(b, str) and not b.strip()
+    if a_blank or b_blank:
+        return a_blank and b_blank
+    try:
+        return float(a) == float(b)
+    except (TypeError, ValueError):
+        return str(a).strip() == str(b).strip()
+
+
+def _row_unchanged(new_values: list, existing: dict | None, header: list[str]) -> bool:
+    """True when every cell of `new_values` already holds that value in the
+    existing row, so the write can be skipped entirely."""
+    if not existing:
+        return False
+    return all(
+        _cell_eq(new, existing.get(col))
+        for new, col in zip(new_values, header)
+    )
+
 _DATASTORE_TABLE_BY_TAB = {
     sheets.GARMIN_DAILY_WORKSHEET: "garmin_daily",
     sheets.GARMIN_ACTIVITIES_WORKSHEET: "garmin_activities",
@@ -1934,7 +1975,8 @@ class Repository:
             "sources_missing": json.dumps(list(record.sources_missing)) if record.sources_missing else "",
         }
 
-    def upsert_biometric_blend_row(self, record: models.BiometricRecord) -> None:
+    def upsert_biometric_blend_row(self, record: models.BiometricRecord,
+                                    existing=_UNSET) -> None:
         """Writes one blended day into the Biometric Blend tab, keyed by
         date — re-running this for the same date overwrites it (idempotent),
         which is how a rolling few-day sync keeps very recent days current
@@ -1942,7 +1984,11 @@ class Repository:
         and become a fixed historical record."""
         row = self._biometric_blend_row(record)
         values = [row.get(k, "") for k in _BIOMETRIC_BLEND_HEADER]
-        sheets.upsert_row_by_key(self._biometric_blend_ws(), key_col=1, key_value=record.date, row_values=values)
+        ws = self._biometric_blend_ws()
+        if self._skip_unchanged(ws, _BIOMETRIC_BLEND_HEADER, "date",
+                                record.date, values, existing):
+            return
+        sheets.upsert_row_by_key(ws, key_col=1, key_value=record.date, row_values=values)
 
     def sync_biometric_blend(self, days: int = 7, today: date | None = None) -> int:
         """Computes get_biometric_rolling(days, today) and persists every
@@ -1951,8 +1997,10 @@ class Repository:
         for the routine once/day sync so only recent days get overwritten;
         large (e.g. 400) for the one-time/on-demand full-history backfill."""
         records = self.get_biometric_rolling(days=days, today=today)
+        # One read of the tab up front, not one per row — see _rows_by_key.
+        existing = self._rows_by_key(self._biometric_blend_ws(), "date")
         for r in records:
-            self.upsert_biometric_blend_row(r)
+            self.upsert_biometric_blend_row(r, existing=existing.get(_sheet_key(r.date)))
         return len(records)
 
     def sync_biometric_blend_if_due(self, days: int = 7, today: date | None = None,
@@ -2040,7 +2088,7 @@ class Repository:
             "readiness_model_version": readiness.MODEL_VERSION,
         }
 
-    def upsert_metrics_history_row(self, snapshot: dict) -> None:
+    def upsert_metrics_history_row(self, snapshot: dict, existing=_UNSET) -> None:
         """snapshot: {"date": ISO str, "readiness_score", "sleep_pct",
         "sleep_score", "strain"} (services.dashboard.
         compute_daily_metrics_snapshot's shape, plus a "date" key) — writes
@@ -2048,8 +2096,12 @@ class Repository:
         same upsert-by-date pattern as Biometric Blend)."""
         row = self._metrics_history_row(snapshot)
         values = [row.get(k, "") for k in _METRICS_HISTORY_HEADER]
+        ws = self._metrics_history_ws()
+        if self._skip_unchanged(ws, _METRICS_HISTORY_HEADER, "date",
+                                snapshot["date"], values, existing):
+            return
         sheets.upsert_row_by_key(
-            self._metrics_history_ws(), key_col=1, key_value=snapshot["date"], row_values=values,
+            ws, key_col=1, key_value=snapshot["date"], row_values=values,
         )
 
     def rebuild_metrics_history(self, fresh: dict[str, dict] | None = None) -> int:
@@ -2085,6 +2137,8 @@ class Repository:
             start=(today - timedelta(days=days - 1)).isoformat(), end=today.isoformat(),
         )
 
+        # One read of the tab up front, not one per row — see _rows_by_key.
+        existing = self._rows_by_key(self._metrics_history_ws(), "date")
         written = 0
         for i in range(days):
             d = today - timedelta(days=i)
@@ -2092,7 +2146,9 @@ class Repository:
                 d, bio_rows, au_rows, stage, wake_time_adjustments=wake_adjustments,
             )
             snapshot["date"] = d.isoformat()
-            self.upsert_metrics_history_row(snapshot)
+            self.upsert_metrics_history_row(
+                snapshot, existing=existing.get(_sheet_key(d.isoformat())),
+            )
             written += 1
         return written
 
@@ -3799,6 +3855,58 @@ class Repository:
 
     _READ_CACHE_TTL_SECONDS = 30.0
 
+    def _rows_by_key(self, ws, key_col_name: str) -> dict[str, dict]:
+        """The tab's current rows indexed by their key column, read ONCE.
+
+        A sync loop must take this snapshot up front and pass each row into
+        the upsert, rather than letting every upsert look itself up. The
+        read cache is keyed on sheets.write_generation(), so the first real
+        write in the loop invalidates it and every later lookup re-downloads
+        the whole tab — turning a 7-row sync where everything changed into 7
+        extra full-tab reads. Snapshotting first is also more correct for
+        this purpose: "did the row differ from what was there when the sync
+        started" is the question being asked.
+
+        Returns {} on a read failure, which makes every row look new and so
+        writes them all — the safe direction.
+        """
+        try:
+            rows = self._read_records(ws)
+        except Exception:
+            return {}
+        out: dict[str, dict] = {}
+        for r in rows:
+            key = _sheet_key(r.get(key_col_name))
+            if key:
+                out[key] = r
+        return out
+
+    def _skip_unchanged(self, ws, header: list[str], key_col_name: str,
+                        key_value: str, values: list,
+                        existing: dict | None) -> bool:
+        """True when the tab already holds exactly `values` for `key_value`,
+        so an upsert would rewrite the row with what is already in it.
+
+        Every Home open re-persists a rolling 7-day window to both Biometric
+        Blend and Metrics History. Six of those seven days are settled
+        history that cannot have changed, so six of every seven writes were
+        pure waste — two Sheets operations each (upsert_row_by_key does a
+        find then an update), against the 60-per-minute quota that is the
+        actual cause of the sync failures this code keeps working around.
+
+        It is also what makes "only overwrite when new information arrives"
+        literally true of the stored data, rather than merely true of what
+        the numbers happen to be.
+
+        `existing` is that date's row as of the START of the sync, taken
+        once by _rows_by_key — see there for why per-row lookups are wrong.
+        Pass None to mean "no such row" (always write); callers outside a
+        sync loop pass _UNSET to have it looked up here.
+        """
+        if existing is _UNSET:
+            existing = self._rows_by_key(ws, key_col_name).get(_sheet_key(key_value))
+        return _row_unchanged(values, existing, header)
+
     def _read_records(self, ws, numericise_ignore: list | None = None) -> list[dict]:
         key = (getattr(ws, "title", id(ws)), tuple(numericise_ignore or ()))
         entry = self._read_cache.get(key)
@@ -3912,12 +4020,11 @@ class Repository:
             return None
 
     def _write_sync_marker(self, name: str, when: datetime | None) -> None:
-        data = local_cache.read()
-        if when is None:
-            data.pop(name, None)
-        else:
-            data[name] = when.isoformat()
-        local_cache.write(data)
+        # local_cache.update, not read()+write() — the sync now runs on a
+        # background thread while the Streamlit script thread reads these,
+        # so the read-modify-write has to be one atomic step or concurrent
+        # marker updates lose each other. None deletes the key.
+        local_cache.update({name: when.isoformat() if when else None})
 
     def last_synced(self, key: str) -> datetime | None:
         """Last successful completion of the sync named `key`, or None."""
@@ -3991,6 +4098,46 @@ class Repository:
             return False, str(exc)
         self.mark_synced(key, when=now)
         return True, None
+
+    def run_home_syncs(self, today: date | None = None, now: datetime | None = None,
+                       hours: float = 2) -> dict[str, tuple[bool, str | None]]:
+        """The Home page's whole device-sync chain, each step individually
+        throttled to `hours`. Returns {name: (ok, error)} and never raises.
+
+        Ordering is load-bearing and unchanged from app.py's original inline
+        sequence: Oura and Garmin write the raw tabs; the blend derives from
+        those; session HR needs the day's Garmin activities present; metrics
+        history derives from all of them; sleep fusion reads the already
+        synced tabs. Grouped into one method so the background runner has a
+        single thing to call and the ordering can't drift between the
+        foreground and background paths.
+        """
+        today = today or date.today()
+        now = now or datetime.now()
+        kw = dict(today=today, now=now, hours=hours)
+        results: dict[str, tuple[bool, str | None]] = {}
+        results["oura"] = self.sync_oura_all_if_due(days=7, **kw)
+        results["garmin"] = self._garmin_daily_if_due_safe(days=2, **kw)
+        results["blend"] = self.sync_biometric_blend_if_due(days=7, **kw)
+        results["session_hr"] = self.sync_session_hr_recent_if_due(days=2, **kw)
+        results["metrics_history"] = self.sync_metrics_history_if_due(days=7, **kw)
+        results["sleep_fusion"] = self.sync_sleep_fusion_if_due(days=14, **kw)
+        return results
+
+    def _garmin_daily_if_due_safe(self, days: int = 2, today: date | None = None,
+                                  now: datetime | None = None, hours: float = 2
+                                  ) -> tuple[bool, str | None]:
+        """sync_garmin_daily_if_due, but never raising and a no-op when
+        Garmin isn't configured — matching the contract every other step of
+        run_home_syncs already has."""
+        if not self.garmin_configured():
+            return True, None
+        try:
+            return self.sync_garmin_daily_if_due(
+                days=days, today=today, hours=hours, now=now,
+            )
+        except Exception as exc:
+            return False, str(exc)
 
     def sync_oura_all(self, days: int = 7, today: date | None = None) -> dict:
         """Pulls every configured Oura data type for the last `days` days

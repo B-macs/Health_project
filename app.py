@@ -426,6 +426,18 @@ try:
 except Exception:
     pass
 
+# Is TODAY's dashboard settled — readiness and sleep both already persisted?
+# Decides whether _run_startup_sync at the bottom of this file waits for the
+# device sync or hands it to a worker thread. Always keyed on the real today,
+# never selected_date: browsing back to a past day must not change what the
+# CURRENT day still needs. A failed read leaves this False, which errs
+# towards syncing in the foreground — the safe direction, since the cards are
+# blank in that case anyway.
+_today_metrics_row = next(
+    (r for r in _metrics_hist if r.get("date") == _today.isoformat()), None,
+)
+_day_settled = dash.snapshot_is_complete(_today_metrics_row)
+
 _wake_adjustments: dict[str, float] = {}
 try:
     _wake_adjustments = _wake_time_adjustments_rolling(days=60)
@@ -1405,32 +1417,61 @@ nav.inject("home")
 
 
 def _run_startup_sync() -> None:
-    """Refresh the device tabs, then rerun once so the page picks it up.
+    """Refresh the device tabs. Deliberately the LAST thing in the script.
 
-    Deliberately the LAST thing in the script. Streamlit streams each widget
-    as it executes, so everything above is already on screen by the time this
-    runs — the user sees their night in ~5s and this tops it up behind them,
-    instead of staring at "No Readings" for ~77s while it finishes.
+    Streamlit streams each widget as it executes, so everything above is
+    already on screen by the time this runs — the user sees their night in
+    ~5s rather than staring at "No Readings" for ~77s while it finishes.
 
-    Ordering between the five is still load-bearing and unchanged: the blend
-    derives from the Oura and Garmin tabs, session HR needs today's Garmin
-    activities, and metrics history derives from all of the above.
+    FOREGROUND or BACKGROUND depends on whether today's numbers are already
+    on screen:
 
-    Runs at most once per session. Each call is individually throttled anyway
-    (Repository.oura_sync_due's local marker, and Garmin's own 2-hour gate),
-    so this guard is about not paying the rerun repeatedly, not about
-    preventing duplicate API calls.
+      not settled  run inline and wait. This is the first open of the day:
+                   last night's Oura row is not in Sheets yet, so the cards
+                   above are showing yesterday. Going to the background here
+                   would mean today's numbers do not appear until the NEXT
+                   time the app is opened, which is the one case where
+                   waiting is clearly right.
+      settled      hand it to a worker thread and return immediately. The
+                   numbers are already up; the sync is topping up data that
+                   may not even have changed. Inline, it kept the Streamlit
+                   session busy for up to ~77s after the page looked
+                   finished — every nav tap in that window did nothing.
+
+    Either way the cadence is the same 2 hours per step, durably marked, and
+    triggered by opening the app rather than by a timer.
+
+    Ordering between the six lives in Repository.run_home_syncs so the two
+    paths cannot drift apart.
+
+    Deliberately NO cache-clear and NO st.rerun() afterwards. The first
+    version did both, on the reasoning that the page above had rendered
+    against pre-sync data. It made things strictly worse and the screenshots
+    showed it: the page painted correctly, then the rerun replaced it with
+    "No Readings" and "Could not load this night's detail". Clearing every
+    cached read forces a re-read of six tabs at the exact moment the sync
+    has just spent a burst of writes, which walks into Sheets'
+    60-operations-per-minute quota — so the rerun reliably re-read into
+    failure. Leaving it out is also what makes the day's numbers STABLE:
+    once shown they stay put, and are replaced only when a later read
+    genuinely returns something different.
     """
-    if st.session_state.get("_startup_sync_done"):
-        return
-    st.session_state["_startup_sync_done"] = True
+    runner = repo.get_sync_runner()
 
-    st.session_state["_sync_status_oura"] = _sync_oura_cached()
-    st.session_state["_sync_status_garmin"] = _sync_garmin_cached()
-    _sync_biometric_blend_cached()
-    _sync_session_hr_cached()
-    _sync_metrics_history_cached()
-    _sync_sleep_fusion_cached()
+    if not _day_settled:
+        # Inline: the numbers aren't up yet and the user is waiting for them.
+        results = runner.run_now()
+        st.session_state["_sync_status_oura"] = results.get("oura", (True, None))
+        st.session_state["_sync_status_garmin"] = results.get("garmin", (True, None))
+        return
+
+    # Settled: fire and forget. start() returns False when a run is already
+    # in flight, which is the normal case on a rerun and not an error.
+    runner.start()
+    results = runner.results()
+    if results:
+        st.session_state["_sync_status_oura"] = results.get("oura", (True, None))
+        st.session_state["_sync_status_garmin"] = results.get("garmin", (True, None))
 
     # Deliberately NO cache-clear and NO st.rerun() here.
     #

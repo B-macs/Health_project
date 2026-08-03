@@ -740,3 +740,50 @@ def test_readiness_unscored_reason_separates_a_failed_read_from_no_data():
     assert "No biometric readings" in absent
 
 
+
+
+# ─── snapshot_is_complete ───────────────────────────────────────────────────
+# Home's "are today's numbers already on screen?" test. Decides whether the
+# device sync runs in the foreground (you're waiting for them) or on a
+# background thread (you're not). See app.py's _run_startup_sync.
+
+def test_snapshot_complete_when_readiness_and_sleep_both_present():
+    assert dashboard.snapshot_is_complete(
+        {"date": "2026-08-01", "readiness_score": 71, "sleep_score": 80, "strain": None},
+    ) is True
+
+
+def test_snapshot_incomplete_when_readiness_missing():
+    assert dashboard.snapshot_is_complete(
+        {"date": "2026-08-01", "readiness_score": None, "sleep_score": 80},
+    ) is False
+
+
+def test_snapshot_incomplete_when_sleep_missing():
+    assert dashboard.snapshot_is_complete(
+        {"date": "2026-08-01", "readiness_score": 71, "sleep_score": None},
+    ) is False
+
+
+def test_snapshot_incomplete_for_a_missing_row():
+    """The first open of the day: nothing persisted yet, so the sync must run
+    in the foreground rather than leaving the cards on yesterday."""
+    assert dashboard.snapshot_is_complete(None) is False
+    assert dashboard.snapshot_is_complete({}) is False
+
+
+def test_snapshot_completeness_ignores_strain():
+    """Strain arrives later, when a session is logged — through the app's own
+    write path, not a wearable sync. Requiring it would force a foreground
+    sync on every visit of every rest day."""
+    assert dashboard.snapshot_is_complete(
+        {"date": "2026-08-01", "readiness_score": 71, "sleep_score": 80, "strain": None},
+    ) is True
+
+
+def test_snapshot_complete_accepts_a_genuine_zero():
+    """0 is a real score, not 'missing' — completeness tests for None, not
+    falsiness."""
+    assert dashboard.snapshot_is_complete(
+        {"date": "2026-08-01", "readiness_score": 0, "sleep_score": 0},
+    ) is True

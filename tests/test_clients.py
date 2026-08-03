@@ -540,3 +540,93 @@ def test_rate_limits_are_recognised_from_the_message_not_just_the_exception_type
     assert garmin_client_mod._is_rate_limit(RuntimeError("returned 429")) is True
     assert garmin_client_mod._is_rate_limit(RuntimeError("Too Many Requests")) is True
     assert garmin_client_mod._is_rate_limit(RuntimeError("404 not found")) is False
+
+
+# ─── local_cache atomicity ──────────────────────────────────────────────────
+# The sync markers are now written from a BACKGROUND thread while the
+# Streamlit script thread reads them (services/background_sync.py), so the
+# read-modify-write has to be one atomic step and the file must never be
+# observable half-written.
+
+def test_local_cache_update_sets_and_preserves_keys(tmp_path):
+    from services.clients import local_cache
+    p = tmp_path / "state.json"
+    local_cache.update({"a_last_synced": "2026-08-01T08:00:00"}, path=p)
+    local_cache.update({"b_last_synced": "2026-08-01T09:00:00"}, path=p)
+    got = local_cache.read(path=p)
+    assert got["a_last_synced"] == "2026-08-01T08:00:00"
+    assert got["b_last_synced"] == "2026-08-01T09:00:00"
+
+
+def test_local_cache_update_deletes_on_none(tmp_path):
+    from services.clients import local_cache
+    p = tmp_path / "state.json"
+    local_cache.update({"x_last_attempted": "2026-08-01T08:00:00"}, path=p)
+    local_cache.update({"x_last_attempted": None}, path=p)
+    assert "x_last_attempted" not in local_cache.read(path=p)
+
+
+def test_local_cache_write_leaves_no_temp_files(tmp_path):
+    from services.clients import local_cache
+    p = tmp_path / "state.json"
+    local_cache.write({"k": "v"}, path=p)
+    leftovers = [f.name for f in tmp_path.iterdir() if f.name != "state.json"]
+    assert leftovers == []
+
+
+def test_local_cache_concurrent_updates_do_not_lose_keys(tmp_path):
+    """The lost-update race the lock exists for: without it, two threads read
+    the same snapshot and the second write drops the first's key."""
+    import threading
+    from services.clients import local_cache
+    p = tmp_path / "state.json"
+    barrier = threading.Barrier(8)
+
+    def _go(i):
+        barrier.wait()
+        local_cache.update({f"key_{i}": str(i)}, path=p)
+
+    threads = [threading.Thread(target=_go, args=(i,)) for i in range(8)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    got = local_cache.read(path=p)
+    assert sorted(got) == [f"key_{i}" for i in range(8)]
+
+
+def test_local_cache_read_never_sees_a_partial_or_missing_file(tmp_path):
+    """Reading concurrently with writes must never yield {} and must never
+    raise.
+
+    Both halves matter. {} reads as "never synced" and would trigger a
+    redundant sync — the exact thing these markers prevent. And on Windows
+    os.replace makes its target briefly unopenable, so a naive reader gets
+    PermissionError; read() retries rather than propagating it. This test
+    caught that on the first run.
+    """
+    import threading
+    from services.clients import local_cache
+    p = tmp_path / "state.json"
+    local_cache.write({"seed": "x" * 5000}, path=p)
+    seen_empty = []
+    errors = []
+    stop = threading.Event()
+
+    def _reader():
+        while not stop.is_set():
+            try:
+                if local_cache.read(path=p) == {}:
+                    seen_empty.append(True)
+            except Exception as exc:      # noqa: BLE001 - recording, not handling
+                errors.append(repr(exc))
+
+    t = threading.Thread(target=_reader, daemon=True)
+    t.start()
+    for i in range(60):
+        local_cache.write({"seed": "y" * 5000, "n": i}, path=p)
+    stop.set()
+    t.join(timeout=5)
+    assert errors == []
+    assert seen_empty == []

@@ -102,6 +102,29 @@ def step_wake_time_adjustment(current_minutes: float, direction: int,
     return round(max(0.0, min(ceiling, current_minutes + direction * step)), 1)
 
 
+def snapshot_is_complete(row: dict | None) -> bool:
+    """True when a persisted Metrics History row already carries the day's
+    morning numbers — readiness AND sleep both present.
+
+    Home uses this to decide whether the device sync has to run in the
+    FOREGROUND (the numbers aren't on screen yet, so you are waiting for
+    them) or can be pushed to a background thread (they are, so you are
+    not). Both derive from last night and are fixed by the time you wake up.
+
+    Strain is deliberately excluded. It legitimately changes later in the
+    day when a session is logged — but that arrives through the app's own
+    write path, which clears the caches, not through a wearable sync.
+    Requiring it here would force a foreground sync on every visit of every
+    rest day.
+
+    Tests for None-vs-zero: 0 is a real score (a heavy-alcohol night floors
+    readiness at 0), so this checks for None rather than falsiness.
+    """
+    if not row:
+        return False
+    return row.get("readiness_score") is not None and row.get("sleep_score") is not None
+
+
 def compute_daily_metrics_snapshot(
     d: date,
     bio_rows: list[dict],

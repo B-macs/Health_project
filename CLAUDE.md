@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1135/1135 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1218/1218 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1135/1135 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1135/1135 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1218/1218 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -105,13 +105,22 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
   Orchestration:    metrics.py — sync_weekly_rollup(); the one services/
                     module that both computes (via metrics_logic.py) and
                     does I/O (via repository.py) in the same call.
+                    background_sync.py — BackgroundSyncRunner, which runs
+                    Repository.run_home_syncs off the Streamlit script
+                    thread so opening the app never waits on the device
+                    APIs. Builds its OWN Repository per run (nothing in one
+                    is thread-safe) and takes a non-blocking lock so the
+                    reruns fired by every widget interaction can't stack up
+                    a thread each. See Key Rule 12.
   Typed models:     models.py (Phase, SessionRecord, ExerciseEntry, DayCell,
                     CheckInRecord, BiometricRecord, WeekScore, StreakInfo —
                     dataclasses)
   I/O clients:      clients/notion.py, clients/sheets.py (generic primitives
                     only, no column/property names), clients/local_cache.py
-                    (local JSON file — Oura sync-throttle marker, survives
-                    process restarts unlike st.cache_data),
+                    (local JSON file — durable sync-throttle markers,
+                    survives process restarts unlike st.cache_data; locked
+                    and atomically replaced because the background sync
+                    thread writes it while the script thread reads it),
                     clients/datastore_reader.py (read-only SQLite stand-in
                     for a Sheets worksheet — see "Offline mode" below)
   Data access:      repository.py — the ONLY place Notion property names /
@@ -136,7 +145,7 @@ Reference data:
                            BioAge muscle-imbalance count, actively imported by
                            services/bioage.py (PROFILE["imbalances"])
 
-tests/       — pytest suite (1031 tests), the sole deterministic gate
+tests/       — pytest suite (1218 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py,
                backfill_garmin_sleep_stages.py — probe before spending calls)
@@ -202,6 +211,10 @@ HEALTH_DATASTORE_PATH=datastore.db python -m streamlit run app.py
 8. **`patient_profile.py` is updated before each new training block**, after the Day 14 assessment updates findings, imbalances, and stage exit criteria.
 9. **Secrets stay in `.streamlit/secrets.toml`** (gitignored). Never commit API keys or service account credentials. `services/` must never read `st.secrets` directly — only `repo.py` adapts it into a `Config` at startup.
 10. **`services/` has zero Streamlit imports.** All backend I/O (Notion, Google Sheets) and business/plan logic lives there so it can be reused by a future non-Streamlit frontend. Streamlit pages (`app.py`, `views/*.py`) are thin presentation shells that call `repo.get_repository()` and `services.*`.
+12. **The device sync runs on a background thread, and that thread must never touch Streamlit.** `services/background_sync.py` owns it; `repo.get_sync_runner()` holds one per process via `st.cache_resource`. The worker builds its **own** `Repository` from the `Config` and shares nothing with the UI thread's — a `Repository` owns a gspread session, a Notion client and two mutable caches, none of them thread-safe, and the script thread reads through its copy the whole time. A worker has no `ScriptRunContext`, so no `st.*` call (including `st.session_state`) is legal from it. Results are read back off the runner by whichever script run asks next.
+13. **`_run_startup_sync` waits only while today's numbers are missing.** `dashboard.snapshot_is_complete` on today's persisted Metrics History row decides: not settled → run inline (last night's row isn't in Sheets yet, so backgrounding would leave the cards on yesterday until the next open); settled → hand to the worker and return. Cadence is 2h per step either way, durably marked, triggered by opening the app.
+14. **Never `st.rerun()` or `st.cache_data.clear()` after a sync.** Both were tried and made it strictly worse: clearing forces a re-read of six tabs at the moment the sync has just spent a burst of writes, which walks into Sheets' 60-per-minute quota. Leaving them out is also what keeps the day's numbers stable — once shown they stay, and change only when a later read genuinely differs.
+15. **A sync loop snapshots its tab once via `_rows_by_key`, then passes each row into the upsert.** `_read_records` is keyed on `sheets.write_generation()`, so the first real write invalidates it and per-row lookups would re-download the whole tab for every subsequent row. The upserts skip writes whose values are unchanged (`_cell_eq` compares the way a spreadsheet does — `71.0 == 71`, `"" == None`, but `"" != 0`), which is what makes "only overwrite when new information arrives" true of the stored data and not just of the numbers.
 11. **Before authoring any new training block, explicitly confirm each local clinical profile document has been read** — `patient_profile.py` plus every `Input_files/*.md` document present — and state how each one influenced the plan, per `docs/clinical_profile_weighting.md`. This is the checkable form of "understood and acknowledged," not a formality to skip.
 
 ---
