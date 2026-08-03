@@ -41,8 +41,14 @@ Current block: Stage 2A — 28-Day Gym Strength Block (Phase 2, Days 1-28,
   behind that schedule), not an oversight — revisit at the Day 28
   reassessment alongside the Stage 2B decision.
 Next block: reassess at Day 28 (2026-08-16) against stage_2_exit_criteria
-  below — decide Stage 2B vs. extending Stage 2A, and the running-
-  introduction question, with the physiotherapist before authoring either.
+  below — decide Stage 2B vs. extending Stage 2A, the running-introduction
+  question, AND endurance-biased scapular programming (see the 2026-08-03
+  symptom_log entry: five days a week of scapular work already runs and the
+  interscapular symptom persists through it, so the gap is endurance under
+  sustained low-load holding, not volume — this needs long isometric holds,
+  which is a prescription change and therefore a physio decision, not a
+  self-directed one). All three are explicit deferred decisions, not
+  oversights; settle them with the physiotherapist before authoring the block.
 """
 
 PROFILE = {
@@ -59,8 +65,10 @@ PROFILE = {
                       "pressing (finding #6) and no running this block — running is an explicit "
                       "deferred decision (see next_reassessment), not an oversight.",
     "next_reassessment": "Day 28 (2026-08-16) — reassess against stage_2_exit_criteria; decide "
-                          "Stage 2B vs. extending Stage 2A, and the running-introduction question, "
-                          "with the physiotherapist — see module docstring",
+                          "Stage 2B vs. extending Stage 2A, the running-introduction question, and "
+                          "endurance-biased scapular programming (2026-08-03 symptom_log entry — an "
+                          "endurance gap, not a volume gap), with the physiotherapist — see module "
+                          "docstring and docs/training/physio_brief_2026-08-16.md",
 
     # ─────────────────────────────────────────────────────────────────────────
     #  MRI Findings
@@ -667,6 +675,133 @@ PROFILE = {
                 "Right-sided extension discomfort at the base of the neck was initially noted "
                 "on 2026-07-31 but had resolved by the time this entry was finalized — not "
                 "included above as an active finding.",
+            ],
+        },
+        {
+            "date":   "2026-08-03",
+            "status": "Active — monitoring; carried forward to the post-Stage-2A block",
+            "region": "Interscapular, bilateral (left dominant) + left cervical base",
+            "title":  "Interscapular Endurance Gap — Consolidated Pattern (Desk-Exposure Driven)",
+
+            "mechanism": (
+                "Consolidation of the 2026-07-21 and 2026-07-31 entries above against the "
+                "actual check-in record, which changes three things those entries got wrong "
+                "(see notes). No loading event and no acute onset at any point — a static "
+                "ache that accumulates across the working day and is provoked by cervical "
+                "flexion. 2026-07-16: 'tightness that has lasted a few days now right between "
+                "my shoulder blades, worse towards the end of the day'. 2026-07-31: 'still "
+                "tight in traps left side down my spine when I put my head foreward'. "
+                "Desk exposure is the constant: symptomatic across sitting, standing AND "
+                "treadmill use, which rules out the chair and rules in duration. Forearms "
+                "confirmed UNSUPPORTED at the desk (user, 2026-08-03) — elbows floating while "
+                "typing, so the scapular retractors hold roughly 4kg of arm weight per side "
+                "for the length of the working day."
+            ),
+
+            "symptoms": {
+                "location": (
+                    "Medial scapular border, both sides — RIGHT on 2026-07-16 and 2026-07-23 "
+                    "('a little towards the bottom'), LEFT from 2026-07-21 onward — extending "
+                    "to the base of the neck, posterior, left side"
+                ),
+                "painful_with": [
+                    "Prolonged desk work — sitting, standing and treadmill walking alike",
+                    "Cumulative through the day ('worse towards the end of the day')",
+                    "Cervical flexion / head-forward position",
+                ],
+                "pain_free_with": ["Natural-pace walking (~20 min)"],
+                "neural":         "None — no arm symptoms, numbness, or tingling",
+                "severity":       "Flat and low throughout: tightness 1-3/10, pain 0/10 on every check-in 2026-07-16 → 2026-07-31",
+            },
+
+            "assessment": {
+                "likely_tissue": [
+                    "Left rhomboid major/minor and mid-trapezius at the medial scapular border "
+                    "— same tissue reasoned in the 2026-07-21 entry, not re-derived here",
+                    "Levator scapulae — the anatomical bridge between the cervical spine and the "
+                    "superior medial scapular angle, and why the ache migrates between the two "
+                    "sites along one corridor (established in the 2026-07-21 and 2026-07-31 entries)",
+                ],
+                "mechanism": (
+                    "FOUR CONVERGING DRIVERS, all already documented elsewhere in this profile:\n"
+                    "(1) The right post-Latarjet shoulder sag shifts postural work onto the LEFT. "
+                    "The tell is injury_profile.md #11 — the July 2025 rhomboid strain was on the "
+                    "LEFT despite the damaged shoulder being the RIGHT — together with the 2025 "
+                    "log's documented left TILT under overhead load. Cross-references finding #6; "
+                    "do not double-count as a separate caution.\n"
+                    "(2) Confirmed hypermobility (Beighton 6/9) means stability is muscular rather "
+                    "than ligamentous, so sustained low-load holding is the worst load case — "
+                    "muscle fatigues, ligament does not. Identical mechanism to the mid-back "
+                    "episodes (which flare after a day of sitting, not after the sprints) and to "
+                    "the 2026-07-06 left QL strain (isometric holding for the length of a walk).\n"
+                    "(3) Finding #3's sitting-driven T6-T10 thoracic stiffness tilts the scapula "
+                    "forward off the ribcage, leaving the retractors holding LENGTHENED all day — "
+                    "a mechanically losing position.\n"
+                    "(4) Desk exposure with unsupported forearms (above) is the unchanged variable."
+                ),
+                "underlying_pattern": (
+                    "NOT a volume gap — an ENDURANCE gap. Scapular work already runs five days a "
+                    "week (see notes), and the symptom persists through all of it, because every "
+                    "one of those is a short high-quality set while the provocation is ~8 hours of "
+                    "continuous low-load holding. Nothing in the block trains that capacity. This "
+                    "is the 2025 movement-pattern analysis's documented 'lumbar endurance low / "
+                    "deep core turns off under fatigue' finding appearing in a new region."
+                ),
+            },
+
+            "plan": [
+                "Forearm support at the desk — both forearms resting on desk or armrests, elbows "
+                "under the shoulders, monitor top at eye level. Highest-leverage intervention and "
+                "needs no sign-off: it removes the arm-weight load the retractors are holding.",
+                "Movement break every 30-45 minutes, taken BEFORE onset rather than after. The "
+                "~20-minute walk that relieved the interscapular component on 2026-07-21 is the "
+                "proven dose — it was simply mistimed, taken once the ache had already built.",
+                "Do NOT chase posture correction. The 2026-07-06 entry records this exact route "
+                "producing a genuine strain in a different region, and its own lesson — 'a "
+                "comfortable posture change is not a conditioned one' — applies unchanged here. "
+                "Vary position frequently; do not hold a corrected one.",
+                "Release the overactive upper trapezius / levator scapulae BEFORE scapular "
+                "activation work, not instead of it — the same inhibit-then-activate sequencing "
+                "the pre-session release protocol already uses for glute medius/piriformis, "
+                "applied upstream.",
+                "No self-directed exercise changes — endurance-biased scapular loading (long "
+                "isometric holds rather than more reps) is an exercise-prescription change and "
+                "goes to the physiotherapist at the Day 28 reassessment (2026-08-16). See "
+                "docs/training/physio_brief_2026-08-16.md.",
+                "Recheck ferritin — 29 ng/mL (Aug 2023) with CRP 0.9, i.e. a true low-normal "
+                "reading rather than an inflammation-masked one, and now three years stale. "
+                "Low-optimal iron worsens exactly this kind of muscular fatigue-tightness. "
+                "Already an open action in Input_files/hypermobility-profile.md section 6.",
+            ],
+
+            "escalation_criteria": [
+                "Any radiating pain into the arm, numbness, or tingling",
+                "Sharp pain or any acute onset (as opposed to the current dull, gradual ache)",
+                "Headache, dizziness, or any symptom suggesting cervical (not just muscular) involvement",
+                "Severity trending up from the current flat 1-3/10 tightness, or no improvement "
+                "after the desk/movement changes above → raise explicitly with physio",
+            ],
+
+            "notes": [
+                "CORRECTION 1 — onset was 2026-07-16, four days BEFORE Stage 2A began on "
+                "2026-07-20. The first symptom_log entry above is dated 2026-07-21, which implies "
+                "the loaded block caused this. It did not.",
+                "CORRECTION 2 — this is BILATERAL with left dominance, not left-lateralised as the "
+                "2026-07-21 entry states. Right side on 2026-07-16 and 2026-07-23, left from "
+                "2026-07-21 on. A bilateral migrating presentation favours a postural-endurance "
+                "driver over a discrete left-sided strain, and the left-lateralised framing is "
+                "what obscured that.",
+                "CORRECTION 3 — the 2026-07-21 entry's claim that scapular-specific work appears "
+                "only in Session C is wrong. training_plan.PLAN_STAGE2 runs Face Pull (Day 1), "
+                "Lat Pulldown + Single-Arm DB Row (Day 3), Scapular Wall Slide (Days 4, 5 and 7) "
+                "and Prone Y-Raise (Day 5) — five days a week. That the symptom persists THROUGH "
+                "that dose is the finding, and is what reframes it as endurance rather than volume.",
+                "Entries above are left as written per the append-only convention — these "
+                "corrections live here, not in the original entries.",
+                "Positive signal, unchanged from 2026-07-21: lower back and hip symptoms have "
+                "improved markedly since Stage 2A began (2026-07-24 check-in: 'first morning in a "
+                "while I woke up with no stiffness in my back or hips'). The block is helping; "
+                "this pattern is independent of it.",
             ],
         },
     ],
