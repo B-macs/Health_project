@@ -2159,7 +2159,8 @@ class Repository:
         why any tab created before a column joined its header needs this."""
         return self.rebuild_tab(self._metrics_history_ws(), _METRICS_HISTORY_HEADER, fresh)
 
-    def sync_metrics_history(self, days: int = 7, today: date | None = None) -> int:
+    def sync_metrics_history(self, days: int = 7, today: date | None = None,
+                              only_dates: set[str] | None = None) -> int:
         """Computes services.dashboard.compute_daily_metrics_snapshot for
         each of the last `days` days and persists it to the Metrics History
         tab. Returns the number of days written. `days` controls how far
@@ -2176,7 +2177,14 @@ class Repository:
         truncated by an under-fetched window. Also fetches wake-time
         adjustments (get_wake_time_adjustments) for the same `days` window
         as a single bulk read, threaded into each day's snapshot so the
-        persisted Sleep Score reflects any per-night wake-time correction."""
+        persisted Sleep Score reflects any per-night wake-time correction.
+
+        `only_dates` (ISO date strings) restricts which days inside the
+        window are written, without narrowing the window itself — the
+        lookbacks above still see every day, so a restricted run computes
+        exactly what an unrestricted one would. It exists so a re-derive can
+        reach a distant row without inventing rows for the untouched dates
+        between; see rederive_metrics_history, which is what callers want."""
         today = today or date.today()
         bio_rows = [dataclasses.asdict(r) for r in self.get_biometric_rolling(days=days + 60, today=today)]
         au_rows = self.get_daily_session_au_weighted(days=days + 28, today=today)
@@ -2190,15 +2198,44 @@ class Repository:
         written = 0
         for i in range(days):
             d = today - timedelta(days=i)
+            iso = d.isoformat()
+            if only_dates is not None and iso not in only_dates:
+                continue
             snapshot = dashboard.compute_daily_metrics_snapshot(
                 d, bio_rows, au_rows, stage, wake_time_adjustments=wake_adjustments,
             )
-            snapshot["date"] = d.isoformat()
+            snapshot["date"] = iso
             self.upsert_metrics_history_row(
-                snapshot, existing=existing.get(_sheet_key(d.isoformat())),
+                snapshot, existing=existing.get(_sheet_key(iso)),
             )
             written += 1
         return written
+
+    def rederive_metrics_history(self, today: date | None = None) -> int:
+        """Recompute every day the Metrics History tab ALREADY holds, and
+        write back only those whose values actually moved. Returns the number
+        of existing rows re-derived.
+
+        Exists because `days` is the wrong handle for this job. The tab is
+        SPARSE — it holds two clusters (2025-09-26→10-13 and 2026-06-29
+        onward) separated by eight months with no rows at all — so the
+        `sync_metrics_history(days=N)` needed to reach the oldest row also
+        invents a row for all 258 dates in between, dates that were never
+        measured and have nothing to persist. A backfill that grows a
+        54-row tab to 312 is not a re-derive.
+
+        Deliberately no `days` parameter: the window is derived from what is
+        stored, which is the only definition of "the rows that exist" that
+        cannot drift out of step with the tab."""
+        today = today or date.today()
+        stored = [r["date"] for r in self.get_metrics_history() if r.get("date")]
+        if not stored:
+            return 0
+        oldest = date.fromisoformat(min(stored))
+        span = (today - oldest).days + 1
+        return self.sync_metrics_history(
+            days=span, today=today, only_dates=set(stored),
+        )
 
     def sync_metrics_history_if_due(self, days: int = 7, today: date | None = None,
                                      hours: float = 2, now: datetime | None = None

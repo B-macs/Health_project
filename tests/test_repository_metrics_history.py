@@ -219,3 +219,74 @@ def test_sync_metrics_history_uses_today_when_not_given(monkeypatch):
     n = repo.sync_metrics_history(days=1)
     assert n == 1
     assert ws.appended[0][0] == datetime.date.today().isoformat()
+
+
+# ─── re-deriving what is already stored ──────────────────────────────────────
+#
+# The tab is SPARSE — two clusters eight months apart — so "how far back" and
+# "which rows exist" are different questions, and using the first to answer
+# the second invents hundreds of rows for dates that were never measured.
+
+def _stub_inputs(monkeypatch, repo):
+    monkeypatch.setattr(repo, "get_biometric_rolling", lambda days=None, today=None: [])
+    monkeypatch.setattr(repo, "get_daily_session_au_weighted", lambda days=None, today=None: [])
+    monkeypatch.setattr(repo, "get_current_stage", lambda: 1)
+
+
+def test_only_dates_restricts_which_days_are_written(monkeypatch):
+    ws = _FakeMetricsHistoryWorksheet()
+    repo = _repo_with_ws(ws)
+    _stub_inputs(monkeypatch, repo)
+
+    n = repo.sync_metrics_history(
+        days=5, today=datetime.date(2026, 7, 20),
+        only_dates={"2026-07-20", "2026-07-17"},
+    )
+    assert n == 2
+    assert {row[0] for row in ws.appended} == {"2026-07-17", "2026-07-20"}
+
+
+def test_only_dates_does_not_narrow_the_lookback_window(monkeypatch):
+    """A restricted run must compute the SAME value an unrestricted one
+    would. The baselines and rolling windows are fed from `days`, so
+    filtering at the write step rather than the fetch step is the whole
+    point — narrowing the fetch would silently change the numbers."""
+    ws = _FakeMetricsHistoryWorksheet()
+    repo = _repo_with_ws(ws)
+    seen = {}
+    monkeypatch.setattr(repo, "get_biometric_rolling",
+                        lambda days=None, today=None: seen.setdefault("bio", days) and [])
+    monkeypatch.setattr(repo, "get_daily_session_au_weighted",
+                        lambda days=None, today=None: seen.setdefault("au", days) and [])
+    monkeypatch.setattr(repo, "get_current_stage", lambda: 1)
+
+    repo.sync_metrics_history(days=90, today=datetime.date(2026, 7, 20),
+                              only_dates={"2026-07-20"})
+    assert seen["bio"] == 150   # days + 60, unaffected by the restriction
+    assert seen["au"] == 118    # days + 28
+
+
+def test_rederive_touches_every_stored_row_and_no_others(monkeypatch):
+    """The sparse-tab hazard, stated as a test: two clusters 100 days apart
+    must yield exactly four writes, not 100."""
+    ws = _FakeMetricsHistoryWorksheet(rows=[
+        ["2026-04-01", 70, 80, 75, 8.0],
+        ["2026-04-02", 70, 80, 75, 8.0],
+        ["2026-07-19", 70, 80, 75, 8.0],
+        ["2026-07-20", 70, 80, 75, 8.0],
+    ])
+    repo = _repo_with_ws(ws)
+    _stub_inputs(monkeypatch, repo)
+
+    n = repo.rederive_metrics_history(today=datetime.date(2026, 7, 20))
+    assert n == 4
+    written = {row[0] for row in ws.appended} | {u[0] for u in ws.updates}
+    assert "2026-05-01" not in written and "2026-06-15" not in written
+
+
+def test_rederive_on_an_empty_tab_writes_nothing(monkeypatch):
+    ws = _FakeMetricsHistoryWorksheet()
+    repo = _repo_with_ws(ws)
+    _stub_inputs(monkeypatch, repo)
+    assert repo.rederive_metrics_history(today=datetime.date(2026, 7, 20)) == 0
+    assert ws.appended == []
