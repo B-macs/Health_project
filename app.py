@@ -120,6 +120,17 @@ except ValueError:
     selected_date = _today
 
 view        = _params.get("view", "home")
+
+# Which point of which chart is open, as "<chart id>:<index>" — see
+# services.dashboard.parse_point_selection. Carried in the URL rather than in
+# session_state for the same reason `view` and `d` are: every link on this
+# page is a plain <a href> (the drill-downs have no Streamlit widgets except
+# the wake-time stepper), so the URL is already the page's state, and a
+# selection kept anywhere else would be lost on the reconnects the router's
+# note above describes. Malformed values resolve to (None, None) and simply
+# select nothing.
+_point_chart, _point_index = dash.parse_point_selection(_params.get("pt"))
+
 is_today    = (selected_date == _today)
 date_label  = "TODAY" if is_today else selected_date.isoformat()
 prev_date   = selected_date - timedelta(days=1)
@@ -419,40 +430,113 @@ def _arc_svg(score, max_score: float, fill_color: str, size: int = 220) -> str:
     )
 
 
-# ─── SVG: sparkline ──────────────────────────────────────────────────────────
+# ─── Charts: axes, tappable bands, point detail ───────────────────────────────
+#  Everything here composes services.dashboard's pure axis maths with styles.py's
+#  renderers. The old `_sparkline` this replaces drew a bare line with the last
+#  value floating beside it and no scale of either kind — see the note at the
+#  head of services/dashboard.py's axis section for why that had to change.
+#
+#  Clicking is an ordinary <a href> that adds `?pt=<chart>:<index>`, which is
+#  the same mechanism the three Home cards already use to open these
+#  drill-downs. No JS, no iframe, and no Streamlit widget — a widget here would
+#  put a native button in the middle of an HTML panel and force the whole block
+#  to be split across several st.markdown calls.
 
-def _sparkline(values: list, width: int = 290, height: int = 68,
-               color: str = "#6BAF8B") -> str:
-    clean = [(i, float(v)) for i, v in enumerate(values) if v is not None]
-    if len(clean) < 2:
-        return (
-            f'<div style="height:{height}px;display:flex;align-items:center;'
-            f'justify-content:center;">'
-            f'<span style="color:#444;font-size:12px;font-style:italic;">'
-            f'No historical readings available for this period.</span>'
-            f'</div>'
-        )
-    n  = len(values)
-    mn = min(v for _, v in clean)
-    mx = max(v for _, v in clean)
-    if mx == mn: mx = mn + 1
-    pad, iw, ih = 10, width - 20, height - 20
+_EMPTY_CHART_HEIGHT = 92
 
-    def _pt(i, v):
-        return pad + i * iw / (n - 1), pad + (1 - (v - mn) / (mx - mn)) * ih
 
-    pts  = [_pt(i, v) for i, v in clean]
-    poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in pts)
-    dots = "".join(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="2.5" fill="{color}"/>' for x, y in pts)
-    lx, ly = pts[-1]
+def _chart_href(chart: str, index: int) -> str:
+    return f"?d={selected_date}&view={view}&pt={dash.point_selection_key(chart, index)}"
+
+
+def _clear_point_href() -> str:
+    return f"?d={selected_date}&view={view}"
+
+
+def _is_selected(chart: str, index: int) -> bool:
+    return _point_chart == chart and _point_index == index
+
+
+def _chart_empty(message: str, height: int = _EMPTY_CHART_HEIGHT) -> str:
+    return (f'<div style="height:{height}px;display:flex;align-items:center;'
+            f'justify-content:center;"><span style="color:#444;font-size:12px;'
+            f'font-style:italic;">{message}</span></div>')
+
+
+def _point_detail_block(detail: dict | None, extra_rows=(), open_view: str = "") -> str:
+    """The panel a selected point opens, rendered INSIDE the chart's own block
+    directly under it.
+
+    Deliberately not a separate card at the top of the screen: the whole value
+    of the thing is that it explains the point being looked at, and putting it
+    anywhere else makes the reader hold a position on one chart in their head
+    while reading numbers somewhere else.
+    """
+    if not detail:
+        return ""
+    rows = _kv_rows(list(detail["rows"]) + list(extra_rows))
+    link = ""
+    if detail.get("open_date") and open_view:
+        link = (f'<a class="hp-link" href="?d={detail["open_date"]}&view={open_view}" '
+                f'style="display:inline-block;margin-top:9px;font-size:11px;'
+                f'color:#8FCDF0;text-decoration:none;">'
+                f'Open {detail["open_date"]} &rarr;</a>')
     return (
-        f'<svg width="{width}" height="{height}" overflow="visible">'
-        f'<polyline points="{poly}" fill="none" stroke="{color}" stroke-width="1.5"'
-        f' stroke-linejoin="round" stroke-linecap="round" opacity="0.9"/>'
-        f'{dots}'
-        f'<text x="{lx + 5:.1f}" y="{ly + 4:.1f}" fill="{color}" font-size="10"'
-        f' font-family="system-ui">{clean[-1][1]:.0f}</text>'
-        f'</svg>'
+        f'<div style="background:#0E1424;border:1px solid #1E2840;border-radius:10px;'
+        f'padding:11px 13px;margin-top:13px;">'
+        f'<div style="display:flex;justify-content:space-between;align-items:baseline;'
+        f'gap:10px;margin-bottom:5px;">'
+        f'<span style="font-size:11px;font-weight:700;color:#D4DCEE;'
+        f'letter-spacing:0.05em;text-transform:uppercase;">{detail["title"]}</span>'
+        f'<a class="hp-link" href="{_clear_point_href()}" style="font-size:15px;'
+        f'color:#6B7A9B;text-decoration:none;line-height:1;">&#10005;</a></div>'
+        f'{rows}{link}</div>'
+    )
+
+
+def _trend_chart(chart: str, dates: list, values: list, *, colour: str,
+                 unit: str = "", decimals: int = 0,
+                 floor: float | None = None, cap: float | None = None,
+                 date_fmt: str = "%d %b", max_x_ticks: int = 5,
+                 height: int = _EMPTY_CHART_HEIGHT) -> str:
+    """A dated trend with both axes and one tappable band per day.
+
+    `floor`/`cap` are the scale's real limits, not the data's — a readiness
+    axis that rounds up to 110 is claiming a score that cannot exist, and one
+    that rounds a resting heart rate down past 0 is worse.
+    """
+    axis = dash.value_axis(values, ticks=4, floor=floor, cap=cap)
+    y_labels = styles.axis_gutter_labels(axis, height)
+    svg = styles.trend_chart_svg(
+        values, height=height, colour=colour,
+        lo=axis["lo"] if axis else None, hi=axis["hi"] if axis else None,
+        gridlines=[f for f, _ in y_labels],
+    )
+    if not svg or not axis:
+        return _chart_empty("No historical readings available for this period.", height)
+
+    n = len(values)
+    hits = []
+    for left, width, i in dash.hit_bands(n, max_bands=n):
+        v = values[i]
+        reading = f"{v:.{decimals}f}{f' {unit}' if unit else ''}" if v is not None else "no reading"
+        hits.append({
+            "left": left, "width": width, "href": _chart_href(chart, i),
+            "title": f"{dash.format_axis_date(dates[i])} · {reading}",
+            "selected": _is_selected(chart, i),
+        })
+    points = [
+        {"x": (i / (n - 1)) if n > 1 else 0.0,
+         "y": styles.plot_y_fraction(v, axis["lo"], axis["hi"], height),
+         "colour": colour, "selected": _is_selected(chart, i)}
+        for i, v in enumerate(values) if v is not None
+    ]
+    x_labels = dash.x_axis_labels(
+        [dash.format_axis_date(d, date_fmt) for d in dates], max_ticks=max_x_ticks)
+    return styles.chart_frame(
+        [{"svg": svg, "height": height, "y_labels": y_labels,
+          "overlay": styles.chart_hits(hits) + styles.chart_points(points)}],
+        x_labels=x_labels,
     )
 
 
@@ -737,6 +821,12 @@ _SLEEP_SOURCE_TITLES = {
     "garmin_only": "Garmin",
 }
 
+# {code: name} — styles.STAGE_BAND stores (colour, name), and everything on the
+# click path wants only the name. Derived once rather than unpacked at each of
+# the three call sites, so the strip's tooltip, its detail panel and its Y-axis
+# labels cannot end up naming the same stage differently.
+_STAGE_LABELS = {code: label for code, (_c, label) in styles.STAGE_BAND.items()}
+
 
 def _hypnogram_strip(detail: dict | None) -> str:
     """One strip, named for whatever actually produced it.
@@ -786,34 +876,111 @@ def _hypnogram_strip(detail: dict | None) -> str:
         note = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;">'
                 f'Stage timeline from <b style="color:#8FCDF0;">{title}</b>.</div>')
 
-    start = dash.format_clock(detail.get("bedtime_start")) or dash.format_clock(
-        fused.get("window_start_utc"))
-    end = dash.format_clock(detail.get("bedtime_end"))
-    if not end and start and fused.get("minutes"):
-        # garmin_only: no Oura bedtime_end, so derive the axis end from the
-        # fusion row's own window rather than leaving the strip unlabelled.
-        end = dash.format_clock_offset(fused.get("window_start_utc"), fused.get("minutes"))
-    axis = (f'<div style="display:flex;justify-content:space-between;font-size:10px;'
-            f'color:#6B7A9B;margin-top:6px;"><span>{start}</span><span>{end}</span></div>'
-            if start and end else "")
-    # The movement strip sits between the hypnogram and the single shared
-    # axis, so "same time axis" is literally true on screen rather than a
-    # claim two separately-labelled charts are asking to be believed.
-    movement, movement_note = _movement_strip(fused)
-    return (f'<div style="margin-top:14px;">{styles.hypnogram_svg(codes, height=56)}</div>'
-            f'{movement}{axis}{styles.stage_legend_html()}{note}{movement_note}')
+    # The window the strips are stretched across. Both are drawn full-width
+    # over the SAME span regardless of their own grid (Oura's hypnogram is
+    # 30-second, the fused master per-minute, movement 30-second), so one
+    # start + one duration describes every tick on either of them — which is
+    # what makes a single shared time axis honest rather than approximate.
+    start_iso = detail.get("bedtime_start") or fused.get("window_start_utc")
+    total_minutes = dash.minutes_between(detail.get("bedtime_start"),
+                                         detail.get("bedtime_end"))
+    if total_minutes is None and fused.get("minutes"):
+        # garmin_only: no Oura sleep period, so the fusion row's own window is
+        # the only description of the night that exists.
+        try:
+            total_minutes = float(fused["minutes"])
+        except (TypeError, ValueError):
+            total_minutes = None
+    x_labels = dash.clock_axis_labels(start_iso, total_minutes, max_ticks=5)
+
+    hyp_height = 56
+    hyp_sel = (dash.run_at(codes, _point_index)
+               if _point_chart == "hyp" and _point_index is not None else None)
+    plots = [{
+        "svg": styles.hypnogram_svg(codes, height=hyp_height, rows=True,
+                                    highlight=(hyp_sel[0], hyp_sel[1]) if hyp_sel else None),
+        "height": hyp_height,
+        "y_labels": styles.hypnogram_row_labels(),
+        "overlay": styles.chart_hits(
+            _strip_hits("hyp", codes, start_iso, total_minutes, _STAGE_LABELS)),
+    }]
+
+    movement_plot, movement_note = _movement_strip(fused, start_iso, total_minutes)
+    if movement_plot:
+        plots.append(movement_plot)
+
+    strip_detail = ""
+    for chart_id, strip_codes, labels, kind in (
+        ("hyp", codes, _STAGE_LABELS, "Stage"),
+        ("mov", str(fused.get("master_movement") or ""), styles.MOVEMENT_LABELS, "Movement"),
+    ):
+        if _point_chart == chart_id and _point_index is not None and strip_codes:
+            strip_detail += _point_detail_block(dash.segment_point_detail(
+                strip_codes, _point_index, start_iso=start_iso,
+                total_minutes=total_minutes, labels=labels, kind=kind))
+
+    # Wider gutter than the value charts': these axes are labelled with stage
+    # and movement NAMES, and the widest ("No motion") measures ~58px in this
+    # theme's monospace face where "100" measures 18. Sized to that label
+    # rather than left at the default, which pushed it out through the panel's
+    # own padding.
+    return (f'<div style="margin-top:14px;">'
+            f'{styles.chart_frame(plots, x_labels=x_labels, gutter_px=58)}</div>'
+            f'{styles.stage_legend_html()}{note}{movement_note}{strip_detail}')
 
 
-def _movement_strip(fused: dict) -> tuple[str, str]:
-    """The fused movement tick strip, or ("", "") when the night has none.
+def _strip_hits(chart: str, codes: str, start_iso, total_minutes,
+                labels: dict) -> list[dict]:
+    """Tappable bands over a digit-coded strip.
 
-    Returns the strip and its caption separately because the caller sandwiches
-    the strip above the shared time axis while the captions collect below —
-    keeping both charts on one axis instead of giving each its own.
+    Uniform bands rather than one per run: a hypnogram has runs as short as a
+    single 30-second slot, which is ~0.1% of the night and cannot be tapped on
+    a phone. The band resolves to the slot at its centre and the detail then
+    reports the whole RUN that slot belongs to, so what opens is still a real
+    segment with real start and end times.
+    """
+    n = len(codes)
+    if not n:
+        return []
+    per_slot = (float(total_minutes) / n) if total_minutes else None
+    active = _point_index if _point_chart == chart else None
+    out = []
+    for left, width, i in dash.hit_bands(n):
+        run = dash.run_at(codes, i)
+        name = labels.get(run[2], "")
+        clock = (dash.format_clock_offset(start_iso, run[0] * per_slot)
+                 if per_slot and start_iso else "")
+        # Highlight every band the selected RUN covers, so the shaded bands
+        # and the outline the SVG draws describe the same segment. The band's
+        # own span is checked as well: a hand-edited ?pt= index need not be a
+        # band centre, and without it such an index would shade nothing while
+        # still opening a detail panel.
+        selected = active is not None and (
+            run[0] <= active < run[1]
+            or int(left * n) <= active < max(int((left + width) * n), int(left * n) + 1)
+        )
+        out.append({
+            "left": left, "width": width, "href": _chart_href(chart, i),
+            "title": f"{name} · {clock}" if clock else str(name),
+            "selected": selected,
+        })
+    return out
+
+
+_MOVEMENT_STRIP_HEIGHT = 34
+
+
+def _movement_strip(fused: dict, start_iso, total_minutes) -> tuple[dict | None, str]:
+    """The fused movement tick strip as a chart_frame plot, or (None, "") when
+    the night has none.
+
+    Returns the plot and its caption separately because the caller stacks the
+    strip under the hypnogram inside one frame while the captions collect
+    below it — keeping both charts on one axis instead of giving each its own.
     """
     codes = str(fused.get("master_movement") or "")
     if not codes:
-        return "", ""
+        return None, ""
 
     source = str(fused.get("movement_source") or "")
     title = _SLEEP_SOURCE_TITLES.get(source, "Movement")
@@ -825,11 +992,21 @@ def _movement_strip(fused: dict) -> tuple[str, str]:
         detail_bits.append(f"{shifts} position shift{'s' if shifts != 1 else ''}")
     suffix = f" · {' · '.join(detail_bits)}" if detail_bits else ""
 
-    strip = (f'<div style="margin-top:4px;">{styles.movement_svg(codes, height=26)}</div>')
+    sel = (dash.run_at(codes, _point_index)
+           if _point_chart == "mov" and _point_index is not None else None)
+    plot = {
+        "svg": styles.movement_svg(codes, height=_MOVEMENT_STRIP_HEIGHT,
+                                   highlight=(sel[0], sel[1]) if sel else None),
+        "height": _MOVEMENT_STRIP_HEIGHT,
+        "gap": 4,
+        "y_labels": styles.movement_row_labels(),
+        "overlay": styles.chart_hits(
+            _strip_hits("mov", codes, start_iso, total_minutes, styles.MOVEMENT_LABELS)),
+    }
     note = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:6px;line-height:1.5;">'
             f'Movement — <b style="color:#8FCDF0;">{title}</b>{suffix}.</div>'
             f'{styles.movement_legend_html()}')
-    return strip, note
+    return plot, note
 
 
 def _garmin_only_stage_rows(fused: dict) -> str:
@@ -925,10 +1102,12 @@ def _sleep_night_blocks() -> str:
 
     out += _overnight_panel(
         "Lowest heart rate", detail.get("hr_series"), "bpm",
-        headline="low", secondary="average", colour="#8FCDF0", detail=detail)
+        headline="low", secondary="average", colour="#8FCDF0", detail=detail,
+        chart="ohr")
     out += _overnight_panel(
         "Average HRV", detail.get("hrv_series"), "ms",
-        headline="average", secondary="high", colour="#6BAF8B", detail=detail)
+        headline="average", secondary="high", colour="#6BAF8B", detail=detail,
+        chart="ohrv")
 
     vitals = dash.sleep_vitals_rows(detail, context)
     if vitals:
@@ -939,30 +1118,80 @@ def _sleep_night_blocks() -> str:
 _OVERNIGHT_LABELS = {"low": "Lowest", "high": "Max", "average": "Average"}
 
 
+_OVERNIGHT_CHART_HEIGHT = 78
+
+
 def _overnight_panel(overline: str, payload, unit: str, headline: str,
-                     secondary: str, colour: str, detail: dict) -> str:
+                     secondary: str, colour: str, detail: dict,
+                     chart: str = "") -> str:
     """One overnight series as a headline figure plus its shape over the night.
 
     Omitted entirely when the series is absent rather than drawn as an empty
     box: these columns were only added on 2026-07-31, so every night before
     the Oura tabs were rebuilt genuinely has nothing to plot, and an empty
     chart would imply a flat night rather than no measurement.
+
+    `chart` is the id used for point selection; passing "" leaves the plot
+    non-interactive, which is what a caller with no URL to link to needs.
     """
     series = dash.overnight_series(payload)
     if not series["count"]:
         return ""
-    chart = styles.overnight_chart_svg(
-        series["values"], colour=colour, baseline=series["average"])
-    if not chart:
+    height = _OVERNIGHT_CHART_HEIGHT
+    axis = dash.value_axis(series["values"], ticks=4, floor=0.0)
+    y_labels = styles.axis_gutter_labels(axis, height)
+    plot = styles.overnight_chart_svg(
+        series["values"], height=height, colour=colour,
+        baseline=series["average"],
+        lo=axis["lo"] if axis else None, hi=axis["hi"] if axis else None,
+        gridlines=[f for f, _ in y_labels],
+    )
+    if not plot or not axis:
         return ""
+
+    values = series["values"]
+    hits, points = [], []
+    if chart:
+        for left, width, i in dash.hit_bands(len(values)):
+            v = values[i]
+            hits.append({
+                "left": left, "width": width, "href": _chart_href(chart, i),
+                "title": f"{v:g} {unit}" if v is not None else "not measured",
+                "selected": _is_selected(chart, i),
+            })
+        # Only the SELECTED sample gets a marker. A night is up to 180 points,
+        # and dotting every one turns a line whose whole purpose is its shape
+        # into a band of speckle.
+        if _point_chart == chart and _point_index is not None:
+            i = _point_index
+            if 0 <= i < len(values) and values[i] is not None:
+                points.append({
+                    "x": (i / (len(values) - 1)) if len(values) > 1 else 0.0,
+                    "y": styles.plot_y_fraction(values[i], axis["lo"], axis["hi"], height),
+                    "colour": colour, "selected": True,
+                })
+
+    # Prefer the series' own timestamps; fall back to the night's bedtime
+    # window, which is all an older night (stored before the interval and
+    # timestamp fields were captured) has.
+    x_labels = dash.overnight_axis_labels(series, max_ticks=4)
+    if not x_labels:
+        start = dash.format_clock(detail.get("bedtime_start"))
+        end = dash.format_clock(detail.get("bedtime_end"))
+        x_labels = [(0.0, start), (1.0, end)] if start and end else []
+
+    body = styles.chart_frame(
+        [{"svg": plot, "height": height, "y_labels": y_labels,
+          "overlay": styles.chart_hits(hits) + styles.chart_points(points)}],
+        x_labels=x_labels,
+    )
+    point_detail = (
+        dash.overnight_point_detail(series, _point_index, unit=unit)
+        if chart and _point_chart == chart and _point_index is not None else None
+    )
 
     big = series[headline]
     small = series[secondary]
-    axis_start = dash.format_clock(detail.get("bedtime_start"))
-    axis_end = dash.format_clock(detail.get("bedtime_end"))
-    axis = (f'<div style="display:flex;justify-content:space-between;font-size:10px;'
-            f'color:#6B7A9B;margin-top:4px;"><span>{axis_start}</span>'
-            f'<span>{axis_end}</span></div>' if axis_start and axis_end else "")
     return _panel(
         overline,
         f'<div style="display:flex;align-items:baseline;gap:10px;">'
@@ -970,7 +1199,8 @@ def _overnight_panel(overline: str, payload, unit: str, headline: str,
         f'<span style="font-size:12px;color:#6B7A9B;">{unit}</span>'
         f'<span style="font-size:11px;color:#6B7A9B;margin-left:auto;">'
         f'{_OVERNIGHT_LABELS[secondary]} {small:g} {unit}</span></div>'
-        f'<div style="margin-top:10px;">{chart}</div>{axis}')
+        f'<div style="margin-top:12px;">{body}</div>'
+        + _point_detail_block(point_detail))
 
 
 def _strain_source_block() -> str:
@@ -1025,72 +1255,85 @@ def _strain_source_block() -> str:
 
 
 def _metric_detail(view: str) -> str:
-    def _trend_block(title: str, unit: str, values: list, color: str) -> str:
-        """7-day, day-of-week-labeled block — used for Strain's supplementary
+    def _chart_block(title: str, headline: str, subtitle: str, chart_html: str,
+                     detail_html: str = "") -> str:
+        """The surface every chart on this screen sits in — same #131929 /
+        12px panel as _panel, with room for a headline figure and a subtitle
+        above the plot."""
+        sub = (f'<div style="font-size:10px;color:#555;margin-bottom:9px;">{subtitle}</div>'
+               if subtitle else '<div style="height:6px;"></div>')
+        return (
+            f'<div style="background:#131929;border-radius:12px;padding:16px 18px;margin-bottom:10px;">'
+            f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;text-transform:uppercase;'
+            f'font-weight:600;margin-bottom:4px;">{title}</div>'
+            f'<div style="font-size:28px;font-weight:700;color:#D4DCEE;margin-bottom:4px;">{headline}</div>'
+            f'{sub}{chart_html}{detail_html}</div>'
+        )
+
+    def _trend_block(chart: str, title: str, unit: str, values: list, color: str,
+                     floor: float | None = None, cap: float | None = None) -> str:
+        """7-day, day-of-week-labelled block — used for Strain's supplementary
         HRV/RHR context (the live 7-day biometric blend, not persisted
         history)."""
-        has_data = any(v is not None for v in values)
-        current  = next((v for v in reversed(values) if v is not None), None)
-        val_str  = f"{current:.0f} {unit}" if current is not None else "—"
-
-        day_labels = "".join(
-            f'<span style="font-size:9px;color:#555;flex:1;text-align:center;">'
-            f'{(selected_date - timedelta(days=6 - i)).strftime("%a")}</span>'
-            for i in range(7)
-        )
-        chart_or_empty = (
-            f'<div style="display:flex;justify-content:center;">'
-            + (_sparkline(values, width=290, height=68, color=color) if has_data else
-               f'<div style="width:290px;height:68px;display:flex;align-items:center;'
-               f'justify-content:center;"><span style="color:#444;font-size:12px;'
-               f'font-style:italic;">No historical readings available for this period.</span></div>')
-            + f'</div>'
-        )
-        return (
-            f'<div style="background:#131929;border-radius:12px;padding:16px 18px;margin-bottom:10px;">'
-            f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;text-transform:uppercase;'
-            f'font-weight:600;margin-bottom:4px;">{title}</div>'
-            f'<div style="font-size:28px;font-weight:700;color:#D4DCEE;margin-bottom:12px;">{val_str}</div>'
-            f'<div style="display:flex;width:290px;margin:0 auto 4px;">'
-            f'{day_labels}</div>'
-            f'{chart_or_empty}'
-            f'</div>'
+        dates = [selected_date - timedelta(days=6 - i) for i in range(7)]
+        current = next((v for v in reversed(values) if v is not None), None)
+        val_str = f"{current:.0f} {unit}" if current is not None else "—"
+        detail = (dash.trend_point_detail(dates, values, _point_index,
+                                          unit=unit, label=title)
+                  if _point_chart == chart and _point_index is not None else None)
+        return _chart_block(
+            title, val_str, "",
+            _trend_chart(chart, dates, values, colour=color, unit=unit,
+                         floor=floor, cap=cap, date_fmt="%a", max_x_ticks=7),
+            _point_detail_block(detail),
         )
 
-    def _history_trend_block(title: str, unit: str, dates: list, values: list, color: str) -> str:
+    def _history_trend_block(chart: str, title: str, metric: str, unit: str,
+                             dates: list, values: list, color: str, hist_key: str,
+                             floor: float | None = None, cap: float | None = None,
+                             decimals: int = 0) -> str:
         """30-day trend from the PERSISTED Metrics History tab (see
         Repository.get_metrics_history) — a fixed record, unlike the 7-day
-        blocks above which recompute live from Oura/Garmin's raw tabs."""
-        has_data = any(v is not None for v in values)
-        current  = next((v for v in reversed(values) if v is not None), None)
-        val_str  = f"{current:.0f}{unit}" if current is not None else "—"
-        range_label = f"{dates[0].strftime('%d %b')} – {dates[-1].strftime('%d %b')}" if dates else ""
-        chart_or_empty = (
-            f'<div style="display:flex;justify-content:center;">'
-            + (_sparkline(values, width=290, height=68, color=color) if has_data else
-               f'<div style="width:290px;height:68px;display:flex;align-items:center;'
-               f'justify-content:center;"><span style="color:#444;font-size:12px;'
-               f'font-style:italic;">No persisted history yet — check back after a few days.</span></div>')
-            + f'</div>'
-        )
-        return (
-            f'<div style="background:#131929;border-radius:12px;padding:16px 18px;margin-bottom:10px;">'
-            f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;text-transform:uppercase;'
-            f'font-weight:600;margin-bottom:4px;">{title}</div>'
-            f'<div style="font-size:28px;font-weight:700;color:#D4DCEE;margin-bottom:4px;">{val_str}</div>'
-            f'<div style="font-size:10px;color:#555;margin-bottom:8px;">{range_label}</div>'
-            f'{chart_or_empty}'
-            f'</div>'
+        blocks above which recompute live from Oura/Garmin's raw tabs.
+
+        A selected point also lists that day's OTHER persisted metrics, which
+        is the question this chart provokes and could not previously answer:
+        a readiness dip is only interpretable next to what sleep and strain
+        did on the same day."""
+        current = next((v for v in reversed(values) if v is not None), None)
+        val_str = f"{current:.{decimals}f}{unit}" if current is not None else "—"
+        range_label = (f"{dash.format_axis_date(dates[0])} – "
+                       f"{dash.format_axis_date(dates[-1])}") if dates else ""
+        detail = extra = None
+        if _point_chart == chart and _point_index is not None:
+            detail = dash.trend_point_detail(dates, values, _point_index,
+                                             unit=unit, decimals=decimals,
+                                             label=metric)
+            if detail:
+                row = next((r for r in _metrics_hist
+                            if r.get("date") == detail["open_date"]), None)
+                extra = dash.metrics_history_rows(row, exclude=hist_key)
+        return _chart_block(
+            title, val_str, range_label,
+            _trend_chart(chart, dates, values, colour=color, unit=unit,
+                         decimals=decimals, floor=floor, cap=cap),
+            _point_detail_block(detail, extra or (), open_view=view),
         )
 
     # pre_blocks render BEFORE the 30-day trend, extra_blocks after. Sleep's
     # contributor breakdown has to lead — it explains the number in the
     # header — whereas strain's supplementary context reads as a footnote.
     pre_blocks = ""
+    # hist_floor/hist_cap are the SCALE's limits, not the window's: readiness
+    # and sleep are 0-100 by construction and strain is 0-21 (engine.au_to_strain
+    # clamps to it), so the rounded axis must never claim a value outside them.
+    hist_decimals = 0
     if view == "readiness":
         col, disp, lbl, _, _, _ = dash.readiness_meta(_readiness_score)
         detail_label = f"READINESS · {date_label}"
         hist_key, hist_unit, hist_title, hist_color = "readiness_score", "", "Readiness Trend", "#6BAF8B"
+        hist_metric = "Readiness"
+        hist_floor, hist_cap = 0.0, 100.0
         # Order mirrors Oura's own Readiness screen: contributors, then key
         # metrics, then the overnight autonomic series. The HR/HRV panels are
         # the same _overnight_panel the Sleep drill-down uses — Oura puts them
@@ -1102,10 +1345,10 @@ def _metric_detail(view: str) -> str:
             + _readiness_key_metrics_block()
             + _overnight_panel("Lowest heart rate", _r_detail.get("hr_series"), "bpm",
                                headline="low", secondary="average",
-                               colour="#8FCDF0", detail=_r_detail)
+                               colour="#8FCDF0", detail=_r_detail, chart="ohr")
             + _overnight_panel("Average HRV", _r_detail.get("hrv_series"), "ms",
                                headline="average", secondary="high",
-                               colour="#6BAF8B", detail=_r_detail)
+                               colour="#6BAF8B", detail=_r_detail, chart="ohrv")
         )
         extra_blocks = ""
     elif view == "sleep":
@@ -1113,16 +1356,28 @@ def _metric_detail(view: str) -> str:
         _today_wake_adj = _wake_adjustments.get(selected_date.isoformat(), 0.0)
         detail_label = f"SLEEP · {date_label}" + (" · ADJUSTED" if _today_wake_adj else "")
         hist_key, hist_unit, hist_title, hist_color = "sleep_score", "", "Sleep Score Trend", "#4FC3F7"
+        hist_metric = "Sleep Score"
+        hist_floor, hist_cap = 0.0, 100.0
         pre_blocks = _sleep_contributors_block() + _sleep_night_blocks()
         extra_blocks = ""
     else:
         col, disp, lbl, _, _ = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
         detail_label = "STRAIN · 7D AVG" if _strain_is_rolling else f"STRAIN · {date_label}"
         hist_key, hist_unit, hist_title, hist_color = "strain", "", "Strain Trend", "#BFA06A"
+        hist_metric = "Strain"
+        # 21.0 is the same ceiling the strain arc is drawn against above
+        # (_arc_svg(_display_strain, 21, ...)) and the one engine.load_to_strain
+        # saturates at.
+        hist_floor, hist_cap = 0.0, 21.0
+        # One decimal: strain spans 0-21, so a whole-number axis rounds a
+        # 1.4-point difference between two sessions away to nothing.
+        hist_decimals = 1
         extra_blocks = (
             _strain_source_block()
-            + _trend_block("Heart Rate Variability", "ms",  _hrv_7d, "#6BAF8B")
-            + _trend_block("Resting Heart Rate",     "bpm", _rhr_7d, "#BFA06A")
+            + _trend_block("hrv7", "Heart Rate Variability", "ms", _hrv_7d,
+                           "#6BAF8B", floor=0.0)
+            + _trend_block("rhr7", "Resting Heart Rate", "bpm", _rhr_7d,
+                           "#BFA06A", floor=0.0)
         )
 
     hist_dates = [selected_date - timedelta(days=29 - i) for i in range(30)]
@@ -1155,7 +1410,10 @@ def _metric_detail(view: str) -> str:
         f'</div>'
         f'</div>'
         + pre_blocks
-        + _history_trend_block(hist_title, hist_unit, hist_dates, hist_values, hist_color)
+        + _history_trend_block("hist", hist_title, hist_metric, hist_unit,
+                               hist_dates, hist_values, hist_color, hist_key,
+                               floor=hist_floor, cap=hist_cap,
+                               decimals=hist_decimals)
         + adjusted_marker
         + extra_blocks
         + f'</div>'
@@ -1268,6 +1526,16 @@ _home_css = """<style>
     margin: 0 auto !important;
 }
 .stApp, [data-testid="stAppViewContainer"] { background:#0B0F1E !important; }
+
+/* styles.enable_chart_links()'s zero-height iframe. Streamlit still gives its
+   element container the standard vertical gap, which on a drill-down shows up
+   as a stray band of empty page under the last chart. Home renders no other
+   component, so collapsing them all here is exact rather than a broad guess. */
+[data-testid="stElementContainer"]:has(> [data-testid="stIFrame"]),
+[data-testid="stElementContainer"]:has(> iframe) {
+    height:0 !important; min-height:0 !important; margin:0 !important;
+    padding:0 !important; overflow:hidden !important;
+}
 </style>"""
 
 # ─── Build cards ─────────────────────────────────────────────────────────────
@@ -1320,6 +1588,9 @@ if _bio_rows_failed:
 
 if view in ("strain", "readiness", "sleep"):
     st.markdown(_metric_detail(view), unsafe_allow_html=True)
+    # Only the drill-downs carry chart links, so the iframe this installs is
+    # never paid for on the three-card Home stream.
+    styles.enable_chart_links()
     if view == "sleep":
         _render_wake_time_control(selected_date)
 else:

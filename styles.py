@@ -6,6 +6,8 @@ Oura aesthetic (mobile ≤768px) · Whoop aesthetic (desktop ≥769px).
 import math
 import streamlit as st
 
+from services import dashboard as _dash
+
 # ─── Colour palettes ───────────────────────────────────────────────────────────
 
 OURA: dict[str, str] = {
@@ -315,7 +317,290 @@ hr {{ border-color:{W['border']} !important; margin:10px 0 !important; }}
 
     [data-testid="stTabs"] [role="tab"] {{ font-size:14px !important; padding:10px !important; }}
 }}
+
+/* ══ CHART AXES + CLICKABLE POINTS ═══════════════════════════════════════════
+   Used by the Home drill-down charts (chart_frame / chart_hits / chart_points).
+   Classes rather than inline styles because :hover cannot be expressed inline,
+   and hover is what makes a tappable band discoverable on desktop — on a phone
+   the band is found by tapping it, which is why the hit target is a full-height
+   column and not just the dot. Outside any media query on purpose: the Home
+   screen renders in the Oura mobile language at every width. */
+.hp-hit {{ position:absolute; top:0; bottom:0; display:block;
+           text-decoration:none; border-radius:3px;
+           -webkit-tap-highlight-color:transparent; }}
+.hp-hit:hover {{ background:rgba(255,255,255,0.07); }}
+.hp-hit.hp-on {{ background:rgba(255,255,255,0.10);
+                 box-shadow:inset 0 0 0 1px rgba(255,255,255,0.22); }}
+.hp-dot {{ position:absolute; width:6px; height:6px; border-radius:50%;
+           transform:translate(-50%,-50%); pointer-events:none; }}
+.hp-dot.hp-on {{ width:11px; height:11px;
+                 box-shadow:0 0 0 2px rgba(11,15,30,0.95); }}
 </style>"""
+
+
+# ─── Chart axes and clickable points (2026-08-03) ───────────────────────────
+#  The rendering half of services/dashboard.py's axis section — see the long
+#  note there for why the Home drill-down charts needed axes at all.
+#
+#  Every plot here is drawn into a viewBox of `0 0 100 height` with
+#  preserveAspectRatio="none", i.e. horizontally stretched to whatever width
+#  the panel happens to be. That is deliberate (it is what lets the hypnogram
+#  and the movement strip share one time axis without either knowing the
+#  other's length) and it has one consequence that shapes this whole section:
+#  ANY text or circle inside such an SVG is stretched with it. So no label and
+#  no point marker is ever drawn in the SVG. Axis text lives in positioned HTML
+#  gutters, and point markers in an HTML overlay — which is also what makes
+#  them clickable, since a plain <a> is already proven to work inside
+#  st.markdown on this page while SVG-namespaced links are not.
+
+AXIS_RULE = "#23304D"
+AXIS_TEXT = "#5A6785"
+GRID_LINE = "rgba(255,255,255,0.055)"
+
+#  Vertical breathing room inside a value plot, in the same units as `height`.
+#  Shared by the plot builders and by axis_gutter_labels so a gridline, its
+#  label and the point it explains all land on the same pixel — a Y axis whose
+#  labels are a few pixels off its own gridlines is worse than none.
+PLOT_PAD = 5
+
+
+def axis_gutter_labels(axis: dict | None, height: int,
+                       pad: int = PLOT_PAD) -> list[tuple[float, str]]:
+    """dashboard.value_axis_labels' VALUE-space fractions → CONTAINER-space
+    fractions of `height`, i.e. where the tick actually sits on screen once
+    the plot's padding is accounted for."""
+    if not axis or height <= 0:
+        return []
+    inner = (height - 2 * pad) / height
+    return [(pad / height + frac * inner, text)
+            for frac, text in _dash.value_axis_labels(axis)]
+
+
+def _y_gutter(labels, height: int, width: int) -> str:
+    if not labels:
+        return f'<div style="width:{width}px;height:{height}px;flex:none;"></div>'
+    spans = "".join(
+        f'<span style="position:absolute;right:6px;top:{frac * 100:.3f}%;'
+        f'transform:translateY(-50%);font-size:9px;line-height:1;'
+        f'color:{AXIS_TEXT};white-space:nowrap;">{text}</span>'
+        for frac, text in labels
+    )
+    return (f'<div style="position:relative;width:{width}px;height:{height}px;'
+            f'flex:none;">{spans}</div>')
+
+
+def _x_axis_row(labels, height: int = 13) -> str:
+    """The tick row under the plot. First and last labels are anchored to the
+    edges instead of centred on their tick, because a centred label at
+    fraction 0 hangs half its width off the left of the chart and gets clipped
+    at phone width — the one place an axis label is guaranteed to be read."""
+    if not labels:
+        return ""
+    parts = []
+    for frac, text in labels:
+        if frac <= 0.001:
+            pos = "left:0;"
+        elif frac >= 0.999:
+            pos = "right:0;"
+        else:
+            pos = f"left:{frac * 100:.3f}%;transform:translateX(-50%);"
+        parts.append(
+            f'<span style="position:absolute;top:0;{pos}font-size:9px;'
+            f'line-height:1.2;color:{AXIS_TEXT};white-space:nowrap;">{text}</span>'
+        )
+    return (f'<div style="position:relative;height:{height}px;margin-top:5px;">'
+            f'{"".join(parts)}</div>')
+
+
+_RULE_LEFT = (f'<i style="position:absolute;left:0;top:0;bottom:0;width:1px;'
+              f'background:{AXIS_RULE};pointer-events:none;"></i>')
+_RULE_BOTTOM = (f'<i style="position:absolute;left:0;right:0;bottom:0;height:1px;'
+                f'background:{AXIS_RULE};pointer-events:none;"></i>')
+
+
+def chart_frame(plots: list[dict], *, x_labels=(), gutter_px: int = 40) -> str:
+    """One or more stacked plots wrapped in a shared Y gutter and X axis.
+
+    `plots` is a list of {"svg", "height", "y_labels", "overlay", "gap"}. It
+    is a LIST rather than a single plot because the Sleep screen stacks the
+    hypnogram over the movement strip on one time axis, and giving each its
+    own axis row would state twice, at slightly different pixel positions,
+    that they cover the same night. The gutter column mirrors the plot
+    column's spacers exactly, which is what keeps a Y label beside the plot
+    it belongs to.
+
+    The axis rules are absolutely-positioned 1px children, not CSS borders:
+    a border participates in layout, and under `box-sizing:border-box` it
+    would silently eat a pixel of the plot it is meant to be framing —
+    enough to walk the gridlines off their labels.
+    """
+    gutter, column = [], []
+    for i, plot in enumerate(plots):
+        height, gap = int(plot["height"]), int(plot.get("gap") or 0)
+        if gap:
+            spacer = f'<div style="height:{gap}px;"></div>'
+            gutter.append(spacer)
+            column.append(spacer)
+        gutter.append(_y_gutter(plot.get("y_labels") or (), height, gutter_px))
+        rules = _RULE_LEFT + (_RULE_BOTTOM if i == len(plots) - 1 else "")
+        column.append(
+            f'<div style="position:relative;height:{height}px;">'
+            f'{plot["svg"]}{rules}{plot.get("overlay") or ""}</div>'
+        )
+    return (f'<div style="display:flex;align-items:flex-start;">'
+            f'<div style="flex:none;">{"".join(gutter)}</div>'
+            f'<div style="flex:1;min-width:0;">{"".join(column)}'
+            f'{_x_axis_row(x_labels)}</div></div>')
+
+
+def chart_hits(items: list[dict]) -> str:
+    """The clickable band overlay: one <a> per tappable slice of a chart.
+
+    Each item is {"left", "width"} as fractions, plus "href", "title" and
+    "selected". `title` becomes the native browser tooltip, so a desktop
+    hover reads the point without a round trip while a tap still opens the
+    full detail — the app is mobile-first and hover does not exist there.
+    """
+    parts = []
+    for it in items:
+        cls = "hp-hit hp-on" if it.get("selected") else "hp-hit"
+        title = str(it.get("title") or "")
+        parts.append(
+            f'<a class="{cls}" href="{it["href"]}" title="{title}" '
+            f'style="left:{max(0.0, float(it["left"])) * 100:.3f}%;'
+            f'width:{max(0.0, float(it["width"])) * 100:.3f}%;"></a>'
+        )
+    return "".join(parts)
+
+
+def chart_points(points: list[dict]) -> str:
+    """The point markers, in their own pointer-events:none layer above the
+    hit bands.
+
+    Separate from chart_hits because a marker sits at its value's exact x
+    while a hit band is a uniform slice — putting the dot inside the <a>
+    would peg it to the band centre and walk every point a few pixels off
+    the line it belongs to.
+    """
+    if not points:
+        return ""
+    dots = "".join(
+        f'<i class="hp-dot{" hp-on" if p.get("selected") else ""}" '
+        f'style="left:{float(p["x"]) * 100:.3f}%;top:{float(p["y"]) * 100:.3f}%;'
+        f'background:{p.get("colour", OURA["green"])};"></i>'
+        for p in points
+    )
+    return (f'<div style="position:absolute;inset:0;pointer-events:none;">'
+            f'{dots}</div>')
+
+
+# ─── Same-tab navigation for chart links ────────────────────────────────────
+#  Streamlit's markdown renderer rewrites EVERY <a> it emits to
+#  target="_blank" rel="noopener noreferrer" — verified in the running app, not
+#  assumed. For the three Home cards that is merely untidy (one extra tab, once
+#  per session). For a chart with 48 tappable bands it makes the feature
+#  unusable: inspecting five points would leave five orphaned tabs, each having
+#  paid a full cold app start.
+#
+#  There is no Streamlit-level opt-out, and st.markdown strips <script>, so the
+#  only route is a components iframe — which is same-origin and can therefore
+#  reach window.parent. It installs ONE capture-phase click listener, guarded by
+#  a flag on the parent window so reruns cannot stack duplicates, and it matches
+#  ONLY this feature's own classes. Every other link in the app keeps whatever
+#  behaviour it already had.
+_CHART_LINK_JS = """
+<script>
+(function () {
+  var p = window.parent;
+  if (!p || !p.document || p.__healthChartNav) { return; }
+  p.__healthChartNav = true;
+  p.document.addEventListener('click', function (e) {
+    var el = e.target;
+    var a = (el && el.closest) ? el.closest('a.hp-hit, a.hp-link') : null;
+    if (!a || !a.href) { return; }
+    e.preventDefault();
+    e.stopPropagation();
+    p.location.href = a.href;
+  }, true);
+})();
+</script>
+"""
+
+
+def enable_chart_links() -> None:
+    """Make chart point links navigate in place. Call once per page that
+    renders chart_hits() output or an hp-link anchor."""
+    import streamlit.components.v1 as _components
+    _components.html(_CHART_LINK_JS, height=0)
+
+
+def _grid_svg(gridlines, height: int) -> str:
+    """Horizontal gridlines at container-space fractions of `height`."""
+    return "".join(
+        f'<line x1="0" y1="{frac * height:.2f}" x2="100" y2="{frac * height:.2f}" '
+        f'stroke="{GRID_LINE}" stroke-width="1" vector-effect="non-scaling-stroke" />'
+        for frac in gridlines
+    )
+
+
+def trend_chart_svg(values: list, *, height: int = 92, colour: str = "#6BAF8B",
+                    lo: float | None = None, hi: float | None = None,
+                    gridlines=()) -> str:
+    """A dated trend as a filled line, drawn against an EXPLICIT [lo, hi].
+
+    Replaces app.py's fixed-width `_sparkline`. Two differences beyond the
+    axis: it is full-width (the old 290px was ~2/3 of the panel it sat in,
+    which cramped 30 points into a smear), and it takes its bounds from the
+    caller instead of the data's own min/max — the bounds have to be the
+    ROUNDED ones the axis is labelled with, or every gridline lands somewhere
+    other than the value printed beside it.
+
+    Gaps are drawn THROUGH rather than broken, unlike overnight_chart_svg. A
+    missing day in a 30-day score history is a day the ring was not worn, and
+    the trend either side of it is genuinely continuous; a missing sample
+    mid-night is not.
+    """
+    clean = [(i, float(v)) for i, v in enumerate(values)
+             if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    if len(clean) < 2:
+        return ""
+    n = len(values)
+    if lo is None or hi is None or hi <= lo:
+        lo = min(v for _, v in clean)
+        hi = max(v for _, v in clean)
+        if hi == lo:
+            hi = lo + 1
+    span = float(hi) - float(lo)
+
+    def xy(i, v):
+        x = i / (n - 1) * 100 if n > 1 else 0.0
+        y = PLOT_PAD + (1 - (v - lo) / span) * (height - 2 * PLOT_PAD)
+        return x, y
+
+    pts = [xy(i, v) for i, v in clean]
+    d = "M" + " L".join(f"{x:.2f},{y:.2f}" for x, y in pts)
+    area = d + f" L{pts[-1][0]:.2f},{height} L{pts[0][0]:.2f},{height} Z"
+    return (
+        f'<svg viewBox="0 0 100 {height}" preserveAspectRatio="none" role="img" '
+        f'aria-label="Trend" style="width:100%;height:{height}px;display:block;">'
+        f'{_grid_svg(gridlines, height)}'
+        f'<path d="{area}" fill="{colour}" fill-opacity="0.12" />'
+        f'<path d="{d}" fill="none" stroke="{colour}" stroke-width="1.6" '
+        f'stroke-linejoin="round" stroke-linecap="round" '
+        f'vector-effect="non-scaling-stroke" />'
+        f'</svg>'
+    )
+
+
+def plot_y_fraction(value, lo, hi, height: int = 0, pad: int = PLOT_PAD) -> float:
+    """Where a value sits vertically inside a padded plot, as a fraction of
+    the container. The inverse of axis_gutter_labels, and the reason a point
+    marker lands on its own gridline."""
+    span = (float(hi) - float(lo)) or 1.0
+    if height <= 0:
+        return max(0.0, min(1.0, 1 - (float(value) - float(lo)) / span))
+    inner = (height - 2 * pad) / height
+    return pad / height + (1 - (float(value) - float(lo)) / span) * inner
 
 
 # ─── Sleep-stage rendering (2026-07-31) ─────────────────────────────────────
@@ -341,34 +626,59 @@ STAGE_BAND: dict[str, tuple[str, str]] = {
 STAGE_ROW: dict[str, int] = {"4": 0, "3": 1, "2": 2, "1": 3}
 
 
-def hypnogram_svg(codes: str, height: int = 52) -> str:
+def hypnogram_svg(codes: str, height: int = 52, *, rows: bool = False,
+                  highlight: tuple[int, int] | None = None) -> str:
     """One night's stage sequence as a stacked band chart.
 
     `codes` is the digit-per-interval string Oura and services/sleep_fusion.py
     both use (1=deep 2=light 3=REM 4=awake). Consecutive identical intervals
     are merged into one rect, so a 500-minute night renders as a few dozen
-    elements rather than 500."""
+    elements rather than 500.
+
+    `rows` draws the three row separators, turning the four implicit stage
+    lanes into a labelled categorical Y axis (see hypnogram_row_labels).
+    `highlight` outlines one (start, end-exclusive) run — the segment a click
+    selected. Both default off so views/insights.py's call is unchanged.
+    """
     if not codes:
         return ""
     n = len(codes)
     row_h = height / 4
-    parts, i = [], 0
-    while i < n:
-        j = i
-        while j < n and codes[j] == codes[i]:
-            j += 1
-        colour, _ = STAGE_BAND.get(codes[i], STAGE_BAND["0"])
-        row = STAGE_ROW.get(codes[i])
+    parts = []
+    for i, j, code in _dash.merge_runs(codes):
+        colour, _ = STAGE_BAND.get(code, STAGE_BAND["0"])
+        row = STAGE_ROW.get(code)
         if row is not None:
             parts.append(
                 f'<rect x="{i / n * 100:.3f}%" y="{row * row_h:.1f}" '
                 f'width="{(j - i) / n * 100:.3f}%" height="{row_h:.1f}" fill="{colour}" />'
             )
-        i = j
+    if rows:
+        parts.append(_grid_svg([0.25, 0.5, 0.75], height))
+    if highlight:
+        s, e = highlight
+        # A 30-second run is a hair over 0.1% of the night, far too narrow to
+        # read as an outline alone, so the selection is also washed lighter.
+        parts.append(
+            f'<rect x="{s / n * 100:.3f}%" y="0" width="{(e - s) / n * 100:.3f}%" '
+            f'height="{height}" fill="#FFFFFF" fill-opacity="0.16" />'
+            f'<rect x="{s / n * 100:.3f}%" y="0.75" width="{(e - s) / n * 100:.3f}%" '
+            f'height="{height - 1.5}" fill="none" stroke="#FFFFFF" stroke-opacity="0.8" '
+            f'stroke-width="1.5" vector-effect="non-scaling-stroke" />'
+        )
     return (f'<svg viewBox="0 0 100 {height}" preserveAspectRatio="none" role="img" '
             f'aria-label="Sleep stage timeline" '
             f'style="width:100%;height:{height}px;display:block;border-radius:4px;'
             f'background:#0E1220;">{"".join(parts)}</svg>')
+
+
+def hypnogram_row_labels() -> list[tuple[float, str]]:
+    """(fraction from top, stage name) centred in each of the four lanes —
+    the hypnogram's Y axis. Derived from STAGE_ROW rather than hard-coded so
+    the labels cannot end up describing a different vertical order than the
+    one hypnogram_svg draws."""
+    return [((row + 0.5) / 4, STAGE_BAND[code][1])
+            for code, row in sorted(STAGE_ROW.items(), key=lambda kv: kv[1])]
 
 
 def stage_legend_html() -> str:
@@ -396,7 +706,25 @@ MOVEMENT_LABELS: dict[str, str] = {
 MOVEMENT_OPACITY: dict[str, float] = {"1": 0.16, "2": 0.42, "3": 0.72, "4": 1.0}
 
 
-def movement_svg(codes: str, height: int = 26) -> str:
+def movement_row_labels() -> list[tuple[float, str]]:
+    """(fraction from top, class name) for the movement strip's Y axis.
+
+    Only the two ENDS are labelled. The tick heights are 25/50/75/100% of a
+    strip that is a couple of dozen pixels tall, so four 9px labels would
+    overlap into an unreadable stack; the middle two classes are already
+    named in movement_legend_html directly beneath. The end labels are what
+    the strip actually lacked — without them an upward tick has no stated
+    direction.
+
+    Inset from the exact ends rather than pinned to 0 and 1: a label is
+    centred on its position, so one at 0.0 hangs half its height above the
+    strip and collides with the bottom row label of the hypnogram stacked
+    directly over it."""
+    return [(0.12, MOVEMENT_LABELS["4"]), (0.88, MOVEMENT_LABELS["1"])]
+
+
+def movement_svg(codes: str, height: int = 26, *,
+                 highlight: tuple[int, int] | None = None) -> str:
     """One night's fused movement as a tick strip, drawn to share the
     hypnogram's time axis exactly.
 
@@ -414,20 +742,24 @@ def movement_svg(codes: str, height: int = 26) -> str:
     if not codes:
         return ""
     n = len(codes)
-    parts, i = [], 0
-    while i < n:
-        j = i
-        while j < n and codes[j] == codes[i]:
-            j += 1
-        opacity = MOVEMENT_OPACITY.get(codes[i])
+    parts = []
+    for i, j, code in _dash.merge_runs(codes):
+        opacity = MOVEMENT_OPACITY.get(code)
         if opacity is not None:
-            tick_h = height * (0.25 + 0.75 * (int(codes[i]) - 1) / 3)
+            tick_h = height * (0.25 + 0.75 * (int(code) - 1) / 3)
             parts.append(
                 f'<rect x="{i / n * 100:.3f}%" y="{height - tick_h:.1f}" '
                 f'width="{(j - i) / n * 100:.3f}%" height="{tick_h:.1f}" '
                 f'fill="{MOVEMENT_HUE}" fill-opacity="{opacity}" />'
             )
-        i = j
+    if highlight:
+        s, e = highlight
+        parts.append(
+            f'<rect x="{s / n * 100:.3f}%" y="0.75" width="{(e - s) / n * 100:.3f}%" '
+            f'height="{height - 1.5}" fill="#FFFFFF" fill-opacity="0.14" '
+            f'stroke="#FFFFFF" stroke-opacity="0.8" stroke-width="1.5" '
+            f'vector-effect="non-scaling-stroke" />'
+        )
     return (f'<svg viewBox="0 0 100 {height}" preserveAspectRatio="none" role="img" '
             f'aria-label="Movement timeline" '
             f'style="width:100%;height:{height}px;display:block;border-radius:4px;'
@@ -435,7 +767,9 @@ def movement_svg(codes: str, height: int = 26) -> str:
 
 
 def overnight_chart_svg(values: list, height: int = 60, colour: str = "#8FCDF0",
-                        baseline: float | None = None) -> str:
+                        baseline: float | None = None, *,
+                        lo: float | None = None, hi: float | None = None,
+                        gridlines=()) -> str:
     """An overnight HR or HRV series as a filled line chart.
 
     `values` is one number per sample with None for gaps — Oura pads the
@@ -443,19 +777,24 @@ def overnight_chart_svg(values: list, height: int = 60, colour: str = "#8FCDF0",
     rather than being drawn through as if measured. The path is emitted as
     separate segments per contiguous run for exactly that reason.
 
-    Scaled to the night's own min/max rather than an absolute axis: the point
-    of these charts is the SHAPE of the night (the descent into deep sleep,
-    the REM excursions), and a fixed axis would flatten a calm night into a
-    straight line. The absolute numbers are stated beside the chart, so
-    nothing is lost by relativising the plot.
+    Scaled to the night rather than to an absolute axis: the point of these
+    charts is the SHAPE of the night (the descent into deep sleep, the REM
+    excursions), and a fixed 0-based axis would flatten a calm night into a
+    straight line. That was always the right call, but until this chart
+    carried a labelled Y axis it also meant the vertical scale was unstated —
+    a 4 ms HRV wobble and a 40 ms collapse drew identically. `lo`/`hi` now
+    take the ROUNDED bounds the axis is labelled with (dashboard.value_axis),
+    falling back to the data's own min/max when omitted so an unlabelled call
+    still renders exactly as before.
     """
     nums = [v for v in values if isinstance(v, (int, float))]
     if len(nums) < 2:
         return ""
-    lo, hi = min(nums), max(nums)
+    if lo is None or hi is None or hi <= lo:
+        lo, hi = min(nums), max(nums)
     span = (hi - lo) or 1.0
     n = len(values)
-    pad = 4
+    pad = PLOT_PAD
 
     def xy(i, v):
         x = i / (n - 1) * 100 if n > 1 else 0
@@ -487,7 +826,12 @@ def overnight_chart_svg(values: list, height: int = 60, colour: str = "#8FCDF0",
         # as a reference rather than a second measured series.
         _, by = xy(0, baseline)
         parts.insert(0, f'<line x1="0" y1="{by:.2f}" x2="100" y2="{by:.2f}" '
-                        f'stroke="#3A4356" stroke-width="1" stroke-dasharray="3 3" />')
+                        f'stroke="#3A4356" stroke-width="1" stroke-dasharray="3 3" '
+                        f'vector-effect="non-scaling-stroke" />')
+    # Gridlines go under everything, including the baseline: the baseline is a
+    # measured figure and must stay the most legible horizontal on the chart.
+    if gridlines:
+        parts.insert(0, _grid_svg(gridlines, height))
 
     return (f'<svg viewBox="0 0 100 {height}" preserveAspectRatio="none" role="img" '
             f'aria-label="Overnight trend" '

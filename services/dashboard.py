@@ -15,6 +15,7 @@ builders are treated.
 
 from __future__ import annotations
 
+import math
 from datetime import date, timedelta
 
 from services import engine as _engine
@@ -777,20 +778,34 @@ def overnight_series(payload, max_points: int = 180) -> dict:
     """
     items = (payload or {}).get("items") if isinstance(payload, dict) else None
     if not items:
-        return {"values": [], "low": None, "high": None, "average": None, "count": 0}
+        return {"values": [], "low": None, "high": None, "average": None, "count": 0,
+                "indices": [], "interval": None, "timestamp": None}
 
     values = [v if isinstance(v, (int, float)) else None for v in items]
+    indices = list(range(len(values)))
     # Downsample by striding, never by averaging: a mean would smooth away the
     # dips and excursions that are the entire reason to plot the night.
     if len(values) > max_points:
         step = len(values) / max_points
-        values = [values[int(i * step)] for i in range(max_points)]
+        indices = [int(i * step) for i in range(max_points)]
+        values = [values[i] for i in indices]
 
+    # `indices` maps each PLOTTED point back to its position in the raw series,
+    # which is the only way a clicked point can be given a real clock time
+    # after striding. Carried as indices rather than as pre-formatted times so
+    # a 180-point night costs one timestamp parse per label actually drawn
+    # (see overnight_axis_labels / overnight_point_detail), not 180.
+    base = {
+        "values": values,
+        "indices": indices,
+        "interval": (payload or {}).get("interval"),
+        "timestamp": (payload or {}).get("timestamp"),
+    }
     real = [v for v in values if v is not None]
     if not real:
-        return {"values": values, "low": None, "high": None, "average": None, "count": 0}
+        return {**base, "low": None, "high": None, "average": None, "count": 0}
     return {
-        "values": values,
+        **base,
         "low": min(real),
         "high": max(real),
         "average": round(sum(real) / len(real), 1),
@@ -814,3 +829,460 @@ def format_clock_offset(iso_datetime: str | None, minutes) -> str:
         return (start + _td(minutes=float(minutes))).strftime("%H:%M")
     except (ValueError, TypeError):
         return ""
+
+
+# ─── Chart axes and point selection (2026-08-03) ────────────────────────────
+#  Every chart on the three Home drill-downs was drawn without a labelled axis
+#  of either kind: the trend sparklines carried a single number floating beside
+#  the last point, the overnight HR/HRV charts were explicitly relativised to
+#  the night's own min/max with nothing on screen saying what the min and max
+#  were, and the hypnogram had only its two end times. A shape with no scale
+#  cannot be read — a 4 ms HRV wobble and a 40 ms collapse drew identically.
+#
+#  This section is the pure half of the fix: tick VALUES and tick POSITIONS,
+#  which slot a click resolves to, and what a selected point should say. The
+#  SVG/HTML that draws it lives in styles.py, and the query-param plumbing in
+#  app.py, keeping this file renderer-agnostic like the rest of it.
+
+def _tick_step(span: float, intervals: int) -> float:
+    """A "nice" (1/2/5 × a power of ten) step of roughly span/intervals.
+
+    Rounds to the NEAREST rung of the ladder rather than up to it, which is
+    the difference between an axis that fits its data and one that wastes
+    half its height: 34 points of readiness spread over 3 intervals wants a
+    step of 11.3, and rounding that up to 20 produces a 40-100 axis for data
+    that lives in 57-91. The sqrt thresholds are the standard geometric
+    midpoints between rungs (d3's tickIncrement uses the same ones), so each
+    rough step goes to whichever rung it is genuinely closer to on a log
+    scale.
+    """
+    if not span or span <= 0 or not math.isfinite(span):
+        return 1.0
+    step0 = span / max(1, int(intervals))
+    power = math.floor(math.log10(step0))
+    err = step0 / (10.0 ** power)
+    if err >= math.sqrt(50):
+        mult = 10.0
+    elif err >= math.sqrt(10):
+        mult = 5.0
+    elif err >= math.sqrt(2):
+        mult = 2.0
+    else:
+        mult = 1.0
+    return mult * (10.0 ** power)
+
+
+def value_axis(values, ticks: int = 4, floor: float | None = None,
+               cap: float | None = None, max_ticks: int = 6) -> dict | None:
+    """Rounded bounds and tick values for a value (Y) axis.
+
+    Returns {"lo", "hi", "step", "ticks"} or None when there is nothing
+    numeric to scale. `lo`/`hi` are the ROUNDED bounds and are what the plot
+    must be drawn against — scaling the line to the raw min/max while
+    labelling the axis with rounded ticks would put every gridline in the
+    wrong place, which is worse than no axis at all.
+
+    `floor`/`cap` clamp the rounded bounds to a scale's real limits (0 for a
+    duration, 0-100 for a score) so an axis never claims a negative resting
+    heart rate or a readiness of 110. They clamp the BOUNDS, never the data:
+    a value outside them still plots, it just stops the axis from being
+    extended past the point where it means anything.
+
+    `ticks` is a target, `max_ticks` a hard limit — nearest-rung rounding can
+    land on a step that fits the data well but produces more gridlines than a
+    92px plot can carry, so the step is widened until the count fits.
+
+    A flat series gets a symmetric band around its single level rather than a
+    zero-height axis, so the line lands mid-chart instead of on an edge.
+    """
+    nums = [float(v) for v in values
+            if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    if not nums:
+        return None
+    lo_raw, hi_raw = min(nums), max(nums)
+    if hi_raw == lo_raw:
+        pad = abs(hi_raw) * 0.05 or 1.0
+        lo_raw, hi_raw = lo_raw - pad, hi_raw + pad
+
+    ticks = max(2, int(ticks))
+    step = _tick_step(hi_raw - lo_raw, ticks - 1)
+    for _ in range(8):
+        lo = math.floor(lo_raw / step) * step
+        hi = math.ceil(hi_raw / step) * step
+        if (hi - lo) / step + 1 <= max_ticks + 1e-9:
+            break
+        step = _tick_step(step * 1.5, 1)
+
+    if floor is not None:
+        lo = max(lo, floor)
+    if cap is not None:
+        hi = min(hi, cap)
+    if hi <= lo:
+        hi = lo + step
+
+    out, v, guard = [], lo, 0
+    while v <= hi + step * 1e-9 and guard < 64:
+        out.append(round(v, 6))
+        v += step
+        guard += 1
+    return {"lo": round(lo, 6), "hi": round(hi, 6), "step": step, "ticks": out}
+
+
+def format_axis_value(value: float, step: float) -> str:
+    """Tick text at exactly the precision the step justifies — a step of 10
+    labelled "60.0" is three characters of noise in a 34px gutter."""
+    if step >= 1:
+        decimals = 0
+    elif step >= 0.1:
+        decimals = 1
+    else:
+        decimals = 2
+    return f"{value:.{decimals}f}"
+
+
+def value_axis_labels(axis: dict | None) -> list[tuple[float, str]]:
+    """(fraction from the TOP, text) per tick — the form a positioned gutter
+    needs. Top-anchored rather than bottom because that is how an absolutely
+    positioned element is placed in CSS, and converting at the call site
+    invites getting the flip wrong in one renderer and not the other."""
+    if not axis:
+        return []
+    span = (axis["hi"] - axis["lo"]) or 1.0
+    return [((axis["hi"] - t) / span, format_axis_value(t, axis["step"]))
+            for t in axis["ticks"]]
+
+
+def x_axis_labels(labels, max_ticks: int = 5) -> list[tuple[float, str]]:
+    """(fraction across, text) for an evenly-spread subset of `labels`.
+
+    Labelling all 30 days of a trend on a phone renders an unreadable smear,
+    so a subset is chosen by even spacing with the first and last always
+    included — those two anchor the axis and their absence is what made the
+    old day-of-week strip ambiguous about which end was today. Blank labels
+    are dropped after selection, never before: dropping first would shift
+    every remaining tick off the position it labels.
+    """
+    labels = list(labels)
+    n = len(labels)
+    if n == 0:
+        return []
+    if n == 1:
+        return [(0.0, str(labels[0]))] if str(labels[0]).strip() else []
+    k = max(2, min(int(max_ticks), n))
+    picks = sorted({round(i * (n - 1) / (k - 1)) for i in range(k)})
+    return [(i / (n - 1), str(labels[i])) for i in picks if str(labels[i]).strip()]
+
+
+def hit_bands(n: int, max_bands: int = 48) -> list[tuple[float, float, int]]:
+    """(left fraction, width fraction, slot index) for the tappable bands laid
+    over a chart of `n` slots.
+
+    One band per slot while that stays tappable, and evenly merged above
+    `max_bands` — a 180-sample overnight series split 180 ways gives 2px
+    targets on a phone, which is not a control. A merged band carries the
+    index of the slot at its CENTRE, so the detail it opens is the reading
+    under the middle of what was tapped rather than the edge.
+    """
+    n = int(n)
+    if n <= 0:
+        return []
+    k = max(1, min(int(max_bands), n))
+    return [(b / k, 1.0 / k, min(n - 1, int((b + 0.5) * n / k))) for b in range(k)]
+
+
+def merge_runs(codes: str) -> list[tuple[int, int, str]]:
+    """(start, end-exclusive, code) per run of identical characters.
+
+    Shared by the strip renderers (which draw one rect per run instead of one
+    per 30-second slot) and by the click path (which reports the whole run a
+    tapped slot belongs to, since "Light, 23:41-00:14" is the fact a user
+    wants and "slot 412" is not)."""
+    out, i, n = [], 0, len(codes or "")
+    while i < n:
+        j = i
+        while j < n and codes[j] == codes[i]:
+            j += 1
+        out.append((i, j, codes[i]))
+        i = j
+    return out
+
+
+def run_at(codes: str, index: int) -> tuple[int, int, str] | None:
+    """The run containing `index`, or None when out of range."""
+    if not codes or not (0 <= index < len(codes)):
+        return None
+    start = end = index
+    while start > 0 and codes[start - 1] == codes[index]:
+        start -= 1
+    while end + 1 < len(codes) and codes[end + 1] == codes[index]:
+        end += 1
+    return (start, end + 1, codes[index])
+
+
+# ─── Selected point ─────────────────────────────────────────────────────────
+
+def parse_point_selection(raw) -> tuple[str | None, int | None]:
+    """`"hist:12"` → ("hist", 12); anything malformed → (None, None).
+
+    The selection arrives as a URL query parameter, so it is user-editable by
+    construction and must never be trusted to be in range — every consumer
+    below re-checks the index against its own series rather than assuming a
+    valid pair means a valid point."""
+    if not raw or not isinstance(raw, str) or ":" not in raw:
+        return None, None
+    chart, _, idx = raw.partition(":")
+    chart = chart.strip()
+    if not chart:
+        return None, None
+    try:
+        return chart, int(idx)
+    except (TypeError, ValueError):
+        return None, None
+
+
+def point_selection_key(chart: str, index: int) -> str:
+    """The inverse of parse_point_selection — the one place the wire format is
+    written, so the two cannot drift."""
+    return f"{chart}:{int(index)}"
+
+
+def _as_iso_date(d) -> str:
+    return d.isoformat() if isinstance(d, date) else str(d or "")
+
+
+def format_axis_date(value, fmt: str = "%d %b") -> str:
+    """A tick label for a dated axis, from either a `date` or an ISO string.
+
+    Both shapes reach here — the trend windows are built as `date` objects
+    while the persisted history is keyed by ISO string — and an axis that
+    silently renders one of them as `2026-08-03` while the other reads
+    `03 Aug` would look like two different charts."""
+    if isinstance(value, date):
+        return value.strftime(fmt)
+    try:
+        return date.fromisoformat(str(value)).strftime(fmt)
+    except (ValueError, TypeError):
+        return str(value or "")
+
+
+def minutes_between(start_iso: str | None, end_iso: str | None) -> float | None:
+    """Span of two ISO timestamps in minutes, or None if either is unusable.
+
+    Compares absolute instants, so a night whose two ends carry different UTC
+    offsets (which happens across a DST change, and which Oura has been seen
+    to do within a single night — see the duplicate-period note in CLAUDE.md)
+    measures the real elapsed time rather than the wall-clock difference."""
+    if not start_iso or not end_iso:
+        return None
+    try:
+        from datetime import datetime as _dt
+        a = _dt.fromisoformat(str(start_iso))
+        b = _dt.fromisoformat(str(end_iso))
+    except (ValueError, TypeError):
+        return None
+    if (a.tzinfo is None) != (b.tzinfo is None):
+        return None
+    span = (b - a).total_seconds() / 60.0
+    return span if span > 0 else None
+
+
+def clock_axis_labels(start_iso: str | None, total_minutes: float | None,
+                      max_ticks: int = 5) -> list[tuple[float, str]]:
+    """(fraction across, HH:MM) evenly spaced over a night's window — the time
+    axis under the hypnogram and movement strips.
+
+    The strips previously carried only their two end times, which said when
+    the night started and ended but nothing about where anything in between
+    fell; reading "the long deep block was around 01:30" off it meant
+    measuring with a finger."""
+    if not start_iso or not total_minutes or float(total_minutes) <= 0:
+        return []
+    k = max(2, int(max_ticks))
+    out = []
+    for i in range(k):
+        frac = i / (k - 1)
+        clock = format_clock_offset(start_iso, frac * float(total_minutes))
+        if clock:
+            out.append((frac, clock))
+    return out
+
+
+def _fmt_number(value, decimals: int = 0, unit: str = "") -> str:
+    if value is None:
+        return "—"
+    suffix = f" {unit}" if unit else ""
+    return f"{float(value):.{decimals}f}{suffix}"
+
+
+def trend_point_detail(dates, values, index: int, *, unit: str = "",
+                       decimals: int = 0, label: str = "Value") -> dict | None:
+    """What one point on a dated trend chart says about itself.
+
+    Rows are deliberately comparative rather than a restatement of the number
+    already under the cursor: the reading, what it moved FROM (and when — a
+    +3 against yesterday and a +3 against nine days ago are different facts),
+    and where it sits in the window being drawn. `open_date` is the day the
+    point belongs to, so the caller can offer to navigate the whole page there.
+    """
+    dates = list(dates)
+    values = list(values)
+    if not (0 <= index < len(dates)) or index >= len(values):
+        return None
+
+    iso = _as_iso_date(dates[index])
+    value = values[index]
+    rows = [{"label": label,
+             "value": _fmt_number(value, decimals, unit) if value is not None
+                      else "No reading"}]
+
+    if value is not None:
+        prev_i = next((i for i in range(index - 1, -1, -1)
+                       if values[i] is not None), None)
+        if prev_i is not None:
+            delta = float(value) - float(values[prev_i])
+            gap = index - prev_i
+            when = ("previous day" if gap == 1
+                    else f"{gap} days earlier ({_as_iso_date(dates[prev_i])})")
+            rows.append({"label": f"Change vs {when}",
+                         "value": f"{delta:+.{decimals}f}{f' {unit}' if unit else ''}"})
+
+    real = [float(v) for v in values if v is not None]
+    if real:
+        rows.append({"label": f"Window average ({len(real)} readings)",
+                     "value": _fmt_number(sum(real) / len(real), decimals, unit)})
+        rows.append({"label": "Window range",
+                     "value": f"{_fmt_number(min(real), decimals)} – "
+                              f"{_fmt_number(max(real), decimals, unit)}"})
+
+    return {"title": iso, "rows": rows, "open_date": iso}
+
+
+_METRICS_HISTORY_FIELDS = (
+    ("readiness_score", "Readiness", "", 0),
+    ("sleep_score", "Sleep Score", "", 0),
+    ("sleep_pct", "Sleep vs need", "%", 0),
+    ("strain", "Strain", "", 1),
+)
+
+
+def metrics_history_rows(row: dict | None, exclude: str = "") -> list[dict]:
+    """The OTHER persisted metrics for a day, for the selected point on the
+    30-day trend.
+
+    The point being inspected is already the headline, so it is excluded —
+    repeating it directly under itself is the kind of duplication that made
+    the adjusted-total note necessary on the Sleep panel. Absent metrics are
+    dropped rather than dashed: this block is supplementary, and a stack of
+    em-dashes under a real reading reads as a fault in the reading."""
+    if not row:
+        return []
+    out = []
+    for key, lbl, unit, decimals in _METRICS_HISTORY_FIELDS:
+        if key == exclude:
+            continue
+        v = row.get(key)
+        if v is None:
+            continue
+        out.append({"label": lbl, "value": _fmt_number(v, decimals, unit)})
+    return out
+
+
+def overnight_axis_labels(series: dict | None, max_ticks: int = 4) -> list[tuple[float, str]]:
+    """Clock ticks across an overnight HR/HRV chart.
+
+    Derived from the series' own timestamp and sample interval rather than
+    from the night's bedtime window: the two are not the same span (Oura's HR
+    series starts when the sensor did, not when bedtime_start says the night
+    began), and labelling a chart with a window it was not drawn against is
+    how an axis becomes actively misleading. Returns [] when the payload
+    lacks either field, which is what an older night looks like."""
+    if not series:
+        return []
+    indices = series.get("indices") or []
+    interval = series.get("interval")
+    timestamp = series.get("timestamp")
+    if len(indices) < 2 or not interval or not timestamp:
+        return []
+    out = []
+    for frac, raw_i in x_axis_labels(indices, max_ticks=max_ticks):
+        clock = format_clock_offset(timestamp, float(raw_i) * float(interval) / 60.0)
+        if clock:
+            out.append((frac, clock))
+    return out
+
+
+def overnight_point_detail(series: dict | None, index: int, *, unit: str,
+                           decimals: int = 0) -> dict | None:
+    """One sample of an overnight series: when it was taken, what it read, and
+    how it sat against the night's own low/high/average — which is the only
+    frame that makes an individual sample meaningful, since these charts are
+    deliberately scaled to the night rather than to an absolute axis."""
+    if not series:
+        return None
+    values = series.get("values") or []
+    if not (0 <= index < len(values)):
+        return None
+    value = values[index]
+
+    rows = []
+    indices = series.get("indices") or []
+    interval, timestamp = series.get("interval"), series.get("timestamp")
+    if index < len(indices) and interval and timestamp:
+        clock = format_clock_offset(
+            timestamp, float(indices[index]) * float(interval) / 60.0)
+        if clock:
+            rows.append({"label": "Time", "value": clock})
+
+    if value is None:
+        rows.append({"label": "Reading", "value": "Not measured"})
+        return {"title": "Sample", "rows": rows, "open_date": None}
+
+    rows.append({"label": "Reading", "value": _fmt_number(value, decimals, unit)})
+    avg = series.get("average")
+    if avg is not None:
+        rows.append({"label": "vs night average",
+                     "value": f"{float(value) - float(avg):+.{max(decimals, 1)}f} {unit}".strip()})
+    lo, hi = series.get("low"), series.get("high")
+    if lo is not None and hi is not None:
+        rows.append({"label": "Night low / high",
+                     "value": f"{_fmt_number(lo, decimals)} – {_fmt_number(hi, decimals, unit)}"})
+    return {"title": "Sample", "rows": rows, "open_date": None}
+
+
+def segment_point_detail(codes: str, index: int, *, start_iso: str | None,
+                         total_minutes: float | None, labels: dict[str, str],
+                         kind: str = "Stage") -> dict | None:
+    """The run of a digit-coded strip (hypnogram or movement) containing the
+    tapped slot — its class, its clock span and how long it lasted.
+
+    The slot width is derived as total_minutes / len(codes) rather than
+    assumed, because the two strips on the Sleep screen are drawn on
+    different grids (Oura's hypnogram is 30-second, the fused master is
+    per-minute, movement is 30-second) and are only guaranteed to share an
+    axis because both are stretched across the same window. Deriving keeps
+    the reported times consistent with what is actually on screen instead of
+    with whichever grid the code was written against.
+    """
+    run = run_at(codes or "", index)
+    if run is None:
+        return None
+    start, end, code = run
+    n = len(codes)
+    rows = [{"label": kind, "value": labels.get(code, "Unknown")}]
+
+    per_slot = (float(total_minutes) / n) if total_minutes and n else None
+    if per_slot:
+        duration = (end - start) * per_slot
+        if start_iso:
+            a = format_clock_offset(start_iso, start * per_slot)
+            b = format_clock_offset(start_iso, end * per_slot)
+            if a and b:
+                rows.append({"label": "From", "value": f"{a} – {b}"})
+        rows.append({"label": "Duration",
+                     "value": format_duration(duration * 60) or "—"})
+        same = sum(e - s for s, e, c in merge_runs(codes) if c == code)
+        rows.append({"label": f"Total {labels.get(code, 'this class').lower()} tonight",
+                     "value": format_duration(same * per_slot * 60) or "—"})
+    rows.append({"label": "Share of night",
+                 "value": f"{(end - start) / n * 100:.1f} %"})
+    return {"title": labels.get(code, "Segment"), "rows": rows, "open_date": None}

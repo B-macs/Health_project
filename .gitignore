@@ -31,3 +31,6 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+# Local scratch: debug HTML dumps, streamlit logs, screenshots.
+tmp/
