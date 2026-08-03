@@ -31,6 +31,7 @@ from datetime import date, datetime, timedelta
 from services import biometrics
 from services import content_weighting
 from services import dashboard
+from services import home_snapshot
 from services import hr_load
 from services import hr_matching
 from services import models
@@ -198,6 +199,24 @@ _OURA_DAILY_ENDPOINTS = (
     "daily_sleep", "daily_readiness", "daily_activity", "daily_stress",
     "daily_resilience", "daily_spo2", "daily_cardiovascular_age", "sleep_time", "vo2_max",
 )
+
+# The order sync_oura_all writes tabs in, most load-bearing first. Oura Daily
+# carries the readiness contributors and Oura Sleep Periods carries duration,
+# efficiency, the hypnogram, HRV and RHR — between them every number on the
+# Home page. The remaining three are archival: nothing on any screen reads
+# them, so they are the right thing to still be mid-write when a run is cut
+# short. Deliberately NOT the order of _oura_event_specs(), which is shared
+# with the historical backfill and pinned by its own test.
+_OURA_SYNC_ORDER = ("daily", "sleep_periods", "workouts", "sessions", "rest_mode_periods")
+
+# .sync_state.json key holding an unfinished run's per-tab counts, and how
+# long that marker stays resumable. See Repository.oura_sync_progress.
+_OURA_SYNC_PROGRESS_KEY = "oura_sync_progress"
+_OURA_SYNC_RESUME_MINUTES = 30
+
+# .sync_state.json key holding the durable Home-card snapshot, keyed by ISO
+# date. See services/home_snapshot.py.
+_HOME_SNAPSHOT_KEY = "home_snapshots"
 _OURA_DAILY_HEADER = [
     "date",
     "sleep_score", "sleep_total_sleep", "sleep_efficiency", "sleep_restfulness",
@@ -4170,23 +4189,56 @@ class Repository:
         except Exception as exc:
             return False, str(exc)
 
-    def sync_oura_all(self, days: int = 7, today: date | None = None) -> dict:
-        """Pulls every configured Oura data type for the last `days` days
-        (inclusive of today) and upserts each into its own Sheet tab — Oura
-        Daily keyed by date, the 4 event tabs keyed by their own id, so
-        re-running this (whether the 2-hour automatic trigger or the manual
-        weekly button) never duplicates a row, only refreshes existing ones.
-        Raises RuntimeError if Oura isn't configured, or whatever `requests`
-        raises on a real API failure — callers (views/sync.py, app.py's
-        cached wrapper) decide how to surface that. Returns
-        {tab_name: rows_written}."""
-        token = self._oc
-        if token is None:
-            raise RuntimeError("Oura is not configured — add OURA_TOKEN to .streamlit/secrets.toml.")
-        today = today or date.today()
-        start = (today - timedelta(days=days - 1)).isoformat()
-        end = today.isoformat()
+    # ─── Durable Home-card snapshot ──────────────────────────────────────
+    #  Lets a reopened app repaint Readiness/Strain/Sleep from local disk
+    #  instead of ~6 Sheets reads. All the rules about when that is safe
+    #  live in services/home_snapshot.py — read its docstring first.
 
+    def get_home_snapshot(self, d: date, today: date | None = None) -> dict | None:
+        """The stored card values for `d`, or None when there is nothing
+        safe to serve (no entry, an older schema, or today's entry still
+        incomplete — see home_snapshot.is_serveable)."""
+        store = local_cache.read().get(_HOME_SNAPSHOT_KEY) or {}
+        entry = home_snapshot.get(store, d)
+        if home_snapshot.is_serveable(entry, d, today or date.today()):
+            return entry
+        return None
+
+    def save_home_snapshot(self, d: date, snapshot: dict,
+                           sleep_need_hours: float | None,
+                           sleep_baseline_window: int | None,
+                           computed_at: datetime | None = None,
+                           today: date | None = None) -> dict:
+        """Persists what the cards show for `d`. Incomplete entries are
+        stored too, deliberately: get_home_snapshot refuses to serve them,
+        but keeping them means a day whose sleep never arrives is a visible
+        record rather than an absent one, and the next complete recompute
+        simply overwrites in place."""
+        entry = home_snapshot.build(
+            snapshot, sleep_need_hours, sleep_baseline_window, computed_at=computed_at,
+        )
+        data = local_cache.read()
+        store = home_snapshot.put(data.get(_HOME_SNAPSHOT_KEY) or {}, d, entry)
+        data[_HOME_SNAPSHOT_KEY] = home_snapshot.prune(store, today or date.today())
+        local_cache.write(data)
+        return entry
+
+    def invalidate_home_snapshot(self, d: date) -> None:
+        """Drops `d`'s entry. Called wherever something happens that can move
+        a card — a logged session (strain), a saved check-in, a wake-time
+        correction (sleep score) — since this cache outlives the process and
+        would otherwise survive the very events that invalidate it."""
+        data = local_cache.read()
+        store = data.get(_HOME_SNAPSHOT_KEY) or {}
+        if home_snapshot.get(store, d) is None:
+            return
+        data[_HOME_SNAPSHOT_KEY] = home_snapshot.drop(store, d)
+        local_cache.write(data)
+
+    def _sync_oura_daily(self, token: str, start: str, end: str) -> int:
+        """The Oura Daily tab alone (readiness/sleep/activity/SpO2 etc.
+        collapsed into one row per date). Split out of sync_oura_all so it is
+        one resumable step alongside the four event tabs."""
         by_date: dict[str, dict] = {}
         for endpoint in _OURA_DAILY_ENDPOINTS:
             for entry in oura.get_collection(token, endpoint, start, end):
@@ -4198,12 +4250,120 @@ class Repository:
             row = self._oura_daily_row(d, group)
             values = [row.get(k, "") for k in _OURA_DAILY_HEADER]
             sheets.upsert_row_by_key(daily_ws, key_col=1, key_value=d, row_values=values)
+        return len(by_date)
 
-        result = {"daily": len(by_date)}
-        for key, endpoint, ws_getter, header, mapper in self._oura_event_specs():
-            result[key] = self._sync_oura_events(
-                token, endpoint, start, end, ws_getter(), header, mapper,
-            )
+    def oura_sync_progress(self, window: str, now: datetime | None = None) -> dict:
+        """Per-tab row counts already written for `window` by a run that
+        started but did not finish, or {} if there is nothing to resume.
+
+        Discarded — i.e. the next run redoes everything — when the window
+        differs (a new day moves the rolling window, so nothing carries
+        over), when the marker is unparseable, or when it is older than
+        _OURA_SYNC_RESUME_MINUTES. That last bound is what stops a resume
+        from serving stale data: Oura revises a day's readiness and sleep
+        scores for some hours after the upload, so skipping a tab written
+        this morning because the marker says "done" would pin the
+        provisional numbers for the rest of the day. Half an hour covers the
+        case this exists for — the app closed mid-sync and reopened shortly
+        after — and nothing longer.
+        """
+        raw = local_cache.read().get(_OURA_SYNC_PROGRESS_KEY) or {}
+        if raw.get("window") != window:
+            return {}
+        try:
+            started = datetime.fromisoformat(raw.get("at", ""))
+        except (TypeError, ValueError):
+            return {}
+        if (now or datetime.now()) - started > timedelta(minutes=_OURA_SYNC_RESUME_MINUTES):
+            return {}
+        counts = raw.get("counts")
+        return dict(counts) if isinstance(counts, dict) else {}
+
+    def _mark_oura_tab_synced(self, window: str, tab: str, count: int,
+                              now: datetime | None = None) -> None:
+        """Records one finished tab. Written after EACH tab rather than once
+        at the end — the whole point is to survive the process disappearing
+        mid-run, which is precisely when an end-of-run write never happens."""
+        data = local_cache.read()
+        raw = data.get(_OURA_SYNC_PROGRESS_KEY) or {}
+        counts = dict(raw.get("counts") or {}) if raw.get("window") == window else {}
+        counts[tab] = count
+        data[_OURA_SYNC_PROGRESS_KEY] = {
+            "window": window,
+            "at": (now or datetime.now()).isoformat(timespec="seconds"),
+            "counts": counts,
+        }
+        local_cache.write(data)
+
+    def _clear_oura_sync_progress(self) -> None:
+        data = local_cache.read()
+        if data.pop(_OURA_SYNC_PROGRESS_KEY, None) is not None:
+            local_cache.write(data)
+
+    def sync_oura_all(self, days: int = 7, today: date | None = None,
+                      now: datetime | None = None) -> dict:
+        """Pulls every configured Oura data type for the last `days` days
+        (inclusive of today) and upserts each into its own Sheet tab — Oura
+        Daily keyed by date, the 4 event tabs keyed by their own id, so
+        re-running this (whether the 2-hour automatic trigger or the manual
+        weekly button) never duplicates a row, only refreshes existing ones.
+        Raises RuntimeError if Oura isn't configured, or whatever `requests`
+        raises on a real API failure — callers (views/sync.py, app.py's
+        cached wrapper) decide how to surface that. Returns
+        {tab_name: rows_written}.
+
+        Interruption-tolerant in two independent ways, because a full run
+        takes ~46 seconds and app.py deliberately starts it AFTER the page
+        paints — so closing the app is a normal way for it to be cut off,
+        not an edge case:
+
+        * **Order.** Tabs are written in _OURA_SYNC_ORDER, which front-loads
+          the only two the Home page reads. A run killed partway therefore
+          leaves the app's own screen correct and only the archival tabs
+          behind, instead of the observed failure where Oura Daily landed,
+          Oura Sleep Periods did not, and the Sleep card read "No Readings"
+          all morning against a night Oura had recorded perfectly well.
+        * **Resume.** Each finished tab is recorded (see oura_sync_progress),
+          so the next attempt within the resume window picks up where this
+          one stopped rather than re-uploading the ~29 workout rows it had
+          already written. Counts for skipped tabs are carried through from
+          the marker, so the returned dict still describes the whole window
+          and the manual button in Insights → Sync keeps reporting real
+          numbers.
+
+        The marker is cleared on completion, so the ordinary path leaves no
+        state behind.
+        """
+        token = self._oc
+        if token is None:
+            raise RuntimeError("Oura is not configured — add OURA_TOKEN to .streamlit/secrets.toml.")
+        today = today or date.today()
+        start = (today - timedelta(days=days - 1)).isoformat()
+        end = today.isoformat()
+        window = f"{start}..{end}"
+
+        already = self.oura_sync_progress(window, now=now)
+        events = {
+            key: (endpoint, ws_getter, header, mapper)
+            for key, endpoint, ws_getter, header, mapper in self._oura_event_specs()
+        }
+
+        result: dict[str, int] = {}
+        for tab in _OURA_SYNC_ORDER:
+            if tab in already:
+                result[tab] = already[tab]
+                continue
+            if tab == "daily":
+                count = self._sync_oura_daily(token, start, end)
+            else:
+                endpoint, ws_getter, header, mapper = events[tab]
+                count = self._sync_oura_events(
+                    token, endpoint, start, end, ws_getter(), header, mapper,
+                )
+            result[tab] = count
+            self._mark_oura_tab_synced(window, tab, count, now=now)
+
+        self._clear_oura_sync_progress()
         return result
 
     def sync_oura_all_if_due(self, days: int = 7, today: date | None = None,
