@@ -55,6 +55,19 @@ def active_phase(phases: list[Phase], today: date) -> Phase | None:
     return None
 
 
+def current_stage_start(phases: list[Phase], today: date) -> date | None:
+    """First day of the stage `today` falls in, or None during a reassessment
+    gap between phases.
+
+    Feeds engine.acwr's `stage_start`, which scopes the chronic baseline to
+    the current stage rather than a flat 28-day calendar window. None is a
+    safe answer, not a failure: acwr() falls back to the calendar window,
+    which is the pre-existing behaviour.
+    """
+    active = active_phase(phases, today)
+    return _start(active) if active is not None else None
+
+
 def day_number_in_phase(phase: Phase, d: date) -> int:
     """1-indexed day number within the phase (not global). A date_overrides
     entry for d wins over the formula — see Phase.date_overrides."""

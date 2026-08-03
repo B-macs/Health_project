@@ -9,6 +9,7 @@ what changed.
 import ast
 import math
 from datetime import date, timedelta
+from unittest import mock
 
 from services import engine
 from tests._legacy_check import check
@@ -165,8 +166,15 @@ def test_engine_acwr():
     chronic_rows = [{"date": (today - timedelta(days=27 - i)).isoformat(), "total_au": 200.0} for i in range(21)]
     spike_rows   = [{"date": (today - timedelta(days=6 - i)).isoformat(),  "total_au": 400.0} for i in range(7)]
     ac_spike = engine.acwr(chronic_rows + spike_rows, stage=1)
-    check("7-day spike -> ACWR > 1.2 -> hard_locked", ac_spike["hard_locked"], True)
-    check("hard locked -> status overreach_risk",     ac_spike["status"], "overreach_risk")
+    check("7-day spike -> ACWR exceeds 1.2 ceiling", ac_spike["exceeds_ceiling"], True)
+    check("breach -> status overreach_risk",         ac_spike["status"], "overreach_risk")
+    # The CEILING is untouched — only enforcement is held (ACWR_ADVISORY_MODE).
+    # Pin both directions so the switch cannot silently stop working either way.
+    check("advisory mode -> breach does not lock",   ac_spike["hard_locked"], False)
+    with mock.patch.object(engine, "ACWR_ADVISORY_MODE", False):
+        ac_enforced = engine.acwr(chronic_rows + spike_rows, stage=1)
+    check("advisory OFF -> same breach hard locks",  ac_enforced["hard_locked"], True)
+    check("advisory OFF -> ceiling still 1.2",       ac_enforced["ceiling"], 1.2)
 
     # Zero-fill check: 1 entry 27 days ago only -> chronic diluted to near 0
     one_entry = [{"date": (today - timedelta(days=27)).isoformat(), "total_au": 300.0}]
@@ -211,11 +219,21 @@ def test_engine_volume_recommendation():
     check("yellow traffic -> REDUCED VOLUME",    "REDUCED" in rec_yel["label"], True)
     check("yellow traffic -> multiplier 0.75",   rec_yel["multiplier"], 0.75)
 
-    # Hard lock
-    ac_locked = engine.acwr(chronic_rows + spike_rows, stage=1)
+    # Hard lock — enforcement is held by default, so re-enable it to test it.
+    with mock.patch.object(engine, "ACWR_ADVISORY_MODE", False):
+        ac_locked = engine.acwr(chronic_rows + spike_rows, stage=1)
     rec_lock = engine.volume_recommendation(tl_ok, ac_locked, 1, 0, injury_weight_val=0.3)
     check("hard lock -> VOLUME HARD-LOCKED",     "HARD-LOCKED" in rec_lock["label"], True)
     check("hard lock -> multiplier 0.75",        rec_lock["multiplier"], 0.75)
+    check("hard lock -> no duplicate advisory",  rec_lock["acwr_advisory"], None)
+
+    # Same ACWR under advisory mode: the directive is NOT overridden, but the
+    # breach is still reported alongside it.
+    ac_adv  = engine.acwr(chronic_rows + spike_rows, stage=1)
+    rec_adv = engine.volume_recommendation(tl_ok, ac_adv, 1, 0, injury_weight_val=0.3)
+    check("advisory -> directive not overridden", "HARD-LOCKED" in rec_adv["label"], False)
+    check("advisory -> breach still surfaced",
+          "Advisory" in (rec_adv["acwr_advisory"] or ""), True)
 
     # Green + low injury weight -> progressive overload
     rec_green = engine.volume_recommendation(tl_ok, ac_ok, 1, 0, injury_weight_val=0.3)

@@ -31,6 +31,7 @@ from services import dashboard as dash
 from services import engine
 from services import stats as stats_mod
 from services import insights as insights_svc
+from services import plan as plan_svc
 from services import volume as volume_svc
 
 
@@ -506,6 +507,13 @@ def _diag():        return repo.get_repository().get_diagnostic_profile()
 def _stage():       return repo.get_repository().get_current_stage()
 
 @st.cache_data(ttl=1800, show_spinner=False)
+def _stage_start():
+    """Start date of the active phase — scopes ACWR's chronic baseline to the
+    current stage. None during a reassessment gap; acwr() then falls back to
+    the flat 28-day calendar window."""
+    return plan_svc.current_stage_start(repo.get_repository().get_phases(), date.today())
+
+@st.cache_data(ttl=1800, show_spinner=False)
 def _sync_raw(sheet_id: str) -> list[dict]:
     return repo.get_repository().get_raw_sheet_rows()
 
@@ -668,7 +676,8 @@ def render() -> None:
             lambda_val    = float(diagnostic.get("injury_weight_decay_lambda") or 0.05)
 
             tl          = engine.traffic_light(bio_rows, drift_rows=_bio_drift())
-            acwr_result = engine.acwr(au_rows, current_stage)
+            acwr_result = engine.acwr(au_rows, current_stage,
+                                      stage_start=_stage_start())
             inj_weight  = engine.injury_weight(lambda_val, pain_streak)
             obs_rem     = engine.observation_days_remaining(tl["data_days"])
             rec         = engine.volume_recommendation(tl, acwr_result, current_stage, obs_rem, inj_weight)
@@ -687,6 +696,10 @@ def render() -> None:
             f"</div>",
             unsafe_allow_html=True,
         )
+        # ACWR rides alongside the directive rather than driving it while the
+        # engine is in advisory mode — see engine.ACWR_ADVISORY_MODE.
+        if rec.get("acwr_advisory"):
+            st.caption(rec["acwr_advisory"])
 
         acwr_val = acwr_result.get("acwr")
 
@@ -817,10 +830,25 @@ def render() -> None:
         with col_vals:
             st.metric("ACWR",            f"{acwr_val:.3f}" if acwr_val else "—")
             st.metric("Acute 7d avg AU", str(acwr_result["acute_avg"]))
-            st.metric("Chronic 28d avg", str(acwr_result["chronic_avg"]))
+            _basis = acwr_result.get("chronic_basis", "calendar")
+            st.metric(
+                "Chronic avg" if _basis == "stage" else "Chronic 28d avg",
+                str(acwr_result["chronic_avg"]),
+                help=(f"Averaged over the {acwr_result.get('in_stage_days', 28)} days "
+                      f"of the current stage only — a window spanning a stage "
+                      f"transition divides training load by rehab load."
+                      if _basis == "stage" else
+                      "Flat 28-day calendar window."),
+            )
             st.metric("Stage ceiling",   str(acwr_result["ceiling"]))
             if acwr_result["hard_locked"]:
                 st.error("Hard lock — do not increase volume.")
+            elif not acwr_result.get("baseline_established", True):
+                st.info(f"Baseline establishing — {acwr_result.get('in_stage_days', 0)}"
+                        f"/{engine.ACWR_MIN_IN_STAGE_DAYS} days into this stage. "
+                        f"Ratio is not diagnostic yet.")
+            elif acwr_result.get("exceeds_ceiling"):
+                st.warning("Above ceiling — advisory only, volume is not capped.")
 
         with col_chart:
             daily_au = acwr_result.get("daily_au_28", [0.0] * 28)

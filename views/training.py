@@ -868,7 +868,12 @@ def _engine_directive() -> dict:
         tight    = r.get_avg_tightness(14)
         lam      = float(diag.get("injury_weight_decay_lambda") or 0.05)
         tl       = engine.traffic_light(bio, drift_rows=drift)
-        acwr_r   = engine.acwr(au, stage)
+        # Scope ACWR's chronic baseline to the current stage — see
+        # engine.ACWR_MIN_IN_STAGE_DAYS for why a calendar window spanning a
+        # stage transition reads as overreach even on zero-AU rest days.
+        acwr_r   = engine.acwr(au, stage,
+                               stage_start=ph.current_stage_start(r.get_phases(),
+                                                                  date.today()))
         inj_w    = engine.injury_weight(lam, streak)
         obs_rem  = engine.observation_days_remaining(tl["data_days"])
         return engine.volume_recommendation(tl, acwr_r, stage, obs_rem, inj_w)
@@ -2168,6 +2173,10 @@ def render():
     elif _sig in ("yellow", "orange"):
         st.warning("Reduced load today — keep this session controlled. Don't push to failure.")
     # green / grey: no banner — train normally, nothing to flag
+    # ACWR is advisory while engine.ACWR_ADVISORY_MODE is set: it annotates the
+    # day, it does not decide it.
+    if _directive.get("acwr_advisory"):
+        st.caption(_directive["acwr_advisory"])
 
     # ── Active plan day ───────────────────────────────────────────────────────
     today_plan = active_plan[day_num]

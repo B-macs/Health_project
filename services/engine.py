@@ -56,6 +56,7 @@ ACWR_STATUS_COLORS: dict[str, str] = {
     "overreach_risk":           "red",
     "insufficient_data":        "grey",
     "insufficient_chronic_data":"grey",
+    "baseline_establishing":    "grey",
 }
 
 # Correlation strength → emoji
@@ -772,7 +773,53 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
 ACWR_OPTIMAL_LOW  = 0.8
 ACWR_OPTIMAL_HIGH = 1.3   # overridden to 1.2 for Stage 1
 
-def acwr(daily_au_rows: list[dict], stage: int = 1, today: date | None = None) -> dict:
+# ── Stage-scoped chronic baseline ────────────────────────────────────────────
+# ACWR is only interpretable when the chronic window is HOMOGENEOUS. A flat
+# 28-day calendar window spanning a stage transition divides a training-load
+# acute window by a rehab-load chronic one. Measured over the Stage 1 -> 2A
+# transition: 20 of the block's first 30 days breached the 1.3 ceiling (67%),
+# peaking at 1.78 on 2026-07-22 — and, decisively, the breach did not depend
+# on training at all. 2026-07-25..27 were three consecutive ZERO-AU days held
+# at 1.73, and the scheduled rest day 2026-08-09 projects to 1.54. A guardrail
+# that fires on days you did not train is not measuring what its message says.
+#
+# Passing `stage_start` scopes the chronic mean to days belonging to the
+# CURRENT stage, so every stage rebuilds its own baseline instead of inheriting
+# the previous one's. Prior-stage days are excluded outright rather than
+# down-weighted: they sit in the DENOMINATOR, so shrinking them RAISES the
+# ratio. Measured on 2026-08-03, weighting rehab days x0.5 moved ACWR 1.32 ->
+# 1.50 — the exact opposite of the intent. Excluding them gives 0.93.
+#
+# The floor exists because a chronic window no longer than the 7-day acute one
+# collapses toward 1.0 by construction and would read "fine" for any ramp
+# whatsoever. Below it the ratio is reported but flagged not-diagnostic.
+ACWR_MIN_IN_STAGE_DAYS = 14
+
+# ── Enforcement switch (testing phase) ───────────────────────────────────────
+# Same pattern, and the same reasoning, as biometrics.HRV_GARMIN_HOLD: hold a
+# behaviour that is not yet trustworthy rather than let it act on real
+# training. While True, an ACWR above the stage ceiling is REPORTED but never
+# caps volume — `hard_locked` stays False and volume_recommendation surfaces
+# the breach as an advisory note alongside the biometric directive instead of
+# overriding it.
+#
+# This does NOT change the ceiling. rules.STAGE_CONSTRAINTS is untouched and
+# `exceeds_ceiling` still carries the raw fact, so flipping this to False
+# restores hard-lock behaviour with no other edit anywhere.
+#
+# Deferred deliberately (user decision, 2026-08-03): the app is still being
+# validated against one athlete's real training, and other engine work lands
+# before hard stops are switched on. Lift it on that work being done, not on
+# a date.
+ACWR_ADVISORY_MODE = True
+
+
+def acwr(
+    daily_au_rows: list[dict],
+    stage: int = 1,
+    today: date | None = None,
+    stage_start: date | None = None,
+) -> dict:
     """
     Compute ACWR from session AU history.
 
@@ -781,62 +828,100 @@ def acwr(daily_au_rows: list[dict], stage: int = 1, today: date | None = None) -
                        get_daily_session_au(). Rest days must be present
                        as gaps — this function fills them with 0.
         stage        : current rehabilitation stage (1|2|3)
+        today        : explicit clock read, never buried (see module contract)
+        stage_start  : first date of the CURRENT stage. When given, the
+                       chronic mean covers only days >= this date, so a new
+                       stage rebuilds its baseline instead of inheriting the
+                       previous stage's load profile. None keeps the flat
+                       28-day calendar window — every pre-existing caller is
+                       therefore bit-identical.
 
     Returns dict with keys:
-        acwr          : float | None
-        acute_avg     : float  (7-day avg AU)
-        chronic_avg   : float  (28-day avg AU)
-        ceiling       : float  (stage-specific ACWR hard cap)
-        status        : str
-        hard_locked   : bool
-        daily_au_28   : list[float]  (28 entries, day -27 to today)
+        acwr                : float | None
+        acute_avg           : float  (7-day avg AU)
+        chronic_avg         : float  (avg AU over the chronic window)
+        ceiling             : float  (stage-specific ACWR cap, from rules.py)
+        status              : str
+        exceeds_ceiling     : bool   — raw fact: is the ratio above `ceiling`
+        hard_locked         : bool   — whether that fact CAPS volume. Always
+                                       False while ACWR_ADVISORY_MODE.
+        chronic_basis       : "stage" | "calendar"
+        in_stage_days       : int    (of the 28 in-window days)
+        baseline_established: bool   (in_stage_days >= ACWR_MIN_IN_STAGE_DAYS)
+        advisory_mode       : bool
+        daily_au_28         : list[float]  (28 entries, day -27 to today)
     """
     ceiling = _rules.STAGE_CONSTRAINTS.get(stage, {}).get("acwr_ceiling", 1.3)
 
     # Build a fully-populated 28-day calendar (rest days = 0 AU)
-    today     = today or date.today()
-    au_by_date = {row["date"]: float(row["total_au"]) for row in daily_au_rows}
-    daily_au_28 = [
-        au_by_date.get((today - timedelta(days=27 - i)).isoformat(), 0.0)
-        for i in range(28)
-    ]
+    today        = today or date.today()
+    au_by_date   = {row["date"]: float(row["total_au"]) for row in daily_au_rows}
+    window_dates = [today - timedelta(days=27 - i) for i in range(28)]
+    daily_au_28  = [au_by_date.get(d.isoformat(), 0.0) for d in window_dates]
 
-    if not any(daily_au_rows):
-        return {
+    if stage_start is None:
+        in_stage_days, chronic_basis = 28, "calendar"
+    else:
+        in_stage_days = sum(1 for d in window_dates if d >= stage_start)
+        chronic_basis = ("stage" if in_stage_days >= ACWR_MIN_IN_STAGE_DAYS
+                         else "calendar")
+    baseline_established = in_stage_days >= ACWR_MIN_IN_STAGE_DAYS
+
+    def _result(**overrides) -> dict:
+        base = {
             "acwr": None, "acute_avg": 0.0, "chronic_avg": 0.0,
             "ceiling": ceiling, "status": "insufficient_data",
-            "hard_locked": False, "daily_au_28": daily_au_28,
+            "exceeds_ceiling": False, "hard_locked": False,
+            "chronic_basis": chronic_basis, "in_stage_days": in_stage_days,
+            "baseline_established": baseline_established,
+            "advisory_mode": ACWR_ADVISORY_MODE,
+            "daily_au_28": [round(v, 1) for v in daily_au_28],
         }
+        base.update(overrides)
+        return base
 
-    chronic_avg = sum(daily_au_28) / 28
-    acute_avg   = sum(daily_au_28[-7:]) / 7
+    if not any(daily_au_rows):
+        return _result()
+
+    acute_avg = sum(daily_au_28[-7:]) / 7
+    if chronic_basis == "stage":
+        in_stage_au = [au for d, au in zip(window_dates, daily_au_28)
+                       if d >= stage_start]
+        chronic_avg = sum(in_stage_au) / len(in_stage_au)
+    else:
+        chronic_avg = sum(daily_au_28) / 28
 
     if chronic_avg == 0:
-        return {
-            "acwr": None, "acute_avg": round(acute_avg, 1), "chronic_avg": 0.0,
-            "ceiling": ceiling, "status": "insufficient_chronic_data",
-            "hard_locked": False, "daily_au_28": daily_au_28,
-        }
+        return _result(acute_avg=round(acute_avg, 1),
+                       status="insufficient_chronic_data")
 
-    ratio       = acute_avg / chronic_avg
-    hard_locked = ratio > ceiling
+    ratio           = acute_avg / chronic_avg
+    exceeds_ceiling = ratio > ceiling
 
-    if ratio < ACWR_OPTIMAL_LOW:
+    # Two independent reasons the breach may not cap volume: the engine is in
+    # advisory mode, or the stage baseline is too young for the ratio to mean
+    # anything. Either one is enough.
+    hard_locked = (exceeds_ceiling
+                   and baseline_established
+                   and not ACWR_ADVISORY_MODE)
+
+    if not baseline_established:
+        status = "baseline_establishing"
+    elif ratio < ACWR_OPTIMAL_LOW:
         status = "undertraining"
-    elif ratio <= ceiling:
+    elif not exceeds_ceiling:
         status = "optimal"
     else:
         status = "overreach_risk"
 
-    return {
-        "acwr":        round(ratio, 3),
-        "acute_avg":   round(acute_avg, 1),
-        "chronic_avg": round(chronic_avg, 1),
-        "ceiling":     ceiling,
-        "status":      status,
-        "hard_locked": hard_locked,
-        "daily_au_28": [round(v, 1) for v in daily_au_28],
-    }
+    return _result(
+        acwr=round(ratio, 3),
+        acute_avg=round(acute_avg, 1),
+        chronic_avg=round(chronic_avg, 1),
+        status=status,
+        exceeds_ceiling=exceeds_ceiling,
+        hard_locked=hard_locked,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -844,7 +929,67 @@ def acwr(daily_au_rows: list[dict], stage: int = 1, today: date | None = None) -
 #  Combines traffic light + ACWR into a single daily output.
 # ─────────────────────────────────────────────────────────────────────────────
 
+def acwr_advisory_note(acwr_result: dict, stage: int = 1) -> str | None:
+    """Text for an ACWR condition worth SAYING but not worth acting on.
+
+    None means there is nothing to report. Two cases produce a note:
+
+    * the ratio is above the stage ceiling but is not hard-locking (either
+      ACWR_ADVISORY_MODE, or a stage baseline too young to trust);
+    * the stage baseline is still establishing, which is itself worth stating
+      plainly rather than letting a not-yet-diagnostic number read as fact.
+
+    Nothing is emitted when the recommendation ALREADY carries the message —
+    a genuine hard lock says it in the directive itself, and repeating it
+    beside that is noise.
+    """
+    if acwr_result.get("hard_locked"):
+        return None
+
+    val = acwr_result.get("acwr")
+    if val is None:
+        return None
+    ceiling = acwr_result.get("ceiling", 1.3)
+
+    if not acwr_result.get("baseline_established", True):
+        have = acwr_result.get("in_stage_days", 0)
+        return (f"ACWR baseline still establishing — {have} of "
+                f"{ACWR_MIN_IN_STAGE_DAYS} days into this stage. The ratio "
+                f"({val:.2f}) is shown for information only; it compares "
+                f"against a window that still includes the previous stage.")
+
+    if acwr_result.get("exceeds_ceiling"):
+        return (f"Advisory: ACWR {val:.2f} is above the Stage {stage} ceiling "
+                f"of {ceiling}. Load is climbing faster than your "
+                f"{acwr_result.get('in_stage_days', 28)}-day stage baseline — "
+                f"hold loads rather than adding. Not enforced: the engine is "
+                f"in advisory mode.")
+
+    return None
+
+
 def volume_recommendation(
+    traffic: dict,
+    acwr_result: dict,
+    stage: int = 1,
+    observation_days_remaining: int = 0,
+    injury_weight_val: float = 1.0,
+) -> dict:
+    """Today's volume directive, plus any non-binding ACWR note.
+
+    Thin wrapper over _volume_recommendation_core so that the ACWR advisory
+    rides along on EVERY branch without each one having to remember it. The
+    directive itself stays driven by biometrics and injury weight; an
+    advisory ACWR informs, it does not decide. See acwr_advisory_note.
+    """
+    rec = _volume_recommendation_core(
+        traffic, acwr_result, stage, observation_days_remaining, injury_weight_val
+    )
+    rec["acwr_advisory"] = acwr_advisory_note(acwr_result, stage)
+    return rec
+
+
+def _volume_recommendation_core(
     traffic: dict,
     acwr_result: dict,
     stage: int = 1,
