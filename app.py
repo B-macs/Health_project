@@ -230,20 +230,12 @@ def _sync_session_hr_cached() -> tuple[bool, str | None]:
     activities and persist the HR load (services/hr_load.py).
 
     Runs after the Garmin sync above, since it needs that day's activities to
-    already be available. Only the last 2 days: a session's Garmin activity
-    doesn't change retroactively, and each date costs several calls to
-    Garmin's unofficial API. A date that yields nothing (no session, no
-    per-set timestamps, no matching activity) is a normal fall-back-to-RPE
-    outcome, not an error."""
-    r = repo.get_repository()
-    if not r.garmin_configured():
-        return True, None
-    try:
-        for offset in (0, 1):
-            r.sync_session_hr_for_date(date.today() - timedelta(days=offset))
-        return True, None
-    except Exception as exc:
-        return False, str(exc)
+    already be available. Throttling, the post-failure back-off and the
+    "nothing matched is not an error" contract all live in
+    Repository.sync_session_hr_recent_if_due — it had no durable throttle
+    before, so a process restart re-ran several Garmin API calls per date
+    against an unofficial, rate-limit-sensitive endpoint."""
+    return repo.get_repository().sync_session_hr_recent_if_due(days=2, hours=2)
 
 
 @st.cache_data(ttl=7200, show_spinner=False)  # 2 hours — runs on Home page open, idle in between
@@ -252,9 +244,8 @@ def _sync_oura_cached() -> tuple[bool, str | None]:
     the engine's biometric blend (services/biometrics.py) as well as
     archiving.
 
-    Throttled by Repository.oura_sync_due() (a local .sync_state.json file —
-    see services/clients/local_cache.py), NOT just this cache's TTL: this
-    st.cache_data layer alone doesn't reliably throttle anything, since
+    Throttled by Repository.sync_oura_all_if_due (a local .sync_state.json
+    file — see services/clients/local_cache.py), NOT just this cache's TTL:
     st.cache_data is in-memory (reset by every process restart) and gets
     wiped by any unrelated st.cache_data.clear() call elsewhere in the app
     (views/checkin.py clears it on every check-in save) — without the local
@@ -264,23 +255,19 @@ def _sync_oura_cached() -> tuple[bool, str | None]:
     actual sync heavy enough that this stopped being harmless. See
     2026-07-14 fix.
 
+    That marker now records the ATTEMPT as well as the success. A sync that
+    died partway — and the Sheets 60-per-minute quota this one strains is
+    exactly how that happens — never reached mark_oura_synced(), so the
+    throttle never engaged and every single open re-ran the whole failing
+    sync. See Repository's durable sync throttle section.
+
     days=7 (not 2): a rolling 2-day window permanently skips any day that
     falls outside every window the app happened to run during — e.g. the
     app not being opened for a stretch silently drops those days from Oura
     Sleep Periods (the only HRV source now that this rig's Garmin device
     doesn't report HRV at all). A week-wide window self-heals gaps up to
     that size on the next open."""
-    r = repo.get_repository()
-    if not r.oura_configured():
-        return True, None
-    if not r.oura_sync_due(hours=2):
-        return True, None
-    try:
-        r.sync_oura_all(days=7)
-        r.mark_oura_synced()
-        return True, None
-    except Exception as exc:
-        return False, str(exc)
+    return repo.get_repository().sync_oura_all_if_due(days=7, hours=2)
 
 
 @st.cache_data(ttl=7200, show_spinner=False)  # throttled for real by the Config-DB marker below, not this TTL
@@ -306,16 +293,17 @@ def _sync_garmin_cached() -> tuple[bool, str | None]:
 @st.cache_data(ttl=1800, show_spinner=False)
 def _sync_biometric_blend_cached() -> tuple[bool, str | None]:
     """Persists the last few days of the Oura+Garmin blend to the Biometric
-    Blend sheet tab (Repository.sync_biometric_blend) so past days become a
-    fixed historical record instead of only being re-derivable live from
-    Oura/Garmin's own tabs. Small rolling window (not full history) — the
-    on-demand "Backfill full history" button in Insights → Sync covers the
-    rest, once."""
-    try:
-        repo.get_repository().sync_biometric_blend(days=7)
-        return True, None
-    except Exception as exc:
-        return False, str(exc)
+    Blend sheet tab (Repository.sync_biometric_blend_if_due) so past days
+    become a fixed historical record instead of only being re-derivable live
+    from Oura/Garmin's own tabs. Small rolling window (not full history) —
+    the on-demand "Backfill full history" button in Insights → Sync covers
+    the rest, once.
+
+    Now throttled durably at 2h by the Repository, matching the cadence of
+    the Oura/Garmin syncs it derives from. This cache's TTL used to be the
+    only thing standing between a process restart and a full re-persist —
+    and it dies with the process."""
+    return repo.get_repository().sync_biometric_blend_if_due(days=7, hours=2)
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -329,15 +317,14 @@ def _sync_sleep_fusion_cached() -> tuple[bool, str | None]:
     looked at, was the one least likely to show the fused view.
 
     Reads only the already-synced Sheet tabs (no Oura or Garmin API calls), so
-    it is immune to the Garmin 429 problem and safe to run on every open. A
-    short window: the full re-derive after a RULES_VERSION bump is still the
-    manual button's job, since that is ~400 nights and a different cost.
+    it is immune to the Garmin 429 problem. Still durably throttled at 2h
+    (Repository.sync_sleep_fusion_if_due) rather than running on every open:
+    it re-derives 14 nights and rewrites the entire Sleep Fusion tab each
+    time, and a fused night doesn't change once both devices' rows are in.
+    A short window: the full re-derive after a RULES_VERSION bump is still
+    the manual button's job, since that is ~400 nights and a different cost.
     """
-    try:
-        repo.get_repository().sync_sleep_fusion(days=14)
-        return True, None
-    except Exception as exc:
-        return False, str(exc)
+    return repo.get_repository().sync_sleep_fusion_if_due(days=14, hours=2)
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -347,12 +334,11 @@ def _sync_metrics_history_cached() -> tuple[bool, str | None]:
     "fixed daily snapshot" rationale as Biometric Blend above, and must run
     after it since sync_metrics_history reads the biometric rolling blend
     (and session AU) live. Small rolling window — the on-demand "Backfill
-    full history" button in Insights → Sync covers the rest, once."""
-    try:
-        repo.get_repository().sync_metrics_history(days=7)
-        return True, None
-    except Exception as exc:
-        return False, str(exc)
+    full history" button in Insights → Sync covers the rest, once.
+
+    Durably throttled at 2h (Repository.sync_metrics_history_if_due), same
+    rationale as the blend sync above."""
+    return repo.get_repository().sync_metrics_history_if_due(days=7, hours=2)
 
 
 # ─── Device sync runs AFTER the page paints — see _run_startup_sync() at the

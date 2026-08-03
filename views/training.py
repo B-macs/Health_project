@@ -734,6 +734,14 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     if notes.strip() and last_id:
         r.save_session_notes(last_id, notes)
 
+    # A logged session is the one thing that legitimately changes today's
+    # numbers after the morning sync has already run: it moves Session AU,
+    # and with it Strain and the ACWR the Training Directive reads. Home
+    # wraps those reads in @st.cache_data(ttl=1800), so without this the
+    # session you just finished would not appear for up to half an hour.
+    # Mirrors views/checkin.py's clear after a check-in save.
+    st.cache_data.clear()
+
 
 def _record_completed_set(idx: int, ex: dict, set_num: int) -> None:
     """Record one real set for exercise `idx`, captured from its live stepper

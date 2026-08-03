@@ -321,6 +321,13 @@ _WAKE_TIME_ADJUSTMENTS_HEADER = ["date", "adjustment_minutes"]
 #     under its raw Apple Health export headers, so it cannot be served
 #     through this generic path. _sheets_biometric_records handles it
 #     directly instead. ────────────────────────────────────────────────────
+# How long a FAILED sync waits before being retried — see the durable sync
+# throttle section in Repository. Deliberately far shorter than any success
+# interval: a transient error should recover within minutes, while a
+# persistent one (Sheets quota, expired credentials) must not be retried on
+# every single page load.
+_SYNC_FAILURE_COOLDOWN_MINUTES = 15
+
 _DATASTORE_TABLE_BY_TAB = {
     sheets.GARMIN_DAILY_WORKSHEET: "garmin_daily",
     sheets.GARMIN_ACTIVITIES_WORKSHEET: "garmin_activities",
@@ -350,6 +357,8 @@ class Repository:
         self._datastore_conn = None
         # {(tab_title, ignore_cols): (write_generation, monotonic_ts, rows)}
         self._read_cache: dict = {}
+        # {tab_title: worksheet handle} — see _ws.
+        self._ws_cache: dict = {}
 
     @property
     def _nc(self):
@@ -408,12 +417,28 @@ class Repository:
         keeps failing.
 
         `header` is unused offline — creating a tab is a write, and the
-        datastore's schema is fixed by datastore_schema.sql."""
+        datastore's schema is fixed by datastore_schema.sql.
+
+        Memoized per Repository instance (a whole Streamlit process, via
+        repo.py's st.cache_resource). The short-lived read cache further down
+        saves the get_all_records() call but NOT this, because the handle is
+        resolved before _read_records is even entered:
+        `self._read_records(self._garmin_daily_ws())` evaluates the getter
+        first, so every cache HIT still paid an open_by_key() plus a
+        fetch_sheet_metadata() round-trip. Caching here is safe in a way
+        caching rows is not — a handle carries no data, so every read through
+        it still goes to the API and no invalidation is needed."""
+        ws = self._ws_cache.get(title)
+        if ws is not None:
+            return ws
         if self.offline:
-            return datastore_reader.OfflineWorksheet(
+            ws = datastore_reader.OfflineWorksheet(
                 self._ds, title, _DATASTORE_TABLE_BY_TAB[title])
-        return sheets.get_or_create_worksheet(
-            self._sc, self.config.google_sheets_id, title, header)
+        else:
+            ws = sheets.get_or_create_worksheet(
+                self._sc, self.config.google_sheets_id, title, header)
+        self._ws_cache[title] = ws
+        return ws
 
     @property
     def _gc(self):
@@ -1930,6 +1955,25 @@ class Repository:
             self.upsert_biometric_blend_row(r)
         return len(records)
 
+    def sync_biometric_blend_if_due(self, days: int = 7, today: date | None = None,
+                                     hours: float = 2, now: datetime | None = None
+                                     ) -> tuple[bool, str | None]:
+        """sync_biometric_blend() at most every `hours` hours, with a durable
+        marker (see the sync throttle section).
+
+        This had no durable throttle at all — app.py relied purely on
+        st.cache_data's TTL, which is in-memory, dies with the process, and
+        is wiped by the blanket st.cache_data.clear() views/checkin.py calls
+        on every check-in save. The blend derives from the Oura/Garmin tabs,
+        so re-persisting it more often than those themselves sync cannot
+        produce a different answer — it just spends a Sheets write per day in
+        the window, against the same quota the Oura sync is already
+        straining."""
+        return self.run_sync_if_due(
+            "biometric_blend", lambda: self.sync_biometric_blend(days=days, today=today),
+            hours=hours, now=now,
+        )
+
     def get_biometric_blend_history(
         self, start: str | None = None, end: str | None = None,
     ) -> list[models.BiometricRecord]:
@@ -2051,6 +2095,18 @@ class Repository:
             self.upsert_metrics_history_row(snapshot)
             written += 1
         return written
+
+    def sync_metrics_history_if_due(self, days: int = 7, today: date | None = None,
+                                     hours: float = 2, now: datetime | None = None
+                                     ) -> tuple[bool, str | None]:
+        """sync_metrics_history() at most every `hours` hours, with a durable
+        marker — same rationale as sync_biometric_blend_if_due (it had no
+        durable throttle either), and the same cadence, since this derives
+        from the blend which derives from the Oura/Garmin tabs."""
+        return self.run_sync_if_due(
+            "metrics_history", lambda: self.sync_metrics_history(days=days, today=today),
+            hours=hours, now=now,
+        )
 
     def get_metrics_history(self, start: str | None = None, end: str | None = None) -> list[dict]:
         """Every persisted day from the Metrics History tab, optionally
@@ -2487,6 +2543,30 @@ class Repository:
             return False
         self.save_session_hr(summary)
         return True
+
+    def sync_session_hr_recent_if_due(self, days: int = 2, today: date | None = None,
+                                       hours: float = 2, now: datetime | None = None
+                                       ) -> tuple[bool, str | None]:
+        """sync_session_hr_for_date() over the last `days` days, at most every
+        `hours` hours, with a durable marker.
+
+        (True, None) when Garmin isn't configured or the window is already
+        fresh — both "nothing to do", not errors. A date that yields nothing
+        (no session, no per-set timestamps, no matching activity) is likewise
+        a normal fall-back-to-RPE outcome; only a raised exception is a
+        failure. Only the last couple of days: a session's Garmin activity
+        doesn't change retroactively, and each date costs several calls to
+        Garmin's unofficial, rate-limit-sensitive API — the one most worth
+        not repeating after a failure."""
+        if not self.garmin_configured():
+            return True, None
+        today = today or date.today()
+
+        def _work():
+            for offset in range(days):
+                self.sync_session_hr_for_date(today - timedelta(days=offset))
+
+        return self.run_sync_if_due("session_hr", _work, hours=hours, now=now)
 
     def _garmin_raw_day(self, client, d: date) -> dict:
         """The four Garmin fetches for one day, done ONCE. Split out from
@@ -3179,6 +3259,23 @@ class Repository:
         sheets.rewrite_worksheet(ws, _SLEEP_FUSION_HEADER, rows)
         return counts
 
+    def sync_sleep_fusion_if_due(self, days: int = 14, today: date | None = None,
+                                  hours: float = 2, now: datetime | None = None
+                                  ) -> tuple[bool, str | None]:
+        """sync_sleep_fusion() at most every `hours` hours, with a durable
+        marker.
+
+        Cheaper than the others — it reads already-synced tabs and makes no
+        Oura or Garmin API calls — but it is not free: it re-derives up to
+        `days` nights and rewrites the whole Sleep Fusion tab every time. A
+        fused night does not change once both devices' rows are in, so
+        repeating that on every process start is pure cost against the same
+        Sheets quota."""
+        return self.run_sync_if_due(
+            "sleep_fusion", lambda: self.sync_sleep_fusion(days=days, today=today),
+            hours=hours, now=now,
+        )
+
     def get_sleep_fusion_history(self, start: str | None = None,
                                   end: str | None = None) -> list[dict]:
         """Persisted fused nights, oldest first. Reads with the hypnogram
@@ -3774,15 +3871,126 @@ class Repository:
         """True if sync_oura_all hasn't run in the last `hours` hours (or
         has never run). app.py's cached wrapper checks this before paying
         for a full Oura pull + the per-row Sheets upserts underneath it."""
-        last = self.oura_last_synced()
-        if last is None:
-            return True
-        return (now or datetime.now()) - last >= timedelta(hours=hours)
+        return self.sync_due("oura", hours=hours, now=now)
 
     def mark_oura_synced(self, when: datetime | None = None) -> None:
+        self.mark_synced("oura", when=when)
+
+    # ─────────────────────────────────────────────────────────────────────
+    #  Durable sync throttles — .sync_state.json, see clients/local_cache.py
+    #
+    #  Two markers per sync key, not one:
+    #
+    #    <key>_last_synced     — last SUCCESSFUL completion. Gates the normal
+    #                            "already fresh, nothing to do" case.
+    #    <key>_last_attempted  — last time the sync was STARTED, written
+    #                            before the work begins and cleared on
+    #                            success. A leftover one means "failed
+    #                            recently".
+    #
+    #  The second exists because a success-only marker is never written when
+    #  a sync raises partway, so every later page load retries the whole
+    #  thing and fails the same way. That is not hypothetical here:
+    #  sync_oura_all spends two Sheets writes per row across five tabs, which
+    #  for a 7-day window walks into Sheets' 60-operations-per-minute quota —
+    #  the same quota _run_startup_sync's own note describes hitting. Under a
+    #  success-only marker the throttle then never engages at all, and every
+    #  single app open pays a full failing Oura sync.
+    #
+    #  Recording the attempt gives a failed sync a short cooldown instead of
+    #  an immediate retry, kept far below the success interval so a genuinely
+    #  transient error still recovers within minutes.
+    # ─────────────────────────────────────────────────────────────────────
+
+    def _sync_marker(self, name: str) -> datetime | None:
+        raw = local_cache.read().get(name)
+        if not raw:
+            return None
+        try:
+            return datetime.fromisoformat(raw)
+        except ValueError:
+            return None
+
+    def _write_sync_marker(self, name: str, when: datetime | None) -> None:
         data = local_cache.read()
-        data["oura_last_synced"] = (when or datetime.now()).isoformat()
+        if when is None:
+            data.pop(name, None)
+        else:
+            data[name] = when.isoformat()
         local_cache.write(data)
+
+    def last_synced(self, key: str) -> datetime | None:
+        """Last successful completion of the sync named `key`, or None."""
+        return self._sync_marker(f"{key}_last_synced")
+
+    def last_sync_attempted(self, key: str) -> datetime | None:
+        """Start time of the last run of `key` that did NOT go on to succeed
+        — mark_synced clears this — or None."""
+        return self._sync_marker(f"{key}_last_attempted")
+
+    def mark_synced(self, key: str, when: datetime | None = None) -> None:
+        """Record a successful completion, and clear the attempt marker so a
+        success never leaves a failure cooldown behind it."""
+        self._write_sync_marker(f"{key}_last_synced", when or datetime.now())
+        self._write_sync_marker(f"{key}_last_attempted", None)
+
+    def mark_sync_attempted(self, key: str, when: datetime | None = None) -> None:
+        self._write_sync_marker(f"{key}_last_attempted", when or datetime.now())
+
+    def in_sync_failure_cooldown(self, key: str,
+                                 minutes: float = _SYNC_FAILURE_COOLDOWN_MINUTES,
+                                 now: datetime | None = None) -> bool:
+        """True if `key` started but never completed within the last
+        `minutes` — it failed recently and should be left alone for a moment
+        rather than retried on this page load.
+
+        A marker dated in the FUTURE counts as not-in-cooldown rather than
+        blocking until the clock catches up: that only happens on clock skew
+        or a hand-edited state file, and silently disabling a sync for hours
+        is much worse than one extra attempt."""
+        last_attempt = self.last_sync_attempted(key)
+        if last_attempt is None:
+            return False
+        elapsed = (now or datetime.now()) - last_attempt
+        return timedelta(0) <= elapsed < timedelta(minutes=minutes)
+
+    def sync_due(self, key: str, hours: float = 2,
+                 cooldown_minutes: float = _SYNC_FAILURE_COOLDOWN_MINUTES,
+                 now: datetime | None = None) -> bool:
+        """True if the sync named `key` should run now: not in a post-failure
+        cooldown, and its last SUCCESS at least `hours` old (or never). A
+        success marker dated in the future is treated as stale, same reason
+        as above."""
+        now = now or datetime.now()
+        if self.in_sync_failure_cooldown(key, minutes=cooldown_minutes, now=now):
+            return False
+        last_success = self.last_synced(key)
+        if last_success is None:
+            return True
+        elapsed = now - last_success
+        return elapsed >= timedelta(hours=hours) or elapsed < timedelta(0)
+
+    def run_sync_if_due(self, key: str, work, hours: float = 2,
+                        cooldown_minutes: float = _SYNC_FAILURE_COOLDOWN_MINUTES,
+                        now: datetime | None = None) -> tuple[bool, str | None]:
+        """Run `work()` at most every `hours` hours, recording the attempt
+        before starting and the success after finishing.
+
+        Returns the (ok, error) contract the rest of this class uses:
+        (True, None) both when the work ran cleanly and when it was skipped
+        as not-due (neither is an error); (False, message) only on a real
+        failure. Never raises — a sync failing must not take the page down.
+        """
+        now = now or datetime.now()
+        if not self.sync_due(key, hours=hours, cooldown_minutes=cooldown_minutes, now=now):
+            return True, None
+        self.mark_sync_attempted(key, when=now)
+        try:
+            work()
+        except Exception as exc:
+            return False, str(exc)
+        self.mark_synced(key, when=now)
+        return True, None
 
     def sync_oura_all(self, days: int = 7, today: date | None = None) -> dict:
         """Pulls every configured Oura data type for the last `days` days
@@ -3819,6 +4027,28 @@ class Repository:
                 token, endpoint, start, end, ws_getter(), header, mapper,
             )
         return result
+
+    def sync_oura_all_if_due(self, days: int = 7, today: date | None = None,
+                             hours: float = 2, now: datetime | None = None
+                             ) -> tuple[bool, str | None]:
+        """sync_oura_all() at most every `hours` hours, recording the attempt
+        before the work starts.
+
+        That last part matters more here than anywhere else. sync_oura_all
+        spends two Sheets writes per row across five tabs, which for a 7-day
+        window runs into the 60-operations-per-minute quota that
+        _run_startup_sync's own note describes hitting. Under the previous
+        success-only marker that meant mark_oura_synced() was never reached,
+        so the next page load started the identical heavy sync again — the
+        throttle could never engage, and every app open paid a full failing
+        Oura sync. (True, None) when Oura isn't configured or the window is
+        already fresh."""
+        if not self.oura_configured():
+            return True, None
+        return self.run_sync_if_due(
+            "oura", lambda: self.sync_oura_all(days=days, today=today),
+            hours=hours, now=now,
+        )
 
     # ─── Historical backfill (arbitrary date range) ──────────────────────
     #  sync_oura_all covers a rolling window ending today and upserts row by
