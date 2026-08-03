@@ -651,3 +651,69 @@ def test_component_scores_and_compute_readiness_agree_on_a_partial_day():
     b = readiness.readiness_breakdown(d, rows)
     assert b["score"] == readiness.compute_readiness(d, rows)
     assert set(b["missing"]) == {"hrv_balance", "body_temp"}
+
+
+# ─── A new calendar day is blank until it has been measured ─────────────────
+# Midnight starts a new data day. Until the ring uploads, Home must show
+# nothing for it — not yesterday's number, and not a score invented from the
+# trailing sleep-debt window.
+#
+# The bug: every component except sleep_debt reads for_date's own row, but
+# sleep_debt is a TRAILING 7-night aggregate needing no row for for_date at
+# all. On an unmeasured day it returned 0h debt, scored 100, and — as the
+# only available component — became the whole weighted mean. compute_readiness
+# returned 100.0 for a day with no data, and compute_readiness_trend then
+# carried the previous day's trend onto it. Sleep already returned
+# NOT_COMPUTED in that state, so the two Home cards disagreed about whether
+# the day had begun.
+
+def _measured_night(n: int) -> dict:
+    return {**_day(n, 30.0, 55.0, 7.5), **_contrib(80.0)}
+
+
+def test_an_unmeasured_day_has_no_readiness_even_with_a_clean_debt_window():
+    rows = [_measured_night(n) for n in range(1, 8)]      # days 1-7 measured
+    # Day 8 never recorded: exactly the state between midnight and the upload.
+    assert readiness.compute_readiness(date(2026, 6, 8), rows) == readiness.NOT_COMPUTED
+
+
+def test_an_unmeasured_day_does_not_inherit_yesterdays_trend():
+    rows = [_measured_night(n) for n in range(1, 8)]
+    assert readiness.compute_readiness_trend(date(2026, 6, 7), rows) != readiness.NOT_COMPUTED
+    assert readiness.compute_readiness_trend(date(2026, 6, 8), rows) == readiness.NOT_COMPUTED
+
+
+def test_a_row_that_exists_for_another_reason_is_not_a_measurement():
+    """A morning check-in, or a Garmin-first sync, creates a row for today
+    carrying nothing about the night. It must not make the day scoreable."""
+    rows = [_measured_night(n) for n in range(1, 8)]
+    for extra in ({"alcohol_units": 0.0}, {"steps": 900}, {"alcohol_units": 2.0, "steps": 4000}):
+        probe = rows + [{"date": "2026-06-08", **extra}]
+        assert readiness.compute_readiness(date(2026, 6, 8), probe) == readiness.NOT_COMPUTED, extra
+
+
+def test_a_garmin_only_night_still_scores():
+    """The ring is worn far less often than the watch (see
+    services/sleep_fusion.py), so 'measured' must not mean 'Oura present' —
+    that would blank readiness on every night the ring was off."""
+    rows = [_measured_night(n) for n in range(1, 8)]
+    rows.append(_day(8, 31.0, 54.0, 7.2))     # blend readings, no oura_* keys
+    assert readiness.compute_readiness(date(2026, 6, 8), rows) != readiness.NOT_COMPUTED
+
+
+def test_readiness_appears_once_the_night_lands():
+    """The transition the morning actually goes through."""
+    rows = [_measured_night(n) for n in range(1, 8)]
+    assert readiness.compute_readiness_trend(date(2026, 6, 8), rows) == readiness.NOT_COMPUTED
+    rows.append(_measured_night(8))
+    assert readiness.compute_readiness_trend(date(2026, 6, 8), rows) != readiness.NOT_COMPUTED
+
+
+def test_a_gap_inside_the_window_still_does_not_reset_the_trend():
+    """The endpoint rule must not disturb the EMA's gap handling — a night
+    not recorded mid-window is skipped, exactly as before."""
+    rows = [_measured_night(n) for n in range(1, 6)]
+    # days 6-7 missing entirely
+    rows.append(_measured_night(8))
+    trend = readiness.compute_readiness_trend(date(2026, 6, 8), rows, lookback_days=7)
+    assert trend != readiness.NOT_COMPUTED

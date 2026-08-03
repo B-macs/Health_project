@@ -324,6 +324,30 @@ def compute_readiness(
     return round(weighted_sum, 1)
 
 
+# Fields whose presence means "this date was actually measured". Deliberately
+# broader than the scored components: it includes the raw blend readings, so a
+# night the ring wasn't worn and only Garmin recorded still counts as measured
+# (services/sleep_fusion.py notes the watch is worn about twice as often), and
+# so pre-enrichment rows that predate the Oura contributor columns still score.
+# What it excludes is a row that exists for some OTHER reason — a morning
+# check-in's alcohol units, or a step count — carrying nothing about the night.
+_SAME_DAY_EVIDENCE = (
+    "hrv_ms", "resting_heart_rate", "sleep_duration_hours",
+    "oura_hrv_balance", "oura_recovery_index", "oura_previous_night",
+    "oura_resting_heart_rate_score", "oura_body_temperature",
+    "oura_previous_day_activity", "oura_sleep_regularity",
+    "oura_activity_balance",
+)
+
+
+def _was_measured(row: dict | None) -> bool:
+    """True when `row` carries at least one reading that says the day was
+    actually measured. See _SAME_DAY_EVIDENCE."""
+    if not row:
+        return False
+    return any(row.get(k) is not None for k in _SAME_DAY_EVIDENCE)
+
+
 def _component_scores(
     for_date: date | None,
     bio_rows: list[dict] | None,
@@ -354,6 +378,22 @@ def _component_scores(
         return None
 
     today_row = next((r for r in rows_to_date if r["date"] == date_str), None)
+    if not _was_measured(today_row):
+        # for_date carries no measurement of its own, so there is nothing to
+        # score it from. Bailing out here rather than falling through matters
+        # because sleep_debt below is a TRAILING 7-night aggregate — it needs
+        # no reading for for_date at all, so on an unmeasured day it came
+        # back 0h against a week of normal nights, scored 100, and (being the
+        # only available component) became the entire weighted mean. A day
+        # with no measurement reported 100/100 readiness.
+        #
+        # That is every morning between midnight and the ring uploading. A
+        # new calendar day starts with no row, so Home showed a full
+        # readiness score for a night that had not been measured yet, while
+        # the Sleep card beside it correctly showed nothing. It also survived
+        # a morning check-in or a Garmin-first sync, either of which creates
+        # a row for today carrying no sleep measurement at all.
+        return None
 
     # sleep_baseline is still needed: sleep_debt_hours scores against it, and
     # the drill-down reports which window it used. HRV/RHR baselines are gone
@@ -533,12 +573,26 @@ def compute_readiness_trend(
 
     for_date = for_date or date.today()
     trend: float | None = None
+    for_date_computed = False
 
     for delta in range(lookback_days, -1, -1):   # oldest -> newest, ending at for_date
         d   = for_date - timedelta(days=delta)
         raw = compute_readiness(d, bio_rows)
         if raw == NOT_COMPUTED:
             continue
+        if delta == 0:
+            for_date_computed = True
         trend = float(raw) if trend is None else alpha * float(raw) + (1 - alpha) * trend
 
-    return round(trend, 1) if trend is not None else NOT_COMPUTED
+    # for_date itself must have a score. Gaps INSIDE the window are still
+    # skipped without resetting the trend (that is the whole point of the
+    # EMA, and is what the "skips days with no data" test pins down) — but
+    # the endpoint is different in kind. Carrying the trend forward onto a
+    # date with no reading of its own means the card for a brand-new day
+    # silently displays yesterday's number: at 06:00, before the ring has
+    # uploaded, Home showed a full readiness score for a day that had not
+    # happened yet. Sleep already returned NOT_COMPUTED in that state, so
+    # the two cards disagreed about whether the day had begun.
+    if trend is None or not for_date_computed:
+        return NOT_COMPUTED
+    return round(trend, 1)
