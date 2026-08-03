@@ -565,7 +565,7 @@ def _strength_bioage_scores() -> dict:
     weighted volume — deliberate, not a bug, while training is still
     bodyweight-only (see services/bioage.py's module docstring). Falls back
     to all-None on a repository error rather than crashing the page, same
-    spirit as app.py's sync wrappers."""
+    spirit as Repository.run_home_syncs' per-step (ok, error) contract."""
     try:
         r = repo.get_repository()
         sessions = r.get_recent_sessions(days=180)

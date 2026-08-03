@@ -4003,8 +4003,8 @@ class Repository:
 
     def oura_sync_due(self, hours: int = 2, now: datetime | None = None) -> bool:
         """True if sync_oura_all hasn't run in the last `hours` hours (or
-        has never run). app.py's cached wrapper checks this before paying
-        for a full Oura pull + the per-row Sheets upserts underneath it."""
+        has never run). sync_oura_all_if_due checks this before paying for a
+        full Oura pull + the per-row Sheets upserts underneath it."""
         return self.sync_due("oura", hours=hours, now=now)
 
     def mark_oura_synced(self, when: datetime | None = None) -> None:
