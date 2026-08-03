@@ -22,11 +22,19 @@ The two rules that make this safe
    the whole time the sync would be writing through it. Cloning per run costs
    one client construction against a multi-second network job.
 
-2. Exactly one run at a time, enforced by a non-blocking lock. A rerun
-   happens on every widget interaction, so start() is called constantly;
-   without this, a slow sync would accumulate a thread per click. start()
-   returning False means "already running", which is a normal outcome, not
-   an error.
+2. Exactly one sync at a time, enforced by one lock that all three entry
+   points take. start() takes it non-blocking — a rerun happens on every
+   widget interaction, so it is called constantly, and without this a slow
+   sync would accumulate a thread per click; returning False means "already
+   running", a normal outcome rather than an error. run_now() and
+   exclusive() both WAIT for it instead, because their callers (the first
+   open of the day, and the manual sync buttons) have explicitly asked for
+   the work and would be wrong to skip it.
+
+   exclusive() is what keeps views/insights.py's manual buttons out of the
+   automatic chain's way even though they call Repository.sync_* directly
+   rather than run_home_syncs — see its docstring for the concrete
+   corruption that serialising prevents.
 
 Nothing here imports Streamlit (CLAUDE.md rule 10) and nothing here touches
 st.session_state — a worker thread has no ScriptRunContext, so writing
@@ -37,6 +45,7 @@ read by whichever script run asks next.
 from __future__ import annotations
 
 import threading
+from contextlib import contextmanager
 from datetime import date, datetime
 
 from services.config import Config
@@ -48,6 +57,15 @@ from services.repository import Repository
 # point of that path — but finite, because a worker stuck on a socket must
 # not be able to freeze the page forever.
 _FOREGROUND_WAIT_SECONDS = 120.0
+
+
+class SyncBusyError(RuntimeError):
+    """A manual sync could not get the one-at-a-time lock in time.
+
+    Deliberately an error rather than a silent fall-through to running
+    anyway: running anyway is precisely the collision exclusive() exists to
+    prevent, so a caller that cannot get the lock must not proceed.
+    """
 
 
 class BackgroundSyncRunner:
@@ -112,6 +130,44 @@ class BackgroundSyncRunner:
             return self.results()
         try:
             return self._execute(today)
+        finally:
+            self._lock.release()
+
+    @contextmanager
+    def exclusive(self, timeout: float = _FOREGROUND_WAIT_SECONDS):
+        """Hold the one-at-a-time lock while the caller runs its own sync work.
+
+        For the manual sync buttons in views/insights.py, which call
+        Repository.sync_* directly rather than going through run_home_syncs.
+        They run the SAME work as the automatic chain, only over a wider
+        window — blend days=400 vs 7, sleep fusion 1200 vs 14, Garmin daily
+        7 vs 2, and an identical days=7 for Oura. Same source APIs, same
+        date-keyed upsert, same skip-unchanged comparison, so serialising
+        them against the automatic chain loses no data: the wider window
+        writes a superset of the rows the narrower one would.
+
+        What racing WOULD lose is row integrity.
+        sheets.upsert_row_by_key is a find-then-write pair, two round-trips
+        with a gap. Two chains upserting a date that is not on the tab yet
+        both find nothing and both append, so that date ends up with two
+        rows and get_all_records hands the engine whichever comes first.
+        The date most likely to be missing is today's — exactly the one both
+        chains are writing. Sheets' 60-operations-per-minute quota is the
+        second reason: two concurrent chains roughly double an already
+        bursty write, and a 429 mid-chain reads as missing data, not as an
+        error.
+
+        Raises SyncBusyError if the lock cannot be taken within `timeout`.
+        Releases the lock however the body exits, so a failing manual sync
+        cannot wedge the runner (the bug start() had).
+        """
+        if not self._lock.acquire(timeout=timeout):
+            raise SyncBusyError(
+                f"an automatic background sync is still running (waited "
+                f"{timeout:.0f}s) — try again in a moment"
+            )
+        try:
+            yield
         finally:
             self._lock.release()
 

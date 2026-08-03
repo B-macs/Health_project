@@ -19,6 +19,7 @@ import time
 import nav
 import repo
 import training_plan as tp
+from services import background_sync
 from services import engine
 from services import metrics
 from services import metrics_logic as ml
@@ -972,9 +973,21 @@ def _sync_garmin_daily_cached() -> tuple[bool, str | None]:
     above). app.py's Home page also triggers this same sync now that Garmin
     feeds the engine's biometric blend (services/biometrics.py) — this call
     here just means it's covered on the Training page too if Home wasn't
-    visited first that day."""
+    visited first that day.
+
+    Takes the background runner's lock NON-blocking (timeout=0), unlike the
+    manual buttons in views/insights.py, which wait. The difference is who
+    asked: a manual button is an explicit request that must not be dropped,
+    whereas this fires on every Training render, and a busy runner means the
+    Home chain is already running _garmin_daily_if_due_safe against this
+    exact tab. Waiting would block the page for as long as the sync takes,
+    which is the thing background_sync.py exists to prevent — so skip, and
+    report ok, because the work is being done."""
     try:
-        return repo.get_repository().sync_garmin_daily_if_due()
+        with repo.get_sync_runner().exclusive(timeout=0):
+            return repo.get_repository().sync_garmin_daily_if_due()
+    except background_sync.SyncBusyError:
+        return True, None
     except Exception as exc:
         return False, str(exc)
 

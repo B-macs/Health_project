@@ -279,3 +279,122 @@ def test_run_now_gives_up_rather_than_hanging_forever(monkeypatch):
     waited = time.time() - t0
     assert waited < 1.0, f"waited {waited:.2f}s, should have bailed at 0.2s"
     _join(runner)
+
+
+# ─── exclusive(): manual sync buttons queue behind the automatic chain ──────
+#
+#  views/insights.py's buttons call Repository.sync_* directly rather than
+#  run_home_syncs, so this lock is the only thing that can serialise them
+#  against the background chain. Racing corrupts rows rather than merely
+#  wasting calls: upsert_row_by_key is find-then-write, so two chains
+#  appending the same not-yet-present date give that date two rows.
+
+
+def test_exclusive_blocks_start_while_held():
+    """A manual sync in progress must stop the automatic chain launching on
+    top of it — every widget interaction reruns the script and calls start()."""
+    runner = _runner()
+    with runner.exclusive():
+        assert runner.running is True
+        assert runner.start() is False
+    assert runner.start() is True     # free again the moment the body exits
+    _join(runner)
+
+
+def test_exclusive_waits_for_an_in_flight_background_run():
+    """The manual button QUEUES rather than forcing through. It costs nothing
+    to wait: every button runs the same work as the automatic step over a
+    window at least as wide, so the wider window writes a superset."""
+    runner = _runner(delay=0.5)
+    runner.start()
+    t0 = time.time()
+    with runner.exclusive():
+        waited = time.time() - t0
+    assert waited >= 0.4, f"took the lock after {waited:.2f}s without waiting"
+    _join(runner)
+
+
+def test_exclusive_and_background_run_never_overlap_in_time():
+    """The actual guarantee, stated as an invariant rather than a call count:
+    no two chains touch the Sheets tabs at the same moment."""
+    runner = _runner(delay=0.3)
+    manual_window: list[tuple[float, float]] = []
+
+    runner.start()
+    with runner.exclusive():
+        start = time.monotonic()
+        time.sleep(0.1)
+        manual_window.append((start, time.monotonic()))
+    _join(runner)
+
+    repo_run = _FakeRepo.instances[0]
+    m_start, m_end = manual_window[0]
+    assert repo_run.finished_at <= m_start or repo_run.started_at >= m_end, (
+        "manual sync overlapped the background chain"
+    )
+
+
+def test_exclusive_releases_the_lock_when_the_body_raises():
+    """A failing manual sync must not wedge the runner for the life of the
+    process — the bug start() had before its try/except."""
+    runner = _runner()
+    try:
+        with runner.exclusive():
+            raise ValueError("sync blew up")
+    except ValueError:
+        pass
+    assert runner.running is False
+    assert runner.start() is True
+    _join(runner)
+
+
+def test_exclusive_raises_rather_than_running_anyway_on_timeout():
+    """Falling through to running anyway is precisely the collision this
+    exists to prevent, so a caller that can't get the lock must not proceed."""
+    from services.background_sync import SyncBusyError
+
+    runner = _runner(delay=1.0)
+    runner.start()
+    try:
+        with runner.exclusive(timeout=0.1):
+            raise AssertionError("body ran despite the lock being held")
+    except SyncBusyError as exc:
+        assert "still running" in str(exc)
+    _join(runner)
+
+
+def test_exclusive_timeout_zero_is_a_non_blocking_try():
+    """views/training.py's Garmin call uses timeout=0: it fires on every
+    render, so waiting would block the page — and a busy runner means the
+    Home chain is already syncing that exact tab."""
+    from services.background_sync import SyncBusyError
+
+    runner = _runner(delay=0.5)
+    runner.start()
+    t0 = time.time()
+    try:
+        with runner.exclusive(timeout=0):
+            raise AssertionError("body ran despite the lock being held")
+    except SyncBusyError:
+        pass
+    assert time.time() - t0 < 0.2, "timeout=0 should not wait at all"
+    _join(runner)
+
+    # ...and still takes the lock normally when nothing is running.
+    with runner.exclusive(timeout=0):
+        assert runner.running is True
+
+
+def test_exclusive_does_not_disturb_the_last_background_run_state():
+    """results()/last_finished() describe the automatic chain. A manual sync
+    runs its own work and must not overwrite that record."""
+    runner = _runner()
+    runner.start()
+    _join(runner)
+    before_results, before_finished = runner.results(), runner.last_finished()
+
+    with runner.exclusive():
+        pass
+
+    assert runner.results() == before_results
+    assert runner.last_finished() == before_finished

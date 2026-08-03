@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1229/1229 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1243/1243 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1229/1229 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1229/1229 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1243/1243 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -109,9 +109,13 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     Repository.run_home_syncs off the Streamlit script
                     thread so opening the app never waits on the device
                     APIs. Builds its OWN Repository per run (nothing in one
-                    is thread-safe) and takes a non-blocking lock so the
-                    reruns fired by every widget interaction can't stack up
-                    a thread each. See Key Rule 12.
+                    is thread-safe) and holds ONE lock that all three entry
+                    points take: start() non-blocking, so the reruns fired
+                    by every widget interaction can't stack up a thread
+                    each; run_now() and exclusive() waiting, because their
+                    callers asked for the work explicitly. exclusive() is
+                    what keeps views/' manual syncs out of the automatic
+                    chain's way. See Key Rules 12 and 16.
   Typed models:     models.py (Phase, SessionRecord, ExerciseEntry, DayCell,
                     CheckInRecord, BiometricRecord, WeekScore, StreakInfo —
                     dataclasses)
@@ -145,7 +149,7 @@ Reference data:
                            BioAge muscle-imbalance count, actively imported by
                            services/bioage.py (PROFILE["imbalances"])
 
-tests/       — pytest suite (1229 tests), the sole deterministic gate
+tests/       — pytest suite (1243 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py,
                backfill_garmin_sleep_stages.py — probe before spending calls)
@@ -215,6 +219,7 @@ HEALTH_DATASTORE_PATH=datastore.db python -m streamlit run app.py
 13. **`_run_startup_sync` waits only while today's numbers are missing.** `dashboard.snapshot_is_complete` on today's persisted Metrics History row decides: not settled → run inline (last night's row isn't in Sheets yet, so backgrounding would leave the cards on yesterday until the next open); settled → hand to the worker and return. Cadence is 2h per step either way, durably marked, triggered by opening the app.
 14. **Never `st.rerun()` or `st.cache_data.clear()` after a sync.** Both were tried and made it strictly worse: clearing forces a re-read of six tabs at the moment the sync has just spent a burst of writes, which walks into Sheets' 60-per-minute quota. Leaving them out is also what keeps the day's numbers stable — once shown they stay, and change only when a later read genuinely differs.
 15. **A sync loop snapshots its tab once via `_rows_by_key`, then passes each row into the upsert.** `_read_records` is keyed on `sheets.write_generation()`, so the first real write invalidates it and per-row lookups would re-download the whole tab for every subsequent row. The upserts skip writes whose values are unchanged (`_cell_eq` compares the way a spreadsheet does — `71.0 == 71`, `"" == None`, but `"" != 0`), which is what makes "only overwrite when new information arrives" true of the stored data and not just of the numbers.
+16. **Every user-triggered sync in `views/` runs inside `BackgroundSyncRunner.exclusive()`.** The manual buttons call `Repository.sync_*` directly rather than `run_home_syncs`, so the runner's lock is the only thing that can serialise them against the background chain. Racing does not merely waste API calls, it corrupts rows: `sheets.upsert_row_by_key` is a *find-then-write pair*, so two chains upserting a date not yet on the tab both find nothing and both append, leaving that date with two rows — and the date most likely to be missing is today's, exactly the one both are writing. Sheets' 60-ops-per-minute quota is the second reason; a 429 mid-chain reads as missing data, not as an error. Serialising costs nothing because every button runs the *same work over a wider window* (blend 400d vs 7, fusion 1200d vs 14, Garmin daily 7d vs 2, Oura an identical 7d), so the wider window writes a superset. **Wait (`exclusive()`) for an explicit button press; skip (`exclusive(timeout=0)`, catching `SyncBusyError`) for anything that fires on every render** — `views/training.py`'s Garmin call is the latter, since waiting there would reintroduce the page blocking that `background_sync.py` exists to prevent. `tests/test_manual_sync_serialised.py` enforces this against the source; adding a new sync button without the wrapper fails it.
 11. **Before authoring any new training block, explicitly confirm each local clinical profile document has been read** — `patient_profile.py` plus every `Input_files/*.md` document present — and state how each one influenced the plan, per `docs/clinical_profile_weighting.md`. This is the checkable form of "understood and acknowledged," not a formality to skip.
 
 ---

@@ -12,6 +12,7 @@ Caller is responsible for st.set_page_config(), styles.inject_css(), nav.inject(
 import base64
 import calendar as cal_mod
 import json
+from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import date, timedelta
 from pathlib import Path
@@ -526,6 +527,26 @@ def _metrics_history() -> list[dict]:
 @st.cache_data(ttl=1800, show_spinner=False)
 def _sleep_fusion_history() -> list[dict]:
     return repo.get_repository().get_sleep_fusion_history()
+
+
+@contextmanager
+def _manual_sync(spinner_message: str):
+    """Wraps a manual sync button: spinner, plus the background runner's
+    one-at-a-time lock so the button cannot collide with the automatic chain.
+
+    These buttons call Repository.sync_* directly instead of going through
+    run_home_syncs, so the runner's lock is the only thing that can serialise
+    them — see BackgroundSyncRunner.exclusive() for why racing corrupts rows
+    (upsert_row_by_key is find-then-write, so two chains appending the same
+    missing date give it two rows) rather than merely wasting calls.
+
+    The button queues rather than forcing through. That costs nothing,
+    because every one of these buttons runs the same work as the automatic
+    step over a window at least as wide.
+    """
+    with st.spinner(spinner_message):
+        with repo.get_sync_runner().exclusive():
+            yield
 
 
 # Sleep-stage rendering moved to styles.py (shared with app.py's Sleep
@@ -1412,14 +1433,14 @@ def render() -> None:
                         use_container_width=False,
                         key="backfill_biometric_blend",
                     ):
-                        with st.spinner("Computing and persisting the full blend history…"):
-                            try:
+                        try:
+                            with _manual_sync("Computing and persisting the full blend history…"):
                                 n = repo.get_repository().sync_biometric_blend(days=400)
-                                st.success(f"Persisted {n} day(s) to the Biometric Blend tab.")
-                                st.cache_data.clear()
-                                st.rerun()
-                            except Exception as exc:
-                                st.warning(f"Backfill failed: {exc}")
+                            st.success(f"Persisted {n} day(s) to the Biometric Blend tab.")
+                            st.cache_data.clear()
+                            st.rerun()
+                        except Exception as exc:
+                            st.warning(f"Backfill failed: {exc}")
 
                     try:
                         blend_history = _blend_history()
@@ -1505,26 +1526,26 @@ def render() -> None:
                                 use_container_width=True,
                                 key="sync_garmin_daily",
                             ):
-                                with st.spinner("Pulling daily metrics from Garmin…"):
-                                    try:
+                                try:
+                                    with _manual_sync("Pulling daily metrics from Garmin…"):
                                         n = sync_repo.sync_garmin_daily(days=7)
-                                        st.success(f"Synced {n} days to the Garmin Daily tab.")
-                                    except Exception as exc:
-                                        st.warning(f"Garmin daily sync failed: {exc}")
+                                    st.success(f"Synced {n} days to the Garmin Daily tab.")
+                                except Exception as exc:
+                                    st.warning(f"Garmin daily sync failed: {exc}")
                         with col_activities:
                             if st.button(
                                 "Sync Garmin Activities",
                                 use_container_width=True,
                                 key="sync_garmin_activities",
                             ):
-                                with st.spinner("Pulling activities from Garmin…"):
-                                    try:
+                                try:
+                                    with _manual_sync("Pulling activities from Garmin…"):
                                         n = sync_repo.sync_garmin_activities(limit=20)
-                                        st.success(
-                                            f"Synced {n} activities to the Garmin Activities tab."
-                                        )
-                                    except Exception as exc:
-                                        st.warning(f"Garmin activity sync failed: {exc}")
+                                    st.success(
+                                        f"Synced {n} activities to the Garmin Activities tab."
+                                    )
+                                except Exception as exc:
+                                    st.warning(f"Garmin activity sync failed: {exc}")
 
                     st.divider()
                     st.subheader("Sleep Fusion")
@@ -1542,17 +1563,17 @@ def render() -> None:
                         use_container_width=True,
                         key="sync_sleep_fusion",
                     ):
-                        with st.spinner("Recomputing fused hypnograms…"):
-                            try:
+                        try:
+                            with _manual_sync("Recomputing fused hypnograms…"):
                                 counts = sync_repo.sync_sleep_fusion(days=1200)
-                                st.cache_data.clear()
-                                st.success(
-                                    f"Fused {counts.get('fused', 0)} night(s); "
-                                    f"{counts.get('oura_only', 0)} had no Garmin match "
-                                    "and pass Oura through unchanged."
-                                )
-                            except Exception as exc:
-                                st.warning(f"Sleep fusion rebuild failed: {exc}")
+                            st.cache_data.clear()
+                            st.success(
+                                f"Fused {counts.get('fused', 0)} night(s); "
+                                f"{counts.get('oura_only', 0)} had no Garmin match "
+                                "and pass Oura through unchanged."
+                            )
+                        except Exception as exc:
+                            st.warning(f"Sleep fusion rebuild failed: {exc}")
 
                     st.divider()
                     st.subheader("Oura")
@@ -1577,15 +1598,15 @@ def render() -> None:
                             use_container_width=False,
                             key="sync_oura_weekly",
                         ):
-                            with st.spinner("Pulling the last 7 days from Oura…"):
-                                try:
+                            try:
+                                with _manual_sync("Pulling the last 7 days from Oura…"):
                                     counts = sync_repo.sync_oura_all(days=7)
-                                    st.success(
-                                        f"Synced {counts['daily']} days, "
-                                        f"{counts['workouts']} workouts, "
-                                        f"{counts['sleep_periods']} sleep periods, "
-                                        f"{counts['sessions']} sessions, "
-                                        f"{counts['rest_mode_periods']} rest-mode periods."
-                                    )
-                                except Exception as exc:
-                                    st.warning(f"Oura sync failed: {exc}")
+                                st.success(
+                                    f"Synced {counts['daily']} days, "
+                                    f"{counts['workouts']} workouts, "
+                                    f"{counts['sleep_periods']} sleep periods, "
+                                    f"{counts['sessions']} sessions, "
+                                    f"{counts['rest_mode_periods']} rest-mode periods."
+                                )
+                            except Exception as exc:
+                                st.warning(f"Oura sync failed: {exc}")
