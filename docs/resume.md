@@ -162,25 +162,37 @@ $$\text{Injury Weight} = e^{-\lambda t}$$
 
 Evaluated at Day 14 and every 14 days thereafter. **All transition logic is deterministic.**
 
-### Stage 1 — Rehab (Tissue Tolerance Focus) ← CURRENT
+### Stage 1 — Rehab (Tissue Tolerance Focus) — COMPLETE (ran to 2026-07-19)
 - Conservative ACWR ceiling: 1.2
 - High injury weight influence (starts at 100%, decays with pain-free days)
 - Bodyweight only — no external load
 - Session RPE ceiling: 7/10
 
-### Stage 2 — Transition (Work Capacity Focus) ← NEXT BLOCK
+Extended by 7 days (Days 15–21) after a mid-back flare meant the Day 14 exit
+criteria were not met on the original schedule. Still `phase_number=1` — a
+continuation, not a new phase.
+
+### Stage 2 — Transition (Work Capacity Focus) ← CURRENT
 - Specific rehab movements blend into standard training warm-ups
 - ACWR ceiling: 1.3
 - External load introduced (barbell, cable)
 - 4-week block — reassess after completion
 - Progressive overload prescription: +2.5 kg per session (vs +1 rep in Stage 1)
 
+**Active block: Stage 2A — 28-Day Gym Strength Block** (`training_plan.PLAN_STAGE2`),
+started 2026-07-20, Day 28 reassessment 2026-08-16. Progression is split
+fast-track / slow-track by whether the 2025 log documents the pattern as a
+strength or a breakdown point, rather than one global +2.5 kg rule. No overhead
+pressing this block, and no running — both deliberate. Current-state detail
+lives in `docs/focus.md`; clinical detail in `patient_profile.py`.
+
 ### Stage 3 — Performance & Growth
 - Injury weight < 20% → becomes silent background watcher
 - Full progressive overload protocols
 - Background Watcher re-activates on any session note matching trigger terms
 
-**Stage 1 → 2 transition criteria (all must be met):**
+**Stage 1 → 2 transition criteria (all must be met):** — SATISFIED 2026-07-19,
+recorded in `patient_profile.PROFILE["stage_transitions"]`.
 
 | Criterion | Threshold |
 |---|---|
@@ -189,6 +201,14 @@ Evaluated at Day 14 and every 14 days thereafter. **All transition logic is dete
 | McGill Big 3 | Performed pain-free with good form (Day 14 screen) |
 | Hip hinge full range | Pain ≤ 2/10 at arms-past-knees range |
 | Physiotherapist sign-off | Required |
+
+Note on `pain_free_streak`: agreed with the user 2026-07-13 to treat it as
+**informative, not a hard blocker**, provided tightness (≤3.0) and pain (≤2/10)
+are met and the physio signs off. A single reversed day inside an otherwise
+improving trend should not restart the clock the way a fresh injury does.
+
+**Stage 2 → next-block criteria** live in
+`patient_profile.PROFILE["stage_2_exit_criteria"]`, evaluated 2026-08-16.
 
 ---
 
@@ -454,11 +474,15 @@ framed as a way to force vocal-fold effort, loudness, or range. Isolated
 sounds, glides, and quiet-rest activities remain paragraph-free unless they
 explicitly transition into connected speech.
 
-The content intentionally reflects the current patient profile: Stage 1
-rehabilitation, an active mid-/lower-back flare, and generalised
-hypermobility. New cards permit a supported chair or easy neutral standing,
+The content intentionally reflects the patient profile it was authored under
+(Stage 1 rehabilitation, an active mid-/lower-back flare, and generalised
+hypermobility). New cards permit a supported chair or easy neutral standing,
 avoid a held posture-correction cue and physical loading, and require a
-position change or stop if back symptoms rise. The latest Voice Training
+position change or stop if back symptoms rise. Those constraints still stand
+under Stage 2 — hypermobility is a standing modifier that does not get
+reassessed away, and the no-held-posture-correction rule is if anything more
+load-bearing now, given the 2026-07-06 strain it came from and the ongoing
+desk-posture interscapular pattern. The latest Voice Training
 recording was quality-limited by low sustained-vowel SNR, so this expansion
 does not use its score to progress work or claim a voice change. Complete
 rationale, source links, library behaviour, and stop/escalation rules are in
@@ -481,9 +505,10 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 | **9** | Clinical Input Profile System (`patient_profile.py`) | COMPLETE ✅ |
 | **10** | Autoregulation → Background; Directive into Training Plan | COMPLETE ✅ |
 | **11** | Biomechanical Profile Integration into Training Plan | COMPLETE ✅ |
-| **12** | 4-Week Stage 2 Transition Plan | PENDING — begins after Day 14 assessment |
+| **12** | 4-Week Stage 2 Transition Plan | COMPLETE ✅ — `training_plan.PLAN_STAGE2`, built after the Day 21 (not Day 14) assessment; running deliberately excluded |
 | **13** | Apple Health Direct API Sync | SUPERSEDED — replaced by the Oura+Garmin blend (2026-07-13) rather than a direct Apple HealthKit sync; Sheet1/Apple Health retired from the live pipeline instead |
-| **14** | Stage 2 Training Entry (barbell/cable — external load) | PENDING |
+| **14** | Stage 2 Training Entry (barbell/cable — external load) | COMPLETE ✅ — live since 2026-07-20; weighted sets logged across all three body regions |
+| **15** | Stage 2B / next block | PENDING — three decisions due at the Day 28 reassessment (2026-08-16): Stage 2B vs. extending 2A, running introduction, endurance-biased scapular programming. See `docs/focus.md`. |
 
 ---
 
@@ -542,7 +567,7 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 
 9. **Right-side asymmetry is a clinical finding, not a preference.** All exercises involving right hip flexion >60° require a neutral/internal rotation cue. All right posterior hip capsule mobilisation is unilateral (right only). Document this wherever it appears.
 
-10. **`patient_profile.py` is updated before each new training block.** After Day 14 assessment, update findings, imbalances, and stage exit criteria before generating the Stage 2 plan.
+10. **`patient_profile.py` is updated before each new training block.** After each block's reassessment, update findings, imbalances and stage exit criteria — and append a `stage_transitions` record, which is the evidence the criteria were actually met rather than merely stated — before generating the next plan. Note the file is now also a live import (`services/bioage.py` reads `PROFILE["imbalances"]`), so edits there can break the gate.
 
 11. **Every new function needs a one-line comment** stating whether it is `DETERMINISTIC` or `AI-LAYER` and what its fallback is if it fails.
 
@@ -557,13 +582,14 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 | Item | Status | Notes |
 |---|---|---|
 | HRV data from Sheet1/Apple Health | Often blank (historical only) | No longer the engine's source — see Oura+Garmin blend above. Still true of the retired pipeline for backfill purposes |
-| Garmin HRV field mapping | Unverified | `hrvSummary.lastNightAvg` assumed; confirm with `scripts/garmin_login_test.py` against a live payload |
+| Garmin HRV field mapping | RESOLVED-as-empty (2026-07-31) | `get_hrv_data` returns `{}` for this account, so `hrvSummary.lastNightAvg` has nothing to map. Separately, the Garmin Daily tab predated `hrv_ms` joining its header and silently discarded the column — repaired via `Repository.rebuild_garmin_daily`. The blend is held at Oura-only on purpose (`biometrics.HRV_GARMIN_HOLD`) |
 | Notion biometrics DB | No longer written to | Could be removed in future; kept for backwards compat |
-| Stage 2 training plan | Not yet built | Needs barbell/cable movement library, updated ACWR ceiling, external load auto-logging |
+| Stage 2 training plan | BUILT — live since 2026-07-20 | `training_plan.PLAN_STAGE2`. Barbell/cable library, ACWR ceiling 1.3 from `STAGE_CONSTRAINTS[2]`, per-set external-load capture all in place. Next block's decisions are due 2026-08-16 — see `docs/focus.md` |
 | Garmin backfill from Sheet1 | Needs to be run once | `scripts/backfill_garmin_from_sheet1.py` — dry-run first, then `--apply` — so readiness baselines have pre-wearable history in the Garmin Daily tab |
-| `Training plan/` folder | Stale duplicate | Contents moved to `docs/training/`; manual deletion needed (`Remove-Item -Recurse -Force "Training plan"`) |
-| `patient_profile.py` not imported | Informational | Human-readable reference only — not wired into active code. Will be imported when Stage 2 plan reads biomechanical profile programmatically. |
+| `Training plan/` folder | RESOLVED (2026-08-03) | Directory no longer exists at root; contents live in `docs/training/` |
+| `patient_profile.py` not imported | SUPERSEDED | No longer true — `services/bioage.py` imports `PROFILE["imbalances"]` for the muscle-imbalance count, and `tests/test_bioage.py` pins it at 8. The file is now both human reference **and** live input, so edits to `imbalances` can break the gate |
+| Interscapular endurance gap | Deferred to the post-Stage-2A block | Onset 2026-07-16, predates the block. Scapular work already runs five days a week and the symptom persists through it, so the gap is endurance under sustained low-load holding, not volume. Physio decides 2026-08-16 — `docs/training/physio_brief_2026-08-16.md` |
 
 ---
 
-*Last updated: 2026-07-14 — added the Voxplot Voice Training Measurement Policy, separate 22-card activity library, and supplied connected-speech paragraph; the original 10-day baseline remains fixed, and optional library practice cannot change daily-plan progress. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*
+*Last updated: 2026-08-03 — documentation refresh: the stage machine, agile roadmap and open-gaps table had all still described Stage 1 as current, five weeks after Stage 2A started (2026-07-20). Stage 1 is marked complete with its 7-day extension recorded, Stage 2 marked current with the active block named, roadmap buckets 12/14 closed and a bucket 15 opened for the three decisions due at the Day 28 reassessment (2026-08-16). Four open-gap rows corrected against reality: `patient_profile.py` IS now imported (`services/bioage.py`), the `Training plan/` duplicate is gone, Garmin HRV is resolved-as-empty and held at Oura-only, and the Stage 2 plan is built. Before that (2026-07-14): the Voxplot Voice Training Measurement Policy, separate 22-card activity library, and supplied connected-speech paragraph; the original 10-day baseline remains fixed, and optional library practice cannot change daily-plan progress. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*

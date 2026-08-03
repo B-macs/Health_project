@@ -1,11 +1,13 @@
 {
   "schema": "health-engine-progress/v1",
-  "last_updated": "2026-06-30",
+  "last_updated": "2026-08-03",
   "project": "Health Engine — Codebase Review & Refiling",
+  "scope_note": "This file tracks the four-phase codebase review/refiling effort that completed 2026-06-30. It is NOT a live project tracker — for current stage, block and next action see docs/focus.md. Only the gate block and any problem whose status has since changed are kept current here.",
   "gate": {
-    "command": "python tests.py",
-    "passing": 141,
-    "total": 141
+    "command": "python -m pytest tests/",
+    "passing": 1290,
+    "total": 1290,
+    "note": "Treat as a floor, not an exact match — the count grows as tests are added. Set HEALTH_DATASTORE_PATH=datastore.db to run offline at zero Sheets API cost."
   },
   "phases": {
     "phase_1": {
@@ -74,8 +76,8 @@
       "id": "P4",
       "severity": "orange",
       "title": "patient_profile.py not imported by any active module",
-      "status": "accepted",
-      "note": "Intentional — human reference only. Stays at root for easy editing. Not wired."
+      "status": "superseded",
+      "note": "No longer true as of the Strength BioAge work — services/bioage.py imports PROFILE['imbalances'] for the muscle-imbalance count, and tests/test_bioage.py pins it at 8. The file is now BOTH human reference and live input, so a careless edit to imbalances breaks the gate. Still stays at root for easy editing."
     },
     {
       "id": "P5",
@@ -130,8 +132,8 @@
       "id": "P12",
       "severity": "yellow",
       "title": "Training plan/ at root — stale duplicate of docs/training/",
-      "status": "partial",
-      "note": "Contents copied to docs/training/ in G3. Manual deletion blocked by sandbox deny rules. User must run: Remove-Item -Recurse -Force 'Training plan'"
+      "status": "passing",
+      "note": "Resolved — the directory no longer exists at root (verified 2026-08-03). Contents had been copied to docs/training/ in G3; the manual deletion has since been run."
     },
     {
       "id": "P13",
@@ -148,16 +150,17 @@
       "fix": "Phase 4: updated to reflect _pages/ stubs + views/ structure"
     }
   ],
-  "manual_actions_required": [
+  "manual_actions_required": [],
+  "manual_actions_completed": [
     {
       "action": "Delete stale duplicate directory",
       "command": "Remove-Item -Recurse -Force 'Training plan'",
-      "reason": "Sandbox deny rules block Remove-Item inside Claude — must be run in user terminal"
+      "status": "done — directory absent from root, verified 2026-08-03"
     },
     {
       "action": "Commit or gitignore untracked assets",
       "files": ["Oura_template.jpg", "background_templates/"],
-      "reason": "Design assets not yet committed — decide whether they belong in git"
+      "status": "done — both committed; background_templates/ tracks 24 files, verified 2026-08-03"
     }
   ]
 }

@@ -61,7 +61,7 @@ When two files define the same constant:
 1. Identify the canonical home (the module that *owns* the concept).
 2. In the consuming file, delete the inline definition.
 3. Add `from canonical_module import CONSTANT_NAME` at the top.
-4. Run `python tests.py` to confirm no break.
+4. Run `python -m pytest tests/` to confirm no break.
 
 Example from G1:
 ```python
@@ -78,10 +78,26 @@ from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
 ## 5. Gate sequence (before every commit)
 
 ```powershell
-python tests.py
+python -m pytest tests/
 ```
 
-Check output: `X/141 passed` — must be 141/141 before committing any logic change.
+Check output: **1290/1290 passed** before committing any logic change. Treat
+that number as a **floor, not an exact match** — it grows as tests are added.
+Never delete or weaken a test to make the gate pass, and never weaken a
+`services/rules.py` guardrail.
+
+Prefer running it against the local snapshot, which serves every Google Sheets
+read from `datastore.db` and costs **zero** API calls — including the
+service-account auth handshake. Sheets allows only 60 reads+writes per minute,
+and a throttled read looks like missing data rather than an error:
+
+```powershell
+$env:HEALTH_DATASTORE_PATH = "datastore.db"; python -m pytest tests/
+```
+
+Refresh the snapshot with `python scripts/build_datastore.py` (one full read
+pass). See CLAUDE.md's "Offline mode" section for what it does and does not
+cover — Notion-backed getters still hit the network.
 
 For file-only moves (no logic change), run the gate anyway to catch accidental breaks.
 

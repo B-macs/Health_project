@@ -2,6 +2,28 @@
 
 *Phase 1 snapshot — 2026-06-30 — read-only codebase audit, no behaviour changed*
 
+> ## ⚠ HISTORICAL SNAPSHOT — DO NOT READ AS CURRENT STATE
+>
+> **Reviewed 2026-08-03 and deliberately left unedited.** This is a dated
+> audit of the codebase as it stood on 2026-06-30, and its value is precisely
+> that it records what was true *then* — rewriting it would destroy the record
+> without producing a useful current inventory.
+>
+> Large parts of it are now wrong. Non-exhaustively: `_pages/` has since been
+> **deleted** (Streamlit 1.36+ auto-detected it and rendered an unwanted
+> top-nav); the entire backend moved into `services/`, so root-level `db.py`,
+> `sync_sheets.py`, `engine.py` and `readiness.py` are gone; the gate is now
+> `python -m pytest tests/` at **1290** tests, not `python tests.py` at 141;
+> and the `Training plan/` duplicate directory has been removed.
+>
+> **For current state, read in this order:**
+> 1. `CLAUDE.md` — architecture, key rules, known open issues
+> 2. `docs/focus.md` — active stage, block, day, next action
+> 3. `docs/resume.md` — architecture decisions and locked design rules
+>
+> The problem IDs (P1–P14) referenced here are tracked to resolution in
+> `docs/progress.json`, which **is** kept current.
+
 ---
 
 ## File Inventory
