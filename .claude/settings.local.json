@@ -19,7 +19,8 @@
       "Bash(python -c ' *)",
       "Bash(git fetch *)",
       "Bash(git rev-list *)",
-      "Bash(git check-ignore *)"
+      "Bash(git check-ignore *)",
+      "PowerShell(git fetch origin)"
     ]
   }
 }
