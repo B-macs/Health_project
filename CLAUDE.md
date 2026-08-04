@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1290/1290 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1373/1373 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1290/1290 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1290/1290 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1373/1373 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -75,7 +75,25 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     alcohol triggers a pairwise-adjacent-day swap for the
                     rest of that calendar week) ·
                     volume.py (weekly tonnage — Σ reps×weight — for Stage 2A+
-                    double-progression exercises) ·
+                    double-progression exercises; no sector split, see
+                    tonnage.py) ·
+                    strength.py (the Overall Strength Score — estimated
+                    strength CAPACITY in points, where 100 is the 2025 peak
+                    from strength_baselines.py. Read its docstring before
+                    touching it: the ONE safety property is that measured
+                    performance can only push the level UP and the only
+                    downward force is detraining decay, which is what stops
+                    pain, a substitution, a rehab restriction or a
+                    deliberately light week from reading as strength loss.
+                    Regional split via a shrinkage estimator, held in a
+                    calibration mode where every index displays at 50 — the
+                    identity `overall = Σ shareᵣ × indexᵣ` then holds the
+                    overall at 50 for ANY split, which is why calibration can
+                    run for months without the headline moving) ·
+                    tonnage.py (weekly WORK COMPLETED, in kg, overall and per
+                    body sector — a SEPARATE metric that shares no term with
+                    strength.py. No decay, no carry-over. Unloaded work is
+                    counted in reps and never converted to kilograms) ·
                     hr_load.py (Edwards' summated-HR-zone TRIMP → the 0-21
                     strain scale; see its docstring for why Edwards' over
                     Banister/Lucia/Stagno, and for the calibration that keeps
@@ -144,12 +162,19 @@ Reference data:
   training_plan.py      — PLAN dict (14 exercise days, exercise objects)
   training_constants.py — EXERCISES catalogue, ANATOMICAL_LOCATIONS, SENSATION_TAGS,
                            EXERCISE_BODY_REGION (exercise name → upper_body/core/
-                           lower_body, feeds services/bioage.py)
+                           lower_body; feeds services/strength.py and
+                           services/tonnage.py — an exercise missing from it is
+                           excluded from every sector total)
+  strength_baselines.py — the 2025 peak that "100" means, one entry per exercise,
+                           plus each entry's `comparability`. Transcribed from
+                           Input_files/2025-training-year.md because NOTION DOES
+                           NOT CONTAIN 2025 — the training DB starts 2026-06-29.
+                           Lose this file and every index loses its denominator.
   patient_profile.py    — clinical data; human reference AND, as of the Strength
                            BioAge muscle-imbalance count, actively imported by
                            services/bioage.py (PROFILE["imbalances"])
 
-tests/       — pytest suite (1290 tests), the sole deterministic gate
+tests/       — pytest suite (1373 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py,
                backfill_garmin_sleep_stages.py — probe before spending calls)
@@ -332,6 +357,10 @@ quiet-wake rule, and compare against the recorded 645 figures in
 | 36 Metrics History rows predated the background-sync commits | **RESOLVED 2026-08-03**, with approval, via the new `Repository.rederive_metrics_history()`. All 54 stored rows re-derived, 24 changed, **readiness blanked on 16 rows across 2025-09-27 → 2025-10-13** — they held flat-repeated values (91.2 for 11 straight days), the stale carry-forward `adec27d` ("a new day is blank until it has actually been measured") was written to fix, and there is no biometric reading behind them. Nap support moved none of them (verified 0 of 36 before the run). |
 | ⚠ A persisted Metrics History value depends on how WIDE the sync that wrote it ran | Found 2026-08-03 during the re-derive, **pre-existing, not fixed.** `sync_metrics_history` fetches `days + 60` biometric rows, so a `days=7` routine sync computes a date against a 67-day lookback while a full re-derive computes the SAME date against a 372-day one. The 56-night progressive sleep baseline and the readiness EMA both read that window, so the two disagree: 2026-07-25 was written 43.3 by the narrow run and 42.9 by the wide one. Only ~0.4 points here, but it means a stored row is not reproducible without knowing the width that produced it, and the 2-hourly `sync_metrics_history_if_due(days=7)` will drift recent rows back toward the narrow-window value. Fixing it means pinning one lookback width for persistence regardless of `days` — do not do that casually, it moves every stored row again. |
 | Biomechanical review due | **DONE 2026-07-19** — Day 21 reassessment passed, physio cleared external load, `patient_profile.py` updated and `stage_transitions` appended. **Next review: 2026-08-16** (Day 28), which gates the next block. |
-| Strength BioAge scores dormant | **NO LONGER DORMANT as of 2026-08-03.** The premise ("training is still Stage 1 bodyweight-only") stopped being true when Stage 2A began on 2026-07-20. All three regions now carry real logged `total_volume_kg` — upper_body ~4395 kg, lower_body ~4140 kg, core ~375 kg, latest 2026-07-28/30 — so `bioage.has_weighted_training` is True for each and the scores activate on their own, exactly as that module's docstring says they would, with no code change. Nine weighted lifts are logged and all nine map in `EXERCISE_BODY_REGION`. |
 | `training_constants.EXERCISE_BODY_REGION` needs upkeep | Stage 2A's names are all mapped — verified 2026-08-03, 9/9 weighted lifts resolve to a region. The rule now applies to the **next** block: every new exercise name needs an entry here or `services/bioage.py` silently excludes it from any region, **and** an entry in `EXERCISE_MOVEMENT_WEIGHT` or it falls back to `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflates Strain/ACWR (that one already bit 34 of 63 Stage 1 names — see the Strain/ACWR row below). See both dicts' own comments in `training_constants.py`. |
+| Stage-Adjusted Recovery Score retired from the Strength screen | **RESOLVED 2026-08-04.** It was `min(100, current_28d / (best_ever_28d × cap) × 100)` with the current window INSIDE the set its own denominator maximised over, so it could never exceed 1 — it returned a flat 100 for the whole first 28 days of any block and had produced exactly one distinct value (100.0) across all 16 days it existed. Same one-sided saturating ratio readiness `MODEL_VERSION 2` removed. Replaced by `services/strength.py` + `services/tonnage.py`. `bioage.region_recovery_score`/`hero_score` are left in place and still tested but are no longer wired to any screen; `muscle_imbalance_count` still is. |
+| Overall Strength Score is in CALIBRATION | Every regional index displays at **50** and the overall is held at `strength_baselines.ANCHOR_VALUE` (50, anchored 2026-07-30). The measured indices are computed and returned, just not displayed. Exit is per region on **confidence ≥ 0.70** (`quantity × comparability × consistency`); today upper is 0.46, lower 0.37, core 0.00. Decay is suspended while calibrating. Nothing jumps when it completes — the identity `overall = Σ shareᵣ × indexᵣ` already holds. |
+| Core cannot be calibrated at all | Its only loaded movement is Pallof Press and its 2025 peak is recorded as "orange band × 15" — a band, not a kilogram, so `comparability` is 0 and confidence is 0 no matter how much is logged. Core's share runs on `REGION_PRIOR` alone. **The fix is already in the 2025 log:** Copenhagen plank (30s × 3) and side plank + march (15/15 × 3) are both recorded and repeatable, and neither needs a 1RM. |
+| No per-set warm-up flag | `services/tonnage.py` counts a set as eligible when it carries reps AND a real external load. Warm-ups are NOT excluded, because the log has no way to mark one — so "working sets only" is an assumption the data cannot currently support. A boolean per set closes it. |
+| 0 of 17 e1RM estimates are inside Epley's validated range | Sets are logged at 10-12 reps at RPE 5-6, i.e. 14-18 *effective* reps against a limit of ~10. `services/strength.estimated_1rm` returns a `within_epley_range` flag for this. The fix is a periodic ~5-rep set at RPE 8 per movement pattern, not a constant change. |
 | See `docs/REFACTOR_NOTES.md` | Smells/bugs found during the services/ extraction, noted but not fixed beyond what the extraction itself required |
