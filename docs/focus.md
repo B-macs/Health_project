@@ -4,15 +4,15 @@
 
 ---
 
-## Current State (2026-08-03)
+## Current State (2026-08-04)
 
 | Item | Value |
 |------|-------|
 | Stage | **Stage 2** — Transition (external load) |
 | Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
-| Day | **Day 15 of 28** |
-| Gate | **1290/1290** — `python -m pytest tests/` |
-| Last commit | `79bb0cf` — corrected the interscapular record (endurance gap, not volume gap) |
+| Day | **Day 16 of 28** |
+| Gate | **1377/1377** — `python -m pytest tests/` |
+| Last commit | `350fcee` — Strength screen rebuilt on `services/strength.py` + `services/tonnage.py`; the Stage-Adjusted Recovery Score deleted |
 | Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required |
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
@@ -57,6 +57,12 @@ Guardrails for the stage itself live in `services/rules.py`
 `STAGE_CONSTRAINTS[2]` (ACWR ceiling 1.3), which `services/engine.py` derives
 from. Never duplicate those values.
 
+**ACWR enforcement is currently HELD** — `engine.ACWR_ADVISORY_MODE = True`, so
+the ratio is reported and can exceed the ceiling without capping volume. The
+ceiling above is the value that *will* bind when the hold lifts, not what is
+binding today. `engine.ACWR_MIN_IN_STAGE_DAYS` (14) also gates the ratio as
+non-diagnostic until a stage has that many days behind it.
+
 ---
 
 ## What Happens at the Next Block Entry
@@ -74,7 +80,7 @@ from. Never duplicate those values.
    `training_constants.EXERCISE_MOVEMENT_WEIGHT` (or they fall back to
    `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflate Strain/ACWR — this already
    happened once, across 34 of 63 Stage 1 exercise names).
-5. Run `python -m pytest tests/` — 1290/1290 or higher.
+5. Run `python -m pytest tests/` — 1377/1377 or higher.
 6. Update this file: block, day, gate, next action.
 
 ---
