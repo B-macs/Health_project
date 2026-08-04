@@ -41,10 +41,11 @@ from datetime import date
 ANCHOR_DATE: date = date(2026, 7, 30)
 ANCHOR_VALUE: float = 50.0
 
-# Every regional index starts here too, which is what makes the overall hold at
-# ANCHOR_VALUE for ANY share split — see services/strength.py's module
-# docstring for the identity that rests on.
-CALIBRATION_INDEX: float = 50.0
+# The value every regional index displays at during calibration lives in
+# services/strength.py as CALIBRATION_INDEX, NOT here. It is the model's own
+# constant, not a measured baseline, and a second copy in this file would be a
+# duplicate nothing reads — every other constant here is injected into the pure
+# service by the caller, while that one is resolved inside it.
 
 # name -> (weight_kg, reps, comparability, why)
 # reps is the REPS PERFORMED in the 2025 PR set, not a prescription.

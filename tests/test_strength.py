@@ -81,6 +81,31 @@ def test_best_observation_is_the_heaviest_set_of_the_latest_day():
     assert obs.weight_kg == 50
 
 
+def test_two_rows_for_one_exercise_on_one_day_keep_the_heavier():
+    """An exercise can occupy two rows in a single session — a top set logged
+    apart from the back-offs, or a re-log. Ordering by date alone lets
+    whichever came last in query order win, which silently understates the
+    index whenever the lighter row is written second."""
+    rows = [
+        _row("Lat Pulldown", "2026-07-27", [{"reps": 10, "weight": 60}]),
+        _row("Lat Pulldown", "2026-07-27", [{"reps": 10, "weight": 20}]),
+    ]
+    obs = strength.best_observations(rows, today=date(2026, 8, 4))["Lat Pulldown"]
+    assert obs.weight_kg == 60
+
+
+def test_a_later_day_still_wins_even_if_it_is_lighter():
+    """The counterpart: within a day take the best, but across days take the
+    most RECENT — the score tracks where you are now, not your best ever."""
+    rows = [
+        _row("Lat Pulldown", "2026-07-20", [{"reps": 10, "weight": 60}]),
+        _row("Lat Pulldown", "2026-07-27", [{"reps": 10, "weight": 20}]),
+    ]
+    obs = strength.best_observations(rows, today=date(2026, 8, 4))["Lat Pulldown"]
+    assert obs.session_date == date(2026, 7, 27)
+    assert obs.weight_kg == 20
+
+
 def test_rows_after_today_are_ignored_so_history_can_be_replayed():
     rows = [_row("Lat Pulldown", "2026-07-27", [{"reps": 10, "weight": 50}])]
     assert strength.best_observations(rows, today=date(2026, 7, 20)) == {}
@@ -201,6 +226,42 @@ def test_split_parts_sum_exactly_at_the_2025_reference_too():
 def test_split_parts_sum_exactly_for_awkward_splits(u, c, l):
     parts = strength.split_parts({"upper_body": u, "core": c, "lower_body": l}, 50.0)
     assert sum(parts.values()) == pytest.approx(50.0)
+
+
+def test_split_parts_always_sum_exactly_and_never_go_negative():
+    """Brute force, because the exact-sum rule is the one thing the display
+    cannot be allowed to violate."""
+    import random
+
+    random.seed(7)
+    for _ in range(2000):
+        raw = [random.random() for _ in range(3)]
+        total_raw = sum(raw)
+        shares = dict(zip(strength.REGIONS, (v / total_raw for v in raw)))
+        for total in (50.0, 100.0, 1.0, 0.0):
+            parts = strength.split_parts(shares, total)
+            assert sum(parts.values()) == pytest.approx(total, abs=1e-9)
+            assert min(parts.values()) >= 0.0
+
+
+def test_the_remainder_absorbed_by_the_last_part_is_bounded():
+    """The cost of making the column total exactly: the last region carries
+    everyone else's rounding error. With three regions at one decimal that is
+    at most two half-ticks, 0.1 of a point — small enough not to misrepresent
+    the share, and it is why the column that has to add up gets the exact
+    treatment rather than the one that does not."""
+    import random
+
+    random.seed(11)
+    bound = (len(strength.REGIONS) - 1) * 0.05
+    worst = 0.0
+    for _ in range(2000):
+        raw = [random.random() for _ in range(3)]
+        total_raw = sum(raw)
+        shares = dict(zip(strength.REGIONS, (v / total_raw for v in raw)))
+        parts = strength.split_parts(shares, 50.0)
+        worst = max(worst, max(abs(parts[r] - shares[r] * 50.0) for r in strength.REGIONS))
+    assert worst <= bound + 1e-9
 
 
 # ── the weekly model ────────────────────────────────────────────────────────
@@ -333,3 +394,58 @@ def test_an_exercise_without_a_2025_baseline_is_excluded_not_guessed():
     rows = [_row("Wall Sit", "2026-07-27", [{"reps": 1, "weight": 0}])]
     snap = _snapshot(rows)
     assert snap["exercises"] == {}
+
+
+# ── the gate that counts and the gate that measures must be the same gate ────
+
+def test_future_dated_rows_cannot_inflate_confidence():
+    """The observation COUNT feeds `quantity`, which multiplies into
+    confidence, which is the shrinkage weight that sets the displayed split.
+    It once filtered on neither the date nor `today`, so twelve rows dated next
+    month took upper body from provisional to established and moved real points
+    off the other two regions."""
+    base = [_row("Lat Pulldown", "2026-07-06", [{"reps": 10, "weight": 40}]),
+            _row("Incline DB Press", "2026-07-06", [{"reps": 10, "weight": 14}])]
+    future = base + [_row("Lat Pulldown", f"2026-09-{d:02d}", [{"reps": 10, "weight": 40}])
+                     for d in range(1, 13)]
+    before = _snapshot(base)["regions"]
+    after = _snapshot(future)["regions"]
+    for a, b in zip(before, after):
+        assert a.observations == b.observations
+        assert a.confidence == pytest.approx(b.confidence)
+        assert a.contribution_points == pytest.approx(b.contribution_points)
+
+
+def test_malformed_dates_cannot_inflate_confidence():
+    base = [_row("Lat Pulldown", "2026-07-06", [{"reps": 10, "weight": 40}]),
+            _row("Incline DB Press", "2026-07-06", [{"reps": 10, "weight": 14}])]
+    junk = base + [_row("Lat Pulldown", "not-a-date", [{"reps": 10, "weight": 40}])] * 5
+    upper_before = next(r for r in _snapshot(base)["regions"] if r.region == "upper_body")
+    upper_after = next(r for r in _snapshot(junk)["regions"] if r.region == "upper_body")
+    assert upper_before.observations == upper_after.observations
+
+
+def test_an_observation_is_a_day_not_a_row():
+    """Two rows for one lift in one session are one observation of it."""
+    rows = [_row("Lat Pulldown", "2026-07-06", [{"reps": 10, "weight": 40}]),
+            _row("Lat Pulldown", "2026-07-06", [{"reps": 10, "weight": 35}])]
+    days = strength.observation_days(rows, today=date(2026, 8, 4))
+    assert days["Lat Pulldown"] == {date(2026, 7, 6)}
+
+
+def test_every_2025_baseline_resolves_in_both_lookup_maps():
+    """A baseline whose exercise name is missing from either map is silently
+    excluded from its region — no error, just a lift that quietly stops
+    counting. The names are hand-transcribed, so nothing but a test catches a
+    typo or a rename."""
+    for name in sb.PEAKS_2025:
+        assert name in tc.EXERCISE_BODY_REGION, f"{name} has no body region"
+        assert name in tc.EXERCISE_MOVEMENT_WEIGHT, f"{name} has no movement weight"
+        assert tc.EXERCISE_BODY_REGION[name] in strength.REGIONS
+
+
+def test_the_calibration_index_is_not_duplicated_in_the_baselines_module():
+    """It is the model's constant, not a measured baseline. A second copy in
+    strength_baselines.py read like the source of truth and was read by
+    nothing."""
+    assert not hasattr(sb, "CALIBRATION_INDEX")

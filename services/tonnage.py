@@ -20,12 +20,22 @@ one — there is no per-set warm-up flag today, so "working sets only" is an
 assumption, not something this module can enforce. Every unloaded rehab drill
 falls out naturally, since its sets carry no weight.
 
-UNLOADED WORK IS COUNTED IN REPS AND NEVER CONVERTED. Dead bugs, planks,
-bird-dogs, side bridges and glute bridges produce real training and zero
+UNLOADED WORK IS COUNTED IN ITS OWN UNITS AND NEVER CONVERTED. Dead bugs,
+planks, bird-dogs, side bridges and glute bridges produce real training and zero
 kilograms. There is no defined bodyweight-to-kg conversion here and inventing
 one would put fictional weight into a real total, so they are carried alongside
-as `unloaded_reps` instead — which is also what stops a week of genuine rehab
-work from displaying as though nothing happened.
+instead — which is also what stops a week of genuine rehab work from displaying
+as though nothing happened.
+
+That takes TWO counters, not one. services/sessions.py encodes a hold or a
+timed exercise as **reps=1 with the work in `tut`** (seconds), so a 60-second
+plank and a single dead bug are both "1 rep". Summing reps alone therefore
+misrepresents exactly the work it was added to represent: across
+training_plan.PLAN, holds and durations are 54 of 113 exercises and 11,955
+seconds of time-under-tension but only 113 of 1,603 reps — 7%. `unloaded_reps`
+and `unloaded_seconds` are kept separate and are never added together, because
+a rep and a second are not the same unit and no exchange rate between them is
+defined here either.
 
 ONE PRIMARY SECTOR PER EXERCISE, from training_constants.EXERCISE_BODY_REGION.
 A compound lift's WHOLE tonnage goes to its primary sector — a Romanian
@@ -42,6 +52,7 @@ all about strength.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -54,6 +65,9 @@ class SectorWeek:
     sets: int = 0
     sessions: int = 0
     unloaded_reps: float = 0.0
+    # Held/timed work, in seconds. Separate from unloaded_reps on purpose —
+    # see the module docstring. Never add the two.
+    unloaded_seconds: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -69,6 +83,7 @@ class TonnageWeek:
             sets=sum(s.sets for s in self.sectors.values()),
             sessions=self.training_days,
             unloaded_reps=sum(s.unloaded_reps for s in self.sectors.values()),
+            unloaded_seconds=sum(s.unloaded_seconds for s in self.sectors.values()),
         )
 
     def value(self, key: str) -> SectorWeek:
@@ -103,6 +118,7 @@ def weekly_tonnage(
     kg: dict[date, dict[str, float]] = {w: {r: 0.0 for r in REGIONS} for w in span}
     sets: dict[date, dict[str, int]] = {w: {r: 0 for r in REGIONS} for w in span}
     unloaded: dict[date, dict[str, float]] = {w: {r: 0.0 for r in REGIONS} for w in span}
+    held: dict[date, dict[str, float]] = {w: {r: 0.0 for r in REGIONS} for w in span}
     sector_days: dict[date, dict[str, set[str]]] = {w: {r: set() for r in REGIONS} for w in span}
     all_days: dict[date, set[str]] = {w: set() for w in span}
     unmapped: set[str] = set()
@@ -131,13 +147,18 @@ def weekly_tonnage(
             continue
 
         all_days[wk].add(raw_date)
-        loaded_kg, loaded_sets, reps_only = 0.0, 0, 0.0
+        loaded_kg, loaded_sets, reps_only, seconds_only = 0.0, 0, 0.0, 0.0
         for s in (row.get("sets") or []):
             reps = float(s.get("reps") or 0)
             weight = float(s.get("weight") or 0)
+            tut = float(s.get("tut") or 0)
             if reps and weight:
                 loaded_kg += reps * weight
                 loaded_sets += 1
+            elif tut:
+                # A hold or a timed piece: sessions.py writes reps=1 and puts
+                # the actual work in tut. Counting its "1 rep" would hide it.
+                seconds_only += tut
             elif reps:
                 reps_only += reps
         if loaded_kg:
@@ -146,6 +167,8 @@ def weekly_tonnage(
             sector_days[wk][region].add(raw_date)
         if reps_only:
             unloaded[wk][region] += reps_only
+        if seconds_only:
+            held[wk][region] += seconds_only
 
     series = [
         TonnageWeek(
@@ -157,6 +180,7 @@ def weekly_tonnage(
                     sets=sets[w][r],
                     sessions=len(sector_days[w][r]),
                     unloaded_reps=round(unloaded[w][r], 1),
+                    unloaded_seconds=round(held[w][r], 1),
                 )
                 for r in REGIONS
             },
@@ -182,7 +206,14 @@ def nice_axis_max(peak: float, divisions: int = 4) -> float:
 
     That the two then look alike at a glance is precisely why kilograms are
     never compared across sectors anywhere else — the axis label is the only
-    thing carrying the scale."""
+    thing carrying the scale.
+
+    The step is forced to a WHOLE number of kilograms. The candidate ladder
+    contains 1.5, 2.5 and 7.5, which are fine at scale (750, 2,500) but at a
+    small peak produce fractional gridlines that the integer kg formatter then
+    prints wrong: a 25 kg core week gave a top of 30 with lines at
+    30/22.5/15/7.5/0 and labels reading 30/22/15/8/0. Rounding the step up
+    keeps the axis above the peak, so the fix cannot hide data."""
     if peak <= 0:
         return float(divisions * 25)
     target = peak / divisions
@@ -192,5 +223,5 @@ def nice_axis_max(peak: float, divisions: int = 4) -> float:
     for candidate in (1, 1.5, 2, 2.5, 3, 4, 5, 6, 7.5, 10):
         step = candidate * exponent
         if step >= target - 1e-9:
-            return step * divisions
-    return exponent * 10 * divisions
+            return math.ceil(step) * divisions
+    return math.ceil(exponent * 10) * divisions

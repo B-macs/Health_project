@@ -107,17 +107,23 @@ SENSATION_TAGS: list[str] = [
 ]
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Exercise → body region — feeds services/bioage.py's per-region Strength
-#  BioAge score. Every exercise name that appears in training_plan.py's PLAN
-#  is listed once below (primary region only — no multi-tagging in v1).
+#  Exercise → body region — feeds services/strength.py (which region an
+#  estimated 1RM belongs to) and services/tonnage.py (which sector a week's
+#  kilograms are credited to). ONE primary region per exercise: that is what
+#  makes upper + core + lower == overall an identity in tonnage rather than an
+#  approximation, so a compound lift's whole tonnage goes to its primary sector
+#  and is never split. Every exercise name that appears in training_plan.py's
+#  PLAN is listed once below.
 #  training_plan.py is a self-contained exercise universe (doesn't reference
 #  EXERCISES above), so this map is scoped to its names, not EXERCISES'.
 #
 #  Maintenance: Stage 2 (training_plan.PLAN_STAGE2) is now built and its new
 #  exercise names are included below. Any *future* block's new exercise names
-#  need an entry here too, or services.bioage will silently skip them (an
-#  exercise absent from this map counts toward no region at all, rather than
-#  raising).
+#  need an entry here too, or services.strength and services.tonnage will
+#  silently skip them (an exercise absent from this map counts toward no region
+#  at all, rather than raising). services.tonnage.weekly_tonnage returns the
+#  names it could not map as its second value, which is the cheapest way to
+#  notice; "Week 1 Self-Assessment" is the only expected member of that set.
 #
 #  "Week 1 Self-Assessment" is deliberately absent — it's a subjective
 #  checkpoint (pain/tightness self-rating), not a physical exercise with a

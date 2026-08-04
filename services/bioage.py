@@ -1,6 +1,26 @@
 """
 services/bioage.py — Strength BioAge scoring engine.
 
+⚠ THE SCORING HALF OF THIS MODULE IS RETIRED. As of 2026-08-04 nothing calls
+region_recovery_score / hero_score / region_baseline_ceiling /
+current_window_effort / has_weighted_training — the Strength screen is built
+from services/strength.py and services/tonnage.py instead. They are left here,
+still tested by tests/test_bioage.py, because deleting them means rewriting
+that suite, which is a separate decision.
+
+WHY IT WAS RETIRED, so nobody wires it back up: region_recovery_score is
+`min(100, current_28d / (best_ever_28d * cap) * 100)`, and
+region_baseline_ceiling maximises over every trailing window INCLUDING today's.
+The current window is therefore inside the set its own denominator maximises
+over, so the ratio cannot exceed 1 — the score reads a flat 100 for the whole
+first 28 days of any block and at every new peak. Measured on 2026-08-04 it had
+returned exactly one distinct value, 100.0, across all 16 days it had existed.
+Same one-sided saturating ratio readiness MODEL_VERSION 2 removed. It also
+measured the wrong thing: tonnage-in-a-window is training VOLUME, and volume is
+not strength — a deload lowers it and a heavier month leaves it unchanged.
+
+muscle_imbalance_count is NOT retired and is still rendered.
+
 Pure functions only — no I/O, no Streamlit, no hidden clock reads (mirrors
 services/engine.py's conventions: every date-dependent function takes an
 explicit `today` param). Computes the per-body-region "Stage-Adjusted

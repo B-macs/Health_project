@@ -314,7 +314,11 @@ def _tonnage_chart_svg(series: list, key: str, colour: str, label: str) -> str:
             f"Week of {x_labels[i]}\n{_kg(cell.kg)} kg\n"
             f"{cell.sets} loaded set{'' if cell.sets == 1 else 's'} · "
             f"{wk.training_days} training day{'' if wk.training_days == 1 else 's'}"
+            # Reps and seconds are reported separately and never summed — a
+            # hold is logged as 1 rep with the work in `tut`, so adding them
+            # would hide exactly the work these counters exist to show.
             + (f" · {_kg(cell.unloaded_reps)} unloaded reps" if cell.unloaded_reps else "")
+            + (f" · {_kg(cell.unloaded_seconds)}s held" if cell.unloaded_seconds else "")
         )
         if cell.kg <= 0:
             out += (
@@ -375,9 +379,18 @@ def _score_chart_svg(points: list[dict], colour: str) -> str:
         poly = " ".join(f"{x_at(i):.1f},{y_at(v):.1f}" for i, v in measured)
         out += (f'<polyline points="{poly}" fill="none" stroke="#6B7A9B" '
                 f'stroke-width="1.5" stroke-dasharray="3,3"/>')
-    for i, v in measured:
+    for n, (i, v) in enumerate(measured):
         out += (f'<g><title>Week of {x_labels[i]}\n{v:.1f} points measured</title>'
                 f'<circle cx="{x_at(i):.1f}" cy="{y_at(v):.1f}" r="3.5" fill="#6B7A9B"/></g>')
+        if n == 0:
+            # The grey series has to be named ON the chart. An SVG <title>
+            # never fires on touch and this app is mobile-first, so without
+            # this the second line is permanently unexplained on a phone —
+            # while running ABOVE the headline number, which invites reading
+            # it as a truer score being suppressed.
+            out += (f'<text x="{x_at(i) + 7:.1f}" y="{y_at(v) + 14:.1f}" font-size="9" '
+                    f'fill="#6B7A9B" font-family="ui-monospace,monospace">'
+                    f'{v:.1f} measured</text>')
 
     levels = [(i, p["level"]) for i, p in enumerate(points) if p["level"] is not None]
     if len(levels) > 1:
@@ -460,8 +473,7 @@ def _strength_readout_html(current: float | None, previous: float | None,
     if current is None or previous is None:
         delta_html, delta_sub, delta_col = "—", "no comparable previous week", _INK3
     else:
-        delta = current - previous
-        pct = None if previous == 0 else delta / previous * 100.0
+        delta, pct = tonnage_svc.change(current, previous)
         delta_col = _tone(delta)
         delta_html = (f'<span style="color:{delta_col}">{_signed(delta, points)}'
                       f"<u>{unit}</u></span>")
@@ -586,6 +598,13 @@ def _render_strength_detail() -> None:
         _strength_hero_html(data["overall"], data["calibrating"]),
         unsafe_allow_html=True,
     )
+    if data.get("load_error"):
+        st.warning(
+            "Training history could not be read, so every figure below is "
+            "showing its no-data state rather than your actual training — "
+            f"{data['load_error']}",
+            icon="⚠️",
+        )
 
     # ── Progress ──────────────────────────────────────────────────────────
     # Plain divs, not <h3>: styles.py's global h3 rule forces font-size:10px +
@@ -768,10 +787,14 @@ def _strength_screen_data() -> dict:
     page — the muscle-imbalance findings still render, since they read the
     clinical profile rather than the network. Same spirit as
     Repository.run_home_syncs' per-step (ok, error) contract."""
+    # A failure must not render as "you have never trained". The two are
+    # indistinguishable once the log is empty — overall 50.0, three regions at
+    # 50.0, every tonnage week zero — and only one of them is a real reading.
+    load_error: str | None = None
     try:
         rows = repo.get_repository().get_all_training_exercises_raw()
-    except Exception:
-        rows = []
+    except Exception as exc:
+        rows, load_error = [], f"{type(exc).__name__}: {exc}"
 
     today = date.today()
     movement_weights = {
@@ -812,6 +835,7 @@ def _strength_screen_data() -> dict:
     imbalances = patient_profile.PROFILE.get("imbalances", {})
     return {
         "today":           today,
+        "load_error":      load_error,
         "overall":         snapshot["overall"],
         "calibrating":     snapshot["calibrating"],
         "regions":         snapshot["regions"],

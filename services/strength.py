@@ -141,31 +141,34 @@ def exercise_index(e1rm_now: float, e1rm_2025: float) -> float | None:
     return e1rm_now / e1rm_2025 * 100.0
 
 
-def best_observations(
-    rows: list[dict],
-    today: date | None = None,
-) -> dict[str, Observation]:
-    """The most recent qualifying observation per exercise.
+def qualifying_rows(rows: list[dict], today: date):
+    """Every row that can produce an estimate, as (name, day, loaded_sets, rpe).
+
+    ONE gate, used by everything that counts or measures. A set only qualifies
+    if it carries both reps and a real external load — an unloaded rehab drill
+    has no 1RM to estimate and must not be invented one. Rows with no name, no
+    date, an unparseable date, or a date after `today` are dropped, so a caller
+    can replay history.
+
+    This exists as a shared generator rather than being written out at each
+    call site because it already diverged once: the observation COUNT that
+    feeds confidence was filtering on neither the date nor `today`, so a
+    future-dated or malformed row inflated `quantity`, and confidence is the
+    shrinkage weight that decides the displayed split.
 
     `rows` is Repository.get_all_training_exercises_raw()'s shape: dicts with
     `movement_name`, `session_date`, `sets` (a list of {reps, weight, ...}),
-    `exercise_rpe` and `session_rpe`. A set only qualifies if it carries both
-    reps and a real external load — an unloaded rehab drill has no 1RM to
-    estimate and must not be invented one.
-
-    Rows dated after `today` are ignored, so a caller can replay history."""
-    today = today or date.today()
-    latest: dict[str, Observation] = {}
+    `exercise_rpe` and `session_rpe`."""
     for row in rows:
         name = row.get("movement_name")
         raw_date = row.get("session_date")
         if not name or not raw_date:
             continue
         try:
-            session_date = date.fromisoformat(raw_date)
+            day = date.fromisoformat(raw_date)
         except (TypeError, ValueError):
             continue
-        if session_date > today:
+        if day > today:
             continue
         loaded = [
             s for s in (row.get("sets") or [])
@@ -176,6 +179,28 @@ def best_observations(
         rpe = row.get("exercise_rpe")
         if rpe is None:
             rpe = row.get("session_rpe")
+        yield name, day, loaded, rpe
+
+
+def observation_days(rows: list[dict], today: date | None = None) -> dict[str, set[date]]:
+    """The distinct DAYS each exercise was measured on, past the same gate the
+    estimates use. Days, not rows — two rows for one lift in one session are
+    one observation of it, not two."""
+    today = today or date.today()
+    out: dict[str, set[date]] = {}
+    for name, day, _loaded, _rpe in qualifying_rows(rows, today):
+        out.setdefault(name, set()).add(day)
+    return out
+
+
+def best_observations(
+    rows: list[dict],
+    today: date | None = None,
+) -> dict[str, Observation]:
+    """The most recent qualifying observation per exercise."""
+    today = today or date.today()
+    latest: dict[str, Observation] = {}
+    for name, session_date, loaded, rpe in qualifying_rows(rows, today):
         best: Observation | None = None
         for s in loaded:
             e1rm, eff, ok = estimated_1rm(float(s["weight"]), float(s["reps"]), rpe)
@@ -189,7 +214,14 @@ def best_observations(
         if best is None:
             continue
         prior = latest.get(name)
-        if prior is None or best.session_date >= prior.session_date:
+        # Later day wins outright. On the SAME day the heavier estimate wins —
+        # an exercise can occupy two rows in one session (a top set logged
+        # apart from the back-offs, or a re-log), and plain ">=" would let
+        # whichever happened to come last in query order overwrite the best
+        # set of the day and understate the index.
+        if (prior is None
+                or best.session_date > prior.session_date
+                or (best.session_date == prior.session_date and best.e1rm > prior.e1rm)):
             latest[name] = best
     return latest
 
@@ -500,14 +532,11 @@ def snapshot(
             "region": region_map.get(name), "observation": obs,
         }
 
-    # counted per exercise-day, so two sessions of a lift count twice
-    counts: dict[str, int] = {}
-    for row in rows:
-        name = row.get("movement_name")
-        if name not in per_exercise:
-            continue
-        if any((s.get("reps") or 0) and (s.get("weight") or 0) for s in (row.get("sets") or [])):
-            counts[name] = counts.get(name, 0) + 1
+    # Distinct measured DAYS per exercise, past the same gate the estimates
+    # use — so a future-dated or malformed row cannot inflate confidence, and
+    # two rows for one lift in one session count once.
+    counts = {name: len(days) for name, days in observation_days(rows, today).items()
+              if name in per_exercise}
 
     indices_by_region: dict[str, dict[str, float]] = {r: {} for r in REGIONS}
     comparability_by_region: dict[str, dict[str, float]] = {r: {} for r in REGIONS}

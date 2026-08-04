@@ -204,3 +204,53 @@ def test_axis_max_always_contains_the_peak():
 
 def test_axis_max_of_an_empty_series_is_still_drawable():
     assert tonnage.nice_axis_max(0.0) > 0
+
+
+# ── held and timed work is not a rep ────────────────────────────────────────
+
+def test_a_hold_is_counted_in_seconds_not_as_one_rep():
+    """services/sessions.py writes a hold as reps=1 with the work in `tut`, so
+    a 60-second plank and a single dead bug are both "1 rep". Summing reps
+    alone misrepresents exactly the work the counter exists to represent."""
+    rows = [_row("Dead Bug", "2026-07-27", [{"reps": 1, "weight": None, "tut": 60}] * 3)]
+    series, _ = tonnage.weekly_tonnage(rows, REGION_MAP, today=TODAY, weeks=4)
+    core = _week(series, "2026-07-27").value("core")
+    assert core.unloaded_seconds == 180.0
+    assert core.unloaded_reps == 0.0
+    assert core.kg == 0.0
+
+
+def test_reps_and_seconds_are_never_added_together():
+    """No exchange rate between a rep and a second is defined here, so the two
+    counters stay apart — the same reason a bodyweight hold never becomes kg."""
+    rows = [
+        _row("Dead Bug", "2026-07-27", [{"reps": 12, "weight": None, "tut": 0}] * 3),
+        _row("Pallof Press (Cable)", "2026-07-27",
+             [{"reps": 1, "weight": None, "tut": 45}] * 2),
+    ]
+    series, _ = tonnage.weekly_tonnage(rows, REGION_MAP, today=TODAY, weeks=4)
+    core = _week(series, "2026-07-27").value("core")
+    assert core.unloaded_reps == 36.0
+    assert core.unloaded_seconds == 90.0
+
+
+def test_a_loaded_set_that_also_has_tut_still_counts_as_tonnage():
+    """`tut` is recorded on loaded sets too. The load branch has to win, or a
+    weighted lift would fall out of tonnage entirely."""
+    rows = [_row("Lat Pulldown", "2026-07-27", [{"reps": 10, "weight": 40, "tut": 30}])]
+    series, _ = tonnage.weekly_tonnage(rows, REGION_MAP, today=TODAY, weeks=4)
+    upper = _week(series, "2026-07-27").value("upper_body")
+    assert upper.kg == pytest.approx(400.0)
+    assert upper.unloaded_seconds == 0.0
+
+
+@pytest.mark.parametrize("peak", [4.1, 9.99, 25.0, 60.0, 225.0, 999.0, 2775.0, 12345.0])
+def test_every_gridline_is_a_whole_number_of_kilograms(peak):
+    """The axis labels are formatted as integers, so a fractional quarter-step
+    prints wrong: a 25 kg core week gave a top of 30 with lines at
+    30/22.5/15/7.5/0 and labels reading 30/22/15/8/0."""
+    top = tonnage.nice_axis_max(peak)
+    assert top >= peak
+    for i in range(5):
+        line = top * i / 4
+        assert line == pytest.approx(round(line)), f"gridline {line} is not whole"
