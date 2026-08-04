@@ -20,7 +20,8 @@
       "Bash(git fetch *)",
       "Bash(git rev-list *)",
       "Bash(git check-ignore *)",
-      "PowerShell(git fetch origin)"
+      "PowerShell(git fetch origin)",
+      "PowerShell(git push origin main)"
     ]
   }
 }
