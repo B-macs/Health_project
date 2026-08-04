@@ -14,7 +14,7 @@ Build a highly private, data-driven Health and Performance Application that elim
 | **Execution** | Local only | Streamlit + Notion cloud DB | Notion provides structured database, relation properties, and a queryable API without a local server to maintain |
 | **Frontend / UI** | Streamlit + AG Grid | Streamlit + responsive CSS (no AG Grid in active use) | Data Grid page removed; responsive dual-theme (Oura/Whoop) CSS system replaces it |
 | **Database** | Local SQLite | Notion API — 4 databases | Notion selected; SQLite schema preserved in resume.md for reference but not in use |
-| **Biometrics source** | Manual Apple Health entry on Autoregulation page | Blended Oura + Garmin read (`services/biometrics.py`) — Oura 70%/Garmin 30% for HRV/RHR/sleep, Garmin 80%/Oura 20% for steps | Apple Health auto-export (Sheet1) proved unreliable; Oura/Garmin were already integrated archivally, so the engine now reads a weighted blend of both instead. Sheet1 is historical-only (one-time backfill source) |
+| **Biometrics source** | Manual Apple Health entry on Autoregulation page | Blended Oura + Garmin read (`services/biometrics.py`) — Oura 70%/Garmin 30% for RHR and sleep duration, Garmin 80%/Oura 20% for steps. **HRV is held at Oura-only** (`HRV_GARMIN_HOLD = True`): `blend_biometric_day` routes HRV around `blend_metric` entirely, so the declared 70/30 HRV weighting has never once run, and a Garmin-only night yields `None` rather than a wrist value rescaling a finger-baselined series. Lift it on a measurement, not a date — `Repository.hrv_blend_status()` | Apple Health auto-export (Sheet1) proved unreliable; Oura/Garmin were already integrated archivally, so the engine now reads a weighted blend of both instead. Sheet1 is historical-only (one-time backfill source) |
 | **Training entry** | Manual session logging via Training Entry page | Auto-logged by Training Plan on session completion | Training Entry page removed; logging is triggered by completing a guided day |
 
 ---
@@ -60,14 +60,14 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 
 ### SPA Navigation
 
-`app.py` is the single Streamlit entry point. Navigation is handled by a JS bridge (`nav.py`) that sets `st.session_state["_nav_page"]`; the router in `app.py` dispatches to the appropriate view. `_pages/` was removed — Streamlit 1.36+ auto-detects that directory as a multi-page app and renders an unwanted top-nav bar. All routing is handled by the `st.session_state["_nav_page"]` state machine in `app.py`; no `_pages/` stubs are needed.
+`app.py` is the single Streamlit entry point. Navigation is **four `st.button()` widgets** rendered by `nav.py` and pinned to the bottom of the viewport with CSS — **no JavaScript is involved**; each button's `on_click` sets `st.session_state["_nav_page"]`, which is a WebSocket rerun with no page reload, and the router in `app.py` dispatches to the appropriate view. Routing resolves as `st.session_state["_nav_page"] or st.query_params.get("page", "home")` — session state is primary, `?page=X` is the fallback for direct URLs and first load — and `app.py` mirrors the resolved page back into `?page=X` on every run so a WebSocket reconnect (screen lock, backgrounding, dropped connection) resumes on the right page. `_pages/` was removed — Streamlit 1.36+ auto-detects that directory as a multi-page app and renders an unwanted top-nav bar; no `_pages/` stubs are needed.
 
 | View module | Page | Purpose |
 |---|---|---|
-| `app.py` (home route) | Home | Dashboard: readiness summary, ACWR, traffic light, session directive |
+| `app.py` (home route) | Home | Dashboard: three cards — Readiness · Strain · Sleep — each opening a drill-down (`?d=<date>&view=readiness\|strain\|sleep`), plus prev/next-day navigation and the Check-In FAB. Card values come from `dashboard.compute_daily_metrics_snapshot`. ACWR, the traffic light and the session directive are **not** on Home — they render in Insights → Engine Data |
 | `views/checkin.py` | Morning Check-In | Daily readiness entry: pain score, tightness, sensation tags, lifestyle factors |
-| `views/training.py` | Training Plan | 14-day interactive rehab session guide with live timers, auto-logging, exit confirmation |
-| `views/insights.py` | AI Insights | Engine data tab (ACWR, biometrics, injury weight) + parser queue + tightness map + macro trends + MRI intelligence |
+| `views/training.py` | Training Plan | Interactive guided session runner for the active phase (Phase 1 → `training_plan.PLAN`, 21 days; Phase 2 → `training_plan.PLAN_STAGE2`, 28 days — mapped in `services/sessions.py::_PLAN_BY_PHASE_NUMBER`, so the day range is however many days are authored, never a fixed 14) with live timers, per-set capture, auto-logging and exit confirmation |
+| `views/insights.py` | Insights | Six tabs: BioAge (four category cards — only **Strength** is built: Overall Strength Score via `services/strength.py`, weekly tonnage via `services/tonnage.py`, muscle-imbalance count via `services/bioage.py`; Flexibility/Metabolism/Cardio are "coming soon"), Engine Data (stage progression, ACWR, biometric traffic light, injury weight), Processing Queue, Macro Trends (tightness map + multi-week trend analysis), Sleep Architecture, Sync |
 | `views/sync.py` | Voice Training | Embedded Voxplot voice-analysis UI |
 
 ### Removed Pages (intentionally)
@@ -84,7 +84,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `engine.py` | Pure deterministic maths — traffic light, ACWR, injury weight decay, stage state machine, volume recommendation. No DB access, no Streamlit. Derives per-stage ceilings from `rules.STAGE_CONSTRAINTS`. |
 | `rules.py` | Movement safety rules — `STAGE_CONSTRAINTS` (ACWR ceilings, RPE caps, volume caps per stage). `MOVEMENT_RULES` (contraindicated / caution / cleared). Single source of truth for guardrails. |
 | `repository.py` | The ONLY place Notion property names and Sheet column names live. ~40 methods wrapping `clients/notion.py`, `clients/sheets.py` and `clients/local_cache.py`. (There is no `db.py` or `sync_sheets.py` — both were replaced by this during the services/ extraction.) |
-| `training_plan.py` | Exercise prescription data — `PLAN` is the completed 14-day Stage 1 block; `PLAN_STAGE2` is the running 28-day Stage 2A block. Exercise specs, mechanics, biomechanical cues, progressions, regressions, pre-session release protocol integrated per day. |
+| `training_plan.py` | Exercise prescription data — `PLAN` is the completed Stage 1 block, **21 days** (authored as 14, extended to 21 on 2026-07-13 after the mid-back flare — Week 3 is "Flare Recovery & Reassessment Prep", Days 15-21); `PLAN_STAGE2` is the running 28-day Stage 2A block. Exercise specs, mechanics, biomechanical cues, progressions, regressions, pre-session release protocol integrated per day. |
 | `training_constants.py` | Single source for `EXERCISES` catalogue, `ANATOMICAL_LOCATIONS`, `SENSATION_TAGS`, plus `EXERCISE_BODY_REGION` (one primary sector per exercise — feeds `strength.py` and `tonnage.py`) and `EXERCISE_MOVEMENT_WEIGHT` (content-aware AU weighting for Strain/ACWR). |
 | `patient_profile.py` | Clinical input file — MRI findings + biomechanical assessment + muscle imbalance summary + `stage_transitions`. **Is** imported by active code: `views/insights.py` reads `PROFILE["imbalances"]` for the muscle-imbalance count. Updated before each new training block. |
 | `readiness.py` | Readiness score calculator, `MODEL_VERSION 2` (2026-08-01). Scored from Oura's eight contributors plus our own Sleep Debt, with our weights and our composite — **not** Oura's score taken directly: hrv_balance .21, recovery .17, prev_night .16, rhr .13, body_temp .12, sleep_debt .09, prev_activity .05, sleep_reg .04, activity_bal .03. v1's HRV 40 / Sleep 35 / RHR 25 split is gone; it used `min(100, ratio*100)`, one-sided and saturating, and ran ~15 points high. Alcohol is no longer deducted. |
@@ -95,7 +95,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `background_sync.py` | `BackgroundSyncRunner` — runs device syncs off the Streamlit script thread. Builds its OWN `Repository` per run and never touches `st.*`. |
 | `stats.py` | Deterministic statistical analysis — lag correlations, slopes, recovery direction. |
 | `styles.py` | Responsive dual-theme CSS + component helpers. Oura palette (mobile ≤768px) / Whoop palette (desktop ≥769px). |
-| `nav.py` | Bottom nav bar + JS bridge. Exposes `stNav(page)` in parent window; navigation is URL-based (`?page=X`). No hidden trigger buttons. |
+| `nav.py` | Bottom nav bar — four real `st.button()` widgets in `st.columns(4)`, pinned to the viewport bottom by CSS. **No JavaScript, no `stNav()`, no hidden trigger buttons**; the only markup it injects is a `display:none` `.stNavRow` marker div that the CSS uses as a `:has()` anchor to find the button row. `on_click` sets `st.session_state["_nav_page"]`. |
 | `ai.py` | Phase 2 AI layer — session note parser, tightness parser, macro trend analysis. Advisory only. `MODEL_FAST = MODEL_SMART = "rules-based"` (no LLM called). |
 
 ### Supporting Directories
@@ -301,10 +301,12 @@ Oura Daily / Oura Sleep Periods sheet tabs    Garmin Daily sheet tab
          Repository.get_biometric_rolling(days, today)
                             ↓  [reads all 3 tabs, groups by date]
          services.biometrics.blend_biometric_day(date, oura, garmin)
-                            ↓  [Oura 70%/Garmin 30% for HRV/RHR/sleep;
-                            ↓   Garmin 80%/Oura 20% for steps; renormalizes
-                            ↓   to 100% of whichever source is present if
-                            ↓   the other is missing that day]
+                            ↓  [Oura 70%/Garmin 30% for RHR/sleep;
+                            ↓   Garmin 80%/Oura 20% for steps; HRV bypasses
+                            ↓   the blend entirely while HRV_GARMIN_HOLD is
+                            ↓   True and is Oura's or None; renormalizes to
+                            ↓   100% of whichever source is present if the
+                            ↓   other is missing that day]
                   engine.traffic_light(biometric_rows)
                             ↓
       Directive → Training Plan banner (plain language)
@@ -353,7 +355,7 @@ Sync.
 
 | Engine Field | Oura Source | Garmin Source | Weights |
 |---|---|---|---|
-| `hrv_ms` | Sleep Periods tab, main sleep period `average_hrv` | Daily tab `hrv_ms` (from `get_hrv_data`) | Oura 70% / Garmin 30% |
+| `hrv_ms` | Sleep Periods tab, main sleep period `average_hrv` | Daily tab `hrv_ms` (from `get_hrv_data`) | **Oura 100%** — held by `HRV_GARMIN_HOLD`; the 70/30 is declared but has never run |
 | `resting_heart_rate` | Sleep Periods tab, main sleep period `lowest_heart_rate` | Daily tab `resting_hr` | Oura 70% / Garmin 30% |
 | `sleep_duration_hours` | Sleep Periods tab, main sleep period `total_sleep_duration` ÷ 3600 | Daily tab `sleep_hours` | Oura 70% / Garmin 30% |
 | `steps` | Daily tab `steps` (from `daily_activity`) | Daily tab `steps` | Garmin 80% / Oura 20% |
@@ -578,7 +580,7 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 
 12. **The keyword library above is the living document** for the deterministic parser. Update it in this file whenever new terms are added to the code.
 
-13. **Bottom nav (Home / Training / Insights / Sync) must be present and functional on every page at all times.** `nav.inject(active)` must be called on every route in `app.py`. The call must come *after* all page content is rendered so that the hidden trigger buttons appear below the cards, not above them. The FAB (+) for Check-In relies on the same JS bridge — do not remove or reorder `nav.inject()` without testing both the bottom bar and the FAB.
+13. **Bottom nav (Home / Training / Insights / Sync) must be present and functional on every page at all times.** `nav.inject(active)` must be called on every route in `app.py`. The call must come *after* all page content is rendered, because the nav is real `st.button()` widgets in document order — inject early and they appear above the cards. The FAB (+) for Check-In does **not** go through the nav at all: it is a plain `<a href="?page=checkin">`, the only real link in the app, which is precisely why `app.py` mirrors the resolved page back into `?page=X` (a reload after using the FAB would otherwise land back on Check-In). Do not remove or reorder `nav.inject()` without testing both the bottom bar and the FAB.
 
 ---
 
@@ -599,7 +601,20 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 
 ---
 
-*Last updated: 2026-08-04 — audit sweep against the code. The Core Modules table
+*Last updated: 2026-08-04 — second audit sweep, adversarially verified, over the
+"CURRENT APPLICATION STRUCTURE" section, which had drifted furthest. Five
+unhedged rows described code that no longer exists: navigation was called "a JS
+bridge (`nav.py`)" exposing `stNav(page)` when `nav.py` contains no JavaScript at
+all (four `st.button()` widgets — `stNav(` appears in zero `.py` files repo-wide,
+and the FAB is a plain `<a href>`, not the same bridge); Home was said to render
+ACWR, the traffic light and the session directive, all three of which are in
+Insights → Engine Data and return zero hits in `app.py`; the training runner was
+"14-day" when `PLAN` is 21 days and `PLAN_STAGE2` is 28 and the runner is
+phase-driven; the Insights row named four tabs including "MRI intelligence",
+deleted 2026-07-14 in `f386121` — there are six; and the biometrics row claimed a
+70/30 HRV blend that `HRV_GARMIN_HOLD` has always bypassed (also corrected in the
+pipeline diagram and the Blend Mapping table, which repeated it). Three of the
+five contradicted other lines in this same file. Before that, the same day — the Core Modules table
 still listed `db.py` and `sync_sheets.py`, neither of which exists (both became
 `services/repository.py` during the services/ extraction), gave readiness's
 retired v1 weights (HRV 40 / Sleep 35 / RHR 25) rather than `MODEL_VERSION 2`'s

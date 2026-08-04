@@ -11,8 +11,8 @@
 | Stage | **Stage 2** — Transition (external load) |
 | Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
 | Day | **Day 16 of 28** |
-| Gate | **1377/1377** — `python -m pytest tests/` |
-| Last commit | `350fcee` — Strength screen rebuilt on `services/strength.py` + `services/tonnage.py`; the Stage-Adjusted Recovery Score deleted |
+| Gate | **1475/1475** — `python -m pytest tests/` |
+| Last code commit | `7adab3b` — chart axis fitting + `tests/test_chart_axes.py` (`services/dashboard.py`, `styles.py`, `app.py`) |
 | Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required |
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
@@ -80,7 +80,7 @@ non-diagnostic until a stage has that many days behind it.
    `training_constants.EXERCISE_MOVEMENT_WEIGHT` (or they fall back to
    `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflate Strain/ACWR — this already
    happened once, across 34 of 63 Stage 1 exercise names).
-5. Run `python -m pytest tests/` — 1377/1377 or higher.
+5. Run `python -m pytest tests/` — 1475/1475 or higher.
 6. Update this file: block, day, gate, next action.
 
 ---
