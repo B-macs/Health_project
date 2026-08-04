@@ -69,7 +69,8 @@ from. Never duplicate those values.
    criteria were actually met, not merely stated.
 3. Build the block in `training_plan.py`.
 4. Add any new exercise names to **both** `training_constants.EXERCISE_BODY_REGION`
-   (or `services/bioage.py` silently drops them from every region) **and**
+   (or `services/strength.py` and `services/tonnage.py` silently drop them
+   from every region — `weekly_tonnage` returns the unmapped names) **and**
    `training_constants.EXERCISE_MOVEMENT_WEIGHT` (or they fall back to
    `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflate Strain/ACWR — this already
    happened once, across 34 of 63 Stage 1 exercise names).

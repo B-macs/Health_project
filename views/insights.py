@@ -126,9 +126,9 @@ def _bioage_card_html(key: str, href: str) -> str:
 #  min(100, current_28d / (best_ever_28d * cap) * 100) with the current window
 #  inside the set its own denominator maximised over — so it returned a flat
 #  100 for the whole first 28 days of any block and had produced exactly one
-#  distinct value across every day it existed. services/bioage.py's scoring
-#  functions are left in place and tested but are no longer wired to this
-#  screen; muscle_imbalance_count still is.
+#  distinct value across every day it existed. Those scoring functions have
+#  been deleted; services/bioage.py is now just the muscle-imbalance count,
+#  which this screen still renders.
 # ─────────────────────────────────────────────────────────────────────────────
 
 # Shared box dimensions for the illustrated cards (hero, muscle balance) so

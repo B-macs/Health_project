@@ -3,11 +3,12 @@ services/strength.py — the Overall Strength Score and its regional split.
 
 Pure functions only. No I/O, no Streamlit, no hidden clock reads — every
 date-dependent function takes an explicit `today`, same convention as
-services/engine.py and services/bioage.py.
+services/engine.py.
 
 WHAT THIS REPLACES, AND WHY
 ---------------------------
-services/bioage.py's Stage-Adjusted Recovery Score is
+The Stage-Adjusted Recovery Score this replaces (deleted from
+services/bioage.py on 2026-08-04) was
 `min(100, current_28d / (best_ever_28d * volume_cap) * 100)`, where
 `best_ever_28d` is maximised over every trailing window INCLUDING today's. The
 current window is therefore inside the set its own denominator maximises over,
