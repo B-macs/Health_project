@@ -13,7 +13,7 @@
 > **deleted** (Streamlit 1.36+ auto-detected it and rendered an unwanted
 > top-nav); the entire backend moved into `services/`, so root-level `db.py`,
 > `sync_sheets.py`, `engine.py` and `readiness.py` are gone; the gate is now
-> `python -m pytest tests/` at **1290** tests, not `python tests.py` at 141;
+> `python -m pytest tests/` at **1475** tests, not `python tests.py` at 141;
 > and the `Training plan/` duplicate directory has been removed.
 >
 > **For current state, read in this order:**

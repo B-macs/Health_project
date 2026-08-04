@@ -105,7 +105,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `views/` | `checkin.py`, `training.py`, `insights.py`, `sync.py` — SPA view modules |
 | `_pages/` | **Deleted** — triggered Streamlit 1.36+ auto top-nav; all routing is in `app.py` SPA router |
 | `scripts/` | One-shot CLI tools: `init_notion.py`, `build_datastore.py` (rebuilds `services/datastore.py`'s snapshot), `backfill_oura_history.py`, `backfill_garmin_sleep_stages.py`, `backfill_garmin_from_sheet1.py`, `compare_readiness_to_oura.py`, `merge_duplicate_checkins.py`, `prepare_bioage_illustrations.py`, `garmin_login_test.py` |
-| `docs/` | `INVENTORY.md`, `resume.md`, `focus.md`, `playbook.md`, `progress.json`, `training/*.md` |
+| `docs/` | `INVENTORY.md`, `resume.md`, `focus.md`, `playbook.md`, `clinical_profile_weighting.md`, `REFACTOR_NOTES.md`, `progress.json`, `training/*.md` |
 | `voice_training/voxplot` | Git submodule — standalone Voxplot voice-analysis source; Health pins its commit and embeds its renderer |
 
 ---
@@ -116,23 +116,49 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 
 **Traffic Light Biometric Autoregulation**
 
-Evaluates HRV, RHR, Sleep against 28-day rolling baseline:
+Evaluates HRV, RHR and Sleep against a 28-day rolling baseline, plus a **fourth
+metric — body-temperature deviation — against absolute cut points** (yellow
++0.35 °C, red +0.60 °C: a deviation has no meaningful ratio to a baseline, and
+it is one-sided, only warmth counts against you). It then applies the
+`baseline_drift` guard, which can downgrade green → yellow when the 28-day
+baseline has itself moved adversely against the window before it — pass the
+wider history as `traffic_light(..., drift_rows=)`, since a 28-row list alone
+leaves the guard a no-op.
 
 | Signal | Condition | Volume Multiplier | User-Facing Message |
 |---|---|---|---|
-| Green | Biometrics at or above baseline | 1.05× (overload) | Nothing shown — train normally |
+| Green | Biometrics at or above baseline | **1.0×** — the traffic light itself never overloads (pinned by `tests/test_engine.py`). The 1.05× progressive-overload prescription comes from `volume_recommendation`, and only once observation mode is over, ACWR is not hard-locked and injury weight ≤ 70% | Nothing shown — train normally |
 | Yellow | Drop within 10–25% | 0.75× | "Reduced load today — keep session controlled" |
 | Red | Drop >25% | 0.0× | "Rest day — mobility and walking only" |
 | Grey | Insufficient data (<7 days) | 1.0× | Nothing shown |
 
-**Directive delivery:** The directive surfaces as a plain-language banner at the top of the Training Plan page. Numeric data (ACWR, HRV delta, injury weight %) is never shown in Training Plan — only in AI Insights.
+**Directive delivery:** The directive surfaces as a plain-language banner at the
+top of the Training Plan page — a signal-colour strip plus the coach headline,
+which is `directive["action"]` verbatim. It is **not** true that no numbers reach
+that page: the headline names the injury-weight percentage on a conservative-load
+day, and while `ACWR_ADVISORY_MODE` is on the advisory caption below it carries
+the raw ACWR ratio. What stays in Insights → Engine Data is the numeric *panel* —
+ACWR acute/chronic/ceiling, HRV/RHR/sleep deltas against the 28-day baseline, and
+the raw injury-weight decay.
 
 **Acute-to-Chronic Workload Ratio (ACWR)**
 ```
-ACWR = 7-day avg session AU / 28-day avg session AU
+ACWR = 7-day avg content-weighted session AU
+     / avg content-weighted AU over the CURRENT stage's days inside the 28-day window
 Session AU = Session-RPE × Duration (minutes)   [Foster method]
+     Stored RAW in Notion; each day is scaled at READ time by
+     content_weighting.day_content_multiplier via get_daily_session_au_weighted,
+     which is what both live callers pass in.
+     Falls back to the flat 28-day mean when no stage_start is given, or when
+     fewer than ACWR_MIN_IN_STAGE_DAYS (14) of the window's days belong to the
+     current stage — in which case status is `baseline_establishing` and the
+     ratio never hard-locks.
 ```
-Stage 1 ACWR ceiling: 1.2. Stage 2: 1.3. Hard-lock triggers if exceeded.
+Stage 1 ACWR ceiling: 1.2. Stage 2: 1.3. **Not enforced right now** —
+`engine.ACWR_ADVISORY_MODE = True`, so a breach sets `exceeds_ceiling` and emits
+an advisory note (`volume_recommendation()["acwr_advisory"]`) but leaves
+`hard_locked` False. The ceiling itself is untouched; flipping that one flag back
+to False restores hard-locking with no other edit.
 
 **Injury Weight Decay**
 $$\text{Injury Weight} = e^{-\lambda t}$$
@@ -144,7 +170,9 @@ $$\text{Injury Weight} = e^{-\lambda t}$$
 **Volume Recommendation Cascade (priority order)**
 1. Observation mode (< 14 days biometric data) → hold at comfortable effort
 2. Red traffic light → rest/mobility only
-3. ACWR hard lock → cap at 75% volume
+3. ACWR hard lock → cap at 75% volume — **currently unreachable**, because
+   `ACWR_ADVISORY_MODE = True` forces `hard_locked` False; the breach rides
+   along as `rec["acwr_advisory"]` beside whatever the biometrics decided
 4. Yellow traffic light → 75% volume
 5. Injury weight > 70% (green bio) → 85% volume (conservative)
 6. All clear → 105% volume (progressive overload)
@@ -157,7 +185,7 @@ $$\text{Injury Weight} = e^{-\lambda t}$$
 |---|---|---|
 | Session note parser | Extracts body parts, sentiment, warning level from free-text | Keyword-to-tag matcher (see library below) |
 | Tightness parser | Converts subjective tightness text to severity + body parts | Keyword severity weights |
-| Macro trend analysis | Interprets lag correlations across 90-day dataset | Fixed lag-correlation (HRV drop → pain score 48h later) |
+| Macro trend analysis | Interprets lag correlations across 90-day dataset | Fixed lag-correlation matrix — `stats.compute_all_correlations`, 9 pairs: AU → HRV/RHR/pain/tightness (lags 1–3), sleep → HRV (0–1) and pain (1–2), stress → HRV (0–1) and pain/tightness (0–2). HRV is only ever a *target* series, never a predictor — there is no HRV → pain pair |
 | Movement risk assessment | Maps MRI findings + recent session notes to movement flags | Pre-populated movement contraindication list in `rules.py` |
 
 ---
@@ -218,7 +246,13 @@ improving trend should not restart the clock the way a fresh injury does.
 
 ## CLINICAL INPUT — `patient_profile.py`
 
-Updated before each new training block. Single source of truth for MRI findings and biomechanical assessment. **Not a UI page** — it is code that the training plan reads.
+Updated before each new training block. Single source of truth for MRI findings
+and biomechanical assessment. **Not a UI page** — it is the design-time clinical
+reference each training block is authored against (`training_plan.py` cites it in
+comments only; it does not import it). It is also live input now: `views/insights.py`
+imports it and passes `PROFILE["imbalances"]` to `bioage.muscle_imbalance_count`
+for the Strength screen, so edits to `imbalances` can break the gate
+(`tests/test_bioage.py` pins the count at 8).
 
 ### MRI (10.11.2025, DIE RADIOLOGIE Munich)
 
@@ -237,7 +271,7 @@ Updated before each new training block. Single source of truth for MRI findings 
 
 **Downstream:** Psoas/hip flexor hypertonicity (L1–L4 origin) amplifying L5/S1 foraminal compression
 
-### Biomechanical Profile (5 Assessed Findings)
+### Biomechanical Profile (6 Assessed Findings)
 
 | # | Finding | Structures | Training Implication |
 |---|---|---|---|
@@ -246,23 +280,37 @@ Updated before each new training block. Single source of truth for MRI findings 
 | 3 | Sitting forward-bend releases | Thoracic facets T6–T10, horizontal lumbar facets at L5/S1 | Thoracic extension work + thread-the-needle; posterior pelvic tilt for lumbar base |
 | 4 | 90° hip click RIGHT side only (painless) | Iliopsoas tendon over iliopectineal eminence | All right hip flexion cues: NEUTRAL or slight INTERNAL rotation — external rotation triggers snap |
 | 5 | Wide-stance windmill cracks | Anterior hip capsule, pubic symphysis, lumbar facet joints (rotation) | Lateral lunge, 90/90 flow, Pallof press address these — introduce wide stance slowly |
+| 6 | Right shoulder instability — maintenance-dependent, **NOT resolved** (3 anterior dislocations; a capsular repair that still permitted a third, then a Latarjet coracoid transfer; RIGHT only) | Right glenohumeral capsule/labrum (post-Latarjet), scapular stabilisers | Stability is now muscular, not ligamentous — scapular control work is a STANDING requirement, not optional conditioning. No overhead or standing press in Stage 2A; Incline DB Press is this block's pressing pattern instead |
 
 **Primary imbalance:** Under-firing glute max + deep core → upper glutes/hip flexors over-grip for artificial stability → compressed joints + snapping tendons.
 
 **Pre-session release protocol (runs at START of every session, ~5 min):**
 1. Upper Glute/TFL Self-Release — wall pressure, 2 × 90s each side
 2. Piriformis Contract-Relax (PNF) — 3 × 5 cycles each side
-3. *(Hip-focused sessions add)* Right Posterior Hip Capsule Cross-Body Stretch — 3 × 60s right only
+3. *(Hip-focused sessions add)* Right Posterior Hip Capsule Cross-Body Stretch — 3 × 60s right only; Ischial Tuberosity Hamstring Release — 2 × 90s each side
 4. *(Right hip loaded)* Right Hip Tendon Path Drill (Coxa Saltans) — 2 × 10 reps right only
 
 ---
 
-## 14-DAY TRAINING PLAN (Stage 1)
+## STAGE 1 TRAINING PLAN — 21 DAYS (COMPLETE, ran to 2026-07-19)
+
+`training_plan.PLAN` — Days 1-14 as originally authored, plus Days 15-21
+("Week 3: Flare Recovery & Reassessment Prep", added 2026-07-13 after the
+mid-back flare left the Day 14 exit criteria unmet). The Session Features below
+are phase-agnostic and drive both blocks — `views/training.py` resolves the plan
+through `services/sessions.py::_PLAN_BY_PHASE_NUMBER` — but the bodyweight
+prescription under Structure is Stage 1 only; Stage 2A is externally loaded.
 
 ### Structure
 - Hardcoded bodyweight prescription in `training_plan.py`
 - Interactive session guide in `views/training.py`
-- Day determined automatically from plan start date stored in Notion Config DB
+- Day number derived from the ACTIVE PHASE's `start_date` (phases are one JSON
+  blob under the Notion Config DB key `phases`), with a `date_overrides` entry
+  for that date winning over the `(d - start).days + 1` formula — that is how
+  `services/scheduling.py`'s readiness auto-shift moves a session day, and
+  `day_number 0` means forced rest. The separate `plan_start_date` config key
+  does NOT drive the day number: it gates the first-run setup screen, seeds
+  Phase 1, and feeds the "Plan Start" metric
 - Session completion auto-logs all exercises to Notion Training DB
 
 ### Session Features
@@ -270,15 +318,26 @@ Updated before each new training block. Single source of truth for MRI findings 
 - Live countdown timers: hold timer (isometric), rest timer (auto-starts after set complete), duration timer (walking, breathing)
 - Timer state persisted to browser `localStorage` — navigating away and returning resumes mid-timer
 - Session state persisted in `st.session_state` — navigate to any other page and return exactly where you left off
-- Exit Training button in sidebar (only visible when session is active) — requires confirmation before discarding progress
+- Exit Training button in the SESSION IN PROGRESS strip at the top of the Training page (only visible when a session is active) — requires confirmation before discarding progress. **There is no sidebar anywhere in this app** — it is suppressed in `app.py`, and `st.sidebar` has zero occurrences repo-wide
 - Rest timer auto-starts on entering rest phase; no Skip button (Next Set serves that function)
-- On completion: RPE slider + duration input + session notes → auto-logged to Notion
+- On completion: RPE slider + session notes → auto-logged to Notion. **Duration is not entered** — it is auto-timed from the first completed set (5-minute floor, falling back to `sessions.estimate_duration()` if no set was marked complete) and shown read-only as "Session duration: N min (auto-timed)"
 
 ### Week 1 Focus: Neural Reset (Days 1–7)
 Daily pre-session biomechanical release block → tissue tolerance, neural desensitisation, psoas inhibition, McGill protocol introduction, gluteal activation foundation, thoracic mobility, walking baseline
 
 ### Week 2 Focus: Neuromuscular Loading (Days 8–14)
 McGill protocol progression, functional hip hinge (RDL), single-leg stability, isometric endurance, functional integration (sit-to-stand, step-ups, plank), Day 14 stage readiness assessment
+
+### Week 3 Focus: Flare Recovery & Reassessment Prep (Days 15–21)
+Added 2026-07-13 after the mid-back flare left Day 14's exit criteria unmet.
+Still Stage 1 — bodyweight only, ACWR ceiling 1.2, RPE ceiling 7 — with session
+RPE targets held at Week-1 levels (3–5) rather than Week 2's, i.e. a gentle
+re-entry rather than a resumption. Right-shoulder scapular stability introduced
+as a standing requirement per biomechanical finding #6 (Scapular Wall Slide,
+Prone Y-Raise), the revised right hip capsule cue replacing the original
+cross-body version, and Day 21 repeating the full Day 14 assessment battery —
+McGill Big 3, single-leg balance eyes-closed, hip hinge full range, 5-minute
+walk + stair — for a directly comparable reassessment data point.
 
 ---
 
@@ -290,7 +349,7 @@ read — Sheet1/Apple Health auto-export was retired from the live pipeline
 
 ```
 Oura API (official)                    Garmin Connect (unofficial)
-        ↓  sync_oura_all(days=2)               ↓  sync_garmin_daily_if_due(days=2)
+        ↓  sync_oura_all(days=7)               ↓  sync_garmin_daily_if_due(days=2)
         ↓  [2h cache, app.py, on Home open]     ↓  [every 2h, Config-DB gated,
         ↓                                         stops for the day once
         ↓                                         today's check-in is in —
@@ -313,7 +372,8 @@ Oura Daily / Oura Sleep Periods sheet tabs    Garmin Daily sheet tab
       Full data + sources_missing flags → AI Insights → Engine Data tab
 
          Repository.sync_biometric_blend(days, today)   [same blend fn]
-                            ↓  [once/day, app.py; also on-demand full-
+                            ↓  [every 2h, app.py → run_home_syncs; also
+                            ↓   on-demand full-
                             ↓   history backfill button, Insights → Sync]
               Biometric Blend sheet tab (persisted, keyed by date)
                             ↓
@@ -328,7 +388,7 @@ Garmin have revised that day's raw reading since, or if the blend weights
 change. `sync_biometric_blend` persists each day's result once to its own
 "Biometric Blend" sheet tab; a day stops being touched (and so becomes a
 fixed historical record) once it falls outside whichever rolling window the
-next sync runs with (7 days for the daily auto-sync). This is what makes
+next sync runs with (7 days for the 2-hourly auto-sync). This is what makes
 "look back at last month" show a stable value rather than a live re-derivation.
 
 Sheet1/Apple Health: `Repository.get_sheet1_biometric_rolling()` /
@@ -357,7 +417,7 @@ Sync.
 |---|---|---|---|
 | `hrv_ms` | Sleep Periods tab, main sleep period `average_hrv` | Daily tab `hrv_ms` (from `get_hrv_data`) | **Oura 100%** — held by `HRV_GARMIN_HOLD`; the 70/30 is declared but has never run |
 | `resting_heart_rate` | Sleep Periods tab, main sleep period `lowest_heart_rate` | Daily tab `resting_hr` | Oura 70% / Garmin 30% |
-| `sleep_duration_hours` | Sleep Periods tab, main sleep period `total_sleep_duration` ÷ 3600 | Daily tab `sleep_hours` | Oura 70% / Garmin 30% |
+| `sleep_duration_hours` | Sleep Periods tab, **DAY TOTAL**: the deduped main sleep period **plus every remaining nap ≥ `biometrics.NAP_MIN_SECONDS` (900 s)**, ÷ 3600. The main period's own `total_sleep_duration` is kept separately as `oura_sleep_total_seconds`, the REM/deep denominator — duration counts naps, architecture does not | Daily tab `sleep_hours` | Oura 70% / Garmin 30% |
 | `steps` | Daily tab `steps` (from `daily_activity`) | Daily tab `steps` | Garmin 80% / Oura 20% |
 
 `weight_kg`, `active_kcal`, `sleep_deep_hours` are out of scope for the blend
@@ -375,9 +435,16 @@ Four databases, replacing the original SQLite schema. Equivalent data structure.
 | `NOTION_DB_READINESS` | `daily_readiness` | Date, Condition, Tightness (0–10), Pain (0–10), Body Areas (multi-select), Sensations (multi-select), Note, Tightness Score parsed, Stress Level (covers both stress and mental clarity), Alcohol Units, Travel. Plus (2026-07-14, `Repository.ensure_checkin_extension_columns`): Instability Events, Bristol Type, Unusual Stool Colour, Hunger Deviation, Thirst Intensity, Electrolytes Taken, Meditation Done (inferred from minutes > 0, not a UI toggle), Meditation Minutes, Relaxation Depth. Craving Type and Sodium (mg) were added then removed the same day — the Notion columns may still exist but are no longer read/written |
 | `NOTION_DB_TRAINING` | `training_log` + `training_set_log` | Movement, Session Date, Session ID, Type, Planned Sets/Reps, Exercise RPE, Sets (JSON), Session RPE, Session Duration, Session AU, Notes |
 | `NOTION_DB_BIOMETRICS` | `daily_biometrics` | Log Date, RHR, HRV, Sleep Hours, Deep Sleep Hours, Active kcal, Weight kg, Steps |
-| `NOTION_DB_CONFIG` | Config + `diagnostic_profile` | Key/Value store — plan_start_date, current_stage, diagnostic_profile (JSON), latest_movement_risk (JSON), injury_weight_decay_lambda |
+| `NOTION_DB_CONFIG` | Config + `diagnostic_profile` | Key/Value store — plan_start_date, current_stage, phases (JSON), training_progress (JSON), diagnostic_profile (JSON, which itself carries `injury_weight_decay_lambda` — it is not a flat Config row), latest_movement_risk (JSON), plus sync markers garmin_daily_last_synced_at / garmin_rate_limited_until |
 
-> **Note:** Biometrics DB is no longer written to by the app. Google Sheets is the authoritative source for biometric data, read directly by `sync_sheets.py`. The Notion biometrics DB is retained for backwards compatibility but receives no new writes.
+> **Note:** The Notion Biometrics DB is no longer written to by the app —
+> `Repository.save_biometrics_today` still exists but has zero callers; it is
+> retained for backwards compatibility and read-only use. Google Sheets remains
+> the biometric store, but **`sync_sheets.py` is gone**: its Sheet1 column
+> mapping was consolidated into `Repository._sheets_biometric_records`, which now
+> serves only the legacy Apple Health history and the Garmin backfill script.
+> The engine's live read is `Repository.get_biometric_rolling`, a live
+> Oura+Garmin blend off each platform's own Sheet tab — never Sheet1.
 
 ---
 
@@ -445,9 +512,18 @@ Recovery Break. They reuse the existing four-step explanation/countdown/
 results template; no acoustic calculation, Voice Quality score, recording
 protocol, or storage behaviour changed.
 
-Days 1-10 remain the original fixed baseline. The Training tab now exposes a
-separate selectable library containing all 22 activities: the 12 baseline
-cards plus these ten new cards. `EXERCISE_LIBRARY` is the single catalogue
+Days 1-10 were **replaced, not kept**: the 2026-07-31 revision of the pinned
+Voxplot submodule rebuilt them as a breath-led block, leading with breath/tension
+work every day, dropping Pulmo-Train from ten days to four, and scheduling eight
+of the ten cards above directly into the plan — leaving only
+`small_step_pitch_pattern` and `voice_recovery_break` library-only. Day 1 is now
+gated behind a daily "is your voice worse today?" readiness question. The
+Training tab exposes a separate selectable library containing all **26**
+activities: the 12 baseline cards, these ten, and four later breath/laryngeal
+cards (`diaphragmatic_breathing_reset`, `belly_breath_phonation`,
+`laryngeal_tension_release`, `breath_hold_awareness`). The 10-day plan now draws
+on 19 distinct library cards; the remaining 7 are library-only.
+`EXERCISE_LIBRARY` is the single catalogue
 for both the library and later plan authoring, so a future plan can mix and
 match its stable activity ids without duplicating definitions. `NEW_RECORDING`
 remains a daily-plan capture step, not a library activity.
@@ -456,7 +532,9 @@ Library practice is explicitly isolated from the daily plan: starting or
 finishing a library card uses the same explanation/countdown/results template
 but does not mark an item complete, change XP, streak, history, or plan
 progress, and does not auto-start the next planned activity. The library is
-available when the next baseline day is locked and after Day 10 is complete.
+available on the Training tab **at all times** — before the plan has started
+(beside the readiness gate), alongside each day's cards, while the next baseline
+day is locked, and after Day 10 is complete.
 
 Seven connected-speech cards now supply a stable three-sentence practice
 paragraph at the exact explanation step and throughout the timer: Pulmo-Train
@@ -505,7 +583,7 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 | **3** | Data Input Engine — Morning Check-In, Biometrics, Training | COMPLETE ✅ |
 | **4** | Autoregulation & ACWR Mathematical Engine | COMPLETE ✅ |
 | **5** | AI Text / MRI Parsing & Macro Trend Analysis | COMPLETE ✅ (Phase 1 deterministic + Phase 2 AI layer) |
-| **6** | 14-Day Interactive Training Plan (Stage 1 Rehab) | COMPLETE ✅ |
+| **6** | Interactive Training Plan (Stage 1 Rehab — authored as 14 days, ran to 21) | COMPLETE ✅ |
 | **7** | Google Sheets Biometric Auto-Sync | COMPLETE ✅ |
 | **8** | Responsive UI System (Oura/Whoop dual-theme) | COMPLETE ✅ |
 | **9** | Clinical Input Profile System (`patient_profile.py`) | COMPLETE ✅ |
@@ -521,36 +599,99 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 
 ## KEYWORD LIBRARY — DETERMINISTIC PARSER (Phase 1 Reference)
 
-### Sensation Tags
+### Sensation Tags — `services/ai.py` `_SENSATION_MAP`
 
-| Keyword(s) | Tag | Severity Weight |
-|---|---|---|
-| sharp, stabbing, shooting | Sharp | 4.0 |
-| burning, hot, fire | Burning | 3.5 |
-| tight, tightness, stiff, stiffness | Tight | 2.0 |
-| dull, ache, aching, throb | Dull Ache | 2.5 |
-| numb, numbness, tingle, tingling | Neural | 3.5 |
-| weak, weakness, gave way | Weakness | 3.0 |
-| normal, fine, good, great, easy | Normal | 0.0 |
+Substring match. `extract_sensation_types` returns EVERY tag whose keyword
+appears in the text, ordered by the map (neural first) — it is a list, not a
+single winner. There is **no per-tag severity weight**; severity is a separate
+table (below).
 
-### Anatomical Location Tags
-
-| Keyword(s) | Tag |
+| Keyword(s) | `sensation_type` |
 |---|---|
-| lower back, lumbar, L5, S1, disc | lower_back |
-| right side, right leg, right hip | right_side |
-| left side, left leg, left hip | left_side |
-| glute, glutes, buttock, sit bone, ischial | glute |
-| hip flexor, psoas, hip, groin | hip_flexor |
-| hamstring, back of leg | hamstring |
-| calf, achilles, ankle | lower_leg |
-| mid back, thoracic | mid_back |
-| neck, cervical | neck |
-| upper glute, hip crest, TFL | upper_glute |
-| piriformis, deep hip | piriformis |
+| pins and needles, shooting pain, shooting, radiating, radiate, electric, numbness, numb, tingling, burning, sciatica, down my leg / down the leg, into my foot / into the foot, weakness, weak leg | neural |
+| very sharp, sharp | sharp |
+| very tightened, very tight, tightened, tight | tight |
+| stiff | stiff |
+| dull ache, aching, throbbing, sore, ache, dull | dull_ache |
+| exhausted, fatigued, fatigue, heavy legs, heavy, tired | fatigue |
+| feels normal, normal, comfortable, fine, good | normal |
 
-### Background Watcher Trigger Terms (Stage 3 — re-activates conservative constraint)
-`shooting`, `nerve`, `numb`, `tingling`, `right leg`, `right foot`, `L5`, `S1`, `sciatica`, `disc`, `foraminal`, `snap`, `click`, `sit bone`, `ischial`
+**Severity is separate** — a keyword → 0-10 table (`_SEVERITY_TABLE`), and
+`infer_severity` scans the whole table and returns the HIGHEST match as a float
+(worst-case clinical conservatism): excruciating 10 · unbearable/agonising/agony 9 ·
+very sharp/severe 8 · very tight/very tightened/sharp/intense/radiating 7 ·
+significant 6 · persistent/constant/moderate 5 · dull ache/aching/ache/sore/tight/tightened 4 ·
+stiff/uncomfortable 3 · slightly tight/slightly tired/mild tiredness/mild/slight/slightly 2 ·
+minimal/barely 1 · no pain/pain free/pain-free/no tightness/feels normal/feels good/
+feeling good/all good/normal/fine/good 0.
+
+The check-in picker offers a third, different list — `training_constants.SENSATION_TAGS`:
+Normal, Tight, Stiff, Dull Ache, Sharp, Neural, Mild Tiredness, Very Tight, Slightly Tired.
+
+### Anatomical Location Tags — `services/ai.py` `_BODY_PART_MAP`
+
+The parser emits **20 canonical Title Case, laterality-qualified strings** — not
+snake_case tags. Phrases match in list order, laterality-qualified before
+generic, so "right glute" resolves before "glute". Note the emitted strings use
+an ASCII double hyphen (`--`) whereas the check-in picker's
+`training_constants.ANATOMICAL_LOCATIONS` spells the same regions with an em
+dash: only `Central Lower Back` and `Thoracic / Mid Back` are byte-identical
+across the two, so never compare parser output to the picker list directly.
+
+| Keyword(s) (laterality-qualified matched first) | Emitted location |
+|---|---|
+| right l5, l5/s1 right, l5 right, right side l5, l5/s1, l5-s1, l5 s1, s1 junction, lumbosacral junction, l5 | Lumbar -- L5/S1 (Right -- Primary) |
+| left l5, l5/s1 left, l5 left, left side l5 | Lumbar -- L5/S1 (Left) |
+| l4/l5, l4-l5, l4 l5, l4 | Lumbar -- L4/L5 (Left) |
+| l3/l4, l3-l4, l3 l4, l3 | Lumbar -- L3/L4 (Left) |
+| lower back, low back, lumbar, lumbosacral, l-spine | Central Lower Back |
+| right hip flexor, right psoas, right iliopsoas | Hip Flexor / Psoas -- Right |
+| left hip flexor / psoas / iliopsoas, hip flexor, psoas, iliopsoas | Hip Flexor / Psoas -- Left |
+| right sacroiliac, right si joint, right si | Sacroiliac Joint -- Right |
+| left sacroiliac / si joint / si, sacroiliac, si joint, sij | Sacroiliac Joint -- Left |
+| right glute medius, right glute med | Glute Medius -- Right |
+| left glute medius / glute med, glute medius, glute med | Glute Medius -- Left |
+| right glute, right buttock | Glute -- Right |
+| left glute / buttock, glute, gluteus, buttock | Glute -- Left |
+| right piriformis | Piriformis -- Right |
+| left piriformis, piriformis | Piriformis -- Left |
+| right hamstring | Hamstring -- Right |
+| left hamstring, hamstring | Hamstring -- Left |
+| right calf, right gastrocnemius, right soleus | Calf -- Right |
+| left calf / gastrocnemius / soleus, calf, gastrocnemius, soleus | Calf -- Left |
+| mid back, midback, middle back, thoracic, t-spine, upper back, between shoulder | Thoracic / Mid Back |
+
+`ANATOMICAL_LOCATIONS` additionally offers Upper Back — General / Rhomboids /
+Trapezius and Other in the check-in picker; the parser never emits those. There
+is **no** neck/cervical, upper-glute/TFL/hip-crest, or generic right-side /
+left-side location, and "disc", "deep hip", "achilles", "ankle", "sit bone",
+"ischial" and "groin" are not keywords. ("right side", "right leg", "right hip"
+appear only in `_MRI_INJURY_KEYWORDS`, which drives `correlates_with_injury`,
+not location tagging.)
+
+### Neural / urgent trigger terms — `services/stats.py`, applied at EVERY stage
+
+`auto_warning_level(text)` takes **no stage argument**, so this runs on every
+check-in and session note regardless of stage — it is not a Stage 3 feature.
+Urgent is tested first, but both lists resolve to the same warning level `"flag"`.
+
+`NEURAL_KEYWORDS` (20 terms): `shooting`, `radiating`, `radiate`, `electric`,
+`numb`, `numbness`, `tingling`, `pins and needles`, `weakness`, `weak leg`,
+`foot drop`, `dead leg`, `burning down`, `sciatica`, `sciatic`, `nerve pain`,
+`down my leg`, `down the leg`, `into my foot`, `into the foot`
+
+`URGENT_KEYWORDS` (11 terms, cauda equina red flags, checked first): `bowel`,
+`bladder`, `incontinence`, `saddle numbness`, `saddle anaesthesia`, `can't walk`,
+`cannot walk`, `loss of sensation`, `paralysis`, `paralysed`, `cauda equina`
+
+Injury-correlation terms — `services/ai.py` `_MRI_INJURY_KEYWORDS` (15 terms),
+matched against the canonical body-part labels returned by `extract_body_parts`,
+not against raw text, to set `correlates_with_injury`: `l5`, `s1`, `l4`, `l3`,
+`lower back`, `lumbar`, `hip flexor`, `psoas`, `glute`, `sacroiliac`, `si joint`,
+`right side`, `right leg`, `right hip`, `right back`
+
+Stage 3's "passive background watcher" (`rules.STAGE_CONSTRAINTS[3]["description"]`)
+is a label on the stage, not a separate term list — no such list exists in code.
 
 ---
 
@@ -564,9 +705,9 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 
 4. **No new dependency without justification.** State what it replaces and why the existing stack cannot handle it. Pin to exact version in `requirements.txt`.
 
-5. **Notion is the write backend; Google Sheets is the biometric read source.** Do not add manual biometric entry anywhere in the app. The pipeline is: Export Health App → Google Sheets → `sync_sheets.py` → engine.
+5. **Notion is the write backend; Oura + Garmin (blended) is the biometric read source.** Do not add manual biometric entry anywhere in the app. The pipeline is: Oura + Garmin APIs → their own Google Sheets tabs (`sync_oura_all` / `sync_garmin_daily_if_due`) → `services/biometrics.py`'s blend → `get_biometric_rolling` → engine. Sheet1/Apple Health is retired to historical-only. **`sync_sheets.py` no longer exists** — its Sheets primitives became `services/clients/sheets.py` and its column mappings became `services/repository.py`. The one sanctioned exception to "no manual entry" is the per-night wake-time correction (`get_wake_time_adjustment`/`set_wake_time_adjustment`), which is stored separately and never overwrites the raw reading.
 
-6. **Autoregulation is background.** The engine directive is exposed as plain language in the Training Plan only. Numeric metrics (ACWR, HRV delta, injury weight %) appear in AI Insights → Engine Data tab only.
+6. **Autoregulation is background.** The engine directive reaches the Training Plan as plain language, and a small fixed set of engine numbers rides along with it there: the injury-weight % embedded in the CONSERVATIVE LOAD directive text, the ACWR advisory caption (shown while `ACWR_ADVISORY_MODE` is set, and also whenever the stage baseline is still establishing), and the readiness-modifier badge. Everything else — HRV/RHR deltas, ACWR acute/chronic averages, traffic-light data days, the raw injury-weight decay — stays in Insights → Engine Data. "No numbers in Training Plan" is the intent, not a literal invariant.
 
 7. **Training sessions are logged automatically by the Training Plan.** No manual training entry page. Do not re-add one.
 
@@ -574,13 +715,13 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 
 9. **Right-side asymmetry is a clinical finding, not a preference.** All exercises involving right hip flexion >60° require a neutral/internal rotation cue. All right posterior hip capsule mobilisation is unilateral (right only). Document this wherever it appears.
 
-10. **`patient_profile.py` is updated before each new training block.** After each block's reassessment, update findings, imbalances and stage exit criteria — and append a `stage_transitions` record, which is the evidence the criteria were actually met rather than merely stated — before generating the next plan. Note the file is now also a live import (`services/bioage.py` reads `PROFILE["imbalances"]`), so edits there can break the gate.
+10. **`patient_profile.py` is updated before each new training block.** After each block's reassessment, update findings, imbalances and stage exit criteria — and append a `stage_transitions` record, which is the evidence the criteria were actually met rather than merely stated — before generating the next plan. Note the file is now live input as well as human reference — `views/insights.py` reads `PROFILE["imbalances"]` and passes it to `bioage.muscle_imbalance_count`, and `tests/test_bioage.py` pins the count at 8 — so edits to `imbalances` can break the gate. `services/bioage.py` itself imports nothing; it takes the dict as a parameter, which is what keeps `services/` free of I/O.
 
 11. **Every new function needs a one-line comment** stating whether it is `DETERMINISTIC` or `AI-LAYER` and what its fallback is if it fails.
 
 12. **The keyword library above is the living document** for the deterministic parser. Update it in this file whenever new terms are added to the code.
 
-13. **Bottom nav (Home / Training / Insights / Sync) must be present and functional on every page at all times.** `nav.inject(active)` must be called on every route in `app.py`. The call must come *after* all page content is rendered, because the nav is real `st.button()` widgets in document order — inject early and they appear above the cards. The FAB (+) for Check-In does **not** go through the nav at all: it is a plain `<a href="?page=checkin">`, the only real link in the app, which is precisely why `app.py` mirrors the resolved page back into `?page=X` (a reload after using the FAB would otherwise land back on Check-In). Do not remove or reorder `nav.inject()` without testing both the bottom bar and the FAB.
+13. **Bottom nav (Home / Training / Insights / Voice Training) must be present and functional on every page at all times.** The fourth item's route key is still `"sync"` (`nav.py`'s `_ITEMS`), which is why `app.py` dispatches it to `views/sync.py` — but that route is the embedded Voxplot Voice Training page; device-sync controls live in the Insights → Sync tab, not on the nav. `nav.inject(active)` must be called on every route in `app.py`. The call must come *after* all page content is rendered, because the nav is real `st.button()` widgets in document order — inject early and they appear above the cards. The FAB (+) for Check-In does **not** go through the nav at all: it is a plain `<a href="?page=checkin">`, the only real link in the app, which is precisely why `app.py` mirrors the resolved page back into `?page=X` (a reload after using the FAB would otherwise land back on Check-In). Do not remove or reorder `nav.inject()` without testing both the bottom bar and the FAB.
 
 ---
 
@@ -601,7 +742,35 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 
 ---
 
-*Last updated: 2026-08-04 — second audit sweep, adversarially verified, over the
+*Last updated: 2026-08-04 — third and final audit sweep, 63 findings across six
+section auditors each adversarially verified, covering the whole file rather than
+one section. Corrected, in code order: the traffic light evaluates a FOURTH metric
+(body-temperature deviation, absolute cut points, not a baseline ratio) and
+applies the `baseline_drift` guard; green's multiplier is **1.0×, not 1.05×** —
+the light itself never overloads, `volume_recommendation` does, and only under
+three further conditions; ACWR's chronic term is stage-scoped and content-weighted,
+not a flat 28-day mean of raw AU; the ACWR hard lock is **currently unreachable**
+because `ACWR_ADVISORY_MODE` is on; the lag-correlation fallback is a 9-pair
+matrix in which HRV is only ever a target, so the documented "HRV drop → pain 48h
+later" pair does not exist. Clinically: the Biomechanical Profile listed **5
+findings when `patient_profile.py` holds 6** — the missing one is the right
+shoulder instability (three dislocations, a failed capsular repair, then a
+Latarjet), which is why scapular control is a standing requirement and why there
+is no overhead press in Stage 2A; and the pre-session release protocol omitted
+the Ischial Tuberosity Hamstring Release. The Stage 1 plan section was headed
+"14-DAY" and stopped at Week 2, when `PLAN` is 21 days with a Week 3 flare-recovery
+block; the day number comes from the active phase's `start_date` and its
+`date_overrides` (which is how the readiness auto-shift moves a day), not from
+`plan_start_date`; the Exit Training button was placed "in sidebar" when the app
+has no sidebar at all; and the completion form was said to take a duration input
+when duration is auto-timed and read-only. Pipeline figures: `sync_oura_all` runs
+at `days=7` not 2, and the blend persists every 2h, not once a day. The entire
+KEYWORD LIBRARY section was fiction — a "Severity Weight" column that exists
+nowhere, snake_case location tags that no code emits (the parser emits 20
+Title Case laterality-qualified strings), and a "Background Watcher Trigger Terms
+(Stage 3)" list that is neither stage-gated nor a real list. Voxplot: days 1-10
+were rebuilt, not kept, the library holds 26 activities not 22, and it is
+available at all times. Before that, the second sweep over the
 "CURRENT APPLICATION STRUCTURE" section, which had drifted furthest. Five
 unhedged rows described code that no longer exists: navigation was called "a JS
 bridge (`nav.py`)" exposing `stNav(page)` when `nav.py` contains no JavaScript at
