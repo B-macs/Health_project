@@ -12,6 +12,8 @@ Caller is responsible for st.set_page_config(), styles.inject_css(), nav.inject(
 import base64
 import calendar as cal_mod
 import json
+import math
+import os
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import date, timedelta
@@ -23,6 +25,7 @@ import pandas as pd
 
 import patient_profile
 import repo
+import strength_baselines
 import styles
 import training_constants
 from services import ai
@@ -32,6 +35,8 @@ from services import engine
 from services import stats as stats_mod
 from services import insights as insights_svc
 from services import plan as plan_svc
+from services import strength as strength_svc
+from services import tonnage as tonnage_svc
 from services import volume as volume_svc
 
 
@@ -103,370 +108,573 @@ def _bioage_card_html(key: str, href: str) -> str:
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  Strength BioAge detail screen (tab_bioage → ?bioage=strength).
-#  Premium dark-mode hero/progress/body-regions/muscle-balance/assessment
-#  layout. Copy, illustrations and layout are the real UI; every *computed*
-#  value (scores, dates, counts, chart history) is a placeholder (None) in
-#  _STRENGTH_SCREEN below until the BioAge engine exists to fill it in.
+#
+#  Two metrics, kept conceptually apart and sharing no term:
+#
+#    Overall Strength Score  — estimated strength CAPACITY, in points, where
+#      100 is the 2025 peak. services/strength.py. Moves on repeatable
+#      performance and estimated-1RM trend; a heavier training week cannot
+#      raise it on its own.
+#    Weekly tonnage          — the WORK COMPLETED in one week, in kilograms,
+#      overall and per body sector. services/tonnage.py. No decay, no
+#      carry-over; a week with no eligible loaded sets is zero.
+#
+#  One dropdown selects which of the five series the progress display shows,
+#  and the axis, unit, readout and tooltips follow it.
+#
+#  Replaces the Stage-Adjusted Recovery Score, which was
+#  min(100, current_28d / (best_ever_28d * cap) * 100) with the current window
+#  inside the set its own denominator maximised over — so it returned a flat
+#  100 for the whole first 28 days of any block and had produced exactly one
+#  distinct value across every day it existed. Those scoring functions have
+#  been deleted; services/bioage.py is now just the muscle-imbalance count,
+#  which this screen still renders.
 # ─────────────────────────────────────────────────────────────────────────────
 
-_MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-# Shared box dimensions for every illustrated card on this screen (hero, body
-# region rows, muscle balance) so they all render at the same on-screen size,
-# growing proportionally on a wide desktop card rather than staying a fixed
-# height; min/max-height clamp the two ends (enough room for text on mobile,
-# not absurdly tall on an ultrawide monitor). The 5 derived illustrations
-# (see prepare_bioage_illustrations.py) each keep their own native aspect
-# ratio — deliberately minimally cropped, nothing forced to match this box's
-# ratio — and render via background-size:contain so the full image is always
-# visible, letterboxed against this shared box rather than cropped to fill it.
+# Shared box dimensions for the illustrated cards (hero, muscle balance) so
+# they render at the same on-screen size, growing proportionally on a wide
+# desktop card rather than staying a fixed height; min/max-height clamp the two
+# ends. The derived illustrations keep their own native aspect ratio and render
+# via background-size:contain, so the full image is always visible.
 _CARD_DIMENSIONS_CSS = "aspect-ratio:1194/356;min-height:220px;max-height:420px;"
 
-_STRENGTH_SCREEN: dict = {
-    "hero": {
-        "title":          "Strength BioAge",
-        # "value" (0-100 Stage-Adjusted Recovery Score, an average of the 3
-        # region scores below) is computed at render time by
-        # _strength_bioage_scores() — see services/bioage.py. Stays None
-        # ("—" on screen) until at least one region has real logged weighted
-        # training volume; bodyweight-only rehab work never produces a score.
-        "value":          None,
-        "unit":           "%",
-        "description":    "",
-        "illustration":   _BIOAGE_BG_DIR / "derived" / "strength_hero.png",
-        "accent_color":   _BIOAGE_COLORS["strength"],
-        "cta_label":      "Assistance",
-        "cta_icon":       "🎙️",
-    },
-    "progress": {
-        "title":            "Progress",
-        "subtitle":         "",
-        "updated_label":    "Updated on",
-        "updated_value":    None,   # blank
-        "real_age_label":   "Real age",
-        "real_age_value":   None,   # blank
-        "chart_points":     [],     # list[(month_index 0-11, value)] — blank
-        "y_min":            None,
-        "y_max":            None,
-        "button_label":     "Show All Progress",
-    },
-    # Each "score" below is filled in at render time from
-    # _strength_bioage_scores()["region_scores"][id] — the static None here
-    # is just the shape/fallback if that lookup ever comes back empty.
-    "body_regions": [
-        {
-            "id": "upper_body", "name": "Upper body", "score": None, "unit": "%",
-            "illustration": _BIOAGE_BG_DIR / "derived" / "upper_body.png",
-            "accent_color": _BIOAGE_COLORS["strength"],
-        },
-        {
-            "id": "core", "name": "Core", "score": None, "unit": "%",
-            "illustration": _BIOAGE_BG_DIR / "derived" / "core.png",
-            "accent_color": _BIOAGE_COLORS["strength"],
-        },
-        {
-            "id": "lower_body", "name": "Lower body", "score": None, "unit": "%",
-            "illustration": _BIOAGE_BG_DIR / "derived" / "lower_body.png",
-            "accent_color": _BIOAGE_COLORS["strength"],
-        },
-    ],
-    "muscle_balance": {
-        "title":            "Muscle balance analysis",
-        "summary":          "",
-        # Filled in at render time from _strength_bioage_scores()
-        # ["imbalance_count"] — a real count from patient_profile.PROFILE's
-        # documented clinical findings, not training-history-dependent.
-        "imbalance_count":  None,
-        "illustration":     _BIOAGE_BG_DIR / "derived" / "muscle_balance.png",
-        "cta_label":        "View All",
-    },
-    "assessment": {
-        "title":        "Test your strength",
-        "description":  (
-            "Perform a strength test to get your muscle balance analysis "
-            "and update your Strength BioAge."
-        ),
-        "primary_cta":          "Start Assessment",
-        "completion_progress":  None,   # blank
-    },
+_STRENGTH_FACEPLATE_DIR = _BIOAGE_BG_DIR / "body_faceplates_v2"
+
+# The three faceplates stack into one continuous figure, so they must render
+# at the SAME displayed width with each image's own aspect ratio preserved —
+# resizing their heights independently would break the join. Native sizes.
+_STRENGTH_REGIONS: tuple[dict, ...] = (
+    {"id": "upper_body", "name": "Upper body", "colour": "#FF8C42", "ratio": "893/640"},
+    {"id": "core",       "name": "Core",       "colour": "#E8B04B", "ratio": "893/428"},
+    {"id": "lower_body", "name": "Lower body", "colour": "#D9663A", "ratio": "893/534"},
+)
+
+# label → (series key, unit, short unit, accent). "score" is the strength
+# metric; the other four are tonnage. Order is the dropdown's order.
+_STRENGTH_METRICS: dict[str, dict] = {
+    "Overall Strength Score":   {"key": "score",      "unit": "points", "short": "pts", "colour": "#FF8C42"},
+    "Overall Strength Tonnage": {"key": "overall",    "unit": "kg",     "short": "kg",  "colour": "#FF8C42"},
+    "Upper Body Tonnage":       {"key": "upper_body", "unit": "kg",     "short": "kg",  "colour": "#FF8C42"},
+    "Core Tonnage":             {"key": "core",       "unit": "kg",     "short": "kg",  "colour": "#E8B04B"},
+    "Lower Body Tonnage":       {"key": "lower_body", "unit": "kg",     "short": "kg",  "colour": "#D9663A"},
 }
 
+# Weeks of history in the progress display. Six bars is what the 640-unit
+# chart can label without crowding, and it is a rolling window — a week with
+# no eligible work is drawn as an explicit zero rather than dropped, so the
+# series is always exactly this long.
+_STRENGTH_WEEKS: int = 6
 
-def _progress_chart_svg(
-    points: list[tuple[int, float]],
-    y_min: float | None,
-    y_max: float | None,
-    accent: str,
-    width: int = 640,
-    height: int = 220,
-) -> str:
-    """Minimal medical-style line chart: dashed gridlines, Jan-Dec x-axis,
-    optional y-range, single highlighted (latest) point. Renders an empty
-    grid with no plotted point when `points` is empty."""
-    pad_l, pad_r, pad_t, pad_b = 34, 14, 14, 24
-    iw, ih = width - pad_l - pad_r, height - pad_t - pad_b
-    has_range = y_min is not None and y_max is not None and y_max > y_min
-    lo, hi = (y_min, y_max) if has_range else (0.0, 1.0)
+_INK, _INK2, _INK3 = "#F4F6FB", "#9AA3B2", "#5A6377"
+_PANEL, _HAIR = "#0E1018", "rgba(255,255,255,0.06)"
+_GOOD, _WARN, _BAD = "#6BAF8B", "#BFA06A", "#C47878"
 
-    def x_for(m: float) -> float:
-        return pad_l + (m / 11) * iw
+_STRENGTH_CSS = f"""
+<style>
+[data-testid="stMainBlockContainer"][data-testid="stMainBlockContainer"]
+  {{max-width:1600px !important;margin-left:auto !important;margin-right:auto !important;}}
 
-    def y_for(v: float) -> float:
-        return pad_t + (1 - (v - lo) / (hi - lo)) * ih
+/* the metric picker, restyled onto the screen's dark palette */
+.st-key-strength_metric label {{ display:none !important; }}
+.st-key-strength_metric div[data-baseweb="select"] > div {{
+  background:rgba(255,255,255,.06) !important; border:1px solid {_HAIR} !important;
+  border-radius:9px !important; color:{_INK} !important; font-weight:600 !important; }}
+.st-key-strength_metric div[data-baseweb="select"] svg {{ fill:{_INK2} !important; }}
+.st-key-strength_metric div[data-baseweb="select"] div {{ font-size:12.5px !important; }}
+.st-key-strength_metric {{ max-width:250px; margin-left:auto; }}
 
-    n_rows = 4
-    grid, y_ticks = [], []
-    for i in range(n_rows + 1):
-        frac = i / n_rows
-        gy = pad_t + frac * ih
-        grid.append(
-            f'<line x1="{pad_l}" y1="{gy:.1f}" x2="{width - pad_r}" y2="{gy:.1f}" '
+.sb-readout {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px;
+  background:{_PANEL}; border:1px solid {_HAIR}; border-radius:14px;
+  padding:14px 18px; margin-top:10px; }}
+.sb-readout .k {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.13em; text-transform:uppercase; color:{_INK3}; }}
+.sb-readout .v {{ font-size:22px; font-weight:600; color:{_INK}; margin-top:8px;
+  line-height:1.1; font-variant-numeric:tabular-nums; }}
+.sb-readout .v u {{ text-decoration:none; font-size:12px; font-weight:400;
+  color:{_INK2}; margin-left:5px; }}
+.sb-readout .p {{ font-size:11.5px; margin-top:5px; font-variant-numeric:tabular-nums; }}
+@media (max-width:520px) {{ .sb-readout {{ grid-template-columns:1fr 1fr; }} }}
+
+.sb-chartbox {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:16px;
+  padding:12px 8px 4px; margin:10px 0 18px; }}
+
+.sb-splitbar {{ display:flex; height:12px; border-radius:6px; overflow:hidden;
+  background:rgba(255,255,255,.05); margin:6px 0 0; }}
+.sb-splitbar i {{ display:block; height:100%; }}
+.sb-splitkey {{ display:flex; flex-wrap:wrap; gap:16px; margin:9px 0 14px;
+  font-size:11.5px; color:{_INK2}; }}
+.sb-splitkey span {{ display:inline-flex; align-items:center; gap:7px; }}
+.sb-splitkey b {{ width:9px; height:9px; border-radius:3px; display:inline-block; }}
+
+/* Body parts: three plates stacked into one continuous figure. Same displayed
+   width, each keeping its own aspect ratio. */
+.sb-bp {{ --fig:330px; }}
+.sb-region {{ display:grid; grid-template-columns:minmax(0,1fr) var(--fig);
+  align-items:center; gap:18px; position:relative; }}
+.sb-region .txt {{ padding:4px 0 4px 20px; border-bottom:1px solid {_HAIR};
+  align-self:stretch; display:flex; flex-direction:column; justify-content:center; }}
+.sb-region:last-child .txt {{ border-bottom:0; }}
+.sb-region .nm {{ font-size:20px; font-weight:700; margin-bottom:4px; }}
+.sb-region .sc {{ font-size:26px; font-weight:300; color:{_INK};
+  font-variant-numeric:tabular-nums; }}
+.sb-region .sc u {{ text-decoration:none; font-size:12px; color:{_INK2}; margin-left:6px; }}
+.sb-region .sc s {{ text-decoration:none; font-size:20px; color:{_INK2}; margin-left:9px; }}
+.sb-region .idx {{ font-size:12px; color:{_INK2}; margin-top:6px;
+  font-variant-numeric:tabular-nums; }}
+.sb-region .idx em {{ font-style:normal; font-weight:600; color:{_INK}; }}
+.sb-cbar {{ height:3px; border-radius:2px; background:rgba(255,255,255,.08);
+  margin-top:9px; max-width:190px; overflow:hidden; }}
+.sb-cbar i {{ display:block; height:100%; border-radius:2px; }}
+.sb-cnote {{ font:600 9px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.1em; text-transform:uppercase; margin-top:5px; }}
+
+.sb-plate {{ width:var(--fig); background-repeat:no-repeat; background-size:100% 100%;
+  transition:opacity 160ms ease, filter 160ms ease; }}
+.sb-plate.off {{ opacity:.22; filter:grayscale(1); }}
+/* Hovering the strip dims every plate; hovering ONE region lights that plate.
+   The .off plate (a region with no confidence yet) starts dimmed, and a rule
+   that dims the rest will also catch its OWN hover at equal specificity — so
+   the row-hover rules name .off explicitly and come last, or pointing at core
+   makes it darker instead of lighting it up. */
+.sb-bp:hover .sb-plate {{ opacity:.45; }}
+.sb-bp:hover .sb-plate.off {{ opacity:.18; }}
+.sb-bp .sb-region:hover .sb-plate,
+.sb-bp .sb-region:hover .sb-plate.off {{ opacity:1; filter:none; }}
+@media (max-width:900px) {{ .sb-bp {{ --fig:240px; }} .sb-region {{ gap:12px; }} }}
+@media (max-width:640px) {{ .sb-bp {{ --fig:168px; }} .sb-region .txt {{ padding-left:16px; }} }}
+
+.sb-imblist {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:16px;
+  padding:6px 18px 14px; }}
+.sb-imblist .grp {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:2px; text-transform:uppercase; color:{_INK3}; margin:14px 0 8px; }}
+.sb-imblist .i {{ display:flex; gap:10px; align-items:baseline; font-size:12.5px;
+  color:#C8CDD8; padding:4px 0; }}
+.sb-imblist .i b {{ width:6px; height:6px; border-radius:50%; flex:none;
+  transform:translateY(-1px); }}
+</style>
+"""
+
+
+def _kg(value: float) -> str:
+    return f"{value:,.0f}"
+
+
+def _signed(value: float, points: bool) -> str:
+    sign = "" if abs(value) < 5e-2 else ("−" if value < 0 else "+")
+    return f"{sign}{abs(value):.1f}" if points else f"{sign}{_kg(abs(value))}"
+
+
+def _tone(value: float) -> str:
+    if abs(value) < 5e-2:
+        return _INK2
+    return _GOOD if value > 0 else _BAD
+
+
+def _svg_frame(y_labels: list[str], x_labels: list[str], w: int, h: int,
+               pl: int, pr: int, pt: int, pb: int) -> str:
+    """Dashed gridlines + axis labels, the geometry the whole screen uses."""
+    iw, ih = w - pl - pr, h - pt - pb
+    out, n = "", len(y_labels) - 1
+    for i, label in enumerate(y_labels):
+        gy = pt + (i / n) * ih
+        out += (
+            f'<line x1="{pl}" y1="{gy:.1f}" x2="{w - pr}" y2="{gy:.1f}" '
             f'stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="2,4"/>'
+            f'<text x="{pl - 8}" y="{gy + 4:.1f}" text-anchor="end" font-size="10" '
+            f'fill="{_INK3}" font-family="system-ui">{label}</text>'
         )
-        label = f"{hi - frac * (hi - lo):.0f}" if has_range else "—"
-        y_ticks.append(
-            f'<text x="{pad_l - 8}" y="{gy + 4:.1f}" text-anchor="end" font-size="10" '
-            f'fill="#5A6377" font-family="system-ui">{label}</text>'
-        )
-
-    x_labels = []
-    for i, m in enumerate(_MONTH_LABELS):
-        gx = x_for(i)
-        x_labels.append(
-            f'<line x1="{gx:.1f}" y1="{pad_t}" x2="{gx:.1f}" y2="{height - pad_b}" '
+    for i, label in enumerate(x_labels):
+        gx = pl + (i / max(1, len(x_labels) - 1)) * iw
+        out += (
+            f'<line x1="{gx:.1f}" y1="{pt}" x2="{gx:.1f}" y2="{h - pb}" '
             f'stroke="rgba(255,255,255,0.04)" stroke-width="1"/>'
-            f'<text x="{gx:.1f}" y="{height - 6}" text-anchor="middle" font-size="9" '
-            f'fill="#5A6377" font-family="system-ui">{m}</text>'
+            f'<text x="{gx:.1f}" y="{h - 6}" text-anchor="middle" font-size="9" '
+            f'fill="{_INK3}" font-family="system-ui">{label}</text>'
         )
+    return out
 
-    line_html = point_html = empty_html = ""
-    if points:
-        pts = sorted(points, key=lambda p: p[0])
-        coords = [(x_for(m), y_for(v)) for m, v in pts]
-        if len(coords) > 1:
-            poly = " ".join(f"{x:.1f},{y:.1f}" for x, y in coords)
-            line_html = (
-                f'<polyline points="{poly}" fill="none" stroke="{accent}" '
-                f'stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>'
-            )
-        for i, (x, y) in enumerate(coords):
-            is_last = i == len(coords) - 1
-            r, fill = (6, accent) if is_last else (4, "rgba(255,255,255,0.25)")
-            halo = (
-                f'<circle cx="{x:.1f}" cy="{y:.1f}" r="{r + 6}" fill="{accent}" opacity="0.18"/>'
-                if is_last else ""
-            )
-            point_html += (
-                f'{halo}<circle cx="{x:.1f}" cy="{y:.1f}" r="{r}" fill="{fill}" '
-                f'stroke="#07080D" stroke-width="2"/>'
-            )
-    else:
-        empty_html = (
-            f'<text x="{width / 2}" y="{height / 2}" text-anchor="middle" font-size="12" '
-            f'fill="#5A6377" font-style="italic" font-family="system-ui">'
-            f'No progress recorded yet</text>'
+
+def _tonnage_chart_svg(series: list, key: str, colour: str, label: str) -> str:
+    """Weekly tonnage bars. A zero week draws a baseline stub and a "0" rather
+    than nothing — absent from the chart and zero in the chart are different
+    claims, and tonnage is a statement about the week."""
+    w, h, pl, pr, pt, pb = 640, 220, 44, 14, 14, 24
+    iw, ih = w - pl - pr, h - pt - pb
+    values = [wk.value(key).kg for wk in series]
+    top = tonnage_svc.nice_axis_max(max(values) if values else 0.0)
+    y_labels = [_kg(top * i / 4) for i in range(4, -1, -1)]
+    x_labels = [wk.week_start.strftime("%-d %b") if os.name != "nt"
+                else wk.week_start.strftime("%d %b").lstrip("0") for wk in series]
+    out = _svg_frame(y_labels, x_labels, w, h, pl, pr, pt, pb)
+    bw = iw / max(1, len(series)) * 0.52
+    for i, wk in enumerate(series):
+        cx = pl + (i / max(1, len(series) - 1)) * iw
+        cell = wk.value(key)
+        tip = (
+            f"Week of {x_labels[i]}\n{_kg(cell.kg)} kg\n"
+            f"{cell.sets} loaded set{'' if cell.sets == 1 else 's'} · "
+            f"{wk.training_days} training day{'' if wk.training_days == 1 else 's'}"
+            # Reps and seconds are reported separately and never summed — a
+            # hold is logged as 1 rep with the work in `tut`, so adding them
+            # would hide exactly the work these counters exist to show.
+            + (f" · {_kg(cell.unloaded_reps)} unloaded reps" if cell.unloaded_reps else "")
+            + (f" · {_kg(cell.unloaded_seconds)}s held" if cell.unloaded_seconds else "")
         )
-
+        if cell.kg <= 0:
+            out += (
+                f'<g><title>{tip}</title>'
+                f'<line x1="{cx - bw / 2:.1f}" y1="{pt + ih}" x2="{cx + bw / 2:.1f}" '
+                f'y2="{pt + ih}" stroke="{_INK3}" stroke-width="2.5" stroke-linecap="round"/>'
+                f'<text x="{cx:.1f}" y="{pt + ih - 7}" text-anchor="middle" font-size="9" '
+                f'fill="{_INK3}" font-family="ui-monospace,monospace">0</text>'
+                f'<rect x="{cx - bw / 2:.1f}" y="{pt}" width="{bw:.1f}" height="{ih}" '
+                f'fill="transparent"/></g>'
+            )
+            continue
+        bh = (cell.kg / top) * ih
+        out += (
+            f'<g><title>{tip}</title>'
+            f'<rect x="{cx - bw / 2:.1f}" y="{pt + ih - bh:.1f}" width="{bw:.1f}" '
+            f'height="{bh:.1f}" rx="3" fill="{colour}" fill-opacity="0.9"/>'
+            f'<text x="{cx:.1f}" y="{pt + ih - bh - 7:.1f}" text-anchor="middle" '
+            f'font-size="10" fill="{_INK}" font-family="ui-monospace,monospace">'
+            f'{_kg(cell.kg)}</text></g>'
+        )
     return (
-        f'<svg viewBox="0 0 {width} {height}" width="100%" height="{height}" '
-        f'preserveAspectRatio="xMidYMid meet">'
-        + "".join(grid) + "".join(y_ticks) + "".join(x_labels)
-        + line_html + point_html + empty_html +
-        '</svg>'
+        f'<svg viewBox="0 0 {w} {h}" width="100%" height="{h}" '
+        f'preserveAspectRatio="xMidYMid meet" role="img" '
+        f'aria-label="{label}, kilograms per week">{out}</svg>'
     )
 
 
-def _strength_hero_html(hero: dict) -> str:
-    accent = hero["accent_color"]
-    bg = _bioage_b64(str(hero["illustration"]))
+def _score_chart_svg(points: list[dict], colour: str) -> str:
+    """The modelled level, with the measured weeks beneath it. Measured is
+    drawn in a muted grey precisely because it is NOT the score — it is the
+    evidence the score is allowed to respond to."""
+    w, h, pl, pr, pt, pb = 640, 220, 44, 14, 14, 24
+    iw, ih = w - pl - pr, h - pt - pb
+    seen = [v for p in points for v in (p["measured"], p["level"]) if v is not None]
+    if seen:
+        lo = max(0.0, (min(seen) // 10) * 10 - 10)
+        hi = ((max(seen) // 10) + 2) * 10
+        # The span has to divide into 4 gridlines cleanly, or the labels are
+        # rounded to whole points while the lines sit on halves — 90/77.5/65/
+        # 52.5/40 printing as 90/78/65/52/40, which misreads the chart.
+        hi = lo + math.ceil((hi - lo) / 20.0) * 20.0
+    else:
+        lo, hi = 0.0, 100.0
+    y_labels = [f"{hi - (hi - lo) * i / 4:.0f}" for i in range(0, 5)]
+    x_labels = [p["week"].strftime("%-d %b") if os.name != "nt"
+                else p["week"].strftime("%d %b").lstrip("0") for p in points]
+    out = _svg_frame(y_labels, x_labels, w, h, pl, pr, pt, pb)
+
+    def x_at(i: int) -> float:
+        return pl + (i / max(1, len(points) - 1)) * iw
+
+    def y_at(v: float) -> float:
+        return pt + (1 - (v - lo) / (hi - lo)) * ih
+
+    measured = [(i, p["measured"]) for i, p in enumerate(points) if p["measured"] is not None]
+    if len(measured) > 1:
+        poly = " ".join(f"{x_at(i):.1f},{y_at(v):.1f}" for i, v in measured)
+        out += (f'<polyline points="{poly}" fill="none" stroke="#6B7A9B" '
+                f'stroke-width="1.5" stroke-dasharray="3,3"/>')
+    for n, (i, v) in enumerate(measured):
+        out += (f'<g><title>Week of {x_labels[i]}\n{v:.1f} points measured</title>'
+                f'<circle cx="{x_at(i):.1f}" cy="{y_at(v):.1f}" r="3.5" fill="#6B7A9B"/></g>')
+        if n == 0:
+            # The grey series has to be named ON the chart. An SVG <title>
+            # never fires on touch and this app is mobile-first, so without
+            # this the second line is permanently unexplained on a phone —
+            # while running ABOVE the headline number, which invites reading
+            # it as a truer score being suppressed.
+            out += (f'<text x="{x_at(i) + 7:.1f}" y="{y_at(v) + 14:.1f}" font-size="9" '
+                    f'fill="#6B7A9B" font-family="ui-monospace,monospace">'
+                    f'{v:.1f} measured</text>')
+
+    levels = [(i, p["level"]) for i, p in enumerate(points) if p["level"] is not None]
+    if len(levels) > 1:
+        poly = " ".join(f"{x_at(i):.1f},{y_at(v):.1f}" for i, v in levels)
+        out += (f'<polyline points="{poly}" fill="none" stroke="{colour}" stroke-width="2" '
+                f'stroke-linecap="round" stroke-linejoin="round"/>')
+    for n, (i, v) in enumerate(levels):
+        last = n == len(levels) - 1
+        halo = (f'<circle cx="{x_at(i):.1f}" cy="{y_at(v):.1f}" r="12" fill="{colour}" '
+                f'opacity="0.18"/>') if last else ""
+        out += (
+            f'<g><title>Week of {x_labels[i]}\n{v:.1f} points\n{points[i]["why"]}</title>'
+            f'{halo}<circle cx="{x_at(i):.1f}" cy="{y_at(v):.1f}" r="{6 if last else 3.5}" '
+            f'fill="{colour}" stroke="#07080D" stroke-width="2"/></g>'
+        )
+        if last:
+            # The newest week sits ON the right edge of the plot, so a
+            # left-anchored label runs past the viewBox and is clipped. Anchor
+            # it to the end and it grows inward instead.
+            at_edge = i == len(points) - 1
+            out += (
+                f'<text x="{x_at(i) + (4 if not at_edge else -4):.1f}" '
+                f'y="{y_at(v) - 13:.1f}" text-anchor="{"end" if at_edge else "start"}" '
+                f'font-size="11" fill="{colour}" '
+                f'font-family="ui-monospace,monospace">{v:.1f}</text>'
+            )
+    if not measured and not levels:
+        out += (f'<text x="{w / 2}" y="{h / 2}" text-anchor="middle" font-size="12" '
+                f'fill="{_INK3}" font-style="italic" font-family="system-ui">'
+                f'No progress recorded yet</text>')
+    return (
+        f'<svg viewBox="0 0 {w} {h}" width="100%" height="{h}" '
+        f'preserveAspectRatio="xMidYMid meet" role="img" '
+        f'aria-label="Overall Strength Score, points per week">{out}</svg>'
+    )
+
+
+def _strength_hero_html(value: float | None, calibrating: bool) -> str:
+    accent = _BIOAGE_COLORS["strength"]
+    bg = _bioage_b64(str(_BIOAGE_BG_DIR / "derived" / "strength_hero.png"))
     bg_css = (
-        f"background-image:linear-gradient(100deg,rgba(11,15,26,0.92) 0%,"
-        f"rgba(11,15,26,0.55) 32%,rgba(11,15,26,0.08) 62%),url('{bg}');"
+        f"background-image:linear-gradient(100deg,rgba(11,15,26,0.94) 0%,"
+        f"rgba(11,15,26,0.58) 34%,rgba(11,15,26,0.08) 64%),url('{bg}');"
         f"background-size:contain;background-repeat:no-repeat;background-position:center right;"
     ) if bg else "background:#0B0F1A;"
-    value = hero["value"] if hero["value"] is not None else "—"
-    desc_html = (
-        f'<div style="font-size:13px;color:#9AA3B2;margin-top:10px;max-width:220px;">'
-        f'{hero["description"]}</div>'
-    ) if hero["description"] else ""
+    shown = f"{value:.1f}" if value is not None else "—"
+    badge = (
+        f'<div><span style="display:inline-block;font:600 9.5px/1.7 ui-monospace,monospace;'
+        f'letter-spacing:.12em;text-transform:uppercase;padding:2px 9px;border-radius:20px;'
+        f'margin-top:12px;background:rgba(191,160,106,.18);color:{_WARN};">Calibrating</span></div>'
+    ) if calibrating else ""
     return (
         f'<div style="position:relative;{_CARD_DIMENSIONS_CSS}border-radius:22px;overflow:hidden;'
         f'margin-bottom:18px;border:1px solid rgba(255,255,255,0.08);{bg_css}'
         f'box-shadow:0 8px 32px rgba(0,0,0,0.4);">'
         f'<div style="position:relative;z-index:1;height:100%;box-sizing:border-box;'
-        f'padding:28px 24px;display:flex;flex-direction:column;justify-content:space-between;">'
+        f'padding:28px 24px;display:flex;flex-direction:column;justify-content:center;">'
         f'<div>'
         f'<div style="font-size:11px;color:{accent};letter-spacing:2px;text-transform:uppercase;'
-        f'font-weight:600;margin-bottom:8px;">{hero["title"]}</div>'
-        f'<div style="font-size:46px;font-weight:800;color:#F4F6FB;line-height:1;'
-        f'text-shadow:0 0 24px {accent}40;">{value}'
-        f'<span style="font-size:18px;font-weight:500;color:#9AA3B2;margin-left:8px;">'
-        f'{hero["unit"]}</span></div>'
-        f'{desc_html}'
-        f'</div>'
-        f'<div><span style="display:inline-flex;align-items:center;gap:6px;'
-        f'background:rgba(255,255,255,0.08);color:#D4DCEE;font-size:13px;font-weight:500;'
-        f'padding:10px 18px;border-radius:30px;">{hero["cta_icon"]} {hero["cta_label"]}</span>'
-        f'</div>'
-        f'</div>'
-        f'</div>'
+        f'font-weight:600;margin-bottom:8px;">Overall Strength</div>'
+        f'<div style="font-size:46px;font-weight:800;color:{_INK};line-height:1;'
+        f'font-variant-numeric:tabular-nums;text-shadow:0 0 24px rgba(255,140,66,.25);">{shown}</div>'
+        f'{badge}'
+        f'</div></div></div>'
     )
 
 
-def _body_region_card_html(region: dict) -> str:
-    accent = region["accent_color"]
-    bg = _bioage_b64(str(region["illustration"]))
-    bg_css = (
-        f"background-image:linear-gradient(90deg,rgba(11,15,26,0.88) 0%,"
-        f"rgba(11,15,26,0.4) 30%,rgba(11,15,26,0.04) 65%),url('{bg}');"
-        f"background-size:contain;background-repeat:no-repeat;background-position:center right;"
-    ) if bg else "background:#0B0F1A;"
-    score = region["score"] if region["score"] is not None else "—"
+def _strength_readout_html(current: float | None, previous: float | None,
+                           labels: tuple[str, str], unit: str, points: bool,
+                           year: int) -> str:
+    def cell(k: str, v: str, sub: str, colour: str = _INK3) -> str:
+        return (f'<div><div class="k">{k}</div><div class="v">{v}</div>'
+                f'<div class="p" style="color:{colour}">{sub}</div></div>')
+
+    def show(v: float | None) -> str:
+        if v is None:
+            return "—"
+        return f'{v:.1f}<u>{unit}</u>' if points else f'{_kg(v)}<u>{unit}</u>'
+
+    if current is None or previous is None:
+        delta_html, delta_sub, delta_col = "—", "no comparable previous week", _INK3
+    else:
+        delta, pct = tonnage_svc.change(current, previous)
+        delta_col = _tone(delta)
+        delta_html = (f'<span style="color:{delta_col}">{_signed(delta, points)}'
+                      f"<u>{unit}</u></span>")
+        if pct is None:
+            delta_sub = "no percentage — the previous week was zero"
+        else:
+            sign = "" if abs(pct) < 5e-2 else ("−" if pct < 0 else "+")
+            delta_sub = f"{sign}{abs(pct):.1f}% week over week"
     return (
-        f'<div style="position:relative;{_CARD_DIMENSIONS_CSS}border-radius:16px;overflow:hidden;'
-        f'margin-bottom:12px;border:1px solid rgba(255,255,255,0.06);{bg_css}">'
-        f'<div style="position:relative;z-index:1;height:100%;box-sizing:border-box;display:flex;'
-        f'flex-direction:column;justify-content:center;padding:18px 44px 18px 20px;">'
-        f'<div style="font-size:20px;font-weight:700;color:{accent};margin-bottom:4px;">'
-        f'{region["name"]}</div>'
-        f'<div style="font-size:26px;font-weight:300;color:#F4F6FB;">{score}'
-        f'<span style="font-size:12px;color:#9AA3B2;margin-left:6px;">{region["unit"]}</span>'
-        f'</div></div>'
-        f'<div style="position:absolute;top:50%;right:16px;transform:translateY(-50%);'
-        f'font-size:22px;color:{accent};font-weight:300;">&rsaquo;</div>'
-        f'</div>'
+        '<div class="sb-readout">'
+        + cell(f"This week · {labels[0]}", show(current), f"week of {labels[0]} {year}")
+        + cell(f"Last week · {labels[1]}", show(previous), f"week of {labels[1]} {year}")
+        + cell("Change", delta_html, delta_sub, delta_col)
+        + "</div>"
     )
 
 
-def _muscle_balance_card_html(mb: dict) -> str:
-    bg = _bioage_b64(str(mb["illustration"]))
+def _strength_region_strip_html(regions: list) -> str:
+    by_id = {r.region: r for r in regions}
+    rows = ""
+    for meta in _STRENGTH_REGIONS:
+        state = by_id.get(meta["id"])
+        if state is None:
+            continue
+        plate = _bioage_b64(str(_STRENGTH_FACEPLATE_DIR / f"{meta['id']}.png"))
+        conf = state.confidence
+        conf_col = _GOOD if conf >= strength_svc.CALIBRATION_EXIT else (_WARN if conf > 0 else _BAD)
+        band = "established" if conf >= strength_svc.CALIBRATION_EXIT else "provisional"
+        off = " off" if conf <= 0 else ""
+        aria = (f'{meta["name"]}, {state.contribution_points:.1f} points, '
+                f'{state.contribution_pct:.1f} percent of overall, '
+                f'index {state.displayed_index:.1f}, confidence {conf:.2f}')
+        rows += (
+            f'<div class="sb-region" role="group" aria-label="{aria}">'
+            f'<div class="txt">'
+            f'<div class="nm" style="color:{meta["colour"]}">{meta["name"]}</div>'
+            f'<div class="sc">{state.contribution_points:.1f}'
+            f'<u>pts&thinsp;<s>{state.contribution_pct:.1f}%</s></u></div>'
+            f'<div class="idx">Index <em>{state.displayed_index:.1f}</em></div>'
+            f'<div class="sb-cbar"><i style="width:{max(round(conf * 100), 2)}%;'
+            f'background:{conf_col}"></i></div>'
+            f'<div class="sb-cnote" style="color:{conf_col}">{band} · confidence {conf:.2f}</div>'
+            f'</div>'
+            # An absent faceplate keeps its slot at the right aspect ratio
+            # rather than collapsing the grid column and shunting the numbers
+            # sideways — background-image:url('') would also make the browser
+            # re-request the page itself.
+            + (f'<div class="sb-plate {meta["id"]}{off}" style="aspect-ratio:{meta["ratio"]};'
+               f'background-image:url(\'{plate}\')"></div>'
+               if plate else
+               f'<div class="sb-plate {meta["id"]}{off}" style="aspect-ratio:{meta["ratio"]};'
+               f'background:rgba(255,255,255,.02);border-radius:12px"></div>')
+            + '</div>'
+        )
+    return f'<div class="sb-bp">{rows}</div>'
+
+
+def _strength_split_html(regions: list) -> str:
+    # Looked up by id, not zipped: zip() would pair by position and silently
+    # recolour every segment if services.strength.REGIONS were ever reordered.
+    by_id = {r.region: r for r in regions}
+    ordered = [(m, by_id[m["id"]]) for m in _STRENGTH_REGIONS if m["id"] in by_id]
+    bar = "".join(
+        f'<i style="width:{r.contribution_pct:.1f}%;background:{m["colour"]}"></i>'
+        for m, r in ordered
+    )
+    key = "".join(
+        f'<span><b style="background:{m["colour"]}"></b>{m["name"]} '
+        f'{r.contribution_points:.1f} pts · {r.contribution_pct:.1f}%</span>'
+        for m, r in ordered
+    )
+    return f'<div class="sb-splitbar">{bar}</div><div class="sb-splitkey">{key}</div>'
+
+
+def _muscle_balance_card_html(count: int | None) -> str:
+    bg = _bioage_b64(str(_BIOAGE_BG_DIR / "derived" / "muscle_balance.png"))
     bg_css = (
-        f"background-image:linear-gradient(90deg,rgba(11,15,26,0.88) 0%,"
-        f"rgba(11,15,26,0.55) 30%,rgba(11,15,26,0.1) 58%),url('{bg}');"
+        f"background-image:linear-gradient(90deg,rgba(11,15,26,0.90) 0%,"
+        f"rgba(11,15,26,0.58) 32%,rgba(11,15,26,0.10) 60%),url('{bg}');"
         f"background-size:contain;background-repeat:no-repeat;background-position:center right;"
     ) if bg else "background:#0B0F1A;"
-    count = mb["imbalance_count"]
-    count_display = str(count) if count is not None else "—"
+    shown = str(count) if count is not None else "—"
     return (
         f'<div style="position:relative;{_CARD_DIMENSIONS_CSS}border-radius:16px;overflow:hidden;'
-        f'margin-bottom:8px;border:1px solid rgba(255,255,255,0.06);{bg_css}">'
+        f'margin-bottom:8px;border:1px solid {_HAIR};{bg_css}">'
         f'<div style="position:relative;z-index:1;height:100%;box-sizing:border-box;display:flex;'
         f'flex-direction:column;justify-content:center;padding:20px 22px;">'
-        f'<div style="font-size:16px;font-weight:600;color:#F4F6FB;margin-bottom:6px;">'
+        f'<div style="font-size:16px;font-weight:600;color:{_INK};margin-bottom:6px;">'
         f'Muscle imbalances</div>'
-        f'<div style="font-size:30px;font-weight:300;color:#F4F6FB;">{count_display}'
-        f'<span style="font-size:13px;color:#9AA3B2;margin-left:6px;">imbalances</span></div>'
+        f'<div style="font-size:30px;font-weight:300;color:{_INK};'
+        f'font-variant-numeric:tabular-nums;">{shown}'
+        f'<span style="font-size:13px;color:{_INK2};margin-left:6px;">imbalances</span></div>'
         f'</div></div>'
     )
 
 
-def _assessment_card_html() -> str:
-    a = _STRENGTH_SCREEN["assessment"]
-    return (
-        f'<div style="border-radius:16px;overflow:hidden;margin-bottom:10px;'
-        f'border:1px solid rgba(255,255,255,0.06);'
-        f'background:linear-gradient(135deg,#12161F 0%,#0B0F1A 100%);padding:24px 22px;">'
-        f'<div style="font-size:19px;font-weight:700;color:#F4F6FB;margin-bottom:8px;">'
-        f'{a["title"]}</div>'
-        f'<div style="font-size:13px;color:#9AA3B2;line-height:1.6;">{a["description"]}</div>'
-        f'</div>'
-    )
+def _imbalance_list_html(imbalances: dict) -> str:
+    over = imbalances.get("overactive_tight", [])
+    under = imbalances.get("underactive_weak", [])
+    if not over and not under:
+        return ""
+    out = '<div class="sb-imblist">'
+    if over:
+        out += '<div class="grp">Overactive · release first</div>'
+        out += "".join(f'<div class="i"><b style="background:{_BAD}"></b>'
+                       f"<span>{name}</span></div>" for name in over)
+    if under:
+        out += '<div class="grp">Underactive · activate second</div>'
+        out += "".join(f'<div class="i"><b style="background:{_GOOD}"></b>'
+                       f"<span>{name}</span></div>" for name in under)
+    return out + "</div>"
 
 
 def _render_strength_detail() -> None:
-    """Strength BioAge detail — hero, progress chart, body regions, muscle
-    balance, assessment CTA. One continuous scroll, no sub-tabs/transitions."""
-    s = _STRENGTH_SCREEN
-    accent = s["hero"]["accent_color"]
-    scores = _strength_bioage_scores()
+    """Strength BioAge detail — hero, a five-series progress display, the
+    regional split, and the muscle-balance findings. One continuous scroll."""
+    accent = _BIOAGE_COLORS["strength"]
+    data = _strength_screen_data()
+    st.markdown(_STRENGTH_CSS, unsafe_allow_html=True)
 
-    # Span the full desktop/Whoop breakpoint width, capped only at a generous
-    # ceiling — real browser windows rarely exceed this, so in practice the
-    # screen goes edge-to-edge; the cap just stops an ultrawide monitor from
-    # stretching the illustrations past the point their (now widened, see
-    # scripts/prepare_bioage_illustrations.py) native resolution supports.
     st.markdown(
-        '<style>[data-testid="stMainBlockContainer"][data-testid="stMainBlockContainer"]'
-        "{max-width:1600px !important;margin-left:auto !important;"
-        "margin-right:auto !important;}</style>",
+        _strength_hero_html(data["overall"], data["calibrating"]),
         unsafe_allow_html=True,
     )
-
-    hero = {**s["hero"], "value": scores["hero_value"]}
-    st.markdown(_strength_hero_html(hero), unsafe_allow_html=True)
+    if data.get("load_error"):
+        st.warning(
+            "Training history could not be read, so every figure below is "
+            "showing its no-data state rather than your actual training — "
+            f"{data['load_error']}",
+            icon="⚠️",
+        )
 
     # ── Progress ──────────────────────────────────────────────────────────
-    # Plain divs, not <h3>, below: styles.py's global h3 rule forces
-    # font-size:10px + uppercase (!important) which would hijack these.
-    p = s["progress"]
-    updated  = p["updated_value"] or "—"
-    real_age = p["real_age_value"] if p["real_age_value"] is not None else "—"
-
+    # Plain divs, not <h3>: styles.py's global h3 rule forces font-size:10px +
+    # uppercase (!important) and would hijack these.
     head_l, head_r = st.columns([2, 1])
     head_l.markdown(
-        f"<div style='color:#F4F6FB;font-size:18px;font-weight:600;'>{p['title']}</div>",
+        f"<div style='color:{_INK};font-size:18px;font-weight:600;margin-top:6px;'>Progress</div>",
         unsafe_allow_html=True,
     )
-    head_r.markdown(
-        f"<div style='text-align:right;font-size:11px;color:#5A6377;margin-top:6px;'>"
-        f"{p['updated_label']} {updated}</div>",
-        unsafe_allow_html=True,
-    )
+    with head_r:
+        chosen = st.selectbox(
+            "Progress metric", list(_STRENGTH_METRICS), key="strength_metric",
+            label_visibility="collapsed",
+        )
+    metric = _STRENGTH_METRICS[chosen]
+    is_score = metric["key"] == "score"
 
     sub_l, sub_r = st.columns([2, 1])
     sub_l.markdown(
-        f"<div style='font-size:13px;color:#6BAF8B;'>{p['real_age_label']}: {real_age}</div>",
+        f"<div style='font-size:13px;color:{_INK2};'>{chosen} · {metric['unit']}</div>",
         unsafe_allow_html=True,
     )
     sub_r.markdown(
-        "<div style='text-align:right;font-size:11px;color:#5A6377;'>Age (yrs)</div>",
+        f"<div style='text-align:right;font-size:11px;color:{_INK3};'>"
+        f"Updated on {data['today'].strftime('%d %b %Y').lstrip('0')}</div>",
         unsafe_allow_html=True,
     )
 
-    st.markdown(
-        f'<div style="background:#0E1018;border:1px solid rgba(255,255,255,0.06);'
-        f'border-radius:16px;padding:12px 8px 4px;margin:10px 0 16px;">'
-        f'{_progress_chart_svg(p["chart_points"], p["y_min"], p["y_max"], accent)}'
-        f'</div>',
-        unsafe_allow_html=True,
-    )
-    st.markdown(
-        f'<div style="text-align:center;padding:12px;border-radius:30px;'
-        f'background:rgba(255,255,255,0.06);color:#D4DCEE;font-size:13px;'
-        f'font-weight:500;margin-bottom:24px;">{p["button_label"]}</div>',
-        unsafe_allow_html=True,
-    )
+    if is_score:
+        points = data["score_series"]
+        current = points[-1]["level"] if points else None
+        previous = points[-2]["level"] if len(points) > 1 else None
+        labels = (data["week_labels"][-1], data["week_labels"][-2])
+        chart = _score_chart_svg(points, accent)
+    else:
+        series = data["tonnage"]
+        current = series[-1].value(metric["key"]).kg if series else None
+        previous = series[-2].value(metric["key"]).kg if len(series) > 1 else None
+        labels = (data["week_labels"][-1], data["week_labels"][-2])
+        chart = _tonnage_chart_svg(series, metric["key"], metric["colour"], chosen)
 
-    # ── Body performance ──────────────────────────────────────────────────
     st.markdown(
-        "<div style='color:#F4F6FB;font-size:18px;font-weight:600;"
-        "margin-bottom:12px;'>Body parts</div>",
+        _strength_readout_html(current, previous, labels, metric["unit"], is_score,
+                               data["today"].year),
         unsafe_allow_html=True,
     )
-    for region in s["body_regions"]:
-        region_with_score = {**region, "score": scores["region_scores"].get(region["id"])}
-        st.markdown(_body_region_card_html(region_with_score), unsafe_allow_html=True)
+    st.markdown(f'<div class="sb-chartbox">{chart}</div>', unsafe_allow_html=True)
+
+    # ── Body parts ────────────────────────────────────────────────────────
+    st.markdown(
+        f"<div style='color:{_INK};font-size:18px;font-weight:600;'>Body parts</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(_strength_split_html(data["regions"]), unsafe_allow_html=True)
+    st.markdown(_strength_region_strip_html(data["regions"]), unsafe_allow_html=True)
 
     # ── Muscle balance ────────────────────────────────────────────────────
-    mb = {**s["muscle_balance"], "imbalance_count": scores["imbalance_count"]}
     bal_l, bal_r = st.columns([2, 1])
     bal_l.markdown(
-        f"<div style='color:#F4F6FB;font-size:18px;font-weight:600;"
-        f"margin-bottom:12px;'>{mb['title']}</div>",
+        f"<div style='color:{_INK};font-size:18px;font-weight:600;margin:18px 0 12px;'>"
+        f"Muscle balance analysis</div>",
         unsafe_allow_html=True,
     )
     bal_r.markdown(
-        f"<div style='text-align:right;font-size:13px;color:{accent};margin-top:6px;'>"
-        f"{mb['cta_label']} &rsaquo;</div>",
+        f"<div style='text-align:right;font-size:13px;color:{accent};margin-top:22px;'>"
+        f"View All &rsaquo;</div>",
         unsafe_allow_html=True,
     )
-    st.markdown(_muscle_balance_card_html(mb), unsafe_allow_html=True)
-
-    st.markdown("<div style='margin-top:8px;'></div>", unsafe_allow_html=True)
-
-    # ── Assessment CTA ────────────────────────────────────────────────────
-    st.markdown(_assessment_card_html(), unsafe_allow_html=True)
+    st.markdown(_muscle_balance_card_html(data["imbalance_count"]), unsafe_allow_html=True)
+    st.markdown(_imbalance_list_html(data["imbalances"]), unsafe_allow_html=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -566,39 +774,78 @@ def _recent_sessions():
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _strength_bioage_scores() -> dict:
-    """Per-region Stage-Adjusted Recovery Scores (services/bioage.py) + hero
-    average + muscle-imbalance count for the Strength BioAge detail screen.
-    A region's score is None ("—" on screen) until it has real logged
-    weighted volume — deliberate, not a bug, while training is still
-    bodyweight-only (see services/bioage.py's module docstring). Falls back
-    to all-None on a repository error rather than crashing the page, same
-    spirit as Repository.run_home_syncs' per-step (ok, error) contract."""
+def _strength_screen_data() -> dict:
+    """Everything the Strength screen renders, from one unwindowed read.
+
+    `get_all_training_exercises_raw()` is the only source with per-set reps and
+    weight — `get_recent_sessions()` parses the Sets JSON and then keeps only
+    `actual_sets` and `total_volume_kg`, so an estimated 1RM cannot be built
+    from it, and neither can the loaded/unloaded split tonnage eligibility
+    needs.
+
+    Falls back to an empty log on a repository error rather than crashing the
+    page — the muscle-imbalance findings still render, since they read the
+    clinical profile rather than the network. Same spirit as
+    Repository.run_home_syncs' per-step (ok, error) contract."""
+    # A failure must not render as "you have never trained". The two are
+    # indistinguishable once the log is empty — overall 50.0, three regions at
+    # 50.0, every tonnage week zero — and only one of them is a real reading.
+    load_error: str | None = None
     try:
-        r = repo.get_repository()
-        sessions = r.get_recent_sessions(days=180)
-        stage = r.get_current_stage()
-    except Exception:
-        sessions, stage = [], 1
+        rows = repo.get_repository().get_all_training_exercises_raw()
+    except Exception as exc:
+        rows, load_error = [], f"{type(exc).__name__}: {exc}"
 
     today = date.today()
-    region_scores: dict[str, float | None] = {}
-    for region in bioage.REGIONS:
-        if not bioage.has_weighted_training(sessions, region, training_constants.EXERCISE_BODY_REGION):
-            region_scores[region] = None
-            continue
-        current = bioage.current_window_effort(
-            sessions, region, training_constants.EXERCISE_BODY_REGION, today=today,
-        )
-        ceiling = bioage.region_baseline_ceiling(
-            sessions, region, training_constants.EXERCISE_BODY_REGION, today=today,
-        )
-        region_scores[region] = bioage.region_recovery_score(current, ceiling, stage)
+    movement_weights = {
+        name: weight
+        for name, (_category, weight) in training_constants.EXERCISE_MOVEMENT_WEIGHT.items()
+    }
 
+    snapshot = strength_svc.snapshot(
+        rows,
+        strength_baselines.PEAKS_2025,
+        training_constants.EXERCISE_BODY_REGION,
+        movement_weights,
+        strength_baselines.REGION_PRIOR,
+        strength_baselines.PR_RIR,
+        strength_baselines.ANCHOR_VALUE,
+        today=today,
+        calibrating=True,
+    )
+    series, unmapped = tonnage_svc.weekly_tonnage(
+        rows, training_constants.EXERCISE_BODY_REGION, today=today, weeks=_STRENGTH_WEEKS,
+    )
+    score_points = strength_svc.score_series(
+        rows,
+        strength_baselines.PEAKS_2025,
+        movement_weights,
+        strength_baselines.PR_RIR,
+        strength_baselines.ANCHOR_DATE,
+        strength_baselines.ANCHOR_VALUE,
+        today=today,
+        weeks=_STRENGTH_WEEKS,
+        calibrating=True,
+    )
+    labels = [
+        w.week_start.strftime("%-d %b") if os.name != "nt"
+        else w.week_start.strftime("%d %b").lstrip("0")
+        for w in series
+    ]
+    imbalances = patient_profile.PROFILE.get("imbalances", {})
     return {
-        "region_scores":   region_scores,
-        "hero_value":      bioage.hero_score(list(region_scores.values())),
-        "imbalance_count": bioage.muscle_imbalance_count(patient_profile.PROFILE.get("imbalances", {})),
+        "today":           today,
+        "load_error":      load_error,
+        "overall":         snapshot["overall"],
+        "calibrating":     snapshot["calibrating"],
+        "regions":         snapshot["regions"],
+        "exercises":       snapshot["exercises"],
+        "tonnage":         series,
+        "unmapped":        sorted(unmapped),
+        "score_series":    score_points,
+        "week_labels":     labels,
+        "imbalances":      imbalances,
+        "imbalance_count": bioage.muscle_imbalance_count(imbalances),
     }
 
 

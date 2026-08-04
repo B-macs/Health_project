@@ -83,12 +83,16 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 |---|---|
 | `engine.py` | Pure deterministic maths — traffic light, ACWR, injury weight decay, stage state machine, volume recommendation. No DB access, no Streamlit. Derives per-stage ceilings from `rules.STAGE_CONSTRAINTS`. |
 | `rules.py` | Movement safety rules — `STAGE_CONSTRAINTS` (ACWR ceilings, RPE caps, volume caps per stage). `MOVEMENT_RULES` (contraindicated / caution / cleared). Single source of truth for guardrails. |
-| `db.py` | Notion API backend — all read/write. Equivalent to the SQLite schema below but using Notion databases. |
-| `sync_sheets.py` | Google Sheets direct reader — pulls biometric rows, maps columns, returns engine-compatible format. No Notion sync needed. |
-| `training_plan.py` | 14-day exercise prescription data — exercise specs, mechanics, biomechanical cues, progressions, regressions, pre-session release protocol integrated per day. |
-| `training_constants.py` | Single source for `EXERCISES` catalogue, `ANATOMICAL_LOCATIONS`, `SENSATION_TAGS`. Imported by `views/checkin.py`. |
-| `patient_profile.py` | Clinical input file — MRI findings + biomechanical assessment + muscle imbalance summary. Not imported by active code; human reference. Updated before each new training block. |
-| `readiness.py` | Readiness score calculator — HRV 40% / Sleep 35% / RHR 25%; adaptive baselines; `NOT_COMPUTED` sentinel. |
+| `repository.py` | The ONLY place Notion property names and Sheet column names live. ~40 methods wrapping `clients/notion.py`, `clients/sheets.py` and `clients/local_cache.py`. (There is no `db.py` or `sync_sheets.py` — both were replaced by this during the services/ extraction.) |
+| `training_plan.py` | Exercise prescription data — `PLAN` is the completed 14-day Stage 1 block; `PLAN_STAGE2` is the running 28-day Stage 2A block. Exercise specs, mechanics, biomechanical cues, progressions, regressions, pre-session release protocol integrated per day. |
+| `training_constants.py` | Single source for `EXERCISES` catalogue, `ANATOMICAL_LOCATIONS`, `SENSATION_TAGS`, plus `EXERCISE_BODY_REGION` (one primary sector per exercise — feeds `strength.py` and `tonnage.py`) and `EXERCISE_MOVEMENT_WEIGHT` (content-aware AU weighting for Strain/ACWR). |
+| `patient_profile.py` | Clinical input file — MRI findings + biomechanical assessment + muscle imbalance summary + `stage_transitions`. **Is** imported by active code: `views/insights.py` reads `PROFILE["imbalances"]` for the muscle-imbalance count. Updated before each new training block. |
+| `readiness.py` | Readiness score calculator, `MODEL_VERSION 2` (2026-08-01). Scored from Oura's eight contributors plus our own Sleep Debt, with our weights and our composite — **not** Oura's score taken directly: hrv_balance .21, recovery .17, prev_night .16, rhr .13, body_temp .12, sleep_debt .09, prev_activity .05, sleep_reg .04, activity_bal .03. v1's HRV 40 / Sleep 35 / RHR 25 split is gone; it used `min(100, ratio*100)`, one-sided and saturating, and ran ~15 points high. Alcohol is no longer deducted. |
+| `strength.py` | The Overall Strength Score — estimated 1RM against a fixed 2025 baseline (`strength_baselines.py`), plus the regional split. Currently in calibration: every index displays at 50. Measured performance can only push the level UP; the only downward force is detraining decay. |
+| `tonnage.py` | Weekly work completed, in kg, overall and per body sector. A **separate** metric from `strength.py` sharing no term with it. No decay. Unloaded work counted in reps and seconds, never converted to kg. |
+| `bioage.py` | One function — the muscle-imbalance count. The Stage-Adjusted Recovery Score it used to hold was deleted 2026-08-04 (its docstring says why; a test fails if the names return). |
+| `biometrics.py` | Oura+Garmin blend, nap handling (`split_sleep_periods`, `dedupe_sleep_periods`, `NAP_MIN_SECONDS`), and `HRV_GARMIN_HOLD`. |
+| `background_sync.py` | `BackgroundSyncRunner` — runs device syncs off the Streamlit script thread. Builds its OWN `Repository` per run and never touches `st.*`. |
 | `stats.py` | Deterministic statistical analysis — lag correlations, slopes, recovery direction. |
 | `styles.py` | Responsive dual-theme CSS + component helpers. Oura palette (mobile ≤768px) / Whoop palette (desktop ≥769px). |
 | `nav.py` | Bottom nav bar + JS bridge. Exposes `stNav(page)` in parent window; navigation is URL-based (`?page=X`). No hidden trigger buttons. |
@@ -100,7 +104,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 |---|---|
 | `views/` | `checkin.py`, `training.py`, `insights.py`, `sync.py` — SPA view modules |
 | `_pages/` | **Deleted** — triggered Streamlit 1.36+ auto top-nav; all routing is in `app.py` SPA router |
-| `scripts/` | `init_notion.py` — one-shot CLI setup for Notion databases; `build_datastore.py` — rebuilds the project's consolidated database (`services/datastore.py`), a full copy of live Notion+Sheets data and the target of the move off them |
+| `scripts/` | One-shot CLI tools: `init_notion.py`, `build_datastore.py` (rebuilds `services/datastore.py`'s snapshot), `backfill_oura_history.py`, `backfill_garmin_sleep_stages.py`, `backfill_garmin_from_sheet1.py`, `compare_readiness_to_oura.py`, `merge_duplicate_checkins.py`, `prepare_bioage_illustrations.py`, `garmin_login_test.py` |
 | `docs/` | `INVENTORY.md`, `resume.md`, `focus.md`, `playbook.md`, `progress.json`, `training/*.md` |
 | `voice_training/voxplot` | Git submodule — standalone Voxplot voice-analysis source; Health pins its commit and embeds its renderer |
 
@@ -509,6 +513,7 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 | **13** | Apple Health Direct API Sync | SUPERSEDED — replaced by the Oura+Garmin blend (2026-07-13) rather than a direct Apple HealthKit sync; Sheet1/Apple Health retired from the live pipeline instead |
 | **14** | Stage 2 Training Entry (barbell/cable — external load) | COMPLETE ✅ — live since 2026-07-20; weighted sets logged across all three body regions |
 | **15** | Stage 2B / next block | PENDING — three decisions due at the Day 28 reassessment (2026-08-16): Stage 2B vs. extending 2A, running introduction, endurance-biased scapular programming. See `docs/focus.md`. |
+| **16** | Strength metric — capacity and volume, separated | COMPLETE ✅ (2026-08-04) — `services/strength.py` (Overall Strength Score: estimated 1RM vs the 2025 baselines in `strength_baselines.py`, currently in calibration at 50) and `services/tonnage.py` (weekly kg by body sector). They share no term, so a heavier week cannot raise the score and a rest week cannot lower it. Replaced the Stage-Adjusted Recovery Score, which was deleted — it could only ever read 100 |
 
 ---
 
@@ -587,9 +592,20 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 | Stage 2 training plan | BUILT — live since 2026-07-20 | `training_plan.PLAN_STAGE2`. Barbell/cable library, ACWR ceiling 1.3 from `STAGE_CONSTRAINTS[2]`, per-set external-load capture all in place. Next block's decisions are due 2026-08-16 — see `docs/focus.md` |
 | Garmin backfill from Sheet1 | Needs to be run once | `scripts/backfill_garmin_from_sheet1.py` — dry-run first, then `--apply` — so readiness baselines have pre-wearable history in the Garmin Daily tab |
 | `Training plan/` folder | RESOLVED (2026-08-03) | Directory no longer exists at root; contents live in `docs/training/` |
-| `patient_profile.py` not imported | SUPERSEDED | No longer true — `services/bioage.py` imports `PROFILE["imbalances"]` for the muscle-imbalance count, and `tests/test_bioage.py` pins it at 8. The file is now both human reference **and** live input, so edits to `imbalances` can break the gate |
+| `patient_profile.py` not imported | SUPERSEDED | No longer true — `views/insights.py` reads `PROFILE["imbalances"]` and passes it to `bioage.muscle_imbalance_count`, and `tests/test_bioage.py` pins the result at 8. (`services/bioage.py` itself imports nothing — it takes the dict as a parameter, which is what keeps `services/` free of I/O.) The file is now both human reference **and** live input, so edits to `imbalances` can break the gate |
+| Overall Strength Score is calibrating | Expected, not a gap | Every regional index displays at 50 and the overall is held at `strength_baselines.ANCHOR_VALUE`. Exit is per region on confidence ≥ 0.70 (`quantity × comparability × consistency`); today upper 0.46, lower 0.37, **core 0.00**. Core cannot be calibrated at all until a repeatable core measurement is logged — its only loaded movement is Pallof Press and its 2025 peak is recorded as a band, not a kilogram |
+| No per-set warm-up flag | Open | `services/tonnage.py` counts a set as eligible when it carries reps AND a real external load. Warm-ups are not excluded because the log cannot mark one, so "working sets only" is an assumption the data does not support. A boolean per set closes it |
 | Interscapular endurance gap | Deferred to the post-Stage-2A block | Onset 2026-07-16, predates the block. Scapular work already runs five days a week and the symptom persists through it, so the gap is endurance under sustained low-load holding, not volume. Physio decides 2026-08-16 — `docs/training/physio_brief_2026-08-16.md` |
 
 ---
 
-*Last updated: 2026-08-03 — documentation refresh: the stage machine, agile roadmap and open-gaps table had all still described Stage 1 as current, five weeks after Stage 2A started (2026-07-20). Stage 1 is marked complete with its 7-day extension recorded, Stage 2 marked current with the active block named, roadmap buckets 12/14 closed and a bucket 15 opened for the three decisions due at the Day 28 reassessment (2026-08-16). Four open-gap rows corrected against reality: `patient_profile.py` IS now imported (`services/bioage.py`), the `Training plan/` duplicate is gone, Garmin HRV is resolved-as-empty and held at Oura-only, and the Stage 2 plan is built. Before that (2026-07-14): the Voxplot Voice Training Measurement Policy, separate 22-card activity library, and supplied connected-speech paragraph; the original 10-day baseline remains fixed, and optional library practice cannot change daily-plan progress. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*
+*Last updated: 2026-08-04 — audit sweep against the code. The Core Modules table
+still listed `db.py` and `sync_sheets.py`, neither of which exists (both became
+`services/repository.py` during the services/ extraction), gave readiness's
+retired v1 weights (HRV 40 / Sleep 35 / RHR 25) rather than `MODEL_VERSION 2`'s
+nine Oura-contributor weights, described `patient_profile.py` as "not imported by
+active code" when `views/insights.py` reads it, and omitted ten services/ modules
+including `strength.py`, `tonnage.py`, `biometrics.py` and `background_sync.py`.
+The scripts/ row listed one of nine tools. Roadmap bucket 16 opened and closed for
+the strength/tonnage split; two open-gap rows added for the calibration state and
+the missing warm-up flag. Before that (2026-08-03) — documentation refresh: the stage machine, agile roadmap and open-gaps table had all still described Stage 1 as current, five weeks after Stage 2A started (2026-07-20). Stage 1 is marked complete with its 7-day extension recorded, Stage 2 marked current with the active block named, roadmap buckets 12/14 closed and a bucket 15 opened for the three decisions due at the Day 28 reassessment (2026-08-16). Four open-gap rows corrected against reality: `patient_profile.py` IS now imported (`services/bioage.py`), the `Training plan/` duplicate is gone, Garmin HRV is resolved-as-empty and held at Oura-only, and the Stage 2 plan is built. Before that (2026-07-14): the Voxplot Voice Training Measurement Policy, separate 22-card activity library, and supplied connected-speech paragraph; the original 10-day baseline remains fixed, and optional library practice cannot change daily-plan progress. Sheet1/Apple Health remains retired as the engine's biometric source; the live health blend is Oura+Garmin (`services/biometrics.py`).*
