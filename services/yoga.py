@@ -50,6 +50,12 @@ class YogaPose:
     safety: str            # "cleared" | "caution" | "contraindicated"
     safety_note: str = ""  # rationale — required for caution/contraindicated, optional otherwise
     option_note: str = ""  # e.g. "Option to grab your left foot"
+    # An open question this pose is the natural instrument for — surfaced when
+    # the pose comes up so the answer is captured in the position that produced
+    # it, rather than recalled afterwards. A finding measured ONCE is a snapshot;
+    # this is what turns it into a re-measurement. Empty for most poses: a retest
+    # on every pose is a retest on none.
+    retest: str = ""
 
 
 @dataclass
@@ -71,6 +77,16 @@ class YogaSession:
     @property
     def session_au(self) -> float:
         return float(self.estimated_rpe * self.total_duration_minutes)
+
+    def retests(self) -> list[tuple[YogaPose, str]]:
+        """(pose, question) for every pose carrying an open question to re-answer.
+
+        Deliberately separate from cautions(): a caution is a standing safety
+        statement, a retest is a one-shot measurement request that should be
+        closed out or re-dated once answered. Ordered by pose sequence so the
+        UI can surface each one at the moment it is answerable.
+        """
+        return [(p, p.retest) for p in self.poses if p.retest]
 
     def cautions(self, stage: int = 1) -> list[tuple[YogaPose, str, str]]:
         """(pose, severity, note) for every pose whose effective safety != cleared."""
@@ -119,6 +135,13 @@ YOGA_LIBRARY: list[YogaSession] = [
                 "cat-cow-family spinal mobilisation. It is not. Per the athlete: "
                 "cross-legged, hand resting on the knee, drawing the shoulder down "
                 "toward it, repeated on the other side.",
+                retest="Is the restriction still in the HIPS rather than the spine, and is "
+                       "the arm still unable to straighten? Baseline 2026-08-05: 40/100, "
+                       "'only can go about 60-70 percent down, restriction in hips', arm "
+                       "would not straighten at all. This is the pose that first showed "
+                       "the seated posterior-tilt pattern, so it is the cheapest place to "
+                       "see whether that pattern is moving. Also confirm the movement is "
+                       "still as described — the whole re-tag depends on it.",
             ),
             YogaPose(
                 "Seated Side Stretch (Right)", _t("01:00"), 30, "caution",
@@ -190,6 +213,13 @@ YOGA_LIBRARY: list[YogaSession] = [
                 "30s hold sits BELOW threshold — this is why the pose is tolerable, and "
                 "why lengthening it would change its character. Keep knees soft and back "
                 "flat for the secondary spinal-flexion component.",
+                retest="Time the burn. Baseline 2026-08-05: onset 50-60s, with the right "
+                       "shoulder reaching back and a small whole-body twist to the right. "
+                       "This is the ONLY quantified endurance figure for the interscapular "
+                       "gap (symptom_log 2026-08-03) and physio_brief_2026-08-16.md §11 "
+                       "asks for the hold prescription to be set against it — so a second "
+                       "reading is worth more here than anywhere else in the flow. Note "
+                       "whether onset moves and whether the rightward twist persists.",
             ),
             YogaPose(
                 "Deep Lunge (Left)", _t("07:40"), 30, "cleared",
@@ -204,8 +234,20 @@ YOGA_LIBRARY: list[YogaSession] = [
             YogaPose(
                 "Deep Lunge Hip Opener (Left)", _t("08:20"), 30, "caution",
                 "Reach/backbend combination risks end-range lumbar extension and rotation. "
-                "Keep the reach modest.",
+                "Keep the reach modest. This is the pose where the RIGHT arm reaches back "
+                "into extension + external rotation — the apprehension-adjacent position "
+                "for the post-Latarjet shoulder (finding #6). It was predicted to be "
+                "range-limited on 2026-08-05 and was not ('right arm can reach the back "
+                "leg with ease'), so the range question is settled; what is NOT settled is "
+                "that finding #6 calls that stability maintenance-dependent.",
                 option_note="Option to grab your right foot",
+                retest="Does the right shoulder still reach the back foot with ease, and "
+                       "does the front of the joint feel stable there? Baseline 2026-08-05: "
+                       "reaches easily, no instability reported, quad is the limiter at "
+                       "46/100. Finding #6 says right-shoulder stability is "
+                       "maintenance-dependent and regresses when training lapses — so this "
+                       "is a cheap unloaded check on whether that has started, and a change "
+                       "here is a signal well before a loaded one appears.",
             ),
             YogaPose(
                 "Half Pigeon Pose (Left)", _t("09:00"), 30, "cleared",

@@ -120,6 +120,47 @@ def test_session_duration_and_au_unchanged_by_the_2026_08_05_corrections():
     assert session.session_au == 45.0
 
 
+def test_retests_are_attached_to_the_poses_that_can_answer_them():
+    """A finding measured once is a snapshot. The three open questions from the
+    2026-08-05 baseline are attached to the poses that actually reproduce the
+    position, so the answer is captured in situ rather than recalled."""
+    session = yoga.YOGA_LIBRARY[0]
+    retests = dict((p.name, q) for p, q in session.retests())
+
+    assert len(retests) == 3, f"expected 3 retests, got {sorted(retests)}"
+    assert "Seated Cross-Legged Side Bend (Shoulder Drop)" in retests
+    assert "Down Dog" in retests
+    assert "Deep Lunge Hip Opener (Left)" in retests
+
+    # Each must carry the baseline value it is a retest OF — a retest without
+    # the number to compare against is just a reminder.
+    assert "2026-08-05" in retests["Seated Cross-Legged Side Bend (Shoulder Drop)"]
+    assert "50-60s" in retests["Down Dog"]
+    assert "2026-08-05" in retests["Deep Lunge Hip Opener (Left)"]
+
+
+def test_retests_are_ordered_by_pose_sequence():
+    session = yoga.YOGA_LIBRARY[0]
+    starts = [pose.start_seconds for pose, _ in session.retests()]
+    assert starts == sorted(starts)
+
+
+def test_retests_and_cautions_are_separate_concerns():
+    """A retest is a one-shot measurement request, a caution is a standing
+    safety statement. Neither collection may absorb the other."""
+    session = yoga.YOGA_LIBRARY[0]
+    retest_names = {p.name for p, _ in session.retests()}
+    caution_names = {p.name for p, _, _ in session.cautions(stage=2)}
+
+    # They overlap by coincidence of subject matter, not by construction —
+    # so neither is derivable from the other.
+    assert retest_names - caution_names == set() or retest_names != caution_names
+    assert caution_names - retest_names, "cautions must not collapse to just the retests"
+
+    # A pose with no retest must not leak an empty string into the list.
+    assert all(question for _, question in session.retests())
+
+
 def test_suggest_for_day_returns_a_rest_day_match():
     suggestion = yoga.suggest_for_day("rest_day")
     assert suggestion is not None

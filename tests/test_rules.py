@@ -65,6 +65,46 @@ def test_forward_fold_rule_matches_named_variants():
     assert straddle["severity"] == "contraindicated"  # stage_cap=1, always contraindicated
 
 
+def test_side_bend_rule_matches_named_variants():
+    # Added 2026-08-05. "right lateral"/"left lateral" only fire on names that
+    # literally spell out "lateral" — the yoga catalogue's opening pose is a
+    # seated cross-legged side bend and matched NOTHING, so it sat at `cleared`
+    # despite being the same lateral-flexion mechanism as the two Seated Side
+    # Stretches. Same generalisation "forward fold" makes over "seated forward
+    # fold" above.
+    for name in (
+        "Seated Cross-Legged Side Bend (Shoulder Drop)",
+        "Standing Side Bend",
+        "side bend",
+    ):
+        result = rules.check_movement(name, current_stage=2)
+        assert result["severity"] == "caution", name
+        assert result["stage_ok"] is True, name
+
+    # stage_cap=1, so it is a caution from Stage 1 onward rather than a hard
+    # stop that later clears — mirrors the two lateral rules it generalises.
+    assert rules.check_movement("Standing Side Bend", current_stage=1)["severity"] == "caution"
+
+
+def test_side_bend_rule_does_not_swallow_unrelated_movements():
+    # check_movement matches BOTH directions (`rule.movement in name` OR
+    # `name in rule.movement`), so a short unrelated name could be captured by
+    # the new keyword. Nothing in the exercise catalogue may start matching it.
+    for name in ("Side Plank", "Side-Lying Hip Abduction", "Lateral Raise", "Bent-Over Row"):
+        matched = [r for r in rules.MOVEMENT_RULES
+                   if r.movement == "side bend"
+                   and (r.movement in name.lower() or name.lower() in r.movement)]
+        assert matched == [], name
+
+
+def test_every_movement_rule_keyword_is_reachable():
+    # A keyword that no name can match is dead weight pretending to be a
+    # guardrail. Each rule must at least match its own movement string.
+    for rule in rules.MOVEMENT_RULES:
+        result = rules.check_movement(rule.movement, current_stage=5)
+        assert result["severity"] != "unknown", rule.movement
+
+
 def test_stage2_gym_exercises_clear_correctly_at_stage_2():
     # Goblet Squat and Bulgarian Split Squat both match the "squat" caution
     # rule (stage_cap=2) — confirm they're usable at Stage 2, not just
