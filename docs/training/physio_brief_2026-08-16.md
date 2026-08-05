@@ -1,8 +1,8 @@
 # Physio Brief — Day 28 Reassessment, 2026-08-16
 
 **Topic:** Interscapular tightness — bilateral, left dominant
-**Prepared:** 2026-08-03 · §9 added 2026-08-05 · **Current block:** Stage 2A, Day 15 of 28
-**Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03
+**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · **Current block:** Stage 2A, Day 15 of 28
+**Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03, 2026-08-05
 
 ---
 
@@ -15,11 +15,17 @@ Nothing has been changed in the current block. Section 6 lists what has been
 actioned without sign-off; all of it is desk-setup and movement timing, no
 exercise prescription.
 
-Sections 9 and 10 were added 2026-08-05 and are **non-blocking**. §9 is a
-specialization/high-frequency cycle, already deferred past this reassessment
-by the athlete — it needs a boundary, not a decision today. §10 is tendon
-loading, which bears directly on the §1 ask above and carries two questions
-(the proximal hamstring site, and the dose/frequency for any holds approved).
+Sections 9, 10 and 11 were added 2026-08-05. §9 and §10 are **non-blocking**:
+§9 is a specialization/high-frequency cycle, already deferred past this
+reassessment by the athlete — it needs a boundary, not a decision today; §10 is
+tendon loading, which bears directly on the §1 ask above and carries two
+questions (the proximal hamstring site, and the dose/frequency for any holds
+approved).
+
+**§11 is not background — it supplies a measured number for the §1 ask.**
+Interscapular fatigue onset under bodyweight load is **50–60 seconds**. If long
+isometric holds are approved, that figure is the anchor for prescribing them,
+and it also carries a new hamstring finding that bears on §10's open question.
 
 ## 2. Presentation
 
@@ -215,6 +221,59 @@ current stage, but enforcement is presently held in advisory mode (it reports
 a breach without capping volume). Restoring hard enforcement is a
 software-side decision the athlete controls, and it needs no prescription
 change.
+
+## 11. Flexibility baseline, 2026-08-05 — and the one number that dates the §1 ask
+
+Added 2026-08-05. The athlete rated all 22 poses of a 15-minute hip/spine yoga
+flow on a 1–100 scale (1 = can barely enter the position, 100 = at the physical
+limit, no stretch sensation left) with a written reason for each. First
+structured flexibility baseline on record. Full table in
+`docs/training/Yoga_Library.md`; synthesis in `patient_profile.py` `symptom_log`
+2026-08-05.
+
+**The dosing number for §1.** Down Dog — bodyweight through the shoulder girdle
+— produces interscapular burn at **50–60 seconds**. Every other hold in the flow
+is 30 s and none of them provoke it. That is the first quantified endurance
+threshold for this region, and it says the current symptom lives on the far side
+of a roughly minute-long boundary under load. If §1's isometric holds are
+approved, **we would rather have the prescribed duration set relative to that
+measurement than guessed** — including whether the intent is to work below it
+(accumulating volume without fatigue) or through it (training the failure point
+directly). §10's short-frequent-dose consideration interacts with this choice.
+
+**A second finding, bearing on §10's hamstring question.** The dominant
+restriction in the whole assessment is an inability to reach **anterior pelvic
+tilt in sitting** — straddle fold scored 25/100 (*"hips stuck in flexion with
+tail bone down, back fully rounds, unable to get shoulders over the hips unless
+greatly bending the knees"*), with the same report in three other seated
+positions. That is the functional presentation of the **proximal hamstring**
+restriction §10 already asks about at the ischial tuberosity, and it means that
+site now has a symptom, a palpation finding and a range measurement pointing at
+it. It does not conflict with the habitual *anterior* tilt documented in
+standing — tight hip flexors drive that in standing, tight hamstrings drive
+posterior tilt in long-sitting.
+
+**Three findings that narrow rather than add.**
+
+| Finding | What it changes |
+|---|---|
+| No left/right asymmetry in any passive stretch — both pigeons scored 40, both lunges 57, athlete's words: *"right and left are the same"* | The documented right > left asymmetry is a **loaded/active** finding. Its absence in a stretch is not resolution, and stretch-based screening will not detect it |
+| No snap or anterior-hip pinch in any passive flexion + external rotation position | Coxa saltans (§10 table) is **contractile**, not positional — it needs active iliopsoas load. Consistent with your "painless clicking is benign" position, and it narrows where the neutral-rotation cue is actually needed |
+| Seated twists 66–68, *"most of the twist comes from the upper body"*, no lumbar pops | Thoracic rotation is better than §5 driver 3 assumes, at least unloaded — mildly encouraging for the scapular picture |
+
+**One question we would not otherwise have thought to ask.** Butterfly forward
+fold scored 82 but the sensation was reported in the **hip flexors**, not the
+adductors. Anterior-hip sensation at deep hip flexion, in someone who cannot
+anteriorly tilt, is as consistent with anterior compression as with a stretch.
+Raised as a question, not a claim.
+
+**Standing constraint on any of this.** Hypermobility (Beighton 6/9) means the
+profile's own training rule favours controlled-range strength over passive
+end-range stretching. Six poses scored 80–88 — positions where he is already at
+end range with no muscular stop — so a low score here is not automatically an
+argument for more stretching, and the high scores are arguably the ones that
+warrant more caution. We are not proposing a flexibility prescription; we are
+putting the baseline on the record before it is acted on.
 
 ---
 

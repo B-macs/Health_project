@@ -11,6 +11,22 @@ Unlike services.rules, a "contraindicated" tag here does not block anything —
 these are externally-sourced videos the user chooses to follow, not exercises
 this app prescribes. The tags exist so the UI can surface an informed caution
 before the user starts.
+
+LATERALITY CONVENTION — a "(Right)"/"(Left)" suffix names the FRONT (or worked)
+leg, never the side receiving the stretch. For a pigeon those are the same leg;
+for a LUNGE they are OPPOSITE legs — "Deep Lunge (Right)" is right-foot-forward
+and therefore stretches the LEFT hip flexor. Getting this backwards silently
+moves every laterality-specific caution onto the wrong side, which matters here
+because the Coxa Saltans mechanism (patient_profile.py finding #4) and the
+post-Latarjet shoulder (finding #6) are both RIGHT-only. Resolved 2026-08-05
+against the athlete's own account of the video; the `option_note` fields are the
+internal evidence ("grab your left foot" appears on the Right hip opener, i.e.
+the left leg is the trailing one).
+
+ROM tags are SAFETY, not difficulty. A pose being `cleared` says nothing about
+how far into it this athlete can get — that was measured separately on
+2026-08-05 and lives in docs/training/Yoga_Library.md, because it is
+observational data about one person rather than a rule.
 """
 
 from __future__ import annotations
@@ -24,6 +40,10 @@ _SEVERITY_RANK = {"contraindicated": 0, "caution": 1, "cleared": 2, "unknown": 3
 
 @dataclass
 class YogaPose:
+    # A "(Right)"/"(Left)" suffix names the FRONT/worked leg — see the module
+    # docstring's LATERALITY CONVENTION. For lunges that is the OPPOSITE leg to
+    # the one being stretched; do not author a side-specific safety_note without
+    # checking which leg the mechanism actually lands on.
     name: str
     start_seconds: int
     hold_seconds: int
@@ -88,7 +108,18 @@ YOGA_LIBRARY: list[YogaSession] = [
         intensity="low",
         suitable_for=["rest_day", "active_rest_day"],
         poses=[
-            YogaPose("Spine Mobilisation", _t("00:20"), 30, "cleared"),
+            YogaPose(
+                "Seated Cross-Legged Side Bend (Shoulder Drop)", _t("00:20"), 30, "caution",
+                "Seated lateral flexion with rotation — the SAME mechanism as the two "
+                "Seated Side Stretches below, and it carries the same caution: bending "
+                "right narrows the stenotic right L5/S1 foramen, bending left loads the "
+                "dorsolateral protrusions at L3/4 and L4/5. Keep it light and "
+                "self-supported. Corrected 2026-08-05 — this was authored as "
+                "'Spine Mobilisation' and tagged `cleared` on the assumption it was a "
+                "cat-cow-family spinal mobilisation. It is not. Per the athlete: "
+                "cross-legged, hand resting on the knee, drawing the shoulder down "
+                "toward it, repeated on the other side.",
+            ),
             YogaPose(
                 "Seated Side Stretch (Right)", _t("01:00"), 30, "caution",
                 "Gentle lateral flexion — right foraminal stenosis at L5/S1. "
@@ -101,10 +132,15 @@ YOGA_LIBRARY: list[YogaSession] = [
             ),
             YogaPose(
                 "90/90 Hip Rotation", _t("02:20"), 30, "caution",
-                "Passes the right hip through flexion + external rotation — the exact "
-                "position that triggers the documented right-hip snap (Coxa Saltans, "
+                "Passes the right hip through flexion + external rotation — the position "
+                "family that triggers the documented right-hip snap (Coxa Saltans, "
                 "patient_profile.py finding #4). Bias toward neutral/internal rotation "
-                "on the right side.",
+                "on the right side. Kept at `caution` rather than downgraded even though "
+                "the athlete measured this as one of the EASIEST poses in the flow on "
+                "2026-08-05 with no snap: finding #4's trigger is ACTIVE hip flexion "
+                "under iliopsoas load (standing knee lift, dead bug), and a passive "
+                "floor-supported position does not reproduce it. The mechanism is "
+                "unchanged, this position just does not load it.",
             ),
             YogaPose(
                 "Butterfly Forward Fold", _t("03:00"), 30, "contraindicated",
@@ -119,8 +155,11 @@ YOGA_LIBRARY: list[YogaSession] = [
             ),
             YogaPose(
                 "Deep Lunge (Right)", _t("04:20"), 30, "cleared",
-                "Hip flexor / psoas stretch — directly addresses the psoas hypertonicity "
-                "noted in the MRI findings. Keep the pelvis neutral, avoid arching the low back.",
+                "Right foot FORWARD, so this stretches the LEFT hip flexor / psoas — "
+                "addresses the psoas hypertonicity noted in the MRI findings. Keep the "
+                "pelvis neutral; arching the low back is how depth gets bought here, and "
+                "the athlete's sense of 'neutral' is calibrated to a habitual anterior "
+                "tilt (symptom_log 2026-07-06).",
             ),
             YogaPose(
                 "Deep Lunge Hip Opener (Right)", _t("05:00"), 30, "caution",
@@ -132,18 +171,35 @@ YOGA_LIBRARY: list[YogaSession] = [
                 "Half Pigeon Pose (Right)", _t("05:40"), 30, "caution",
                 "Front-leg hip flexion + external rotation on the right — the documented "
                 "Coxa Saltans mechanism (finding #4). Keep a neutral/slight-internal-"
-                "rotation bias; ease out if it snaps or pinches.",
+                "rotation bias; ease out if it snaps or pinches. Athlete reported NO "
+                "pinch or click here on 2026-08-05 and scored it identically to the left "
+                "side, consistent with the 90/90 note above — passive positioning does "
+                "not load the tendon path. Retained as `caution` on the same reasoning.",
             ),
             YogaPose("Seated Twist (Left)", _t("06:20"), 30, "cleared",
                       "Gentle unloaded rotation — same family as the thread-the-needle "
                       "stretch already used in the release protocol. Keep it gentle."),
             YogaPose(
                 "Down Dog", _t("07:00"), 30, "caution",
-                "Mild spinal flexion under bodyweight load. Keep knees soft and back flat.",
+                "The load here is SHOULDER GIRDLE, not hamstring or spine — 30s of "
+                "bodyweight through a post-Latarjet right shoulder (finding #6) and the "
+                "left scapular retractors already flagged in the interscapular endurance "
+                "pattern (symptom_log 2026-08-03). Athlete reports the right shoulder "
+                "reaching back with a small whole-body twist to the right, i.e. the same "
+                "compensation finding #6 describes. Measured burn onset is 50-60s, so a "
+                "30s hold sits BELOW threshold — this is why the pose is tolerable, and "
+                "why lengthening it would change its character. Keep knees soft and back "
+                "flat for the secondary spinal-flexion component.",
             ),
             YogaPose(
                 "Deep Lunge (Left)", _t("07:40"), 30, "cleared",
-                "Hip flexor / psoas stretch. Keep the pelvis neutral, avoid arching the low back.",
+                "Left foot FORWARD, so this stretches the RIGHT hip flexor / TFL — the "
+                "side listed as overactive in patient_profile.py's imbalances. The "
+                "previous note here ('no right-side-specific concern on this leg') was "
+                "written against the opposite laterality convention and was backwards; "
+                "corrected 2026-08-05. Measured the same as the right-foot-forward "
+                "version by the athlete, i.e. the asymmetry does NOT appear in a passive "
+                "lunge — keep the pelvis neutral rather than arching for depth.",
             ),
             YogaPose(
                 "Deep Lunge Hip Opener (Left)", _t("08:20"), 30, "caution",
