@@ -230,6 +230,32 @@ RUNGS: dict[str, RungTest] = {
                "rather than ligamentous (finding #6). This is the athlete's own failed test: "
                "he cannot rest both elbows on the floor with the arms overhead.",
     ),
+    "lats": RungTest(
+        key="lats", label="Lats",
+        test_name="Supine unilateral overhead reach at FULL posterior pelvic tilt",
+        unit="°", value_at_100=160.0, value_at_0=0.0, bilateral=True,
+        setup="Supine with the hips and knees at 90° and the feet flat on a wall or a chair "
+              "seat — that holds the pelvis in FULL posterior tilt hands-free, which is more "
+              "than the 'flat' the shoulders_overhead test gauges with a towel. One arm at a "
+              "time, elbow locked straight, thumb at the ceiling, reaching overhead toward "
+              "the floor behind the head.",
+        lock="The feet on the wall, plus the low back pressed hard into the floor. Rounding "
+             "the lumbar spine IS the isolation mechanism here, not just a safety gate: of "
+             "the three tissues that limit an overhead reach — pec major, subscapularis with "
+             "teres major, and lats — the lats are the ONLY ones crossing the lower back, so "
+             "taking the lumbar spine into full flexion puts them on stretch relative to the "
+             "other two. Unilateral, so the other side cannot compensate.",
+        measurement="Same read as shoulders_overhead: photo from that side, floor-to-ulnar-"
+                    "styloid gap in cm, converted with the same frozen acromion-to-styloid "
+                    "length L. L and R separately, to 0.5 cm.",
+        safety="ANCHOR IS PROVISIONAL AND STRICTER THAN THE PUBLISHED NORM. The supine "
+               "lat-length test is normally defined against a FLAT lumbar spine, where full "
+               "shoulder flexion is the pass; this uses full posterior tilt, which is harder. "
+               "160° is set as the ceiling on that reasoning rather than from a source, so "
+               "the number is comparable with itself over time but NOT with a published norm "
+               "— revisit once there are two or three sessions to look at. Unloaded and "
+               "self-limited, no partner pressing the arm down (finding #6).",
+    ),
     "chest_horizontal": RungTest(
         key="chest_horizontal", label="Chest / pecs",
         test_name="Wall slide — goalpost start-position contact (the athlete's own drill)",
@@ -383,16 +409,17 @@ SKILLS: dict[str, Skill] = {
     ),
     "shoulder_flexion": Skill(
         key="shoulder_flexion", label="Shoulder flexion",
-        ladder=("shoulders_overhead", "chest_horizontal", "thoracic_rotation", "lumbar"),
+        ladder=("shoulders_overhead", "lats", "chest_horizontal", "thoracic_rotation",
+                "lumbar"),
         goal_level=70.0,
         gates="Overhead work (currently prohibited), lat pulldown path",
-        note="LADDER INCOMPLETE — nothing here isolates the LATS, the classic overhead "
-             "limiter. chest_horizontal catches pec length and shoulders_overhead is the "
-             "composite; neither separates the lat out. Flagged rather than papered over, "
-             "because this is a skill the athlete named as a problem. The isolation trick is "
-             "known (lats are the only one of the three crossing the lower back, so rounding "
-             "the lumbar spine while reaching overhead isolates them relatively) — it needs a "
-             "14th rung and the athlete's sign-off.",
+        note="The three tissues that limit an overhead reach now have a rung each: "
+             "chest_horizontal for pec major, lats for latissimus, and thoracic_rotation for "
+             "the segment they both act across, with shoulders_overhead as the composite the "
+             "athlete actually fails. READ THEM TOGETHER: if shoulders_overhead is low AND "
+             "lats is low, the lat is the limiter; if shoulders_overhead is low while lats is "
+             "fine, it is pec or capsule. That comparison is the reason the lat rung exists — "
+             "the composite alone cannot say which tissue stopped it.",
     ),
     "active_pike": Skill(
         key="active_pike", label="Active pike",

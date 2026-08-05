@@ -1483,35 +1483,64 @@ def _fx_render_capture(accent: str) -> None:
             st.warning(test.safety, icon="⚠️")
 
     sides = ["left", "right"] if test.bilateral else [""]
-    cols = st.columns(len(sides))
-    entered: dict[str, dict] = {}
-    for col, side in zip(cols, sides):
-        with col:
-            if side:
-                st.markdown(f'<div class="fx-cap">{side}</div>', unsafe_allow_html=True)
-            prev = existing.get((key, side))
-            vals = {}
-            for measure in flexibility_baselines.MEASURES:
-                current = getattr(prev, measure, None) if prev else None
-                vals[measure] = st.number_input(
-                    f"{measure} ({test.unit})", value=current, step=0.5,
-                    format="%.1f", key=f"fx_{key}_{side}_{measure}",
-                    placeholder="—",
-                )
-            entered[side] = vals
-
-    void = st.checkbox("The lock was lost — void this trial",
-                        key=f"fx_void_{key}")
-    if void:
-        st.caption("Nothing will be saved for this rung. A voided trial is "
-                   "reported as unmeasured, which is honest; a bad number "
-                   "poisons a whole ladder.")
-
-    b1, b2, b3 = st.columns([2, 1, 1])
     last = step == len(order) - 1
 
-    if b1.button("Save & next" if not last else "Save & finish",
-                  key=f"fx_save_{key}", use_container_width=True, type="primary"):
+    # A FORM, not loose inputs. st.number_input does not commit until the field
+    # loses focus — type a value, press Save immediately, and Streamlit still
+    # holds the old one. That silently DROPS a reading the athlete physically
+    # took, which is the worst failure this screen has; a full end-to-end run
+    # lost the `neck` rung to exactly it. A form commits every field atomically
+    # on submit, so the button press cannot outrun the typing.
+    with st.form(key=f"fx_form_{key}", border=False):
+        cols = st.columns(len(sides))
+        entered: dict[str, dict] = {}
+        for col, side in zip(cols, sides):
+            with col:
+                if side:
+                    st.markdown(f'<div class="fx-cap">{side}</div>',
+                                unsafe_allow_html=True)
+                prev = existing.get((key, side))
+                vals = {}
+                for measure in flexibility_baselines.MEASURES:
+                    current = getattr(prev, measure, None) if prev else None
+                    vals[measure] = st.number_input(
+                        f"{measure} ({test.unit})", value=current, step=0.5,
+                        format="%.1f", key=f"fx_{key}_{side}_{measure}",
+                        placeholder="—",
+                    )
+                entered[side] = vals
+
+        void = st.checkbox("The lock was lost — void this trial",
+                           key=f"fx_void_{key}")
+        st.caption("Voiding stores nothing for this rung. A voided trial reports "
+                   "as unmeasured, which is honest; a bad number poisons a ladder.")
+        submitted = st.form_submit_button(
+            "Save & next" if not last else "Save & finish",
+            use_container_width=True, type="primary")
+
+    if submitted:
+        # Range check runs HERE rather than live, because a form does not rerun
+        # on every keystroke. A value outside the test's own scale is almost
+        # always a unit slip, and it would otherwise clamp to 0 or 100 silently —
+        # indistinguishable from a real floor. First press warns and holds; a
+        # second press accepts it, because a genuinely extreme reading is data.
+        lo, hi = sorted((test.value_at_0, test.value_at_100))
+        bad = [f"{side or 'value'} {m} {v:g}{test.unit}"
+               for side, vals in entered.items() for m, v in vals.items()
+               if v is not None and not (lo <= v <= hi)]
+        confirm_key = f"fx_confirm_{key}"
+        if bad and not st.session_state.get(confirm_key):
+            st.session_state[confirm_key] = True
+            st.warning(
+                f"Outside this test's scale ({lo:g}–{hi:g}{test.unit}): "
+                + ", ".join(bad)
+                + ". Check the units. Press Save again to record it anyway.",
+                icon="⚠️",
+            )
+            submitted = False
+
+    if submitted:
+        st.session_state.pop(f"fx_confirm_{key}", None)
         updated = draft
         if not void:
             for side, vals in entered.items():
@@ -1529,6 +1558,7 @@ def _fx_render_capture(accent: str) -> None:
             st.session_state["fx_step"] = step + 1
         st.rerun()
 
+    b2, b3 = st.columns(2)
     if b2.button("Skip", key=f"fx_skip_{key}", use_container_width=True):
         # First-class: several tests need a bench or a wall. A skipped rung
         # reports honestly as unmeasured; a guessed one poisons a ladder.
@@ -1619,7 +1649,9 @@ def _fx_render_populated(rep, accent: str) -> None:
             unsafe_allow_html=True,
         )
 
-    with st.expander(f"Ladder rungs · {len(flexibility_baselines.RUNGS)} — diagnostics, not a score"):
+    with st.expander(f"What could be limiting you · {len(flexibility_baselines.RUNGS)} tests"):
+        st.caption("Diagnostics — only the **lowest** one limits a skill. The rest are "
+                   "here so you can see why, not to be averaged into anything.")
         for r in rep.rungs:
             if not r.measured:
                 continue

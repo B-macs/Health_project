@@ -231,20 +231,27 @@ def test_every_rung_names_a_lock():
         assert t.value_at_100 != t.value_at_0, key
 
 
-def test_the_thirteen_rungs_are_all_present():
-    assert len(fb.RUNGS) == 13
+def test_the_fourteen_rungs_are_all_present():
+    assert len(fb.RUNGS) == 14
     assert set(fb.RUNGS) == {
-        "neck", "shoulders_overhead", "chest_horizontal", "thoracic_rotation",
+        "neck", "shoulders_overhead", "lats", "chest_horizontal", "thoracic_rotation",
         "lumbar", "lateral_trunk", "hip_flexors", "quads", "hip_rotation",
         "adductors", "hamstrings", "calves_ankle", "squat_depth"}
 
 
-def test_the_missing_lat_rung_is_declared_not_hidden():
-    """shoulder_flexion's ladder has a known hole. It must stay visible until
-    the athlete signs off a 14th rung."""
-    note = fb.SKILLS["shoulder_flexion"].note
-    assert "LAT" in note.upper()
-    assert "INCOMPLETE" in note.upper()
+def test_the_lat_rung_closes_the_overhead_ladder():
+    """The hole this used to declare is filled. All three tissues that limit an
+    overhead reach now have a rung, and the lat one isolates by taking the
+    lumbar spine into full flexion — the lats are the only one of the three
+    crossing the lower back."""
+    ladder = fb.SKILLS["shoulder_flexion"].ladder
+    for rung in ("shoulders_overhead", "lats", "chest_horizontal"):
+        assert rung in ladder, rung
+    assert "INCOMPLETE" not in fb.SKILLS["shoulder_flexion"].note.upper()
+
+    lats = fb.RUNGS["lats"]
+    assert "lower back" in lats.lock          # the isolation mechanism, stated
+    assert "PROVISIONAL" in lats.safety.upper()  # the anchor is not a published norm
 
 
 def test_the_contraindicated_replacements_are_recorded():
@@ -326,6 +333,21 @@ def test_re_entering_a_test_overwrites_rather_than_accumulating():
     # ...but the other side is a different reading and must survive.
     c = fx.merge_reading(b, fb.RungReading("hamstrings", active=50.0, side="right"))
     assert len(c.readings) == 2
+
+
+def test_the_report_counts_distinct_rungs_not_readings():
+    """A bilateral test produces two readings for one rung. Counting readings
+    displayed "19 of 14 rungs" on the first real end-to-end run."""
+    a = fb.Assessment(taken_on=TODAY, readings=(
+        fb.RungReading("hamstrings", passive=85.5, active=36.0, side="left"),
+        fb.RungReading("hamstrings", passive=84.0, active=35.0, side="right"),
+        fb.RungReading("lumbar", active=0.5),
+    ))
+    rep = fx.report(a, TODAY)
+    assert len(rep.rungs) == 3            # three readings...
+    assert rep.measured_rung_count == 2   # ...but two rungs
+    assert rep.gap_count == 1             # only hamstrings has passive AND active
+    assert rep.measured_rung_count <= len(fb.RUNGS)
 
 
 def test_progress_counts_rungs_with_any_measure_not_readings():

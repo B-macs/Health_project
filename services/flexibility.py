@@ -171,11 +171,13 @@ class FlexibilityReport:
 
     @property
     def measured_rung_count(self) -> int:
-        return sum(1 for r in self.rungs if r.measured)
+        """DISTINCT rungs, not readings. A bilateral test produces two readings
+        for one rung, so counting readings displayed "19 of 14"."""
+        return len({r.key for r in self.rungs if r.measured})
 
     @property
     def gap_count(self) -> int:
-        return sum(1 for r in self.rungs if r.gap is not None)
+        return len({r.key for r in self.rungs if r.gap is not None})
 
 
 # ── scoring ──────────────────────────────────────────────────────────────────
