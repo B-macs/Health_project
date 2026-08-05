@@ -77,14 +77,18 @@ reason: `Movements per hour` is NOT partner-contaminated (solo vs partner
 p=0.43) — it is simply uncorrelated with Oura restless periods (rho=0.111,
 CI spanning zero) at ~3x the rate. Two counting rules on two detectors.
 
-WHY NOTHING IS INGESTED, even though 247 nights are covered by no device.
+WHY NOTHING IS INGESTED, even though 119 nights are covered by no device.
+(That figure was 247 until the Garmin duration backfill of 2026-08-05 showed
+most "device-free" nights were simply nights whose Garmin history had never
+been pulled. Over the 631-night era: Garmin 357, Oura 65, either 368 (58%);
+Sleep Cycle adds 119, taking coverage to 77%; 144 nights have nothing.)
 CLAUDE.md rule 2b and sleep_fusion.py's shadow report settle it: partial
 coverage of a rolling-baseline metric is not directional, it is noise with a
 plausible-looking sign — 26 fused nights moved the traffic light green ->
 YELLOW and RAISED 7-day sleep debt 8.04h -> 8.47h. Here it would be worse on
-four axes: the mixture is 247 uncalibrated against 43 calibrated nights (the
+four axes: the mixture is 119 uncalibrated against 43 calibrated nights (the
 anchored part would be the minority); the calibration is one night-level
-bias, not a per-minute mapping; +0.47h across 247 nights would raise the
+bias, not a per-minute mapping; +0.47h across 119 nights would raise the
 56-night sleep baseline exactly over the stretch the ring was not worn,
 making every later ring night score worse by comparison; and fusion's escape
 hatch — recompute the entire history in one pass — is unavailable because
@@ -96,9 +100,14 @@ than physiology, which is rule 2b's objection one notch more literal.
 THE BIAS HAS NO FIXED VALUE, BECAUSE THERE IS NO FIXED REFERENCE. Added
 2026-08-05 after measuring against Garmin as well, and it corrects the
 framing above rather than the numbers. Sleep Cycle reads +0.47h vs Oura
-(n=43) but -1.07h vs Garmin (n=11, sd 0.74) — opposite sign, twice the size.
-The reason is that the two wearables do not agree with each other: over the
-26 fused nights Garmin reads +1.11h MORE sleep than Oura (sd 0.64), and
+(n=43) but **-0.73h vs Garmin (n=168 after the duration backfill, sd 0.70,
+r=0.740)** — opposite sign. Note which way that cuts: the systematic offset
+is SMALLER against Garmin, but the night-to-night scatter is 50% WIDER than
+the devices' own (sd 0.70 vs 0.46), and scatter is what decides
+substitutability. The reason the sign flips is that the two wearables do not
+agree with each other: **Garmin reads +1.01h MORE sleep than Oura (sd 0.46,
+r=0.923, n=58 backfilled nights), replicating +1.11h over the 26 fused
+nights** — two independent windows, so a stable instrument offset. And
 their minute-by-minute stage agreement is 52.3% at Cohen's kappa 0.178 —
 "slight" on the conventional scale. So Sleep Cycle sits BETWEEN the devices,
 not outside them. Do not describe its +0.47h as an overestimate or as the
@@ -114,10 +123,10 @@ GARMIN HAS THE HISTORY, BUT ONLY THE SUMMARY. Probed 2026-08-05 over
 6/10, reaching back to 2024-10-31. The watch WAS worn across the Sleep Cycle
 era — the local record looked thin only because stage capture began
 2026-05-19 and `garmin_daily.sleep_hours` on 2026-06-28. Consequences:
-a DURATION comparison against Garmin over the full era is available and
-would take n from 11 to potentially 150+ (and would also feed the readiness
-baselines the "Garmin backfill" Known Open Issue is about), while a STAGE
-comparison against history is permanently impossible — Garmin keeps the
+a DURATION backfill was run 2026-08-05 (scripts/backfill_garmin_daily_sleep.py
+— 618 nights archived, 361 confirmed, 108 unconfirmed, 149 empty), taking the
+comparison from n=11 to n=168, while a STAGE comparison against history is
+permanently impossible — Garmin keeps the
 daily total and discards the hypnogram, so the 53 captured nights are all
 there will ever be. Before relying on the historical totals, check
 `sleepWindowConfirmationType`: an unconfirmed window is Garmin guessing.
