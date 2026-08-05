@@ -93,6 +93,35 @@ single pass covers both. Per S1/S2 the imported quantity would also swing on
 whether the athlete remembered to press start: phone-button behaviour rather
 than physiology, which is rule 2b's objection one notch more literal.
 
+THE BIAS HAS NO FIXED VALUE, BECAUSE THERE IS NO FIXED REFERENCE. Added
+2026-08-05 after measuring against Garmin as well, and it corrects the
+framing above rather than the numbers. Sleep Cycle reads +0.47h vs Oura
+(n=43) but -1.07h vs Garmin (n=11, sd 0.74) — opposite sign, twice the size.
+The reason is that the two wearables do not agree with each other: over the
+26 fused nights Garmin reads +1.11h MORE sleep than Oura (sd 0.64), and
+their minute-by-minute stage agreement is 52.3% at Cohen's kappa 0.178 —
+"slight" on the conventional scale. So Sleep Cycle sits BETWEEN the devices,
+not outside them. Do not describe its +0.47h as an overestimate or as the
+classic actigraphy wake-specificity failure; that was the first reading here
+and it does not survive a second comparator. The correct statement is that a
+channel whose offset depends on which device you call the reference is
+precisely the channel that cannot be substituted into a rolling baseline —
+which makes the verdict firmer, not softer.
+
+GARMIN HAS THE HISTORY, BUT ONLY THE SUMMARY. Probed 2026-08-05 over
+2024-10-31..2026-05-18 (10 sampled dates, `backfill_garmin_sleep_stages.py
+--probe`): sleepLevels present on 0/10, but `sleepTimeSeconds` present on
+6/10, reaching back to 2024-10-31. The watch WAS worn across the Sleep Cycle
+era — the local record looked thin only because stage capture began
+2026-05-19 and `garmin_daily.sleep_hours` on 2026-06-28. Consequences:
+a DURATION comparison against Garmin over the full era is available and
+would take n from 11 to potentially 150+ (and would also feed the readiness
+baselines the "Garmin backfill" Known Open Issue is about), while a STAGE
+comparison against history is permanently impossible — Garmin keeps the
+daily total and discards the hypnogram, so the 53 captured nights are all
+there will ever be. Before relying on the historical totals, check
+`sleepWindowConfirmationType`: an unconfirmed window is Garmin guessing.
+
 WHAT WOULD CHANGE THE ANSWER. Staging reads UNTESTABLE, not failed (n=19,
 one app version, one season) and accrues one night per night now the ring is
 worn again — re-run this after ~30 same-regime paired nights. Respiratory
