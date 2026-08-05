@@ -31,6 +31,7 @@ from datetime import date, datetime, timedelta
 from services import biometrics
 from services import content_weighting
 from services import dashboard
+from services import flexibility
 from services import home_snapshot
 from services import hr_load
 from services import hr_matching
@@ -217,6 +218,14 @@ _OURA_SYNC_RESUME_MINUTES = 30
 # .sync_state.json key holding the durable Home-card snapshot, keyed by ISO
 # date. See services/home_snapshot.py.
 _HOME_SNAPSHOT_KEY = "home_snapshots"
+
+#: Completed flexibility assessments, and the one in-progress draft.
+#: Kept on local disk rather than in Sheets deliberately: the capture flow runs
+#: ~40 minutes across 13 steps, and a network write failing at step 9 would lose
+#: the session. Syncing completed assessments onward is a separate, later job —
+#: losing the draft is the failure that actually matters.
+_FLEXIBILITY_KEY = "flexibility_assessments"
+_FLEXIBILITY_DRAFT_KEY = "flexibility_draft"
 _OURA_DAILY_HEADER = [
     "date",
     "sleep_score", "sleep_total_sleep", "sleep_efficiency", "sleep_restfulness",
@@ -4302,6 +4311,62 @@ class Repository:
         if home_snapshot.get(store, d) is None:
             return
         data[_HOME_SNAPSHOT_KEY] = home_snapshot.drop(store, d)
+        local_cache.write(data)
+
+    # ─── Flexibility assessments ─────────────────────────────────────────
+    #  The 13-rung standalone assessment (see flexibility_baselines.py). Read
+    #  its module docstring before touching this: readings are the ONLY input
+    #  the flexibility model has, so a lost or half-parsed one is not a
+    #  degraded score, it is a wrong one.
+
+    def get_flexibility_assessments(self) -> tuple:
+        """Every completed assessment, oldest first.
+
+        Unreadable entries are DROPPED rather than raising or being partially
+        recovered — flexibility.assessment_from_dict returns None for an
+        unknown schema or a rung that no longer exists, and "no assessment" is
+        a state the screen already renders honestly.
+        """
+        raw = local_cache.read().get(_FLEXIBILITY_KEY) or []
+        parsed = [flexibility.assessment_from_dict(d) for d in raw]
+        good = [a for a in parsed if a is not None]
+        return tuple(sorted(good, key=lambda a: a.taken_on))
+
+    def save_flexibility_assessment(self, assessment) -> None:
+        """Store a completed assessment, replacing any same-dated one.
+
+        Same date replaces rather than appending: re-running on the same day is
+        a correction, and two entries for one date would let the model see a
+        history that never happened.
+        """
+        data = local_cache.read()
+        existing = data.get(_FLEXIBILITY_KEY) or []
+        stamp = assessment.taken_on.isoformat()
+        kept = [d for d in existing
+                if not (isinstance(d, dict) and d.get("taken_on") == stamp)]
+        kept.append(flexibility.assessment_to_dict(assessment))
+        data[_FLEXIBILITY_KEY] = kept
+        local_cache.write(data)
+
+    def get_flexibility_draft(self):
+        """The in-progress assessment, or None. This is what makes the flow
+        resumable — 40 minutes is long enough to be interrupted, and a
+        half-finished assessment that vanishes will not be attempted twice."""
+        return flexibility.assessment_from_dict(
+            local_cache.read().get(_FLEXIBILITY_DRAFT_KEY) or {})
+
+    def save_flexibility_draft(self, assessment) -> None:
+        """Called after EVERY step, not at the end. The whole point is that
+        nothing is lost mid-flow."""
+        data = local_cache.read()
+        data[_FLEXIBILITY_DRAFT_KEY] = flexibility.assessment_to_dict(assessment)
+        local_cache.write(data)
+
+    def clear_flexibility_draft(self) -> None:
+        data = local_cache.read()
+        if _FLEXIBILITY_DRAFT_KEY not in data:
+            return
+        data.pop(_FLEXIBILITY_DRAFT_KEY, None)
         local_cache.write(data)
 
     def _sync_oura_daily(self, token: str, start: str, end: str) -> int:

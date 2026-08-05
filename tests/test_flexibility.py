@@ -285,6 +285,59 @@ def test_the_legacy_gym_readings_are_provenance_and_name_their_successor():
         assert r.superseded_by in fb.RUNGS, r.label
 
 
+# ── serialisation and the resumable draft ────────────────────────────────────
+
+def test_an_assessment_round_trips_through_the_store_format():
+    a = fb.Assessment(taken_on=TODAY, cold=True, note="n", readings=(
+        fb.RungReading("hamstrings", passive=85.5, active=36.0, side="left"),
+        fb.RungReading("lumbar", active=0.5),
+    ))
+    assert fx.assessment_from_dict(fx.assessment_to_dict(a)) == a
+
+
+def test_an_unreadable_assessment_degrades_to_none_rather_than_half_parsing():
+    """"No assessment" is a state the screen renders honestly. A half-parsed one
+    would silently score a ladder against rungs it does not have."""
+    assert fx.assessment_from_dict({}) is None
+    assert fx.assessment_from_dict({"schema": 99, "taken_on": "2026-08-05"}) is None
+    assert fx.assessment_from_dict({"schema": 1, "taken_on": "not-a-date"}) is None
+    assert fx.assessment_from_dict({"schema": 1}) is None
+
+
+def test_a_reading_for_a_retired_rung_is_dropped_not_kept():
+    a = fx.assessment_from_dict({
+        "schema": 1, "taken_on": "2026-08-05",
+        "readings": [{"rung": "some_removed_rung", "active": 10},
+                     {"rung": "hamstrings", "active": 45}],
+    })
+    assert [r.rung for r in a.readings] == ["hamstrings"]
+
+
+def test_re_entering_a_test_overwrites_rather_than_accumulating():
+    """A corrected trial must not leave the bad one in the record, where the
+    worse-side rule would pick it up."""
+    a = fb.Assessment(taken_on=TODAY, readings=(
+        fb.RungReading("hamstrings", active=36.0, side="left"),
+    ))
+    b = fx.merge_reading(a, fb.RungReading("hamstrings", active=72.0, side="left"))
+    assert len(b.readings) == 1
+    assert b.readings[0].active == 72.0
+
+    # ...but the other side is a different reading and must survive.
+    c = fx.merge_reading(b, fb.RungReading("hamstrings", active=50.0, side="right"))
+    assert len(c.readings) == 2
+
+
+def test_progress_counts_rungs_with_any_measure_not_readings():
+    a = fb.Assessment(taken_on=TODAY, readings=(
+        fb.RungReading("hamstrings", active=45.0, side="left"),
+        fb.RungReading("hamstrings", active=44.0, side="right"),
+        fb.RungReading("lumbar"),                       # empty — not progress
+    ))
+    assert fx.assessment_progress(a) == (1, len(fb.RUNGS))
+    assert fx.assessment_progress(None) == (0, len(fb.RUNGS))
+
+
 # ── the scheduling window ────────────────────────────────────────────────────
 
 def test_the_window_reads_the_training_log():

@@ -1306,22 +1306,19 @@ def _recent_sessions():
 # ─────────────────────────────────────────────────────────────────────────────
 #  Flexibility detail screen (tab_bioage → ?bioage=flexibility). v2.
 #
-#  Rebuilt 2026-08-05. The v1 screen averaged eight regions into one number and
-#  the athlete's objection killed it: "we know my hips are stuck in flexion with
-#  my back arched and this is a huge issue for me, and yet my flexibility score
-#  is nearly 80 for hips."
+#  THREE STATES, DESIGNED SEPARATELY. Empty is not a degraded version of
+#  populated — it is where this athlete actually is, it will be for weeks, and
+#  it is the only state with an obvious single action. It gets its own screen
+#  with one button on it rather than seventeen cards reading "not measured".
 #
-#  So this screen leads with SKILLS, not joints, and every skill prints the name
-#  of the rung that is limiting it — because min(ladder) is the score and the
-#  name of that rung is the only output that says what to train. Rungs appear
-#  underneath as diagnostics, never averaged into anything.
+#  Capture is one test per step because 13 rungs x 3 measures x left/right is
+#  up to 78 numbers, and it saves a draft after EVERY step because 40 minutes
+#  is long enough to be interrupted. A half-finished assessment that vanishes
+#  will not be attempted twice.
 #
-#  Each rung shows the passive/active GAP where both exist, and a prescription
-#  derived from it: a wide gap means the range is there and cannot be held, so
-#  more stretching is the wrong lever.
-#
-#  The empty state is the real state today: no assessment has been run, so every
-#  skill renders as unmeasured rather than as a zero.
+#  Populated leads with ONE rung — the lowest across every ladder — because the
+#  original ask was "come to conclusions on where to focus in my training", and
+#  four skill scores is not that answer.
 # ─────────────────────────────────────────────────────────────────────────────
 
 _FX_PRESCRIPTION_LABEL: dict[str, str] = {
@@ -1330,268 +1327,368 @@ _FX_PRESCRIPTION_LABEL: dict[str, str] = {
     fx.PRESCRIPTION_UNKNOWN:  "gap not measured",
 }
 
+_ACCENT_FLEX = _BIOAGE_COLORS["flexibility"]
+
 _FLEXIBILITY_CSS = f"""
 <style>
-.fx-hero {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:16px;
-  padding:20px 22px; margin-bottom:14px; }}
-.fx-hero .cap {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
-  letter-spacing:.13em; text-transform:uppercase; color:{_INK3}; margin-bottom:10px; }}
-.fx-hero .big {{ font-size:40px; font-weight:800; line-height:1.15; color:{_INK}; }}
-.fx-hero .sub {{ color:{_INK2}; font-size:12.5px; margin-top:10px; line-height:1.55; }}
-
-.fx-skill {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:14px;
-  padding:15px 18px; margin-bottom:10px; }}
-.fx-skill .top {{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }}
-.fx-skill .nm {{ color:{_INK}; font-size:16px; font-weight:650; }}
-.fx-skill .gates {{ color:{_INK3}; font-size:10.5px; margin-top:3px; }}
-.fx-skill .val {{ font-size:27px; font-weight:800; font-variant-numeric:tabular-nums; }}
-.fx-skill .val u {{ text-decoration:none; font-size:11px; color:{_INK3}; font-weight:500; }}
-.fx-lim {{ margin-top:11px; padding:9px 12px; border-radius:9px;
-  background:rgba(196,120,120,.10); border:1px solid rgba(196,120,120,.28); }}
-.fx-lim .k {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
-  letter-spacing:.12em; text-transform:uppercase; color:{_BAD}; }}
-.fx-lim .v {{ color:{_INK}; font-size:14px; font-weight:650; margin-top:5px; }}
-.fx-lim .d {{ color:{_INK3}; font-size:10.5px; margin-top:3px; line-height:1.45; }}
-
-.fx-track {{ height:8px; border-radius:5px; background:rgba(255,255,255,.07);
-  margin-top:10px; position:relative; overflow:hidden; }}
-.fx-track i {{ display:block; height:100%; border-radius:5px; }}
-.fx-goal {{ position:absolute; top:-3px; bottom:-3px; width:2px;
-  background:{_GOOD}; opacity:.85; }}
-
-.fx-rung {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:11px;
-  padding:11px 14px; margin-bottom:7px; }}
-.fx-rung .r1 {{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }}
-.fx-rung .rn {{ color:{_INK}; font-size:13.5px; font-weight:600; }}
-.fx-rung .rv {{ font-size:17px; font-weight:700; font-variant-numeric:tabular-nums; color:{_INK}; }}
-.fx-rung .m {{ display:flex; gap:14px; flex-wrap:wrap; margin-top:7px;
-  font:11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:{_INK3}; }}
-.fx-rung .m b {{ color:{_INK2}; font-weight:600; }}
-.fx-rung .gap {{ margin-top:6px; font-size:10.5px; color:{_INK3}; }}
+.fx-card {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:14px;
+  padding:16px 18px; margin-bottom:10px; }}
+.fx-card.hi {{ border-color:rgba(196,120,120,.45); background:rgba(196,120,120,.07); }}
+.fx-cap {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.13em; text-transform:uppercase; color:{_INK3}; }}
+.fx-huge {{ font-size:40px; font-weight:800; line-height:1.08; margin-top:8px; }}
+.fx-big {{ font-size:30px; font-weight:800; line-height:1.1; margin-top:6px; }}
+.fx-sm {{ font-size:11.5px; color:{_INK3}; margin-top:8px; line-height:1.6; }}
+.fx-row {{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }}
+.fx-nm {{ color:{_INK}; font-size:15px; font-weight:650; }}
+.fx-val {{ font-size:23px; font-weight:750; font-variant-numeric:tabular-nums; }}
+.fx-val u {{ text-decoration:none; font-size:10px; color:{_INK3}; font-weight:500; }}
+.fx-track {{ height:7px; border-radius:4px; background:rgba(255,255,255,.07);
+  margin-top:9px; position:relative; overflow:hidden; }}
+.fx-track i {{ display:block; height:100%; border-radius:4px; }}
+.fx-goal {{ position:absolute; top:-3px; bottom:-3px; width:2px; background:{_GOOD}; }}
+.fx-kv {{ display:flex; gap:16px; flex-wrap:wrap; margin-top:9px;
+  font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:{_INK3}; }}
+.fx-kv b {{ color:{_INK2}; font-weight:650; }}
+.fx-lock {{ background:rgba(191,160,106,.11); border:1px solid rgba(191,160,106,.32);
+  color:#E2CB9B; border-radius:10px; padding:11px 13px; font-size:11.5px;
+  line-height:1.6; margin:10px 0; }}
+.fx-steps {{ display:flex; gap:3px; margin-bottom:12px; }}
+.fx-steps i {{ height:3px; flex:1; border-radius:2px; background:rgba(255,255,255,.10); }}
+.fx-steps i.done {{ background:{_GOOD}; }}
+.fx-steps i.now {{ background:{_ACCENT_FLEX}; }}
+.fx-steps i.skip {{ background:{_INK3}; }}
 .fx-pill {{ display:inline-block; padding:2px 8px; border-radius:999px;
-  font-size:9.5px; font-weight:700; letter-spacing:.03em; }}
-.fx-empty {{ color:{_INK3}; font-size:11.5px; font-style:italic; }}
+  font-size:9.5px; font-weight:700; }}
 </style>
 """
 
 
-def _fx_bar(pct: float, colour: str, goal: float | None = None) -> str:
-    goal_mark = (f'<span class="fx-goal" style="left:{goal:.0f}%;"></span>'
-                 if goal is not None else "")
+def _fx_track(pct: float, colour: str, goal: float | None = None) -> str:
+    mark = f'<span class="fx-goal" style="left:{goal:.0f}%;"></span>' if goal else ""
     return (f'<div class="fx-track"><i style="width:{max(0.0, min(100.0, pct)):.0f}%;'
-            f'background:{colour};"></i>{goal_mark}</div>')
+            f'background:{colour};"></i>{mark}</div>')
 
 
-def _fx_skill_html(skill) -> str:
-    base = flexibility_baselines.SKILLS[skill.key]
+# ── state 1: empty ───────────────────────────────────────────────────────────
 
-    if skill.excluded:
-        return (
-            f'<div class="fx-skill"><div class="top">'
-            f'<div><span class="nm">{skill.label}</span>'
-            f'<div class="gates">tracked so regression is visible &middot; never a target</div></div>'
-            f'<span class="val" style="color:{_INK3};font-size:13px;">excluded</span></div>'
-            f'<div class="fx-lim" style="background:rgba(154,163,178,.07);'
-            f'border-color:{_HAIR};"><div class="k" style="color:{_INK3};">why</div>'
-            f'<div class="d">{base.excluded_reason}</div></div></div>'
-        )
+def _fx_render_empty(accent: str) -> None:
+    """Two cards and a real button. The skills and rungs are deliberately NOT
+    rendered — thirteen unmeasured things is a progress bar at zero, and it
+    belongs inside the assessment where it fills up, not on the dashboard."""
+    st.markdown(
+        f'<div class="fx-card"><div class="fx-cap">Standing goal &middot; no deadline</div>'
+        f'<div class="fx-huge" style="color:{accent};">Not measured</div>'
+        f'<div class="fx-sm">{len(flexibility_baselines.RUNGS)} tests &middot; ~40 min '
+        f'&middot; measured <b style="color:{_INK2};">cold</b>, no warm-up.<br>'
+        f'Every 6&ndash;12 weeks. Nothing else on this screen works until it runs once.'
+        f'</div></div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("Start assessment", key="fx_start", use_container_width=True,
+                  type="primary"):
+        st.session_state["fx_mode"] = "capture"
+        st.session_state["fx_step"] = 0
+        st.rerun()
 
-    if skill.score is None:
-        return (
-            f'<div class="fx-skill"><div class="top">'
-            f'<div><span class="nm">{skill.label}</span>'
-            f'<div class="gates">gates: {base.gates}</div></div>'
-            f'<span class="val" style="color:{_INK3};font-size:14px;">not measured</span></div>'
-            f'<div class="gap fx-empty" style="margin-top:9px;">'
-            f'{len(skill.unmeasured_rungs)} of {len(base.ladder)} rungs have no reading &mdash; '
-            f'run the assessment</div></div>'
-        )
-
-    colour = _GOOD if skill.clears_goal else _BAD
-    bound = ("" if skill.complete else
-             f'<div class="gap fx-empty">Upper bound only &mdash; '
-             f'{len(skill.unmeasured_rungs)} rung(s) unmeasured, and an unmeasured rung '
-             f'could be lower than anything seen.</div>')
-    return (
-        f'<div class="fx-skill"><div class="top">'
-        f'<div><span class="nm">{skill.label}</span>'
-        f'<div class="gates">gates: {base.gates}</div></div>'
-        f'<span class="val" style="color:{colour};">{skill.score:.0f}<u>/100</u></span></div>'
-        f'{_fx_bar(skill.score, colour, skill.goal_level)}'
-        f'<div class="fx-lim"><div class="k">limiting rung</div>'
-        f'<div class="v">{skill.limiting_label}</div>'
-        f'<div class="d">Only the lowest rung limits the skill. Raise this one and the '
-        f'limiter moves to the next &mdash; that re-pointing is the programme.</div></div>'
-        f'{bound}</div>'
+    st.markdown(
+        f'<div class="fx-card" style="margin-top:12px;">'
+        f'<div class="fx-nm" style="font-size:13px;color:{_INK2};">'
+        f'Why there is nothing else here</div>'
+        f'<div class="fx-sm">The 22 yoga depth-ratings from '
+        f'{flexibility_baselines.LEGACY_DEPTH_RATING_DATE:%d %b %Y} are kept in full, '
+        f'and feed nothing. They answer &ldquo;how far did I get <i>and</i> how much '
+        f'did I feel&rdquo; &mdash; neither of the two things this model measures, so '
+        f'reinterpreting them would be inventing data.</div></div>',
+        unsafe_allow_html=True,
     )
 
 
-def _fx_rung_html(rung) -> str:
-    test = flexibility_baselines.RUNGS[rung.key]
-    side = f' <span style="color:{_INK3};font-size:11px;">{rung.side}</span>' if rung.side else ""
+# ── state 2: capture ─────────────────────────────────────────────────────────
 
-    parts = []
-    for m in (rung.passive, rung.isometric, rung.active):
-        if m is None:
+def _fx_steps_html(order: list[str], step: int, draft) -> str:
+    done = set()
+    if draft is not None:
+        done = {r.rung for r in draft.readings
+                if r.passive is not None or r.isometric is not None or r.active is not None}
+    out = []
+    for i, key in enumerate(order):
+        cls = "now" if i == step else ("done" if key in done else "")
+        out.append(f'<i class="{cls}"></i>')
+    return f'<div class="fx-steps">{"".join(out)}</div>'
+
+
+def _fx_render_capture(accent: str) -> None:
+    repo_ = repo.get_repository()
+    order = list(flexibility_baselines.RUNGS)
+    step = int(st.session_state.get("fx_step", 0))
+    step = max(0, min(step, len(order) - 1))
+
+    draft = repo_.get_flexibility_draft()
+    if draft is None:
+        # Session 1 of this assessment: the cold gate. Asked once, recorded on
+        # the assessment, because a warm reading measures the viscoelastic
+        # effect that is gone in hours and is not comparable with a cold one.
+        st.markdown(
+            f'<div class="fx-card"><div class="fx-cap">Before you start</div>'
+            f'<div class="fx-big" style="color:{accent};">Measure cold</div>'
+            f'<div class="fx-sm">No warm-up, no session beforehand. A warm reading '
+            f'measures the viscoelastic effect, which is gone within hours &mdash; a '
+            f'cold one isolates the durable change. A warm session is still worth '
+            f'recording, but it is labelled and never compared with a cold one.'
+            f'</div></div>',
+            unsafe_allow_html=True,
+        )
+        cold = st.radio("Is this a cold measurement?",
+                        ["Cold — no warm-up", "Warm — I have trained today"],
+                        key="fx_cold", label_visibility="collapsed")
+        c1, c2 = st.columns([2, 1])
+        if c1.button("Begin", key="fx_begin", use_container_width=True, type="primary"):
+            repo_.save_flexibility_draft(flexibility_baselines.Assessment(
+                taken_on=date.today(), readings=(),
+                cold=cold.startswith("Cold"),
+            ))
+            st.rerun()
+        if c2.button("Cancel", key="fx_cancel0", use_container_width=True):
+            st.session_state["fx_mode"] = None
+            st.rerun()
+        return
+
+    key = order[step]
+    test = flexibility_baselines.RUNGS[key]
+    existing = {(r.rung, r.side): r for r in draft.readings}
+
+    st.markdown(_fx_steps_html(order, step, draft), unsafe_allow_html=True)
+    st.markdown(
+        f'<div class="fx-row"><span class="fx-nm">{test.label}</span>'
+        f'<span class="fx-cap">{step + 1} of {len(order)}</span></div>'
+        f'<div class="fx-sm" style="margin-top:2px;">{test.test_name}</div>',
+        unsafe_allow_html=True,
+    )
+
+    # The lock is the loudest thing on the screen, above the setup and above the
+    # fields — an unlocked joint lets a neighbour substitute and the test
+    # measures nothing, which is the failure that broke this model twice.
+    st.markdown(f'<div class="fx-lock"><b>LOCK</b> &mdash; {test.lock}</div>',
+                unsafe_allow_html=True)
+    st.markdown(f'<div class="fx-card"><div class="fx-sm" style="color:{_INK2};">'
+                f'{test.setup}</div></div>', unsafe_allow_html=True)
+    with st.expander("How to read it"):
+        st.caption(test.measurement)
+        st.caption(f"Scale: **{test.value_at_100:g}{test.unit} = 100** · "
+                   f"**{test.value_at_0:g}{test.unit} = 0**")
+        if test.replaces:
+            st.caption(f"Replaces {test.replaces}.")
+        if test.safety:
+            st.warning(test.safety, icon="⚠️")
+
+    sides = ["left", "right"] if test.bilateral else [""]
+    cols = st.columns(len(sides))
+    entered: dict[str, dict] = {}
+    for col, side in zip(cols, sides):
+        with col:
+            if side:
+                st.markdown(f'<div class="fx-cap">{side}</div>', unsafe_allow_html=True)
+            prev = existing.get((key, side))
+            vals = {}
+            for measure in flexibility_baselines.MEASURES:
+                current = getattr(prev, measure, None) if prev else None
+                vals[measure] = st.number_input(
+                    f"{measure} ({test.unit})", value=current, step=0.5,
+                    format="%.1f", key=f"fx_{key}_{side}_{measure}",
+                    placeholder="—",
+                )
+            entered[side] = vals
+
+    void = st.checkbox("The lock was lost — void this trial",
+                        key=f"fx_void_{key}")
+    if void:
+        st.caption("Nothing will be saved for this rung. A voided trial is "
+                   "reported as unmeasured, which is honest; a bad number "
+                   "poisons a whole ladder.")
+
+    b1, b2, b3 = st.columns([2, 1, 1])
+    last = step == len(order) - 1
+
+    if b1.button("Save & next" if not last else "Save & finish",
+                  key=f"fx_save_{key}", use_container_width=True, type="primary"):
+        updated = draft
+        if not void:
+            for side, vals in entered.items():
+                if all(v is None for v in vals.values()):
+                    continue
+                updated = fx.merge_reading(updated, flexibility_baselines.RungReading(
+                    rung=key, side=side, **vals))
+        repo_.save_flexibility_draft(updated)
+        if last:
+            repo_.save_flexibility_assessment(updated)
+            repo_.clear_flexibility_draft()
+            st.session_state["fx_mode"] = None
+            _flexibility_screen_data.clear()
+        else:
+            st.session_state["fx_step"] = step + 1
+        st.rerun()
+
+    if b2.button("Skip", key=f"fx_skip_{key}", use_container_width=True):
+        # First-class: several tests need a bench or a wall. A skipped rung
+        # reports honestly as unmeasured; a guessed one poisons a ladder.
+        if last:
+            repo_.save_flexibility_assessment(draft)
+            repo_.clear_flexibility_draft()
+            st.session_state["fx_mode"] = None
+            _flexibility_screen_data.clear()
+        else:
+            st.session_state["fx_step"] = step + 1
+        st.rerun()
+
+    if b3.button("Pause", key=f"fx_pause_{key}", use_container_width=True):
+        st.session_state["fx_mode"] = None
+        st.rerun()
+
+    if step > 0 and st.button("← Back", key=f"fx_back_{key}"):
+        st.session_state["fx_step"] = step - 1
+        st.rerun()
+
+
+# ── state 3: populated ───────────────────────────────────────────────────────
+
+def _fx_headline_rung(rep) -> tuple:
+    """(RungScore, how many ladders it is currently lowest on), or (None, 0).
+
+    'limits N of 4 skills' is not a new metric — it is a count of how many
+    ladders this rung is the minimum of. lumbar sits on ALL FOUR, so if it is
+    ever the limiter it is unambiguously the highest-leverage thing to train,
+    and the screen can say so without any extra measurement."""
+    counts: dict[str, int] = {}
+    for s in rep.skills:
+        if s.excluded or s.limiting_rung is None:
             continue
-        parts.append(f'<span><b>{m.measure}</b> {m.score:.0f} '
-                     f'<span style="opacity:.7;">({m.raw:g}{test.unit})</span></span>')
-    measures = "".join(parts) or f'<span class="fx-empty">no reading</span>'
+        counts[s.limiting_rung] = counts.get(s.limiting_rung, 0) + 1
+    if not counts:
+        return None, 0
+    by_key = {r.key: r for r in rep.rungs if r.measured}
+    worst = min((by_key[k] for k in counts if k in by_key),
+                key=lambda r: r.score, default=None)
+    return worst, counts.get(worst.key, 0) if worst else 0
 
-    gap_html = ""
-    if rung.gap is not None:
-        pres = rung.prescription
-        colour = _BAD if pres == fx.PRESCRIPTION_STRENGTH else _WARN
-        gap_html = (
-            f'<div class="gap">passive &minus; active = <b style="color:{colour};">'
-            f'{rung.gap:.0f}</b> &middot; '
-            f'<span class="fx-pill" style="background:{colour}22;color:{colour};">'
-            f'{_FX_PRESCRIPTION_LABEL[pres]}</span></div>'
+
+def _fx_render_populated(rep, accent: str) -> None:
+    lead, limits_n = _fx_headline_rung(rep)
+    active = [s for s in rep.skills if not s.excluded]
+
+    if lead is not None:
+        pres = _FX_PRESCRIPTION_LABEL[lead.prescription]
+        gap = f'{lead.gap:+.0f}' if lead.gap is not None else "—"
+        st.markdown(
+            f'<div class="fx-card hi"><div class="fx-cap" style="color:{_BAD};">'
+            f'Train this</div>'
+            f'<div class="fx-big" style="color:{_BAD};">{lead.label}</div>'
+            f'<div class="fx-kv"><span><b>{lead.score:.0f}</b>/100</span>'
+            f'<span>limits <b>{limits_n} of {len(active)}</b> skills</span>'
+            f'<span>gap <b>{gap}</b> &rarr; <b>{pres}</b></span></div></div>',
+            unsafe_allow_html=True,
         )
 
-    score = f"{rung.score:.0f}" if rung.measured else "&mdash;"
-    return (
-        f'<div class="fx-rung"><div class="r1">'
-        f'<span class="rn">{rung.label}{side}</span>'
-        f'<span class="rv">{score}</span></div>'
-        f'<div class="m">{measures}</div>{gap_html}</div>'
-    )
+    st.markdown(f'<div class="fx-cap" style="margin:16px 0 8px;">Skills</div>',
+                unsafe_allow_html=True)
+    for s in active:
+        if s.score is None:
+            st.markdown(
+                f'<div class="fx-card"><div class="fx-row">'
+                f'<span class="fx-nm">{s.label}</span>'
+                f'<span class="fx-val" style="color:{_INK3};font-size:14px;">'
+                f'not measured</span></div>'
+                f'<div class="fx-sm">{len(s.unmeasured_rungs)} rung(s) with no reading'
+                f'</div></div>',
+                unsafe_allow_html=True,
+            )
+            continue
+        colour = _GOOD if s.clears_goal else (_WARN if s.score >= s.goal_level * 0.8 else _BAD)
+        bound = ("" if s.complete else
+                 f'<div class="fx-sm" style="color:{_WARN};">&#9888; upper bound &mdash; '
+                 f'{len(s.unmeasured_rungs)} rung(s) unmeasured, and an unmeasured rung '
+                 f'could be lower than anything seen</div>')
+        st.markdown(
+            f'<div class="fx-card"><div class="fx-row">'
+            f'<span class="fx-nm">{s.label}</span>'
+            f'<span class="fx-val" style="color:{colour};">{s.score:.0f}<u>/100</u></span>'
+            f'</div>{_fx_track(s.score, colour, s.goal_level)}'
+            f'<div class="fx-sm">limited by <b style="color:{_INK2};">'
+            f'{s.limiting_label}</b> &middot; gates '
+            f'{flexibility_baselines.SKILLS[s.key].gates}</div>{bound}</div>',
+            unsafe_allow_html=True,
+        )
 
+    with st.expander(f"Ladder rungs · {len(flexibility_baselines.RUNGS)} — diagnostics, not a score"):
+        for r in rep.rungs:
+            if not r.measured:
+                continue
+            parts = []
+            for m in (r.passive, r.isometric, r.active):
+                if m is not None:
+                    parts.append(f"**{m.measure}** {m.score:.0f} ({m.raw:g}{m.unit})")
+            gap = (f" · gap **{r.gap:+.0f}** → {_FX_PRESCRIPTION_LABEL[r.prescription]}"
+                   if r.gap is not None else "")
+            side = f" *{r.side}*" if r.side else ""
+            st.markdown(f"**{r.label}**{side} — {r.score:.0f}/100 · "
+                        + " · ".join(parts) + gap)
+
+
+# ── entry point ──────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _flexibility_screen_data() -> dict:
-    """Everything the Flexibility screen renders.
-
-    No I/O — skills, rungs and any recorded assessment are in-repo constants,
-    so unlike the Metabolism screen there is no read that can fail and no error
-    state to carry."""
+    """Skills and rungs are in-repo constants; only the assessments are read
+    from disk, which cannot fail the way a Sheets read can."""
     today = date.today()
-    return {"report": fx.report(today=today), "today": today}
+    stored = repo.get_repository().get_flexibility_assessments()
+    latest = stored[-1] if stored else None
+    return {"report": fx.report(latest, today), "count": len(stored), "today": today}
 
 
 def _render_flexibility_detail() -> None:
-    """Flexibility detail — skills first with their limiting rung named, then
-    the rungs as diagnostics."""
     accent = _BIOAGE_COLORS["flexibility"]
     st.markdown(_FLEXIBILITY_CSS, unsafe_allow_html=True)
 
-    data = _flexibility_screen_data()
-    rep, today = data["report"], data["today"]
+    if st.session_state.get("fx_mode") == "capture":
+        _fx_render_capture(accent)
+        return
 
-    measured = rep.measured_rung_count
-    total = len(flexibility_baselines.RUNGS)
+    data = _flexibility_screen_data()
+    rep = data["report"]
+    draft = repo.get_repository().get_flexibility_draft()
+
+    if draft is not None:
+        done, total = fx.assessment_progress(draft)
+        st.info(f"**Assessment in progress** — {done} of {total} rungs recorded, "
+                f"started {draft.taken_on:%d %b}. It is saved after every step.",
+                icon="🪜")
+        if st.button("Resume assessment", key="fx_resume",
+                      use_container_width=True, type="primary"):
+            st.session_state["fx_mode"] = "capture"
+            st.rerun()
 
     if rep.assessed_on is None:
-        st.markdown(
-            f'<div class="fx-hero"><div class="cap">Flexibility</div>'
-            f'<div class="big" style="color:{accent};">No assessment yet</div>'
-            f'<div class="sub">This is the real state, not a loading screen. '
-            f'<b>0 of {total} rungs</b> have a reading and <b>0</b> have the '
-            f'passive&minus;active gap that decides whether a rung needs range or '
-            f'strength.<br>The 22 yoga depth-ratings from 05 Aug 2026 are kept in full '
-            f'as provenance and feed nothing &mdash; they answer neither question '
-            f'("how far did I get <i>and</i> how much did I feel"), so reinterpreting '
-            f'them would be inventing data.</div></div>',
-            unsafe_allow_html=True,
-        )
-        st.info(
-            "**The assessment is not an enhancement to this model — until it is run "
-            "once, it is the model.** 13 tests, three readings each, measured **cold** "
-            "with no warm-up. Roughly 35–45 minutes, every 6–12 weeks.",
-            icon="🪜",
-        )
-    else:
-        st.markdown(
-            f'<div class="fx-hero"><div class="cap">Flexibility</div>'
-            f'<div class="big" style="color:{accent};">{measured} of {total} rungs measured</div>'
-            f'<div class="sub">Assessed {rep.assessed_on:%d %b %Y} '
-            f'{"cold" if rep.cold else "<b>WARM — reads the viscoelastic effect, not durable change</b>"} '
-            f'&middot; confidence {rep.confidence:.0%} &middot; {rep.gap_count} rung(s) '
-            f'have both passive and active, so the gap is known for those.</div></div>',
-            unsafe_allow_html=True,
-        )
+        if draft is None:
+            _fx_render_empty(accent)
+        return
 
-    # ── Skills ────────────────────────────────────────────────────────────
     st.markdown(
-        f"<div style='color:{_INK};font-size:18px;font-weight:600;margin:16px 0 2px;'>"
-        f"Skills</div><div style='color:{_INK3};font-size:11.5px;margin-bottom:10px;'>"
-        f"A skill scores its <b>lowest</b> rung, never an average — that is how v1 hid "
-        f"hip extension behind a hip score of 79. The green mark is the goal level."
-        f"</div>",
+        f'<div class="fx-card"><div class="fx-cap">Flexibility</div>'
+        f'<div class="fx-sm" style="margin-top:6px;">Assessed '
+        f'{rep.assessed_on:%d %b %Y} &middot; '
+        f'{"cold" if rep.cold else "<b>WARM &mdash; not comparable with a cold reading</b>"} '
+        f'&middot; {rep.measured_rung_count} of {len(flexibility_baselines.RUNGS)} rungs '
+        f'&middot; {rep.gap_count} with a passive&minus;active gap '
+        f'&middot; confidence {rep.confidence:.0%}</div></div>',
         unsafe_allow_html=True,
     )
-    for skill in rep.skills:
-        if not skill.excluded:
-            st.markdown(_fx_skill_html(skill), unsafe_allow_html=True)
+    _fx_render_populated(rep, accent)
 
-    with st.expander("Skills tracked but never trained toward"):
-        for skill in rep.skills:
-            if skill.excluded:
-                st.markdown(_fx_skill_html(skill), unsafe_allow_html=True)
-
-    # ── Rungs ─────────────────────────────────────────────────────────────
-    st.markdown(
-        f"<div style='color:{_INK};font-size:18px;font-weight:600;margin:18px 0 2px;'>"
-        f"Ladder rungs</div><div style='color:{_INK3};font-size:11.5px;margin-bottom:10px;'>"
-        f"Diagnostics. Never averaged into anything. A wide passive&minus;active gap "
-        f"means the range is already there and cannot be held, so stretching is the "
-        f"wrong lever.</div>",
-        unsafe_allow_html=True,
-    )
-    if rep.rungs:
-        for rung in rep.rungs:
-            st.markdown(_fx_rung_html(rung), unsafe_allow_html=True)
-    else:
-        for key, test in flexibility_baselines.RUNGS.items():
-            st.markdown(
-                f'<div class="fx-rung"><div class="r1">'
-                f'<span class="rn">{test.label}</span>'
-                f'<span class="rv" style="color:{_INK3};font-size:12px;">not measured</span>'
-                f'</div><div class="m"><span class="fx-empty">{test.test_name}</span></div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-    # ── The protocol ──────────────────────────────────────────────────────
-    with st.expander(f"The assessment — {total} tests, and what each one locks"):
-        st.caption(
-            "Every test names a **lock**: the thing that must not move. An unlocked "
-            "joint lets a neighbour substitute and the test measures nothing — the "
-            "failure that broke this model twice. Measure **cold**, no warm-up."
-        )
-        for key, test in flexibility_baselines.RUNGS.items():
-            st.markdown(f"**{test.label}** — {test.test_name}")
-            st.markdown(
-                f"- **Lock:** {test.lock}\n"
-                f"- **Setup:** {test.setup}\n"
-                f"- **Read:** {test.measurement}\n"
-                f"- **Scale:** {test.value_at_100:g}{test.unit} = 100 · "
-                f"{test.value_at_0:g}{test.unit} = 0"
-                + (f"\n- **Replaces:** {test.replaces}" if test.replaces else "")
-            )
-
-    # ── Provenance ────────────────────────────────────────────────────────
-    with st.expander("What the gym measured in Jan 2025, and why none of it scores"):
-        st.caption(
-            "The protocol was never recorded — the screen printed degrees per region "
-            "and never said which movement produced them, so `Hip 33°` corroborates a "
-            "different clinical finding depending on whether it is internal rotation, "
-            "abduction or a Thomas test. v1 assumed protocols and scored them anyway. "
-            "Kept as provenance; every one is superseded by a v2 test."
-        )
-        for r in flexibility_baselines.LEGACY_GYM_READINGS:
-            note = f" — {r.note}" if r.note else ""
-            st.markdown(
-                f"- **{r.label}** {r.left:g}° / {r.right:g}° · gym verdict *{r.vendor_verdict}* "
-                f"→ superseded by `{r.superseded_by}`{note}"
-            )
-        st.caption(
-            f"No flexibility age in years is computed. The gym's own "
-            f"({flexibility_baselines.VENDOR_BIOAGE_YEARS}) compares a measurement taken "
-            f"at age {flexibility_baselines.AGE_AT_SCAN_YEARS} against a live age of "
-            f"{flexibility_baselines.VENDOR_BIOAGE_COMPARED_AGAINST_AGE}, so the gap "
-            f"widens every birthday without anybody moving."
-        )
+    if st.button("Re-run assessment", key="fx_rerun", use_container_width=True):
+        st.session_state["fx_mode"] = "capture"
+        st.session_state["fx_step"] = 0
+        st.rerun()
 
 
 

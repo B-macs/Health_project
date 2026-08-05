@@ -291,6 +291,82 @@ def report(
     )
 
 
+# ── serialisation ────────────────────────────────────────────────────────────
+#
+# Pure dict <-> dataclass, so the store underneath can be a JSON file, a Sheets
+# tab or anything else without this module knowing. services/repository.py owns
+# where it actually lands, the same way it owns every other storage decision.
+
+SCHEMA_VERSION: int = 1
+
+
+def assessment_to_dict(a: _fb.Assessment) -> dict:
+    return {
+        "schema": SCHEMA_VERSION,
+        "taken_on": a.taken_on.isoformat(),
+        "cold": a.cold,
+        "note": a.note,
+        "readings": [
+            {"rung": r.rung, "side": r.side, "note": r.note,
+             "passive": r.passive, "isometric": r.isometric, "active": r.active}
+            for r in a.readings
+        ],
+    }
+
+
+def assessment_from_dict(d: dict) -> _fb.Assessment | None:
+    """None for anything unreadable — an unknown schema, a missing date, or a
+    reading naming a rung that no longer exists.
+
+    Returning None rather than raising is deliberate: a stored assessment that
+    cannot be understood must degrade to "no assessment", which the screen
+    already renders honestly. A half-parsed one would silently score a ladder
+    against rungs it does not have.
+    """
+    if not isinstance(d, dict) or d.get("schema") != SCHEMA_VERSION:
+        return None
+    try:
+        taken_on = date.fromisoformat(d["taken_on"])
+    except (KeyError, TypeError, ValueError):
+        return None
+
+    readings = []
+    for raw in d.get("readings") or []:
+        rung = raw.get("rung")
+        if rung not in _fb.RUNGS:
+            continue
+        readings.append(_fb.RungReading(
+            rung=rung, side=raw.get("side") or "", note=raw.get("note") or "",
+            passive=raw.get("passive"), isometric=raw.get("isometric"),
+            active=raw.get("active"),
+        ))
+    return _fb.Assessment(taken_on=taken_on, readings=tuple(readings),
+                          cold=bool(d.get("cold", True)), note=d.get("note") or "")
+
+
+def merge_reading(assessment: _fb.Assessment,
+                  reading: _fb.RungReading) -> _fb.Assessment:
+    """Replace any existing reading for the same (rung, side), else append.
+
+    Re-entering a test overwrites rather than accumulating, so a corrected
+    trial does not leave the bad one in the record to be picked up by the
+    worse-side rule.
+    """
+    kept = tuple(r for r in assessment.readings
+                 if not (r.rung == reading.rung and r.side == reading.side))
+    return _fb.Assessment(taken_on=assessment.taken_on, cold=assessment.cold,
+                          note=assessment.note, readings=kept + (reading,))
+
+
+def assessment_progress(assessment: _fb.Assessment | None) -> tuple[int, int]:
+    """(rungs with at least one reading, total rungs)."""
+    if assessment is None:
+        return 0, len(_fb.RUNGS)
+    done = {r.rung for r in assessment.readings
+            if r.passive is not None or r.isometric is not None or r.active is not None}
+    return len(done), len(_fb.RUNGS)
+
+
 # ── the scheduling window ────────────────────────────────────────────────────
 
 def flexibility_window(
