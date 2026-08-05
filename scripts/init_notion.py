@@ -40,7 +40,7 @@ DIAGNOSTIC_PROFILE = {
         "Psoas shortening amplifies L5/S1 foraminal compression."
     ),
     "mri_raw_text": (
-        "MRI LWS mit Myelographie und knöch. Becken, 10.11.2025, DIE RADIOLOGIE München. "
+        "MRI LWS mit Myelographie und knöch. Becken, 10.11.2025. "
         "LWK5/SWK1: Moderat ausgeprägte aktivierte Osteochondrose mit bandförmigem paradiscalem "
         "Knochenödem und geringen erosiven Veränderungen. Schmale breitbasige Retrospondylose und "
         "Bandscheibenprotrusion mit rechts dorsolateraler Betonung. Moderate Foramenstenose rechts, "

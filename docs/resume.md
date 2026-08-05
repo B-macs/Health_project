@@ -254,7 +254,7 @@ imports it and passes `PROFILE["imbalances"]` to `bioage.muscle_imbalance_count`
 for the Strength screen, so edits to `imbalances` can break the gate
 (`tests/test_bioage.py` pins the count at 8).
 
-### MRI (10.11.2025, DIE RADIOLOGIE Munich)
+### MRI (10.11.2025)
 
 **Primary — L5/S1:**
 - Moderately activated osteochondrosis with paradiscal bone oedema and mild erosive changes
@@ -470,7 +470,7 @@ and generated validation output are ignored locally and are never staged.
 
 ### Voice Training Measurement Policy (2026-07-14)
 
-Voxplot's **Voice Quality** score remains intentionally visible as Brian's
+Voxplot's **Voice Quality** score remains intentionally visible as the athlete's
 personal baseline/trend score. Its established `voice_quality_v1` recipe is
 unchanged: equal reference-mapped AVQI-like overall index and Voxplot
 breathiness estimate. The score is not a diagnosis, does not silently fall

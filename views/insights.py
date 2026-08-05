@@ -1304,7 +1304,7 @@ def _recent_sessions():
 #: Where the Foryond export lands. Gitignored with the rest of `Input_files/`,
 #: so a deployment without it renders the empty state rather than crashing —
 #: which is also what a first-time user sees, and is the correct thing to show.
-_FITDAYS_EXPORT = Path(__file__).resolve().parent.parent / "Input_files" / "Fitdays-Brian.csv"
+_FITDAYS_EXPORT = Path(__file__).resolve().parent.parent / "Input_files" / "Fitdays.csv"
 
 
 @st.cache_data(ttl=1800, show_spinner=False)

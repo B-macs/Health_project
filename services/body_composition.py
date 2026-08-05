@@ -9,7 +9,7 @@ WHAT THE TWO DEVICES ACTUALLY MEASURE
 -------------------------------------
 Measured 2026-08-04/05 against the real exports, not assumed:
 
-*Foryond foot-only scale* (`Input_files/Fitdays-Brian.csv`, 142 scans,
+*Foryond foot-only scale* (`Input_files/Fitdays.csv`, 142 scans,
 2024-06-07 -> 2026-08-03). Fourteen columns, ONE of which a sensor produced:
 weight. Its body fat percent is itself predicted by weight and age at
 R^2 0.9966 with a residual scatter of 0.051 pp against the 0.1 pp step it
