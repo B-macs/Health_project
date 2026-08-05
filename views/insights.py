@@ -24,6 +24,7 @@ import streamlit as st
 import pandas as pd
 
 import body_composition_baselines as bcb
+import flexibility_baselines
 import patient_profile
 import repo
 import strength_baselines
@@ -34,6 +35,7 @@ from services import bioage
 from services import body_composition as bc
 from services import dashboard as dash
 from services import engine
+from services import flexibility as fx
 from services import stats as stats_mod
 from services import insights as insights_svc
 from services import plan as plan_svc
@@ -1301,6 +1303,282 @@ def _recent_sessions():
     return repo.get_repository().get_recent_sessions(days=60)
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  Flexibility BioAge detail screen (tab_bioage → ?bioage=flexibility).
+#
+#  Mirrors the vendor app's layout — hero, then Functional, then Isolated — so
+#  the athlete can read them side by side. Three things are deliberately NOT
+#  mirrored:
+#
+#  1. No age in years. The vendor shows "28" against "Real age: 31", but the
+#     measurement is from 2025-01-17 when he was 30, so the gap was -2 at
+#     measurement, displays as -3, and widens every birthday without anybody
+#     moving. Same refusal as the Metabolism screen's.
+#  2. Degrees are shown, but the SCORE is what is ranked on. The athlete asked
+#     for a value out of 100 rather than raw angles; the angle stays visible
+#     underneath because a score whose input you cannot see is not auditable.
+#  3. Every region shows BOTH axes, always. "Range 89 · Control 70 → 79" says
+#     what the single number cannot, and the whole design rests on flexibility
+#     being two things — the range to reach a position and the control to hold
+#     it correctly.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_FLEX_DIRECTION_COLOUR: dict[str, str] = {
+    fx.DIRECTION_IDEAL:      _GOOD,
+    fx.DIRECTION_RESTRICTED: _WARN,
+    fx.DIRECTION_UNSTABLE:   _BAD,
+}
+
+_FLEX_DIRECTION_LABEL: dict[str, str] = {
+    fx.DIRECTION_IDEAL:      "Ideal",
+    fx.DIRECTION_RESTRICTED: "Restricted",
+    fx.DIRECTION_UNSTABLE:   "End range, no stop",
+}
+
+_FLEXIBILITY_CSS = f"""
+<style>
+.fx-hero {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:16px;
+  padding:20px 22px; margin-bottom:14px; }}
+.fx-hero .big {{ font-size:52px; font-weight:800; line-height:1;
+  font-variant-numeric:tabular-nums; }}
+.fx-hero .big u {{ text-decoration:none; font-size:18px; font-weight:500;
+  color:{_INK2}; margin-left:6px; }}
+.fx-hero .cap {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.13em; text-transform:uppercase; color:{_INK3};
+  margin-bottom:10px; }}
+.fx-hero .sub {{ color:{_INK2}; font-size:12.5px; margin-top:10px;
+  line-height:1.55; }}
+
+.fx-bar {{ height:7px; border-radius:4px; background:rgba(255,255,255,.07);
+  overflow:hidden; margin-top:9px; }}
+.fx-bar i {{ display:block; height:100%; border-radius:4px; }}
+
+.fx-row {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:13px;
+  padding:13px 16px; margin-bottom:9px; }}
+.fx-row .top {{ display:flex; align-items:baseline; justify-content:space-between;
+  gap:10px; }}
+.fx-row .name {{ color:{_INK}; font-size:15px; font-weight:600; }}
+.fx-row .score {{ font-size:23px; font-weight:700; color:{_INK};
+  font-variant-numeric:tabular-nums; }}
+.fx-row .score u {{ text-decoration:none; font-size:11px; color:{_INK3};
+  font-weight:500; margin-left:3px; }}
+.fx-row .axes {{ display:grid; grid-template-columns:1fr 1fr; gap:10px;
+  margin-top:11px; }}
+.fx-row .ax {{ background:rgba(255,255,255,.03); border-radius:9px;
+  padding:8px 11px; }}
+.fx-row .ax .k {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.12em; text-transform:uppercase; color:{_INK3}; }}
+.fx-row .ax .v {{ font-size:17px; font-weight:600; color:{_INK}; margin-top:6px;
+  font-variant-numeric:tabular-nums; }}
+.fx-row .ax .d {{ font-size:10.5px; color:{_INK3}; margin-top:4px;
+  line-height:1.4; }}
+.fx-row .ax.absent .v {{ color:{_INK3}; font-weight:500; font-size:14px; }}
+.fx-row .meta {{ color:{_INK3}; font-size:10.5px; margin-top:9px;
+  line-height:1.5; }}
+.fx-pill {{ display:inline-block; padding:2px 8px; border-radius:999px;
+  font-size:10px; font-weight:700; letter-spacing:.04em; }}
+.fx-vendor {{ display:inline-block; padding:1px 7px; border-radius:999px;
+  font-size:9.5px; font-weight:600; color:{_INK3};
+  border:1px solid {_HAIR}; margin-left:6px; }}
+@media (max-width:560px) {{ .fx-row .axes {{ grid-template-columns:1fr; }} }}
+</style>
+"""
+
+
+def _fx_axis_html(axis, axis_name: str, absent_label: str) -> str:
+    """One axis cell. An ABSENT axis still renders, labelled with its own name —
+    a missing measurement has to look different from a low one, and blanking the
+    cell entirely would make the two indistinguishable."""
+    if axis is None:
+        return (f'<div class="ax absent"><div class="k">{axis_name}</div>'
+                f'<div class="v">Not measured</div>'
+                f'<div class="d">{absent_label}</div></div>')
+    colour = _FLEX_DIRECTION_COLOUR[axis.direction]
+    star = " *" if axis.provisional else ""
+    return (
+        f'<div class="ax"><div class="k">{axis.name}{star}</div>'
+        f'<div class="v" style="color:{colour};">{axis.score:.0f}'
+        f'<span style="font-size:11px;color:{_INK3};">/100</span></div>'
+        f'<div class="d">{axis.detail}</div></div>'
+    )
+
+
+def _fx_range_absent_reason(base) -> str:
+    """Why a region has no Range axis. The two reasons are different in kind and
+    only one of them is fixable by booking a scan."""
+    if base.mean_deg is None:
+        return "gym scan reads &ldquo;No data yet&rdquo; for this region"
+    return (f"{base.mean_deg:.0f}&deg; measured, but no reference band — the "
+            f"vendor&rsquo;s own verdict contradicts the label, so a band would "
+            f"be a guess")
+
+
+def _fx_region_html(region, accent: str) -> str:
+    base = flexibility_baselines.REGION_BASELINES[region.key]
+    vendor = (f'<span class="fx-vendor">gym: {base.vendor_verdict}</span>'
+              if base.vendor_verdict else "")
+
+    if region.score is None:
+        return (
+            f'<div class="fx-row"><div class="top">'
+            f'<span class="name">{region.label}{vendor}</span>'
+            f'<span class="score" style="color:{_INK3};font-size:15px;">No data</span>'
+            f'</div><div class="meta">{region.unscoreable_reason} · '
+            f'carries {region.weight:.0%} of the overall, currently unused</div></div>'
+        )
+
+    colour = _FLEX_DIRECTION_COLOUR[region.direction]
+    label = _FLEX_DIRECTION_LABEL[region.direction]
+    return (
+        f'<div class="fx-row">'
+        f'<div class="top"><span class="name">{region.label}{vendor}</span>'
+        f'<span class="score" style="color:{colour};">{region.score:.0f}'
+        f'<u>/100</u></span></div>'
+        f'<div class="fx-bar"><i style="width:{region.score:.0f}%;'
+        f'background:{colour};"></i></div>'
+        f'<div class="axes">'
+        f'{_fx_axis_html(region.range_axis, "range", _fx_range_absent_reason(base))}'
+        f'{_fx_axis_html(region.control_axis, "control", "no pose in the flow reaches this region")}'
+        f'</div>'
+        f'<div class="meta">'
+        f'<span class="fx-pill" style="background:{colour}22;color:{colour};">{label}</span>'
+        f' · weight {region.weight:.0%} · confidence {region.confidence:.0%}'
+        f'</div></div>'
+    )
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _flexibility_screen_data() -> dict:
+    """Everything the Flexibility screen renders.
+
+    Both inputs are in-repo constants rather than files or API calls — the
+    goniometry is transcribed from a phone screenshot and the depth ratings
+    are self-reported — so there is no I/O to fail here and no error state to
+    carry, unlike the Metabolism screen's CSV read."""
+    today = date.today()
+    return {"score": fx.overall_score(today=today), "today": today}
+
+
+def _render_flexibility_detail() -> None:
+    """Flexibility BioAge detail — the Range x Control hero, then the vendor's
+    own two blocks (Functional, Isolated) rebuilt on our score."""
+    accent = _BIOAGE_COLORS["flexibility"]
+    st.markdown(_FLEXIBILITY_CSS, unsafe_allow_html=True)
+
+    data = _flexibility_screen_data()
+    result, today = data["score"], data["today"]
+    by_key = {r.key: r for r in result.regions}
+
+    scan_age_days = (today - flexibility_baselines.SCAN_DATE).days
+    rating_age_days = (today - flexibility_baselines.DEPTH_RATING_DATE).days
+
+    overall = f"{result.overall:.0f}" if result.overall is not None else "—"
+    st.markdown(
+        f'<div class="fx-hero"><div class="cap">Overall flexibility</div>'
+        f'<div class="big" style="color:{accent};">{overall}<u>/ 100</u></div>'
+        f'<div class="fx-bar"><i style="width:{result.overall or 0:.0f}%;'
+        f'background:{accent};"></i></div>'
+        f'<div class="sub">100 is the <b>ideal</b>, not the maximum — a perfect '
+        f'flexible body is the range to reach a position <i>and</i> the control '
+        f'to hold it correctly, so a joint taken past its ideal band with no '
+        f'muscular stop scores <i>down</i>, not up.<br>'
+        f'Built on <b>{result.coverage:.0%}</b> of the complete evidence: '
+        f'{sum(1 for r in result.regions if r.axes_present == 2)} of '
+        f'{len(result.regions)} regions have both axes, the goniometry is '
+        f'{scan_age_days} days old and its protocols are unrecorded.</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    if any(flexibility_baselines.REGION_BASELINES[r.key].provisional
+           and r.range_axis is not None for r in result.regions):
+        st.warning(
+            "The gym scan never recorded **which movement** produced each angle, "
+            "so every Range band below is assumed from the most likely protocol "
+            "and marked \\*. `Hip 33°` means one thing as internal rotation and "
+            "another as a Thomas test, and it corroborates a different clinical "
+            "finding in each case. Range confidence is penalised until the "
+            "protocol list arrives — nothing else needs to change when it does.",
+            icon="⚠️",
+        )
+
+    # ── Functional, then Isolated — the vendor's own two blocks ────────────
+    for heading, keys, blurb in (
+        ("Functional flexibility",
+         flexibility_baselines.FUNCTIONAL_REGIONS,
+         "Whole-position movements. The gym has no data for any of these — "
+         "the yoga flow covers two of the three."),
+        ("Isolated flexibility",
+         flexibility_baselines.ISOLATED_REGIONS,
+         "Single-joint angles from the gym scan, plus whatever the yoga flow "
+         "reaches."),
+    ):
+        st.markdown(
+            f"<div style='color:{_INK};font-size:18px;font-weight:600;"
+            f"margin:16px 0 2px;'>{heading}</div>"
+            f"<div style='color:{_INK3};font-size:11.5px;margin-bottom:10px;'>"
+            f"{blurb}</div>",
+            unsafe_allow_html=True,
+        )
+        for key in keys:
+            st.markdown(_fx_region_html(by_key[key], accent), unsafe_allow_html=True)
+
+    # ── What would move the number ────────────────────────────────────────
+    st.markdown(
+        f"<div style='color:{_INK};font-size:18px;font-weight:600;"
+        f"margin:18px 0 8px;'>What would move this</div>",
+        unsafe_allow_html=True,
+    )
+    gaps: list[str] = []
+    if any(flexibility_baselines.REGION_BASELINES[k].provisional
+           for k in flexibility_baselines.ISOLATED_REGIONS):
+        gaps.append(
+            f"**The protocol list from the gym.** It costs one question and "
+            f"lifts Range confidence from "
+            f"{fx.PROVISIONAL_PROTOCOL_PENALTY:.0%} of its stale value to full."
+        )
+    gaps.append(
+        f"**A re-scan.** The goniometry is {scan_age_days} days old and halves "
+        f"in weight every {fx.CONFIDENCE_HALFLIFE_DAYS:.0f} days, so it "
+        f"currently counts for "
+        f"{fx.staleness_confidence(flexibility_baselines.SCAN_DATE, today):.0%} "
+        f"of a fresh reading. Ask for **Squat Depth, Back and Shoulders** to be "
+        f"run too — all three are empty, and Back and Shoulders carry "
+        f"{by_key['back'].weight + by_key['shoulders'].weight:.0%} of the overall between them."
+    )
+    gaps.append(
+        f"**Re-rating the 22 poses.** Free, repeatable, and the only axis that "
+        f"is current ({rating_age_days} days old). Three poses also carry "
+        f"specific retests — see the yoga session."
+    )
+    if result.uncovered_regions:
+        names = ", ".join(by_key[k].label for k in result.uncovered_regions)
+        gaps.append(
+            f"**{names}** — no reading on either axis. Not imputed from "
+            f"anything, and reported here rather than quietly dropped."
+        )
+    for g in gaps:
+        st.markdown(f"- {g}")
+
+    if result.unmapped_poses:
+        st.warning(
+            "These poses have no region mapping, so they are contributing to "
+            "nothing: " + ", ".join(result.unmapped_poses) +
+            ". Add them to `flexibility_baselines.POSE_REGION_WEIGHT`.",
+            icon="⚠️",
+        )
+
+    st.caption(
+        f"Range from the gym scan of "
+        f"{flexibility_baselines.SCAN_DATE:%d %b %Y} · Control from the "
+        f"{flexibility_baselines.DEPTH_RATING_DATE:%d %b %Y} self-rating of "
+        f"{len(flexibility_baselines.POSE_DEPTH_RATING_2026_08_05)} poses · "
+        f"no flexibility age in years is computed, and the vendor's own "
+        f"({flexibility_baselines.VENDOR_BIOAGE_YEARS}) compares a measurement "
+        f"taken at age {flexibility_baselines.AGE_AT_SCAN_YEARS} against a live "
+        f"age of {flexibility_baselines.VENDOR_BIOAGE_COMPARED_AGAINST_AGE}."
+    )
+
+
 #: Where the Foryond export lands. Gitignored with the rest of `Input_files/`,
 #: so a deployment without it renders the empty state rather than crashing —
 #: which is also what a first-time user sees, and is the correct thing to show.
@@ -1461,6 +1739,8 @@ def render() -> None:
                 _render_strength_detail()
             elif selected == "metabolism":
                 _render_metabolism_detail()
+            elif selected == "flexibility":
+                _render_flexibility_detail()
             else:
                 st.info(f"{label} biological age breakdown — coming soon.")
         else:

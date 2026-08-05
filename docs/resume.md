@@ -430,6 +430,98 @@ see below.
 
 ---
 
+## FLEXIBILITY (2026-08-05)
+
+`services/flexibility.py` + `flexibility_baselines.py` +
+`views/insights.py::_render_flexibility_detail`. Display-only. **Nothing here
+feeds the engine** — same standing rule as Body Composition below. Flexibility
+is not a safety input (Key Rule 2); `services/rules.py` remains the only thing
+that constrains movement.
+
+### The score is two things multiplied, and that is the whole design
+
+```
+region  = sqrt(RANGE × CONTROL)
+overall = Σ(weight_r × confidence_r × score_r) / Σ(weight_r × confidence_r)
+```
+
+**Range** comes from instrumented degrees, **Control** from the athlete's
+self-rated pose depth. The geometric mean is deliberate: an arithmetic mean lets
+a 100 on one axis carry a 20 on the other to a respectable 60, where the
+geometric mean gives 45 and a zero on either axis correctly annihilates the
+region. Both axes stay visible to the screen — *"Range 100 · Control 66 → 81"*
+says what the single number cannot.
+
+Locked with the athlete 2026-08-05: *"the overall perfect flexible body is
+having the flexibility and the control to do the stretch correctly. it is
+always two things."*
+
+### 100 is the IDEAL, never the maximum
+
+`CONTROL_BAND` is **two-sided**: full marks inside (50, 70), penalised below
+(cannot enter the position) **and above** (no muscular stop at the end of it).
+A depth rating of 88 scores **46**.
+
+This is the one place this sector inverts every other. `patient_profile`'s
+hypermobility block (Beighton 6/9) instructs favouring "controlled-range
+strength/stability work over passive end-range stretching" — and six of the 22
+poses rated 80–88, all supine positions entered with no muscular endpoint. Under
+a more-is-better model those six are his best results. They are the hazard.
+
+### Score first, then average. Never average, then score.
+
+The hamstring region sees straddle 25, Walk the Dog 76, Down Dog 64. Averaging
+the **ratings** gives ~55 — inside the ideal band, scoring 100, erasing the 25,
+the single most informative reading in the assessment. Scoring each pose first
+gives **65.5** and keeps it. Same class of error as summing Oura sleep periods
+before deduplicating them. The region's *direction* is likewise attributed from
+where the lost points came from, not from a rating mean, which is what makes
+hamstrings read `restricted` rather than `ideal`.
+
+### Staleness decays WEIGHT, never VALUE
+
+Goniometry 2025-01-17, depth ratings 2026-08-05 — 565 days apart. Confidence
+halves every 365 days, so the scan counts for ~34% of a fresh reading, ×0.6
+again while its protocol is unrecorded. Decaying the stale *value* would invent
+a decline nobody measured — the error `services/strength.py`'s asymmetry rule
+exists to prevent.
+
+### The protocol defect — this sector's version of the InBody height
+
+The vendor screen prints degrees per region and **never says which movement
+produced them**. `Hip 33°` means one thing as internal rotation, another as
+abduction, another as a Thomas test (where 33 would be excellent, not the "Low"
+printed) — and corroborates a different clinical finding in each case. Every
+entry carries `protocol=None` and `provisional=True`; bands are assumed from the
+most likely protocol and marked `*` on screen. Setting `protocol` removes the
+penalty with no other edit.
+
+`lat_flex` is deliberately **unscoreable on Range**: the vendor calls 20–21°
+"Normal", which contradicts the obvious reading of the label, and a band guessed
+out of a contradiction is worse than no band.
+
+### Refusals (tests pin all four)
+
+- **No flexibility age in years.** The vendor ships 28 against "Real age: 31",
+  but it was measured 2025-01-17 when he was **30** — a stale measurement against
+  a *live* chronological age, so the gap was −2, displays as −3, and widens every
+  birthday without anybody moving. Same refusal, same reason, as
+  `services/body_composition.py`'s.
+- **No scoring the vendor's Low/Normal verdicts.** Kept verbatim as provenance;
+  nothing computes from them. Their norm tables are undisclosed, so scoring them
+  would import the vendor's reference into ours and double-count it.
+- **No filling an empty region from the other instrument or from a training
+  note.** Squat Depth is empty on both axes and stays reported-as-empty; the 2025
+  log's "hits depth easily" is not a measurement.
+- **No region scored without a reference band.**
+
+### Open
+
+Protocol list requested from the gym (2026-08-05). Perfect bilateral symmetry at
+Neck 30/30 and Chest 106/106 — against 1–3° differences everywhere else — is
+flagged `symmetry_suspect`, not resolved; post-Latarjet, exact equality at the
+chest is the least likely reading on the sheet. Both settle in one visit.
+
 ## BODY COMPOSITION (2026-08-05)
 
 `services/body_composition.py` + `body_composition_baselines.py` +

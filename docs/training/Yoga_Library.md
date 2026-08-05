@@ -117,8 +117,16 @@ points, MAE **2.05** excluding the two structural misses, signed bias −0.58.
    screen**, not a ROM measurement — palms-to-floor scores the whole flexion
    chain (hips + lumbar flexion + gravity + locked knees). The real restriction
    is an inability to reach **anterior pelvic tilt in sitting**, reported
-   independently in four seated positions here, and it is the proximal hamstring
-   already listed in `imbalances.overactive_tight`.
+   independently in four seated positions here.
+
+   **Restated against the Jan-2025 gym goniometry**, which reads hamstrings
+   89°/86° and calls them *Normal*: this is not short hamstrings, it is **normal
+   hamstring length with no reserve**. Long-sitting upright is already ~90° of hip
+   flexion with the knee straight, so at 86–89° he is at the limit just sitting up
+   with his legs out, and every further degree has to come from the spine. An
+   ordinary hamstring under an exceptional lumbar spine is what produces a 25.
+   Holds only if that reading is a straight-leg raise — the protocol is
+   unrecorded, so confirm it at the next scan.
 2. **90/90, −52.** The prediction read `overactive_tight` as "short". It is
    **resting tone**, not length. Tone predicts behaviour under active control and
    load; it does not predict passive range.
