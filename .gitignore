@@ -3,8 +3,11 @@
 .env
 .env.*
 
-# Clinical input files — personal medical documents, never commit
+# Clinical input files — personal medical documents, never commit.
+# The archive form is listed separately: `Input_files/` does not match a zip
+# sitting beside it, so `git add -A` would have committed the MRI.
 Input_files/
+Input_files*.zip
 
 # Virtual environment
 venv/

@@ -44,9 +44,9 @@ def test_oura_not_configured_by_default():
 
 
 def test_oura_configured_when_token_present():
-    repo = Repository(_config(oura_token="Y76AC25JVDVDSUX42QRWIUKUYNPHUNNJ"))
+    repo = Repository(_config(oura_token="DUMMY_OURA_TOKEN_NOT_A_REAL_CREDENTIAL"))
     assert repo.oura_configured() is True
-    assert repo._oc == "Y76AC25JVDVDSUX42QRWIUKUYNPHUNNJ"
+    assert repo._oc == "DUMMY_OURA_TOKEN_NOT_A_REAL_CREDENTIAL"
 
 
 # ─── _oura_daily_row ─────────────────────────────────────────────────────────
