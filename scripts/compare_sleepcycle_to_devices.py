@@ -30,7 +30,14 @@ printed (the partner battery) are descriptive companions to an effect size.
 
 --------------------------------------------------------------------------
 MEASURED 2026-08-05 — 299 nights 2024-10-31 -> 2026-07-23, n=43 paired vs
-Oura, n=12 vs Garmin. VERDICT: KEEP RECORDING, DO NOT INGEST.
+Oura, n=168 vs Garmin. MEASUREMENT VERDICT: keep recording, do not ingest.
+ATHLETE'S DECISION 2026-08-05: STOP RECORDING — CONSIDERED AND NOT
+IMPLEMENTED. Nothing here beats wearing the ring and the watch, and the
+coverage archive that was the whole remaining case shrank from 245 unique
+nights to 119 once Garmin's own history was backfilled. This script is
+retained because it is re-runnable at zero cost and because these numbers
+exist nowhere else — Input_files/ is gitignored. It is a closed question,
+not a dormant one.
 
 The structural findings decided most channels before any statistic ran, and
 they are facts about the file that no sample size or regime change affects:
