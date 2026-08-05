@@ -12,6 +12,16 @@ directly for full detail; only what's currently weight-relevant is
 synthesized here). Recent Notion readiness/training-log data (last 14 days)
 is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
 
+2026-08-05: first structured FLEXIBILITY baseline added (symptom_log, 22-pose
+  self-rated ROM assessment). Two things in this file were being read wrongly
+  and the entry's `notes` say so explicitly: the Beighton score is a laxity
+  screen, not a hamstring-length measurement, and `imbalances.overactive_tight`
+  is resting TONE, not shortness. Net new clinical content: seated anterior
+  pelvic tilt is the dominant restriction (proximal hamstrings), the documented
+  right>left asymmetry does not appear in passive stretch, finding #4's Coxa
+  Saltans trigger is contractile rather than positional, and interscapular
+  fatigue onset under bodyweight is measured at 50-60s.
+
 Stage 1 history: Rehab extended by 7 days (Days 15-21, "Week 3: Flare
   Recovery & Reassessment Prep" in training_plan.py) — decided 2026-07-13.
   Day 14's exit criteria were not met on the original schedule
@@ -223,6 +233,20 @@ PROFILE = {
                 "range may be broader than originally characterised — cue neutral/internal "
                 "rotation on the right through supine leg-extension patterns too, not only "
                 "standing hip flexion drills."
+            ),
+            "additional_evidence_2026_08_05": (
+                "NEGATIVE finding, and it sharpens the trigger definition: across a 22-pose "
+                "yoga flow the athlete reported NO snap and NO anterior-hip pinch in 90/90 "
+                "hip rotation ('able to bring both knees to the ground with ease') or in "
+                "Half Pigeon right ('no pinch or click at the front of the right hip'), and "
+                "scored both sides identically. Both positions place the right hip in "
+                "flexion + external rotation, so POSITION ALONE DOES NOT TRIGGER IT. Every "
+                "positive observation on record — standing 90° knee lift, Dead Bug leg "
+                "extension — involves ACTIVE hip flexion under iliopsoas contraction. "
+                "Read the trigger as CONTRACTILE, not positional: cue neutral/internal "
+                "rotation wherever the right hip flexes under its own muscular effort, and "
+                "do not treat passive, floor-supported external rotation as a risk position. "
+                "Does not downgrade the finding — it narrows where it applies."
             ),
         },
         {
@@ -802,6 +826,121 @@ PROFILE = {
                 "improved markedly since Stage 2A began (2026-07-24 check-in: 'first morning in a "
                 "while I woke up with no stiffness in my back or hips'). The block is helping; "
                 "this pattern is independent of it.",
+            ],
+        },
+        {
+            "date":   "2026-08-05",
+            "status": "Baseline established — not a symptom; a measurement",
+            "region": "Whole-body passive range of motion",
+            "title":  "Flexibility Baseline — 22-Pose Self-Rated ROM Assessment",
+
+            "mechanism": (
+                "Not an injury entry. The athlete rated every pose of the 15-minute hip/spine "
+                "yoga flow (services/yoga.py, YOGA_LIBRARY[0]) on a 1-100 scale where 1 = can "
+                "barely enter the position and 100 = at the physical limit with no stretch "
+                "sensation left, and gave a free-text reason for each. Same self-assessment "
+                "format as the 2026-07-31 cervical ROM entry above. Recorded because it is the "
+                "first structured flexibility baseline in this profile and it CORRECTS two "
+                "long-standing assumptions. Full per-pose table: docs/training/Yoga_Library.md."
+            ),
+
+            "findings": {
+                "primary": (
+                    "SEATED ANTERIOR PELVIC TILT IS THE DOMINANT RESTRICTION, and it is the "
+                    "hamstrings. Three independent seated positions produced the same report: "
+                    "straddle forward fold 25/100 ('hips stuck in flexion with tail bone down, "
+                    "back fully rounds, unable to get shoulders over the hips unless greatly "
+                    "bending the knees — one of the worst stretches in this list'); both seated "
+                    "side stretches ~60-65 ('the hips are in flexion with tail bone under me'); "
+                    "the opening seated side bend 40 ('only can go about 60-70 percent down, "
+                    "restriction in hips'). The pelvis cannot reach anterior tilt in sitting and "
+                    "the lumbar spine compensates by rounding. This is the classic presentation "
+                    "of proximal hamstring restriction — ALREADY LISTED in imbalances."
+                    "overactive_tight ('Proximal hamstrings at ischial tuberosity'), now with a "
+                    "functional measurement behind it."
+                ),
+                "does_not_contradict_anterior_tilt": (
+                    "The habitual ANTERIOR pelvic tilt documented in standing (2026-07-06 entry, "
+                    "and imbalances.compensation_pattern) is not in conflict. Tight hip flexors "
+                    "drive anterior tilt in standing; tight hamstrings drive posterior tilt in "
+                    "long-sitting. Both are true, in different postures, and the yoga ratings "
+                    "show both — hip-flexor-length poses (deep lunges 50-57, hip openers 46) sit "
+                    "in the same restricted band as the seated hamstring poses."
+                ),
+                "no_passive_lateral_asymmetry": (
+                    "The documented right > left asymmetry (findings #1, #2, #4) did NOT appear "
+                    "in any passive stretch. Both half pigeons scored 40, both deep lunges 57, "
+                    "and the athlete stated it explicitly: 'right and left are the same — no "
+                    "blocking sensation on right side'. The asymmetry findings are drawn from "
+                    "LOADED and ACTIVE observations and remain valid there; do not expect them "
+                    "to show up in passive positioning, and do not read their absence in a "
+                    "stretch as resolution."
+                ),
+                "coxa_saltans_is_contractile": (
+                    "See finding #4's additional_evidence_2026_08_05 — no snap in any passive "
+                    "flexion+external-rotation position. Trigger requires active iliopsoas load."
+                ),
+                "thoracic_rotation_better_than_assumed": (
+                    "Seated twists scored 66-68 with 'most of the twist comes from the upper "
+                    "body' and 'no lumbar pops normally'. Finding #3's sitting-driven T6-T10 "
+                    "stiffness had been expected to force the rotation down into the lumbar "
+                    "facets; it does not, at least unloaded. Mildly encouraging for the "
+                    "interscapular question going to physio on 2026-08-16."
+                ),
+                "scapular_fatigue_onset_measured": (
+                    "MOST DECISION-RELEVANT NUMBER HERE. Down Dog (bodyweight through the "
+                    "shoulder girdle) produces interscapular burn at 50-60 SECONDS, not 20-30. "
+                    "That is the first quantified endurance threshold for the region in the "
+                    "2026-08-03 entry above, and it means the 30s holds elsewhere in this flow "
+                    "sit BELOW threshold. Carried into docs/training/physio_brief_2026-08-16.md "
+                    "as a dosing anchor for the endurance-biased scapular ask."
+                ),
+                "open_question_anterior_hip": (
+                    "Butterfly forward fold scored 82 but with the sensation reported in the "
+                    "HIP FLEXORS ('slight tightness in my hip flexors but nearly at the end of "
+                    "the stretch') rather than the adductors. Anterior-hip sensation at deep "
+                    "hip flexion in someone who cannot anteriorly tilt is as consistent with "
+                    "anterior compression as with a stretch. NOT a claim — a question for the "
+                    "physiotherapist, and cheap to ask while the 2026-08-16 appointment is open."
+                ),
+            },
+
+            "plan": [
+                "No self-directed exercise changes. This is a baseline measurement, and the "
+                "corrective implication (loaded hamstring lengthening vs. passive stretching in "
+                "a hypermobile athlete) is a prescription question, not a self-directed one.",
+                "Re-rate the same 22 poses at the next reassessment for a like-for-like "
+                "comparison — the value of this baseline is entirely in it being repeated with "
+                "the identical instrument.",
+                "Raise the anterior-hip sensation in deep hip flexion (above) at 2026-08-16.",
+                "Note the hypermobility constraint before acting on any of this: "
+                "hypermobility.training_implication explicitly favours controlled-range "
+                "strength over passive end-range stretching. A low ROM score here is NOT "
+                "automatically an argument for more stretching, and the poses scoring 80-88 are "
+                "positions where the athlete is already at end range with no muscular stop.",
+            ],
+
+            "notes": [
+                "Instrument caveat — a Beighton score is a LAXITY SCREEN, not a ROM "
+                "measurement. The palms-flat-to-floor positive scores the whole flexion chain "
+                "(hips + lumbar flexion + gravity + locked knees) and does not establish "
+                "hamstring length. Using it as a hamstring proxy over-predicted the straddle "
+                "fold by 55 points in the 2026-08-05 prediction pass. Do not reuse it that way.",
+                "Second instrument caveat — imbalances.overactive_tight is a list of muscles "
+                "with high resting TONE, not short muscles. Reading 'overactive' as 'restricted "
+                "range' under-predicted 90/90 hip rotation by 52 points. Tone findings predict "
+                "behaviour under active control and load; they do not predict passive range.",
+                "Prediction accuracy for the record, since it calibrates how far this profile "
+                "can be trusted to forecast ROM: 12 of 21 comparable poses predicted exactly, "
+                "19 of 21 within 10 points, mean absolute error 2.05 excluding the two "
+                "structural misses above, with near-zero signed bias. The profile predicts this "
+                "athlete's flexibility well EXCEPT where a laxity screen or a tone finding was "
+                "substituted for a length measurement.",
+                "One pose was misidentified in services/yoga.py and has been corrected: what "
+                "was authored as 'Spine Mobilisation' (tagged cleared, assumed cat-cow family) "
+                "is a seated cross-legged side bend with a shoulder drop — lateral flexion, the "
+                "same mechanism as the two Seated Side Stretches, now tagged caution and caught "
+                "by a new 'side bend' keyword in services/rules.py.",
             ],
         },
     ],

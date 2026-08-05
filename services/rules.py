@@ -149,6 +149,15 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="caution", laterality="left",
     ),
     MovementRule(
+        movement="side bend",
+        reason="Lateral flexion in either direction has a mechanism here — right narrows the "
+               "stenotic L5/S1 foramen, left loads the dorsolateral protrusions at L3/4 and L4/5. "
+               "Generalises 'right lateral'/'left lateral' to catch named variants that don't "
+               "spell out the word (e.g. yoga poses), the same way 'forward fold' generalises "
+               "'seated forward fold'.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
         movement="rotation under load",
         reason="Rotational shear with active disc pathology at L3-L5.",
         stage_cap=2, severity="caution", laterality="bilateral",
