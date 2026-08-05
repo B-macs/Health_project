@@ -1177,11 +1177,7 @@ def _render_metabolism_detail() -> None:
     st.markdown(_metab_analysis_html(latest, accent), unsafe_allow_html=True)
 
     # ── Add measurement ───────────────────────────────────────────────────
-    st.markdown(
-        '<div class="mb-grp">Add measurement'
-        "<span>the two you can take yourself</span></div>",
-        unsafe_allow_html=True,
-    )
+    st.markdown('<div class="mb-grp">Add measurement</div>', unsafe_allow_html=True)
     add_l, add_r = st.columns(2)
     add_l.button("＋  Foryond weigh-in", key="metab_add_weight",
                  use_container_width=True, disabled=True,
