@@ -1,0 +1,877 @@
+<title>Flexibility BioAge — mockup</title>
+
+<style>
+  :root {
+    color-scheme: light;
+
+    /* review chrome — the sibling artifacts' warm neutral. The accent moves to
+       this page's own hue so Strength keeps its orange and Metabolism its
+       violet. Chrome accent is a DARKENED cyan: the screen's #22C3E6 does not
+       reach 3:1 on white. */
+    --chrome-bg:     #F3F2F0;
+    --chrome-panel:  #FFFFFF;
+    --chrome-ink:    #201C18;
+    --chrome-mute:   #6B6259;
+    --chrome-line:   #E0DCD6;
+    --chrome-accent: #0D6E86;
+    --chrome-code:   #EFEBE5;
+
+    /* Two categorical series for the chrome figures: Range and Control.
+       Slots 1 and 2 of the validated default order. Checked on #FFFFFF with
+       --pairs all: CVD ΔE 24.7 (protan), normal-vision ΔE 33.6, both ≥3:1.
+       ALL SIX CHECKS PASS. */
+    --s-range:   #2a78d6;
+    --s-control: #eb6834;
+
+    /* app screen — views/insights.py's own tokens, reproduced verbatim.
+       NOT design choices here. _BIOAGE_COLORS["flexibility"] is #22C3E6; the
+       screen keeps one dark ground in both themes because it is a phone UI. */
+    --scr-bg:    #0B0F1A;
+    --scr-panel: #0E1018;
+    --ink:       #F4F6FB;
+    --ink-2:     #9AA3B2;
+    --ink-3:     #5A6377;
+    --accent:    #22C3E6;
+    --good:      #6BAF8B;
+    --warn:      #BFA06A;
+    --bad:       #C47878;
+    --hair:      rgba(255,255,255,0.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--chrome-bg);
+    color: var(--chrome-ink);
+    font: 15px/1.65 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 900px; margin: 0 auto; padding: 46px 22px 90px; }
+
+  header.top { margin-bottom: 34px; }
+  header.top .eyebrow {
+    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: var(--chrome-accent); margin-bottom: 12px;
+  }
+  header.top h1 {
+    font-size: 33px; line-height: 1.18; margin: 0 0 14px;
+    letter-spacing: -.02em; font-weight: 700;
+  }
+  header.top .lede { font-size: 17px; color: var(--chrome-mute); margin: 0; max-width: 66ch; }
+  header.top .meta {
+    margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--chrome-line);
+    font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+    color: var(--chrome-mute);
+  }
+
+  h2.sec {
+    font-size: 21px; margin: 52px 0 8px; letter-spacing: -.01em; font-weight: 700;
+    padding-top: 22px; border-top: 1px solid var(--chrome-line);
+  }
+  h3.sub { font-size: 15.5px; margin: 30px 0 8px; font-weight: 650; }
+  p { margin: 12px 0; max-width: 74ch; }
+  .note { color: var(--chrome-mute); font-size: 13.5px; max-width: 74ch; }
+
+  code, .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: .89em;
+  }
+  code { background: var(--chrome-code); padding: 1.5px 5px; border-radius: 4px; }
+
+  .callout {
+    border-left: 3px solid var(--chrome-accent);
+    background: var(--chrome-panel);
+    padding: 14px 18px; margin: 20px 0; border-radius: 0 9px 9px 0;
+  }
+  .callout.bad { border-left-color: #A8322F; }
+  .callout.ok  { border-left-color: #1B7A55; }
+  .callout p:first-child { margin-top: 0; }
+  .callout p:last-child  { margin-bottom: 0; }
+  .callout .h {
+    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .13em; text-transform: uppercase;
+    color: var(--chrome-mute); margin-bottom: 9px;
+  }
+
+  .scroller { overflow-x: auto; margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 560px; }
+  th, td { text-align: left; padding: 8px 11px; border-bottom: 1px solid var(--chrome-line); }
+  th {
+    font: 600 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .1em; text-transform: uppercase; color: var(--chrome-mute);
+    vertical-align: bottom;
+  }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  tbody tr:hover { background: var(--chrome-panel); }
+
+  .chip {
+    display: inline-block; padding: 1px 7px; border-radius: 999px;
+    font: 600 10.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+    white-space: nowrap;
+  }
+  .c-ok   { background: #E2F0E8; color: #17603F; }
+  .c-warn { background: #F6EEDC; color: #7A5A15; }
+  .c-bad  { background: #F7E4E2; color: #8E2B27; }
+  .c-none { background: var(--chrome-code); color: var(--chrome-mute); }
+
+  figure { margin: 24px 0; }
+  figure figcaption {
+    font-size: 12.5px; color: var(--chrome-mute); margin-top: 10px; max-width: 74ch;
+  }
+  .figwrap {
+    background: var(--chrome-panel); border: 1px solid var(--chrome-line);
+    border-radius: 12px; padding: 16px 14px 10px; overflow-x: auto;
+  }
+  .flegend {
+    display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+    font-size: 12.5px; color: var(--chrome-mute); margin: 2px 0 12px 4px;
+  }
+  .flegend b { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--chrome-ink); }
+  .flegend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  /* ── the phone screen ─────────────────────────────────────────────── */
+  .screen {
+    background: var(--scr-bg); color: var(--ink); border-radius: 16px;
+    padding: 20px 18px 24px; margin: 22px 0;
+    font: 13.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+    border: 1px solid #1b2030;
+  }
+  .screen .s-eyebrow {
+    font-size: 10px; letter-spacing: .16em; text-transform: uppercase;
+    color: var(--accent); font-weight: 700; margin-bottom: 14px;
+  }
+  .fx-hero {
+    background: var(--scr-panel); border: 1px solid var(--hair);
+    border-radius: 16px; padding: 18px 20px; margin-bottom: 12px;
+  }
+  .fx-hero .cap {
+    font-size: 9px; letter-spacing: .13em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 600; margin-bottom: 9px;
+  }
+  .fx-hero .big { font-size: 46px; font-weight: 800; line-height: 1; color: var(--accent); }
+  .fx-hero .big u { text-decoration: none; font-size: 16px; font-weight: 500; color: var(--ink-2); margin-left: 6px; }
+  .fx-hero .sub { color: var(--ink-2); font-size: 11.5px; margin-top: 10px; line-height: 1.55; }
+  .fx-bar { height: 7px; border-radius: 4px; background: rgba(255,255,255,.07); overflow: hidden; margin-top: 9px; }
+  .fx-bar i { display: block; height: 100%; border-radius: 4px; }
+
+  .fx-row {
+    background: var(--scr-panel); border: 1px solid var(--hair);
+    border-radius: 13px; padding: 12px 15px; margin-bottom: 8px;
+  }
+  .fx-row .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .fx-row .nm { font-size: 14px; font-weight: 600; color: var(--ink); }
+  .fx-row .val { font-size: 21px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .fx-row .val u { text-decoration: none; font-size: 10px; color: var(--ink-3); font-weight: 500; }
+  .fx-row .axes { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 10px; }
+  .fx-row .ax { background: rgba(255,255,255,.03); border-radius: 9px; padding: 8px 10px; }
+  .fx-row .ax .k { font-size: 9px; letter-spacing: .12em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; }
+  .fx-row .ax .v { font-size: 16px; font-weight: 600; margin-top: 5px; font-variant-numeric: tabular-nums; }
+  .fx-row .ax .d { font-size: 10px; color: var(--ink-3); margin-top: 4px; line-height: 1.4; }
+  .fx-row .ax.absent .v { color: var(--ink-3); font-weight: 500; font-size: 13px; }
+  .fx-row .meta { color: var(--ink-3); font-size: 10px; margin-top: 8px; }
+  .s-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 9.5px; font-weight: 700; }
+  .s-vendor {
+    display: inline-block; padding: 1px 6px; border-radius: 999px; font-size: 9px;
+    font-weight: 600; color: var(--ink-3); border: 1px solid var(--hair); margin-left: 6px;
+  }
+  .s-warn {
+    background: rgba(191,160,106,.12); border: 1px solid rgba(191,160,106,.35);
+    color: #E2CB9B; border-radius: 10px; padding: 11px 13px; font-size: 11px;
+    line-height: 1.55; margin-bottom: 12px;
+  }
+  .s-head { font-size: 15px; font-weight: 700; color: var(--ink); margin: 16px 0 2px; }
+  .s-blurb { font-size: 10.5px; color: var(--ink-3); margin-bottom: 9px; }
+  @media (max-width: 620px) { .fx-row .axes { grid-template-columns: 1fr; } }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--chrome-panel); border: 1px solid var(--chrome-line);
+    border-radius: 11px; padding: 14px 16px;
+  }
+  .card .k {
+    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .12em; text-transform: uppercase; color: var(--chrome-mute);
+  }
+  .card .v { font-size: 25px; font-weight: 700; margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
+  .card .d { font-size: 12.5px; color: var(--chrome-mute); line-height: 1.5; }
+
+  ol.steps { max-width: 74ch; padding-left: 22px; }
+  ol.steps li { margin: 9px 0; }
+  ul.tight { max-width: 74ch; padding-left: 20px; }
+  ul.tight li { margin: 7px 0; }
+
+  footer.foot {
+    margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--chrome-line);
+    font-size: 12.5px; color: var(--chrome-mute);
+  }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">Mockup · Flexibility BioAge</div>
+  <h1>The Flexibility screen shows one number.<br>It is two numbers multiplied — and one of them scores you&nbsp;<em>down</em> for being too flexible.</h1>
+  <p class="lede">
+    Every other sector in this app treats higher as better. This one cannot, and the
+    reason is in the clinical file rather than in the design: Beighton 6/9 means
+    stability here is muscular, not ligamentous, so a joint reached with nothing to
+    stop it is the hazard the profile names — not an achievement to reward.
+  </p>
+  <div class="meta">
+    services/flexibility.py &middot; flexibility_baselines.py &middot;
+    views/insights.py::_render_flexibility_detail<br>
+    36 tests &middot; gate 1563 &middot; built 2026-08-05 &middot; sibling artifacts:
+    strength_bioage.html, metabolic_bioage.html
+  </div>
+</header>
+
+
+<h2 class="sec">The claim</h2>
+
+<p>
+  The athlete's brief was one number out of 100 where 100 is a perfect flexible body,
+  assembled from two inputs that share no unit: <b>degrees</b> from a gym goniometer,
+  and a <b>1&ndash;100 self-rating</b> of how far into a yoga pose he can get. His own
+  framing, and the reason the design is what it is:
+</p>
+
+<div class="callout">
+  <div class="h">Athlete, 2026-08-05</div>
+  <p>&ldquo;The overall perfect flexible body is having the flexibility <b>and</b> the
+  control to do the stretch correctly. It is always two things.&rdquo;</p>
+</div>
+
+<p>So the score is two things, multiplied:</p>
+
+<div class="figwrap" style="padding:18px 20px;">
+<div class="mono" style="font-size:13.5px;line-height:1.9;">
+region&nbsp;&nbsp;= <b>sqrt(RANGE &times; CONTROL)</b><br>
+overall = &Sigma;(weight<sub>r</sub> &times; confidence<sub>r</sub> &times; score<sub>r</sub>) / &Sigma;(weight<sub>r</sub> &times; confidence<sub>r</sub>)
+</div>
+</div>
+
+<p>
+  The geometric mean is the argument, not an implementation detail. An arithmetic
+  mean lets a 100 on one axis carry a 20 on the other to a respectable 60. This
+  gives <b>45</b>, and a zero on either axis annihilates the region &mdash; which is
+  the correct behaviour when the two things are jointly necessary. Both axes stay
+  visible all the way to the screen, because <i>&ldquo;Range 100, Control 66 &rarr;
+  81&rdquo;</i> says something the number 81 alone does not.
+</p>
+
+
+<h2 class="sec">The transform that inverts the scale</h2>
+
+<p>
+  The athlete's depth scale runs <b>1 = can barely enter the position</b> to
+  <b>100 = at the physical limit, no stretch sensation left</b>. That 100 is not the
+  overall score's 100. <code>control_score()</code> is the transform between them,
+  and it is the whole reason two axes exist rather than one blended number.
+</p>
+
+<figure>
+  <div class="flegend">
+    <b><i style="background:var(--s-control);"></i>Control score</b>
+    <span>&mdash; ideal band 50&ndash;70 shaded; falloff is quadratic below, linear above</span>
+  </div>
+  <div class="figwrap">
+    <svg viewBox="0 0 640 316" width="640" height="316" role="img"
+         aria-label="Control score as a function of depth rating. It rises quadratically from 0 to 100 across depth ratings 0 to 50, holds at 100 across the ideal band 50 to 70, then falls linearly to 10 at a depth rating of 100.">
+      <!-- ideal band -->
+      <rect x="326" y="16" width="111.2" height="248" fill="#1B7A55" opacity="0.075"/>
+      <line x1="326" y1="16" x2="326" y2="264" stroke="#1B7A55" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>
+      <line x1="437.2" y1="16" x2="437.2" y2="264" stroke="#1B7A55" stroke-width="1" stroke-dasharray="3 3" opacity=".55"/>
+
+      <!-- gridlines -->
+      <g stroke="#E0DCD6" stroke-width="1">
+        <line x1="48" y1="264" x2="604" y2="264"/>
+        <line x1="48" y1="202" x2="604" y2="202"/>
+        <line x1="48" y1="140" x2="604" y2="140"/>
+        <line x1="48" y1="78"  x2="604" y2="78"/>
+        <line x1="48" y1="16"  x2="604" y2="16"/>
+      </g>
+
+      <!-- y axis labels -->
+      <g font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#6B6259" text-anchor="end">
+        <text x="40" y="267">0</text>
+        <text x="40" y="205">25</text>
+        <text x="40" y="143">50</text>
+        <text x="40" y="81">75</text>
+        <text x="40" y="19">100</text>
+      </g>
+
+      <!-- x axis labels -->
+      <g font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#6B6259" text-anchor="middle">
+        <text x="48"  y="282">0</text>
+        <text x="187" y="282">25</text>
+        <text x="326" y="282">50</text>
+        <text x="437" y="282">70</text>
+        <text x="604" y="282">100</text>
+      </g>
+      <text x="326" y="304" font-family="ui-monospace,Menlo,monospace" font-size="10.5" fill="#6B6259" text-anchor="middle">depth rating (athlete&rsquo;s own scale)</text>
+
+      <!-- zone labels, direct -->
+      <g font-family="ui-monospace,Menlo,monospace" font-size="10" font-weight="700">
+        <text x="180" y="34" fill="#7A5A15" text-anchor="middle">RESTRICTED</text>
+        <text x="381" y="34" fill="#17603F" text-anchor="middle">IDEAL</text>
+        <text x="530" y="34" fill="#8E2B27" text-anchor="middle">NO STOP</text>
+      </g>
+
+      <!-- the curve -->
+      <polyline fill="none" stroke="var(--s-control)" stroke-width="2.5"
+        stroke-linejoin="round" stroke-linecap="round"
+        points="48,264 75.8,261.5 103.6,254.1 131.4,241.7 159.2,224.3 187,202 214.8,174.7 242.6,142.5 270.4,105.3 298.2,63.1 326,16 437.2,16 465,53.2 492.8,90.4 520.6,127.6 548.4,164.8 576.2,202 604,239.2"/>
+
+      <!-- his actual poses, labelled. paint-order puts a surface-coloured halo
+           behind each label so it stays legible where the curve runs under it. -->
+      <g font-family="ui-monospace,Menlo,monospace" font-size="9.5" fill="#201C18"
+         paint-order="stroke" stroke="#FFFFFF" stroke-width="3.5" stroke-linejoin="round">
+        <circle cx="187" cy="202" r="5" fill="var(--s-control)" stroke="#FFFFFF" stroke-width="2"/>
+        <text x="187" y="230" text-anchor="middle">Straddle 25 &rarr; 25</text>
+
+        <circle cx="270.4" cy="105.3" r="5" fill="var(--s-control)" stroke="#FFFFFF" stroke-width="2"/>
+        <text x="264" y="94" text-anchor="end">Pigeon 40 &rarr; 64</text>
+
+        <circle cx="403.8" cy="16" r="5" fill="var(--s-control)" stroke="#FFFFFF" stroke-width="2"/>
+        <text x="403.8" y="54" text-anchor="middle">Down Dog 64 &rarr; 100</text>
+
+        <circle cx="537.3" cy="149.9" r="5" fill="var(--s-control)" stroke="#FFFFFF" stroke-width="2"/>
+        <text x="529" y="141" text-anchor="end">Lying twist 88 &rarr; 46</text>
+      </g>
+    </svg>
+  </div>
+  <figcaption>
+    The right-hand slope is the entire point. A depth rating of 88 &mdash; the athlete's
+    own words for it, <i>&ldquo;no sensation left&rdquo;</i> &mdash; scores <b>46</b>.
+    Six of his 22 poses rated 80&ndash;88, every one a supine position entered with no
+    muscular endpoint. Under a more-is-better model those six are his best results.
+  </figcaption>
+</figure>
+
+<h3 class="sub">All 22 poses through the transform</h3>
+
+<div class="scroller">
+<table>
+  <thead>
+    <tr>
+      <th>Pose</th><th class="n">Depth</th><th class="n">Control</th><th>Reads as</th><th>Region weights</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>Straddle Forward Fold</td><td class="n">25</td><td class="n">25.0</td><td><span class="chip c-warn">Restricted</span></td><td class="mono">hams .5 / hip .3 / back .2</td></tr>
+    <tr><td>Seated Cross-Legged Side Bend</td><td class="n">40</td><td class="n">64.0</td><td><span class="chip c-warn">Restricted</span></td><td class="mono">lat .6 / back .3 / neck .1</td></tr>
+    <tr><td>Half Pigeon (R)</td><td class="n">40</td><td class="n">64.0</td><td><span class="chip c-warn">Restricted</span></td><td class="mono">hip 1.0</td></tr>
+    <tr><td>Half Pigeon (L)</td><td class="n">40</td><td class="n">64.0</td><td><span class="chip c-warn">Restricted</span></td><td class="mono">hip 1.0</td></tr>
+    <tr><td>Deep Lunge Hip Opener (R)</td><td class="n">46</td><td class="n">84.6</td><td><span class="chip c-warn">Restricted</span></td><td class="mono">hip .6 / back .2 / sh .2</td></tr>
+    <tr><td>Deep Lunge Hip Opener (L)</td><td class="n">46</td><td class="n">84.6</td><td><span class="chip c-warn">Restricted</span></td><td class="mono">hip .6 / back .2 / sh .2</td></tr>
+    <tr><td>Deep Lunge (R)</td><td class="n">57</td><td class="n">100.0</td><td><span class="chip c-ok">Ideal</span></td><td class="mono">hip 1.0</td></tr>
+    <tr><td>Deep Lunge (L)</td><td class="n">57</td><td class="n">100.0</td><td><span class="chip c-ok">Ideal</span></td><td class="mono">hip 1.0</td></tr>
+    <tr><td>Seated Side Stretch (R)</td><td class="n">60</td><td class="n">100.0</td><td><span class="chip c-ok">Ideal</span></td><td class="mono">lat .7 / back .3</td></tr>
+    <tr><td>Down Dog</td><td class="n">64</td><td class="n">100.0</td><td><span class="chip c-ok">Ideal</span></td><td class="mono">sh .5 / hams .3 / back .2</td></tr>
+    <tr><td>Seated Side Stretch (L)</td><td class="n">65</td><td class="n">100.0</td><td><span class="chip c-ok">Ideal</span></td><td class="mono">lat .7 / back .3</td></tr>
+    <tr><td>Seated Twist (L)</td><td class="n">66</td><td class="n">100.0</td><td><span class="chip c-ok">Ideal</span></td><td class="mono">back 1.0</td></tr>
+    <tr><td>Seated Twist (R)</td><td class="n">68</td><td class="n">100.0</td><td><span class="chip c-ok">Ideal</span></td><td class="mono">back 1.0</td></tr>
+    <tr><td>Walk the Dog</td><td class="n">76</td><td class="n">82.0</td><td><span class="chip c-bad">No stop</span></td><td class="mono">hams .6 / sh .4</td></tr>
+    <tr><td>Happy Baby</td><td class="n">80</td><td class="n">70.0</td><td><span class="chip c-bad">No stop</span></td><td class="mono">hip .8 / back .2</td></tr>
+    <tr><td>Butterfly Forward Fold</td><td class="n">82</td><td class="n">64.0</td><td><span class="chip c-bad">No stop</span></td><td class="mono">hip .5 / back .5</td></tr>
+    <tr><td>90/90 Hip Rotation</td><td class="n">85</td><td class="n">55.0</td><td><span class="chip c-bad">No stop</span></td><td class="mono">hip 1.0</td></tr>
+    <tr><td>Knee to Chest (R)</td><td class="n">85</td><td class="n">55.0</td><td><span class="chip c-bad">No stop</span></td><td class="mono">hip .7 / back .3</td></tr>
+    <tr><td>Lying Twist (R)</td><td class="n">85</td><td class="n">55.0</td><td><span class="chip c-bad">No stop</span></td><td class="mono">back .7 / hip .3</td></tr>
+    <tr><td>Knee to Chest (L)</td><td class="n">88</td><td class="n">46.0</td><td><span class="chip c-bad">No stop</span></td><td class="mono">hip .7 / back .3</td></tr>
+    <tr><td>Lying Twist (L)</td><td class="n">88</td><td class="n">46.0</td><td><span class="chip c-bad">No stop</span></td><td class="mono">back .7 / hip .3</td></tr>
+    <tr><td>Savasana</td><td class="n">100</td><td class="n">&mdash;</td><td><span class="chip c-none">Excluded</span></td><td class="mono">not a stretch</td></tr>
+  </tbody>
+</table>
+</div>
+
+
+<h2 class="sec">Score first, then average &mdash; never the reverse</h2>
+
+<p>
+  The hamstring region sees three poses. Averaging the <b>ratings</b> and scoring once
+  gives a completely different answer from scoring each pose and averaging the
+  <b>scores</b>, and only one of them is honest:
+</p>
+
+<div class="grid2">
+  <div class="card">
+    <div class="k">Average, then score &mdash; wrong</div>
+    <div class="v" style="color:#8E2B27;">100</div>
+    <div class="d">
+      ratings 25, 76, 64 &rarr; weighted mean <b>55.2</b> &rarr; inside the ideal band
+      &rarr; scores 100. The 25 &mdash; a straddle fold he can barely enter, and the single
+      most informative reading in the whole assessment &mdash; vanishes completely.
+    </div>
+  </div>
+  <div class="card">
+    <div class="k">Score, then average &mdash; right</div>
+    <div class="v" style="color:#17603F;">65.5</div>
+    <div class="d">
+      each pose scored first &rarr; 25.0, 82.0, 100.0 &rarr; weighted mean <b>65.5</b>.
+      The straddle survives into the region total, which is the only reason the region
+      reads as a problem at all.
+    </div>
+  </div>
+</div>
+
+<div class="callout bad">
+  <div class="h">The same trap, one layer down &mdash; found while hand-checking</div>
+  <p>
+    The region's <b>direction</b> label had the identical bug in the first build. It was
+    derived by averaging the ratings, so hamstrings &mdash; mean rating 55.2, inside the
+    band &mdash; came out labelled <span class="chip c-ok">Ideal</span> while scoring 65.
+    A region cannot be ideal and score 65.
+  </p>
+  <p>
+    Direction is now attributed from <b>where the lost points came from</b>: sum the
+    weighted deficit on each side and take the larger. Hamstrings gives 37.5 restricted
+    against 10.8 unstable &rarr; <span class="chip c-warn">Restricted</span>. Back gives
+    31.9 against 123.0 &rarr; <span class="chip c-bad">No stop</span>, which is the correct
+    read of a region whose deficit is almost entirely end-range passive twists.
+    <code>test_direction_is_attributed_from_lost_points_not_from_the_mean_rating</code> pins it.
+  </p>
+</div>
+
+
+<h2 class="sec">Where each number comes from</h2>
+
+<p>
+  Five instrumented readings, one date, and a defect that runs through all of them.
+  The gym screen prints degrees per region and <b>never says which movement produced
+  them</b>.
+</p>
+
+<div class="scroller">
+<table>
+  <thead>
+    <tr>
+      <th>Region</th><th class="n">L / R</th><th>Gym verdict</th><th>Assumed protocol</th>
+      <th class="n">Ideal band</th><th class="n">Range</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Neck</td><td class="n">30 / 30</td><td><span class="chip c-warn">Low</span></td>
+      <td>cervical lateral flexion</td><td class="n">40&ndash;50&deg;</td><td class="n">65.0</td>
+    </tr>
+    <tr>
+      <td>Chest</td><td class="n">106 / 106</td><td><span class="chip c-warn">Low</span></td>
+      <td>supine shoulder flexion</td><td class="n">160&ndash;180&deg;</td><td class="n">53.9</td>
+    </tr>
+    <tr>
+      <td>Lat Flex</td><td class="n">20 / 21</td><td><span class="chip c-ok">Normal</span></td>
+      <td colspan="2"><b>none &mdash; deliberately unscoreable</b></td><td class="n">&mdash;</td>
+    </tr>
+    <tr>
+      <td>Hip</td><td class="n">33 / 32</td><td><span class="chip c-warn">Low</span></td>
+      <td>hip internal rotation</td><td class="n">35&ndash;45&deg;</td><td class="n">89.5</td>
+    </tr>
+    <tr>
+      <td>Hamstrings</td><td class="n">89 / 86</td><td><span class="chip c-ok">Normal</span></td>
+      <td>passive straight-leg raise</td><td class="n">80&ndash;90&deg;</td><td class="n">100.0</td>
+    </tr>
+    <tr>
+      <td>Squat Depth</td><td class="n">&mdash;</td><td><span class="chip c-none">No data</span></td>
+      <td colspan="3">empty on the device, and no yoga pose reaches it</td>
+    </tr>
+    <tr>
+      <td>Back</td><td class="n">&mdash;</td><td><span class="chip c-none">No data</span></td>
+      <td colspan="3">empty on the device; covered on Control by the twists and folds</td>
+    </tr>
+    <tr>
+      <td>Shoulders</td><td class="n">&mdash;</td><td><span class="chip c-none">No data</span></td>
+      <td colspan="3">empty on the device; covered on Control by Down Dog and the openers</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout bad">
+  <div class="h">This sector's version of the InBody typed height</div>
+  <p>
+    <code>Hip 33&deg;</code> means one thing as internal rotation (normal 35&ndash;45,
+    so: low, and it corroborates the tight posterior capsule already in
+    <code>imbalances.overactive_tight</code>) and something else entirely as a Thomas
+    test (normal 10&ndash;20, where 33&deg; would be <i>excellent</i> &mdash; the
+    opposite finding, and flatly contradicting the &ldquo;Low&rdquo; the gym printed).
+  </p>
+  <p>
+    Every entry therefore carries <code>protocol=None</code> and
+    <code>provisional=True</code>; bands are assumed from the most likely protocol,
+    marked <b>*</b> on screen, and their confidence multiplied by 0.6. Setting
+    <code>protocol</code> clears all of that with <b>no other edit</b>.
+  </p>
+</div>
+
+<div class="callout">
+  <div class="h">Why Lat Flex has no band at all</div>
+  <p>
+    The gym calls 20&ndash;21&deg; <span class="chip c-ok">Normal</span>. Trunk lateral
+    flexion is normally 35&ndash;45&deg;, where 20&deg; would be markedly low. So either
+    the label does not mean trunk side-bend, or those are not population norms.
+    A band guessed out of a contradiction is worse than no band &mdash; the Range axis
+    is absent and the region scores on Control alone.
+  </p>
+</div>
+
+<h3 class="sub">The perfect-symmetry question</h3>
+
+<p>
+  Three regions differ left-to-right by 1&ndash;3&deg;. Two are <i>exactly</i> equal.
+  <b>Chest 106/106 is the least likely reading on the sheet</b>: three right anterior
+  dislocations, a failed capsular repair and a Latarjet coracoid transfer
+  (<code>patient_profile.py</code> finding #6), and a post-Latarjet shoulder
+  characteristically loses external rotation and horizontal abduction on the operated
+  side. Either one measurement was mirrored into both columns, or the protocol does not
+  isolate the shoulder. Flagged <code>symmetry_suspect</code>, not resolved &mdash; one
+  visit settles it.
+</p>
+
+
+<h2 class="sec">The screen</h2>
+
+<p class="note">
+  Reproduced from the live render at <code>?page=insights&amp;bioage=flexibility</code>,
+  2026-08-05. Layout mirrors the gym app's own &mdash; hero, Functional, Isolated &mdash;
+  so the two can be read side by side.
+</p>
+
+<div class="screen">
+  <div class="s-eyebrow">Flexibility</div>
+
+  <div class="fx-hero">
+    <div class="cap">Overall flexibility</div>
+    <div class="big">80<u>/ 100</u></div>
+    <div class="fx-bar"><i style="width:80%;background:var(--accent);"></i></div>
+    <div class="sub">
+      100 is the <b>ideal</b>, not the maximum &mdash; a perfect flexible body is the
+      range to reach a position <i>and</i> the control to hold it correctly, so a joint
+      taken past its ideal band with no muscular stop scores <i>down</i>, not up.<br>
+      Built on <b>44%</b> of the complete evidence: 2 of 8 regions have both axes, the
+      goniometry is 565 days old and its protocols are unrecorded.
+    </div>
+  </div>
+
+  <div class="s-warn">
+    &#9888; The gym scan never recorded <b>which movement</b> produced each angle, so
+    every Range band below is assumed from the most likely protocol and marked *.
+  </div>
+
+  <div class="s-head">Functional flexibility</div>
+  <div class="s-blurb">Whole-position movements. The gym has no data for any of these &mdash; the yoga flow covers two of the three.</div>
+
+  <div class="fx-row">
+    <div class="top"><span class="nm">Squat Depth</span><span class="val" style="color:var(--ink-3);font-size:14px;">No data</span></div>
+    <div class="meta">no instrumented reading and no yoga pose maps to this region &middot; carries 5% of the overall, currently unused</div>
+  </div>
+
+  <div class="fx-row">
+    <div class="top"><span class="nm">Back</span><span class="val" style="color:var(--bad);">76<u>/100</u></span></div>
+    <div class="fx-bar"><i style="width:76%;background:var(--bad);"></i></div>
+    <div class="axes">
+      <div class="ax absent"><div class="k">range</div><div class="v">Not measured</div><div class="d">gym scan reads &ldquo;No data yet&rdquo;</div></div>
+      <div class="ax"><div class="k">control</div><div class="v" style="color:var(--bad);">76<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">6.4 pose-weight &middot; lost points 32 restricted / 123 unstable</div></div>
+    </div>
+    <div class="meta"><span class="s-pill" style="background:rgba(196,120,120,.13);color:var(--bad);">End range, no stop</span> &middot; weight 20% &middot; confidence 50%</div>
+  </div>
+
+  <div class="fx-row">
+    <div class="top"><span class="nm">Shoulders</span><span class="val" style="color:var(--bad);">90<u>/100</u></span></div>
+    <div class="fx-bar"><i style="width:90%;background:var(--bad);"></i></div>
+    <div class="axes">
+      <div class="ax absent"><div class="k">range</div><div class="v">Not measured</div><div class="d">gym scan reads &ldquo;No data yet&rdquo;</div></div>
+      <div class="ax"><div class="k">control</div><div class="v" style="color:var(--bad);">90<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">1.3 pose-weight &middot; lost points 6 restricted / 7 unstable</div></div>
+    </div>
+    <div class="meta"><span class="s-pill" style="background:rgba(196,120,120,.13);color:var(--bad);">End range, no stop</span> &middot; weight 15% &middot; confidence 50%</div>
+  </div>
+
+  <div class="s-head">Isolated flexibility</div>
+  <div class="s-blurb">Single-joint angles from the gym scan, plus whatever the yoga flow reaches.</div>
+
+  <div class="fx-row">
+    <div class="top"><span class="nm">Hip<span class="s-vendor">gym: Low</span></span><span class="val" style="color:var(--bad);">79<u>/100</u></span></div>
+    <div class="fx-bar"><i style="width:79%;background:var(--bad);"></i></div>
+    <div class="axes">
+      <div class="ax"><div class="k">range *</div><div class="v" style="color:var(--warn);">89<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">32.5&deg; vs ideal 35&ndash;45&deg; (band assumed for hip internal rotation)</div></div>
+      <div class="ax"><div class="k">control</div><div class="v" style="color:var(--bad);">69<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">9.8 pose-weight &middot; lost points 113 restricted / 186 unstable</div></div>
+    </div>
+    <div class="meta"><span class="s-pill" style="background:rgba(196,120,120,.13);color:var(--bad);">End range, no stop</span> &middot; weight 20% &middot; confidence 60%</div>
+  </div>
+
+  <div class="fx-row">
+    <div class="top"><span class="nm">Hamstrings<span class="s-vendor">gym: Normal</span></span><span class="val" style="color:var(--warn);">81<u>/100</u></span></div>
+    <div class="fx-bar"><i style="width:81%;background:var(--warn);"></i></div>
+    <div class="axes">
+      <div class="ax"><div class="k">range *</div><div class="v" style="color:var(--good);">100<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">87.5&deg; vs ideal 80&ndash;90&deg; (band assumed for passive straight-leg raise)</div></div>
+      <div class="ax"><div class="k">control</div><div class="v" style="color:var(--warn);">66<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">1.4 pose-weight &middot; lost points 38 restricted / 11 unstable</div></div>
+    </div>
+    <div class="meta"><span class="s-pill" style="background:rgba(191,160,106,.13);color:var(--warn);">Restricted</span> &middot; weight 15% &middot; confidence 60%</div>
+  </div>
+
+  <div class="fx-row">
+    <div class="top"><span class="nm">Lat Flex<span class="s-vendor">gym: Normal</span></span><span class="val" style="color:var(--warn);">89<u>/100</u></span></div>
+    <div class="fx-bar"><i style="width:89%;background:var(--warn);"></i></div>
+    <div class="axes">
+      <div class="ax absent"><div class="k">range</div><div class="v">Not measured</div><div class="d">20&deg; measured, but no reference band &mdash; the gym&rsquo;s own verdict contradicts the label</div></div>
+      <div class="ax"><div class="k">control</div><div class="v" style="color:var(--warn);">89<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">2.0 pose-weight &middot; lost points 22 restricted / 0 unstable</div></div>
+    </div>
+    <div class="meta"><span class="s-pill" style="background:rgba(191,160,106,.13);color:var(--warn);">Restricted</span> &middot; weight 7% &middot; confidence 50%</div>
+  </div>
+
+  <div class="fx-row">
+    <div class="top"><span class="nm">Neck<span class="s-vendor">gym: Low</span></span><span class="val" style="color:var(--warn);">65<u>/100</u></span></div>
+    <div class="fx-bar"><i style="width:65%;background:var(--warn);"></i></div>
+    <div class="axes">
+      <div class="ax"><div class="k">range *</div><div class="v" style="color:var(--warn);">65<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">30.0&deg; vs ideal 40&ndash;50&deg; (band assumed for cervical lateral flexion)</div></div>
+      <div class="ax absent"><div class="k">control</div><div class="v">Not measured</div><div class="d">no pose in the flow reaches this region</div></div>
+    </div>
+    <div class="meta"><span class="s-pill" style="background:rgba(191,160,106,.13);color:var(--warn);">Restricted</span> &middot; weight 10% &middot; confidence 10%</div>
+  </div>
+
+  <div class="fx-row">
+    <div class="top"><span class="nm">Chest<span class="s-vendor">gym: Low</span></span><span class="val" style="color:var(--warn);">54<u>/100</u></span></div>
+    <div class="fx-bar"><i style="width:54%;background:var(--warn);"></i></div>
+    <div class="axes">
+      <div class="ax"><div class="k">range *</div><div class="v" style="color:var(--warn);">54<span style="font-size:10px;color:var(--ink-3);">/100</span></div><div class="d">106.0&deg; vs ideal 160&ndash;180&deg; (band assumed for supine shoulder flexion)</div></div>
+      <div class="ax absent"><div class="k">control</div><div class="v">Not measured</div><div class="d">no pose in the flow reaches this region</div></div>
+    </div>
+    <div class="meta"><span class="s-pill" style="background:rgba(191,160,106,.13);color:var(--warn);">Restricted</span> &middot; weight 8% &middot; confidence 10%</div>
+  </div>
+</div>
+
+
+<h2 class="sec">What the score says today</h2>
+
+<figure>
+  <div class="flegend">
+    <b><i style="background:var(--s-range);"></i>Range</b>
+    <b><i style="background:var(--s-control);"></i>Control</b>
+    <span>&mdash; a missing axis is drawn as an outline, never as a zero</span>
+  </div>
+  <div class="figwrap">
+    <svg viewBox="0 0 640 400" width="640" height="400" role="img"
+         aria-label="Range and Control scores for each of the eight regions. Back, Shoulders and Lat Flex have Control only; Neck and Chest have Range only; Hip and Hamstrings have both; Squat Depth has neither.">
+      <!-- scale gridlines -->
+      <g stroke="#E0DCD6" stroke-width="1">
+        <line x1="108" y1="4" x2="108" y2="360"/>
+        <line x1="223" y1="4" x2="223" y2="360"/>
+        <line x1="338" y1="4" x2="338" y2="360"/>
+        <line x1="453" y1="4" x2="453" y2="360"/>
+        <line x1="568" y1="4" x2="568" y2="360"/>
+      </g>
+      <g font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#6B6259" text-anchor="middle">
+        <text x="108" y="376">0</text><text x="223" y="376">25</text>
+        <text x="338" y="376">50</text><text x="453" y="376">75</text>
+        <text x="568" y="376">100</text>
+      </g>
+      <text x="338" y="394" font-family="ui-monospace,Menlo,monospace" font-size="10.5" fill="#6B6259" text-anchor="middle">axis score (100 = ideal)</text>
+
+      <g font-family="ui-sans-serif,-apple-system,Segoe UI,sans-serif" font-size="12" fill="#201C18" text-anchor="end">
+        <text x="100" y="26">Back <tspan font-size="10" fill="#6B6259">20%</tspan></text>
+        <text x="100" y="72">Hip <tspan font-size="10" fill="#6B6259">20%</tspan></text>
+        <text x="100" y="118">Hamstrings <tspan font-size="10" fill="#6B6259">15%</tspan></text>
+        <text x="100" y="164">Shoulders <tspan font-size="10" fill="#6B6259">15%</tspan></text>
+        <text x="100" y="210">Neck <tspan font-size="10" fill="#6B6259">10%</tspan></text>
+        <text x="100" y="256">Chest <tspan font-size="10" fill="#6B6259">8%</tspan></text>
+        <text x="100" y="302">Lat Flex <tspan font-size="10" fill="#6B6259">7%</tspan></text>
+        <text x="100" y="348">Squat Depth <tspan font-size="10" fill="#6B6259">5%</tspan></text>
+      </g>
+
+      <g font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#6B6259">
+        <!-- Back: control only -->
+        <rect x="108" y="10" width="464" height="12" rx="4" fill="none" stroke="#C9C3BA" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="116" y="20" font-size="9.5">Range not measured</text>
+        <rect x="108" y="26" width="348.7" height="12" rx="4" fill="var(--s-control)"/>
+        <text x="464.7" y="36" fill="#201C18">76</text>
+
+        <!-- Hip: both -->
+        <rect x="108" y="56" width="411.7" height="12" rx="4" fill="var(--s-range)"/>
+        <text x="527.7" y="66" fill="#201C18">89</text>
+        <rect x="108" y="72" width="319.7" height="12" rx="4" fill="var(--s-control)"/>
+        <text x="435.7" y="82" fill="#201C18">69</text>
+
+        <!-- Hamstrings: both -->
+        <rect x="108" y="102" width="460" height="12" rx="4" fill="var(--s-range)"/>
+        <text x="576" y="112" fill="#201C18">100</text>
+        <rect x="108" y="118" width="301.3" height="12" rx="4" fill="var(--s-control)"/>
+        <text x="417.3" y="128" fill="#201C18">66</text>
+
+        <!-- Shoulders: control only -->
+        <rect x="108" y="148" width="464" height="12" rx="4" fill="none" stroke="#C9C3BA" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="116" y="158" font-size="9.5">Range not measured</text>
+        <rect x="108" y="164" width="412.6" height="12" rx="4" fill="var(--s-control)"/>
+        <text x="528.6" y="174" fill="#201C18">90</text>
+
+        <!-- Neck: range only -->
+        <rect x="108" y="194" width="299" height="12" rx="4" fill="var(--s-range)"/>
+        <text x="415" y="204" fill="#201C18">65</text>
+        <rect x="108" y="210" width="464" height="12" rx="4" fill="none" stroke="#C9C3BA" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="116" y="220" font-size="9.5">Control not measured &mdash; no pose reaches it</text>
+
+        <!-- Chest: range only -->
+        <rect x="108" y="240" width="247.9" height="12" rx="4" fill="var(--s-range)"/>
+        <text x="363.9" y="250" fill="#201C18">54</text>
+        <rect x="108" y="256" width="464" height="12" rx="4" fill="none" stroke="#C9C3BA" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="116" y="266" font-size="9.5">Control not measured &mdash; no pose reaches it</text>
+
+        <!-- Lat Flex: control only -->
+        <rect x="108" y="286" width="464" height="12" rx="4" fill="none" stroke="#C9C3BA" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="116" y="296" font-size="9.5">Range unscoreable &mdash; verdict contradicts the label</text>
+        <rect x="108" y="302" width="410.3" height="12" rx="4" fill="var(--s-control)"/>
+        <text x="526.3" y="312" fill="#201C18">89</text>
+
+        <!-- Squat Depth: neither -->
+        <rect x="108" y="332" width="464" height="12" rx="4" fill="none" stroke="#C9C3BA" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="116" y="342" font-size="9.5">Neither axis &mdash; excluded from the overall, not imputed</text>
+      </g>
+    </svg>
+  </div>
+  <figcaption>
+    Read the gaps, not just the bars. <b>Two of eight regions have both axes.</b>
+    Hamstrings is the clearest case the design exists for: Range 100 against
+    Control 66 &mdash; length is fine, what he can do with it is not.
+  </figcaption>
+</figure>
+
+<div class="callout">
+  <div class="h">The hamstring reconciliation</div>
+  <p>
+    The gym reads 89&deg;/86&deg; and calls it <span class="chip c-ok">Normal</span>,
+    which <b>agrees</b> with a straddle fold rated 25/100 rather than contradicting it.
+    Long-sitting upright is already ~90&deg; of hip flexion with the knee straight, so at
+    86&ndash;89&deg; he is at the hamstring limit <i>merely sitting up with his legs out</i>,
+    and every further degree of fold has to come from the spine.
+  </p>
+  <p>
+    So the finding is <b>normal length with no reserve</b>, not shortness &mdash; an
+    ordinary hamstring under an exceptional lumbar spine. The earlier wording in
+    <code>patient_profile.py</code> said &ldquo;restriction&rdquo; and implied short; it
+    has been restated. And the reconciliation holds <b>only</b> if that reading is a
+    straight-leg raise, which is exactly what the unrecorded protocol prevents anyone
+    from knowing.
+  </p>
+</div>
+
+
+<h2 class="sec">Findings from building it</h2>
+
+<div class="callout bad">
+  <div class="h">Finding 1 &mdash; the app's shared status trio fails CVD separation</div>
+  <p>
+    <code>views/insights.py:172</code> defines <code>_GOOD #6BAF8B</code>,
+    <code>_WARN #BFA06A</code>, <code>_BAD #C47878</code>. Run against the dark panel
+    <code>#0E1018</code>:
+  </p>
+  <div class="scroller">
+  <table style="min-width:0;">
+    <thead><tr><th>Check</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td>CVD separation</td><td><span class="chip c-bad">FAIL</span> worst adjacent <code>#BFA06A</code>&harr;<code>#6BAF8B</code> &Delta;E <b>4.3</b> (protan), target &ge;8</td></tr>
+      <tr><td>Normal-vision floor</td><td><span class="chip c-bad">FAIL</span> &Delta;E <b>10.9</b>, floor 15 &mdash; hard to tell apart <i>with</i> full colour vision</td></tr>
+      <tr><td>Chroma floor</td><td><span class="chip c-bad">FAIL</span> all three below 0.1 &mdash; they read grey</td></tr>
+      <tr><td>Contrast vs surface</td><td><span class="chip c-ok">PASS</span> all three &ge; 3:1</td></tr>
+    </tbody>
+  </table>
+  </div>
+  <p>
+    Green-vs-red at &Delta;E 4.1 for a deuteranope means <i>Ideal</i> and <i>End range,
+    no stop</i> are close to indistinguishable &mdash; opposite clinical meanings, nearly
+    the same colour. <b>The screen is not broken</b>, because every direction ships a
+    text pill (&ldquo;Ideal&rdquo;, &ldquo;Restricted&rdquo;, &ldquo;End range, no
+    stop&rdquo;) and is never colour-alone. But the colour is carrying none of the load
+    it appears to.
+  </p>
+  <p>
+    <b>Not changed here.</b> These tokens are shared with the Strength and Metabolism
+    screens, so re-stepping them is a visual change to two shipped sectors and needs a
+    decision, not a drive-by.
+  </p>
+</div>
+
+<div class="callout ok">
+  <div class="h">Finding 2 &mdash; the chrome figures' own palette passes</div>
+  <p>
+    Range <code>#2a78d6</code> / Control <code>#eb6834</code> on white, all pairs:
+    CVD &Delta;E <b>24.7</b> (protan), normal-vision &Delta;E <b>33.6</b>, both &ge;3:1.
+    All six checks pass. Both are also direct-labelled, so identity never rests on hue.
+  </p>
+</div>
+
+
+<h2 class="sec">What this refuses to do</h2>
+
+<ul class="tight">
+  <li>
+    <b>No flexibility age in years.</b> The gym ships one &mdash; <i>28</i> against
+    &ldquo;Real age: 31&rdquo; &mdash; but it was measured 2025-01-17 when he was
+    <b>30</b>. It compares a stale measurement against a <i>live</i> chronological age,
+    so the gap was &minus;2 at measurement, displays as &minus;3, and widens every
+    birthday without anybody moving a millimetre. Same defect class as the typed InBody
+    height, same refusal as <code>services/body_composition.py</code>'s.
+  </li>
+  <li>
+    <b>No scoring the gym's Low/Normal verdicts.</b> Kept verbatim as provenance and
+    shown on the screen; nothing computes from them. Their norm tables are undisclosed,
+    so scoring them would import the vendor's reference into ours and then double-count
+    it against our own band.
+  </li>
+  <li>
+    <b>No filling an empty region from the other instrument, or from a training note.</b>
+    Squat Depth is empty on both axes and is reported as empty. The 2025 log's
+    &ldquo;mobility excellent, hits depth easily&rdquo; is a qualitative note, not a
+    measurement.
+  </li>
+  <li>
+    <b>No region scored without a reference band.</b>
+  </li>
+  <li>
+    <b>Nothing here reaches the engine.</b> Not the traffic light, not ACWR, not
+    readiness, not the volume recommendation. <code>services/rules.py</code> remains the
+    only thing that constrains movement.
+  </li>
+</ul>
+
+
+<h2 class="sec">What has to be built</h2>
+
+<ol class="steps">
+  <li>
+    <b>The protocol list from the gym.</b> One question. Lifts Range confidence from 60%
+    of its stale value to full, and settles whether the hamstring reconciliation above is
+    real. Nothing in the code changes &mdash; set <code>protocol</code>, confirm the band,
+    <code>provisional</code> clears itself.
+  </li>
+  <li>
+    <b>A re-scan, asking explicitly for Squat Depth, Back and Shoulders.</b> All three are
+    empty; Back and Shoulders carry <b>35%</b> of the overall between them and currently
+    run on Control alone. The existing scan is 565 days old and halves in weight every
+    365, so it counts for 34% of a fresh reading.
+  </li>
+  <li>
+    <b>Re-rate the 22 poses.</b> Free, repeatable, and the only axis that is current.
+    Three poses carry specific retests attached to them in <code>services/yoga.py</code>.
+  </li>
+  <li>
+    <b>Decide the status-trio question</b> from Finding 1 &mdash; app-wide, affects three
+    screens.
+  </li>
+  <li>
+    <b>Then, and only then, a trend.</b> One instrumented date cannot have one. The
+    progress chart the gym draws with a single point in January is the thing this screen
+    deliberately does not imitate.
+  </li>
+</ol>
+
+<footer class="foot">
+  Range from the gym scan of 17 Jan 2025 &middot; Control from the 05 Aug 2026 self-rating
+  of 22 poses &middot; overall 80/100 on 44% of the complete evidence &middot;
+  <code>flexibility_baselines.py</code>, <code>services/flexibility.py</code>,
+  <code>tests/test_flexibility.py</code> (36 tests) &middot; locked decisions in
+  <code>docs/resume.md</code> &sect; FLEXIBILITY.
+</footer>
+
+</div>
