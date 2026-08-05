@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1475/1475 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
+Expected: **1515/1515 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -38,7 +38,7 @@ Expected: **1475/1475 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1475/1475 (or higher if new tests were added)
+1. `python -m pytest tests/` → 1515/1515 (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -115,6 +115,19 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     read its module docstring before wiring any of it into the
                     engine, the shadow report showed partial coverage makes
                     the traffic light STRICTER, not looser) ·
+                    body_composition.py (the Metabolism screen's backend. Two
+                    devices kept in SEPARATE lanes: a Foryond foot-only scale
+                    whose 14 columns are one measurement — weight — since its
+                    body fat % is itself fitted from weight and age at R² 0.9966,
+                    and an InBody 770 whose five scans were run against four
+                    different typed heights. `InBodyScan.at_height` re-runs a
+                    scan at the true 182 cm; height enters InBody's first step
+                    SQUARED, so the correction moves every kilogram and moves
+                    neither of the two height-immune readings, phase angle and
+                    ECW/TBW. Read the module docstring before adding anything:
+                    a fused body-fat number across the two devices and a
+                    composition expressed in years are both refused there, and
+                    tests pin the refusals) ·
                     sleep_movement.py (fuses the two devices' MOVEMENT series —
                     Oura's ordinal 1-4 class per 30s and Garmin's undocumented
                     float per minute — by quantile-mapping Garmin onto Oura's
@@ -168,6 +181,12 @@ Reference data:
                            lower_body; feeds services/strength.py and
                            services/tonnage.py — an exercise missing from it is
                            excluded from every sector total)
+  body_composition_baselines.py — the five InBody 770 scans, transcribed from a
+                           PAPER print-out with no export path. Carries the raw 50 kHz
+                           impedances and the waist/WHR the phone app never synced.
+                           Both 2025-05-21 scans are kept: taken 8 minutes apart, they
+                           differ by 6.0 pp of body fat purely because the operator
+                           corrected the height between them.
   strength_baselines.py — the 2025 peak that "100" means, one entry per exercise,
                            plus each entry's `comparability`. Transcribed from
                            Input_files/2025-training-year.md because NOTION DOES
@@ -178,7 +197,7 @@ Reference data:
                            services/bioage.py (PROFILE["imbalances"], for the
                            muscle-imbalance count)
 
-tests/       — pytest suite (1475 tests), the sole deterministic gate
+tests/       — pytest suite (1515 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py,
                backfill_garmin_sleep_stages.py — probe before spending calls)

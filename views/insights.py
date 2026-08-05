@@ -23,6 +23,7 @@ import altair as alt
 import streamlit as st
 import pandas as pd
 
+import body_composition_baselines as bcb
 import patient_profile
 import repo
 import strength_baselines
@@ -30,6 +31,7 @@ import styles
 import training_constants
 from services import ai
 from services import bioage
+from services import body_composition as bc
 from services import dashboard as dash
 from services import engine
 from services import stats as stats_mod
@@ -678,6 +680,532 @@ def _render_strength_detail() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  Metabolism BioAge detail screen (tab_bioage → ?bioage=metabolism).
+#
+#  Two devices, kept in separate lanes on purpose:
+#
+#    Foryond foot-only scale — 142 readings, near-daily when the habit holds.
+#      Contributes exactly ONE measurement, weight. Its body fat percent is
+#      fitted from weight and age (R^2 0.9966) so the fat/lean split shown here
+#      is a statement about weight wearing the vocabulary of composition. It is
+#      still the best split available and it is labelled as derived everywhere.
+#    InBody 770 at the gym — five scans, then nothing for over a year. The only
+#      source of PHASE ANGLE and the ECW/TBW ratio, which are the two readings
+#      on either device that no height typed at a console can move.
+#
+#  The screen never blends them. Weight is the only quantity they agree on
+#  (mean gap +0.24 kg across five paired dates); everything else they estimate
+#  separately, so a fused number would invent agreement that is not there.
+#  See services/body_composition.py for the measured constants.
+# ─────────────────────────────────────────────────────────────────────────────
+
+_METAB_FAT, _METAB_LEAN, _METAB_DEV = "#B8822A", "#9B6BFF", "#3FA895"
+
+#: label → (series key, unit, decimals, minimum axis span, colour, source)
+_METAB_METRICS: dict[str, dict] = {
+    "Weight":            {"key": "weight",  "unit": "kg", "dp": 1, "span": 2.0,
+                          "colour": _METAB_LEAN, "src": "scale"},
+    "Fat mass":          {"key": "fat",     "unit": "kg", "dp": 1, "span": 1.5,
+                          "colour": _METAB_FAT,  "src": "scale"},
+    "Fat-free mass":     {"key": "ffm",     "unit": "kg", "dp": 1, "span": 1.5,
+                          "colour": _METAB_LEAN, "src": "scale"},
+    "Body fat percent":  {"key": "bf",      "unit": "%",  "dp": 1, "span": 1.5,
+                          "colour": _METAB_FAT,  "src": "scale"},
+    "Phase angle":       {"key": "phase",   "unit": "°",  "dp": 1, "span": 0.5,
+                          "colour": _METAB_DEV,  "src": "inbody"},
+    "ECW / TBW ratio":   {"key": "ecw",     "unit": "",   "dp": 3, "span": 0.008,
+                          "colour": _METAB_DEV,  "src": "inbody"},
+}
+
+_METAB_RANGES: tuple[tuple[str, str], ...] = (
+    ("Week", "week"), ("Month", "month"), ("Year", "year"), ("All", "all"),
+)
+
+_METABOLISM_CSS = f"""
+<style>
+.st-key-metab_metric label {{ display:none !important; }}
+.st-key-metab_metric div[data-baseweb="select"] > div {{
+  background:rgba(255,255,255,.06) !important; border:1px solid {_HAIR} !important;
+  border-radius:9px !important; color:{_INK} !important; font-weight:600 !important; }}
+.st-key-metab_metric div[data-baseweb="select"] svg {{ fill:{_INK2} !important; }}
+.st-key-metab_metric div[data-baseweb="select"] div {{ font-size:12.5px !important; }}
+.st-key-metab_metric {{ max-width:250px; margin-left:auto; }}
+
+/* Range + period stepper. Streamlit buttons, restyled onto the dark screen. */
+div[class*="st-key-metab_r_"] button, div[class*="st-key-metab_p_"] button {{
+  background:rgba(255,255,255,.05) !important; border:1px solid {_HAIR} !important;
+  color:{_INK2} !important; border-radius:8px !important;
+  font:600 11.5px/1 system-ui !important; padding:7px 4px !important; width:100%; }}
+div[class*="st-key-metab_r_"] button:hover, div[class*="st-key-metab_p_"] button:hover {{
+  color:{_INK} !important; background:rgba(255,255,255,.10) !important; }}
+div[class*="st-key-metab_r_"] button[kind="primary"] {{
+  background:rgba(155,107,255,.22) !important; color:{_INK} !important;
+  border-color:rgba(155,107,255,.45) !important; }}
+div[class*="st-key-metab_p_"] button:disabled {{ opacity:.3 !important; }}
+
+.mb-plabel {{ text-align:center; line-height:1.25; padding-top:5px; }}
+.mb-plabel b {{ display:block; font-size:13px; font-weight:600; color:{_INK};
+  font-variant-numeric:tabular-nums; }}
+.mb-plabel i {{ display:block; font:400 10px/1.4 ui-monospace,monospace;
+  font-style:normal; letter-spacing:.06em; text-transform:uppercase; color:{_INK3}; }}
+
+/* The split bar and chart panel. Named mb-* rather than reusing the sb-*
+   classes: _STRENGTH_CSS is only injected by the Strength screen, so borrowing
+   its class names here renders them unstyled. */
+.mb-splitbar {{ display:flex; gap:2px; height:13px; border-radius:7px; overflow:hidden;
+  background:rgba(255,255,255,.05); margin:6px 0 0; }}
+.mb-splitbar i {{ display:block; height:100%; }}
+.mb-splitkey {{ display:flex; flex-wrap:wrap; gap:18px; margin:10px 0 14px;
+  font-size:11.5px; color:{_INK2}; }}
+.mb-splitkey span {{ display:inline-flex; align-items:center; gap:7px; }}
+.mb-splitkey b {{ width:9px; height:9px; border-radius:3px; display:inline-block; }}
+.mb-chartbox {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:16px;
+  padding:12px 8px 4px; margin:10px 0 18px; }}
+
+.mb-readout {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px;
+  background:{_PANEL}; border:1px solid {_HAIR}; border-radius:14px;
+  padding:14px 18px; margin-top:10px; }}
+.mb-readout .k {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
+  letter-spacing:.13em; text-transform:uppercase; color:{_INK3}; }}
+.mb-readout .v {{ font-size:22px; font-weight:600; color:{_INK}; margin-top:8px;
+  line-height:1.1; font-variant-numeric:tabular-nums; }}
+.mb-readout .v u {{ text-decoration:none; font-size:12px; font-weight:400;
+  color:{_INK2}; margin-left:5px; }}
+@media (max-width:520px) {{ .mb-readout {{ grid-template-columns:1fr; }} }}
+
+.mb-cards {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }}
+@media (max-width:640px) {{ .mb-cards {{ grid-template-columns:1fr; }} }}
+.mb-card {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:14px;
+  padding:13px 15px 12px; }}
+.mb-card .top {{ display:flex; justify-content:space-between; align-items:baseline;
+  gap:10px; }}
+.mb-card .nm {{ font-size:13.5px; font-weight:600; line-height:1.3; }}
+.mb-card .dt {{ font:11px ui-monospace,monospace; color:{_INK3}; white-space:nowrap;
+  font-variant-numeric:tabular-nums; }}
+.mb-card .val {{ font-size:25px; font-weight:300; color:{_INK}; margin-top:5px;
+  font-variant-numeric:tabular-nums; line-height:1.15; }}
+.mb-card .val u {{ text-decoration:none; font-size:12px; color:{_INK2}; margin-left:5px; }}
+.mb-card.empty .val {{ color:{_INK3}; }}
+.mb-card .foot {{ display:flex; justify-content:space-between; align-items:center;
+  gap:8px; margin-top:9px; }}
+.mb-src {{ font:600 8.5px/1.7 ui-monospace,monospace; letter-spacing:.1em;
+  text-transform:uppercase; padding:1px 7px; border-radius:5px; white-space:nowrap; }}
+.mb-src.measured {{ background:rgba(155,107,255,.16); color:#C6A9FF; }}
+.mb-src.derived {{ background:rgba(255,255,255,.06); color:{_INK3}; }}
+.mb-src.absent {{ background:rgba(196,120,120,.14); color:{_BAD}; }}
+.mb-pill {{ font:600 9px/1.7 ui-monospace,monospace; letter-spacing:.1em;
+  text-transform:uppercase; padding:1px 8px; border-radius:20px; white-space:nowrap; }}
+.mb-pill.ok {{ background:rgba(107,175,139,.18); color:{_GOOD}; }}
+.mb-pill.bad {{ background:rgba(196,120,120,.18); color:{_BAD}; }}
+.mb-grp {{ font:600 9px/1 ui-monospace,monospace; letter-spacing:2px;
+  text-transform:uppercase; color:{_INK3}; margin:20px 0 9px; }}
+.mb-grp span {{ color:{_INK2}; text-transform:none; letter-spacing:0;
+  font-family:system-ui,sans-serif; font-weight:400; font-size:11px; margin-left:9px; }}
+
+div[class*="st-key-metab_add_"] button {{
+  background:{_PANEL} !important; border:1px solid rgba(155,107,255,.28) !important;
+  color:{_INK} !important; border-radius:14px !important; width:100%;
+  padding:16px 14px !important; font:600 14px/1.3 system-ui !important; }}
+div[class*="st-key-metab_add_"] button:hover {{
+  border-color:rgba(155,107,255,.55) !important;
+  background:rgba(155,107,255,.07) !important; }}
+</style>
+"""
+
+
+def _metab_hero_html(fat: float | None, lean: float | None,
+                     taken: date | None, accent: str) -> str:
+    """Fat and fat-free in kilograms, which is the most the data supports.
+
+    Not an age in years: the scale already ships one and it is
+    `-20.73 + 1.226*body_fat_pct + 0.900*chronological age`, i.e. age predicting
+    age. A composition hero also degrades honestly — it can say how old the
+    reading is, where a number in years just keeps printing."""
+    bg = _bioage_b64(str(_BIOAGE_BG_DIR / "derived" / "metabolism_hero.png"))
+    layer = (
+        f"background-image:linear-gradient(100deg,rgba(11,15,26,0.95) 0%,"
+        f"rgba(11,15,26,0.62) 36%,rgba(11,15,26,0.10) 66%),url('{bg}');"
+        f"background-size:contain;background-repeat:no-repeat;"
+        f"background-position:center right;"
+    ) if bg else "background:#0B0F1A;"
+    if fat is None or lean is None:
+        body = (
+            f"<div style='font-size:30px;font-weight:800;color:#555;line-height:1;"
+            f"margin-top:6px;'>—</div>"
+            f"<div style='font-size:12.5px;color:{_INK3};margin-top:8px;'>"
+            f"No weigh-in on record yet.</div>"
+        )
+    else:
+        body = (
+            f"<div style='font-size:44px;font-weight:800;color:{_INK};line-height:1;"
+            f"font-variant-numeric:tabular-nums;'>{fat:.1f}"
+            f"<u style='text-decoration:none;font-size:17px;font-weight:500;"
+            f"color:{_INK2};margin-left:8px;'>kg fat</u>"
+            f"<span style='margin:0 14px;color:{_INK3};'>·</span>{lean:.1f}"
+            f"<u style='text-decoration:none;font-size:17px;font-weight:500;"
+            f"color:{_INK2};margin-left:8px;'>kg fat-free</u></div>"
+            f"<div style='display:inline-block;font:600 9.5px/1.7 ui-monospace,monospace;"
+            f"letter-spacing:.12em;text-transform:uppercase;padding:2px 9px;"
+            f"border-radius:20px;margin-top:12px;background:rgba(107,175,139,.18);"
+            f"color:{_GOOD};'>Measured · "
+            f"{taken.strftime('%d %b %Y').lstrip('0')}</div>"
+        )
+    # Double quotes on the outer style attribute: `layer` contains
+    # url('data:...'), and single-quoting the attribute would close it at the
+    # first quote of the URL and drop the background entirely.
+    return (
+        f'<div style="position:relative;{_CARD_DIMENSIONS_CSS}overflow:hidden;'
+        f'border-radius:22px;margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);'
+        f'box-shadow:0 8px 32px rgba(0,0,0,0.4);{layer}">'
+        f'<div style="position:relative;z-index:1;height:100%;box-sizing:border-box;'
+        f'padding:26px 24px;display:flex;flex-direction:column;justify-content:center;"><div>'
+        f'<div style="font-size:11px;color:{accent};letter-spacing:2px;'
+        f'text-transform:uppercase;font-weight:600;margin-bottom:8px;">Composition</div>'
+        f"{body}</div></div></div>"
+    )
+
+
+def _metab_split_html(fat: float | None, lean: float | None) -> str:
+    """Fat against fat-free, which must total the weight. It does so by
+    construction — `fat = weight * pct` and `lean = weight - fat` — so this bar
+    is a restatement of one number, never corroboration of it."""
+    if fat is None or lean is None or (fat + lean) <= 0:
+        return ""
+    total = fat + lean
+    pct = fat / total * 100
+    return (
+        f'<div class="mb-splitbar">'
+        f'<i style="width:{pct:.1f}%;background:{_METAB_FAT}"></i>'
+        f'<i style="width:{100 - pct:.1f}%;background:{_METAB_LEAN}"></i></div>'
+        f'<div class="mb-splitkey">'
+        f'<span><b style="background:{_METAB_FAT}"></b>Fat {fat:.1f} kg · {pct:.1f}%</span>'
+        f'<span><b style="background:{_METAB_LEAN}"></b>Fat-free {lean:.1f} kg · '
+        f'{100 - pct:.1f}%</span>'
+        f'<span style="color:{_INK3}">total {total:.1f} kg</span></div>'
+    )
+
+
+def _metab_readout_html(first: tuple | None, last: tuple | None,
+                        unit: str, dp: int) -> str:
+    """Latest, and the change across what the chart is showing.
+
+    The change is first-to-last of the VISIBLE points, not of the whole series
+    — a number that disagrees with the picture beside it teaches the reader to
+    trust neither."""
+    def cell(key: str, value: str) -> str:
+        return f'<div><div class="k">{key}</div><div class="v">{value}</div></div>'
+
+    if last is None:
+        return (f'<div class="mb-readout">{cell("Latest", "—")}'
+                f'{cell("Change", "—")}</div>')
+    last_day, last_val = last
+    latest = cell(f"Latest · {last_day.strftime('%d %b %Y').lstrip('0')}",
+                  f"{last_val:.{dp}f}<u>{unit}</u>" if unit else f"{last_val:.{dp}f}")
+    if first is None or first[0] == last_day and first[1] == last_val:
+        return f'<div class="mb-readout">{latest}{cell("Change · one reading only", "—")}</div>'
+    delta = last_val - first[1]
+    colour = _INK3 if abs(delta) < 10 ** -dp / 2 else (_WARN if delta > 0 else _GOOD)
+    sign = "" if abs(delta) < 10 ** -dp / 2 else ("−" if delta < 0 else "+")
+    span = (f"Change · {first[0].strftime('%d %b %Y').lstrip('0')} → "
+            f"{last_day.strftime('%d %b %Y').lstrip('0')}")
+    body = (f'<span style="color:{colour}">{sign}{abs(delta):.{dp}f}'
+            f'{f"<u>{unit}</u>" if unit else ""}</span>')
+    return f'<div class="mb-readout">{latest}{cell(span, body)}</div>'
+
+
+def _metab_chart_svg(points: list[tuple], colour: str, dp: int, min_span: float,
+                     window, runs: list[list], label: str) -> str:
+    """One series across a calendar window, auto-scaled to what is visible.
+
+    `min_span` stops a zoomed-in week of near-identical readings being magnified
+    into drama, and `runs` carries the gap breaks so the 97-day injury hole is
+    never drawn as a line."""
+    w, h, pl, pr, pt, pb = 640, 236, 46, 16, 16, 30
+    iw, ih = w - pl - pr, h - pt - pb
+    lo_d, hi_d = window.start.toordinal(), window.end.toordinal()
+    span_d = max(1, hi_d - lo_d)
+
+    def x_at(day: date) -> float:
+        return pl + (day.toordinal() - lo_d) / span_d * iw
+
+    if not points:
+        return (
+            f'<svg viewBox="0 0 {w} {h}" width="100%" height="{h}" role="img" '
+            f'aria-label="{label}, no reading in {window.label}">'
+            f'<text x="{w / 2}" y="{pt + ih / 2 - 6}" text-anchor="middle" '
+            f'font-size="13" fill="{_INK2}" font-family="system-ui">'
+            f'No reading in {window.label}</text></svg>'
+        )
+
+    values = [v for _, v in points]
+    mid = (min(values) + max(values)) / 2
+    span_v = max(max(values) - min(values), min_span) * 1.25
+    y_lo, y_hi = mid - span_v / 2, mid + span_v / 2
+
+    def y_at(value: float) -> float:
+        return pt + (1 - (value - y_lo) / (y_hi - y_lo)) * ih
+
+    y_labels = [f"{y_hi - i / 4 * (y_hi - y_lo):.{dp}f}" for i in range(5)]
+    x_labels = []
+    for i in range(5):
+        day = date.fromordinal(lo_d + round(i / 4 * span_d))
+        x_labels.append(day.strftime("%d %b" if span_d <= 60 else "%b %y").lstrip("0"))
+    out = _svg_frame(y_labels, x_labels, w, h, pl, pr, pt, pb)
+
+    for run in runs:
+        if len(run) < 2:
+            continue
+        pts = " ".join(f"{x_at(d):.1f},{y_at(v):.1f}" for d, v in run)
+        out += (f'<polyline points="{pts}" fill="none" stroke="{colour}" '
+                f'stroke-width="2" stroke-linejoin="round" stroke-linecap="round" '
+                f'opacity="0.85"/>')
+    radius = 1.9 if len(points) > 40 else 3.2
+    for day, value in points:
+        out += (f'<circle cx="{x_at(day):.1f}" cy="{y_at(value):.1f}" r="{radius}" '
+                f'fill="{colour}" opacity="0.8"/>')
+    last_day, last_val = points[-1]
+    out += (
+        f'<circle cx="{x_at(last_day):.1f}" cy="{y_at(last_val):.1f}" r="11" '
+        f'fill="{colour}" opacity="0.18"/>'
+        f'<circle cx="{x_at(last_day):.1f}" cy="{y_at(last_val):.1f}" r="5" '
+        f'fill="{colour}" stroke="#0B0F1A" stroke-width="2"/>'
+        f'<text x="{x_at(last_day) - 15:.1f}" y="{y_at(last_val) - 13:.1f}" '
+        f'text-anchor="end" font-size="11" fill="{colour}" '
+        f'font-family="ui-monospace, monospace">{last_val:.{dp}f}</text>'
+    )
+    return (
+        f'<svg viewBox="0 0 {w} {h}" width="100%" height="{h}" '
+        f'preserveAspectRatio="xMidYMid meet" role="img" aria-label="{label}, '
+        f'{len(points)} readings in {window.label}">{out}</svg>'
+    )
+
+
+def _metab_card_html(name: str, value: str, unit: str, when: str, source: str,
+                     pill: tuple[str, str] | None, colour: str) -> str:
+    empty = value == "—"
+    pill_html = (f'<span class="mb-pill {pill[0]}">{pill[1]}</span>') if pill else ""
+    return (
+        f'<div class="mb-card{" empty" if empty else ""}">'
+        f'<div class="top"><span class="nm" style="color:{colour}">{name}</span>'
+        f'<span class="dt">{when} &rsaquo;</span></div>'
+        f'<div class="val">{value}{f"<u>{unit}</u>" if unit else ""}</div>'
+        f'<div class="foot"><span class="mb-src {source}">{source}</span>'
+        f'{pill_html}</div></div>'
+    )
+
+
+def _metab_cellular_html(scan, days_old: int, accent: str) -> str:
+    """Phase angle and ECW/TBW — the two readings the entered height cannot
+    reach, given their own block above the derived cards because they are the
+    only measurements on this screen that are not restatements of weight."""
+    if scan is None:
+        return ""
+    cards = [
+        _metab_card_html("Phase angle",
+                         f"{scan.phase_angle_deg:.1f}" if scan.phase_angle_deg else "—",
+                         "°", scan.day.strftime("%d %b %Y").lstrip("0"),
+                         "measured" if scan.phase_angle_deg else "absent",
+                         ("bad", f"{days_old} days old"), _METAB_DEV),
+        _metab_card_html("ECW / TBW ratio", f"{scan.ecw_tbw:.3f}", "",
+                         scan.day.strftime("%d %b %Y").lstrip("0"), "measured",
+                         ("bad", f"{days_old} days old"), _METAB_DEV),
+    ]
+    return f'<div class="mb-cards">{"".join(cards)}</div>'
+
+
+def _metab_analysis_html(reading, accent: str) -> str:
+    """Every remaining figure, each labelled with what it really is.
+
+    `services.body_composition.DERIVED_COLUMNS` is the source of truth for which
+    of these are arithmetic; nothing here is stored, it is all recomputed from
+    the weight so that the screen cannot drift from the docstring."""
+    if reading is None:
+        return ""
+    when = reading.day.strftime("%d %b %Y").lstrip("0")
+    weight, pct = reading.weight_kg, reading.body_fat_pct
+    fat, lean = reading.fat_mass_kg, reading.fat_free_mass_kg
+    height = bc.TRUE_HEIGHT_M
+    rows: list[tuple] = [
+        ("MASS", "what the body is made of, in kilograms", [
+            ("Weight", f"{weight:.1f}", "kg", "measured", ("ok", "Normal")),
+            ("Body mass index", f"{weight / height ** 2:.1f}", "kg/m²", "derived", None),
+        ]),
+    ]
+    if pct is not None and fat is not None and lean is not None:
+        rows[0][2].extend([
+            ("Body fat", f"{fat:.1f}", "kg", "derived", ("ok", "Normal")),
+            ("Body fat", f"{pct:.1f}", "%", "derived", ("ok", "Normal")),
+            ("Fat-free mass", f"{lean:.1f}", "kg", "derived", None),
+            ("Bone mass", f"{lean * 0.04994:.1f}", "kg", "derived", None),
+        ])
+        rows.append(("ENERGY", "what it costs to run", [
+            ("Basal metabolic rate", f"{370 + 21.6 * lean:.0f}", "kcal", "derived", None),
+        ]))
+        rows.append(("WATER", "how that mass is hydrated", [
+            ("Body water", f"{0.72201 * (100 - pct):.1f}", "%", "derived", None),
+            ("Protein", f"{0.22797 * (100 - pct):.1f}", "%", "derived", None),
+        ]))
+        rows.append(("RISK", "what it implies", [
+            ("Visceral fat level", f"{-2.8932 + 0.5927 * pct:.1f}", "", "derived",
+             ("ok", "Normal")),
+            ("Subcutaneous fat", f"{pct - 2.25:.1f}", "%", "derived", None),
+            ("Waist circumference", "—", "cm", "absent", None),
+            ("Hip circumference", "—", "cm", "absent", None),
+        ]))
+    out = ""
+    for group, blurb, cards in rows:
+        out += f'<div class="mb-grp">{group}<span>{blurb}</span></div><div class="mb-cards">'
+        out += "".join(
+            _metab_card_html(n, v, u, when if v != "—" else "no reading", s, p, accent)
+            for n, v, u, s, p in cards
+        )
+        out += "</div>"
+    return out
+
+
+def _render_metabolism_detail() -> None:
+    """Metabolism BioAge detail — composition hero, a steppable progress
+    display, the two height-immune readings, and the derived cards."""
+    accent = _BIOAGE_COLORS["metabolism"]
+    data = _metabolism_screen_data()
+    st.markdown(_METABOLISM_CSS, unsafe_allow_html=True)
+
+    readings, scans, today = data["readings"], data["scans"], data["today"]
+    latest = readings[-1] if readings else None
+
+    st.markdown(
+        _metab_hero_html(latest.fat_mass_kg if latest else None,
+                         latest.fat_free_mass_kg if latest else None,
+                         latest.day if latest else None, accent),
+        unsafe_allow_html=True,
+    )
+    if data.get("load_error"):
+        st.warning(
+            "The scale export could not be read, so the figures below are "
+            f"showing their no-data state — {data['load_error']}",
+            icon="⚠️",
+        )
+    if latest:
+        st.markdown(
+            _metab_split_html(latest.fat_mass_kg, latest.fat_free_mass_kg),
+            unsafe_allow_html=True,
+        )
+
+    # ── Progress ──────────────────────────────────────────────────────────
+    head_l, head_r = st.columns([2, 1])
+    head_l.markdown(
+        f"<div style='color:{_INK};font-size:18px;font-weight:600;margin-top:6px;'>"
+        f"Progress</div>",
+        unsafe_allow_html=True,
+    )
+    with head_r:
+        chosen = st.selectbox("Progress metric", list(_METAB_METRICS),
+                              key="metab_metric", label_visibility="collapsed")
+    metric = _METAB_METRICS[chosen]
+
+    kind = st.session_state.get("metab_range", "all")
+    offset = st.session_state.get("metab_offset", 0)
+
+    cols = st.columns([1, 1, 1, 1, 1, 3, 1])
+    for i, (label, key) in enumerate(_METAB_RANGES):
+        if cols[i].button(label, key=f"metab_r_{key}", use_container_width=True,
+                          type="primary" if key == kind else "secondary"):
+            # A new granularity always opens on the period containing today —
+            # carrying an offset across a switch lands you somewhere arbitrary.
+            st.session_state["metab_range"] = key
+            st.session_state["metab_offset"] = 0
+            st.rerun()
+
+    earliest = readings[0].day if readings else None
+    if cols[4].button("‹", key="metab_p_prev", use_container_width=True,
+                      disabled=not bc.can_step(kind, offset, -1, today, earliest)):
+        st.session_state["metab_offset"] = offset - 1
+        st.rerun()
+    window = bc.period_window(kind, offset, today, earliest)
+    cols[5].markdown(
+        f'<div class="mb-plabel"><b>{window.label}</b><i>{window.sub}</i></div>',
+        unsafe_allow_html=True,
+    )
+    if cols[6].button("›", key="metab_p_next", use_container_width=True,
+                      disabled=not bc.can_step(kind, offset, 1, today, earliest)):
+        st.session_state["metab_offset"] = offset + 1
+        st.rerun()
+
+    source = scans if metric["src"] == "inbody" else readings
+    gap = (bc.INBODY_GAP_BREAK_DAYS if metric["src"] == "inbody"
+           else bc.SCALE_GAP_BREAK_DAYS)
+    visible = bc.readings_in(source, window)
+    points = [(r.day, v) for r in visible
+              if (v := _metab_value(r, metric["key"])) is not None]
+    runs = [[(r.day, v) for r in run if (v := _metab_value(r, metric["key"])) is not None]
+            for run in bc.split_runs(visible, gap)]
+
+    st.markdown(
+        _metab_readout_html(points[0] if points else None,
+                            points[-1] if points else None,
+                            metric["unit"], metric["dp"]),
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f'<div class="mb-chartbox">'
+        f'{_metab_chart_svg(points, metric["colour"], metric["dp"], metric["span"], window, runs, chosen)}'
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Cellular health ───────────────────────────────────────────────────
+    if scans:
+        clean = scans[-1]
+        st.markdown(
+            f"<div style='color:{_INK};font-size:18px;font-weight:600;margin:6px 0 2px;'>"
+            f"Cellular health</div>"
+            f"<div style='font-size:11px;color:{_INK3};margin-bottom:9px;'>"
+            f"{bcb.DEVICE} · nothing else measures these</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(
+            _metab_cellular_html(clean, (today - clean.day).days, accent),
+            unsafe_allow_html=True,
+        )
+
+    # ── Body analysis ─────────────────────────────────────────────────────
+    st.markdown(
+        f"<div style='color:{_INK};font-size:18px;font-weight:600;margin:22px 0 2px;'>"
+        f"Body analysis</div>",
+        unsafe_allow_html=True,
+    )
+    st.markdown(_metab_analysis_html(latest, accent), unsafe_allow_html=True)
+
+    # ── Add measurement ───────────────────────────────────────────────────
+    st.markdown('<div class="mb-grp">Add measurement</div>', unsafe_allow_html=True)
+    add_l, add_r = st.columns(2)
+    add_l.button("＋  Foryond weigh-in", key="metab_add_weight",
+                 use_container_width=True, disabled=True,
+                 help="Weight entry — not wired up yet")
+    add_r.button("＋  Tape baseline", key="metab_add_tape",
+                 use_container_width=True, disabled=True,
+                 help="Waist and hip — not wired up yet")
+
+
+def _metab_value(record, key: str) -> float | None:
+    """One accessor for both record types, so the chart does not need to know
+    which device a series came from."""
+    if key == "weight":
+        return getattr(record, "weight_kg", None)
+    if key == "fat":
+        return record.fat_mass_kg
+    if key == "ffm":
+        return record.fat_free_mass_kg
+    if key == "bf":
+        return record.body_fat_pct
+    if key == "phase":
+        return getattr(record, "phase_angle_deg", None)
+    if key == "ecw":
+        return getattr(record, "ecw_tbw", None)
+    return None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Module-level cached data fetchers  (must live outside render() so that
 #  Streamlit recognises them as stable across reruns)
 # ─────────────────────────────────────────────────────────────────────────────
@@ -771,6 +1299,45 @@ def _manual_sync(spinner_message: str):
 @st.cache_data(ttl=1800, show_spinner=False)
 def _recent_sessions():
     return repo.get_repository().get_recent_sessions(days=60)
+
+
+#: Where the Foryond export lands. Gitignored with the rest of `Input_files/`,
+#: so a deployment without it renders the empty state rather than crashing —
+#: which is also what a first-time user sees, and is the correct thing to show.
+_FITDAYS_EXPORT = Path(__file__).resolve().parent.parent / "Input_files" / "Fitdays-Brian.csv"
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _metabolism_screen_data() -> dict:
+    """Everything the Metabolism screen renders.
+
+    The file read lives here rather than in `services/body_composition.py` —
+    that module is pure by contract, so it takes CSV *text* and this layer owns
+    the I/O, the same split every other service in this app uses.
+
+    A read failure must not render as "you have never weighed yourself". The
+    two are indistinguishable once the list is empty, and only one of them is a
+    real reading — so the error is carried through and surfaced."""
+    load_error: str | None = None
+    readings: list = []
+    try:
+        if _FITDAYS_EXPORT.exists():
+            readings = bc.parse_fitdays_csv(
+                _FITDAYS_EXPORT.read_text(encoding="utf-8-sig"))
+    except Exception as exc:
+        readings, load_error = [], f"{type(exc).__name__}: {exc}"
+
+    # Every gym scan corrected to the true height before it is shown. Four of
+    # the five were run against a height 3-7 cm out, and height is squared
+    # inside InBody's first step — see body_composition_baselines.py.
+    scans = [s.at_height() for s in bcb.SCANS]
+
+    return {
+        "readings": readings,
+        "scans": scans,
+        "today": date.today(),
+        "load_error": load_error,
+    }
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -892,6 +1459,8 @@ def render() -> None:
             )
             if selected == "strength":
                 _render_strength_detail()
+            elif selected == "metabolism":
+                _render_metabolism_detail()
             else:
                 st.info(f"{label} biological age breakdown — coming soon.")
         else:
