@@ -1,9 +1,11 @@
 """
-Tests for services/flexibility.py — the Range x Control score, its two-sided
-band, and the refusals that keep it honest.
+Tests for services/flexibility.py — the v2 ladder model.
 
-Expected values below are hand-computed from flexibility_baselines.py, not
-copied out of the implementation.
+v1's tests pinned semantics the athlete refuted (a two-sided band that scored
+high range DOWN). They are deleted, not weakened: a test pinning wrong
+behaviour is a defect, and the replacement guard below fails loudly if any of
+it returns. Same pattern as tests/test_bioage.py's guard over the retired
+Stage-Adjusted Recovery Score.
 """
 
 import ast
@@ -14,308 +16,300 @@ import pytest
 import flexibility_baselines as fb
 from services import flexibility as fx
 
-TODAY = date(2026, 8, 5)          # same day as the depth ratings
-SCAN_AGE_DAYS = 565               # 2025-01-17 -> 2026-08-05
+TODAY = date(2026, 8, 5)
 
 
-# ── the two-sided band, which is the whole design ────────────────────────────
+# ── the guard ────────────────────────────────────────────────────────────────
 
-def test_band_scores_100_anywhere_inside_and_penalises_both_sides():
-    lo, hi = fx.CONTROL_BAND
-    for v in (lo, (lo + hi) / 2, hi):
-        score, direction = fx.band_score(v, lo, hi, 2.0, 3.0)
-        assert score == 100.0
-        assert direction == fx.DIRECTION_IDEAL
-
-    below, d_below = fx.band_score(lo - 10, lo, hi, 2.0, 3.0)
-    above, d_above = fx.band_score(hi + 10, lo, hi, 2.0, 3.0)
-    assert below < 100.0 and d_below == fx.DIRECTION_RESTRICTED
-    assert above < 100.0 and d_above == fx.DIRECTION_UNSTABLE
-
-
-def test_depth_rating_100_is_not_a_score_of_100():
-    """The single most important property in this module. On the athlete's own
-    depth scale 100 means 'at the physical limit, no sensation left'. On the
-    control score 100 means IDEAL. Conflating them would make the six poses he
-    rated 80-88 his best results, when the profile names them as the hazard."""
-    score, direction = fx.control_score(100)
-    assert score < 50.0
-    assert direction == fx.DIRECTION_UNSTABLE
-
-
-@pytest.mark.parametrize("rating,expected,direction", [
-    (25, 25.0,  fx.DIRECTION_RESTRICTED),   # (25/50)^2  — the straddle fold
-    (40, 64.0,  fx.DIRECTION_RESTRICTED),
-    (46, 84.64, fx.DIRECTION_RESTRICTED),
-    (50, 100.0, fx.DIRECTION_IDEAL),        # floor of the band
-    (64, 100.0, fx.DIRECTION_IDEAL),
-    (70, 100.0, fx.DIRECTION_IDEAL),        # ceiling of the band
-    (76, 82.0,  fx.DIRECTION_UNSTABLE),     # 100 - 3*6
-    (85, 55.0,  fx.DIRECTION_UNSTABLE),
-    (88, 46.0,  fx.DIRECTION_UNSTABLE),     # the lying twists
-])
-def test_control_score_reference_values(rating, expected, direction):
-    score, got_direction = fx.control_score(rating)
-    assert score == pytest.approx(expected, abs=0.01)
-    assert got_direction == direction
-
-
-def test_band_score_is_clamped_and_rejects_a_nonsense_band():
-    score, _ = fx.band_score(500, 50, 70, 2.0, 3.0)
-    assert score == 0.0                      # linear falloff cannot go negative
-    with pytest.raises(ValueError):
-        fx.band_score(10, 70, 50, 2.0, 3.0)  # hi < lo
-    with pytest.raises(ValueError):
-        fx.band_score(10, 0, 50, 2.0, 3.0)   # lo == 0 would divide by zero
-
-
-# ── score-then-average, the error this module is built to avoid ──────────────
-
-def test_scores_each_pose_before_averaging_not_after():
-    """Hamstrings sees straddle 25, Walk the Dog 76, Down Dog 64 at weights
-    0.5/0.6/0.3. Averaging the RATINGS gives ~55, which lands inside the ideal
-    band and would score 100, erasing the 25 — the most informative reading in
-    the assessment. Scoring first gives ~65.5."""
-    axis = fx.control_axis("hamstrings", fb.POSE_DEPTH_RATING_2026_08_05,
-                           fb.DEPTH_RATING_DATE, TODAY)
-    expected = (0.6 * 82.0 + 0.3 * 100.0 + 0.5 * 25.0) / 1.4
-    assert axis.score == pytest.approx(expected, abs=0.01)
-    assert axis.score == pytest.approx(65.5, abs=0.1)
-    assert axis.score < 100.0
-
-
-def test_direction_is_attributed_from_lost_points_not_from_the_mean_rating():
-    """Same region, and the reason the direction cannot come from a rating mean:
-    the weighted mean rating is ~55, inside the ideal band, so a rating-mean
-    would label a 65-scoring region 'ideal'."""
-    ratings = fb.POSE_DEPTH_RATING_2026_08_05
-    mean_rating = (0.6 * 76 + 0.3 * 64 + 0.5 * 25) / 1.4
-    lo, hi = fx.CONTROL_BAND
-    assert lo <= mean_rating <= hi, "precondition: the rating mean looks ideal"
-
-    axis = fx.control_axis("hamstrings", ratings, fb.DEPTH_RATING_DATE, TODAY)
-    assert axis.direction == fx.DIRECTION_RESTRICTED
-
-
-def test_back_reads_unstable_because_its_deficit_is_end_range_twists():
-    axis = fx.control_axis("back", fb.POSE_DEPTH_RATING_2026_08_05,
-                           fb.DEPTH_RATING_DATE, TODAY)
-    assert axis.direction == fx.DIRECTION_UNSTABLE
-
-
-# ── the geometric mean ───────────────────────────────────────────────────────
-
-def test_region_uses_geometric_mean_so_one_axis_cannot_carry_the_other():
-    region = fx.score_region("hamstrings", fb.POSE_DEPTH_RATING_2026_08_05,
-                             fb.DEPTH_RATING_DATE, TODAY)
-    r, c = region.range_axis.score, region.control_axis.score
-    assert region.score == pytest.approx((r * c) ** 0.5, abs=0.01)
-    # The arithmetic mean would be materially kinder — that difference is the
-    # design, not rounding.
-    assert region.score < (r + c) / 2 - 1.0
-
-
-def test_a_zero_on_either_axis_annihilates_the_region():
-    ratings = dict.fromkeys(fb.POSE_DEPTH_RATING_2026_08_05, 1)
-    region = fx.score_region("hamstrings", ratings, fb.DEPTH_RATING_DATE, TODAY)
-    assert region.control_axis.score < 1.0
-    assert region.score < 10.0
-
-
-# ── staleness ────────────────────────────────────────────────────────────────
-
-def test_staleness_halves_confidence_every_halflife():
-    assert fx.staleness_confidence(TODAY, TODAY) == 1.0
-    half = date.fromordinal(TODAY.toordinal() - int(fx.CONFIDENCE_HALFLIFE_DAYS))
-    assert fx.staleness_confidence(half, TODAY) == pytest.approx(0.5, abs=0.01)
-
-
-def test_a_future_measurement_cannot_manufacture_extra_confidence():
-    future = date.fromordinal(TODAY.toordinal() + 400)
-    assert fx.staleness_confidence(future, TODAY) == 1.0
-
-
-def test_staleness_moves_confidence_and_never_the_score():
-    """Decaying a stale VALUE would invent a decline that was never measured —
-    the error services/strength.py's asymmetry rule exists to prevent."""
-    fresh = fx.score_region("hamstrings", fb.POSE_DEPTH_RATING_2026_08_05,
-                            fb.DEPTH_RATING_DATE, TODAY)
-    later = date.fromordinal(TODAY.toordinal() + 3 * 365)
-    stale = fx.score_region("hamstrings", fb.POSE_DEPTH_RATING_2026_08_05,
-                            fb.DEPTH_RATING_DATE, later)
-    assert stale.range_axis.score == fresh.range_axis.score
-    assert stale.confidence < fresh.confidence
-
-
-def test_the_provisional_protocol_penalty_applies_and_is_self_removing():
-    axis = fx.range_axis(fb.REGION_BASELINES["hamstrings"], TODAY)
-    expected = 0.5 ** (SCAN_AGE_DAYS / fx.CONFIDENCE_HALFLIFE_DAYS) * fx.PROVISIONAL_PROTOCOL_PENALTY
-    assert axis.provisional is True
-    assert axis.confidence == pytest.approx(expected, abs=0.001)
-
-    # Setting the protocol removes the penalty with no other edit — which is
-    # what should happen the day the gym supplies the movement list.
-    from dataclasses import replace
-    confirmed = replace(fb.REGION_BASELINES["hamstrings"],
-                        protocol="passive straight-leg raise", provisional=False)
-    assert fx.range_axis(confirmed, TODAY).confidence == pytest.approx(
-        expected / fx.PROVISIONAL_PROTOCOL_PENALTY, abs=0.001)
-
-
-# ── uncovered and unscoreable regions are reported, never imputed ────────────
-
-def test_lat_flex_range_is_unscoreable_and_stays_that_way():
-    """The vendor calls 20-21 deg 'Normal', which contradicts the obvious
-    reading of the label. A band guessed out of a contradiction is worse than
-    no band, so the Range axis is absent and the region scores on Control."""
-    assert fb.REGION_BASELINES["lat_flex"].reference_band is None
-    region = fx.score_region("lat_flex", fb.POSE_DEPTH_RATING_2026_08_05,
-                             fb.DEPTH_RATING_DATE, TODAY)
-    assert region.range_axis is None
-    assert region.control_axis is not None
-    assert region.score == pytest.approx(region.control_axis.score, abs=0.01)
-
-
-def test_squat_depth_is_uncovered_on_both_axes_and_excluded_not_imputed():
-    region = fx.score_region("squat_depth", fb.POSE_DEPTH_RATING_2026_08_05,
-                             fb.DEPTH_RATING_DATE, TODAY)
-    assert region.score is None
-    assert region.confidence == 0.0
-    assert region.unscoreable_reason
-
-    result = fx.overall_score(today=TODAY)
-    assert "squat_depth" in result.uncovered_regions
-
-
-def test_neck_control_is_withheld_below_the_evidence_floor():
-    """Only one pose touches the neck, at weight 0.1. A score built on that
-    would look like evidence and not be one."""
-    total = sum(w.get("neck", 0.0) for w in fb.POSE_REGION_WEIGHT.values())
-    assert total < fx.MIN_CONTROL_EVIDENCE
-    assert fx.control_axis("neck", fb.POSE_DEPTH_RATING_2026_08_05,
-                           fb.DEPTH_RATING_DATE, TODAY) is None
-
-
-def test_unmapped_poses_are_surfaced_rather_than_silently_dropped():
-    """Same failure mode as training_constants.EXERCISE_BODY_REGION: a pose
-    missing from the map is excluded from every region total."""
-    ratings = dict(fb.POSE_DEPTH_RATING_2026_08_05)
-    ratings["Some Brand New Pose"] = 55
-    result = fx.overall_score(ratings=ratings, ratings_date=fb.DEPTH_RATING_DATE, today=TODAY)
-    assert "Some Brand New Pose" in result.unmapped_poses
-    # Savasana is deliberately unmapped and must NOT be reported as an oversight.
-    assert "Deep Relaxation (Savasana)" not in result.unmapped_poses
-
-
-# ── the overall ──────────────────────────────────────────────────────────────
-
-def test_overall_on_the_real_data():
-    result = fx.overall_score(today=TODAY)
-    assert result.overall == pytest.approx(80.5, abs=0.5)
-    assert result.coverage == pytest.approx(0.44, abs=0.02)
-
-
-def test_adding_either_instrument_moves_the_overall():
-    """The athlete's stated requirement. A Control-only region gaining a Range
-    reading changes the score (single axis -> geometric mean) AND the confidence
-    (0.5 -> higher), so numerator and denominator move together."""
-    from dataclasses import replace
-    before = fx.overall_score(today=TODAY).overall
-
-    original = fb.REGION_BASELINES["back"]
-    try:
-        fb.REGION_BASELINES["back"] = replace(
-            original, left_deg=40.0, right_deg=40.0,
-            reference_band=(50.0, 60.0), assumed_protocol="lumbar flexion",
+def test_the_refuted_two_sided_band_is_gone_and_stays_gone():
+    """v1 scored a self-rated depth on a band with full marks in 50-70 and a
+    penalty ABOVE it, so a rating of 88 scored 46. The athlete refuted it: his
+    rating measured how far he got, and penalising high values treated it as if
+    it measured absence of muscular control. Achievement is monotonic now, and
+    the hypermobility concern lives in the passive-active gap where it can be
+    measured rather than assumed."""
+    for name in ("band_score", "control_score", "CONTROL_BAND", "OVERSHOOT_SLOPE",
+                 "UNDERSHOOT_EXPONENT", "RANGE_OVERSHOOT_SLOPE_PER_DEG",
+                 "DIRECTION_UNSTABLE", "MIN_CONTROL_EVIDENCE"):
+        assert not hasattr(fx, name), (
+            f"{name} is back — read services/flexibility.py's docstring on why the "
+            "two-sided band was removed before wiring it up again"
         )
-        after = fx.overall_score(today=TODAY).overall
-    finally:
-        fb.REGION_BASELINES["back"] = original
-
-    assert after != pytest.approx(before, abs=0.01)
 
 
-def test_region_weights_sum_to_one_and_cover_every_baseline():
-    assert sum(fb.REGION_WEIGHT.values()) == pytest.approx(1.0, abs=1e-9)
-    assert set(fb.REGION_WEIGHT) == set(fb.REGION_BASELINES)
+def test_rung_scoring_is_monotonic_in_both_scale_directions():
+    """The property the guard above exists to protect. More achievement can
+    never score less, whichever way the test's own scale runs."""
+    for key in ("calves_ankle", "shoulders_overhead"):
+        test = fb.RUNGS[key]
+        lo, hi = sorted((test.value_at_0, test.value_at_100))
+        samples = [lo + (hi - lo) * i / 20 for i in range(21)]
+        scores = [fx.rung_score(v, test) for v in samples]
+        ordered = scores if test.value_at_100 > test.value_at_0 else scores[::-1]
+        assert ordered == sorted(ordered), f"{key} is not monotonic"
 
 
-def test_pose_region_weights_sum_to_one_per_pose():
-    for pose, weights in fb.POSE_REGION_WEIGHT.items():
-        assert sum(weights.values()) == pytest.approx(1.0, abs=1e-9), pose
-        assert set(weights) <= set(fb.REGION_WEIGHT), pose
+def test_rung_score_anchors_and_clamps():
+    ankle = fb.RUNGS["calves_ankle"]            # 12 cm = 100, 0 cm = 0
+    assert fx.rung_score(12.0, ankle) == pytest.approx(100.0)
+    assert fx.rung_score(0.0, ankle) == pytest.approx(0.0)
+    assert fx.rung_score(6.0, ankle) == pytest.approx(50.0)
+    assert fx.rung_score(30.0, ankle) == 100.0     # clamped, never >100
+    assert fx.rung_score(-5.0, ankle) == 0.0
+
+    quads = fb.RUNGS["quads"]                  # 0 cm = 100, 25 cm = 0 (inverted)
+    assert quads.inverted is True
+    assert fx.rung_score(0.0, quads) == pytest.approx(100.0)
+    assert fx.rung_score(25.0, quads) == pytest.approx(0.0)
+    assert fx.rung_score(12.5, quads) == pytest.approx(50.0)
+
+    hips = fb.RUNGS["hip_flexors"]             # +15 deg = 100, -20 deg = 0
+    assert hips.inverted is False
+    assert fx.rung_score(15.0, hips) == pytest.approx(100.0)
+    assert fx.rung_score(-20.0, hips) == pytest.approx(0.0)
+    assert fx.rung_score(-2.5, hips) == pytest.approx(50.0)
 
 
-def test_every_yoga_pose_is_either_mapped_or_explicitly_excluded():
-    from services import yoga
-    for pose in yoga.YOGA_LIBRARY[0].poses:
-        assert pose.name in fb.POSE_REGION_WEIGHT or pose.name in fb.UNMAPPED_POSES, pose.name
-    # ...and the depth-rating table must cover the flow exactly.
-    assert set(fb.POSE_DEPTH_RATING_2026_08_05) == {
-        p.name for p in yoga.YOGA_LIBRARY[0].poses
-    }
+def test_a_degenerate_scale_raises_rather_than_dividing_by_zero():
+    bad = fb.RungTest(key="x", label="x", test_name="x", unit="cm",
+                      value_at_100=5.0, value_at_0=5.0, setup="", lock="",
+                      measurement="", bilateral=False, safety="")
+    with pytest.raises(ValueError):
+        fx.rung_score(5.0, bad)
 
 
-def test_region_direction_is_taken_from_the_worse_axis():
-    region = fx.score_region("hamstrings", fb.POSE_DEPTH_RATING_2026_08_05,
-                             fb.DEPTH_RATING_DATE, TODAY)
-    assert region.range_axis.score > region.control_axis.score
-    assert region.direction == region.control_axis.direction
+# ── minimum, not mean ────────────────────────────────────────────────────────
+
+def _reading(rung, active, passive=None):
+    return fb.RungReading(rung=rung, active=active, passive=passive)
+
+
+def _assessment(pairs, taken_on=TODAY):
+    """pairs: {rung_key: active_raw}."""
+    return fb.Assessment(taken_on=taken_on,
+                         readings=tuple(_reading(k, v) for k, v in pairs.items()))
+
+
+def test_a_skill_scores_its_lowest_rung_and_names_it():
+    """The whole model. One broken rung must not be carried by healthy ones —
+    that is exactly how v1 hid hip extension behind a hip score of 79."""
+    a = _assessment({
+        "calves_ankle": 4.56,    # -> 38
+        "adductors":    9.5,     # -> 62
+        "hip_rotation": 35.1,    # -> 88
+        "lumbar":       1.45,    # -> 71
+        "quads":        4.0,     # -> 84
+    })
+    squat = next(s for s in fx.report(a, TODAY).skills if s.key == "deep_squat")
+
+    assert squat.score == pytest.approx(38.0, abs=0.5)
+    assert squat.limiting_rung == "calves_ankle"
+    assert squat.limiting_label == "Calves / ankle"
+    # The mean would have been ~66.6 and would have said nothing actionable.
+    assert squat.score < 66.6
+
+
+def test_clearing_the_limiter_re_points_it_to_the_next_rung():
+    """The re-pointing IS the training programme, so it has to be pinned."""
+    base = {"calves_ankle": 4.56, "adductors": 9.5, "hip_rotation": 35.1,
+            "lumbar": 1.45, "quads": 4.0}
+    before = next(s for s in fx.report(_assessment(base), TODAY).skills
+                  if s.key == "deep_squat")
+    assert before.limiting_rung == "calves_ankle"
+
+    fixed = dict(base, calves_ankle=8.4)          # ankle up to ~70
+    after = next(s for s in fx.report(_assessment(fixed), TODAY).skills
+                 if s.key == "deep_squat")
+    assert after.limiting_rung == "adductors"
+    assert after.score > before.score
+
+
+def test_the_worse_side_limits_and_sides_are_never_averaged():
+    a = fb.Assessment(taken_on=TODAY, readings=(
+        fb.RungReading("hamstrings", active=72.0, side="left"),    # -> 80
+        fb.RungReading("hamstrings", active=36.0, side="right"),   # -> 40
+        fb.RungReading("lumbar", active=0.5),
+    ))
+    pike = next(s for s in fx.report(a, TODAY).skills if s.key == "active_pike")
+    assert pike.limiting_rung == "hamstrings"
+    assert pike.score == pytest.approx(40.0, abs=0.5)   # not the 60 an average gives
+
+
+def test_a_partial_ladder_is_reported_as_incomplete():
+    """A skill scored on some of its rungs is only an UPPER BOUND — an
+    unmeasured rung might be lower than anything seen."""
+    a = _assessment({"calves_ankle": 12.0})
+    squat = next(s for s in fx.report(a, TODAY).skills if s.key == "deep_squat")
+    assert squat.score is not None
+    assert squat.complete is False
+    assert set(squat.unmeasured_rungs) == {"adductors", "hip_rotation", "lumbar", "quads"}
+
+
+# ── the gap ──────────────────────────────────────────────────────────────────
+
+def test_the_gap_is_passive_minus_active_and_drives_the_prescription():
+    wide = fb.RungReading("hamstrings", passive=85.5, active=36.0)    # 95 vs 40
+    narrow = fb.RungReading("hamstrings", passive=49.5, active=40.5)  # 55 vs 45
+
+    w, n = fx.score_reading(wide), fx.score_reading(narrow)
+    assert w.gap == pytest.approx(55.0, abs=0.5)
+    assert n.gap == pytest.approx(10.0, abs=0.5)
+    assert w.prescription == fx.PRESCRIPTION_STRENGTH
+    assert n.prescription == fx.PRESCRIPTION_RANGE
+
+
+def test_the_gap_is_unknown_rather_than_zero_when_a_measure_is_missing():
+    r = fx.score_reading(fb.RungReading("hamstrings", passive=72.0))
+    assert r.gap is None
+    assert r.prescription == fx.PRESCRIPTION_UNKNOWN
+
+
+def test_a_rung_scores_from_usable_range_not_from_its_passive_ceiling():
+    """A passive ceiling nobody can enter under their own power does not limit
+    a skill any less for being high."""
+    r = fx.score_reading(fb.RungReading("hamstrings", passive=85.5, active=36.0))
+    assert r.score == pytest.approx(40.0, abs=0.5)      # active, not the 95 passive
+    assert r.passive.score == pytest.approx(95.0, abs=0.5)
+
+
+def test_isometric_is_used_when_active_is_absent():
+    r = fx.score_reading(fb.RungReading("hamstrings", passive=85.5, isometric=54.0))
+    assert r.score == pytest.approx(60.0, abs=0.5)
+
+
+# ── the empty state ──────────────────────────────────────────────────────────
+
+def test_no_assessment_yields_none_everywhere_and_never_a_zero():
+    """0 is a measurement meaning 'could not begin the movement'. Absent data
+    must not be indistinguishable from it."""
+    rep = fx.report(None, TODAY)
+    assert rep.assessed_on is None
+    assert rep.measured_rung_count == 0
+    assert rep.gap_count == 0
+    for s in rep.skills:
+        assert s.score is None
+        assert s.limiting_rung is None
+        assert s.complete is False
+
+
+def test_the_shipped_state_really_is_empty():
+    assert fb.ASSESSMENTS == ()
+    rep = fx.report(today=TODAY)
+    assert all(s.score is None for s in rep.skills)
+
+
+# ── structure ────────────────────────────────────────────────────────────────
+
+def test_every_skill_ladder_references_real_rungs():
+    for skill in fb.SKILLS.values():
+        assert skill.ladder, skill.key
+        for rung in skill.ladder:
+            assert rung in fb.RUNGS, f"{skill.key} -> unknown rung {rung}"
+
+
+def test_squat_depth_is_never_a_rung_on_the_squat_ladder():
+    """It is the OUTCOME of that ladder. Including it would let the symptom vote
+    on its own diagnosis."""
+    assert "squat_depth" not in fb.SKILLS["deep_squat"].ladder
+
+
+def test_excluded_skills_are_tracked_but_flagged_with_a_reason():
+    for key in ("bridge", "shoulder_extension"):
+        s = fb.SKILLS[key]
+        assert s.excluded is True
+        assert len(s.excluded_reason) > 40, key
+    assert set(fb.ACTIVE_SKILLS) == {
+        "deep_squat", "hip_extension", "shoulder_flexion", "active_pike"}
+
+
+def test_every_rung_names_a_lock():
+    """An unlocked joint lets a neighbour substitute and the test measures
+    nothing — the failure that broke this model twice."""
+    for key, t in fb.RUNGS.items():
+        assert len(t.lock) > 30, f"{key} has no meaningful lock"
+        assert len(t.measurement) > 30, f"{key} has no measurement protocol"
+        assert t.value_at_100 != t.value_at_0, key
+
+
+def test_the_thirteen_rungs_are_all_present():
+    assert len(fb.RUNGS) == 13
+    assert set(fb.RUNGS) == {
+        "neck", "shoulders_overhead", "chest_horizontal", "thoracic_rotation",
+        "lumbar", "lateral_trunk", "hip_flexors", "quads", "hip_rotation",
+        "adductors", "hamstrings", "calves_ankle", "squat_depth"}
+
+
+def test_the_missing_lat_rung_is_declared_not_hidden():
+    """shoulder_flexion's ladder has a known hole. It must stay visible until
+    the athlete signs off a 14th rung."""
+    note = fb.SKILLS["shoulder_flexion"].note
+    assert "LAT" in note.upper()
+    assert "INCOMPLETE" in note.upper()
+
+
+def test_the_contraindicated_replacements_are_recorded():
+    """Four tests replace a standard that is contraindicated here. The
+    replacement must say what it replaced, or the reasoning is lost."""
+    replacing = {k: t for k, t in fb.RUNGS.items() if t.replaces}
+    assert set(replacing) == {"hamstrings", "quads", "chest_horizontal",
+                              "thoracic_rotation", "hip_flexors", "neck"}
+    assert "forward fold" in fb.RUNGS["hamstrings"].replaces.lower()
 
 
 # ── refusals ─────────────────────────────────────────────────────────────────
 
-def test_no_flexibility_age_in_years_is_ever_produced():
-    """Same refusal as services/body_composition.py's. The vendor ships one and
-    it is contaminated: 28 was measured when the athlete was 30, and it is
-    displayed against a live age of 31, so the gap widens every birthday
-    without anybody moving."""
+def test_none_of_the_legacy_pose_ratings_feed_a_score():
+    """They answer neither question — 'how far did I get AND how much did I
+    feel' is not passive range and not active range. Reinterpreting them would
+    be inventing data."""
+    assert len(fb.LEGACY_POSE_DEPTH_RATINGS_2026_08_05) == 22
     source = open(fx.__file__, encoding="utf-8").read()
-    tree = ast.parse(source)
-    names = {n.name for n in ast.walk(tree)
-             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))}
-    for banned in ("flexibility_age", "bio_age", "bioage", "age_years", "flexibility_bioage"):
+    body = source.split('"""', 2)[-1]
+    assert "LEGACY_POSE_DEPTH_RATINGS" not in body
+    assert "LEGACY_GYM_READINGS" not in body
+
+
+def test_no_flexibility_age_in_years_is_produced():
+    source = open(fx.__file__, encoding="utf-8").read()
+    names = {n.name for n in ast.walk(ast.parse(source))
+             if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))}
+    for banned in ("flexibility_age", "bio_age", "bioage", "age_years"):
         assert not any(banned in n.lower() for n in names), banned
-
-    result = fx.overall_score(today=TODAY)
-    assert not hasattr(result, "age_years")
-    assert 0.0 <= result.overall <= 100.0
-
-    # The vendor's own numbers are kept for provenance, and the defect with them.
     assert fb.AGE_AT_SCAN_YEARS == 30
     assert fb.VENDOR_BIOAGE_COMPARED_AGAINST_AGE == 31
 
 
-def test_vendor_verdicts_are_kept_verbatim_but_never_scored():
-    """Converting Low/Normal into a score would import the vendor's undisclosed
-    norm table into ours and double-count it against our own band."""
-    assert fb.REGION_BASELINES["hamstrings"].vendor_verdict == "Normal"
-    assert fb.REGION_BASELINES["hip"].vendor_verdict == "Low"
-
-    source = open(fx.__file__, encoding="utf-8").read()
-    body = source.split('"""', 2)[-1]          # drop the module docstring
-    assert "vendor_verdict" not in body, "the score must not read the vendor's verdict"
+def test_the_legacy_gym_readings_are_provenance_and_name_their_successor():
+    assert len(fb.LEGACY_GYM_READINGS) == 5
+    for r in fb.LEGACY_GYM_READINGS:
+        assert r.superseded_by in fb.RUNGS, r.label
 
 
-def test_symmetry_suspects_are_flagged_not_silently_averaged():
-    """Neck 30/30 and Chest 106/106 are exactly equal while the other three
-    differ by 1-3 deg. Post-Latarjet, exact bilateral equality at the chest is
-    the least likely reading on the sheet."""
-    assert fb.REGION_BASELINES["chest"].symmetry_suspect is True
-    assert fb.REGION_BASELINES["neck"].symmetry_suspect is True
-    assert fb.REGION_BASELINES["hip"].symmetry_suspect is False
-    assert fb.REGION_BASELINES["chest"].asymmetry_deg == 0.0
-    assert fb.REGION_BASELINES["hamstrings"].asymmetry_deg == 3.0
+# ── the scheduling window ────────────────────────────────────────────────────
+
+def test_the_window_reads_the_training_log():
+    hard = {date(2026, 8, 3)}
+    assert fx.flexibility_window(date(2026, 8, 4), hard)[0] == fb.WINDOW_POOR
+    assert fx.flexibility_window(date(2026, 8, 5), hard)[0] == fb.WINDOW_GOOD
+    assert fx.flexibility_window(date(2026, 8, 3), hard)[0] == fb.WINDOW_OK
+    assert fx.flexibility_window(date(2026, 8, 3), hard, same_day_pm=True)[0] == fb.WINDOW_GOOD
 
 
-def test_every_provisional_region_names_the_protocol_it_assumed():
-    for key, base in fb.REGION_BASELINES.items():
-        if base.provisional and base.reference_band is not None:
-            assert base.assumed_protocol, key
-        assert base.protocol is None, (
-            f"{key}: protocol is now recorded — confirm the reference band and "
-            "clear `provisional`, then update this test"
-        )
+def test_a_rest_day_alone_does_not_downgrade_the_window():
+    """A restorative flow on a rest day is fine; only an adaptation-seeking
+    session is the thing the rule calls worst, and nothing yet distinguishes
+    them. Downgrading here would penalise the harmless case."""
+    assert fb.REST_DAY_CONFLICT_UNRESOLVED is True
+    window, _ = fx.flexibility_window(date(2026, 8, 9), {date(2026, 8, 5)}, is_rest_day=True)
+    assert window == fb.WINDOW_GOOD
+
+
+def test_staleness_halves_and_cannot_exceed_one():
+    assert fx.staleness_confidence(TODAY, TODAY) == 1.0
+    year_ago = date.fromordinal(TODAY.toordinal() - 365)
+    assert fx.staleness_confidence(year_ago, TODAY) == pytest.approx(0.5, abs=0.01)
+    future = date.fromordinal(TODAY.toordinal() + 400)
+    assert fx.staleness_confidence(future, TODAY) == 1.0
 
 
 def test_no_streamlit_import():

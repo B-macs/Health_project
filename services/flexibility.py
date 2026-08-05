@@ -1,433 +1,332 @@
 """
-services/flexibility.py — the Flexibility score: Range x Control.
+services/flexibility.py — skill scores, ladder rungs, and the passive-active gap.
 
 Pure functions only. No I/O, no Streamlit, no hidden clock reads — every
 date-dependent function takes an explicit `today`, same convention as
 services/engine.py, services/strength.py and services/body_composition.py.
 
-THE ONE IDEA
-------------
-A perfect flexible body is TWO things, not one: the range to reach a position,
-and the control to hold it correctly. Either alone is worthless — range without
-control is hanging on a ligament, control without range is a position never
-reached. So a region scores
+Read flexibility_baselines.py's module docstring first; it carries the model.
 
-    region = sqrt(RANGE x CONTROL)
+THE ONE RULE: MINIMUM, NOT MEAN
+-------------------------------
+A skill's score is the LOWEST rung on its ladder, and the name of that rung is
+returned beside it. Averaging is what v1 did and it is exactly how a broken
+capacity hides behind healthy ones — the `hip` score averaged fourteen
+contributions across five unrelated capacities while Deep Lunge, the only thing
+testing hip extension, scored 100.
 
-and the geometric mean is the point, not an implementation detail. An arithmetic
-mean lets a 100 on one axis carry a 20 on the other to a respectable 60; the
-geometric mean gives 45, and a zero on either axis correctly annihilates the
-region. Both axes are also kept VISIBLE all the way to the screen, because
-"Range 90, Control 40" says something the single number 60 does not.
+If the ankle stops you at 38 it does not matter that the quads are at 84: you
+still cannot squat. `limiting_rung` is therefore a first-class output, not a
+diagnostic afterthought — it is the only part of the result that says what to
+train.
 
-WHY CONTROL PENALISES THE TOP OF THE SCALE
-------------------------------------------
-This is the part that differs from every commercial flexibility app, and it is
-here because patient_profile.PROFILE["hypermobility"] instructs it: Beighton
-6/9, so stability is muscular rather than ligamentous, and the standing training
-implication is to favour "controlled-range strength/stability work over passive
-end-range stretching".
+THREE MEASURES, AND THE GAP
+---------------------------
+    PASSIVE    the ceiling
+    ISOMETRIC  is the range defended
+    ACTIVE     the usable range
 
-The athlete's own depth scale runs 1 = can barely enter the position to
-100 = at the physical limit with no stretch sensation left. On 2026-08-05 six of
-his 22 poses scored 80-88 — supine twists, knee-to-chest, happy baby — every one
-a position entered with no muscular endpoint. Under a more-is-better model those
-six are his best results. They are in fact the hazard the profile names.
+`gap = passive - active`. For a Beighton 6/9 athlete this is the number that
+decides the prescription: a WIDE gap means the range is already there and
+cannot be held, so more stretching is the wrong lever and resisted/isometric
+work is the right one. A NARROW gap means chase range.
 
-So CONTROL_BAND is two-sided: full marks inside it, penalised below (cannot
-enter the position) AND above (no stop at the end of it). 100 on this axis means
-IDEAL, never MAXIMUM. Confirmed as the intended semantics by the athlete,
-2026-08-05.
+The rung's own score is taken from ACTIVE where it exists, because usable range
+is what limits a skill — a passive ceiling you cannot enter under your own
+power does not help you squat. Passive is descriptive; it is half of the gap
+and it is never the score on its own when an active reading exists.
 
-SCORE FIRST, THEN AVERAGE. NEVER AVERAGE THEN SCORE.
-----------------------------------------------------
-The hamstring region sees three poses: straddle 25, Walk the Dog 76, Down Dog
-64. Averaging the RATINGS gives 55, which lands inside the ideal band and scores
-100 — erasing the 25, the single most informative reading in the whole
-assessment. Scoring each pose first and averaging the SCORES gives 65.5 and
-keeps it. Same class of error as summing Oura sleep periods before deduplicating
-them (see services/biometrics.dedupe_sleep_periods).
+WHAT WAS DELETED, AND MUST NOT COME BACK
+----------------------------------------
+v1 scored a self-rated "depth" on a TWO-SIDED band: full marks in 50-70,
+penalised below AND above, so a rating of 88 scored 46. The athlete refuted it
+correctly — his rating measured HOW FAR HE GOT, and penalising high values
+treated it as if it measured ABSENCE OF MUSCULAR CONTROL. Those are different
+things and v1 inferred one from the other with no evidence.
 
-STALENESS DECAYS WEIGHT, NEVER VALUE
-------------------------------------
-The goniometry is from 2025-01-17 and the depth ratings from 2026-08-05 — 566
-days apart. A combined number that weights them equally pretends they are
-contemporaneous. But decaying the stale VALUE would invent a decline that was
-never measured, which is the error services/strength.py's asymmetry rule exists
-to prevent. So staleness reduces an axis's CONFIDENCE, and confidence sets how
-much a region moves the overall. The score itself is whatever was measured.
+Achievement is now monotonic: more is always better, and the hypermobility
+concern lives in the gap, where it can be measured instead of assumed. The
+names `band_score`, `control_score`, `CONTROL_BAND`, `OVERSHOOT_SLOPE` and
+`UNDERSHOOT_EXPONENT` are gone and a test fails loudly if any returns — the
+defect survived review once, so it gets a guard rather than a comment.
 
 WHAT THIS MODULE REFUSES TO DO
 ------------------------------
-No flexibility age in years. The vendor screen ships one — 28 against a "real
-age" of 31 — and it is computed from a Jan-2025 measurement against a LIVE
-chronological age, so it was -2 at measurement, displays as -3, and widens every
-birthday without anybody moving. Same refusal, and the same reason, as
-services/body_composition.py's.
-
-No scoring the vendor's own Low/Normal verdicts. They are kept verbatim as
-provenance and nothing computes from them: the norm tables behind them are
-undisclosed, so converting a verdict into a score would import the vendor's
-reference into ours and then double-count it against our own band.
-
-No filling an empty region from the other instrument, or from a training note.
-Squat Depth reads "No data yet" on the device and has no pose in the yoga flow;
-it stays uncovered and is REPORTED as uncovered rather than imputed.
-
-No scoring a region whose reference band is None. `lat_flex` is the live case —
-the vendor calls 20-21 deg "Normal", which contradicts the obvious reading of
-its label, and a band guessed out of a contradiction is worse than no band.
+No flexibility age in years (the gym ships one and it compares a Jan-2025
+measurement against a live chronological age). No averaging of rungs into a
+skill. No scoring a rung from the 22 legacy pose ratings, which answer neither
+question. No filling an unmeasured rung from a neighbour or a training note.
+Nothing here reaches the engine.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 
 import flexibility_baselines as _fb
 
-# ── tunable parameters, all in one place ─────────────────────────────────────
-#
-# Calibrated 2026-08-05 against the athlete's own 22 ratings so that: his worst
-# pose (straddle, 25) scores ~25; a pose at the physical limit with no muscular
-# stop (88) scores below 50; and the ideal band matches "deep enough to be a
-# real position, with a felt endpoint". These are a documented starting point,
-# not a fit — there is one rating date, so nothing could be fitted. Change them
-# deliberately and record why; every score in the app moves when they do.
+# ── tunables ─────────────────────────────────────────────────────────────────
 
-#: Depth ratings inside this band are ideal and score 100.
-CONTROL_BAND: tuple[float, float] = (50.0, 70.0)
-
-#: Below the band the falloff is (v/lo)**this — quadratic, so failing to enter a
-#: position at all is punished hard.
-UNDERSHOOT_EXPONENT: float = 2.0
-
-#: Above the band the falloff is linear at this many points per rating point.
-#: 3.0 puts a rating of 88 ("no sensation left") at 46.
-OVERSHOOT_SLOPE: float = 3.0
-
-#: Same shape as CONTROL_BAND, applied to degrees against a region's reference.
-RANGE_UNDERSHOOT_EXPONENT: float = 1.5
-RANGE_OVERSHOOT_SLOPE_PER_DEG: float = 1.5
-
-#: An axis's confidence halves every this-many days. ROM does not change fast,
-#: so a year is generous rather than punitive; the 566-day-old goniometry still
-#: lands near 0.34 rather than at zero.
+#: An assessment's confidence halves every this many days. ROM is slow-changing,
+#: so a year is generous rather than punitive.
 CONFIDENCE_HALFLIFE_DAYS: float = 365.0
 
-#: Multiplier applied while a reading's protocol is unrecorded and its reference
-#: band is therefore assumed. Removed automatically the moment `protocol` is set.
-PROVISIONAL_PROTOCOL_PENALTY: float = 0.6
+#: A passive-minus-active gap at or above this is called wide, i.e. the rung
+#: needs STRENGTH rather than RANGE. Provisional: it is set from the general
+#: hypermobility literature rather than from this athlete's own data, because
+#: he has no paired readings yet. Revisit once ASSESSMENTS has entries.
+WIDE_GAP_POINTS: float = 25.0
 
-#: A region's confidence is (sum of its present axes' confidences) / this. Two,
-#: because two axes is the complete evidence for a region — so a region with one
-#: fresh perfect axis tops out at 0.5, and that is the intended message.
-IDEAL_AXIS_COUNT: float = 2.0
-
-#: A region's Control axis needs at least this much summed pose weight before it
-#: is computed at all. Without it, `neck` would take its entire Control score
-#: from one pose contributing 0.1 — a number that looks like evidence and isn't.
-MIN_CONTROL_EVIDENCE: float = 0.5
-
-DIRECTION_RESTRICTED = "restricted"
-DIRECTION_IDEAL      = "ideal"
-DIRECTION_UNSTABLE   = "unstable"
+PRESCRIPTION_RANGE = "range"
+PRESCRIPTION_STRENGTH = "strength"
+PRESCRIPTION_UNKNOWN = "unknown"
 
 
 # ── results ──────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
-class AxisScore:
-    """One axis of one region. `value` is the raw measurement in its own units;
-    `score` is 0-100 where 100 is IDEAL. `direction` says which side of ideal a
-    sub-100 score fell on, because 65 restricted and 65 unstable call for
-    opposite responses and the number alone cannot distinguish them."""
-    name: str                    # "range" | "control"
+class MeasureScore:
+    measure: str
+    raw: float
     score: float
-    direction: str
-    confidence: float
-    value: float | None = None
-    unit: str = ""
-    provisional: bool = False
-    measured_on: date | None = None
-    detail: str = ""
+    unit: str
 
 
 @dataclass(frozen=True)
-class RegionScore:
+class RungScore:
     key: str
     label: str
-    score: float | None          # None = not scoreable on any axis
-    range_axis: AxisScore | None
-    control_axis: AxisScore | None
-    confidence: float
-    weight: float
-    unscoreable_reason: str = ""
+    side: str
+    passive: MeasureScore | None
+    isometric: MeasureScore | None
+    active: MeasureScore | None
 
     @property
-    def axes_present(self) -> int:
-        return sum(1 for a in (self.range_axis, self.control_axis) if a is not None)
+    def score(self) -> float | None:
+        """Usable range. ACTIVE where it exists, else isometric, else passive.
+
+        Deliberately prefers the most self-generated reading available: a
+        passive ceiling nobody can enter under their own power does not limit a
+        skill any less for being high.
+        """
+        for m in (self.active, self.isometric, self.passive):
+            if m is not None:
+                return m.score
+        return None
 
     @property
-    def direction(self) -> str:
-        """The worse axis decides how the region reads — a region held back by
-        an unstable axis and one held back by a restricted axis need different
-        work, and the region-level label should say which."""
-        axes = [a for a in (self.range_axis, self.control_axis) if a is not None]
-        if not axes:
-            return ""
-        worst = min(axes, key=lambda a: a.score)
-        return worst.direction
+    def gap(self) -> float | None:
+        if self.passive is None or self.active is None:
+            return None
+        return self.passive.score - self.active.score
+
+    @property
+    def prescription(self) -> str:
+        g = self.gap
+        if g is None:
+            return PRESCRIPTION_UNKNOWN
+        return PRESCRIPTION_STRENGTH if g >= WIDE_GAP_POINTS else PRESCRIPTION_RANGE
+
+    @property
+    def measured(self) -> bool:
+        return self.score is not None
 
 
 @dataclass(frozen=True)
-class FlexibilityScore:
-    overall: float | None
-    regions: list[RegionScore]
-    unmapped_poses: list[str] = field(default_factory=list)
-    uncovered_regions: list[str] = field(default_factory=list)
+class SkillScore:
+    key: str
+    label: str
+    score: float | None
+    limiting_rung: str | None
+    limiting_label: str | None
+    goal_level: float
+    rungs: tuple[RungScore, ...]
+    unmeasured_rungs: tuple[str, ...]
+    excluded_reason: str = ""
 
     @property
-    def coverage(self) -> float:
-        """Fraction of the ideal evidence actually held: confidence-weighted by
-        region weight. This is the honest headline beside the score."""
-        total = sum(r.weight for r in self.regions)
-        if total <= 0:
-            return 0.0
-        return sum(r.weight * r.confidence for r in self.regions) / total
+    def excluded(self) -> bool:
+        return bool(self.excluded_reason)
+
+    @property
+    def clears_goal(self) -> bool:
+        return self.score is not None and self.score >= self.goal_level
+
+    @property
+    def complete(self) -> bool:
+        """True when every rung on the ladder has a reading. A skill scored on a
+        partial ladder can only ever be an UPPER BOUND — an unmeasured rung
+        might be lower than anything seen so far."""
+        return not self.unmeasured_rungs
 
 
-# ── scoring primitives ───────────────────────────────────────────────────────
+@dataclass(frozen=True)
+class FlexibilityReport:
+    skills: tuple[SkillScore, ...]
+    rungs: tuple[RungScore, ...]
+    assessed_on: date | None
+    confidence: float
+    cold: bool
 
-def band_score(
-    value: float,
-    lo: float,
-    hi: float,
-    undershoot_exponent: float,
-    overshoot_slope: float,
-) -> tuple[float, str]:
-    """Two-sided band score, 0-100, plus which side of ideal it fell on.
+    @property
+    def measured_rung_count(self) -> int:
+        return sum(1 for r in self.rungs if r.measured)
 
-    100 anywhere inside [lo, hi]. Below lo it decays as (value/lo)**exponent —
-    quadratic by default, so a value at half the floor scores 25 rather than 50.
-    Above hi it falls linearly. Clamped to [0, 100].
+    @property
+    def gap_count(self) -> int:
+        return sum(1 for r in self.rungs if r.gap is not None)
 
-    The two-sidedness is the whole design: for this athlete, exceeding the ideal
-    range is a finding, not an achievement. See the module docstring.
+
+# ── scoring ──────────────────────────────────────────────────────────────────
+
+def rung_score(value: float, test: _fb.RungTest) -> float:
+    """Linear interpolation between the test's own 0 and 100 anchors, clamped.
+
+    MONOTONIC BY CONSTRUCTION — there is no upper penalty and there must never
+    be one. Handles both scale directions without a special case, because
+    several tests measure a gap that shrinks as capacity improves (elbows to
+    floor: 0 cm is perfect) while others measure a distance that grows
+    (knee-to-wall: 12 cm is perfect).
     """
-    if lo <= 0 or hi < lo:
-        raise ValueError(f"invalid band ({lo}, {hi})")
-    if value < lo:
-        return max(0.0, min(100.0, 100.0 * (value / lo) ** undershoot_exponent)), DIRECTION_RESTRICTED
-    if value > hi:
-        return max(0.0, min(100.0, 100.0 - overshoot_slope * (value - hi))), DIRECTION_UNSTABLE
-    return 100.0, DIRECTION_IDEAL
-
-
-def control_score(depth_rating: float) -> tuple[float, str]:
-    """Transform the athlete's 1-100 depth rating into a 0-100 CONTROL score.
-
-    These are different scales and conflating them is the single easiest mistake
-    to make here. On the depth rating 100 means "at the limit of what is
-    physically possible, no sensation left". On the control score 100 means
-    "ideal". A depth rating of 88 is therefore a control score of 46.
-    """
-    return band_score(depth_rating, *CONTROL_BAND, UNDERSHOOT_EXPONENT, OVERSHOOT_SLOPE)
-
-
-def range_score(degrees: float, band: tuple[float, float]) -> tuple[float, str]:
-    """Degrees against a region's ideal reference band."""
-    return band_score(degrees, band[0], band[1],
-                      RANGE_UNDERSHOOT_EXPONENT, RANGE_OVERSHOOT_SLOPE_PER_DEG)
+    lo, hi = test.value_at_0, test.value_at_100
+    if lo == hi:
+        raise ValueError(f"{test.key}: value_at_0 and value_at_100 are identical")
+    return max(0.0, min(100.0, (value - lo) / (hi - lo) * 100.0))
 
 
 def staleness_confidence(measured_on: date, today: date) -> float:
-    """Confidence multiplier from age alone. Halves every CONFIDENCE_HALFLIFE_DAYS.
-
-    A future date yields 1.0 rather than >1.0 — a clock skew must not manufacture
-    extra confidence.
-    """
+    """Halves every CONFIDENCE_HALFLIFE_DAYS. A future date yields 1.0 rather
+    than >1.0 — a clock skew must not manufacture confidence."""
     days = max(0, (today - measured_on).days)
     return 0.5 ** (days / CONFIDENCE_HALFLIFE_DAYS)
 
 
-# ── axes ─────────────────────────────────────────────────────────────────────
+def score_reading(reading: _fb.RungReading) -> RungScore:
+    test = _fb.RUNGS[reading.rung]
 
-def range_axis(baseline: _fb.RegionBaseline, today: date) -> AxisScore | None:
-    """The instrumented degrees axis. None when the region has no reading, or
-    has one whose reference band is deliberately absent (see lat_flex)."""
-    mean = baseline.mean_deg
-    if mean is None or baseline.reference_band is None:
-        return None
+    def one(measure: str, raw: float | None) -> MeasureScore | None:
+        if raw is None:
+            return None
+        return MeasureScore(measure=measure, raw=raw,
+                            score=rung_score(raw, test), unit=test.unit)
 
-    score, direction = range_score(mean, baseline.reference_band)
-    confidence = staleness_confidence(_fb.SCAN_DATE, today)
-    if baseline.provisional:
-        confidence *= PROVISIONAL_PROTOCOL_PENALTY
-
-    lo, hi = baseline.reference_band
-    detail = f"{mean:.1f}° vs ideal {lo:.0f}-{hi:.0f}°"
-    if baseline.provisional:
-        detail += f" (band assumed for {baseline.assumed_protocol}; protocol unrecorded)"
-
-    return AxisScore(
-        name="range", score=score, direction=direction, confidence=confidence,
-        value=mean, unit="°", provisional=baseline.provisional,
-        measured_on=_fb.SCAN_DATE, detail=detail,
+    return RungScore(
+        key=reading.rung, label=test.label, side=reading.side,
+        passive=one(_fb.PASSIVE, reading.passive),
+        isometric=one(_fb.ISOMETRIC, reading.isometric),
+        active=one(_fb.ACTIVE, reading.active),
     )
 
 
-def control_axis(
-    region_key: str,
-    ratings: dict[str, int],
-    measured_on: date,
-    today: date,
-) -> AxisScore | None:
-    """The self-rated depth axis for one region.
+def score_skill(skill: _fb.Skill, rungs: dict[str, RungScore]) -> SkillScore:
+    """min(rungs), and the name of the rung that produced it.
 
-    Scores every contributing pose FIRST, then takes the pose-weighted mean of
-    those scores — never the mean of the ratings. Returns None when the region's
-    summed pose weight is below MIN_CONTROL_EVIDENCE.
+    A bilateral rung appears once per side; the WORSE side is the one that
+    limits, because a skill is performed by the whole body and the weak side
+    stops it. Sides are never averaged.
     """
-    total_weight = 0.0
-    weighted = 0.0
-    deficit = {DIRECTION_RESTRICTED: 0.0, DIRECTION_UNSTABLE: 0.0}
-    for pose, rating in ratings.items():
-        weight = _fb.POSE_REGION_WEIGHT.get(pose, {}).get(region_key)
-        if not weight:
-            continue
-        score, pose_direction = control_score(rating)
-        weighted += weight * score
-        total_weight += weight
-        if pose_direction != DIRECTION_IDEAL:
-            deficit[pose_direction] += weight * (100.0 - score)
+    on_ladder = [rungs[k] for k in skill.ladder if k in rungs and rungs[k].measured]
+    unmeasured = tuple(k for k in skill.ladder
+                       if k not in rungs or not rungs[k].measured)
 
-    if total_weight < MIN_CONTROL_EVIDENCE:
-        return None
+    if not on_ladder:
+        return SkillScore(
+            key=skill.key, label=skill.label, score=None,
+            limiting_rung=None, limiting_label=None, goal_level=skill.goal_level,
+            rungs=(), unmeasured_rungs=unmeasured,
+            excluded_reason=skill.excluded_reason,
+        )
 
-    mean_score = weighted / total_weight
-
-    # Direction is decided by WHERE THE LOST POINTS CAME FROM, not by the mean
-    # rating. Averaging the ratings and scoring once is the exact trap this
-    # module forbids, and it bites hardest here: the hamstring region's ratings
-    # are 25, 76 and 64, whose weighted mean is ~55 — inside the ideal band. So
-    # a rating-mean would label the region "ideal" while its score sits at 65,
-    # dragged down by a straddle fold he can barely enter. Attributing the
-    # deficit instead correctly returns "restricted".
-    if mean_score >= 99.5:
-        direction = DIRECTION_IDEAL
-    elif deficit[DIRECTION_RESTRICTED] >= deficit[DIRECTION_UNSTABLE]:
-        direction = DIRECTION_RESTRICTED
-    else:
-        direction = DIRECTION_UNSTABLE
-
-    return AxisScore(
-        name="control", score=mean_score, direction=direction,
-        confidence=staleness_confidence(measured_on, today),
-        value=mean_score, unit="/100", provisional=False,
-        measured_on=measured_on,
-        detail=(
-            f"{total_weight:.1f} pose-weight · lost points "
-            f"{deficit[DIRECTION_RESTRICTED]:.0f} restricted / "
-            f"{deficit[DIRECTION_UNSTABLE]:.0f} unstable"
-        ),
+    worst = min(on_ladder, key=lambda r: r.score)
+    return SkillScore(
+        key=skill.key, label=skill.label, score=worst.score,
+        limiting_rung=worst.key, limiting_label=worst.label,
+        goal_level=skill.goal_level, rungs=tuple(on_ladder),
+        unmeasured_rungs=unmeasured, excluded_reason=skill.excluded_reason,
     )
 
 
-# ── composition ──────────────────────────────────────────────────────────────
-
-def score_region(
-    region_key: str,
-    ratings: dict[str, int],
-    ratings_date: date,
-    today: date,
-) -> RegionScore:
-    baseline = _fb.REGION_BASELINES[region_key]
-    weight = _fb.REGION_WEIGHT[region_key]
-
-    r_axis = range_axis(baseline, today)
-    c_axis = control_axis(region_key, ratings, ratings_date, today)
-
-    present = [a for a in (r_axis, c_axis) if a is not None]
-    if not present:
-        reason = (
-            "no instrumented reading and no yoga pose maps to this region"
-            if baseline.mean_deg is None
-            else "reference band deliberately absent — see flexibility_baselines"
-        )
-        return RegionScore(
-            key=region_key, label=baseline.label, score=None,
-            range_axis=r_axis, control_axis=c_axis, confidence=0.0,
-            weight=weight, unscoreable_reason=reason,
-        )
-
-    if len(present) == 2:
-        # Geometric mean — a zero on either axis annihilates the region, which
-        # is the intended behaviour and what an arithmetic mean would hide.
-        score = (r_axis.score * c_axis.score) ** 0.5
-    else:
-        score = present[0].score
-
-    confidence = sum(a.confidence for a in present) / IDEAL_AXIS_COUNT
-
-    return RegionScore(
-        key=region_key, label=baseline.label, score=score,
-        range_axis=r_axis, control_axis=c_axis,
-        confidence=confidence, weight=weight,
-    )
-
-
-def overall_score(
-    ratings: dict[str, int] | None = None,
-    ratings_date: date | None = None,
+def report(
+    assessment: _fb.Assessment | None = None,
     today: date | None = None,
-) -> FlexibilityScore:
-    """The whole sector. `today` is required in spirit — it defaults only so
-    callers with no clock of their own are not forced to invent one, and every
-    date-dependent term below reads it explicitly.
+) -> FlexibilityReport:
+    """The whole sector, from one assessment.
 
-    Overall is the confidence-weighted mean of scoreable regions:
-
-        overall = sum(weight_r * confidence_r * score_r)
-                / sum(weight_r * confidence_r)
-
-    which is what makes "adding either metric changes the overall" true, and
-    makes the SIZE of the change proportional to the evidence behind it. Adding
-    a Range reading to a Control-only region changes both the score (single axis
-    -> geometric mean) and the confidence (0.5 -> up to 1.0), so it moves the
-    numerator and the denominator together.
+    Defaults to the most recent recorded assessment, which is currently NONE —
+    every skill then scores None with its whole ladder unmeasured, and that is
+    the correct and honest empty state rather than a zero.
     """
-    if ratings is None:
-        ratings = _fb.POSE_DEPTH_RATING_2026_08_05
-    if ratings_date is None:
-        ratings_date = _fb.DEPTH_RATING_DATE
     if today is None:
         today = date.today()
+    if assessment is None:
+        assessment = _fb.ASSESSMENTS[-1] if _fb.ASSESSMENTS else None
 
-    regions = [
-        score_region(key, ratings, ratings_date, today)
-        for key in _fb.REGION_WEIGHT
-    ]
+    scored: list[RungScore] = []
+    if assessment is not None:
+        scored = [score_reading(r) for r in assessment.readings]
 
-    numerator = 0.0
-    denominator = 0.0
-    for r in regions:
-        if r.score is None:
+    # Worst side wins per rung key — see score_skill's docstring.
+    by_key: dict[str, RungScore] = {}
+    for r in scored:
+        if not r.measured:
             continue
-        w = r.weight * r.confidence
-        numerator += w * r.score
-        denominator += w
+        prev = by_key.get(r.key)
+        if prev is None or r.score < prev.score:
+            by_key[r.key] = r
 
-    overall = numerator / denominator if denominator > 0 else None
-
-    unmapped = sorted(
-        p for p in ratings
-        if p not in _fb.POSE_REGION_WEIGHT and p not in _fb.UNMAPPED_POSES
+    skills = tuple(
+        score_skill(skill, by_key) for skill in _fb.SKILLS.values()
     )
 
-    return FlexibilityScore(
-        overall=overall,
-        regions=sorted(regions, key=lambda r: (-r.weight, r.key)),
-        unmapped_poses=unmapped,
-        uncovered_regions=[r.key for r in regions if r.score is None],
+    confidence = (staleness_confidence(assessment.taken_on, today)
+                  if assessment is not None else 0.0)
+
+    return FlexibilityReport(
+        skills=skills,
+        rungs=tuple(scored),
+        assessed_on=assessment.taken_on if assessment else None,
+        confidence=confidence,
+        cold=assessment.cold if assessment else True,
     )
+
+
+# ── the scheduling window ────────────────────────────────────────────────────
+
+def flexibility_window(
+    today: date,
+    hard_session_days: set[date] | frozenset[date],
+    *,
+    is_rest_day: bool = False,
+    same_day_pm: bool = False,
+) -> tuple[str, str]:
+    """(window, reason) for a given day. ADVISORY ONLY — nothing reads this into
+    the engine.
+
+    The heuristic comes from the athlete's source brief. Its physiological
+    mechanism is NOT encoded and NOT relied on: the calpain-mediated central
+    fatigue story is stated well past what the evidence carries, and is treated
+    as motivation the way services/sleep_fusion.py treats the abandoned
+    quiet-wake rule.
+
+    `is_rest_day` is accepted but deliberately does NOT downgrade the window on
+    its own — see flexibility_baselines.REST_DAY_CONFLICT_UNRESOLVED. A
+    restorative flow on a rest day is fine; an adaptation-seeking session is the
+    thing the rule calls worst, and nothing in this codebase yet distinguishes
+    them. Downgrading here would penalise the harmless case.
+    """
+    if today in hard_session_days:
+        if same_day_pm:
+            return _fb.WINDOW_GOOD, ("same day, PM, after an AM session — the fatigue signal "
+                                     "has not landed yet")
+        return _fb.WINDOW_OK, "immediately after training — reduce the volume of both"
+
+    days_since = [(today - d).days for d in hard_session_days if (today - d).days > 0]
+    if not days_since:
+        return _fb.WINDOW_GOOD, "no recent hard session on record"
+
+    since = min(days_since)
+    if since == 1:
+        return _fb.WINDOW_POOR, ("the day after a hard session — the worst slot for the "
+                                 "adaptation this is trying to produce")
+    return _fb.WINDOW_GOOD, f"{since} days since the last hard session"

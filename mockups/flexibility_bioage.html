@@ -40,6 +40,14 @@
 
   * { box-sizing: border-box; }
 
+  /* SINGLE-THEME BY CHOICE, not omission. This page is a review document with
+     the dark phone UI embedded inside it; the light chrome against that dark
+     screen IS the argument, and a dark chrome would collapse the distinction
+     between "the document" and "the thing under review". Matches the two
+     sibling mockups. Both html and body carry the ground so a dark-theme
+     viewer cannot bleed through behind the content. */
+  html { background: var(--chrome-bg); }
+
   body {
     margin: 0;
     background: var(--chrome-bg);

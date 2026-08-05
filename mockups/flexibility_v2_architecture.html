@@ -1,0 +1,616 @@
+<title>Flexibility v2 — architecture</title>
+
+<style>
+  :root {
+    color-scheme: light;
+    --chrome-bg:     #F3F2F0;
+    --chrome-panel:  #FFFFFF;
+    --chrome-ink:    #201C18;
+    --chrome-mute:   #6B6259;
+    --chrome-line:   #E0DCD6;
+    --chrome-accent: #0D6E86;
+    --chrome-code:   #EFEBE5;
+
+    /* Three measures. Slots 1/2/3 of the validated categorical order, checked
+       on #FFFFFF all-pairs: worst CVD dE 9.2, worst normal-vision dE 24.0,
+       all >=3:1. Passive is the ceiling, active the floor, isometric between. */
+    --m-passive:   #2a78d6;
+    --m-isometric: #eda100;
+    --m-active:    #1baf7a;
+
+    --lim:  #A8322F;   /* the limiting rung */
+    --ok:   #1B7A55;
+    --warn: #7A5A15;
+  }
+
+  * { box-sizing: border-box; }
+  html { background: var(--chrome-bg); }
+  body {
+    margin: 0; background: var(--chrome-bg); color: var(--chrome-ink);
+    font: 15px/1.65 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 46px 22px 90px; }
+
+  header.top .eyebrow {
+    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .18em; text-transform: uppercase;
+    color: var(--chrome-accent); margin-bottom: 12px;
+  }
+  header.top h1 {
+    font-size: 33px; line-height: 1.18; margin: 0 0 14px;
+    letter-spacing: -.02em; font-weight: 700; text-wrap: balance;
+  }
+  header.top .lede { font-size: 17px; color: var(--chrome-mute); margin: 0; max-width: 66ch; }
+  header.top .meta {
+    margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--chrome-line);
+    font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--chrome-mute);
+  }
+
+  h2.sec {
+    font-size: 21px; margin: 52px 0 8px; letter-spacing: -.01em; font-weight: 700;
+    padding-top: 22px; border-top: 1px solid var(--chrome-line); text-wrap: balance;
+  }
+  h3.sub { font-size: 15.5px; margin: 30px 0 8px; font-weight: 650; }
+  p { margin: 12px 0; max-width: 74ch; }
+  .note { color: var(--chrome-mute); font-size: 13.5px; max-width: 74ch; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .89em; }
+  code { background: var(--chrome-code); padding: 1.5px 5px; border-radius: 4px; }
+
+  .callout {
+    border-left: 3px solid var(--chrome-accent); background: var(--chrome-panel);
+    padding: 14px 18px; margin: 20px 0; border-radius: 0 9px 9px 0;
+  }
+  .callout.bad { border-left-color: var(--lim); }
+  .callout.ok  { border-left-color: var(--ok); }
+  .callout p:first-child { margin-top: 0; }
+  .callout p:last-child  { margin-bottom: 0; }
+  .callout .h {
+    font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+    letter-spacing: .13em; text-transform: uppercase; color: var(--chrome-mute); margin-bottom: 9px;
+  }
+
+  .scroller { overflow-x: auto; margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; min-width: 540px; }
+  th, td { text-align: left; padding: 8px 11px; border-bottom: 1px solid var(--chrome-line);
+           vertical-align: top; }
+  th { font: 600 10px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+       letter-spacing: .1em; text-transform: uppercase; color: var(--chrome-mute); }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums;
+               font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  tbody tr:hover { background: var(--chrome-panel); }
+
+  .chip { display: inline-block; padding: 1px 7px; border-radius: 999px;
+          font: 600 10.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; }
+  .c-ok   { background: #E2F0E8; color: #17603F; }
+  .c-warn { background: #F6EEDC; color: #7A5A15; }
+  .c-bad  { background: #F7E4E2; color: #8E2B27; }
+  .c-none { background: var(--chrome-code); color: var(--chrome-mute); }
+
+  figure { margin: 24px 0; }
+  figcaption { font-size: 12.5px; color: var(--chrome-mute); margin-top: 10px; max-width: 74ch; }
+  .figwrap { background: var(--chrome-panel); border: 1px solid var(--chrome-line);
+             border-radius: 12px; padding: 16px 14px 10px; overflow-x: auto; }
+  .flegend { display: flex; gap: 18px; flex-wrap: wrap; align-items: center;
+             font-size: 12.5px; color: var(--chrome-mute); margin: 2px 0 12px 4px; }
+  .flegend b { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--chrome-ink); }
+  .flegend i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  @media (max-width: 700px) { .grid2 { grid-template-columns: 1fr; } }
+  .card { background: var(--chrome-panel); border: 1px solid var(--chrome-line);
+          border-radius: 11px; padding: 14px 16px; }
+  .card .k { font: 600 10px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+             letter-spacing: .12em; text-transform: uppercase; color: var(--chrome-mute); }
+  .card .v { font-size: 25px; font-weight: 700; margin: 8px 0 4px; font-variant-numeric: tabular-nums; }
+  .card .d { font-size: 12.5px; color: var(--chrome-mute); line-height: 1.5; }
+
+  ul.tight, ol.tight { max-width: 74ch; padding-left: 20px; }
+  ul.tight li, ol.tight li { margin: 7px 0; }
+
+  .stack { display: flex; flex-direction: column; gap: 10px; margin: 18px 0; }
+  .layer { background: var(--chrome-panel); border: 1px solid var(--chrome-line);
+           border-radius: 11px; padding: 13px 16px; }
+  .layer .lk { font: 600 9.5px/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+               letter-spacing: .13em; text-transform: uppercase; color: var(--chrome-accent); }
+  .layer .lt { font-size: 15px; font-weight: 650; margin: 7px 0 4px; }
+  .layer .ld { font-size: 13px; color: var(--chrome-mute); line-height: 1.55; }
+
+  footer.foot { margin-top: 60px; padding-top: 18px; border-top: 1px solid var(--chrome-line);
+                font-size: 12.5px; color: var(--chrome-mute); }
+</style>
+
+<div class="wrap">
+
+<header class="top">
+  <div class="eyebrow">Architecture &middot; Flexibility v2</div>
+  <h1>Stop scoring joints. Score the skill, and name the rung that&rsquo;s holding it back.</h1>
+  <p class="lede">
+    v1 averaged eight body regions into one number and buried the athlete&rsquo;s
+    worst capacity in it. v2 takes the <b>minimum</b>, because only the lowest
+    rung on a ladder limits anything &mdash; and it reports which rung that is,
+    which is the only output that tells you what to train.
+  </p>
+  <div class="meta">
+    Supersedes flexibility_bioage.html &middot; drafted 2026-08-05<br>
+    Sources: the athlete&rsquo;s flexibility-ladder brief &middot; 13 test protocols
+    from a 3-designer / 3-reviewer design pass &middot; patient_profile.py
+  </div>
+</header>
+
+
+<h2 class="sec">Why v1 failed, in one line</h2>
+
+<p>
+  The athlete&rsquo;s own objection killed it: <i>&ldquo;we know my hips are stuck
+  in flexion with my back arched and this is a huge issue for me, and yet my
+  flexibility score is nearly 80 for hips.&rdquo;</i>
+</p>
+
+<p>
+  He was right, and the arithmetic shows exactly how. The <code>hip</code> score
+  averaged fourteen pose-contributions spanning five unrelated capacities &mdash;
+  and <b>Deep Lunge, the only pose testing hip extension, scored 100.</b>
+  Averaging is what let a maxed-out rung hide a broken one.
+</p>
+
+<div class="callout bad">
+  <div class="h">The structural fix</div>
+  <p>
+    <b>A ladder has no average.</b> If your ankle stops you at 40, it does not
+    matter that your hamstrings are at 95 &mdash; you still cannot squat. The
+    score for a skill is <code>min(rungs)</code>, and the name of that rung is
+    published beside it.
+  </p>
+</div>
+
+
+<h2 class="sec">The four layers</h2>
+
+<div class="stack">
+  <div class="layer">
+    <div class="lk">Layer 1 &middot; Goal</div>
+    <div class="lt">Skills, not joints</div>
+    <div class="ld">
+      &ldquo;Hip mobility&rdquo; is as meaningless as &ldquo;hip strength&rdquo;
+      &mdash; the joint does too many things. A skill is a position you can
+      either achieve or not. Four are in scope, chosen for transfer to the lifts
+      already in the block, not for gymnastics.
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lk">Layer 2 &middot; Diagnosis</div>
+    <div class="lt">Ladder rungs</div>
+    <div class="ld">
+      Each skill sits on a ladder of candidate limiters &mdash; muscle length,
+      joint capsule, nerve tension, strength deficit, technique. The 13 regions
+      agreed earlier are these rungs. They are <b>diagnostics, never a score</b>.
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lk">Layer 3 &middot; Measurement</div>
+    <div class="lt">Three readings per rung</div>
+    <div class="ld">
+      Passive, isometric, active &mdash; the same position measured three ways.
+      The <b>passive&minus;active gap</b> is the number that matters here, and it
+      replaces v1&rsquo;s self-rated &ldquo;control&rdquo; question with two
+      objective readings.
+    </div>
+  </div>
+  <div class="layer">
+    <div class="lk">Layer 4 &middot; Scheduling</div>
+    <div class="ld" style="margin-top:7px;">
+      A daily <b>flexibility window</b> &mdash; good / ok / poor &mdash; computed
+      from the existing training log. Advisory only; nothing here reaches the
+      engine.
+    </div>
+  </div>
+</div>
+
+
+<h2 class="sec">The ladder, drawn</h2>
+
+<figure>
+  <div class="flegend">
+    <b><i style="background:var(--lim);"></i>limiting rung</b>
+    <b><i style="background:#9FB4C4;"></i>not limiting</b>
+    <span>&mdash; illustrative values; the real ladder is empty until the assessment runs</span>
+  </div>
+  <div class="figwrap">
+    <svg viewBox="0 0 640 300" width="640" height="300" role="img"
+         aria-label="A ladder diagram for the deep squat skill. Five rungs are shown at different heights against a goal line at 70. Calves and ankle sits lowest at 38, well below the goal, and is marked as the limiting rung. Adductors 62, lumbar control 71, hip rotation 78 and quads 84 are all at or above the goal line.">
+      <!-- Goal threshold. VERTICAL, because the bars are horizontal: a rung
+           clears the goal by reaching PAST this line. Drawn first so the bars
+           sit over it. -->
+      <rect x="150" y="78" width="329" height="167" fill="var(--lim)" opacity="0.045"/>
+      <line x1="479" y1="72" x2="479" y2="248" stroke="var(--ok)" stroke-width="2" stroke-dasharray="5 4"/>
+      <text x="479" y="64" text-anchor="middle" font-family="ui-monospace,Menlo,monospace"
+            font-size="10.5" font-weight="700" fill="var(--ok)">GOAL = 70</text>
+      <text x="314" y="64" text-anchor="middle" font-family="ui-monospace,Menlo,monospace"
+            font-size="10" fill="var(--lim)">below goal &mdash; limits the skill</text>
+
+      <g font-family="ui-monospace,Menlo,monospace" font-size="11">
+        <!-- rungs: x from 150, scale 4.7px/unit -->
+        <!-- calves 38 -->
+        <text x="142" y="100" text-anchor="end" fill="var(--chrome-ink)" font-weight="700">calves_ankle</text>
+        <rect x="150" y="88" width="178.6" height="15" rx="4" fill="var(--lim)"/>
+        <text x="338" y="100" fill="var(--lim)" font-weight="700">38</text>
+        <text x="372" y="100" fill="var(--chrome-mute)" font-size="10">&larr; THE LIMITER. Train this.</text>
+
+        <!-- adductors 62 -->
+        <text x="142" y="134" text-anchor="end" fill="var(--chrome-ink)">adductors</text>
+        <rect x="150" y="122" width="291.4" height="15" rx="4" fill="#9FB4C4"/>
+        <text x="451" y="134" fill="var(--chrome-mute)">62</text>
+        <text x="485" y="134" fill="var(--chrome-mute)" font-size="10">next, once the ankle clears</text>
+
+        <!-- lumbar 71 -->
+        <text x="142" y="168" text-anchor="end" fill="var(--chrome-ink)">lumbar control</text>
+        <rect x="150" y="156" width="333.7" height="15" rx="4" fill="#9FB4C4"/>
+        <text x="493" y="168" fill="var(--chrome-mute)">71</text>
+
+        <!-- hip rotation 78 -->
+        <text x="142" y="202" text-anchor="end" fill="var(--chrome-ink)">hip_rotation</text>
+        <rect x="150" y="190" width="366.6" height="15" rx="4" fill="#9FB4C4"/>
+        <text x="526" y="202" fill="var(--chrome-mute)">78</text>
+
+        <!-- quads 84 -->
+        <text x="142" y="236" text-anchor="end" fill="var(--chrome-ink)">quads</text>
+        <rect x="150" y="224" width="394.8" height="15" rx="4" fill="#9FB4C4"/>
+        <text x="554" y="236" fill="var(--chrome-mute)">84</text>
+      </g>
+
+      <line x1="150" y1="255" x2="620" y2="255" stroke="var(--chrome-line)" stroke-width="1"/>
+      <g font-family="ui-monospace,Menlo,monospace" font-size="10" fill="var(--chrome-mute)" text-anchor="middle">
+        <text x="150" y="270">0</text>
+        <text x="385" y="270">50</text>
+        <text x="620" y="270">100</text>
+      </g>
+      <text x="385" y="290" font-family="ui-monospace,Menlo,monospace" font-size="10.5"
+            fill="var(--chrome-mute)" text-anchor="middle">rung level</text>
+    </svg>
+  </div>
+  <figcaption>
+    <b>deep_squat scores 38, and the screen says &ldquo;calves_ankle&rdquo;.</b>
+    Under v1 this same athlete would have scored <code>mean = 66.6</code> and been
+    told nothing actionable &mdash; the ankle would have been carried by four
+    healthy rungs and never surfaced. Raising the ankle to 70 moves the skill from
+    38 to 62, at which point the limiter <i>changes</i> to adductors. That
+    re-pointing is the training programme.
+  </figcaption>
+</figure>
+
+
+<h2 class="sec">Three measures, and why the gap is the point</h2>
+
+<p>
+  The blueprint this is built on is written for people who <b>lack</b> range. This
+  athlete is Beighton 6/9 &mdash; the assisted half of that method largely solves a
+  problem he does not have. What survives, and what matters here, is the
+  <b>passive&minus;active gap</b>.
+</p>
+
+<figure>
+  <div class="flegend">
+    <b><i style="background:var(--m-passive);"></i>passive</b>
+    <b><i style="background:var(--m-isometric);"></i>isometric</b>
+    <b><i style="background:var(--m-active);"></i>active</b>
+    <span>&mdash; schematic, showing the two patterns</span>
+  </div>
+  <div class="figwrap">
+    <svg viewBox="0 0 640 250" width="640" height="250" role="img"
+         aria-label="Two profiles compared. A typical stiff athlete shows passive 55, isometric 50, active 45, a narrow 10 point gap. A hypermobile athlete shows passive 95, isometric 60, active 40, a 55 point gap between passive and active range.">
+      <g font-family="ui-monospace,Menlo,monospace" font-size="11">
+        <text x="20" y="28" font-weight="700" fill="var(--chrome-ink)" font-size="12">Typical stiff athlete</text>
+        <text x="20" y="50" fill="var(--chrome-mute)" font-size="10">passive</text>
+        <rect x="96" y="40" width="242" height="13" rx="4" fill="var(--m-passive)"/>
+        <text x="348" y="50" fill="var(--chrome-mute)">55</text>
+        <text x="20" y="70" fill="var(--chrome-mute)" font-size="10">isometric</text>
+        <rect x="96" y="60" width="220" height="13" rx="4" fill="var(--m-isometric)"/>
+        <text x="326" y="70" fill="var(--chrome-mute)">50</text>
+        <text x="20" y="90" fill="var(--chrome-mute)" font-size="10">active</text>
+        <rect x="96" y="80" width="198" height="13" rx="4" fill="var(--m-active)"/>
+        <text x="304" y="90" fill="var(--chrome-mute)">45</text>
+        <text x="400" y="70" fill="var(--ok)" font-weight="700" font-size="11">gap 10 &mdash; range is usable</text>
+        <text x="400" y="86" fill="var(--chrome-mute)" font-size="10">chase RANGE: assisted work</text>
+
+        <line x1="20" y1="118" x2="620" y2="118" stroke="var(--chrome-line)" stroke-width="1"/>
+
+        <text x="20" y="148" font-weight="700" fill="var(--chrome-ink)" font-size="12">This athlete (Beighton 6/9)</text>
+        <text x="20" y="170" fill="var(--chrome-mute)" font-size="10">passive</text>
+        <rect x="96" y="160" width="418" height="13" rx="4" fill="var(--m-passive)"/>
+        <text x="524" y="170" fill="var(--chrome-mute)">95</text>
+        <text x="20" y="190" fill="var(--chrome-mute)" font-size="10">isometric</text>
+        <rect x="96" y="180" width="264" height="13" rx="4" fill="var(--m-isometric)"/>
+        <text x="370" y="190" fill="var(--chrome-mute)">60</text>
+        <text x="20" y="210" fill="var(--chrome-mute)" font-size="10">active</text>
+        <rect x="96" y="200" width="176" height="13" rx="4" fill="var(--m-active)"/>
+        <text x="282" y="210" fill="var(--chrome-mute)">40</text>
+
+        <line x1="176" y1="228" x2="418" y2="228" stroke="var(--lim)" stroke-width="1.5"/>
+        <line x1="176" y1="223" x2="176" y2="233" stroke="var(--lim)" stroke-width="1.5"/>
+        <line x1="418" y1="223" x2="418" y2="233" stroke="var(--lim)" stroke-width="1.5"/>
+        <text x="297" y="244" text-anchor="middle" fill="var(--lim)" font-weight="700" font-size="11">gap 55 &mdash; range exists but is not owned</text>
+        <text x="440" y="190" fill="var(--lim)" font-weight="700" font-size="11">chase STRENGTH</text>
+        <text x="440" y="206" fill="var(--chrome-mute)" font-size="10">resisted / isometric work</text>
+      </g>
+    </svg>
+  </div>
+  <figcaption>
+    Same skill, opposite prescriptions. A wide gap means more stretching is the
+    wrong lever &mdash; the range is already there and cannot be held. This single
+    number decides whether a rung needs <b>range</b> or <b>strength</b>, which is
+    the question v1 could not answer at all.
+  </figcaption>
+</figure>
+
+<div class="callout ok">
+  <div class="h">What this replaces</div>
+  <p>
+    v1&rsquo;s <code>CONTROL</code> axis asked the athlete <i>&ldquo;did you own
+    that position?&rdquo;</i> and scored the answer. That was a self-rating
+    standing in for a measurement. Passive and active are two readings of the same
+    position taken minutes apart; the gap falls out of them. Strictly better, and
+    it costs one extra reading per rung.
+  </p>
+</div>
+
+
+<h2 class="sec">The four skills, and the two that are clinically excluded</h2>
+
+<div class="scroller">
+<table>
+  <thead>
+    <tr><th>Skill</th><th>Ladder rungs</th><th>Gates which lift</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>deep_squat</b></td>
+      <td class="mono">calves_ankle &middot; adductors &middot; hip_rotation &middot; lumbar &middot; quads</td>
+      <td>Goblet squat, Bulgarian split squat</td>
+    </tr>
+    <tr>
+      <td><b>hip_extension</b><br><span class="chip c-bad">stated #1 problem</span></td>
+      <td class="mono">hip_flexors &middot; quads &middot; lumbar</td>
+      <td>Hip thrust, RDL lockout, lunge</td>
+    </tr>
+    <tr>
+      <td><b>shoulder_flexion</b></td>
+      <td class="mono">shoulders_overhead &middot; chest_horizontal &middot; thoracic_rotation &middot; lumbar &middot; <b style="color:var(--lim);">lats (MISSING)</b></td>
+      <td>Overhead work (currently prohibited), lat pulldown path</td>
+    </tr>
+    <tr>
+      <td><b>active_pike</b></td>
+      <td class="mono">hamstrings &middot; lumbar &middot; hip-flexor strength</td>
+      <td>RDL, hinge pattern</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout bad">
+  <div class="h">A gap in the agreed 13</div>
+  <p>
+    <b>Nothing isolates the lats</b>, and they are the classic overhead limiter.
+    <code>chest_horizontal</code> catches pec length and
+    <code>shoulders_overhead</code> is the composite &mdash; neither separates the
+    lat out. The source method does: the lats are the only ones of the three
+    crossing the lower back, so rounding the lumbar spine while reaching overhead
+    isolates them relatively.
+  </p>
+  <p>
+    Flagging rather than silently adding a 14th rung. It is a real hole in
+    <code>shoulder_flexion</code>&rsquo;s ladder and it is the skill the athlete
+    named as a problem.
+  </p>
+</div>
+
+<h3 class="sub">Excluded, with reasons</h3>
+
+<div class="scroller">
+<table>
+  <thead><tr><th>Standard skill</th><th></th><th>Why</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><b>bridge</b></td><td><span class="chip c-bad">out as a goal</span></td>
+      <td>End-range lumbar extension against L5/S1 retrolisthesis + activated osteochondrosis. <code>rules.py</code> already contraindicates &ldquo;hyperextension&rdquo; and &ldquo;back extension&rdquo;. Its <i>components</i> &mdash; hip extension, shoulder flexion, thoracic extension &mdash; are exactly what he needs, so they stay as rungs. Only the composite goal goes.</td>
+    </tr>
+    <tr>
+      <td><b>shoulder_extension</b></td><td><span class="chip c-warn">measure, never maximise</span></td>
+      <td>The apprehension direction for an anterior-instability shoulder post-Latarjet. Tracked as a rung so regression is visible; never a target.</td>
+    </tr>
+    <tr>
+      <td><b>pike (passive)</b></td><td><span class="chip c-ok">already achieved</span></td>
+      <td>Palms flat to floor is a Beighton positive &mdash; the passive ceiling is done. The <i>active</i> version is unmeasured, and that gap is the whole thesis. Passive pike is also contraindicated as a <i>test</i> (seated forward fold, covered annulus tears), so the rung is measured supine.</td>
+    </tr>
+    <tr>
+      <td><b>pancake, side_split</b></td><td><span class="chip c-none">deferred</span></td>
+      <td>Little transfer to the current programme. Add later if wanted for their own sake.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+<h2 class="sec">The instrument: 13 rungs, each with a lock</h2>
+
+<p>
+  Every test names a <b>LOCK</b> &mdash; the thing that must not move, because an
+  unlocked joint lets a neighbour substitute and the test measures nothing. This
+  is the failure that broke the model twice, so it is now an explicit field.
+  Measurements are <b>taped distances</b>, not eyeballed angles, because distance
+  is what the same person alone reproduces in three months.
+</p>
+
+<div class="scroller">
+<table>
+  <thead>
+    <tr><th>Rung</th><th>Test</th><th>The lock</th><th class="n">100 =</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>hip_flexors</td><td>Floor modified Thomas &mdash; knee-gap</td><td>lumbar gap photographed in the same frame; hug with the <b>arms</b>, never lift with the hip</td><td class="n">0 cm</td></tr>
+    <tr><td>quads</td><td>Side-lying rectus femoris, heel-to-buttock</td><td>bottom knee hugged &mdash; posteriorly tilts the pelvis so the lumbar cannot substitute</td><td class="n">0 cm</td></tr>
+    <tr><td>calves_ankle</td><td>Knee-to-wall lunge, arch-controlled</td><td>the arch itself &mdash; pes planus buys fake dorsiflexion by collapsing the midfoot</td><td class="n">12 cm</td></tr>
+    <tr><td>hamstrings</td><td>Supine SLR, phone inclinometer on the shin</td><td>opposite heel and thigh stay in floor contact</td><td class="n">120&deg;</td></tr>
+    <tr><td>adductors</td><td>Supine butterfly, knee-to-floor at fixed heels</td><td>heel position marked + low back flat</td><td class="n">0 cm</td></tr>
+    <tr><td>hip_rotation</td><td>Seated internal rotation, heel offset</td><td>sit bones even, hands gripping the chair</td><td class="n">45&deg;</td></tr>
+    <tr><td>shoulders_overhead</td><td>Supine arms overhead, elbows to floor</td><td>low back flat &mdash; a folded towel as a go/no-go pressure sensor voids the trial if contact is lost</td><td class="n">0 cm</td></tr>
+    <tr><td>chest_horizontal</td><td>Wall slide, goalpost contact</td><td>A4 sheet pinned between low back and wall &mdash; self-verifying, it drops if you arch</td><td class="n">0 cm</td></tr>
+    <tr><td>thoracic_rotation</td><td>Side-lying modified open book</td><td>knees stacked on a fixed-thickness towel, bottom hand pins the pelvis</td><td class="n">50&deg;</td></tr>
+    <tr><td>lumbar</td><td>Supine lumbar flattening, residual gap</td><td>feet and glutes &mdash; measures the tilt, not a leg press</td><td class="n">0 cm</td></tr>
+    <tr><td>lateral_trunk</td><td>Wall-backed lateral flexion, fingertip travel</td><td>heels, buttocks, upper back, head all on the wall</td><td class="n">20 cm</td></tr>
+    <tr><td>neck</td><td>Seated rotation, chin-to-acromion excursion</td><td>back flat to wall, hands gripping the seat &mdash; and <b>no hand overpressure, ever</b></td><td class="n">8 cm</td></tr>
+    <tr><td>squat_depth</td><td>Bodyweight squat to first loss of neutral</td><td>foot outline traced once and photographed &mdash; stance is the largest source of drift</td><td class="n">+5 cm</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout">
+  <div class="h">Four tests replace a contraindicated standard</div>
+  <p>
+    Not warned about &mdash; <b>replaced</b>, with something measuring the same
+    capacity safely. The seated forward fold, sit-and-reach and standing toe-touch
+    all go (end-range lumbar flexion, covered annulus tears at L3/4 and L4/5) and
+    become a supine straight-leg raise. The prone Ely quad test goes (a tight
+    rectus femoris tilts the pelvis and drives lumbar extension) and becomes
+    side-lying with the pelvis hugged shut. The doorway pec stretch and supine
+    90/90 both go &mdash; they hang the anterior capsule on an external frame,
+    which is the post-Latarjet apprehension position &mdash; and become the wall
+    slide he already uses.
+  </p>
+</div>
+
+<h3 class="sub">Protocol rules</h3>
+<ul class="tight">
+  <li><b>Measure cold.</b> No warm-up. A warm measurement reads the viscoelastic effect, which is gone in hours; a cold one isolates the durable change. This is the difference between tracking progress and tracking whether you happened to stretch that morning.</li>
+  <li><b>Same surface, same marks, same time of day.</b> Trace the foot outline once and photograph it. Freeze the phone position.</li>
+  <li><b>Bilateral rungs record L and R separately</b> and never average them &mdash; the asymmetries are the clinical content.</li>
+  <li><b>~35&ndash;45 min, every 6&ndash;12 weeks.</b> Not a weekly ritual.</li>
+</ul>
+
+
+<h2 class="sec">Scheduling: a window, not a rule</h2>
+
+<p>
+  The source claims flexibility training generates central fatigue through the
+  same downstream pathway as strength training, delayed by hours to days. The
+  <b>mechanism is stated well past what the evidence carries</b> and is recorded as
+  motivation, not fact &mdash; the same treatment
+  <code>services/sleep_fusion.py</code> gives the abandoned quiet-wake rule. The
+  <i>scheduling heuristic</i> is worth encoding regardless, and it is computable
+  from the training log the app already holds.
+</p>
+
+<div class="grid2">
+  <div class="card">
+    <div class="k">Good</div>
+    <div class="v" style="color:var(--ok);">2+ days</div>
+    <div class="d">after hard sport or strength &mdash; or the same day, PM, after an AM session (the fatigue signal has not landed yet)</div>
+  </div>
+  <div class="card">
+    <div class="k">Poor</div>
+    <div class="v" style="color:var(--lim);">the day after</div>
+    <div class="d">strength &mdash; or slotted into a rest day as &ldquo;active recovery&rdquo;, which the source argues it is not</div>
+  </div>
+</div>
+
+<div class="callout bad">
+  <div class="h">A contradiction with what the app does today</div>
+  <p>
+    <code>views/training.py:1472</code> offers a yoga session <b>on rest days</b>
+    via <code>suggest_for_day("rest_day")</code> &mdash; the slot this rule calls
+    worst.
+  </p>
+  <p>
+    They are not the same thing: a <i>restorative</i> flow on a rest day is fine,
+    a <i>training</i> session aimed at adaptation is what should move. But nothing
+    in the code distinguishes them right now, so the sessions need an intent flag
+    before the window can be honest.
+  </p>
+</div>
+
+
+<h2 class="sec">Where the data actually stands</h2>
+
+<div class="grid2">
+  <div class="card">
+    <div class="k">Rungs with any data</div>
+    <div class="v" style="color:var(--lim);">1 of 13</div>
+    <div class="d">hamstrings only, provisional, from the gym goniometry at ~0.10 confidence</div>
+  </div>
+  <div class="card">
+    <div class="k">Rungs with active or isometric</div>
+    <div class="v" style="color:var(--lim);">0 of 13</div>
+    <div class="d">the gap metric &mdash; the whole point of v2 &mdash; has no data at all yet</div>
+  </div>
+</div>
+
+<p>
+  <b>None of the 22 yoga depth-ratings survive.</b> They answer a question that is
+  neither passive range nor active range (&ldquo;how far did I get <i>and</i> how
+  much did I feel&rdquo;), and reinterpreting them would be inventing data. They
+  are kept in full, with the athlete&rsquo;s verbatim notes, as a dated historical
+  instrument &mdash; provenance, not input.
+</p>
+
+<p>
+  So the assessment is not an enhancement to the model. <b>Until it is run once,
+  it is the model.</b>
+</p>
+
+
+<h2 class="sec">Where this sits among the goals</h2>
+
+<div class="callout">
+  <div class="h">Athlete, 2026-08-05</div>
+  <p>
+    &ldquo;It needs to be an underlying goal, not as strong as running 10&nbsp;km in
+    October, but it should be part of getting the whole body in a better position,
+    as this will limit future injuries and provide better overall strength and
+    wellness rather than just getting strong.&rdquo;
+  </p>
+</div>
+
+<p>
+  That makes flexibility a <b>standing objective</b>, not a block. The profile
+  already has exactly one thing shaped like this &mdash; the hypermobility entry,
+  whose training implication reads <i>&ldquo;a standing modifier on every block,
+  not something that resolves or gets reassessed away like a healing injury.&rdquo;</i>
+  Flexibility v2 takes the same shape, and the same precedence:
+</p>
+
+<ol class="tight">
+  <li><b>Clinical constraints</b> &mdash; <code>rules.py</code>, the MRI, the physio. Never overridden.</li>
+  <li><b>The 10&nbsp;km on 2026-10-11</b> &mdash; the dated goal with a deadline.</li>
+  <li><b>Flexibility</b> &mdash; standing, undated, no deadline. Yields the calendar to the race, but is never <i>finished</i>.</li>
+</ol>
+
+<p>
+  Concretely that means one to two sessions a week of three to five exercises,
+  targeting whichever rung is currently lowest, scheduled into good windows and
+  never displacing race work. And the rationale is a claim the app can eventually
+  test rather than assert: <b>if a lift is limited by position rather than by
+  force, then clearing the limiting rung should raise the lift without any change
+  in strength.</b> <code>services/strength.py</code> already tracks the strength
+  side independently, so the two series can be compared.
+</p>
+
+
+<h2 class="sec">What gets built</h2>
+
+<ol class="tight">
+  <li><b><code>flexibility_baselines.py</code></b> &mdash; rewritten. Skills, their ladders, the 13 rung definitions with lock/measurement/reference, and the gym goniometry demoted to provenance.</li>
+  <li><b><code>services/flexibility.py</code></b> &mdash; rewritten. <code>min</code>-not-mean, three measures per rung, the passive&minus;active gap, and <code>limiting_rung</code> as a first-class output. The old <code>band_score</code> / <code>CONTROL_BAND</code> downslope is deleted, with a guard test so it cannot return.</li>
+  <li><b>The assessment capture path</b> &mdash; 13 tests &times; up to 3 readings &times; L/R, with the protocol text shown at the point of entry, cold-measurement reminder included.</li>
+  <li><b>The upper-body yoga session</b> &mdash; 17 poses, holds kept <b>under 30 s</b> so the app is not quietly making the endurance prescription that is reserved for the physio on 2026-08-16.</li>
+  <li><b>The screen</b> &mdash; skill score, the named limiting rung, the gap per rung, and the window.</li>
+  <li><b>Tests and docs</b> &mdash; and a <code>docs/resume.md</code> FLEXIBILITY section rewritten against this.</li>
+</ol>
+
+<footer class="foot">
+  Supersedes <code>mockups/flexibility_bioage.html</code>. Test protocols from a
+  3-designer / 3-reviewer pass; three blocking findings applied, including the one
+  that caught the app about to self-prescribe scapular holds reserved for the
+  physiotherapist. Nothing in this document is in the repo yet.
+</footer>
+
+</div>

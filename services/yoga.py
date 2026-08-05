@@ -287,6 +287,149 @@ YOGA_LIBRARY: list[YogaSession] = [
             YogaPose("Deep Relaxation (Savasana)", _t("14:20"), 30, "cleared"),
         ],
     ),
+    YogaSession(
+        slug="shoulder_scapula_neck_flow_16min",
+        name="16-Minute Shoulder, Scapula & Neck Flow",
+        video_url="",
+        estimated_rpe=3,
+        primary_focus=["shoulder_flexion", "thoracic_extension", "scapular_control",
+                        "cervical", "relaxation"],
+        intensity="low",
+        suitable_for=["rest_day", "active_rest_day"],
+        # ── AUTHORED 2026-08-05, and the hold durations are the whole story ──
+        #
+        # Every scapular-loading hold here is kept UNDER 30 SECONDS, deliberately
+        # and against the first draft, which used 55s holds pitched at the
+        # measured 50-60s interscapular fatigue onset.
+        #
+        # That draft was blocked in review against patient_profile.py's own
+        # symptom_log 2026-08-03 plan: "No self-directed exercise changes —
+        # endurance-biased scapular loading (long isometric holds rather than
+        # more reps) is an exercise-prescription change and goes to the
+        # physiotherapist at the Day 28 reassessment (2026-08-16)."
+        #
+        # A session of 55s scapular holds IS that prescription. Authoring one
+        # here would have had the app quietly make a call reserved for the
+        # physio. Under 30s sits clearly below the measured threshold, so this
+        # session trains nothing of the endurance capacity and prejudges
+        # nothing. If the holds are approved on 2026-08-16, lengthen them then
+        # — and record that it was approved.
+        #
+        # There is also NO second timed Down Dog here. The first draft placed
+        # one at 14:05 to re-read the 50-60s burn onset, but it sat after three
+        # 55s holds and would have measured fatigue on top of fatigue while
+        # reporting it as a clean re-reading. The retest already lives on the
+        # 15-minute flow's Down Dog at 30s, uncontaminated; duplicating the
+        # instrument corrupts both.
+        poses=[
+            YogaPose(
+                "Supported Diaphragmatic Breathing (Supine, Knees Bent)",
+                _t("00:20"), 60, "cleared",
+                "Sets the rib position the rest of the session works from. Nothing here "
+                "loads the shoulder or the neck.",
+            ),
+            YogaPose(
+                "Supine Arms-Overhead Reach (Elbows Toward the Floor)",
+                _t("01:30"), 45, "caution",
+                "The athlete's own failed test — he cannot rest both elbows on the floor "
+                "with the arms overhead. Unloaded and self-limited: never a partner "
+                "pressing the elbows down, which would put passive end-range pressure "
+                "into a post-Latarjet shoulder whose stability is muscular rather than "
+                "ligamentous (finding #6). Keep the low back flat; arching is how the "
+                "lumbar spine buys fake overhead range.",
+                option_note="A folded towel under the low back tells you the moment you arch",
+            ),
+            YogaPose(
+                "Cat-Cow (Mid-Range, Thoracic-Biased)", _t("02:25"), 45, "cleared",
+                "MID-RANGE only, and biased to the thoracic spine. The extension half stops "
+                "well short of end range — L5/S1 retrolisthesis plus activated "
+                "osteochondrosis means end-range lumbar extension is contraindicated.",
+            ),
+            YogaPose(
+                "Thoracic Extension over a Rolled Towel", _t("03:20"), 60, "caution",
+                "The towel goes at mid-thoracic (T6-T10), the region finding #3 identifies "
+                "as sitting-stiffened, and NOT at the lumbar spine. Placement is the whole "
+                "safety margin: too low and this becomes the end-range lumbar extension "
+                "that is contraindicated.",
+            ),
+            YogaPose(
+                "Thread the Needle (Right Arm Under)", _t("04:30"), 45, "cleared",
+                "Unloaded thoracic rotation — the same family already used in the "
+                "pre-session release protocol.",
+            ),
+            YogaPose(
+                "Thread the Needle (Left Arm Under)", _t("05:25"), 45, "cleared",
+                "As above, other side.",
+            ),
+            YogaPose(
+                "Extended Puppy Pose", _t("06:20"), 45, "caution",
+                "Passive shoulder flexion with the lats on stretch — the one pose here "
+                "that reaches the lat, which is otherwise the gap in this athlete's "
+                "overhead ladder. Let the chest sink rather than pushing into it.",
+            ),
+            YogaPose(
+                "Prone Scapular Retraction Hold (Arms Low, Palms Down)",
+                _t("07:15"), 25, "caution",
+                "ARMS LOW, not a prone T — arms at 90 degrees of abduction would put the "
+                "post-Latarjet shoulder toward the apprehension position. 25s is "
+                "deliberately BELOW the measured 50-60s interscapular fatigue onset: this "
+                "is a positioning drill, not the endurance prescription, which is the "
+                "physiotherapist's call on 2026-08-16.",
+            ),
+            YogaPose(
+                "Wall Forearm Press Hold (Elbows Below Shoulder Height)",
+                _t("08:00"), 25, "caution",
+                "Elbows stay BELOW shoulder height — above it the same drill drifts toward "
+                "abduction plus external rotation. Serratus-biased. 25s, below threshold, "
+                "for the same reason as the pose above.",
+            ),
+            YogaPose(
+                "Supported Chest Opening over a Rolled Towel (Arms at 45 Degrees)",
+                _t("08:45"), 60, "caution",
+                "Arms at 45 degrees, NOT a supine 90/90 T — 90 degrees of abduction with "
+                "external rotation is the apprehension position for anterior instability. "
+                "The towel runs along the spine so the load is gravity on an open chest "
+                "rather than an external frame levering the joint.",
+            ),
+            YogaPose(
+                "Seated Neck Tilt — Right Ear Toward Right Shoulder",
+                _t("09:55"), 40, "caution",
+                "Self-generated only, NO hand overpressure — at Beighton 6/9 the cervical "
+                "spine is the last place to hang on ligament, and symptom_log 2026-07-31 "
+                "records asymmetric flexion tightness with mechanical crepitus.",
+            ),
+            YogaPose(
+                "Seated Neck Tilt — Left Ear Toward Left Shoulder",
+                _t("10:45"), 40, "caution",
+                "As above. The LEFT side is the documented dominant side of the "
+                "interscapular and cervical pattern, so expect asymmetry here and do not "
+                "chase it into end range.",
+            ),
+            YogaPose(
+                "Levator Scapulae Stretch (Left Side)", _t("11:35"), 40, "caution",
+                "Levator scapulae is the anatomical bridge between the cervical spine and "
+                "the superior medial scapular angle — the corridor the ache migrates along "
+                "in symptom_log 2026-08-03. Released BEFORE the scapular work would be "
+                "ideal; here it follows, because the holds above are positioning rather "
+                "than loading.",
+            ),
+            YogaPose(
+                "Levator Scapulae Stretch (Right Side)", _t("12:25"), 40, "caution",
+                "Not merely the other side. symptom_log 2026-08-03's CORRECTION 2 records "
+                "the pattern as BILATERAL with left dominance — right on 2026-07-16 and "
+                "2026-07-23, left from 2026-07-21 — and it was the left-lateralised framing "
+                "that obscured a postural-endurance driver. Treating the right as an "
+                "afterthought would reintroduce exactly that error. Same rule as the left: "
+                "self-generated, no hand overpressure.",
+            ),
+            YogaPose(
+                "Supine Rest with Arms Overhead on a Cushion", _t("13:15"), 60, "cleared",
+                "Supported overhead position with no reach demand — the shoulder rests at "
+                "range rather than working to get there.",
+            ),
+            YogaPose("Deep Relaxation (Savasana)", _t("14:25"), 60, "cleared"),
+        ],
+    ),
 ]
 
 
@@ -294,8 +437,45 @@ def get(slug: str) -> YogaSession | None:
     return next((y for y in YOGA_LIBRARY if y.slug == slug), None)
 
 
-def suggest_for_day(day_kind: str) -> YogaSession | None:
-    """day_kind: 'rest_day' | 'active_rest_day'. First catalogue entry tagged
-    for that day kind — deterministic; becomes a real ranking once there's more
-    than one candidate worth ranking."""
-    return next((y for y in YOGA_LIBRARY if day_kind in y.suitable_for), None)
+#: Intensity as an orderable number, so the ranking below is a total order
+#: rather than a string comparison that happens to sort "high" before "low".
+_INTENSITY_RANK: dict[str, int] = {"low": 0, "moderate": 1, "high": 2}
+
+
+def suggest_for_day(
+    day_kind: str,
+    *,
+    focus_hint: frozenset[str] | set[str] = frozenset(),
+    recent_slugs: tuple[str, ...] = (),
+) -> YogaSession | None:
+    """day_kind: 'rest_day' | 'active_rest_day'.
+
+    A real ranking, as this function's previous docstring promised once a second
+    session existed. Deterministic lexicographic sort over a key tuple in which
+    every element is smaller-is-better, with the slug last so the result never
+    depends on YOGA_LIBRARY's list order:
+
+      1. focus_hint miss count — a caller asking for shoulder work gets the
+         shoulder session, which is the whole reason a second session exists.
+      2. repeat penalty — a session in `recent_slugs` sorts later, so alternating
+         is the default rather than always returning the first match.
+      3. intensity, direction depending on the day. An ACTIVE rest day prefers
+         the higher-intensity option; a plain rest day prefers the lower one.
+      4. slug, for a strict total order.
+
+    No argument is required, so the existing single-argument call sites keep
+    working unchanged.
+    """
+    eligible = [y for y in YOGA_LIBRARY if day_kind in y.suitable_for]
+    if not eligible:
+        return None
+
+    wants_harder = day_kind == "active_rest_day"
+
+    def key(session: YogaSession) -> tuple:
+        missed = len(set(focus_hint) - set(session.primary_focus))
+        repeat = 1 if session.slug in recent_slugs else 0
+        rank = _INTENSITY_RANK.get(session.intensity, 0)
+        return (missed, repeat, -rank if wants_harder else rank, session.slug)
+
+    return min(eligible, key=key)

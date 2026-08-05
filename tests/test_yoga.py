@@ -161,6 +161,97 @@ def test_retests_and_cautions_are_separate_concerns():
     assert all(question for _, question in session.retests())
 
 
+def test_upper_body_session_exists_and_its_timings_do_not_overlap():
+    s = yoga.get("shoulder_scapula_neck_flow_16min")
+    assert s is not None
+    assert len(s.poses) == 16
+    assert s.total_duration_minutes == 16
+    end = 0
+    for pose in s.poses:
+        assert pose.start_seconds >= end, f"{pose.name} overlaps the pose before it"
+        end = pose.start_seconds + pose.hold_seconds
+
+
+def test_scapular_loading_holds_stay_below_the_measured_fatigue_onset():
+    """THE governing constraint on this session. Interscapular fatigue onset is
+    measured at 50-60s, and patient_profile symptom_log 2026-08-03 reserves
+    endurance-biased scapular loading — long isometric holds — for the
+    physiotherapist at the 2026-08-16 reassessment. A session of 55s scapular
+    holds IS that prescription, so authoring one here would have the app make a
+    call that is explicitly not its to make. Under 30s trains none of that
+    capacity and prejudges nothing."""
+    s = yoga.get("shoulder_scapula_neck_flow_16min")
+    loading = [p for p in s.poses
+               if "Scapular Retraction" in p.name or "Wall Forearm Press" in p.name]
+    assert len(loading) == 2
+    for pose in loading:
+        assert pose.hold_seconds < 30, (
+            f"{pose.name} is {pose.hold_seconds}s — at or above the measured 50-60s "
+            "threshold this becomes the endurance prescription reserved for physio"
+        )
+
+
+def test_the_burn_onset_retest_is_not_duplicated_into_the_new_session():
+    """The first draft put a second timed Down Dog at 14:05, after three 55s
+    holds — it would have measured fatigue on top of fatigue and reported it as
+    a clean re-reading of the 50-60s baseline. The retest stays on the 15-minute
+    flow's Down Dog, uncontaminated."""
+    upper = yoga.get("shoulder_scapula_neck_flow_16min")
+    assert not any("Down Dog" in p.name for p in upper.poses)
+
+    original = yoga.get("hip_spine_flow_15min")
+    down_dog = next(p for p in original.poses if p.name == "Down Dog")
+    assert "50-60s" in down_dog.retest
+
+
+def test_the_new_session_avoids_the_apprehension_position():
+    """Post-Latarjet: 90 degrees of abduction with external rotation is the
+    apprehension position. Two poses are deliberately re-specified away from it
+    and must say so."""
+    s = yoga.get("shoulder_scapula_neck_flow_16min")
+    by_name = {p.name: p for p in s.poses}
+    prone = next(p for n, p in by_name.items() if "Scapular Retraction" in n)
+    assert "ARMS LOW" in prone.safety_note or "arms low" in prone.safety_note.lower()
+    chest = next(p for n, p in by_name.items() if "Chest Opening" in n)
+    assert "45" in chest.safety_note and "apprehension" in chest.safety_note.lower()
+
+
+def test_every_non_cleared_pose_in_the_new_session_states_a_mechanism():
+    s = yoga.get("shoulder_scapula_neck_flow_16min")
+    for pose in s.poses:
+        if pose.safety != "cleared":
+            assert len(pose.safety_note) > 60, f"{pose.name} has no real rationale"
+
+
+def test_suggest_for_day_ranks_rather_than_taking_the_first_match():
+    """The old first-match filter's own docstring said it had to become a real
+    ranking once a second session existed."""
+    shoulder = "shoulder_scapula_neck_flow_16min"
+    hips = "hip_spine_flow_15min"
+
+    # A focus hint picks the session that carries it — the reason a second
+    # session exists at all.
+    assert yoga.suggest_for_day(
+        "rest_day", focus_hint={"shoulder_flexion"}).slug == shoulder
+    assert yoga.suggest_for_day("rest_day", focus_hint={"hip_opening"}).slug == hips
+
+    # Having just done one, the other comes up.
+    assert yoga.suggest_for_day("rest_day", recent_slugs=(hips,)).slug == shoulder
+    assert yoga.suggest_for_day("rest_day", recent_slugs=(shoulder,)).slug == hips
+
+
+def test_suggest_for_day_is_order_independent_and_still_single_arg():
+    """The slug tie-break makes the result independent of YOGA_LIBRARY's list
+    order, and every existing call site passes one argument."""
+    original = list(yoga.YOGA_LIBRARY)
+    try:
+        first = yoga.suggest_for_day("rest_day").slug
+        yoga.YOGA_LIBRARY.reverse()
+        assert yoga.suggest_for_day("rest_day").slug == first
+    finally:
+        yoga.YOGA_LIBRARY[:] = original
+
+
 def test_suggest_for_day_returns_a_rest_day_match():
     suggestion = yoga.suggest_for_day("rest_day")
     assert suggestion is not None

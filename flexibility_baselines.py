@@ -1,316 +1,557 @@
 """
-flexibility_baselines.py — the gym flexibility scan, transcribed.
+flexibility_baselines.py — skills, their ladders, and the 13 rung tests.
 
-Same reason `strength_baselines.py` and `body_composition_baselines.py` exist:
-the source is not machine-readable and cannot be re-derived from anything the
-app can reach. This one is worse than either — the source is a **phone
-screenshot of a vendor app**, with no export, no PDF and no print-out. Lose this
-file and the only instrumented range-of-motion measurements ever taken on this
-athlete are gone.
+REWRITTEN 2026-08-05 (v2). The v1 model in this file scored eight body regions
+and averaged them. That is the wrong shape and it failed in a specific, provable
+way: the `hip` score averaged fourteen contributions across five unrelated
+capacities, and Deep Lunge — the ONLY thing testing hip extension, the athlete's
+single worst documented capacity — scored 100 and was carried by healthy rungs.
+The athlete's own objection killed it:
 
-Source: gym flexibility scan, five isolated regions measured 2025-01-17,
-screenshotted and read 2026-08-05.
+    "we know my hips are stuck in flexion with my back arched and this is a huge
+     issue for me, and yet my flexibility score is nearly 80 for hips"
 
-THE PROTOCOL IS UNRECORDED, AND THAT IS THE HEIGHT DEFECT ALL OVER AGAIN
------------------------------------------------------------------------
-`body_composition_baselines.py` records that the InBody sheet never prints the
-height it was told, so four of five scans are wrong in every kilogram. The same
-class of defect is here: the screen prints a number of degrees per region and
-never says WHICH MOVEMENT produced it.
+THE MODEL NOW
+-------------
+A SKILL is a position you can either achieve or not ("hip mobility" is as
+meaningless as "hip strength" — the joint does too many things). Under each
+skill is a LADDER of candidate limiters. Only the LOWEST rung limits the skill,
+so the skill's score is min(rungs), and the name of that rung is published
+beside it. Fix it, re-test, and the limiter moves to the next one — that
+re-pointing IS the training programme.
 
-"Hip 33 deg" means something different, and corroborates a different clinical
-finding, depending on whether it is internal rotation (normal 35-45), abduction
-(normal ~45) or a Thomas-test hip extension (normal 10-20, where 33 would be
-excellent rather than the "Low" the vendor printed). A reference band cannot be
-chosen without knowing which.
+Regions are therefore DIAGNOSTICS, never a score. Nothing here is averaged.
 
-So every entry carries `protocol`, and every entry currently carries
-`protocol=None`. `reference_band` holds a PROVISIONAL band chosen from the most
-likely protocol, and `provisional=True` propagates all the way to the score, to
-the confidence weighting and to the screen. Nothing here silently defaults. The
-athlete is asking the gym for the movement list (2026-08-05); when it arrives,
-set `protocol` and confirm or replace each band, and the provisional penalty
-disappears on its own.
+THREE MEASURES PER RUNG, AND THE GAP IS THE POINT
+-------------------------------------------------
+Each rung is measured three ways in the same position:
 
-LAT_FLEX IS DELIBERATELY LEFT UNSCOREABLE
------------------------------------------
-Its `reference_band` is None, not a guess. The vendor calls 20-21 deg "Normal",
-which is incompatible with the obvious reading of the label — trunk lateral
-flexion is normally 35-45 deg, where 20 would be markedly low, not normal. So
-either the label does not mean trunk side-bend or the vendor's norms are not
-population norms. Guessing a band here would invent a number out of a
-contradiction. `services.flexibility` reports it as UNSCOREABLE and excludes it
-from the Range axis; the region still scores off its Control axis.
+    PASSIVE    gravity or hands put you there      -> the ceiling
+    ISOMETRIC  can you hold it once you are there  -> is the range defended
+    ACTIVE     can you pull yourself in unassisted -> the usable range
 
-THE PERFECT-SYMMETRY QUESTION, TO BE ANSWERED AT THE NEXT SCAN
---------------------------------------------------------------
-Three regions differ left-to-right by 1-3 deg (lat flex 20/21, hip 33/32,
-hamstrings 89/86). Two are EXACTLY equal (neck 30/30, chest 106/106).
+PASSIVE - ACTIVE is the number that matters for THIS athlete. The source method
+this is built on is written for people who LACK range; at Beighton 6/9 the
+assisted half of it solves a problem he does not have. A wide gap means the
+range exists and cannot be held, so more stretching is the wrong lever and
+resisted/isometric work is the right one. That single number decides whether a
+rung needs RANGE or STRENGTH — the question v1 could not answer at all.
 
-Chest 106/106 is the least likely result on the sheet. This athlete has three
-right anterior dislocations, a failed capsular repair and a Latarjet coracoid
-transfer (patient_profile.py finding #6); a post-Latarjet shoulder
-characteristically loses external rotation and horizontal abduction on the
-operated side. Exact bilateral equality there is either one measurement mirrored
-into both columns, or a protocol that does not isolate the shoulder.
+This replaces v1's `CONTROL` axis, which asked the athlete to self-rate whether
+he "owned" a position. Two objective readings beat one subjective rating.
 
-Not asserted either way — `symmetry_suspect` flags the two, and one visit
-settles it. Same discipline as keeping both 2025-05-21 InBody scans rather than
-deduplicating the one that looked wrong.
+EVERY TEST NAMES A LOCK
+-----------------------
+The `lock` field is the thing that must not move. An unlocked joint lets a
+neighbour substitute and the test measures nothing — which is precisely the
+failure that broke this model twice. Four tests REPLACE a standard test that is
+contraindicated for this athlete, with something measuring the same capacity
+safely; they are marked `replaces`.
 
-THE VENDOR'S BIOAGE IS NOT STORED, AND ITS DEFECT IS WHY
---------------------------------------------------------
-The screen reads "Flexibility BioAge 28 years" against "Real age: 31 years".
-The measurement is from 2025-01-17, when this athlete was **30** (DOB
-1994-10-19) — the vendor compares a Jan-2025 measurement against a LIVE
-chronological age, so the displayed gap was -2 at measurement and is shown as
--3, and it widens every birthday without anybody moving. That is a console value
-contaminating a derived number, exactly as the typed height was.
+Measurements are taped DISTANCES wherever possible rather than eyeballed
+angles, because a distance is what one person alone reproduces in three months.
 
-`services/body_composition.py` already refuses "body composition expressed as an
-age in years"; the same refusal applies here and is enforced by a test. The
-vendor's verdicts ARE kept, verbatim, as provenance — see `vendor_verdict` — but
-nothing computes from them: converting a verdict to a score would import the
-vendor's undisclosed norm table into ours and then double-count it against our
-own reference band.
+MEASURE COLD
+------------
+No warm-up, ever. A warm reading measures the viscoelastic effect, which is
+gone within hours; a cold reading isolates the durable change. This is the
+difference between tracking progress and tracking whether he happened to
+stretch that morning.
+
+Source: 13 test protocols from a 3-designer / 3-reviewer design pass,
+2026-08-05, reconciled against patient_profile.py and services/rules.py.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
-#: The one date on which any instrumented ROM was recorded for this athlete.
+# ── measures ─────────────────────────────────────────────────────────────────
+
+PASSIVE = "passive"
+ISOMETRIC = "isometric"
+ACTIVE = "active"
+MEASURES: tuple[str, ...] = (PASSIVE, ISOMETRIC, ACTIVE)
+
+
+@dataclass(frozen=True)
+class RungTest:
+    """One ladder rung and how it is measured.
+
+    `value_at_100` and `value_at_0` bracket the scale and MAY RUN IN EITHER
+    DIRECTION — several tests measure a gap that shrinks as capacity improves
+    (elbows to floor: 0 cm is perfect, 30 cm is the floor), while others measure
+    a distance that grows (knee-to-wall: 12 cm is perfect, 0 cm is the floor).
+    `services.flexibility.rung_score` interpolates between them and therefore
+    handles both without a special case.
+    """
+    key: str
+    label: str
+    test_name: str
+    unit: str
+    value_at_100: float
+    value_at_0: float
+    setup: str
+    lock: str
+    measurement: str
+    bilateral: bool
+    safety: str
+    replaces: str = ""
+
+    @property
+    def inverted(self) -> bool:
+        """True when a SMALLER reading is better."""
+        return self.value_at_100 < self.value_at_0
+
+
+#: The 13 rungs. Keys are stable and are referenced by SKILLS below.
+RUNGS: dict[str, RungTest] = {
+    "hip_flexors": RungTest(
+        key="hip_flexors", label="Hip flexors",
+        test_name="Bench-edge modified Thomas, tested knee STRAIGHT — thigh angle by inclinometer",
+        unit="°", value_at_100=15.0, value_at_0=-20.0, bilateral=True,
+        setup="Sit on the very edge of a bench or firm bed, roll back and draw BOTH knees to "
+              "the chest, then lower the tested leg. Hug the other knee to the chest. The "
+              "tested KNEE STAYS STRAIGHT — a bent knee puts rectus femoris on stretch and "
+              "turns a hip-extension test into a quad test, which is the quads rung's job.",
+        lock="The hugged knee holds the pelvis in posterior tilt, and the bench edge must sit "
+             "at the gluteal fold so the thigh is free to drop BELOW horizontal. If the low "
+             "back lifts off the bench the reading is void. Hug with the ARMS, never lift with "
+             "the hip — that is the contractile Coxa Saltans trigger (finding #4).",
+        measurement="Phone strapped flat along the front of the tested thigh as an "
+                    "inclinometer, zeroed against the bench surface. Read the thigh angle "
+                    "relative to horizontal — below horizontal is positive hip extension, "
+                    "above it is a flexion contracture. L and R separately, to 1°.",
+        safety="The athlete's stated #1 problem: 'my hips are stuck in flexion with my back "
+               "arched'. A test that lets the low back arch measures nothing here, so the "
+               "posterior-tilt lock is the entire protocol rather than a detail.",
+        replaces="the FLOOR version of the modified Thomas test, where the floor blocks the "
+                 "thigh at 0° and every result below neutral is censored to the same value",
+    ),
+    "quads": RungTest(
+        key="quads", label="Quads / rectus femoris",
+        test_name="Side-lying rectus femoris — heel to buttock, pelvis hugged shut",
+        unit="cm", value_at_100=0.0, value_at_0=25.0, bilateral=True,
+        setup="Side-lying on the floor. Draw the BOTTOM hip and knee up and hold that knee "
+              "with the bottom hand. Bend the top knee and draw the heel toward the buttock.",
+        lock="The hugged bottom knee — it posteriorly tilts the pelvis and rounds the low "
+             "back, which is what stops the lumbar spine substituting for quad length.",
+        measurement="Photo from behind, phone on a marked spot, ruler upright in frame. Gap "
+                    "from the back of the heel to the gluteal fold, to 0.5 cm.",
+        safety="Rectus femoris crosses both hip and knee, so it appears on two ladders.",
+        replaces="the prone Ely / prone quad stretch — a restricted rectus femoris in prone "
+                 "tilts the pelvis anteriorly and drives lumbar extension, which is "
+                 "contraindicated here",
+    ),
+    "calves_ankle": RungTest(
+        key="calves_ankle", label="Calves / ankle",
+        test_name="Knee-to-wall lunge, arch-controlled",
+        unit="cm", value_at_100=12.0, value_at_0=0.0, bilateral=True,
+        setup="Barefoot. Tape a strip perpendicular to a wall with a tape measure along it, "
+              "zeroed AT the wall. Tested foot on the line, second toe pointing at the wall. "
+              "Drive the knee forward to touch the wall with the heel flat.",
+        lock="The ARCH. Pes planus buys apparent dorsiflexion by collapsing the midfoot and "
+             "subtalar joint instead of moving the ankle — the arch must be held, or the "
+             "test reads foot collapse as ankle range.",
+        measurement="Greatest toe-to-wall distance at which the knee still touches with the "
+                    "heel flat, to 0.5 cm.",
+        safety="Documented pes planus makes the arch the whole protocol here, not a footnote.",
+    ),
+    "hamstrings": RungTest(
+        key="hamstrings", label="Hamstrings",
+        test_name="Passive supine straight-leg raise — phone inclinometer on the shin",
+        unit="°", value_at_100=90.0, value_at_0=0.0, bilateral=True,
+        setup="Supine on the floor, both legs straight, low back flat, arms at the sides. "
+              "Phone strapped to the shin as an inclinometer. Raise one straight leg to firm "
+              "resistance.",
+        lock="The opposite leg — its heel and the back of its thigh stay in floor contact for "
+             "the whole trial, or the pelvis has rotated and the number is not hamstring length.",
+        measurement="Maximum angle in degrees at firm resistance, to 1°.",
+        safety="Long-sitting upright is already ~90° of hip flexion with the knee straight, so "
+               "the 2026-08-05 finding — normal length with NO RESERVE — predicts a reading "
+               "near 90 rather than a low one.",
+        replaces="the seated forward fold, sit-and-reach and standing toe-touch, all "
+                 "contraindicated in rules.py (end-range lumbar flexion loads the covered "
+                 "annulus tears at L3/4 and L4/5)",
+    ),
+    "adductors": RungTest(
+        key="adductors", label="Adductors",
+        test_name="Supine butterfly — knee-to-floor height at a fixed heel position",
+        unit="cm", value_at_100=0.0, value_at_0=25.0, bilateral=True,
+        setup="Supine, low back pressed flat, soles together, knees falling out to the sides. "
+              "Draw the heels in to a marked position and leave them there.",
+        lock="Heel position marked on the floor PLUS the flat low back — sliding the heels out "
+             "makes the knees drop without any change in adductor length.",
+        measurement="Tape held vertically beside each knee in turn; vertical gap from the floor "
+                    "to the lateral aspect of the knee, L and R separately.",
+        safety="Passive floor-supported hip flexion + external rotation, which the 2026-08-05 "
+               "finding established is NOT a Coxa Saltans risk position — the trigger is "
+               "contractile, not positional.",
+    ),
+    "hip_rotation": RungTest(
+        key="hip_rotation", label="Hip rotation",
+        test_name="Seated bench-edge hip INTERNAL rotation — shank tilt by inclinometer",
+        unit="°", value_at_100=40.0, value_at_0=0.0, bilateral=True,
+        setup="Sit on the EDGE of a bench with both knees at 90° and the shins hanging free, "
+              "sitting tall with even weight on both sit bones and both hands gripping the "
+              "bench. Swing the foot outward, keeping the thigh still.",
+        lock="Even weight on both sit bones plus the grip — letting the pelvis rotate turns "
+             "hip internal rotation into trunk rotation. The free-hanging shin is what lets "
+             "an inclinometer read the tilt directly instead of inferring it from a "
+             "floor-blocked distance and a frozen shin length.",
+        measurement="Phone strapped to the shin, zeroed with the shank vertical. Read the tilt "
+                    "in degrees at end range, L and R separately, to 1°.",
+        safety="Internal rotation is the SAFE direction for finding #4 — the trigger is "
+               "external rotation under ACTIVE hip flexion, and this is neither. Confirmed by "
+               "the 2026-08-05 negative finding that passive flexion + external rotation "
+               "produced no snap at all.",
+    ),
+    "shoulders_overhead": RungTest(
+        key="shoulders_overhead", label="Shoulders overhead",
+        test_name="Supine shoulder flexion — straight arms, thumbs up, towel-gauged lumbar lock",
+        unit="°", value_at_100=170.0, value_at_0=0.0, bilateral=True,
+        setup="Supine on a bare hard floor or the SAME thin mat every session, knees bent, "
+              "feet flat. A folded hand towel of FIXED, RECORDED thickness under the lumbar "
+              "spine. Arms start at the sides, ELBOWS LOCKED STRAIGHT and THUMBS POINTING AT "
+              "THE CEILING. Raise both arms overhead toward the floor behind the head.",
+        lock="The towel, and it is binary and externally detectable: it is compressed at the "
+             "start and the trial is VOID the moment a finger slides under it. That matters "
+             "specifically here — symptom_log 2026-07-06 records that this athlete's internal "
+             "sense of neutral is calibrated to his habitual anterior tilt, so 'low back flat' "
+             "is precisely the judgement he gets wrong. It is also the L5/S1 safety gate.",
+        measurement="One photo per side from that side, phone on a marked spot at floor level "
+                    "≥1.5 m away, a ruler upright beside that wrist. Read the floor-to-ulnar-"
+                    "styloid gap, then derive flexion = 180 − arcsin(gap / L), where L is the "
+                    "acromion-to-styloid length frozen at session 1. The cm is the record; the "
+                    "angle is what scores.",
+        safety="Unloaded and self-limited. NEVER a partner pressing the arms down — passive "
+               "end-range pressure into a post-Latarjet shoulder whose stability is muscular "
+               "rather than ligamentous (finding #6). This is the athlete's own failed test: "
+               "he cannot rest both elbows on the floor with the arms overhead.",
+    ),
+    "chest_horizontal": RungTest(
+        key="chest_horizontal", label="Chest / pecs",
+        test_name="Wall slide — goalpost start-position contact (the athlete's own drill)",
+        unit="cm", value_at_100=0.0, value_at_0=15.0, bilateral=True,
+        setup="Back to a wall, heels 10-15 cm out, knees soft. Press the low back flat and pin "
+              "a sheet of A4 paper between the low back and the wall. Bring the arms to a "
+              "goalpost position and take them back toward the wall.",
+        lock="The pinned A4 sheet — self-verifying, because it drops the moment the low back "
+             "arches. Arching is how the shoulders reach the wall without any pec length.",
+        measurement="Horizontal gap from the wall to the back of the WRIST CREASE, L and R "
+                    "separately, to 0.5 cm.",
+        safety="The athlete already reports this drill as difficult, and it is the one place "
+               "the gym's 'Chest 106° Low' reading has a live successor.",
+        replaces="the doorway pec stretch and the supine 90/90 pec stretch — both hang the "
+                 "anterior capsule on an external frame, which is the apprehension position "
+                 "for this shoulder",
+    ),
+    "thoracic_rotation": RungTest(
+        key="thoracic_rotation", label="Thoracic rotation",
+        test_name="Side-lying modified open book — arms folded, top-shoulder descent",
+        unit="°", value_at_100=45.0, value_at_0=0.0, bilateral=True,
+        setup="Side-lying, hips and knees stacked and bent to 90°, knees resting on a folded "
+              "towel of the SAME thickness every time. Arms folded across the chest. Rotate "
+              "the top shoulder back toward the floor.",
+        lock="The pelvis — the bottom hand presses the top knee down and it must stay stacked. "
+             "An unlocked pelvis turns thoracic rotation into a lumbar roll.",
+        measurement="Vertical height from the floor to the top acromion at start (frozen at "
+                    "session 1) and at end range; the drop converts to degrees.",
+        safety="Arms FOLDED, not swept out to the floor behind — the classic open book ends in "
+               "90° abduction plus horizontal extension, the apprehension position.",
+        replaces="the classic open book with the top arm sweeping to the floor",
+    ),
+    "lumbar": RungTest(
+        key="lumbar", label="Lumbar control",
+        test_name="Supine lumbar flattening — residual floor-to-lumbar gap",
+        unit="cm", value_at_100=0.0, value_at_0=5.0, bilateral=False,
+        setup="Supine, both legs straight and together, arms at the sides, alongside a wall "
+              "with a 30 cm ruler taped upright at hip level. Actively flatten the low back "
+              "to the floor.",
+        lock="The feet and glutes — pushing through the heels turns the test into a leg press "
+             "and flattens the back without any lumbar control.",
+        measurement="Side-on photo from ≥1.5 m, phone on a marked spot at floor level, ruler in "
+                    "frame. Maximum vertical gap between the floor and the low back.",
+        safety="A posterior pelvic tilt is exactly what finding #3's training implication "
+               "prescribes to decompress the L5/S1 horizontal facet slides. Safe, and useful.",
+    ),
+    "lateral_trunk": RungTest(
+        key="lateral_trunk", label="Lateral trunk",
+        test_name="Wall-backed standing lateral flexion — fingertip travel",
+        unit="cm", value_at_100=20.0, value_at_0=0.0, bilateral=True,
+        setup="Heels, buttocks, upper back and head all touching a wall, feet on a traced floor "
+              "mark at hip width, arms hanging with palms flat against the outside of the "
+              "thighs. Slide one hand down the leg.",
+        lock="The wall — four points of contact. Coming off the wall converts side-bend into "
+             "flexion or rotation.",
+        measurement="Pen-mark the trouser seam at rest and at end range; measure the travel, "
+                    "L and R separately, to 0.5 cm.",
+        safety="rules.py rates side bending CAUTION in BOTH directions for DIFFERENT reasons — "
+               "right narrows the stenotic right L5/S1 foramen, left loads the dorsolateral "
+               "protrusions at L3/4 and L4/5. Light, self-generated, no reaching overhead.",
+    ),
+    "neck": RungTest(
+        key="neck", label="Neck (rotation)",
+        test_name="Supine cervical rotation to first firm resistance — inclinometer on the forehead",
+        unit="°", value_at_100=80.0, value_at_0=0.0, bilateral=True,
+        setup="Supine on a bare hard floor or the SAME thin mat every session, knees bent, "
+              "feet flat, arms at the sides. Phone strapped flat across the forehead with a "
+              "headband, levelled and zeroed face-up with the chin level. Turn the head slowly "
+              "to one side and stop at FIRST FIRM RESISTANCE — not as far as it will go.",
+        lock="Bodyweight plus the shoulder blades: both stay in floor contact for the whole "
+             "trial, which mechanically removes the trunk rotation a seated version has to "
+             "police. The chin stays level — tipping it buys apparent rotation, so record "
+             "pitch as well and void the trial if it moved more than 5°.",
+        measurement="Roll angle in degrees off the phone at first firm resistance, to 1°, L "
+                    "and R separately. Two attempts per side: the first is familiarisation, "
+                    "RECORD THE SECOND.",
+        safety="ACTIVE and self-generated only — NO hand overpressure on the head, ever. At "
+               "Beighton 6/9 the cervical spine is the last place to hang on ligament. Stopped "
+               "at first firm resistance rather than end range until the hEDS/HSD assessment "
+               "is done (patient_profile joint_notes: 'Possible HSD/hEDS-spectrum — not yet "
+               "assessed against 2017 criteria'), because craniocervical laxity is the one "
+               "thing that would matter here — put that question on the 2026-08-16 agenda. "
+               "NOTE THE GAP: cervical FLEXION is this athlete's documented dominant "
+               "restriction (symptom_log 2026-07-31, markedly left-dominant) and is "
+               "deliberately NOT measured on safety grounds, so this rung will not move when "
+               "his actual neck problem moves.",
+        replaces="a seated chin-to-acromion tape reading, whose own lock required both hands "
+                 "on the seat while its measurement required holding a tape",
+    ),
+    "squat_depth": RungTest(
+        key="squat_depth", label="Squat depth",
+        test_name="Bodyweight squat to first loss of neutral spine — hip crease vs knee height",
+        unit="cm", value_at_100=5.0, value_at_0=-20.0, bilateral=False,
+        setup="Barefoot, feet on a traced floor outline. Trace the feet ONCE, photograph the "
+              "outline, and reproduce the stance width and toe-out angle exactly every session. "
+              "Descend to the first loss of a neutral spine and stop there.",
+        lock="The traced outline — stance width and toe-out are the single largest source of "
+             "session-to-session drift in this test.",
+        measurement="Side-on photo at the deepest neutral-spine position, phone at ~knee height "
+                    "≥1.5 m away, tape taped vertically to the wall behind. Height of the hip "
+                    "crease relative to the top of the kneecap; below = positive.",
+        safety="Bodyweight only, never loaded. This is a COMPOSITE and is interpreted, not "
+               "independent — it is downstream of calves_ankle, adductors and hip_rotation, so "
+               "a low reading here is a symptom whose cause is one of those rungs.",
+    ),
+}
+
+
+@dataclass(frozen=True)
+class Skill:
+    """A goal position, and the ladder of rungs that could be limiting it.
+
+    `goal_level` is the rung level every rung must reach for the skill to be
+    considered achieved. `excluded_reason`, when set, means the skill is
+    tracked but must never be trained toward.
+    """
+    key: str
+    label: str
+    ladder: tuple[str, ...]
+    goal_level: float
+    gates: str
+    note: str = ""
+    excluded_reason: str = ""
+
+    @property
+    def excluded(self) -> bool:
+        return bool(self.excluded_reason)
+
+
+#: The four in-scope skills, chosen for transfer to the lifts already in the
+#: block rather than for gymnastics. The athlete's stated aim is to get "the
+#: muscle pulling in the right direction with nothing restricted" so his lifts
+#: work — not the splits.
+SKILLS: dict[str, Skill] = {
+    "deep_squat": Skill(
+        key="deep_squat", label="Deep squat",
+        ladder=("calves_ankle", "adductors", "hip_rotation", "lumbar", "quads"),
+        goal_level=70.0,
+        gates="Goblet squat, Bulgarian split squat",
+        note="squat_depth is the OUTCOME of this ladder, not a rung in it — including it "
+             "would let the symptom vote on its own diagnosis.",
+    ),
+    "hip_extension": Skill(
+        key="hip_extension", label="Hip extension",
+        ladder=("hip_flexors", "quads", "lumbar"),
+        goal_level=70.0,
+        gates="Hip thrust, RDL lockout, lunge",
+        note="The athlete's stated #1 problem: 'my hips are stuck in flexion with my back "
+             "arched'. lumbar is on this ladder because arching is how hip extension gets "
+             "faked, so a good lumbar score is a precondition for trusting hip_flexors.",
+    ),
+    "shoulder_flexion": Skill(
+        key="shoulder_flexion", label="Shoulder flexion",
+        ladder=("shoulders_overhead", "chest_horizontal", "thoracic_rotation", "lumbar"),
+        goal_level=70.0,
+        gates="Overhead work (currently prohibited), lat pulldown path",
+        note="LADDER INCOMPLETE — nothing here isolates the LATS, the classic overhead "
+             "limiter. chest_horizontal catches pec length and shoulders_overhead is the "
+             "composite; neither separates the lat out. Flagged rather than papered over, "
+             "because this is a skill the athlete named as a problem. The isolation trick is "
+             "known (lats are the only one of the three crossing the lower back, so rounding "
+             "the lumbar spine while reaching overhead isolates them relatively) — it needs a "
+             "14th rung and the athlete's sign-off.",
+    ),
+    "active_pike": Skill(
+        key="active_pike", label="Active pike",
+        ladder=("hamstrings", "lumbar"),
+        goal_level=70.0,
+        gates="RDL, hinge pattern",
+        note="The PASSIVE version is already achieved — palms flat to floor is a Beighton "
+             "positive — and is also contraindicated as a test (seated forward fold). The "
+             "active version is unmeasured, and that gap is the whole thesis of this model.",
+    ),
+    # ── tracked, never trained toward ────────────────────────────────────────
+    "bridge": Skill(
+        key="bridge", label="Bridge",
+        ladder=("hip_flexors", "shoulders_overhead", "thoracic_rotation"),
+        goal_level=70.0,
+        gates="—",
+        excluded_reason="End-range lumbar extension against L5/S1 retrolisthesis and activated "
+                        "osteochondrosis; services.rules already contraindicates "
+                        "'hyperextension' and 'back extension'. Its COMPONENTS are exactly what "
+                        "this athlete needs and remain rungs elsewhere — only the composite "
+                        "goal is refused.",
+    ),
+    "shoulder_extension": Skill(
+        key="shoulder_extension", label="Shoulder extension",
+        ladder=("chest_horizontal", "shoulders_overhead"),
+        goal_level=70.0,
+        gates="—",
+        excluded_reason="The apprehension direction for an anterior-instability shoulder "
+                        "post-Latarjet (finding #6). Tracked so regression is visible; never a "
+                        "target to maximise.",
+    ),
+}
+
+#: Skills that may be trained toward.
+ACTIVE_SKILLS: tuple[str, ...] = tuple(k for k, s in SKILLS.items() if not s.excluded)
+
+
+# ── the flexibility window ───────────────────────────────────────────────────
+#
+# From the athlete's source brief. The MECHANISM it offers (calcium accumulation
+# -> calpain -> fibre damage -> inflammation -> central fatigue) is stated well
+# past what the evidence carries and is recorded as MOTIVATION, NOT FACT — the
+# same treatment services/sleep_fusion.py gives the abandoned quiet-wake rule.
+# The scheduling heuristic is worth encoding regardless and is computable from
+# the training log the app already holds.
+#
+# ADVISORY ONLY. Nothing here reaches the engine — not the traffic light, not
+# ACWR, not readiness, not the volume recommendation.
+
+WINDOW_GOOD = "good"
+WINDOW_OK = "ok"
+WINDOW_POOR = "poor"
+
+WINDOW_RULES: dict[str, str] = {
+    WINDOW_GOOD: "2+ days after hard sport or strength, or the same day PM after an AM session "
+                 "(the fatigue signal has not landed yet)",
+    WINDOW_OK:   "immediately after sport or strength, with the volume of both reduced",
+    WINDOW_POOR: "the day after strength, or slotted into a rest day as 'active recovery' — "
+                 "which the source argues it is not",
+}
+
+#: A rest day is the WORST slot for adaptation-seeking flexibility work and a
+#: perfectly good slot for a restorative flow. Nothing in the codebase currently
+#: distinguishes the two — views/training.py's suggest_for_day("rest_day") offers
+#: a session on exactly the day this rule calls worst. Resolving that needs an
+#: intent flag on the session, which is why this constant exists rather than a
+#: silent assumption.
+REST_DAY_CONFLICT_UNRESOLVED: bool = True
+
+
+# ── provenance: what existed before v2 ───────────────────────────────────────
+
 SCAN_DATE: date = date(2025, 1, 17)
-
-#: Chronological age ON THE SCAN DATE, not today. Recorded because the vendor
-#: screen gets exactly this wrong. DOB 1994-10-19.
 AGE_AT_SCAN_YEARS: int = 30
-
-#: What the vendor's own screen displayed, kept only so the defect above stays
-#: auditable. Nothing reads these two for any computation, and a test enforces
-#: that no flexibility age in years is ever produced from them.
 VENDOR_BIOAGE_YEARS: int = 28
 VENDOR_BIOAGE_COMPARED_AGAINST_AGE: int = 31
 
 
 @dataclass(frozen=True)
-class RegionBaseline:
-    """One isolated-ROM row off the vendor screen.
+class LegacyGymReading:
+    """A 2025-01-17 gym goniometry row, kept as PROVENANCE ONLY.
 
-    left_deg/right_deg are as printed. `protocol` is the movement that produced
-    them and is None until the gym supplies the list. `reference_band` is
-    (lo, hi) in degrees of the IDEAL range — full marks inside it, penalised
-    below it, and penalised above it too, because for a hypermobile athlete
-    more range is not automatically better. None means UNSCOREABLE.
+    None of these enter a score. Their protocol is unrecorded — the screen
+    printed degrees per region and never said which movement produced them — so
+    'Hip 33°' corroborates a different clinical finding depending on whether it
+    is internal rotation, abduction or a Thomas test. v1 assumed protocols and
+    scored them anyway; v2 does not, and the v2 tests above supersede all five.
     """
-    key: str
     label: str
-    left_deg: float | None
-    right_deg: float | None
-    vendor_verdict: str | None          # "Low" | "Normal" | None — provenance only
-    protocol: str | None                # None = unrecorded
-    assumed_protocol: str | None        # what reference_band was chosen for
-    reference_band: tuple[float, float] | None
-    provisional: bool                   # True while protocol is None
-    symmetry_suspect: bool = False
+    left: float
+    right: float
+    vendor_verdict: str
+    superseded_by: str
     note: str = ""
 
-    @property
-    def mean_deg(self) -> float | None:
-        sides = [s for s in (self.left_deg, self.right_deg) if s is not None]
-        return sum(sides) / len(sides) if sides else None
 
-    @property
-    def asymmetry_deg(self) -> float | None:
-        if self.left_deg is None or self.right_deg is None:
-            return None
-        return abs(self.left_deg - self.right_deg)
-
-
-#: The eight regions the vendor screen lays out, in its own order. Three carry
-#: no instrumented reading at all — they are the "Functional flexibility
-#: results" rows, all of which read "No data yet". They are kept as entries
-#: rather than omitted so that coverage is visible instead of invisible.
-REGION_BASELINES: dict[str, RegionBaseline] = {
-    "neck": RegionBaseline(
-        key="neck", label="Neck",
-        left_deg=30.0, right_deg=30.0, vendor_verdict="Low",
-        protocol=None, assumed_protocol="cervical lateral flexion",
-        reference_band=(40.0, 50.0), provisional=True, symmetry_suspect=True,
-        note="30 deg is low for lateral flexion (normal ~45) and severely low for "
-             "rotation (normal ~80), so the verdict is consistent with either. "
-             "Independently, symptom_log 2026-07-31 records ASYMMETRIC cervical "
-             "flexion tightness, left-dominant — which the exactly-equal 30/30 "
-             "does not show. That assessment is 18 months later, so this is not "
-             "necessarily a contradiction, but it is the second reason to doubt "
-             "the perfect symmetry.",
-    ),
-    "chest": RegionBaseline(
-        key="chest", label="Chest",
-        left_deg=106.0, right_deg=106.0, vendor_verdict="Low",
-        protocol=None, assumed_protocol="supine shoulder flexion",
-        reference_band=(160.0, 180.0), provisional=True, symmetry_suspect=True,
-        note="See the module docstring — exact bilateral equality is least "
-             "plausible here of anywhere on the sheet, given finding #6.",
-    ),
-    "lat_flex": RegionBaseline(
-        key="lat_flex", label="Lat Flex",
-        left_deg=20.0, right_deg=21.0, vendor_verdict="Normal",
-        protocol=None, assumed_protocol=None,
-        reference_band=None, provisional=True,
-        note="UNSCOREABLE by design. 'Normal' at 20-21 deg contradicts the "
-             "obvious reading of the label (trunk lateral flexion, normal "
-             "35-45). Do not guess a band out of a contradiction.",
-    ),
-    "hip": RegionBaseline(
-        key="hip", label="Hip",
-        left_deg=33.0, right_deg=32.0, vendor_verdict="Low",
-        protocol=None, assumed_protocol="hip internal rotation",
-        reference_band=(35.0, 45.0), provisional=True,
-        note="Internal rotation assumed because the vendor called it Low, which "
-             "rules out a Thomas-test reading (normal 10-20, where 33 would be "
-             "excellent). If it IS internal rotation, low bilaterally "
-             "corroborates the tight posterior capsule and piriformis in "
-             "imbalances.overactive_tight.",
-    ),
-    "hamstrings": RegionBaseline(
-        key="hamstrings", label="Hamstrings",
-        left_deg=89.0, right_deg=86.0, vendor_verdict="Normal",
-        protocol=None, assumed_protocol="passive straight-leg raise",
-        reference_band=(80.0, 90.0), provisional=True,
-        note="Best-supported of the five assumptions: SLR normal is 80-90 and "
-             "the vendor's 'Normal' agrees. This is the reading that reconciles "
-             "with the 25/100 straddle fold — see patient_profile.py symptom_log "
-             "2026-08-05. Normal length with NO RESERVE, not shortness: "
-             "long-sitting upright is already ~90 deg of hip flexion with the "
-             "knee straight, so at 86-89 he is at the limit merely sitting up. "
-             "If this is actually a popliteal-angle test, that reconciliation "
-             "needs redoing.",
-    ),
-    "squat_depth": RegionBaseline(
-        key="squat_depth", label="Squat Depth",
-        left_deg=None, right_deg=None, vendor_verdict=None,
-        protocol=None, assumed_protocol=None, reference_band=None,
-        provisional=False,
-        note="'No data yet' on the device. NOT to be filled from the 2025 "
-             "training log's 'mobility excellent, hits depth easily' — that is "
-             "a qualitative note, not a measurement, and writing it here would "
-             "be the same error as fusing the scale's body fat with the "
-             "InBody's. The yoga flow has no squat pose either, so this region "
-             "is genuinely uncovered on both axes.",
-    ),
-    "back": RegionBaseline(
-        key="back", label="Back",
-        left_deg=None, right_deg=None, vendor_verdict=None,
-        protocol=None, assumed_protocol=None, reference_band=None,
-        provisional=False,
-        note="'No data yet' on the device. Covered on the Control axis by the "
-             "yoga flow's twists and folds.",
-    ),
-    "shoulders": RegionBaseline(
-        key="shoulders", label="Shoulders",
-        left_deg=None, right_deg=None, vendor_verdict=None,
-        protocol=None, assumed_protocol=None, reference_band=None,
-        provisional=False,
-        note="'No data yet' on the device. Covered on the Control axis by Down "
-             "Dog, Walk the Dog and the two hip openers.",
-    ),
-}
-
-#: Display order, as the vendor lays it out: functional block first, then
-#: isolated. Kept so our screen can mirror the one the athlete already reads.
-FUNCTIONAL_REGIONS: tuple[str, ...] = ("squat_depth", "back", "shoulders")
-ISOLATED_REGIONS: tuple[str, ...] = ("neck", "chest", "lat_flex", "hip", "hamstrings")
+LEGACY_GYM_READINGS: tuple[LegacyGymReading, ...] = (
+    LegacyGymReading("Neck", 30.0, 30.0, "Low", "neck",
+                     "Exactly equal L/R while three other rows differ by 1-3°."),
+    LegacyGymReading("Chest", 106.0, 106.0, "Low", "chest_horizontal",
+                     "Exactly equal L/R is the least plausible reading on the sheet given "
+                     "three right anterior dislocations and a Latarjet."),
+    LegacyGymReading("Lat Flex", 20.0, 21.0, "Normal", "lateral_trunk",
+                     "'Normal' at 20-21° contradicts the obvious reading of the label."),
+    LegacyGymReading("Hip", 33.0, 32.0, "Low", "hip_rotation"),
+    LegacyGymReading("Hamstrings", 89.0, 86.0, "Normal", "hamstrings",
+                     "The one reading whose successor test measures the same thing the same "
+                     "way; it predicts a v2 passive SLR near 90°."),
+)
 
 
-#: Share of the overall score each region carries. Documented prior, not fitted
-#: — there is one instrumented date, so nothing could be fitted. Weighted toward
-#: this athlete's clinical centre: lumbar spine (L3-S1 protrusions, activated
-#: L5/S1 osteochondrosis) and hips (Coxa Saltans, tight posterior capsule,
-#: upper-glute gripping) carry the most, and both are where symptoms actually
-#: appear. Revisit only with a reason, and record the reason.
-REGION_WEIGHT: dict[str, float] = {
-    "hip":         0.20,
-    "back":        0.20,
-    "hamstrings":  0.15,
-    "shoulders":   0.15,
-    "neck":        0.10,
-    "chest":       0.08,
-    "lat_flex":    0.07,
-    "squat_depth": 0.05,
-}
-
-
-#: Which yoga poses inform which region's CONTROL axis, and how strongly.
-#: Weights per pose sum to 1.0 so no pose counts more than once in total.
+#: The 22 yoga depth-ratings from 2026-08-05. RETAINED IN FULL as a dated
+#: historical instrument with the athlete's verbatim notes in
+#: docs/training/Yoga_Library.md — and used by NOTHING.
 #:
-#: Same pattern as training_constants.EXERCISE_BODY_REGION — and the SAME
-#: failure mode: a pose missing from this dict is silently excluded from every
-#: region total. services.flexibility.control_axis returns the unmapped pose
-#: names as part of its result for exactly that reason, which is the cheapest
-#: way to notice. Savasana is deliberately absent: it is not a stretch.
-POSE_REGION_WEIGHT: dict[str, dict[str, float]] = {
-    "Seated Cross-Legged Side Bend (Shoulder Drop)": {"lat_flex": 0.6, "back": 0.3, "neck": 0.1},
-    "Seated Side Stretch (Right)":                   {"lat_flex": 0.7, "back": 0.3},
-    "Seated Side Stretch (Left)":                    {"lat_flex": 0.7, "back": 0.3},
-    "90/90 Hip Rotation":                            {"hip": 1.0},
-    "Butterfly Forward Fold":                        {"hip": 0.5, "back": 0.5},
-    "Walk the Dog (Down Dog pedaling)":              {"hamstrings": 0.6, "shoulders": 0.4},
-    "Deep Lunge (Right)":                            {"hip": 1.0},
-    "Deep Lunge Hip Opener (Right)":                 {"hip": 0.6, "back": 0.2, "shoulders": 0.2},
-    "Half Pigeon Pose (Right)":                      {"hip": 1.0},
-    "Seated Twist (Left)":                           {"back": 1.0},
-    "Down Dog":                                      {"shoulders": 0.5, "hamstrings": 0.3, "back": 0.2},
-    "Deep Lunge (Left)":                             {"hip": 1.0},
-    "Deep Lunge Hip Opener (Left)":                  {"hip": 0.6, "back": 0.2, "shoulders": 0.2},
-    "Half Pigeon Pose (Left)":                       {"hip": 1.0},
-    "Seated Twist (Right)":                          {"back": 1.0},
-    "Straddle Forward Fold":                         {"hamstrings": 0.5, "hip": 0.3, "back": 0.2},
-    "Knee to Chest (Right)":                         {"hip": 0.7, "back": 0.3},
-    "Lying Twist (Right)":                           {"back": 0.7, "hip": 0.3},
-    "Knee to Chest (Left)":                          {"hip": 0.7, "back": 0.3},
-    "Lying Twist (Left)":                            {"back": 0.7, "hip": 0.3},
-    "Happy Baby":                                    {"hip": 0.8, "back": 0.2},
-}
-
-#: Poses with no region mapping, stated rather than left implicit.
-UNMAPPED_POSES: frozenset[str] = frozenset({"Deep Relaxation (Savasana)"})
-
-
-#: The 2026-08-05 self-rated depth ratings, 1-100, one per pose. 1 = can barely
-#: enter the position, 100 = at the physical limit with no stretch sensation
-#: left. Athlete's own scale and own numbers; full table with his verbatim
-#: reasons in docs/training/Yoga_Library.md.
-#:
-#: NOTE the scale's 100 is NOT the overall score's 100. On this scale 100 means
-#: "at the end of what is physically possible"; on the overall it means "ideal".
-#: services.flexibility.control_score is the transform between them, and it is
-#: the whole reason the two axes exist.
-POSE_DEPTH_RATING_2026_08_05: dict[str, int] = {
+#: They answer a question that is neither passive range nor active range ("how
+#: far did I get AND how much did I feel"), so reinterpreting any of them as an
+#: achievement or a control reading would be inventing data. 0 of 13 rungs
+#: inherit a value from them. A test pins that.
+LEGACY_POSE_DEPTH_RATINGS_2026_08_05: dict[str, int] = {
     "Seated Cross-Legged Side Bend (Shoulder Drop)": 40,
-    "Seated Side Stretch (Right)":                   60,
-    "Seated Side Stretch (Left)":                    65,
-    "90/90 Hip Rotation":                            85,
-    "Butterfly Forward Fold":                        82,
-    "Walk the Dog (Down Dog pedaling)":              76,
-    "Deep Lunge (Right)":                            57,
-    "Deep Lunge Hip Opener (Right)":                 46,
-    "Half Pigeon Pose (Right)":                      40,
-    "Seated Twist (Left)":                           66,
-    "Down Dog":                                      64,
-    "Deep Lunge (Left)":                             57,
-    "Deep Lunge Hip Opener (Left)":                  46,
-    "Half Pigeon Pose (Left)":                       40,
-    "Seated Twist (Right)":                          68,
-    "Straddle Forward Fold":                         25,
-    "Knee to Chest (Right)":                         85,
-    "Lying Twist (Right)":                           85,
-    "Knee to Chest (Left)":                          88,
-    "Lying Twist (Left)":                            88,
-    "Happy Baby":                                    80,
-    "Deep Relaxation (Savasana)":                   100,
+    "Seated Side Stretch (Right)": 60, "Seated Side Stretch (Left)": 65,
+    "90/90 Hip Rotation": 85, "Butterfly Forward Fold": 82,
+    "Walk the Dog (Down Dog pedaling)": 76, "Deep Lunge (Right)": 57,
+    "Deep Lunge Hip Opener (Right)": 46, "Half Pigeon Pose (Right)": 40,
+    "Seated Twist (Left)": 66, "Down Dog": 64, "Deep Lunge (Left)": 57,
+    "Deep Lunge Hip Opener (Left)": 46, "Half Pigeon Pose (Left)": 40,
+    "Seated Twist (Right)": 68, "Straddle Forward Fold": 25,
+    "Knee to Chest (Right)": 85, "Lying Twist (Right)": 85,
+    "Knee to Chest (Left)": 88, "Lying Twist (Left)": 88,
+    "Happy Baby": 80, "Deep Relaxation (Savasana)": 100,
 }
+LEGACY_DEPTH_RATING_DATE: date = date(2026, 8, 5)
 
-#: When the depth ratings above were taken.
-DEPTH_RATING_DATE: date = date(2026, 8, 5)
+
+# ── recorded assessments ─────────────────────────────────────────────────────
+
+@dataclass(frozen=True)
+class RungReading:
+    """One rung, one session. Any measure may be absent."""
+    rung: str
+    passive: float | None = None
+    isometric: float | None = None
+    active: float | None = None
+    side: str = ""          # "left" | "right" | "" for midline
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class Assessment:
+    taken_on: date
+    readings: tuple[RungReading, ...] = field(default_factory=tuple)
+    cold: bool = True
+    note: str = ""
+
+
+#: Every assessment ever run, oldest first. EMPTY — the standalone assessment
+#: has not been run yet, which is the honest state: 0 of 13 rungs have a passive
+#: reading, and 0 of 13 have an isometric or active one, so the gap metric that
+#: is the entire point of v2 has no data at all. Until this list is non-empty,
+#: the assessment is not an enhancement to the model — it IS the model.
+ASSESSMENTS: tuple[Assessment, ...] = ()
