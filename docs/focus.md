@@ -4,15 +4,15 @@
 
 ---
 
-## Current State (2026-08-04)
+## Current State (2026-08-05)
 
 | Item | Value |
 |------|-------|
 | Stage | **Stage 2** — Transition (external load) |
 | Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
-| Day | **Day 16 of 28** |
-| Gate | **1475/1475** — `python -m pytest tests/` |
-| Last code commit | `7adab3b` — chart axis fitting + `tests/test_chart_axes.py` (`services/dashboard.py`, `styles.py`, `app.py`) |
+| Day | **Day 17 of 28** |
+| Gate | **1515/1515** — `python -m pytest tests/` |
+| Last code commit | `da56f17` — Metabolism BioAge screen (`services/body_composition.py`, `body_composition_baselines.py`, `views/insights.py`) |
 | Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required |
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
@@ -80,8 +80,40 @@ non-diagnostic until a stage has that many days behind it.
    `training_constants.EXERCISE_MOVEMENT_WEIGHT` (or they fall back to
    `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflate Strain/ACWR — this already
    happened once, across 34 of 63 Stage 1 exercise names).
-5. Run `python -m pytest tests/` — 1475/1475 or higher.
+5. Run `python -m pytest tests/` — 1515/1515 or higher.
 6. Update this file: block, day, gate, next action.
+
+---
+
+## Time-Limited: the InBody bridge scan
+
+**The gym is replacing its InBody 770 (~Sept 2026). One visit, and it expires
+when the old machine leaves the floor.**
+
+Under the never-pool-two-devices rule, a reading on the new machine cannot be
+compared with the five corrected 2025 scans unless both machines measure the
+same body on the same morning. Miss it and that history is permanently
+orphaned and the lean-mass clock restarts at zero — the same lesson the
+Garmin 645 → 265 movement-calibration refit records in CLAUDE.md.
+
+One morning, fasted, before training:
+
+1. Confirm **182.0 cm** is entered — check it before the operator starts. Four
+   of the five 2025 scans were run against a wrong height, at −0.89 pp of body
+   fat per centimetre.
+2. Scan on the **old 770**.
+3. Scan on the **old 770 again**, ~8 minutes later. This is the only estimate
+   you will ever get of that machine's own test-retest spread, and it is the
+   input to every later threshold. The existing 8-minute pair is confounded by
+   the height re-type and cannot serve.
+4. Scan on the **new machine**.
+5. Take a **tape baseline** — waist and hip. Compare against the InBody's
+   estimated 82.8 cm / 0.84.
+6. Keep the **print-out**, not the app summary: the app drops the raw impedance
+   table, the scan history, the waist and the fitness score.
+
+Record the model and serial with every row. Add the new scans to
+`body_composition_baselines.py`.
 
 ---
 
@@ -98,6 +130,11 @@ non-diagnostic until a stage has that many days behind it.
       `Repository.hrv_blend_status()` reporting `ready` (≥14 paired nights)
       with an acceptable `mean_bias`/`sd_bias`. Blocked on a watch that reports
       HRV — the 645 does not.
+- [ ] Does the Foryond use height in its body-fat model at all? The setting was
+      corrected 183 → 182 cm on 2026-08-05 and the export did **not**
+      back-apply, so the next weigh-in is the test: BMI must step **+0.27**; if
+      body fat also steps about **+0.9 pp**, height is in its model too. Either
+      way that step is a setting, never fat gain.
 
 *Resolved since Stage 1: Apple Health sync — Sheet1/Apple Health is retired
 from the live pipeline; the engine's biometric source is the Oura+Garmin blend

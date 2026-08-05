@@ -1,12 +1,12 @@
 {
   "schema": "health-engine-progress/v1",
-  "last_updated": "2026-08-03",
+  "last_updated": "2026-08-05",
   "project": "Health Engine — Codebase Review & Refiling",
   "scope_note": "This file tracks the four-phase codebase review/refiling effort that completed 2026-06-30. It is NOT a live project tracker — for current stage, block and next action see docs/focus.md. Only the gate block and any problem whose status has since changed are kept current here.",
   "gate": {
     "command": "python -m pytest tests/",
-    "passing": 1290,
-    "total": 1290,
+    "passing": 1515,
+    "total": 1515,
     "note": "Treat as a floor, not an exact match — the count grows as tests are added. Set HEALTH_DATASTORE_PATH=datastore.db to run offline at zero Sheets API cost."
   },
   "phases": {
@@ -159,7 +159,10 @@
     },
     {
       "action": "Commit or gitignore untracked assets",
-      "files": ["Oura_template.jpg", "background_templates/"],
+      "files": [
+        "Oura_template.jpg",
+        "background_templates/"
+      ],
       "status": "done — both committed; background_templates/ tracks 24 files, verified 2026-08-03"
     }
   ]

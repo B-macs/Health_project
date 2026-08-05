@@ -16,6 +16,7 @@ Build a highly private, data-driven Health and Performance Application that elim
 | **Database** | Local SQLite | Notion API — 4 databases | Notion selected; SQLite schema preserved in resume.md for reference but not in use |
 | **Biometrics source** | Manual Apple Health entry on Autoregulation page | Blended Oura + Garmin read (`services/biometrics.py`) — Oura 70%/Garmin 30% for RHR and sleep duration, Garmin 80%/Oura 20% for steps. **HRV is held at Oura-only** (`HRV_GARMIN_HOLD = True`): `blend_biometric_day` routes HRV around `blend_metric` entirely, so the declared 70/30 HRV weighting has never once run, and a Garmin-only night yields `None` rather than a wrist value rescaling a finger-baselined series. Lift it on a measurement, not a date — `Repository.hrv_blend_status()` | Apple Health auto-export (Sheet1) proved unreliable; Oura/Garmin were already integrated archivally, so the engine now reads a weighted blend of both instead. Sheet1 is historical-only (one-time backfill source) |
 | **Training entry** | Manual session logging via Training Entry page | Auto-logged by Training Plan on session completion | Training Entry page removed; logging is triggered by completing a guided day |
+| **Body composition** | Not in the original spec | Two devices in **separate lanes**, display-only, never blended and never wired to the engine (`services/body_composition.py`, 2026-08-05) | The home scale contributes exactly one measurement — weight — since its body fat percent is fitted from weight and age; the gym's InBody measures genuinely but was run against four different typed heights. Blending them would invent agreement, and neither is measured on a cadence that could safely inform a training decision |
 
 ---
 
@@ -91,6 +92,7 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `strength.py` | The Overall Strength Score — estimated 1RM against a fixed 2025 baseline (`strength_baselines.py`), plus the regional split. Currently in calibration: every index displays at 50. Measured performance can only push the level UP; the only downward force is detraining decay. |
 | `tonnage.py` | Weekly work completed, in kg, overall and per body sector. A **separate** metric from `strength.py` sharing no term with it. No decay. Unloaded work counted in reps and seconds, never converted to kg. |
 | `bioage.py` | One function — the muscle-imbalance count. The Stage-Adjusted Recovery Score it used to hold was deleted 2026-08-04 (its docstring says why; a test fails if the names return). |
+| `body_composition.py` | The Metabolism screen's backend (2026-08-05). Parses the Foryond scale export, corrects the InBody 770's typed-height defect via `InBodyScan.at_height`, and supplies calendar-aligned `period_window` / `can_step` / `split_runs`. Stores three fields and lists the rest in `DERIVED_COLUMNS` — see BODY COMPOSITION below for the locked decisions, including the two things it refuses to compute. |
 | `biometrics.py` | Oura+Garmin blend, nap handling (`split_sleep_periods`, `dedupe_sleep_periods`, `NAP_MIN_SECONDS`), and `HRV_GARMIN_HOLD`. |
 | `background_sync.py` | `BackgroundSyncRunner` — runs device syncs off the Streamlit script thread. Builds its OWN `Repository` per run and never touches `st.*`. |
 | `stats.py` | Deterministic statistical analysis — lag correlations, slopes, recovery direction. |
@@ -420,9 +422,115 @@ Sync.
 | `sleep_duration_hours` | Sleep Periods tab, **DAY TOTAL**: the deduped main sleep period **plus every remaining nap ≥ `biometrics.NAP_MIN_SECONDS` (900 s)**, ÷ 3600. The main period's own `total_sleep_duration` is kept separately as `oura_sleep_total_seconds`, the REM/deep denominator — duration counts naps, architecture does not | Daily tab `sleep_hours` | Oura 70% / Garmin 30% |
 | `steps` | Daily tab `steps` (from `daily_activity`) | Daily tab `steps` | Garmin 80% / Oura 20% |
 
-`weight_kg`, `active_kcal`, `sleep_deep_hours` are out of scope for the blend
-(nothing in `engine.py`/`stats.py`/`insights.py` reads them) and are `None`
-on blended records.
+`active_kcal` and `sleep_deep_hours` are out of scope for the blend (nothing in
+`engine.py`/`stats.py`/`insights.py` reads them) and are `None` on blended
+records. `weight_kg` is also `None` here and stays that way: body composition
+has its own pipeline and is deliberately **not** part of the biometric blend —
+see below.
+
+---
+
+## BODY COMPOSITION (2026-08-05)
+
+`services/body_composition.py` + `body_composition_baselines.py` +
+`views/insights.py::_render_metabolism_detail`. Display-only. **Nothing here
+feeds the engine** — not the traffic light, not ACWR, not readiness, not the
+volume recommendation — and it must not, until composition is measured on a
+fixed cadence. Body composition is not a safety input (Key Rule 2).
+
+### Two devices, kept in separate lanes — permanently
+
+| | Foryond foot-only scale | InBody 770 (gym) |
+|---|---|---|
+| Source | `Input_files/Fitdays-Brian.csv`, gitignored | paper print-out, no export path |
+| Cadence | near-daily when the habit holds | five scans, then nothing for 404 days |
+| Real measurements | **weight, and nothing else** | segmental impedance |
+| Unique to it | — | **phase angle, ECW/TBW** |
+
+They are never blended. Measured across five paired dates the weight gap
+averages **+0.24 kg** (sd 0.35) and on 2025-05-21 both read 79.5 kg exactly —
+but everything else they *estimate* separately, so a fused number would invent
+an agreement that is not there. Weight is the only quantity they may share.
+
+### The scale's fourteen columns are one measurement
+
+Its body fat percent is itself fitted from weight and age at **R² 0.9966**,
+residual **0.051 pp** against the 0.1 pp step it prints — and it read 78.8 kg
+on three occasions across 111 days and printed 16.0% every time. Every other
+column reproduces from weight to inside its own display precision: BMR is
+Katch-McArdle on fat-free mass, skeletal muscle % is `77.80 − BMI`, bone is
+4.994% of fat-free mass, and so on. `DERIVED_COLUMNS` lists all of them and a
+test fails if any becomes a stored field. One number presented as fourteen
+agreeing measurements is how a screen misleads without stating anything false.
+
+### The InBody height defect, and why the fix is a correction not a dismissal
+
+InBody derives total body water from `k · height² / R`, then fat-free mass as
+`TBW / 0.73450`, then fat as the remainder — so **height enters squared, in the
+first step**, at a measured **−0.89 pp of body fat per centimetre**. The gym
+typed a different height on four of five scans; back-solving `√(weight ÷ BMI)`
+recovers **185.5, 175.1, 174.9, 181.6, 181.8 cm** against a true **182.0**.
+
+The proof needs no fitting: two scans **eight minutes apart** on 2025-05-21
+report 20.0% and 14.0% body fat at an identical 79.5 kg, because BMI moved
+while weight did not.
+
+`InBodyScan.at_height` re-runs a scan through the device's own chain at 182 cm.
+What matters is what survives it:
+
+- the eight-minute pair goes from **6.0 pp apart to 0.31 pp**
+- the five-scan spread falls **8.2 → 4.64 pp**
+- 13 Jan → 27 Jun 2025 becomes **−4.22 kg fat, +0.72 kg lean** on a −3.5 kg
+  weight change — three figures that reconcile exactly, inside the year's
+  strongest training block
+- no height exponent between 0 and 6 removes the residual
+
+**Correcting a measurement is not the same as dismissing it.** The correction
+is what made the real recomposition visible.
+
+### Phase angle and ECW/TBW are the only height-immune readings
+
+Both are quotients of directly measured quantities — `arctan(Xc/R)` and a ratio
+of two volumes — so no value typed at a console can move either. Phase angle
+read **6.1° on all three scans that report it** while printed body fat went
+20.0 → 14.0 → 11.8%; ECW/TBW held **0.375–0.379** across all five. They get
+their own block on the screen, above the derived cards, and tests pin that
+`at_height` leaves them untouched.
+
+### Refused, with tests
+
+1. **A fused body-fat number across the two devices.** The scale contributes no
+   composition information, so fusing adds a term with no signal and would make
+   the result look more certain than the InBody alone.
+2. **Any composition expressed in years.** The scale already ships one:
+   `−20.73 + 1.226·body_fat% + 0.900·chronological age`. That is age predicting
+   age.
+
+Both are the Stage-Adjusted Recovery Score's mistake in a new place — a
+plausible formula over inputs too weak to carry it. `test_body_composition.py`
+fails if either name reappears.
+
+### Known limits, deliberately not solved yet
+
+- **Cross-device calibration is infeasible at this cadence.** The body-fat gap
+  has sd 3.30 pp across five pairings; the mean offset needs **11 paired scans**
+  for SE < 1.0 pp and **44** for SE < 0.5. At monthly gym visits that is a year
+  and four years. Segregate rather than calibrate.
+- **The training log cannot produce kilograms of lean mass.** No calibrated
+  within-person e1RM→kg mapping exists, the chain would be e1RM → regional CSA
+  → whole-body lean (two lossy conversions), and the log records no per-set
+  laterality so it cannot be matched to the InBody's left/right segments. The
+  intended use is a **consistency gate** — flagging a scan whose regional lean
+  change contradicts regional strength — not an input to a fused number.
+- **A block-level lean readout is arithmetically pointless.** Published
+  two-scan minimal difference for InBody fat-free mass is 1.60–2.32 kg against
+  a plausible 28-day signal of ≤1 kg. And BIA fat-free mass *is* a water
+  measurement, so returning to loaded training repletes glycogen and its bound
+  water by 1–2 kg with no new contractile protein.
+- **A 183 → 182 cm discontinuity exists in the scale series** from 2026-08-05.
+  The re-export did not back-apply, so all 142 historical rows remain at 183.0.
+  The next reading steps **BMI +0.27** guaranteed, and possibly **+0.9 pp** body
+  fat, from the setting alone. That step is a setting, never fat gain.
 
 ---
 
@@ -594,6 +702,8 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 | **14** | Stage 2 Training Entry (barbell/cable — external load) | COMPLETE ✅ — live since 2026-07-20; weighted sets logged across all three body regions |
 | **15** | Stage 2B / next block | PENDING — three decisions due at the Day 28 reassessment (2026-08-16): Stage 2B vs. extending 2A, running introduction, endurance-biased scapular programming. See `docs/focus.md`. |
 | **16** | Strength metric — capacity and volume, separated | COMPLETE ✅ (2026-08-04) — `services/strength.py` (Overall Strength Score: estimated 1RM vs the 2025 baselines in `strength_baselines.py`, currently in calibration at 50) and `services/tonnage.py` (weekly kg by body sector). They share no term, so a heavier week cannot raise the score and a rest week cannot lower it. Replaced the Stage-Adjusted Recovery Score, which was deleted — it could only ever read 100 |
+| **17** | Metabolism BioAge screen | COMPLETE ✅ (2026-08-05) — `services/body_composition.py`, `body_composition_baselines.py`, `views/insights.py::_render_metabolism_detail`. Two devices in separate lanes, the InBody's typed-height defect corrected rather than dismissed, and the two height-immune readings (phase angle, ECW/TBW) surfaced above the derived cards. Display-only; see BODY COMPOSITION above for the locked decisions and the two refusals |
+| **18** | Body-composition accuracy layer | DEFERRED to 2027 (user decision, 2026-08-05) — revisit once a year of standardised readings exists. The design is recorded: weigh 4–5×/week under fixed conditions (protocol standardisation is worth 24% at zero extra weigh-ins, against 33% for tripling frequency), a monthly tape baseline as the one fat signal independent of impedance, and the training log as a **consistency gate** rather than an input. The bridge scan is the only time-limited piece — see below |
 
 ---
 
