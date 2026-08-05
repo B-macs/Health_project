@@ -124,6 +124,37 @@ Record the model and serial with every row. Add the new scans to
 - [ ] Is the left interscapular load a compensation worth loading **on the
       left**, or a consequence of the documented **right** eccentric-control
       deficit? Determines which side gets programmed — see the physio brief.
+- [ ] Specialization / high-frequency cycle (the daily-training experiment) —
+      **deferred past the Day 28 reassessment by athlete decision 2026-08-05**,
+      to after the 10 km on **2026-10-11**. Running introduction and the Stage
+      2B decision already land on 2026-08-16; a fourth simultaneous change
+      makes attribution impossible when something flares. First trial is
+      **arms only, 1–3 months** — the lowest-consequence target available (0
+      direct sets/week today, no spinal or scapular loading), so a failed
+      trial costs nothing. Expand elsewhere only if it runs clean. The
+      blocking risk is connective tissue, not muscle: the cited 2024 daily-bench
+      study injured >half of trained lifters, and hypermobility + post-Latarjet
+      shoulder + three lumbar protrusions is exactly that failure mode. Boundary
+      question is on the physio brief as §9.
+      **First question in October is whether this is still relevant at all** —
+      re-derive it against the state of the record then, don't resume it by
+      default. Specifically: did the Day 28 and post-race reassessments change
+      the picture, is `services/strength.py` out of calibration (it cannot
+      evaluate a trial while every index reads 50), did the running block
+      surface a tendon issue, and is arms still the lagging region it is
+      today (0 direct sets/week). Any of those can retire the question rather
+      than answer it.
+      **Sequencing, added 2026-08-05:** if connective tissue is what blocks the
+      trial, and tendon capacity is buildable, then the order is *build tendon
+      capacity first, trial second* — not "wait until October, then start". So
+      the October question is two questions: is it still relevant, and has
+      anything been done in the meantime that changes the risk. Decide the
+      prep in **September**, not on the day. Tendon capacity comes mainly from
+      heavy slow resistance and loaded lengthened positions — largely the block
+      already running, executed with deliberate eccentric tempo — with
+      isometrics as the early-rehab/analgesia tool rather than the whole
+      picture. Physio brief §10 carries the detail and the two questions put to
+      the physiotherapist.
 - [ ] Anterior knee cues for right TFL offload — carried over from Stage 1,
       still unresolved.
 - [ ] Lift `biometrics.HRV_GARMIN_HOLD`? The gate is a measurement, not a date:
