@@ -31,3 +31,56 @@ Currently: `Input_files/2025-training-year.md` (full-year strength log + movemen
 - Documented working weights/volumes are a **ceiling, not a starting point**. Stage 2 (or any block introducing/reintroducing external load) starts at a conservative percentage of those numbers — accounting for time away, reduced/rehab-focused training since, and the current injury — then the existing `+2.5 kg/session` progressive-overload rule (`docs/resume.md`, Stage 2 section) takes over from there.
 - Equally important as the numbers: the **movement-pattern analysis** (what patterns were staples, what consistently broke down under fatigue, which structures under-fired during compound lifts vs. isolation work). This informs exercise *selection* and *sequencing* independent of load — e.g. a pattern that reliably lost bracing/control at moderate load in the past is a candidate for more conservative progression or an assistance-exercise emphasis, regardless of what absolute weight it reaches.
 - Where the strength analysis's own injury notes overlap with the injury history document (§1) or `patient_profile.py`, treat them as the same finding, not double-counted — cross-reference rather than layering separate cautions for what's really one issue.
+
+## 4. Externally-sourced training methods — adapt the document, do not filter at runtime
+
+Added 2026-08-06, from the flexibility cluster work. When a training method
+arrives as a document rather than as a plan — a book, a course, a video series
+reduced to notes — the question is where the athlete's constraints get applied.
+
+**Adapt the source document in place.** Not a parallel "safe version", and not a
+runtime filter that strips unsafe items on the way to the screen. Two documents
+defining one programme is the failure this is meant to avoid, and a runtime
+filter leaves the unsafe version as the thing on record.
+
+Four rules make that safe rather than merely tidy:
+
+1. **Every adaptation names the condition that reverts it.** These are holds on
+   evidence, not deletions — the same idiom as the HRV blend hold in
+   `services/biometrics.py`, which is lifted on a measurement rather than on a
+   date. An adaptation with no revert condition becomes permanent by nobody
+   looking at it.
+
+2. **Removals are recorded, not silent.** What was taken out, the mechanism that
+   made it unsafe, and what would put it back. An unexplained absence is
+   indistinguishable from an oversight, and the next reader cannot tell whether
+   a missing exercise was considered and rejected or never noticed.
+
+3. **Prefer the source's own alternatives.** The strongest adaptation is one the
+   material already offers. In the flexibility case the source stated that two
+   different joint alignments were equivalent, and only one of them collided
+   with the imaging — so the substitution cost nothing and needed no defending.
+   Look for that before inventing a modification.
+
+4. **Make the safety check executable.** Every movement named in the adapted
+   document is run through `services/rules.py` at the athlete's live stage, by a
+   script and by a test. Extraction should be structural rather than a keyword
+   list: a list needs updating whenever the document gains a term and fails
+   *open* when it has not been.
+
+**Two failure modes worth naming**, both found in practice:
+
+- **The rules engine may not speak the document's vocabulary.** Training
+  material names skills; a movement-safety rule set names mechanisms. The same
+  movement under two names produced opposite verdicts, and the fix belonged in
+  the rule set rather than in the training document.
+- **The source may contradict itself.** A footer saying "these sensations are a
+  clinician's business" while the body instructs producing them. Where that
+  happens, the conservative half is the one to keep, and it is worth writing
+  down which half you kept and why.
+
+**And the reason it is worth the effort:** the athlete's own reframing of his
+restriction — that a spinal compensation was the symptom of a missing hip
+movement rather than the problem itself — changed the shape of the programme
+more than any safety substitution did. Adapting the document is what created a
+place to put that.

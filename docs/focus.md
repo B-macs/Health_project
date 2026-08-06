@@ -11,8 +11,8 @@
 | Stage | **Stage 2** — Transition (external load) |
 | Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
 | Day | **Day 18 of 28** |
-| Gate | **1584/1584** — `python -m pytest tests/` |
-| Last code commit | `1e85c8b` — Flexibility sector v2: the `lats` rung closing the overhead ladder, and the `st.form` fix that stopped the capture flow dropping readings |
+| Gate | **1602/1602** — `python -m pytest tests/` |
+| Last code commit | Flexibility rebuilt as Cluster A — three layers, a four-slot battery that stops at the first failure, and `services/rules.py` taught the vocabulary it was blind to |
 | Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required |
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
@@ -80,56 +80,71 @@ non-diagnostic until a stage has that many days behind it.
    `training_constants.EXERCISE_MOVEMENT_WEIGHT` (or they fall back to
    `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflate Strain/ACWR — this already
    happened once, across 34 of 63 Stage 1 exercise names).
-5. Run `python -m pytest tests/` — 1584/1584 or higher.
+5. Run `python -m pytest tests/` — 1602/1602 or higher.
 6. Update this file: block, day, gate, next action.
 
 ---
 
-## Standing Goal: Flexibility — built, never measured
+## Standing Goal: Flexibility — Cluster A, built and unmeasured
 
-**Status: 0 of 14 rungs have a reading.** The sector shipped 2026-08-06
-(`services/flexibility.py`, `flexibility_baselines.py`,
-`views/insights.py::_render_flexibility_detail`) and its 14-step capture flow is
-built, resumable and verified end-to-end — against fixtures. It has not been run
-against the athlete's body once, so every skill reads unmeasured and the screen
-sits in its empty state. Locked decisions in `docs/resume.md` § FLEXIBILITY.
+**Status: zero assessments run.** The battery is built, its early exit is
+verified end to end, and nothing has been measured against the athlete's body.
+Locked decisions in `docs/resume.md` § FLEXIBILITY; the model itself in
+`cluster_a_mechanics.py`, `services/battery.py`, `cluster_a_battery.py` and
+`cluster_a_prescription.py`.
 
 This is a **standing goal with no deadline**, explicitly ranked *below* the
-10 km on 2026-10-11 (athlete, 2026-08-05): *"it should be part of getting the
-whole body in a better position, as this will limit future injuries and provide
-better overall strength and wellness rather than just getting strong."*
+10 km on 2026-10-11 (athlete, 2026-08-05).
 
-**To run the first assessment** — ~40 minutes, and read this before starting:
+### Run it before 2026-08-16
 
-1. **COLD. No warm-up, ever.** A warm reading measures the viscoelastic effect,
-   which is gone within hours. A cold reading is the only one that tracks
-   durable change rather than whether he stretched that morning. The flow gates
-   on this before step 1 and it is the single easiest thing to get wrong.
-2. **Capture the three frozen constants at the same session** — acromion-to-
-   styloid length, shin length, a traced foot outline. Three rung tests
-   normalise against them and cannot be run first. Measure once, store, reuse;
-   they are frozen so a later re-measure cannot silently re-scale history.
-3. Each step prints its own **setup, LOCK and measurement**. The lock is the
-   thing that must not move — an unlocked joint lets a neighbour substitute and
-   the test measures nothing, which is the failure that broke this model twice.
-4. Skip anything that provokes symptoms; **Skip and void-this-trial are not the
-   same** and both are better than a bad number. Drafts save after every step,
-   so stopping halfway costs nothing.
-5. Two anchors are provisional and worth raising with the physio on 2026-08-16
-   if there is time: the `lats` 100-anchor (160°, borrowed from a norm defined
-   against a *flat* lumbar spine while this test uses full posterior tilt) and
-   `WIDE_GAP_POINTS` (25.0, from the general hypermobility literature rather
-   than from this athlete).
+It is **measurement, not prescription**, so it does not conflict with the
+standing "no self-directed exercise changes" instruction — and running it first
+means walking into the Day 28 reassessment with a pattern label and real numbers
+instead of a plan to get some. Roughly 20 minutes, not 40: it usually stops
+early.
 
-After the first assessment the headline is a **limiting rung**, not a score —
-the lowest rung across every ladder, and the one thing to train. Re-test, watch
-it move to the next rung, and that re-pointing is the programme.
+1. **COLD. No warm-up, ever.** A warm reading measures a viscoelastic effect
+   that is gone within hours. The flow gates on this and it is the single
+   easiest thing to get wrong.
+2. **Capture the four frozen constants at the same session** — straddle width,
+   tailor's heel distance, the traced side-split stance, the floor reference.
+   They are setup numbers, not scores, and **the number is the record**: a chalk
+   mark is gone by next month and one re-placed by eye silently invalidates
+   every reading taken against it. Note `block_height_cm` is deliberately *not*
+   frozen — lowering it is the progress.
+3. **Expect it to stop early.** Four slots run in order and it stops at the
+   first failure, because a reading taken below a failing slot cannot be
+   interpreted. Continuing is offered; it is not the default.
+4. **Each step prints its own setup, LOCK and measurement.** A lost lock makes
+   the number *better*, not worse, so nothing warns you — which is why every
+   lock names a tell you can see from outside.
+5. **Order within the spectrum slot is active → isometric → passive**, and not
+   the order the source writes them in. Passive work leaves tissue looser for an
+   hour and would flatter everything after it.
 
-**Deferred, decided, not built:** the app offers yoga on rest days — the window
-this model calls worst for adaptation. The fix is an `intent` field
-(`restorative` | `training`) on `YogaSession`, agreed 2026-08-06 and held until
-the **training-schedule overhaul**. Do not wire flexibility into
-`services/scheduling.py` before then.
+**Expected outcome, recorded in the code before measuring:** Pattern **F**, tilt
+range. That is what the 2026-08-05 straddle report predicts, and it *disagrees*
+with the generic hypermobility prediction of H or I — he has a specific range
+deficit inside an otherwise lax body. Worth watching rather than resolving in
+advance.
+
+**A pattern from one morning is a hypothesis.** Three baseline mornings set the
+noise floor; until then no single reading is a reason to change anything, and
+the screen says so.
+
+### What to bring to the physiotherapist
+
+- The pattern label and the readings behind it.
+- The **collision table** in `docs/training/physio_brief_2026-08-16.md` — 14
+  movements in the source material are contraindicated as written, and the
+  substitutions made for each.
+- **Every threshold is provisional.** They come from the source document, not
+  from this athlete's spread.
+- The **anterior-hip question** from 2026-08-05, which gate 0 can provoke and
+  must not adjudicate.
+- Whether **horse stance and Cossack** can come off deferral. They are held only
+  because an open Stage 2 exit criterion is judged at that appointment.
 
 ---
 

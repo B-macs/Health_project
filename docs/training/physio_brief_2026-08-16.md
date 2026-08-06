@@ -302,6 +302,89 @@ this athlete, and either would be better set by you:
 
 ---
 
+## 12. Flexibility programme — 14 movements we changed, and why
+
+Added 2026-08-06. Since §11 we have built a structured flexibility assessment
+and training programme from three source documents covering the side split and
+the pancake. **Nothing has been performed yet.** We are bringing it here before
+the first session rather than after.
+
+The programme is four tests run in order, stopping at the first failure, which
+produces a single pattern label; the label selects a training stack. What we
+want from you is not approval of the method but a view on the fourteen places
+where the source material collides with the imaging.
+
+### What we changed, grouped by mechanism
+
+**Loaded lumbar flexion, over the covered annulus tears at L3/4 and L4/5.**
+Removed: elevated pancake with a plate held behind the neck (asked for 3 × 90 s);
+pancake with a strap pulling past self-limitation; pancake lift-offs from a
+rounded fold; seated straddle good-mornings holding a plate. In each the
+external load or assistance produces the depth **through the spine**, because
+this athlete cannot currently tilt the pelvis in sitting.
+
+**Lumbar extension, against the L5/S1 retrolisthesis and the narrowed right
+foramen.** The source's side-split cue is *"tilt the front of the hip down
+toward the floor, arching the back"*, and that one cue propagated into nine
+separate prescription instances, each held under full bodyweight. We replaced it
+with an external-rotation cue. **This costs nothing**: the source's own mechanics
+section states that anterior tilt and leg external rotation *"align the joint
+identically"* and that neither is more correct. Also removed a standing anterior
+tilt drill prescribed at 5 × 20 s.
+
+**External load onto passively held end range**, against the standing
+hypermobility guidance. Tailor's pose with weight plates on the knees (up to
+4 × 90 s) and a wall straddle with ankle weights are both now unloaded.
+
+**Deliberate neural provocation.** The source's nerve check instructs producing
+*"a sharp, electric or burning quality"* and reading it as a programming
+variable. Given the moderate right L5/S1 foraminal stenosis and no neural signs
+on any log to date, we kept the ankle/chin comparison as a differentiator at
+submaximal depth and removed the instruction to provoke. **Any such sensation is
+an escalation to you, not a number.** The source document's own footer says the
+same thing its body contradicts.
+
+### Three questions
+
+1. **The anterior-hip question from §11 is now on the critical path.** The first
+   test of the battery can produce a sharp pinch at the front of the hip, which
+   the source reads as a bony end point and treats as a training pattern. We
+   have written it as *stop and record, do not adjudicate* — because it is the
+   same sensation as the butterfly finding raised on 2026-08-05, which is
+   already an open question for you. A view on whether that is bone, anterior
+   compression, or neither would unblock the top of the assessment.
+
+2. **Horse stance and Cossack squats are deferred until after today.** Both are
+   externally-rotated loaded squats, and one of the Stage 2 exit criteria being
+   evaluated at this appointment is *"no increase in Coxa Saltans frequency
+   under loaded squat/split-squat work"*. Introducing two new ER-cued loaded
+   squat patterns inside the assessment window would confound the criterion
+   itself. Can they come off deferral now, and with what rotation cue?
+
+3. **Every threshold in the assessment is provisional.** The pass/fail cut
+   points come from the source document, not from this athlete's own
+   measurement spread, which has never been established. We plan three baseline
+   mornings before treating any of them as real. If you would set any of them
+   differently, now is the cheapest time.
+
+### The one thing we would most like checked
+
+The programme's organising claim is the athlete's own: **the lumbar rounding is
+the compensation, not the problem — he rounds because the pelvis will not rotate
+forward in sitting.** The straddle fold scored 25/100 on 2026-08-05 with the
+note *"hips stuck in flexion with tail bone down, back fully rounds"*, and the
+same report appeared independently in three other seated positions.
+
+If that reading is right, the correct response is to train the tilt directly —
+which is what we have built: elevation to make the position available, a pelvic
+rock to train the movement in isolation, lift-offs from a flat back to build the
+strength that produces it, and a flat-back hinge to raise the hamstring ceiling.
+Progress is measured by the elevation coming down, not by reaching further.
+
+If that reading is wrong, most of the programme is aimed at the wrong thing.
+
+---
+
 ## Also worth raising while here
 
 **Ferritin 29 ng/mL (Aug 2023), CRP 0.9** — a true low-normal reading rather

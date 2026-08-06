@@ -273,7 +273,7 @@ Biometric data fetched over a 60-day rolling window to support the 56-night slee
 | `services/readiness.py` | Readiness score (MODEL_VERSION 2) + baseline computation |
 | `services/hr_load.py` | Edwards' TRIMP — heart-rate-derived strain |
 | `services/biometrics.py` | Oura+Garmin blend — the engine's biometric read source |
-| `services/flexibility.py` + `flexibility_baselines.py` | Flexibility: four scored SKILLS over 14 rung tests, `skill = min(rungs)` with the limiting rung named. **Display-only, nothing reaches the engine.** [Yoga_Library.md](Yoga_Library.md) and `docs/resume.md` § FLEXIBILITY carry the model |
+| `cluster_a_*.py` + `services/battery.py` + `services/flexibility.py` | Flexibility, as a three-layer cluster system: Mechanics (why) → Battery (how to test) → Prescription (what to do), with the dependency enforced by guard tests. Four slots run in order and **stop at the first failure**; the output is one pattern label and nothing else. **Display-only, nothing reaches the engine.** See `docs/resume.md` § FLEXIBILITY |
 | `services/yoga.py` | Yoga catalogue + advisory safety layer (`effective_safety()` cross-checks each pose against live `rules.check_movement()`). Advisory only — nothing here blocks a button |
 | `app.py` | SPA router + home dashboard |
 | `services/repository.py` | The only place Notion property / Sheet column names live |

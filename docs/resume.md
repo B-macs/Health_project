@@ -430,326 +430,251 @@ see below.
 
 ---
 
-## FLEXIBILITY (v2, 2026-08-06 — v1 was refuted and deleted)
+## FLEXIBILITY (v3, 2026-08-06 — clusters. v1 and v2 are both deleted)
 
-`services/flexibility.py` + `flexibility_baselines.py` +
-`views/insights.py::_render_flexibility_detail`, with durable storage via
-`Repository.get_flexibility_assessments()` / `save_flexibility_assessment()`
-and drafts via `get_flexibility_draft()` / `save_flexibility_draft()` /
-`clear_flexibility_draft()`, all backed by `clients/local_cache.py`.
+`cluster_a_mechanics.py` + `services/battery.py` + `cluster_a_battery.py` +
+`cluster_a_prescription.py`, joined by `services/flexibility.py` and rendered by
+`views/insights.py::_render_flexibility_detail`. Storage via the five
+`Repository.*_flexibility_*` methods on `clients/local_cache.py`.
 
 Display-only. **Nothing here feeds the engine** — same standing rule as Body
 Composition below. Flexibility is not a safety input (Key Rule 2);
 `services/rules.py` remains the only thing that constrains movement.
 
-### Why v1 was deleted — read this before proposing anything that averages
+### Two models were built and deleted before this one. Read why before proposing a third.
 
-v1 scored eight body **regions** as `sqrt(RANGE × CONTROL)` and averaged them
-into an overall. It reported **hip 79** and **shoulders 90**. The athlete
-refuted both from lived experience:
+**v1** scored eight body regions as `sqrt(RANGE × CONTROL)` and averaged them.
+The athlete refuted it in one sentence — *"we know my hips are stuck in flexion
+with my back arched and this is a huge issue for me, and yet my flexibility
+score is nearly 80 for hips"* — because the `hip` average buried Deep Lunge, the
+one thing testing his worst documented capacity, under four healthy
+contributions. It also scored a self-rated depth on a **two-sided band** where a
+rating of 88 scored 46, inferring absence of control from presence of range with
+no evidence for the step.
 
-> *"We know that my hips are stuck in flexion with my back arched and this is a
-> huge issue for me, and yet my flexibility score is nearly 80 for hips."*
+**v2** replaced regions with skills, scored `skill = min(rungs)` over fourteen
+rungs, and named the limiting rung. Better, and still the wrong shape.
 
-He was right and the mechanism is exact: the `hip` score averaged **fourteen
-contributions across five unrelated capacities**, and Deep Lunge — the only
-thing on the sheet testing hip *extension*, his single worst documented capacity
-— was carried to 100 by healthy neighbours. A region is not a capacity. "Hip
-mobility" is as meaningless a quantity as "hip strength".
+**v3 is not a refinement of v2.** The battery is a **decision tree with early
+exit**; `min()` is a scoring function over everything. A failing slot 0 does not
+make the slots below it lower priority — it makes them **meaningless**, because
+a bony block makes the tissue questions unanswerable. Those are different
+programs and the second cannot be tuned into the first.
 
-Two further v1 defects died with it:
+Guards live in `tests/test_cluster_a.py`: the v1 names (`band_score`,
+`CONTROL_BAND`, `OVERSHOOT_SLOPE`…) and the v2 names (`rung_score`,
+`score_skill`, `SkillScore`, `WIDE_GAP_POINTS`, `RUNGS`, `SKILLS`) all fail the
+gate if they reappear.
 
-1. **`CONTROL_BAND` was two-sided** — full marks in 50–70, penalised below *and*
-   above, so a self-rated depth of 88 scored **46**. The athlete's objection
-   ("why does the graph go down once you leave the ideal region?") was correct:
-   his rating measured **how far he got**, and penalising a high value treats it
-   as if it measured **absence of muscular control**. Those are different
-   things, and v1 inferred one from the other with no evidence. The root error
-   was **inferring control from range**.
-2. **It scored control from a subjective rating.** Two objective readings beat
-   one self-report.
+Nothing was lost in either deletion: no assessment had ever been run, and none
+of Cluster A's measurements were implemented by any v2 rung — the closest,
+`adductors`, tested the same tissue at the same leverage from a different
+position with a different landmark.
 
-`band_score`, `control_score`, `CONTROL_BAND`, `OVERSHOOT_SLOPE` and
-`UNDERSHOOT_EXPONENT` are **gone**, and
-`test_the_refuted_two_sided_band_is_gone_and_stays_gone` brings the gate down if
-any of them returns. The defect survived one review, so it gets a guard rather
-than a comment.
-
-### The model: skills are scored, regions are diagnostics
-
-A **SKILL** is a position you can either achieve or not. Under each skill is a
-**LADDER** of candidate limiters. Only the lowest rung limits the skill, so:
+### Three layers, one direction, enforced by tests
 
 ```
-skill = min(rungs)          # and the name of that rung is published beside it
+MECHANICS  (why)          limiters + the exercise library
+    ↓                     no tests, no doses
+BATTERY    (how to test)  four slots, one pattern label out
+    ↓                     no exercise names
+PRESCRIPTION (what to do) pattern in, ordered stack out
+                          no tests; names exercises but defines none
 ```
 
-Fix the limiting rung, re-test, and the limiter moves to the next one. **That
-re-pointing is the training programme.** If the ankle stops you at 38 it does
-not matter that the quads are at 84: you still cannot squat.
+Stating the rule is not enough — this repo already makes exactly this class of
+rule executable in `tests/test_no_streamlit_in_services.py`, and the four guards
+do the same job here:
 
-**Nothing is averaged, anywhere.**
+1. The battery layer's source contains no exercise name from the Mechanics
+   library, and no dose.
+2. Every exercise the Prescription names **resolves in the Mechanics library**.
+   This is the load-bearing one: a name that does not resolve means the
+   Prescription invented an exercise, which is how two documents end up defining
+   the same thing.
+3. `Exercise` has nowhere to put a dose, and Mechanics defines no pattern
+   labels. Checked structurally rather than by scanning for "× 8", because the
+   Copenhagen note legitimately records what he last performed in 2025.
+4. **`prescribe(None)` raises `NoPatternError`** and the message names the next
+   action. The source is explicit: *"a prescription without a pattern is a guess.
+   Say so rather than guessing."*
 
-### ONE TARGET AT A TIME, chosen BEFORE the tests (2026-08-06)
+### The four slots, and stopping
 
-The second thing this sector got wrong, and the athlete's objection is the
-clearest statement of it:
-
-> *"When you say Chest / pecs is the limiting factor — what skill am I working
-> towards? Chest and pecs are only the limiting factor if I want to do a
-> handstand or a bridge, but if my first goal is a pancake then chest and pecs
-> wouldn't be that important compared to hamstrings."*
-
-**A limiting rung means nothing without a goal.** So the target skill is chosen
-**before any test is taken** — asking afterwards would be asking him to
-interpret a number computed without knowing the question — and it is recorded on
-the assessment (`Assessment.target_skill`) rather than held as one global
-setting, which is what makes a later switch of target legible instead of looking
-like the numbers moved for no reason.
-
-The flow: **pick one goal → 14 tests → limiting rung + the stack steps that move
-it**. At the next assessment, 6–12 weeks later: **what moved (`compare`) → stay
-on this skill and take the next rung, or switch and get a different ladder.**
-
-`prescribe()` returns only the stack steps targeting the limiting rung. Handing
-over five stretches when one rung is the blocker is how "come to conclusions on
-where to focus in my training" turns back into a list.
-
-### The eight skills
-
-The previous four — deep squat, hip extension, shoulder flexion, active pike —
-were **correct as ladders and wrong as goals**. He can already hold a deep squat,
-active pike is a Down Dog he has demonstrated, and nobody aims at "hip
-extension". Replaced with the source method's own list:
-
-| Skill | Also known as | Ladder | State |
-|---|---|---|---|
-| **Pancake** | Flat-back straddle fold | hamstrings · adductors · hip rotation · lumbar | **first target, stack built** |
-| Pike & head to toe | Flat-back forward hinge | hamstrings · lumbar | no stack yet |
-| Front split | Split lunge, back leg long | hip flexors · quads · hamstrings · lumbar | no stack yet |
-| Side split | Straddle standing | adductors · hip rotation · lumbar | no stack yet |
-| Squat | Deep bodyweight squat | calves/ankle · adductors · hip rotation · quads · lumbar | no stack yet |
-| Shoulder flexion | Elbows to the floor overhead | shoulders overhead · lats · chest · thoracic rotation · lumbar | **next target** |
-| Shoulder extension | Arms behind the back | chest · shoulders overhead | **needs sign-off** |
-| Bridge | Back bend | hip flexors · shoulders overhead · thoracic rotation | **needs sign-off** |
-
-**No new rungs were needed**, which is the evidence that the failure was in the
-naming layer alone: hip extension became the back leg of a front split, shoulder
-flexion became elbows-to-the-floor, and the tests underneath are unchanged.
-
-### Two goals are in the catalogue but cannot be selected
-
-**Bridge** and **shoulder extension** are the athlete's own stated goals and are
-**not deleted**. They still score and still show regression — hiding them would
-lose the only signal a skill nobody trains toward can give. What they cannot be
-is the target, because the route to each runs through a direction his imaging
-rules out: end-range lumbar extension against the L5/S1 retrolisthesis, and the
-post-Latarjet apprehension direction. `services/rules.py` is untouched.
-
-Both name **2026-08-16** as what unblocks them, and both carry the specific
-question rather than a flat refusal — for bridge, whether extending through the
-*upper* back with the lower back neutral is a safe substitute; for shoulder
-extension, whether a bounded, actively controlled range can be trained. Note
-bridge's components are all rungs on skills he *can* train, so progress toward it
-happens regardless.
-
-### Stacks: assisted → resisted, and none of his may be assisted
-
-A **stack** is ordered and cumulative — each step adds one demand to the one
-before, and you do not advance until `advance_when` is true. Step 3 is not harder
-than step 2 by accident; it is step 2 plus one thing.
-
-Every step sits on the source method's spectrum: **heavily assisted** (something
-else puts you there) → **unassisted** → **heavily resisted** (you fight in, or
-hold against load).
-
-**For this athlete the assisted half is wasted, and that is measured rather than
-preferred.** Beighton 6/9; the straddle scored 25/100 not because the tissue is
-short but because he cannot tilt the pelvis in sitting; and `patient_profile`'s
-own rule prescribes controlled-range strength over passive end-range stretching.
-A test asserts **no step in any stack is `assisted`**, and that the resisted work
-comes last.
-
-### The Pancake stack, and the one thing it must never become
-
-Five steps: elevated seated pelvic tilt → half straddle hinge → elevated straddle
-hinge → **straddle adductor press** → **straddle leg lift**. The last two are
-resisted and are where the work actually is; the first exists because nothing
-above it functions until he can tilt the pelvis forward in sitting at all.
-
-**It must never become a seated forward fold.** `services/rules.py`
-contraindicates "forward fold", "seated forward fold" and "toe touch" outright —
-end-range lumbar flexion on the covered annulus tears at L3/4 and L4/5 — and the
-conventional pancake finishes as exactly that. Every step hinges from the **hip
-with a flat back**, on an elevation chosen so a flat back is possible. **The
-elevation coming down IS the progression**; reaching further with a rounded back
-is the failure the whole stack is shaped to prevent. A test scans every stack
-step's name and setup against the contraindicated list.
-
-What makes the goal valuable here (opening from the hip) and what makes it
-dangerous (rounding the lumbar spine) are separable. That separation is the only
-reason this skill is trainable at all — and it aims straight at his single
-dominant restriction.
-
-### Three measures per rung, and the GAP is the point
-
-Each rung is measured three ways in the same position:
-
-```
-PASSIVE     gravity or hands put you there       -> the ceiling
-ISOMETRIC   can you hold it once you are there   -> is the range defended
-ACTIVE      can you pull yourself in unassisted  -> the usable range
-
-gap = passive - active
-```
-
-The rung **scores off ACTIVE** where it exists, because usable range is what
-limits a skill — a passive ceiling you cannot enter under your own power does
-not help you squat. Passive is descriptive; it is half of the gap and never the
-score on its own when an active reading exists.
-
-**The gap is the number that matters for this athlete.** The source method this
-is built on is written for people who *lack* range; at Beighton 6/9 the assisted
-half of it solves a problem he does not have. A **wide** gap (≥
-`WIDE_GAP_POINTS`, currently 25.0) means the range already exists and cannot be
-held — so more stretching is the wrong lever and resisted/isometric work is the
-right one. A **narrow** gap means chase range. That single number decides
-`prescription` ∈ {`range`, `strength`, `unknown`}, which is the question v1 could
-not answer at all.
-
-`WIDE_GAP_POINTS` is **provisional**: set from the general hypermobility
-literature, not from this athlete, because he has no paired readings yet.
-Revisit once `ASSESSMENTS` has entries.
-
-### Achievement is monotonic
-
-More is always better. The hypermobility concern did not disappear — it moved to
-the gap, **where it is measured instead of assumed**. This is the correction v1
-needed and it is why the sector no longer inverts every other one.
-
-### Every test names a LOCK
-
-The `lock` field is the thing that must not move. An unlocked joint lets a
-neighbour substitute and the test measures nothing — precisely the failure that
-broke this model twice.
-
-**Six tests `replaces` a standard test that is contraindicated here**, with
-something measuring the same capacity safely:
-
-| Rung | Replaces | Why |
+| Slot | Question | What the answer decides |
 |---|---|---|
-| Hip flexors | the **floor** modified Thomas | the floor blocks the thigh at 0°, censoring every result below neutral to one value — and below neutral is exactly where he lives |
-| Quads | prone Ely / prone quad stretch | a restricted rectus femoris in prone tilts the pelvis anteriorly and drives lumbar extension |
-| Hamstrings | seated forward fold, sit-and-reach, standing toe-touch | all contraindicated: end-range lumbar flexion loads the covered annulus tears |
-| Chest/pecs | doorway and supine 90/90 pec stretch | both hang the anterior capsule on an external frame — the apprehension position post-Latarjet |
-| Thoracic rotation | classic open book, top arm sweeping to the floor | same reason |
-| Neck | seated chin-to-acromion tape reading | its own lock needed both hands on the seat while its measurement needed a hand on the tape |
+| **0 Structure** | Is a bone stopping you? | Whether anything below is valid |
+| **1 Regressed** | Is the tissue short at low demand? | *Which* exercises |
+| **2 Prerequisite** | Do you have the component the skill needs? | *Whether* it is trainable, and where the fix sits |
+| **3 Spectrum** | Passive, isometric, active | *Which end* — assisted or resisted |
 
-Measurements are **taped distances wherever possible, not eyeballed angles** —
-a distance is what one person alone reproduces in three months.
+Output is **one pattern label, A–I, and nothing else**. Not a score, not a
+ranking. `services/battery.py` walks the evaluators in order and returns as soon
+as one does not pass; the slots below are never evaluated.
 
-### MEASURE COLD
+**The capture flow stops too**, and it asks the real battery after every step
+rather than re-implementing the rule, so the screen and the engine cannot
+disagree about when to stop. Failing gate 0 on orientation ends the session
+after two readings instead of walking him through eight more that cannot be
+interpreted. Continuing is offered but is not the default — a curious athlete
+taking extra readings is harmless, and forbidding it would be paternalistic, but
+the time is real.
 
-No warm-up, ever. A warm reading measures the viscoelastic effect, which is gone
-within hours; a cold reading isolates the durable change. This is the difference
-between tracking progress and tracking whether he happened to stretch that
-morning. The capture flow gates on it before the first step.
+**A third outcome beside pass and fail: `indeterminate`.** The readings were not
+taken, so the battery stops without naming a limiter. That is honestly different
+from "you passed" and must never collapse into it — **a measurement not taken is
+not evidence of health.**
 
-### The 14th rung — why `lats` exists
+### The fifth limiter, and the claim the whole cluster rests on
 
-Three tissues can stop an overhead reach: **pec major**, **subscapularis/teres
-major**, and the **latissimus dorsi**. Only the lat crosses the lumbar spine. So
-changing pelvic tilt changes lat tension *and nothing else* — arch and the lat
-goes slack, flatten and it goes tight, same arm movement either way.
+The source names four limiters: bone, adductor length, end-range strength,
+puller strength. A fifth was added for this athlete, and it is his dominant one.
 
-Without that isolation a single overhead test says *"the arm does not go up"* and
-cannot say which tissue stopped it — and the three prescriptions diverge
-sharply. For this athlete the third possibility is the one that matters: if the
-restriction is **capsular**, stretching harder into it is the wrong answer for an
-anterior-instability shoulder post-Latarjet, and potentially a harmful one.
+> *"The lumbar issue is driven from the specific tilt deficit, which needs a
+> specific flexibility training method to fix it."* — athlete, 2026-08-06
 
-Read as a pair: `shoulders_overhead` low **and** `lats` low ⇒ the lat is the
-limiter. `shoulders_overhead` low **with** `lats` fine ⇒ pec or capsule.
+**The lumbar rounding is the compensation, not the problem.** He rounds because
+the pelvis will not rotate forward in sitting — straddle fold 25/100, *"hips
+stuck in flexion with tail bone down, back fully rounds"*, reported
+independently in four seated positions on 2026-08-05. That distinction decides
+the programme: the answer is not to fold more carefully, it is to build the tilt
+until there is no reason to compensate. A stack that only removes the fold takes
+away the symptom and leaves the cause.
 
-Its 100-anchor (160°) is **explicitly provisional**: the published supine
-lat-length norm is defined against a *flat* lumbar spine, while this test uses
-*full posterior tilt* (hips/knees 90°, feet on a wall, hands free). Different
-positions, so the norm does not transfer cleanly.
+It has two components, which map exactly onto slot 2's Range/Production split:
 
-### Staleness decays WEIGHT, never VALUE
+| Component | Evidence | Fix |
+|---|---|---|
+| **Hamstring reserve** | 89°/86°, called *Normal* — but long-sitting upright with a straight knee is already ~90° of hip flexion, so he is at the limit **just sitting up** | Hinge flat-backed, never fold. Or sit above it — elevation removes the requirement |
+| **Hip flexor production** | Untested. *"You need end-range hip flexor strength to pull yourself into the anterior tilt"* | Resisted work — lift-offs from a flat back |
 
-`staleness_confidence()` halves every `CONFIDENCE_HALFLIFE_DAYS` (365 — ROM is
-slow-changing, so a year is generous rather than punitive). Decaying the stale
-*value* would invent a decline nobody measured — the error
-`services/strength.py`'s asymmetry rule exists to prevent.
+This is not short hamstrings. It is **normal length with no reserve** under an
+exceptional lumbar spine, which is why every further degree of fold has to come
+from the spine.
 
-### Capture is a resumable 14-step flow
+### §F is the tilt-specific method, rebuilt rather than filtered
 
-14 rungs × 3 measures × left/right is far too much for one screen, so capture is
-**one test per step**, with its full setup, lock and measurement text in front of
-the athlete at the moment the reading is taken. Skip, void-this-trial, one-sided
-entry, Back, Pause and Resume all work; drafts persist through `local_cache`, so
-a 40-minute assessment survives closing the app.
+`cluster_a_battery.EXPECTED_PATTERN` is **F**, written into the code *before
+measuring* so a borderline reading cannot be quietly read toward the answer
+already in mind. It also disagrees with the generic lax-tissue prediction of H
+or I — he has a specific range deficit inside an otherwise hypermobile body, and
+that disagreement is worth watching rather than resolving in advance.
 
-Two implementation facts that are load-bearing:
+The source's §F was four pancake variations, three using a plate or a strap to
+reach depth. For a body that folds by rounding, that assistance produces depth
+**through the spine** — the contraindicated route and the wrong measurement.
+Removing them would have left a stack of leftovers. Four prongs instead:
 
-- **Each step is an `st.form`.** `st.number_input` does not commit until blur, so
-  pressing *Save & next* without leaving the last field silently dropped that
-  reading — a full verification run lost the entire `neck` rung this way. The
-  form makes the commit atomic.
-- **Count DISTINCT rungs, not readings.** A bilateral test writes two readings
-  for one rung, so counting readings displayed *"19 of 14"*.
-  `FlexibilityReport.measured_rung_count` de-duplicates on rung key.
+1. **Seated pelvic rock, mid-range** — the tilt as an isolated movement. You
+   cannot train a position through a joint action you cannot perform alone.
+2. **Elevated flat-back straddle hinge, no added weight** — sitting above foot
+   level rotates the pelvis forward on its own. **Lowering the block over months
+   is the progression**, not reaching further at a fixed height.
+3. **Straddle lift-offs from a flat back** — hip flexor strength to *produce* the
+   tilt rather than be placed into it.
+4. **Flat-back hip hinge, legs together** — raises the hamstring ceiling.
 
-An out-of-range confirm gate holds a value far outside a test's own anchors and
-requires a second press — a unit slip (cm into a degrees field) is the most
-likely capture error and is otherwise invisible.
+**Success is not depth.** The number that should move first is the height at
+which the lower back stops being flat. Forehead height may not move for weeks
+and that is not failure.
 
-### The window is advisory, and the rest-day conflict is unresolved on purpose
+### Procedural rules that are now tests, not comments
 
-`flexibility_window(today, hard_session_days, ...)` returns `(window, reason)`:
-`poor` the day after a hard session, `ok` immediately after one, `good`
-otherwise. **Its physiological mechanism is not encoded and not relied on** —
-the calpain-mediated central-fatigue story in the source brief is stated well
-past what the evidence carries, and is treated as motivation, the way
+- **Measure order is active → isometric → passive.** Passive work leaves tissue
+  looser for an hour, so a passive trial taken first flatters everything after
+  it — the rule most likely to be broken by working through the tests in written
+  order.
+- **The load window.** An isometric reading as deep as the passive one means the
+  load was too light and passive tissue absorbed it; the slot reports a botched
+  measurement rather than a gap of zero. **Load and measurement are one datum**
+  and round-trip together.
+- **Three baselines on three mornings** before a number is trusted. The spread is
+  the noise; a change under ~2× it returns *"not a result"* rather than a delta,
+  and before three mornings exist `is_a_result` is False for any change —
+  the safe direction, because a wrong True changes a programme for nothing.
+  `BatteryResult.trusted` is separate from `.complete`: a pattern off one session
+  is a **hypothesis**, and the screen says so.
+- **Measure cold**, and **the worse side decides** — never an average.
+
+### The documents are adapted, not filtered at runtime
+
+The three source documents in `Input_files/` are edited **in place** for this
+body (dated 2026-08-06), because leaving two documents defining one thing is the
+failure the layering exists to prevent. Every adaptation carries the **condition
+that reverts it** — the `biometrics.HRV_GARMIN_HOLD` idiom, held on evidence
+rather than deleted. `cluster_a_mechanics.REMOVED` and `.DEFERRED` carry the same
+in code, and a test asserts every one names its revert condition.
+
+Two adaptations cost nothing because the source supplies them: gate 0 and every
+triangle side split are cued from **external rotation** rather than a lumbar arch
+(*"neither is more correct; both align the joint identically"* — one arch cue had
+propagated into nine prescription instances), and the nerve check became a
+differentiator rather than a provocation, which the battery's own footer already
+demanded.
+
+Held with stated conditions: loaded end-range work is unloaded pending the
+anterior-hip question raised 2026-08-05; horse stance and Cossack are deferred
+past **2026-08-16**, because an open Stage 2 exit criterion reads *"no increase
+in Coxa Saltans frequency under loaded squat/split-squat work"* and introducing
+two ER-cued loaded squats inside the assessment window would confound the
+criterion he is about to be assessed on — a measurement cost as much as a safety
+one.
+
+Every stack is prefixed with `patient_profile.PROFILE["pre_session_release"]`,
+which all nine source stacks omitted entirely because it comes from the clinical
+file rather than from any flexibility method.
+
+`scripts/check_cluster_documents.py` runs every movement **named** in all three
+documents through `check_movement` at the live stage — 77 of them, all resolving
+to cleared or caution. Extraction is structural (a table whose header declares an
+exercise column, or a numbered item with a bolded head) rather than a word list,
+which would need updating whenever a document gained a term and would fail open
+when it hadn't. `tests/test_cluster_documents.py` pins it and skips cleanly when
+`Input_files/` is absent.
+
+### The rest-day question is closed
+
+`REST_DAY_CONFLICT_UNRESOLVED` is **retired**. The Prescription's dosage section
+settles it: a cluster session is adaptation-seeking by definition, so
+`flexibility_window` now returns `poor` for a rest day rather than deliberately
+ignoring the flag. A restorative yoga flow on a rest day remains fine — that is
+`services/yoga.py`'s business. Placement is set against the real week: Stage 2A
+loads legs on days 1, 3 and 5, leaving **day 7** clean with day 2 as the
+same-day-evening fallback.
+
+The window's physiological mechanism is still **not encoded and not relied on** —
+the source's own "what to hold loosely" section says the calpain story is stated
+past what the evidence carries, and it is treated as motivation the way
 `services/sleep_fusion.py` treats the abandoned quiet-wake rule.
 
-`is_rest_day` is accepted and deliberately **does not** downgrade the window on
-its own. A restorative flow on a rest day is fine; an adaptation-seeking session
-is the thing the rule calls worst — and nothing in this codebase yet
-distinguishes them, so downgrading here would penalise the harmless case. See
-`flexibility_baselines.REST_DAY_CONFLICT_UNRESOLVED`; the agreed fix is an
-`intent` field on `YogaSession`, deferred to the training-schedule overhaul.
+### Refusals (all pinned)
 
-### Refusals (tests pin them)
-
-- **No flexibility age in years.** The gym ships one — 28 against "Real age: 31"
-  — but it was measured 2025-01-17 when he was **30**: a stale measurement against
-  a *live* chronological age, so the gap widens every birthday without anybody
-  moving. Same refusal, same reason, as `services/body_composition.py`'s.
-- **No averaging of rungs into a skill.** This is the v1 defect; `min` is the
-  model.
-- **No scoring a rung from the 22 legacy pose ratings.** They answer neither the
-  passive nor the active question, and no yoga pose isolates a locked joint.
-- **No filling an unmeasured rung** from a neighbour, from the gym scan, or from
-  a training note.
-- **Nothing reaches the engine.**
+- **No score out of 100.** The battery's output is a label and "nothing else".
+- **No flexibility age in years.** The gym ships 28 against a live age of 31,
+  measured when he was 30 — a stale measurement against a moving comparator.
+- **No prescription without a pattern.** Raises, with the next action named.
+- **No averaging of anything with anything**, including left against right.
+- **No reading carried over** from the legacy gym goniometry or the 22 pose
+  ratings. They answer none of the battery's questions, and a self-rating of a
+  yoga pose isolates no locked joint. Kept as provenance; nothing computes from
+  them.
 
 ### Open
 
-- **`ASSESSMENTS` is empty — 0 of 14 rungs measured.** The flow is built and
-  verified; it has not been run against the athlete's body. Everything above is
-  a model waiting for its first reading.
-- **Three frozen constants uncaptured**: acromion-to-styloid length, shin length,
-  a traced foot outline. Three tests normalise against them. Measure once, store,
-  reuse — frozen so a later re-measure cannot silently re-scale history.
-- **`WIDE_GAP_POINTS` and the `lats` anchor are both provisional**, as above.
-- The Jan-2025 gym goniometry survives as `LEGACY_GYM_READINGS` — **provenance
-  only, nothing computes from it**. Its defect is unchanged and is this sector's
-  version of the InBody typed height: the vendor prints degrees per region and
-  never records *which movement* produced them, so `Hip 33°` means one thing as
-  internal rotation and another as a Thomas test. The protocol list was requested
-  from the gym on 2026-08-05.
+- **Zero assessments run.** Everything above is a model waiting for its first
+  reading. Run it **before 2026-08-16** — it is measurement, not prescription,
+  and it puts a pattern label in front of the physiotherapist instead of a plan
+  to get one.
+- **Every threshold is provisional** — `GATE0_ORIENTATION_GAIN_CM`,
+  `LEVERAGE_TARGETS`, `TILT_TARGET_CM`, `SPECTRUM_GAP_CM` all come from the
+  source rather than from his own spread, which has never been measured.
+- **Four frozen constants uncaptured**: straddle width, tailor's heel distance,
+  the traced side-split stance, the floor reference. `block_height_cm` is
+  deliberately *not* frozen — it is the progression variable.
+- **Cluster B is unbuilt.** The blueprint's Pike is defined as *"touching your
+  toes; forward fold"*, wording that hits two contraindicated rules outright — a
+  whole-cluster collision to resolve before that one is authored.
+
 
 ## BODY COMPOSITION (2026-08-05)
 
@@ -1025,8 +950,8 @@ rationale, source links, library behaviour, and stop/escalation rules are in
 | **16** | Strength metric — capacity and volume, separated | COMPLETE ✅ (2026-08-04) — `services/strength.py` (Overall Strength Score: estimated 1RM vs the 2025 baselines in `strength_baselines.py`, currently in calibration at 50) and `services/tonnage.py` (weekly kg by body sector). They share no term, so a heavier week cannot raise the score and a rest week cannot lower it. Replaced the Stage-Adjusted Recovery Score, which was deleted — it could only ever read 100 |
 | **17** | Metabolism BioAge screen | COMPLETE ✅ (2026-08-05) — `services/body_composition.py`, `body_composition_baselines.py`, `views/insights.py::_render_metabolism_detail`. Two devices in separate lanes, the InBody's typed-height defect corrected rather than dismissed, and the two height-immune readings (phase angle, ECW/TBW) surfaced above the derived cards. Display-only; see BODY COMPOSITION above for the locked decisions and the two refusals |
 | **18** | Body-composition accuracy layer | DEFERRED to 2027 (user decision, 2026-08-05) — revisit once a year of standardised readings exists. The design is recorded: weigh 4–5×/week under fixed conditions (protocol standardisation is worth 24% at zero extra weigh-ins, against 33% for tripling frequency), a monthly tape baseline as the one fat signal independent of impedance, and the training log as a **consistency gate** rather than an input. The bridge scan is the only time-limited piece — see below |
-| **19** | Flexibility BioAge screen | **BUILT, UNMEASURED** (2026-08-06) — `services/flexibility.py`, `flexibility_baselines.py`, `views/insights.py::_render_flexibility_detail`, plus a resumable 14-step capture flow with durable drafts. Four scored skills over 14 rungs, `skill = min(rungs)` with the limiting rung named; three measures per rung and `passive − active` deciding range-vs-strength. **v1 shipped and was refuted by the athlete within a day, then deleted** — see FLEXIBILITY above for what it got wrong and the guard test that stops it returning. `ASSESSMENTS` is empty: 0 of 14 rungs measured, so the screen sits in its empty state until the first assessment is run. Display-only |
-| **20** | Flexibility as a standing training goal | PENDING — ranked *below* the 10 km on 2026-10-11 by the athlete (2026-08-05). Blocked on nothing but running the first assessment. Two follow-ons are decided and deliberately unbuilt: the rest-day `intent` field on `YogaSession` (waits on the training-schedule overhaul) and three frozen constants that three rung tests need |
+| **19** | Flexibility — Cluster A | **BUILT, UNMEASURED** (2026-08-06) — three layers with a one-directional dependency made executable by four guard tests: `cluster_a_mechanics.py` (why), `services/battery.py` + `cluster_a_battery.py` (how to test), `cluster_a_prescription.py` (what to do), joined by `services/flexibility.py`. **Two earlier models were built and deleted** — v1's `sqrt(RANGE × CONTROL)` and v2's `min(rungs)`; the battery is a decision tree with early exit and neither scoring function could be tuned into it. Output is one pattern label and nothing else. Zero assessments run. Display-only |
+| **20** | Flexibility as a standing training goal | PENDING — ranked *below* the 10 km on 2026-10-11 by the athlete (2026-08-05). Blocked on nothing but running the first assessment, which should happen **before 2026-08-16** so a pattern label reaches the physiotherapist rather than a plan to get one |
 
 ---
 
@@ -1172,14 +1097,30 @@ is a label on the stage, not a separate term list — no such list exists in cod
 | Overall Strength Score is calibrating | Expected, not a gap | Every regional index displays at 50 and the overall is held at `strength_baselines.ANCHOR_VALUE`. Exit is per region on confidence ≥ 0.70 (`quantity × comparability × consistency`); today upper 0.46, lower 0.37, **core 0.00**. Core cannot be calibrated at all until a repeatable core measurement is logged — its only loaded movement is Pallof Press and its 2025 peak is recorded as a band, not a kilogram |
 | No per-set warm-up flag | Open | `services/tonnage.py` counts a set as eligible when it carries reps AND a real external load. Warm-ups are not excluded because the log cannot mark one, so "working sets only" is an assumption the data does not support. A boolean per set closes it |
 | Interscapular endurance gap | Deferred to the post-Stage-2A block | Onset 2026-07-16, predates the block. Scapular work already runs five days a week and the symptom persists through it, so the gap is endurance under sustained low-load holding, not volume. Physio decides 2026-08-16 — `docs/training/physio_brief_2026-08-16.md` |
-| Flexibility: 0 of 14 rungs measured | Open — the only thing between this sector and usefulness | `ASSESSMENTS` is empty. The 14-step flow is built, resumable and verified against fixtures; it has never been run against the athlete. **Measure COLD.** The 22 legacy pose ratings do not fill it — they answer neither the passive nor the active question |
-| Three frozen constants uncaptured | Open | Acromion-to-styloid length, shin length, a traced foot outline. Three rung tests normalise against them and cannot run first. Measure once at the same session, store, reuse — frozen so a re-measure cannot silently re-scale history |
-| Rest-day yoga vs. the adaptation window | Decided 2026-08-06, deliberately not built | The app offers yoga on rest days, the window `flexibility_window()` calls worst for adaptation. Fix is an `intent` field (`restorative` \| `training`) on `YogaSession`; **deferred to the training-schedule overhaul** by athlete decision. `is_rest_day` is accepted by `flexibility_window` and deliberately does not downgrade on its own — a restorative flow there is fine, and penalising it would be wrong |
-| `WIDE_GAP_POINTS` and the `lats` anchor are provisional | Open | 25.0 comes from the general hypermobility literature, not this athlete (no paired readings exist yet); the `lats` 100-anchor borrows a norm defined against a *flat* lumbar spine while the test uses full posterior tilt. Both are on the physio brief for 2026-08-16 |
+| Flexibility: zero assessments run | Open — the only thing between this sector and usefulness | The four-slot battery is built, its early exit is verified end to end, and nothing has been measured. **Measure COLD.** Every threshold is provisional until three baseline mornings exist, and a pattern from one session is a hypothesis rather than a verdict — `BatteryResult.trusted` says so and the screen renders it |
+| Four frozen constants uncaptured | Open | Straddle width, tailor's heel distance, the traced side-split stance, the floor reference. Setup numbers, not scores: get one wrong and two sessions are not comparable however carefully each was measured. `block_height_cm` is deliberately NOT frozen — it is the §F progression variable and is meant to move |
+| Rest-day yoga vs. the adaptation window | **RESOLVED 2026-08-06** | The Prescription's dosage section settles it: a cluster session is adaptation-seeking by definition, so `flexibility_window` now returns `poor` on a rest day rather than ignoring the flag, and `REST_DAY_CONFLICT_UNRESOLVED` is retired. A restorative yoga flow there is still fine — `services/yoga.py`'s business, not this one's |
+| Every Cluster A threshold is provisional | Open | `GATE0_ORIENTATION_GAIN_CM`, `LEVERAGE_TARGETS`, `TILT_TARGET_CM` and `SPECTRUM_GAP_CM` all come from the source document rather than from this athlete's own spread, which has never been measured. Three baseline mornings set the noise floor; until then no single reading is a reason to change anything |
 
 ---
 
-*Last updated: 2026-08-06 — the FLEXIBILITY section was **rewritten from scratch**
+*Last updated: 2026-08-06 (second pass) — the FLEXIBILITY section was rewritten
+AGAIN, for the third model in two days, and the churn itself is the thing worth
+recording. v1 scored `sqrt(RANGE × CONTROL)` across eight regions; v2 scored
+`min(rungs)` across fourteen rungs under eight skills; v3 runs four slots in
+order and stops at the first failure, emitting a pattern label and nothing else.
+Only v3 matches the source method, and the reason the first two did not is
+structural rather than a matter of tuning: a battery is a decision tree with
+early exit, and a scoring function computes over everything. A failing slot 0
+does not make the rest lower priority, it makes them unanswerable. Both earlier
+models are deleted, and `tests/test_cluster_a.py` fails if any of their eleven
+named symbols reappear. The section now leads with why they died, because that
+reasoning is the most reusable thing three attempts produced. Also corrected
+here: roadmap 19 and 20 rewritten for the cluster model, three open-gap rows
+replaced (zero assessments rather than "0 of 14 rungs", four frozen constants
+rather than three, and the rest-day conflict marked RESOLVED — the Prescription's
+dosage section answered a question this file had recorded as open). Before that,
+earlier the same day — the FLEXIBILITY section was **rewritten from scratch**
 for v2. The v1 text this replaced was not merely stale, it documented a model the
 athlete had refuted and the code had deleted: `sqrt(RANGE × CONTROL)` averaged
 across eight regions, the two-sided `CONTROL_BAND` where a depth rating of 88

@@ -142,11 +142,14 @@ because it is observational data about one person, not a rule.
 > to.** `services/flexibility.py` scores rungs from **passive / isometric /
 > active** readings taken in a **locked** position, measured cold. A 1–100
 > self-rating of a yoga pose answers none of those three questions, and no pose
-> here isolates a locked joint. **0 of 14 rungs inherit a value from this
-> table**, `flexibility_baselines.LEGACY_POSE_DEPTH_RATINGS_2026_08_05` keeps it
-> as provenance only, and a test pins that nothing computes from it. Its value
-> is clinical and historical — it is what corrected the two misreadings below —
-> not as a score.
+> here isolates a locked joint. **Nothing in the flexibility model inherits a
+> value from this table**, `flexibility_baselines.LEGACY_POSE_DEPTH_RATINGS_2026_08_05`
+> keeps it as provenance only, and a test pins that nothing computes from it.
+>
+> Its value is clinical and historical, and it is considerable: **the straddle
+> row is what identified the seated pelvic-tilt deficit that the whole of
+> Cluster A is now built around.** 25/100, his worst of the 22, with the note
+> that his back fully rounds — which is the compensation, not the restriction.
 
 **Scale:** 1 = can barely enter the position · 100 = at the physical limit, no
 stretch sensation left. **High is not good, clinically** — per
@@ -251,7 +254,13 @@ No argument is required, so existing single-argument call sites keep working.
 > penalise the harmless case). Agreed fix, 2026-08-06: an **`intent` field
 > (`restorative` | `training`) on `YogaSession`**, with rest days restricted to
 > restorative. **Deferred to the training-schedule overhaul** by athlete
-> decision. See `flexibility_baselines.REST_DAY_CONFLICT_UNRESOLVED`.
+> **RESOLVED 2026-08-06.** The Cluster A prescription's dosage section settles
+> it: a flexibility *cluster session* is adaptation-seeking by definition and is
+> never a rest-day activity, so `services.flexibility.flexibility_window` now
+> returns `poor` for a rest day. **A restorative yoga flow on a rest day is
+> still fine** — that is this library's business and it is a different thing.
+> The `intent` field is therefore no longer needed to answer the scheduling
+> question, though it would still be useful for surfacing the right flow.
 
 ## Adding a new yoga
 
