@@ -55,6 +55,7 @@ if DRAFT is not None:
 repo.get_repository = lambda: _Stub()
 import streamlit as st
 st.session_state["fx_mode"] = {mode!r}
+st.session_state["fx_step"] = {step}
 from views import insights as V
 V._flexibility_screen_data.clear()
 V._render_flexibility_detail()
@@ -81,10 +82,10 @@ _GATE0_FAILS = [
 ]
 
 
-def _run(readings=(), draft=None, mode=None) -> AppTest:
+def _run(readings=(), draft=None, mode=None, step=0) -> AppTest:
     script = _SCRIPT.format(root=_ROOT, readings=list(readings),
                             draft=list(draft) if draft is not None else None,
-                            mode=mode)
+                            mode=mode, step=step)
     return AppTest.from_string(script, default_timeout=90).run()
 
 
@@ -202,9 +203,65 @@ def test_a_draft_is_offered_for_resume_rather_than_lost():
 
 def test_the_screen_survives_a_repository_failure():
     """A read failure must render an error, not a stack trace."""
-    script = _SCRIPT.format(root=_ROOT, readings=[], draft=None, mode=None).replace(
+    script = _SCRIPT.format(root=_ROOT, readings=[], draft=None, mode=None, step=0).replace(
         "def get_flexibility_assessments(self):\n        return tuple(_saved)",
         "def get_flexibility_assessments(self):\n        raise RuntimeError('cache gone')")
     at = AppTest.from_string(script, default_timeout=90).run()
     assert not at.exception
     assert any("flexibility record" in e.value for e in at.error)
+
+
+# ── parity with the prototype ────────────────────────────────────────────────
+#
+# The clickable mockup and the shipped screen are generated from the same
+# modules, so their CONTENT cannot drift. What can drift is which of it each one
+# chooses to show — and a mockup that shows more than the app is worse than no
+# mockup, because it is the thing that got clicked through and agreed to.
+
+def test_the_empty_state_shows_what_is_held_back_and_why():
+    at = _run()
+    body = _text(at)
+    # Streamlit's harness exposes the CONTENTS of an expander but not its label,
+    # so assert on what is inside rather than on the summary line.
+    assert "condition rather than a date" in body.lower()
+    assert "knees at 90 degrees" in body.lower(), "the held test is not named"
+    assert "loaded squat work has run clean" in body.lower(), "the condition is not stated"
+
+
+def test_the_cold_gate_carries_the_two_record_but_never_chase_notes():
+    at = _run(mode="capture")
+    body = _text(at)
+    assert "nerve check" in body.lower()
+    assert "medial knee" in body.lower()
+    assert "differentiator, not a provocation" in body.lower()
+    assert "finding, not a training sensation" in body.lower()
+
+
+def test_the_capture_step_asks_for_the_setup_number_where_a_test_has_one():
+    """The bent-knee leverage needs its heel distance, and that number decides
+    which pattern comes out."""
+    started = [{"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"},
+               {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"}]
+    import cluster_a_battery as cba
+    step = list(cba.AVAILABLE_TESTS).index("leverage_bent")
+    at = _run(draft=started, mode="capture", step=step)
+    labels = " ".join(str(n.label) for n in at.number_input)
+    assert "heel" in labels.lower(), labels
+
+
+def test_a_pattern_from_an_invented_cut_point_says_so_on_the_screen():
+    """Pattern E is what actually came out of the first real run, off a 90 cm
+    line nobody had validated. The screen has to distinguish 'your gracilis is
+    short' from 'your straddle fell below a number we chose'."""
+    gracilis = [
+        {"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"},
+        {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"},
+        {"test_key": "leverage_bent", "value": 8.0, "unit": "cm"},
+        {"test_key": "leverage_straight", "value": 40.0, "unit": "cm"},
+    ]
+    at = _run(readings=gracilis)
+    body = _text(at) + " ".join(e.value for e in at.error)
+    assert "Gracilis" in body
+    assert "cut point we invented" in body.lower()
+    # And the two reasons stay separate on screen, not merged into one caveat.
+    assert "hypothesis" in body.lower()

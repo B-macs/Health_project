@@ -187,9 +187,10 @@ LIBRARY: tuple[Exercise, ...] = (
                   "power. Passive floor-supported external rotation is NOT a snapping-hip "
                   "risk position — that was confirmed 2026-08-05.",
              adapted_from="Tailor's pose with weight plates on the knees",
-             reverts_when="the physiotherapist answers the anterior-hip sensation question "
-                          "raised 2026-08-05, where a deep butterfly produced hip-flexor "
-                          "rather than adductor sensation"),
+             reverts_when="the anterior-hip sensation reported in a deep butterfly on "
+                          "2026-08-05 has been re-tested unloaded and does not reappear. "
+                          "Adding external load to a position that produced an unexplained "
+                          "anterior sensation is the one order that cannot be undone"),
     Exercise("butterfly_active", "Butterfly, knees pressed down under own power", _U,
              ("adductor_length",),
              note="No hands. Active and controlled — the pattern the hypermobility profile "
@@ -207,25 +208,25 @@ LIBRARY: tuple[Exercise, ...] = (
     # ── adductors, 90° knee — deferred as a group ───────────────────────────
     Exercise("horse_stance", "Horse stance squat", _U, ("adductor_length",),
              note="Feet wide, toes slightly out, knees to 90°.",
-             deferred_until="2026-08-16",
-             reverts_when="the Day 28 reassessment has been read. Held because an open "
-                          "Stage 2 exit criterion is 'no increase in Coxa Saltans frequency "
-                          "under loaded squat/split-squat work', judged on that date — "
-                          "introducing an externally-rotated loaded squat inside the "
-                          "assessment window would confound the criterion he is about to be "
-                          "assessed on. A measurement cost as much as a safety one"),
+             deferred_until="the block's own loaded squat work has run clean",
+             reverts_when="the gym block's own loaded squat work has run without a "
+                          "change in right-hip snapping. Held because that question is "
+                          "already being answered by squat work in the block, and adding a "
+                          "second new externally-rotated squat now would make it impossible "
+                          "to attribute a change to either. A measurement argument, not a "
+                          "permission one"),
     Exercise("horse_stance_weighted", "Horse stance hold, weighted", _R,
              ("end_range_strength",),
-             deferred_until="2026-08-16",
+             deferred_until="the block's own loaded squat work has run clean",
              reverts_when="as horse_stance"),
     Exercise("cossack_bent", "Cossack squat, bent leg emphasis", _R, ("adductor_length",),
-             deferred_until="2026-08-16",
+             deferred_until="the block's own loaded squat work has run clean",
              reverts_when="as horse_stance"),
     Exercise("cossack_straight", "Cossack squat, trailing leg straight", _R,
              ("adductor_length",),
              note="The straight trailing leg also loads the proximal hamstring at the "
                   "ischial tuberosity, which is listed as overactive.",
-             deferred_until="2026-08-16",
+             deferred_until="the block's own loaded squat work has run clean",
              reverts_when="as horse_stance"),
 
     # ── adductors, straight knee (gracilis) ─────────────────────────────────
@@ -370,7 +371,8 @@ REMOVED: tuple[Removal, ...] = (
             "External load onto a passively held end-range hip — the practice the "
             "hypermobility profile rules out. The source asked for up to 4 × 90 s, six "
             "minutes, the highest loaded-end-range dose in the material.",
-            "the physiotherapist answers the anterior-hip sensation question"),
+            "the anterior-hip sensation has been re-tested unloaded and does not "
+            "reappear"),
     Removal("Supine wall straddle with ankle weights",
             "Same mechanism, lower magnitude.",
             "as above"),

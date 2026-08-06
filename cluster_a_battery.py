@@ -24,14 +24,19 @@ THE ADAPTATIONS, each with what reverts it
   B1  Gate 0 turns the legs out instead of arching the back. The Mechanics
       document calls the two routes equivalent, and only one collides with an
       L5/S1 retrolisthesis. Reverts: never — it is an equal option.
-  B2  The 90° leverage is deferred past 2026-08-16, because it is an
-      externally-rotated loaded squat and an open Stage 2 exit criterion is
-      judged on that date. Reverts: once that reassessment has been read.
+  B2  The 90° leverage is HELD until the right hip has been observed under the
+      loaded squat work already in the block. It is an externally-rotated loaded
+      squat and the right hip has an open snapping question; adding a second
+      new one now would make it impossible to tell which produced a change.
+      A measurement argument, not a permission one. Reverts: once the current
+      block's squat work has run clean.
   B3  Test 2 is KEPT AS WRITTEN on the athlete's call, with his reason recorded
       as a falsifiable prediction and a stop rule added.
-  B4  The nerve check is a differentiator, not a provocation. Reverts: if the
-      physiotherapist directs otherwise.
-  B5  Every threshold is provisional until three baseline mornings exist.
+  B4  The nerve check is a differentiator, not a provocation. An electric or
+      burning sensation is a FINDING — stop, record, and do not train through
+      it. That is a different category of event, not a permission gate.
+  B5  Every threshold is provisional until three baseline mornings exist, and
+      they are OURS to set from his own readings rather than borrowed.
 """
 
 from __future__ import annotations
@@ -121,9 +126,12 @@ TESTS: dict[str, BatteryTest] = {
                            "between healthy people. Bone does not stretch, so if this is your "
                            "limit the answer is alignment rather than more stretching.",
         safety="**A sharp pinch at the front of the hip with a sudden hard stop is a "
-               "finding, not a result — stop and record it.** It is already an open "
-               "question on your file from 2026-08-05, queued for the physiotherapist. Do "
-               "not decide it yourself and do not train around it for a fortnight first.",
+               "finding, not a result — stop and record it.** It is not a pattern to train "
+               "against and it is not a number. The same sensation was reported in a deep "
+               "butterfly on 2026-08-05 and has never been explained; if it appears again, "
+               "note what position produced it and go no further into that position today. "
+               "Repeated collision with a bony end causes joint irritation, and it is the "
+               "reason people stall permanently rather than slowly.",
     ),
     "gate0_turned_out": BatteryTest(
         key="gate0_turned_out", slot=_b.SLOT_STRUCTURE,
@@ -186,15 +194,15 @@ TESTS: dict[str, BatteryTest] = {
                     "nearest half centimetre.",
         what_youre_testing="The middle leverage — the same muscle group loaded at a knee "
                            "angle between the other two tests.",
-        deferred_until="2026-08-16",
-        safety="**Deferred until after 2026-08-16.** This is a wide, turned-out, loaded "
-               "squat held at depth, and an open Stage 2 exit criterion reads 'no increase "
-               "in Coxa Saltans frequency under loaded squat/split-squat work' — judged on "
-               "that date. Adding a new externally-rotated loaded squat inside the "
-               "assessment window would confound the criterion you are about to be assessed "
-               "on. That is a measurement cost as much as a safety one. The bent and "
-               "straight tests still name the muscle between them; this one adds resolution, "
-               "not the diagnosis.",
+        deferred_until="the block's own loaded squat work has run clean",
+        safety="**Held for now, and the reason is measurement rather than caution.** "
+               "This is a wide, turned-out, loaded squat held at depth. Your right hip has "
+               "an open question about snapping under exactly that pattern, and the gym "
+               "block already contains loaded squat work that is answering it. Adding a "
+               "second new externally-rotated squat now would make it impossible to tell "
+               "which one produced a change. Bring it back once the block's squat work has "
+               "run clean. Meanwhile the bent and straight tests still name the muscle "
+               "between them — this one adds resolution, not the diagnosis.",
     ),
     "leverage_straight": BatteryTest(
         key="leverage_straight", slot=_b.SLOT_REGRESSED,
@@ -345,10 +353,11 @@ NERVE_CHECK: str = (
     "difference in range is nerve rather than muscle. **Stop at the first change in the "
     "QUALITY of the sensation.** The original said to push until you produce a sharp, "
     "electric or burning feeling and read that as a result. Do not. Those are the exact "
-    "words your symptom logs name as the trigger to stop and contact the physiotherapist, "
-    "and you have a narrowed nerve exit on the right at L5/S1 with no neural signs on any "
-    "log to date. If one appears at any depth: stop, record it, take it to the physio. It "
-    "is a finding, not a number."
+    "words your own symptom logs have always treated as the line between a training "
+    "sensation and something else, and you have a narrowed nerve exit on the right at L5/S1 "
+    "with no neural signs on any log to date. **If one appears at any depth: stop, record "
+    "the position and the quality, and do not train into it.** It is a finding, not a "
+    "number, and nothing in this programme is worth producing one to obtain."
 )
 
 MEDIAL_KNEE_NOTE: str = (

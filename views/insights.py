@@ -1414,6 +1414,18 @@ def _fx_render_empty(accent: str) -> None:
                     f"{cba.PATTERNS[cba.EXPECTED_PATTERN]}")
         st.caption(cba.EXPECTED_PATTERN_BASIS)
 
+    held = list(cba.DEFERRED_TESTS)
+    if held:
+        with st.expander(f"Held back for now · {len(held)}"):
+            st.caption("Held on a CONDITION rather than a date — a date passes whether or "
+                       "not the thing it was waiting for has happened, which is how a hold "
+                       "becomes permanent by nobody looking at it.")
+            for key in held:
+                test = cba.TESTS[key]
+                st.markdown(f"**{test.label}** — until {test.deferred_until}")
+                if test.safety:
+                    st.caption(_fx_bold(test.safety))
+
 
 # ── state 2: capture ─────────────────────────────────────────────────────────
 
@@ -1470,6 +1482,12 @@ def _fx_render_capture(accent: str) -> None:
             moving_name, moving_why = flexibility_baselines.PROGRESSION_VARIABLE
             st.markdown(f"**{moving_name.replace('_', ' ')}** — *this one is meant to "
                         f"move.* {moving_why}")
+
+        with st.expander("Two things to record but never chase"):
+            st.markdown("**The nerve check**")
+            st.markdown(_fx_bold(cba.NERVE_CHECK))
+            st.markdown("**Medial knee discomfort**")
+            st.markdown(_fx_bold(cba.MEDIAL_KNEE_NOTE))
 
         c1, c2 = st.columns([2, 1])
         if c1.button("Begin", key="fx_begin", use_container_width=True, type="primary"):

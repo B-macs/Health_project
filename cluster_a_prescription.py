@@ -99,9 +99,14 @@ STACKS: dict[str, Stack] = {
                       "Turn the legs out; do not arch the back to find the room."),
             StackItem(_T["er_holds"].name, "5 × 20 s"),
         ),
-        outro="**Do not wait two weeks on this one.** A sharp anterior-hip pinch is an open "
-              "question on your file from 2026-08-05, already queued for 2026-08-16. "
-              "Pattern A means bring it to that appointment, not train around it first.",
+        outro="**Re-test gate 0 in two weeks, and stop sooner if it pinches.** A sharp "
+              "anterior-hip pinch with a hard, unspringy stop is the one finding in this "
+              "cluster that training cannot answer — bone does not lengthen, and repeated "
+              "collision with it causes joint irritation rather than progress. If every "
+              "orientation still pinches after two weeks of the drills above, the honest "
+              "conclusion is that this is the shape of your hip rather than a restriction "
+              "in it, and the goal moves to what the joint allows rather than what the "
+              "skill asks for. That is a real outcome, not a failure.",
     ),
 
     "B": Stack(

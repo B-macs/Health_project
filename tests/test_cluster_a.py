@@ -397,14 +397,21 @@ def test_every_deferral_names_the_event_that_lifts_it():
         assert removal.reverts_when, removal.name
 
 
-def test_the_deferred_squats_are_the_ones_that_would_confound_the_exit_criterion():
-    """An open Stage 2 exit criterion reads 'no increase in Coxa Saltans
-    frequency under loaded squat/split-squat work', judged 2026-08-16. The
-    deferral is a measurement decision as much as a safety one."""
+def test_the_deferred_squats_are_held_on_a_condition_not_a_date():
+    """The deferral is a MEASUREMENT decision, not a permission one. The right
+    hip has an open question about snapping under loaded squat work, the gym
+    block already contains squat work answering it, and adding a second new
+    externally-rotated squat now would make a change impossible to attribute.
+
+    Held on the condition rather than on a calendar date, because a date passes
+    whether or not the thing it was waiting for has happened — which is how a
+    hold becomes permanent, or lifts too early, by nobody looking."""
     deferred = {e.key for e in cm.DEFERRED}
     assert {"horse_stance", "cossack_bent", "cossack_straight"} <= deferred
     for ex in cm.DEFERRED:
-        assert ex.deferred_until == "2026-08-16"
+        assert ex.deferred_until, ex.name
+        assert not any(ch.isdigit() for ch in ex.deferred_until), (
+            f"{ex.name} is held until a date; hold it on the condition instead")
 
 
 # ── plain English, in the fields the athlete reads mid-test ──────────────────
@@ -464,13 +471,20 @@ def test_the_nerve_check_is_a_differentiator_not_a_provocation():
     """The original said to push until you produce a sharp, electric or burning
     sensation and read that as a result. Those words are the deterministic
     neural keywords in services/stats.py, which hard-flags on them before
-    anything else runs, and five symptom-log entries name that class as
-    stop-and-contact-physio."""
+    anything else runs.
+
+    The programme is self-directed now, so the instruction is no longer "take it
+    to someone" — but the STOP survives unchanged, because an electric or
+    burning sensation is a different CATEGORY of event rather than a permission
+    question. Losing the stop while removing the referral would have been the
+    wrong half to drop.
+    """
     text = cb.NERVE_CHECK.lower()
     assert "differentiator, not a provocation" in text
     assert "submaximal" in text
-    assert "physio" in text
     assert "stop" in text
+    assert "do not train into it" in text
+    assert "finding, not a number" in text
 
 
 # ── serialisation ────────────────────────────────────────────────────────────
