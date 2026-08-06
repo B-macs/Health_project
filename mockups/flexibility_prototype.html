@@ -86,6 +86,8 @@ const DATA = {
    "testing": "Whether the thing stopping you is the shape of your hip joint rather than tissue length. The neck of the thigh bone eventually meets the rim of the socket, and where that happens varies a lot between healthy people. Bone does not stretch, so if this is your limit the answer is alignment rather than more stretching.",
    "safety": "**A sharp pinch at the front of the hip with a sudden hard stop is a finding, not a result \u2014 stop and record it.** It is already an open question on your file from 2026-08-05, queued for the physiotherapist. Do not decide it yourself and do not train around it for a fortnight first.",
    "adapted": "",
+   "setupInput": "",
+   "setupFake": null,
    "fake": {
     "": 28.0
    }
@@ -103,6 +105,8 @@ const DATA = {
    "testing": "The same question, asked with the joint aligned differently. There are two ways to give the hip more room \u2014 turn the leg out, or tilt the pelvis \u2014 and they reach the same place. This uses the turn-out because tilting means arching your lower back under your full bodyweight, which your imaging rules out. A large jump between the two attempts means alignment was the limit, not tissue.",
    "safety": "",
    "adapted": "the original asked for a deliberate anterior pelvic tilt with the back arched",
+   "setupInput": "",
+   "setupFake": null,
    "fake": {
     "": 25.0
    }
@@ -116,10 +120,12 @@ const DATA = {
    "bilateral": true,
    "setup": "Sit with your back flat against a wall, soles of your feet together, heels pulled in to **your recorded heel distance**. Press your knees down toward the floor **without using your hands**.",
    "lock": "Your back stays flat on the wall, and your heels stay at the recorded distance. **The tell for the heels is a number, not a chalk mark** \u2014 measure from your tailbone to the back of your heels and match the figure. Heels further out drop the knees without your groin being one millimetre longer, so a session that re-places them by eye is void against the last one.",
-   "measurement": "Measure from the floor up to **the outside of each calf**. Smaller is better. Left and right separately, to the nearest half centimetre.",
-   "testing": "Your groin muscles with the knee fully bent. Bending the knee slackens gracilis \u2014 the one groin muscle that crosses the knee \u2014 so this loads everything except it. Comparing this against the straight-knee test is what names which part of the group is short.",
+   "measurement": "Measure from the floor up to **the outside of each calf**. Smaller is better. Left and right separately, to the nearest half centimetre. **Also record the heel distance you actually used** \u2014 it decides what this reading means.",
+   "testing": "Your groin muscles with the knee fully bent. Bending the knee slackens gracilis \u2014 the one groin muscle that crosses the knee \u2014 so this loads everything except it. Comparing this against the straight-knee test is what names which part of the group is short. **That comparison is why the heel distance matters more here than anywhere else**: heels pulled closer than your reference drop the knees further, so this test passes too easily, and a whole-group restriction comes out looking like a gracilis one.",
    "safety": "",
    "adapted": "",
+   "setupInput": "Tailbone to the back of your heels (cm)",
+   "setupFake": 34.0,
    "fake": {
     "left": 8.0,
     "right": 9.5
@@ -138,6 +144,8 @@ const DATA = {
    "testing": "Your groin muscles with the knee straight, which is what puts gracilis under the most stretch. Read against the bent-knee test: if the bent version is fine and this one is much worse, gracilis is the limit. If both are poor, the whole group is short.",
    "safety": "Unloaded and gravity-driven. The weighted version was removed \u2014 external load onto a passively held end-range hip is the practice your profile rules out.",
    "adapted": "the original used ankle weights",
+   "setupInput": "",
+   "setupFake": null,
    "fake": {
     "left": 95.0,
     "right": 94.0
@@ -156,6 +164,8 @@ const DATA = {
    "testing": "Whether you can get into the position at all when something else helps. Paired with the next test, it separates 'cannot reach it' from 'can reach it but cannot produce it' \u2014 and those two answers send you to completely different training.",
    "safety": "**Stop where it lands. Do not chase depth once your lower back has rounded.** Past that point you are measuring your spine rather than your hip, which is both the wrong variable and the one your discs cannot take. You predicted on 2026-08-06 that you would fail before reaching the deep position at all \u2014 this test is what checks that. If you get significantly past upright, say so, because the decision to keep this test rests on that prediction being right.",
    "adapted": "",
+   "setupInput": "",
+   "setupFake": null,
    "fake": {
     "": 40.0
    }
@@ -173,6 +183,8 @@ const DATA = {
    "testing": "Whether you can PRODUCE the position, not just be placed in it. This is the half that matters most for you: your file records that you cannot roll the pelvis forward in sitting, and that the rounding everyone notices is the compensation for it rather than the problem itself. If this fails and the previous test passed, the fix is strength at the end of the range, done last in the session.",
    "safety": "",
    "adapted": "",
+   "setupInput": "",
+   "setupFake": null,
    "fake": {
     "": 55.0
    }
@@ -190,6 +202,8 @@ const DATA = {
    "testing": "Not just how far you go, but **how strong the muscles that OPEN you are**. Something has to pull the legs apart, and if those muscles are weak the groin will not release however much you stretch it. A poor number here is a strength problem wearing a flexibility costume. Add your left and right angles together and compare the sum against your passive split \u2014 a passive 160\u00b0 with an active sum of 70\u00b0 is a very different athlete from one at 140\u00b0.",
    "safety": "",
    "adapted": "",
+   "setupInput": "",
+   "setupFake": null,
    "fake": {
     "left": 38.0,
     "right": 35.0
@@ -208,6 +222,8 @@ const DATA = {
    "testing": "Whether the range is defended by muscle or only propped up from outside. Your body will not let a muscle relax into a position it cannot support, so end-range strength is not something running alongside flexibility \u2014 it is what permits it.",
    "safety": "**If your isometric number comes out as deep as your passive one, the load is too light** and passive tissue absorbed it \u2014 you have measured passive twice. Take weight off and repeat.",
    "adapted": "",
+   "setupInput": "",
+   "setupFake": null,
    "fake": {
     "": 30.0
    }
@@ -225,6 +241,8 @@ const DATA = {
    "testing": "Your ceiling \u2014 the furthest the joint goes when something else does the work. On its own it says little; its value is as the reference the other two are compared against.",
    "safety": "**Taken LAST, and taken once.** Passive work leaves tissue looser for an hour or more, so doing it first would flatter every reading after it. It is also the one item here that is deliberately passive end-range with bodyweight driving it \u2014 a measurement, not a stretch to sink into, and never held for time. With lax tissue nothing complains on the approach, so the usual warning is absent.",
    "adapted": "",
+   "setupInput": "",
+   "setupFake": null,
    "fake": {
     "": 12.0
    }
@@ -983,6 +1001,9 @@ function step(){
     +(t.safety?'<div class="sm" style="color:#E2CB9B">'+md(t.safety)+'</div>':'')
     +'</details>'
     +'<div class="grid'+(sides.length===1?' one':'')+'">'+fields+'</div>'
+    +(t.setupInput?'<div class="fld"><div class="l">'+t.setupInput+'</div>'
+      +'<input type="number" step="0.5" value="'+(t.setupFake==null?'':t.setupFake)+'" '
+      +'placeholder="recorded beside the reading — they are one datum"></div>':'')
     +'<label class="chk"><input type="checkbox"> The lock was lost — void this trial</label>'
     +'<div class="btns">'
     +'<button class="b" onclick="next()">'+(S.step===DATA.order.length-1?'Save &amp; finish':'Save &amp; next')+'</button>'

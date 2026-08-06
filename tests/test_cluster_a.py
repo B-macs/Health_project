@@ -589,3 +589,92 @@ def test_no_streamlit_in_the_service_modules():
                 assert not any(a.name.split(".")[0] == "streamlit" for a in node.names)
             if isinstance(node, ast.ImportFrom):
                 assert node.module is None or node.module.split(".")[0] != "streamlit"
+
+
+# ── what a verdict rests on ──────────────────────────────────────────────────
+#
+# Added after the first real run of this battery returned Pattern E off a cut
+# point of 90 cm that nobody had validated. The source specifies Test 1 entirely
+# qualitatively — "fails both", "fails bent, straight relatively better",
+# "passes bent, fails straight badly" — and gives NO numbers. They were invented
+# so the code could run, and then the code handed out a diagnosis.
+
+def test_the_source_gives_no_numbers_for_the_leverage_test():
+    """The premise of everything below. If the source ever does supply cut
+    points, this test should fail and the thresholds should come from there."""
+    import io, os
+    doc = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                       "Input_files", "assessment_battery.md")
+    if not os.path.exists(doc):
+        pytest.skip("Input_files/ is gitignored and absent from this checkout")
+    text = io.open(doc, encoding="utf-8").read()
+    table = text.split("| Pattern of results | Reading |")[1].split("\n\n")[0]
+    assert "cm" not in table, "the source now gives numbers — use them"
+    assert "Fails both" in table and "fails straight badly" in table
+
+
+def test_gate_zero_is_the_only_slot_that_needs_no_invented_number():
+    """It compares two of his own readings taken minutes apart, so it carries
+    its own reference. Every other slot measures against a line we drew."""
+    a = _assessment([b.Reading("gate0_neutral", 40.0, "cm"),
+                     b.Reading("gate0_turned_out", 25.0, "cm")])
+    result = b.run("a", cb.SLOT_EVALUATORS, a)
+    assert result.basis == b.BASIS_RELATIVE
+    assert result.rests_on_an_invented_number is False
+
+
+def test_a_leverage_verdict_declares_that_it_rests_on_an_invented_number():
+    """Pattern E specifically — the one that actually came out — must carry the
+    caveat rather than reading as a finding about his gracilis."""
+    a = _assessment(_GATE0_PASS + [b.Reading("leverage_bent", 8.0, "cm"),
+                                   b.Reading("leverage_straight", 40.0, "cm")])
+    result = b.run("a", cb.SLOT_EVALUATORS, a)
+    assert result.pattern == "E"
+    assert result.basis == b.BASIS_PROVISIONAL
+    assert result.rests_on_an_invented_number is True
+
+
+def test_the_two_reasons_a_pattern_is_untrusted_are_kept_separate():
+    """More mornings fixes one; a validated threshold fixes the other. Conflating
+    them would let three repeat measurements look like they had confirmed a
+    number nobody had checked."""
+    a = _assessment(_GATE0_PASS + [b.Reading("leverage_bent", 8.0, "cm"),
+                                   b.Reading("leverage_straight", 40.0, "cm")])
+    settled = b.run("a", cb.SLOT_EVALUATORS, a, baseline_sessions=3)
+    assert settled.trusted is True                       # enough mornings
+    assert settled.rests_on_an_invented_number is True   # still an invented line
+
+
+def test_a_slot_that_forgets_to_declare_its_basis_reads_as_provisional():
+    """The safe default. A slot with no stated basis should not be mistaken for
+    one that compares the athlete against himself."""
+    assert b.SlotResult(slot=0, passed=True).basis == b.BASIS_PROVISIONAL
+
+
+# ── the setup number that decides the pattern ────────────────────────────────
+
+def test_the_bent_leverage_asks_for_the_heel_distance():
+    """Pattern E is 'passes bent, fails straight'. Heels pulled closer than the
+    reference drop the knees further, so the bent test passes too easily and a
+    whole-group restriction comes out looking like a gracilis one. The number
+    that was not being captured is the one that chose the diagnosis."""
+    test = cb.TESTS["leverage_bent"]
+    assert test.setup_input, "the bent leverage must capture its heel distance"
+    assert "heel" in test.setup_input.lower()
+    assert "heel" in test.what_youre_testing.lower()
+
+
+def test_the_setup_value_round_trips_and_older_payloads_still_parse():
+    """Added WITHOUT a schema bump on purpose: bumping would have silently
+    dropped the athlete's first recorded session, which is far worse than a
+    missing setup number."""
+    a = _assessment([b.Reading("leverage_bent", 8.0, "cm", side="left", setup_value=34.0)])
+    back = fx.assessment_from_dict(fx.assessment_to_dict(a))
+    assert back.readings[0].setup_value == 34.0
+
+    stale = fx.assessment_to_dict(a)
+    for reading in stale["readings"]:
+        reading.pop("setup_value", None)
+    recovered = fx.assessment_from_dict(stale)
+    assert recovered is not None
+    assert recovered.readings[0].setup_value is None

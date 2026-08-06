@@ -1576,6 +1576,18 @@ def _fx_render_capture(accent: str) -> None:
                 value=None, step=0.5, format="%.1f", key=f"fx_load_{key}",
             )
 
+        # The setup number this trial was taken at. Same principle as the load,
+        # and on the bent-knee leverage it is the number that decides which
+        # PATTERN comes out — heels closer than the reference drop the knees
+        # further, so the test passes too easily and a whole-group restriction
+        # reads as a gracilis one.
+        setup_value = None
+        if test.setup_input:
+            setup_value = st.number_input(
+                f"{test.setup_input} — recorded beside the reading, they are one datum",
+                value=None, step=0.5, format="%.1f", key=f"fx_setup_{key}",
+            )
+
         void = st.checkbox("The lock was lost — void this trial",
                            key=f"fx_void_{key}")
         submitted = st.form_submit_button(
@@ -1589,7 +1601,7 @@ def _fx_render_capture(accent: str) -> None:
                 continue
             updated = fx.merge_reading(updated, btry.Reading(
                 test_key=key, value=float(value), unit=test.unit, side=side,
-                load_kg=load, voided=bool(void),
+                load_kg=load, setup_value=setup_value, voided=bool(void),
             ))
         repo_.save_flexibility_draft(updated)
         if last:
@@ -1645,6 +1657,16 @@ def _fx_render_populated(report, accent: str) -> None:
         unsafe_allow_html=True,
     )
     st.caption(result.slots[-1].reason)
+
+    # TWO separate reasons a pattern may not be a verdict, and they need
+    # different fixes: more mornings for one, a validated threshold for the
+    # other. Shown separately so three repeat measurements cannot look like
+    # they confirmed a number nobody had checked.
+    if result.rests_on_an_invented_number:
+        st.error(
+            f"**This label rests on a cut point we invented.** "
+            f"{btry.BASIS_EXPLAINED[btry.BASIS_PROVISIONAL]}",
+            icon="🚧")
 
     if not report.trusted:
         st.warning(
@@ -1707,8 +1729,11 @@ def _fx_render_populated(report, accent: str) -> None:
     with st.expander(f"How that was reached · {len(result.slots)} slot(s) run"):
         for slot in result.slots:
             mark = "✓" if slot.passed else ("—" if slot.indeterminate else "✗")
+            basis = ("compares your own readings"
+                     if slot.basis == btry.BASIS_RELATIVE
+                     else "rests on a cut point we invented")
             st.markdown(f"**{mark} Slot {slot.slot} · {btry.SLOT_LABELS[slot.slot]}** — "
-                        f"{btry.SLOT_QUESTIONS[slot.slot]}")
+                        f"{btry.SLOT_QUESTIONS[slot.slot]}  ·  *{basis}*")
             st.caption(slot.reason)
         skipped = 4 - len(result.slots)
         if skipped:
@@ -1720,7 +1745,8 @@ def _fx_render_populated(report, accent: str) -> None:
         for r in result.slots[-1].readings or ():
             side = f" *{r.side}*" if r.side else ""
             load = f" @ {r.load_kg:g} kg" if r.load_kg else ""
-            st.markdown(f"**{r.test_key}**{side} — {r.value:g}{r.unit}{load}")
+            setup = f" · setup {r.setup_value:g}" if r.setup_value is not None else ""
+            st.markdown(f"**{r.test_key}**{side} — {r.value:g}{r.unit}{load}{setup}")
 
     c1, c2 = st.columns(2)
     if c1.button("Re-assess", key="fx_reassess", use_container_width=True):

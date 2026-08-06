@@ -88,6 +88,9 @@ class BatteryTest:
     bilateral: bool = False
     smaller_is_better: bool = False
     safety: str = ""
+    #: A second number this test needs beside the measurement — the setup it was
+    #: taken at. Empty for tests that have none. See Reading.setup_value.
+    setup_input: str = ""
     deferred_until: str = ""
     adapted_from: str = ""
 
@@ -156,12 +159,19 @@ TESTS: dict[str, BatteryTest] = {
              "further out drop the knees without your groin being one millimetre longer, so "
              "a session that re-places them by eye is void against the last one.",
         measurement="Measure from the floor up to **the outside of each calf**. Smaller is "
-                    "better. Left and right separately, to the nearest half centimetre.",
+                    "better. Left and right separately, to the nearest half centimetre. "
+                    "**Also record the heel distance you actually used** — it decides what "
+                    "this reading means.",
+        setup_input="Tailbone to the back of your heels (cm)",
         what_youre_testing="Your groin muscles with the knee fully bent. Bending the knee "
                            "slackens gracilis — the one groin muscle that crosses the knee — "
                            "so this loads everything except it. Comparing this against the "
                            "straight-knee test is what names which part of the group is "
-                           "short.",
+                           "short. **That comparison is why the heel distance matters more "
+                           "here than anywhere else**: heels pulled closer than your "
+                           "reference drop the knees further, so this test passes too "
+                           "easily, and a whole-group restriction comes out looking like a "
+                           "gracilis one.",
     ),
     "leverage_90": BatteryTest(
         key="leverage_90", slot=_b.SLOT_REGRESSED,
@@ -414,13 +424,17 @@ def evaluate_structure(assessment):
 
     # Smaller is deeper. A turned-out attempt that goes MUCH deeper means the
     # joint was misaligned rather than the tissue short.
+    # RELATIVE: this compares two of his own readings taken minutes apart, so it
+    # carries its own reference and no invented norm is involved. The only slot
+    # in the battery that is sound on a first morning.
     gain = neutral.value - turned.value
     if gain >= GATE0_ORIENTATION_GAIN_CM:
         return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, pattern="B",
+                            basis=b.BASIS_RELATIVE,
                             reason=f"Turning the legs out gained {gain:.1f} cm. Orientation "
                                    f"is the limiter, not tissue length.",
                             readings=(neutral, turned))
-    return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=True,
+    return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=True, basis=b.BASIS_RELATIVE,
                         reason=f"Turning out changed the depth by {gain:.1f} cm — below the "
                                f"threshold for calling alignment the limiter, so this is a "
                                f"genuine tissue restriction.",
@@ -437,21 +451,29 @@ def evaluate_regressed(assessment):
                             reason="Both available leverages are needed — bent against "
                                    "straight is what names the muscle.")
 
+    # PROVISIONAL, and this is the slot where that matters most. The source
+    # document describes Test 1 entirely qualitatively — "fails both", "fails
+    # bent, straight relatively better", "passes bent, fails straight badly" —
+    # and gives NO numbers. The two below were invented so the code could run.
+    # The first real run of this battery returned Pattern E off them.
     bent_fails = bent > LEVERAGE_TARGETS["leverage_bent"]
     straight_fails = straight < LEVERAGE_TARGETS["leverage_straight"]
 
     if bent_fails and straight_fails:
         return b.SlotResult(slot=b.SLOT_REGRESSED, passed=False, pattern="C",
+                            basis=b.BASIS_PROVISIONAL,
                             reason="Both leverages short — the whole group.")
     if bent_fails:
         return b.SlotResult(slot=b.SLOT_REGRESSED, passed=False, pattern="D",
+                            basis=b.BASIS_PROVISIONAL,
                             reason="Short with the knee bent, relatively better straight — "
                                    "the adductors and rotators rather than gracilis.")
     if straight_fails:
         return b.SlotResult(slot=b.SLOT_REGRESSED, passed=False, pattern="E",
+                            basis=b.BASIS_PROVISIONAL,
                             reason="Fine bent, poor straight. Gracilis is the only one of "
                                    "the group crossing the knee, so that difference names it.")
-    return b.SlotResult(slot=b.SLOT_REGRESSED, passed=True,
+    return b.SlotResult(slot=b.SLOT_REGRESSED, passed=True, basis=b.BASIS_PROVISIONAL,
                         reason="Length is adequate at both available leverages.")
 
 
@@ -466,14 +488,17 @@ def evaluate_prerequisite(assessment):
                                    "produce-alone are what separate F from G, and one "
                                    "without the other names neither.")
 
+    # PROVISIONAL for the same reason — TILT_TARGET_CM is ours, not the source's.
     if rng.value > TILT_TARGET_CM:
         return b.SlotResult(slot=b.SLOT_PREREQUISITE, passed=False, pattern="F",
+                            basis=b.BASIS_PROVISIONAL,
                             reason="The position is not available even with help. Tilt work "
                                    "goes FIRST in the session and starts assisted — you "
                                    "cannot train actively into a position you cannot reach.",
                             readings=(rng, prod))
     if prod.value > TILT_TARGET_CM:
         return b.SlotResult(slot=b.SLOT_PREREQUISITE, passed=False, pattern="G",
+                            basis=b.BASIS_PROVISIONAL,
                             reason="You can reach it, you cannot produce it. Tilt work moves "
                                    "to the END of the session and becomes strength work.",
                             readings=(rng, prod))
@@ -497,6 +522,7 @@ def evaluate_spectrum(assessment):
     # than passive, or the load was too light and passive tissue absorbed it.
     if not b.isometric_is_shallower(passive.value, iso.value, smaller_is_better=True):
         return b.SlotResult(slot=b.SLOT_SPECTRUM, passed=False, indeterminate=True,
+                            basis=b.BASIS_RELATIVE,
                             reason="The isometric reading is as deep as the passive one, so "
                                    "the load was too light — you measured passive twice. "
                                    "Take weight off and repeat before reading this slot.",

@@ -236,7 +236,8 @@ def assessment_to_dict(a: _b.Assessment) -> dict:
         "note": a.note,
         "readings": [
             {"test_key": r.test_key, "value": r.value, "unit": r.unit, "side": r.side,
-             "load_kg": r.load_kg, "note": r.note, "voided": r.voided}
+             "load_kg": r.load_kg, "setup_value": r.setup_value,
+             "note": r.note, "voided": r.voided}
             for r in a.readings
         ],
     }
@@ -250,6 +251,11 @@ def assessment_from_dict(d: dict) -> _b.Assessment | None:
     cannot be understood must degrade to "no assessment", which the screen
     renders honestly. A half-parsed one would run a battery against readings it
     does not have.
+
+    `setup_value` was ADDED without a schema bump, on purpose: it is optional and
+    absent payloads parse to None, so an assessment recorded before it existed
+    still loads. Bumping would have silently dropped the athlete's first real
+    session, which is a far worse outcome than a missing setup number.
 
     NOTE the schema bump to 2. Version 1 held the retired rung model, and a v1
     payload is not convertible — its readings measured different positions with
@@ -280,6 +286,7 @@ def assessment_from_dict(d: dict) -> _b.Assessment | None:
         readings.append(_b.Reading(
             test_key=key, value=value, unit=raw.get("unit") or "",
             side=raw.get("side") or "", load_kg=raw.get("load_kg"),
+            setup_value=raw.get("setup_value"),
             note=raw.get("note") or "", voided=bool(raw.get("voided")),
         ))
 

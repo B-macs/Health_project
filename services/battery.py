@@ -91,6 +91,45 @@ BASELINE_SESSIONS_REQUIRED: int = 3
 NOISE_MULTIPLE: float = 2.0
 
 
+# ── what a slot's verdict actually rests on ──────────────────────────────────
+#
+# THIS DISTINCTION IS THE DIFFERENCE BETWEEN A FINDING AND AN ARTEFACT, and it
+# was learned the hard way: the first real run of Cluster A returned Pattern E
+# (gracilis) off a cut point of 90 cm that nobody had validated. The source
+# document specifies Test 1 qualitatively — "fails both", "fails bent, straight
+# relatively better", "passes bent, fails straight badly" — and gives no numbers
+# at all. The numbers were invented so the code could run, marked provisional in
+# a comment, and then handed the athlete a diagnosis.
+#
+#   RELATIVE    the verdict compares two of the athlete's OWN readings from the
+#               same session. Sound on day one, because the comparison carries
+#               its own reference and no external norm is involved.
+#   PROVISIONAL the verdict compares a reading against a CUT POINT that has no
+#               validated basis for this athlete. Directionally useful, not a
+#               diagnosis, and it stays that way until three baseline mornings
+#               establish what his own numbers look like.
+#
+# Surfaced on the result rather than buried, because "your gracilis is short" and
+# "your straddle is below a line we drew" are different claims and the athlete
+# has to be able to tell which one he has been given.
+
+BASIS_RELATIVE = "relative"
+BASIS_PROVISIONAL = "provisional"
+
+BASIS_EXPLAINED: dict[str, str] = {
+    BASIS_RELATIVE:
+        "This compares two of your own readings from the same session, so it "
+        "carries its own reference. It does not depend on any threshold we set.",
+    BASIS_PROVISIONAL:
+        "This compares your reading against a CUT POINT WE INVENTED. The source "
+        "material describes this test qualitatively and gives no numbers, so the "
+        "threshold was chosen to make the code run and has never been validated "
+        "against your body. Treat the label as a direction to investigate, not a "
+        "diagnosis, until three baseline mornings show what your own numbers "
+        "look like.",
+}
+
+
 # ── readings ─────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
@@ -109,6 +148,20 @@ class Reading:
     unit: str
     side: str = ""
     load_kg: float | None = None
+
+    #: The SETUP number this trial was taken at, where the test has one — the
+    #: heel distance in the bent-knee leverage, for instance. Same principle as
+    #: `load_kg` and the same reason: a reading taken at an unrecorded setup
+    #: cannot be compared with anything, including itself next month.
+    #:
+    #: This one earns its own field because it is the setup that decides which
+    #: PATTERN comes out. Pattern E is "passes bent, fails straight", and heels
+    #: pulled closer than the reference drop the knees further — so an
+    #: unrecorded heel distance can turn a whole-group restriction into an
+    #: apparent gracilis one. The number that was not captured is the one that
+    #: chose the diagnosis.
+    setup_value: float | None = None
+
     note: str = ""
     voided: bool = False
 
@@ -124,6 +177,10 @@ class SlotResult:
     passed: bool
     pattern: str = ""
     reason: str = ""
+    #: RELATIVE or PROVISIONAL — see BASIS_EXPLAINED. Defaults to provisional
+    #: because that is the safe direction: a slot that forgot to declare its
+    #: basis should read as "rests on a number we invented", not as sound.
+    basis: str = BASIS_PROVISIONAL
     readings: tuple[Reading, ...] = field(default_factory=tuple)
     #: True when the slot could not be evaluated — a skipped or deferred test,
     #: not a pass and not a failure. The battery stops, but the reason is
@@ -184,6 +241,23 @@ class BatteryResult:
     @property
     def limiting_slot_label(self) -> str:
         return SLOT_LABELS.get(self.stopped_at, "") if self.stopped_at is not None else ""
+
+    @property
+    def basis(self) -> str:
+        """What the pattern actually rests on — the deciding slot's basis."""
+        return self.slots[-1].basis if self.slots else BASIS_PROVISIONAL
+
+    @property
+    def rests_on_an_invented_number(self) -> bool:
+        """True when the pattern came from a cut point with no validated basis.
+
+        Separate from `trusted`, which is about how many mornings were measured.
+        A pattern can be untrusted for both reasons at once, and they need
+        different fixes: more mornings for one, a validated threshold for the
+        other. Conflating them would let three repeat measurements look like
+        they had confirmed a number nobody had checked.
+        """
+        return self.complete and self.basis == BASIS_PROVISIONAL
 
 
 # ── running a battery ────────────────────────────────────────────────────────
