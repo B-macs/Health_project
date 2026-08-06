@@ -4314,10 +4314,17 @@ class Repository:
         local_cache.write(data)
 
     # ─── Flexibility assessments ─────────────────────────────────────────
-    #  The 13-rung standalone assessment (see flexibility_baselines.py). Read
-    #  its module docstring before touching this: readings are the ONLY input
-    #  the flexibility model has, so a lost or half-parsed one is not a
-    #  degraded score, it is a wrong one.
+    #  One session of a cluster battery (see services/battery.py and
+    #  cluster_a_battery.py). Read those docstrings before touching this:
+    #  readings are the ONLY input the model has, so a lost or half-parsed one
+    #  is not a degraded answer, it is a wrong one.
+    #
+    #  The payload schema went to 2 on 2026-08-06 when the rung model was
+    #  deleted. A v1 payload is NOT migrated — its readings measured different
+    #  positions with different landmarks, so there is nothing to convert — and
+    #  assessment_from_dict returns None for one, which lands it in the
+    #  dropped-entry path below. No v1 assessment was ever recorded, so this
+    #  costs nothing and guessing a conversion would not have.
 
     def get_flexibility_assessments(self) -> tuple:
         """Every completed assessment, oldest first.

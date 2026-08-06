@@ -24,6 +24,9 @@ import streamlit as st
 import pandas as pd
 
 import body_composition_baselines as bcb
+import cluster_a_battery as cba
+import cluster_a_mechanics
+import cluster_a_prescription
 import flexibility_baselines
 import patient_profile
 import repo
@@ -35,6 +38,7 @@ from services import bioage
 from services import body_composition as bc
 from services import dashboard as dash
 from services import engine
+from services import battery as btry
 from services import flexibility as fx
 from services import stats as stats_mod
 from services import insights as insights_svc
@@ -1304,205 +1308,139 @@ def _recent_sessions():
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  Flexibility detail screen (tab_bioage → ?bioage=flexibility). v2.
+#  Flexibility detail screen (tab_bioage → ?bioage=flexibility). v3 — clusters.
 #
 #  THREE STATES, DESIGNED SEPARATELY. Empty is not a degraded version of
-#  populated — it is where this athlete actually is, it will be for weeks, and
-#  it is the only state with an obvious single action. It gets its own screen
-#  with one button on it rather than seventeen cards reading "not measured".
+#  populated — it is where this athlete actually is, and it is the only state
+#  with an obvious single action. It gets its own screen with one button on it.
 #
-#  Capture is one test per step because 14 rungs x 3 measures x left/right is
-#  up to 78 numbers, and it saves a draft after EVERY step because 40 minutes
-#  is long enough to be interrupted. A half-finished assessment that vanishes
-#  will not be attempted twice.
+#  CAPTURE STOPS AT THE FIRST FAILING SLOT, and that is not a shortcut — it is
+#  the method. Slots below a failure are meaningless rather than lower priority,
+#  so continuing would collect numbers that cannot be read. The screen runs the
+#  real battery against the draft after every step rather than duplicating the
+#  rule, so the flow and the engine cannot disagree about when to stop.
 #
-#  Populated leads with ONE rung — the lowest across every ladder — because the
-#  original ask was "come to conclusions on where to focus in my training", and
-#  four skill scores is not that answer.
+#  Populated leads with the PATTERN and the one thing to train. The model this
+#  replaced led with the worst rung across every ladder, which is how
+#  "chest/pecs is limiting you" got shown against a goal chest has nothing to
+#  do with.
 # ─────────────────────────────────────────────────────────────────────────────
-
-_FX_PRESCRIPTION_LABEL: dict[str, str] = {
-    fx.PRESCRIPTION_RANGE:    "needs range",
-    fx.PRESCRIPTION_STRENGTH: "needs strength",
-    fx.PRESCRIPTION_UNKNOWN:  "gap not measured",
-}
 
 _ACCENT_FLEX = _BIOAGE_COLORS["flexibility"]
 
 _FLEXIBILITY_CSS = f"""
 <style>
 .fx-card {{ background:{_PANEL}; border:1px solid {_HAIR}; border-radius:14px;
-  padding:16px 18px; margin-bottom:10px; }}
+           padding:16px 18px; margin-bottom:10px; }}
 .fx-card.hi {{ border-color:rgba(196,120,120,.45); background:rgba(196,120,120,.07); }}
-.fx-cap {{ font:600 9px/1 ui-monospace,SFMono-Regular,Menlo,monospace;
-  letter-spacing:.13em; text-transform:uppercase; color:{_INK3}; }}
-.fx-huge {{ font-size:40px; font-weight:800; line-height:1.08; margin-top:8px; }}
-.fx-big {{ font-size:30px; font-weight:800; line-height:1.1; margin-top:6px; }}
-.fx-sm {{ font-size:11.5px; color:{_INK3}; margin-top:8px; line-height:1.6; }}
+.fx-cap {{ font-size:9px; letter-spacing:.13em; text-transform:uppercase;
+          color:{_INK3}; font-weight:700; }}
+.fx-huge {{ font-size:38px; font-weight:800; line-height:1.08; margin-top:8px; }}
+.fx-big {{ font-size:28px; font-weight:800; line-height:1.12; margin-top:6px; }}
+.fx-sm {{ font-size:11.5px; color:{_INK3}; margin-top:8px; line-height:1.65; }}
 .fx-row {{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }}
-.fx-nm {{ color:{_INK}; font-size:15px; font-weight:650; }}
-.fx-val {{ font-size:23px; font-weight:750; font-variant-numeric:tabular-nums; }}
-.fx-val u {{ text-decoration:none; font-size:10px; color:{_INK3}; font-weight:500; }}
-.fx-track {{ height:7px; border-radius:4px; background:rgba(255,255,255,.07);
-  margin-top:9px; position:relative; overflow:hidden; }}
-.fx-track i {{ display:block; height:100%; border-radius:4px; }}
-.fx-goal {{ position:absolute; top:-3px; bottom:-3px; width:2px; background:{_GOOD}; }}
-.fx-kv {{ display:flex; gap:16px; flex-wrap:wrap; margin-top:9px;
-  font:11.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:{_INK3}; }}
+.fx-nm {{ font-size:15px; font-weight:650; color:{_INK}; }}
+.fx-kv {{ display:flex; gap:16px; flex-wrap:wrap; margin-top:9px; font-size:11.5px;
+         color:{_INK3}; }}
 .fx-kv b {{ color:{_INK2}; font-weight:650; }}
 .fx-lock {{ background:rgba(191,160,106,.11); border:1px solid rgba(191,160,106,.32);
-  color:#E2CB9B; border-radius:10px; padding:11px 13px; font-size:11.5px;
-  line-height:1.6; margin:10px 0; }}
-.fx-steps {{ display:flex; gap:3px; margin-bottom:12px; }}
+           color:#E2CB9B; border-radius:10px; padding:11px 13px; font-size:11.5px;
+           line-height:1.65; margin:12px 0; }}
+.fx-steps {{ display:flex; gap:3px; margin-bottom:14px; }}
 .fx-steps i {{ height:3px; flex:1; border-radius:2px; background:rgba(255,255,255,.10); }}
 .fx-steps i.done {{ background:{_GOOD}; }}
 .fx-steps i.now {{ background:{_ACCENT_FLEX}; }}
 .fx-steps i.skip {{ background:{_INK3}; }}
-.fx-pill {{ display:inline-block; padding:2px 8px; border-radius:999px;
-  font-size:9.5px; font-weight:700; }}
+.fx-pill {{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:9.5px;
+           font-weight:700; }}
 </style>
 """
-
-
-def _fx_track(pct: float, colour: str, goal: float | None = None) -> str:
-    mark = f'<span class="fx-goal" style="left:{goal:.0f}%;"></span>' if goal else ""
-    return (f'<div class="fx-track"><i style="width:{max(0.0, min(100.0, pct)):.0f}%;'
-            f'background:{colour};"></i>{mark}</div>')
-
-
-# ── state 1: empty ───────────────────────────────────────────────────────────
-
-def _fx_render_empty(accent: str) -> None:
-    """Two cards and a real button. The skills and rungs are deliberately NOT
-    rendered — fourteen unmeasured things is a progress bar at zero, and it
-    belongs inside the assessment where it fills up, not on the dashboard."""
-    st.markdown(
-        f'<div class="fx-card"><div class="fx-cap">Standing goal &middot; no deadline</div>'
-        f'<div class="fx-huge" style="color:{accent};">Not measured</div>'
-        f'<div class="fx-sm">{len(flexibility_baselines.RUNGS)} tests &middot; ~40 min '
-        f'&middot; measured <b style="color:{_INK2};">cold</b>, no warm-up.<br>'
-        f'Every 6&ndash;12 weeks.'
-        f'</div></div>',
-        unsafe_allow_html=True,
-    )
-    if st.button("Start assessment", key="fx_start", use_container_width=True,
-                  type="primary"):
-        st.session_state["fx_mode"] = "capture"
-        st.session_state["fx_step"] = 0
-        st.rerun()
-
-    st.markdown(
-        f'<div class="fx-card" style="margin-top:12px;">'
-        f'<div class="fx-nm" style="font-size:13px;color:{_INK2};">'
-        f'Why there is nothing else here</div>'
-        f'<div class="fx-sm">The 22 yoga depth-ratings from '
-        f'{flexibility_baselines.LEGACY_DEPTH_RATING_DATE:%d %b %Y} are kept in full, '
-        f'and feed nothing. They answer &ldquo;how far did I get <i>and</i> how much '
-        f'did I feel&rdquo; &mdash; neither of the two things this model measures, so '
-        f'reinterpreting them would be inventing data.</div></div>',
-        unsafe_allow_html=True,
-    )
-
-
-# ── state 2: capture ─────────────────────────────────────────────────────────
-
-def _fx_steps_html(order: list[str], step: int, draft) -> str:
-    done = set()
-    if draft is not None:
-        done = {r.rung for r in draft.readings
-                if r.passive is not None or r.isometric is not None or r.active is not None}
-    out = []
-    for i, key in enumerate(order):
-        cls = "now" if i == step else ("done" if key in done else "")
-        out.append(f'<i class="{cls}"></i>')
-    return f'<div class="fx-steps">{"".join(out)}</div>'
 
 
 def _fx_bold(text: str) -> str:
     """`**x**` -> `<b>x</b>`, for the fields rendered as raw HTML.
 
     The protocol text is authored in markdown so it reads correctly in the
-    docs, the prototype and st.caption. Three of the fields go out through
+    source documents and in st.caption. Three fields go out through
     st.markdown(unsafe_allow_html=True) instead, where markdown is NOT applied
-    and the asterisks would show up literally — and the emphasis is load-bearing
-    here, because it is what marks the tell that says a trial is void.
+    and the asterisks would show literally — and the emphasis is load-bearing,
+    because it marks the tell that says a trial is void.
     """
     parts = text.split("**")
     return "".join(p if i % 2 == 0 else f"<b>{p}</b>" for i, p in enumerate(parts))
 
 
+# ── state 1: empty ───────────────────────────────────────────────────────────
+
+def _fx_render_empty(accent: str) -> None:
+    spec = fx.CLUSTERS[fx.DEFAULT_CLUSTER]
+    n = len(spec["battery"].AVAILABLE_TESTS)
+    st.markdown(
+        f'<div class="fx-card"><div class="fx-cap">Standing goal &middot; no deadline</div>'
+        f'<div class="fx-huge" style="color:{accent};">Not measured</div>'
+        f'<div class="fx-sm">{spec["label"]} &middot; up to {n} tests &middot; measured '
+        f'<b style="color:{_INK2};">cold</b>, no warm-up.<br>'
+        f'Every four weeks. It usually stops early &mdash; the first failing slot is '
+        f'your answer, and nothing below it is worth measuring.</div></div>',
+        unsafe_allow_html=True,
+    )
+    if st.button("Start assessment", key="fx_start", use_container_width=True,
+                 type="primary"):
+        st.session_state["fx_mode"] = "capture"
+        st.session_state["fx_step"] = 0
+        st.rerun()
+
+    st.markdown(
+        f'<div class="fx-card" style="margin-top:12px;">'
+        f'<div class="fx-cap">What this produces</div>'
+        f'<div class="fx-sm">One <b style="color:{_INK2};">pattern label</b>, and nothing '
+        f'else. Not a score. The label is what the training stack is looked up by &mdash; '
+        f'and a stack without a label is a guess, so the app refuses to produce one.'
+        f'</div></div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("The four slots, and why they run in order"):
+        for slot in (btry.SLOT_STRUCTURE, btry.SLOT_REGRESSED,
+                     btry.SLOT_PREREQUISITE, btry.SLOT_SPECTRUM):
+            st.markdown(f"**{slot}. {btry.SLOT_LABELS[slot]}** — "
+                        f"{btry.SLOT_QUESTIONS[slot]}")
+            st.caption(f"Decides: {btry.SLOT_DECIDES[slot]}")
+        st.caption("Stop at the first failure. There is no value in measuring a spectrum "
+                   "profile for a skill that a bony block had already made unavailable.")
+
+    with st.expander("Expected outcome, written down before measuring"):
+        st.markdown(f"**Pattern {cba.EXPECTED_PATTERN}** — "
+                    f"{cba.PATTERNS[cba.EXPECTED_PATTERN]}")
+        st.caption(cba.EXPECTED_PATTERN_BASIS)
+
+
+# ── state 2: capture ─────────────────────────────────────────────────────────
+
+def _fx_steps_html(order: list, step: int, draft) -> str:
+    done = {r.test_key for r in draft.readings if r.usable} if draft else set()
+    ticks = []
+    for i, key in enumerate(order):
+        cls = "now" if i == step else ("done" if key in done else "")
+        ticks.append(f'<i class="{cls}"></i>')
+    return f'<div class="fx-steps">{"".join(ticks)}</div>'
+
+
 def _fx_render_capture(accent: str) -> None:
     repo_ = repo.get_repository()
-    order = list(flexibility_baselines.RUNGS)
-    step = int(st.session_state.get("fx_step", 0))
-    step = max(0, min(step, len(order) - 1))
+    spec = fx.CLUSTERS[fx.DEFAULT_CLUSTER]
+    battery_mod = spec["battery"]
+    order = list(battery_mod.AVAILABLE_TESTS)
 
     draft = repo_.get_flexibility_draft()
 
-    # ── step 0: choose the target, BEFORE any test is taken ──────────────────
-    #
-    # Deliberately first. The target is what makes a limiting rung mean
-    # anything, so asking afterwards would be asking the athlete to interpret a
-    # number that was computed without knowing the question. It is also what
-    # the athlete asked for: "at the start of the flexibility questions and
-    # before the tests, the user must be asked, what is the skill you would
-    # like to test towards".
-    if draft is None and not st.session_state.get("fx_target"):
-        st.markdown(
-            f'<div class="fx-card"><div class="fx-cap">First</div>'
-            f'<div class="fx-big" style="color:{accent};">Pick one goal</div>'
-            f'<div class="fx-sm">One skill at a time. The goal decides which of the '
-            f'{len(flexibility_baselines.RUNGS)} tests actually matters to you &mdash; '
-            f'your chest is what stops a bridge and is irrelevant to a pancake, so '
-            f'"what is limiting you" has no answer until there is a goal to limit.'
-            f'</div></div>',
-            unsafe_allow_html=True,
-        )
-        choices = list(flexibility_baselines.SELECTABLE_SKILLS)
-        pick = st.radio(
-            "Goal",
-            choices,
-            format_func=lambda k: (f"{flexibility_baselines.SKILLS[k].label}"
-                                   f"  ·  {flexibility_baselines.SKILLS[k].aka}"),
-            key="fx_target_pick", label_visibility="collapsed",
-        )
-        st.caption(flexibility_baselines.SKILLS[pick].note)
-
-        others = [k for k in flexibility_baselines.UNBUILT_SKILLS]
-        if others:
-            with st.expander(f"Goals with no stack built yet · {len(others)}"):
-                st.caption("Measured and scored, but there is no route to hand you, "
-                           "so they cannot be the target. Shoulder flexion is next.")
-                for k in others:
-                    sk = flexibility_baselines.SKILLS[k]
-                    st.markdown(f"**{sk.label}** — {sk.aka}")
-        blocked = list(flexibility_baselines.BLOCKED_SKILLS)
-        if blocked:
-            with st.expander(f"Goals waiting on a sign-off · {len(blocked)}"):
-                for k in blocked:
-                    sk = flexibility_baselines.SKILLS[k]
-                    st.markdown(f"**{sk.label}** — {sk.aka}")
-                    st.caption(sk.blocked_reason)
-
-        c1, c2 = st.columns([2, 1])
-        if c1.button("Next", key="fx_pick_go", use_container_width=True,
-                     type="primary"):
-            st.session_state["fx_target"] = pick
-            st.rerun()
-        if c2.button("Cancel", key="fx_cancel_pick", use_container_width=True):
-            st.session_state["fx_mode"] = None
-            st.rerun()
-        return
-
+    # ── the cold gate ───────────────────────────────────────────────────────
     if draft is None:
-        # Session 1 of this assessment: the cold gate. Asked once, recorded on
-        # the assessment, because a warm reading measures the viscoelastic
-        # effect that is gone in hours and is not comparable with a cold one.
         st.markdown(
             f'<div class="fx-card"><div class="fx-cap">Before you start</div>'
             f'<div class="fx-big" style="color:{accent};">Measure cold</div>'
-            f'<div class="fx-sm">No warm-up, no session beforehand. A warm reading '
-            f'measures the viscoelastic effect, which is gone within hours &mdash; a '
+            f'<div class="fx-sm">No warm-up, no session beforehand, first thing. A warm '
+            f'reading measures a viscoelastic effect that is gone within hours &mdash; a '
             f'cold one isolates the durable change. A warm session is still worth '
             f'recording, but it is labelled and never compared with a cold one.'
             f'</div></div>',
@@ -1512,33 +1450,32 @@ def _fx_render_capture(accent: str) -> None:
                         ["Cold — no warm-up", "Warm — I have trained today"],
                         key="fx_cold", label_visibility="collapsed")
 
-        # Everything the athlete needs to understand BEFORE the first number,
-        # rather than inferred from the first test. Expanded by default the
-        # first time through: these are the three concepts the whole assessment
-        # is built on and none of them were explained anywhere on screen.
-        with st.expander("How to understand the measurements", expanded=True):
-            for _measure, _short, _long in flexibility_baselines.MEASURES_EXPLAINED:
-                st.markdown(f"**{_measure.title()} — {_short}**")
-                st.caption(_long)
+        with st.expander("How to understand the three numbers", expanded=True):
+            for measure, short, long in flexibility_baselines.MEASURES_EXPLAINED:
+                st.markdown(f"**{measure.title()} — {short}**")
+                st.caption(long)
             st.markdown(flexibility_baselines.GAP_EXPLAINED)
+            st.caption("Taken in the order **active → isometric → passive**. Passive work "
+                       "leaves tissue looser for an hour, so doing it first would flatter "
+                       "everything after it.")
 
         with st.expander("What a LOCK is, and what to do if you lose it"):
             st.markdown(flexibility_baselines.LOCK_EXPLAINED)
 
         with st.expander("Measure these once, then re-use them forever"):
-            st.caption("Take these on your first session and write them down. "
-                       "They are not scores — they are setup numbers that make "
-                       "one session comparable with the next.")
-            for _name, _why in flexibility_baselines.FROZEN_CONSTANTS:
-                st.markdown(f"**{_name.replace('_', ' ')}** — {_why}")
+            st.caption("Setup numbers, not scores. Get one wrong and two sessions are not "
+                       "comparable however carefully each was measured.")
+            for name, why in flexibility_baselines.FROZEN_CONSTANTS:
+                st.markdown(f"**{name.replace('_', ' ')}** — {why}")
+            moving_name, moving_why = flexibility_baselines.PROGRESSION_VARIABLE
+            st.markdown(f"**{moving_name.replace('_', ' ')}** — *this one is meant to "
+                        f"move.* {moving_why}")
 
         c1, c2 = st.columns([2, 1])
         if c1.button("Begin", key="fx_begin", use_container_width=True, type="primary"):
-            repo_.save_flexibility_draft(flexibility_baselines.Assessment(
-                taken_on=date.today(), readings=(),
+            repo_.save_flexibility_draft(btry.Assessment(
+                cluster=spec["key"], taken_on=date.today(), readings=(),
                 cold=cold.startswith("Cold"),
-                target_skill=st.session_state.get(
-                    "fx_target", flexibility_baselines.DEFAULT_TARGET_SKILL),
             ))
             st.rerun()
         if c2.button("Cancel", key="fx_cancel0", use_container_width=True):
@@ -1546,328 +1483,302 @@ def _fx_render_capture(accent: str) -> None:
             st.rerun()
         return
 
+    # ── has the battery already reached an answer? ──────────────────────────
+    #
+    # Asked of the REAL engine rather than re-implemented here, so the flow and
+    # the battery cannot disagree about when to stop. This is the early exit,
+    # and it is the method rather than a convenience: once a slot has failed,
+    # everything below it is unreadable and collecting it wastes 30 minutes.
+    live = btry.run(spec["key"], battery_mod.SLOT_EVALUATORS, draft)
+    if live.pattern:
+        st.markdown(
+            f'<div class="fx-card hi"><div class="fx-cap" style="color:{_GOOD};">'
+            f'That is your answer &mdash; stop here</div>'
+            f'<div class="fx-big" style="color:{accent};">Pattern {live.pattern} '
+            f'&middot; {cba.PATTERNS[live.pattern]}</div>'
+            f'<div class="fx-sm">{live.slots[-1].reason}</div>'
+            f'<div class="fx-sm">The remaining tests measure things below the slot that '
+            f'stopped you, and a reading taken below a failure cannot be interpreted. '
+            f'There is nothing more to collect today.</div></div>',
+            unsafe_allow_html=True,
+        )
+        c1, c2 = st.columns([2, 1])
+        if c1.button("Save assessment", key="fx_finish_early", use_container_width=True,
+                     type="primary"):
+            repo_.save_flexibility_assessment(draft)
+            repo_.clear_flexibility_draft()
+            _flexibility_screen_data.clear()
+            st.session_state["fx_mode"] = None
+            st.rerun()
+        if c2.button("Keep going anyway", key="fx_continue", use_container_width=True):
+            st.session_state["fx_force_continue"] = True
+            st.rerun()
+        if not st.session_state.get("fx_force_continue"):
+            return
+
+    step = int(st.session_state.get("fx_step", 0))
+    step = max(0, min(step, len(order) - 1))
     key = order[step]
-    test = flexibility_baselines.RUNGS[key]
-    existing = {(r.rung, r.side): r for r in draft.readings}
+    test = battery_mod.TESTS[key]
 
     st.markdown(_fx_steps_html(order, step, draft), unsafe_allow_html=True)
     st.markdown(
         f'<div class="fx-row"><span class="fx-nm">{test.label}</span>'
-        f'<span class="fx-cap">{step + 1} of {len(order)}</span></div>'
-        f'<div class="fx-sm" style="margin-top:2px;">{test.test_name}</div>',
+        f'<span class="fx-cap">{step + 1} of {len(order)} &middot; slot {test.slot} '
+        f'{btry.SLOT_LABELS[test.slot]}</span></div>',
         unsafe_allow_html=True,
     )
 
     # The lock is the loudest thing on the screen, above the setup and above the
-    # fields — an unlocked joint lets a neighbour substitute and the test
-    # measures nothing, which is the failure that broke this model twice.
+    # fields — a lost lock makes the reading BETTER, not worse, so nothing warns
+    # you and the tell has to be impossible to miss.
     st.markdown(f'<div class="fx-lock"><b>LOCK</b> &mdash; {_fx_bold(test.lock)}</div>',
                 unsafe_allow_html=True)
     st.markdown(f'<div class="fx-card"><div class="fx-sm" style="color:{_INK2};">'
                 f'{_fx_bold(test.setup)}</div></div>', unsafe_allow_html=True)
+
     with st.expander("How to read it"):
-        st.caption(test.measurement)
-        st.caption(f"Scale: **{test.value_at_100:g}{test.unit} = 100** · "
-                   f"**{test.value_at_0:g}{test.unit} = 0**"
-                   + ("  ·  *this scale is our own estimate, not a published norm*"
-                      if test.anchor_provisional else ""))
-
-        # Three separate questions, in three separate sections, because they get
-        # asked at three different moments. `measurement` is read WHILE holding
-        # the tape. The measures block is read on the first step and then only
-        # when the words stop being obvious. `what_youre_testing` is the one the
-        # athlete asked for explicitly — the anatomy, kept OUT of the
-        # instructions above so the instructions stay followable.
-        st.markdown("**What the three numbers mean**")
-        for _measure, _short, _long in flexibility_baselines.MEASURES_EXPLAINED:
-            st.caption(f"**{_measure.title()}** — {_short}. {_long}")
-        st.caption(flexibility_baselines.GAP_EXPLAINED)
-
-        if test.what_youre_testing:
-            st.markdown("**What you're testing**")
-            st.caption(test.what_youre_testing)
-
-        # `test.replaces` is deliberately NOT rendered. Which standard test this
-        # substitutes for is a decision already taken on clinical grounds, and
-        # surfacing it mid-assessment invites a "why not just do the normal one"
-        # that the contraindication answers and the sentence does not.
+        st.caption(_fx_bold(test.measurement))
+        st.markdown("**What you're testing**")
+        st.caption(test.what_youre_testing)
+        if test.adapted_from:
+            st.caption(f"*Adapted for you — {test.adapted_from}.*")
         if test.safety:
             st.warning(test.safety, icon="⚠️")
 
     sides = ["left", "right"] if test.bilateral else [""]
     last = step == len(order) - 1
+    existing = {(r.test_key, r.side): r for r in draft.readings}
 
     # A FORM, not loose inputs. st.number_input does not commit until the field
     # loses focus — type a value, press Save immediately, and Streamlit still
-    # holds the old one. That silently DROPS a reading the athlete physically
-    # took, which is the worst failure this screen has; a full end-to-end run
-    # lost the `neck` rung to exactly it. A form commits every field atomically
-    # on submit, so the button press cannot outrun the typing.
+    # holds the old one, silently dropping a reading the athlete physically
+    # took. A form commits every field atomically on submit.
     with st.form(key=f"fx_form_{key}", border=False):
         cols = st.columns(len(sides))
-        entered: dict[str, dict] = {}
+        entered: dict[str, float | None] = {}
         for col, side in zip(cols, sides):
             with col:
                 if side:
-                    st.markdown(f'<div class="fx-cap">{side}</div>',
-                                unsafe_allow_html=True)
-                prev = existing.get((key, side))
-                vals = {}
-                for measure in flexibility_baselines.MEASURES:
-                    current = getattr(prev, measure, None) if prev else None
-                    vals[measure] = st.number_input(
-                        f"{measure} ({test.unit})", value=current, step=0.5,
-                        format="%.1f", key=f"fx_{key}_{side}_{measure}",
-                        placeholder="—",
-                    )
-                entered[side] = vals
+                    st.markdown(f'<div class="fx-cap">{side}</div>', unsafe_allow_html=True)
+                prior = existing.get((key, side))
+                entered[side] = st.number_input(
+                    f"{test.label} {side} ({test.unit})".strip(),
+                    value=float(prior.value) if prior else None,
+                    step=0.5, format="%.1f",
+                    key=f"fx_{key}_{side}", label_visibility="collapsed",
+                )
+
+        load = None
+        if test.slot == btry.SLOT_SPECTRUM and "isometric" in key:
+            load = st.number_input(
+                "Added load (kg), if any — logged beside the reading, they are one datum",
+                value=None, step=0.5, format="%.1f", key=f"fx_load_{key}",
+            )
 
         void = st.checkbox("The lock was lost — void this trial",
                            key=f"fx_void_{key}")
-        st.caption("Voiding stores nothing for this rung. A voided trial reports "
-                   "as unmeasured, which is honest; a bad number poisons a ladder.")
         submitted = st.form_submit_button(
-            "Save & next" if not last else "Save & finish",
+            "Save & finish" if last else "Save & next",
             use_container_width=True, type="primary")
 
     if submitted:
-        # Range check runs HERE rather than live, because a form does not rerun
-        # on every keystroke. A value outside the test's own scale is almost
-        # always a unit slip, and it would otherwise clamp to 0 or 100 silently —
-        # indistinguishable from a real floor. First press warns and holds; a
-        # second press accepts it, because a genuinely extreme reading is data.
-        lo, hi = sorted((test.value_at_0, test.value_at_100))
-        bad = [f"{side or 'value'} {m} {v:g}{test.unit}"
-               for side, vals in entered.items() for m, v in vals.items()
-               if v is not None and not (lo <= v <= hi)]
-        confirm_key = f"fx_confirm_{key}"
-        if bad and not st.session_state.get(confirm_key):
-            st.session_state[confirm_key] = True
-            st.warning(
-                f"Outside this test's scale ({lo:g}–{hi:g}{test.unit}): "
-                + ", ".join(bad)
-                + ". Check the units. Press Save again to record it anyway.",
-                icon="⚠️",
-            )
-            submitted = False
-
-    if submitted:
-        st.session_state.pop(f"fx_confirm_{key}", None)
         updated = draft
-        if not void:
-            for side, vals in entered.items():
-                if all(v is None for v in vals.values()):
-                    continue
-                updated = fx.merge_reading(updated, flexibility_baselines.RungReading(
-                    rung=key, side=side, **vals))
+        for side, value in entered.items():
+            if value is None:
+                continue
+            updated = fx.merge_reading(updated, btry.Reading(
+                test_key=key, value=float(value), unit=test.unit, side=side,
+                load_kg=load, voided=bool(void),
+            ))
         repo_.save_flexibility_draft(updated)
         if last:
             repo_.save_flexibility_assessment(updated)
             repo_.clear_flexibility_draft()
-            st.session_state["fx_mode"] = None
             _flexibility_screen_data.clear()
+            st.session_state["fx_mode"] = None
         else:
             st.session_state["fx_step"] = step + 1
         st.rerun()
 
-    b2, b3 = st.columns(2)
-    if b2.button("Skip", key=f"fx_skip_{key}", use_container_width=True):
-        # First-class: several tests need a bench or a wall. A skipped rung
-        # reports honestly as unmeasured; a guessed one poisons a ladder.
-        if last:
-            repo_.save_flexibility_assessment(draft)
-            repo_.clear_flexibility_draft()
-            st.session_state["fx_mode"] = None
-            _flexibility_screen_data.clear()
-        else:
-            st.session_state["fx_step"] = step + 1
+    c1, c2, c3 = st.columns(3)
+    if c1.button("Skip", key=f"fx_skip_{key}", use_container_width=True):
+        st.session_state["fx_step"] = min(step + 1, len(order) - 1)
         st.rerun()
-
-    if b3.button("Pause", key=f"fx_pause_{key}", use_container_width=True):
+    if c2.button("Back", key=f"fx_back_{key}", use_container_width=True, disabled=step == 0):
+        st.session_state["fx_step"] = max(0, step - 1)
+        st.rerun()
+    if c3.button("Pause", key=f"fx_pause_{key}", use_container_width=True):
         st.session_state["fx_mode"] = None
-        st.rerun()
-
-    if step > 0 and st.button("← Back", key=f"fx_back_{key}"):
-        st.session_state["fx_step"] = step - 1
         st.rerun()
 
 
 # ── state 3: populated ───────────────────────────────────────────────────────
 
-# `_fx_headline_rung` lived here and is DELETED. It answered "which rung is
-# lowest across every ladder, and how many does it limit" — a genuinely useful
-# question, and the wrong headline. With one skill trained at a time the
-# headline is that skill's limiter; a global worst is exactly what produced
-# "chest/pecs is limiting you" against a goal chest has nothing to do with.
-# Removed rather than left unused: it also read `skill.excluded`, which no
-# longer exists, so a future caller would have found a latent AttributeError.
+def _fx_render_populated(report, accent: str) -> None:
+    result = report.result
 
-
-def _fx_render_populated(rep, accent: str) -> None:
-    active = [s for s in rep.skills if not s.needs_signoff]
-
-    # THE HEADLINE IS THE TARGET SKILL'S LIMITER, not the worst rung overall.
-    # A global worst is what produced "chest/pecs is limiting you" against a
-    # goal chest has nothing to do with — the athlete's objection, and the
-    # reason a target is now chosen before the tests are taken.
-    pres = fx.prescribe(rep)
-    if pres is not None:
-        skill = flexibility_baselines.SKILLS[pres.skill_key]
-        if pres.limiting_rung is None:
-            st.markdown(
-                f'<div class="fx-card hi"><div class="fx-cap">Working toward</div>'
-                f'<div class="fx-big" style="color:{accent};">{pres.skill_label}</div>'
-                f'<div class="fx-sm">No readings yet on this ladder.</div></div>',
-                unsafe_allow_html=True,
-            )
-        else:
-            word = _FX_PRESCRIPTION_LABEL[pres.prescription]
-            st.markdown(
-                f'<div class="fx-card hi"><div class="fx-cap">Working toward '
-                f'<b style="color:{_INK2};">{pres.skill_label}</b></div>'
-                f'<div class="fx-cap" style="color:{_BAD};margin-top:8px;">'
-                f'What is stopping you</div>'
-                f'<div class="fx-big" style="color:{_BAD};">{pres.limiting_label}</div>'
-                f'<div class="fx-kv"><span><b>{pres.limiting_score:.0f}</b>/100</span>'
-                f'<span>needs <b>{word}</b></span>'
-                f'<span>{len(skill.ladder)}-rung ladder</span></div></div>',
-                unsafe_allow_html=True,
-            )
-
-        if pres.stretches:
-            st.markdown('<div class="fx-cap" style="margin:16px 0 8px;">'
-                        'Your stack &mdash; work the first one that is not clean yet'
-                        '</div>', unsafe_allow_html=True)
-            for i, step in enumerate(pres.stretches, 1):
-                band = flexibility_baselines.RESISTED
-                tint = _GOOD if step.spectrum == band else _INK3
-                with st.expander(f"{i}. {step.name}  ·  {step.dose}"):
-                    st.markdown(
-                        f'<span class="fx-cap" style="color:{tint};">'
-                        f'{step.spectrum}</span>', unsafe_allow_html=True)
-                    st.markdown(_fx_bold(step.setup))
-                    st.caption(_fx_bold(step.why))
-                    st.caption(f"**Move on when:** {step.advance_when}")
-                    if step.safety:
-                        st.warning(step.safety, icon="⚠️")
-        elif not flexibility_baselines.SKILLS[pres.skill_key].built:
-            st.info("This goal has no stack built yet — the tests still score it, "
-                    "but there is no route to hand you.", icon="🧱")
-
-    st.markdown(f'<div class="fx-cap" style="margin:16px 0 8px;">Skills</div>',
-                unsafe_allow_html=True)
-    for s in active:
-        if s.score is None:
-            st.markdown(
-                f'<div class="fx-card"><div class="fx-row">'
-                f'<span class="fx-nm">{s.label}</span>'
-                f'<span class="fx-val" style="color:{_INK3};font-size:14px;">'
-                f'not measured</span></div>'
-                f'<div class="fx-sm">{len(s.unmeasured_rungs)} rung(s) with no reading'
-                f'</div></div>',
-                unsafe_allow_html=True,
-            )
-            continue
-        colour = _GOOD if s.clears_goal else (_WARN if s.score >= s.goal_level * 0.8 else _BAD)
-        bound = ("" if s.complete else
-                 f'<div class="fx-sm" style="color:{_WARN};">&#9888; upper bound &mdash; '
-                 f'{len(s.unmeasured_rungs)} rung(s) unmeasured, and an unmeasured rung '
-                 f'could be lower than anything seen</div>')
+    if not report.pattern:
         st.markdown(
-            f'<div class="fx-card"><div class="fx-row">'
-            f'<span class="fx-nm">{s.label}</span>'
-            f'<span class="fx-val" style="color:{colour};">{s.score:.0f}<u>/100</u></span>'
-            f'</div>{_fx_track(s.score, colour, s.goal_level)}'
-            f'<div class="fx-sm">limited by <b style="color:{_INK2};">'
-            f'{s.limiting_label}</b> &middot; gates '
-            f'{flexibility_baselines.SKILLS[s.key].gates}</div>{bound}</div>',
+            f'<div class="fx-card"><div class="fx-cap">Assessed '
+            f'{report.assessed_on:%d %b %Y}</div>'
+            f'<div class="fx-big" style="color:{_INK3};">No pattern reached</div>'
+            f'<div class="fx-sm">{result.slots[-1].reason if result and result.slots else ""}'
+            f'</div></div>',
             unsafe_allow_html=True,
         )
+        st.info("A missing measurement is not a pass. Re-run the slot that stopped, rather "
+                "than reading this as nothing being wrong.", icon="ℹ️")
+        return
 
-    blocked = [s for s in rep.skills if s.needs_signoff]
-    if blocked:
-        with st.expander(f"Goals waiting on a sign-off · {len(blocked)}"):
-            st.caption("Still measured, still tracked, so a slide would show. What "
-                       "they cannot be is the thing you train toward — the usual "
-                       "route to each runs through a direction your imaging rules "
-                       "out.")
-            for s in blocked:
-                score = f"{s.score:.0f}/100" if s.score is not None else "not measured"
-                st.markdown(f"**{s.label}** — {score}")
-                st.caption(flexibility_baselines.SKILLS[s.key].blocked_reason)
+    warm = "" if result.cold else (
+        f'<span style="color:{_WARN};"> &middot; <b>WARM — not comparable with a cold '
+        f'reading</b></span>')
+    st.markdown(
+        f'<div class="fx-card hi"><div class="fx-cap">{report.cluster_label} &middot; '
+        f'assessed {report.assessed_on:%d %b %Y}{warm}</div>'
+        f'<div class="fx-cap" style="color:{_BAD};margin-top:8px;">What is stopping you</div>'
+        f'<div class="fx-big" style="color:{_BAD};">{report.pattern_label}</div>'
+        f'<div class="fx-kv"><span>pattern <b>{report.pattern}</b></span>'
+        f'<span>stopped at <b>{report.stopped_at_label}</b></span>'
+        f'<span><b>{len(result.slots)}</b> of 4 slots run</span></div></div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(result.slots[-1].reason)
 
-    with st.expander(f"What could be limiting you · {len(flexibility_baselines.RUNGS)} tests"):
-        st.caption("Diagnostics — only the **lowest** one limits a skill. The rest are "
-                   "here so you can see why, not to be averaged into anything.")
-        for r in rep.rungs:
-            if not r.measured:
-                continue
-            parts = []
-            for m in (r.passive, r.isometric, r.active):
-                if m is not None:
-                    parts.append(f"**{m.measure}** {m.score:.0f} ({m.raw:g}{m.unit})")
-            gap = (f" · gap **{r.gap:+.0f}** → {_FX_PRESCRIPTION_LABEL[r.prescription]}"
-                   if r.gap is not None else "")
+    if not report.trusted:
+        st.warning(
+            f"This is a **hypothesis, not a verdict**. A pattern is trusted after "
+            f"{btry.BASELINE_SESSIONS_REQUIRED} baseline mornings; there "
+            f"{'is' if result.baseline_sessions == 1 else 'are'} "
+            f"{result.baseline_sessions}. Until then every threshold above is provisional "
+            f"and no single reading is a reason to change anything.",
+            icon="⚠️")
+
+    # ── the stack ───────────────────────────────────────────────────────────
+    try:
+        stack = fx.prescribe(report)
+    except cluster_a_prescription.NoPatternError as exc:
+        st.error(str(exc), icon="🚫")
+        return
+
+    st.markdown('<div class="fx-cap" style="margin:18px 0 8px;">Before every session, '
+                'without exception</div>', unsafe_allow_html=True)
+    for item in fx.release_block_for(stack):
+        side = f" · **{item.laterality} only**" if item.laterality != "bilateral" else ""
+        st.markdown(f"- {item.name} — {item.dose}{side}")
+    st.caption("Inhibit, then activate. Overactive structures are released before the "
+               "underactive ones are asked to work; the other way round trains the "
+               "compensation. This comes from the clinical profile, not from the "
+               "flexibility method — which is why the source stacks all omitted it.")
+
+    st.markdown(f'<div class="fx-cap" style="margin:18px 0 8px;">Your stack &mdash; '
+                f'&sect;{stack.pattern}, {stack.limiter}</div>', unsafe_allow_html=True)
+    if stack.intro:
+        st.markdown(stack.intro)
+
+    for i, item in enumerate(stack.live_items, 1):
+        ex = cluster_a_mechanics.exercise(item.exercise)
+        tint = _GOOD if ex and ex.spectrum == flexibility_baselines.RESISTED else _INK3
+        with st.expander(f"{i}. {item.exercise}  ·  {item.dose}"):
+            if ex:
+                st.markdown(f'<span class="fx-cap" style="color:{tint};">{ex.spectrum}'
+                            f'</span>', unsafe_allow_html=True)
+                st.caption(ex.note)
+                if ex.adapted_from:
+                    st.caption(f"*Adapted for you — replaces {ex.adapted_from}. "
+                               f"Reverts when {ex.reverts_when}.*")
+            if item.note:
+                st.markdown(_fx_bold(item.note))
+
+    deferred = [i for i in stack.items if i.deferred]
+    if deferred:
+        with st.expander(f"Held back for now · {len(deferred)}"):
+            for item in deferred:
+                ex = cluster_a_mechanics.exercise(item.exercise)
+                st.markdown(f"**{item.exercise}**")
+                if ex and ex.deferred_until:
+                    st.caption(f"Until {ex.deferred_until}. {ex.reverts_when}")
+
+    if stack.outro:
+        st.markdown(stack.outro)
+
+    # ── the trail ───────────────────────────────────────────────────────────
+    with st.expander(f"How that was reached · {len(result.slots)} slot(s) run"):
+        for slot in result.slots:
+            mark = "✓" if slot.passed else ("—" if slot.indeterminate else "✗")
+            st.markdown(f"**{mark} Slot {slot.slot} · {btry.SLOT_LABELS[slot.slot]}** — "
+                        f"{btry.SLOT_QUESTIONS[slot.slot]}")
+            st.caption(slot.reason)
+        skipped = 4 - len(result.slots)
+        if skipped:
+            st.caption(f"{skipped} slot(s) below the failure were NOT measured. That is the "
+                       f"method, not an omission — a reading taken below a failing slot "
+                       f"cannot be interpreted.")
+
+    with st.expander("Every reading"):
+        for r in result.slots[-1].readings or ():
             side = f" *{r.side}*" if r.side else ""
-            st.markdown(f"**{r.label}**{side} — {r.score:.0f}/100 · "
-                        + " · ".join(parts) + gap)
+            load = f" @ {r.load_kg:g} kg" if r.load_kg else ""
+            st.markdown(f"**{r.test_key}**{side} — {r.value:g}{r.unit}{load}")
+
+    c1, c2 = st.columns(2)
+    if c1.button("Re-assess", key="fx_reassess", use_container_width=True):
+        st.session_state["fx_mode"] = "capture"
+        st.session_state["fx_step"] = 0
+        st.session_state.pop("fx_force_continue", None)
+        st.rerun()
+    c2.caption(cluster_a_prescription.RETEST)
 
 
 # ── entry point ──────────────────────────────────────────────────────────────
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _flexibility_screen_data() -> dict:
-    """Skills and rungs are in-repo constants; only the assessments are read
-    from disk, which cannot fail the way a Sheets read can."""
     today = date.today()
     stored = repo.get_repository().get_flexibility_assessments()
     latest = stored[-1] if stored else None
-    return {"report": fx.report(latest, today), "count": len(stored), "today": today}
+    return {
+        "report": fx.assess(latest, today, baseline_sessions=len(stored)),
+        "count": len(stored),
+    }
 
 
 def _render_flexibility_detail() -> None:
-    accent = _BIOAGE_COLORS["flexibility"]
+    accent = _ACCENT_FLEX
     st.markdown(_FLEXIBILITY_CSS, unsafe_allow_html=True)
 
     if st.session_state.get("fx_mode") == "capture":
         _fx_render_capture(accent)
         return
 
-    data = _flexibility_screen_data()
-    rep = data["report"]
-    draft = repo.get_repository().get_flexibility_draft()
+    try:
+        data = _flexibility_screen_data()
+    except Exception as exc:                                  # noqa: BLE001
+        st.error(f"Could not read the flexibility record: {exc}", icon="🚫")
+        return
+
+    draft = None
+    try:
+        draft = repo.get_repository().get_flexibility_draft()
+    except Exception:                                          # noqa: BLE001
+        pass
 
     if draft is not None:
-        done, total = fx.assessment_progress(draft)
-        st.info(f"**Assessment in progress** — {done} of {total} rungs recorded, "
-                f"started {draft.taken_on:%d %b}. It is saved after every step.",
-                icon="🪜")
-        if st.button("Resume assessment", key="fx_resume",
-                      use_container_width=True, type="primary"):
+        done, total = fx.capture_progress(draft)
+        st.info(f"Assessment in progress — {done} of {total} tests, started "
+                f"{draft.taken_on:%d %b}. It picks up where you left off.", icon="⏸️")
+        if st.button("Resume assessment", key="fx_resume", use_container_width=True,
+                     type="primary"):
             st.session_state["fx_mode"] = "capture"
             st.rerun()
 
-    if rep.assessed_on is None:
-        if draft is None:
-            _fx_render_empty(accent)
+    report = data["report"]
+    if not report.measured:
+        _fx_render_empty(accent)
         return
+    _fx_render_populated(report, accent)
 
-    st.markdown(
-        f'<div class="fx-card"><div class="fx-cap">Flexibility</div>'
-        f'<div class="fx-sm" style="margin-top:6px;">Assessed '
-        f'{rep.assessed_on:%d %b %Y} &middot; '
-        f'{"cold" if rep.cold else "<b>WARM &mdash; not comparable with a cold reading</b>"} '
-        f'&middot; {rep.measured_rung_count} of {len(flexibility_baselines.RUNGS)} rungs '
-        f'&middot; {rep.gap_count} with a passive&minus;active gap '
-        f'&middot; confidence {rep.confidence:.0%}</div></div>',
-        unsafe_allow_html=True,
-    )
-    _fx_render_populated(rep, accent)
-
-    if st.button("Re-run assessment", key="fx_rerun", use_container_width=True):
-        st.session_state["fx_mode"] = "capture"
-        st.session_state["fx_step"] = 0
-        st.rerun()
 
 
 

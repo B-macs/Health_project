@@ -1,62 +1,42 @@
 """
-services/flexibility.py — skill scores, ladder rungs, and the passive-active gap.
+services/flexibility.py — the one place the three layers are joined.
 
-Pure functions only. No I/O, no Streamlit, no hidden clock reads — every
-date-dependent function takes an explicit `today`, same convention as
-services/engine.py, services/strength.py and services/body_composition.py.
+Pure functions. No I/O, no Streamlit, no hidden clock reads — every
+date-dependent function takes an explicit `today`, the same convention as
+services/engine.py and services/strength.py.
 
-Read flexibility_baselines.py's module docstring first; it carries the model.
+    Mechanics tells you what is worth testing.
+    Battery produces a pattern.
+    Prescription looks the pattern up.
 
-THE ONE RULE: MINIMUM, NOT MEAN
--------------------------------
-A skill's score is the LOWEST rung on its ladder, and the name of that rung is
-returned beside it. Averaging is what v1 did and it is exactly how a broken
-capacity hides behind healthy ones — the `hip` score averaged fourteen
-contributions across five unrelated capacities while Deep Lunge, the only thing
-testing hip extension, scored 100.
+This module walks that chain and nothing else. It holds no tests, no exercises
+and no doses of its own; when it needs one it asks the layer that owns it.
 
-If the ankle stops you at 38 it does not matter that the quads are at 84: you
-still cannot squat. `limiting_rung` is therefore a first-class output, not a
-diagnostic afterthought — it is the only part of the result that says what to
-train.
+WHAT THIS REPLACED, so nobody rebuilds it
+------------------------------------------
+v2 scored fourteen rungs, took min() per skill, and reported a number out of
+100. That was deleted on 2026-08-06 along with the rung tests, the skill
+ladders and the stretch stacks. The names `rung_score`, `score_skill`,
+`SkillScore`, `WIDE_GAP_POINTS`, `RUNGS` and `SKILLS` are gone and a test fails
+loudly if any returns. Before that, v1 scored a self-rated depth on a two-sided
+band where a rating of 88 scored 46; that guard is still here too, because a
+defect that survived one review earns a permanent one.
 
-THREE MEASURES, AND THE GAP
----------------------------
-    PASSIVE    the ceiling
-    ISOMETRIC  is the range defended
-    ACTIVE     the usable range
-
-`gap = passive - active`. For a Beighton 6/9 athlete this is the number that
-decides the prescription: a WIDE gap means the range is already there and
-cannot be held, so more stretching is the wrong lever and resisted/isometric
-work is the right one. A NARROW gap means chase range.
-
-The rung's own score is taken from ACTIVE where it exists, because usable range
-is what limits a skill — a passive ceiling you cannot enter under your own
-power does not help you squat. Passive is descriptive; it is half of the gap
-and it is never the score on its own when an active reading exists.
-
-WHAT WAS DELETED, AND MUST NOT COME BACK
-----------------------------------------
-v1 scored a self-rated "depth" on a TWO-SIDED band: full marks in 50-70,
-penalised below AND above, so a rating of 88 scored 46. The athlete refuted it
-correctly — his rating measured HOW FAR HE GOT, and penalising high values
-treated it as if it measured ABSENCE OF MUSCULAR CONTROL. Those are different
-things and v1 inferred one from the other with no evidence.
-
-Achievement is now monotonic: more is always better, and the hypermobility
-concern lives in the gap, where it can be measured instead of assumed. The
-names `band_score`, `control_score`, `CONTROL_BAND`, `OVERSHOOT_SLOPE` and
-`UNDERSHOOT_EXPONENT` are gone and a test fails loudly if any returns — the
-defect survived review once, so it gets a guard rather than a comment.
+The reason is not that min() was badly implemented. It is that the battery is a
+DECISION TREE WITH EARLY EXIT and min() is a scoring function over everything.
+A failing slot 0 does not make slots 1-3 lower priority, it makes them
+meaningless — there is no value in a spectrum profile for a skill a bony block
+had already made unavailable.
 
 WHAT THIS MODULE REFUSES TO DO
 ------------------------------
-No flexibility age in years (the gym ships one and it compares a Jan-2025
-measurement against a live chronological age). No averaging of rungs into a
-skill. No scoring a rung from the 22 legacy pose ratings, which answer neither
-question. No filling an unmeasured rung from a neighbour or a training note.
-Nothing here reaches the engine.
+No score out of 100 — the battery's output is a pattern label and, in the
+source's words, "nothing else". No flexibility age in years. No prescription
+without a pattern; `prescribe` raises rather than guessing. No averaging of
+anything with anything. No reading carried over from the legacy gym goniometry
+or the 22 pose ratings, which answer none of the battery's questions. Nothing
+here reaches the engine — flexibility is not a safety input, and services/rules
+remains the only thing that constrains movement.
 """
 
 from __future__ import annotations
@@ -64,363 +44,177 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+import cluster_a_battery as _a_battery
+import cluster_a_mechanics as _a_mech
+import cluster_a_prescription as _a_rx
 import flexibility_baselines as _fb
+from services import battery as _b
 
-# ── tunables ─────────────────────────────────────────────────────────────────
+# ── clusters ─────────────────────────────────────────────────────────────────
 
-#: An assessment's confidence halves every this many days. ROM is slow-changing,
-#: so a year is generous rather than punitive.
+#: Every cluster the app knows about. One entry today; the shape is what makes
+#: adding a second one a data change rather than a code change.
+CLUSTERS: dict[str, dict] = {
+    "a": {
+        "key": "a",
+        "label": _a_mech.CLUSTER_LABEL,
+        "skills": _a_mech.SKILLS,
+        "mechanics": _a_mech,
+        "battery": _a_battery,
+        "prescription": _a_rx,
+    },
+}
+
+DEFAULT_CLUSTER: str = "a"
+
+#: An assessment's confidence halves every this many days. Range of motion is
+#: slow-changing, so a year is generous rather than punitive. Staleness decays
+#: WEIGHT, never VALUE — decaying a stale reading would invent a decline nobody
+#: measured.
 CONFIDENCE_HALFLIFE_DAYS: float = 365.0
-
-#: A passive-minus-active gap at or above this is called wide, i.e. the rung
-#: needs STRENGTH rather than RANGE. Provisional: it is set from the general
-#: hypermobility literature rather than from this athlete's own data, because
-#: he has no paired readings yet. Revisit once ASSESSMENTS has entries.
-WIDE_GAP_POINTS: float = 25.0
-
-PRESCRIPTION_RANGE = "range"
-PRESCRIPTION_STRENGTH = "strength"
-PRESCRIPTION_UNKNOWN = "unknown"
 
 
 # ── results ──────────────────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
-class MeasureScore:
-    measure: str
-    raw: float
-    score: float
-    unit: str
-
-
-@dataclass(frozen=True)
-class RungScore:
-    key: str
-    label: str
-    side: str
-    passive: MeasureScore | None
-    isometric: MeasureScore | None
-    active: MeasureScore | None
-
-    @property
-    def score(self) -> float | None:
-        """Usable range. ACTIVE where it exists, else isometric, else passive.
-
-        Deliberately prefers the most self-generated reading available: a
-        passive ceiling nobody can enter under their own power does not limit a
-        skill any less for being high.
-        """
-        for m in (self.active, self.isometric, self.passive):
-            if m is not None:
-                return m.score
-        return None
-
-    @property
-    def gap(self) -> float | None:
-        if self.passive is None or self.active is None:
-            return None
-        return self.passive.score - self.active.score
-
-    @property
-    def prescription(self) -> str:
-        g = self.gap
-        if g is None:
-            return PRESCRIPTION_UNKNOWN
-        return PRESCRIPTION_STRENGTH if g >= WIDE_GAP_POINTS else PRESCRIPTION_RANGE
+class Report:
+    """Everything the screen needs, from one assessment."""
+    cluster: str
+    cluster_label: str
+    result: _b.BatteryResult | None
+    confidence: float
+    assessed_on: date | None
 
     @property
     def measured(self) -> bool:
-        return self.score is not None
-
-
-@dataclass(frozen=True)
-class SkillScore:
-    key: str
-    label: str
-    score: float | None
-    limiting_rung: str | None
-    limiting_label: str | None
-    goal_level: float
-    rungs: tuple[RungScore, ...]
-    unmeasured_rungs: tuple[str, ...]
-    #: Set when the skill is in the catalogue but cannot be chosen as a target
-    #: until a clinician clears it. It still SCORES — hiding the number would
-    #: lose the regression signal, which is the only reason to track a skill
-    #: nobody is training toward.
-    blocked_reason: str = ""
+        return self.result is not None
 
     @property
-    def needs_signoff(self) -> bool:
-        return bool(self.blocked_reason)
+    def pattern(self) -> str | None:
+        return self.result.pattern if self.result else None
 
     @property
-    def clears_goal(self) -> bool:
-        return self.score is not None and self.score >= self.goal_level
+    def pattern_label(self) -> str:
+        if not self.pattern:
+            return ""
+        return _a_battery.PATTERNS.get(self.pattern, "")
 
     @property
-    def complete(self) -> bool:
-        """True when every rung on the ladder has a reading. A skill scored on a
-        partial ladder can only ever be an UPPER BOUND — an unmeasured rung
-        might be lower than anything seen so far."""
-        return not self.unmeasured_rungs
+    def trusted(self) -> bool:
+        """False until three baseline mornings exist. A pattern off one session
+        is a HYPOTHESIS about where the failure is, not a verdict."""
+        return bool(self.result and self.result.trusted)
+
+    @property
+    def stopped_at_label(self) -> str:
+        return self.result.limiting_slot_label if self.result else ""
 
 
-@dataclass(frozen=True)
-class Prescription:
-    """What to actually do, for ONE target skill.
+def cluster(key: str = DEFAULT_CLUSTER) -> dict:
+    return CLUSTERS[key]
 
-    This is the output the whole sector exists to produce, and the reason it is
-    keyed on a target: a limiting rung is only actionable against a goal. The
-    athlete's objection to the previous design was exactly this — "when you say
-    chest/pecs is the limiting factor, what skill am I working towards? chest
-    and pecs are only the limiting factor if I want a handstand or a bridge; if
-    my first goal is a pancake then hamstrings matter more."
+
+# ── the chain ────────────────────────────────────────────────────────────────
+
+def assess(assessment: _b.Assessment | None,
+           today: date,
+           *,
+           baseline_sessions: int = 0) -> Report:
+    """Run the battery for an assessment's cluster and wrap the result.
+
+    `None` in gives an honest empty report rather than a zero — no assessment
+    has been run, and a zero would read as "measured, and bad".
     """
-    skill_key: str
-    skill_label: str
-    limiting_rung: str | None
-    limiting_label: str
-    limiting_score: float | None
-    #: The steps of the skill's stack that move the limiting rung. May be empty
-    #: when the skill has no stack built yet — an honest "nothing to do here
-    #: yet" beats inventing a stretch.
-    stretches: tuple[_fb.Stretch, ...]
-    #: RANGE or STRENGTH, off the passive-active gap on the limiting rung.
-    prescription: str
-    complete: bool
-    unmeasured_rungs: tuple[str, ...]
+    if assessment is None:
+        return Report(cluster=DEFAULT_CLUSTER,
+                      cluster_label=CLUSTERS[DEFAULT_CLUSTER]["label"],
+                      result=None, confidence=0.0, assessed_on=None)
+
+    spec = CLUSTERS.get(assessment.cluster, CLUSTERS[DEFAULT_CLUSTER])
+    result = _b.run(spec["key"], spec["battery"].SLOT_EVALUATORS, assessment,
+                    baseline_sessions=baseline_sessions)
+    return Report(
+        cluster=spec["key"],
+        cluster_label=spec["label"],
+        result=result,
+        confidence=staleness_confidence(assessment.taken_on, today),
+        assessed_on=assessment.taken_on,
+    )
 
 
-@dataclass(frozen=True)
-class RungDelta:
-    """One rung's movement between two assessments."""
-    key: str
-    label: str
-    before: float | None
-    after: float | None
+def prescribe(report: Report):
+    """The stack for a report's pattern. RAISES when there is no pattern.
 
-    @property
-    def delta(self) -> float | None:
-        if self.before is None or self.after is None:
-            return None
-        return self.after - self.before
-
-    @property
-    def improved(self) -> bool:
-        d = self.delta
-        return d is not None and d > 0
-
-
-@dataclass(frozen=True)
-class FlexibilityReport:
-    skills: tuple[SkillScore, ...]
-    rungs: tuple[RungScore, ...]
-    assessed_on: date | None
-    confidence: float
-    cold: bool
-    target_skill: str = ""
-
-    @property
-    def measured_rung_count(self) -> int:
-        """DISTINCT rungs, not readings. A bilateral test produces two readings
-        for one rung, so counting readings displayed "19 of 14"."""
-        return len({r.key for r in self.rungs if r.measured})
-
-    @property
-    def gap_count(self) -> int:
-        return len({r.key for r in self.rungs if r.gap is not None})
-
-
-# ── scoring ──────────────────────────────────────────────────────────────────
-
-def rung_score(value: float, test: _fb.RungTest) -> float:
-    """Linear interpolation between the test's own 0 and 100 anchors, clamped.
-
-    MONOTONIC BY CONSTRUCTION — there is no upper penalty and there must never
-    be one. Handles both scale directions without a special case, because
-    several tests measure a gap that shrinks as capacity improves (elbows to
-    floor: 0 cm is perfect) while others measure a distance that grows
-    (knee-to-wall: 12 cm is perfect).
+    Deliberately not `-> Stack | None`. A None return invites a caller to render
+    an empty panel and move on, which is how "we do not know what to train" gets
+    quietly displayed as "nothing to train". The refusal carries the reason and
+    the caller has to handle it.
     """
-    lo, hi = test.value_at_0, test.value_at_100
-    if lo == hi:
-        raise ValueError(f"{test.key}: value_at_0 and value_at_100 are identical")
-    return max(0.0, min(100.0, (value - lo) / (hi - lo) * 100.0))
+    spec = CLUSTERS.get(report.cluster, CLUSTERS[DEFAULT_CLUSTER])
+    return spec["prescription"].prescribe(report.pattern)
 
+
+def release_block_for(stack) -> tuple:
+    """The pre-session protocol appropriate to a stack.
+
+    A stack loads the right hip actively if it contains lift-offs or a squat
+    pattern, which is what adds the Coxa Saltans tendon-path drill. Derived from
+    the stack rather than hard-coded per pattern, so a stack edit cannot leave
+    the protocol behind.
+    """
+    loaded = any(
+        any(k in item.exercise.lower() for k in ("lift-off", "squat", "rotation"))
+        for item in stack.live_items
+    )
+    return _a_rx.release_block(hip_focused=True, right_hip_loaded=loaded)
+
+
+# ── staleness ────────────────────────────────────────────────────────────────
 
 def staleness_confidence(measured_on: date, today: date) -> float:
-    """Halves every CONFIDENCE_HALFLIFE_DAYS. A future date yields 1.0 rather
-    than >1.0 — a clock skew must not manufacture confidence."""
-    days = max(0, (today - measured_on).days)
-    return 0.5 ** (days / CONFIDENCE_HALFLIFE_DAYS)
+    """Halves every CONFIDENCE_HALFLIFE_DAYS. Clamped to 1.0 for future dates.
 
-
-def score_reading(reading: _fb.RungReading) -> RungScore:
-    test = _fb.RUNGS[reading.rung]
-
-    def one(measure: str, raw: float | None) -> MeasureScore | None:
-        if raw is None:
-            return None
-        return MeasureScore(measure=measure, raw=raw,
-                            score=rung_score(raw, test), unit=test.unit)
-
-    return RungScore(
-        key=reading.rung, label=test.label, side=reading.side,
-        passive=one(_fb.PASSIVE, reading.passive),
-        isometric=one(_fb.ISOMETRIC, reading.isometric),
-        active=one(_fb.ACTIVE, reading.active),
-    )
-
-
-def score_skill(skill: _fb.Skill, rungs: dict[str, RungScore]) -> SkillScore:
-    """min(rungs), and the name of the rung that produced it.
-
-    A bilateral rung appears once per side; the WORSE side is the one that
-    limits, because a skill is performed by the whole body and the weak side
-    stops it. Sides are never averaged.
+    Decays WEIGHT, never VALUE.
     """
-    on_ladder = [rungs[k] for k in skill.ladder if k in rungs and rungs[k].measured]
-    unmeasured = tuple(k for k in skill.ladder
-                       if k not in rungs or not rungs[k].measured)
-
-    if not on_ladder:
-        return SkillScore(
-            key=skill.key, label=skill.label, score=None,
-            limiting_rung=None, limiting_label=None, goal_level=skill.goal_level,
-            rungs=(), unmeasured_rungs=unmeasured,
-            blocked_reason=skill.blocked_reason,
-        )
-
-    worst = min(on_ladder, key=lambda r: r.score)
-    return SkillScore(
-        key=skill.key, label=skill.label, score=worst.score,
-        limiting_rung=worst.key, limiting_label=worst.label,
-        goal_level=skill.goal_level, rungs=tuple(on_ladder),
-        unmeasured_rungs=unmeasured, blocked_reason=skill.blocked_reason,
-    )
+    days = (today - measured_on).days
+    if days <= 0:
+        return 1.0
+    return float(0.5 ** (days / CONFIDENCE_HALFLIFE_DAYS))
 
 
-def report(
-    assessment: _fb.Assessment | None = None,
-    today: date | None = None,
-) -> FlexibilityReport:
-    """The whole sector, from one assessment.
+# ── progress through a capture session ───────────────────────────────────────
 
-    Defaults to the most recent recorded assessment, which is currently NONE —
-    every skill then scores None with its whole ladder unmeasured, and that is
-    the correct and honest empty state rather than a zero.
-    """
-    if today is None:
-        today = date.today()
+def capture_progress(assessment: _b.Assessment | None,
+                     cluster_key: str = DEFAULT_CLUSTER) -> tuple[int, int]:
+    """(tests with any usable reading, tests available). Distinct TESTS, not
+    readings — a bilateral test produces two readings for one test, and counting
+    readings once displayed "19 of 14" in the model this replaced."""
+    spec = CLUSTERS[cluster_key]
+    available = spec["battery"].AVAILABLE_TESTS
     if assessment is None:
-        assessment = _fb.ASSESSMENTS[-1] if _fb.ASSESSMENTS else None
-
-    scored: list[RungScore] = []
-    if assessment is not None:
-        scored = [score_reading(r) for r in assessment.readings]
-
-    # Worst side wins per rung key — see score_skill's docstring.
-    by_key: dict[str, RungScore] = {}
-    for r in scored:
-        if not r.measured:
-            continue
-        prev = by_key.get(r.key)
-        if prev is None or r.score < prev.score:
-            by_key[r.key] = r
-
-    skills = tuple(
-        score_skill(skill, by_key) for skill in _fb.SKILLS.values()
-    )
-
-    confidence = (staleness_confidence(assessment.taken_on, today)
-                  if assessment is not None else 0.0)
-
-    return FlexibilityReport(
-        skills=skills,
-        rungs=tuple(scored),
-        assessed_on=assessment.taken_on if assessment else None,
-        confidence=confidence,
-        cold=assessment.cold if assessment else True,
-        target_skill=assessment.target_skill if assessment else "",
-    )
+        return 0, len(available)
+    done = {r.test_key for r in assessment.readings if r.usable and r.test_key in available}
+    return len(done), len(available)
 
 
-# ── one target at a time ─────────────────────────────────────────────────────
+def merge_reading(assessment: _b.Assessment, reading: _b.Reading) -> _b.Assessment:
+    """Replace any existing reading for the same (test, side), then append.
 
-def prescribe(rep: FlexibilityReport, skill_key: str = "") -> Prescription | None:
-    """The limiting rung of ONE skill, and the steps that move it.
+    (test_key, side) is the identity. Re-entering a test overwrites rather than
+    accumulating, and the other side survives untouched.
 
-    Defaults to the report's own target — the skill chosen before the tests
-    were taken. None if the skill is unknown.
-
-    Deliberately NOT filtered by whether the skill is selectable: a blocked
-    skill still scores and still shows a limiting rung, it simply has no stack,
-    so `stretches` comes back empty. Hiding the score would lose the regression
-    signal, which is the reason a blocked skill is tracked at all.
+    EVERY FIELD of the assessment is carried through explicitly. The version of
+    this in the model it replaced silently dropped one, which was masked in
+    practice because the dropped field had only one possible value at the time.
     """
-    key = skill_key or rep.target_skill or _fb.DEFAULT_TARGET_SKILL
-    skill = _fb.SKILLS.get(key)
-    if skill is None:
-        return None
-
-    score = next((s for s in rep.skills if s.key == key), None)
-    limiting = score.limiting_rung if score else None
-
-    # Only the steps that move the rung actually limiting the skill. The rest
-    # of the stack is not wrong, it is just not the next thing — and handing
-    # over five stretches when one rung is the blocker is how "come to
-    # conclusions on where to focus" turns back into a list.
-    stretches = tuple(s for s in skill.stack if limiting and limiting in s.targets)
-
-    # Fall back to the whole stack only when nothing is measured yet, so a
-    # freshly-chosen target still shows its route rather than an empty panel.
-    if limiting is None:
-        stretches = skill.stack
-
-    rung = next((r for r in rep.rungs if r.key == limiting), None) if limiting else None
-    return Prescription(
-        skill_key=key,
-        skill_label=skill.label,
-        limiting_rung=limiting,
-        limiting_label=score.limiting_label if score else "",
-        limiting_score=score.score if score else None,
-        stretches=stretches,
-        prescription=rung.prescription if rung else PRESCRIPTION_UNKNOWN,
-        complete=bool(score.complete) if score else False,
-        unmeasured_rungs=tuple(score.unmeasured_rungs) if score else (),
-    )
-
-
-def compare(before: FlexibilityReport, after: FlexibilityReport) -> tuple[RungDelta, ...]:
-    """Per-rung movement between two assessments, worst side each time.
-
-    Shown after a re-test and before the athlete decides whether to stay on the
-    current skill or switch. That decision is the one place the whole model
-    pays off, and it cannot be made against a single column of numbers.
-
-    Rungs measured in only one of the two assessments are INCLUDED with a None
-    on the missing side rather than dropped: "we did not measure this last
-    time" is information, and silently omitting it makes a partial re-test look
-    like a complete one.
-    """
-    def worst(rep: FlexibilityReport) -> dict[str, RungScore]:
-        out: dict[str, RungScore] = {}
-        for r in rep.rungs:
-            if not r.measured:
-                continue
-            if r.key not in out or r.score < out[r.key].score:
-                out[r.key] = r
-        return out
-
-    b, a = worst(before), worst(after)
-    return tuple(
-        RungDelta(
-            key=key,
-            label=_fb.RUNGS[key].label,
-            before=b[key].score if key in b else None,
-            after=a[key].score if key in a else None,
-        )
-        for key in _fb.RUNGS if key in b or key in a
+    kept = tuple(r for r in assessment.readings
+                 if not (r.test_key == reading.test_key and r.side == reading.side))
+    return _b.Assessment(
+        cluster=assessment.cluster,
+        taken_on=assessment.taken_on,
+        readings=kept + (reading,),
+        cold=assessment.cold,
+        note=assessment.note,
     )
 
 
@@ -428,34 +222,39 @@ def compare(before: FlexibilityReport, after: FlexibilityReport) -> tuple[RungDe
 #
 # Pure dict <-> dataclass, so the store underneath can be a JSON file, a Sheets
 # tab or anything else without this module knowing. services/repository.py owns
-# where it actually lands, the same way it owns every other storage decision.
+# where it actually lands.
 
-SCHEMA_VERSION: int = 1
+SCHEMA_VERSION: int = 2
 
 
-def assessment_to_dict(a: _fb.Assessment) -> dict:
+def assessment_to_dict(a: _b.Assessment) -> dict:
     return {
         "schema": SCHEMA_VERSION,
+        "cluster": a.cluster,
         "taken_on": a.taken_on.isoformat(),
         "cold": a.cold,
         "note": a.note,
-        "target_skill": a.target_skill,
         "readings": [
-            {"rung": r.rung, "side": r.side, "note": r.note,
-             "passive": r.passive, "isometric": r.isometric, "active": r.active}
+            {"test_key": r.test_key, "value": r.value, "unit": r.unit, "side": r.side,
+             "load_kg": r.load_kg, "note": r.note, "voided": r.voided}
             for r in a.readings
         ],
     }
 
 
-def assessment_from_dict(d: dict) -> _fb.Assessment | None:
+def assessment_from_dict(d: dict) -> _b.Assessment | None:
     """None for anything unreadable — an unknown schema, a missing date, or a
-    reading naming a rung that no longer exists.
+    reading naming a test that no longer exists.
 
     Returning None rather than raising is deliberate: a stored assessment that
     cannot be understood must degrade to "no assessment", which the screen
-    already renders honestly. A half-parsed one would silently score a ladder
-    against rungs it does not have.
+    renders honestly. A half-parsed one would run a battery against readings it
+    does not have.
+
+    NOTE the schema bump to 2. Version 1 held the retired rung model, and a v1
+    payload is not convertible — its readings measured different positions with
+    different landmarks. It is dropped rather than migrated, which is safe
+    because no v1 assessment was ever recorded.
     """
     if not isinstance(d, dict) or d.get("schema") != SCHEMA_VERSION:
         return None
@@ -464,75 +263,57 @@ def assessment_from_dict(d: dict) -> _fb.Assessment | None:
     except (KeyError, TypeError, ValueError):
         return None
 
+    cluster_key = d.get("cluster") or DEFAULT_CLUSTER
+    if cluster_key not in CLUSTERS:
+        return None
+    known = CLUSTERS[cluster_key]["battery"].TESTS
+
     readings = []
     for raw in d.get("readings") or []:
-        rung = raw.get("rung")
-        if rung not in _fb.RUNGS:
+        key = raw.get("test_key")
+        if key not in known:
             continue
-        readings.append(_fb.RungReading(
-            rung=rung, side=raw.get("side") or "", note=raw.get("note") or "",
-            passive=raw.get("passive"), isometric=raw.get("isometric"),
-            active=raw.get("active"),
+        try:
+            value = float(raw["value"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        readings.append(_b.Reading(
+            test_key=key, value=value, unit=raw.get("unit") or "",
+            side=raw.get("side") or "", load_kg=raw.get("load_kg"),
+            note=raw.get("note") or "", voided=bool(raw.get("voided")),
         ))
-    # An unknown target degrades to "" rather than rejecting the assessment:
-    # the readings are still good data, and a renamed skill must not delete a
-    # session's worth of measurements taken on the floor.
-    target = d.get("target_skill") or ""
-    if target not in _fb.SKILLS:
-        target = ""
 
-    return _fb.Assessment(taken_on=taken_on, readings=tuple(readings),
-                          cold=bool(d.get("cold", True)), note=d.get("note") or "",
-                          target_skill=target)
-
-
-def merge_reading(assessment: _fb.Assessment,
-                  reading: _fb.RungReading) -> _fb.Assessment:
-    """Replace any existing reading for the same (rung, side), else append.
-
-    Re-entering a test overwrites rather than accumulating, so a corrected
-    trial does not leave the bad one in the record to be picked up by the
-    worse-side rule.
-    """
-    kept = tuple(r for r in assessment.readings
-                 if not (r.rung == reading.rung and r.side == reading.side))
-    return _fb.Assessment(taken_on=assessment.taken_on, cold=assessment.cold,
-                          note=assessment.note, readings=kept + (reading,))
-
-
-def assessment_progress(assessment: _fb.Assessment | None) -> tuple[int, int]:
-    """(rungs with at least one reading, total rungs)."""
-    if assessment is None:
-        return 0, len(_fb.RUNGS)
-    done = {r.rung for r in assessment.readings
-            if r.passive is not None or r.isometric is not None or r.active is not None}
-    return len(done), len(_fb.RUNGS)
+    return _b.Assessment(cluster=cluster_key, taken_on=taken_on, readings=tuple(readings),
+                         cold=bool(d.get("cold", True)), note=d.get("note") or "")
 
 
 # ── the scheduling window ────────────────────────────────────────────────────
 
-def flexibility_window(
-    today: date,
-    hard_session_days: set[date] | frozenset[date],
-    *,
-    is_rest_day: bool = False,
-    same_day_pm: bool = False,
-) -> tuple[str, str]:
-    """(window, reason) for a given day. ADVISORY ONLY — nothing reads this into
-    the engine.
+def flexibility_window(today: date,
+                       hard_session_days: set[date] | frozenset[date],
+                       *,
+                       is_rest_day: bool = False,
+                       same_day_pm: bool = False) -> tuple[str, str]:
+    """(window, reason) for a given day. ADVISORY — nothing reads this into the
+    engine.
 
-    The heuristic comes from the athlete's source brief. Its physiological
-    mechanism is NOT encoded and NOT relied on: the calpain-mediated central
-    fatigue story is stated well past what the evidence carries, and is treated
-    as motivation the way services/sleep_fusion.py treats the abandoned
-    quiet-wake rule.
+    The physiological mechanism behind the ranking is NOT encoded and NOT relied
+    on: the calpain-mediated central-fatigue story in the source is stated well
+    past what the evidence carries, and the source's own "what to hold loosely"
+    section says so. It is treated as motivation, the way
+    services/sleep_fusion.py treats the abandoned quiet-wake rule. The practical
+    ordering survives whether or not the mechanism does.
 
-    `is_rest_day` is accepted but deliberately does NOT downgrade the window on
-    its own — see flexibility_baselines.REST_DAY_CONFLICT_UNRESOLVED. A
-    restorative flow on a rest day is fine; an adaptation-seeking session is the
-    thing the rule calls worst, and nothing in this codebase yet distinguishes
-    them. Downgrading here would penalise the harmless case.
+    REST DAYS, resolved 2026-08-06. This used to accept `is_rest_day` and
+    deliberately ignore it, because nothing distinguished a restorative flow
+    from an adaptation-seeking session. The Prescription's dosage section
+    settles it: a cluster session is adaptation-seeking by definition and is
+    never a rest-day activity. A restorative yoga flow on a rest day remains
+    fine — that is services/yoga.py's business, not this function's.
     """
+    if is_rest_day:
+        return _fb.WINDOW_POOR, ("a rest day — flexibility training is training, not "
+                                 "recovery, and this is the slot the rule calls worst")
     if today in hard_session_days:
         if same_day_pm:
             return _fb.WINDOW_GOOD, ("same day, PM, after an AM session — the fatigue signal "
@@ -545,6 +326,6 @@ def flexibility_window(
 
     since = min(days_since)
     if since == 1:
-        return _fb.WINDOW_POOR, ("the day after a hard session — the worst slot for the "
-                                 "adaptation this is trying to produce")
+        return _fb.WINDOW_POOR, ("the day after a hard session — peak fatigue, minimum "
+                                 "adaptation")
     return _fb.WINDOW_GOOD, f"{since} days since the last hard session"

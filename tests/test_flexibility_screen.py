@@ -1,0 +1,210 @@
+"""End-to-end render of the Flexibility screen through Streamlit's own harness,
+with the repository stubbed.
+
+The pure logic lives in test_cluster_a.py. What this adds is the WIRING: that
+the page runs at all, that each of its three states draws, and — the one that
+matters — that the capture flow stops as soon as the battery has an answer.
+
+That last one cannot be caught by a unit test on services/. The early exit is
+the method rather than a convenience, and it lives in the view: the screen runs
+the real battery against the draft after every step instead of re-implementing
+the rule, so a bug here would silently ask the athlete for thirty minutes of
+readings that cannot be interpreted.
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from streamlit.testing.v1 import AppTest
+
+_ROOT = r"c:\Users\brian\Documents\1.Projects\AIProject\Health_project"
+
+_SCRIPT = '''
+import sys
+sys.path.insert(0, r"{root}")
+from datetime import date
+import repo
+from services import battery as b
+
+_saved = []
+_draft = {{"v": None}}
+
+class _Stub:
+    def get_flexibility_assessments(self):
+        return tuple(_saved)
+    def get_flexibility_draft(self):
+        return _draft["v"]
+    def save_flexibility_draft(self, a):
+        _draft["v"] = a
+    def clear_flexibility_draft(self):
+        _draft["v"] = None
+    def save_flexibility_assessment(self, a):
+        _saved.append(a)
+
+READINGS = {readings}
+if READINGS:
+    _saved.append(b.Assessment(cluster="a", taken_on=date(2026, 8, 6),
+                               readings=tuple(b.Reading(**r) for r in READINGS)))
+
+DRAFT = {draft}
+if DRAFT is not None:
+    _draft["v"] = b.Assessment(cluster="a", taken_on=date(2026, 8, 6),
+                               readings=tuple(b.Reading(**r) for r in DRAFT))
+
+repo.get_repository = lambda: _Stub()
+import streamlit as st
+st.session_state["fx_mode"] = {mode!r}
+from views import insights as V
+V._flexibility_screen_data.clear()
+V._render_flexibility_detail()
+'''
+
+# Gate 0 and the leverages pass; the tilt fails on both halves -> Pattern F,
+# which is what this athlete's 2026-08-05 baseline predicts.
+_PASS_TO_TILT = [
+    {"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"},
+    {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"},
+    {"test_key": "leverage_bent", "value": 8.0, "unit": "cm", "side": "left"},
+    {"test_key": "leverage_bent", "value": 9.0, "unit": "cm", "side": "right"},
+    {"test_key": "leverage_straight", "value": 95.0, "unit": "cm", "side": "left"},
+    {"test_key": "leverage_straight", "value": 94.0, "unit": "cm", "side": "right"},
+]
+_TILT_FAILS = _PASS_TO_TILT + [
+    {"test_key": "tilt_range", "value": 40.0, "unit": "cm"},
+    {"test_key": "tilt_production", "value": 55.0, "unit": "cm"},
+]
+# Gate 0 alone, failing on orientation -> Pattern B at the very first slot.
+_GATE0_FAILS = [
+    {"test_key": "gate0_neutral", "value": 40.0, "unit": "cm"},
+    {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"},
+]
+
+
+def _run(readings=(), draft=None, mode=None) -> AppTest:
+    script = _SCRIPT.format(root=_ROOT, readings=list(readings),
+                            draft=list(draft) if draft is not None else None,
+                            mode=mode)
+    return AppTest.from_string(script, default_timeout=90).run()
+
+
+def _text(at: AppTest) -> str:
+    parts = [m.value for m in at.markdown]
+    parts += [c.value for c in at.caption]
+    parts += [w.value for w in at.warning]
+    parts += [i.value for i in at.info]
+    parts += [b.label for b in at.button]
+    return " ".join(str(p) for p in parts)
+
+
+def test_the_screen_renders_in_every_state_without_an_exception():
+    for label, kwargs in (
+        ("empty", {}),
+        ("populated", {"readings": _TILT_FAILS}),
+        ("cold gate", {"mode": "capture"}),
+        ("mid-capture", {"draft": _PASS_TO_TILT, "mode": "capture"}),
+    ):
+        at = _run(**kwargs)
+        assert not at.exception, f"{label}: {at.exception[0].message if at.exception else ''}"
+
+
+def test_the_empty_state_offers_one_action_and_promises_a_label_not_a_score():
+    at = _run()
+    assert [b.label for b in at.button] == ["Start assessment"]
+    body = _text(at)
+    assert "Not measured" in body
+    assert "pattern label" in body.lower()
+    assert "/100" not in body, "a score has come back"
+
+
+def test_the_populated_state_leads_with_the_pattern_and_the_limiter():
+    at = _run(readings=_TILT_FAILS)
+    body = _text(at)
+    assert "What is stopping you" in body
+    assert "Tilt range" in body
+    assert "Prerequisite" in body           # the slot it stopped at
+    assert "/100" not in body
+
+
+def test_the_populated_state_says_a_single_session_is_a_hypothesis():
+    """Three baseline mornings before a pattern is trusted. Showing a
+    confident-looking label off one session is how a programme gets changed on
+    measurement scatter."""
+    at = _run(readings=_TILT_FAILS)
+    body = _text(at).lower()
+    assert "hypothesis" in body
+    assert "not a verdict" in body
+
+
+def test_the_mandatory_release_block_is_on_the_screen():
+    """It comes from the clinical profile rather than the flexibility method,
+    which is exactly why every source stack omitted it."""
+    at = _run(readings=_TILT_FAILS)
+    body = _text(at)
+    assert "Before every session" in body
+    assert "Upper glute" in body
+    assert "inhibit" in body.lower()
+
+
+def test_capture_stops_as_soon_as_the_battery_has_an_answer():
+    """THE ONE THIS FILE EXISTS FOR. Gate 0 failing on orientation is a Pattern
+    B at the very first slot — the remaining eight tests measure things below a
+    failure and cannot be interpreted, so the screen must say stop rather than
+    walk him through them."""
+    at = _run(draft=_GATE0_FAILS, mode="capture")
+    assert not at.exception
+    body = _text(at)
+    assert "stop here" in body.lower()
+    assert "Pattern B" in body
+    assert "Save assessment" in [b.label for b in at.button]
+    assert "nothing more to collect" in body.lower()
+
+
+def test_the_early_exit_can_be_overridden_but_is_not_the_default():
+    """Offered, because a curious athlete taking extra readings is harmless and
+    forbidding it would be paternalistic. Not the default, because the readings
+    are uninterpretable and the time is real."""
+    at = _run(draft=_GATE0_FAILS, mode="capture")
+    labels = [b.label for b in at.button]
+    assert "Keep going anyway" in labels
+    assert labels.index("Save assessment") < labels.index("Keep going anyway")
+
+
+def test_capture_shows_the_lock_and_its_tell_on_every_step():
+    """A lost lock makes the reading BETTER, not worse, so nothing warns you.
+    The tell has to be on the step, not buried in an expander."""
+    at = _run(draft=[], mode="capture")          # a started draft, no readings yet
+    assert not at.exception
+    body = _text(at)
+    assert "LOCK" in body
+    assert "tell" in body.lower()
+    assert "void" in body.lower()
+
+
+def test_the_cold_gate_explains_the_three_measures_before_asking_for_any():
+    """No draft at all means the gate, which is the first thing a session sees.
+    The three measures are the whole model and were explained nowhere on screen
+    in the version this replaced."""
+    at = _run(mode="capture")                    # draft is None -> the cold gate
+    body = _text(at)
+    assert "Measure cold" in body
+    for word in ("Passive", "Isometric", "Active"):
+        assert word in body, word
+    assert "flatter" in body.lower(), "the reason passive goes last must be stated"
+
+
+def test_a_draft_is_offered_for_resume_rather_than_lost():
+    at = _run(draft=_PASS_TO_TILT)
+    body = _text(at)
+    assert "Assessment in progress" in body
+    assert "Resume assessment" in [b.label for b in at.button]
+
+
+def test_the_screen_survives_a_repository_failure():
+    """A read failure must render an error, not a stack trace."""
+    script = _SCRIPT.format(root=_ROOT, readings=[], draft=None, mode=None).replace(
+        "def get_flexibility_assessments(self):\n        return tuple(_saved)",
+        "def get_flexibility_assessments(self):\n        raise RuntimeError('cache gone')")
+    at = AppTest.from_string(script, default_timeout=90).run()
+    assert not at.exception
+    assert any("flexibility record" in e.value for e in at.error)
