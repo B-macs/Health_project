@@ -18,6 +18,8 @@ MRI reference summary:
 """
 
 from __future__ import annotations
+
+import re
 from dataclasses import dataclass, field
 
 
@@ -32,6 +34,51 @@ class MovementRule:
     stage_cap: int          # safest from this stage onwards (1=always, 3=perf only)
     severity: str           # "contraindicated" | "caution" | "cleared"
     laterality: str = "bilateral"  # "left" | "right" | "bilateral" | "axial"
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Name normalisation
+# ─────────────────────────────────────────────────────────────────────────────
+
+def normalise_movement(name: str) -> str:
+    """Lowercase, punctuation and hyphens to spaces, whitespace collapsed.
+
+    WHY THIS EXISTS. `check_movement` matches by substring, and a raw substring
+    test is defeated by a single punctuation mark. Measured 2026-08-06 against
+    the Cluster A source documents:
+
+        check_movement("good morning", 2)   -> contraindicated (cap 3 vs stage 2)
+        check_movement("good-mornings", 2)  -> unknown
+
+    "Seated straddle good-mornings holding a plate" is a loaded lumbar-flexion
+    movement over two covered annulus tears, and one hyphen was the difference
+    between a hard block and silence. `unknown` is not a block — services/yoga.py
+    discards it entirely — so a false negative here is indistinguishable from
+    "no rule applies".
+
+    Possessives are also stripped ("tailor's pose" -> "tailors pose") so a rule
+    can be authored either way round without a second entry.
+    """
+    lowered = name.lower().replace("'", "").replace("’", "")
+    spaced = re.sub(r"[^a-z0-9]+", " ", lowered)
+    return re.sub(r"\s+", " ", spaced).strip()
+
+
+def _heads_the_name(name: str, keyword: str) -> bool:
+    """True when `keyword` is the head of `name`, tolerating a plural 's'.
+
+    Used only for CLEARED rules, where a fragment match is dangerous. Token-wise
+    rather than by string prefix, because a string prefix is defeated by exactly
+    the plural these names carry: "adductor squeezes at width" does not start
+    with "adductor squeeze " (the 's' lands where the space should be).
+    """
+    name_tokens, kw_tokens = name.split(), keyword.split()
+    if len(name_tokens) < len(kw_tokens):
+        return False
+    for got, want in zip(name_tokens, kw_tokens):
+        if got != want and got != want + "s" and want != got + "s":
+            return False
+    return True
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -244,6 +291,168 @@ MOVEMENT_RULES: list[MovementRule] = [
         reason="Glute medius activation — minimal spinal load.",
         stage_cap=1, severity="cleared", laterality="bilateral",
     ),
+
+    # ── Flexibility-skill vocabulary (added 2026-08-06) ──────────────────────
+    #
+    # WHY THESE EXIST. The rules above speak MOVEMENT DESCRIPTIONS; flexibility
+    # source material speaks SKILL NAMES, and nothing bridged the two. Measured
+    # across the Cluster A documents on 2026-08-06:
+    #
+    #     check_movement("Straddle Forward Fold", 2) -> contraindicated
+    #     check_movement("Pancake", 2)               -> unknown
+    #
+    # The same movement, under two names, with opposite verdicts. 70 of 78
+    # names in those documents returned `unknown`, and `unknown` is not a block
+    # — services/yoga.py discards it. Every entry below is a bridge from a
+    # skill name to a mechanism already ruled on above.
+    #
+    # SEVERITY IS CHOSEN FOR THE MOVEMENT AS NAMED, and most of these are
+    # `caution` rather than contraindicated on purpose: the skill is trainable,
+    # the DEFAULT EXECUTION is not, and the reason string carries the cue that
+    # makes the difference. A blanket contraindication on "pancake" would block
+    # the flat-back version this athlete is specifically training toward, which
+    # is the wrong answer to the right worry.
+    MovementRule(
+        movement="weight behind",
+        reason="Axial load carried behind the neck or across the shoulders while seated "
+               "and folding. The load, not the athlete's own tilt, produces the depth — "
+               "over covered annulus tears at L3/4 and L4/5, and with a placement the "
+               "post-Latarjet right shoulder should not be holding either.",
+        stage_cap=1, severity="contraindicated", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="pancake",
+        reason="Seated wide-leg fold. Trainable ONLY as a flat-back hinge from an "
+               "elevated seat — the rounded-spine version is a seated forward fold and "
+               "loads the covered annulus tears at L3/4 and L4/5. The elevation supplies "
+               "the pelvic tilt; the spine must not. Never loaded, never strap-assisted.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="straddle",
+        reason="Wide-leg seated position. Safe sitting tall or hinging with a flat back; "
+               "the folded version is a seated forward fold. Also a wide-stance position "
+               "— introduce slowly per the anterior hip capsule / pubic symphysis finding.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="pike",
+        reason="Named in the source material as 'touching your toes; forward fold'. That "
+               "execution is contraindicated end-range lumbar flexion. Trainable only as a "
+               "flat-back hip hinge.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="lift off",
+        reason="Repeated concentric lift out of a deep seated fold. From a rounded spine "
+               "this is a bodyweight seated good-morning over two annulus tears. Only "
+               "permissible from a flat back, and it is active hip flexion under iliopsoas "
+               "load — cue neutral or slight internal rotation on the right.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="side split",
+        reason="Wide-stance hip abduction under full bodyweight. Align the joint by "
+               "EXTERNAL ROTATION, never by arching the lumbar spine — both routes reach "
+               "the same joint position and only one collides with the L5/S1 "
+               "retrolisthesis and narrowed right foramen.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="anterior tilt",
+        reason="Forward pelvic tilt drives lumbar extension, which compresses the already "
+               "narrowed right L5/S1 foramen. Already this athlete's habitual standing "
+               "posture. Train the movement, never the end range, and never held under "
+               "bodyweight at depth.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="pelvic rock",
+        reason="Mid-range pelvic tilt drill. Safe as a movement rehearsal; the arched end "
+               "of it is lumbar extension against the L5/S1 retrolisthesis. Train the "
+               "movement, not the depth.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="horse stance",
+        reason="Wide stance with the feet turned out, loaded, at depth. Active hip flexion "
+               "in external rotation is the contractile trigger for the right snapping hip "
+               "— cue neutral or slight internal rotation. Also a squat pattern under the "
+               "wide-stance caution.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="cossack",
+        reason="Deep unilateral squat in abduction and external rotation. Active, loaded "
+               "right hip flexion past 60° — the snapping-hip trigger. Trailing leg "
+               "straight also loads the proximal hamstring at the ischial tuberosity.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="tailors pose",
+        reason="Seated butterfly against a wall. Passive floor-supported external rotation "
+               "is NOT a snapping-hip risk position. Unloaded only: external load onto a "
+               "passively held end-range hip is the practice the hypermobility profile "
+               "specifically rules out, and the anterior-hip sensation reported here on "
+               "2026-08-05 is an open question.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="butterfly",
+        reason="Supine or seated soles-together hip abduction. Floor-supported and "
+               "unloaded it is safe. The 2026-08-05 report of anterior HIP FLEXOR "
+               "sensation rather than adductor stretch is unresolved — do not add load "
+               "until that is answered.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="frog",
+        reason="Deep hip flexion with abduction. Floor-supported and self-limited, but it "
+               "is the same anterior-hip compression question as the butterfly position.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="nerve glide",
+        reason="Neurodynamic technique. Legitimate, but this athlete has moderate right "
+               "L5/S1 foraminal stenosis and every symptom log to date records no neural "
+               "signs — electric or burning sensations are an escalation to the "
+               "physiotherapist, never a training variable. Physio-directed only.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="copenhagen",
+        reason="Side-lying adductor plank. Clean mechanically — spine neutral, no lumbar "
+               "flexion or extension, no axial load. The caution is dose: last performed "
+               "May/June 2025 at 30 s × 3, and a back injury plus a full rehab block sit "
+               "between then and now.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="adductor squeeze",
+        reason="Isometric adduction at a controlled width. No spinal load, no end-range "
+               "passive hold — the controlled-range strength work the hypermobility "
+               "profile asks for in place of passive stretching.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="side leg raise",
+        reason="Active hip abduction, spine neutral. Loads glute medius, which the "
+               "biomechanical assessment lists as overactive and right-dominant — release "
+               "before activating, per the pre-session protocol.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="banded abduction",
+        reason="Resisted hip abduction. Same glute medius sequencing note as the side leg "
+               "raise: inhibit before you activate.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="terminal knee extension",
+        reason="Banded knee extension for VMO. Knee-local, no spinal or hip load. Named "
+               "here so it is not caught by the lumbar 'back extension' rule.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
 ]
 
 
@@ -296,12 +505,35 @@ def check_movement(movement_name: str, current_stage: int) -> dict:
             stage_available: int | None,  (which stage it becomes appropriate)
         }
     """
-    name_lower = movement_name.lower()
+    name_lower = normalise_movement(movement_name)
 
-    # Find the strictest matching rule
+    # Find the strictest matching rule.
+    #
+    # A CLEARED rule must NAME the movement — it may match the whole name or
+    # head it, never appear as a fragment buried inside a description.
+    # Measured 2026-08-06: the assessment battery's most flexion-loaded item
+    # reads "hands walking forward on the floor", which contains the substring
+    # "walking" and therefore matched the `walking` CLEARED rule — returning an
+    # affirmative "Low-impact movement — maintains tissue health" on a movement
+    # that loads two covered annulus tears. A wrong green light is worse than
+    # silence, because silence at least reads as "apply clinical judgment".
+    #
+    # Head-matching, not exact, so ordinary variants keep their clearance:
+    # "Glute Bridge (Single Leg)" and "Pallof Press Hold (Doorframe)" still
+    # clear. A cleared rule that fails to fire degrades to `unknown`, which is
+    # the safe direction; a cleared rule that fires wrongly is not.
+    #
+    # Contraindicated and caution rules keep the permissive substring match:
+    # over-catching there fails safe, and the generalising keywords
+    # ("forward fold" catching named variants) depend on it.
     matched: list[MovementRule] = []
     for rule in MOVEMENT_RULES:
-        if rule.movement in name_lower or name_lower in rule.movement:
+        keyword = normalise_movement(rule.movement)
+        if rule.severity == "cleared":
+            hit = _heads_the_name(name_lower, keyword)
+        else:
+            hit = keyword in name_lower or name_lower in keyword
+        if hit:
             matched.append(rule)
 
     if not matched:

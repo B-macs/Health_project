@@ -159,3 +159,91 @@ def test_no_streamlit_import():
             assert not any(a.name.split(".")[0] == "streamlit" for a in node.names)
         if isinstance(node, ast.ImportFrom):
             assert node.module is None or node.module.split(".")[0] != "streamlit"
+
+
+# ── the matcher itself ───────────────────────────────────────────────────────
+#
+# Added 2026-08-06 after auditing the Cluster A flexibility documents against
+# this rule set. 78 movement names were run through check_movement at the live
+# stage: 8 matched anything at all, 70 returned `unknown`, and `unknown` is not
+# a block — services/yoga.py:107 discards it. Zero of the 14 movements that are
+# contraindicated on mechanism were caught by the rule written for them.
+#
+# Three defects, one test each. All three were live in shipped code.
+
+def test_punctuation_cannot_defeat_a_contraindication():
+    """A single hyphen was the difference between a hard block and silence.
+
+    "Seated straddle good-mornings holding a plate" loads the lumbar spine in
+    flexion over two covered annulus tears. `"good morning" in "good-mornings"`
+    is False, so it returned `unknown` while the spaced spelling returned
+    contraindicated. Names are normalised on both sides now.
+    """
+    hyphen = rules.check_movement("Seated straddle good-mornings holding a plate", 2)
+    spaced = rules.check_movement("Seated straddle good mornings holding a plate", 2)
+    assert hyphen["severity"] == spaced["severity"] == "contraindicated"
+    assert hyphen["stage_available"] == 3          # caution rule, gated by stage
+
+    # Possessives too, so a rule can be authored either way round.
+    assert rules.normalise_movement("Tailor's pose") == "tailors pose"
+    assert rules.normalise_movement("good-mornings") == "good mornings"
+
+
+def test_a_cleared_rule_cannot_fire_on_a_fragment_of_a_description():
+    """The dangerous failure is not silence, it is a wrong green light.
+
+    The assessment battery's most flexion-loaded instruction reads "hands
+    walking forward on the floor". That contains "walking", which matched the
+    `walking` CLEARED rule and returned an affirmative "Low-impact movement —
+    maintains tissue health without axial impact" on a movement that loads two
+    covered annulus tears.
+    """
+    assert rules.check_movement("hands walking forward on the floor", 2)["severity"] != "cleared"
+    assert rules.check_movement("pulling on a strap, hands walking forward", 2)["severity"] != "cleared"
+
+    # The whole class, not just the one instance that was found.
+    for fragment_carrier in ("arms swimming through the water overhead",
+                             "hips cycling through the position",
+                             "face pulled toward the floor"):
+        assert rules.check_movement(fragment_carrier, 2)["severity"] != "cleared", fragment_carrier
+
+
+def test_the_fragment_fix_did_not_cost_legitimate_clearances():
+    """A cleared rule must still HEAD a longer name, plurals included —
+    otherwise the fix trades a false positive for a pile of false negatives."""
+    for name in ("Walking", "Cat-Cow", "Dead Bug", "Bird-Dog Hold",
+                 "Glute Bridge (Single Leg)", "Pallof Press Hold (Doorframe)",
+                 "Adductor squeezes at width", "Terminal knee extension with a band"):
+        assert rules.check_movement(name, 2)["severity"] == "cleared", name
+
+
+def test_a_skill_name_resolves_to_the_mechanism_it_actually_is():
+    """The rules spoke movement descriptions; the flexibility material speaks
+    skill names, and nothing bridged them. `Straddle Forward Fold` was
+    contraindicated while `Pancake` — the same movement — was unknown."""
+    for skill in ("Pancake", "Straddle", "Pike", "Side split", "Horse stance",
+                  "Cossack squat", "Tailor's pose", "Butterfly", "Copenhagen plank",
+                  "Seated pelvic rock", "Anterior tilt drill", "Nerve glide"):
+        assert rules.check_movement(skill, 2)["severity"] != "unknown", skill
+
+
+def test_an_axial_load_behind_the_neck_is_contraindicated_however_it_is_spelled():
+    """The load, not the athlete's own tilt, produces the depth — and the
+    placement sits on a post-Latarjet right shoulder."""
+    for name in ("Elevated-hip pancake, weight behind the neck",
+                 "Elevated-hip pancake, weight behind neck",
+                 "Seated fold with weight behind the head"):
+        assert rules.check_movement(name, 2)["severity"] == "contraindicated", name
+
+
+def test_adding_vocabulary_never_loosened_an_existing_verdict():
+    """Every rule added on 2026-08-06 is a bridge to a mechanism already ruled
+    on. None of them may make anything MORE permissive than it was."""
+    for name, expected in (("seated forward fold", "contraindicated"),
+                           ("Straddle Forward Fold", "contraindicated"),
+                           ("Butterfly Forward Fold", "contraindicated"),
+                           ("toe touch", "contraindicated"),
+                           ("hyperextension", "contraindicated"),
+                           ("barbell deadlift", "contraindicated"),
+                           ("box jump", "contraindicated")):
+        assert rules.check_movement(name, 3)["severity"] == expected, name
