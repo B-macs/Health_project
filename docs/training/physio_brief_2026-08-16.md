@@ -275,6 +275,31 @@ argument for more stretching, and the high scores are arguably the ones that
 warrant more caution. We are not proposing a flexibility prescription; we are
 putting the baseline on the record before it is acted on.
 
+**A structured re-test protocol now exists, and two of its numbers would benefit
+from your input.** Added 2026-08-06: a standalone 14-test assessment, each test
+measured three ways in the same position — **passive** (the ceiling),
+**isometric** (is the range defended), **active** (usable range) — with
+`passive − active` as the headline, on the reasoning that at Beighton 6/9 the
+assisted half of a conventional mobility screen answers a question he does not
+have. Every test specifies the joint that must be **locked**, and six of them
+deliberately replace a standard test that is contraindicated here (seated
+forward fold, prone Ely, doorway and supine 90/90 pec stretches, floor Thomas,
+classic open book). Nothing has been measured yet.
+
+Two thresholds in it are currently set from general literature rather than from
+this athlete, and either would be better set by you:
+
+1. **What passive-minus-active gap should count as "wide"** — i.e. the point at
+   which the answer is resisted/isometric work rather than more range. Currently
+   25 points on a 0–100 scale, which is a guess.
+2. **A normal end-point for supine overhead reach at full posterior pelvic
+   tilt.** The published norm assumes a *flat* lumbar spine; this test uses full
+   posterior tilt to isolate latissimus from pectoralis, so the norm does not
+   transfer cleanly. This test exists specifically to separate a lat restriction
+   from a pec or **capsular** one — post-Latarjet, the third answer changes the
+   prescription from "stretch it" to "do not", which is why we would rather not
+   guess it.
+
 ---
 
 ## Also worth raising while here

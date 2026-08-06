@@ -81,7 +81,7 @@ from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
 python -m pytest tests/
 ```
 
-Check output: **1515/1515 passed** before committing any logic change. Treat
+Check output: **1568/1568 passed** before committing any logic change. Treat
 that number as a **floor, not an exact match** — it grows as tests are added.
 Never delete or weaken a test to make the gate pass, and never weaken a
 `services/rules.py` guardrail.

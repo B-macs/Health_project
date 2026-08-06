@@ -68,19 +68,97 @@ The two Coxa-Saltans cautions (90/90, Half Pigeon Right) are laterality-specific
 to finding #4 and aren't expressible as a generic `rules.py` keyword, so they're
 authored directly on the pose.
 
+## 16-Minute Shoulder, Scapula & Neck Flow
+
+Video: *(not yet sourced — the pose list is authored, the video is not)*
+Estimated RPE: 3/10 (restorative/mobility pace — same Foster-AU pipeline).
+Suitable for: rest day, active rest day.
+Primary focus: shoulder flexion · thoracic extension · scapular control ·
+cervical · relaxation.
+
+Added 2026-08-05. The hip/spine flow above touches the upper body almost
+nowhere, and the two live upper-body questions in the record — the interscapular
+endurance gap (`symptom_log` 2026-08-03) and the overhead restriction — had no
+unloaded session addressing them at all.
+
+**The dosing constraint that shaped this flow.** Down Dog produces interscapular
+burn at a measured **50–60 s**. Every scapular hold here is **25 s, deliberately
+below that threshold**. These are *positioning* drills, not the endurance
+prescription — long isometric holds are a prescription change and belong to the
+physiotherapist on 2026-08-16 (`docs/training/physio_brief_2026-08-16.md` §1).
+An earlier draft of this flow built 55 s holds *around* the measured onset; that
+was caught in review as pre-empting a decision that is not this codebase's to
+make. **Do not lengthen these holds without the physio's sign-off.**
+
+| # | Pose | Start | Hold | Tag | Why |
+|---|---|---|---|---|---|
+| 1 | Supported Diaphragmatic Breathing (Supine, Knees Bent) | 00:20 | 60s | cleared | Sets the rib position the rest of the session works from. Loads neither shoulder nor neck. |
+| 2 | Supine Arms-Overhead Reach (Elbows Toward the Floor) | 01:30 | 45s | caution | **The athlete's own failed test** — he cannot rest both elbows on the floor overhead. Unloaded and self-limited: never a partner pressing the elbows down, which puts passive end-range pressure into a post-Latarjet shoulder whose stability is muscular, not ligamentous (finding #6). Keep the low back flat — **arching is how the lumbar spine buys fake overhead range**. A folded towel under the low back tells you the moment you arch. |
+| 3 | Cat-Cow (Mid-Range, Thoracic-Biased) | 02:25 | 45s | cleared | **Mid-range only**, thoracic-biased. The extension half stops well short of end range — L5/S1 retrolisthesis plus activated osteochondrosis means end-range lumbar extension is contraindicated. |
+| 4 | Thoracic Extension over a Rolled Towel | 03:20 | 60s | caution | Towel at **mid-thoracic (T6–T10)**, the region finding #3 identifies as sitting-stiffened, and **not** at the lumbar spine. Placement is the entire safety margin: too low and this becomes the contraindicated end-range lumbar extension. |
+| 5 | Thread the Needle (Right Arm Under) | 04:30 | 45s | cleared | Unloaded thoracic rotation — the family already used in the pre-session release protocol. |
+| 6 | Thread the Needle (Left Arm Under) | 05:25 | 45s | cleared | As above, other side. |
+| 7 | Extended Puppy Pose | 06:20 | 45s | caution | Passive shoulder flexion with the **lats on stretch** — the one pose here that reaches the lat, otherwise the gap in this athlete's overhead ladder. Let the chest sink rather than pushing into it. |
+| 8 | Prone Scapular Retraction Hold (Arms Low, Palms Down) | 07:15 | **25s** | caution | **Arms low, not a prone T** — 90° of abduction moves a post-Latarjet shoulder toward apprehension. 25 s is deliberately below the measured 50–60 s onset. |
+| 9 | Wall Forearm Press Hold (Elbows Below Shoulder Height) | 08:00 | **25s** | caution | **Elbows stay below shoulder height** — above it the drill drifts toward abduction + external rotation. Serratus-biased. Below threshold, same reason. |
+| 10 | Supported Chest Opening over a Rolled Towel (Arms at 45°) | 08:45 | 60s | caution | **Arms at 45°, not a supine 90/90 T** — 90° abduction with external rotation is the apprehension position for anterior instability. The towel runs *along* the spine, so the load is gravity on an open chest rather than an external frame levering the joint. |
+| 11 | Seated Neck Tilt — Right Ear to Right Shoulder | 09:55 | 40s | caution | **Self-generated only, no hand overpressure** — at Beighton 6/9 the cervical spine is the last place to hang on ligament, and `symptom_log` 2026-07-31 records asymmetric flexion tightness with mechanical crepitus. |
+| 12 | Seated Neck Tilt — Left Ear to Left Shoulder | 10:45 | 40s | caution | As above. **Left is the documented dominant side** of the interscapular/cervical pattern, so expect asymmetry and do not chase it into end range. |
+| 13 | Levator Scapulae Stretch (Left) | 11:35 | 40s | caution | Levator scapulae is the anatomical bridge between the cervical spine and the superior medial scapular angle — **the corridor the ache migrates along** in `symptom_log` 2026-08-03. Releasing it *before* the scapular work would be ideal; here it follows, because the holds above are positioning rather than loading. |
+| 14 | Levator Scapulae Stretch (Right) | 12:25 | 40s | caution | **Not merely "the other side."** `symptom_log` 2026-08-03's CORRECTION 2 records the pattern as **bilateral with left dominance** — right on 07-16 and 07-23, left from 07-21 — and it was the left-lateralised framing that obscured a postural-endurance driver. Treating the right as an afterthought reintroduces exactly that error. |
+| 15 | Supine Rest with Arms Overhead on a Cushion | 13:15 | 60s | cleared | Supported overhead position with no reach demand — the shoulder **rests at range** rather than working to get there. |
+| 16 | Deep Relaxation (Savasana) | 14:25 | 60s | cleared | Passive rest. |
+
+**Net:** 6 cleared, 10 caution, **0 contraindicated**. Three distinct mechanisms
+drive every caution: the post-Latarjet apprehension position (poses 2, 8, 9, 10),
+end-range lumbar extension (3, 4), and cervical overpressure at Beighton 6/9
+(11–14). None of them is expressible as a generic `rules.py` keyword without
+losing the position detail that makes each one safe, so all are authored on the
+pose.
+
+---
+
+## Retests — questions carried back to the pose that can answer them
+
+`YogaPose.retest` holds an open clinical question on the pose best placed to
+close it. Three are set, all on the hip/spine flow, all from the 2026-08-05
+baseline:
+
+| Pose | Question | Baseline |
+|---|---|---|
+| Seated Cross-Legged Side Bend | Is the restriction still in the **hips** rather than the spine, and does the arm still refuse to straighten? Also confirm the movement is still as described — **the whole re-tag depends on it.** | 40/100, *"only can go about 60-70 percent down, restriction in hips"*, arm would not straighten at all. This is the pose that first showed the seated posterior-tilt pattern, so it is the cheapest place to see that pattern move. |
+| Down Dog | **Time the burn.** Note whether onset moves and whether the rightward twist persists. | Onset **50–60 s**, right shoulder reaching back, small whole-body twist right. The **only** quantified endurance figure for the interscapular gap, and physio brief §11 asks for the hold prescription to be set against it — so a second reading is worth more here than anywhere else in the flow. |
+| Deep Lunge Hip Opener (Left) | Does the right shoulder still reach the back foot with ease, and does the front of the joint feel stable there? | Reaches easily, no instability, quad is the limiter at 46/100. Finding #6 says right-shoulder stability is **maintenance-dependent and regresses when training lapses** — so this is a cheap unloaded check on whether that has started, and a change here shows well before a loaded one does. |
+
+---
+
 ## Measured ROM baseline — 2026-08-05
 
 Safety tags say nothing about how far into a pose this athlete can actually get.
 That was measured separately and lives here rather than in `services/yoga.py`,
 because it is observational data about one person, not a rule.
 
+> **⚠ These 22 ratings do NOT feed the Flexibility sector, and must not be made
+> to.** `services/flexibility.py` scores rungs from **passive / isometric /
+> active** readings taken in a **locked** position, measured cold. A 1–100
+> self-rating of a yoga pose answers none of those three questions, and no pose
+> here isolates a locked joint. **0 of 14 rungs inherit a value from this
+> table**, `flexibility_baselines.LEGACY_POSE_DEPTH_RATINGS_2026_08_05` keeps it
+> as provenance only, and a test pins that nothing computes from it. Its value
+> is clinical and historical — it is what corrected the two misreadings below —
+> not as a score.
+
 **Scale:** 1 = can barely enter the position · 100 = at the physical limit, no
-stretch sensation left. **High is not good** — per
+stretch sensation left. **High is not good, clinically** — per
 `patient_profile.PROFILE["hypermobility"]["training_implication"]`, a pose scoring
 85 is one reached with no muscular stop, which is the load case this profile is
-told to avoid. `Pred` is a prediction made from the clinical documents *before*
-the athlete rated anything; it is kept so the profile's forecasting accuracy stays
-auditable.
+told to avoid. Note this is a *clinical* reading of the rating, not a scoring
+rule: an early version of the Flexibility sector encoded it as a two-sided band
+that penalised high values, and **that model was refuted and deleted** — a
+rating measures how far he got, not whether he controlled it, and inferring one
+from the other was the error. See `docs/resume.md` § FLEXIBILITY. `Pred` is a
+prediction made from the clinical documents *before* the athlete rated anything;
+it is kept so the profile's forecasting accuracy stays auditable.
 
 | Pose | Pred | **Measured** | Δ | Athlete's note (verbatim, condensed) |
 |---|---|---|---|---|
@@ -147,17 +225,41 @@ Synthesis and clinical implications: `patient_profile.py` `symptom_log`
 
 ## Suggestion rule
 
-`services.yoga.suggest_for_day(day_kind)` returns the first catalogue entry
-whose `suitable_for` list contains `day_kind` (`"rest_day"` or
-`"active_rest_day"`). It's a plain filter, not a ranking — with one entry in
-the library there's nothing to rank yet. When a second yoga is added, extend
-this into an actual ranking (e.g. prefer higher `intensity` on an active rest
-day vs. a fully passive rest day) rather than leaving it a first-match filter.
+`services.yoga.suggest_for_day(day_kind, *, focus_hint=..., recent_slugs=...)`.
+**Rebuilt 2026-08-05 from a first-match filter into a real ranking**, which is
+what the previous docstring promised once a second session existed.
+
+Deterministic lexicographic sort over a key tuple where **every element is
+smaller-is-better**, slug last so the result never depends on `YOGA_LIBRARY`'s
+list order:
+
+1. **`focus_hint` miss count** — a caller asking for shoulder work gets the
+   shoulder session. This is the whole reason a second session exists.
+2. **Repeat penalty** — a slug in `recent_slugs` sorts later, so **alternating is
+   the default** rather than always returning the first match.
+3. **Intensity, direction depending on the day** — an *active* rest day prefers
+   the higher-intensity option, a plain rest day the lower one.
+4. **Slug**, for a strict total order.
+
+No argument is required, so existing single-argument call sites keep working.
+
+> **⚠ Unresolved: the app offers yoga on rest days, which the flexibility model
+> calls the *worst* window for adaptation.** A restorative flow there is fine; an
+> adaptation-seeking session is not, and **nothing in the code distinguishes
+> them** — which is why `services.flexibility.flexibility_window()` accepts
+> `is_rest_day` and deliberately does *not* downgrade on it (downgrading would
+> penalise the harmless case). Agreed fix, 2026-08-06: an **`intent` field
+> (`restorative` | `training`) on `YogaSession`**, with rest days restricted to
+> restorative. **Deferred to the training-schedule overhaul** by athlete
+> decision. See `flexibility_baselines.REST_DAY_CONFLICT_UNRESOLVED`.
 
 ## Adding a new yoga
 
 1. Add a `YogaSession` entry to `YOGA_LIBRARY` in `services/yoga.py` with its
-   full pose list (`YogaPose` per pose: name, start/hold seconds, safety tag).
+   full pose list (`YogaPose` per pose: name, start/hold seconds, safety tag,
+   `safety_note`, optional `option_note` and `retest`). Set `primary_focus` and
+   `intensity` deliberately — `suggest_for_day` ranks on both, so a session with
+   a vague `primary_focus` will never be the one a focused caller gets.
 2. Review every pose against `patient_profile.py`'s biomechanical findings and
    `services/rules.py`'s `MOVEMENT_RULES`, the same way as above — add a row
    to a new table in this file.
@@ -166,4 +268,11 @@ day vs. a fully passive rest day) rather than leaving it a first-match filter.
    than re-authoring a one-off tag. If it's genuinely novel, add the keyword
    to `MOVEMENT_RULES` so future poses/exercises benefit too.
 4. Add a test to `tests/test_yoga.py` for anything the suggestion logic now
-   needs to distinguish between the two entries.
+   needs to distinguish between entries.
+5. If a pose can answer an open clinical question, put that question in its
+   `retest` field with the **baseline value written into the question** — a
+   retest that does not carry what it is being compared against is a note, not
+   a measurement.
+6. **Do not author a hold longer than the measured interscapular onset (50–60 s)
+   under shoulder-girdle load** without physiotherapist sign-off. That duration
+   is a prescription, and prescriptions are not this codebase's to write.

@@ -1,5 +1,5 @@
 """
-flexibility_baselines.py — skills, their ladders, and the 13 rung tests.
+flexibility_baselines.py — skills, their ladders, and the 14 rung tests.
 
 REWRITTEN 2026-08-05 (v2). The v1 model in this file scored eight body regions
 and averaged them. That is the wrong shape and it failed in a specific, provable
@@ -44,7 +44,7 @@ EVERY TEST NAMES A LOCK
 -----------------------
 The `lock` field is the thing that must not move. An unlocked joint lets a
 neighbour substitute and the test measures nothing — which is precisely the
-failure that broke this model twice. Four tests REPLACE a standard test that is
+failure that broke this model twice. Six tests REPLACE a standard test that is
 contraindicated for this athlete, with something measuring the same capacity
 safely; they are marked `replaces`.
 
@@ -105,7 +105,7 @@ class RungTest:
         return self.value_at_100 < self.value_at_0
 
 
-#: The 13 rungs. Keys are stable and are referenced by SKILLS below.
+#: The 14 rungs. Keys are stable and are referenced by SKILLS below.
 RUNGS: dict[str, RungTest] = {
     "hip_flexors": RungTest(
         key="hip_flexors", label="Hip flexors",
@@ -537,7 +537,7 @@ LEGACY_GYM_READINGS: tuple[LegacyGymReading, ...] = (
 #:
 #: They answer a question that is neither passive range nor active range ("how
 #: far did I get AND how much did I feel"), so reinterpreting any of them as an
-#: achievement or a control reading would be inventing data. 0 of 13 rungs
+#: achievement or a control reading would be inventing data. 0 of 14 rungs
 #: inherit a value from them. A test pins that.
 LEGACY_POSE_DEPTH_RATINGS_2026_08_05: dict[str, int] = {
     "Seated Cross-Legged Side Bend (Shoulder Drop)": 40,
@@ -577,8 +577,8 @@ class Assessment:
 
 
 #: Every assessment ever run, oldest first. EMPTY — the standalone assessment
-#: has not been run yet, which is the honest state: 0 of 13 rungs have a passive
-#: reading, and 0 of 13 have an isometric or active one, so the gap metric that
+#: has not been run yet, which is the honest state: 0 of 14 rungs have a passive
+#: reading, and 0 of 14 have an isometric or active one, so the gap metric that
 #: is the entire point of v2 has no data at all. Until this list is non-empty,
 #: the assessment is not an enhancement to the model — it IS the model.
 ASSESSMENTS: tuple[Assessment, ...] = ()

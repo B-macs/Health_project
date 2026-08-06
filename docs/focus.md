@@ -4,15 +4,15 @@
 
 ---
 
-## Current State (2026-08-05)
+## Current State (2026-08-06)
 
 | Item | Value |
 |------|-------|
 | Stage | **Stage 2** — Transition (external load) |
 | Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
-| Day | **Day 17 of 28** |
-| Gate | **1515/1515** — `python -m pytest tests/` |
-| Last code commit | `da56f17` — Metabolism BioAge screen (`services/body_composition.py`, `body_composition_baselines.py`, `views/insights.py`) |
+| Day | **Day 18 of 28** |
+| Gate | **1568/1568** — `python -m pytest tests/` |
+| Last code commit | `1e85c8b` — Flexibility sector v2: the `lats` rung closing the overhead ladder, and the `st.form` fix that stopped the capture flow dropping readings |
 | Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required |
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
@@ -80,8 +80,56 @@ non-diagnostic until a stage has that many days behind it.
    `training_constants.EXERCISE_MOVEMENT_WEIGHT` (or they fall back to
    `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflate Strain/ACWR — this already
    happened once, across 34 of 63 Stage 1 exercise names).
-5. Run `python -m pytest tests/` — 1515/1515 or higher.
+5. Run `python -m pytest tests/` — 1568/1568 or higher.
 6. Update this file: block, day, gate, next action.
+
+---
+
+## Standing Goal: Flexibility — built, never measured
+
+**Status: 0 of 14 rungs have a reading.** The sector shipped 2026-08-06
+(`services/flexibility.py`, `flexibility_baselines.py`,
+`views/insights.py::_render_flexibility_detail`) and its 14-step capture flow is
+built, resumable and verified end-to-end — against fixtures. It has not been run
+against the athlete's body once, so every skill reads unmeasured and the screen
+sits in its empty state. Locked decisions in `docs/resume.md` § FLEXIBILITY.
+
+This is a **standing goal with no deadline**, explicitly ranked *below* the
+10 km on 2026-10-11 (athlete, 2026-08-05): *"it should be part of getting the
+whole body in a better position, as this will limit future injuries and provide
+better overall strength and wellness rather than just getting strong."*
+
+**To run the first assessment** — ~40 minutes, and read this before starting:
+
+1. **COLD. No warm-up, ever.** A warm reading measures the viscoelastic effect,
+   which is gone within hours. A cold reading is the only one that tracks
+   durable change rather than whether he stretched that morning. The flow gates
+   on this before step 1 and it is the single easiest thing to get wrong.
+2. **Capture the three frozen constants at the same session** — acromion-to-
+   styloid length, shin length, a traced foot outline. Three rung tests
+   normalise against them and cannot be run first. Measure once, store, reuse;
+   they are frozen so a later re-measure cannot silently re-scale history.
+3. Each step prints its own **setup, LOCK and measurement**. The lock is the
+   thing that must not move — an unlocked joint lets a neighbour substitute and
+   the test measures nothing, which is the failure that broke this model twice.
+4. Skip anything that provokes symptoms; **Skip and void-this-trial are not the
+   same** and both are better than a bad number. Drafts save after every step,
+   so stopping halfway costs nothing.
+5. Two anchors are provisional and worth raising with the physio on 2026-08-16
+   if there is time: the `lats` 100-anchor (160°, borrowed from a norm defined
+   against a *flat* lumbar spine while this test uses full posterior tilt) and
+   `WIDE_GAP_POINTS` (25.0, from the general hypermobility literature rather
+   than from this athlete).
+
+After the first assessment the headline is a **limiting rung**, not a score —
+the lowest rung across every ladder, and the one thing to train. Re-test, watch
+it move to the next rung, and that re-pointing is the programme.
+
+**Deferred, decided, not built:** the app offers yoga on rest days — the window
+this model calls worst for adaptation. The fix is an `intent` field
+(`restorative` | `training`) on `YogaSession`, agreed 2026-08-06 and held until
+the **training-schedule overhaul**. Do not wire flexibility into
+`services/scheduling.py` before then.
 
 ---
 
@@ -155,6 +203,15 @@ Record the model and serial with every row. Add the new scans to
       isometrics as the early-rehab/analgesia tool rather than the whole
       picture. Physio brief §10 carries the detail and the two questions put to
       the physiotherapist.
+- [ ] **Is the overhead restriction a lat, a pec, or the capsule?** The new
+      `lats` rung exists to answer exactly this and nothing else does — three
+      tissues stop an overhead reach and only the lat crosses the lumbar spine,
+      so pelvic tilt isolates it. `shoulders_overhead` low **and** `lats` low ⇒
+      the lat limits. `shoulders_overhead` low **with** `lats` fine ⇒ pec or
+      capsule. This matters more than the score: post-Latarjet, a capsular
+      restriction makes aggressive stretching the wrong answer for an
+      anterior-instability shoulder, not merely an ineffective one. Unanswerable
+      until the first assessment runs.
 - [ ] Anterior knee cues for right TFL offload — carried over from Stage 1,
       still unresolved.
 - [ ] Lift `biometrics.HRV_GARMIN_HOLD`? The gate is a measurement, not a date:

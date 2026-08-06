@@ -1,0 +1,801 @@
+<title>Flexibility capture — prototype</title>
+
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:#0B0F1A; --panel:#0E1018; --ink:#F4F6FB; --ink2:#9AA3B2; --ink3:#5A6377;
+    --accent:#22C3E6; --good:#6BAF8B; --warn:#BFA06A; --bad:#C47878;
+    --hair:rgba(255,255,255,0.07);
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:760px;margin:0 auto;padding:26px 18px 80px}
+  .bar{display:flex;align-items:center;justify-content:space-between;
+    padding-bottom:14px;border-bottom:1px solid var(--hair);margin-bottom:20px}
+  .bar b{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
+  .bar .rs{font-size:11px;color:var(--ink3);cursor:pointer;border:1px solid var(--hair);
+    padding:5px 11px;border-radius:8px;background:transparent;color:var(--ink3);
+    font-family:inherit}
+  .bar .rs:hover{color:var(--ink2);border-color:var(--ink3)}
+
+  .card{background:var(--panel);border:1px solid var(--hair);border-radius:14px;
+    padding:16px 18px;margin-bottom:10px}
+  .card.hi{border-color:rgba(196,120,120,.45);background:rgba(196,120,120,.07)}
+  .cap{font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);
+    font-weight:700}
+  .huge{font-size:38px;font-weight:800;line-height:1.08;margin-top:8px}
+  .big{font-size:28px;font-weight:800;line-height:1.12;margin-top:6px}
+  .sm{font-size:11.5px;color:var(--ink3);margin-top:8px;line-height:1.65}
+  .row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .nm{font-size:15px;font-weight:650;color:var(--ink)}
+  .val{font-size:23px;font-weight:750;font-variant-numeric:tabular-nums}
+  .val u{text-decoration:none;font-size:10px;color:var(--ink3);font-weight:500}
+  .track{height:7px;border-radius:4px;background:rgba(255,255,255,.07);margin-top:9px;
+    position:relative;overflow:hidden}
+  .track i{display:block;height:100%;border-radius:4px}
+  .goal{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--good)}
+  .kv{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:var(--ink3)}
+  .kv b{color:var(--ink2);font-weight:650}
+
+  .steps{display:flex;gap:3px;margin-bottom:14px}
+  .steps i{height:3px;flex:1;border-radius:2px;background:rgba(255,255,255,.10)}
+  .steps i.done{background:var(--good)} .steps i.now{background:var(--accent)}
+  .steps i.skip{background:var(--ink3)} .steps i.void{background:var(--bad)}
+
+  .lock{background:rgba(191,160,106,.11);border:1px solid rgba(191,160,106,.32);
+    color:#E2CB9B;border-radius:10px;padding:11px 13px;font-size:11.5px;
+    line-height:1.65;margin:12px 0}
+  details{background:var(--panel);border:1px solid var(--hair);border-radius:11px;
+    padding:10px 14px;margin-bottom:10px}
+  details summary{cursor:pointer;font-size:12px;color:var(--ink2)}
+  details .sm{margin-top:10px}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
+  .grid.one{grid-template-columns:1fr}
+  .fld{background:rgba(255,255,255,.04);border:1px solid var(--hair);
+    border-radius:9px;padding:8px 11px;margin-top:7px}
+  .fld .l{font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink3);
+    font-weight:650}
+  .fld input{width:100%;background:transparent;border:0;color:var(--ink);
+    font:650 17px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px;
+    font-variant-numeric:tabular-nums;outline:none}
+  .fld.blank input{color:var(--ink3)}
+
+  .chk{display:flex;align-items:center;gap:9px;margin:14px 0 4px;font-size:12px;
+    color:var(--ink2);cursor:pointer}
+  .chk input{width:15px;height:15px;accent-color:var(--bad);cursor:pointer}
+
+  .btns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
+  button.b{flex:1;min-width:110px;padding:13px 14px;border-radius:11px;border:0;
+    font:800 13.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer;
+    background:var(--accent);color:#04222B}
+  button.b.ghost{background:transparent;border:1px solid var(--hair);color:var(--ink2);
+    font-weight:600}
+  button.b:hover{filter:brightness(1.08)}
+  .back{margin-top:12px;background:transparent;border:0;color:var(--ink3);
+    font:12px ui-monospace,Menlo,monospace;cursor:pointer;padding:4px 0}
+  .back:hover{color:var(--ink2)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:9.5px;
+    font-weight:700}
+  .note{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.6}
+  .banner{background:rgba(34,195,230,.09);border:1px solid rgba(34,195,230,.3);
+    border-radius:10px;padding:11px 13px;font-size:11.5px;color:#A9E6F5;margin-bottom:12px}
+  @media(max-width:620px){.grid{grid-template-columns:1fr}}
+</style>
+
+<div class="wrap">
+  <div class="bar">
+    <b>Flexibility &middot; prototype</b>
+    <button class="rs" onclick="reset()">Reset</button>
+  </div>
+  <div id="app"></div>
+  <div class="note" id="foot"></div>
+</div>
+
+<script>
+const DATA = {
+ "rungs": [
+  {
+   "key": "hip_flexors",
+   "label": "Hip flexors",
+   "test": "Bench-edge modified Thomas, tested knee STRAIGHT \u2014 thigh angle by inclinometer",
+   "unit": "\u00b0",
+   "v100": 15.0,
+   "v0": -20.0,
+   "setup": "Sit on the very edge of a bench or firm bed, roll back and draw BOTH knees to the chest, then lower the tested leg. Hug the other knee to the chest. The tested KNEE STAYS STRAIGHT \u2014 a bent knee puts rectus femoris on stretch and turns a hip-extension test into a quad test, which is the quads rung's job.",
+   "lock": "The hugged knee holds the pelvis in posterior tilt, and the bench edge must sit at the gluteal fold so the thigh is free to drop BELOW horizontal. If the low back lifts off the bench the reading is void. Hug with the ARMS, never lift with the hip \u2014 that is the contractile Coxa Saltans trigger (finding #4).",
+   "measurement": "Phone strapped flat along the front of the tested thigh as an inclinometer, zeroed against the bench surface. Read the thigh angle relative to horizontal \u2014 below horizontal is positive hip extension, above it is a flexion contracture. L and R separately, to 1\u00b0.",
+   "bilateral": true,
+   "safety": "The athlete's stated #1 problem: 'my hips are stuck in flexion with my back arched'. A test that lets the low back arch measures nothing here, so the posterior-tilt lock is the entire protocol rather than a detail.",
+   "replaces": "the FLOOR version of the modified Thomas test, where the floor blocks the thigh at 0\u00b0 and every result below neutral is censored to the same value",
+   "fake": {
+    "left": [
+     -4,
+     -7,
+     -9
+    ],
+    "right": [
+     -6,
+     -9,
+     -11
+    ]
+   }
+  },
+  {
+   "key": "quads",
+   "label": "Quads / rectus femoris",
+   "test": "Side-lying rectus femoris \u2014 heel to buttock, pelvis hugged shut",
+   "unit": "cm",
+   "v100": 0.0,
+   "v0": 25.0,
+   "setup": "Side-lying on the floor. Draw the BOTTOM hip and knee up and hold that knee with the bottom hand. Bend the top knee and draw the heel toward the buttock.",
+   "lock": "The hugged bottom knee \u2014 it posteriorly tilts the pelvis and rounds the low back, which is what stops the lumbar spine substituting for quad length.",
+   "measurement": "Photo from behind, phone on a marked spot, ruler upright in frame. Gap from the back of the heel to the gluteal fold, to 0.5 cm.",
+   "bilateral": true,
+   "safety": "Rectus femoris crosses both hip and knee, so it appears on two ladders.",
+   "replaces": "the prone Ely / prone quad stretch \u2014 a restricted rectus femoris in prone tilts the pelvis anteriorly and drives lumbar extension, which is contraindicated here",
+   "fake": {
+    "left": [
+     6,
+     9,
+     11
+    ],
+    "right": [
+     7,
+     10,
+     12
+    ]
+   }
+  },
+  {
+   "key": "calves_ankle",
+   "label": "Calves / ankle",
+   "test": "Knee-to-wall lunge, arch-controlled",
+   "unit": "cm",
+   "v100": 12.0,
+   "v0": 0.0,
+   "setup": "Barefoot. Tape a strip perpendicular to a wall with a tape measure along it, zeroed AT the wall. Tested foot on the line, second toe pointing at the wall. Drive the knee forward to touch the wall with the heel flat.",
+   "lock": "The ARCH. Pes planus buys apparent dorsiflexion by collapsing the midfoot and subtalar joint instead of moving the ankle \u2014 the arch must be held, or the test reads foot collapse as ankle range.",
+   "measurement": "Greatest toe-to-wall distance at which the knee still touches with the heel flat, to 0.5 cm.",
+   "bilateral": true,
+   "safety": "Documented pes planus makes the arch the whole protocol here, not a footnote.",
+   "replaces": "",
+   "fake": {
+    "left": [
+     9,
+     8,
+     7.5
+    ],
+    "right": [
+     8.5,
+     7.5,
+     7
+    ]
+   }
+  },
+  {
+   "key": "hamstrings",
+   "label": "Hamstrings",
+   "test": "Passive supine straight-leg raise \u2014 phone inclinometer on the shin",
+   "unit": "\u00b0",
+   "v100": 90.0,
+   "v0": 0.0,
+   "setup": "Supine on the floor, both legs straight, low back flat, arms at the sides. Phone strapped to the shin as an inclinometer. Raise one straight leg to firm resistance.",
+   "lock": "The opposite leg \u2014 its heel and the back of its thigh stay in floor contact for the whole trial, or the pelvis has rotated and the number is not hamstring length.",
+   "measurement": "Maximum angle in degrees at firm resistance, to 1\u00b0.",
+   "bilateral": true,
+   "safety": "Long-sitting upright is already ~90\u00b0 of hip flexion with the knee straight, so the 2026-08-05 finding \u2014 normal length with NO RESERVE \u2014 predicts a reading near 90 rather than a low one.",
+   "replaces": "the seated forward fold, sit-and-reach and standing toe-touch, all contraindicated in rules.py (end-range lumbar flexion loads the covered annulus tears at L3/4 and L4/5)",
+   "fake": {
+    "left": [
+     86,
+     62,
+     52
+    ],
+    "right": [
+     83,
+     60,
+     50
+    ]
+   }
+  },
+  {
+   "key": "adductors",
+   "label": "Adductors",
+   "test": "Supine butterfly \u2014 knee-to-floor height at a fixed heel position",
+   "unit": "cm",
+   "v100": 0.0,
+   "v0": 25.0,
+   "setup": "Supine, low back pressed flat, soles together, knees falling out to the sides. Draw the heels in to a marked position and leave them there.",
+   "lock": "Heel position marked on the floor PLUS the flat low back \u2014 sliding the heels out makes the knees drop without any change in adductor length.",
+   "measurement": "Tape held vertically beside each knee in turn; vertical gap from the floor to the lateral aspect of the knee, L and R separately.",
+   "bilateral": true,
+   "safety": "Passive floor-supported hip flexion + external rotation, which the 2026-08-05 finding established is NOT a Coxa Saltans risk position \u2014 the trigger is contractile, not positional.",
+   "replaces": "",
+   "fake": {
+    "left": [
+     9,
+     11,
+     13
+    ],
+    "right": [
+     10,
+     12,
+     14
+    ]
+   }
+  },
+  {
+   "key": "hip_rotation",
+   "label": "Hip rotation",
+   "test": "Seated bench-edge hip INTERNAL rotation \u2014 shank tilt by inclinometer",
+   "unit": "\u00b0",
+   "v100": 40.0,
+   "v0": 0.0,
+   "setup": "Sit on the EDGE of a bench with both knees at 90\u00b0 and the shins hanging free, sitting tall with even weight on both sit bones and both hands gripping the bench. Swing the foot outward, keeping the thigh still.",
+   "lock": "Even weight on both sit bones plus the grip \u2014 letting the pelvis rotate turns hip internal rotation into trunk rotation. The free-hanging shin is what lets an inclinometer read the tilt directly instead of inferring it from a floor-blocked distance and a frozen shin length.",
+   "measurement": "Phone strapped to the shin, zeroed with the shank vertical. Read the tilt in degrees at end range, L and R separately, to 1\u00b0.",
+   "bilateral": true,
+   "safety": "Internal rotation is the SAFE direction for finding #4 \u2014 the trigger is external rotation under ACTIVE hip flexion, and this is neither. Confirmed by the 2026-08-05 negative finding that passive flexion + external rotation produced no snap at all.",
+   "replaces": "",
+   "fake": {
+    "left": [
+     32,
+     27,
+     24
+    ],
+    "right": [
+     29,
+     25,
+     22
+    ]
+   }
+  },
+  {
+   "key": "shoulders_overhead",
+   "label": "Shoulders overhead",
+   "test": "Supine shoulder flexion \u2014 straight arms, thumbs up, towel-gauged lumbar lock",
+   "unit": "\u00b0",
+   "v100": 170.0,
+   "v0": 0.0,
+   "setup": "Supine on a bare hard floor or the SAME thin mat every session, knees bent, feet flat. A folded hand towel of FIXED, RECORDED thickness under the lumbar spine. Arms start at the sides, ELBOWS LOCKED STRAIGHT and THUMBS POINTING AT THE CEILING. Raise both arms overhead toward the floor behind the head.",
+   "lock": "The towel, and it is binary and externally detectable: it is compressed at the start and the trial is VOID the moment a finger slides under it. That matters specifically here \u2014 symptom_log 2026-07-06 records that this athlete's internal sense of neutral is calibrated to his habitual anterior tilt, so 'low back flat' is precisely the judgement he gets wrong. It is also the L5/S1 safety gate.",
+   "measurement": "One photo per side from that side, phone on a marked spot at floor level \u22651.5 m away, a ruler upright beside that wrist. Read the floor-to-ulnar-styloid gap, then derive flexion = 180 \u2212 arcsin(gap / L), where L is the acromion-to-styloid length frozen at session 1. The cm is the record; the angle is what scores.",
+   "bilateral": true,
+   "safety": "Unloaded and self-limited. NEVER a partner pressing the arms down \u2014 passive end-range pressure into a post-Latarjet shoulder whose stability is muscular rather than ligamentous (finding #6). This is the athlete's own failed test: he cannot rest both elbows on the floor with the arms overhead.",
+   "replaces": "",
+   "fake": {
+    "left": [
+     152,
+     138,
+     130
+    ],
+    "right": [
+     146,
+     132,
+     124
+    ]
+   }
+  },
+  {
+   "key": "lats",
+   "label": "Lats",
+   "test": "Supine unilateral overhead reach at FULL posterior pelvic tilt",
+   "unit": "\u00b0",
+   "v100": 160.0,
+   "v0": 0.0,
+   "setup": "Supine with the hips and knees at 90\u00b0 and the feet flat on a wall or a chair seat \u2014 that holds the pelvis in FULL posterior tilt hands-free, which is more than the 'flat' the shoulders_overhead test gauges with a towel. One arm at a time, elbow locked straight, thumb at the ceiling, reaching overhead toward the floor behind the head.",
+   "lock": "The feet on the wall, plus the low back pressed hard into the floor. Rounding the lumbar spine IS the isolation mechanism here, not just a safety gate: of the three tissues that limit an overhead reach \u2014 pec major, subscapularis with teres major, and lats \u2014 the lats are the ONLY ones crossing the lower back, so taking the lumbar spine into full flexion puts them on stretch relative to the other two. Unilateral, so the other side cannot compensate.",
+   "measurement": "Same read as shoulders_overhead: photo from that side, floor-to-ulnar-styloid gap in cm, converted with the same frozen acromion-to-styloid length L. L and R separately, to 0.5 cm.",
+   "bilateral": true,
+   "safety": "ANCHOR IS PROVISIONAL AND STRICTER THAN THE PUBLISHED NORM. The supine lat-length test is normally defined against a FLAT lumbar spine, where full shoulder flexion is the pass; this uses full posterior tilt, which is harder. 160\u00b0 is set as the ceiling on that reasoning rather than from a source, so the number is comparable with itself over time but NOT with a published norm \u2014 revisit once there are two or three sessions to look at. Unloaded and self-limited, no partner pressing the arm down (finding #6).",
+   "replaces": "",
+   "fake": {
+    "left": [
+     104,
+     94,
+     88
+    ],
+    "right": [
+     99,
+     90,
+     84
+    ]
+   }
+  },
+  {
+   "key": "chest_horizontal",
+   "label": "Chest / pecs",
+   "test": "Wall slide \u2014 goalpost start-position contact (the athlete's own drill)",
+   "unit": "cm",
+   "v100": 0.0,
+   "v0": 15.0,
+   "setup": "Back to a wall, heels 10-15 cm out, knees soft. Press the low back flat and pin a sheet of A4 paper between the low back and the wall. Bring the arms to a goalpost position and take them back toward the wall.",
+   "lock": "The pinned A4 sheet \u2014 self-verifying, because it drops the moment the low back arches. Arching is how the shoulders reach the wall without any pec length.",
+   "measurement": "Horizontal gap from the wall to the back of the WRIST CREASE, L and R separately, to 0.5 cm.",
+   "bilateral": true,
+   "safety": "The athlete already reports this drill as difficult, and it is the one place the gym's 'Chest 106\u00b0 Low' reading has a live successor.",
+   "replaces": "the doorway pec stretch and the supine 90/90 pec stretch \u2014 both hang the anterior capsule on an external frame, which is the apprehension position for this shoulder",
+   "fake": {
+    "left": [
+     4,
+     5,
+     6
+    ],
+    "right": [
+     5,
+     6.5,
+     7.5
+    ]
+   }
+  },
+  {
+   "key": "thoracic_rotation",
+   "label": "Thoracic rotation",
+   "test": "Side-lying modified open book \u2014 arms folded, top-shoulder descent",
+   "unit": "\u00b0",
+   "v100": 45.0,
+   "v0": 0.0,
+   "setup": "Side-lying, hips and knees stacked and bent to 90\u00b0, knees resting on a folded towel of the SAME thickness every time. Arms folded across the chest. Rotate the top shoulder back toward the floor.",
+   "lock": "The pelvis \u2014 the bottom hand presses the top knee down and it must stay stacked. An unlocked pelvis turns thoracic rotation into a lumbar roll.",
+   "measurement": "Vertical height from the floor to the top acromion at start (frozen at session 1) and at end range; the drop converts to degrees.",
+   "bilateral": true,
+   "safety": "Arms FOLDED, not swept out to the floor behind \u2014 the classic open book ends in 90\u00b0 abduction plus horizontal extension, the apprehension position.",
+   "replaces": "the classic open book with the top arm sweeping to the floor",
+   "fake": {
+    "left": [
+     38,
+     33,
+     30
+    ],
+    "right": [
+     35,
+     31,
+     28
+    ]
+   }
+  },
+  {
+   "key": "lumbar",
+   "label": "Lumbar control",
+   "test": "Supine lumbar flattening \u2014 residual floor-to-lumbar gap",
+   "unit": "cm",
+   "v100": 0.0,
+   "v0": 5.0,
+   "setup": "Supine, both legs straight and together, arms at the sides, alongside a wall with a 30 cm ruler taped upright at hip level. Actively flatten the low back to the floor.",
+   "lock": "The feet and glutes \u2014 pushing through the heels turns the test into a leg press and flattens the back without any lumbar control.",
+   "measurement": "Side-on photo from \u22651.5 m, phone on a marked spot at floor level, ruler in frame. Maximum vertical gap between the floor and the low back.",
+   "bilateral": false,
+   "safety": "A posterior pelvic tilt is exactly what finding #3's training implication prescribes to decompress the L5/S1 horizontal facet slides. Safe, and useful.",
+   "replaces": "",
+   "fake": {
+    "": [
+     null,
+     1.2,
+     1.0
+    ]
+   }
+  },
+  {
+   "key": "lateral_trunk",
+   "label": "Lateral trunk",
+   "test": "Wall-backed standing lateral flexion \u2014 fingertip travel",
+   "unit": "cm",
+   "v100": 20.0,
+   "v0": 0.0,
+   "setup": "Heels, buttocks, upper back and head all touching a wall, feet on a traced floor mark at hip width, arms hanging with palms flat against the outside of the thighs. Slide one hand down the leg.",
+   "lock": "The wall \u2014 four points of contact. Coming off the wall converts side-bend into flexion or rotation.",
+   "measurement": "Pen-mark the trouser seam at rest and at end range; measure the travel, L and R separately, to 0.5 cm.",
+   "bilateral": true,
+   "safety": "rules.py rates side bending CAUTION in BOTH directions for DIFFERENT reasons \u2014 right narrows the stenotic right L5/S1 foramen, left loads the dorsolateral protrusions at L3/4 and L4/5. Light, self-generated, no reaching overhead.",
+   "replaces": "",
+   "fake": {
+    "left": [
+     15,
+     13,
+     12
+    ],
+    "right": [
+     14,
+     12,
+     11
+    ]
+   }
+  },
+  {
+   "key": "neck",
+   "label": "Neck (rotation)",
+   "test": "Supine cervical rotation to first firm resistance \u2014 inclinometer on the forehead",
+   "unit": "\u00b0",
+   "v100": 80.0,
+   "v0": 0.0,
+   "setup": "Supine on a bare hard floor or the SAME thin mat every session, knees bent, feet flat, arms at the sides. Phone strapped flat across the forehead with a headband, levelled and zeroed face-up with the chin level. Turn the head slowly to one side and stop at FIRST FIRM RESISTANCE \u2014 not as far as it will go.",
+   "lock": "Bodyweight plus the shoulder blades: both stay in floor contact for the whole trial, which mechanically removes the trunk rotation a seated version has to police. The chin stays level \u2014 tipping it buys apparent rotation, so record pitch as well and void the trial if it moved more than 5\u00b0.",
+   "measurement": "Roll angle in degrees off the phone at first firm resistance, to 1\u00b0, L and R separately. Two attempts per side: the first is familiarisation, RECORD THE SECOND.",
+   "bilateral": true,
+   "safety": "ACTIVE and self-generated only \u2014 NO hand overpressure on the head, ever. At Beighton 6/9 the cervical spine is the last place to hang on ligament. Stopped at first firm resistance rather than end range until the hEDS/HSD assessment is done (patient_profile joint_notes: 'Possible HSD/hEDS-spectrum \u2014 not yet assessed against 2017 criteria'), because craniocervical laxity is the one thing that would matter here \u2014 put that question on the 2026-08-16 agenda. NOTE THE GAP: cervical FLEXION is this athlete's documented dominant restriction (symptom_log 2026-07-31, markedly left-dominant) and is deliberately NOT measured on safety grounds, so this rung will not move when his actual neck problem moves.",
+   "replaces": "a seated chin-to-acromion tape reading, whose own lock required both hands on the seat while its measurement required holding a tape",
+   "fake": {
+    "left": [
+     66,
+     60,
+     57
+    ],
+    "right": [
+     63,
+     58,
+     55
+    ]
+   }
+  },
+  {
+   "key": "squat_depth",
+   "label": "Squat depth",
+   "test": "Bodyweight squat to first loss of neutral spine \u2014 hip crease vs knee height",
+   "unit": "cm",
+   "v100": 5.0,
+   "v0": -20.0,
+   "setup": "Barefoot, feet on a traced floor outline. Trace the feet ONCE, photograph the outline, and reproduce the stance width and toe-out angle exactly every session. Descend to the first loss of a neutral spine and stop there.",
+   "lock": "The traced outline \u2014 stance width and toe-out are the single largest source of session-to-session drift in this test.",
+   "measurement": "Side-on photo at the deepest neutral-spine position, phone at ~knee height \u22651.5 m away, tape taped vertically to the wall behind. Height of the hip crease relative to the top of the kneecap; below = positive.",
+   "bilateral": false,
+   "safety": "Bodyweight only, never loaded. This is a COMPOSITE and is interpreted, not independent \u2014 it is downstream of calves_ankle, adductors and hip_rotation, so a low reading here is a symptom whose cause is one of those rungs.",
+   "replaces": "",
+   "fake": {
+    "": [
+     null,
+     null,
+     -3
+    ]
+   }
+  }
+ ],
+ "skills": [
+  {
+   "key": "deep_squat",
+   "label": "Deep squat",
+   "ladder": [
+    "calves_ankle",
+    "adductors",
+    "hip_rotation",
+    "lumbar",
+    "quads"
+   ],
+   "goal": 70.0,
+   "gates": "Goblet squat, Bulgarian split squat",
+   "excluded": ""
+  },
+  {
+   "key": "hip_extension",
+   "label": "Hip extension",
+   "ladder": [
+    "hip_flexors",
+    "quads",
+    "lumbar"
+   ],
+   "goal": 70.0,
+   "gates": "Hip thrust, RDL lockout, lunge",
+   "excluded": ""
+  },
+  {
+   "key": "shoulder_flexion",
+   "label": "Shoulder flexion",
+   "ladder": [
+    "shoulders_overhead",
+    "lats",
+    "chest_horizontal",
+    "thoracic_rotation",
+    "lumbar"
+   ],
+   "goal": 70.0,
+   "gates": "Overhead work (currently prohibited), lat pulldown path",
+   "excluded": ""
+  },
+  {
+   "key": "active_pike",
+   "label": "Active pike",
+   "ladder": [
+    "hamstrings",
+    "lumbar"
+   ],
+   "goal": 70.0,
+   "gates": "RDL, hinge pattern",
+   "excluded": ""
+  },
+  {
+   "key": "bridge",
+   "label": "Bridge",
+   "ladder": [
+    "hip_flexors",
+    "shoulders_overhead",
+    "thoracic_rotation"
+   ],
+   "goal": 70.0,
+   "gates": "\u2014",
+   "excluded": "End-range lumbar extension against L5/S1 retrolisthesis and activated osteochondrosis; services.rules already contraindicates 'hyperextension' and 'back extension'. Its COMPONENTS are exactly what this athlete needs and remain rungs elsewhere \u2014 only the composite goal is refused."
+  },
+  {
+   "key": "shoulder_extension",
+   "label": "Shoulder extension",
+   "ladder": [
+    "chest_horizontal",
+    "shoulders_overhead"
+   ],
+   "goal": 70.0,
+   "gates": "\u2014",
+   "excluded": "The apprehension direction for an anterior-instability shoulder post-Latarjet (finding #6). Tracked so regression is visible; never a target to maximise."
+  }
+ ],
+ "measures": [
+  "passive",
+  "isometric",
+  "active"
+ ]
+};
+const M = DATA.measures;
+let S = null;
+
+function reset(){
+  S = {screen:'intro', step:0, cold:true, readings:{}, status:{}};
+  render();
+}
+
+function scoreOf(r, v){
+  if(v===null||v===undefined||v==='') return null;
+  const s = (v - r.v0) / (r.v100 - r.v0) * 100;
+  return Math.max(0, Math.min(100, s));
+}
+
+// A rung scores from ACTIVE where it exists, else isometric, else passive —
+// a passive ceiling you cannot enter under your own power does not limit a
+// skill any less for being high.
+function rungScore(key){
+  const st = S.status[key];
+  if(st === 'skip' || st === 'void') return null;
+  const rd = S.readings[key];
+  if(!rd) return null;
+  const r = DATA.rungs.find(x=>x.key===key);
+  let worst = null;
+  for(const side in rd){
+    const [p,i,a] = rd[side];
+    const v = (a!==null&&a!==undefined&&a!=='') ? a
+            : (i!==null&&i!==undefined&&i!=='') ? i : p;
+    const s = scoreOf(r, v===''?null:v);
+    if(s===null) continue;
+    if(worst===null || s < worst) worst = s;   // the worse SIDE limits
+  }
+  return worst;
+}
+
+function gapOf(key){
+  const rd = S.readings[key]; if(!rd) return null;
+  const r = DATA.rungs.find(x=>x.key===key);
+  let g = null;
+  for(const side in rd){
+    const [p,i,a] = rd[side];
+    const ps = scoreOf(r, p===''?null:p), as = scoreOf(r, a===''?null:a);
+    if(ps===null||as===null) continue;
+    const d = ps - as;
+    if(g===null || d > g) g = d;
+  }
+  return g;
+}
+
+function skillScore(sk){
+  let best=null, lim=null, unmeasured=[];
+  for(const k of sk.ladder){
+    const s = rungScore(k);
+    if(s===null){ unmeasured.push(k); continue; }
+    if(best===null || s < best){ best=s; lim=k; }   // MIN, never a mean
+  }
+  return {score:best, limiter:lim, unmeasured};
+}
+
+function el(h){ document.getElementById('app').innerHTML = h; }
+function lbl(k){ const r=DATA.rungs.find(x=>x.key===k); return r?r.label:k; }
+
+function stepsBar(){
+  return '<div class="steps">' + DATA.rungs.map((r,i)=>{
+    const st = S.status[r.key];
+    const c = i===S.step ? 'now' : st==='skip' ? 'skip' : st==='void' ? 'void'
+            : S.readings[r.key] ? 'done' : '';
+    return `<i class="${c}"></i>`;
+  }).join('') + '</div>';
+}
+
+function render(){
+  document.getElementById('foot').innerHTML =
+    'Prototype only — readings are pre-filled and nothing is saved anywhere. '
+    + 'Rung definitions, locks and scales are the real ones from '
+    + 'flexibility_baselines.py.';
+
+  if(S.screen==='intro') return renderIntro();
+  if(S.screen==='cold')  return renderCold();
+  if(S.screen==='step')  return renderStep();
+  return renderDone();
+}
+
+function renderIntro(){
+  el(`<div class="card">
+      <div class="cap">Standing goal &middot; no deadline</div>
+      <div class="huge" style="color:var(--accent)">Not measured</div>
+      <div class="sm">${DATA.rungs.length} tests &middot; ~40 min &middot;
+        measured <b style="color:var(--ink2)">cold</b>, no warm-up.<br>
+        Every 6&ndash;12 weeks. Nothing else on this screen works until it runs once.</div>
+    </div>
+    <div class="btns"><button class="b" onclick="S.screen='cold';render()">Start assessment</button></div>
+    <div class="card" style="margin-top:12px">
+      <div class="nm" style="font-size:13px;color:var(--ink2)">Why there is nothing else here</div>
+      <div class="sm">The 22 yoga depth-ratings are kept in full, and feed nothing. They answer
+        &ldquo;how far did I get <i>and</i> how much did I feel&rdquo; &mdash; neither of the two
+        things this model measures.</div>
+    </div>`);
+}
+
+function renderCold(){
+  el(`<div class="card">
+      <div class="cap">Before you start</div>
+      <div class="big" style="color:var(--accent)">Measure cold</div>
+      <div class="sm">No warm-up, no session beforehand. A warm reading measures the
+        viscoelastic effect, which is gone within hours &mdash; a cold one isolates the
+        durable change. A warm session is still recorded, but it is labelled and never
+        compared with a cold one.</div>
+      <label class="chk"><input type="radio" name="c" checked
+        onchange="S.cold=true"> Cold &mdash; no warm-up</label>
+      <label class="chk"><input type="radio" name="c"
+        onchange="S.cold=false"> Warm &mdash; I have trained today</label>
+    </div>
+    <div class="btns">
+      <button class="b" onclick="S.screen='step';S.step=0;render()">Begin</button>
+      <button class="b ghost" onclick="S.screen='intro';render()">Cancel</button>
+    </div>`);
+}
+
+function renderStep(){
+  const r = DATA.rungs[S.step];
+  const sides = r.bilateral ? ['left','right'] : [''];
+  const pre = S.readings[r.key];
+
+  const fields = sides.map(side=>{
+    const vals = pre ? pre[side] : (r.fake[side] || [null,null,null]);
+    const inner = M.map((m,i)=>{
+      const v = vals[i];
+      const blank = (v===null||v===undefined||v==='') ? ' blank' : '';
+      return `<div class="fld${blank}"><div class="l">${m} (${r.unit})</div>
+        <input id="in_${side}_${i}" value="${v===null||v===undefined?'':v}"
+          placeholder="—"></div>`;
+    }).join('');
+    return `<div>${side?`<div class="cap">${side}</div>`:''}${inner}</div>`;
+  }).join('');
+
+  const last = S.step === DATA.rungs.length - 1;
+  el(`${stepsBar()}
+    <div class="row"><span class="nm">${r.label}</span>
+      <span class="cap">${S.step+1} of ${DATA.rungs.length}</span></div>
+    <div class="sm" style="margin-top:2px">${r.test}</div>
+    <div class="lock"><b>LOCK</b> &mdash; ${r.lock}</div>
+    <div class="card"><div class="sm" style="color:var(--ink2)">${r.setup}</div></div>
+    <details><summary>How to read it</summary>
+      <div class="sm">${r.measurement}</div>
+      <div class="sm">Scale: <b style="color:var(--ink2)">${r.v100}${r.unit} = 100</b>
+        &middot; <b style="color:var(--ink2)">${r.v0}${r.unit} = 0</b></div>
+      ${r.replaces?`<div class="sm">Replaces ${r.replaces}.</div>`:''}
+      ${r.safety?`<div class="sm" style="color:#E2CB9B">${r.safety}</div>`:''}
+    </details>
+    <div class="grid${sides.length===1?' one':''}">${fields}</div>
+    <label class="chk"><input type="checkbox" id="void"> The lock was lost &mdash; void this trial</label>
+    <div class="btns">
+      <button class="b" onclick="save()">${last?'Save &amp; finish':'Save &amp; next'}</button>
+      <button class="b ghost" onclick="mark('skip')">Skip</button>
+    </div>
+    ${S.step>0?'<button class="back" onclick="S.step--;render()">&larr; Back</button>':''}`);
+}
+
+function save(){
+  const r = DATA.rungs[S.step];
+  const sides = r.bilateral ? ['left','right'] : [''];
+  if(document.getElementById('void').checked) return mark('void');
+  const out = {};
+  let any = false;
+  for(const side of sides){
+    out[side] = M.map((m,i)=>{
+      const raw = document.getElementById(`in_${side}_${i}`).value.trim();
+      if(raw===''){ return null; }
+      any = true; return parseFloat(raw);
+    });
+  }
+  if(any){ S.readings[r.key] = out; delete S.status[r.key]; }
+  advance();
+}
+
+function mark(kind){
+  const r = DATA.rungs[S.step];
+  S.status[r.key] = kind;
+  delete S.readings[r.key];
+  advance();
+}
+
+function advance(){
+  if(S.step === DATA.rungs.length-1){ S.screen='done'; }
+  else { S.step++; }
+  render();
+}
+
+function renderDone(){
+  const active = DATA.skills.filter(s=>!s.excluded);
+  const scored = active.map(s=>({sk:s, ...skillScore(s)}));
+
+  // "limits N of 4" is a COUNT of how many ladders this rung is lowest on —
+  // not a new metric. lumbar sits on all four.
+  const counts = {};
+  scored.forEach(x=>{ if(x.limiter) counts[x.limiter]=(counts[x.limiter]||0)+1; });
+  let lead=null, leadScore=null;
+  for(const k in counts){
+    const s = rungScore(k);
+    if(s===null) continue;
+    if(leadScore===null || s<leadScore){ leadScore=s; lead=k; }
+  }
+
+  const measured = DATA.rungs.filter(r=>rungScore(r.key)!==null).length;
+  const gaps = DATA.rungs.filter(r=>gapOf(r.key)!==null).length;
+
+  let h = `<div class="card"><div class="cap">Flexibility</div>
+    <div class="sm">Assessed today &middot; ${S.cold?'cold':'<b style="color:var(--warn)">WARM — not comparable with a cold reading</b>'}
+    &middot; ${measured} of ${DATA.rungs.length} rungs &middot; ${gaps} with a
+    passive&minus;active gap</div></div>`;
+
+  if(lead){
+    const g = gapOf(lead);
+    const pres = g===null ? 'gap not measured' : (g>=25 ? 'needs strength' : 'needs range');
+    h += `<div class="card hi"><div class="cap" style="color:var(--bad)">Train this</div>
+      <div class="big" style="color:var(--bad)">${lbl(lead)}</div>
+      <div class="kv"><span><b>${leadScore.toFixed(0)}</b>/100</span>
+      <span>limits <b>${counts[lead]} of ${active.length}</b> skills</span>
+      <span>gap <b>${g===null?'—':(g>0?'+':'')+g.toFixed(0)}</b> &rarr; <b>${pres}</b></span></div></div>`;
+  }
+
+  h += `<div class="cap" style="margin:18px 0 8px">Skills</div>`;
+  for(const x of scored){
+    if(x.score===null){
+      h += `<div class="card"><div class="row"><span class="nm">${x.sk.label}</span>
+        <span class="val" style="color:var(--ink3);font-size:14px">not measured</span></div>
+        <div class="sm">${x.unmeasured.length} rung(s) with no reading</div></div>`;
+      continue;
+    }
+    const c = x.score>=x.sk.goal ? 'var(--good)' : x.score>=x.sk.goal*0.8 ? 'var(--warn)' : 'var(--bad)';
+    h += `<div class="card"><div class="row"><span class="nm">${x.sk.label}</span>
+      <span class="val" style="color:${c}">${x.score.toFixed(0)}<u>/100</u></span></div>
+      <div class="track"><i style="width:${x.score}%;background:${c}"></i>
+        <span class="goal" style="left:${x.sk.goal}%"></span></div>
+      <div class="sm">limited by <b style="color:var(--ink2)">${lbl(x.limiter)}</b>
+        &middot; gates ${x.sk.gates}</div>
+      ${x.unmeasured.length?`<div class="sm" style="color:var(--warn)">&#9888; upper bound &mdash;
+        ${x.unmeasured.length} rung(s) unmeasured, and an unmeasured rung could be lower
+        than anything seen</div>`:''}</div>`;
+  }
+
+  h += `<details style="margin-top:12px"><summary>What could be limiting you &middot;
+    ${DATA.rungs.length} tests</summary>
+    <div class="sm">Diagnostics &mdash; only the <b>lowest</b> one limits a skill.
+    Never averaged into anything.</div>`;
+  for(const r of DATA.rungs){
+    const s = rungScore(r.key), g = gapOf(r.key), st = S.status[r.key];
+    if(s===null){
+      h += `<div class="sm">${r.label} &mdash; <span style="color:var(--ink3)">${
+        st==='skip'?'skipped':st==='void'?'voided (lock lost)':'not measured'}</span></div>`;
+      continue;
+    }
+    const pres = g===null?'':(g>=25?' &rarr; needs strength':' &rarr; needs range');
+    h += `<div class="sm"><b style="color:var(--ink2)">${r.label}</b> ${s.toFixed(0)}/100${
+      g===null?'':` &middot; gap ${(g>0?'+':'')+g.toFixed(0)}${pres}`}</div>`;
+  }
+  h += `</details>
+    <div class="btns"><button class="b ghost" onclick="reset()">Run it again</button></div>`;
+  el(h);
+}
+
+reset();
+</script>

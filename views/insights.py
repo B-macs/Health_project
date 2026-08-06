@@ -1311,7 +1311,7 @@ def _recent_sessions():
 #  it is the only state with an obvious single action. It gets its own screen
 #  with one button on it rather than seventeen cards reading "not measured".
 #
-#  Capture is one test per step because 13 rungs x 3 measures x left/right is
+#  Capture is one test per step because 14 rungs x 3 measures x left/right is
 #  up to 78 numbers, and it saves a draft after EVERY step because 40 minutes
 #  is long enough to be interrupted. A half-finished assessment that vanishes
 #  will not be attempted twice.
@@ -1374,7 +1374,7 @@ def _fx_track(pct: float, colour: str, goal: float | None = None) -> str:
 
 def _fx_render_empty(accent: str) -> None:
     """Two cards and a real button. The skills and rungs are deliberately NOT
-    rendered — thirteen unmeasured things is a progress bar at zero, and it
+    rendered — fourteen unmeasured things is a progress bar at zero, and it
     belongs inside the assessment where it fills up, not on the dashboard."""
     st.markdown(
         f'<div class="fx-card"><div class="fx-cap">Standing goal &middot; no deadline</div>'
