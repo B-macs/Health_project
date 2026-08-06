@@ -485,36 +485,111 @@ skill = min(rungs)          # and the name of that rung is published beside it
 ```
 
 Fix the limiting rung, re-test, and the limiter moves to the next one. **That
-re-pointing is the training programme.** `limiting_rung` is a first-class
-output, not a diagnostic afterthought — it is the only part of the result that
-says what to train. If the ankle stops you at 38 it does not matter that the
-quads are at 84: you still cannot squat.
+re-pointing is the training programme.** If the ankle stops you at 38 it does
+not matter that the quads are at 84: you still cannot squat.
 
 **Nothing is averaged, anywhere.**
 
-| Skill | Ladder (in order) | Gates |
-|---|---|---|
-| Deep squat | calves/ankle · adductors · hip rotation · lumbar · quads | Goblet squat, Bulgarian split squat |
-| Hip extension | hip flexors · quads · lumbar | Hip thrust, RDL lockout, lunge |
-| Shoulder flexion | shoulders overhead · lats · chest/pecs · thoracic rotation · lumbar | Overhead work (currently prohibited), lat pulldown path |
-| Active pike | hamstrings · lumbar | RDL, hinge pattern |
+### ONE TARGET AT A TIME, chosen BEFORE the tests (2026-08-06)
 
-Two skills are **defined but excluded from scoring**, each with a recorded
-reason — tracked so regression stays visible, never targets to maximise:
+The second thing this sector got wrong, and the athlete's objection is the
+clearest statement of it:
 
-- **Bridge** — end-range lumbar extension against L5/S1 retrolisthesis and
-  activated osteochondrosis; `services/rules.py` already contraindicates
-  "hyperextension" and "back extension". Its *components* are on other ladders.
-- **Shoulder extension** — the apprehension direction for an anterior-instability
-  shoulder post-Latarjet (finding #6).
+> *"When you say Chest / pecs is the limiting factor — what skill am I working
+> towards? Chest and pecs are only the limiting factor if I want to do a
+> handstand or a bridge, but if my first goal is a pancake then chest and pecs
+> wouldn't be that important compared to hamstrings."*
 
-Two ladder decisions worth keeping:
+**A limiting rung means nothing without a goal.** So the target skill is chosen
+**before any test is taken** — asking afterwards would be asking him to
+interpret a number computed without knowing the question — and it is recorded on
+the assessment (`Assessment.target_skill`) rather than held as one global
+setting, which is what makes a later switch of target legible instead of looking
+like the numbers moved for no reason.
 
-- **`squat_depth` is not a rung on Deep squat.** It is the *outcome* of that
-  ladder; including it would let the symptom vote on its own diagnosis.
-- **`lumbar` is on the Hip extension ladder** because arching is *how hip
-  extension gets faked*. A good lumbar score is a precondition for believing the
-  hip number at all.
+The flow: **pick one goal → 14 tests → limiting rung + the stack steps that move
+it**. At the next assessment, 6–12 weeks later: **what moved (`compare`) → stay
+on this skill and take the next rung, or switch and get a different ladder.**
+
+`prescribe()` returns only the stack steps targeting the limiting rung. Handing
+over five stretches when one rung is the blocker is how "come to conclusions on
+where to focus in my training" turns back into a list.
+
+### The eight skills
+
+The previous four — deep squat, hip extension, shoulder flexion, active pike —
+were **correct as ladders and wrong as goals**. He can already hold a deep squat,
+active pike is a Down Dog he has demonstrated, and nobody aims at "hip
+extension". Replaced with the source method's own list:
+
+| Skill | Also known as | Ladder | State |
+|---|---|---|---|
+| **Pancake** | Flat-back straddle fold | hamstrings · adductors · hip rotation · lumbar | **first target, stack built** |
+| Pike & head to toe | Flat-back forward hinge | hamstrings · lumbar | no stack yet |
+| Front split | Split lunge, back leg long | hip flexors · quads · hamstrings · lumbar | no stack yet |
+| Side split | Straddle standing | adductors · hip rotation · lumbar | no stack yet |
+| Squat | Deep bodyweight squat | calves/ankle · adductors · hip rotation · quads · lumbar | no stack yet |
+| Shoulder flexion | Elbows to the floor overhead | shoulders overhead · lats · chest · thoracic rotation · lumbar | **next target** |
+| Shoulder extension | Arms behind the back | chest · shoulders overhead | **needs sign-off** |
+| Bridge | Back bend | hip flexors · shoulders overhead · thoracic rotation | **needs sign-off** |
+
+**No new rungs were needed**, which is the evidence that the failure was in the
+naming layer alone: hip extension became the back leg of a front split, shoulder
+flexion became elbows-to-the-floor, and the tests underneath are unchanged.
+
+### Two goals are in the catalogue but cannot be selected
+
+**Bridge** and **shoulder extension** are the athlete's own stated goals and are
+**not deleted**. They still score and still show regression — hiding them would
+lose the only signal a skill nobody trains toward can give. What they cannot be
+is the target, because the route to each runs through a direction his imaging
+rules out: end-range lumbar extension against the L5/S1 retrolisthesis, and the
+post-Latarjet apprehension direction. `services/rules.py` is untouched.
+
+Both name **2026-08-16** as what unblocks them, and both carry the specific
+question rather than a flat refusal — for bridge, whether extending through the
+*upper* back with the lower back neutral is a safe substitute; for shoulder
+extension, whether a bounded, actively controlled range can be trained. Note
+bridge's components are all rungs on skills he *can* train, so progress toward it
+happens regardless.
+
+### Stacks: assisted → resisted, and none of his may be assisted
+
+A **stack** is ordered and cumulative — each step adds one demand to the one
+before, and you do not advance until `advance_when` is true. Step 3 is not harder
+than step 2 by accident; it is step 2 plus one thing.
+
+Every step sits on the source method's spectrum: **heavily assisted** (something
+else puts you there) → **unassisted** → **heavily resisted** (you fight in, or
+hold against load).
+
+**For this athlete the assisted half is wasted, and that is measured rather than
+preferred.** Beighton 6/9; the straddle scored 25/100 not because the tissue is
+short but because he cannot tilt the pelvis in sitting; and `patient_profile`'s
+own rule prescribes controlled-range strength over passive end-range stretching.
+A test asserts **no step in any stack is `assisted`**, and that the resisted work
+comes last.
+
+### The Pancake stack, and the one thing it must never become
+
+Five steps: elevated seated pelvic tilt → half straddle hinge → elevated straddle
+hinge → **straddle adductor press** → **straddle leg lift**. The last two are
+resisted and are where the work actually is; the first exists because nothing
+above it functions until he can tilt the pelvis forward in sitting at all.
+
+**It must never become a seated forward fold.** `services/rules.py`
+contraindicates "forward fold", "seated forward fold" and "toe touch" outright —
+end-range lumbar flexion on the covered annulus tears at L3/4 and L4/5 — and the
+conventional pancake finishes as exactly that. Every step hinges from the **hip
+with a flat back**, on an elevation chosen so a flat back is possible. **The
+elevation coming down IS the progression**; reaching further with a rounded back
+is the failure the whole stack is shaped to prevent. A test scans every stack
+step's name and setup against the contraindicated list.
+
+What makes the goal valuable here (opening from the hip) and what makes it
+dangerous (rounding the lumbar spine) are separable. That separation is the only
+reason this skill is trainable at all — and it aims straight at his single
+dominant restriction.
 
 ### Three measures per rung, and the GAP is the point
 

@@ -143,11 +143,15 @@ class SkillScore:
     goal_level: float
     rungs: tuple[RungScore, ...]
     unmeasured_rungs: tuple[str, ...]
-    excluded_reason: str = ""
+    #: Set when the skill is in the catalogue but cannot be chosen as a target
+    #: until a clinician clears it. It still SCORES — hiding the number would
+    #: lose the regression signal, which is the only reason to track a skill
+    #: nobody is training toward.
+    blocked_reason: str = ""
 
     @property
-    def excluded(self) -> bool:
-        return bool(self.excluded_reason)
+    def needs_signoff(self) -> bool:
+        return bool(self.blocked_reason)
 
     @property
     def clears_goal(self) -> bool:
@@ -162,12 +166,59 @@ class SkillScore:
 
 
 @dataclass(frozen=True)
+class Prescription:
+    """What to actually do, for ONE target skill.
+
+    This is the output the whole sector exists to produce, and the reason it is
+    keyed on a target: a limiting rung is only actionable against a goal. The
+    athlete's objection to the previous design was exactly this — "when you say
+    chest/pecs is the limiting factor, what skill am I working towards? chest
+    and pecs are only the limiting factor if I want a handstand or a bridge; if
+    my first goal is a pancake then hamstrings matter more."
+    """
+    skill_key: str
+    skill_label: str
+    limiting_rung: str | None
+    limiting_label: str
+    limiting_score: float | None
+    #: The steps of the skill's stack that move the limiting rung. May be empty
+    #: when the skill has no stack built yet — an honest "nothing to do here
+    #: yet" beats inventing a stretch.
+    stretches: tuple[_fb.Stretch, ...]
+    #: RANGE or STRENGTH, off the passive-active gap on the limiting rung.
+    prescription: str
+    complete: bool
+    unmeasured_rungs: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class RungDelta:
+    """One rung's movement between two assessments."""
+    key: str
+    label: str
+    before: float | None
+    after: float | None
+
+    @property
+    def delta(self) -> float | None:
+        if self.before is None or self.after is None:
+            return None
+        return self.after - self.before
+
+    @property
+    def improved(self) -> bool:
+        d = self.delta
+        return d is not None and d > 0
+
+
+@dataclass(frozen=True)
 class FlexibilityReport:
     skills: tuple[SkillScore, ...]
     rungs: tuple[RungScore, ...]
     assessed_on: date | None
     confidence: float
     cold: bool
+    target_skill: str = ""
 
     @property
     def measured_rung_count(self) -> int:
@@ -237,7 +288,7 @@ def score_skill(skill: _fb.Skill, rungs: dict[str, RungScore]) -> SkillScore:
             key=skill.key, label=skill.label, score=None,
             limiting_rung=None, limiting_label=None, goal_level=skill.goal_level,
             rungs=(), unmeasured_rungs=unmeasured,
-            excluded_reason=skill.excluded_reason,
+            blocked_reason=skill.blocked_reason,
         )
 
     worst = min(on_ladder, key=lambda r: r.score)
@@ -245,7 +296,7 @@ def score_skill(skill: _fb.Skill, rungs: dict[str, RungScore]) -> SkillScore:
         key=skill.key, label=skill.label, score=worst.score,
         limiting_rung=worst.key, limiting_label=worst.label,
         goal_level=skill.goal_level, rungs=tuple(on_ladder),
-        unmeasured_rungs=unmeasured, excluded_reason=skill.excluded_reason,
+        unmeasured_rungs=unmeasured, blocked_reason=skill.blocked_reason,
     )
 
 
@@ -290,6 +341,86 @@ def report(
         assessed_on=assessment.taken_on if assessment else None,
         confidence=confidence,
         cold=assessment.cold if assessment else True,
+        target_skill=assessment.target_skill if assessment else "",
+    )
+
+
+# ── one target at a time ─────────────────────────────────────────────────────
+
+def prescribe(rep: FlexibilityReport, skill_key: str = "") -> Prescription | None:
+    """The limiting rung of ONE skill, and the steps that move it.
+
+    Defaults to the report's own target — the skill chosen before the tests
+    were taken. None if the skill is unknown.
+
+    Deliberately NOT filtered by whether the skill is selectable: a blocked
+    skill still scores and still shows a limiting rung, it simply has no stack,
+    so `stretches` comes back empty. Hiding the score would lose the regression
+    signal, which is the reason a blocked skill is tracked at all.
+    """
+    key = skill_key or rep.target_skill or _fb.DEFAULT_TARGET_SKILL
+    skill = _fb.SKILLS.get(key)
+    if skill is None:
+        return None
+
+    score = next((s for s in rep.skills if s.key == key), None)
+    limiting = score.limiting_rung if score else None
+
+    # Only the steps that move the rung actually limiting the skill. The rest
+    # of the stack is not wrong, it is just not the next thing — and handing
+    # over five stretches when one rung is the blocker is how "come to
+    # conclusions on where to focus" turns back into a list.
+    stretches = tuple(s for s in skill.stack if limiting and limiting in s.targets)
+
+    # Fall back to the whole stack only when nothing is measured yet, so a
+    # freshly-chosen target still shows its route rather than an empty panel.
+    if limiting is None:
+        stretches = skill.stack
+
+    rung = next((r for r in rep.rungs if r.key == limiting), None) if limiting else None
+    return Prescription(
+        skill_key=key,
+        skill_label=skill.label,
+        limiting_rung=limiting,
+        limiting_label=score.limiting_label if score else "",
+        limiting_score=score.score if score else None,
+        stretches=stretches,
+        prescription=rung.prescription if rung else PRESCRIPTION_UNKNOWN,
+        complete=bool(score.complete) if score else False,
+        unmeasured_rungs=tuple(score.unmeasured_rungs) if score else (),
+    )
+
+
+def compare(before: FlexibilityReport, after: FlexibilityReport) -> tuple[RungDelta, ...]:
+    """Per-rung movement between two assessments, worst side each time.
+
+    Shown after a re-test and before the athlete decides whether to stay on the
+    current skill or switch. That decision is the one place the whole model
+    pays off, and it cannot be made against a single column of numbers.
+
+    Rungs measured in only one of the two assessments are INCLUDED with a None
+    on the missing side rather than dropped: "we did not measure this last
+    time" is information, and silently omitting it makes a partial re-test look
+    like a complete one.
+    """
+    def worst(rep: FlexibilityReport) -> dict[str, RungScore]:
+        out: dict[str, RungScore] = {}
+        for r in rep.rungs:
+            if not r.measured:
+                continue
+            if r.key not in out or r.score < out[r.key].score:
+                out[r.key] = r
+        return out
+
+    b, a = worst(before), worst(after)
+    return tuple(
+        RungDelta(
+            key=key,
+            label=_fb.RUNGS[key].label,
+            before=b[key].score if key in b else None,
+            after=a[key].score if key in a else None,
+        )
+        for key in _fb.RUNGS if key in b or key in a
     )
 
 
@@ -308,6 +439,7 @@ def assessment_to_dict(a: _fb.Assessment) -> dict:
         "taken_on": a.taken_on.isoformat(),
         "cold": a.cold,
         "note": a.note,
+        "target_skill": a.target_skill,
         "readings": [
             {"rung": r.rung, "side": r.side, "note": r.note,
              "passive": r.passive, "isometric": r.isometric, "active": r.active}
@@ -342,8 +474,16 @@ def assessment_from_dict(d: dict) -> _fb.Assessment | None:
             passive=raw.get("passive"), isometric=raw.get("isometric"),
             active=raw.get("active"),
         ))
+    # An unknown target degrades to "" rather than rejecting the assessment:
+    # the readings are still good data, and a renamed skill must not delete a
+    # session's worth of measurements taken on the floor.
+    target = d.get("target_skill") or ""
+    if target not in _fb.SKILLS:
+        target = ""
+
     return _fb.Assessment(taken_on=taken_on, readings=tuple(readings),
-                          cold=bool(d.get("cold", True)), note=d.get("note") or "")
+                          cold=bool(d.get("cold", True)), note=d.get("note") or "",
+                          target_skill=target)
 
 
 def merge_reading(assessment: _fb.Assessment,

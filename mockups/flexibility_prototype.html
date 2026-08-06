@@ -469,34 +469,170 @@ const DATA = {
  ],
  "skills": [
   {
-   "key": "deep_squat",
-   "label": "Deep squat",
+   "key": "pancake",
+   "label": "Pancake",
+   "aka": "Flat-back straddle fold",
+   "ladder": [
+    "hamstrings",
+    "adductors",
+    "hip_rotation",
+    "lumbar"
+   ],
+   "goal": 70.0,
+   "gates": "Sumo/wide-stance work, hip hinge with a long spine",
+   "note": "THE FIRST TARGET, chosen by the athlete 2026-08-06. It aims at his single dominant restriction: an inability to reach forward pelvic tilt in sitting, reported independently in four seated positions and scoring 25/100. Defined as the FLAT-BACK version \u2014 the conventional pancake finishes as a seated forward fold, which services.rules contraindicates outright. What makes the goal valuable here (opening from the hip) and what makes it dangerous (rounding the lumbar spine) are separable, and this definition keeps the first and drops the second.",
+   "blocked": "",
+   "selectable": true,
+   "built": true,
+   "stack": [
+    {
+     "key": "pancake_tilt",
+     "name": "Elevated seated pelvic tilt",
+     "spectrum": "unassisted",
+     "targets": [
+      "lumbar",
+      "hamstrings"
+     ],
+     "dose": "5 x 20 s hold, most days",
+     "setup": "Sit on the edge of a folded blanket or a low box \u2014 high enough that sitting up straight is easy rather than a fight. Legs out in front, knees soft. Roll your pelvis forwards so your lower back makes a small arch, then back the other way. Only the pelvis moves; the chest stays where it is.",
+     "why": "You cannot currently tilt your pelvis forwards in sitting, and that single restriction is what produced a 25/100 on the straddle and the same report in three other seated positions. Every step after this one needs it, so nothing above works until this does.",
+     "advance": "You can hold the forward tilt for 20 seconds with a flat back, and do it on an elevation one fold lower than where you started.",
+     "safety": "Sit HIGH. This should feel easy \u2014 if you are straining to sit upright, the block is too low and you will get the range by rounding instead, which is the one thing this stack exists to avoid."
+    },
+    {
+     "key": "pancake_half",
+     "name": "Half straddle hinge",
+     "spectrum": "unassisted",
+     "targets": [
+      "hamstrings",
+      "lumbar"
+     ],
+     "dose": "3 x 30 s each side",
+     "setup": "Still sitting up on the block. One leg straight out to the side, the other bent with the foot tucked in toward you. Keeping your chest open and your back flat, hinge toward the straight leg **from the hip**. Hands on a block or the floor for support. Stop the moment your back starts to round.",
+     "why": "Takes the groin out of the movement so your hamstring and your pelvic tilt can be worked on their own. One side at a time also shows you which side is worse, which a straddle hides.",
+     "advance": "Both sides hinge the same distance with a flat back and no shaking.",
+     "safety": ""
+    },
+    {
+     "key": "pancake_hinge",
+     "name": "Elevated straddle hinge",
+     "spectrum": "unassisted",
+     "targets": [
+      "hamstrings",
+      "adductors",
+      "hip_rotation"
+     ],
+     "dose": "3 x 30 s",
+     "setup": "Both legs out wide, still up on the block, kneecaps pointing at the ceiling. Hinge forwards from the hips with a flat back, walking your hands forward onto a block in front of you. **Stop at the first moment your back rounds** \u2014 that point is the measurement, not the floor.",
+     "why": "This is the pancake shape itself, at a height that still lets you keep the back flat. Lowering the block over months is the progression.",
+     "advance": "Your chest travels more than halfway toward the floor with the back still flat, on the lowest block you own.",
+     "safety": "Kneecaps stay pointing up. Letting them roll in turns this into a knee stretch, and at Beighton 6/9 that is not a trade worth making."
+    },
+    {
+     "key": "pancake_press",
+     "name": "Straddle adductor press",
+     "spectrum": "resisted",
+     "targets": [
+      "adductors",
+      "hip_rotation"
+     ],
+     "dose": "3 x 10 s press, 10 s relax",
+     "setup": "Sit in the widest straddle you can hold with a flat back. Press the backs of your legs down into the floor hard for 10 seconds \u2014 nothing should visibly move \u2014 then relax completely for 10 seconds and let the legs settle wider.",
+     "why": "**This is the step that actually matters for you.** Your problem is not that the range is missing, it is that nothing holds it. Pressing into the position builds the strength to keep the range you gain, which is what your own hypermobility guidance asks for instead of more passive stretching.",
+     "advance": "You can press hard for the full 10 seconds without your back rounding or your pelvis rolling backwards.",
+     "safety": "Press, do not bounce. Stop if you get any groin pain as opposed to a stretch."
+    },
+    {
+     "key": "pancake_lift",
+     "name": "Straddle leg lift",
+     "spectrum": "resisted",
+     "targets": [
+      "adductors",
+      "hamstrings",
+      "hip_rotation"
+     ],
+     "dose": "3 x 5 lifts each side, slow",
+     "setup": "Sit tall in your straddle, hands on the floor beside your hips. Keeping the knee straight, **lift one whole leg off the floor** a few centimetres under its own power and hold for two seconds. Lower slowly. No swinging.",
+     "why": "The hardest step and the one that closes the gap. It asks you to hold the wide position with nothing supporting you at all \u2014 which is the exact difference between the range you own and the range you can only fall into.",
+     "advance": "Five slow lifts a side with no drop in height across the set.",
+     "safety": "Tiny range. A couple of centimetres of clean lift beats a big one driven by leaning away from the leg."
+    }
+   ]
+  },
+  {
+   "key": "pike",
+   "label": "Pike & head to toe",
+   "aka": "Flat-back forward hinge, legs together",
+   "ladder": [
+    "hamstrings",
+    "lumbar"
+   ],
+   "goal": 70.0,
+   "gates": "RDL, every hip-hinge pattern in the block",
+   "note": "Same flat-back redefinition as the pancake and for the same reason. Shares both of its rungs with the pancake, so training the pancake moves this too \u2014 worth knowing when choosing the next target, because it would be nearly free.",
+   "blocked": "",
+   "selectable": false,
+   "built": false,
+   "stack": []
+  },
+  {
+   "key": "front_split",
+   "label": "Front split",
+   "aka": "Split lunge, back leg long",
+   "ladder": [
+    "hip_flexors",
+    "quads",
+    "hamstrings",
+    "lumbar"
+   ],
+   "goal": 70.0,
+   "gates": "Lunge, split squat, hip thrust, RDL lockout",
+   "note": "The old 'hip extension' skill, renamed into something you can actually aim at, with the same rungs plus hamstrings for the front leg. Targets the athlete's stated #1 problem \u2014 'my hips are stuck in flexion with my back arched'. **Train the back leg, and do not square the hips**: squaring drives lumbar extension, which is the direction his L5/S1 cannot take. lumbar is on the ladder because arching is how hip extension gets faked.",
+   "blocked": "",
+   "selectable": false,
+   "built": false,
+   "stack": []
+  },
+  {
+   "key": "side_split",
+   "label": "Side split",
+   "aka": "Straddle standing",
+   "ladder": [
+    "adductors",
+    "hip_rotation",
+    "lumbar"
+   ],
+   "goal": 70.0,
+   "gates": "Sumo stance, lateral lunge, wide-stance work",
+   "note": "The safest of the classic list for this athlete \u2014 the pelvis stays near neutral throughout, so it demands neither end-range lumbar flexion nor extension. Shares two rungs with the pancake.",
+   "blocked": "",
+   "selectable": false,
+   "built": false,
+   "stack": []
+  },
+  {
+   "key": "squat",
+   "label": "Squat",
+   "aka": "Deep bodyweight squat, neutral spine",
    "ladder": [
     "calves_ankle",
     "adductors",
     "hip_rotation",
-    "lumbar",
-    "quads"
-   ],
-   "goal": 70.0,
-   "gates": "Goblet squat, Bulgarian split squat",
-   "excluded": ""
-  },
-  {
-   "key": "hip_extension",
-   "label": "Hip extension",
-   "ladder": [
-    "hip_flexors",
     "quads",
     "lumbar"
    ],
    "goal": 70.0,
-   "gates": "Hip thrust, RDL lockout, lunge",
-   "excluded": ""
+   "gates": "Goblet squat, Bulgarian split squat",
+   "note": "Kept in the catalogue as a goal, dropped as an always-on monitor (athlete, 2026-08-06) \u2014 with one skill trained at a time there is no monitor tier. squat_depth is deliberately NOT a rung here: it is the OUTCOME of this ladder, and including it would let the symptom vote on its own diagnosis.",
+   "blocked": "",
+   "selectable": false,
+   "built": false,
+   "stack": []
   },
   {
    "key": "shoulder_flexion",
    "label": "Shoulder flexion",
+   "aka": "Elbows to the floor overhead",
    "ladder": [
     "shoulders_overhead",
     "lats",
@@ -506,22 +642,32 @@ const DATA = {
    ],
    "goal": 70.0,
    "gates": "Overhead work (currently prohibited), lat pulldown path",
-   "excluded": ""
+   "note": "NOMINATED AS THE SECOND TARGET (athlete, 2026-08-06); the stack is not built yet. A goal he already fails in a way he can feel \u2014 he cannot rest both elbows on the floor. READ THE RUNGS TOGETHER: shoulders_overhead low AND lats low means the lat is the limiter; shoulders_overhead low while lats is fine means pec or capsule. That comparison is the whole reason the lat rung exists, and it decides the prescription \u2014 a capsular restriction post-Latarjet makes aggressive stretching the wrong answer rather than merely a useless one.",
+   "blocked": "",
+   "selectable": false,
+   "built": false,
+   "stack": []
   },
   {
-   "key": "active_pike",
-   "label": "Active pike",
+   "key": "shoulder_extension",
+   "label": "Shoulder extension",
+   "aka": "Arms behind the back",
    "ladder": [
-    "hamstrings",
-    "lumbar"
+    "chest_horizontal",
+    "shoulders_overhead"
    ],
    "goal": 70.0,
-   "gates": "RDL, hinge pattern",
-   "excluded": ""
+   "gates": "\u2014",
+   "note": "Nominated by the athlete as a target after shoulder flexion. That ordering is sound anyway \u2014 flexion is unblocked and shares three rungs with it.",
+   "blocked": "This is the apprehension direction for an anterior-instability shoulder after a Latarjet (finding #6) \u2014 the position the joint was operated on to stop it leaving. Tracked so any regression shows, but training toward more of it is a decision for the physiotherapist. **Put it on the 2026-08-16 agenda**: the question is whether a bounded, actively controlled range can be trained, not whether to maximise it.",
+   "selectable": false,
+   "built": false,
+   "stack": []
   },
   {
    "key": "bridge",
    "label": "Bridge",
+   "aka": "Back bend",
    "ladder": [
     "hip_flexors",
     "shoulders_overhead",
@@ -529,18 +675,11 @@ const DATA = {
    ],
    "goal": 70.0,
    "gates": "\u2014",
-   "excluded": "End-range lumbar extension against L5/S1 retrolisthesis and activated osteochondrosis; services.rules already contraindicates 'hyperextension' and 'back extension'. Its COMPONENTS are exactly what this athlete needs and remain rungs elsewhere \u2014 only the composite goal is refused."
-  },
-  {
-   "key": "shoulder_extension",
-   "label": "Shoulder extension",
-   "ladder": [
-    "chest_horizontal",
-    "shoulders_overhead"
-   ],
-   "goal": 70.0,
-   "gates": "\u2014",
-   "excluded": "The apprehension direction for an anterior-instability shoulder post-Latarjet (finding #6). Tracked so regression is visible; never a target to maximise."
+   "note": "",
+   "blocked": "A full bridge finishes in end-range lumbar extension, against L5/S1 retrolisthesis and activated osteochondrosis; services.rules contraindicates 'hyperextension' and 'back extension' outright. **Its components are not blocked and are exactly what you need** \u2014 hip flexors, overhead reach and upper-back rotation are all rungs on skills you can train today, so progress toward it happens anyway. What needs sign-off is the finish position, and the honest question for 2026-08-16 is whether a version that extends through the UPPER back while the lower back stays neutral is a safe substitute.",
+   "selectable": false,
+   "built": false,
+   "stack": []
   }
  ],
  "measures": [
@@ -584,13 +723,29 @@ const DATA = {
    "butterfly_heel_distance_cm",
    "Tailbone to the back of the heels in the butterfly position. THE NUMBER is the setup, not a mark on the floor: heels further away drop the knees without your groin being one millimetre longer, so a session that re-marks the floor by eye is not comparable with the last one."
   ]
- ]
+ ],
+ "selectable": [
+  "pancake"
+ ],
+ "unbuilt": [
+  "pike",
+  "front_split",
+  "side_split",
+  "squat",
+  "shoulder_flexion"
+ ],
+ "blocked": [
+  "shoulder_extension",
+  "bridge"
+ ],
+ "defaultTarget": "pancake"
 };
 const M = DATA.measures;
 let S = null;
 
 function reset(){
-  S = {screen:'intro', step:0, cold:true, readings:{}, status:{}};
+  S = {screen:'intro', step:0, cold:true, readings:{}, status:{},
+       target: DATA.defaultTarget};
   render();
 }
 
@@ -667,6 +822,7 @@ function render(){
     + 'flexibility_baselines.py.';
 
   if(S.screen==='intro') return renderIntro();
+  if(S.screen==='pick')  return renderPick();
   if(S.screen==='cold')  return renderCold();
   if(S.screen==='step')  return renderStep();
   return renderDone();
@@ -680,12 +836,43 @@ function renderIntro(){
         measured <b style="color:var(--ink2)">cold</b>, no warm-up.<br>
         Every 6&ndash;12 weeks.</div>
     </div>
-    <div class="btns"><button class="b" onclick="S.screen='cold';render()">Start assessment</button></div>
+    <div class="btns"><button class="b" onclick="S.screen='pick';render()">Start assessment</button></div>
     <div class="card" style="margin-top:12px">
       <div class="nm" style="font-size:13px;color:var(--ink2)">Why there is nothing else here</div>
       <div class="sm">The 22 yoga depth-ratings are kept in full, and feed nothing. They answer
         &ldquo;how far did I get <i>and</i> how much did I feel&rdquo; &mdash; neither of the two
         things this model measures.</div>
+    </div>`);
+}
+
+function renderPick(){
+  const sel = DATA.skills.filter(s=>s.selectable);
+  const unb = DATA.skills.filter(s=>DATA.unbuilt.includes(s.key));
+  const blk = DATA.skills.filter(s=>DATA.blocked.includes(s.key));
+  const cur = DATA.skills.find(s=>s.key===S.target) || sel[0];
+  el(`<div class="card"><div class="cap">First</div>
+      <div class="big" style="color:var(--accent)">Pick one goal</div>
+      <div class="sm">One skill at a time. The goal decides which of the
+        ${DATA.rungs.length} tests actually matters to you &mdash; your chest is what
+        stops a bridge and is irrelevant to a pancake, so &ldquo;what is limiting
+        you&rdquo; has no answer until there is a goal to limit.</div></div>
+    ${sel.map(s=>`<label class="chk"><input type="radio" name="g"
+      ${s.key===cur.key?'checked':''} onchange="S.target='${s.key}';render()">
+      <b style="color:var(--ink2)">${s.label}</b> &middot; ${s.aka}</label>`).join('')}
+    <div class="card"><div class="sm">${md(cur.note)}</div></div>
+    <details><summary>Goals with no stack built yet &middot; ${unb.length}</summary>
+      <div class="sm">Measured and scored, but there is no route to hand you, so they
+        cannot be the target. Shoulder flexion is next.</div>
+      ${unb.map(s=>`<div class="sm"><b style="color:var(--ink2)">${s.label}</b>
+        &mdash; ${s.aka}</div>`).join('')}
+    </details>
+    <details><summary>Goals waiting on a sign-off &middot; ${blk.length}</summary>
+      ${blk.map(s=>`<div class="sm"><b style="color:var(--ink2)">${s.label}</b>
+        &mdash; ${s.aka}</div><div class="sm">${md(s.blocked)}</div>`).join('')}
+    </details>
+    <div class="btns">
+      <button class="b" onclick="S.screen='cold';render()">Next</button>
+      <button class="b ghost" onclick="S.screen='intro';render()">Cancel</button>
     </div>`);
 }
 
@@ -803,19 +990,16 @@ function advance(){
 }
 
 function renderDone(){
-  const active = DATA.skills.filter(s=>!s.excluded);
+  const active = DATA.skills.filter(s=>!DATA.blocked.includes(s.key));
   const scored = active.map(s=>({sk:s, ...skillScore(s)}));
 
-  // "limits N of 4" is a COUNT of how many ladders this rung is lowest on —
-  // not a new metric. lumbar sits on all four.
-  const counts = {};
-  scored.forEach(x=>{ if(x.limiter) counts[x.limiter]=(counts[x.limiter]||0)+1; });
-  let lead=null, leadScore=null;
-  for(const k in counts){
-    const s = rungScore(k);
-    if(s===null) continue;
-    if(leadScore===null || s<leadScore){ leadScore=s; lead=k; }
-  }
+  // The headline is the TARGET skill's limiter — not the worst rung overall.
+  // A global worst is exactly what produced "chest/pecs is limiting you"
+  // against a goal chest has nothing to do with.
+  const tgt = DATA.skills.find(s=>s.key===S.target);
+  const tscore = skillScore(tgt);
+  const lead = tscore.limiter;
+  const leadScore = lead===null ? null : rungScore(lead);
 
   const measured = DATA.rungs.filter(r=>rungScore(r.key)!==null).length;
   const gaps = DATA.rungs.filter(r=>gapOf(r.key)!==null).length;
@@ -828,11 +1012,29 @@ function renderDone(){
   if(lead){
     const g = gapOf(lead);
     const pres = g===null ? 'gap not measured' : (g>=25 ? 'needs strength' : 'needs range');
-    h += `<div class="card hi"><div class="cap" style="color:var(--bad)">Train this</div>
+    h += `<div class="card hi">
+      <div class="cap">Working toward <b style="color:var(--ink2)">${tgt.label}</b></div>
+      <div class="cap" style="color:var(--bad);margin-top:8px">What is stopping you</div>
       <div class="big" style="color:var(--bad)">${lbl(lead)}</div>
       <div class="kv"><span><b>${leadScore.toFixed(0)}</b>/100</span>
-      <span>limits <b>${counts[lead]} of ${active.length}</b> skills</span>
-      <span>gap <b>${g===null?'—':(g>0?'+':'')+g.toFixed(0)}</b> &rarr; <b>${pres}</b></span></div></div>`;
+      <span>gap <b>${g===null?'—':(g>0?'+':'')+g.toFixed(0)}</b> &rarr; <b>${pres}</b></span>
+      <span>${tgt.ladder.length}-rung ladder</span></div></div>`;
+
+    const steps = tgt.stack.filter(x=>x.targets.includes(lead));
+    if(steps.length){
+      h += `<div class="cap" style="margin:18px 0 8px">Your stack &mdash; work the
+        first one that is not clean yet</div>`;
+      steps.forEach((x,i)=>{
+        const tint = x.spectrum==='resisted' ? 'var(--good)' : 'var(--ink3)';
+        h += `<details><summary>${i+1}. ${x.name} &middot; ${x.dose}</summary>
+          <div class="sm"><span class="pill" style="color:${tint}">${x.spectrum}</span></div>
+          <div class="sm">${md(x.setup)}</div>
+          <div class="sm">${md(x.why)}</div>
+          <div class="sm"><b style="color:var(--ink2)">Move on when:</b> ${x.advance}</div>
+          ${x.safety?`<div class="sm" style="color:#E2CB9B">${md(x.safety)}</div>`:''}
+        </details>`;
+      });
+    }
   }
 
   h += `<div class="cap" style="margin:18px 0 8px">Skills</div>`;

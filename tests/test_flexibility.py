@@ -100,7 +100,7 @@ def test_a_skill_scores_its_lowest_rung_and_names_it():
         "lumbar":       1.45,    # -> 71
         "quads":        4.0,     # -> 84
     })
-    squat = next(s for s in fx.report(a, TODAY).skills if s.key == "deep_squat")
+    squat = next(s for s in fx.report(a, TODAY).skills if s.key == "squat")
 
     assert squat.score == pytest.approx(38.0, abs=0.5)
     assert squat.limiting_rung == "calves_ankle"
@@ -114,12 +114,12 @@ def test_clearing_the_limiter_re_points_it_to_the_next_rung():
     base = {"calves_ankle": 4.56, "adductors": 9.5, "hip_rotation": 35.1,
             "lumbar": 1.45, "quads": 4.0}
     before = next(s for s in fx.report(_assessment(base), TODAY).skills
-                  if s.key == "deep_squat")
+                  if s.key == "squat")
     assert before.limiting_rung == "calves_ankle"
 
     fixed = dict(base, calves_ankle=8.4)          # ankle up to ~70
     after = next(s for s in fx.report(_assessment(fixed), TODAY).skills
-                 if s.key == "deep_squat")
+                 if s.key == "squat")
     assert after.limiting_rung == "adductors"
     assert after.score > before.score
 
@@ -130,7 +130,7 @@ def test_the_worse_side_limits_and_sides_are_never_averaged():
         fb.RungReading("hamstrings", active=36.0, side="right"),   # -> 40
         fb.RungReading("lumbar", active=0.5),
     ))
-    pike = next(s for s in fx.report(a, TODAY).skills if s.key == "active_pike")
+    pike = next(s for s in fx.report(a, TODAY).skills if s.key == "pike")
     assert pike.limiting_rung == "hamstrings"
     assert pike.score == pytest.approx(40.0, abs=0.5)   # not the 60 an average gives
 
@@ -139,7 +139,7 @@ def test_a_partial_ladder_is_reported_as_incomplete():
     """A skill scored on some of its rungs is only an UPPER BOUND — an
     unmeasured rung might be lower than anything seen."""
     a = _assessment({"calves_ankle": 12.0})
-    squat = next(s for s in fx.report(a, TODAY).skills if s.key == "deep_squat")
+    squat = next(s for s in fx.report(a, TODAY).skills if s.key == "squat")
     assert squat.score is not None
     assert squat.complete is False
     assert set(squat.unmeasured_rungs) == {"adductors", "hip_rotation", "lumbar", "quads"}
@@ -210,16 +210,51 @@ def test_every_skill_ladder_references_real_rungs():
 def test_squat_depth_is_never_a_rung_on_the_squat_ladder():
     """It is the OUTCOME of that ladder. Including it would let the symptom vote
     on its own diagnosis."""
-    assert "squat_depth" not in fb.SKILLS["deep_squat"].ladder
+    assert "squat_depth" not in fb.SKILLS["squat"].ladder
 
 
-def test_excluded_skills_are_tracked_but_flagged_with_a_reason():
+def test_the_eight_skills_are_the_athletes_own_list():
+    """Goals, not lift-transfer capacities. The previous four were correct as
+    ladders and wrong as goals — "deep squat" is something he can already hold
+    and "hip extension" is not a position anybody aims at. NO NEW RUNGS were
+    needed to fix it, which is the evidence the failure was in the naming."""
+    assert set(fb.SKILLS) == {
+        "pancake", "pike", "front_split", "side_split", "squat",
+        "shoulder_flexion", "shoulder_extension", "bridge"}
+
+
+def test_a_blocked_skill_is_still_tracked_and_still_scores():
+    """Bridge and shoulder extension are the athlete's own stated goals and are
+    NOT deleted. What they cannot do is be chosen as the thing being trained
+    toward, because the route to each runs through a direction his imaging rules
+    out. Hiding them would lose the regression signal, which is the only reason
+    to track a skill nobody is training toward."""
     for key in ("bridge", "shoulder_extension"):
         s = fb.SKILLS[key]
-        assert s.excluded is True
-        assert len(s.excluded_reason) > 40, key
-    assert set(fb.ACTIVE_SKILLS) == {
-        "deep_squat", "hip_extension", "shoulder_flexion", "active_pike"}
+        assert s.needs_signoff is True
+        assert s.selectable is False
+        assert len(s.blocked_reason) > 40, key
+        assert "2026-08-16" in s.blocked_reason, key   # names what unblocks it
+    assert set(fb.BLOCKED_SKILLS) == {"bridge", "shoulder_extension"}
+
+    # It still appears in the report, with a score, like any other skill.
+    a = _assessment({"hip_flexors": -6.0, "shoulders_overhead": 120.0,
+                     "thoracic_rotation": 30.0})
+    bridge = next(s for s in fx.report(a, TODAY).skills if s.key == "bridge")
+    assert bridge.score is not None
+    assert bridge.needs_signoff is True
+
+
+def test_only_a_cleared_skill_with_a_built_stack_can_be_a_target():
+    """An unbuilt skill is not selectable either — there is no point aiming at
+    a goal with no route to it, and offering one would produce a limiting rung
+    with nothing to do about it."""
+    assert fb.SELECTABLE_SKILLS == ("pancake",)
+    assert fb.DEFAULT_TARGET_SKILL == "pancake"
+    for key in fb.UNBUILT_SKILLS:
+        s = fb.SKILLS[key]
+        assert s.status == fb.SKILL_AVAILABLE and not s.built
+        assert s.selectable is False
 
 
 def test_every_rung_names_a_lock():
@@ -485,3 +520,151 @@ def test_the_three_measures_are_explained_somewhere_the_athlete_can_see():
     for _measure, short, long in fb.MEASURES_EXPLAINED:
         assert short and len(long) > 80
     assert "hypermobile" in fb.GAP_EXPLAINED
+
+
+# ── one target at a time ─────────────────────────────────────────────────────
+#
+# The athlete's design, 2026-08-06: the target skill is chosen BEFORE the tests
+# are taken, and at the next assessment he is shown what moved and then decides
+# whether to stay on the skill (take the next rung) or switch (get a different
+# ladder entirely). His objection to the previous design is what forced it:
+# "when you say Chest / pecs is the limiting factor — what skill am I working
+# towards? Chest and pecs are only the limiting factor if I want to do a
+# handstand or a bridge, but if my first goal is a pancake then chest and pecs
+# wouldn't be that important compared to hamstrings."
+
+def test_the_same_readings_prescribe_differently_for_different_targets():
+    """THE POINT OF THE WHOLE REDESIGN. One set of numbers, two goals, two
+    different answers — because a limiting rung is only meaningful against a
+    target."""
+    a = fb.Assessment(taken_on=TODAY, target_skill="pancake", readings=(
+        fb.RungReading("hamstrings", active=27.0),         # -> 30, poor
+        fb.RungReading("adductors", active=10.0),          # -> 60
+        fb.RungReading("hip_rotation", active=32.0),       # -> 80
+        fb.RungReading("lumbar", active=1.0),              # -> 80
+        fb.RungReading("chest_horizontal", active=12.0),   # -> 20, worse
+        fb.RungReading("shoulders_overhead", active=119.0),
+        fb.RungReading("lats", active=112.0),
+        fb.RungReading("thoracic_rotation", active=27.0),
+    ))
+    rep = fx.report(a, TODAY)
+
+    pancake = fx.prescribe(rep, "pancake")
+    shoulder = fx.prescribe(rep, "shoulder_flexion")
+
+    # Chest is the lowest rung in the whole assessment, and it is IRRELEVANT to
+    # the pancake — it is not on that ladder at all.
+    assert pancake.limiting_rung == "hamstrings"
+    assert shoulder.limiting_rung == "chest_horizontal"
+    assert "chest_horizontal" not in fb.SKILLS["pancake"].ladder
+
+
+def test_the_target_defaults_to_the_one_recorded_on_the_assessment():
+    a = fb.Assessment(taken_on=TODAY, target_skill="pancake",
+                      readings=(fb.RungReading("hamstrings", active=27.0),))
+    rep = fx.report(a, TODAY)
+    assert rep.target_skill == "pancake"
+    assert fx.prescribe(rep).skill_key == "pancake"
+
+
+def test_only_the_stretches_that_move_the_limiting_rung_are_returned():
+    """Handing over the whole stack when one rung is the blocker is how "come
+    to conclusions on where to focus" turns back into a list."""
+    a = fb.Assessment(taken_on=TODAY, target_skill="pancake", readings=(
+        fb.RungReading("hamstrings", active=81.0),      # -> 90, fine
+        fb.RungReading("adductors", active=20.0),       # -> 20, the blocker
+        fb.RungReading("hip_rotation", active=32.0),
+        fb.RungReading("lumbar", active=1.0),
+    ))
+    p = fx.prescribe(fx.report(a, TODAY))
+    assert p.limiting_rung == "adductors"
+    assert p.stretches, "a built skill must offer a route"
+    for s in p.stretches:
+        assert "adductors" in s.targets, s.key
+    # The pelvic-tilt step does not target adductors, so it must not appear.
+    assert "pancake_tilt" not in {s.key for s in p.stretches}
+
+
+def test_an_unmeasured_target_offers_the_whole_stack_rather_than_nothing():
+    rep = fx.report(fb.Assessment(taken_on=TODAY, target_skill="pancake"), TODAY)
+    p = fx.prescribe(rep)
+    assert p.limiting_rung is None
+    assert len(p.stretches) == len(fb.SKILLS["pancake"].stack)
+
+
+def test_a_blocked_target_scores_but_has_no_route():
+    p = fx.prescribe(fx.report(fb.Assessment(
+        taken_on=TODAY, readings=(fb.RungReading("hip_flexors", active=-6.0),)),
+        TODAY), "bridge")
+    assert p is not None
+    assert p.stretches == ()
+
+
+def test_compare_shows_what_moved_between_two_assessments():
+    """Shown after a re-test, before the stay-or-switch decision. That decision
+    is where the model pays off and it cannot be made from one column."""
+    before = fx.report(fb.Assessment(taken_on=date(2026, 8, 6), readings=(
+        fb.RungReading("hamstrings", active=27.0),      # 30
+        fb.RungReading("adductors", active=10.0),       # 60
+    )), TODAY)
+    after = fx.report(fb.Assessment(taken_on=date(2026, 10, 15), readings=(
+        fb.RungReading("hamstrings", active=45.0),      # 50
+        fb.RungReading("lumbar", active=1.0),           # new this time
+    )), date(2026, 10, 15))
+
+    deltas = {d.key: d for d in fx.compare(before, after)}
+    assert deltas["hamstrings"].delta == pytest.approx(20.0, abs=0.5)
+    assert deltas["hamstrings"].improved is True
+    # Measured before but not after, and vice versa: both kept, with a None on
+    # the missing side. Dropping them makes a partial re-test look complete.
+    assert deltas["adductors"].after is None
+    assert deltas["adductors"].delta is None
+    assert deltas["lumbar"].before is None
+
+
+def test_a_stack_is_ordered_cumulative_and_weighted_to_the_resisted_end():
+    """The athlete's own instruction: "remember the heavily assisted to heavily
+    resisted training". At Beighton 6/9 the ASSISTED half of that spectrum
+    solves a problem he does not have — his passive range is fine and the
+    active gap is the deficit — so no step in a stack of his may be assisted."""
+    stack = fb.SKILLS["pancake"].stack
+    assert len(stack) >= 3
+    assert {s.spectrum for s in stack} <= set(fb.SPECTRUM)
+    assert fb.ASSISTED not in {s.spectrum for s in stack}
+    assert any(s.spectrum == fb.RESISTED for s in stack)
+    # The resisted work is the destination, so it comes last.
+    spectra = [s.spectrum for s in stack]
+    assert spectra.index(fb.RESISTED) >= len(stack) - 2
+    for s in stack:
+        assert s.advance_when.strip(), s.key
+        for t in s.targets:
+            assert t in fb.RUNGS, s.key
+
+
+def test_no_stack_step_is_a_forward_fold():
+    """services.rules contraindicates 'forward fold', 'seated forward fold' and
+    'toe touch' outright — end-range lumbar flexion on the covered annulus
+    tears. The conventional pancake finishes as exactly that, so the flat-back
+    redefinition is the only reason this skill is trainable at all."""
+    from services import rules as _rules
+    banned = {r.movement for r in _rules.MOVEMENT_RULES
+              if r.severity == "contraindicated"}
+    for skill in fb.SKILLS.values():
+        for step in skill.stack:
+            text = f"{step.name} {step.setup}".lower()
+            for movement in banned:
+                assert movement not in text, f"{step.key}: {movement!r}"
+
+
+def test_the_target_survives_a_save_and_reload_and_an_unknown_one_does_not():
+    a = fb.Assessment(taken_on=TODAY, target_skill="pancake",
+                      readings=(fb.RungReading("hamstrings", active=45.0),))
+    assert fx.assessment_from_dict(fx.assessment_to_dict(a)).target_skill == "pancake"
+
+    # A renamed skill must not delete a session's worth of floor measurements.
+    d = fx.assessment_to_dict(a)
+    d["target_skill"] = "handstand"
+    back = fx.assessment_from_dict(d)
+    assert back is not None
+    assert back.target_skill == ""
+    assert len(back.readings) == 1

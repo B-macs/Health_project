@@ -1438,6 +1438,62 @@ def _fx_render_capture(accent: str) -> None:
     step = max(0, min(step, len(order) - 1))
 
     draft = repo_.get_flexibility_draft()
+
+    # ── step 0: choose the target, BEFORE any test is taken ──────────────────
+    #
+    # Deliberately first. The target is what makes a limiting rung mean
+    # anything, so asking afterwards would be asking the athlete to interpret a
+    # number that was computed without knowing the question. It is also what
+    # the athlete asked for: "at the start of the flexibility questions and
+    # before the tests, the user must be asked, what is the skill you would
+    # like to test towards".
+    if draft is None and not st.session_state.get("fx_target"):
+        st.markdown(
+            f'<div class="fx-card"><div class="fx-cap">First</div>'
+            f'<div class="fx-big" style="color:{accent};">Pick one goal</div>'
+            f'<div class="fx-sm">One skill at a time. The goal decides which of the '
+            f'{len(flexibility_baselines.RUNGS)} tests actually matters to you &mdash; '
+            f'your chest is what stops a bridge and is irrelevant to a pancake, so '
+            f'"what is limiting you" has no answer until there is a goal to limit.'
+            f'</div></div>',
+            unsafe_allow_html=True,
+        )
+        choices = list(flexibility_baselines.SELECTABLE_SKILLS)
+        pick = st.radio(
+            "Goal",
+            choices,
+            format_func=lambda k: (f"{flexibility_baselines.SKILLS[k].label}"
+                                   f"  ·  {flexibility_baselines.SKILLS[k].aka}"),
+            key="fx_target_pick", label_visibility="collapsed",
+        )
+        st.caption(flexibility_baselines.SKILLS[pick].note)
+
+        others = [k for k in flexibility_baselines.UNBUILT_SKILLS]
+        if others:
+            with st.expander(f"Goals with no stack built yet · {len(others)}"):
+                st.caption("Measured and scored, but there is no route to hand you, "
+                           "so they cannot be the target. Shoulder flexion is next.")
+                for k in others:
+                    sk = flexibility_baselines.SKILLS[k]
+                    st.markdown(f"**{sk.label}** — {sk.aka}")
+        blocked = list(flexibility_baselines.BLOCKED_SKILLS)
+        if blocked:
+            with st.expander(f"Goals waiting on a sign-off · {len(blocked)}"):
+                for k in blocked:
+                    sk = flexibility_baselines.SKILLS[k]
+                    st.markdown(f"**{sk.label}** — {sk.aka}")
+                    st.caption(sk.blocked_reason)
+
+        c1, c2 = st.columns([2, 1])
+        if c1.button("Next", key="fx_pick_go", use_container_width=True,
+                     type="primary"):
+            st.session_state["fx_target"] = pick
+            st.rerun()
+        if c2.button("Cancel", key="fx_cancel_pick", use_container_width=True):
+            st.session_state["fx_mode"] = None
+            st.rerun()
+        return
+
     if draft is None:
         # Session 1 of this assessment: the cold gate. Asked once, recorded on
         # the assessment, because a warm reading measures the viscoelastic
@@ -1481,6 +1537,8 @@ def _fx_render_capture(accent: str) -> None:
             repo_.save_flexibility_draft(flexibility_baselines.Assessment(
                 taken_on=date.today(), readings=(),
                 cold=cold.startswith("Cold"),
+                target_skill=st.session_state.get(
+                    "fx_target", flexibility_baselines.DEFAULT_TARGET_SKILL),
             ))
             st.rerun()
         if c2.button("Cancel", key="fx_cancel0", use_container_width=True):
@@ -1636,42 +1694,65 @@ def _fx_render_capture(accent: str) -> None:
 
 # ── state 3: populated ───────────────────────────────────────────────────────
 
-def _fx_headline_rung(rep) -> tuple:
-    """(RungScore, how many ladders it is currently lowest on), or (None, 0).
-
-    'limits N of 4 skills' is not a new metric — it is a count of how many
-    ladders this rung is the minimum of. lumbar sits on ALL FOUR, so if it is
-    ever the limiter it is unambiguously the highest-leverage thing to train,
-    and the screen can say so without any extra measurement."""
-    counts: dict[str, int] = {}
-    for s in rep.skills:
-        if s.excluded or s.limiting_rung is None:
-            continue
-        counts[s.limiting_rung] = counts.get(s.limiting_rung, 0) + 1
-    if not counts:
-        return None, 0
-    by_key = {r.key: r for r in rep.rungs if r.measured}
-    worst = min((by_key[k] for k in counts if k in by_key),
-                key=lambda r: r.score, default=None)
-    return worst, counts.get(worst.key, 0) if worst else 0
+# `_fx_headline_rung` lived here and is DELETED. It answered "which rung is
+# lowest across every ladder, and how many does it limit" — a genuinely useful
+# question, and the wrong headline. With one skill trained at a time the
+# headline is that skill's limiter; a global worst is exactly what produced
+# "chest/pecs is limiting you" against a goal chest has nothing to do with.
+# Removed rather than left unused: it also read `skill.excluded`, which no
+# longer exists, so a future caller would have found a latent AttributeError.
 
 
 def _fx_render_populated(rep, accent: str) -> None:
-    lead, limits_n = _fx_headline_rung(rep)
-    active = [s for s in rep.skills if not s.excluded]
+    active = [s for s in rep.skills if not s.needs_signoff]
 
-    if lead is not None:
-        pres = _FX_PRESCRIPTION_LABEL[lead.prescription]
-        gap = f'{lead.gap:+.0f}' if lead.gap is not None else "—"
-        st.markdown(
-            f'<div class="fx-card hi"><div class="fx-cap" style="color:{_BAD};">'
-            f'Train this</div>'
-            f'<div class="fx-big" style="color:{_BAD};">{lead.label}</div>'
-            f'<div class="fx-kv"><span><b>{lead.score:.0f}</b>/100</span>'
-            f'<span>limits <b>{limits_n} of {len(active)}</b> skills</span>'
-            f'<span>gap <b>{gap}</b> &rarr; <b>{pres}</b></span></div></div>',
-            unsafe_allow_html=True,
-        )
+    # THE HEADLINE IS THE TARGET SKILL'S LIMITER, not the worst rung overall.
+    # A global worst is what produced "chest/pecs is limiting you" against a
+    # goal chest has nothing to do with — the athlete's objection, and the
+    # reason a target is now chosen before the tests are taken.
+    pres = fx.prescribe(rep)
+    if pres is not None:
+        skill = flexibility_baselines.SKILLS[pres.skill_key]
+        if pres.limiting_rung is None:
+            st.markdown(
+                f'<div class="fx-card hi"><div class="fx-cap">Working toward</div>'
+                f'<div class="fx-big" style="color:{accent};">{pres.skill_label}</div>'
+                f'<div class="fx-sm">No readings yet on this ladder.</div></div>',
+                unsafe_allow_html=True,
+            )
+        else:
+            word = _FX_PRESCRIPTION_LABEL[pres.prescription]
+            st.markdown(
+                f'<div class="fx-card hi"><div class="fx-cap">Working toward '
+                f'<b style="color:{_INK2};">{pres.skill_label}</b></div>'
+                f'<div class="fx-cap" style="color:{_BAD};margin-top:8px;">'
+                f'What is stopping you</div>'
+                f'<div class="fx-big" style="color:{_BAD};">{pres.limiting_label}</div>'
+                f'<div class="fx-kv"><span><b>{pres.limiting_score:.0f}</b>/100</span>'
+                f'<span>needs <b>{word}</b></span>'
+                f'<span>{len(skill.ladder)}-rung ladder</span></div></div>',
+                unsafe_allow_html=True,
+            )
+
+        if pres.stretches:
+            st.markdown('<div class="fx-cap" style="margin:16px 0 8px;">'
+                        'Your stack &mdash; work the first one that is not clean yet'
+                        '</div>', unsafe_allow_html=True)
+            for i, step in enumerate(pres.stretches, 1):
+                band = flexibility_baselines.RESISTED
+                tint = _GOOD if step.spectrum == band else _INK3
+                with st.expander(f"{i}. {step.name}  ·  {step.dose}"):
+                    st.markdown(
+                        f'<span class="fx-cap" style="color:{tint};">'
+                        f'{step.spectrum}</span>', unsafe_allow_html=True)
+                    st.markdown(_fx_bold(step.setup))
+                    st.caption(_fx_bold(step.why))
+                    st.caption(f"**Move on when:** {step.advance_when}")
+                    if step.safety:
+                        st.warning(step.safety, icon="⚠️")
+        elif not flexibility_baselines.SKILLS[pres.skill_key].built:
+            st.info("This goal has no stack built yet — the tests still score it, "
+                    "but there is no route to hand you.", icon="🧱")
 
     st.markdown(f'<div class="fx-cap" style="margin:16px 0 8px;">Skills</div>',
                 unsafe_allow_html=True)
@@ -1702,6 +1783,18 @@ def _fx_render_populated(rep, accent: str) -> None:
             f'{flexibility_baselines.SKILLS[s.key].gates}</div>{bound}</div>',
             unsafe_allow_html=True,
         )
+
+    blocked = [s for s in rep.skills if s.needs_signoff]
+    if blocked:
+        with st.expander(f"Goals waiting on a sign-off · {len(blocked)}"):
+            st.caption("Still measured, still tracked, so a slide would show. What "
+                       "they cannot be is the thing you train toward — the usual "
+                       "route to each runs through a direction your imaging rules "
+                       "out.")
+            for s in blocked:
+                score = f"{s.score:.0f}/100" if s.score is not None else "not measured"
+                st.markdown(f"**{s.label}** — {score}")
+                st.caption(flexibility_baselines.SKILLS[s.key].blocked_reason)
 
     with st.expander(f"What could be limiting you · {len(flexibility_baselines.RUNGS)} tests"):
         st.caption("Diagnostics — only the **lowest** one limits a skill. The rest are "

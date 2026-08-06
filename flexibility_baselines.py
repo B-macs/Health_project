@@ -604,97 +604,338 @@ RUNGS: dict[str, RungTest] = {
 }
 
 
+# ── the assisted → resisted spectrum ─────────────────────────────────────────
+#
+# The source method's central idea, and the athlete asked for it explicitly:
+# every stretch sits somewhere on a line from HEAVILY ASSISTED (a partner, a
+# wall or gravity puts you in the position) through UNASSISTED to HEAVILY
+# RESISTED (you fight your way in, or hold it against load).
+#
+# FOR THIS ATHLETE THE ASSISTED HALF IS LARGELY WASTED, and that is a
+# measured claim rather than a preference. Beighton 6/9; the straddle scored
+# 25/100 not because the tissue is short but because he cannot tilt the pelvis
+# in sitting; and `patient_profile`'s own hypermobility rule prescribes
+# "controlled-range strength/stability work over passive end-range stretching".
+# A stack that opens with assisted work spends weeks buying range he already
+# owns and cannot hold.
+#
+# This is the same distinction the three MEASURES draw, seen from the training
+# side rather than the testing side: passive is what assisted work improves,
+# active is what resisted work improves, and the gap between them is which of
+# the two he needs.
+
+ASSISTED = "assisted"
+UNASSISTED = "unassisted"
+RESISTED = "resisted"
+SPECTRUM: tuple[str, ...] = (ASSISTED, UNASSISTED, RESISTED)
+
+SPECTRUM_EXPLAINED: tuple[tuple[str, str], ...] = (
+    (ASSISTED, "Something else puts you in the position — a wall, a block, "
+               "gravity, a partner. Builds the ceiling. **Mostly not your "
+               "problem**: your passive range is already good, and this is the "
+               "half of the usual method aimed at people who lack it."),
+    (UNASSISTED, "You get into the position under your own power, with nothing "
+                 "helping. This is the range you can actually use, and it is "
+                 "what the tests score."),
+    (RESISTED, "You hold or fight the position against resistance — your own "
+               "muscles, a band, a load. Builds the strength to keep the range "
+               "you have. **This is where most of your work belongs**, and the "
+               "wide passive-minus-active gap is what says so."),
+)
+
+
+@dataclass(frozen=True)
+class Stretch:
+    """One step in a skill's stack.
+
+    A STACK is ordered and cumulative: each step adds one demand to the one
+    before it, and you do not advance until `advance_when` is true. That is what
+    makes it a stack rather than a list — step 3 is not harder than step 2 by
+    accident, it is step 2 plus one thing.
+    """
+    key: str
+    name: str
+    spectrum: str
+    targets: tuple[str, ...]
+    dose: str
+    setup: str
+    why: str
+    advance_when: str
+    safety: str = ""
+
+
+SKILL_AVAILABLE = "available"
+SKILL_NEEDS_SIGNOFF = "needs_signoff"
+
+
 @dataclass(frozen=True)
 class Skill:
     """A goal position, and the ladder of rungs that could be limiting it.
 
-    `goal_level` is the rung level every rung must reach for the skill to be
-    considered achieved. `excluded_reason`, when set, means the skill is
-    tracked but must never be trained toward.
+    ONE SKILL IS TRAINED AT A TIME (athlete's decision, 2026-08-06, from the
+    source method). The target is chosen BEFORE the tests are taken, because
+    the target is what makes a limiting rung mean anything — "chest/pecs is
+    limiting you" is actionable if the goal is an overhead position and noise
+    if the goal is a pancake. At the next assessment the athlete is shown what
+    moved, then chooses: stay on this skill and take the next rung, or switch
+    and get a different ladder entirely.
+
+    `status` gates SELECTION, not tracking. A skill needing sign-off still
+    appears, still scores, and still shows regression — it just cannot be
+    chosen as the thing being trained toward until a physiotherapist clears it.
+    Deleting the athlete's stated goal would be the wrong answer; so would
+    quietly programming toward a contraindication.
+
+    `stack` may be empty. An unbuilt skill is selectable only if it is also
+    available — there is no point aiming at a goal with no route to it.
     """
     key: str
     label: str
     ladder: tuple[str, ...]
     goal_level: float
     gates: str
+    aka: str = ""
     note: str = ""
-    excluded_reason: str = ""
+    status: str = SKILL_AVAILABLE
+    blocked_reason: str = ""
+    stack: tuple[Stretch, ...] = ()
 
     @property
-    def excluded(self) -> bool:
-        return bool(self.excluded_reason)
+    def needs_signoff(self) -> bool:
+        return self.status == SKILL_NEEDS_SIGNOFF
+
+    @property
+    def built(self) -> bool:
+        """True when this skill has a stack, i.e. something to actually do."""
+        return bool(self.stack)
+
+    @property
+    def selectable(self) -> bool:
+        return self.status == SKILL_AVAILABLE and self.built
 
 
-#: The four in-scope skills, chosen for transfer to the lifts already in the
-#: block rather than for gymnastics. The athlete's stated aim is to get "the
-#: muscle pulling in the right direction with nothing restricted" so his lifts
-#: work — not the splits.
+#: The PANCAKE stack. Five steps, ordered and cumulative, and deliberately
+#: weighted to the RESISTED end of the spectrum — steps 4 and 5 are where the
+#: work actually is, and step 1 exists because nothing above it functions until
+#: he can tilt the pelvis forward in sitting at all.
+#:
+#: THE ONE THING THIS STACK MUST NEVER BECOME: a seated forward fold.
+#: `services.rules` contraindicates "forward fold", "seated forward fold" and
+#: "toe touch" outright — end-range lumbar flexion loads the covered annulus
+#: tears at L3/4 and L4/5. Every step below hinges from the HIP with a flat
+#: back, on an elevation chosen so a flat back is possible. The elevation
+#: coming down IS the progression; reaching further with a rounded back is the
+#: failure this whole stack is shaped to prevent.
+_PANCAKE_STACK: tuple[Stretch, ...] = (
+    Stretch(
+        key="pancake_tilt", name="Elevated seated pelvic tilt", spectrum=UNASSISTED,
+        targets=("lumbar", "hamstrings"),
+        dose="5 x 20 s hold, most days",
+        setup="Sit on the edge of a folded blanket or a low box — high enough that sitting up "
+              "straight is easy rather than a fight. Legs out in front, knees soft. Roll your "
+              "pelvis forwards so your lower back makes a small arch, then back the other way. "
+              "Only the pelvis moves; the chest stays where it is.",
+        why="You cannot currently tilt your pelvis forwards in sitting, and that single "
+            "restriction is what produced a 25/100 on the straddle and the same report in "
+            "three other seated positions. Every step after this one needs it, so nothing "
+            "above works until this does.",
+        advance_when="You can hold the forward tilt for 20 seconds with a flat back, and do it "
+                     "on an elevation one fold lower than where you started.",
+        safety="Sit HIGH. This should feel easy — if you are straining to sit upright, the "
+               "block is too low and you will get the range by rounding instead, which is the "
+               "one thing this stack exists to avoid.",
+    ),
+    Stretch(
+        key="pancake_half", name="Half straddle hinge", spectrum=UNASSISTED,
+        targets=("hamstrings", "lumbar"),
+        dose="3 x 30 s each side",
+        setup="Still sitting up on the block. One leg straight out to the side, the other bent "
+              "with the foot tucked in toward you. Keeping your chest open and your back flat, "
+              "hinge toward the straight leg **from the hip**. Hands on a block or the floor "
+              "for support. Stop the moment your back starts to round.",
+        why="Takes the groin out of the movement so your hamstring and your pelvic tilt can be "
+            "worked on their own. One side at a time also shows you which side is worse, which "
+            "a straddle hides.",
+        advance_when="Both sides hinge the same distance with a flat back and no shaking.",
+    ),
+    Stretch(
+        key="pancake_hinge", name="Elevated straddle hinge", spectrum=UNASSISTED,
+        targets=("hamstrings", "adductors", "hip_rotation"),
+        dose="3 x 30 s",
+        setup="Both legs out wide, still up on the block, kneecaps pointing at the ceiling. "
+              "Hinge forwards from the hips with a flat back, walking your hands forward onto "
+              "a block in front of you. **Stop at the first moment your back rounds** — that "
+              "point is the measurement, not the floor.",
+        why="This is the pancake shape itself, at a height that still lets you keep the back "
+            "flat. Lowering the block over months is the progression.",
+        advance_when="Your chest travels more than halfway toward the floor with the back still "
+                     "flat, on the lowest block you own.",
+        safety="Kneecaps stay pointing up. Letting them roll in turns this into a knee stretch, "
+               "and at Beighton 6/9 that is not a trade worth making.",
+    ),
+    Stretch(
+        key="pancake_press", name="Straddle adductor press", spectrum=RESISTED,
+        targets=("adductors", "hip_rotation"),
+        dose="3 x 10 s press, 10 s relax",
+        setup="Sit in the widest straddle you can hold with a flat back. Press the backs of "
+              "your legs down into the floor hard for 10 seconds — nothing should visibly move "
+              "— then relax completely for 10 seconds and let the legs settle wider.",
+        why="**This is the step that actually matters for you.** Your problem is not that the "
+            "range is missing, it is that nothing holds it. Pressing into the position builds "
+            "the strength to keep the range you gain, which is what your own hypermobility "
+            "guidance asks for instead of more passive stretching.",
+        advance_when="You can press hard for the full 10 seconds without your back rounding or "
+                     "your pelvis rolling backwards.",
+        safety="Press, do not bounce. Stop if you get any groin pain as opposed to a stretch.",
+    ),
+    Stretch(
+        key="pancake_lift", name="Straddle leg lift", spectrum=RESISTED,
+        targets=("adductors", "hamstrings", "hip_rotation"),
+        dose="3 x 5 lifts each side, slow",
+        setup="Sit tall in your straddle, hands on the floor beside your hips. Keeping the knee "
+              "straight, **lift one whole leg off the floor** a few centimetres under its own "
+              "power and hold for two seconds. Lower slowly. No swinging.",
+        why="The hardest step and the one that closes the gap. It asks you to hold the wide "
+            "position with nothing supporting you at all — which is the exact difference "
+            "between the range you own and the range you can only fall into.",
+        advance_when="Five slow lifts a side with no drop in height across the set.",
+        safety="Tiny range. A couple of centimetres of clean lift beats a big one driven by "
+               "leaning away from the leg.",
+    ),
+)
+
+
+#: THE EIGHT SKILLS (athlete's list, 2026-08-06). One is trained at a time, and
+#: the target is chosen BEFORE the tests are taken.
+#:
+#: These are the source method's goals, not the four lift-transfer capacities
+#: this file scored first. Those were correct as ladders and wrong as goals —
+#: the athlete's objection was that "deep squat" is something he can already
+#: hold and "hip extension" is not a position anybody aims at. NO NEW RUNGS
+#: WERE NEEDED to fix it: hip_extension became the back leg of a front split,
+#: shoulder_flexion became elbows-to-the-floor, and the same tests underneath
+#: them are unchanged. The failure was in the naming layer alone.
 SKILLS: dict[str, Skill] = {
-    "deep_squat": Skill(
-        key="deep_squat", label="Deep squat",
-        ladder=("calves_ankle", "adductors", "hip_rotation", "lumbar", "quads"),
+    "pancake": Skill(
+        key="pancake", label="Pancake", aka="Flat-back straddle fold",
+        ladder=("hamstrings", "adductors", "hip_rotation", "lumbar"),
+        goal_level=70.0,
+        gates="Sumo/wide-stance work, hip hinge with a long spine",
+        stack=_PANCAKE_STACK,
+        note="THE FIRST TARGET, chosen by the athlete 2026-08-06. It aims at his single "
+             "dominant restriction: an inability to reach forward pelvic tilt in sitting, "
+             "reported independently in four seated positions and scoring 25/100. Defined as "
+             "the FLAT-BACK version — the conventional pancake finishes as a seated forward "
+             "fold, which services.rules contraindicates outright. What makes the goal "
+             "valuable here (opening from the hip) and what makes it dangerous (rounding the "
+             "lumbar spine) are separable, and this definition keeps the first and drops the "
+             "second.",
+    ),
+    "pike": Skill(
+        key="pike", label="Pike & head to toe", aka="Flat-back forward hinge, legs together",
+        ladder=("hamstrings", "lumbar"),
+        goal_level=70.0,
+        gates="RDL, every hip-hinge pattern in the block",
+        note="Same flat-back redefinition as the pancake and for the same reason. Shares both "
+             "of its rungs with the pancake, so training the pancake moves this too — worth "
+             "knowing when choosing the next target, because it would be nearly free.",
+    ),
+    "front_split": Skill(
+        key="front_split", label="Front split", aka="Split lunge, back leg long",
+        ladder=("hip_flexors", "quads", "hamstrings", "lumbar"),
+        goal_level=70.0,
+        gates="Lunge, split squat, hip thrust, RDL lockout",
+        note="The old 'hip extension' skill, renamed into something you can actually aim at, "
+             "with the same rungs plus hamstrings for the front leg. Targets the athlete's "
+             "stated #1 problem — 'my hips are stuck in flexion with my back arched'. **Train "
+             "the back leg, and do not square the hips**: squaring drives lumbar extension, "
+             "which is the direction his L5/S1 cannot take. lumbar is on the ladder because "
+             "arching is how hip extension gets faked.",
+    ),
+    "side_split": Skill(
+        key="side_split", label="Side split", aka="Straddle standing",
+        ladder=("adductors", "hip_rotation", "lumbar"),
+        goal_level=70.0,
+        gates="Sumo stance, lateral lunge, wide-stance work",
+        note="The safest of the classic list for this athlete — the pelvis stays near neutral "
+             "throughout, so it demands neither end-range lumbar flexion nor extension. Shares "
+             "two rungs with the pancake.",
+    ),
+    "squat": Skill(
+        key="squat", label="Squat", aka="Deep bodyweight squat, neutral spine",
+        ladder=("calves_ankle", "adductors", "hip_rotation", "quads", "lumbar"),
         goal_level=70.0,
         gates="Goblet squat, Bulgarian split squat",
-        note="squat_depth is the OUTCOME of this ladder, not a rung in it — including it "
-             "would let the symptom vote on its own diagnosis.",
-    ),
-    "hip_extension": Skill(
-        key="hip_extension", label="Hip extension",
-        ladder=("hip_flexors", "quads", "lumbar"),
-        goal_level=70.0,
-        gates="Hip thrust, RDL lockout, lunge",
-        note="The athlete's stated #1 problem: 'my hips are stuck in flexion with my back "
-             "arched'. lumbar is on this ladder because arching is how hip extension gets "
-             "faked, so a good lumbar score is a precondition for trusting hip_flexors.",
+        note="Kept in the catalogue as a goal, dropped as an always-on monitor (athlete, "
+             "2026-08-06) — with one skill trained at a time there is no monitor tier. "
+             "squat_depth is deliberately NOT a rung here: it is the OUTCOME of this ladder, "
+             "and including it would let the symptom vote on its own diagnosis.",
     ),
     "shoulder_flexion": Skill(
-        key="shoulder_flexion", label="Shoulder flexion",
+        key="shoulder_flexion", label="Shoulder flexion", aka="Elbows to the floor overhead",
         ladder=("shoulders_overhead", "lats", "chest_horizontal", "thoracic_rotation",
                 "lumbar"),
         goal_level=70.0,
         gates="Overhead work (currently prohibited), lat pulldown path",
-        note="The three tissues that limit an overhead reach now have a rung each: "
-             "chest_horizontal for pec major, lats for latissimus, and thoracic_rotation for "
-             "the segment they both act across, with shoulders_overhead as the composite the "
-             "athlete actually fails. READ THEM TOGETHER: if shoulders_overhead is low AND "
-             "lats is low, the lat is the limiter; if shoulders_overhead is low while lats is "
-             "fine, it is pec or capsule. That comparison is the reason the lat rung exists — "
-             "the composite alone cannot say which tissue stopped it.",
+        note="NOMINATED AS THE SECOND TARGET (athlete, 2026-08-06); the stack is not built "
+             "yet. A goal he already fails in a way he can feel — he cannot rest both elbows "
+             "on the floor. READ THE RUNGS TOGETHER: shoulders_overhead low AND lats low means "
+             "the lat is the limiter; shoulders_overhead low while lats is fine means pec or "
+             "capsule. That comparison is the whole reason the lat rung exists, and it decides "
+             "the prescription — a capsular restriction post-Latarjet makes aggressive "
+             "stretching the wrong answer rather than merely a useless one.",
     ),
-    "active_pike": Skill(
-        key="active_pike", label="Active pike",
-        ladder=("hamstrings", "lumbar"),
-        goal_level=70.0,
-        gates="RDL, hinge pattern",
-        note="The PASSIVE version is already achieved — palms flat to floor is a Beighton "
-             "positive — and is also contraindicated as a test (seated forward fold). The "
-             "active version is unmeasured, and that gap is the whole thesis of this model.",
-    ),
-    # ── tracked, never trained toward ────────────────────────────────────────
-    "bridge": Skill(
-        key="bridge", label="Bridge",
-        ladder=("hip_flexors", "shoulders_overhead", "thoracic_rotation"),
-        goal_level=70.0,
-        gates="—",
-        excluded_reason="End-range lumbar extension against L5/S1 retrolisthesis and activated "
-                        "osteochondrosis; services.rules already contraindicates "
-                        "'hyperextension' and 'back extension'. Its COMPONENTS are exactly what "
-                        "this athlete needs and remain rungs elsewhere — only the composite "
-                        "goal is refused.",
-    ),
+    # ── in the catalogue, not yet selectable ─────────────────────────────────
+    # Both are the athlete's own stated goals and are NOT deleted. They score,
+    # they show regression, and they are visible in the list. What they cannot
+    # do is become the thing being trained toward, because the route to each
+    # runs through a direction his imaging rules out. The gate is a
+    # physiotherapist's decision, and the appointment is already scheduled.
     "shoulder_extension": Skill(
-        key="shoulder_extension", label="Shoulder extension",
+        key="shoulder_extension", label="Shoulder extension", aka="Arms behind the back",
         ladder=("chest_horizontal", "shoulders_overhead"),
         goal_level=70.0,
         gates="—",
-        excluded_reason="The apprehension direction for an anterior-instability shoulder "
-                        "post-Latarjet (finding #6). Tracked so regression is visible; never a "
-                        "target to maximise.",
+        status=SKILL_NEEDS_SIGNOFF,
+        blocked_reason="This is the apprehension direction for an anterior-instability shoulder "
+                       "after a Latarjet (finding #6) — the position the joint was operated on "
+                       "to stop it leaving. Tracked so any regression shows, but training "
+                       "toward more of it is a decision for the physiotherapist. **Put it on "
+                       "the 2026-08-16 agenda**: the question is whether a bounded, actively "
+                       "controlled range can be trained, not whether to maximise it.",
+        note="Nominated by the athlete as a target after shoulder flexion. That ordering is "
+             "sound anyway — flexion is unblocked and shares three rungs with it.",
+    ),
+    "bridge": Skill(
+        key="bridge", label="Bridge", aka="Back bend",
+        ladder=("hip_flexors", "shoulders_overhead", "thoracic_rotation"),
+        goal_level=70.0,
+        gates="—",
+        status=SKILL_NEEDS_SIGNOFF,
+        blocked_reason="A full bridge finishes in end-range lumbar extension, against L5/S1 "
+                       "retrolisthesis and activated osteochondrosis; services.rules "
+                       "contraindicates 'hyperextension' and 'back extension' outright. **Its "
+                       "components are not blocked and are exactly what you need** — hip "
+                       "flexors, overhead reach and upper-back rotation are all rungs on "
+                       "skills you can train today, so progress toward it happens anyway. "
+                       "What needs sign-off is the finish position, and the honest question "
+                       "for 2026-08-16 is whether a version that extends through the UPPER "
+                       "back while the lower back stays neutral is a safe substitute.",
     ),
 }
 
-#: Skills that may be trained toward.
-ACTIVE_SKILLS: tuple[str, ...] = tuple(k for k, s in SKILLS.items() if not s.excluded)
+#: Skills that may be chosen as the current target: cleared AND with a stack.
+SELECTABLE_SKILLS: tuple[str, ...] = tuple(k for k, s in SKILLS.items() if s.selectable)
+
+#: Cleared, but no route built yet. Visible, and honest about why not.
+UNBUILT_SKILLS: tuple[str, ...] = tuple(
+    k for k, s in SKILLS.items() if s.status == SKILL_AVAILABLE and not s.built)
+
+#: In the catalogue, gated on a clinician.
+BLOCKED_SKILLS: tuple[str, ...] = tuple(k for k, s in SKILLS.items() if s.needs_signoff)
+
+#: The target chosen for the first assessment.
+DEFAULT_TARGET_SKILL: str = "pancake"
 
 
 # ── the flexibility window ───────────────────────────────────────────────────
@@ -814,6 +1055,16 @@ class Assessment:
     readings: tuple[RungReading, ...] = field(default_factory=tuple)
     cold: bool = True
     note: str = ""
+
+    #: The skill this assessment was taken IN SERVICE OF. Chosen BEFORE the
+    #: tests, not after, which is the athlete's design and is right: a limiting
+    #: rung only means something against a goal. "Chest/pecs is limiting you" is
+    #: a prescription if the target is an overhead position and noise if the
+    #: target is a pancake. Stored per assessment rather than as one global
+    #: setting, so the record says what he was aiming at on the day — which is
+    #: what makes a switch of target legible six months later instead of
+    #: looking like the numbers moved for no reason.
+    target_skill: str = ""
 
 
 #: Every assessment ever run, oldest first. EMPTY — the standalone assessment
