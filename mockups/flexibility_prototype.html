@@ -1,4 +1,4 @@
-<title>Flexibility capture — prototype</title>
+<title>Flexibility — Cluster A prototype</title>
 
 <style>
   :root {
@@ -10,85 +10,59 @@
   *{box-sizing:border-box}
   html{background:var(--bg)}
   body{margin:0;background:var(--bg);color:var(--ink);
-    font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;
-    -webkit-font-smoothing:antialiased}
-  .wrap{max-width:760px;margin:0 auto;padding:26px 18px 80px}
+    font:14px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:780px;margin:0 auto;padding:26px 18px 90px}
   .bar{display:flex;align-items:center;justify-content:space-between;
     padding-bottom:14px;border-bottom:1px solid var(--hair);margin-bottom:20px}
   .bar b{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent)}
-  .bar .rs{font-size:11px;color:var(--ink3);cursor:pointer;border:1px solid var(--hair);
-    padding:5px 11px;border-radius:8px;background:transparent;color:var(--ink3);
-    font-family:inherit}
+  .bar .rs{font-size:11px;cursor:pointer;border:1px solid var(--hair);
+    padding:5px 11px;border-radius:8px;background:transparent;color:var(--ink3);font-family:inherit}
   .bar .rs:hover{color:var(--ink2);border-color:var(--ink3)}
-
   .card{background:var(--panel);border:1px solid var(--hair);border-radius:14px;
     padding:16px 18px;margin-bottom:10px}
   .card.hi{border-color:rgba(196,120,120,.45);background:rgba(196,120,120,.07)}
-  .cap{font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);
-    font-weight:700}
-  .huge{font-size:38px;font-weight:800;line-height:1.08;margin-top:8px}
-  .big{font-size:28px;font-weight:800;line-height:1.12;margin-top:6px}
+  .card.ok{border-color:rgba(107,175,139,.45);background:rgba(107,175,139,.07)}
+  .cap{font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);font-weight:700}
+  .huge{font-size:36px;font-weight:800;line-height:1.08;margin-top:8px}
+  .big{font-size:26px;font-weight:800;line-height:1.12;margin-top:6px}
   .sm{font-size:11.5px;color:var(--ink3);margin-top:8px;line-height:1.65}
   .row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
   .nm{font-size:15px;font-weight:650;color:var(--ink)}
-  .val{font-size:23px;font-weight:750;font-variant-numeric:tabular-nums}
-  .val u{text-decoration:none;font-size:10px;color:var(--ink3);font-weight:500}
-  .track{height:7px;border-radius:4px;background:rgba(255,255,255,.07);margin-top:9px;
-    position:relative;overflow:hidden}
-  .track i{display:block;height:100%;border-radius:4px}
-  .goal{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--good)}
   .kv{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:var(--ink3)}
   .kv b{color:var(--ink2);font-weight:650}
-
   .steps{display:flex;gap:3px;margin-bottom:14px}
   .steps i{height:3px;flex:1;border-radius:2px;background:rgba(255,255,255,.10)}
   .steps i.done{background:var(--good)} .steps i.now{background:var(--accent)}
-  .steps i.skip{background:var(--ink3)} .steps i.void{background:var(--bad)}
-
   .lock{background:rgba(191,160,106,.11);border:1px solid rgba(191,160,106,.32);
-    color:#E2CB9B;border-radius:10px;padding:11px 13px;font-size:11.5px;
-    line-height:1.65;margin:12px 0}
+    color:#E2CB9B;border-radius:10px;padding:11px 13px;font-size:11.5px;line-height:1.65;margin:12px 0}
   details{background:var(--panel);border:1px solid var(--hair);border-radius:11px;
     padding:10px 14px;margin-bottom:10px}
   details summary{cursor:pointer;font-size:12px;color:var(--ink2)}
   details .sm{margin-top:10px}
-
   .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:4px}
   .grid.one{grid-template-columns:1fr}
-  .fld{background:rgba(255,255,255,.04);border:1px solid var(--hair);
-    border-radius:9px;padding:8px 11px;margin-top:7px}
-  .fld .l{font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink3);
-    font-weight:650}
+  .fld{background:rgba(255,255,255,.04);border:1px solid var(--hair);border-radius:9px;
+    padding:8px 11px;margin-top:7px}
+  .fld .l{font-size:9px;letter-spacing:.11em;text-transform:uppercase;color:var(--ink3);font-weight:650}
   .fld input{width:100%;background:transparent;border:0;color:var(--ink);
-    font:650 17px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px;
+    font:650 17px/1.4 ui-monospace,Menlo,monospace;margin-top:4px;
     font-variant-numeric:tabular-nums;outline:none}
-  .fld.blank input{color:var(--ink3)}
-
   .chk{display:flex;align-items:center;gap:9px;margin:14px 0 4px;font-size:12px;
     color:var(--ink2);cursor:pointer}
   .chk input{width:15px;height:15px;accent-color:var(--bad);cursor:pointer}
-
   .btns{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap}
   button.b{flex:1;min-width:110px;padding:13px 14px;border-radius:11px;border:0;
-    font:800 13.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer;
-    background:var(--accent);color:#04222B}
-  button.b.ghost{background:transparent;border:1px solid var(--hair);color:var(--ink2);
-    font-weight:600}
+    font:800 13.5px/1 ui-monospace,Menlo,monospace;cursor:pointer;background:var(--accent);color:#04222B}
+  button.b.ghost{background:transparent;border:1px solid var(--hair);color:var(--ink2);font-weight:600}
   button.b:hover{filter:brightness(1.08)}
-  .back{margin-top:12px;background:transparent;border:0;color:var(--ink3);
-    font:12px ui-monospace,Menlo,monospace;cursor:pointer;padding:4px 0}
-  .back:hover{color:var(--ink2)}
-  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:9.5px;
-    font-weight:700}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:9.5px;font-weight:700}
   .note{font-size:11px;color:var(--ink3);margin-top:8px;line-height:1.6}
-  .banner{background:rgba(34,195,230,.09);border:1px solid rgba(34,195,230,.3);
-    border-radius:10px;padding:11px 13px;font-size:11.5px;color:#A9E6F5;margin-bottom:12px}
   @media(max-width:620px){.grid{grid-template-columns:1fr}}
 </style>
 
 <div class="wrap">
   <div class="bar">
-    <b>Flexibility &middot; prototype</b>
+    <b>Flexibility &middot; Cluster A &middot; prototype</b>
     <button class="rs" onclick="reset()">Reset</button>
   </div>
   <div id="app"></div>
@@ -97,597 +71,702 @@
 
 <script>
 const DATA = {
- "rungs": [
+ "clusterLabel": "Side split & pancake",
+ "tests": [
   {
-   "key": "hip_flexors",
-   "label": "Hip flexors",
-   "test": "Lying back off the edge of a bench, one knee hugged in",
-   "unit": "\u00b0",
-   "v100": 15.0,
-   "v0": -20.0,
-   "setup": "Sit right on the edge of a bench or a firm bed \u2014 the edge should be under the crease where your buttock meets your thigh. Roll back, pull both knees to your chest, then let the leg you are testing down toward the floor. Keep hugging the other knee. **Keep the lowered leg straight.** If you let that knee bend you start stretching the front of the thigh instead, and that is the next test, not this one.",
-   "lock": "The knee you are hugging. It holds your pelvis still so your lower back stays pressed flat on the bench. **The tell: if your lower back lifts off the bench, the trial is void** \u2014 reset and take it again. Pull the knee in with your arms only, never by lifting with the hip itself, because working that hip actively is what sets your right hip clicking.",
-   "measurement": "Strap your phone flat along the front of the lowered thigh and use it as an angle meter, zeroed against the top of the bench. Read how far the thigh sits above or below level. **Below level is a positive number and is the good direction**; above level means the hip will not straighten all the way. Left and right separately, to the nearest degree.",
-   "bilateral": true,
-   "safety": "This is your stated number one problem \u2014 'my hips are stuck in flexion with my back arched'. A test that lets your back arch measures nothing at all here, which is why the hugged knee is the whole protocol rather than a detail.",
-   "testing": "Whether your hip can straighten past neutral, or whether it is held in a bent position even at rest. Anatomically this is the modified Thomas test read off the thigh angle, done off a bench edge so the thigh is free to drop below horizontal. It is the capacity behind standing tall without arching, driving the hips through at the top of a lift, and the back leg of a lunge.",
-   "prov": false,
-   "fake": {
-    "left": [
-     -4,
-     -7,
-     -9
-    ],
-    "right": [
-     -6,
-     -9,
-     -11
-    ]
-   }
-  },
-  {
-   "key": "quads",
-   "label": "Quads / rectus femoris",
-   "test": "Lying on your side, heel pulled toward your backside",
+   "key": "gate0_neutral",
+   "slot": 0,
+   "slotLabel": "Structure",
+   "label": "Side split, legs neutral",
    "unit": "cm",
-   "v100": 0.0,
-   "v0": 25.0,
-   "setup": "Lie on your side on the floor. Pull your bottom knee up toward your chest and hold it there with your bottom hand. Now bend your top knee and pull that heel toward your backside, using your top hand on the ankle.",
-   "lock": "The bottom knee you are hugging. Holding it in tips your pelvis and rounds your lower back, and that is what stops your spine arching to buy fake range. **The tell: if your lower back arches out of that rounded shape, or your top hip swings forward, the trial is void** \u2014 reset and take it again.",
-   "measurement": "Photo from behind, phone on a marked spot, a ruler standing upright in the shot. Measure the gap between the back of your heel and the crease under your buttock. **Smaller is better \u2014 0 cm means the heel touches.** Left and right separately, to the nearest half centimetre.",
-   "bilateral": true,
-   "safety": "Nothing here is loaded and nobody pushes on you. Stop at firm resistance; this is not a test of how much stretch you can tolerate.",
-   "testing": "The rectus femoris, the one thigh muscle that crosses both the hip and the knee. Because it spans two joints it can limit two different things \u2014 how deep you can squat, and how far your hip can extend behind you \u2014 which is why it appears on more than one list.",
-   "prov": false,
-   "fake": {
-    "left": [
-     6,
-     9,
-     11
-    ],
-    "right": [
-     7,
-     10,
-     12
-    ]
-   }
-  },
-  {
-   "key": "calves_ankle",
-   "label": "Calves / ankle",
-   "test": "Driving your knee forward to a wall, heel down",
-   "unit": "cm",
-   "v100": 12.0,
-   "v0": 0.0,
-   "setup": "Bare feet. Run a strip of tape along the floor straight out from a wall, and lay a tape measure along it with **zero at the wall**. Put the foot you are testing on the line, second toe pointing straight at the wall. Bend that knee forward until it touches the wall, keeping your heel flat on the floor.",
-   "lock": "Your arch. A flat foot can fake ankle range by rolling inward and collapsing instead of the ankle actually bending. **The tell: watch the inside of your foot \u2014 if the arch sinks toward the floor or your ankle rolls in, the trial is void** \u2014 reset and take it again.",
-   "measurement": "Start with your toe close to the wall, where the knee reaches easily. Move the foot back a little at a time and try again. **The reading is the furthest your toe can be from the wall while your knee can still touch the wall and your heel stays flat on the floor.** Bigger is better. Left and right separately, to the nearest half centimetre.",
-   "bilateral": true,
-   "safety": "You have flat feet on record, which is exactly why the arch is the point of this test and not a footnote \u2014 without holding it you would be measuring your foot collapsing rather than your ankle bending.",
-   "testing": "How far your shin can travel forward over your foot \u2014 ankle dorsiflexion. It is usually the first thing that stops a deep squat: when the ankle runs out of room, either your heels lift or your back rounds to keep your balance, and both of those look like a hip problem when they are not.",
-   "prov": false,
-   "fake": {
-    "left": [
-     9,
-     8,
-     7.5
-    ],
-    "right": [
-     8.5,
-     7.5,
-     7
-    ]
-   }
-  },
-  {
-   "key": "hamstrings",
-   "label": "Hamstrings",
-   "test": "Lying on your back, raising one straight leg",
-   "unit": "\u00b0",
-   "v100": 90.0,
-   "v0": 0.0,
-   "setup": "Lie on your back on the floor, both legs straight, lower back flat, arms by your sides. Strap your phone to your shin to use as an angle meter. Raise one leg, **keeping that knee locked straight**, until you feel firm resistance \u2014 not the furthest it will go if you push.",
-   "lock": "The leg still on the floor. Its heel and the back of its thigh must stay in contact with the floor for the whole trial. **The tell: if that leg lifts off the floor or its knee starts to bend, your pelvis has rolled and you are no longer measuring the hamstring \u2014 the trial is void.**",
-   "measurement": "Read the angle off the phone at firm resistance. Bigger is better. Left and right separately, to the nearest degree.",
-   "bilateral": true,
-   "safety": "Raise the leg yourself and stop at firm resistance. Nobody pushes it further, and there is nothing to gain here from finding the furthest it will go.",
-   "testing": "Hamstring length, on its own, with the pelvis held still. Worth knowing what 'normal' means here: sitting upright with your legs straight out in front of you is already about 90 degrees. You measured 86-89 at the gym, which is normal length with **no reserve** \u2014 so every extra degree of a forward fold has to come from your spine instead, which is exactly what you described.",
-   "prov": false,
-   "fake": {
-    "left": [
-     86,
-     62,
-     52
-    ],
-    "right": [
-     83,
-     60,
-     50
-    ]
-   }
-  },
-  {
-   "key": "adductors",
-   "label": "Adductors",
-   "test": "Butterfly on your back \u2014 how far the knees drop",
-   "unit": "cm",
-   "v100": 0.0,
-   "v0": 25.0,
-   "setup": "Lie on your back with your lower back pressed flat to the floor. Put the soles of your feet together and let your knees fall out to the sides. Pull your heels in toward you until you reach **your recorded heel distance** (tailbone to the back of the heels \u2014 see the frozen measurements), then leave them there and let the knees settle.",
-   "lock": "Two things: where your heels are, and your lower back staying flat. Sliding the heels further away drops the knees without your groin being one millimetre longer. **The tell for the back is easy \u2014 if you can slide a hand under your waist, the trial is void. The tell for the heels is a number you measure, not a mark on the floor:** measure tailbone to the back of your heels each time and match the recorded figure. A chalk mark is gone by the next session, and a mark you have re-placed by eye makes the new reading impossible to compare with the old one \u2014 so if you did not check the number, treat the trial as void.",
-   "measurement": "Hold a tape measure standing up beside each knee in turn. Measure the gap from the floor up to **the outside of the knee**. Smaller is better \u2014 0 cm means the knee is resting on the floor. Left and right separately, to the nearest half centimetre.",
-   "bilateral": true,
-   "safety": "You are fully supported on the floor and nothing is loaded. You confirmed on 2026-08-05 that this position does not set your right hip clicking \u2014 that needs the hip working actively, not just being in the position.",
-   "testing": "Your groin muscles, and how far the thigh bone can travel out to the side while turned outward at the hip. This is what lets your knees track out over your feet in a squat instead of caving in.",
-   "prov": false,
-   "fake": {
-    "left": [
-     9,
-     11,
-     13
-    ],
-    "right": [
-     10,
-     12,
-     14
-    ]
-   }
-  },
-  {
-   "key": "hip_rotation",
-   "label": "Hip rotation",
-   "test": "Sitting on a bench edge, swinging one foot outward",
-   "unit": "\u00b0",
-   "v100": 40.0,
-   "v0": 0.0,
-   "setup": "Sit on the edge of a bench with both knees bent square and your shins hanging free \u2014 feet off the floor. Sit up tall with even weight on both sit bones and grip the bench with both hands. Now **keep your thigh completely still and swing that foot outward, away from your other leg.** Only the shin moves.",
-   "lock": "Even weight on both sit bones, and your grip on the bench. **The tell: if one side of your backside lifts, or your body starts turning to follow the foot, you have stopped testing the hip and started turning your whole trunk \u2014 the trial is void.** Sit back down square and take it again.",
-   "measurement": "Strap your phone to your shin, zeroed with the shin hanging straight down. Read the tilt in degrees where the movement stops. Bigger is better. Left and right separately, to the nearest degree.",
-   "bilateral": true,
-   "safety": "Turning the hip inward is the safe direction for your right hip. What sets it clicking is turning outward while the hip is working actively, and this is neither \u2014 confirmed on 2026-08-05, when no passive position produced a snap at all.",
-   "testing": "How far the ball of your hip can turn inward inside its socket. Swinging the foot **outward** is what turns the hip **inward** \u2014 that feels backwards but it is correct, because the shin acts as a lever below the knee. This is the range that lets you sit into a deep squat without your knees collapsing inward.",
-   "prov": false,
-   "fake": {
-    "left": [
-     32,
-     27,
-     24
-    ],
-    "right": [
-     29,
-     25,
-     22
-    ]
-   }
-  },
-  {
-   "key": "shoulders_overhead",
-   "label": "Shoulders overhead",
-   "test": "Supine shoulder flexion \u2014 straight arms, thumbs up, towel-gauged lumbar lock",
-   "unit": "\u00b0",
-   "v100": 170.0,
-   "v0": 0.0,
-   "setup": "Lie on your back on a bare hard floor, or **the same thin mat every time**. Knees bent, feet flat. Fold a hand towel to a set thickness \u2014 write that thickness down \u2014 and slide it under your lower back. Start with your arms by your sides, **elbows locked straight and thumbs pointing at the ceiling**. Reach both arms overhead, toward the floor behind your head.",
-   "lock": "The towel. Squash it flat against the floor before you start. **The tell does not depend on how the position feels: if anyone can slide a finger under that towel at any point, your back has arched and the trial is void.** That matters more here than anywhere else, because your sense of what 'flat' feels like is set by your normal arched posture \u2014 so 'it feels flat to me' is exactly the judgement that will mislead you. Reset and take it again.",
-   "measurement": "One photo from each side: phone on a marked spot at floor level, at least 1.5 m away, with a ruler standing upright beside that wrist. Measure the gap from the floor up to **the wrist bone on the little-finger side**. Smaller is better \u2014 0 cm means the arm is resting on the floor. The app converts that gap into an angle using your recorded arm length, so the centimetres are what you write down and the angle is what scores.",
-   "bilateral": true,
-   "safety": "You raise your own arms and stop where they stop. **Never let anyone press your arms down toward the floor.** Your right shoulder is held by muscle rather than ligament after the surgery, and pressure into the end of this range is the one thing it is least able to resist.",
-   "testing": "How far your arms travel overhead with your back honestly flat. This is the position you already know you fail \u2014 you cannot rest both elbows on the floor. Three separate tissues can be the reason: your chest muscles, the muscles deep in the armpit, and your lats. This test says how far you get; the lat test that follows is what tells them apart.",
-   "prov": false,
-   "fake": {
-    "left": [
-     152,
-     138,
-     130
-    ],
-    "right": [
-     146,
-     132,
-     124
-    ]
-   }
-  },
-  {
-   "key": "lats",
-   "label": "Lats",
-   "test": "One arm overhead, with your lower back fully rounded into the floor",
-   "unit": "\u00b0",
-   "v100": 160.0,
-   "v0": 0.0,
-   "setup": "Lie on your back with your hips and knees bent square and **your feet flat against a wall or a chair seat**. That holds your lower back rounded into the floor without you having to hold it there, and it is a stronger position than simply 'flat'. **One arm at a time**, elbow locked straight, thumb at the ceiling, reaching overhead toward the floor behind your head.",
-   "lock": "Your feet against the wall, and your lower back pressed hard into the floor. Here the rounded back is not just a safety rule \u2014 **it is the entire point of the test**, because it is what puts the lats on stretch and leaves the other two tissues alone. **The tell: if your lower back lifts away from the floor at all, or your feet push off the wall, the trial is void.** One arm at a time, so the other side cannot help.",
-   "measurement": "Same as the previous test: photo from that side, gap from the floor up to **the wrist bone on the little-finger side**. Smaller is better. Left and right separately, to the nearest half centimetre.",
-   "bilateral": true,
-   "safety": "**The 100 mark on this one is our own estimate, and it is deliberately harsh.** The standard version of this test is done with the back merely flat; we round it further, which makes it harder, so a score here is comparable with your own future scores but should not be compared against any published figure. Worth asking the physio to set it properly. As with the last test: you move your own arm, and nobody presses it down.",
-   "testing": "Your lats specifically, separated from everything else. Three tissues can stop an arm going overhead, and **only the lat is attached to your lower back** \u2014 so changing your back position changes the lat's tension and nothing else's. Round the back and the lat pulls tight; arch it and the lat goes slack. That is why the same arm movement, done in two back positions, tells you whether the lat is the thing stopping you. Read together with the previous test: both poor means the lat is your limit; this one fine but the last one poor means it is your chest or the shoulder joint itself.",
-   "prov": true,
-   "fake": {
-    "left": [
-     104,
-     94,
-     88
-    ],
-    "right": [
-     99,
-     90,
-     84
-    ]
-   }
-  },
-  {
-   "key": "chest_horizontal",
-   "label": "Chest / pecs",
-   "test": "Standing against a wall, arms up in a goalpost",
-   "unit": "cm",
-   "v100": 0.0,
-   "v0": 15.0,
-   "setup": "Stand with your back to a wall, heels about 10-15 cm out from it, knees soft. Press your lower back flat to the wall and **trap a sheet of A4 paper between your lower back and the wall**. Bring your arms up into a goalpost shape \u2014 upper arms out level with your shoulders, elbows bent square, forearms pointing up. Take the backs of your hands back toward the wall.",
-   "lock": "The trapped sheet of paper. **The tell checks itself: the moment your lower back arches, the paper goes loose and falls \u2014 and that trial is void.** Arching is how the shoulders reach the wall without your chest being any longer at all. Reset and take it again.",
-   "measurement": "Measure the horizontal gap from the wall to **the back of your wrist**, at the crease. Smaller is better \u2014 0 cm means the wrist touches the wall. Left and right separately, to the nearest half centimetre.",
-   "bilateral": true,
-   "safety": "Stop where the movement stops. This is a measurement of where your arms sit, not a stretch to push into, and pressing into the end of it is the direction your right shoulder likes least.",
-   "testing": "The length of your chest muscles, and how freely the shoulder turns outward. This is the wall-slide start position you already find hard, measured rather than guessed at. It is also the live replacement for the gym's 'Chest \u2014 Low' reading from January 2025, which never recorded how it was taken.",
-   "prov": false,
-   "fake": {
-    "left": [
-     4,
-     5,
-     6
-    ],
-    "right": [
-     5,
-     6.5,
-     7.5
-    ]
-   }
-  },
-  {
-   "key": "thoracic_rotation",
-   "label": "Thoracic rotation",
-   "test": "Lying on your side, turning the top shoulder back",
-   "unit": "\u00b0",
-   "v100": 45.0,
-   "v0": 0.0,
-   "setup": "Lie on your side with your hips and knees stacked one on top of the other and bent square, knees resting on a folded towel of **the same thickness every time**. **Fold your arms across your chest.** Now turn your top shoulder backwards, toward the floor behind you.",
-   "lock": "Your pelvis. Reach across with your bottom hand and press your top knee down, and keep the hips stacked. **The tell: if your top knee lifts or your hips roll back with your shoulder, you are rolling your whole body instead of turning your upper back \u2014 the trial is void.**",
-   "measurement": "Measure the height from the floor up to **the bony point on top of your top shoulder**, first at the start and then at the end of the turn. Record the drop between the two. Bigger is better. The app converts it to degrees.",
-   "bilateral": true,
-   "safety": "**Arms stay folded across your chest** \u2014 do not sweep the top arm out to the floor behind you, which is the usual way this stretch is taught. That end position puts your right shoulder in the exact position it was operated on for.",
-   "testing": "Rotation through your upper back \u2014 the part of your spine that is actually built to twist. Your lower back is not, which is why pinning the pelvis matters. Stiffness here shows up as your ribs and shoulder blade fighting each other when you reach overhead.",
-   "prov": false,
-   "fake": {
-    "left": [
-     38,
-     33,
-     30
-    ],
-    "right": [
-     35,
-     31,
-     28
-    ]
-   }
-  },
-  {
-   "key": "lumbar",
-   "label": "Lumbar control",
-   "test": "Flattening your lower back to the floor",
-   "unit": "cm",
-   "v100": 0.0,
-   "v0": 5.0,
-   "setup": "Lie on your back with both legs straight and together, arms by your sides, next to a wall with a 30 cm ruler taped upright at hip height. **Actively flatten your lower back down to the floor** \u2014 draw it down using your stomach, and hold it there.",
-   "lock": "Your feet and your backside. **The tell: if you press through your heels or clench your buttocks, you are pushing the floor away rather than controlling your back \u2014 the gap closes without you having done the thing being measured, and the trial is void.** Keep the legs relaxed and heavy.",
-   "measurement": "Photo from the side, from at least 1.5 m, phone on a marked spot at floor level with the ruler in shot. Measure the biggest gap left between the floor and your lower back. Smaller is better \u2014 0 cm means flat to the floor.",
    "bilateral": false,
-   "safety": "Safe, and actively good for you: flattening the lower back is the same movement already recommended to take pressure off the two lowest joints in your spine.",
-   "testing": "Whether you can flatten your lower back on purpose and hold it there. This is the only test here that is control rather than length, and it sits underneath almost everything else \u2014 nearly every other test can be faked by arching, so if you cannot flatten your back on demand, several other readings cannot be trusted either.",
-   "prov": false,
+   "setup": "Slide into a side split with your legs in a **neutral rotation** \u2014 kneecaps pointing forward, not turned up. Go to where it stops, not past it. Hands on blocks in front of you so your chest stays up.",
+   "lock": "Your pelvis and lower back must be **identical between this attempt and the next one**. The whole reading is the difference the leg rotation makes, so anything else that moves contaminates it. **The tell: if your back position changes between the two attempts, the trial is void** \u2014 reset and take both again.",
+   "measurement": "Measure the gap from the floor up to your crotch. Smaller is deeper. To the nearest half centimetre.",
+   "testing": "Whether the thing stopping you is the shape of your hip joint rather than tissue length. The neck of the thigh bone eventually meets the rim of the socket, and where that happens varies a lot between healthy people. Bone does not stretch, so if this is your limit the answer is alignment rather than more stretching.",
+   "safety": "**A sharp pinch at the front of the hip with a sudden hard stop is a finding, not a result \u2014 stop and record it.** It is already an open question on your file from 2026-08-05, queued for the physiotherapist. Do not decide it yourself and do not train around it for a fortnight first.",
+   "adapted": "",
    "fake": {
-    "": [
-     null,
-     1.2,
-     1.0
-    ]
+    "": 28.0
    }
   },
   {
-   "key": "lateral_trunk",
-   "label": "Lateral trunk",
-   "test": "Standing against a wall, sliding one hand down your leg",
+   "key": "gate0_turned_out",
+   "slot": 0,
+   "slotLabel": "Structure",
+   "label": "Side split, legs turned out",
    "unit": "cm",
-   "v100": 20.0,
-   "v0": 0.0,
-   "setup": "Stand with your heels, buttocks, upper back and head **all touching a wall**, feet hip-width apart on your traced floor mark. Let your arms hang with your palms flat against the outside of your thighs. Slide one hand straight down the side of that leg, bending sideways.",
-   "lock": "The wall \u2014 all four points of contact. **The tell: if your buttocks, upper back or head come away from the wall, you have started leaning forward or twisting instead of bending sideways, and the trial is void.**",
-   "measurement": "Mark your trouser seam with a pen where your fingertips reach at rest, and again at the furthest point. Measure the distance between the two marks. Bigger is better. Left and right separately, to the nearest half centimetre.",
-   "bilateral": true,
-   "safety": "**Keep it light and stop early.** Bending sideways is a caution movement for you in *both* directions, for two different reasons \u2014 to the right it narrows an already-narrowed nerve opening at the base of your spine, and to the left it loads the two disc bulges higher up. Move yourself, do not reach overhead, and do not chase the number.",
-   "testing": "Sideways bend through your trunk. It is measured as how far the hand travels rather than as an angle, because a tape between two pen marks is something you can reproduce alone in three months' time and an eyeballed angle is not.",
-   "prov": false,
-   "fake": {
-    "left": [
-     15,
-     13,
-     12
-    ],
-    "right": [
-     14,
-     12,
-     11
-    ]
-   }
-  },
-  {
-   "key": "neck",
-   "label": "Neck (rotation)",
-   "test": "Lying on your back, turning your head to one side",
-   "unit": "\u00b0",
-   "v100": 80.0,
-   "v0": 0.0,
-   "setup": "Lie on your back on a bare hard floor, or **the same thin mat every time**. Knees bent, feet flat, arms by your sides. Strap your phone flat across your forehead with a headband, and zero it looking straight up with your chin level. Turn your head slowly to one side and **stop at the first firm resistance \u2014 not as far as it will go.**",
-   "lock": "Your own bodyweight and your shoulder blades: both stay on the floor for the whole trial, which is what stops your body turning with your head. Your chin also stays level. **The tell: tipping the chin up or down buys fake rotation, so if the phone shows the chin has moved more than about 5 degrees, the trial is void.**",
-   "measurement": "Read the turn angle off the phone where you meet firm resistance. Bigger is better. Left and right separately, to the nearest degree. **Do it twice per side and record the second** \u2014 the first is always a familiarisation attempt.",
-   "bilateral": true,
-   "safety": "**You turn your own head, and nobody ever pushes it further \u2014 not a partner, not your own hand.** Given how mobile your joints are generally, the neck is the last place to go hunting for extra range. Stopping at first firm resistance rather than the true end is deliberate and stays that way until the hypermobility assessment has been done properly; that question is on the list for the physio on 2026-08-16.",
-   "testing": "How far your neck turns. Note what this test does **not** cover: your actual neck complaint is tightness bending forward, noticeably worse on the left, and that direction is deliberately not measured because it is not safe to push. So expect this number to sit still even in a week when your neck feels worse.",
-   "prov": false,
-   "fake": {
-    "left": [
-     66,
-     60,
-     57
-    ],
-    "right": [
-     63,
-     58,
-     55
-    ]
-   }
-  },
-  {
-   "key": "squat_depth",
-   "label": "Squat depth",
-   "test": "Squatting down until your back stops being flat",
-   "unit": "cm",
-   "v100": 5.0,
-   "v0": -20.0,
-   "setup": "Bare feet, standing on your traced foot outline. Squat down and **stop at the first moment your lower back stops being flat and starts to round or arch** \u2014 not the lowest you can get.",
-   "lock": "The traced outline. How wide your feet are and how far your toes point out change this reading more than anything else does, so the stance has to be identical every time. **The tell: if your feet are not sitting inside the traced lines, the trial is void** \u2014 reset them before you squat, not after.",
-   "measurement": "Photo from the side at your lowest good position, phone at about knee height and at least 1.5 m away, with a tape stuck vertically to the wall behind you. Measure the height of your hip crease against the top of your kneecap. **Below the kneecap is a positive number and is the good direction.**",
    "bilateral": false,
-   "safety": "Bodyweight only, never with a bar or a weight. You stop at the first loss of a flat back rather than at the bottom, so nothing here loads your spine in a rounded position.",
-   "testing": "How deep you can squat while your back is still doing what it should. Read this one differently from the rest: **it is a result, not a cause.** If it is low, the reason is your ankles, your groin or your hip rotation \u2014 so this number tells you something is wrong and the other three tell you what.",
-   "prov": false,
+   "setup": "The same position, but now **turn both legs out from the hips** \u2014 let the kneecaps rotate toward the ceiling. Keep your back exactly as it was in the first attempt.",
+   "lock": "As above: pelvis and lower back unchanged between the two. **The tell is the same** \u2014 if your back moves, the comparison is void.",
+   "measurement": "Same measurement: floor to crotch, to the nearest half centimetre. **The reading is the difference between the two attempts.**",
+   "testing": "The same question, asked with the joint aligned differently. There are two ways to give the hip more room \u2014 turn the leg out, or tilt the pelvis \u2014 and they reach the same place. This uses the turn-out because tilting means arching your lower back under your full bodyweight, which your imaging rules out. A large jump between the two attempts means alignment was the limit, not tissue.",
+   "safety": "",
+   "adapted": "the original asked for a deliberate anterior pelvic tilt with the back arched",
    "fake": {
-    "": [
-     null,
-     null,
-     -3
-    ]
+    "": 25.0
+   }
+  },
+  {
+   "key": "leverage_bent",
+   "slot": 1,
+   "slotLabel": "Regressed",
+   "label": "Knees fully bent",
+   "unit": "cm",
+   "bilateral": true,
+   "setup": "Sit with your back flat against a wall, soles of your feet together, heels pulled in to **your recorded heel distance**. Press your knees down toward the floor **without using your hands**.",
+   "lock": "Your back stays flat on the wall, and your heels stay at the recorded distance. **The tell for the heels is a number, not a chalk mark** \u2014 measure from your tailbone to the back of your heels and match the figure. Heels further out drop the knees without your groin being one millimetre longer, so a session that re-places them by eye is void against the last one.",
+   "measurement": "Measure from the floor up to **the outside of each calf**. Smaller is better. Left and right separately, to the nearest half centimetre.",
+   "testing": "Your groin muscles with the knee fully bent. Bending the knee slackens gracilis \u2014 the one groin muscle that crosses the knee \u2014 so this loads everything except it. Comparing this against the straight-knee test is what names which part of the group is short.",
+   "safety": "",
+   "adapted": "",
+   "fake": {
+    "left": 8.0,
+    "right": 9.5
+   }
+  },
+  {
+   "key": "leverage_straight",
+   "slot": 1,
+   "slotLabel": "Regressed",
+   "label": "Knees fully straight",
+   "unit": "cm",
+   "bilateral": false,
+   "setup": "Lie on your back with your backside against a wall and your legs straight up it. Lock your knees straight, kneecaps facing the ceiling. Let your legs slide apart under their own weight for 30 seconds. **No ankle weights.**",
+   "lock": "Your backside stays against the wall and your knees stay straight. **The tell: if your backside slides away from the wall or a knee bends, the trial is void.** Kneecaps stay facing the ceiling \u2014 letting them roll in cheats the load off the groin.",
+   "measurement": "Measure from the inside of one ankle to the inside of the other. **Bigger is better here** \u2014 this is the one test on the list where a larger number is the good direction.",
+   "testing": "Your groin muscles with the knee straight, which is what puts gracilis under the most stretch. Read against the bent-knee test: if the bent version is fine and this one is much worse, gracilis is the limit. If both are poor, the whole group is short.",
+   "safety": "Unloaded and gravity-driven. The weighted version was removed \u2014 external load onto a passively held end-range hip is the practice your profile rules out.",
+   "adapted": "the original used ankle weights",
+   "fake": {
+    "left": 95.0,
+    "right": 94.0
+   }
+  },
+  {
+   "key": "tilt_range",
+   "slot": 2,
+   "slotLabel": "Prerequisite",
+   "label": "Tilt \u2014 with help",
+   "unit": "cm",
+   "bilateral": false,
+   "setup": "Sit with your legs straight and open to **your recorded straddle width**. Kneecaps and toes pointing up. Now fold forward, **using your hands walking forward on the floor or pulling on a strap anchored in front of you**.",
+   "lock": "Your knees stay straight and your kneecaps stay pointing up. **The tell: if your knees bend or roll inward, the trial is void.**",
+   "measurement": "Measure from the floor up to your forehead. **Also record, separately, the height at which your lower back stops being flat.** Two numbers, not one \u2014 the second is the one that should move first.",
+   "testing": "Whether you can get into the position at all when something else helps. Paired with the next test, it separates 'cannot reach it' from 'can reach it but cannot produce it' \u2014 and those two answers send you to completely different training.",
+   "safety": "**Stop where it lands. Do not chase depth once your lower back has rounded.** Past that point you are measuring your spine rather than your hip, which is both the wrong variable and the one your discs cannot take. You predicted on 2026-08-06 that you would fail before reaching the deep position at all \u2014 this test is what checks that. If you get significantly past upright, say so, because the decision to keep this test rests on that prediction being right.",
+   "adapted": "",
+   "fake": {
+    "": 40.0
+   }
+  },
+  {
+   "key": "tilt_production",
+   "slot": 2,
+   "slotLabel": "Prerequisite",
+   "label": "Tilt \u2014 under your own power",
+   "unit": "cm",
+   "bilateral": false,
+   "setup": "The same position, same width. **Arms crossed on your chest. No hands, no strap, nothing to pull on.** Roll your pelvis forward and fold as far as you can under your own power.",
+   "lock": "Arms stay crossed and the knees stay straight. **The tell: if a hand comes down to the floor, even briefly, the trial is void.**",
+   "measurement": "Floor to forehead again, and again the height at which the lower back stops being flat.",
+   "testing": "Whether you can PRODUCE the position, not just be placed in it. This is the half that matters most for you: your file records that you cannot roll the pelvis forward in sitting, and that the rounding everyone notices is the compensation for it rather than the problem itself. If this fails and the previous test passed, the fix is strength at the end of the range, done last in the session.",
+   "safety": "",
+   "adapted": "",
+   "fake": {
+    "": 55.0
+   }
+  },
+  {
+   "key": "spectrum_active",
+   "slot": 3,
+   "slotLabel": "Spectrum",
+   "label": "Active \u2014 leg raise to the side",
+   "unit": "\u00b0",
+   "bilateral": true,
+   "setup": "Stand tall with no support. Lift one leg out to the side as high as you can. **No swing, no lean.** Hold it three seconds at the top.",
+   "lock": "Your torso stays upright. **The tell: if you lean away from the lifting leg, the trial is void** \u2014 that buys height from your spine rather than your hip.",
+   "measurement": "The angle of the raised leg from vertical. Bigger is better. Left and right separately, to the nearest degree.",
+   "testing": "Not just how far you go, but **how strong the muscles that OPEN you are**. Something has to pull the legs apart, and if those muscles are weak the groin will not release however much you stretch it. A poor number here is a strength problem wearing a flexibility costume. Add your left and right angles together and compare the sum against your passive split \u2014 a passive 160\u00b0 with an active sum of 70\u00b0 is a very different athlete from one at 140\u00b0.",
+   "safety": "",
+   "adapted": "",
+   "fake": {
+    "left": 38.0,
+    "right": 35.0
+   }
+  },
+  {
+   "key": "spectrum_isometric",
+   "slot": 3,
+   "slotLabel": "Spectrum",
+   "label": "Isometric \u2014 split, hands off",
+   "unit": "cm",
+   "bilateral": false,
+   "setup": "Slide into a side split at depth and **take your hands off everything**, holding your own weight. Five seconds, then measure.",
+   "lock": "Hands off. **The tell is obvious and that is the point** \u2014 if a hand goes back down, the trial is void.",
+   "measurement": "Floor to crotch. **If you are using any added load, write the load down beside the number** \u2014 they are one measurement and neither means anything alone.",
+   "testing": "Whether the range is defended by muscle or only propped up from outside. Your body will not let a muscle relax into a position it cannot support, so end-range strength is not something running alongside flexibility \u2014 it is what permits it.",
+   "safety": "**If your isometric number comes out as deep as your passive one, the load is too light** and passive tissue absorbed it \u2014 you have measured passive twice. Take weight off and repeat.",
+   "adapted": "",
+   "fake": {
+    "": 30.0
+   }
+  },
+  {
+   "key": "spectrum_passive",
+   "slot": 3,
+   "slotLabel": "Spectrum",
+   "label": "Passive \u2014 split, supported",
+   "unit": "cm",
+   "bilateral": false,
+   "setup": "Side split with a bench or blocks taking your upper body weight, legs relaxed. **Go to firm resistance, not to the floor.**",
+   "lock": "Legs stay relaxed \u2014 this is the one trial where you are not holding yourself up. **The tell: if you are working to stay there, you are measuring the isometric again and the trial is void.** Let the support take the weight.",
+   "measurement": "Floor to crotch, to the nearest half centimetre.",
+   "testing": "Your ceiling \u2014 the furthest the joint goes when something else does the work. On its own it says little; its value is as the reference the other two are compared against.",
+   "safety": "**Taken LAST, and taken once.** Passive work leaves tissue looser for an hour or more, so doing it first would flatter every reading after it. It is also the one item here that is deliberately passive end-range with bodyweight driving it \u2014 a measurement, not a stretch to sink into, and never held for time. With lax tissue nothing complains on the approach, so the usual warning is absent.",
+   "adapted": "",
+   "fake": {
+    "": 12.0
    }
   }
  ],
- "skills": [
-  {
-   "key": "pancake",
-   "label": "Pancake",
-   "aka": "Flat-back straddle fold",
-   "ladder": [
-    "hamstrings",
-    "adductors",
-    "hip_rotation",
-    "lumbar"
-   ],
-   "goal": 70.0,
-   "gates": "Sumo/wide-stance work, hip hinge with a long spine",
-   "note": "THE FIRST TARGET, chosen by the athlete 2026-08-06. It aims at his single dominant restriction: an inability to reach forward pelvic tilt in sitting, reported independently in four seated positions and scoring 25/100. Defined as the FLAT-BACK version \u2014 the conventional pancake finishes as a seated forward fold, which services.rules contraindicates outright. What makes the goal valuable here (opening from the hip) and what makes it dangerous (rounding the lumbar spine) are separable, and this definition keeps the first and drops the second.",
-   "blocked": "",
-   "selectable": true,
-   "built": true,
-   "stack": [
+ "order": [
+  "gate0_neutral",
+  "gate0_turned_out",
+  "leverage_bent",
+  "leverage_straight",
+  "tilt_range",
+  "tilt_production",
+  "spectrum_active",
+  "spectrum_isometric",
+  "spectrum_passive"
+ ],
+ "patterns": {
+  "A": "Bone",
+  "B": "Orientation",
+  "C": "Whole adductor group",
+  "D": "Short adductors and rotators",
+  "E": "Gracilis",
+  "F": "Tilt range",
+  "G": "Tilt production \u2014 hip flexor strength",
+  "H": "Adductor end-range strength",
+  "I": "Puller strength \u2014 hip abductors"
+ },
+ "stacks": {
+  "A": {
+   "limiter": "Bone",
+   "intro": "No stretching stack. The only thing available is finding an orientation that clears the collision.",
+   "outro": "**Do not wait two weeks on this one.** A sharp anterior-hip pinch is an open question on your file from 2026-08-05, already queued for 2026-08-16. Pattern A means bring it to that appointment, not train around it first.",
+   "items": [
     {
-     "key": "pancake_tilt",
-     "name": "Elevated seated pelvic tilt",
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "5 \u00d7 20 s, partial depth",
+     "note": "Turn the legs out; do not arch the back to find the room.",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    },
+    {
+     "name": "Seated external rotation holds",
+     "dose": "5 \u00d7 20 s",
+     "note": "",
+     "deferred": false,
      "spectrum": "unassisted",
-     "targets": [
-      "lumbar",
-      "hamstrings"
-     ],
-     "dose": "5 x 20 s hold, most days",
-     "setup": "Sit on the edge of a folded blanket or a low box \u2014 high enough that sitting up straight is easy rather than a fight. Legs out in front, knees soft. Roll your pelvis forwards so your lower back makes a small arch, then back the other way. Only the pelvis moves; the chest stays where it is.",
-     "why": "You cannot currently tilt your pelvis forwards in sitting, and that single restriction is what produced a 25/100 on the straddle and the same report in three other seated positions. Every step after this one needs it, so nothing above works until this does.",
-     "advance": "You can hold the forward tilt for 20 seconds with a flat back, and do it on an elevation one fold lower than where you started.",
-     "safety": "Sit HIGH. This should feel easy \u2014 if you are straining to sit upright, the block is too low and you will get the range by rounding instead, which is the one thing this stack exists to avoid."
-    },
-    {
-     "key": "pancake_half",
-     "name": "Half straddle hinge",
-     "spectrum": "unassisted",
-     "targets": [
-      "hamstrings",
-      "lumbar"
-     ],
-     "dose": "3 x 30 s each side",
-     "setup": "Still sitting up on the block. One leg straight out to the side, the other bent with the foot tucked in toward you. Keeping your chest open and your back flat, hinge toward the straight leg **from the hip**. Hands on a block or the floor for support. Stop the moment your back starts to round.",
-     "why": "Takes the groin out of the movement so your hamstring and your pelvic tilt can be worked on their own. One side at a time also shows you which side is worse, which a straddle hides.",
-     "advance": "Both sides hinge the same distance with a flat back and no shaking.",
-     "safety": ""
-    },
-    {
-     "key": "pancake_hinge",
-     "name": "Elevated straddle hinge",
-     "spectrum": "unassisted",
-     "targets": [
-      "hamstrings",
-      "adductors",
-      "hip_rotation"
-     ],
-     "dose": "3 x 30 s",
-     "setup": "Both legs out wide, still up on the block, kneecaps pointing at the ceiling. Hinge forwards from the hips with a flat back, walking your hands forward onto a block in front of you. **Stop at the first moment your back rounds** \u2014 that point is the measurement, not the floor.",
-     "why": "This is the pancake shape itself, at a height that still lets you keep the back flat. Lowering the block over months is the progression.",
-     "advance": "Your chest travels more than halfway toward the floor with the back still flat, on the lowest block you own.",
-     "safety": "Kneecaps stay pointing up. Letting them roll in turns this into a knee stretch, and at Beighton 6/9 that is not a trade worth making."
-    },
-    {
-     "key": "pancake_press",
-     "name": "Straddle adductor press",
-     "spectrum": "resisted",
-     "targets": [
-      "adductors",
-      "hip_rotation"
-     ],
-     "dose": "3 x 10 s press, 10 s relax",
-     "setup": "Sit in the widest straddle you can hold with a flat back. Press the backs of your legs down into the floor hard for 10 seconds \u2014 nothing should visibly move \u2014 then relax completely for 10 seconds and let the legs settle wider.",
-     "why": "**This is the step that actually matters for you.** Your problem is not that the range is missing, it is that nothing holds it. Pressing into the position builds the strength to keep the range you gain, which is what your own hypermobility guidance asks for instead of more passive stretching.",
-     "advance": "You can press hard for the full 10 seconds without your back rounding or your pelvis rolling backwards.",
-     "safety": "Press, do not bounce. Stop if you get any groin pain as opposed to a stretch."
-    },
-    {
-     "key": "pancake_lift",
-     "name": "Straddle leg lift",
-     "spectrum": "resisted",
-     "targets": [
-      "adductors",
-      "hamstrings",
-      "hip_rotation"
-     ],
-     "dose": "3 x 5 lifts each side, slow",
-     "setup": "Sit tall in your straddle, hands on the floor beside your hips. Keeping the knee straight, **lift one whole leg off the floor** a few centimetres under its own power and hold for two seconds. Lower slowly. No swinging.",
-     "why": "The hardest step and the one that closes the gap. It asks you to hold the wide position with nothing supporting you at all \u2014 which is the exact difference between the range you own and the range you can only fall into.",
-     "advance": "Five slow lifts a side with no drop in height across the set.",
-     "safety": "Tiny range. A couple of centimetres of clean lift beats a big one driven by leaning away from the leg."
+     "why": "Seat-supported and passive, so not a snapping-hip risk position.",
+     "adapted": "",
+     "reverts": ""
     }
    ]
   },
+  "B": {
+   "limiter": "Orientation",
+   "intro": "The cheapest situation on the list. Expect movement within a couple of sessions with no length change at all.",
+   "outro": "Retest gate 0 before adding anything.",
+   "items": [
+    {
+     "name": "Seated pelvic rock, mid-range",
+     "dose": "3 \u00d7 12",
+     "note": "",
+     "deferred": false,
+     "spectrum": "unassisted",
+     "why": "Hands behind you, rock the pelvis forward and back through MID-RANGE. Train the movement, not the depth, and not the arched end of it. You cannot train a position through a joint action you cannot perform on its own.",
+     "adapted": "Seated pelvic rock taken to the arched end",
+     "reverts": "never \u2014 the arched end is lumbar extension against a retrolisthesis, and the drill's purpose is the movement anyway"
+    },
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "5 \u00d7 20 s",
+     "note": "No depth chasing.",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    },
+    {
+     "name": "Elevated flat-back straddle hinge",
+     "dose": "3 \u00d7 60 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Sit on a block or bench, no added weight, and hinge with a flat back. The elevation is the whole point: sitting above foot level rotates the pelvis forward on its own, so the block is the assist device for the TILT specifically. Lowering the block over months is the progression \u2014 reaching further at a fixed height is not.",
+     "adapted": "Elevated-hip pancake with a weight behind the neck",
+     "reverts": "never as written. The weight supplied depth through a spine that had not tilted, which is the opposite of what the elevation does. When the tilt is producible unaided, no assist is needed"
+    },
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "3 \u00d7 30 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    }
+   ]
+  },
+  "C": {
+   "limiter": "Whole adductor group",
+   "intro": "Everything is short. Work up the leverage ladder \u2014 bent-knee work opens the rest of the group so the straight-knee work can reach gracilis instead of being capped before it gets there.",
+   "outro": "Five is the ceiling and the release block does not count toward it. Under time pressure drop the straddle hinge \u2014 it is the least specific to what failed.",
+   "items": [
+    {
+     "name": "Tailor's pose, unloaded",
+     "dose": "3 \u00d7 90 s",
+     "note": "Bent leverage.",
+     "deferred": false,
+     "spectrum": "unassisted",
+     "why": "Back flat to a wall, soles together, knees pressed down under your own power. Passive floor-supported external rotation is NOT a snapping-hip risk position \u2014 that was confirmed 2026-08-05.",
+     "adapted": "Tailor's pose with weight plates on the knees",
+     "reverts": "the physiotherapist answers the anterior-hip sensation question raised 2026-08-05, where a deep butterfly produced hip-flexor rather than adductor sensation"
+    },
+    {
+     "name": "Horse stance squat",
+     "dose": "3 \u00d7 8",
+     "note": "90\u00b0 leverage.",
+     "deferred": true,
+     "spectrum": "unassisted",
+     "why": "Feet wide, toes slightly out, knees to 90\u00b0.",
+     "adapted": "",
+     "reverts": "the Day 28 reassessment has been read. Held because an open Stage 2 exit criterion is 'no increase in Coxa Saltans frequency under loaded squat/split-squat work', judged on that date \u2014 introducing an externally-rotated loaded squat inside the assessment window would confound the criterion he is about to be assessed on. A measurement cost as much as a safety one"
+    },
+    {
+     "name": "Elevated flat-back straddle hinge",
+     "dose": "3 \u00d7 90 s",
+     "note": "Tilt.",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Sit on a block or bench, no added weight, and hinge with a flat back. The elevation is the whole point: sitting above foot level rotates the pelvis forward on its own, so the block is the assist device for the TILT specifically. Lowering the block over months is the progression \u2014 reaching further at a fixed height is not.",
+     "adapted": "Elevated-hip pancake with a weight behind the neck",
+     "reverts": "never as written. The weight supplied depth through a spine that had not tilted, which is the opposite of what the elevation does. When the tilt is producible unaided, no assist is needed"
+    },
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "5 \u00d7 20 s",
+     "note": "Straight leverage.",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    },
+    {
+     "name": "Isometric side split, hands off",
+     "dose": "3 \u00d7 15 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "At depth, holding your own weight, knees straight.",
+     "adapted": "",
+     "reverts": ""
+    }
+   ]
+  },
+  "D": {
+   "limiter": "Short adductors and rotators",
+   "intro": "",
+   "outro": "",
+   "items": [
+    {
+     "name": "Tailor's pose, unloaded",
+     "dose": "4 \u00d7 90 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "unassisted",
+     "why": "Back flat to a wall, soles together, knees pressed down under your own power. Passive floor-supported external rotation is NOT a snapping-hip risk position \u2014 that was confirmed 2026-08-05.",
+     "adapted": "Tailor's pose with weight plates on the knees",
+     "reverts": "the physiotherapist answers the anterior-hip sensation question raised 2026-08-05, where a deep butterfly produced hip-flexor rather than adductor sensation"
+    },
+    {
+     "name": "Frog rocks",
+     "dose": "3 \u00d7 10",
+     "note": "",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Deep flexion with abduction, floor-supported and self-limited.",
+     "adapted": "",
+     "reverts": ""
+    },
+    {
+     "name": "Butterfly PIR",
+     "dose": "5 rounds of 5 s contract, 15 s relax",
+     "note": "",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Press the knees up into your hands for 5 s, relax, sink. Contract-relax; the same family as the piriformis PNF already in the release protocol.",
+     "adapted": "",
+     "reverts": ""
+    },
+    {
+     "name": "90/90 hip rotations with lift-offs",
+     "dose": "3 \u00d7 8 per side",
+     "note": "Neutral or slight internal rotation on the right.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "Cue neutral or slight internal rotation on the right \u2014 the lift-off is active hip flexion, which is the contractile trigger.",
+     "adapted": "",
+     "reverts": ""
+    },
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "3 \u00d7 30 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    }
+   ]
+  },
+  "E": {
+   "limiter": "Gracilis",
+   "intro": "Bent-leg work slackens the exact muscle limiting you, so a STRAIGHT knee is the point of this stack \u2014 any bend and you have trained something else.",
+   "outro": "**Medial knee discomfort is a finding, not a training sensation.** The original text here told you to expect it and continue; that contradicted both other documents and has been removed. Gracilis crosses the knee so some sensation is mechanically expected \u2014 but a weak VMO produces pain in the same place for a different reason, and at Beighton 6/9 the passive restraints are not doing the work they would in another body. If it appears, stop and check against \u00a7I before continuing. Note also that 'knees locked hard' is now 'knees straight': forcing a locked joint is what the hypermobility profile rules out.",
+   "items": [
+    {
+     "name": "Horse stance squat",
+     "dose": "3 \u00d7 8",
+     "note": "Brief, to open the rest of the group.",
+     "deferred": true,
+     "spectrum": "unassisted",
+     "why": "Feet wide, toes slightly out, knees to 90\u00b0.",
+     "adapted": "",
+     "reverts": "the Day 28 reassessment has been read. Held because an open Stage 2 exit criterion is 'no increase in Coxa Saltans frequency under loaded squat/split-squat work', judged on that date \u2014 introducing an externally-rotated loaded squat inside the assessment window would confound the criterion he is about to be assessed on. A measurement cost as much as a safety one"
+    },
+    {
+     "name": "Supine wall straddle, unloaded",
+     "dose": "3 \u00d7 90 s",
+     "note": "Knees straight.",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Backside to the wall, legs up it, knees straight, kneecaps to the ceiling, let the legs slide apart. Spine unloaded throughout.",
+     "adapted": "Supine wall straddle with ankle weights",
+     "reverts": "as tailors_pose \u2014 the same loaded-passive-end-range question"
+    },
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "4 \u00d7 30 s",
+     "note": "Knees straight.",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    },
+    {
+     "name": "Cossack squat, trailing leg straight",
+     "dose": "3 \u00d7 6 per side",
+     "note": "",
+     "deferred": true,
+     "spectrum": "resisted",
+     "why": "The straight trailing leg also loads the proximal hamstring at the ischial tuberosity, which is listed as overactive.",
+     "adapted": "",
+     "reverts": "as horse_stance"
+    },
+    {
+     "name": "Isometric side split, hands off",
+     "dose": "3 \u00d7 15 s",
+     "note": "Knees straight.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "At depth, holding your own weight, knees straight.",
+     "adapted": "",
+     "reverts": ""
+    }
+   ]
+  },
+  "F": {
+   "limiter": "Tilt range",
+   "intro": "**The tilt-specific method, rebuilt rather than filtered.** The source's \u00a7F was four pancake variations, three of them using a plate or a strap to reach depth \u2014 which for a body that folds by rounding produces the depth through the spine. That is both the contraindicated route and the wrong measurement, and removing those would have left a stack of leftovers.\n\nThe organising idea instead: **the lumbar rounding is the compensation, not the problem.** You round because the pelvis will not rotate forward. So the work is not to fold more carefully \u2014 it is to build the tilt until there is no reason to compensate.",
+   "outro": "**What success looks like, and it is not depth.** The number that should move first is the height at which your lower back stops being flat. Forehead height may not move for weeks and that is not failure \u2014 if the flat-back height improves while total depth stays put, the stack is working exactly as intended. Retest the tilt after four weeks, cold, before adding anything.",
+   "items": [
+    {
+     "name": "Seated pelvic rock, mid-range",
+     "dose": "3 \u00d7 12",
+     "note": "The tilt as an isolated MOVEMENT, no depth. You cannot train a position through a joint action you cannot perform on its own.",
+     "deferred": false,
+     "spectrum": "unassisted",
+     "why": "Hands behind you, rock the pelvis forward and back through MID-RANGE. Train the movement, not the depth, and not the arched end of it. You cannot train a position through a joint action you cannot perform on its own.",
+     "adapted": "Seated pelvic rock taken to the arched end",
+     "reverts": "never \u2014 the arched end is lumbar extension against a retrolisthesis, and the drill's purpose is the movement anyway"
+    },
+    {
+     "name": "Elevated flat-back straddle hinge",
+     "dose": "3 \u00d7 60 s",
+     "note": "The elevation supplies the tilt. **Lowering the block over months is the progression** \u2014 not reaching further at a fixed height.",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Sit on a block or bench, no added weight, and hinge with a flat back. The elevation is the whole point: sitting above foot level rotates the pelvis forward on its own, so the block is the assist device for the TILT specifically. Lowering the block over months is the progression \u2014 reaching further at a fixed height is not.",
+     "adapted": "Elevated-hip pancake with a weight behind the neck",
+     "reverts": "never as written. The weight supplied depth through a spine that had not tilted, which is the opposite of what the elevation does. When the tilt is producible unaided, no assist is needed"
+    },
+    {
+     "name": "Straddle lift-offs from a flat back",
+     "dose": "3 \u00d7 8",
+     "note": "Hip flexor strength to PRODUCE the tilt rather than be placed into it. Neutral or slight internal rotation on the right.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "Sit tall, hinge to your flat-back limit, lift the chest 5-10 cm, lower. Hip flexor strength to PRODUCE the tilt rather than be placed into it. Active hip flexion under iliopsoas load \u2014 cue neutral or slight internal rotation on the right.",
+     "adapted": "Pancake lift-offs from a rounded fold",
+     "reverts": "when a flat back holds through the full lift, at which point the two are the same exercise"
+    },
+    {
+     "name": "Flat-back hip hinge, legs together",
+     "dose": "3 \u00d7 8",
+     "note": "Raises the hamstring ceiling that currently caps the tilt at about 90\u00b0, without a fold. Hinge, never round.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "Raises the hamstring ceiling that currently caps the tilt at about 90\u00b0, without a fold. Hinge, never round.",
+     "adapted": "",
+     "reverts": ""
+    }
+   ]
+  },
+  "G": {
+   "limiter": "Tilt production \u2014 hip flexor strength",
+   "intro": "You can reach the position, you cannot produce it. The tilt work moves to the END of the session and becomes strength work.",
+   "outro": "",
+   "items": [
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "3 \u00d7 45 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    },
+    {
+     "name": "Isometric side split, hands off",
+     "dose": "3 \u00d7 15 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "At depth, holding your own weight, knees straight.",
+     "adapted": "",
+     "reverts": ""
+    },
+    {
+     "name": "Straddle lift-offs from a flat back",
+     "dose": "3 \u00d7 8",
+     "note": "",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "Sit tall, hinge to your flat-back limit, lift the chest 5-10 cm, lower. Hip flexor strength to PRODUCE the tilt rather than be placed into it. Active hip flexion under iliopsoas load \u2014 cue neutral or slight internal rotation on the right.",
+     "adapted": "Pancake lift-offs from a rounded fold",
+     "reverts": "when a flat back holds through the full lift, at which point the two are the same exercise"
+    },
+    {
+     "name": "Flat-back straddle hinge holding a light weight at the chest",
+     "dose": "3 \u00d7 8",
+     "note": "At the chest, never behind the neck.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "At the chest, never behind the neck.",
+     "adapted": "Seated straddle good-mornings holding a plate",
+     "reverts": "stage 3, AND a hinge that no longer rounds. The original started from a position already at his hamstring limit, so the spine had to round before anything moved; services.rules also caps good-mornings at stage 3 and he is stage 2"
+    },
+    {
+     "name": "Pancake, own power, arms crossed",
+     "dose": "3 \u00d7 30 s",
+     "note": "Stop at the first loss of a flat back.",
+     "deferred": false,
+     "spectrum": "unassisted",
+     "why": "No hands, no strap. Stop at the first loss of a flat back \u2014 that point is the measurement, not the floor.",
+     "adapted": "Pancake with a strap anchored in front",
+     "reverts": "never \u2014 a strap supplies force past the point he would self-limit, which is the mechanism the annulus tears cannot take"
+    }
+   ]
+  },
+  "H": {
+   "limiter": "Adductor end-range strength",
+   "intro": "The body will not concede range it cannot support. The strength work here is what PERMITS the range rather than something added alongside it.",
+   "outro": "",
+   "items": [
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "1 \u00d7 60 s",
+     "note": "Purely to open the door, to firm resistance only.",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    },
+    {
+     "name": "Isometric side split, hands off",
+     "dose": "6 \u00d7 10 s",
+     "note": "Hands off, full rest between.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "At depth, holding your own weight, knees straight.",
+     "adapted": "",
+     "reverts": ""
+    },
+    {
+     "name": "Horse stance hold, weighted",
+     "dose": "3 \u00d7 8",
+     "note": "",
+     "deferred": true,
+     "spectrum": "resisted",
+     "why": "",
+     "adapted": "",
+     "reverts": "as horse_stance"
+    },
+    {
+     "name": "Adductor squeezes at width",
+     "dose": "5 \u00d7 5 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "Isometric adduction at a controlled width. No spinal load and no passive end-range hold \u2014 the single best-aligned item in the cluster against this athlete's hypermobility guidance.",
+     "adapted": "",
+     "reverts": ""
+    },
+    {
+     "name": "Copenhagen plank",
+     "dose": "3 \u00d7 20 s per side",
+     "note": "Start here and hold it. Last performed May/June 2025 at 30 s \u00d7 3, with a back injury and a full rehab block since \u2014 the old number is history, not a starting point.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "Mechanically the cleanest item in the cluster \u2014 side-lying, spine neutral, no lumbar flexion or extension, no axial load. The caution is DOSE: last performed May/June 2025 at 30 s \u00d7 3, with a back injury and a full rehab block since. That number is history, not a starting point.",
+     "adapted": "",
+     "reverts": ""
+    }
+   ]
+  },
+  "I": {
+   "limiter": "Puller strength \u2014 hip abductors",
+   "intro": "If the abductors cannot open the legs, the adductors do not release. The repeated split between abductor sets is deliberate, not filler \u2014 contracting the antagonist relaxes what you were stretching, so the second round goes deeper than the first.\n\n**The release block is load-bearing here, not routine.** This whole stack loads glute medius, minimus and TFL, and glute medius upper fibres are listed as overactive and right-dominant \u2014 named as the primary anchor driving joint compression through the chain, with release required BEFORE activation. Running this stack without it trains the compensation.",
+   "outro": "**If medial knee discomfort has appeared**, add terminal knee extensions or a Spanish squat, 3 \u00d7 10. VMO resists the knee collapsing inward, which is the direction gravity pulls it in a split. If you are running \u00a7E instead, gracilis load is the more likely cause and the fix is managing volume.",
+   "items": [
+    {
+     "name": "Standing side leg raises",
+     "dose": "4 \u00d7 8 per side",
+     "note": "Slow, no swing.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "Slow, no swing. Loads glute medius \u2014 release before activating.",
+     "adapted": "",
+     "reverts": ""
+    },
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "60 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    },
+    {
+     "name": "Banded end-range abduction",
+     "dose": "3 \u00d7 10",
+     "note": "",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "",
+     "adapted": "",
+     "reverts": ""
+    },
+    {
+     "name": "Triangle side split, external-rotation cue",
+     "dose": "60 s",
+     "note": "",
+     "deferred": false,
+     "spectrum": "assisted",
+     "why": "Hips on a separate line to the feet. Turn the legs out from the hips to clear the joint; sit the hips back, weight in the heels, chest high. Train the triangle before any inline work.",
+     "adapted": "Triangle side split cued by tilting the hip down and arching the back",
+     "reverts": "never \u2014 the source calls the two routes equivalent, so this is the other of two equal options rather than a lesser version"
+    },
+    {
+     "name": "Side leg raises with eccentric overload",
+     "dose": "3 \u00d7 6",
+     "note": "Lift bent, straighten, lower slow.",
+     "deferred": false,
+     "spectrum": "resisted",
+     "why": "Lift bent, straighten, lower slow. You are stronger eccentrically, so this loads the top of the range you cannot otherwise reach.",
+     "adapted": "",
+     "reverts": ""
+    }
+   ]
+  }
+ },
+ "release": [
   {
-   "key": "pike",
-   "label": "Pike & head to toe",
-   "aka": "Flat-back forward hinge, legs together",
-   "ladder": [
-    "hamstrings",
-    "lumbar"
-   ],
-   "goal": 70.0,
-   "gates": "RDL, every hip-hinge pattern in the block",
-   "note": "Same flat-back redefinition as the pancake and for the same reason. Shares both of its rungs with the pancake, so training the pancake moves this too \u2014 worth knowing when choosing the next target, because it would be nearly free.",
-   "blocked": "",
-   "selectable": false,
-   "built": false,
-   "stack": []
+   "name": "Upper glute / TFL self-release",
+   "dose": "2 \u00d7 90 s per side",
+   "laterality": "bilateral"
   },
   {
-   "key": "front_split",
-   "label": "Front split",
-   "aka": "Split lunge, back leg long",
-   "ladder": [
-    "hip_flexors",
-    "quads",
-    "hamstrings",
-    "lumbar"
-   ],
-   "goal": 70.0,
-   "gates": "Lunge, split squat, hip thrust, RDL lockout",
-   "note": "The old 'hip extension' skill, renamed into something you can actually aim at, with the same rungs plus hamstrings for the front leg. Targets the athlete's stated #1 problem \u2014 'my hips are stuck in flexion with my back arched'. **Train the back leg, and do not square the hips**: squaring drives lumbar extension, which is the direction his L5/S1 cannot take. lumbar is on the ladder because arching is how hip extension gets faked.",
-   "blocked": "",
-   "selectable": false,
-   "built": false,
-   "stack": []
+   "name": "Piriformis contract-relax (PNF)",
+   "dose": "3 \u00d7 5 per side",
+   "laterality": "bilateral"
   },
   {
-   "key": "side_split",
-   "label": "Side split",
-   "aka": "Straddle standing",
-   "ladder": [
-    "adductors",
-    "hip_rotation",
-    "lumbar"
-   ],
-   "goal": 70.0,
-   "gates": "Sumo stance, lateral lunge, wide-stance work",
-   "note": "The safest of the classic list for this athlete \u2014 the pelvis stays near neutral throughout, so it demands neither end-range lumbar flexion nor extension. Shares two rungs with the pancake.",
-   "blocked": "",
-   "selectable": false,
-   "built": false,
-   "stack": []
+   "name": "Right posterior hip capsule stretch",
+   "dose": "3 \u00d7 60 s",
+   "laterality": "right"
   },
   {
-   "key": "squat",
-   "label": "Squat",
-   "aka": "Deep bodyweight squat, neutral spine",
-   "ladder": [
-    "calves_ankle",
-    "adductors",
-    "hip_rotation",
-    "quads",
-    "lumbar"
-   ],
-   "goal": 70.0,
-   "gates": "Goblet squat, Bulgarian split squat",
-   "note": "Kept in the catalogue as a goal, dropped as an always-on monitor (athlete, 2026-08-06) \u2014 with one skill trained at a time there is no monitor tier. squat_depth is deliberately NOT a rung here: it is the OUTCOME of this ladder, and including it would let the symptom vote on its own diagnosis.",
-   "blocked": "",
-   "selectable": false,
-   "built": false,
-   "stack": []
+   "name": "Ischial tuberosity hamstring release",
+   "dose": "2 \u00d7 90 s per side",
+   "laterality": "bilateral"
   },
   {
-   "key": "shoulder_flexion",
-   "label": "Shoulder flexion",
-   "aka": "Elbows to the floor overhead",
-   "ladder": [
-    "shoulders_overhead",
-    "lats",
-    "chest_horizontal",
-    "thoracic_rotation",
-    "lumbar"
-   ],
-   "goal": 70.0,
-   "gates": "Overhead work (currently prohibited), lat pulldown path",
-   "note": "NOMINATED AS THE SECOND TARGET (athlete, 2026-08-06); the stack is not built yet. A goal he already fails in a way he can feel \u2014 he cannot rest both elbows on the floor. READ THE RUNGS TOGETHER: shoulders_overhead low AND lats low means the lat is the limiter; shoulders_overhead low while lats is fine means pec or capsule. That comparison is the whole reason the lat rung exists, and it decides the prescription \u2014 a capsular restriction post-Latarjet makes aggressive stretching the wrong answer rather than merely a useless one.",
-   "blocked": "",
-   "selectable": false,
-   "built": false,
-   "stack": []
-  },
-  {
-   "key": "shoulder_extension",
-   "label": "Shoulder extension",
-   "aka": "Arms behind the back",
-   "ladder": [
-    "chest_horizontal",
-    "shoulders_overhead"
-   ],
-   "goal": 70.0,
-   "gates": "\u2014",
-   "note": "Nominated by the athlete as a target after shoulder flexion. That ordering is sound anyway \u2014 flexion is unblocked and shares three rungs with it.",
-   "blocked": "This is the apprehension direction for an anterior-instability shoulder after a Latarjet (finding #6) \u2014 the position the joint was operated on to stop it leaving. Tracked so any regression shows, but training toward more of it is a decision for the physiotherapist. **Put it on the 2026-08-16 agenda**: the question is whether a bounded, actively controlled range can be trained, not whether to maximise it.",
-   "selectable": false,
-   "built": false,
-   "stack": []
-  },
-  {
-   "key": "bridge",
-   "label": "Bridge",
-   "aka": "Back bend",
-   "ladder": [
-    "hip_flexors",
-    "shoulders_overhead",
-    "thoracic_rotation"
-   ],
-   "goal": 70.0,
-   "gates": "\u2014",
-   "note": "",
-   "blocked": "A full bridge finishes in end-range lumbar extension, against L5/S1 retrolisthesis and activated osteochondrosis; services.rules contraindicates 'hyperextension' and 'back extension' outright. **Its components are not blocked and are exactly what you need** \u2014 hip flexors, overhead reach and upper-back rotation are all rungs on skills you can train today, so progress toward it happens anyway. What needs sign-off is the finish position, and the honest question for 2026-08-16 is whether a version that extends through the UPPER back while the lower back stays neutral is a safe substitute.",
-   "selectable": false,
-   "built": false,
-   "stack": []
+   "name": "Coxa Saltans tendon-path drill",
+   "dose": "2 \u00d7 10",
+   "laterality": "right"
   }
  ],
+ "slots": {
+  "0": {
+   "label": "Structure",
+   "question": "Is a bone stopping you?",
+   "decides": "Whether anything below is even valid"
+  },
+  "1": {
+   "label": "Regressed",
+   "question": "Is the tissue short at low demand?",
+   "decides": "Which exercises \u2014 isolated or integrated"
+  },
+  "2": {
+   "label": "Prerequisite",
+   "question": "Do you have the component the skill needs?",
+   "decides": "Whether the skill is trainable yet, and where the fix sits"
+  },
+  "3": {
+   "label": "Spectrum",
+   "question": "Passive, isometric, active",
+   "decides": "Which end of the spectrum \u2014 assisted or resisted"
+  }
+ },
  "measures": [
-  "passive",
-  "isometric",
-  "active"
- ],
- "measuresExplained": [
   [
    "passive",
    "How far it goes when something else does the work",
@@ -704,376 +783,277 @@ const DATA = {
    "Same position, no help at all \u2014 no hands, no wall, no swinging. Only your own muscles pulling you in. This is the range you can actually use in a lift or a sport, which is why it is the one that scores."
   ]
  ],
- "gapExplained": "Passive minus active is the number that matters most for you. A BIG gap means the range is already there and you cannot hold it \u2014 stretching more will not help, and strength work in the position will. A SMALL gap means you are using nearly everything you have, and the range itself is what to chase. You are hypermobile, so the big-gap case is the one to expect.",
- "lockExplained": "Every test names a LOCK: one thing that must not move. It is there because your body will always find another joint to do the job \u2014 arch the back instead of opening the hip, collapse the arch instead of bending the ankle. That substitution does not feel like cheating; it feels like success, because you got further. **And that is the trap: a lost lock makes the number BETTER, not worse, so nothing warns you.** Yes \u2014 if you lose the lock, just reset and take the reading again. There is no limit and no penalty; a repeated trial is not a worse trial. That is why each lock has a TELL you can see or feel from outside \u2014 a towel that stops being squashed, a sheet of paper that drops, a heel that leaves the floor. Trust the tell, not the feeling. If you finish a trial and only then realise the lock went, tick 'void this trial' and do it again.",
+ "gap": "Passive minus active is the number that matters most for you. A BIG gap means the range is already there and you cannot hold it \u2014 stretching more will not help, and strength work in the position will. A SMALL gap means you are using nearly everything you have, and the range itself is what to chase. You are hypermobile, so the big-gap case is the one to expect \u2014 with one documented exception, the seated pelvic tilt, where the range genuinely is missing.",
+ "lock": "Every test names a LOCK: one thing that must not move. It is there because your body will always find another joint to do the job \u2014 arch the back instead of opening the hip, collapse the arch instead of bending the ankle. That substitution does not feel like cheating; it feels like success, because you got further. **And that is the trap: a lost lock makes the number BETTER, not worse, so nothing warns you.** Yes \u2014 if you lose the lock, just reset and take the reading again. There is no limit and no penalty; a repeated trial is not a worse trial. That is why each lock has a TELL you can see or feel from outside \u2014 a towel that stops being squashed, a sheet of paper that drops, a heel that leaves the floor. Trust the tell, not the feeling. If you finish a trial and only then realise the lock went, tick 'void this trial' and do it again.",
  "frozen": [
   [
-   "arm_length_cm",
-   "Shoulder-tip to wrist bone, arm straight. Converts the overhead and lat measurements from a floor gap into an angle."
+   "straddle_width_cm",
+   "Inner ankle to inner ankle in the seated straddle, at the width you actually work at. The instruction is 'open to maximum, then come in slightly' \u2014 which is bone clearance, not comfort, and is not reproducible by feel."
   ],
   [
-   "shin_length_cm",
-   "Knee joint line to the floor, sitting with the knee bent square. Used by the hip-rotation reading."
+   "tailors_heel_distance_cm",
+   "Tailbone to the back of the heels in the seated butterfly. Heels further away drop the knees without the groin being one millimetre longer, so a session that re-places them by eye is not comparable with the last one."
   ],
   [
-   "foot_outline",
-   "Both feet traced on a sheet of card, photographed. Reproduces squat stance width and toe-out, which is the single biggest source of session-to-session drift in the squat test."
+   "side_split_stance",
+   "Both feet traced on card, photographed, with the turn-out angle marked. Stance width and toe-out move this reading more than anything else does."
   ],
   [
-   "butterfly_heel_distance_cm",
-   "Tailbone to the back of the heels in the butterfly position. THE NUMBER is the setup, not a mark on the floor: heels further away drop the knees without your groin being one millimetre longer, so a session that re-marks the floor by eye is not comparable with the last one."
+   "floor_reference",
+   "Which floor and which surface. A carpet, a mat and bare boards give different crotch and forehead heights for the same body."
   ]
  ],
- "selectable": [
-  "pancake"
+ "progression": [
+  "block_height_cm",
+  "The elevation under the hips. Sitting above foot level rotates the pelvis forward on its own, so the block is the assist device for the tilt specifically. Lowering it over months is the progression \u2014 reaching further at a fixed height is not."
  ],
- "unbuilt": [
-  "pike",
-  "front_split",
-  "side_split",
-  "squat",
-  "shoulder_flexion"
+ "expected": "F",
+ "expectedWhy": "Seated anterior pelvic tilt is the dominant restriction on record, reported independently in four seated positions on 2026-08-05. That is a slot 2 failure, which yields F or G. Note this DISAGREES with the generic lax-tissue prediction of H or I \u2014 he has a specific range deficit inside an otherwise hypermobile body, and the disagreement is worth watching rather than resolving in advance.",
+ "nerve": "**A differentiator, not a provocation.** Do the tilt test twice at a COMFORTABLE, submaximal depth \u2014 once with your ankles pointed away and chin lifted, once with ankles pulled back and chin tucked. Muscle length is identical in both, so any difference in range is nerve rather than muscle. **Stop at the first change in the QUALITY of the sensation.** The original said to push until you produce a sharp, electric or burning feeling and read that as a result. Do not. Those are the exact words your symptom logs name as the trigger to stop and contact the physiotherapist, and you have a narrowed nerve exit on the right at L5/S1 with no neural signs on any log to date. If one appears at any depth: stop, record it, take it to the physio. It is a finding, not a number.",
+ "deferredTests": [
+  {
+   "label": "Knees at 90 degrees",
+   "why": "**Deferred until after 2026-08-16.** This is a wide, turned-out, loaded squat held at depth, and an open Stage 2 exit criterion reads 'no increase in Coxa Saltans frequency under loaded squat/split-squat work' \u2014 judged on that date. Adding a new externally-rotated loaded squat inside the assessment window would confound the criterion you are about to be assessed on. That is a measurement cost as much as a safety one. The bent and straight tests still name the muscle between them; this one adds resolution, not the diagnosis."
+  }
  ],
- "blocked": [
-  "shoulder_extension",
-  "bridge"
- ],
- "defaultTarget": "pancake"
+ "baselinesRequired": 3,
+ "th": {
+  "gate0Gain": 10.0,
+  "bent": 10.0,
+  "straight": 90.0,
+  "tilt": 25.0,
+  "gap": 12.0
+ }
 };
-const M = DATA.measures;
 let S = null;
 
-function reset(){
-  S = {screen:'intro', step:0, cold:true, readings:{}, status:{},
-       target: DATA.defaultTarget};
-  render();
-}
-
-function scoreOf(r, v){
-  if(v===null||v===undefined||v==='') return null;
-  const s = (v - r.v0) / (r.v100 - r.v0) * 100;
-  return Math.max(0, Math.min(100, s));
-}
-
-// A rung scores from ACTIVE where it exists, else isometric, else passive —
-// a passive ceiling you cannot enter under your own power does not limit a
-// skill any less for being high.
-function rungScore(key){
-  const st = S.status[key];
-  if(st === 'skip' || st === 'void') return null;
-  const rd = S.readings[key];
-  if(!rd) return null;
-  const r = DATA.rungs.find(x=>x.key===key);
-  let worst = null;
-  for(const side in rd){
-    const [p,i,a] = rd[side];
-    const v = (a!==null&&a!==undefined&&a!=='') ? a
-            : (i!==null&&i!==undefined&&i!=='') ? i : p;
-    const s = scoreOf(r, v===''?null:v);
-    if(s===null) continue;
-    if(worst===null || s < worst) worst = s;   // the worse SIDE limits
-  }
-  return worst;
-}
-
-function gapOf(key){
-  const rd = S.readings[key]; if(!rd) return null;
-  const r = DATA.rungs.find(x=>x.key===key);
-  let g = null;
-  for(const side in rd){
-    const [p,i,a] = rd[side];
-    const ps = scoreOf(r, p===''?null:p), as = scoreOf(r, a===''?null:a);
-    if(ps===null||as===null) continue;
-    const d = ps - as;
-    if(g===null || d > g) g = d;
-  }
-  return g;
-}
-
-function skillScore(sk){
-  let best=null, lim=null, unmeasured=[];
-  for(const k of sk.ladder){
-    const s = rungScore(k);
-    if(s===null){ unmeasured.push(k); continue; }
-    if(best===null || s < best){ best=s; lim=k; }   // MIN, never a mean
-  }
-  return {score:best, limiter:lim, unmeasured};
-}
-
+function reset(){ S = {screen:'intro', step:0, cold:true, r:{}, forced:false}; render(); }
+function md(t){ return String(t||'').replace(/\*\*([^*]+)\*\*/g,'<b style="color:var(--ink2)">$1</b>'); }
 function el(h){ document.getElementById('app').innerHTML = h; }
-function md(t){
-  return String(t).replace(/\*\*([^*]+)\*\*/g,'<b style="color:var(--ink2)">$1</b>');
-}
-function lbl(k){ const r=DATA.rungs.find(x=>x.key===k); return r?r.label:k; }
+function T(k){ return DATA.tests.find(t=>t.key===k); }
 
-function stepsBar(){
-  return '<div class="steps">' + DATA.rungs.map((r,i)=>{
-    const st = S.status[r.key];
-    const c = i===S.step ? 'now' : st==='skip' ? 'skip' : st==='void' ? 'void'
-            : S.readings[r.key] ? 'done' : '';
-    return `<i class="${c}"></i>`;
-  }).join('') + '</div>';
+// ── the slot logic, mirroring cluster_a_battery.py's evaluators ─────────────
+function val(k,side){ const v=(S.r[k]||{})[side===undefined?'':side]; return (v===''||v==null)?null:Number(v); }
+function worst(k){ const o=S.r[k]||{}; const v=Object.values(o).filter(x=>x!==''&&x!=null).map(Number);
+  return v.length?Math.max.apply(null,v):null; }
+function best(k){ const o=S.r[k]||{}; const v=Object.values(o).filter(x=>x!==''&&x!=null).map(Number);
+  return v.length?Math.min.apply(null,v):null; }
+
+function evaluate(){
+  const out=[];
+  const n=val('gate0_neutral'), t=val('gate0_turned_out');
+  if(n===null||t===null) return {slots:out, pattern:null, stopped:0, indet:true};
+  const gain=n-t;
+  if(gain>=DATA.th.gate0Gain){ out.push({slot:0,pass:false,pattern:'B',
+      reason:'Turning the legs out gained '+gain.toFixed(1)+' cm. Orientation is the limiter, not tissue length.'});
+    return {slots:out, pattern:'B', stopped:0}; }
+  out.push({slot:0,pass:true,reason:'Turning out changed the depth by '+gain.toFixed(1)+' cm — below the threshold, so this is a genuine tissue restriction.'});
+
+  const bent=worst('leverage_bent'), str=best('leverage_straight');
+  if(bent===null||str===null) return {slots:out, pattern:null, stopped:1, indet:true};
+  const bf=bent>DATA.th.bent, sf=str<DATA.th.straight;
+  if(bf&&sf){ out.push({slot:1,pass:false,pattern:'C',reason:'Both leverages short — the whole group.'}); return {slots:out,pattern:'C',stopped:1}; }
+  if(bf){ out.push({slot:1,pass:false,pattern:'D',reason:'Short bent, better straight — adductors and rotators.'}); return {slots:out,pattern:'D',stopped:1}; }
+  if(sf){ out.push({slot:1,pass:false,pattern:'E',reason:'Fine bent, poor straight. Gracilis is the only one of the group crossing the knee, so that difference names it.'}); return {slots:out,pattern:'E',stopped:1}; }
+  out.push({slot:1,pass:true,reason:'Length is adequate at both available leverages.'});
+
+  const rg=val('tilt_range'), pr=val('tilt_production');
+  if(rg===null||pr===null) return {slots:out, pattern:null, stopped:2, indet:true};
+  if(rg>DATA.th.tilt){ out.push({slot:2,pass:false,pattern:'F',reason:'The position is not available even with help. Tilt work goes FIRST in the session and starts assisted.'}); return {slots:out,pattern:'F',stopped:2}; }
+  if(pr>DATA.th.tilt){ out.push({slot:2,pass:false,pattern:'G',reason:'You can reach it, you cannot produce it. Tilt work moves to the END and becomes strength work.'}); return {slots:out,pattern:'G',stopped:2}; }
+  out.push({slot:2,pass:true,reason:'The tilt is available and producible — not your limiter.'});
+
+  const act=worst('spectrum_active'), iso=val('spectrum_isometric'), pas=val('spectrum_passive');
+  if(act===null||iso===null||pas===null) return {slots:out, pattern:null, stopped:3, indet:true};
+  if(!(iso>pas)){ out.push({slot:3,pass:false,indet:true,reason:'The isometric reading is as deep as the passive one, so the load was too light — you measured passive twice.'}); return {slots:out,pattern:null,stopped:3,indet:true}; }
+  const g=iso-pas;
+  if(g>=DATA.th.gap){ out.push({slot:3,pass:false,pattern:'H',reason:'Passive goes '+g.toFixed(1)+' cm deeper than you can hold. The range exists and is not defended.'}); return {slots:out,pattern:'H',stopped:3}; }
+  out.push({slot:3,pass:false,pattern:'I',reason:'You hold what you can reach, but cannot open the legs under your own power.'});
+  return {slots:out,pattern:'I',stopped:3};
+}
+
+// Seed ONE test, and only when its step is reached. Prefilling everything up
+// front made the battery reach its answer before the first step was shown,
+// which is correct behaviour and a useless demonstration of it.
+function seed(t){
+  S.r[t.key]=S.r[t.key]||{};
+  Object.keys(t.fake).forEach(function(side){
+    if(S.r[t.key][side]===undefined) S.r[t.key][side]=t.fake[side]; });
 }
 
 function render(){
   document.getElementById('foot').innerHTML =
-    'Prototype only — readings are pre-filled and nothing is saved anywhere. '
-    + 'Rung definitions, locks and scales are the real ones from '
-    + 'flexibility_baselines.py.';
-
-  if(S.screen==='intro') return renderIntro();
-  if(S.screen==='pick')  return renderPick();
-  if(S.screen==='cold')  return renderCold();
-  if(S.screen==='step')  return renderStep();
-  return renderDone();
+    'Prototype only — readings are pre-filled and nothing is saved. Tests, locks, slot thresholds, '
+    + 'the exercise library and the stacks are the real ones, read out of cluster_a_*.py at build time.';
+  if(S.screen==='intro') return intro();
+  if(S.screen==='cold')  return cold();
+  if(S.screen==='step')  return step();
+  return done();
 }
 
-function renderIntro(){
-  el(`<div class="card">
-      <div class="cap">Standing goal &middot; no deadline</div>
-      <div class="huge" style="color:var(--accent)">Not measured</div>
-      <div class="sm">${DATA.rungs.length} tests &middot; ~40 min &middot;
-        measured <b style="color:var(--ink2)">cold</b>, no warm-up.<br>
-        Every 6&ndash;12 weeks.</div>
-    </div>
-    <div class="btns"><button class="b" onclick="S.screen='pick';render()">Start assessment</button></div>
-    <div class="card" style="margin-top:12px">
-      <div class="nm" style="font-size:13px;color:var(--ink2)">Why there is nothing else here</div>
-      <div class="sm">The 22 yoga depth-ratings are kept in full, and feed nothing. They answer
-        &ldquo;how far did I get <i>and</i> how much did I feel&rdquo; &mdash; neither of the two
-        things this model measures.</div>
-    </div>`);
+function intro(){
+  el('<div class="card"><div class="cap">Standing goal &middot; no deadline</div>'
+    +'<div class="huge" style="color:var(--accent)">Not measured</div>'
+    +'<div class="sm">'+DATA.clusterLabel+' &middot; up to '+DATA.order.length+' tests &middot; '
+    +'measured <b style="color:var(--ink2)">cold</b>, no warm-up.<br>'
+    +'Every four weeks. It usually stops early — the first failing slot is your answer, '
+    +'and nothing below it is worth measuring.</div></div>'
+    +'<div class="btns"><button class="b" onclick="S.screen=\'cold\';render()">Start assessment</button></div>'
+    +'<div class="card" style="margin-top:12px"><div class="cap">What this produces</div>'
+    +'<div class="sm">One <b style="color:var(--ink2)">pattern label</b>, and nothing else. Not a score. '
+    +'The label is what the training stack is looked up by — and a stack without a label is a guess, '
+    +'so the app refuses to produce one.</div></div>'
+    +'<details><summary>The four slots, and why they run in order</summary>'
+    + Object.keys(DATA.slots).map(function(k){ var v=DATA.slots[k];
+        return '<div class="sm"><b style="color:var(--ink2)">'+k+'. '+v.label+'</b> — '+v.question+'</div>'
+             + '<div class="sm">Decides: '+v.decides+'</div>'; }).join('')
+    +'<div class="sm">Stop at the first failure. There is no value in measuring a spectrum profile '
+    +'for a skill that a bony block had already made unavailable.</div></details>'
+    +'<details><summary>Expected outcome, written down before measuring</summary>'
+    +'<div class="sm"><b style="color:var(--ink2)">Pattern '+DATA.expected+'</b> — '+DATA.patterns[DATA.expected]+'</div>'
+    +'<div class="sm">'+DATA.expectedWhy+'</div></details>'
+    +'<details><summary>Held back until after 2026-08-16 &middot; '+DATA.deferredTests.length+'</summary>'
+    + DATA.deferredTests.map(function(d){ return '<div class="sm"><b style="color:var(--ink2)">'+d.label+'</b></div>'
+        +'<div class="sm">'+md(d.why)+'</div>'; }).join('')+'</details>');
 }
 
-function renderPick(){
-  const sel = DATA.skills.filter(s=>s.selectable);
-  const unb = DATA.skills.filter(s=>DATA.unbuilt.includes(s.key));
-  const blk = DATA.skills.filter(s=>DATA.blocked.includes(s.key));
-  const cur = DATA.skills.find(s=>s.key===S.target) || sel[0];
-  el(`<div class="card"><div class="cap">First</div>
-      <div class="big" style="color:var(--accent)">Pick one goal</div>
-      <div class="sm">One skill at a time. The goal decides which of the
-        ${DATA.rungs.length} tests actually matters to you &mdash; your chest is what
-        stops a bridge and is irrelevant to a pancake, so &ldquo;what is limiting
-        you&rdquo; has no answer until there is a goal to limit.</div></div>
-    ${sel.map(s=>`<label class="chk"><input type="radio" name="g"
-      ${s.key===cur.key?'checked':''} onchange="S.target='${s.key}';render()">
-      <b style="color:var(--ink2)">${s.label}</b> &middot; ${s.aka}</label>`).join('')}
-    <div class="card"><div class="sm">${md(cur.note)}</div></div>
-    <details><summary>Goals with no stack built yet &middot; ${unb.length}</summary>
-      <div class="sm">Measured and scored, but there is no route to hand you, so they
-        cannot be the target. Shoulder flexion is next.</div>
-      ${unb.map(s=>`<div class="sm"><b style="color:var(--ink2)">${s.label}</b>
-        &mdash; ${s.aka}</div>`).join('')}
-    </details>
-    <details><summary>Goals waiting on a sign-off &middot; ${blk.length}</summary>
-      ${blk.map(s=>`<div class="sm"><b style="color:var(--ink2)">${s.label}</b>
-        &mdash; ${s.aka}</div><div class="sm">${md(s.blocked)}</div>`).join('')}
-    </details>
-    <div class="btns">
-      <button class="b" onclick="S.screen='cold';render()">Next</button>
-      <button class="b ghost" onclick="S.screen='intro';render()">Cancel</button>
-    </div>`);
+function cold(){
+  el('<div class="card"><div class="cap">Before you start</div>'
+    +'<div class="big" style="color:var(--accent)">Measure cold</div>'
+    +'<div class="sm">No warm-up, no session beforehand, first thing. A warm reading measures a '
+    +'viscoelastic effect that is gone within hours — a cold one isolates the durable change.</div></div>'
+    +'<label class="chk"><input type="radio" name="c" checked onchange="S.cold=true"> Cold — no warm-up</label>'
+    +'<label class="chk"><input type="radio" name="c" onchange="S.cold=false"> Warm — I have trained today</label>'
+    +'<details open><summary>How to understand the three numbers</summary>'
+    + DATA.measures.map(function(m){ return '<div class="sm"><b style="color:var(--ink2)">'
+        +m[0].charAt(0).toUpperCase()+m[0].slice(1)+' — '+m[1]+'</b></div><div class="sm">'+m[2]+'</div>'; }).join('')
+    +'<div class="sm">'+md(DATA.gap)+'</div>'
+    +'<div class="sm">Taken in the order <b style="color:var(--ink2)">active → isometric → passive</b>. '
+    +'Passive work leaves tissue looser for an hour, so doing it first would flatter everything after it.</div></details>'
+    +'<details><summary>What a LOCK is, and what to do if you lose it</summary>'
+    +'<div class="sm">'+md(DATA.lock)+'</div></details>'
+    +'<details><summary>Measure these once, then re-use them forever</summary>'
+    + DATA.frozen.map(function(f){ return '<div class="sm"><b style="color:var(--ink2)">'
+        +f[0].replace(/_/g,' ')+'</b> — '+f[1]+'</div>'; }).join('')
+    +'<div class="sm"><b style="color:var(--good)">'+DATA.progression[0].replace(/_/g,' ')+'</b> — '
+    +'<i>this one is meant to move.</i> '+DATA.progression[1]+'</div></details>'
+    +'<details><summary>The nerve check</summary><div class="sm">'+md(DATA.nerve)+'</div></details>'
+    +'<div class="btns">'
+    +'<button class="b" onclick="S.screen=\'step\';S.step=0;render()">Begin</button>'
+    +'<button class="b ghost" onclick="S.screen=\'intro\';render()">Cancel</button></div>');
 }
 
-function renderCold(){
-  el(`<div class="card">
-      <div class="cap">Before you start</div>
-      <div class="big" style="color:var(--accent)">Measure cold</div>
-      <div class="sm">No warm-up, no session beforehand. A warm reading measures the
-        viscoelastic effect, which is gone within hours &mdash; a cold one isolates the
-        durable change. A warm session is still recorded, but it is labelled and never
-        compared with a cold one.</div>
-      <label class="chk"><input type="radio" name="c" checked
-        onchange="S.cold=true"> Cold &mdash; no warm-up</label>
-      <label class="chk"><input type="radio" name="c"
-        onchange="S.cold=false"> Warm &mdash; I have trained today</label>
-    </div>
-    <details open><summary>How to understand the measurements</summary>
-      ${DATA.measuresExplained.map(([m,short,long])=>
-        `<div class="sm"><b style="color:var(--ink2)">${m[0].toUpperCase()+m.slice(1)}
-          &mdash; ${short}</b></div><div class="sm">${long}</div>`).join('')}
-      <div class="sm">${md(DATA.gapExplained)}</div>
-    </details>
-    <details><summary>What a LOCK is, and what to do if you lose it</summary>
-      <div class="sm">${md(DATA.lockExplained)}</div>
-    </details>
-    <details><summary>Measure these once, then re-use them forever</summary>
-      <div class="sm">Take these on your first session and write them down. They are not
-        scores &mdash; they are setup numbers that make one session comparable with the
-        next.</div>
-      ${DATA.frozen.map(([n,why])=>
-        `<div class="sm"><b style="color:var(--ink2)">${n.replace(/_/g,' ')}</b>
-         &mdash; ${why}</div>`).join('')}
-    </details>
-    <div class="btns">
-      <button class="b" onclick="S.screen='step';S.step=0;render()">Begin</button>
-      <button class="b ghost" onclick="S.screen='intro';render()">Cancel</button>
-    </div>`);
-}
+function step(){
+  const ev = evaluate();
+  if(ev.pattern && !S.forced){
+    const last = ev.slots[ev.slots.length-1];
+    el('<div class="card ok"><div class="cap" style="color:var(--good)">That is your answer — stop here</div>'
+      +'<div class="big" style="color:var(--accent)">Pattern '+ev.pattern+' &middot; '+DATA.patterns[ev.pattern]+'</div>'
+      +'<div class="sm">'+last.reason+'</div>'
+      +'<div class="sm">The remaining tests measure things below the slot that stopped you, and a reading '
+      +'taken below a failure cannot be interpreted. There is nothing more to collect today.</div></div>'
+      +'<div class="btns">'
+      +'<button class="b" onclick="S.screen=\'done\';render()">Save assessment</button>'
+      +'<button class="b ghost" onclick="S.forced=true;render()">Keep going anyway</button></div>');
+    return;
+  }
 
-function renderStep(){
-  const r = DATA.rungs[S.step];
-  const sides = r.bilateral ? ['left','right'] : [''];
-  const pre = S.readings[r.key];
-
-  const fields = sides.map(side=>{
-    const vals = pre ? pre[side] : (r.fake[side] || [null,null,null]);
-    const inner = M.map((m,i)=>{
-      const v = vals[i];
-      const blank = (v===null||v===undefined||v==='') ? ' blank' : '';
-      return `<div class="fld${blank}"><div class="l">${m} (${r.unit})</div>
-        <input id="in_${side}_${i}" value="${v===null||v===undefined?'':v}"
-          placeholder="—"></div>`;
-    }).join('');
-    return `<div>${side?`<div class="cap">${side}</div>`:''}${inner}</div>`;
+  const t = T(DATA.order[S.step]);
+  seed(t);
+  const sides = t.bilateral ? ['left','right'] : [''];
+  const ticks = DATA.order.map(function(k,i){
+    return '<i class="'+(i===S.step?'now':((S.r[k]&&Object.keys(S.r[k]).length)?'done':''))+'"></i>'; }).join('');
+  const fields = sides.map(function(s){
+    var v = (S.r[t.key]||{})[s];
+    return '<div><div class="fld"><div class="l">'+(s||'value')+' ('+t.unit+')</div>'
+      +'<input type="number" step="0.5" value="'+(v===undefined?'':v)+'" '
+      +'oninput="S.r[\''+t.key+'\']=S.r[\''+t.key+'\']||{};S.r[\''+t.key+'\'][\''+s+'\']=this.value"></div></div>';
   }).join('');
 
-  const last = S.step === DATA.rungs.length - 1;
-  el(`${stepsBar()}
-    <div class="row"><span class="nm">${r.label}</span>
-      <span class="cap">${S.step+1} of ${DATA.rungs.length}</span></div>
-    <div class="sm" style="margin-top:2px">${r.test}</div>
-    <div class="lock"><b>LOCK</b> &mdash; ${md(r.lock)}</div>
-    <div class="card"><div class="sm" style="color:var(--ink2)">${md(r.setup)}</div></div>
-    <details><summary>How to read it</summary>
-      <div class="sm">${md(r.measurement)}</div>
-      <div class="sm">Scale: <b style="color:var(--ink2)">${r.v100}${r.unit} = 100</b>
-        &middot; <b style="color:var(--ink2)">${r.v0}${r.unit} = 0</b>
-        ${r.prov?' &middot; <i>this scale is our own estimate, not a published norm</i>':''}</div>
-      <div class="sm"><b>What the three numbers mean</b></div>
-      ${DATA.measuresExplained.map(([m,short,long])=>
-        `<div class="sm"><b style="color:var(--ink2)">${m[0].toUpperCase()+m.slice(1)}</b>
-         &mdash; ${short}. ${long}</div>`).join('')}
-      <div class="sm">${md(DATA.gapExplained)}</div>
-      ${r.testing?`<div class="sm"><b>What you&rsquo;re testing</b></div>
-        <div class="sm">${md(r.testing)}</div>`:''}
-      ${r.safety?`<div class="sm" style="color:#E2CB9B">${md(r.safety)}</div>`:''}
-    </details>
-    <div class="grid${sides.length===1?' one':''}">${fields}</div>
-    <label class="chk"><input type="checkbox" id="void"> The lock was lost &mdash; void this trial</label>
-    <div class="btns">
-      <button class="b" onclick="save()">${last?'Save &amp; finish':'Save &amp; next'}</button>
-      <button class="b ghost" onclick="mark('skip')">Skip</button>
-    </div>
-    ${S.step>0?'<button class="back" onclick="S.step--;render()">&larr; Back</button>':''}`);
+  el('<div class="steps">'+ticks+'</div>'
+    +'<div class="row"><span class="nm">'+t.label+'</span>'
+    +'<span class="cap">'+(S.step+1)+' of '+DATA.order.length+' &middot; slot '+t.slot+' '+t.slotLabel+'</span></div>'
+    +'<div class="lock"><b>LOCK</b> &mdash; '+md(t.lock)+'</div>'
+    +'<div class="card"><div class="sm" style="color:var(--ink2)">'+md(t.setup)+'</div></div>'
+    +'<details><summary>How to read it</summary>'
+    +'<div class="sm">'+md(t.measurement)+'</div>'
+    +'<div class="sm"><b style="color:var(--ink2)">What you are testing</b></div>'
+    +'<div class="sm">'+t.testing+'</div>'
+    +(t.adapted?'<div class="sm"><i>Adapted for you — '+t.adapted+'.</i></div>':'')
+    +(t.safety?'<div class="sm" style="color:#E2CB9B">'+md(t.safety)+'</div>':'')
+    +'</details>'
+    +'<div class="grid'+(sides.length===1?' one':'')+'">'+fields+'</div>'
+    +'<label class="chk"><input type="checkbox"> The lock was lost — void this trial</label>'
+    +'<div class="btns">'
+    +'<button class="b" onclick="next()">'+(S.step===DATA.order.length-1?'Save &amp; finish':'Save &amp; next')+'</button>'
+    +'<button class="b ghost" onclick="next()">Skip</button>'
+    +(S.step>0?'<button class="b ghost" onclick="S.step--;render()">Back</button>':'')+'</div>');
 }
 
-function save(){
-  const r = DATA.rungs[S.step];
-  const sides = r.bilateral ? ['left','right'] : [''];
-  if(document.getElementById('void').checked) return mark('void');
-  const out = {};
-  let any = false;
-  for(const side of sides){
-    out[side] = M.map((m,i)=>{
-      const raw = document.getElementById(`in_${side}_${i}`).value.trim();
-      if(raw===''){ return null; }
-      any = true; return parseFloat(raw);
-    });
-  }
-  if(any){ S.readings[r.key] = out; delete S.status[r.key]; }
-  advance();
-}
-
-function mark(kind){
-  const r = DATA.rungs[S.step];
-  S.status[r.key] = kind;
-  delete S.readings[r.key];
-  advance();
-}
-
-function advance(){
-  if(S.step === DATA.rungs.length-1){ S.screen='done'; }
-  else { S.step++; }
+function next(){
+  if(S.step===DATA.order.length-1){ S.screen='done'; } else { S.step++; }
   render();
 }
 
-function renderDone(){
-  const active = DATA.skills.filter(s=>!DATA.blocked.includes(s.key));
-  const scored = active.map(s=>({sk:s, ...skillScore(s)}));
-
-  // The headline is the TARGET skill's limiter — not the worst rung overall.
-  // A global worst is exactly what produced "chest/pecs is limiting you"
-  // against a goal chest has nothing to do with.
-  const tgt = DATA.skills.find(s=>s.key===S.target);
-  const tscore = skillScore(tgt);
-  const lead = tscore.limiter;
-  const leadScore = lead===null ? null : rungScore(lead);
-
-  const measured = DATA.rungs.filter(r=>rungScore(r.key)!==null).length;
-  const gaps = DATA.rungs.filter(r=>gapOf(r.key)!==null).length;
-
-  let h = `<div class="card"><div class="cap">Flexibility</div>
-    <div class="sm">Assessed today &middot; ${S.cold?'cold':'<b style="color:var(--warn)">WARM — not comparable with a cold reading</b>'}
-    &middot; ${measured} of ${DATA.rungs.length} rungs &middot; ${gaps} with a
-    passive&minus;active gap</div></div>`;
-
-  if(lead){
-    const g = gapOf(lead);
-    const pres = g===null ? 'gap not measured' : (g>=25 ? 'needs strength' : 'needs range');
-    h += `<div class="card hi">
-      <div class="cap">Working toward <b style="color:var(--ink2)">${tgt.label}</b></div>
-      <div class="cap" style="color:var(--bad);margin-top:8px">What is stopping you</div>
-      <div class="big" style="color:var(--bad)">${lbl(lead)}</div>
-      <div class="kv"><span><b>${leadScore.toFixed(0)}</b>/100</span>
-      <span>gap <b>${g===null?'—':(g>0?'+':'')+g.toFixed(0)}</b> &rarr; <b>${pres}</b></span>
-      <span>${tgt.ladder.length}-rung ladder</span></div></div>`;
-
-    const steps = tgt.stack.filter(x=>x.targets.includes(lead));
-    if(steps.length){
-      h += `<div class="cap" style="margin:18px 0 8px">Your stack &mdash; work the
-        first one that is not clean yet</div>`;
-      steps.forEach((x,i)=>{
-        const tint = x.spectrum==='resisted' ? 'var(--good)' : 'var(--ink3)';
-        h += `<details><summary>${i+1}. ${x.name} &middot; ${x.dose}</summary>
-          <div class="sm"><span class="pill" style="color:${tint}">${x.spectrum}</span></div>
-          <div class="sm">${md(x.setup)}</div>
-          <div class="sm">${md(x.why)}</div>
-          <div class="sm"><b style="color:var(--ink2)">Move on when:</b> ${x.advance}</div>
-          ${x.safety?`<div class="sm" style="color:#E2CB9B">${md(x.safety)}</div>`:''}
-        </details>`;
-      });
-    }
+function done(){
+  const ev = evaluate();
+  if(!ev.pattern){
+    el('<div class="card"><div class="cap">Assessed today</div>'
+      +'<div class="big" style="color:var(--ink3)">No pattern reached</div>'
+      +'<div class="sm">'+((ev.slots[ev.slots.length-1]||{}).reason||'Not enough readings.')+'</div>'
+      +'<div class="sm">A missing measurement is not a pass. Re-run the slot that stopped, rather than '
+      +'reading this as nothing being wrong.</div></div>'
+      +'<div class="btns"><button class="b ghost" onclick="reset()">Start again</button></div>');
+    return;
   }
+  const st = DATA.stacks[ev.pattern];
+  const last = ev.slots[ev.slots.length-1];
+  let h = '<div class="card hi">'
+    +'<div class="cap">'+DATA.clusterLabel+' &middot; assessed today'
+    +(S.cold?'':' &middot; <b style="color:var(--warn)">WARM — not comparable with a cold reading</b>')+'</div>'
+    +'<div class="cap" style="color:var(--bad);margin-top:8px">What is stopping you</div>'
+    +'<div class="big" style="color:var(--bad)">'+DATA.patterns[ev.pattern]+'</div>'
+    +'<div class="kv"><span>pattern <b>'+ev.pattern+'</b></span>'
+    +'<span>stopped at <b>'+DATA.slots[String(ev.stopped)].label+'</b></span>'
+    +'<span><b>'+ev.slots.length+'</b> of 4 slots run</span></div></div>'
+    +'<div class="sm">'+last.reason+'</div>'
+    +'<div class="card" style="border-color:rgba(191,160,106,.4)">'
+    +'<div class="sm" style="color:#E2CB9B"><b>This is a hypothesis, not a verdict.</b> '
+    +'A pattern is trusted after '+DATA.baselinesRequired+' baseline mornings; there is 1. '
+    +'Until then every threshold is provisional and no single reading is a reason to change anything.</div></div>';
 
-  h += `<div class="cap" style="margin:18px 0 8px">Skills</div>`;
-  for(const x of scored){
-    if(x.score===null){
-      h += `<div class="card"><div class="row"><span class="nm">${x.sk.label}</span>
-        <span class="val" style="color:var(--ink3);font-size:14px">not measured</span></div>
-        <div class="sm">${x.unmeasured.length} rung(s) with no reading</div></div>`;
-      continue;
-    }
-    const c = x.score>=x.sk.goal ? 'var(--good)' : x.score>=x.sk.goal*0.8 ? 'var(--warn)' : 'var(--bad)';
-    h += `<div class="card"><div class="row"><span class="nm">${x.sk.label}</span>
-      <span class="val" style="color:${c}">${x.score.toFixed(0)}<u>/100</u></span></div>
-      <div class="track"><i style="width:${x.score}%;background:${c}"></i>
-        <span class="goal" style="left:${x.sk.goal}%"></span></div>
-      <div class="sm">limited by <b style="color:var(--ink2)">${lbl(x.limiter)}</b>
-        &middot; gates ${x.sk.gates}</div>
-      ${x.unmeasured.length?`<div class="sm" style="color:var(--warn)">&#9888; upper bound &mdash;
-        ${x.unmeasured.length} rung(s) unmeasured, and an unmeasured rung could be lower
-        than anything seen</div>`:''}</div>`;
-  }
+  h += '<div class="cap" style="margin:18px 0 8px">Before every session, without exception</div>';
+  DATA.release.forEach(function(r){ h += '<div class="sm">&bull; '+r.name+' — '+r.dose
+    +(r.laterality!=='bilateral'?' &middot; <b style="color:var(--ink2)">'+r.laterality+' only</b>':'')+'</div>'; });
+  h += '<div class="sm">Inhibit, then activate. This comes from the clinical profile, not from the '
+    +'flexibility method — which is why the source stacks all omitted it.</div>';
 
-  h += `<details style="margin-top:12px"><summary>What could be limiting you &middot;
-    ${DATA.rungs.length} tests</summary>
-    <div class="sm">Diagnostics &mdash; only the <b>lowest</b> one limits a skill.
-    Never averaged into anything.</div>`;
-  for(const r of DATA.rungs){
-    const s = rungScore(r.key), g = gapOf(r.key), st = S.status[r.key];
-    if(s===null){
-      h += `<div class="sm">${r.label} &mdash; <span style="color:var(--ink3)">${
-        st==='skip'?'skipped':st==='void'?'voided (lock lost)':'not measured'}</span></div>`;
-      continue;
-    }
-    const pres = g===null?'':(g>=25?' &rarr; needs strength':' &rarr; needs range');
-    h += `<div class="sm"><b style="color:var(--ink2)">${r.label}</b> ${s.toFixed(0)}/100${
-      g===null?'':` &middot; gap ${(g>0?'+':'')+g.toFixed(0)}${pres}`}</div>`;
-  }
-  h += `</details>
-    <div class="btns"><button class="b ghost" onclick="reset()">Run it again</button></div>`;
+  h += '<div class="cap" style="margin:18px 0 8px">Your stack &mdash; &sect;'+ev.pattern+', '+st.limiter+'</div>';
+  if(st.intro) h += '<div class="sm">'+md(st.intro).replace(/\n\n/g,'<br><br>')+'</div>';
+  st.items.filter(function(i){return !i.deferred;}).forEach(function(i,n){
+    var tint = i.spectrum==='resisted' ? 'var(--good)' : 'var(--ink3)';
+    h += '<details><summary>'+(n+1)+'. '+i.name+' &middot; '+i.dose+'</summary>'
+      +'<div class="sm"><span class="pill" style="color:'+tint+'">'+i.spectrum+'</span></div>'
+      +'<div class="sm">'+md(i.why)+'</div>'
+      +(i.note?'<div class="sm">'+md(i.note)+'</div>':'')
+      +(i.adapted?'<div class="sm"><i>Adapted — replaces '+i.adapted+'. Reverts when '+i.reverts+'.</i></div>':'')
+      +'</details>';
+  });
+  var held = st.items.filter(function(i){return i.deferred;});
+  if(held.length) h += '<details><summary>Held back for now &middot; '+held.length+'</summary>'
+    + held.map(function(i){ return '<div class="sm"><b style="color:var(--ink2)">'+i.name+'</b></div>'
+        +'<div class="sm">'+(i.reverts||'')+'</div>'; }).join('')+'</details>';
+  if(st.outro) h += '<div class="sm">'+md(st.outro)+'</div>';
+
+  h += '<details><summary>How that was reached &middot; '+ev.slots.length+' slot(s) run</summary>'
+    + ev.slots.map(function(s){ return '<div class="sm"><b style="color:var(--ink2)">'
+        +(s.pass?'&#10003;':(s.indet?'&mdash;':'&#10007;'))+' Slot '+s.slot+' &middot; '
+        +DATA.slots[String(s.slot)].label+'</b> — '+DATA.slots[String(s.slot)].question+'</div>'
+        +'<div class="sm">'+s.reason+'</div>'; }).join('')
+    +'<div class="sm">'+(4-ev.slots.length)+' slot(s) below the failure were NOT measured. That is the method, '
+    +'not an omission — a reading taken below a failing slot cannot be interpreted.</div></details>';
+
+  h += '<div class="btns"><button class="b ghost" onclick="reset()">Start again</button></div>';
   el(h);
 }
 
