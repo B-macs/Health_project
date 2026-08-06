@@ -251,7 +251,11 @@ def test_the_lat_rung_closes_the_overhead_ladder():
 
     lats = fb.RUNGS["lats"]
     assert "lower back" in lats.lock          # the isolation mechanism, stated
-    assert "PROVISIONAL" in lats.safety.upper()  # the anchor is not a published norm
+    # The anchor is our own estimate, not a published norm. Pinned as a FIELD:
+    # asserting a word appeared in the prose made rewriting that prose into
+    # plain English look like a regression, when the fact had not changed.
+    assert lats.anchor_provisional is True
+    assert lats.anchor_provisional is not fb.RUNGS["hamstrings"].anchor_provisional
 
 
 def test_the_contraindicated_replacements_are_recorded():
@@ -394,3 +398,90 @@ def test_no_streamlit_import():
             assert not any(a.name.split(".")[0] == "streamlit" for a in node.names)
         if isinstance(node, ast.ImportFrom):
             assert node.module is None or node.module.split(".")[0] != "streamlit"
+
+
+# ── the protocol text is read by a person, on the floor, holding a tape ──────
+#
+# These four tests exist because the first draft of the protocols failed
+# review by the only person who will ever run them. Verbatim: "the Lock and
+# explanation is too scientific", "the english is very convoluted and difficult
+# to understand", "'at which the knee still touches' — the knee still touches
+# WHAT?", "'binary and externally detectable' — what does that even mean?", and
+# "remove any mention of python scripts and what it's replacing, this is for a
+# patient". A test he cannot follow does not produce a wrong number — it
+# produces a plausible one, which is worse, because nothing downstream can tell.
+
+#: Anatomical names and codebase internals that must never appear in the four
+#: fields the athlete reads while performing the test. Every one of these was
+#: present in the first draft. They are not banned from the file — they belong
+#: in `what_youre_testing`, which is where someone who wants the anatomy looks.
+_JARGON = (
+    "supine", "prone", "gluteal fold", "lateral aspect", "ulnar", "acromion",
+    "styloid", "inclinometer", "pes planus", "contracture", "shank",
+    "subtalar", "dorsiflexion", "abduction", "adduction", "rectus femoris",
+    "posterior tilt", "anterior tilt", "lumbar", "cervical", "thoracic",
+    "coxa saltans", "contraindicat", "end range", "midfoot",
+)
+_REPO_INTERNALS = (
+    ".py", "rules.py", "symptom_log", "patient_profile", "finding #",
+    "_score", "RUNGS", "SKILLS", "shoulders_overhead", "calves_ankle",
+)
+_PATIENT_FACING = ("setup", "lock", "measurement", "safety")
+
+
+def test_the_patient_facing_fields_stay_in_plain_english():
+    """setup / lock / measurement / safety are read mid-assessment. Anatomy
+    goes in what_youre_testing; nothing about this codebase goes anywhere."""
+    offences = []
+    for key, test in fb.RUNGS.items():
+        for field in _PATIENT_FACING:
+            body = getattr(test, field).lower()
+            for word in _JARGON + _REPO_INTERNALS:
+                if word.lower() in body:
+                    offences.append(f"{key}.{field}: {word!r}")
+    assert offences == [], offences
+
+
+def test_every_rung_says_what_it_is_actually_testing():
+    """The scientific explanation is not deleted, it is relocated. Every rung
+    owes the athlete an answer to 'what is this for', separately from 'how do
+    I do it' — asked for directly, and the reason the anatomy can leave the
+    instructions without the information being lost."""
+    for key, test in fb.RUNGS.items():
+        assert test.what_youre_testing.strip(), key
+        assert len(test.what_youre_testing) > 80, key
+
+
+def test_every_lock_states_the_tell_that_says_the_trial_is_void():
+    """A lost lock makes the reading BETTER, not worse, so nothing warns you.
+    That is why each lock must name something externally observable — a towel,
+    a sheet of paper, a heel leaving the floor — rather than a feeling. The
+    athlete's question was 'if the lock is lost can't you just redo the test?'
+    Yes; the difficulty was never redoing it, it was noticing."""
+    for key, test in fb.RUNGS.items():
+        assert "tell" in test.lock.lower(), key
+        assert "void" in test.lock.lower(), key
+    assert "just reset and take the reading again" in fb.LOCK_EXPLAINED
+
+
+def test_the_butterfly_heel_distance_is_a_frozen_number_not_a_floor_mark():
+    """Found by the athlete reading the protocol: the adductor test set the
+    heels to 'a marked position' and recorded nothing about where that was, so
+    a re-mark by eye at the next session silently invalidates the comparison.
+    Heels further out drop the knees without the groin being any longer."""
+    names = {n for n, _ in fb.FROZEN_CONSTANTS}
+    assert "butterfly_heel_distance_cm" in names
+    adductors = fb.RUNGS["adductors"]
+    assert "tailbone" in adductors.lock.lower()
+    assert "mark" in adductors.lock.lower()      # says why a mark is not enough
+
+
+def test_the_three_measures_are_explained_somewhere_the_athlete_can_see():
+    """passive / isometric / active are the whole model and were previously
+    explained nowhere on screen. 'Active' does not obviously mean 'under your
+    own power' to anyone who has not read the module docstring."""
+    explained = {m for m, _, _ in fb.MEASURES_EXPLAINED}
+    assert explained == set(fb.MEASURES)
+    for _measure, short, long in fb.MEASURES_EXPLAINED:
+        assert short and len(long) > 80
+    assert "hypermobile" in fb.GAP_EXPLAINED

@@ -1381,7 +1381,7 @@ def _fx_render_empty(accent: str) -> None:
         f'<div class="fx-huge" style="color:{accent};">Not measured</div>'
         f'<div class="fx-sm">{len(flexibility_baselines.RUNGS)} tests &middot; ~40 min '
         f'&middot; measured <b style="color:{_INK2};">cold</b>, no warm-up.<br>'
-        f'Every 6&ndash;12 weeks. Nothing else on this screen works until it runs once.'
+        f'Every 6&ndash;12 weeks.'
         f'</div></div>',
         unsafe_allow_html=True,
     )
@@ -1418,6 +1418,19 @@ def _fx_steps_html(order: list[str], step: int, draft) -> str:
     return f'<div class="fx-steps">{"".join(out)}</div>'
 
 
+def _fx_bold(text: str) -> str:
+    """`**x**` -> `<b>x</b>`, for the fields rendered as raw HTML.
+
+    The protocol text is authored in markdown so it reads correctly in the
+    docs, the prototype and st.caption. Three of the fields go out through
+    st.markdown(unsafe_allow_html=True) instead, where markdown is NOT applied
+    and the asterisks would show up literally — and the emphasis is load-bearing
+    here, because it is what marks the tell that says a trial is void.
+    """
+    parts = text.split("**")
+    return "".join(p if i % 2 == 0 else f"<b>{p}</b>" for i, p in enumerate(parts))
+
+
 def _fx_render_capture(accent: str) -> None:
     repo_ = repo.get_repository()
     order = list(flexibility_baselines.RUNGS)
@@ -1442,6 +1455,27 @@ def _fx_render_capture(accent: str) -> None:
         cold = st.radio("Is this a cold measurement?",
                         ["Cold — no warm-up", "Warm — I have trained today"],
                         key="fx_cold", label_visibility="collapsed")
+
+        # Everything the athlete needs to understand BEFORE the first number,
+        # rather than inferred from the first test. Expanded by default the
+        # first time through: these are the three concepts the whole assessment
+        # is built on and none of them were explained anywhere on screen.
+        with st.expander("How to understand the measurements", expanded=True):
+            for _measure, _short, _long in flexibility_baselines.MEASURES_EXPLAINED:
+                st.markdown(f"**{_measure.title()} — {_short}**")
+                st.caption(_long)
+            st.markdown(flexibility_baselines.GAP_EXPLAINED)
+
+        with st.expander("What a LOCK is, and what to do if you lose it"):
+            st.markdown(flexibility_baselines.LOCK_EXPLAINED)
+
+        with st.expander("Measure these once, then re-use them forever"):
+            st.caption("Take these on your first session and write them down. "
+                       "They are not scores — they are setup numbers that make "
+                       "one session comparable with the next.")
+            for _name, _why in flexibility_baselines.FROZEN_CONSTANTS:
+                st.markdown(f"**{_name.replace('_', ' ')}** — {_why}")
+
         c1, c2 = st.columns([2, 1])
         if c1.button("Begin", key="fx_begin", use_container_width=True, type="primary"):
             repo_.save_flexibility_draft(flexibility_baselines.Assessment(
@@ -1469,16 +1503,36 @@ def _fx_render_capture(accent: str) -> None:
     # The lock is the loudest thing on the screen, above the setup and above the
     # fields — an unlocked joint lets a neighbour substitute and the test
     # measures nothing, which is the failure that broke this model twice.
-    st.markdown(f'<div class="fx-lock"><b>LOCK</b> &mdash; {test.lock}</div>',
+    st.markdown(f'<div class="fx-lock"><b>LOCK</b> &mdash; {_fx_bold(test.lock)}</div>',
                 unsafe_allow_html=True)
     st.markdown(f'<div class="fx-card"><div class="fx-sm" style="color:{_INK2};">'
-                f'{test.setup}</div></div>', unsafe_allow_html=True)
+                f'{_fx_bold(test.setup)}</div></div>', unsafe_allow_html=True)
     with st.expander("How to read it"):
         st.caption(test.measurement)
         st.caption(f"Scale: **{test.value_at_100:g}{test.unit} = 100** · "
-                   f"**{test.value_at_0:g}{test.unit} = 0**")
-        if test.replaces:
-            st.caption(f"Replaces {test.replaces}.")
+                   f"**{test.value_at_0:g}{test.unit} = 0**"
+                   + ("  ·  *this scale is our own estimate, not a published norm*"
+                      if test.anchor_provisional else ""))
+
+        # Three separate questions, in three separate sections, because they get
+        # asked at three different moments. `measurement` is read WHILE holding
+        # the tape. The measures block is read on the first step and then only
+        # when the words stop being obvious. `what_youre_testing` is the one the
+        # athlete asked for explicitly — the anatomy, kept OUT of the
+        # instructions above so the instructions stay followable.
+        st.markdown("**What the three numbers mean**")
+        for _measure, _short, _long in flexibility_baselines.MEASURES_EXPLAINED:
+            st.caption(f"**{_measure.title()}** — {_short}. {_long}")
+        st.caption(flexibility_baselines.GAP_EXPLAINED)
+
+        if test.what_youre_testing:
+            st.markdown("**What you're testing**")
+            st.caption(test.what_youre_testing)
+
+        # `test.replaces` is deliberately NOT rendered. Which standard test this
+        # substitutes for is a decision already taken on clinical grounds, and
+        # surfacing it mid-assessment invites a "why not just do the normal one"
+        # that the contraindication answers and the sentence does not.
         if test.safety:
             st.warning(test.safety, icon="⚠️")
 
