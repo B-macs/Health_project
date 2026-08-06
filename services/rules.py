@@ -448,6 +448,101 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="caution", laterality="right",
     ),
     MovementRule(
+        movement="hip abduction",
+        reason="Active or resisted hip abduction, spine neutral. Loads glute medius, listed "
+               "as overactive and right-dominant and named as the primary anchor driving "
+               "joint compression through the chain — release before activating.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="external rotation",
+        reason="At the HIP: passive, floor- or seat-supported external rotation is NOT a "
+               "snapping-hip risk position — confirmed 2026-08-05 — but it becomes one the "
+               "moment the hip flexes past 60° under its own muscular effort. At the "
+               "SHOULDER: external rotation combined with abduction is the apprehension "
+               "position for the anterior-stabilised right side.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="abduction",
+        reason="Moving a limb away from the midline. At the hip this loads glute medius, "
+               "listed as overactive and right-dominant — release before activating. At the "
+               "shoulder, abduction with external rotation is the apprehension position "
+               "post-Latarjet.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="triangle",
+        reason="The triangle side-split position — hips on a separate line to the feet. "
+               "Align the joint by turning the legs out, never by arching the lower back.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+
+    # ── The mandatory pre-session release protocol ───────────────────────────
+    # From patient_profile.py, not from any flexibility source. Named here so
+    # the protocol that must precede EVERY session resolves like anything else
+    # — it appears at the head of every cluster stack and returned `unknown`.
+    # Named by their HEADS as the protocol writes them, because a cleared rule
+    # must head the name it clears — it may not match a fragment buried inside
+    # one. "self release" alone would never fire on "Upper glute / TFL
+    # self-release".
+    MovementRule(
+        movement="upper glute",
+        reason="Upper glute / TFL self-release. Inhibitory, unloaded, and the first half "
+               "of the mandatory inhibit-then-activate sequence. Right side runs tighter.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="piriformis contract",
+        reason="Piriformis contract-relax (PNF). Self-generated and controlled; part of "
+               "the mandatory pre-session release protocol.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="ischial tuberosity",
+        reason="Ischial tuberosity hamstring release. Targets the proximal hamstring "
+               "attachment listed as overactive; inhibitory rather than loading.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="self release",
+        reason="Soft-tissue self-release. Inhibitory, unloaded, and the first half of the "
+               "mandatory inhibit-then-activate sequence.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="contract relax",
+        reason="PNF contract-relax. Self-generated, controlled, and part of the mandatory "
+               "pre-session release protocol.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="hip capsule stretch",
+        reason="Right posterior hip capsule mobilisation, cross-body. UNILATERAL — right "
+               "side only, per the biomechanical assessment.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="hamstring release",
+        reason="Ischial tuberosity soft-tissue release. Targets the proximal hamstring "
+               "attachment listed as overactive; inhibitory rather than loading.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="tendon path",
+        reason="Coxa Saltans tendon-path drill — takes the right iliopsoas through its "
+               "path deliberately rather than letting it snap. Right side only, and only "
+               "when the session loads the right hip.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="hip tilt",
+        reason="Pelvic tilt drill. Forward tilt drives lumbar extension against the L5/S1 "
+               "retrolisthesis and the narrowed right foramen. Mid-range only; never held "
+               "at the arched end.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
         movement="terminal knee extension",
         reason="Banded knee extension for VMO. Knee-local, no spinal or hip load. Named "
                "here so it is not caught by the lumbar 'back extension' rule.",
