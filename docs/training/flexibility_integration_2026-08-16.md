@@ -113,14 +113,30 @@ they stay held. Either way the outcome is RECORDED against
 `cluster_a_mechanics.DEFERRED` and the battery's `leverage_90` — a hold judged
 on its condition, not expired by a date.
 
-### 6 · The retest lands mid-block — schedule it now
+### 6 · The retest lands mid-block — schedule it now, and the app watches it
 
 Four weeks from the first pattern puts the retest around mid-September, inside
-the new block. Cold, in the morning, BEFORE any training that day, and only the
-slots below the one being fixed. Put it on the calendar when the block is
-authored. Separately: three baseline mornings are still owed; until they exist
-every threshold stays provisional and `CHANGE_NOTHING` applies — no mid-block
-recalibration off a single reading in either direction.
+the new block. Cold, in the morning, BEFORE any training that day, only the
+slots below the one being fixed — **and never the morning after leg training**
+(athlete's rule, 2026-08-07): a leg day the day before reads as extra tightness
+in exactly the areas being tested, so the reading measures the leg day rather
+than the baseline. The same contamination class as a warm-up, one day earlier.
+
+This is surfaced, not remembered: `services/flexibility.retest_readiness()`
+computes the status from the last assessment date plus the logged leg days
+(judged by `EXERCISE_BODY_REGION` — the same map the sectors read), and
+
+- the **training screen** banners the day before ("keep today off the legs",
+  or "swap today" when today's session already loaded them) and the day of;
+- the **flexibility screen** shows the due date and whether the morning it
+  falls on is clean;
+- the **capture cold gate** warns when yesterday loaded the legs — warn, never
+  block, but it says what the reading would mean.
+
+When the block is authored, place the retest morning after the rest day the
+placement in step 2 already produced. Separately: three baseline mornings are
+still owed; until they exist every threshold stays provisional and
+`CHANGE_NOTHING` applies — no mid-block recalibration off a single reading.
 
 ### 7 · The pull-back condition, written before starting
 

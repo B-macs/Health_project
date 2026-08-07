@@ -42,9 +42,10 @@ remains the only thing that constrains movement.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 import cluster_a_battery as _a_battery
+import training_constants as _tc
 import cluster_a_mechanics as _a_mech
 import cluster_a_prescription as _a_rx
 import flexibility_baselines as _fb
@@ -303,6 +304,80 @@ def assessment_from_dict(d: dict) -> _b.Assessment | None:
 
     return _b.Assessment(cluster=cluster_key, taken_on=taken_on, readings=tuple(readings),
                          cold=bool(d.get("cold", True)), note=d.get("note") or "")
+
+
+# ── the retest window ────────────────────────────────────────────────────────
+#
+# THE ATHLETE'S RULE (2026-08-07): a leg day the day before a retest reads as
+# extra tightness in exactly the areas being tested, so a cold reading the
+# morning after leg training measures the leg day, not the baseline. Same class
+# of contamination as a warm-up — the cold gate already guards the same-day
+# half; this guards the day before. The app surfaces it in two places: the
+# training screen (the day before and the day of) and the capture cold gate.
+
+RETEST_NOT_DUE = "not_due"
+RETEST_TOMORROW = "tomorrow"
+RETEST_READY = "ready"
+RETEST_BLOCKED = "blocked"
+
+
+def leg_loading_days(sessions) -> set[date]:
+    """Dates whose logged session loaded the legs, judged by exercise NAME
+    against `training_constants.EXERCISE_BODY_REGION` — the same mapping the
+    strength and tonnage sectors read, so 'a leg day' means the same thing
+    everywhere. A session with no mapped lower-body exercise is not a leg day,
+    and an unparseable session is skipped rather than guessed at."""
+    days: set[date] = set()
+    for s in sessions or ():
+        try:
+            d = date.fromisoformat(str(getattr(s, "session_date", ""))[:10])
+        except ValueError:
+            continue
+        for ex in getattr(s, "exercises", None) or ():
+            if _tc.EXERCISE_BODY_REGION.get(getattr(ex, "name", "")) == "lower_body":
+                days.add(d)
+                break
+    return days
+
+
+def retest_due_on(last_assessed_on: date,
+                  cluster_key: str = DEFAULT_CLUSTER) -> date:
+    """When the next retest falls. The interval is the Prescription's — dosage
+    and cadence are its business, not this module's."""
+    interval = getattr(CLUSTERS[cluster_key]["prescription"],
+                       "RETEST_INTERVAL_DAYS", 28)
+    return last_assessed_on + timedelta(days=interval)
+
+
+def retest_readiness(last_assessed_on: date,
+                     today: date,
+                     leg_days: set[date] | frozenset[date],
+                     *,
+                     cluster_key: str = DEFAULT_CLUSTER) -> tuple[str, str]:
+    """(status, reason) for the retest, honouring the clean-day rule.
+
+    TOMORROW exists so the training screen can protect the reading a day in
+    advance — by the morning of, the leg day has already happened and the only
+    honest options are to wait or to record a reading that is not comparable.
+    """
+    due = retest_due_on(last_assessed_on, cluster_key)
+    if today < due - timedelta(days=1):
+        return RETEST_NOT_DUE, (f"next retest {due.isoformat()} — cold, in the "
+                                f"morning, after a legs-free day")
+    if today == due - timedelta(days=1):
+        if today in leg_days:
+            return RETEST_TOMORROW, ("retest is TOMORROW morning, and today's session "
+                                     "loaded the legs — that reads as extra tightness in "
+                                     "exactly the areas being tested. Swap today off the "
+                                     "legs, or move the retest a day.")
+        return RETEST_TOMORROW, ("retest tomorrow morning — cold, before anything else. "
+                                 "Keep today off the legs so the reading measures your "
+                                 "baseline, not today's session.")
+    if today - timedelta(days=1) in leg_days:
+        return RETEST_BLOCKED, ("yesterday loaded the legs — a cold reading today would "
+                                "measure the leg day, not the baseline. Take the first "
+                                "morning after a legs-free day instead.")
+    return RETEST_READY, "measure cold, before any training today"
 
 
 # ── the scheduling window ────────────────────────────────────────────────────

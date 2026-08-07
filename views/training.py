@@ -26,6 +26,7 @@ from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
 from services import scheduling
 from services import sessions as sess
+from services import flexibility as fx
 from services import yoga as yg
 from services.repository import PhasesCorruptError
 
@@ -2002,6 +2003,29 @@ def render():
                 pass  # never let a scheduling-check failure crash the page
             if _shift_write_succeeded:
                 st.rerun()
+
+    # ── Flexibility retest banner — measurement scheduling, not training ──────
+    # The athlete's rule (2026-08-07): a leg day the day BEFORE a retest reads
+    # as extra tightness in exactly the areas being tested, so the reading
+    # would measure the leg day rather than the baseline. The day-before banner
+    # exists to protect tomorrow's reading while today's session can still be
+    # kept off the legs; by the morning of, the only honest options are a clean
+    # reading or waiting a day. Renders in every page state, and a failure to
+    # compute it never touches the page.
+    try:
+        _fx_stored = repo.get_repository().get_flexibility_assessments()
+        if _fx_stored:
+            _fx_legs = fx.leg_loading_days(repo.get_repository().get_recent_sessions(days=3))
+            _fx_status, _fx_reason = fx.retest_readiness(
+                _fx_stored[-1].taken_on, date.today(), _fx_legs)
+            if _fx_status == fx.RETEST_TOMORROW:
+                st.warning(f"Flexibility retest — {_fx_reason}", icon="🧘")
+            elif _fx_status == fx.RETEST_READY:
+                st.info(f"Flexibility retest due — {_fx_reason}", icon="🧘")
+            elif _fx_status == fx.RETEST_BLOCKED:
+                st.warning(f"Flexibility retest due, but {_fx_reason}", icon="🧘")
+    except Exception:
+        pass
 
     # ─────────────────────────────────────────────────────────────────────────
     #  Main Page

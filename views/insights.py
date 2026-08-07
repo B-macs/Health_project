@@ -1481,6 +1481,21 @@ def _fx_render_capture(accent: str) -> None:
                         ["Cold — no warm-up", "Warm — I have trained today"],
                         key="fx_cold", label_visibility="collapsed")
 
+        # The other half of "measure cold": yesterday. A leg day the day before
+        # reads as extra tightness in exactly the areas being tested, so even a
+        # genuinely cold reading this morning measures the leg day, not the
+        # baseline. Warn, never block — but say what the reading would mean.
+        try:
+            yesterday = date.today() - timedelta(days=1)
+            if yesterday in fx.leg_loading_days(repo_.get_recent_sessions(days=3)):
+                st.warning("Yesterday's session loaded your legs. A cold reading this "
+                           "morning will read tighter than your real baseline in "
+                           "exactly the areas being tested — measure after a legs-free "
+                           "day, or record today knowing it is not comparable with a "
+                           "clean morning.", icon="⚠️")
+        except Exception:                                      # noqa: BLE001
+            pass
+
         with st.expander("How to understand the three numbers", expanded=True):
             for measure, short, long in flexibility_baselines.MEASURES_EXPLAINED:
                 st.markdown(f"**{measure.title()} — {short}**")
@@ -1891,6 +1906,22 @@ def _fx_render_populated(report, accent: str) -> None:
             load = f" @ {r.load_kg:g} kg" if r.load_kg else ""
             setup = f" · setup {r.setup_value:g}" if r.setup_value is not None else ""
             st.markdown(f"**{r.test_key}**{side} — {r.value:g}{r.unit}{load}{setup}")
+
+    # When the retest falls, and whether the morning it falls on is clean —
+    # the same status the training screen banners a day in advance.
+    if report.assessed_on:
+        try:
+            status, reason = fx.retest_readiness(
+                report.assessed_on, date.today(),
+                fx.leg_loading_days(_recent_sessions()))
+            if status == fx.RETEST_NOT_DUE:
+                st.caption(f"{reason[0].upper()}{reason[1:]}.")
+            elif status == fx.RETEST_BLOCKED:
+                st.warning(f"Retest due, but {reason}", icon="⚠️")
+            else:
+                st.info(f"Retest — {reason}", icon="🧘")
+        except Exception:                                      # noqa: BLE001
+            pass
 
     c1, c2 = st.columns(2)
     if c1.button("Re-assess", key="fx_reassess", use_container_width=True):

@@ -23,6 +23,7 @@ from streamlit.testing.v1 import AppTest
 
 import cluster_a_battery as cba
 from services import battery as sb
+from services import flexibility as sfx
 
 # Derived, not hardcoded: a hardcoded absolute path silently imports the code
 # of a DIFFERENT checkout when the suite runs from a worktree or a clone.
@@ -31,12 +32,13 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _SCRIPT = '''
 import sys
 sys.path.insert(0, r"{root}")
-from datetime import date
+from datetime import date, timedelta
 import repo
 from services import battery as b
 
 _saved = []
 _draft = {{"v": None}}
+_recent = []
 
 class _Stub:
     def get_flexibility_assessments(self):
@@ -49,6 +51,20 @@ class _Stub:
         _draft["v"] = None
     def save_flexibility_assessment(self, a):
         _saved.append(a)
+    def get_recent_sessions(self, days=3):
+        return list(_recent)
+
+# A logged leg session YESTERDAY (real yesterday — the view compares against
+# date.today()), built from the same region map the view reads.
+if {recent_legs}:
+    import training_constants as _tc
+    from services import models as _m
+    _lower = next(n for n, r in _tc.EXERCISE_BODY_REGION.items()
+                  if r == "lower_body")
+    _recent.append(_m.SessionRecord(
+        session_date=(date.today() - timedelta(days=1)).isoformat(),
+        session_duration_minutes=60.0, session_rpe=6.0, session_au=360.0,
+        exercises=[_m.ExerciseEntry(name=_lower, movement_type="Strength")]))
 
 READINGS = {readings}
 if READINGS:
@@ -97,10 +113,10 @@ def _as_assessment(readings) -> sb.Assessment:
                          readings=tuple(sb.Reading(**r) for r in readings))
 
 
-def _run(readings=(), draft=None, mode=None, step=0) -> AppTest:
+def _run(readings=(), draft=None, mode=None, step=0, recent_legs=False) -> AppTest:
     script = _SCRIPT.format(root=_ROOT, readings=list(readings),
                             draft=list(draft) if draft is not None else None,
-                            mode=mode, step=step)
+                            mode=mode, step=step, recent_legs=bool(recent_legs))
     return AppTest.from_string(script, default_timeout=90).run()
 
 
@@ -218,7 +234,8 @@ def test_a_draft_is_offered_for_resume_rather_than_lost():
 
 def test_the_screen_survives_a_repository_failure():
     """A read failure must render an error, not a stack trace."""
-    script = _SCRIPT.format(root=_ROOT, readings=[], draft=None, mode=None, step=0).replace(
+    script = _SCRIPT.format(root=_ROOT, readings=[], draft=None, mode=None, step=0,
+                            recent_legs=False).replace(
         "def get_flexibility_assessments(self):\n        return tuple(_saved)",
         "def get_flexibility_assessments(self):\n        raise RuntimeError('cache gone')")
     at = AppTest.from_string(script, default_timeout=90).run()
@@ -308,6 +325,30 @@ def test_a_recorded_setup_number_is_offered_back_the_next_time():
     body = _text(at)
     assert "Last time you used" in body
     assert "92" in body
+
+
+def test_the_cold_gate_warns_when_yesterday_loaded_the_legs():
+    """The athlete's rule (2026-08-07): a leg day the day before reads as extra
+    tightness in exactly the areas being tested. The gate warns and explains
+    what the reading would mean; it never blocks."""
+    at = _run(mode="capture", recent_legs=True)
+    body = _text(at)
+    assert "loaded your legs" in body.lower()
+    assert "not comparable" in body.lower()
+    # And a clean morning stays clean — no warning invented from nothing.
+    assert "loaded your legs" not in _text(_run(mode="capture")).lower()
+
+
+def test_the_populated_screen_says_when_the_retest_falls():
+    """The retest date is a commitment, not a memory exercise — it renders on
+    the screen that owns the assessment. Asserted against the pure function
+    with the SAME inputs the view uses (stored date 2026-08-06, real today,
+    no logged legs), so the expected text tracks the calendar instead of
+    rotting when today passes the fixture's due date."""
+    _, expected_reason = sfx.retest_readiness(date(2026, 8, 6), date.today(), set())
+    at = _run(readings=_TILT_FAILS)
+    body = _text(at)
+    assert expected_reason[1:40] in body, expected_reason
 
 
 def test_the_ladder_is_on_the_populated_screen_with_honest_states():

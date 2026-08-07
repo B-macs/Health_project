@@ -754,6 +754,56 @@ def test_a_rest_day_is_now_the_worst_slot_rather_than_ignored():
     assert not hasattr(fb, "REST_DAY_CONFLICT_UNRESOLVED")
 
 
+def test_the_retest_is_never_the_morning_after_leg_training():
+    """The athlete's rule (2026-08-07): a leg day the day before reads as extra
+    tightness in exactly the areas being tested, so the reading would measure
+    the leg day, not the baseline — the same contamination class as a warm-up,
+    one day earlier."""
+    last = date(2026, 8, 16)
+    assert fx.retest_due_on(last) == date(2026, 9, 13)
+    blocked, reason = fx.retest_readiness(last, date(2026, 9, 13),
+                                          {date(2026, 9, 12)})
+    assert blocked == fx.RETEST_BLOCKED
+    assert "yesterday loaded the legs" in reason
+    ready, _ = fx.retest_readiness(last, date(2026, 9, 13), set())
+    assert ready == fx.RETEST_READY
+
+
+def test_the_day_before_warns_to_stay_off_the_legs():
+    """TOMORROW exists so the training screen can protect the reading while
+    today's session can still be moved — by the morning of, it is too late."""
+    last = date(2026, 8, 16)
+    status, reason = fx.retest_readiness(last, date(2026, 9, 12), set())
+    assert status == fx.RETEST_TOMORROW
+    assert "off the legs" in reason
+    status, reason = fx.retest_readiness(last, date(2026, 9, 12),
+                                         {date(2026, 9, 12)})
+    assert status == fx.RETEST_TOMORROW
+    assert "loaded the legs" in reason.lower()
+    assert "swap" in reason.lower()
+    status, _ = fx.retest_readiness(last, date(2026, 9, 1), set())
+    assert status == fx.RETEST_NOT_DUE
+
+
+def test_leg_days_are_judged_by_the_same_map_the_sectors_read():
+    """'A leg day' must mean one thing everywhere, so the judgement reads
+    training_constants.EXERCISE_BODY_REGION — the map strength and tonnage
+    already depend on — rather than inventing a second definition."""
+    import training_constants as tc
+    from services.models import ExerciseEntry, SessionRecord
+    lower = next(n for n, r in tc.EXERCISE_BODY_REGION.items() if r == "lower_body")
+    upper = next(n for n, r in tc.EXERCISE_BODY_REGION.items() if r == "upper_body")
+
+    def session(name):
+        return SessionRecord(session_date="2026-09-12", session_duration_minutes=60.0,
+                             session_rpe=6.0, session_au=360.0,
+                             exercises=[ExerciseEntry(name=name, movement_type="Strength")])
+
+    assert fx.leg_loading_days([session(lower)]) == {date(2026, 9, 12)}
+    assert fx.leg_loading_days([session(upper)]) == set()
+    assert fx.leg_loading_days(None) == set()
+
+
 def test_the_window_reads_the_training_log():
     hard = {date(2026, 8, 5)}
     assert fx.flexibility_window(date(2026, 8, 6), hard)[0] == fb.WINDOW_POOR

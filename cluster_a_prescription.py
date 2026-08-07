@@ -302,7 +302,15 @@ LENGTH: str = (
     "not count toward it — it is a precondition, not part of the stack."
 )
 
-RETEST: str = "Every four weeks, cold, in order. Only re-run the slots below the one you have been fixing."
+#: The retest cadence as a number, for anything that needs to compute the date.
+RETEST_INTERVAL_DAYS: int = 28
+
+RETEST: str = (
+    "Every four weeks, cold, in order. Only re-run the slots below the one you have "
+    "been fixing. **Never the morning after leg training** — a leg day reads as extra "
+    "tightness in exactly the areas being tested, so the reading would measure the "
+    "leg day rather than the baseline. Take the first morning after a legs-free day."
+)
 
 CHANGE_NOTHING: str = (
     "A number moving less than about double your baseline noise is not a result and is not "
