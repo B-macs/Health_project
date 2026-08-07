@@ -821,6 +821,21 @@ def test_merge_check_in_group_concatenates_distinct_notes_and_resets_parsed():
     assert properties["Parsed"] == {"checkbox": False}
 
 
+def test_merge_check_in_group_long_unchanged_note_does_not_reset_parsed():
+    # notion.rich_text now CHUNKS values over 2000 chars, so the changed-note
+    # check must compare the full joined content — comparing block 0 alone
+    # against the joined read-back would flag a long UNCHANGED note as
+    # changed on every merge and re-queue it for parsing.
+    long_note = "sitting stiffness " * 150  # ~2700 chars -> two chunks
+    first = _dupe_page("page-1", "2026-07-31T07:00:00.000Z",
+                        **{"Note": _rich_text_prop(long_note), "Parsed": _checkbox_prop(True)})
+    second = _dupe_page("page-2", "2026-07-31T07:10:00.000Z")
+    repo = _repo({})
+    _, properties, _ = repo.merge_check_in_group([first, second])
+    assert len(properties["Note"]["rich_text"]) > 1  # genuinely chunked
+    assert "Parsed" not in properties
+
+
 def test_merge_check_in_group_returns_none_on_genuine_scalar_conflict():
     first = _dupe_page("page-1", "2026-07-31T07:00:00.000Z", **{"Tightness": _number_prop(3)})
     second = _dupe_page("page-2", "2026-07-31T07:10:00.000Z", **{"Tightness": _number_prop(6)})

@@ -21,7 +21,8 @@
       "Bash(git rev-list *)",
       "Bash(git check-ignore *)",
       "PowerShell(git fetch origin)",
-      "PowerShell(git push origin main)"
+      "PowerShell(git push origin main)",
+      "Bash(python -m pytest tests/test_scheduling.py tests/test_training_plan_stage2.py tests/test_content_weighting.py tests/test_plan.py -q)"
     ]
   }
 }

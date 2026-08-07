@@ -727,7 +727,11 @@ class Repository:
 
         properties["Meditation Done"] = notion.checkbox(bool(properties["Meditation Minutes"]["number"]))
         old_note = notion.get_property(primary, "Note", "rich_text") or ""
-        if properties["Note"]["rich_text"][0]["text"]["content"] != old_note:
+        # Join ALL blocks: notion.rich_text chunks values over 2000 chars, so
+        # comparing block 0 alone against the joined read-back would flag a
+        # long unchanged note as changed on every merge.
+        new_note = "".join(b["text"]["content"] for b in properties["Note"]["rich_text"])
+        if new_note != old_note:
             properties["Parsed"] = notion.checkbox(False)
 
         return primary["id"], properties, [p["id"] for p in pages_sorted[1:]]
