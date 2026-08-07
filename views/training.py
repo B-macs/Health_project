@@ -828,12 +828,23 @@ def _pop_nav_state() -> bool:
 
 
 def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
-                             directive: dict, day_num: int) -> None:
+                             policy: dict, day_num: int) -> None:
     """Seeds st.session_state.tp_actuals[idx] the first time this exercise
-    is shown this session, from Repository.get_last_performance (if any)
-    plus the readiness engine's nudge — a live +/- stepper, not a re-seed,
-    drives every render after that. Guarded so it never re-queries Notion
-    or re-applies the nudge on subsequent reruns of the same exercise."""
+    is shown this session, via sess.resolve_prescription — a live +/- stepper,
+    not a re-seed, drives every render after that. Guarded so it never
+    re-queries Notion or re-resolves on subsequent reruns of the same exercise.
+
+    `policy` is sess.load_policy's output, the SAME object the reduced-load
+    banner at the top of this page is rendered from. That shared object is
+    what makes it impossible for the banner to say "reduced load" while the
+    steppers below it seed higher than last session — the contradiction
+    observed 2026-08-06. See services/sessions.py's LOAD RESOLUTION section.
+
+    The full per-set array is now fetched for EVERY loaded exercise, not just
+    the double-progression ones: it is what the clamp's ceiling is derived
+    from, and get_last_performance alone returns the LAST set rather than the
+    top one. Same Notion query either way, and the guard above means it runs
+    once per exercise per session."""
     if idx in st.session_state.tp_actuals or not ex.get("equipment_type"):
         return
     last = None
@@ -842,17 +853,33 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
     except Exception:
         pass  # never block the live flow on a lookup failure
     last_session_sets = None
-    if ex.get("rep_min") is not None:
-        try:
-            last_session_sets = repo.get_repository().get_last_session_all_sets(ex["name"])
-        except Exception:
-            pass  # never block the live flow on a lookup failure
-    entry = sess.seed_actual_entry(
-        ex, last, readiness_modifier.get("streak_label", "unknown"),
-        allow_increase=(directive.get("signal_color") != "red"),
-        weight_increment=ex.get("increment_size", 2.5),
-        last_session_sets=last_session_sets,
-    )
+    try:
+        last_session_sets = repo.get_repository().get_last_session_all_sets(ex["name"])
+    except Exception:
+        pass  # never block the live flow on a lookup failure
+    try:
+        entry = sess.resolve_prescription(
+            ex, last, readiness_modifier.get("streak_label", "unknown"),
+            policy,
+            weight_increment=ex.get("increment_size", 2.5),
+            last_session_sets=last_session_sets,
+        )
+    except sess.PrescriptionContradiction as exc:
+        # Hard error, surfaced not swallowed. The clamp should already have
+        # made this unreachable, so reaching it means the resolution itself is
+        # broken. Show it, then fall back to the ceiling — the athlete is
+        # mid-session and blocking the screen is worse than continuing at last
+        # session's numbers, which is the safe direction by definition.
+        st.error(f"⚠️ Prescription contradiction — {exc}")
+        st.caption(
+            "The engine flagged today as reduced load but produced a higher "
+            "prescription. Falling back to your last completed session. "
+            "Please report this."
+        )
+        ceiling = sess.last_completed_ceiling(last, last_session_sets)
+        entry = {"reps": ceiling.get("reps"), "weight_kg": ceiling.get("weight_kg"),
+                  "band_tier": ceiling.get("band_tier"), "source": "last_time",
+                  "last_seen_date": ceiling.get("session_date"), "clamped": {}}
     st.session_state.tp_actuals[idx] = entry
     _save_checkpoint(day_num)
 
@@ -1593,17 +1620,29 @@ def _render_day_detail(d: date, active, phases: list) -> None:
 
 
 @st.dialog("Session Adaptation")
-def _adapt_session_dialog(readiness_modifier: dict) -> None:
-    factor = readiness_modifier.get("volume_factor", 1.0)
-    if factor == 1.0:
+def _adapt_session_dialog(policy: dict) -> None:
+    """Reads the RESOLVED factor, not readiness's raw proposal — quoting the
+    raw one here would tell the athlete "+12% volume" on a day the app is
+    actually holding him at 100%."""
+    factor = policy.get("volume_factor", 1.0)
+    if factor == 1.0 and not policy.get("reduced"):
         st.markdown("**No adaptation today** — your readiness supports the full prescribed volume.")
     else:
         direction = "increased" if factor > 1.0 else "reduced"
-        st.markdown(f"**Volume {direction} to {factor:.0%}** of the standard prescription.")
-        st.caption(readiness_modifier.get("description", ""))
+        if factor == 1.0:
+            st.markdown("**Volume held at 100%** of the standard prescription.")
+        else:
+            st.markdown(f"**Volume {direction} to {factor:.0%}** of the standard prescription.")
+        st.caption(policy.get("volume_note", ""))
+    if policy.get("reduced"):
+        st.warning(
+            "Reduced-load day: no weight, rep or band tier will be seeded above "
+            "your last completed session, whatever your readiness streak says."
+        )
     st.divider()
     st.caption(
-        "Based on your last 3 days of HRV, RHR and sleep. This adjusts reps, hold time and "
+        "Based on your last 3 days of HRV, RHR and sleep, then held down by the engine "
+        "directive where the two disagree. This adjusts reps, hold time and "
         "duration automatically — sets and rest periods stay fixed. Safety ceilings (ACWR, "
         "RPE cap) are never affected by this modifier."
     )
@@ -1649,7 +1688,7 @@ _FAB_CSS = f"""<style>
 
 
 def _render_overview(day_num: int, active, today_plan: dict,
-                      exercises: list, directive: dict, readiness_modifier: dict) -> None:
+                      exercises: list, directive: dict, policy: dict) -> None:
     """Today's session — coach header, workout card, accordions, floating actions.
     The day strip, phase resolution, and past/future/rest routing all happen once
     in render() before this is ever called; this only ever renders today."""
@@ -1716,7 +1755,7 @@ def _render_overview(day_num: int, active, today_plan: dict,
     col_adapt, col_start = st.columns(2, gap="small")
     with col_adapt:
         if st.button("Adapt session", use_container_width=True):
-            _adapt_session_dialog(readiness_modifier)
+            _adapt_session_dialog(policy)
     with col_start:
         if st.button("Start", type="primary", use_container_width=True):
             st.session_state.tp_started = True
@@ -2000,7 +2039,14 @@ def render():
     except Exception:
         _rm_bio = []
     _readiness_modifier = engine.readiness_training_modifier(_rm_bio)
-    _volume_factor = _readiness_modifier.get("volume_factor", 1.0)
+    # ONE load decision for the whole page — the banner, the SESSION ADAPTED
+    # badge, the volume factor applied to reps/holds/durations, and the clamp
+    # on every seeded weight all read this single object. Two independently
+    # computed flags are exactly what produced the 2026-08-06 contradiction
+    # (header said reduced load, Lat Pulldown seeded 45x10 -> 47.5x11); see
+    # services/sessions.py's LOAD RESOLUTION section.
+    _policy = sess.load_policy(_engine_directive(), _readiness_modifier)
+    _volume_factor = _policy["volume_factor"]
 
     # ── Missed-session rescheduling — priority-based carry within the week ──────
     # Runs BEFORE the readiness auto-shift so a carried session claims its slot
@@ -2211,7 +2257,7 @@ def render():
         _directive = _engine_directive()
         today_plan = active_plan[day_num]
         exercises  = today_plan["exercises"]
-        _render_overview(day_num, active, today_plan, exercises, _directive, _readiness_modifier)
+        _render_overview(day_num, active, today_plan, exercises, _directive, _policy)
         nav.inject("training")
         st.stop()
 
@@ -2283,12 +2329,15 @@ def render():
         st.stop()
 
     # ── Engine directive banner ───────────────────────────────────────────────
+    # Rendered from _policy — the SAME object that clamps every prescribed
+    # number below — never from a separately re-derived signal_color. That is
+    # the structural guarantee: the banner cannot describe a day the numbers
+    # disagree with, because there is only one day-decision to describe.
     _directive = _engine_directive()
-    _sig = _directive["signal_color"]
-    if _sig == "red":
-        st.error("Rest day recommended today — mobility and walking only. No loaded exercises.")
-    elif _sig in ("yellow", "orange"):
-        st.warning("Reduced load today — keep this session controlled. Don't push to failure.")
+    if _policy["banner_kind"] == "error":
+        st.error(_policy["banner_text"])
+    elif _policy["banner_kind"] == "warning":
+        st.warning(_policy["banner_text"])
     # green / grey: no banner — train normally, nothing to flag
     # ACWR is advisory while engine.ACWR_ADVISORY_MODE is set: it annotates the
     # day, it does not decide it.
@@ -2613,17 +2662,21 @@ def render():
         st.stop()
 
     # ── Readiness modifier badge ──────────────────────────────────────────────
-    if _volume_factor != 1.0:
+    # Also renders when the factor resolved back to 1.0 but the policy has
+    # something to say — the "readiness suggested +12%, held at 100%" case,
+    # which is precisely the one worth showing and the one a bare
+    # `factor != 1.0` test would hide.
+    if _volume_factor != 1.0 or _policy["volume_note"]:
         _badge_color = (
             "#E8ECEF" if _volume_factor > 1.0
-            else ("#FFD700" if _volume_factor >= 0.75 else "#FF4B4B")
+            else ("#FFD700" if _policy["reduced"] or _volume_factor >= 0.75 else "#FF4B4B")
         )
         st.markdown(
             f"<div style='background:#0E1117;border-left:3px solid {_badge_color};"
             f"border-radius:6px;padding:8px 12px;margin-bottom:8px;'>"
             f"<span style='font-size:11px;color:{_badge_color};font-family:monospace;"
             f"letter-spacing:1px;'>SESSION ADAPTED &nbsp;·&nbsp; "
-            f"{_readiness_modifier['description']}</span></div>",
+            f"{_policy['volume_note']}</span></div>",
             unsafe_allow_html=True,
         )
 
@@ -2652,13 +2705,20 @@ def render():
 
     # Unique timer keys scoped to this exercise / set / rep / side
     _eidx = st.session_state.tp_ex_idx
-    _seed_actuals_if_needed(_eidx, ex, _readiness_modifier, _directive, day_num)
+    _seed_actuals_if_needed(_eidx, ex, _readiness_modifier, _policy, day_num)
     _eset = st.session_state.tp_set
     _erep = st.session_state.tp_rep_in_set
     _side = st.session_state.tp_side
     _hold_key = f"tp_h_{_eidx}_{_eset}_{_erep}_{_side}"
     _rest_key = f"tp_r_{_eidx}_{_eset}"
     _dur_key  = f"tp_d_{_eidx}"
+
+    # Every place this screen PRINTS the prescription reads _shown, which is
+    # `ex` overlaid with the resolved entry the stepper is bound to. Printing
+    # ex["reps"] here while the stepper below showed the resolved value is the
+    # third disagreement the 2026-08-06 report picked up ("x 11" in the header
+    # over "10" in the stepper). One number, one source.
+    _shown = sess.displayed_prescription(ex, st.session_state.tp_actuals.get(_eidx))
 
     # Exercise header
     st.markdown(
@@ -2669,7 +2729,7 @@ def render():
         f"<div style='font-size:24px;font-weight:700;color:#E8ECEF;margin:4px 0;'>"
         f"{sess.type_icon(ex)} {ex['name']}</div>"
         f"<div style='font-size:13px;color:#8A99A3;font-family:monospace;'>"
-        f"{sess.prescription_label(ex)}</div></div>",
+        f"{sess.prescription_label(_shown)}</div></div>",
         unsafe_allow_html=True,
     )
 
@@ -2874,7 +2934,7 @@ def render():
                     st.markdown(
                         f"<div style='text-align:center;margin-top:8px;'>"
                         f"<div style='font-size:11px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>REPS</div>"
-                        f"<div style='font-size:48px;font-weight:700;color:#E8ECEF;line-height:1;'>{ex['reps']}</div></div>",
+                        f"<div style='font-size:48px;font-weight:700;color:#E8ECEF;line-height:1;'>{_shown['reps']}</div></div>",
                         unsafe_allow_html=True,
                     )
                 if ex.get("tempo"):
@@ -2958,7 +3018,7 @@ def render():
                 st.markdown(
                     f"<div style='background:#1A2026;border-radius:8px;padding:20px;text-align:center;'>"
                     f"<div style='color:#8A99A3;font-size:13px;margin-bottom:8px;'>"
-                    f"Perform {ex['reps']} reps{_side_note}</div>"
+                    f"Perform {_shown['reps']} reps{_side_note}</div>"
                     f"<div style='color:#E8ECEF;font-size:12px;'>"
                     + (f"Tempo: {ex['tempo'].replace('-','s – ')}s" if ex.get("tempo") else "Control each rep")
                     + "</div></div>",

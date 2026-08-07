@@ -469,11 +469,357 @@ def seed_actual_entry(
     return entry
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+#  LOAD RESOLUTION — progression PROPOSES, autoregulation CLAMPS
+#
+#  The bug this section exists to make structurally impossible (observed
+#  2026-08-06): the session header read "Reduced load today — don't push to
+#  failure" while every prescribed number went UP. Lat Pulldown moved 45kg x 10
+#  -> 47.5kg x 11 on a day the engine had flagged as reduced.
+#
+#  It was not a display bug. The header and the numbers were computed from two
+#  DIFFERENT signals that read different inputs and are free to disagree:
+#
+#    header  <- engine.traffic_light (HRV/RHR/sleep/temperature vs baselines)
+#                 -> volume_recommendation -> signal_color
+#    numbers <- engine.readiness_training_modifier (the compute_readiness
+#                 composite) -> volume_factor (reps, holds, durations)
+#                            -> streak_label   (weight, band tier)
+#
+#  The directive reached the prescription through exactly ONE wire --
+#  `allow_increase=(signal_color != "red")` -- and "yellow"/"orange", the two
+#  colours that RENDER the reduced-load banner, are not "red". So on precisely
+#  the day the header said hold back, the upward nudge was allowed. Reps never
+#  consulted the directive at all.
+#
+#  The fix is an ORDER, not a patch:
+#
+#    1. load_policy()  decides ONCE whether today is a reduced-load day, and
+#       owns the banner text. There is no second flag anywhere -- the string
+#       the athlete reads and the clamp applied to the numbers come out of the
+#       same object, so they cannot describe different days.
+#    2. Progression proposes freely (seed_actual_entry, unchanged).
+#    3. clamp_to_ceiling() applies the policy AFTER, and can only move a
+#       number DOWN. There is no code path by which autoregulation raises one.
+#    4. assert_within_ceiling() re-checks the invariant on the FINAL numbers
+#       and raises PrescriptionContradiction if it was violated. That is a hard
+#       error by design: a reduced-load day that prescribes an increase is the
+#       app lying to the athlete about its own safety reasoning, and silently
+#       passing it is worse than crashing.
+#
+#  Note engine.apply_volume_recommendation already encoded the right semantics
+#  ("0.75 -> reduce sets, preserve weight, hold intensity") and was called by
+#  nothing but its own test. It is left alone; this is the live path.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Every signal_color that renders a hold-back banner in the training view.
+# "yellow" is volume_recommendation's injury-weight branch, "orange" its
+# below-baseline-biometrics branch, "red" its rest branch -- the colour names
+# do not line up with the traffic light's own, which is exactly why testing
+# for one of them by hand (`!= "red"`) went wrong.
+REDUCED_LOAD_SIGNALS = ("red", "orange", "yellow")
+
+_REDUCED_BANNER = (
+    "Reduced load today — keep this session controlled and don't push to "
+    "failure. Every weight and rep below is held at or under your last "
+    "session; the app will not ask you to add load."
+)
+_REST_BANNER = (
+    "Rest day recommended today — mobility and walking only. No loaded "
+    "exercises."
+)
+
+
+class PrescriptionContradiction(RuntimeError):
+    """The resolved prescription exceeds the previous session on a day the
+    engine flagged as reduced load.
+
+    Raised by assert_within_ceiling. This is an internal-invariant failure,
+    not a user error: by the time it fires, clamp_to_ceiling should already
+    have made it impossible. It exists so the contradiction can never again
+    reach the screen unnoticed -- the 2026-08-06 report was a human spotting
+    it by eye, which is not a control.
+    """
+
+
+def load_policy(directive: dict | None, readiness_modifier: dict | None) -> dict:
+    """TODAY'S ONE LOAD DECISION -- the single source both the banner text and
+    the numeric clamp are read from.
+
+    Takes the two signals that were previously allowed to disagree and folds
+    them into one verdict. Any of the three saying "hold back" is enough;
+    they are OR-ed, never averaged, because each is a different reason to not
+    add load and a good reason does not cancel a bad one.
+
+    Returns:
+        reduced        : bool -- today is a reduced-load day
+        reasons        : list[str] -- every input that said so, in plain words
+        volume_factor  : float -- the factor the view must ACTUALLY apply to
+                          reps/holds/durations. Capped at 1.0 whenever reduced,
+                          so a "+12% volume" readiness streak cannot inflate
+                          reps on a day the traffic light is holding load down.
+                          This is the number to use; readiness_modifier's own
+                          volume_factor is the raw proposal.
+        volume_note    : str -- the caption for the SESSION ADAPTED badge,
+                          describing the resolved factor rather than the raw one
+        banner_kind    : "error" | "warning" | "" -- how the view renders it
+        banner_text    : str -- what it says, "" for no banner
+
+    Both inputs are optional and tolerate None/missing keys: a failed engine
+    lookup must degrade to "no opinion", never to a silent green light.
+    """
+    directive          = directive or {}
+    readiness_modifier = readiness_modifier or {}
+
+    signal    = directive.get("signal_color") or "grey"
+    raw_factor = readiness_modifier.get("volume_factor")
+    raw_factor = 1.0 if raw_factor is None else float(raw_factor)
+    try:
+        multiplier = float(directive.get("multiplier", 1.0) or 1.0)
+    except (TypeError, ValueError):
+        multiplier = 1.0
+
+    reasons: list[str] = []
+    if signal in REDUCED_LOAD_SIGNALS:
+        label = directive.get("label") or signal.upper()
+        reasons.append(f"engine directive: {label}")
+    if multiplier < 1.0:
+        reasons.append(f"volume multiplier {multiplier:g}")
+    if raw_factor < 1.0:
+        reasons.append(readiness_modifier.get("description")
+                       or f"readiness volume factor {raw_factor:g}")
+
+    reduced = bool(reasons)
+    factor  = min(raw_factor, 1.0) if reduced else raw_factor
+
+    if reduced and raw_factor > 1.0:
+        # The contradiction itself, said out loud rather than resolved in
+        # silence -- readiness wanted more volume, the directive said no.
+        note = (f"Readiness suggested +{(raw_factor - 1) * 100:.0f}% volume; "
+                f"held at 100% — {reasons[0]}")
+    elif reduced:
+        note = "; ".join(reasons)
+    else:
+        note = readiness_modifier.get("description", "") or ""
+
+    if signal == "red":
+        kind, text = "error", _REST_BANNER
+    elif reduced:
+        kind, text = "warning", _REDUCED_BANNER
+    else:
+        kind, text = "", ""
+
+    return {
+        "reduced":       reduced,
+        "reasons":       reasons,
+        "volume_factor": factor,
+        "volume_note":   note,
+        "banner_kind":   kind,
+        "banner_text":   text,
+    }
+
+
+def last_completed_ceiling(last_performance: dict | None,
+                            last_session_sets: list[dict] | None) -> dict:
+    """The most a reduced-load day is allowed to prescribe: the TOP completed
+    set of the most recent logged session for this movement.
+
+    Returns {"weight_kg": float|None, "reps": int|None, "band_tier": str|None,
+    "session_date": str|None}. None on an axis means NO RECORD -- there is
+    nothing to clamp against, and clamp_to_ceiling leaves that axis alone
+    rather than inventing a limit.
+
+    Reps are taken from the sets at the TOP weight, not the maximum reps
+    across all sets. 45x10, 45x10, 47.5x8 yields (47.5, 8) -- repeat your top
+    set -- and never (47.5, 10), a combination that was not completed. Falls
+    back to the max reps overall when the top-weight sets carry no rep count
+    (a hold logged as reps=1 with the work in `tut`).
+
+    last_performance is the fallback when the full per-set array is
+    unavailable; it holds the LAST set rather than the top one, which is a
+    lower or equal ceiling and therefore safe in the same direction.
+    """
+    out = {"weight_kg": None, "reps": None, "band_tier": None,
+            "session_date": None}
+    sets = list(last_session_sets or [])
+    if not sets and last_performance:
+        sets = [{"reps": last_performance.get("reps"),
+                  "weight": last_performance.get("weight_kg"),
+                  "band_tier": last_performance.get("band_tier")}]
+    if last_performance:
+        out["session_date"] = last_performance.get("session_date")
+    if not sets:
+        return out
+
+    weights = [s.get("weight") for s in sets if s.get("weight") is not None]
+    if weights:
+        top = max(float(w) for w in weights)
+        out["weight_kg"] = top
+        at_top = [s.get("reps") for s in sets
+                  if s.get("weight") is not None and float(s["weight"]) >= top
+                  and s.get("reps") is not None]
+    else:
+        at_top = []
+    if not at_top:
+        at_top = [s.get("reps") for s in sets if s.get("reps") is not None]
+    if at_top:
+        out["reps"] = int(max(at_top))
+
+    tiers = [s.get("band_tier") for s in sets
+             if s.get("band_tier") in engine.BAND_TIERS]
+    if tiers:
+        out["band_tier"] = max(tiers, key=engine.BAND_TIERS.index)
+    return out
+
+
+def clamp_to_ceiling(entry: dict, ceiling: dict) -> dict:
+    """Apply the ceiling to a proposed entry. DOWNWARD ONLY -- this function
+    has no branch that raises a number, which is the property that makes the
+    header/numbers contradiction structurally impossible rather than merely
+    fixed.
+
+    Returns a copy. Records what it moved in entry["clamped"], a dict of
+    axis -> {"from": proposed, "to": final}, empty when nothing was held. That
+    dict is what the per-exercise caption is rendered from, so the athlete is
+    told the number was held rather than left to wonder why it did not move.
+    """
+    out = dict(entry)
+    moved: dict[str, dict] = {}
+
+    cw = ceiling.get("weight_kg")
+    if cw is not None and out.get("weight_kg") is not None and out["weight_kg"] > cw:
+        moved["weight_kg"] = {"from": out["weight_kg"], "to": round(float(cw), 2)}
+        out["weight_kg"] = round(float(cw), 2)
+
+    cr = ceiling.get("reps")
+    if cr is not None and out.get("reps") is not None and out["reps"] > cr:
+        moved["reps"] = {"from": out["reps"], "to": int(cr)}
+        out["reps"] = int(cr)
+
+    ct = ceiling.get("band_tier")
+    if (ct in engine.BAND_TIERS and out.get("band_tier") in engine.BAND_TIERS
+            and engine.BAND_TIERS.index(out["band_tier"]) > engine.BAND_TIERS.index(ct)):
+        moved["band_tier"] = {"from": out["band_tier"], "to": ct}
+        out["band_tier"] = ct
+
+    out["clamped"] = moved
+    return out
+
+
+def assert_within_ceiling(entry: dict, ceiling: dict, policy: dict,
+                           exercise_name: str = "") -> None:
+    """Hard invariant on the FINAL resolved prescription. No-op unless
+    policy["reduced"].
+
+    On a reduced-load day the resolved weight must be <= the last completed
+    working weight and the resolved reps <= the last completed reps. Raises
+    PrescriptionContradiction naming the exercise and both numbers if not.
+
+    Deliberately re-derived from the final entry rather than trusting
+    clamp_to_ceiling's own output: an assertion that reads the value the
+    clamp just wrote would pass by construction and check nothing.
+    """
+    if not policy.get("reduced"):
+        return
+    name = exercise_name or "this exercise"
+    cw, cr = ceiling.get("weight_kg"), ceiling.get("reps")
+    w, r   = entry.get("weight_kg"), entry.get("reps")
+    if cw is not None and w is not None and w > cw:
+        raise PrescriptionContradiction(
+            f"{name}: reduced-load day prescribes {w} kg, above the last "
+            f"completed working weight of {cw} kg ({'; '.join(policy.get('reasons') or [])})"
+        )
+    if cr is not None and r is not None and r > cr:
+        raise PrescriptionContradiction(
+            f"{name}: reduced-load day prescribes {r} reps, above the last "
+            f"completed {cr} reps ({'; '.join(policy.get('reasons') or [])})"
+        )
+    ct, t = ceiling.get("band_tier"), entry.get("band_tier")
+    if (ct in engine.BAND_TIERS and t in engine.BAND_TIERS
+            and engine.BAND_TIERS.index(t) > engine.BAND_TIERS.index(ct)):
+        raise PrescriptionContradiction(
+            f"{name}: reduced-load day prescribes the {t} band, above the last "
+            f"completed {ct} band ({'; '.join(policy.get('reasons') or [])})"
+        )
+
+
+def resolve_prescription(
+    ex: dict,
+    last_performance: dict | None,
+    streak_label: str,
+    policy: dict,
+    weight_increment: float = 2.5,
+    last_session_sets: list[dict] | None = None,
+) -> dict:
+    """THE single ordered resolution. Every prescribed number the live training
+    screen shows comes out of here, and the banner above them comes out of the
+    same `policy` argument.
+
+    Order, and the order is the whole point:
+      1. seed_actual_entry proposes -- double progression, then last
+         performance, then the readiness nudge. It is handed
+         allow_increase=True so progression is free to want more; suppressing
+         it here would put autoregulation BEFORE progression and reintroduce
+         the two-signals-two-answers shape this replaced.
+      2. clamp_to_ceiling holds it to the last completed session, but only on
+         a reduced-load day, and only downward.
+      3. assert_within_ceiling verifies the result.
+
+    On a reduced-load day with NO logged history the ceiling is empty and
+    nothing is clamped -- but the view has already capped policy["volume_factor"]
+    at 1.0 before building `ex`, so the plan's authored reps are what gets
+    proposed, not an inflated version of them.
+    """
+    proposed = seed_actual_entry(
+        ex, last_performance, streak_label,
+        allow_increase=True,
+        weight_increment=weight_increment,
+        last_session_sets=last_session_sets,
+    )
+    ceiling = last_completed_ceiling(last_performance, last_session_sets)
+    final = clamp_to_ceiling(proposed, ceiling) if policy.get("reduced") else dict(proposed)
+    final.setdefault("clamped", {})
+    assert_within_ceiling(final, ceiling, policy, ex.get("name", ""))
+    return final
+
+
+def displayed_prescription(ex: dict, actual: dict | None) -> dict:
+    """`ex` overlaid with the live resolved entry, for every place the screen
+    PRINTS the prescription rather than steps it.
+
+    The training screen shows a rep target in three places: the exercise
+    header's prescription_label, the "Perform N reps" instruction, and the
+    +/- stepper. Only the stepper read the resolved entry -- the other two
+    printed ex["reps"], which is the plan value after the readiness volume
+    modifier and nothing else. On 2026-08-06 that is what put "11" on screen
+    while the stepper underneath it said 10.
+
+    Returns ex unchanged when there is no resolved entry to overlay (an
+    unloaded exercise has no stepper, so the plan value IS the prescription).
+    """
+    if not actual:
+        return ex
+    out = dict(ex)
+    # "reps" only. hold_reps' reps_in_set is deliberately NOT overlaid: it is
+    # driven by the live per-rep hold-timer counter, and seed_actual_entry
+    # leaves entry["reps"] None for that type precisely so the two can never
+    # disagree. Overlaying it here would reintroduce that from the other end.
+    if out.get("type") == "reps" and actual.get("reps") is not None:
+        out["reps"] = actual["reps"]
+    if actual.get("weight_kg") is not None:
+        out["weight_kg"] = actual["weight_kg"]
+    if actual.get("band_tier"):
+        out["band_tier"] = actual["band_tier"]
+    return out
+
+
 def actual_caption(entry: dict) -> str:
     """The small 'last time' / 'plan default' caption shown next to the
     steppers -- pure so it's unit-testable without Streamlit."""
+    held = entry.get("clamped") or {}
     if entry.get("source") != "last_time":
-        return "No prior record — using plan default."
+        base = "No prior record — using plan default."
+        return f"{base} {_held_caption(held)}" if held else base
     parts = []
     if entry.get("reps") is not None:
         parts.append(f"{entry['reps']} reps")
@@ -484,7 +830,22 @@ def actual_caption(entry: dict) -> str:
         parts.append(f"{entry['weight_kg']} kg")
     body = " @ ".join(parts) if parts else "logged"
     date_part = f" ({entry['last_seen_date']})" if entry.get("last_seen_date") else ""
-    return f"Last time: {body}{date_part}"
+    caption = f"Last time: {body}{date_part}"
+    return f"{caption} {_held_caption(held)}" if held else caption
+
+
+def _held_caption(held: dict) -> str:
+    """Renders clamp_to_ceiling's ledger into the caption. The athlete is told
+    the number was held DOWN and by how much -- a prescription that silently
+    fails to move looks identical to one the app forgot to progress."""
+    bits = []
+    if "weight_kg" in held:
+        bits.append(f"{held['weight_kg']['from']:g} → {held['weight_kg']['to']:g} kg")
+    if "reps" in held:
+        bits.append(f"{held['reps']['from']} → {held['reps']['to']} reps")
+    if "band_tier" in held:
+        bits.append(f"{held['band_tier']['from']} → {held['band_tier']['to']} band")
+    return f"· Held down ({', '.join(bits)}) — reduced-load day." if bits else ""
 
 
 def exercise_duration_seconds(ex: dict) -> int:

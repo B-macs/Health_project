@@ -38,7 +38,9 @@ def test_set_timestamp_falls_back_rather_than_raising_on_a_bad_zone():
     out = sessions.set_timestamp(datetime(2026, 8, 6, 11, 8, 27, tzinfo=timezone.utc), "Not/AZone")
     assert datetime.fromisoformat(out) == datetime(2026, 8, 6, 11, 8, 27, tzinfo=timezone.utc)
 
-from services import sessions
+import pytest
+
+from services import engine, sessions
 from services.models import Phase
 
 _PHASE = Phase(phase_number=1, name="Stage 1 Rehab", start_date="2026-06-29",
@@ -590,7 +592,426 @@ def test_seed_actual_entry_double_progression_uses_actual_lifted_weight_not_stal
     assert entry["weight_kg"] == 15.0  # 12.5 (actually lifted) + 2.5, not 10.0 (stale) + 2.5
 
 
+# ─── LOAD RESOLUTION: progression proposes, autoregulation clamps ──────────
+#
+# Regression suite for the 2026-08-06 contradiction: the session header read
+# "Reduced load today — don't push to failure" while Lat Pulldown was
+# prescribed 47.5kg x 11, up from 45kg x 10 on both axes. Cause was two
+# independently computed signals — engine.traffic_light drove the banner,
+# engine.readiness_training_modifier drove the numbers — with the directive
+# reaching the prescription through one wire that only tested for "red".
+#
+# These tests pin the three properties that make it impossible: a green day
+# still progresses, a reduced-load day never exceeds the prior session on
+# EITHER axis, and the header text is a function of the same object that
+# clamps the numbers.
+
+_GREEN = {"signal_color": "green", "multiplier": 1.05, "label": "PROGRESSIVE OVERLOAD"}
+_ORANGE = {"signal_color": "orange", "multiplier": 0.75, "label": "REDUCED VOLUME  (−25%)"}
+_YELLOW_INJURY = {"signal_color": "yellow", "multiplier": 0.85,
+                   "label": "CONSERVATIVE LOAD  (injury weight 80%)"}
+_RED = {"signal_color": "red", "multiplier": 0.0, "label": "REST / DELOAD"}
+_HIGH_STREAK = {"volume_factor": 1.12, "streak_label": "high", "streak_days": 3,
+                 "description": "Strong 3-day readiness -- +12% volume"}
+_NEUTRAL = {"volume_factor": 1.0, "streak_label": "normal", "streak_days": 0,
+             "description": ""}
+
+# The exact exercise and history from the bug report.
+_PULLDOWN = {"name": "Lat Pulldown", "type": "reps", "reps": 10, "sets": 3,
+              "weight_kg": 45.0, "equipment_type": "cable",
+              "laterality": "bilateral", "rest_seconds": 60}
+_PULLDOWN_LAST_SETS = [{"reps": 10, "weight": 45.0}] * 3
+_PULLDOWN_LAST_PERF = {"reps": 10, "weight_kg": 45.0, "session_date": "2026-07-30"}
+
+
+# ── load_policy ────────────────────────────────────────────────────────────
+
+def test_load_policy_green_day_is_not_reduced_and_shows_no_banner():
+    p = sessions.load_policy(_GREEN, _HIGH_STREAK)
+    assert p["reduced"] is False
+    assert p["banner_kind"] == ""
+    assert p["banner_text"] == ""
+    assert p["volume_factor"] == 1.12  # readiness proposal survives untouched
+
+
+def test_load_policy_orange_signal_is_reduced_even_though_it_is_not_red():
+    # The whole defect in one assertion: the old wire was
+    # `allow_increase = signal_color != "red"`, and orange is not red.
+    p = sessions.load_policy(_ORANGE, _HIGH_STREAK)
+    assert p["reduced"] is True
+    assert p["banner_kind"] == "warning"
+
+
+def test_load_policy_yellow_injury_signal_is_reduced_too():
+    p = sessions.load_policy(_YELLOW_INJURY, _HIGH_STREAK)
+    assert p["reduced"] is True
+    assert p["banner_kind"] == "warning"
+
+
+def test_load_policy_caps_an_inflating_volume_factor_on_a_reduced_day():
+    # readiness wanted +12% reps; the directive says hold. 1.12 -> 1.0, which
+    # is what stops round(10 x 1.12) = 11 from ever being built.
+    p = sessions.load_policy(_ORANGE, _HIGH_STREAK)
+    assert p["volume_factor"] == 1.0
+    assert "held at 100%" in p["volume_note"]
+
+
+def test_load_policy_never_raises_a_reducing_volume_factor():
+    low = {"volume_factor": 0.75, "streak_label": "low", "description": "Low readiness"}
+    p = sessions.load_policy(_GREEN, low)
+    assert p["reduced"] is True          # readiness alone is enough
+    assert p["volume_factor"] == 0.75    # clamping is downward-only
+
+
+def test_load_policy_red_signal_gets_the_rest_banner():
+    p = sessions.load_policy(_RED, _HIGH_STREAK)
+    assert p["reduced"] is True
+    assert p["banner_kind"] == "error"
+    assert "Rest day" in p["banner_text"]
+
+
+def test_load_policy_degrades_to_no_opinion_on_missing_inputs():
+    # A failed engine lookup must not read as a green light.
+    p = sessions.load_policy(None, None)
+    assert p["reduced"] is False
+    assert p["volume_factor"] == 1.0
+    assert p["banner_text"] == ""
+
+
+def test_load_policy_records_every_reason_not_just_the_first():
+    low = {"volume_factor": 0.75, "streak_label": "low", "description": "Low readiness"}
+    p = sessions.load_policy(_ORANGE, low)
+    assert len(p["reasons"]) == 3  # signal, multiplier < 1, factor < 1
+
+
+# ── last_completed_ceiling ─────────────────────────────────────────────────
+
+def test_ceiling_is_the_top_set_not_the_last_set():
+    sets = [{"reps": 10, "weight": 45.0}, {"reps": 8, "weight": 47.5},
+            {"reps": 8, "weight": 45.0}]
+    c = sessions.last_completed_ceiling(None, sets)
+    assert c["weight_kg"] == 47.5
+    # 8, not 10 -- 47.5 x 10 was never completed and must not be prescribable.
+    assert c["reps"] == 8
+
+
+def test_ceiling_falls_back_to_last_performance_when_sets_are_unavailable():
+    c = sessions.last_completed_ceiling(_PULLDOWN_LAST_PERF, None)
+    assert c == {"weight_kg": 45.0, "reps": 10, "band_tier": None,
+                 "session_date": "2026-07-30"}
+
+
+def test_ceiling_with_no_history_is_all_none_so_nothing_is_clamped():
+    c = sessions.last_completed_ceiling(None, None)
+    assert c["weight_kg"] is None and c["reps"] is None and c["band_tier"] is None
+
+
+def test_ceiling_takes_the_heaviest_band_tier_completed():
+    sets = [{"reps": 12, "band_tier": "Green"}, {"reps": 12, "band_tier": "Yellow"}]
+    assert sessions.last_completed_ceiling(None, sets)["band_tier"] == "Yellow"
+
+
+def test_ceiling_falls_back_to_overall_reps_when_top_weight_sets_have_none():
+    sets = [{"reps": 12, "weight": None}, {"reps": None, "weight": 20.0}]
+    c = sessions.last_completed_ceiling(None, sets)
+    assert c["weight_kg"] == 20.0
+    assert c["reps"] == 12
+
+
+# ── clamp_to_ceiling ───────────────────────────────────────────────────────
+
+def test_clamp_lowers_both_axes_and_records_what_it_moved():
+    entry = {"reps": 11, "weight_kg": 47.5, "band_tier": None, "source": "last_time"}
+    out = sessions.clamp_to_ceiling(entry, {"weight_kg": 45.0, "reps": 10})
+    assert out["weight_kg"] == 45.0 and out["reps"] == 10
+    assert out["clamped"]["weight_kg"] == {"from": 47.5, "to": 45.0}
+    assert out["clamped"]["reps"] == {"from": 11, "to": 10}
+
+
+def test_clamp_never_raises_a_number_that_is_already_below_the_ceiling():
+    entry = {"reps": 8, "weight_kg": 40.0, "band_tier": None}
+    out = sessions.clamp_to_ceiling(entry, {"weight_kg": 45.0, "reps": 10})
+    assert out["weight_kg"] == 40.0 and out["reps"] == 8
+    assert out["clamped"] == {}
+
+
+def test_clamp_leaves_an_axis_alone_when_the_ceiling_has_no_record_of_it():
+    entry = {"reps": 11, "weight_kg": 47.5, "band_tier": None}
+    out = sessions.clamp_to_ceiling(entry, {"weight_kg": None, "reps": None})
+    assert out["weight_kg"] == 47.5 and out["reps"] == 11
+
+
+def test_clamp_lowers_a_band_tier():
+    entry = {"reps": 12, "weight_kg": None, "band_tier": "Red"}
+    out = sessions.clamp_to_ceiling(entry, {"band_tier": "Blue"})
+    assert out["band_tier"] == "Blue"
+
+
+def test_clamp_does_not_mutate_the_entry_it_was_given():
+    entry = {"reps": 11, "weight_kg": 47.5, "band_tier": None}
+    sessions.clamp_to_ceiling(entry, {"weight_kg": 45.0, "reps": 10})
+    assert entry["weight_kg"] == 47.5 and entry["reps"] == 11
+
+
+# ── assert_within_ceiling ──────────────────────────────────────────────────
+
+def test_assertion_is_a_noop_on_a_normal_day():
+    sessions.assert_within_ceiling(
+        {"reps": 11, "weight_kg": 47.5}, {"weight_kg": 45.0, "reps": 10},
+        {"reduced": False}, "Lat Pulldown",
+    )  # must not raise
+
+
+def test_assertion_raises_on_an_over_ceiling_weight():
+    with pytest.raises(sessions.PrescriptionContradiction) as exc:
+        sessions.assert_within_ceiling(
+            {"reps": 10, "weight_kg": 47.5}, {"weight_kg": 45.0, "reps": 10},
+            {"reduced": True, "reasons": ["engine directive: REDUCED VOLUME"]},
+            "Lat Pulldown",
+        )
+    assert "Lat Pulldown" in str(exc.value) and "47.5" in str(exc.value)
+
+
+def test_assertion_raises_on_over_ceiling_reps_even_when_weight_is_fine():
+    with pytest.raises(sessions.PrescriptionContradiction):
+        sessions.assert_within_ceiling(
+            {"reps": 11, "weight_kg": 45.0}, {"weight_kg": 45.0, "reps": 10},
+            {"reduced": True, "reasons": []}, "Lat Pulldown",
+        )
+
+
+def test_assertion_raises_on_an_over_ceiling_band_tier():
+    with pytest.raises(sessions.PrescriptionContradiction):
+        sessions.assert_within_ceiling(
+            {"reps": 12, "weight_kg": None, "band_tier": "Red"},
+            {"band_tier": "Blue"}, {"reduced": True, "reasons": []}, "Pallof Press",
+        )
+
+
+# ── resolve_prescription: the end-to-end regressions ───────────────────────
+
+def test_green_day_still_progresses():
+    # The fix must not turn every day into a hold.
+    p = sessions.load_policy(_GREEN, _HIGH_STREAK)
+    entry = sessions.resolve_prescription(
+        _PULLDOWN, _PULLDOWN_LAST_PERF, "high", p,
+        last_session_sets=_PULLDOWN_LAST_SETS,
+    )
+    assert entry["weight_kg"] == 47.5   # 45 + 2.5, the readiness nudge
+    assert entry["clamped"] == {}
+
+
+def test_the_2026_08_06_bug_reduced_load_day_never_exceeds_the_prior_session():
+    # THE regression. Header said reduced load; Lat Pulldown was seeded
+    # 47.5kg x 11, up from 45kg x 10. Both axes must now hold.
+    p = sessions.load_policy(_ORANGE, _HIGH_STREAK)
+    ex = engine.apply_exercise_volume_modifier(_PULLDOWN, p["volume_factor"])
+    entry = sessions.resolve_prescription(
+        ex, _PULLDOWN_LAST_PERF, "high", p,
+        last_session_sets=_PULLDOWN_LAST_SETS,
+    )
+    assert entry["weight_kg"] <= 45.0
+    assert entry["reps"] <= 10
+    assert entry["weight_kg"] == 45.0 and entry["reps"] == 10
+
+
+def test_the_raw_readiness_factor_is_what_would_have_inflated_the_reps():
+    # Pins the actual mechanism, so a future refactor that drops the cap fails
+    # here with an explanation rather than just somewhere.
+    assert engine.apply_exercise_volume_modifier(_PULLDOWN, 1.12)["reps"] == 11
+    assert engine.apply_exercise_volume_modifier(_PULLDOWN, 1.0)["reps"] == 10
+
+
+def test_reduced_load_day_holds_every_signal_colour_that_shows_a_banner():
+    for directive in (_ORANGE, _YELLOW_INJURY, _RED):
+        p = sessions.load_policy(directive, _HIGH_STREAK)
+        ex = engine.apply_exercise_volume_modifier(_PULLDOWN, p["volume_factor"])
+        entry = sessions.resolve_prescription(
+            ex, _PULLDOWN_LAST_PERF, "high", p,
+            last_session_sets=_PULLDOWN_LAST_SETS,
+        )
+        assert entry["weight_kg"] <= 45.0, directive["signal_color"]
+        assert entry["reps"] <= 10, directive["signal_color"]
+
+
+def test_reduced_load_day_blocks_double_progression_too():
+    # The other upward path: every set hit rep_max, so double progression
+    # wants +2.5kg. It proposes; the clamp still holds it.
+    ex = {"name": "RDL", "type": "reps", "reps": 10, "rep_min": 10, "rep_max": 12,
+          "sets": 3, "weight_kg": 12.5, "equipment_type": "dumbbell"}
+    last_sets = [{"reps": 12, "weight": 12.5}] * 3
+    last_perf = {"reps": 12, "weight_kg": 12.5, "session_date": "2026-07-30"}
+    p = sessions.load_policy(_ORANGE, _NEUTRAL)
+    entry = sessions.resolve_prescription(ex, last_perf, "normal", p,
+                                           last_session_sets=last_sets)
+    assert entry["weight_kg"] == 12.5
+    assert entry["clamped"]["weight_kg"] == {"from": 15.0, "to": 12.5}
+
+
+def test_reduced_load_day_holds_a_band_tier_increase():
+    ex = {"name": "Pallof Press", "type": "reps", "reps": 12, "sets": 3,
+          "band_tier": "Blue", "equipment_type": "band"}
+    last_perf = {"reps": 12, "band_tier": "Blue", "session_date": "2026-07-30"}
+    p = sessions.load_policy(_ORANGE, _HIGH_STREAK)
+    entry = sessions.resolve_prescription(ex, last_perf, "high", p)
+    assert entry["band_tier"] == "Blue"
+
+
+def test_reduced_load_day_still_allows_a_decrease():
+    # Clamping downward must not become "hold at last session no matter what"
+    # -- a low-readiness streak still reduces below the ceiling.
+    low = {"volume_factor": 0.75, "streak_label": "low", "description": "Low readiness"}
+    p = sessions.load_policy(_ORANGE, low)
+    entry = sessions.resolve_prescription(
+        _PULLDOWN, _PULLDOWN_LAST_PERF, "low", p,
+        last_session_sets=_PULLDOWN_LAST_SETS,
+    )
+    assert entry["weight_kg"] == 42.5  # 45 - 2.5, below the ceiling, untouched
+    assert entry["clamped"] == {}
+
+
+def test_reduced_load_day_with_no_history_does_not_invent_a_ceiling():
+    # First-ever exposure on a reduced day: nothing to clamp against, and the
+    # volume cap upstream already kept the plan's authored reps honest.
+    p = sessions.load_policy(_ORANGE, _HIGH_STREAK)
+    ex = engine.apply_exercise_volume_modifier(_PULLDOWN, p["volume_factor"])
+    entry = sessions.resolve_prescription(ex, None, "high", p)
+    assert entry["reps"] == 10                     # not 11
+    assert entry["weight_kg"] == 47.5              # unclamped: no record exists
+    assert entry["clamped"] == {}
+
+
+def test_resolution_output_always_carries_the_clamped_ledger():
+    # Downstream captions read entry["clamped"]; it must exist on every path.
+    for policy in (sessions.load_policy(_GREEN, _NEUTRAL),
+                   sessions.load_policy(_ORANGE, _NEUTRAL)):
+        entry = sessions.resolve_prescription(
+            _PULLDOWN, _PULLDOWN_LAST_PERF, "normal", policy,
+            last_session_sets=_PULLDOWN_LAST_SETS,
+        )
+        assert "clamped" in entry
+
+
+# ── header text and the numbers cannot disagree ────────────────────────────
+
+def test_header_and_numbers_are_derived_from_the_same_object():
+    # The structural property, stated as a test: whenever the policy renders a
+    # hold-back banner, the resolution it also drives must not exceed the
+    # prior session -- for every combination of the two signals that can occur.
+    directives = [_GREEN, _ORANGE, _YELLOW_INJURY, _RED,
+                  {"signal_color": "grey", "multiplier": 1.0, "label": "OBSERVATION MODE"}]
+    modifiers = [_HIGH_STREAK, _NEUTRAL,
+                 {"volume_factor": 0.75, "streak_label": "low", "description": "Low"},
+                 {"volume_factor": 1.04, "streak_label": "high", "description": "+4%"}]
+    for d in directives:
+        for m in modifiers:
+            p = sessions.load_policy(d, m)
+            ex = engine.apply_exercise_volume_modifier(_PULLDOWN, p["volume_factor"])
+            entry = sessions.resolve_prescription(
+                ex, _PULLDOWN_LAST_PERF, m["streak_label"], p,
+                last_session_sets=_PULLDOWN_LAST_SETS,
+            )
+            banner_says_hold = p["banner_kind"] in ("warning", "error")
+            if banner_says_hold:
+                assert entry["weight_kg"] <= 45.0, (d, m)
+                assert entry["reps"] <= 10, (d, m)
+            else:
+                # No banner means no hold-back claim was made, so an increase
+                # is honest. Assert the pairing, not the direction.
+                assert p["reduced"] is False, (d, m)
+
+
+def test_a_banner_is_shown_for_exactly_the_days_that_are_reduced():
+    for d in (_GREEN, _ORANGE, _YELLOW_INJURY, _RED,
+              {"signal_color": "grey", "multiplier": 1.0}):
+        for m in (_HIGH_STREAK, _NEUTRAL,
+                  {"volume_factor": 0.5, "streak_label": "low", "description": "x"}):
+            p = sessions.load_policy(d, m)
+            assert bool(p["banner_text"]) == p["reduced"], (d, m)
+            assert bool(p["banner_kind"]) == p["reduced"], (d, m)
+
+
+def test_the_old_signal_color_test_would_have_missed_two_of_three_banner_days():
+    # Documents the defect itself so it cannot be reintroduced as a
+    # "simplification": the retired wire was `signal_color != "red"`.
+    missed = [d for d in (_ORANGE, _YELLOW_INJURY, _RED)
+              if d["signal_color"] != "red"
+              and sessions.load_policy(d, _HIGH_STREAK)["reduced"]]
+    assert len(missed) == 2
+
+
+# ── the printed prescription matches the stepper underneath it ─────────────
+
+def test_printed_prescription_reads_the_resolved_entry_not_the_plan():
+    # The third disagreement in the 2026-08-06 report: the exercise header
+    # printed prescription_label(ex) — the plan's reps after the readiness
+    # volume modifier, 11 — while the stepper below it held the resolved 10.
+    inflated = engine.apply_exercise_volume_modifier(_PULLDOWN, 1.12)
+    assert inflated["reps"] == 11
+    resolved = {"reps": 10, "weight_kg": 45.0, "band_tier": None}
+    shown = sessions.displayed_prescription(inflated, resolved)
+    assert shown["reps"] == 10
+    assert "10" in sessions.prescription_label(shown)
+    assert "11" not in sessions.prescription_label(shown)
+
+
+def test_printed_prescription_shows_the_resolved_weight_too():
+    shown = sessions.displayed_prescription(
+        _PULLDOWN, {"reps": 10, "weight_kg": 45.0, "band_tier": None})
+    assert shown["weight_kg"] == 45.0
+
+
+def test_printed_prescription_falls_back_to_the_plan_with_no_stepper():
+    # Unloaded exercises have no resolved entry; the plan value IS the
+    # prescription and must survive untouched.
+    assert sessions.displayed_prescription(_PULLDOWN, None) is _PULLDOWN
+
+
+def test_printed_prescription_never_overlays_a_hold_reps_counter():
+    # reps_in_set is driven by the live hold-timer, not the stepper.
+    ex = {"name": "Prone Y-Raise", "type": "hold_reps", "reps_in_set": 8,
+          "sets": 3, "weight_kg": 1.0, "equipment_type": "dumbbell"}
+    shown = sessions.displayed_prescription(ex, {"reps": 99, "weight_kg": 1.0})
+    assert shown["reps_in_set"] == 8
+
+
+def test_printed_prescription_does_not_mutate_the_plan_exercise():
+    ex = dict(_PULLDOWN)
+    sessions.displayed_prescription(ex, {"reps": 3, "weight_kg": 5.0})
+    assert ex["reps"] == 10 and ex["weight_kg"] == 45.0
+
+
+def test_header_text_and_printed_numbers_agree_on_the_bug_day():
+    # End to end: banner, printed prescription and stepper value, all three
+    # from one resolution, on the exact 2026-08-06 inputs.
+    p = sessions.load_policy(_ORANGE, _HIGH_STREAK)
+    ex = engine.apply_exercise_volume_modifier(_PULLDOWN, p["volume_factor"])
+    entry = sessions.resolve_prescription(
+        ex, _PULLDOWN_LAST_PERF, "high", p, last_session_sets=_PULLDOWN_LAST_SETS)
+    label = sessions.prescription_label(sessions.displayed_prescription(ex, entry))
+    assert "don't push to failure" in p["banner_text"]
+    # prescription_label carries reps, not weight — pin each where it renders.
+    assert "10 reps" in label and "11 reps" not in label
+    assert entry["weight_kg"] == 45.0 and entry["reps"] == 10
+    assert sessions.displayed_prescription(ex, entry)["weight_kg"] == 45.0
+
+
 # ─── actual_caption ─────────────────────────────────────────────────────────
+
+def test_actual_caption_reports_a_held_prescription():
+    entry = {"source": "last_time", "reps": 10, "weight_kg": 45.0, "band_tier": None,
+             "last_seen_date": "2026-07-30",
+             "clamped": {"weight_kg": {"from": 47.5, "to": 45.0},
+                         "reps": {"from": 11, "to": 10}}}
+    caption = sessions.actual_caption(entry)
+    assert "Held down" in caption and "47.5 → 45 kg" in caption and "11 → 10 reps" in caption
+
+
+def test_actual_caption_says_nothing_extra_when_nothing_was_held():
+    entry = {"source": "last_time", "reps": 8, "weight_kg": 12.5, "band_tier": None,
+             "last_seen_date": "2026-07-14", "clamped": {}}
+    assert sessions.actual_caption(entry) == "Last time: 8 reps @ 12.5 kg (2026-07-14)"
+
 
 def test_actual_caption_last_time_weight():
     entry = {"source": "last_time", "reps": 8, "weight_kg": 12.5, "band_tier": None,
