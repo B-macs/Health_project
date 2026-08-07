@@ -383,6 +383,9 @@ def _rest_timer(seconds: int, timer_key: str = "tp_r") -> None:
     <button id="rest-btn" onclick="startRest()" style="
         background:#6B7280;color:#FFF;border:none;border-radius:6px;
         padding:8px 20px;font-size:13px;cursor:pointer;">⏸ Pause</button>
+    <button onclick="resetRest()" style="
+        background:#1A2026;color:#E8ECEF;border:1px solid #444;
+        border-radius:6px;padding:8px 16px;font-size:13px;cursor:pointer;">↺ Reset</button>
   </div>
 </div>
 <script>
@@ -490,6 +493,20 @@ function startRest() {{
 }}
 function pauseRest() {{
   clearInterval(_riv); _save(false);
+  document.getElementById('rest-btn').textContent='▶ Resume';
+  document.getElementById('rest-btn').onclick=startRest;
+}}
+// Mirrors resetHold() in _hold_timer. The rest timer only ever had Pause,
+// and once it hit GO the single button became "Restart" -- so mid-rest there
+// was no way back to the full interval, which is what you want after a set
+// that needed re-racking or a longer break than planned. Clears the PERSISTED
+// state too (_clear), not just the interval: leaving a stale saved deadline
+// behind means the next render restores the old countdown and the reset
+// silently undoes itself.
+function resetRest() {{
+  clearInterval(_riv); _clear(); _rrem=_rtotal; _beeped={{}};
+  var el=document.getElementById('rest-num');
+  el.textContent=fmt(_rtotal); el.style.color='#6B7280'; el.style.fontSize='52px';
   document.getElementById('rest-btn').textContent='▶ Resume';
   document.getElementById('rest-btn').onclick=startRest;
 }}
