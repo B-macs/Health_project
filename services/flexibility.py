@@ -84,6 +84,10 @@ class Report:
     result: _b.BatteryResult | None
     confidence: float
     assessed_on: date | None
+    #: The battery's decision path as rungs, bottom-up — see LadderRung. Empty
+    #: when nothing was measured. Display only: the pattern, not the ladder, is
+    #: what prescriptions are looked up by.
+    ladder: tuple = ()
 
     @property
     def measured(self) -> bool:
@@ -133,12 +137,14 @@ def assess(assessment: _b.Assessment | None,
     spec = CLUSTERS.get(assessment.cluster, CLUSTERS[DEFAULT_CLUSTER])
     result = _b.run(spec["key"], spec["battery"].SLOT_EVALUATORS, assessment,
                     baseline_sessions=baseline_sessions)
+    build_ladder = getattr(spec["battery"], "ladder", None)
     return Report(
         cluster=spec["key"],
         cluster_label=spec["label"],
         result=result,
         confidence=staleness_confidence(assessment.taken_on, today),
         assessed_on=assessment.taken_on,
+        ladder=build_ladder(assessment, result) if build_ladder else (),
     )
 
 

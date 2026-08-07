@@ -962,6 +962,118 @@ def test_every_test_says_where_its_number_comes_from():
             assert "degree" in test.input_hint.lower(), key
 
 
+# ── the ladder ───────────────────────────────────────────────────────────────
+#
+# The battery's decision path made visual (athlete's ask, 2026-08-07): rungs
+# bottom-up, tightest at the bottom, the working rung = the battery's first
+# failure. THE GUARDS BELOW ARE WHAT KEEP IT FROM BECOMING v1/v2 AGAIN: no
+# aggregate, no number for an unmeasured muscle, every fraction over a NAMED
+# denominator, and the ladder never decides — it displays what run() decided.
+
+_LADDER_KEYS = ("bone", "group_length", "gracilis", "tilt_range",
+                "tilt_production", "end_range", "pullers")
+
+
+def _ladder_for(readings):
+    a = _assessment(readings)
+    return cb.ladder(a, b.run("a", cb.SLOT_EVALUATORS, a))
+
+
+def test_the_ladder_reads_bottom_up_and_marks_the_working_rung():
+    """Pattern F: everything below the tilt is climbed, the helped tilt is the
+    working rung, its own-power twin is context, and everything above is
+    unmeasured."""
+    rungs = _ladder_for(_GATE0_PASS + _LEVERAGE_PASS + [
+        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+    assert tuple(r.key for r in rungs) == _LADDER_KEYS
+    by = {r.key: r for r in rungs}
+    assert by["bone"].state == b.RUNG_PASSED
+    assert by["group_length"].state == b.RUNG_PASSED
+    assert by["gracilis"].state == b.RUNG_PASSED
+    assert by["tilt_range"].state == b.RUNG_LIMITING
+    assert by["tilt_range"].pattern == "F"
+    assert by["tilt_range"].fraction == pytest.approx(0.4)     # 8° of 20°
+    assert by["tilt_production"].state == b.RUNG_CONTEXT
+    assert by["end_range"].state == b.RUNG_UNMEASURED
+    assert by["pullers"].state == b.RUNG_UNMEASURED
+
+
+def test_an_unmeasured_rung_has_no_number_ever():
+    """None, never zero. Showing 0/100 for a muscle the battery never reached
+    would read as 'terrible' when the truth is 'unknown' — the v1 failure with
+    the sign flipped."""
+    rungs = _ladder_for(_GATE0_PASS + _LEVERAGE_PASS + [
+        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+    for rung in rungs:
+        if rung.state == b.RUNG_UNMEASURED:
+            assert rung.fraction is None, rung.key
+            assert rung.measured is None, rung.key
+
+
+def test_keep_going_readings_surface_as_context_not_diagnosis():
+    """The athlete's choice (2026-08-07): rungs above the failure fill in when
+    he keeps going, labelled context — and the pattern must not move."""
+    full = _GATE0_PASS + _LEVERAGE_PASS + [
+        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°"),
+        b.Reading("spectrum_active", 40.0, "°", side="left"),
+        b.Reading("spectrum_active", 38.0, "°", side="right"),
+        b.Reading("spectrum_isometric", 30.0, "cm"),
+        b.Reading("spectrum_passive", 10.0, "cm")]
+    a = _assessment(full)
+    result = b.run("a", cb.SLOT_EVALUATORS, a)
+    assert result.pattern == "F", "extra readings must never move the pattern"
+    by = {r.key: r for r in cb.ladder(a, result)}
+    assert by["end_range"].state == b.RUNG_CONTEXT
+    assert by["end_range"].fraction == pytest.approx(10.0 / 30.0)
+    assert by["pullers"].state == b.RUNG_CONTEXT
+    assert by["pullers"].fraction == pytest.approx(78.0 / 180.0)
+
+
+def test_two_muscles_can_share_the_bottom_of_the_ladder():
+    """Pattern C fails both leverages, so both rungs read limiting — exactly
+    the 'it could be two muscles at the same time' case."""
+    by = {r.key: r for r in _ladder_for(_GATE0_PASS + [
+        b.Reading("leverage_bent", 20.0, "cm"),
+        b.Reading("leverage_straight", 40.0, "cm")])}
+    assert by["group_length"].state == b.RUNG_LIMITING
+    assert by["gracilis"].state == b.RUNG_LIMITING
+
+
+def test_fractions_are_clamped_and_direction_aware():
+    """A passed rung caps at 100% rather than reading 125%, and on a
+    smaller-is-better scale a doubled reading halves the fraction."""
+    assert b.fraction_of_target(8.0, 10.0, smaller_is_better=True) == 1.0
+    assert b.fraction_of_target(20.0, 10.0, smaller_is_better=True) == 0.5
+    assert b.fraction_of_target(8.0, 20.0) == pytest.approx(0.4)
+    assert b.fraction_of_target(None, 20.0) is None
+    assert b.fraction_of_target(8.0, None) is None
+
+
+def test_the_ladder_names_its_denominators_honestly():
+    """The invented targets stay flagged provisional; the two rungs whose
+    denominators are the athlete's own reading (strength at depth) or the
+    geometry of the skill (openers vs 180°) do not."""
+    provisional = {i["key"]: i["provisional"] for i in cb.LADDER_INFO}
+    assert provisional["group_length"] and provisional["gracilis"]
+    assert provisional["tilt_range"] and provisional["tilt_production"]
+    assert not provisional["end_range"]
+    assert not provisional["pullers"]
+    assert not provisional["bone"]
+
+
+def test_the_ladder_produces_no_aggregate():
+    """Rungs are never combined: no total, no average, no overall number. The
+    battery's output stays one pattern label — the ladder only shows the path."""
+    rungs = _ladder_for(_GATE0_PASS + _LEVERAGE_PASS + [
+        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+    assert isinstance(rungs, tuple)
+    for banned in ("overall", "total_", "combined", "average"):
+        assert not any(banned in dir(r) for r in rungs), banned
+    source = _source(cb)
+    assert "sum(r.fraction" not in source
+    assert "mean(" not in source
+
+
 # ── the setup number that decides the pattern ────────────────────────────────
 
 def test_the_bent_leverage_asks_for_the_heel_distance():

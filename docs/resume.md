@@ -690,6 +690,15 @@ past what the evidence carries, and it is treated as motivation the way
 - **Cluster B is unbuilt.** The blueprint's Pike is defined as *"touching your
   toes; forward fold"*, wording that hits two contraindicated rules outright — a
   whole-cluster collision to resolve before that one is authored.
+- **The ladder (2026-08-07).** The battery's decision path rendered as seven
+  rungs, tightest at the bottom, working rung = the first failure. The athlete
+  asked for per-muscle 0-100; the shipped form is the honest version he chose:
+  every fraction is a measured reading over a NAMED denominator (provisional
+  targets flagged; strength-at-depth is his own passive over his own isometric;
+  openers are the active sum over 180°), an unmeasured muscle shows no number
+  ever, keep-going readings render as context-not-diagnosis, and no aggregate
+  exists — the pattern label remains the battery's only output. Display only:
+  `Report.ladder`, built by `cluster_a_battery.ladder()`.
 - **Every exercise says HOW (2026-08-07).** Five mandatory fields per library
   entry — position, movement (naming what actually resists you), feel, stop
   rule, progress — plain-English- and hedge-scanned, rendered ahead of the why.

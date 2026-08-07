@@ -1354,6 +1354,21 @@ _FLEXIBILITY_CSS = f"""
 .fx-steps i.skip {{ background:{_INK3}; }}
 .fx-pill {{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:9.5px;
            font-weight:700; }}
+.fx-rung {{ border:1px solid {_HAIR}; border-radius:10px; padding:9px 12px 10px;
+           margin-bottom:6px; }}
+.fx-rung.limit {{ border-color:{_ACCENT_FLEX}; background:rgba(34,195,230,.06); }}
+.fx-rung .top {{ display:flex; justify-content:space-between; align-items:baseline;
+           gap:10px; font-size:12px; color:{_INK}; }}
+.fx-rung .top b {{ font-weight:650; }}
+.fx-rung .mus {{ font-size:10.5px; color:{_INK2}; }}
+.fx-rung .val {{ font-size:11.5px; color:{_INK2}; white-space:nowrap;
+           font-variant-numeric:tabular-nums; }}
+.fx-rung .bar {{ height:5px; border-radius:3px; background:rgba(255,255,255,.08);
+           margin-top:7px; overflow:hidden; }}
+.fx-rung .bar i {{ display:block; height:5px; border-radius:3px; }}
+.fx-rung .det {{ font-size:10.5px; color:{_INK2}; margin-top:6px; line-height:1.5; }}
+.fx-rung .tag {{ font-size:9px; letter-spacing:.11em; text-transform:uppercase;
+           font-weight:700; }}
 /* The page-wide caption style is 10px dim grey, which is fine for metadata but
    unreadable for protocol text — and on this screen the athlete READS captions
    mid-test. Injected after styles.py's sheet, so it wins at equal specificity. */
@@ -1736,6 +1751,65 @@ def _fx_render_populated(report, accent: str) -> None:
             f"{result.baseline_sessions}. Until then every threshold above is provisional "
             f"and no single reading is a reason to change anything.",
             icon="⚠️")
+
+    # ── the ladder ──────────────────────────────────────────────────────────
+    #
+    # The battery's decision path made visual (athlete's ask, 2026-08-07):
+    # tightest at the bottom, the working rung highlighted. NOT the v2 rung
+    # model returning — nothing is aggregated, an unmeasured muscle has no
+    # number, and the working rung IS the pattern the battery already chose.
+    if report.ladder:
+        st.markdown('<div class="fx-cap" style="margin:18px 0 8px;">The ladder &mdash; '
+                    'tightest at the bottom, work the marked rung first</div>',
+                    unsafe_allow_html=True)
+        rows = []
+        for rung in reversed(report.ladder):          # top rung renders first
+            cls, tag_color, tag = "", _INK3, ""
+            fill, fill_color = 0.0, _GOOD
+            if rung.state == btry.RUNG_LIMITING:
+                cls, tag_color = " limit", _ACCENT_FLEX
+                tag = f"▶ work this first · §{rung.pattern}" if rung.pattern else \
+                      "▶ work this first"
+                fill, fill_color = rung.fraction or 0.0, _ACCENT_FLEX
+            elif rung.state == btry.RUNG_PASSED:
+                tag, tag_color = "✓ climbed", _GOOD
+                fill = rung.fraction if rung.fraction is not None else 1.0
+            elif rung.state == btry.RUNG_CONTEXT:
+                tag, tag_color = "context, not diagnosis", _WARN
+                fill, fill_color = rung.fraction or 0.0, _WARN
+            elif rung.state == btry.RUNG_UNREADABLE:
+                tag, tag_color = "botched — repeat", _BAD
+            else:
+                tag = "not measured"
+
+            if rung.fraction is not None:
+                value = (f"{rung.measured:g}{rung.unit} of {rung.target:g}{rung.unit}"
+                         f" · {rung.fraction * 100:.0f}%")
+            elif rung.measured is not None:
+                value = f"{rung.measured:g}{rung.unit}"
+            else:
+                value = "—"
+            prov = (' <span class="tag" style="color:{c};">provisional target</span>'
+                    .format(c=_INK3) if rung.provisional and rung.fraction is not None
+                    else "")
+            bar = (f'<div class="bar"><i style="width:{fill * 100:.0f}%;'
+                   f'background:{fill_color};"></i></div>'
+                   if rung.state not in (btry.RUNG_UNMEASURED, btry.RUNG_UNREADABLE)
+                   else '<div class="bar"></div>')
+            detail = f'<div class="det">{rung.detail}</div>' if rung.detail else ""
+            rows.append(
+                f'<div class="fx-rung{cls}">'
+                f'<div class="top"><span><b>{rung.label}</b> '
+                f'<span class="mus">· {rung.muscle}</span></span>'
+                f'<span class="val">{value}{prov}</span></div>'
+                f'{bar}'
+                f'<div class="tag" style="color:{tag_color};margin-top:6px;">{tag}</div>'
+                f'{detail}</div>'
+            )
+        st.markdown("".join(rows), unsafe_allow_html=True)
+        st.caption("A grey rung is unknown, not zero — the battery stops at the first "
+                   "failure, so rungs above it are unmeasured until you choose to keep "
+                   "going. No rung is ever averaged with another.")
 
     # ── the stack ───────────────────────────────────────────────────────────
     try:

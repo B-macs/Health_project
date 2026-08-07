@@ -14,6 +14,7 @@ readings that cannot be interpreted.
 
 from __future__ import annotations
 
+import os
 from datetime import date
 
 import pytest
@@ -23,7 +24,9 @@ from streamlit.testing.v1 import AppTest
 import cluster_a_battery as cba
 from services import battery as sb
 
-_ROOT = r"c:\Users\brian\Documents\1.Projects\AIProject\Health_project"
+# Derived, not hardcoded: a hardcoded absolute path silently imports the code
+# of a DIFFERENT checkout when the suite runs from a worktree or a clone.
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 _SCRIPT = '''
 import sys
@@ -305,6 +308,20 @@ def test_a_recorded_setup_number_is_offered_back_the_next_time():
     body = _text(at)
     assert "Last time you used" in body
     assert "92" in body
+
+
+def test_the_ladder_is_on_the_populated_screen_with_honest_states():
+    """Tightest at the bottom, the working rung marked, unmeasured rungs shown
+    as unknown — never as a number."""
+    at = _run(readings=_TILT_FAILS)
+    body = _text(at)
+    assert "The ladder" in body
+    assert "work this first" in body.lower()
+    assert "not measured" in body.lower()
+    assert "8° of 20°" in body
+    assert "40%" in body
+    assert "hip abductors" in body.lower()
+    assert "ever averaged" in body.lower()
 
 
 def test_stack_items_lead_with_how_not_why():

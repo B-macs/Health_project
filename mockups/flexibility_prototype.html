@@ -257,6 +257,57 @@ const DATA = {
    }
   }
  ],
+ "ladderInfo": [
+  {
+   "key": "bone",
+   "label": "Bone & orientation",
+   "muscle": "the shape of the hip joint",
+   "unit": "cm",
+   "provisional": false
+  },
+  {
+   "key": "group_length",
+   "label": "Adductor group \u2014 bent knee",
+   "muscle": "inner thigh group",
+   "unit": "cm",
+   "provisional": true
+  },
+  {
+   "key": "gracilis",
+   "label": "Gracilis \u2014 straight knee",
+   "muscle": "the groin muscle that crosses the knee",
+   "unit": "cm",
+   "provisional": true
+  },
+  {
+   "key": "tilt_range",
+   "label": "Tilt, with help",
+   "muscle": "hamstrings capping the pelvis",
+   "unit": "\u00b0",
+   "provisional": true
+  },
+  {
+   "key": "tilt_production",
+   "label": "Tilt, own power",
+   "muscle": "hip flexors",
+   "unit": "\u00b0",
+   "provisional": true
+  },
+  {
+   "key": "end_range",
+   "label": "Strength at depth",
+   "muscle": "adductors under load",
+   "unit": "cm",
+   "provisional": false
+  },
+  {
+   "key": "pullers",
+   "label": "Openers",
+   "muscle": "hip abductors",
+   "unit": "\u00b0",
+   "provisional": false
+  }
+ ],
  "order": [
   "gate0_neutral",
   "gate0_turned_out",
@@ -1116,6 +1167,63 @@ function evaluate(){
   return {slots:out,pattern:'I',stopped:3};
 }
 
+// ── the ladder, mirroring cluster_a_battery.ladder() ────────────────────────
+function frac(m,t,smaller){ if(m==null||t==null||m<=0||t<=0) return null;
+  var f = smaller ? t/m : m/t; return Math.max(0, Math.min(1, f)); }
+
+function ladderRungs(ev){
+  const ran={}; ev.slots.forEach(function(s){ ran[s.slot]=s; });
+  const n=val('gate0_neutral');
+  const bent=worst('leverage_bent'), str=best('leverage_straight');
+  const rg=val('tilt_range'), pr=val('tilt_production');
+  const iso=val('spectrum_isometric'), pas=val('spectrum_passive');
+  const act=S.r['spectrum_active']||{};
+  const sum=(act['left']!=null&&act['left']!==''&&act['right']!=null&&act['right']!=='')
+    ? Number(act['left'])+Number(act['right']) : null;
+  function info(k){ return DATA.ladderInfo.find(function(i){return i.key===k;}); }
+  const out=[];
+  function add(k,state,m,t,f,pat){ const i=info(k);
+    out.push({key:k,label:i.label,muscle:i.muscle,unit:i.unit,provisional:i.provisional,
+              state:state,measured:m,target:t,fraction:f,pattern:pat||''}); }
+
+  if(!(0 in ran)) add('bone','unmeasured',null,null,null);
+  else if(!ran[0].pass) add('bone','limiting',n,null,null,'B');
+  else add('bone','passed',n,null,null);
+
+  const s1=ran[1], bf=frac(bent,DATA.th.bent,true), sf=frac(str,DATA.th.straight,false);
+  if(s1){ const p=s1.pattern||'';
+    add('group_length',(p==='C'||p==='D')?'limiting':'passed',bent,DATA.th.bent,bf,(p==='C'||p==='D')?p:'');
+    add('gracilis',(p==='C'||p==='E')?'limiting':'passed',str,DATA.th.straight,sf,(p==='C'||p==='E')?p:'');
+  } else {
+    add('group_length',bent!=null?'context':'unmeasured',bent,DATA.th.bent,bent!=null?bf:null);
+    add('gracilis',str!=null?'context':'unmeasured',str,DATA.th.straight,str!=null?sf:null);
+  }
+
+  const s2=ran[2], rf=frac(rg,DATA.th.tilt,false), pf=frac(pr,DATA.th.tilt,false);
+  if(s2){ const p=s2.pattern||'';
+    if(p==='F'){ add('tilt_range','limiting',rg,DATA.th.tilt,rf,'F');
+                 add('tilt_production','context',pr,DATA.th.tilt,pf); }
+    else if(p==='G'){ add('tilt_range','passed',rg,DATA.th.tilt,rf);
+                      add('tilt_production','limiting',pr,DATA.th.tilt,pf,'G'); }
+    else { add('tilt_range','passed',rg,DATA.th.tilt,rf);
+           add('tilt_production','passed',pr,DATA.th.tilt,pf); }
+  } else {
+    add('tilt_range',rg!=null?'context':'unmeasured',rg,DATA.th.tilt,rg!=null?rf:null);
+    add('tilt_production',pr!=null?'context':'unmeasured',pr,DATA.th.tilt,pr!=null?pf:null);
+  }
+
+  const s3=ran[3];
+  const df=(iso!=null&&pas!=null&&iso>0)?Math.max(0,Math.min(1,pas/iso)):null;
+  const opf=frac(sum,180,false);
+  if(s3&&s3.indet){ add('end_range','unreadable',iso,pas,null);
+    add('pullers',sum!=null?'context':'unmeasured',sum,180,sum!=null?opf:null); }
+  else if(s3){ add('end_range',s3.pattern==='H'?'limiting':'passed',iso,pas,df,s3.pattern==='H'?'H':'');
+    add('pullers',s3.pattern==='I'?'limiting':'passed',sum,180,opf,s3.pattern==='I'?'I':''); }
+  else { add('end_range',(iso!=null&&pas!=null)?'context':'unmeasured',iso,pas,df);
+    add('pullers',sum!=null?'context':'unmeasured',sum,180,sum!=null?opf:null); }
+  return out;
+}
+
 // Seed ONE test, and only when its step is reached. Prefilling everything up
 // front made the battery reach its answer before the first step was shown,
 // which is correct behaviour and a useless demonstration of it.
@@ -1274,6 +1382,32 @@ function done(){
     +'<div class="sm" style="color:#E2CB9B"><b>This is a hypothesis, not a verdict.</b> '
     +'A pattern is trusted after '+DATA.baselinesRequired+' baseline mornings; there is 1. '
     +'Until then every threshold is provisional and no single reading is a reason to change anything.</div></div>';
+
+  h += '<div class="cap" style="margin:18px 0 8px">The ladder &mdash; tightest at the bottom, work the marked rung first</div>';
+  ladderRungs(ev).slice().reverse().forEach(function(r){
+    var tag='not measured', tcol='var(--ink3)', fill=null, fcol='var(--good)', box='';
+    if(r.state==='limiting'){ tag='▶ work this first'+(r.pattern?' · §'+r.pattern:'');
+      tcol='var(--accent)'; fill=r.fraction||0; fcol='var(--accent)';
+      box='border-color:var(--accent);background:rgba(34,195,230,.06);'; }
+    else if(r.state==='passed'){ tag='✓ climbed'; tcol='var(--good)';
+      fill=(r.fraction==null?1:r.fraction); }
+    else if(r.state==='context'){ tag='context, not diagnosis'; tcol='var(--warn)';
+      fill=r.fraction||0; fcol='var(--warn)'; }
+    else if(r.state==='unreadable'){ tag='botched — repeat'; tcol='var(--bad)'; }
+    var v = r.fraction!=null
+      ? (r.measured+r.unit+' of '+r.target+r.unit+' · '+Math.round(r.fraction*100)+'%'
+         +(r.provisional?' · provisional':''))
+      : (r.measured!=null?(r.measured+r.unit):'—');
+    h += '<div class="card" style="padding:10px 13px;margin-bottom:6px;'+box+'">'
+      +'<div class="row"><span style="font-size:12px"><b>'+r.label+'</b> '
+      +'<span style="color:var(--ink3);font-size:10.5px">· '+r.muscle+'</span></span>'
+      +'<span style="font-size:11px;color:var(--ink2);white-space:nowrap">'+v+'</span></div>'
+      +'<div style="height:5px;border-radius:3px;background:rgba(255,255,255,.08);margin-top:6px;overflow:hidden">'
+      +(fill!=null?'<i style="display:block;height:5px;width:'+Math.round(fill*100)+'%;background:'+fcol+'"></i>':'')
+      +'</div>'
+      +'<div class="cap" style="color:'+tcol+';margin-top:6px">'+tag+'</div></div>';
+  });
+  h += '<div class="note">A grey rung is unknown, not zero — the battery stops at the first failure. No rung is ever averaged with another.</div>';
 
   h += '<div class="cap" style="margin:18px 0 8px">Before every session, without exception</div>';
   DATA.release.forEach(function(r){ h += '<div class="sm">&bull; '+r.name+' — '+r.dose

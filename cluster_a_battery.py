@@ -695,3 +695,207 @@ SLOT_EVALUATORS = [
     evaluate_prerequisite,
     evaluate_spectrum,
 ]
+
+
+# ── the ladder ───────────────────────────────────────────────────────────────
+#
+# Cluster A's ladder, bottom-up: the tightest thing is at the bottom and it is
+# what you work first. Seven rungs, each a capacity the battery measures,
+# annotated with the muscle it names. States come from the battery result —
+# the ladder never re-decides anything.
+#
+# Denominators, because every fraction must name one:
+#   group/gracilis/tilt  the PROVISIONAL targets (invented, flagged as such)
+#   strength at depth    the athlete's OWN passive reading — relative, sound
+#   openers              180° — the geometry of a full side split, not a guess
+
+#: Display metadata, bottom rung first. The prototype reads this too.
+LADDER_INFO: tuple[dict, ...] = (
+    {"key": "bone", "label": "Bone & orientation",
+     "muscle": "the shape of the hip joint", "unit": "cm", "provisional": False},
+    {"key": "group_length", "label": "Adductor group — bent knee",
+     "muscle": "inner thigh group", "unit": "cm", "provisional": True},
+    {"key": "gracilis", "label": "Gracilis — straight knee",
+     "muscle": "the groin muscle that crosses the knee", "unit": "cm",
+     "provisional": True},
+    {"key": "tilt_range", "label": "Tilt, with help",
+     "muscle": "hamstrings capping the pelvis", "unit": "°", "provisional": True},
+    {"key": "tilt_production", "label": "Tilt, own power",
+     "muscle": "hip flexors", "unit": "°", "provisional": True},
+    {"key": "end_range", "label": "Strength at depth",
+     "muscle": "adductors under load", "unit": "cm", "provisional": False},
+    {"key": "pullers", "label": "Openers",
+     "muscle": "hip abductors", "unit": "°", "provisional": False},
+)
+
+
+def _info(key: str) -> dict:
+    return next(i for i in LADDER_INFO if i["key"] == key)
+
+
+def ladder(assessment, result) -> tuple:
+    """The battery's decision path as rungs, bottom-up.
+
+    Readings below the first failure appear as CONTEXT when they exist (the
+    athlete chose to keep going) — measured numbers, honestly shown, but the
+    working rung stays the battery's first failure. Absent readings appear as
+    UNMEASURED with no number at all.
+    """
+    from services import battery as b
+
+    ran = {s.slot: s for s in result.slots}
+    rungs: list = []
+
+    def add(key, state, *, measured=None, target=None, fraction=None,
+            detail="", pattern=""):
+        info = _info(key)
+        rungs.append(b.LadderRung(
+            key=key, label=info["label"], muscle=info["muscle"], state=state,
+            unit=info["unit"], measured=measured, target=target,
+            fraction=fraction, detail=detail, pattern=pattern,
+            provisional=info["provisional"]))
+
+    # ── bone & orientation (slot 0) ─────────────────────────────────────────
+    slot0 = ran.get(b.SLOT_STRUCTURE)
+    neutral = assessment.reading("gate0_neutral")
+    if slot0 is None or slot0.indeterminate:
+        add("bone", b.RUNG_UNMEASURED, detail="Gate 0 incomplete.")
+    elif not slot0.passed:
+        add("bone", b.RUNG_LIMITING, pattern=slot0.pattern,
+            measured=neutral.value if neutral else None,
+            detail="Turning the legs out changes the depth — alignment, not tissue.")
+    elif neutral is not None and neutral.value > GATE0_BONE_RELEVANT_CM:
+        add("bone", b.RUNG_PASSED, measured=neutral.value,
+            detail=f"Not a factor at {neutral.value:g} cm off the floor — the "
+                   f"question goes live under {GATE0_BONE_RELEVANT_CM:g} cm.")
+    else:
+        add("bone", b.RUNG_PASSED, measured=neutral.value if neutral else None,
+            detail="Turning out changed little — tissue, not bone.")
+
+    # ── the two leverages (slot 1) ──────────────────────────────────────────
+    slot1 = ran.get(b.SLOT_REGRESSED)
+    bent = _worse(assessment.readings_for("leverage_bent"))
+    straight = _better(assessment.readings_for("leverage_straight"))
+    bent_frac = b.fraction_of_target(bent, LEVERAGE_TARGETS["leverage_bent"],
+                                     smaller_is_better=True)
+    straight_frac = b.fraction_of_target(straight,
+                                         LEVERAGE_TARGETS["leverage_straight"])
+
+    def leverage_state(has_reading, failed):
+        if slot1 is None or slot1.indeterminate:
+            if not has_reading:
+                return b.RUNG_UNMEASURED
+            return b.RUNG_CONTEXT if slot1 is None else b.RUNG_PASSED
+        return b.RUNG_LIMITING if failed else b.RUNG_PASSED
+
+    if slot1 is not None and not slot1.indeterminate:
+        group_fails = slot1.pattern in ("C", "D")
+        gracilis_fails = slot1.pattern in ("C", "E")
+    else:
+        group_fails = gracilis_fails = False
+
+    add("group_length",
+        leverage_state(bent is not None, group_fails),
+        measured=bent, target=LEVERAGE_TARGETS["leverage_bent"],
+        fraction=bent_frac if bent is not None else None,
+        pattern="D" if slot1 and slot1.pattern == "D" else
+                ("C" if slot1 and slot1.pattern == "C" else ""),
+        detail="Worse side decides; heels at the recorded distance.")
+    add("gracilis",
+        leverage_state(straight is not None, gracilis_fails),
+        measured=straight, target=LEVERAGE_TARGETS["leverage_straight"],
+        fraction=straight_frac if straight is not None else None,
+        pattern="E" if slot1 and slot1.pattern == "E" else
+                ("C" if slot1 and slot1.pattern == "C" else ""),
+        detail="Named by the straight-against-bent comparison.")
+
+    # ── the tilt, two ways (slot 2) ─────────────────────────────────────────
+    slot2 = ran.get(b.SLOT_PREREQUISITE)
+    rng = assessment.reading("tilt_range")
+    rng = rng if rng is not None and rng.unit == "°" else None
+    prod = assessment.reading("tilt_production")
+    prod = prod if prod is not None and prod.unit == "°" else None
+    rng_frac = b.fraction_of_target(rng.value if rng else None, TILT_TARGET_DEG)
+    prod_frac = b.fraction_of_target(prod.value if prod else None, TILT_TARGET_DEG)
+
+    if slot2 is not None and not slot2.indeterminate:
+        if slot2.pattern == "F":
+            add("tilt_range", b.RUNG_LIMITING, pattern="F",
+                measured=rng.value, target=TILT_TARGET_DEG, fraction=rng_frac,
+                detail="Not available even with help — tilt work first, assisted.")
+            add("tilt_production", b.RUNG_CONTEXT,
+                measured=prod.value, target=TILT_TARGET_DEG, fraction=prod_frac,
+                detail="Same slot, second question — read it again once the "
+                       "helped tilt moves.")
+        elif slot2.pattern == "G":
+            add("tilt_range", b.RUNG_PASSED,
+                measured=rng.value, target=TILT_TARGET_DEG, fraction=rng_frac,
+                detail="The position exists when something helps.")
+            add("tilt_production", b.RUNG_LIMITING, pattern="G",
+                measured=prod.value, target=TILT_TARGET_DEG, fraction=prod_frac,
+                detail="Reachable but not producible — strength work, last in "
+                       "the session.")
+        else:
+            add("tilt_range", b.RUNG_PASSED, measured=rng.value,
+                target=TILT_TARGET_DEG, fraction=rng_frac)
+            add("tilt_production", b.RUNG_PASSED, measured=prod.value,
+                target=TILT_TARGET_DEG, fraction=prod_frac)
+    else:
+        for key, reading, frac in (("tilt_range", rng, rng_frac),
+                                   ("tilt_production", prod, prod_frac)):
+            if reading is None:
+                add(key, b.RUNG_UNMEASURED)
+            else:
+                add(key, b.RUNG_CONTEXT, measured=reading.value,
+                    target=TILT_TARGET_DEG, fraction=frac,
+                    detail="Measured below a failure — context, not diagnosis.")
+
+    # ── the spectrum (slot 3) ───────────────────────────────────────────────
+    slot3 = ran.get(b.SLOT_SPECTRUM)
+    iso = assessment.reading("spectrum_isometric")
+    passive = assessment.reading("spectrum_passive")
+    actives = assessment.readings_for("spectrum_active")
+    by_side = {r.side: r.value for r in actives}
+    active_sum = sum(by_side.values()) if len(by_side) >= 2 else None
+
+    # RELATIVE, and the one rung that needs no invented number: the fraction is
+    # the athlete's own held depth over his own passive depth.
+    depth_frac = None
+    if iso is not None and passive is not None and iso.value > 0:
+        depth_frac = max(0.0, min(1.0, passive.value / iso.value))
+    open_frac = b.fraction_of_target(active_sum, 180.0)
+
+    unreadable = (slot3 is not None and slot3.indeterminate
+                  and "too light" in slot3.reason)
+    if unreadable:
+        add("end_range", b.RUNG_UNREADABLE, measured=iso.value, target=passive.value,
+            detail="The load was too light — passive measured twice. Repeat "
+                   "before reading this rung.")
+    elif slot3 is not None and not slot3.indeterminate:
+        add("end_range",
+            b.RUNG_LIMITING if slot3.pattern == "H" else b.RUNG_PASSED,
+            pattern="H" if slot3.pattern == "H" else "",
+            measured=iso.value, target=passive.value, fraction=depth_frac,
+            detail=f"Holds {iso.value:g} cm against a passive {passive.value:g} cm "
+                   f"— your own reading is the yardstick.")
+    elif iso is not None and passive is not None:
+        add("end_range", b.RUNG_CONTEXT, measured=iso.value, target=passive.value,
+            fraction=depth_frac,
+            detail="Measured below a failure — context, not diagnosis.")
+    else:
+        add("end_range", b.RUNG_UNMEASURED)
+
+    if slot3 is not None and not slot3.indeterminate:
+        add("pullers",
+            b.RUNG_LIMITING if slot3.pattern == "I" else b.RUNG_PASSED,
+            pattern="I" if slot3.pattern == "I" else "",
+            measured=active_sum, target=180.0, fraction=open_frac,
+            detail="Left plus right, against the 180° of a full split.")
+    elif active_sum is not None:
+        add("pullers", b.RUNG_CONTEXT, measured=active_sum, target=180.0,
+            fraction=open_frac,
+            detail="Measured below a failure — context, not diagnosis.")
+    else:
+        add("pullers", b.RUNG_UNMEASURED)
+
+    return tuple(rungs)

@@ -260,6 +260,60 @@ class BatteryResult:
         return self.complete and self.basis == BASIS_PROVISIONAL
 
 
+# ── the ladder ───────────────────────────────────────────────────────────────
+#
+# The battery's decision path made visual, the way the athlete pictures it
+# (2026-08-07): a ladder with the tightest thing at the bottom, climbed rung by
+# rung, stuck exactly where the battery stopped. THIS IS NOT THE v2 RUNG MODEL
+# COMING BACK: nothing is aggregated, nothing is min()'d, there is no overall
+# number, and the working rung IS the battery's first failure — the ladder
+# shows the decision, it never makes one. Every displayed fraction is a
+# measured reading over a NAMED denominator, and an unmeasured muscle has no
+# number at all: None, never zero.
+
+RUNG_PASSED = "passed"          #: climbed — measured, and not the limiter
+RUNG_LIMITING = "limiting"      #: the rung you are stuck on — work this first
+RUNG_CONTEXT = "context"        #: measured below a failure — context, not diagnosis
+RUNG_UNMEASURED = "unmeasured"  #: no readings — no number, never zero
+RUNG_UNREADABLE = "unreadable"  #: readings exist but were botched (e.g. load too light)
+
+
+@dataclass(frozen=True)
+class LadderRung:
+    """One rung: a capacity the battery tests, annotated with the muscle it
+    names, and where the athlete stands on it."""
+    key: str
+    label: str
+    muscle: str
+    state: str
+    unit: str = ""
+    measured: float | None = None
+    target: float | None = None
+    #: 0..1 toward the target. None whenever nothing was measured — showing 0
+    #: for an unmeasured muscle would read as "terrible" when the truth is
+    #: "unknown", which is the exact confusion the third outcome exists to stop.
+    fraction: float | None = None
+    detail: str = ""
+    pattern: str = ""
+    #: True when the denominator is an invented cut point rather than the
+    #: athlete's own reading or the geometry of the skill.
+    provisional: bool = False
+
+
+def fraction_of_target(measured: float | None, target: float | None,
+                       *, smaller_is_better: bool = False) -> float | None:
+    """How far a reading is toward its target, clamped to 0..1.
+
+    Direction-aware: on a smaller-is-better scale the fraction is target over
+    measured, so 8 cm against a 10 cm limit reads full rather than 125%.
+    None in, None out — a missing reading never becomes a number.
+    """
+    if measured is None or target is None or measured <= 0 or target <= 0:
+        return None
+    frac = (target / measured) if smaller_is_better else (measured / target)
+    return max(0.0, min(1.0, frac))
+
+
 # ── running a battery ────────────────────────────────────────────────────────
 
 def run(cluster: str,
