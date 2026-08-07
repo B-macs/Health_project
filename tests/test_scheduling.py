@@ -850,3 +850,68 @@ def test_both_view_writer_blocks_are_gated_off_during_a_guided_session():
     text = src.read_text(encoding="utf-8")
     assert "if active is not None and not _in_session:" in text
     assert "if active is not None and day_num is not None and not _in_session:" in text
+
+
+# ─── ask-first: nothing that moves a session is written without permission ──
+
+def test_has_real_move_distinguishes_swaps_from_pure_records():
+    monday = _monday_on_or_before(date(2026, 7, 6))
+    tuesday = monday + timedelta(days=1)
+    phase = Phase(2, "Stage 2", monday.isoformat(), 28, "active")
+
+    # Pure self-maps (holds/drops) move nothing.
+    assert scheduling.has_real_move(phase, {monday.isoformat(): 1}) is False
+    assert scheduling.has_real_move(phase, {}) is False
+    # A swap moves; one moving entry makes the whole proposal a move.
+    assert scheduling.has_real_move(
+        phase, {monday.isoformat(): 2, tuesday.isoformat(): 1}) is True
+    assert scheduling.has_real_move(
+        phase, {monday.isoformat(): 1, tuesday.isoformat(): 1}) is True
+    # "Self-map" means equal to the CURRENT resolution, overrides included:
+    # re-stating an existing override is a record, not a move.
+    overridden = Phase(2, "Stage 2", monday.isoformat(), 28, "active",
+                       date_overrides={monday.isoformat(): 9})
+    assert scheduling.has_real_move(overridden, {monday.isoformat(): 9}) is False
+
+
+def test_declined_entries_are_self_maps_that_close_both_guards():
+    # A decline is a remembered "no": nothing moves, the banner never says
+    # "Session moved", and neither mechanism ever asks about the date again.
+    plan_dict = {1: {"day_type": "main"}, **_rest_days(2, 3, 4, 5, 6, 7)}
+    monday = _MONDAY
+    phase = _phase(monday)
+
+    overrides, reasons = scheduling.declined_entries(
+        phase, [monday], "Sleep debt of 10.2h over the last 7 nights")
+
+    assert overrides == {monday.isoformat(): 1}  # self-map, nothing moves
+    assert reasons == {monday.isoformat():
+                       scheduling.DECLINED_REASON_PREFIX
+                       + "Sleep debt of 10.2h over the last 7 nights"}
+    assert scheduling.has_real_move(phase, overrides) is False
+    # The readiness guard closes on the merged ledger...
+    assert scheduling.should_evaluate_shift(True, monday.isoformat(), reasons) is False
+    # ...and so does the miss scan: a declined missed main stays missed.
+    settled = replace(phase,
+                      date_overrides={**phase.date_overrides, **overrides},
+                      shift_reasons={**phase.shift_reasons, **reasons})
+    assert scheduling.missed_reschedules(
+        settled, plan_dict, set(), today=monday + timedelta(days=1)) == ({}, {})
+    # The three no-movement prefixes must stay distinguishable.
+    assert len({scheduling.DROPPED_REASON_PREFIX, scheduling.HELD_REASON_PREFIX,
+                scheduling.DECLINED_REASON_PREFIX}) == 3
+
+
+def test_view_never_writes_a_real_move_without_a_button_press():
+    # Source-scan pin: both writer blocks must route every real move through
+    # an explicit confirmation button, gate their unasked writes on
+    # has_real_move being False, and persist a decline via declined_entries.
+    import pathlib
+    src = pathlib.Path(scheduling.__file__).parent.parent / "views" / "training.py"
+    text = src.read_text(encoding="utf-8")
+    for marker in ('"Apply reschedule"', '"Leave as missed"',
+                   '"Move session"', '"Keep as planned"'):
+        assert marker in text, f"confirmation button {marker} missing"
+    assert text.count("scheduling.has_real_move(") >= 3
+    assert text.count("scheduling.declined_entries(") >= 2
+    assert "scheduling.DECLINED_REASON_PREFIX" in text  # banner honesty

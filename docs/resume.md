@@ -335,9 +335,16 @@ prescription under Structure is Stage 1 only; Stage 2A is externally loaded.
   `shift_reasons` ledger, and each date is scheduled at most once — a
   reschedule claiming today suppresses today's auto-shift, an auto-shifted
   date later missed stays missed, and the auto-shift never re-swaps a date
-  the carry already claimed (all pinned). Neither writer runs while a
-  guided session is in progress — a mid-session remap of today would carry
-  index-keyed session state onto a different session's exercises. The plan
+  the carry already claimed (all pinned). **ASK-FIRST (the athlete's rule,
+  2026-08-07): neither mechanism MOVES anything unasked**, however loudly
+  the readings argue — a proposal that would relocate a session renders as
+  an Apply/Keep prompt and only an explicit button press persists it;
+  holds, drops and declines (records that move nothing, `has_real_move`
+  False) write unasked, and a decline (`declined_entries`,
+  `DECLINED_REASON_PREFIX`) is remembered in the ledger so the question is
+  never re-asked. Neither writer runs while a guided session is in
+  progress — a mid-session remap of today would carry index-keyed session
+  state onto a different session's exercises. The plan
   authors `day_type` per day (`training_plan.PLAN_STAGE2`, all 28 days —
   all-or-nothing, coverage test enforces); Stage 1 is untyped and inert. The
   phases blob write is chunked (`clients/notion.py rich_text`) because the

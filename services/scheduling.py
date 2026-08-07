@@ -38,14 +38,20 @@ docstring).
 
 This module is pure: it computes what SHOULD happen and the date_overrides/
 shift_reasons entries needed to make it so. The caller (views/training.py)
-owns the actual Notion write via Repository.set_phases(). shift_reasons is
-the shared evaluated-once ledger for BOTH mechanisms: the auto-shift never
-re-evaluates a date already recorded there (should_evaluate_shift), and
-missed_reschedules records every miss it evaluates — moved or dropped — and
-never touches a date already in the ledger. Two deliberate consequences,
-both failing safe to the pre-feature behaviour: a reschedule that claims
-TODAY suppresses today's auto-shift, and an auto-shifted date that is later
-missed reads as already handled and simply stays missed.
+owns the actual Notion write via Repository.set_phases() — and, by the
+athlete's rule (2026-08-07), the athlete owns the DECISION: a proposal that
+would MOVE a session is never persisted without an explicit confirmation,
+however loudly the readings argue for it. has_real_move draws the line —
+only no-movement records (holds, drops, declines) may be written unasked —
+and declined_entries turns a "no" into a ledger entry so the question is
+never re-asked. shift_reasons is the shared evaluated-once ledger for BOTH
+mechanisms: the auto-shift never re-evaluates a date already recorded there
+(should_evaluate_shift), and missed_reschedules records every miss it
+evaluates — moved, dropped or declined — and never touches a date already
+in the ledger. Two deliberate consequences, both failing safe to the
+pre-feature behaviour: a reschedule that claims TODAY suppresses today's
+auto-shift, and an auto-shifted date that is later missed reads as already
+handled and simply stays missed.
 """
 
 from __future__ import annotations
@@ -89,6 +95,11 @@ DROPPED_REASON_PREFIX = "Not rescheduled: "
 #: rewrite loop — but the banner renders these without the "Session moved"
 #: framing, which would otherwise announce a move that never happened.
 HELD_REASON_PREFIX = "Session kept in place: "
+
+#: Reason-string prefix for a proposed move the ATHLETE declined. The engine
+#: asked, the answer was no, and the ledger entry is what stops it asking
+#: again — nothing about the schedule itself changes.
+DECLINED_REASON_PREFIX = "Declined: "
 
 
 def should_evaluate_shift(is_gym_session: bool, today_iso: str, shift_reasons: dict[str, str]) -> bool:
@@ -176,6 +187,32 @@ def _week_sunday(d: date) -> date:
     boundary no scheduling move ever crosses, shared by
     swap_pairs_for_shift and missed_reschedules."""
     return d + timedelta(days=6 - d.weekday())
+
+
+def has_real_move(phase: Phase, overrides: dict[str, int]) -> bool:
+    """DETERMINISTIC. Whether a proposed override set MOVES anything — any
+    entry whose day-number differs from that date's current resolution. A
+    proposal of pure self-maps (holds, drops) is a RECORD, not a move, and
+    is the only kind the caller may persist without the athlete's explicit
+    confirmation (the athlete's rule, 2026-08-07: never swapped without
+    permission, even when the readings say it should be)."""
+    return any(
+        plan.day_number_in_phase(phase, date.fromisoformat(iso)) != num
+        for iso, num in overrides.items()
+    )
+
+
+def declined_entries(phase: Phase, dates: list[date],
+                     reason: str) -> tuple[dict[str, int], dict[str, str]]:
+    """DETERMINISTIC. The ledger entries to persist when the athlete
+    DECLINES a proposed move: a no-op self-map plus a DECLINED reason for
+    each evaluated date, so the guards never propose it again and the
+    banner tells the truth (nothing moved). Same (date_overrides,
+    shift_reasons) delta shape as every other writer — merge, don't
+    replace."""
+    overrides = {d.isoformat(): plan.day_number_in_phase(phase, d) for d in dates}
+    reasons = {iso: DECLINED_REASON_PREFIX + reason for iso in overrides}
+    return overrides, reasons
 
 
 def swap_pairs_for_shift(phase: Phase, from_date: date, plan_dict: dict) -> dict[str, int]:

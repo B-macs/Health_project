@@ -1232,9 +1232,10 @@ def _render_shift_banner(active, d: date) -> None:
     reason = active.shift_reasons.get(d.isoformat())
     if reason:
         if reason.startswith((scheduling.DROPPED_REASON_PREFIX,
-                              scheduling.HELD_REASON_PREFIX)):
-            # A dropped miss and a held (refused/undone) shift did NOT move
-            # — "Session moved" would be a lie for both.
+                              scheduling.HELD_REASON_PREFIX,
+                              scheduling.DECLINED_REASON_PREFIX)):
+            # A dropped miss, a held (refused/undone) shift and a declined
+            # proposal did NOT move — "Session moved" would be a lie.
             st.info(reason)
         else:
             st.info(f"Session moved — {reason}")
@@ -2062,45 +2063,78 @@ def render():
     _volume_factor = _policy["volume_factor"]
 
     # ── Missed-session rescheduling — priority-based carry within the week ──────
-    # Runs BEFORE the readiness auto-shift so a carried session claims its slot
-    # first. The rerun on a successful write is LOAD-BEARING, not polish:
-    # phases/active were fetched once at the top of render(), so letting this
-    # render continue would hand the auto-shift block a stale `active` whose
-    # own merge (last-write-wins) silently drops the entries just written.
-    # Termination is structural, no separate guard needed: every evaluated
-    # miss — moved or dropped — leaves a shift_reasons entry, and
-    # missed_reschedules skips dates already in that ledger, so the rerun
-    # finds nothing left to do.
+    # ASK-FIRST (the athlete's rule, 2026-08-07): a proposal that would MOVE a
+    # session is never written without an explicit button press — it renders
+    # as a prompt, recomputed fresh each render, and only "Apply reschedule"
+    # or "Leave as missed" persists anything. The ONE thing written unasked
+    # is a proposal with no real move (pure drop records: nothing could be
+    # carried, nothing changes on the calendar) — scheduling.has_real_move
+    # draws that line. Declining writes DECLINED self-maps so the prompt
+    # never nags again. The rerun on a successful write is LOAD-BEARING:
+    # phases/active were fetched once at the top of render(), so continuing
+    # this render would hand the auto-shift block a stale `active` whose own
+    # merge (last-write-wins) silently drops the entries just written. A
+    # pending unanswered prompt writes nothing and loops nothing — every
+    # render recomputes pure functions only.
     if active is not None and not _in_session:
         _mr_write_succeeded = False
         try:
             _mr_plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
-            _mr_monday = date.today() - timedelta(days=date.today().weekday())
-            _mr_logged = _week_logged_dates(_mr_monday.isoformat())
+            _mr_today = date.today()
+            _mr_monday = _mr_today - timedelta(days=_mr_today.weekday())
             _mr_overrides, _mr_reasons = scheduling.missed_reschedules(
-                active, _mr_plan_dict, _mr_logged, date.today())
-            if _mr_overrides:
-                # The cached logged set can be up to 5 minutes stale and this
-                # write is permanent — before trusting a "missed"
+                active, _mr_plan_dict, _week_logged_dates(_mr_monday.isoformat()),
+                _mr_today)
+
+            def _mr_recompute():
+                # The cached logged set can be up to 5 minutes stale and any
+                # write here is permanent — before trusting a "missed"
                 # classification, re-read the week's logged dates fresh
-                # (uncached; one Notion query, and only on the rare render
-                # that actually proposes a reschedule) and recompute.
-                _mr_logged = repo.get_repository().get_logged_session_dates(
+                # (uncached; one Notion query, only on the rare render that
+                # actually writes) and recompute.
+                _fresh = repo.get_repository().get_logged_session_dates(
                     _mr_monday, _mr_monday + timedelta(days=6))
-                _mr_overrides, _mr_reasons = scheduling.missed_reschedules(
-                    active, _mr_plan_dict, _mr_logged, date.today())
-            if _mr_overrides:
+                return scheduling.missed_reschedules(
+                    active, _mr_plan_dict, _fresh, _mr_today)
+
+            def _mr_write(_ovr, _rsn):
                 _mr_active = replace(
                     active,
-                    date_overrides={**active.date_overrides, **_mr_overrides},
-                    shift_reasons={**active.shift_reasons, **_mr_reasons},
+                    date_overrides={**active.date_overrides, **_ovr},
+                    shift_reasons={**active.shift_reasons, **_rsn},
                 )
-                _mr_phases = [
+                repo.get_repository().set_phases([
                     _mr_active if p.phase_number == active.phase_number else p
                     for p in phases
-                ]
-                repo.get_repository().set_phases(_mr_phases)
-                _mr_write_succeeded = True
+                ])
+
+            if _mr_overrides and not scheduling.has_real_move(active, _mr_overrides):
+                # Drops only — a record that nothing could be carried, not a
+                # move; needs no permission (the calendar is unchanged).
+                _d_ovr, _d_rsn = _mr_recompute()
+                if _d_ovr and not scheduling.has_real_move(active, _d_ovr):
+                    _mr_write(_d_ovr, _d_rsn)
+                    _mr_write_succeeded = True
+            elif _mr_overrides:
+                st.warning(
+                    "Missed session — proposed reschedule (nothing is changed "
+                    "until you choose):\n\n"
+                    + "\n".join(f"- {d}: {r}" for d, r in sorted(_mr_reasons.items()))
+                )
+                _mr_apply_col, _mr_keep_col = st.columns(2)
+                if _mr_apply_col.button("Apply reschedule", key="mr_apply"):
+                    _a_ovr, _a_rsn = _mr_recompute()
+                    if _a_ovr:
+                        _mr_write(_a_ovr, _a_rsn)
+                        _mr_write_succeeded = True
+                if _mr_keep_col.button("Leave as missed", key="mr_dismiss"):
+                    _k_ovr, _k_rsn = _mr_recompute()
+                    _k_miss_dates = [date.fromisoformat(_iso) for _iso in _k_ovr
+                                     if date.fromisoformat(_iso) < _mr_today]
+                    if _k_miss_dates:
+                        _mr_write(*scheduling.declined_entries(
+                            active, _k_miss_dates, "left as missed by choice"))
+                        _mr_write_succeeded = True
         except Exception:
             pass  # never let a scheduling-check failure crash the page
         if _mr_write_succeeded:
@@ -2124,15 +2158,17 @@ def render():
         _today_content = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
         _is_gym_day = bool(_today_content and _today_content.get("is_gym_session"))
         if scheduling.should_evaluate_shift(_is_gym_day, _today_iso, active.shift_reasons):
-            # st.rerun() must only fire once set_phases() has actually
-            # succeeded — gating on "a shift was computed" instead (the
-            # previous version of this code) reruns unconditionally even
-            # when the write itself raised, which re-enters this same
-            # unguarded branch on every subsequent render (shift_reasons
-            # was never actually persisted) — an unbounded retry loop
-            # against Notion during any outage/rate-limit window. Confirmed
-            # by adversarial review; this flag is only set on the line
-            # immediately after set_phases() returns without raising.
+            # ASK-FIRST (the athlete's rule, 2026-08-07): a shift that would
+            # MOVE today's session renders as a prompt and is only written on
+            # "Move session" / "Keep as planned" — a pending prompt writes
+            # nothing and re-evaluates pure functions each render. A proposal
+            # with no real move (a HELD self-map: trailing day, refusal, or
+            # spacing collapse) is a record, not a move, and persists unasked
+            # so the guard closes. st.rerun() must only fire once
+            # set_phases() has actually succeeded — gating on "a shift was
+            # computed" instead re-enters this branch on every render during
+            # any outage window: an unbounded retry loop against Notion
+            # (confirmed by adversarial review).
             _shift_write_succeeded = False
             try:
                 _shift, _reason = scheduling.should_shift_session(_rm_bio, _rm_bio, date.today())
@@ -2141,17 +2177,34 @@ def render():
                     _new_overrides = scheduling.swap_pairs_for_shift(active, date.today(), _plan_dict)
                     _new_reasons = scheduling.shift_reason_entries(
                         _new_overrides, _reason, phase=active)
-                    _shifted_active = replace(
-                        active,
-                        date_overrides={**active.date_overrides, **_new_overrides},
-                        shift_reasons={**active.shift_reasons, **_new_reasons},
-                    )
-                    _shifted_phases = [
-                        _shifted_active if p.phase_number == active.phase_number else p
-                        for p in phases
-                    ]
-                    repo.get_repository().set_phases(_shifted_phases)
-                    _shift_write_succeeded = True
+
+                    def _rs_write(_ovr, _rsn):
+                        _shifted_active = replace(
+                            active,
+                            date_overrides={**active.date_overrides, **_ovr},
+                            shift_reasons={**active.shift_reasons, **_rsn},
+                        )
+                        repo.get_repository().set_phases([
+                            _shifted_active if p.phase_number == active.phase_number else p
+                            for p in phases
+                        ])
+
+                    if not scheduling.has_real_move(active, _new_overrides):
+                        _rs_write(_new_overrides, _new_reasons)
+                        _shift_write_succeeded = True
+                    else:
+                        st.warning(
+                            f"Readiness suggests moving today's session — {_reason}. "
+                            "Nothing is changed until you choose."
+                        )
+                        _rs_move_col, _rs_keep_col = st.columns(2)
+                        if _rs_move_col.button("Move session", key="rs_apply"):
+                            _rs_write(_new_overrides, _new_reasons)
+                            _shift_write_succeeded = True
+                        if _rs_keep_col.button("Keep as planned", key="rs_dismiss"):
+                            _rs_write(*scheduling.declined_entries(
+                                active, [date.today()], _reason))
+                            _shift_write_succeeded = True
             except Exception:
                 pass  # never let a scheduling-check failure crash the page
             if _shift_write_succeeded:

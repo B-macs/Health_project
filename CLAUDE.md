@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1770/1770 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **1773/1773 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -84,7 +84,13 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     session becomes the missed one; spacing rules keep mains
                     non-adjacent and off the day before a test; a miss with
                     nowhere to go is dropped visibly, and nothing ever
-                    crosses the week's Sunday) ·
+                    crosses the week's Sunday. ASK-FIRST, the athlete's
+                    rule: NO proposal that moves a session is ever written
+                    without an explicit confirmation button press, however
+                    loudly the readings argue — has_real_move draws the
+                    line, only no-movement records (holds, drops, declines)
+                    persist unasked, and declined_entries remembers a "no"
+                    so the prompt never nags) ·
                     volume.py (weekly tonnage — Σ reps×weight — for Stage 2A+
                     double-progression exercises; no sector split, see
                     tonnage.py) ·
