@@ -200,10 +200,12 @@ STACKS: dict[str, Stack] = {
                       "90°, without a fold. Hinge, never round."),
         ),
         outro="**What success looks like, and it is not depth.** The number that should move "
-              "first is the height at which your lower back stops being flat. Forehead "
-              "height may not move for weeks and that is not failure — if the flat-back "
-              "height improves while total depth stays put, the stack is working exactly as "
-              "intended. Retest the tilt after four weeks, cold, before adding anything.",
+              "is the tilt angle — the degrees your pelvis tips, phone on your lower back, "
+              "measured the way the battery measures it. How far forward you fold may not "
+              "change for weeks and that is not failure: if the angle grows, or the block "
+              "under your hips comes down, while the fold stays put, the stack is working "
+              "exactly as intended. Retest the tilt after four weeks, cold, before adding "
+              "anything.",
     ),
 
     "G": Stack(

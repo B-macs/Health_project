@@ -1337,7 +1337,8 @@ _FLEXIBILITY_CSS = f"""
           color:{_INK3}; font-weight:700; }}
 .fx-huge {{ font-size:38px; font-weight:800; line-height:1.08; margin-top:8px; }}
 .fx-big {{ font-size:28px; font-weight:800; line-height:1.12; margin-top:6px; }}
-.fx-sm {{ font-size:11.5px; color:{_INK3}; margin-top:8px; line-height:1.65; }}
+.fx-sm {{ font-size:12px; color:{_INK2}; margin-top:8px; line-height:1.65; }}
+.fx-read {{ font-size:12.5px; color:{_INK2}; line-height:1.65; margin:8px 0 4px; }}
 .fx-row {{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; }}
 .fx-nm {{ font-size:15px; font-weight:650; color:{_INK}; }}
 .fx-kv {{ display:flex; gap:16px; flex-wrap:wrap; margin-top:9px; font-size:11.5px;
@@ -1353,6 +1354,11 @@ _FLEXIBILITY_CSS = f"""
 .fx-steps i.skip {{ background:{_INK3}; }}
 .fx-pill {{ display:inline-block; padding:2px 8px; border-radius:999px; font-size:9.5px;
            font-weight:700; }}
+/* The page-wide caption style is 10px dim grey, which is fine for metadata but
+   unreadable for protocol text — and on this screen the athlete READS captions
+   mid-test. Injected after styles.py's sheet, so it wins at equal specificity. */
+[data-testid="stCaptionContainer"] p {{ color:{_INK2} !important;
+    font-size:12px !important; line-height:1.6 !important; }}
 </style>
 """
 
@@ -1409,11 +1415,10 @@ def _fx_render_empty(accent: str) -> None:
         st.caption("Stop at the first failure. There is no value in measuring a spectrum "
                    "profile for a skill that a bony block had already made unavailable.")
 
-    with st.expander("Expected outcome, written down before measuring"):
-        st.markdown(f"**Pattern {cba.EXPECTED_PATTERN}** — "
-                    f"{cba.PATTERNS[cba.EXPECTED_PATTERN]}")
-        st.caption(cba.EXPECTED_PATTERN_BASIS)
-
+    # The expected-outcome expander was REMOVED from this screen on the
+    # athlete's request (2026-08-07). The prediction itself stays in
+    # cluster_a_battery.EXPECTED_PATTERN — its job is to be written down BEFORE
+    # measuring, which the code does; the screen does not need to advertise it.
     held = list(cba.DEFERRED_TESTS)
     if held:
         with st.expander(f"Held back for now · {len(held)}"):
@@ -1442,7 +1447,6 @@ def _fx_render_capture(accent: str) -> None:
     repo_ = repo.get_repository()
     spec = fx.CLUSTERS[fx.DEFAULT_CLUSTER]
     battery_mod = spec["battery"]
-    order = list(battery_mod.AVAILABLE_TESTS)
 
     draft = repo_.get_flexibility_draft()
 
@@ -1467,9 +1471,10 @@ def _fx_render_capture(accent: str) -> None:
                 st.markdown(f"**{measure.title()} — {short}**")
                 st.caption(long)
             st.markdown(flexibility_baselines.GAP_EXPLAINED)
-            st.caption("Taken in the order **active → isometric → passive**. Passive work "
-                       "leaves tissue looser for an hour, so doing it first would flatter "
-                       "everything after it.")
+            st.caption("Assisted work always comes after unassisted: the spectrum runs "
+                       "**active → isometric → passive**, and the tilt runs own power "
+                       "before helped. Help and passive work leave everything looser, so "
+                       "taking either first would flatter what follows it.")
 
         with st.expander("What a LOCK is, and what to do if you lose it"):
             st.markdown(flexibility_baselines.LOCK_EXPLAINED)
@@ -1534,12 +1539,23 @@ def _fx_render_capture(accent: str) -> None:
         if not st.session_state.get("fx_force_continue"):
             return
 
+    # The LIVE order, asked of the battery module rather than computed here —
+    # a neutral reading well off the floor puts the turned-out comparison out
+    # of scope, and the module owns that rule so the screen cannot disagree
+    # with the evaluator about when it matters.
+    order = list(getattr(battery_mod, "applicable_tests", lambda _d: battery_mod.AVAILABLE_TESTS)(draft))
+
     step = int(st.session_state.get("fx_step", 0))
     step = max(0, min(step, len(order) - 1))
     key = order[step]
     test = battery_mod.TESTS[key]
 
     st.markdown(_fx_steps_html(order, step, draft), unsafe_allow_html=True)
+    for skipped_key in battery_mod.AVAILABLE_TESTS:
+        if skipped_key not in order:
+            note = getattr(battery_mod, "SKIP_NOTES", {}).get(skipped_key)
+            if note:
+                st.caption(note)
     st.markdown(
         f'<div class="fx-row"><span class="fx-nm">{test.label}</span>'
         f'<span class="fx-cap">{step + 1} of {len(order)} &middot; slot {test.slot} '
@@ -1573,6 +1589,11 @@ def _fx_render_capture(accent: str) -> None:
     # holds the old one, silently dropping a reading the athlete physically
     # took. A form commits every field atomically on submit.
     with st.form(key=f"fx_form_{key}", border=False):
+        # WHERE the number comes from, at the field itself — the athlete should
+        # not have to open an expander to know what to type.
+        if test.input_hint:
+            st.markdown(f'<div class="fx-read"><b>What to type:</b> '
+                        f'{_fx_bold(test.input_hint)}</div>', unsafe_allow_html=True)
         cols = st.columns(len(sides))
         entered: dict[str, float | None] = {}
         for col, side in zip(cols, sides):
@@ -1601,9 +1622,30 @@ def _fx_render_capture(accent: str) -> None:
         # reads as a gracilis one.
         setup_value = None
         if test.setup_input:
+            # The setup number is the SAME number every session by design, so
+            # the last recorded one is offered back: re-measuring it fresh by
+            # eye is exactly what makes two sessions incomparable.
+            prior_setup = next((r.setup_value for r in draft.readings
+                                if r.test_key == key and r.setup_value is not None), None)
+            if prior_setup is None:
+                try:
+                    for past in reversed(repo_.get_flexibility_assessments()):
+                        prior_setup = next((r.setup_value for r in past.readings
+                                            if r.test_key == key
+                                            and r.setup_value is not None), None)
+                        if prior_setup is not None:
+                            st.caption(f"Last time you used **{prior_setup:g}**. Use the "
+                                       f"same number unless something real changed — a "
+                                       f"new setup number starts a new comparison, and "
+                                       f"every reading against the old one stops being "
+                                       f"comparable.")
+                            break
+                except Exception:                              # noqa: BLE001
+                    prior_setup = None
             setup_value = st.number_input(
                 f"{test.setup_input} — recorded beside the reading, they are one datum",
-                value=None, step=0.5, format="%.1f", key=f"fx_setup_{key}",
+                value=float(prior_setup) if prior_setup is not None else None,
+                step=0.5, format="%.1f", key=f"fx_setup_{key}",
             )
 
         void = st.checkbox("The lock was lost — void this trial",

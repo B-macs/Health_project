@@ -190,11 +190,16 @@ def capture_progress(assessment: _b.Assessment | None,
     readings — a bilateral test produces two readings for one test, and counting
     readings once displayed "19 of 14" in the model this replaced."""
     spec = CLUSTERS[cluster_key]
-    available = spec["battery"].AVAILABLE_TESTS
+    battery = spec["battery"]
     if assessment is None:
-        return 0, len(available)
-    done = {r.test_key for r in assessment.readings if r.usable and r.test_key in available}
-    return len(done), len(available)
+        return 0, len(battery.AVAILABLE_TESTS)
+    # The LIVE order, not the full list — a session whose neutral reading puts
+    # the turned-out comparison out of scope has one fewer test, and counting
+    # the skipped one would show "8 of 9" forever on a finished session.
+    applicable = getattr(battery, "applicable_tests", None)
+    order = applicable(assessment) if applicable else battery.AVAILABLE_TESTS
+    done = {r.test_key for r in assessment.readings if r.usable and r.test_key in order}
+    return len(done), len(order)
 
 
 def merge_reading(assessment: _b.Assessment, reading: _b.Reading) -> _b.Assessment:

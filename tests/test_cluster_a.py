@@ -175,8 +175,12 @@ _LEVERAGE_PASS = [b.Reading("leverage_bent", 8.0, "cm", side="left"),
                   b.Reading("leverage_bent", 9.0, "cm", side="right"),
                   b.Reading("leverage_straight", 95.0, "cm", side="left"),
                   b.Reading("leverage_straight", 94.0, "cm", side="right")]
-_TILT_PASS = [b.Reading("tilt_range", 20.0, "cm"),
-              b.Reading("tilt_production", 22.0, "cm")]
+_TILT_PASS = [b.Reading("tilt_production", 25.0, "°"),
+              b.Reading("tilt_range", 30.0, "°")]
+#: Pattern B needs the neutral reading INSIDE the relevance line — above it,
+#: bone is not a live question and slot 0 passes on the height alone.
+_GATE0_BONY = [b.Reading("gate0_neutral", 14.0, "cm"),
+               b.Reading("gate0_turned_out", 3.0, "cm")]
 
 
 def test_a_failing_slot_stops_the_battery_and_the_rest_is_never_evaluated():
@@ -184,8 +188,7 @@ def test_a_failing_slot_stops_the_battery_and_the_rest_is_never_evaluated():
     meaningless — there is no value in a spectrum profile for a skill a bony
     block had already made unavailable."""
     # Gate 0 fails: turning out gains far more than the threshold.
-    a = _assessment([b.Reading("gate0_neutral", 40.0, "cm"),
-                     b.Reading("gate0_turned_out", 25.0, "cm")] + _LEVERAGE_PASS + _TILT_PASS)
+    a = _assessment(_GATE0_BONY + _LEVERAGE_PASS + _TILT_PASS)
     result = b.run("a", cb.SLOT_EVALUATORS, a)
     assert result.pattern == "B"
     assert result.stopped_at == b.SLOT_STRUCTURE
@@ -194,12 +197,11 @@ def test_a_failing_slot_stops_the_battery_and_the_rest_is_never_evaluated():
 
 def test_each_slot_can_be_the_one_that_stops_it():
     cases = [
-        ([b.Reading("gate0_neutral", 40.0, "cm"),
-          b.Reading("gate0_turned_out", 25.0, "cm")], "B", b.SLOT_STRUCTURE, 1),
+        (list(_GATE0_BONY), "B", b.SLOT_STRUCTURE, 1),
         (_GATE0_PASS + [b.Reading("leverage_bent", 20.0, "cm"),
                         b.Reading("leverage_straight", 40.0, "cm")], "C", b.SLOT_REGRESSED, 2),
-        (_GATE0_PASS + _LEVERAGE_PASS + [b.Reading("tilt_range", 40.0, "cm"),
-                                         b.Reading("tilt_production", 55.0, "cm")],
+        (_GATE0_PASS + _LEVERAGE_PASS + [b.Reading("tilt_range", 8.0, "°"),
+                                         b.Reading("tilt_production", 4.0, "°")],
          "F", b.SLOT_PREREQUISITE, 3),
         (_GATE0_PASS + _LEVERAGE_PASS + _TILT_PASS + [
             b.Reading("spectrum_active", 40.0, "°", side="left"),
@@ -245,8 +247,10 @@ def test_the_worse_side_decides_and_sides_are_never_averaged():
 
 
 def test_a_voided_trial_is_not_used():
-    a = _assessment([b.Reading("gate0_neutral", 28.0, "cm"),
-                     b.Reading("gate0_turned_out", 25.0, "cm", voided=True)])
+    # Inside the relevance line so the turned-out attempt is REQUIRED — voiding
+    # it must leave the slot unanswerable, not quietly passed.
+    a = _assessment([b.Reading("gate0_neutral", 14.0, "cm"),
+                     b.Reading("gate0_turned_out", 3.0, "cm", voided=True)])
     assert b.run("a", cb.SLOT_EVALUATORS, a).slots[0].indeterminate is True
 
 
@@ -302,7 +306,7 @@ def test_a_change_inside_twice_the_noise_is_not_a_result():
 
 def test_a_pattern_from_one_morning_is_a_hypothesis_not_a_verdict():
     a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + [
-        b.Reading("tilt_range", 40.0, "cm"), b.Reading("tilt_production", 55.0, "cm")])
+        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
     assert b.run("a", cb.SLOT_EVALUATORS, a, baseline_sessions=1).trusted is False
     assert b.run("a", cb.SLOT_EVALUATORS, a, baseline_sessions=3).trusted is True
 
@@ -315,7 +319,7 @@ def test_the_athletes_own_baseline_routes_him_to_the_expected_pattern():
     in flexion with tail bone down, back fully rounds' — is a slot 2 failure."""
     assert cb.EXPECTED_PATTERN == "F"
     a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + [
-        b.Reading("tilt_range", 40.0, "cm"), b.Reading("tilt_production", 55.0, "cm")])
+        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
     assert b.run("a", cb.SLOT_EVALUATORS, a).pattern == cb.EXPECTED_PATTERN
 
 
@@ -426,7 +430,8 @@ _JARGON = ("supine", "prone", "gluteal fold", "lateral aspect", "ulnar", "acromi
 #: movement belong here.
 _REPO_INTERNALS = (".py", "rules.py", "symptom_log", "patient_profile", "finding #",
                    "slot_", "_fb.", "services.", "cluster_a_", "dataclass")
-_PATIENT_FACING = ("label", "setup", "lock", "measurement", "safety")
+_PATIENT_FACING = ("label", "setup", "lock", "measurement", "safety",
+                   "input_hint", "setup_input")
 
 
 def test_the_fields_read_mid_test_stay_in_plain_english():
@@ -628,11 +633,11 @@ def test_the_source_gives_no_numbers_for_the_leverage_test():
 
 
 def test_gate_zero_is_the_only_slot_that_needs_no_invented_number():
-    """It compares two of his own readings taken minutes apart, so it carries
-    its own reference. Every other slot measures against a line we drew."""
-    a = _assessment([b.Reading("gate0_neutral", 40.0, "cm"),
-                     b.Reading("gate0_turned_out", 25.0, "cm")])
-    result = b.run("a", cb.SLOT_EVALUATORS, a)
+    """Inside the relevance line it compares two of his own readings taken
+    minutes apart, so it carries its own reference. Every other slot measures
+    against a line we drew."""
+    result = b.run("a", cb.SLOT_EVALUATORS, _assessment(list(_GATE0_BONY)))
+    assert result.pattern == "B"
     assert result.basis == b.BASIS_RELATIVE
     assert result.rests_on_an_invented_number is False
 
@@ -663,6 +668,103 @@ def test_a_slot_that_forgets_to_declare_its_basis_reads_as_provisional():
     """The safe default. A slot with no stated basis should not be mistaken for
     one that compares the athlete against himself."""
     assert b.SlotResult(slot=0, passed=True).basis == b.BASIS_PROVISIONAL
+
+
+# ── the relevance line: when is bone even a live question? ───────────────────
+#
+# THE ATHLETE'S CALL (2026-08-07): the neck of the thigh bone meets the socket
+# only in the last few centimetres of a FULL side split. At his current height,
+# tissue stops him long before bone can — so asking the two-orientation
+# comparison up there answers nothing, and the original version of gate 0 was
+# wrong to ask it unconditionally.
+
+def test_the_bone_check_is_skipped_above_the_relevance_line():
+    """A 28 cm neutral reading passes slot 0 on its own: bone cannot be what
+    stops him at that height, and the turned-out attempt is not asked for."""
+    alone = _assessment([b.Reading("gate0_neutral", 28.0, "cm")])
+    slot = cb.evaluate_structure(alone)
+    assert slot.passed is True
+    assert slot.indeterminate is False
+    assert "cannot be what stops you" in slot.reason
+    assert cb.applicable_tests(alone) == tuple(
+        k for k in cb.AVAILABLE_TESTS if k != "gate0_turned_out")
+
+
+def test_the_bone_check_is_required_inside_the_relevance_line():
+    """Under the line the question is live, and a missing turned-out attempt is
+    indeterminate — not a pass. And with no neutral reading yet, the session
+    plans for both attempts rather than assuming."""
+    inside = _assessment([b.Reading("gate0_neutral", 14.0, "cm")])
+    slot = cb.evaluate_structure(inside)
+    assert slot.passed is False and slot.indeterminate is True
+    assert cb.applicable_tests(inside) == cb.AVAILABLE_TESTS
+    assert cb.applicable_tests(None) == cb.AVAILABLE_TESTS
+
+
+def test_progress_total_shrinks_when_the_bone_check_is_out_of_scope():
+    """Counting the skipped comparison would show '8 of 9' forever on a
+    finished session."""
+    a = _assessment([b.Reading("gate0_neutral", 28.0, "cm")])
+    done, total = fx.capture_progress(a)
+    assert done == 1
+    assert total == len(cb.AVAILABLE_TESTS) - 1
+
+
+def test_the_skip_carries_its_reason_in_the_athletes_language():
+    note = cb.SKIP_NOTES["gate0_turned_out"]
+    assert "not yet a factor" in note
+    assert "come back by itself" in note
+
+
+# ── the tilt: an angle, own power first ──────────────────────────────────────
+
+def test_the_tilt_runs_under_own_power_first():
+    """The athlete's requirement (2026-08-07), and the same principle as slot
+    3's order: help flatters whatever follows it, so the unassisted trial can
+    never come after the assisted one."""
+    assert cb.TEST_ORDER.index("tilt_production") < cb.TEST_ORDER.index("tilt_range")
+
+
+def test_the_tilt_is_an_angle_and_bigger_is_better():
+    """Forehead height is exactly the number a rounding spine can fake, and the
+    rounding is his documented compensation — which is why the old protocol
+    needed a second guard measurement and the angle needs none."""
+    for key in ("tilt_production", "tilt_range"):
+        test = cb.TESTS[key]
+        assert test.unit == "°", key
+        assert test.smaller_is_better is False, key
+    a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + [
+        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+    assert b.run("a", cb.SLOT_EVALUATORS, a).pattern == "F"
+
+
+def test_an_old_centimetre_tilt_reading_is_unreadable_not_misread():
+    """40 cm of forehead height is not 40 degrees of tilt. A reading from the
+    retired protocol must come back indeterminate rather than be compared
+    against the angle target — where it would score, loudly and wrongly."""
+    a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + [
+        b.Reading("tilt_range", 40.0, "cm"), b.Reading("tilt_production", 55.0, "cm")])
+    slot = b.run("a", cb.SLOT_EVALUATORS, a).slots[-1]
+    assert slot.indeterminate is True
+    assert "centimetres" in slot.reason
+
+
+def test_the_tilt_captures_the_straddle_width_it_was_taken_at():
+    """The width is the uniform base number: every tilt reading is relative to
+    it, and a session at a different width is a different test."""
+    assert "straddle width" in cb.TESTS["tilt_production"].setup_input.lower()
+    assert "same straddle width" in cb.TESTS["tilt_range"].setup.lower()
+
+
+def test_every_test_says_where_its_number_comes_from():
+    """The input hint sits AT the field — 'floor to crotch, in cm' — so the
+    athlete does not type a knee height into a crotch-height box."""
+    for key, test in cb.TESTS.items():
+        assert test.input_hint, key
+        if test.unit == "cm":
+            assert "cm" in test.input_hint, key
+        if test.unit == "°":
+            assert "degree" in test.input_hint.lower(), key
 
 
 # ── the setup number that decides the pattern ────────────────────────────────

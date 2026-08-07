@@ -666,11 +666,27 @@ past what the evidence carries, and it is treated as motivation the way
   and it puts a pattern label in front of the physiotherapist instead of a plan
   to get one.
 - **Every threshold is provisional** — `GATE0_ORIENTATION_GAIN_CM`,
-  `LEVERAGE_TARGETS`, `TILT_TARGET_CM`, `SPECTRUM_GAP_CM` all come from the
-  source rather than from his own spread, which has never been measured.
-- **Four frozen constants uncaptured**: straddle width, tailor's heel distance,
-  the traced side-split stance, the floor reference. `block_height_cm` is
-  deliberately *not* frozen — it is the progression variable.
+  `LEVERAGE_TARGETS`, `TILT_TARGET_DEG`, `SPECTRUM_GAP_CM` all come from the
+  source (or were invented to make the code run) rather than from his own
+  spread, which has never been measured. `GATE0_BONE_RELEVANT_CM` (15) is
+  different in kind: the athlete's own call (2026-08-07) about where the bony
+  mechanism operates — bone meets socket only in the last few centimetres of a
+  full split — so above it `applicable_tests` skips the turned-out comparison
+  and slot 0 passes on the neutral height alone.
+- **The tilt is an ANGLE, own power first (2026-08-07).** Degrees of pelvic tip
+  read off a phone held flat on the lower back, sitting tall vs deepest tip.
+  Forehead height was exactly the number a rounding spine can fake — and the
+  rounding is his documented compensation — so the angle needs no second guard
+  measurement and one number replaced two. Production runs before the helped
+  trial for the same reason slot 3 runs active → isometric → passive: help
+  flatters whatever follows it. A tilt reading stored in centimetres is from
+  the retired protocol and comes back `indeterminate`, never read as degrees.
+- **Two frozen constants still uncaptured**: the traced side-split stance and
+  the floor reference. Straddle width and the tailor's heel distance are now
+  captured beside their readings (`Reading.setup_value`), and the capture
+  screen offers last session's number back rather than trusting memory.
+  `block_height_cm` is deliberately *not* frozen — it is the progression
+  variable.
 - **Cluster B is unbuilt.** The blueprint's Pike is defined as *"touching your
   toes; forward fold"*, wording that hits two contraindicated rules outright — a
   whole-cluster collision to resolve before that one is authored.
@@ -1098,9 +1114,9 @@ is a label on the stage, not a separate term list — no such list exists in cod
 | No per-set warm-up flag | Open | `services/tonnage.py` counts a set as eligible when it carries reps AND a real external load. Warm-ups are not excluded because the log cannot mark one, so "working sets only" is an assumption the data does not support. A boolean per set closes it |
 | Interscapular endurance gap | Deferred to the post-Stage-2A block | Onset 2026-07-16, predates the block. Scapular work already runs five days a week and the symptom persists through it, so the gap is endurance under sustained low-load holding, not volume. Physio decides 2026-08-16 — `docs/training/physio_brief_2026-08-16.md` |
 | Flexibility: zero assessments run | Open — the only thing between this sector and usefulness | The four-slot battery is built, its early exit is verified end to end, and nothing has been measured. **Measure COLD.** Every threshold is provisional until three baseline mornings exist, and a pattern from one session is a hypothesis rather than a verdict — `BatteryResult.trusted` says so and the screen renders it |
-| Four frozen constants uncaptured | Open | Straddle width, tailor's heel distance, the traced side-split stance, the floor reference. Setup numbers, not scores: get one wrong and two sessions are not comparable however carefully each was measured. `block_height_cm` is deliberately NOT frozen — it is the §F progression variable and is meant to move |
+| Frozen constants: two of four now captured in-flow | Half-resolved 2026-08-07 | Straddle width (at the tilt) and the tailor's heel distance (at the bent-knee leverage) are recorded beside the reading as `Reading.setup_value`, and the screen offers last session's number back. Still uncaptured: the traced side-split stance and the floor reference. `block_height_cm` is deliberately NOT frozen — it is the §F progression variable and is meant to move |
 | Rest-day yoga vs. the adaptation window | **RESOLVED 2026-08-06** | The Prescription's dosage section settles it: a cluster session is adaptation-seeking by definition, so `flexibility_window` now returns `poor` on a rest day rather than ignoring the flag, and `REST_DAY_CONFLICT_UNRESOLVED` is retired. A restorative yoga flow there is still fine — `services/yoga.py`'s business, not this one's |
-| Every Cluster A threshold is provisional | Open | `GATE0_ORIENTATION_GAIN_CM`, `LEVERAGE_TARGETS`, `TILT_TARGET_CM` and `SPECTRUM_GAP_CM` all come from the source document rather than from this athlete's own spread, which has never been measured. Three baseline mornings set the noise floor; until then no single reading is a reason to change anything |
+| Every Cluster A threshold is provisional | Open | `GATE0_ORIENTATION_GAIN_CM`, `LEVERAGE_TARGETS`, `TILT_TARGET_DEG` and `SPECTRUM_GAP_CM` all come from the source document (or were invented to make the code run) rather than from this athlete's own spread, which has never been measured. Three baseline mornings set the noise floor; until then no single reading is a reason to change anything. `GATE0_BONE_RELEVANT_CM` (15) is the athlete's own call about mechanism, not a borrowed cut point |
 
 ---
 

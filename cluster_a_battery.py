@@ -37,6 +37,20 @@ THE ADAPTATIONS, each with what reverts it
       it. That is a different category of event, not a permission gate.
   B5  Every threshold is provisional until three baseline mornings exist, and
       they are OURS to set from his own readings rather than borrowed.
+  B6  Gate 0's two-orientation comparison only runs within
+      GATE0_BONE_RELEVANT_CM of the floor. The athlete's call (2026-08-07):
+      bone meets socket in the last few centimetres of a FULL side split, so at
+      his current height tissue stops him long before bone can, and the
+      comparison answers nothing up there. Above the line, slot 0 passes on the
+      neutral reading alone and the turned-out attempt is skipped.
+      Reverts: if a reading taken inside the line ever contradicts the claim.
+  B7  The tilt is measured as an ANGLE at the pelvis, not as forehead height
+      (athlete's call, 2026-08-07). Forehead height is exactly the number a
+      rounding spine can fake, and his rounding is the documented compensation
+      — so the old protocol needed a second guard measurement, and the angle
+      needs none. One number replaces two. The two tilt trials also run OWN
+      POWER FIRST, then helped — help flatters whatever follows it, the same
+      principle as slot 3's order, and the athlete states it as a requirement.
 """
 
 from __future__ import annotations
@@ -90,6 +104,10 @@ class BatteryTest:
     lock: str
     measurement: str
     what_youre_testing: str
+    #: One line answering "where does the number I am about to type come
+    #: from?", shown AT the input field itself. The measurement field explains
+    #: the whole procedure; this one locates the tape. Patient-facing.
+    input_hint: str = ""
     bilateral: bool = False
     smaller_is_better: bool = False
     safety: str = ""
@@ -120,11 +138,17 @@ TESTS: dict[str, BatteryTest] = {
              "again.",
         measurement="Measure the gap from the floor up to your crotch. Smaller is deeper. "
                     "To the nearest half centimetre.",
+        input_hint="The gap between the floor and your crotch, in cm",
         what_youre_testing="Whether the thing stopping you is the shape of your hip joint "
                            "rather than tissue length. The neck of the thigh bone eventually "
                            "meets the rim of the socket, and where that happens varies a lot "
                            "between healthy people. Bone does not stretch, so if this is your "
-                           "limit the answer is alignment rather than more stretching.",
+                           "limit the answer is alignment rather than more stretching. That "
+                           "collision only happens in the last few centimetres of a full "
+                           "split, though — so this reading doubles as the check on whether "
+                           "the question is even live yet. More than 15 cm off the floor, "
+                           "tissue is stopping you long before any bone could, and the "
+                           "turned-out comparison is skipped until you are closer.",
         safety="**A sharp pinch at the front of the hip with a sudden hard stop is a "
                "finding, not a result — stop and record it.** It is not a pattern to train "
                "against and it is not a number. The same sensation was reported in a deep "
@@ -143,13 +167,17 @@ TESTS: dict[str, BatteryTest] = {
              "same** — if your back moves, the comparison is void.",
         measurement="Same measurement: floor to crotch, to the nearest half centimetre. "
                     "**The reading is the difference between the two attempts.**",
+        input_hint="The gap between the floor and your crotch, in cm — same spot and "
+                   "same tape as the first attempt",
         what_youre_testing="The same question, asked with the joint aligned differently. "
                            "There are two ways to give the hip more room — turn the leg out, "
                            "or tilt the pelvis — and they reach the same place. This uses the "
                            "turn-out because tilting means arching your lower back under your "
                            "full bodyweight, which your imaging rules out. A large jump "
                            "between the two attempts means alignment was the limit, not "
-                           "tissue.",
+                           "tissue. This attempt only runs when your neutral reading lands "
+                           "within 15 cm of the floor — higher than that, bone cannot be "
+                           "what stops you and the comparison answers nothing.",
         adapted_from="the original asked for a deliberate anterior pelvic tilt with the "
                      "back arched",
     ),
@@ -170,6 +198,8 @@ TESTS: dict[str, BatteryTest] = {
                     "better. Left and right separately, to the nearest half centimetre. "
                     "**Also record the heel distance you actually used** — it decides what "
                     "this reading means.",
+        input_hint="The gap between the floor and the outside of each calf, in cm — "
+                   "left and right separately",
         setup_input="Tailbone to the back of your heels (cm)",
         what_youre_testing="Your groin muscles with the knee fully bent. Bending the knee "
                            "slackens gracilis — the one groin muscle that crosses the knee — "
@@ -192,6 +222,7 @@ TESTS: dict[str, BatteryTest] = {
              "with your knee and your back rather than your hips.",
         measurement="Measure from the floor up to your hip crease. Smaller is deeper. To the "
                     "nearest half centimetre.",
+        input_hint="The gap between the floor and your hip crease, in cm",
         what_youre_testing="The middle leverage — the same muscle group loaded at a knee "
                            "angle between the other two tests.",
         deferred_until="the block's own loaded squat work has run clean",
@@ -215,8 +246,9 @@ TESTS: dict[str, BatteryTest] = {
              "void.** Kneecaps stay facing the ceiling — letting them roll in cheats the "
              "load off the groin.",
         measurement="Measure from the inside of one ankle to the inside of the other. "
-                    "**Bigger is better here** — this is the one test on the list where a "
-                    "larger number is the good direction.",
+                    "**Bigger is better here** — a larger number is the good direction.",
+        input_hint="The distance between the inside of one ankle and the inside of the "
+                   "other, in cm",
         what_youre_testing="Your groin muscles with the knee straight, which is what puts "
                            "gracilis under the most stretch. Read against the bent-knee test: "
                            "if the bent version is fine and this one is much worse, gracilis "
@@ -228,46 +260,74 @@ TESTS: dict[str, BatteryTest] = {
     ),
 
     # ── Slot 2 — Prerequisite, run two ways ─────────────────────────────────
-    "tilt_range": BatteryTest(
-        key="tilt_range", slot=_b.SLOT_PREREQUISITE,
-        label="Tilt — with help", unit="cm", smaller_is_better=True,
-        setup="Sit with your legs straight and open to **your recorded straddle width**. "
-              "Kneecaps and toes pointing up. Now fold forward, **using your hands walking "
-              "forward on the floor or pulling on a strap anchored in front of you**.",
-        lock="Your knees stay straight and your kneecaps stay pointing up. **The tell: if "
-             "your knees bend or roll inward, the trial is void.**",
-        measurement="Measure from the floor up to your forehead. **Also record, separately, "
-                    "the height at which your lower back stops being flat.** Two numbers, "
-                    "not one — the second is the one that should move first.",
-        what_youre_testing="Whether you can get into the position at all when something else "
-                           "helps. Paired with the next test, it separates 'cannot reach it' "
-                           "from 'can reach it but cannot produce it' — and those two answers "
-                           "send you to completely different training.",
-        safety="**Stop where it lands. Do not chase depth once your lower back has "
-               "rounded.** Past that point you are measuring your spine rather than your "
-               "hip, which is both the wrong variable and the one your discs cannot take. "
-               "You predicted on 2026-08-06 that you would fail before reaching the deep "
-               "position at all — this test is what checks that. If you get significantly "
-               "past upright, say so, because the decision to keep this test rests on that "
-               "prediction being right.",
-    ),
+    #
+    # OWN POWER FIRST, then helped — the athlete's requirement (2026-08-07),
+    # and the same principle as slot 3's order: an assisted trial flatters
+    # whatever follows it, so the unassisted one cannot come after.
+    #
+    # Measured as an ANGLE at the pelvis, not as forehead height. Forehead
+    # height is exactly the number a rounding spine can fake, and his rounding
+    # is the documented compensation — which is why the old protocol needed a
+    # second guard measurement and this one needs none.
     "tilt_production": BatteryTest(
         key="tilt_production", slot=_b.SLOT_PREREQUISITE,
-        label="Tilt — under your own power", unit="cm", smaller_is_better=True,
-        setup="The same position, same width. **Arms crossed on your chest. No hands, no "
-              "strap, nothing to pull on.** Roll your pelvis forward and fold as far as you "
-              "can under your own power.",
-        lock="Arms stay crossed and the knees stay straight. **The tell: if a hand comes "
-             "down to the floor, even briefly, the trial is void.**",
-        measurement="Floor to forehead again, and again the height at which the lower back "
-                    "stops being flat.",
-        what_youre_testing="Whether you can PRODUCE the position, not just be placed in it. "
-                           "This is the half that matters most for you: your file records "
-                           "that you cannot roll the pelvis forward in sitting, and that the "
-                           "rounding everyone notices is the compensation for it rather than "
-                           "the problem itself. If this fails and the previous test passed, "
-                           "the fix is strength at the end of the range, done last in the "
-                           "session.",
+        label="Tilt — under your own power", unit="°",
+        setup="Sit tall with your legs straight and open to **your recorded straddle "
+              "width** — kneecaps and toes pointing up. **Arms crossed on your chest. No "
+              "hands, no strap, nothing to pull on.** Now tip your hips forward — as if "
+              "your waistband were a bowl of water you are pouring out the front — as far "
+              "as you can under your own power, and hold it there.",
+        lock="Arms stay crossed, knees stay straight, kneecaps stay pointing up. **The "
+             "tell: if a hand comes down to the floor, even briefly, the trial is void.** "
+             "Steadying the phone against your lower back with one hand is fine — it is "
+             "the floor you must not touch.",
+        measurement="Your phone, flat against your lower back just above the tailbone, "
+                    "with a level app open. Sitting tall, note the angle. Tip as far as "
+                    "you can, hold it, and read the angle again in the same spot. **The "
+                    "reading is how many degrees it moved. Bigger is better.** One number "
+                    "is enough — a rounding back cannot fake this one, which is why the "
+                    "old two-number version is gone.",
+        input_hint="How many degrees the phone reading moved between sitting tall and "
+                   "your deepest tip",
+        setup_input="Straddle width — inside of one heel to the inside of the other (cm)",
+        what_youre_testing="Whether you can PRODUCE the position, not just be placed in "
+                           "it. This is the half that matters most for you: your file "
+                           "records that you cannot roll the pelvis forward in sitting, "
+                           "and that the rounding everyone notices is the compensation "
+                           "for it rather than the problem itself. Measured at the pelvis "
+                           "because the pelvis is the thing being tested — a forehead "
+                           "height is exactly what a rounding spine fakes. Taken before "
+                           "the helped version, because help flatters whatever follows "
+                           "it. If this fails and the helped test passes, the fix is "
+                           "strength at the end of the range, done last in the session.",
+    ),
+    "tilt_range": BatteryTest(
+        key="tilt_range", slot=_b.SLOT_PREREQUISITE,
+        label="Tilt — with help", unit="°",
+        setup="The same position and **the same straddle width you just recorded**. This "
+              "time use help: walk your hands forward on the floor, or pull on a strap "
+              "anchored in front of you, to tip your hips further forward than you could "
+              "on your own.",
+        lock="Your knees stay straight and your kneecaps stay pointing up. **The tell: if "
+             "your knees bend or roll inward, the trial is void.**",
+        measurement="The same phone reading: flat against your lower back, sitting tall "
+                    "first, then at your deepest helped tip. **The reading is how many "
+                    "degrees it moved. Bigger is better.**",
+        input_hint="How many degrees the phone reading moved, sitting tall to your "
+                   "deepest helped tip",
+        what_youre_testing="Whether the position exists at all when something else helps. "
+                           "Paired with the test before it, this separates 'cannot reach "
+                           "it' from 'can reach it but cannot produce it' — and those two "
+                           "answers send you to completely different training. It runs "
+                           "second on purpose: help leaves everything looser, so the "
+                           "own-power trial had to come first.",
+        safety="**Help tips the hips; it must not fold the spine. Stop the moment your "
+               "lower back rounds** — past that point the extra depth is coming from "
+               "your spine, which is both the wrong variable and the one your discs "
+               "cannot take. You predicted on 2026-08-06 that you would fail before "
+               "reaching the deep position at all — this test is what checks that. If "
+               "you get significantly past sitting tall, say so, because the decision "
+               "to keep this test rests on that prediction being right.",
     ),
 
     # ── Slot 3 — Spectrum ───────────────────────────────────────────────────
@@ -283,6 +343,8 @@ TESTS: dict[str, BatteryTest] = {
              "the trial is void** — that buys height from your spine rather than your hip.",
         measurement="The angle of the raised leg from vertical. Bigger is better. Left and "
                     "right separately, to the nearest degree.",
+        input_hint="The angle of the raised leg, in degrees up from straight down — "
+                   "left and right separately",
         what_youre_testing="Not just how far you go, but **how strong the muscles that OPEN "
                            "you are**. Something has to pull the legs apart, and if those "
                            "muscles are weak the groin will not release however much you "
@@ -301,6 +363,8 @@ TESTS: dict[str, BatteryTest] = {
         measurement="Floor to crotch. **If you are using any added load, write the load down "
                     "beside the number** — they are one measurement and neither means "
                     "anything alone.",
+        input_hint="The gap between the floor and your crotch, in cm — plus the load "
+                   "beside it if you used one",
         what_youre_testing="Whether the range is defended by muscle or only propped up from "
                            "outside. Your body will not let a muscle relax into a position it "
                            "cannot support, so end-range strength is not something running "
@@ -318,6 +382,7 @@ TESTS: dict[str, BatteryTest] = {
              "up. **The tell: if you are working to stay there, you are measuring the "
              "isometric again and the trial is void.** Let the support take the weight.",
         measurement="Floor to crotch, to the nearest half centimetre.",
+        input_hint="The gap between the floor and your crotch, in cm",
         what_youre_testing="Your ceiling — the furthest the joint goes when something else "
                            "does the work. On its own it says little; its value is as the "
                            "reference the other two are compared against.",
@@ -330,18 +395,34 @@ TESTS: dict[str, BatteryTest] = {
     ),
 }
 
-#: The order they are performed in. Slot by slot, and within slot 3 the measure
-#: order is active → isometric → passive, which is not the order they are
-#: written in the source.
+#: The order they are performed in. Slot by slot; within slot 2 own-power comes
+#: before helped, and within slot 3 the measure order is active → isometric →
+#: passive. NEITHER is the order the source writes them in, and both exist for
+#: the same reason: an assisted or passive trial flatters whatever follows it.
 TEST_ORDER: tuple[str, ...] = (
     "gate0_neutral", "gate0_turned_out",
     "leverage_bent", "leverage_straight",          # leverage_90 deferred
-    "tilt_range", "tilt_production",
+    "tilt_production", "tilt_range",
     "spectrum_active", "spectrum_isometric", "spectrum_passive",
 )
 
 AVAILABLE_TESTS: tuple[str, ...] = tuple(k for k in TEST_ORDER if TESTS[k].available)
 DEFERRED_TESTS: tuple[str, ...] = tuple(k for k, t in TESTS.items() if not t.available)
+
+
+def applicable_tests(assessment=None) -> tuple[str, ...]:
+    """The tests a SESSION actually asks for, given what it has measured so far.
+
+    One rule today: the turned-out attempt only runs when the neutral
+    side-split reading is within GATE0_BONE_RELEVANT_CM of the floor — above
+    that, bone cannot be what stops him and the comparison answers nothing.
+    Owned here rather than by the screen, so the capture flow and the evaluator
+    cannot disagree about when the comparison matters.
+    """
+    neutral = assessment.reading("gate0_neutral") if assessment is not None else None
+    if neutral is not None and neutral.value > GATE0_BONE_RELEVANT_CM:
+        return tuple(k for k in AVAILABLE_TESTS if k != "gate0_turned_out")
+    return AVAILABLE_TESTS
 
 
 # ── extras recorded alongside, never scored ──────────────────────────────────
@@ -386,7 +467,27 @@ def test_for(key: str) -> BatteryTest | None:
 #: How much deeper the turned-out attempt must be for orientation to be the
 #: limiter. PROVISIONAL: from the source, not from this athlete's own spread.
 GATE0_ORIENTATION_GAIN_CM: float = 10.0
-GATE0_SAME_CM: float = 5.0
+
+#: The height off the floor below which the bony question becomes live. THE
+#: ATHLETE'S CALL (2026-08-07): the neck of the thigh bone meets the socket only
+#: in the last few centimetres of a FULL side split, so at his current height
+#: tissue stops him long before bone can, and asking the two-orientation
+#: comparison up there answers nothing. Above this line slot 0 passes on the
+#: neutral reading alone and the turned-out attempt is skipped. A claim about
+#: where in the range the mechanism operates, not a preference — re-open it only
+#: if a reading taken inside the line contradicts it.
+GATE0_BONE_RELEVANT_CM: float = 15.0
+
+#: Why a test that applicable_tests dropped was dropped, in the athlete's
+#: language — the capture flow shows this instead of the step.
+SKIP_NOTES: dict[str, str] = {
+    "gate0_turned_out": (
+        f"Skipped: legs turned out. At your height off the floor, bone is not yet "
+        f"a factor — the comparison starts mattering under "
+        f"{GATE0_BONE_RELEVANT_CM:.0f} cm, and it will come back by itself once a "
+        f"neutral reading lands inside that line."
+    ),
+}
 
 #: A leverage reading at or past its target counts as a pass. PROVISIONAL for
 #: the same reason — every threshold here moves once three baseline mornings
@@ -396,8 +497,10 @@ LEVERAGE_TARGETS: dict[str, float] = {
     "leverage_straight": 90.0,    # cm ankle-to-ankle, bigger is better
 }
 
-#: Forehead height, cm. Smaller is better.
-TILT_TARGET_CM: float = 25.0
+#: Degrees of pelvic tip produced, sitting tall to deepest. Bigger is better.
+#: PROVISIONAL like the rest — invented so the code can run, and it moves once
+#: three baseline mornings show what his own numbers look like.
+TILT_TARGET_DEG: float = 20.0
 
 #: Centimetres between the passive and isometric split depths before end-range
 #: strength rather than puller strength is called the limiter.
@@ -426,10 +529,37 @@ def evaluate_structure(assessment):
     neutral = assessment.reading("gate0_neutral")
     turned = assessment.reading("gate0_turned_out")
 
-    if neutral is None or turned is None:
+    if neutral is None:
         return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, indeterminate=True,
                             reason="Gate 0 was not completed, so nothing below it can be "
                                    "read. A missing measurement is not a pass.")
+
+    # THE RELEVANCE LINE (athlete's call, 2026-08-07). Bone meets socket only in
+    # the last few centimetres of a full split; above the line, tissue stops him
+    # long before bone can, so the two-orientation comparison answers nothing
+    # and is skipped rather than asked. PROVISIONAL in the formal sense — no
+    # measurement validates 15 over 12 — but the number is his, from the
+    # mechanics of the test, not one invented to make the code run.
+    if neutral.value > GATE0_BONE_RELEVANT_CM:
+        extra = ""
+        if turned is not None:
+            diff = neutral.value - turned.value
+            extra = (f" Turning out changed it by {diff:.1f} cm — noted, but at this "
+                     f"height that is tissue following the alignment, not bone.")
+        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=True, basis=b.BASIS_PROVISIONAL,
+                            reason=f"At {neutral.value:.1f} cm off the floor, bone cannot be "
+                                   f"what stops you — that contact only happens in the last "
+                                   f"few centimetres of a full split. The two-orientation "
+                                   f"check starts mattering under "
+                                   f"{GATE0_BONE_RELEVANT_CM:.0f} cm; it comes back by "
+                                   f"itself once you are inside that line.{extra}",
+                            readings=(neutral,) if turned is None else (neutral, turned))
+
+    if turned is None:
+        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, indeterminate=True,
+                            reason=f"Within {GATE0_BONE_RELEVANT_CM:.0f} cm of the floor "
+                                   f"the bony question is live, and it needs the turned-out "
+                                   f"attempt. A missing measurement is not a pass.")
 
     # Smaller is deeper. A turned-out attempt that goes MUCH deeper means the
     # joint was misaligned rather than the tissue short.
@@ -488,24 +618,33 @@ def evaluate_regressed(assessment):
 
 def evaluate_prerequisite(assessment):
     from services import battery as b
-    rng = assessment.reading("tilt_range")
     prod = assessment.reading("tilt_production")
+    rng = assessment.reading("tilt_range")
+
+    # Degrees only. A tilt recorded in centimetres is from the retired
+    # forehead-height protocol and cannot be read against an angle target —
+    # treating it as unreadable is honest; treating 40 cm as 40° would not be.
+    prod = prod if prod is not None and prod.unit == "°" else None
+    rng = rng if rng is not None and rng.unit == "°" else None
 
     if rng is None or prod is None:
         return b.SlotResult(slot=b.SLOT_PREREQUISITE, passed=False, indeterminate=True,
-                            reason="Both halves are needed. Reach-with-help and "
-                                   "produce-alone are what separate F from G, and one "
-                                   "without the other names neither.")
+                            reason="Both halves are needed. Produce-alone and "
+                                   "reach-with-help are what separate F from G, and one "
+                                   "without the other names neither. (Angle readings only "
+                                   "— a tilt recorded in centimetres is from the old "
+                                   "protocol and cannot be read.)")
 
-    # PROVISIONAL for the same reason — TILT_TARGET_CM is ours, not the source's.
-    if rng.value > TILT_TARGET_CM:
+    # PROVISIONAL for the same reason — TILT_TARGET_DEG is ours, not the
+    # source's. Bigger is better: the reading is degrees of pelvic tip produced.
+    if rng.value < TILT_TARGET_DEG:
         return b.SlotResult(slot=b.SLOT_PREREQUISITE, passed=False, pattern="F",
                             basis=b.BASIS_PROVISIONAL,
                             reason="The position is not available even with help. Tilt work "
                                    "goes FIRST in the session and starts assisted — you "
                                    "cannot train actively into a position you cannot reach.",
                             readings=(rng, prod))
-    if prod.value > TILT_TARGET_CM:
+    if prod.value < TILT_TARGET_DEG:
         return b.SlotResult(slot=b.SLOT_PREREQUISITE, passed=False, pattern="G",
                             basis=b.BASIS_PROVISIONAL,
                             reason="You can reach it, you cannot produce it. Tilt work moves "

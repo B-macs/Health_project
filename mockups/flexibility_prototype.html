@@ -25,7 +25,7 @@
   .cap{font-size:9px;letter-spacing:.13em;text-transform:uppercase;color:var(--ink3);font-weight:700}
   .huge{font-size:36px;font-weight:800;line-height:1.08;margin-top:8px}
   .big{font-size:26px;font-weight:800;line-height:1.12;margin-top:6px}
-  .sm{font-size:11.5px;color:var(--ink3);margin-top:8px;line-height:1.65}
+  .sm{font-size:12px;color:var(--ink2);margin-top:8px;line-height:1.65}
   .row{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
   .nm{font-size:15px;font-weight:650;color:var(--ink)}
   .kv{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:var(--ink3)}
@@ -83,7 +83,8 @@ const DATA = {
    "setup": "Slide into a side split with your legs in a **neutral rotation** \u2014 kneecaps pointing forward, not turned up. Go to where it stops, not past it. Hands on blocks in front of you so your chest stays up.",
    "lock": "Your pelvis and lower back must be **identical between this attempt and the next one**. The whole reading is the difference the leg rotation makes, so anything else that moves contaminates it. **The tell: if your back position changes between the two attempts, the trial is void** \u2014 reset and take both again.",
    "measurement": "Measure the gap from the floor up to your crotch. Smaller is deeper. To the nearest half centimetre.",
-   "testing": "Whether the thing stopping you is the shape of your hip joint rather than tissue length. The neck of the thigh bone eventually meets the rim of the socket, and where that happens varies a lot between healthy people. Bone does not stretch, so if this is your limit the answer is alignment rather than more stretching.",
+   "hint": "The gap between the floor and your crotch, in cm",
+   "testing": "Whether the thing stopping you is the shape of your hip joint rather than tissue length. The neck of the thigh bone eventually meets the rim of the socket, and where that happens varies a lot between healthy people. Bone does not stretch, so if this is your limit the answer is alignment rather than more stretching. That collision only happens in the last few centimetres of a full split, though \u2014 so this reading doubles as the check on whether the question is even live yet. More than 15 cm off the floor, tissue is stopping you long before any bone could, and the turned-out comparison is skipped until you are closer.",
    "safety": "**A sharp pinch at the front of the hip with a sudden hard stop is a finding, not a result \u2014 stop and record it.** It is not a pattern to train against and it is not a number. The same sensation was reported in a deep butterfly on 2026-08-05 and has never been explained; if it appears again, note what position produced it and go no further into that position today. Repeated collision with a bony end causes joint irritation, and it is the reason people stall permanently rather than slowly.",
    "adapted": "",
    "setupInput": "",
@@ -102,7 +103,8 @@ const DATA = {
    "setup": "The same position, but now **turn both legs out from the hips** \u2014 let the kneecaps rotate toward the ceiling. Keep your back exactly as it was in the first attempt.",
    "lock": "As above: pelvis and lower back unchanged between the two. **The tell is the same** \u2014 if your back moves, the comparison is void.",
    "measurement": "Same measurement: floor to crotch, to the nearest half centimetre. **The reading is the difference between the two attempts.**",
-   "testing": "The same question, asked with the joint aligned differently. There are two ways to give the hip more room \u2014 turn the leg out, or tilt the pelvis \u2014 and they reach the same place. This uses the turn-out because tilting means arching your lower back under your full bodyweight, which your imaging rules out. A large jump between the two attempts means alignment was the limit, not tissue.",
+   "hint": "The gap between the floor and your crotch, in cm \u2014 same spot and same tape as the first attempt",
+   "testing": "The same question, asked with the joint aligned differently. There are two ways to give the hip more room \u2014 turn the leg out, or tilt the pelvis \u2014 and they reach the same place. This uses the turn-out because tilting means arching your lower back under your full bodyweight, which your imaging rules out. A large jump between the two attempts means alignment was the limit, not tissue. This attempt only runs when your neutral reading lands within 15 cm of the floor \u2014 higher than that, bone cannot be what stops you and the comparison answers nothing.",
    "safety": "",
    "adapted": "the original asked for a deliberate anterior pelvic tilt with the back arched",
    "setupInput": "",
@@ -121,6 +123,7 @@ const DATA = {
    "setup": "Sit with your back flat against a wall, soles of your feet together, heels pulled in to **your recorded heel distance**. Press your knees down toward the floor **without using your hands**.",
    "lock": "Your back stays flat on the wall, and your heels stay at the recorded distance. **The tell for the heels is a number, not a chalk mark** \u2014 measure from your tailbone to the back of your heels and match the figure. Heels further out drop the knees without your groin being one millimetre longer, so a session that re-places them by eye is void against the last one.",
    "measurement": "Measure from the floor up to **the outside of each calf**. Smaller is better. Left and right separately, to the nearest half centimetre. **Also record the heel distance you actually used** \u2014 it decides what this reading means.",
+   "hint": "The gap between the floor and the outside of each calf, in cm \u2014 left and right separately",
    "testing": "Your groin muscles with the knee fully bent. Bending the knee slackens gracilis \u2014 the one groin muscle that crosses the knee \u2014 so this loads everything except it. Comparing this against the straight-knee test is what names which part of the group is short. **That comparison is why the heel distance matters more here than anywhere else**: heels pulled closer than your reference drop the knees further, so this test passes too easily, and a whole-group restriction comes out looking like a gracilis one.",
    "safety": "",
    "adapted": "",
@@ -140,7 +143,8 @@ const DATA = {
    "bilateral": false,
    "setup": "Lie on your back with your backside against a wall and your legs straight up it. Lock your knees straight, kneecaps facing the ceiling. Let your legs slide apart under their own weight for 30 seconds. **No ankle weights.**",
    "lock": "Your backside stays against the wall and your knees stay straight. **The tell: if your backside slides away from the wall or a knee bends, the trial is void.** Kneecaps stay facing the ceiling \u2014 letting them roll in cheats the load off the groin.",
-   "measurement": "Measure from the inside of one ankle to the inside of the other. **Bigger is better here** \u2014 this is the one test on the list where a larger number is the good direction.",
+   "measurement": "Measure from the inside of one ankle to the inside of the other. **Bigger is better here** \u2014 a larger number is the good direction.",
+   "hint": "The distance between the inside of one ankle and the inside of the other, in cm",
    "testing": "Your groin muscles with the knee straight, which is what puts gracilis under the most stretch. Read against the bent-knee test: if the bent version is fine and this one is much worse, gracilis is the limit. If both are poor, the whole group is short.",
    "safety": "Unloaded and gravity-driven. The weighted version was removed \u2014 external load onto a passively held end-range hip is the practice your profile rules out.",
    "adapted": "the original used ankle weights",
@@ -152,41 +156,43 @@ const DATA = {
    }
   },
   {
-   "key": "tilt_range",
-   "slot": 2,
-   "slotLabel": "Prerequisite",
-   "label": "Tilt \u2014 with help",
-   "unit": "cm",
-   "bilateral": false,
-   "setup": "Sit with your legs straight and open to **your recorded straddle width**. Kneecaps and toes pointing up. Now fold forward, **using your hands walking forward on the floor or pulling on a strap anchored in front of you**.",
-   "lock": "Your knees stay straight and your kneecaps stay pointing up. **The tell: if your knees bend or roll inward, the trial is void.**",
-   "measurement": "Measure from the floor up to your forehead. **Also record, separately, the height at which your lower back stops being flat.** Two numbers, not one \u2014 the second is the one that should move first.",
-   "testing": "Whether you can get into the position at all when something else helps. Paired with the next test, it separates 'cannot reach it' from 'can reach it but cannot produce it' \u2014 and those two answers send you to completely different training.",
-   "safety": "**Stop where it lands. Do not chase depth once your lower back has rounded.** Past that point you are measuring your spine rather than your hip, which is both the wrong variable and the one your discs cannot take. You predicted on 2026-08-06 that you would fail before reaching the deep position at all \u2014 this test is what checks that. If you get significantly past upright, say so, because the decision to keep this test rests on that prediction being right.",
-   "adapted": "",
-   "setupInput": "",
-   "setupFake": null,
-   "fake": {
-    "": 40.0
-   }
-  },
-  {
    "key": "tilt_production",
    "slot": 2,
    "slotLabel": "Prerequisite",
    "label": "Tilt \u2014 under your own power",
-   "unit": "cm",
+   "unit": "\u00b0",
    "bilateral": false,
-   "setup": "The same position, same width. **Arms crossed on your chest. No hands, no strap, nothing to pull on.** Roll your pelvis forward and fold as far as you can under your own power.",
-   "lock": "Arms stay crossed and the knees stay straight. **The tell: if a hand comes down to the floor, even briefly, the trial is void.**",
-   "measurement": "Floor to forehead again, and again the height at which the lower back stops being flat.",
-   "testing": "Whether you can PRODUCE the position, not just be placed in it. This is the half that matters most for you: your file records that you cannot roll the pelvis forward in sitting, and that the rounding everyone notices is the compensation for it rather than the problem itself. If this fails and the previous test passed, the fix is strength at the end of the range, done last in the session.",
+   "setup": "Sit tall with your legs straight and open to **your recorded straddle width** \u2014 kneecaps and toes pointing up. **Arms crossed on your chest. No hands, no strap, nothing to pull on.** Now tip your hips forward \u2014 as if your waistband were a bowl of water you are pouring out the front \u2014 as far as you can under your own power, and hold it there.",
+   "lock": "Arms stay crossed, knees stay straight, kneecaps stay pointing up. **The tell: if a hand comes down to the floor, even briefly, the trial is void.** Steadying the phone against your lower back with one hand is fine \u2014 it is the floor you must not touch.",
+   "measurement": "Your phone, flat against your lower back just above the tailbone, with a level app open. Sitting tall, note the angle. Tip as far as you can, hold it, and read the angle again in the same spot. **The reading is how many degrees it moved. Bigger is better.** One number is enough \u2014 a rounding back cannot fake this one, which is why the old two-number version is gone.",
+   "hint": "How many degrees the phone reading moved between sitting tall and your deepest tip",
+   "testing": "Whether you can PRODUCE the position, not just be placed in it. This is the half that matters most for you: your file records that you cannot roll the pelvis forward in sitting, and that the rounding everyone notices is the compensation for it rather than the problem itself. Measured at the pelvis because the pelvis is the thing being tested \u2014 a forehead height is exactly what a rounding spine fakes. Taken before the helped version, because help flatters whatever follows it. If this fails and the helped test passes, the fix is strength at the end of the range, done last in the session.",
    "safety": "",
+   "adapted": "",
+   "setupInput": "Straddle width \u2014 inside of one heel to the inside of the other (cm)",
+   "setupFake": 92.0,
+   "fake": {
+    "": 4.0
+   }
+  },
+  {
+   "key": "tilt_range",
+   "slot": 2,
+   "slotLabel": "Prerequisite",
+   "label": "Tilt \u2014 with help",
+   "unit": "\u00b0",
+   "bilateral": false,
+   "setup": "The same position and **the same straddle width you just recorded**. This time use help: walk your hands forward on the floor, or pull on a strap anchored in front of you, to tip your hips further forward than you could on your own.",
+   "lock": "Your knees stay straight and your kneecaps stay pointing up. **The tell: if your knees bend or roll inward, the trial is void.**",
+   "measurement": "The same phone reading: flat against your lower back, sitting tall first, then at your deepest helped tip. **The reading is how many degrees it moved. Bigger is better.**",
+   "hint": "How many degrees the phone reading moved, sitting tall to your deepest helped tip",
+   "testing": "Whether the position exists at all when something else helps. Paired with the test before it, this separates 'cannot reach it' from 'can reach it but cannot produce it' \u2014 and those two answers send you to completely different training. It runs second on purpose: help leaves everything looser, so the own-power trial had to come first.",
+   "safety": "**Help tips the hips; it must not fold the spine. Stop the moment your lower back rounds** \u2014 past that point the extra depth is coming from your spine, which is both the wrong variable and the one your discs cannot take. You predicted on 2026-08-06 that you would fail before reaching the deep position at all \u2014 this test is what checks that. If you get significantly past sitting tall, say so, because the decision to keep this test rests on that prediction being right.",
    "adapted": "",
    "setupInput": "",
    "setupFake": null,
    "fake": {
-    "": 55.0
+    "": 8.0
    }
   },
   {
@@ -199,6 +205,7 @@ const DATA = {
    "setup": "Stand tall with no support. Lift one leg out to the side as high as you can. **No swing, no lean.** Hold it three seconds at the top.",
    "lock": "Your torso stays upright. **The tell: if you lean away from the lifting leg, the trial is void** \u2014 that buys height from your spine rather than your hip.",
    "measurement": "The angle of the raised leg from vertical. Bigger is better. Left and right separately, to the nearest degree.",
+   "hint": "The angle of the raised leg, in degrees up from straight down \u2014 left and right separately",
    "testing": "Not just how far you go, but **how strong the muscles that OPEN you are**. Something has to pull the legs apart, and if those muscles are weak the groin will not release however much you stretch it. A poor number here is a strength problem wearing a flexibility costume. Add your left and right angles together and compare the sum against your passive split \u2014 a passive 160\u00b0 with an active sum of 70\u00b0 is a very different athlete from one at 140\u00b0.",
    "safety": "",
    "adapted": "",
@@ -219,6 +226,7 @@ const DATA = {
    "setup": "Slide into a side split at depth and **take your hands off everything**, holding your own weight. Five seconds, then measure.",
    "lock": "Hands off. **The tell is obvious and that is the point** \u2014 if a hand goes back down, the trial is void.",
    "measurement": "Floor to crotch. **If you are using any added load, write the load down beside the number** \u2014 they are one measurement and neither means anything alone.",
+   "hint": "The gap between the floor and your crotch, in cm \u2014 plus the load beside it if you used one",
    "testing": "Whether the range is defended by muscle or only propped up from outside. Your body will not let a muscle relax into a position it cannot support, so end-range strength is not something running alongside flexibility \u2014 it is what permits it.",
    "safety": "**If your isometric number comes out as deep as your passive one, the load is too light** and passive tissue absorbed it \u2014 you have measured passive twice. Take weight off and repeat.",
    "adapted": "",
@@ -238,6 +246,7 @@ const DATA = {
    "setup": "Side split with a bench or blocks taking your upper body weight, legs relaxed. **Go to firm resistance, not to the floor.**",
    "lock": "Legs stay relaxed \u2014 this is the one trial where you are not holding yourself up. **The tell: if you are working to stay there, you are measuring the isometric again and the trial is void.** Let the support take the weight.",
    "measurement": "Floor to crotch, to the nearest half centimetre.",
+   "hint": "The gap between the floor and your crotch, in cm",
    "testing": "Your ceiling \u2014 the furthest the joint goes when something else does the work. On its own it says little; its value is as the reference the other two are compared against.",
    "safety": "**Taken LAST, and taken once.** Passive work leaves tissue looser for an hour or more, so doing it first would flatter every reading after it. It is also the one item here that is deliberately passive end-range with bodyweight driving it \u2014 a measurement, not a stretch to sink into, and never held for time. With lax tissue nothing complains on the approach, so the usual warning is absent.",
    "adapted": "",
@@ -253,12 +262,15 @@ const DATA = {
   "gate0_turned_out",
   "leverage_bent",
   "leverage_straight",
-  "tilt_range",
   "tilt_production",
+  "tilt_range",
   "spectrum_active",
   "spectrum_isometric",
   "spectrum_passive"
  ],
+ "skipNotes": {
+  "gate0_turned_out": "Skipped: legs turned out. At your height off the floor, bone is not yet a factor \u2014 the comparison starts mattering under 15 cm, and it will come back by itself once a neutral reading lands inside that line."
+ },
  "patterns": {
   "A": "Bone",
   "B": "Orientation",
@@ -519,7 +531,7 @@ const DATA = {
   "F": {
    "limiter": "Tilt range",
    "intro": "**The tilt-specific method, rebuilt rather than filtered.** The source's \u00a7F was four pancake variations, three of them using a plate or a strap to reach depth \u2014 which for a body that folds by rounding produces the depth through the spine. That is both the contraindicated route and the wrong measurement, and removing those would have left a stack of leftovers.\n\nThe organising idea instead: **the lumbar rounding is the compensation, not the problem.** You round because the pelvis will not rotate forward. So the work is not to fold more carefully \u2014 it is to build the tilt until there is no reason to compensate.",
-   "outro": "**What success looks like, and it is not depth.** The number that should move first is the height at which your lower back stops being flat. Forehead height may not move for weeks and that is not failure \u2014 if the flat-back height improves while total depth stays put, the stack is working exactly as intended. Retest the tilt after four weeks, cold, before adding anything.",
+   "outro": "**What success looks like, and it is not depth.** The number that should move is the tilt angle \u2014 the degrees your pelvis tips, phone on your lower back, measured the way the battery measures it. How far forward you fold may not change for weeks and that is not failure: if the angle grows, or the block under your hips comes down, while the fold stays put, the stack is working exactly as intended. Retest the tilt after four weeks, cold, before adding anything.",
    "items": [
     {
      "name": "Seated pelvic rock, mid-range",
@@ -825,8 +837,6 @@ const DATA = {
   "block_height_cm",
   "The elevation under the hips. Sitting above foot level rotates the pelvis forward on its own, so the block is the assist device for the tilt specifically. Lowering it over months is the progression \u2014 reaching further at a fixed height is not."
  ],
- "expected": "F",
- "expectedWhy": "Seated anterior pelvic tilt is the dominant restriction on record, reported independently in four seated positions on 2026-08-05. That is a slot 2 failure, which yields F or G. Note this DISAGREES with the generic lax-tissue prediction of H or I \u2014 he has a specific range deficit inside an otherwise hypermobile body, and the disagreement is worth watching rather than resolving in advance.",
  "nerve": "**A differentiator, not a provocation.** Do the tilt test twice at a COMFORTABLE, submaximal depth \u2014 once with your ankles pointed away and chin lifted, once with ankles pulled back and chin tucked. Muscle length is identical in both, so any difference in range is nerve rather than muscle. **Stop at the first change in the QUALITY of the sensation.** The original said to push until you produce a sharp, electric or burning feeling and read that as a result. Do not. Those are the exact words your own symptom logs have always treated as the line between a training sensation and something else, and you have a narrowed nerve exit on the right at L5/S1 with no neural signs on any log to date. **If one appears at any depth: stop, record the position and the quality, and do not train into it.** It is a finding, not a number, and nothing in this programme is worth producing one to obtain.",
  "deferredTests": [
   {
@@ -837,9 +847,10 @@ const DATA = {
  "baselinesRequired": 3,
  "th": {
   "gate0Gain": 10.0,
+  "bone": 15.0,
   "bent": 10.0,
   "straight": 90.0,
-  "tilt": 25.0,
+  "tilt": 20.0,
   "gap": 12.0
  }
 };
@@ -857,15 +868,29 @@ function worst(k){ const o=S.r[k]||{}; const v=Object.values(o).filter(x=>x!==''
 function best(k){ const o=S.r[k]||{}; const v=Object.values(o).filter(x=>x!==''&&x!=null).map(Number);
   return v.length?Math.min.apply(null,v):null; }
 
+// The LIVE order: above the relevance line the turned-out comparison answers
+// nothing and its step skips itself — mirroring cluster_a_battery.applicable_tests.
+function liveOrder(){ const n=val('gate0_neutral');
+  return (n!==null && n>DATA.th.bone)
+    ? DATA.order.filter(function(k){return k!=='gate0_turned_out';})
+    : DATA.order; }
+
 function evaluate(){
   const out=[];
   const n=val('gate0_neutral'), t=val('gate0_turned_out');
-  if(n===null||t===null) return {slots:out, pattern:null, stopped:0, indet:true};
-  const gain=n-t;
-  if(gain>=DATA.th.gate0Gain){ out.push({slot:0,pass:false,pattern:'B',
-      reason:'Turning the legs out gained '+gain.toFixed(1)+' cm. Orientation is the limiter, not tissue length.'});
-    return {slots:out, pattern:'B', stopped:0}; }
-  out.push({slot:0,pass:true,reason:'Turning out changed the depth by '+gain.toFixed(1)+' cm — below the threshold, so this is a genuine tissue restriction.'});
+  if(n===null) return {slots:out, pattern:null, stopped:0, indet:true};
+  if(n>DATA.th.bone){
+    out.push({slot:0,pass:true,reason:'At '+n.toFixed(1)+' cm off the floor, bone cannot be what stops you — '
+      +'that contact only happens in the last few centimetres of a full split. The two-orientation check '
+      +'starts mattering under '+DATA.th.bone.toFixed(0)+' cm; it comes back by itself once you are inside that line.'});
+  } else {
+    if(t===null) return {slots:out, pattern:null, stopped:0, indet:true};
+    const gain=n-t;
+    if(gain>=DATA.th.gate0Gain){ out.push({slot:0,pass:false,pattern:'B',
+        reason:'Turning the legs out gained '+gain.toFixed(1)+' cm. Orientation is the limiter, not tissue length.'});
+      return {slots:out, pattern:'B', stopped:0}; }
+    out.push({slot:0,pass:true,reason:'Turning out changed the depth by '+gain.toFixed(1)+' cm — below the threshold, so this is a genuine tissue restriction.'});
+  }
 
   const bent=worst('leverage_bent'), str=best('leverage_straight');
   if(bent===null||str===null) return {slots:out, pattern:null, stopped:1, indet:true};
@@ -875,10 +900,11 @@ function evaluate(){
   if(sf){ out.push({slot:1,pass:false,pattern:'E',reason:'Fine bent, poor straight. Gracilis is the only one of the group crossing the knee, so that difference names it.'}); return {slots:out,pattern:'E',stopped:1}; }
   out.push({slot:1,pass:true,reason:'Length is adequate at both available leverages.'});
 
+  // Degrees of pelvic tip, BIGGER is better — own power first, then helped.
   const rg=val('tilt_range'), pr=val('tilt_production');
   if(rg===null||pr===null) return {slots:out, pattern:null, stopped:2, indet:true};
-  if(rg>DATA.th.tilt){ out.push({slot:2,pass:false,pattern:'F',reason:'The position is not available even with help. Tilt work goes FIRST in the session and starts assisted.'}); return {slots:out,pattern:'F',stopped:2}; }
-  if(pr>DATA.th.tilt){ out.push({slot:2,pass:false,pattern:'G',reason:'You can reach it, you cannot produce it. Tilt work moves to the END and becomes strength work.'}); return {slots:out,pattern:'G',stopped:2}; }
+  if(rg<DATA.th.tilt){ out.push({slot:2,pass:false,pattern:'F',reason:'The position is not available even with help. Tilt work goes FIRST in the session and starts assisted.'}); return {slots:out,pattern:'F',stopped:2}; }
+  if(pr<DATA.th.tilt){ out.push({slot:2,pass:false,pattern:'G',reason:'You can reach it, you cannot produce it. Tilt work moves to the END and becomes strength work.'}); return {slots:out,pattern:'G',stopped:2}; }
   out.push({slot:2,pass:true,reason:'The tilt is available and producible — not your limiter.'});
 
   const act=worst('spectrum_active'), iso=val('spectrum_isometric'), pas=val('spectrum_passive');
@@ -902,7 +928,8 @@ function seed(t){
 function render(){
   document.getElementById('foot').innerHTML =
     'Prototype only — readings are pre-filled and nothing is saved. Tests, locks, slot thresholds, '
-    + 'the exercise library and the stacks are the real ones, read out of cluster_a_*.py at build time.';
+    + 'the exercise library and the stacks are the real ones, read out of cluster_a_*.py at build time '
+    + '(scripts/build_flexibility_prototype.py).';
   if(S.screen==='intro') return intro();
   if(S.screen==='cold')  return cold();
   if(S.screen==='step')  return step();
@@ -927,10 +954,7 @@ function intro(){
              + '<div class="sm">Decides: '+v.decides+'</div>'; }).join('')
     +'<div class="sm">Stop at the first failure. There is no value in measuring a spectrum profile '
     +'for a skill that a bony block had already made unavailable.</div></details>'
-    +'<details><summary>Expected outcome, written down before measuring</summary>'
-    +'<div class="sm"><b style="color:var(--ink2)">Pattern '+DATA.expected+'</b> — '+DATA.patterns[DATA.expected]+'</div>'
-    +'<div class="sm">'+DATA.expectedWhy+'</div></details>'
-    +'<details><summary>Held back until after 2026-08-16 &middot; '+DATA.deferredTests.length+'</summary>'
+    +'<details><summary>Held back for now &middot; '+DATA.deferredTests.length+'</summary>'
     + DATA.deferredTests.map(function(d){ return '<div class="sm"><b style="color:var(--ink2)">'+d.label+'</b></div>'
         +'<div class="sm">'+md(d.why)+'</div>'; }).join('')+'</details>');
 }
@@ -946,8 +970,10 @@ function cold(){
     + DATA.measures.map(function(m){ return '<div class="sm"><b style="color:var(--ink2)">'
         +m[0].charAt(0).toUpperCase()+m[0].slice(1)+' — '+m[1]+'</b></div><div class="sm">'+m[2]+'</div>'; }).join('')
     +'<div class="sm">'+md(DATA.gap)+'</div>'
-    +'<div class="sm">Taken in the order <b style="color:var(--ink2)">active → isometric → passive</b>. '
-    +'Passive work leaves tissue looser for an hour, so doing it first would flatter everything after it.</div></details>'
+    +'<div class="sm">Assisted work always comes after unassisted: the spectrum runs '
+    +'<b style="color:var(--ink2)">active → isometric → passive</b>, and the tilt runs '
+    +'<b style="color:var(--ink2)">own power before helped</b>. Help and passive work leave everything '
+    +'looser, so taking either first would flatter what follows it.</div></details>'
     +'<details><summary>What a LOCK is, and what to do if you lose it</summary>'
     +'<div class="sm">'+md(DATA.lock)+'</div></details>'
     +'<details><summary>Measure these once, then re-use them forever</summary>'
@@ -976,10 +1002,14 @@ function step(){
     return;
   }
 
-  const t = T(DATA.order[S.step]);
+  const ORD = liveOrder();
+  if(S.step>ORD.length-1) S.step=ORD.length-1;
+  const t = T(ORD[S.step]);
   seed(t);
+  const skipped = DATA.order.filter(function(k){return ORD.indexOf(k)<0;})
+    .map(function(k){return DATA.skipNotes[k]||'';}).filter(Boolean);
   const sides = t.bilateral ? ['left','right'] : [''];
-  const ticks = DATA.order.map(function(k,i){
+  const ticks = ORD.map(function(k,i){
     return '<i class="'+(i===S.step?'now':((S.r[k]&&Object.keys(S.r[k]).length)?'done':''))+'"></i>'; }).join('');
   const fields = sides.map(function(s){
     var v = (S.r[t.key]||{})[s];
@@ -989,8 +1019,9 @@ function step(){
   }).join('');
 
   el('<div class="steps">'+ticks+'</div>'
+    + skipped.map(function(n){return '<div class="note">'+n+'</div>';}).join('')
     +'<div class="row"><span class="nm">'+t.label+'</span>'
-    +'<span class="cap">'+(S.step+1)+' of '+DATA.order.length+' &middot; slot '+t.slot+' '+t.slotLabel+'</span></div>'
+    +'<span class="cap">'+(S.step+1)+' of '+ORD.length+' &middot; slot '+t.slot+' '+t.slotLabel+'</span></div>'
     +'<div class="lock"><b>LOCK</b> &mdash; '+md(t.lock)+'</div>'
     +'<div class="card"><div class="sm" style="color:var(--ink2)">'+md(t.setup)+'</div></div>'
     +'<details><summary>How to read it</summary>'
@@ -1000,19 +1031,20 @@ function step(){
     +(t.adapted?'<div class="sm"><i>Adapted for you — '+t.adapted+'.</i></div>':'')
     +(t.safety?'<div class="sm" style="color:#E2CB9B">'+md(t.safety)+'</div>':'')
     +'</details>'
+    +(t.hint?'<div class="sm"><b style="color:var(--ink2)">What to type:</b> '+md(t.hint)+'</div>':'')
     +'<div class="grid'+(sides.length===1?' one':'')+'">'+fields+'</div>'
     +(t.setupInput?'<div class="fld"><div class="l">'+t.setupInput+'</div>'
       +'<input type="number" step="0.5" value="'+(t.setupFake==null?'':t.setupFake)+'" '
       +'placeholder="recorded beside the reading — they are one datum"></div>':'')
     +'<label class="chk"><input type="checkbox"> The lock was lost — void this trial</label>'
     +'<div class="btns">'
-    +'<button class="b" onclick="next()">'+(S.step===DATA.order.length-1?'Save &amp; finish':'Save &amp; next')+'</button>'
+    +'<button class="b" onclick="next()">'+(S.step===ORD.length-1?'Save &amp; finish':'Save &amp; next')+'</button>'
     +'<button class="b ghost" onclick="next()">Skip</button>'
     +(S.step>0?'<button class="b ghost" onclick="S.step--;render()">Back</button>':'')+'</div>');
 }
 
 function next(){
-  if(S.step===DATA.order.length-1){ S.screen='done'; } else { S.step++; }
+  if(S.step>=liveOrder().length-1){ S.screen='done'; } else { S.step++; }
   render();
 }
 

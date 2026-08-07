@@ -107,21 +107,31 @@ early.
 1. **COLD. No warm-up, ever.** A warm reading measures a viscoelastic effect
    that is gone within hours. The flow gates on this and it is the single
    easiest thing to get wrong.
-2. **Capture the four frozen constants at the same session** — straddle width,
-   tailor's heel distance, the traced side-split stance, the floor reference.
-   They are setup numbers, not scores, and **the number is the record**: a chalk
-   mark is gone by next month and one re-placed by eye silently invalidates
-   every reading taken against it. Note `block_height_cm` is deliberately *not*
-   frozen — lowering it is the progress.
+2. **Capture the frozen constants at the same session.** Straddle width and the
+   tailor's heel distance are now asked for in the flow itself, beside the
+   reading they belong to — type them, don't chalk them. The traced side-split
+   stance and the floor reference still have no field and remain setup
+   discipline. **The number is the record**: a chalk mark is gone by next month
+   and one re-placed by eye silently invalidates every reading taken against
+   it. Note `block_height_cm` is deliberately *not* frozen — lowering it is the
+   progress.
 3. **Expect it to stop early.** Four slots run in order and it stops at the
    first failure, because a reading taken below a failing slot cannot be
-   interpreted. Continuing is offered; it is not the default.
+   interpreted. Continuing is offered; it is not the default. The turned-out
+   attempt of Gate 0 skips itself entirely while the neutral reading sits more
+   than 15 cm off the floor — bone only engages in the last few centimetres of
+   a full split (his call, 2026-08-07).
 4. **Each step prints its own setup, LOCK and measurement.** A lost lock makes
    the number *better*, not worse, so nothing warns you — which is why every
    lock names a tell you can see from outside.
-5. **Order within the spectrum slot is active → isometric → passive**, and not
-   the order the source writes them in. Passive work leaves tissue looser for an
-   hour and would flatter everything after it.
+5. **Assisted work always comes after unassisted.** Within the spectrum slot the
+   order is active → isometric → passive, and the tilt runs own-power before
+   helped — neither is the order the source writes them in. Passive or helped
+   work leaves everything looser and would flatter what follows it.
+6. **The tilt is an angle, not a distance** (2026-08-07): phone flat on the
+   lower back, degrees between sitting tall and the deepest tip. A rounding
+   spine cannot fake it, which is why it replaced forehead height and the
+   flat-back guard number in one move. Bring the phone to the mat.
 
 **Expected outcome, recorded in the code before measuring:** Pattern **F**, tilt
 range. That is what the 2026-08-05 straddle report predicts, and it *disagrees*

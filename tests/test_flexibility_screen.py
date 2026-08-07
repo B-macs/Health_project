@@ -14,9 +14,14 @@ readings that cannot be interpreted.
 
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 
 from streamlit.testing.v1 import AppTest
+
+import cluster_a_battery as cba
+from services import battery as sb
 
 _ROOT = r"c:\Users\brian\Documents\1.Projects\AIProject\Health_project"
 
@@ -72,14 +77,21 @@ _PASS_TO_TILT = [
     {"test_key": "leverage_straight", "value": 94.0, "unit": "cm", "side": "right"},
 ]
 _TILT_FAILS = _PASS_TO_TILT + [
-    {"test_key": "tilt_range", "value": 40.0, "unit": "cm"},
-    {"test_key": "tilt_production", "value": 55.0, "unit": "cm"},
+    {"test_key": "tilt_range", "value": 8.0, "unit": "°"},
+    {"test_key": "tilt_production", "value": 4.0, "unit": "°"},
 ]
 # Gate 0 alone, failing on orientation -> Pattern B at the very first slot.
+# The neutral reading must sit INSIDE the 15 cm relevance line — above it, bone
+# is not a live question and slot 0 passes on the height alone.
 _GATE0_FAILS = [
-    {"test_key": "gate0_neutral", "value": 40.0, "unit": "cm"},
-    {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"},
+    {"test_key": "gate0_neutral", "value": 14.0, "unit": "cm"},
+    {"test_key": "gate0_turned_out", "value": 3.0, "unit": "cm"},
 ]
+
+
+def _as_assessment(readings) -> sb.Assessment:
+    return sb.Assessment(cluster="a", taken_on=date(2026, 8, 6),
+                         readings=tuple(sb.Reading(**r) for r in readings))
 
 
 def _run(readings=(), draft=None, mode=None, step=0) -> AppTest:
@@ -242,11 +254,67 @@ def test_the_capture_step_asks_for_the_setup_number_where_a_test_has_one():
     which pattern comes out."""
     started = [{"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"},
                {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"}]
-    import cluster_a_battery as cba
-    step = list(cba.AVAILABLE_TESTS).index("leverage_bent")
+    # The step index comes from the LIVE order: a 28 cm neutral reading puts
+    # the turned-out comparison out of scope, which shifts every later step.
+    step = list(cba.applicable_tests(_as_assessment(started))).index("leverage_bent")
     at = _run(draft=started, mode="capture", step=step)
     labels = " ".join(str(n.label) for n in at.number_input)
     assert "heel" in labels.lower(), labels
+
+
+def test_a_neutral_reading_off_the_floor_skips_the_turned_out_step():
+    """The athlete's call (2026-08-07): bone only engages in the last few
+    centimetres of a full split. After a 28 cm neutral reading the turned-out
+    comparison is out of scope — the flow must move straight to the bent-knee
+    leverage and say why, not walk him through a comparison that answers
+    nothing."""
+    started = [{"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"}]
+    at = _run(draft=started, mode="capture", step=1)
+    body = _text(at)
+    assert "Knees fully bent" in body
+    assert "not yet a factor" in body.lower()
+
+
+def test_the_tilt_asks_for_one_number_in_degrees_plus_the_straddle_width():
+    """The old protocol asked for two measurements and offered one box. The
+    angle protocol asks for exactly one number — degrees at the pelvis — and
+    the width it was taken at, and the input says so at the field."""
+    step = list(cba.applicable_tests(_as_assessment(_PASS_TO_TILT))).index("tilt_production")
+    at = _run(draft=_PASS_TO_TILT, mode="capture", step=step)
+    body = _text(at)
+    assert "degrees" in body.lower()
+    # The old instruction must be gone; mentioning forehead height while
+    # explaining WHY the angle replaced it is fine.
+    assert "floor up to your forehead" not in body.lower()
+    assert "two numbers" not in body.lower()
+    labels = " ".join(str(n.label) for n in at.number_input)
+    assert "straddle width" in labels.lower(), labels
+    assert len(at.number_input) == 2, "one measurement box and one width box"
+
+
+def test_a_recorded_setup_number_is_offered_back_the_next_time():
+    """THE NUMBER IS THE RECORD. A straddle width recorded last session is the
+    width this session must use, so the screen says so instead of trusting
+    memory."""
+    prior = [dict(r) for r in _TILT_FAILS]
+    for r in prior:
+        if r["test_key"] == "tilt_production":
+            r["setup_value"] = 92.0
+    step = list(cba.applicable_tests(_as_assessment(_PASS_TO_TILT))).index("tilt_production")
+    at = _run(readings=prior, draft=_PASS_TO_TILT, mode="capture", step=step)
+    body = _text(at)
+    assert "Last time you used" in body
+    assert "92" in body
+
+
+def test_the_expected_outcome_is_no_longer_advertised_on_the_screen():
+    """Removed on the athlete's request (2026-08-07). The prediction stays in
+    the code — its job is to exist BEFORE measuring, not to prime the person
+    about to measure."""
+    at = _run()
+    body = _text(at)
+    assert "worth watching rather than resolving in advance" not in body
+    assert f"Pattern {cba.EXPECTED_PATTERN}" not in body
 
 
 def test_a_pattern_from_an_invented_cut_point_says_so_on_the_screen():
