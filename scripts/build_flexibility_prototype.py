@@ -74,6 +74,11 @@ for pattern, stack in cp.STACKS.items():
             "name": i.exercise, "dose": i.dose, "note": i.note, "deferred": i.deferred,
             "spectrum": ex.spectrum if ex else "",
             "why": ex.note if ex else "",
+            "position": ex.position if ex else "",
+            "movement": ex.movement if ex else "",
+            "feel": ex.feel if ex else "",
+            "stopRule": ex.stop if ex else "",
+            "progress": ex.progress if ex else "",
             "adapted": ex.adapted_from if ex else "",
             "reverts": ex.reverts_when if ex else "",
         })
@@ -416,7 +421,12 @@ function done(){
     var tint = i.spectrum==='resisted' ? 'var(--good)' : 'var(--ink3)';
     h += '<details><summary>'+(n+1)+'. '+i.name+' &middot; '+i.dose+'</summary>'
       +'<div class="sm"><span class="pill" style="color:'+tint+'">'+i.spectrum+'</span></div>'
-      +'<div class="sm">'+md(i.why)+'</div>'
+      +(i.position?'<div class="sm"><b style="color:var(--ink2)">Position</b> — '+md(i.position)+'</div>'
+        +'<div class="sm"><b style="color:var(--ink2)">The movement</b> — '+md(i.movement)+'</div>'
+        +'<div class="sm"><b style="color:var(--ink2)">You should feel</b> — '+md(i.feel)+'</div>'
+        +'<div class="sm"><b style="color:var(--ink2)">Stop rule</b> — '+md(i.stopRule)+'</div>'
+        +'<div class="sm"><b style="color:var(--ink2)">Progress is</b> — '+md(i.progress)+'</div>':'')
+      +(i.why?'<div class="note">Why: '+md(i.why)+'</div>':'')
       +(i.note?'<div class="sm">'+md(i.note)+'</div>':'')
       +(i.adapted?'<div class="sm"><i>Adapted — replaces '+i.adapted+'. Reverts when '+i.reverts+'.</i></div>':'')
       +'</details>';

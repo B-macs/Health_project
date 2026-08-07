@@ -307,6 +307,17 @@ def test_a_recorded_setup_number_is_offered_back_the_next_time():
     assert "92" in body
 
 
+def test_stack_items_lead_with_how_not_why():
+    """The athlete's direction (2026-08-07): the why is background; the how is
+    what the user needs. Each stack item must show position, movement, feel,
+    stop rule and progress — the why demoted to a caption underneath."""
+    at = _run(readings=_TILT_FAILS)
+    body = _text(at)
+    for label in ("Position", "The movement", "You should feel",
+                  "Stop rule", "Progress is"):
+        assert label in body, label
+
+
 def test_the_expected_outcome_is_no_longer_advertised_on_the_screen():
     """Removed on the athlete's request (2026-08-07). The prediction stays in
     the code — its job is to exist BEFORE measuring, not to prime the person

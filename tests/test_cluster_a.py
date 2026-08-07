@@ -565,6 +565,13 @@ _PATIENT_FACING = ("label", "setup", "lock", "measurement", "safety",
                    "input_hint", "setup_input")
 
 
+#: The athlete's wording rule (2026-08-07): when two options are offered, offer
+#: them — never add that it does not matter which. The reader already assumes a
+#: free choice unless told otherwise, so the phrase is pure noise.
+_HEDGES = ("doesn't matter", "does not matter", "either is fine", "either works",
+           "whichever")
+
+
 def test_the_fields_read_mid_test_stay_in_plain_english():
     """setup / lock / measurement / safety are read while lying on the floor
     holding a tape. Anatomy goes in what_youre_testing; nothing about this
@@ -574,10 +581,67 @@ def test_the_fields_read_mid_test_stay_in_plain_english():
     for key, test in cb.TESTS.items():
         for field in _PATIENT_FACING:
             body = getattr(test, field).lower()
-            for word in _JARGON + _REPO_INTERNALS:
+            for word in _JARGON + _REPO_INTERNALS + _HEDGES:
                 if word.lower() in body:
                     offences.append(f"{key}.{field}: {word!r}")
     assert offences == [], offences
+
+
+# ── the exercise library says HOW, not just why ──────────────────────────────
+#
+# The athlete's direction (2026-08-07), after the §F walkthrough: knowing WHY is
+# assumed correct in the background — understanding HOW is the part the user
+# needs, and the notes alone did not provide it. Five mandatory fields per
+# exercise: where your body is, what you actually do (including what resists
+# you), what you should feel, what ends the set, and what progress looks like.
+
+_HOW_FIELDS = ("position", "movement", "feel", "stop", "progress")
+
+
+def test_every_exercise_says_how_to_do_it_not_just_why():
+    for ex in cm.LIBRARY:
+        for field in _HOW_FIELDS:
+            assert getattr(ex, field).strip(), f"{ex.key}.{field} is empty"
+        assert len(ex.movement) >= 40, (
+            f"{ex.key}.movement is a stub — it must say what you actually do")
+
+
+def test_the_how_fields_stay_in_plain_english_and_never_hedge():
+    """Same rule as the battery's patient-facing fields — anatomy belongs in
+    the note (the why), not in the instructions — plus the wording rule: no
+    'it doesn't matter which' after offering options."""
+    offences = []
+    for ex in cm.LIBRARY:
+        for field in _HOW_FIELDS:
+            body = getattr(ex, field).lower()
+            for word in _JARGON + _REPO_INTERNALS + _HEDGES:
+                if word.lower() in body:
+                    offences.append(f"{ex.key}.{field}: {word!r}")
+    assert offences == [], offences
+
+
+def test_the_positions_carry_the_athletes_corrections():
+    """From the 2026-08-07 review of §F: the straddle hinges must state the
+    legs are straight, and the legs-together hinge must say STANDING — the
+    original note left the entire body position unstated, and a seated
+    legs-together hinge would have zero range for this athlete to train in."""
+    for key in ("elevated_hinge", "pancake_own_power", "straddle_lift_offs",
+                "loaded_flat_back_hinge"):
+        assert "straight" in cm.LIBRARY_BY_KEY[key].position.lower(), key
+    assert cm.LIBRARY_BY_KEY["flat_back_hinge"].position.lower().startswith("standing")
+
+
+def test_the_lift_offs_and_the_hinge_are_distinguishable_from_their_text():
+    """The complaint that started this: nothing said how the two differ. The
+    lift-offs must name what actually resists you (your own tissue, not
+    gravity); the hinge must be standing with the legs together. If either
+    stops being true, the two blur back together."""
+    lift = cm.LIBRARY_BY_KEY["straddle_lift_offs"]
+    hinge = cm.LIBRARY_BY_KEY["flat_back_hinge"]
+    assert "gravity is not the resistance" in lift.movement.lower()
+    assert "straddle" in lift.position.lower()
+    assert "legs together" in hinge.name.lower()
+    assert "standing" in hinge.position.lower()
 
 
 def test_every_test_says_what_it_is_actually_testing():

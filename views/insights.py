@@ -1766,7 +1766,17 @@ def _fx_render_populated(report, accent: str) -> None:
             if ex:
                 st.markdown(f'<span class="fx-cap" style="color:{tint};">{ex.spectrum}'
                             f'</span>', unsafe_allow_html=True)
-                st.caption(ex.note)
+                # HOW before WHY — the athlete's direction (2026-08-07). The
+                # why is assumed correct in the background; understanding how
+                # is the part the user needs mid-session.
+                if ex.position:
+                    st.markdown(f"**Position** — {ex.position}")
+                    st.markdown(f"**The movement** — {ex.movement}")
+                    st.markdown(f"**You should feel** — {ex.feel}")
+                    st.markdown(f"**Stop rule** — {ex.stop}")
+                    st.markdown(f"**Progress is** — {ex.progress}")
+                if ex.note:
+                    st.caption(f"Why: {ex.note}")
                 if ex.adapted_from:
                     st.caption(f"*Adapted for you — replaces {ex.adapted_from}. "
                                f"Reverts when {ex.reverts_when}.*")

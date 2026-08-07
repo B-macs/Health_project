@@ -690,6 +690,12 @@ past what the evidence carries, and it is treated as motivation the way
 - **Cluster B is unbuilt.** The blueprint's Pike is defined as *"touching your
   toes; forward fold"*, wording that hits two contraindicated rules outright — a
   whole-cluster collision to resolve before that one is authored.
+- **Every exercise says HOW (2026-08-07).** Five mandatory fields per library
+  entry — position, movement (naming what actually resists you), feel, stop
+  rule, progress — plain-English- and hedge-scanned, rendered ahead of the why.
+  The athlete's rules: how before why; never "it doesn't matter which"; always
+  state the body position. See the memory of the review and
+  `tests/test_cluster_a.py` `_HOW_FIELDS`.
 - **The stacking rules are tests now (2026-08-07).** The source's rules —
   isolated before integrated, full position last, bent knee before straight
   except §E, each item serving the stack's diagnosis, the five-item ceiling —
