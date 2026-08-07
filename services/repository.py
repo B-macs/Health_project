@@ -2563,6 +2563,7 @@ class Repository:
         self, session_date: date | str, set_records_by_exercise: dict,
         duration_minutes: float = 0.0, hr_max: float | None = None,
         hr_rest: float | None = None, activity_limit: int = 20,
+        force_activity_id: str | None = None, shift_hours: float = 0.0,
     ) -> dict | None:
         """Match a logged session to a Garmin activity and derive its
         heart-rate load. None when nothing matched — the caller then falls
@@ -2572,6 +2573,16 @@ class Repository:
         the Sets JSON — the per-set "ts" timestamps are what make time-window
         matching (and per-exercise attribution) possible at all, so sessions
         logged before per-set capture existed correctly return None here.
+
+        Returns a dict with "needs_choice": True instead of a load summary
+        when the day HAS activities but none aligns convincingly — the travel
+        case, where HEALTH_TIMEZONE names one zone and the watch recorded in
+        another. The caller is expected to show `candidates` and ask. Guessing
+        is specifically what this avoids: an hour-shifted session still
+        overlaps a long activity enough to look like a match, and would
+        attribute every exercise an hour of the wrong heart rate.
+
+        `force_activity_id` / `shift_hours` are how that answer comes back.
         """
         if self._gc is None:
             return None
@@ -2580,16 +2591,51 @@ class Repository:
             all_sets, duration_minutes=duration_minutes)
         if window is None:
             return None
+        if shift_hours:
+            window = (window[0] + timedelta(hours=shift_hours),
+                      window[1] + timedelta(hours=shift_hours))
+            all_sets = [dict(r, ts=hr_matching.shift_ts(r.get("ts"), shift_hours))
+                        for r in all_sets]
+            set_records_by_exercise = {
+                i: [dict(r, ts=hr_matching.shift_ts(r.get("ts"), shift_hours)) for r in rows]
+                for i, rows in (set_records_by_exercise or {}).items()
+            }
 
         day = str(session_date)[:10]
         candidates = [
             self._garmin_activity_row(a)
             for a in garmin.get_recent_activities(self._gc, limit=activity_limit)
         ]
-        candidates = [c for c in candidates if c.get("date") == day]
-        activity, overlap = hr_matching.match_activity(candidates, window)
-        if activity is None:
-            return None
+        # Same-day filter uses the SHIFTED window's date: training late in
+        # Ireland can land the Berlin-rendered clock on the following day.
+        candidates = [c for c in candidates
+                      if c.get("date") in (day, str(window[0].date()))]
+
+        if force_activity_id:
+            activity = next((c for c in candidates
+                             if str(c.get("activity_id")) == str(force_activity_id)), None)
+            if activity is None:
+                return None
+            overlap = hr_matching.overlap_seconds(
+                window[0], window[1], activity.get("start_time_local"),
+                hr_matching._to_dt(activity.get("start_time_local"))
+                + timedelta(minutes=float(activity.get("duration_minutes") or 0)))
+        else:
+            activity, overlap = hr_matching.match_activity(candidates, window)
+            quality = hr_matching.match_quality(window, activity, overlap)
+            if activity is None or quality < hr_matching.MIN_MATCH_QUALITY:
+                alts = hr_matching.alignment_candidates(candidates, window)
+                if alts:
+                    return {
+                        "needs_choice": True,
+                        "session_au": None,
+                        "reason": ("no activity lines up with this session's clock"
+                                   if activity is None else
+                                   f"best overlap covers only {quality:.0%} of the session"),
+                        "window": window,
+                        "candidates": alts,
+                    }
+                return None
 
         if hr_max is None:
             hr_max = self.get_observed_hr_max()

@@ -188,6 +188,113 @@ def match_activity(
     return best, best_overlap
 
 
+# Below this, a "match" is not trusted. Quality is the share of the shorter
+# of the two spans that actually overlaps, so a genuine match scores near 1.0
+# (the real 2026-08-06 session scores 0.98). The threshold exists because a
+# PARTIAL overlap is the dangerous case, not a missing one: shift a 64-minute
+# session an hour against a 61-minute activity and roughly five minutes still
+# overlap — comfortably past MIN_OVERLAP_SECONDS — so it would be accepted
+# and every exercise attributed an hour of someone else's heart rate.
+MIN_MATCH_QUALITY: float = 0.5
+
+# Whole-hour shifts tested when looking for a better alignment. Timezone
+# differences are the reason, so the candidates are hours rather than
+# arbitrary offsets; the range covers any zone the athlete could train in.
+_SHIFT_HOURS: tuple[int, ...] = tuple(range(-12, 15))
+
+
+def match_quality(window: tuple[datetime, datetime] | None,
+                   activity: dict | None, overlap: float) -> float:
+    """How much of the shorter span the overlap actually covers, 0..1.
+
+    Distinguishes a real match from a coincidental one. `overlap_seconds`
+    alone cannot: five minutes of overlap is five minutes whether it is the
+    tail of an hour-shifted mismatch or a genuinely short session.
+    """
+    if not window or not activity:
+        return 0.0
+    session_s = (window[1] - window[0]).total_seconds()
+    try:
+        activity_s = float(activity.get("duration_minutes") or 0) * 60.0
+    except (TypeError, ValueError):
+        return 0.0
+    shortest = min(s for s in (session_s, activity_s) if s > 0) if (
+        session_s > 0 and activity_s > 0) else 0.0
+    return round(min(1.0, overlap / shortest), 3) if shortest > 0 else 0.0
+
+
+def alignment_candidates(
+    activities: list[dict], window: tuple[datetime, datetime] | None,
+    same_day_only: bool = True,
+) -> list[dict]:
+    """Every same-day activity, each with the whole-hour shift that best
+    aligns it to the session, best first.
+
+    Exists for the travel case. HEALTH_TIMEZONE names one zone, so training
+    in another renders the session's clock face an hour or more away from the
+    watch's own local clock — the athlete's timestamps say 14:08 while Garmin
+    says 13:08. Wall-clock matching then finds nothing, or worse finds a
+    partial overlap and trusts it.
+
+    Rather than guess, this enumerates what the day actually contains so the
+    caller can show it and let the athlete choose. A non-zero `shift_hours`
+    on the best candidate is a strong signal of exactly that mismatch, and is
+    worth saying out loud rather than silently applying: a shift that "fixes"
+    the alignment is a hypothesis about where the athlete was, and only they
+    know.
+
+    Each entry: {"activity", "shift_hours", "overlap_seconds", "quality"}.
+    """
+    if not window or not activities:
+        return []
+    day = window[0].date()
+    out = []
+    for act in activities:
+        if str(act.get("type", "")).lower() in NON_SESSION_ACTIVITY_TYPES:
+            continue
+        start = _to_dt(act.get("start_time_local"))
+        if start is None:
+            continue
+        if same_day_only and start.date() != day:
+            continue
+        try:
+            minutes = float(act.get("duration_minutes") or 0)
+        except (TypeError, ValueError):
+            continue
+        if minutes <= 0:
+            continue
+        end = start + timedelta(minutes=minutes)
+        best = None
+        for shift in _SHIFT_HOURS:
+            shifted = (window[0] + timedelta(hours=shift),
+                       window[1] + timedelta(hours=shift))
+            ov = overlap_seconds(shifted[0] - timedelta(seconds=MATCH_TOLERANCE_SECONDS),
+                                 shifted[1] + timedelta(seconds=MATCH_TOLERANCE_SECONDS),
+                                 start, end)
+            q = match_quality(shifted, act, ov)
+            # Ties go to the smaller shift: 0 is always preferred over an
+            # explanation involving travel.
+            if best is None or (q, -abs(shift)) > (best["quality"], -abs(best["shift_hours"])):
+                best = {"activity": act, "shift_hours": shift,
+                        "overlap_seconds": ov, "quality": q}
+        if best:
+            out.append(best)
+    out.sort(key=lambda c: (c["quality"], -abs(c["shift_hours"])), reverse=True)
+    return out
+
+
+def shift_ts(value, hours: float) -> str | None:
+    """Move one per-set timestamp by whole hours, preserving its offset if it
+    carries one. Used when the athlete confirms a session was recorded in a
+    different timezone from the configured one — the SETS have to move too,
+    not just the matching window, or per-exercise attribution would still be
+    reading the wrong minutes of the activity."""
+    dt = _to_dt(value)
+    if dt is None:
+        return value
+    return (dt + timedelta(hours=hours)).isoformat()
+
+
 def exercise_blocks(set_records_by_exercise: dict[int, list[dict]]) -> list[dict]:
     """Turn each exercise's captured sets into a time block.
 

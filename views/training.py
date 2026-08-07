@@ -2448,7 +2448,54 @@ def render():
             # ── Measured vs reported — the comparison, side by side ────────
             _hr = st.session_state.get("tp_hr_au")
             _rep_rpe = st.session_state.get("tp_reported_rpe")
-            if _hr and _hr.get("hr_au") is not None:
+
+            # The travel case. HEALTH_TIMEZONE names one zone; train in
+            # another and the session's clock face sits an hour or more from
+            # the watch's own. Rather than pick — an hour-shifted session
+            # still overlaps a long activity enough to look convincing, and
+            # would attribute every exercise the wrong heart rate — the day's
+            # activities are listed and the athlete decides.
+            if _hr and _hr.get("needs_choice"):
+                st.error(
+                    f"⚠️ **Couldn't line this session up with your watch** — "
+                    f"{_hr.get('reason')}.\n\n"
+                    "This normally means you trained in a different timezone from the one "
+                    "configured, so the clocks disagree. Pick the activity below and the "
+                    "session will be re-matched against it."
+                )
+                _cands = _hr.get("candidates") or []
+                _labels = []
+                for c in _cands:
+                    a, sh = c["activity"], c["shift_hours"]
+                    _labels.append(
+                        f"{str(a.get('start_time_local'))[11:16]} · "
+                        f"{a.get('name') or a.get('type')} · "
+                        f"{a.get('duration_minutes')} min"
+                        + (f"  (needs {sh:+d}h — looks like a timezone difference)" if sh else "")
+                        + f"  · {c['quality']:.0%} fit"
+                    )
+                _pick = st.radio("Which activity was this session?", options=range(len(_cands)),
+                                 format_func=lambda i: _labels[i], key="tp_hr_pick")
+                if st.button("Use this activity", type="primary", key="tp_hr_pick_go"):
+                    _c = _cands[_pick]
+                    with st.spinner("Re-matching…"):
+                        try:
+                            st.session_state.tp_hr_au = repo.get_repository().compute_session_hr(
+                                date.today(),
+                                {i: rows for i, rows in st.session_state.tp_set_log.items() if rows},
+                                duration_minutes=elapsed_minutes,
+                                force_activity_id=_c["activity"].get("activity_id"),
+                                shift_hours=_c["shift_hours"],
+                            )
+                        except Exception:
+                            st.session_state.tp_hr_au = None
+                    st.rerun()
+                st.caption(
+                    "Skip this and the session is logged at your own rating, which is already "
+                    "saved — nothing is lost either way."
+                )
+
+            elif _hr and _hr.get("hr_au") is not None:
                 _cov = _hr.get("hr_coverage") or 0
                 _d_rpe = _hr["hr_rpe"] - _rep_rpe if _rep_rpe is not None else None
                 _d_au = (_hr["hr_au"] - st.session_state.get("tp_reported_au", 0)

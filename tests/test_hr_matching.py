@@ -278,3 +278,57 @@ def test_all_aware_bounds_compare_as_instants_not_wall_clock():
     ov = hm.overlap_seconds(
         berlin, berlin + timedelta(hours=1), london, london + timedelta(hours=1))
     assert ov == 0.0  # berlin 11:00-12:00 UTC vs london 12:00-13:00 UTC
+
+
+# ─── travel: a shifted clock must not silently half-match ───────────────────
+
+_WIN_ACT = {"activity_id": "9", "type": "indoor_cardio",
+            "start_time_local": "2026-08-06 12:50:35", "duration_minutes": 61.2}
+
+
+def _win(first, last, minutes=64):
+    return hm.session_window([{"ts": first}, {"ts": last}], duration_minutes=minutes)
+
+
+def test_match_quality_separates_a_real_match_from_an_hour_shifted_one():
+    """The dangerous case is a PARTIAL overlap, not a missing one: an
+    hour-shifted 64-minute session still shares minutes with a 61-minute
+    activity, comfortably past MIN_OVERLAP_SECONDS, so raw overlap accepts it
+    and every exercise gets an hour of the wrong heart rate."""
+    good = _win("2026-08-06T12:46:47", "2026-08-06T13:50:55")
+    _, ov_good = hm.match_activity([_WIN_ACT], good)
+    assert hm.match_quality(good, _WIN_ACT, ov_good) > 0.9
+
+    shifted = _win("2026-08-06T13:46:47", "2026-08-06T14:50:55")
+    act, ov_bad = hm.match_activity([_WIN_ACT], shifted)
+    assert act is not None                      # raw overlap still "matches"
+    assert ov_bad > hm.MIN_OVERLAP_SECONDS      # ...and passes the old gate
+    assert hm.match_quality(shifted, _WIN_ACT, ov_bad) < hm.MIN_MATCH_QUALITY
+
+
+def test_alignment_candidates_finds_the_hour_that_explains_the_gap():
+    shifted = _win("2026-08-06T13:46:47", "2026-08-06T14:50:55")
+    cands = hm.alignment_candidates([_WIN_ACT], shifted)
+    assert cands and cands[0]["shift_hours"] == -1
+    assert cands[0]["quality"] > 0.9
+
+
+def test_alignment_prefers_no_shift_when_the_session_already_aligns():
+    """A zero shift must always win a tie — travel is an explanation of last
+    resort, not a first guess."""
+    good = _win("2026-08-06T12:46:47", "2026-08-06T13:50:55")
+    assert hm.alignment_candidates([_WIN_ACT], good)[0]["shift_hours"] == 0
+
+
+def test_alignment_candidates_lists_every_same_day_activity_to_choose_from():
+    other = {"activity_id": "10", "type": "walking",
+             "start_time_local": "2026-08-06 19:05:00", "duration_minutes": 25.0}
+    cands = hm.alignment_candidates([_WIN_ACT, other],
+                                    _win("2026-08-06T13:46:47", "2026-08-06T14:50:55"))
+    assert {c["activity"]["activity_id"] for c in cands} == {"9", "10"}
+
+
+def test_shift_ts_moves_sets_and_keeps_any_offset():
+    assert hm.shift_ts("2026-08-06T13:08:27+02:00", -1).startswith("2026-08-06T12:08:27+02:00")
+    assert hm.shift_ts("2026-08-06T13:08:27", 2).startswith("2026-08-06T15:08:27")
+    assert hm.shift_ts(None, 1) is None
