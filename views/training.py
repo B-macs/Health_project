@@ -1231,8 +1231,10 @@ def _render_shift_banner(active, d: date) -> None:
         return
     reason = active.shift_reasons.get(d.isoformat())
     if reason:
-        if reason.startswith(scheduling.DROPPED_REASON_PREFIX):
-            # A dropped miss did NOT move — "Session moved" would be a lie.
+        if reason.startswith((scheduling.DROPPED_REASON_PREFIX,
+                              scheduling.HELD_REASON_PREFIX)):
+            # A dropped miss and a held (refused/undone) shift did NOT move
+            # — "Session moved" would be a lie for both.
             st.info(reason)
         else:
             st.info(f"Session moved — {reason}")
@@ -2025,6 +2027,17 @@ def render():
     day_num = ph.day_number_in_phase(active, date.today()) if active else None
     _init_state(day_num)
 
+    # Both scheduling writer blocks below are gated off while a guided
+    # session is IN PROGRESS: their writes remap today's day-number, and
+    # tp_ex_idx/tp_actuals/tp_set_log are keyed by exercise index against
+    # the content the session STARTED with — a mid-session remap (possible
+    # when the day's first evaluation failed on a Notion error and a later
+    # rerun succeeds) would carry that state onto a different session's
+    # exercise list. Deferring is safe and terminating: once the session
+    # completes and logs, today is no longer claimable, and the evaluation
+    # runs on the next render.
+    _in_session = bool(st.session_state.get("tp_started")) and not st.session_state.get("tp_done_today")
+
     # ── "Add Training" — floating + menu on every state below; the yoga-picker
     #     sub-screen short-circuits everything else (same page, no navigation) ──
     if st.session_state.get("tp_yoga_select"):
@@ -2058,7 +2071,7 @@ def render():
     # miss — moved or dropped — leaves a shift_reasons entry, and
     # missed_reschedules skips dates already in that ledger, so the rerun
     # finds nothing left to do.
-    if active is not None:
+    if active is not None and not _in_session:
         _mr_write_succeeded = False
         try:
             _mr_plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
@@ -2106,7 +2119,7 @@ def render():
     # subsequent render this same day from re-evaluating and re-writing once
     # a shift has already been recorded for today. This is the single most
     # important check in this feature (see its own docstring).
-    if active is not None and day_num is not None:
+    if active is not None and day_num is not None and not _in_session:
         _today_iso = date.today().isoformat()
         _today_content = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
         _is_gym_day = bool(_today_content and _today_content.get("is_gym_session"))
@@ -2126,7 +2139,8 @@ def render():
                 if _shift:
                     _plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
                     _new_overrides = scheduling.swap_pairs_for_shift(active, date.today(), _plan_dict)
-                    _new_reasons = scheduling.shift_reason_entries(_new_overrides, _reason)
+                    _new_reasons = scheduling.shift_reason_entries(
+                        _new_overrides, _reason, phase=active)
                     _shifted_active = replace(
                         active,
                         date_overrides={**active.date_overrides, **_new_overrides},

@@ -324,16 +324,25 @@ prescription under Structure is Stage 1 only; Stage 2A is externally loaded.
   week's Sunday nor the phase end (an override past the phase end would add
   a scheduled day to a later week's rollup); a miss with no eligible target
   is dropped visibly (`DROPPED_REASON_PREFIX` reason, self-map override).
-  Spacing at placement: no two mains adjacent, a main never lands the day
-  before a test, a test never the day after a main. Weekly Rollup needs no
-  change: same-week carry makes performed-week ≡ scheduled-week. Both
-  mechanisms share the `shift_reasons` ledger, so each date is scheduled at
-  most once — a reschedule claiming today suppresses today's auto-shift, and
-  an auto-shifted date later missed stays missed (both fail safe). The plan
+  Spacing binds BOTH mechanisms: no two mains adjacent, a main never lands
+  the day before a test, a test never the day after a main — the carry
+  refuses targets up front, the auto-shift validates every landing
+  post-walk and undoes violating swaps to a fixed point (a week-4 trigger
+  can legitimately collapse to a hold: with Friday pinned off the test's
+  eve, every partial shift stacks two mains, so nothing moves and the
+  banner says "kept in place"). Weekly Rollup needs no change: same-week
+  carry makes performed-week ≡ scheduled-week. Both mechanisms share the
+  `shift_reasons` ledger, and each date is scheduled at most once — a
+  reschedule claiming today suppresses today's auto-shift, an auto-shifted
+  date later missed stays missed, and the auto-shift never re-swaps a date
+  the carry already claimed (all pinned). Neither writer runs while a
+  guided session is in progress — a mid-session remap of today would carry
+  index-keyed session state onto a different session's exercises. The plan
   authors `day_type` per day (`training_plan.PLAN_STAGE2`, all 28 days —
   all-or-nothing, coverage test enforces); Stage 1 is untyped and inert. The
   phases blob write is chunked (`clients/notion.py rich_text`) because the
-  growing overrides/reasons history crossed Notion's 2000-char element cap.
+  growing overrides/reasons history was within one block of crossing
+  Notion's 2000-char element cap.
 - Session completion auto-logs all exercises to Notion Training DB
 
 ### Session Features

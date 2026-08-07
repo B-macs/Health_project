@@ -13,9 +13,15 @@ AUTO-SHIFT (approved, matches the user's own example: "Mon/Wed/Fri becomes
 Tue/Thu/Sat"): when a trigger condition fires on a scheduled gym-session day,
 that day's resolved day-number swaps with tomorrow's; the NEXT remaining
 gym-session day that calendar week swaps with the day after IT; and so on
-through Sunday — except that a swap is refused when the neighbor holds KNOWN
-equal-or-higher SESSION_PRIORITY content (a gym day never displaces a test
-day; see swap_pairs_for_shift).
+through Sunday (never past the phase end). A swap is refused when the
+neighbor holds KNOWN day_type content the mover does not STRICTLY outrank
+(a gym day never displaces a test day), when the neighbor resolves out of
+the phase's range (forced rest stays rest), or when either date already
+carries a shift_reasons entry — and every accepted landing is then
+validated against the same _spacing_ok rules the carry uses, undoing swaps
+that would put a main on the eve of a test or two mains back to back. A
+held (unswapped) from_date self-maps with a HELD_REASON_PREFIX reason. See
+swap_pairs_for_shift.
 
 MISSED-SESSION RESCHEDULING (missed_reschedules): a session missed earlier
 THIS calendar week may be carried onto a later day of the same week that
@@ -76,6 +82,13 @@ SESSION_PRIORITY: dict[str, int] = {"test": 3, "main": 2, "stretch": 1, "rest": 
 #: Reason-string prefix for a miss that could NOT be carried anywhere this
 #: week — the shift banner renders these without its "Session moved" framing.
 DROPPED_REASON_PREFIX = "Not rescheduled: "
+
+#: Reason-string prefix for a date whose auto-shift was evaluated but whose
+#: session was KEPT IN PLACE (a refused or spacing-undone swap's no-op
+#: self-map). The ledger entry must exist either way — it is what stops the
+#: rewrite loop — but the banner renders these without the "Session moved"
+#: framing, which would otherwise announce a move that never happened.
+HELD_REASON_PREFIX = "Session kept in place: "
 
 
 def should_evaluate_shift(is_gym_session: bool, today_iso: str, shift_reasons: dict[str, str]) -> bool:
@@ -169,83 +182,165 @@ def swap_pairs_for_shift(phase: Phase, from_date: date, plan_dict: dict) -> dict
     """Pairwise-adjacent-day swap of day-numbers, from_date through the end
     of its calendar week (Sunday), for the REMAINDER of that week only.
 
-    Walks day by day starting at from_date. At each date, resolves its
-    CURRENT day-number via plan.day_number_in_phase(phase, d) (i.e. against
-    phase's own existing date_overrides — this function never accumulates
-    its own overrides mid-walk). If that day-number's plan_dict content is a
-    gym session, it swaps with the immediately following date and the walk
-    jumps past both — UNLESS the neighbor holds KNOWN content of equal or
-    higher SESSION_PRIORITY ("nothing overwrites an equal or higher priority
-    session": a gym day never displaces a test day), in which case nothing
-    is swapped and the walk advances one date. A neighbor with no day_type
-    at all (every Stage 1 day) permits the swap: you cannot rank what the
-    plan has not typed, and refusing would silently kill the auto-shift for
-    every untyped plan. A trailing gym day with no remaining day that week
-    to pair with (i.e. Sunday itself) is left untouched — no drift outside
-    the week is ever introduced.
+    Walks day by day starting at from_date, never past the week's Sunday
+    NOR the phase end — a swap onto a date outside the phase would map a
+    session where nothing ever renders or counts it, the same reason
+    missed_reschedules caps its carry at the phase end. At each date,
+    resolves its CURRENT day-number via plan.day_number_in_phase(phase, d)
+    (i.e. against phase's own existing date_overrides — this function never
+    accumulates its own overrides mid-walk). If that day-number's plan_dict
+    content is a gym session, it swaps with the immediately following date
+    and the walk jumps past both — UNLESS the swap is refused, in which
+    case nothing is swapped and the walk advances one date. Refusals:
+      * the partner holds KNOWN day_type content the mover does not
+        STRICTLY outrank ("nothing overwrites an equal or higher priority
+        session" — note an untyped mover next to any typed partner is
+        refused too: you cannot rank what you cannot see);
+      * the partner's resolved day-number is out of the phase's range — a
+        forced-rest 0 override (the athlete's explicit rest stays rest,
+        especially when readiness demanded MORE recovery) or a date beyond
+        the plan;
+      * the partner OR the mover (mid-walk) already carries a shift_reasons
+        entry — a date is scheduled at most once, so a session carried in
+        by missed_reschedules is never re-shifted and its reason never
+        overwritten.
+    A partner with no day_type at all (every Stage 1 day) permits the swap:
+    refusing would silently kill the auto-shift for every untyped plan. A
+    trailing gym day with no remaining day to pair with is left untouched —
+    no drift outside the week or phase is ever introduced.
+
+    After the walk, every accepted swap's LANDING is validated against
+    _spacing_ok on the final mapping, and violating swaps are undone to a
+    fixed point. This is what keeps a main off the eve of a test — on the
+    live plan, a Friday trigger in week 4 must NOT push Session C onto the
+    Saturday before the day-28 reassessment — and what stops a mid-walk
+    refusal from leaving two mains adjacent. The check runs post-walk, not
+    mid-walk, because mid-walk adjacency is transient (the canonical
+    Mon/Wed/Fri -> Tue/Thu/Sat cascade briefly reads adjacent until the
+    next pair also moves). The undo loop can legitimately collapse the
+    WHOLE cascade — a week-4 Monday trigger shifts nothing, because with
+    Friday pinned off the test's eve every partial shift stacks two mains —
+    in which case the session is held in place (the volume modifier still
+    protects the athlete) and the banner says so via HELD_REASON_PREFIX.
 
     Walk safety invariant (weaker than the pre-priority "every date is
     visited exactly once", still sufficient): d strictly increases every
     iteration, and no date that has received an accumulated override is
-    ever re-resolved — a swap jumps past both its dates, and the refused-
-    swap branch writes at most from_date's own self-map, which the
-    strictly-forward walk never revisits.
+    ever re-resolved mid-walk — a swap jumps past both its dates, and the
+    refused-swap branch writes at most from_date's own self-map, which the
+    strictly-forward walk never revisits. The post-walk validation only
+    deletes accepted pairs or restores from_date's self-map, so the
+    guarantee below survives it.
 
     Returns only the dates whose day-number actually changed, in
     date_overrides' own {"YYYY-MM-DD": day_number} shape — merge into the
     caller's existing date_overrides, don't replace it. GUARANTEED to
     always include an entry for from_date itself — even a no-op
-    self-mapping, both when from_date is a trailing gym day with no
-    same-week partner AND when its swap is refused on priority — so the
-    caller's idempotency guard (never re-evaluate a date already recorded
-    in shift_reasons) always has something to key off. Omitting from_date
-    here caused an unbounded re-trigger-and-rewrite loop against Notion on
-    any date where this was the trailing case — confirmed by adversarial
-    review — and the refused-swap branch would recreate it identically.
+    self-mapping, whether from_date is a trailing gym day with no partner,
+    its swap was refused, or its swap was undone by spacing validation — so
+    the caller's idempotency guard (never re-evaluate a date already
+    recorded in shift_reasons) always has something to key off. Omitting
+    from_date here caused an unbounded re-trigger-and-rewrite loop against
+    Notion on any date where this was the trailing case — confirmed by
+    adversarial review — and every refusal path would recreate it
+    identically.
     """
-    week_end = _week_sunday(from_date)
+    week_end = min(_week_sunday(from_date), plan.phase_end_date(phase))
     overrides: dict[str, int] = {}
+    swapped: list[tuple[str, str]] = []  # (mover iso, landing iso) per accepted swap
 
     d = from_date
     while d <= week_end:
         day_num = plan.day_number_in_phase(phase, d)
         content = plan_dict.get(day_num)
         if content and content.get("is_gym_session"):
+            if d != from_date and d.isoformat() in phase.shift_reasons:
+                # Already scheduled once (e.g. a session carried in by
+                # missed_reschedules) — never rescheduled. from_date itself
+                # is exempt: the caller's guard already vouches for it.
+                d += timedelta(days=1)
+                continue
             partner = d + timedelta(days=1)
             if partner > week_end:
-                # Trailing gym day with no same-week neighbor to swap with
-                # (from_date itself can only ever be this date, since every
-                # later date reached by the walk already consumed its pair
-                # -- see docstring). Record a no-op self-mapping so from_date
-                # still gets a date_overrides/shift_reasons entry.
+                # Trailing gym day with no same-week/in-phase neighbor to
+                # swap with. Record a no-op self-mapping so from_date still
+                # gets a date_overrides/shift_reasons entry.
                 if d == from_date:
                     overrides[d.isoformat()] = day_num
-                break  # no same-week neighbor to pair with — leave untouched
+                break  # nothing to pair with — leave untouched
             partner_num = plan.day_number_in_phase(phase, partner)
             partner_type = day_type(plan_dict.get(partner_num))
-            if partner_type is not None and not can_overwrite(day_type(content), partner_type):
-                # Priority refusal: the neighbor holds known equal-or-higher
-                # content (e.g. a test day). from_date still needs its entry
-                # (see docstring — the Notion rewrite loop), then advance one.
+            refused = (
+                (partner_type is not None
+                 and not can_overwrite(day_type(content), partner_type))
+                or not (1 <= partner_num <= phase.length_days)
+                or partner.isoformat() in phase.shift_reasons
+            )
+            if refused:
+                # from_date still needs its entry (see docstring — the
+                # Notion rewrite loop), then advance one.
                 if d == from_date:
                     overrides[d.isoformat()] = day_num
                 d += timedelta(days=1)
                 continue
             overrides[d.isoformat()] = partner_num
             overrides[partner.isoformat()] = day_num
+            swapped.append((d.isoformat(), partner.isoformat()))
             d = partner + timedelta(days=1)
         else:
             d += timedelta(days=1)
 
+    # Post-walk spacing validation on the FINAL mapping, undone to a fixed
+    # point: undoing one pair can re-expose a neighbor for an earlier pair
+    # (restoring Friday's main makes Thursday's landing adjacent), so loop
+    # until a full pass deletes nothing. Terminates: each pass either
+    # removes a pair or breaks, and pairs only ever shrink.
+    def _final_type(x: date) -> str | None:
+        num = overrides.get(x.isoformat())
+        if num is None:
+            num = plan.day_number_in_phase(phase, x)
+        return day_type(plan_dict.get(num))
+
+    undone = True
+    while undone:
+        undone = False
+        for pair in list(swapped):
+            mover_iso, landing_iso = pair
+            landing = date.fromisoformat(landing_iso)
+            mover_type = day_type(plan_dict.get(overrides[landing_iso]))
+            if not _spacing_ok(_final_type(landing - timedelta(days=1)),
+                               mover_type,
+                               _final_type(landing + timedelta(days=1))):
+                del overrides[mover_iso]
+                del overrides[landing_iso]
+                swapped.remove(pair)
+                if mover_iso == from_date.isoformat():
+                    overrides[mover_iso] = plan.day_number_in_phase(phase, from_date)
+                undone = True
+
     return overrides
 
 
-def shift_reason_entries(overrides: dict[str, int], reason: str) -> dict[str, str]:
+def shift_reason_entries(overrides: dict[str, int], reason: str,
+                          phase: Phase | None = None) -> dict[str, str]:
     """The shift_reasons entries to merge alongside swap_pairs_for_shift's
     date_overrides — every date the swap touched gets the same trigger
-    reason, so the "Session moved" banner explains why on whichever of the
-    swapped dates the user is actually looking at."""
-    return {d: reason for d in overrides}
+    reason, so the shift banner explains why on whichever of the touched
+    dates the user is actually looking at.
+
+    Pass the phase to distinguish a no-op self-map (an entry whose
+    day-number equals the date's pre-merge resolution — a refused, undone
+    or trailing swap) from a real move: self-maps get HELD_REASON_PREFIX so
+    the banner never announces "Session moved" over a session that did not
+    move. The ledger semantics are identical either way — the caller's
+    guard keys on the entry existing, never on its wording."""
+    if phase is None:
+        return {d: reason for d in overrides}
+    entries: dict[str, str] = {}
+    for iso, num in overrides.items():
+        held = plan.day_number_in_phase(phase, date.fromisoformat(iso)) == num
+        entries[iso] = (HELD_REASON_PREFIX + reason) if held else reason
+    return entries
 
 
 # ─── Missed-session rescheduling ────────────────────────────────────────────

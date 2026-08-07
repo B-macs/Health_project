@@ -658,3 +658,195 @@ def test_blocked_from_date_swap_still_self_maps_and_writes_a_reason():
 
     assert overrides == {monday.isoformat(): 1}
     assert monday.isoformat() in reasons
+
+
+# ─── swap_pairs_for_shift × _spacing_ok (post-walk validation) ──────────────
+# The live phase: Stage 2A started Monday 2026-07-20, so day 26 (main) falls
+# on Friday 2026-08-14, day 27 (rest) on Saturday, and day 28 — the Day-28
+# physio reassessment, day_type "test" — on Sunday 2026-08-16.
+
+_LIVE_PHASE = Phase(2, "Stage 2A", "2026-07-20", 28, "active")
+
+
+def test_auto_shift_never_lands_a_main_on_the_eve_of_a_test():
+    # THE live hazard the adversarial review found: a readiness trigger on
+    # Friday 2026-08-14 must NOT push Session C onto the Saturday before
+    # the reassessment — leg work the morning before the test is the exact
+    # contamination the athlete's own rule forbids. The swap is undone and
+    # Friday holds in place.
+    overrides = scheduling.swap_pairs_for_shift(
+        _LIVE_PHASE, date(2026, 8, 14), tp.PLAN_STAGE2)
+    assert overrides == {"2026-08-14": 26}
+
+
+def test_week4_monday_trigger_holds_everything_rather_than_stack_mains():
+    # With Friday pinned off the test's eve, EVERY partial shift of week 4
+    # stacks two mains somewhere, so the whole cascade collapses to a hold:
+    # the Monday session stays scheduled (the readiness volume modifier
+    # still protects the athlete) and the banner says so.
+    overrides = scheduling.swap_pairs_for_shift(
+        _LIVE_PHASE, date(2026, 8, 10), tp.PLAN_STAGE2)
+    assert overrides == {"2026-08-10": 22}
+
+
+def test_typed_canonical_cascade_still_shifts_all_three_mains_when_sunday_is_rest():
+    # Weeks 1-3 end on a plain rest day, so the approved Mon/Wed/Fri ->
+    # Tue/Thu/Sat cascade must survive the spacing validation unchanged —
+    # mid-walk adjacency is transient and must not be punished.
+    overrides = scheduling.swap_pairs_for_shift(
+        _LIVE_PHASE, date(2026, 7, 20), tp.PLAN_STAGE2)
+    assert overrides == {
+        "2026-07-20": 2, "2026-07-21": 1,
+        "2026-07-22": 4, "2026-07-23": 3,
+        "2026-07-24": 6, "2026-07-25": 5,
+    }
+
+
+def test_a_refused_swap_never_leaves_two_mains_adjacent():
+    # Monday's swap is individually legal, but Wednesday's is refused by
+    # Thursday's test — leaving Monday's moved main next to Wednesday's
+    # unmoved one. The post-walk validation undoes Monday's swap too.
+    plan_dict = {1: {"is_gym_session": True, "day_type": "main"},
+                 2: {"day_type": "rest"},
+                 3: {"is_gym_session": True, "day_type": "main"},
+                 4: {"day_type": "test"}, **_rest_days(5, 6, 7)}
+    monday = _monday_on_or_before(date(2026, 7, 6))
+    phase = Phase(2, "Stage 2", monday.isoformat(), 28, "active")
+
+    overrides = scheduling.swap_pairs_for_shift(phase, monday, plan_dict)
+
+    assert overrides == {monday.isoformat(): 1}
+
+
+def test_auto_shift_walk_never_crosses_the_phase_end():
+    # A 5-day phase ending Friday with a gym day on its last day: Saturday
+    # is a free calendar date but outside the phase, where a swapped
+    # session would never render, count, or be rescued — same cap, same
+    # reason as missed_reschedules' phase-end horizon.
+    plan_dict = {**_rest_days(1, 2, 3, 4), 5: {"is_gym_session": True, "day_type": "main"}}
+    monday = _monday_on_or_before(date(2026, 7, 6))
+    friday = monday + timedelta(days=4)
+    phase = Phase(2, "Stage 2", monday.isoformat(), 5, "active")
+
+    overrides = scheduling.swap_pairs_for_shift(phase, friday, plan_dict)
+
+    assert overrides == {friday.isoformat(): 5}
+
+
+def test_a_forced_rest_partner_is_never_swapped_onto():
+    # Tuesday carries the athlete's explicit forced-rest 0 override; the
+    # auto-shift fired precisely because readiness demanded MORE recovery,
+    # so clobbering the rest day would invert the trigger's own intent.
+    plan_dict = {1: {"is_gym_session": True, "day_type": "main"}, 2: {"day_type": "rest"}}
+    monday = _monday_on_or_before(date(2026, 7, 6))
+    tuesday = monday + timedelta(days=1)
+    phase = Phase(2, "Stage 2", monday.isoformat(), 28, "active",
+                  date_overrides={tuesday.isoformat(): 0})
+
+    overrides = scheduling.swap_pairs_for_shift(phase, monday, plan_dict)
+
+    assert overrides == {monday.isoformat(): 1}
+
+
+def test_a_partner_already_in_the_ledger_is_never_reswapped():
+    # Tuesday holds a session carried in by missed_reschedules (override +
+    # ledger reason). A date is scheduled at most once: the auto-shift may
+    # not displace it again nor overwrite its reason.
+    plan_dict = {1: {"is_gym_session": True, "day_type": "main"},
+                 2: {"day_type": "rest"}, **_rest_days(3, 4, 5, 6, 7)}
+    monday = _monday_on_or_before(date(2026, 7, 6))
+    tuesday = monday + timedelta(days=1)
+    phase = Phase(2, "Stage 2", monday.isoformat(), 28, "active",
+                  date_overrides={tuesday.isoformat(): 9},
+                  shift_reasons={tuesday.isoformat(): "Moved from 2026-06-29 (missed)"})
+
+    overrides = scheduling.swap_pairs_for_shift(phase, monday, plan_dict)
+
+    assert tuesday.isoformat() not in overrides
+    assert overrides == {monday.isoformat(): 1}
+
+
+def test_a_gym_date_mid_walk_already_in_the_ledger_is_skipped():
+    # Wednesday's main was itself carried in earlier (ledger entry), so the
+    # walk skips it — and the validation then also undoes Monday's swap,
+    # which would have stacked Monday's moved main against Wednesday's.
+    plan_dict = {1: {"is_gym_session": True, "day_type": "main"},
+                 2: {"day_type": "rest"},
+                 3: {"is_gym_session": True, "day_type": "main"},
+                 **_rest_days(4, 5, 6, 7)}
+    monday = _monday_on_or_before(date(2026, 7, 6))
+    wednesday = monday + timedelta(days=2)
+    phase = Phase(2, "Stage 2", monday.isoformat(), 28, "active",
+                  shift_reasons={wednesday.isoformat(): "Moved from 2026-06-29 (missed)"})
+
+    overrides = scheduling.swap_pairs_for_shift(phase, monday, plan_dict)
+
+    assert wednesday.isoformat() not in overrides
+    assert overrides == {monday.isoformat(): 1}
+
+
+def test_shift_reason_entries_marks_self_maps_held_and_real_moves_bare():
+    # A held day must not read "Session moved" on screen; the ledger
+    # semantics (entry exists -> never re-evaluated) are identical either
+    # way, so the anti-loop guard survives the retag.
+    monday = _monday_on_or_before(date(2026, 7, 6))
+    tuesday = monday + timedelta(days=1)
+    phase = Phase(2, "Stage 2", monday.isoformat(), 28, "active")
+    overrides = {monday.isoformat(): 1, tuesday.isoformat(): 3}  # self-map + real move
+
+    reasons = scheduling.shift_reason_entries(
+        overrides, "Only 4.2h slept last night", phase=phase)
+
+    assert reasons[monday.isoformat()] == (
+        scheduling.HELD_REASON_PREFIX + "Only 4.2h slept last night")
+    assert reasons[tuesday.isoformat()] == "Only 4.2h slept last night"
+    assert scheduling.should_evaluate_shift(
+        True, monday.isoformat(), reasons) is False
+
+
+def test_a_logged_today_is_never_claimed_as_a_target():
+    # Today already holds a completed session (the yoga-inclusive source
+    # counts it): the carried main must skip it and land on the next free
+    # day, never relabelling a done date.
+    plan_dict = {1: {"day_type": "main"}, **_rest_days(2, 3, 4, 5, 6, 7)}
+    monday = _MONDAY
+    tuesday, wednesday = monday + timedelta(days=1), monday + timedelta(days=2)
+
+    overrides, reasons = scheduling.missed_reschedules(
+        _phase(monday), plan_dict, {tuesday.isoformat()}, today=tuesday)
+
+    assert overrides == {monday.isoformat(): 3, wednesday.isoformat(): 1}
+    assert reasons[wednesday.isoformat()] == f"Moved from {monday.isoformat()} (missed)"
+
+
+def test_higher_priority_miss_drops_while_lower_still_places():
+    # A missed test with no legal slot (Saturday sits after Friday's
+    # performed main, Sunday is another test) drops — and the lower-priority
+    # stretch missed the day after it must STILL be evaluated and placed.
+    plan_dict = {**_rest_days(1, 2, 6), 3: {"day_type": "test"},
+                 4: {"day_type": "stretch"}, 5: {"day_type": "main"},
+                 7: {"day_type": "test"}}
+    monday = _MONDAY
+    wednesday, thursday = monday + timedelta(days=2), monday + timedelta(days=3)
+    friday, saturday = monday + timedelta(days=4), monday + timedelta(days=5)
+
+    overrides, reasons = scheduling.missed_reschedules(
+        _phase(monday), plan_dict, {friday.isoformat()}, today=saturday)
+
+    assert overrides == {wednesday.isoformat(): 3,       # test: dropped, self-map
+                         thursday.isoformat(): 6,        # stretch -> Saturday
+                         saturday.isoformat(): 4}
+    assert reasons[wednesday.isoformat()].startswith(scheduling.DROPPED_REASON_PREFIX)
+
+
+def test_both_view_writer_blocks_are_gated_off_during_a_guided_session():
+    # Source-scan pin (the tests/test_manual_sync_serialised.py idiom): both
+    # scheduling writer blocks in views/training.py remap today's
+    # day-number, and the guided flow's tp_ex_idx/tp_actuals are keyed by
+    # exercise index against the content the session STARTED with — a
+    # mid-session remap would carry them onto a different session.
+    import pathlib
+    src = pathlib.Path(scheduling.__file__).parent.parent / "views" / "training.py"
+    text = src.read_text(encoding="utf-8")
+    assert "if active is not None and not _in_session:" in text
+    assert "if active is not None and day_num is not None and not _in_session:" in text
