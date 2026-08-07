@@ -385,10 +385,14 @@ If that reading is wrong, most of the programme is aimed at the wrong thing.
 
 ---
 
-## 13. Right anterior-chest cramp beside the surgical scar — new, painless, position-specific
+## 13. Right anterior-chest cramp beside the surgical scar — long-standing, painless, position-specific
 
-Added 2026-08-07. A recurring sensation, first put on the record today, and
-easy to demonstrate in the room:
+Added 2026-08-07. A **long-standing** sensation, first put on the record
+today, and easy to demonstrate in the room. Per the athlete it has been
+present since the years **after** the shoulder surgeries and well **before**
+the current back/hip era — but he only recently started paying attention to
+it, so whether it has changed over that span is unobserved; today's record is
+the baseline for watching it, not the onset.
 
 **The position:** hands together in a prayer position in front of the chest,
 but with the **fingers pointing forward** (away from the body) rather than up,
@@ -401,19 +405,26 @@ connecting toward the shoulder. The athlete's own tissue read is **pec
 minor**. **No pain**, no neural signs, and the identical position on the
 **left is completely clear**.
 
+**Documented negative:** it has never appeared during pressing — the
+sensation coexisted with past eras of regular, active Incline DB pressing
+without ever showing up in the lift. It is pressing-tolerant, and we are
+explicitly **not** raising it against the Day 28 shoulder exit criterion.
+
 Why we are bringing it to you rather than acting on it:
 
 1. **The location is surgically altered anatomy.** The Latarjet transferred
    the coracoid — pec minor's insertion — so the immediate region also holds
    the conjoint-tendon transfer site, pec major's upper fibres, and scar
    tissue. Surface anatomy there is not standard, and our "pec minor" label
-   is the athlete's guess, not a finding.
+   is the athlete's guess, not a finding. Onset in the years after the
+   Latarjet is *consistent with* the altered insertion being involved — we
+   record that as consistency, not causation.
 2. **§11's rule already covers the temptation.** Post-Latarjet, a capsular
    restriction changes the prescription from "stretch it" to "do not" — so no
    pec stretching has been added, and none will be until the tissue is named.
 3. **It bears on §8.** Everything previously recorded for this shoulder is
-   posterior/scapular; this is the first *anterior* signal, and it is
-   right-only — which supports the reading that the left-sided load is
+   posterior/scapular; this is the first *anterior* signal on the record, and
+   it is right-only — which supports the reading that the left-sided load is
    downstream of a right-side deficit.
 
 The character — painless, provoked only by active contraction in a shortened

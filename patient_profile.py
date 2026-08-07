@@ -23,12 +23,16 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
   fatigue onset under bodyweight is measured at 50-60s.
 
 2026-08-07: first anterior-chest signal on the post-Latarjet right shoulder
-  (symptom_log entry + finding #6 addendum): a recurring, painless,
-  position-specific cramp/'lock-out' in the pec-minor region just medial to
-  the surgical scar, right only. The location is surgically altered anatomy —
-  the Latarjet transferred the coracoid, pec minor's insertion — so the plan
-  is tissue identification by the physio at 2026-08-16 (brief §13), not
-  self-treatment, and explicitly NO pec stretching until then.
+  put on record (symptom_log entry + finding #6 addendum): a LONG-STANDING,
+  painless, position-specific cramp/'lock-out' in the pec-minor region just
+  medial to the surgical scar, right only — present since the years after the
+  surgeries, well before the recent injury era, and never provoked by pressing
+  (it coexisted with active Incline DB pressing eras), so it does not bear on
+  the Stage 2 shoulder exit criterion. The location is surgically altered
+  anatomy — the Latarjet transferred the coracoid, pec minor's insertion — so
+  the plan is tissue identification by the physio at 2026-08-16 (brief §13),
+  not self-treatment, and explicitly NO pec stretching until then. Trend was
+  never observed before now; the entry is the baseline for watching it.
 
 Stage 1 history: Rehab extended by 7 days (Days 15-21, "Week 3: Flare
   Recovery & Reassessment Prep" in training_plan.py) — decided 2026-07-13.
@@ -312,19 +316,23 @@ PROFILE = {
             ),
             "laterality": "RIGHT ONLY",
             "additional_evidence_2026_08_07": (
-                "First ANTERIOR signal on this shoulder: a recurring, position-specific, "
-                "painless cramp / 'locking out' burn in the pec-minor region just medial to "
-                "the surgical scar — right only, the identical position on the left is "
-                "completely clear (prayer hands at the chest, fingers forward, forearms ~45° "
-                "up toward the face). Everything previously recorded here is "
-                "posterior/scapular. Reads as CONTRACTILE (active contraction in a shortened "
-                "position), not positional — finding #4's framing. Clinically loaded "
-                "location: the Latarjet transferred the coracoid, pec minor's insertion, so "
-                "the region contains surgically altered anatomy and tissue identification "
-                "belongs to the physio (2026-08-16, brief §13). Full entry: symptom_log "
-                "2026-08-07. Does not change the training implication above — "
-                "scapular-control-first, conservative pressing — but is direct new evidence "
-                "on the physio brief's §8 right-vs-left question."
+                "First ANTERIOR signal RECORDED on this shoulder: a LONG-STANDING, "
+                "position-specific, painless cramp / 'locking out' burn in the pec-minor "
+                "region just medial to the surgical scar — right only, the identical "
+                "position on the left is completely clear (prayer hands at the chest, "
+                "fingers forward, forearms ~45° up toward the face). Chronicity: present "
+                "since the years after the surgeries and well before the 2025/2026 injury "
+                "era — attention to it is recent, so trend is unobserved; onset after the "
+                "Latarjet is consistent with, not proof of, the transferred pec minor "
+                "insertion being involved. Documented negative: never appeared during "
+                "pressing, across past eras of active Incline DB pressing — it does NOT "
+                "bear on the Stage 2 shoulder exit criterion. Everything previously "
+                "recorded here is posterior/scapular. Reads as CONTRACTILE (active "
+                "contraction in a shortened position), not positional — finding #4's "
+                "framing. Tissue identification belongs to the physio (2026-08-16, brief "
+                "§13). Full entry: symptom_log 2026-08-07. Does not change the training "
+                "implication above — scapular-control-first, conservative pressing — but is "
+                "direct new evidence on the physio brief's §8 right-vs-left question."
             ),
         },
     ],
@@ -982,20 +990,26 @@ PROFILE = {
         },
         {
             "date":   "2026-08-07",
-            "status": "Active — monitoring",
+            "status": "Longstanding — first recorded 2026-08-07; trend unobserved until now",
             "region": "Right anterior chest / front of the shoulder — upper right, just medial to the right-shoulder surgical scar",
             "title":  "Right Pec-Minor-Region Cramp / Lock-Out (Position-Specific, Painless)",
 
             "mechanism": (
-                "Recurring, and reliably reproduced by ONE specific position (first recorded "
-                "today; the sensation predates the record): hands together in a prayer "
-                "position in front of the chest, but with the fingers pointing FORWARD — away "
-                "from the body — rather than up, and the forearms angled ~45° upward toward "
-                "the face rather than sitting horizontal at 90° from the elbows. In that "
-                "position a strong burning, 'muscle locking out' sensation builds in the "
-                "upper right chest — just before the surgical scar, connecting toward the "
-                "shoulder — 'almost like a cramp'. No pain at any point, and the identical "
-                "position on the left produces nothing."
+                "LONG-STANDING, and reliably reproduced by ONE specific position: hands "
+                "together in a prayer position in front of the chest, but with the fingers "
+                "pointing FORWARD — away from the body — rather than up, and the forearms "
+                "angled ~45° upward toward the face rather than sitting horizontal at 90° "
+                "from the elbows. In that position a strong burning, 'muscle locking out' "
+                "sensation builds in the upper right chest — just before the surgical scar, "
+                "connecting toward the shoulder — 'almost like a cramp'. No pain at any "
+                "point, and the identical position on the left produces nothing. "
+                "Chronicity, per the athlete: present since the years AFTER the shoulder "
+                "surgeries and well BEFORE the 2025/2026 back/hip injury era — but attention "
+                "to it is recent, so whether it has changed over that span is unknown; this "
+                "entry is the baseline for observing trend, not the onset. Documented "
+                "negative: it has NEVER appeared during pressing — the sensation coexisted "
+                "with past eras of regular, active Incline DB pressing without ever showing "
+                "up in the lift."
             ),
 
             "symptoms": {
@@ -1031,15 +1045,23 @@ PROFILE = {
                     "does not trigger it; contraction in a specific configuration does."
                 ),
                 "underlying_pattern": (
-                    "FIRST ANTERIOR-CHEST SIGNAL on the post-Latarjet shoulder — everything "
-                    "previously recorded for that shoulder (sag, eccentric-control weakness, "
-                    "left tilt under overhead load) is posterior/scapular. Right-only "
-                    "laterality is consistent with the documented right-side asymmetry under "
-                    "ACTIVE/loaded conditions (findings #1, #2, #4), and per the 2026-08-05 "
-                    "baseline's no_passive_lateral_asymmetry note, its absence in passive "
-                    "stretching would say nothing either way. Direct new evidence on the "
-                    "physio brief's §8 open question: a right-sided anterior finding supports "
-                    "the 'left load is downstream of a right-side deficit' reading."
+                    "FIRST ANTERIOR-CHEST SIGNAL RECORDED on the post-Latarjet shoulder — "
+                    "everything previously recorded for that shoulder (sag, eccentric-control "
+                    "weakness, left tilt under overhead load) is posterior/scapular. The "
+                    "chronicity DECOUPLES it from the current injury cascade: it predates the "
+                    "2025/2026 back/hip era entirely, so it is a long-standing feature, not a "
+                    "development of this block, and it does NOT bear on the Stage 2 shoulder "
+                    "exit criterion. Onset in the years after the Latarjet is CONSISTENT "
+                    "with — not proof of — the surgically altered pec minor insertion being "
+                    "involved; record that as consistency, never causation. Chronic + "
+                    "painless + pressing-tolerant together support the benign contractile "
+                    "reading. Right-only laterality is consistent with the documented "
+                    "right-side asymmetry under ACTIVE/loaded conditions (findings #1, #2, "
+                    "#4), and per the 2026-08-05 baseline's no_passive_lateral_asymmetry "
+                    "note, its absence in passive stretching would say nothing either way. "
+                    "Direct new evidence on the physio brief's §8 open question: a "
+                    "right-sided anterior finding supports the 'left load is downstream of a "
+                    "right-side deficit' reading."
                 ),
             },
 
@@ -1059,8 +1081,12 @@ PROFILE = {
                 "explicitly pain-free, so pain is a change of kind, not degree",
                 "Any neural signs — numbness, tingling, or radiation into the arm",
                 "Any instability sensation in the right shoulder (finding #6)",
-                "Appearance during Incline DB Press or other pressing work — interacts "
-                "directly with stage_2_exit_criteria's shoulder criterion",
+                "Appearance during pressing work — NOT a live expectation (the documented "
+                "negative history spans past eras of active Incline DB pressing with zero "
+                "occurrences), so showing up there would be a BREAK in a long-established "
+                "pattern, which is exactly what makes it worth escalating",
+                "Any strengthening or easier triggering now that attention is on it — trend "
+                "was never observed before this entry, so this record is the baseline",
                 "Spreading to new positions or to the left side",
             ],
 
