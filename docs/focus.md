@@ -22,6 +22,51 @@ in `patient_profile.PROFILE["stage_transitions"]`.
 
 ---
 
+## ⏱ REVISIT ON 2026-08-16 — measured RPE vs self-reported
+
+**Added 2026-08-07. This is a software decision the athlete controls, not a
+physiotherapist question — it is listed here because 08-16 is the review date,
+not because it needs sign-off.**
+
+Every session now produces **two** intensity figures:
+
+| | Source | Feeds |
+|---|---|---|
+| **Self-reported RPE** | the slider, always asked | `session_au`, and therefore **Strain and ACWR** |
+| **Measured RPE** | Garmin HR, %HRR, active-time weighted | stored beside it, feeds **nothing** |
+
+They are deliberately *not* unified. `CLAUDE.md` key rule 2b keeps load on one
+unit because a figure that changes depending on whether the watch happened to
+be running would swing the ACWR ceiling on **button behaviour rather than
+physiology** — the same hazard as `HRV_GARMIN_HOLD` and the sleep-blend row.
+Rule 2b names the exit condition precisely: *a per-athlete conversion regressed
+from sessions that have BOTH signals.*
+
+**That is what is now accumulating.** The self-reported rating is collected on
+every session, Garmin or not, specifically so the pair exists — a rating taken
+only when the watch was off could never be compared against a measurement.
+
+**What to look at on 2026-08-16:**
+
+1. **How many paired sessions exist.** One is not a regression. First data
+   point, 2026-08-06: measured **5.2** against self-reported **5** — 333 AU
+   vs 320. Encouragingly close, and *only* one point.
+2. **Bias and spread** of (measured − reported), the same way the HRV hold is
+   judged: a consistent offset can be corrected, a wide spread means no single
+   conversion works and the hold should stand.
+3. **Whether the athlete's rating is systematically off in one direction**,
+   which is interesting in its own right regardless of the switch.
+
+**Do not flip anything on a date.** Flip it on the measurement, exactly as
+`HRV_GARMIN_HOLD` requires. If the spread is wide, the correct outcome is to
+keep both and say so.
+
+Also worth checking that day: **coverage**. If sessions routinely come back
+under ~85% covered, the watch is being started late or stopped early, and the
+fix is the prompt — not the model.
+
+---
+
 ## Three Decisions Due at Day 28 (2026-08-16)
 
 All three are **explicit deferred decisions**, not oversights. Settle each with

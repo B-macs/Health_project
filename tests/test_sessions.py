@@ -704,7 +704,7 @@ _STATE = {
     "tp_ex_idx": 2, "tp_set": 1, "tp_rep_in_set": 1, "tp_phase": "resting",
     "tp_started": True, "tp_done_today": False, "tp_session_logged": False,
     "tp_side": "right", "tp_session_start_ts": 12345.0, "tp_actuals": {},
-    "tp_set_log": {},
+    "tp_set_log": {}, "tp_garmin_declared": False,
 }
 
 

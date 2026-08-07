@@ -608,7 +608,10 @@ def _init_state(day_num: int | None = None):
         "tp_garmin_minutes":   {},       # {exercise_idx: actual_minutes} pulled from Garmin on Complete
         "tp_garmin_activity_detail": {}, # {exercise_idx: {avg_hr, max_hr, distance_km, calories}}
         "tp_garmin_check":     None,     # completion screen: today's Garmin activity, or {} if none. Not checkpointed — a stale "found" would be worse than re-asking
+        "tp_garmin_declared":  False,    # did the athlete say they started a Garmin workout? Decided BEFORE the session; drives the stop-prompt and the RPE comparison
         "tp_hr_au":            None,     # HR-derived session RPE/AU, computed after saving
+        "tp_reported_rpe":     None,     # the athlete's own rating, kept for the measured-vs-reported comparison
+        "tp_reported_au":      None,
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
         "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
         "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
@@ -1676,6 +1679,34 @@ def _render_overview(day_num: int, active, today_plan: dict,
     # floating action bar + bottom nav once scrolled to the end.
     st.markdown("<div style='height:150px;'></div>", unsafe_allow_html=True)
 
+    # ── Garmin: declared HERE, before the session, not asked for after it ───
+    #
+    # The watch has to be started BEFORE the first set or there is nothing to
+    # match against — a decision that cannot be made retrospectively, which is
+    # why it is a pre-session prompt rather than a post-session question.
+    #
+    # The answer also decides what the completion screen does: declaring "no
+    # Garmin" suppresses the stop-your-watch prompt entirely rather than
+    # nagging about a workout that was never started. The self-reported RPE
+    # slider is asked for either way — see the completion screen for why.
+    st.markdown(
+        "<div style='background:#0E1117;border:1px solid #2A3138;border-left:3px solid #FFD700;"
+        "border-radius:8px;padding:12px 16px;margin-bottom:10px;'>"
+        "<span style='color:#FFD700;font-size:11px;font-family:monospace;letter-spacing:2px;'>"
+        "⌚ BEFORE YOU START</span><br>"
+        "<span style='color:#C8CAD0;font-size:14px;line-height:1.6;'>"
+        "Start a workout on your Garmin now — any activity type that records heart rate. "
+        "It lets every exercise get a measured intensity instead of one guessed at the end."
+        "</span></div>",
+        unsafe_allow_html=True,
+    )
+    st.checkbox(
+        "I've started a Garmin workout",
+        key="tp_garmin_planned",
+        help="Leave unticked to train without the watch — you'll just rate the session "
+             "yourself at the end, exactly as before.",
+    )
+
     st.markdown(_FAB_CSS, unsafe_allow_html=True)
     st.markdown('<div class="stFabRow" style="display:none"></div>', unsafe_allow_html=True)
     col_adapt, col_start = st.columns(2, gap="small")
@@ -1685,6 +1716,12 @@ def _render_overview(day_num: int, active, today_plan: dict,
     with col_start:
         if st.button("Start", type="primary", use_container_width=True):
             st.session_state.tp_started = True
+            # Copy the checkbox out of widget state into state we own, for the
+            # same reason the per-exercise notes are checkpointed: this widget
+            # stops rendering the moment the guided flow begins, and Streamlit
+            # discards a keyed widget's entry as soon as it is gone.
+            st.session_state.tp_garmin_declared = bool(
+                st.session_state.get("tp_garmin_planned"))
             _save_checkpoint(day_num)
             st.rerun()
 
@@ -2310,33 +2347,42 @@ def render():
             # running. Checking before the save is the point — afterwards the
             # athlete has left the screen and the HR record for the session is
             # lost for good.
-            _garmin_status = st.session_state.get("tp_garmin_check")
-            _c1, _c2 = st.columns([3, 1])
-            with _c2:
-                if st.button("↻ Re-check", use_container_width=True, key="tp_recheck_garmin"):
-                    _garmin_status = None
-            if _garmin_status is None:
-                with st.spinner("Checking for a Garmin workout…"):
-                    try:
-                        _garmin_status = repo.get_repository().find_open_garmin_activity(
-                            str(date.today())) or {}
-                    except Exception:
-                        _garmin_status = {}
-                st.session_state.tp_garmin_check = _garmin_status
-            with _c1:
-                if _garmin_status:
-                    st.success(
-                        f"✅ Garmin workout found — **{_garmin_status.get('name') or 'activity'}**, "
-                        f"{_garmin_status.get('duration_minutes')} min. Heart rate will be "
-                        "matched to each exercise."
-                    )
-                else:
-                    st.warning(
-                        "⏱️ **Stop your Garmin workout now**, then tap Re-check.\n\n"
-                        "A running activity isn't visible until it's stopped and synced. "
-                        "Save without it and this session gets no heart-rate data — "
-                        "there's no way to add it later."
-                    )
+            # Only asked for when a Garmin workout was DECLARED at the start.
+            # Nagging someone to stop a watch they never started is noise, and
+            # noise in a safety-adjacent flow teaches the athlete to skim it.
+            if st.session_state.get("tp_garmin_declared"):
+                _garmin_status = st.session_state.get("tp_garmin_check")
+                _c1, _c2 = st.columns([3, 1])
+                with _c2:
+                    if st.button("↻ Re-check", use_container_width=True, key="tp_recheck_garmin"):
+                        _garmin_status = None
+                if _garmin_status is None:
+                    with st.spinner("Checking for a Garmin workout…"):
+                        try:
+                            _garmin_status = repo.get_repository().find_open_garmin_activity(
+                                str(date.today())) or {}
+                        except Exception:
+                            _garmin_status = {}
+                    st.session_state.tp_garmin_check = _garmin_status
+                with _c1:
+                    if _garmin_status:
+                        st.success(
+                            f"✅ Garmin workout found — **{_garmin_status.get('name') or 'activity'}**, "
+                            f"{_garmin_status.get('duration_minutes')} min. Heart rate will be "
+                            "matched to each exercise."
+                        )
+                    else:
+                        st.warning(
+                            "⏱️ **Stop your Garmin workout now**, then tap Re-check.\n\n"
+                            "A running activity isn't visible until it's stopped and synced. "
+                            "Save without it and this session gets no heart-rate data — "
+                            "there's no way to add it later."
+                        )
+            else:
+                st.caption(
+                    "No Garmin workout was started for this session, so your rating below is "
+                    "the only intensity record — it's what the session load is built from."
+                )
 
             with st.form("log_session_form"):
                 session_rpe = st.slider("Session RPE — how hard did it feel?",
@@ -2356,19 +2402,29 @@ def render():
             if save_btn:
                 with st.spinner("Saving session to Notion…"):
                     _auto_log_session(day_num, exercises, session_rpe, elapsed_minutes, session_notes)
+                # Keep the self-reported figures so the comparison below has
+                # both sides. The rating is ALWAYS collected, Garmin or not:
+                # its value is precisely that it is independent of the
+                # measurement, and a rating only taken when the watch was off
+                # could never be compared against one.
+                st.session_state.tp_reported_rpe = session_rpe
+                st.session_state.tp_reported_au = session_rpe * elapsed_minutes
                 # Derive the HR-based session RPE/AU while the per-set records
                 # are still in hand. Never blocks the save — the session is
                 # already in Notion by this point and a Garmin failure must
                 # not undo that.
-                with st.spinner("Matching heart rate to exercises…"):
-                    try:
-                        st.session_state.tp_hr_au = repo.get_repository().compute_session_hr(
-                            date.today(),
-                            {i: rows for i, rows in st.session_state.tp_set_log.items() if rows},
-                            duration_minutes=elapsed_minutes,
-                        )
-                    except Exception:
-                        st.session_state.tp_hr_au = None
+                if st.session_state.get("tp_garmin_declared"):
+                    with st.spinner("Matching heart rate to exercises…"):
+                        try:
+                            st.session_state.tp_hr_au = repo.get_repository().compute_session_hr(
+                                date.today(),
+                                {i: rows for i, rows in st.session_state.tp_set_log.items() if rows},
+                                duration_minutes=elapsed_minutes,
+                            )
+                        except Exception:
+                            st.session_state.tp_hr_au = None
+                else:
+                    st.session_state.tp_hr_au = None
                 st.session_state.tp_session_logged = True
                 _save_checkpoint(day_num)
                 st.rerun()
@@ -2389,15 +2445,35 @@ def render():
                 unsafe_allow_html=True,
             )
 
-            # ── HR-derived session load, if a Garmin activity matched ──────
+            # ── Measured vs reported — the comparison, side by side ────────
             _hr = st.session_state.get("tp_hr_au")
+            _rep_rpe = st.session_state.get("tp_reported_rpe")
             if _hr and _hr.get("hr_au") is not None:
                 _cov = _hr.get("hr_coverage") or 0
+                _d_rpe = _hr["hr_rpe"] - _rep_rpe if _rep_rpe is not None else None
+                _d_au = (_hr["hr_au"] - st.session_state.get("tp_reported_au", 0)
+                         if _rep_rpe is not None else None)
                 m1, m2, m3 = st.columns(3)
-                m1.metric("HR-derived RPE", f"{_hr['hr_rpe']}")
-                m2.metric("HR-derived AU", f"{_hr['hr_au']:.0f}",
-                          help="Measured RPE x session duration — same basis as the self-reported AU, so the two compare like for like.")
+                m1.metric("Measured RPE", f"{_hr['hr_rpe']}",
+                          delta=(f"{_d_rpe:+.1f} vs your {_rep_rpe}"
+                                 if _d_rpe is not None else None),
+                          delta_color="off")
+                m2.metric("Measured AU", f"{_hr['hr_au']:.0f}",
+                          delta=(f"{_d_au:+.0f} vs your {st.session_state.get('tp_reported_au'):.0f}"
+                                 if _d_au is not None else None),
+                          delta_color="off",
+                          help="Measured RPE x session duration — Foster's own basis, so it "
+                               "compares like for like with your self-reported AU.")
                 m3.metric("Active time", f"{_hr['hr_active_minutes']:.0f} min")
+                if _d_rpe is not None:
+                    _verdict = ("You called it almost exactly." if abs(_d_rpe) < 0.5 else
+                                "You under-rated it." if _d_rpe > 0 else
+                                "You over-rated it.")
+                    st.caption(
+                        f"**{_verdict}** You rated this {_rep_rpe}; heart rate says "
+                        f"{_hr['hr_rpe']}. Neither replaces the other — yours measures how "
+                        "close to failure it felt, heart rate measures metabolic cost."
+                    )
                 st.caption(
                     f"Matched to *{_hr.get('activity_name') or _hr.get('activity_type')}* · "
                     f"{_hr.get('hr_covered_exercises')}/{_hr.get('hr_total_exercises')} exercises "
@@ -2417,8 +2493,17 @@ def render():
                     "drives ACWR — the two are kept on separate units deliberately, so load "
                     "never depends on whether the watch was running."
                 )
-            elif _hr and _hr.get("reason"):
-                st.caption(f"No heart-rate match for this session ({_hr['reason']}).")
+            elif st.session_state.get("tp_garmin_declared"):
+                st.caption(
+                    "No heart-rate match for this session"
+                    + (f" ({_hr['reason']})." if _hr and _hr.get("reason") else ".")
+                    + f" Load is from your own rating: RPE {_rep_rpe}."
+                )
+            elif _rep_rpe is not None:
+                st.caption(
+                    f"Logged at your rating of RPE {_rep_rpe}. Start a Garmin workout next "
+                    "session to get a measured figure alongside it."
+                )
             if day_num < _plan_days:
                 next_plan = active_plan[day_num + 1]
                 with st.expander(f"Preview: Day {day_num + 1} — {next_plan['objective']}", expanded=False):

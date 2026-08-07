@@ -50,7 +50,7 @@ RELEASE_EXERCISE_NAMES = frozenset({
 CHECKPOINT_FIELDS = (
     "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
     "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
-    "tp_actuals", "tp_set_log",
+    "tp_actuals", "tp_set_log", "tp_garmin_declared",
 )
 
 BAND_TIERS = engine.BAND_TIERS
