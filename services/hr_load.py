@@ -406,6 +406,111 @@ def exercise_hr_rpe(
     }
 
 
+def covered_seconds(samples: list[tuple[float, float]]) -> float:
+    """Seconds of REAL recording in a sample series — pauses excluded.
+
+    This is the pause-handling primitive, and it is why the session AU below
+    is not simply RPE x wall-clock. A Garmin workout can be paused mid-session
+    (a phone call, a queue for the rack, a set moved to another machine) and
+    resumed. Wall clock keeps running; the recording does not. Crediting the
+    gap would inflate AU by exactly the time the athlete spent NOT training,
+    and would do so invisibly.
+
+    Each sample is credited with the interval to the next one, clamped to
+    MAX_SAMPLE_GAP_SECONDS — the same rule seconds_in_zone_from_samples
+    applies, so covered time and zone time can never disagree. A four-minute
+    pause therefore contributes ten seconds, not four minutes.
+    """
+    ordered = sorted(samples or [], key=lambda s: s[0])
+    if not ordered:
+        return 0.0
+    if len(ordered) == 1:
+        return MAX_SAMPLE_GAP_SECONDS
+    deltas = [b[0] - a[0] for a, b in zip(ordered, ordered[1:]) if b[0] > a[0]]
+    tail = min(median(deltas), MAX_SAMPLE_GAP_SECONDS) if deltas else MAX_SAMPLE_GAP_SECONDS
+    total = sum(
+        min(max(0.0, ordered[i + 1][0] - ts), MAX_SAMPLE_GAP_SECONDS)
+        for i, (ts, _) in enumerate(ordered[:-1])
+    )
+    return round(total + tail, 1)
+
+
+def session_hr_rpe(
+    blocks: list[dict], hr_rest: float | None, hr_max: float | None,
+    session_minutes: float = 0.0,
+) -> dict:
+    """Session-level HR-derived RPE and AU, aggregated from per-exercise blocks.
+
+    `blocks`: [{"name": str, "samples": [(epoch, bpm), ...]}] — one per
+    exercise, built by hr_matching.exercise_blocks + samples_for_block, so a
+    block only ever contains samples whose timestamps actually fall inside
+    that exercise. Nothing is inferred from ordering or assumed to be
+    contiguous: an exercise performed while the watch was paused simply has
+    no samples and is reported as uncovered rather than estimated.
+
+    The session RPE is the ACTIVE-TIME-WEIGHTED mean of the per-exercise
+    RPEs, not a plain average. A three-minute Pallof hold and a
+    twelve-minute pulldown block must not count equally, and weighting by
+    covered seconds rather than by set count also stops a paused block from
+    pulling the session figure toward an intensity that was never recorded.
+
+    AU follows Foster's form -- RPE x minutes -- so it is directly comparable
+    with the self-reported AU, but on ACTIVE minutes only.
+
+    `coverage` is the fraction of the session's block time that carries real
+    samples, and is the number to look at before trusting the rest: a session
+    where the watch was stopped halfway produces a perfectly plausible AU
+    from half a session unless coverage is checked.
+    """
+    per_ex, weighted, total_active = [], 0.0, 0.0
+    for b in blocks or []:
+        samples = b.get("samples") or []
+        active = covered_seconds(samples)
+        res = exercise_hr_rpe([hr for _, hr in samples], hr_rest, hr_max)
+        res["name"] = b.get("name")
+        res["active_seconds"] = active
+        per_ex.append(res)
+        if res["rpe"] is not None and active > 0:
+            weighted += res["rpe"] * active
+            total_active += active
+
+    span = 0.0
+    for b in blocks or []:
+        s = sorted(b.get("samples") or [], key=lambda x: x[0])
+        if len(s) >= 2:
+            span += s[-1][0] - s[0][0]
+
+    rpe = round(weighted / total_active, 1) if total_active > 0 else None
+    active_minutes = round(total_active / 60.0, 1)
+    # Clamped: covered_seconds credits the final sample a tail interval that
+    # the raw first-to-last span does not contain, so an unbroken block can
+    # compute marginally over 1.0. Coverage is a fraction by definition.
+    coverage = min(1.0, total_active / span) if span > 0 else (1.0 if total_active else 0.0)
+    return {
+        "exercises": per_ex,
+        "session_rpe": rpe,
+        "active_minutes": active_minutes,
+        # TWO AU figures, because they answer different questions and
+        # conflating them would misreport the session either way.
+        #
+        # au_active = RPE x RECORDED WORK minutes. Excludes rests between
+        # exercises and any stretch the watch was paused for. The honest
+        # measure of work actually done, and NOT comparable with the stored
+        # Foster AU, which counts the whole session.
+        #
+        # au_session = RPE x TOTAL session minutes — Foster's own basis, so
+        # it can sit directly beside the self-reported AU and be compared
+        # like for like. This is the one that answers "what would the AU
+        # have been with a measured RPE instead of a guessed one".
+        "au_active": round(rpe * active_minutes, 1) if rpe is not None else None,
+        "au_session": (round(rpe * session_minutes, 1)
+                       if rpe is not None and session_minutes > 0 else None),
+        "coverage": round(coverage, 3),
+        "covered_exercises": sum(1 for e in per_ex if e["rpe"] is not None),
+        "total_exercises": len(per_ex),
+    }
+
+
 def session_hr_summary(
     seconds_in_zone: dict[int, float], avg_hr: float | None = None,
     max_hr: float | None = None, hr_rest: float | None = None,

@@ -2538,6 +2538,27 @@ class Repository:
                 continue
         return hr_load.estimate_hr_max(observed)
 
+    def find_open_garmin_activity(self, day: str) -> dict | None:
+        """Today's longest Garmin activity, or None.
+
+        Used by the completion screen to tell the athlete whether the watch
+        workout has actually been saved yet. A Garmin activity IN PROGRESS
+        does not appear in the API at all — it materialises only once the
+        athlete stops and syncs it — so a None here is an actionable prompt
+        ("go stop your watch"), not an error. Checking before the session is
+        saved is the whole point: afterwards the athlete has walked away and
+        the heart-rate record for that session cannot be recovered.
+        """
+        if self._gc is None:
+            return None
+        try:
+            rows = [self._garmin_activity_row(a)
+                    for a in garmin.get_recent_activities(self._gc, limit=15)]
+        except Exception:
+            return None
+        today = [r for r in rows if r.get("date") == day]
+        return max(today, key=lambda r: r.get("duration_minutes") or 0) if today else None
+
     def compute_session_hr(
         self, session_date: date | str, set_records_by_exercise: dict,
         duration_minutes: float = 0.0, hr_max: float | None = None,
@@ -2574,6 +2595,19 @@ class Repository:
             hr_max = self.get_observed_hr_max()
         if hr_max is None:
             return None
+        if hr_rest is None:
+            # Heart-rate RESERVE divides by (max - rest), so a wrong resting
+            # value distorts every derived intensity. Use the measured
+            # Oura/Garmin median rather than the activity's own minimum,
+            # which on 2026-08-06 read 73 against a true 54 because the
+            # athlete never stopped moving.
+            try:
+                rows = self.get_biometric_rolling(days=45) or []
+                rests = sorted(float(r.resting_heart_rate) for r in rows
+                               if getattr(r, "resting_heart_rate", None))
+                hr_rest = rests[len(rests) // 2] if rests else None
+            except Exception:
+                hr_rest = None
 
         activity_id = activity.get("activity_id")
         samples = self.garmin_activity_hr_samples(activity_id)
@@ -2596,20 +2630,48 @@ class Repository:
         )
 
         # Per-exercise attribution — only possible from a real sample series.
+        #
+        # An exercise with NO samples is recorded as uncovered rather than
+        # skipped. Skipping it made a paused watch invisible: the session
+        # still produced a confident-looking figure, from only the exercises
+        # that happened to be recorded. Keeping the row is what lets the
+        # coverage fraction below be true.
         per_exercise: dict[str, dict] = {}
+        rpe_blocks: list[dict] = []
         if samples:
             for block in hr_matching.exercise_blocks(set_records_by_exercise):
+                key = str(block["exercise_idx"])
                 blk = hr_matching.samples_for_block(samples, block["start"], block["end"])
+                rpe_blocks.append({"name": key, "samples": blk})
                 if not blk:
+                    per_exercise[key] = {"edwards_load": 0.0, "avg_hr": None,
+                                          "max_hr": None, "minutes": 0.0,
+                                          "hr_rpe": None, "covered": False}
                     continue
                 blk_zones = hr_load.seconds_in_zone_from_samples(blk, hr_max)
                 hrs = [hr for _, hr in blk]
-                per_exercise[str(block["exercise_idx"])] = {
+                rpe = hr_load.exercise_hr_rpe(hrs, hr_rest, hr_max)
+                per_exercise[key] = {
                     "edwards_load": hr_load.edwards_load(blk_zones),
                     "avg_hr": round(sum(hrs) / len(hrs), 1),
                     "max_hr": max(hrs),
                     "minutes": round(sum(blk_zones.values()) / 60.0, 1),
+                    "hr_rpe": rpe["rpe"],
+                    "covered": True,
                 }
+
+        # HR-derived session RPE and AU, on ACTIVE minutes only.
+        #
+        # NOT a replacement for the self-reported Foster AU, and deliberately
+        # stored beside it: CLAUDE.md rule 2b keeps ACWR on one unit, because
+        # a load figure that changes depending on whether the watch happened
+        # to be running would swing the ceiling on button behaviour rather
+        # than physiology. This is the paired signal that rule says must
+        # accumulate before the two can ever be unified.
+        rpe_summary = hr_load.session_hr_rpe(
+            rpe_blocks, hr_rest=hr_rest, hr_max=hr_max,
+            session_minutes=float(duration_minutes or activity.get('duration_minutes') or 0),
+        )
 
         summary.update({
             "date": day,
@@ -2621,6 +2683,13 @@ class Repository:
             "overlap_minutes": round(overlap / 60.0, 1),
             "zone_source": zone_source,
             "per_exercise": per_exercise,
+            "hr_rpe": rpe_summary["session_rpe"],
+            "hr_au": rpe_summary["au_session"],
+            "hr_au_active": rpe_summary["au_active"],
+            "hr_active_minutes": rpe_summary["active_minutes"],
+            "hr_coverage": rpe_summary["coverage"],
+            "hr_covered_exercises": rpe_summary["covered_exercises"],
+            "hr_total_exercises": rpe_summary["total_exercises"],
         })
         return summary
 

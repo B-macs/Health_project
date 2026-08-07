@@ -354,3 +354,94 @@ def test_exercise_hr_rpe_returns_none_rather_than_zero_when_it_cannot_tell():
     for args in (([], 52, 163), ([120], None, 163), ([120], 52, None)):
         out = hr_load.exercise_hr_rpe(*args)
         assert out["rpe"] is None and out["confident"] is False
+
+
+# ─── pause-aware active time and session AU (added 2026-08-07) ──────────────
+
+def _series(start: float, n: int, bpm: float, step: float = 3.0):
+    return [(start + i * step, bpm) for i in range(n)]
+
+
+def test_covered_seconds_excludes_a_paused_stretch():
+    """The pause case this exists for: a Garmin workout paused mid-session
+    keeps the wall clock running but stops recording. Crediting the gap would
+    inflate AU by exactly the time NOT spent training."""
+    before = _series(0, 20, 120)          # 60s of recording
+    after = _series(300, 20, 120)         # resumes 4 minutes later
+    covered = hr_load.covered_seconds(before + after)
+    wall = (after[-1][0] - before[0][0])
+    assert wall == pytest.approx(357, abs=1)
+    # The 4-minute gap contributes only the clamp, not 240s.
+    assert covered < 140
+    assert covered == pytest.approx(
+        hr_load.covered_seconds(before) + hr_load.covered_seconds(after)
+        - hr_load.MAX_SAMPLE_GAP_SECONDS + hr_load.MAX_SAMPLE_GAP_SECONDS, abs=15)
+
+
+def test_covered_seconds_edges():
+    assert hr_load.covered_seconds([]) == 0.0
+    assert hr_load.covered_seconds([(0, 120)]) == hr_load.MAX_SAMPLE_GAP_SECONDS
+
+
+def test_session_hr_rpe_weights_by_active_time_not_exercise_count():
+    """A 3-minute hold and a 12-minute pulldown block must not count equally."""
+    blocks = [
+        {"name": "Short hard", "samples": _series(0, 20, 155)},      # ~60s
+        {"name": "Long easy",  "samples": _series(100, 200, 95)},    # ~600s
+    ]
+    out = hr_load.session_hr_rpe(blocks, hr_rest=54, hr_max=180)
+    hard = next(e for e in out["exercises"] if e["name"] == "Short hard")["rpe"]
+    easy = next(e for e in out["exercises"] if e["name"] == "Long easy")["rpe"]
+    assert easy < out["session_rpe"] < hard
+    # Weighted toward the long block, so nearer the easy end.
+    assert abs(out["session_rpe"] - easy) < abs(out["session_rpe"] - hard)
+
+
+def test_session_au_uses_active_minutes_not_wall_clock():
+    """AU keeps Foster's RPE x minutes form so it stays comparable with the
+    self-reported figure, but a paused session must not bill the pause."""
+    paused = [{"name": "A", "samples": _series(0, 20, 130) + _series(600, 20, 130)}]
+    out = hr_load.session_hr_rpe(paused, hr_rest=54, hr_max=180)
+    assert out["active_minutes"] < 3.0          # ~2 min recorded, 10 min wall
+    assert out["au_active"] == pytest.approx(out["session_rpe"] * out["active_minutes"], abs=0.2)
+    assert out["coverage"] < 0.35               # the pause is visible, not hidden
+
+
+def test_session_hr_rpe_reports_uncovered_exercises_rather_than_inventing_them():
+    """An exercise performed while the watch was paused has no samples. It is
+    reported as uncovered — never estimated from neighbouring exercises."""
+    blocks = [
+        {"name": "Recorded", "samples": _series(0, 20, 130)},
+        {"name": "Watch was paused", "samples": []},
+    ]
+    out = hr_load.session_hr_rpe(blocks, hr_rest=54, hr_max=180)
+    assert out["covered_exercises"] == 1 and out["total_exercises"] == 2
+    missing = next(e for e in out["exercises"] if e["name"] == "Watch was paused")
+    assert missing["rpe"] is None and missing["active_seconds"] == 0.0
+    assert out["session_rpe"] is not None       # the covered part still reports
+
+
+def test_session_hr_rpe_is_none_when_nothing_was_recorded():
+    out = hr_load.session_hr_rpe([{"name": "A", "samples": []}], 54, 180)
+    assert out["session_rpe"] is None and out["au_active"] is None
+    assert hr_load.session_hr_rpe([], 54, 180)["au_active"] is None
+
+
+def test_two_au_bases_answer_different_questions():
+    """au_active bills only recorded work; au_session uses Foster's own basis
+    (RPE x total session minutes) so it can sit beside the self-reported AU
+    and be compared like for like. Conflating them misreports either way."""
+    blocks = [{"name": "A", "samples": _series(0, 200, 130)}]   # ~10 min recorded
+    out = hr_load.session_hr_rpe(blocks, hr_rest=54, hr_max=180, session_minutes=64)
+    assert out["au_active"] == pytest.approx(out["session_rpe"] * out["active_minutes"], abs=0.2)
+    assert out["au_session"] == pytest.approx(out["session_rpe"] * 64, abs=0.2)
+    assert out["au_session"] > out["au_active"]
+    # No duration supplied -> no Foster-basis figure invented.
+    assert hr_load.session_hr_rpe(blocks, 54, 180)["au_session"] is None
+
+
+def test_coverage_is_a_fraction_and_never_exceeds_one():
+    """covered_seconds credits the last sample a tail the raw span does not
+    contain, so an unbroken block computed marginally over 100% before this."""
+    out = hr_load.session_hr_rpe([{"name": "A", "samples": _series(0, 50, 120)}], 54, 180)
+    assert 0.0 <= out["coverage"] <= 1.0
