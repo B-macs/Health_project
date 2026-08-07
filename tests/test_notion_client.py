@@ -70,3 +70,33 @@ def test_ensure_number_properties_skips_existing():
     client = _FakeClient(existing_properties={"Activity Avg HR": {"number": {}}})
     created = notion.ensure_number_properties(client, "db-1", ["Activity Avg HR"])
     assert created == []
+
+
+# ─── rich_text chunking ─────────────────────────────────────────────────────
+# Notion caps a rich_text ELEMENT at 2000 chars; get_property joins every
+# element on read. Chunking (instead of the old silent [:2000] truncation)
+# is what lets the phases store — one JSON blob carrying every phase's
+# date_overrides and shift_reasons forever — grow past 2000 chars without
+# losing its tail and poisoning the next get_phases parse.
+
+def test_rich_text_chunks_values_over_2000_chars_and_round_trips_intact():
+    value = "x" * 4500
+    blocks = notion.rich_text(value)["rich_text"]
+    assert [len(b["text"]["content"]) for b in blocks] == [2000, 2000, 500]
+    page = {"properties": {"Value": {
+        "rich_text": [{"plain_text": b["text"]["content"]} for b in blocks]}}}
+    assert notion.get_property(page, "Value", "rich_text") == value
+
+
+def test_rich_text_is_byte_identical_to_the_single_block_form_for_short_values():
+    assert notion.rich_text("short") == {"rich_text": [{"text": {"content": "short"}}]}
+    assert notion.rich_text("") == {"rich_text": [{"text": {"content": ""}}]}
+    assert notion.rich_text(None) == {"rich_text": [{"text": {"content": ""}}]}
+
+
+def test_rich_text_refuses_values_beyond_notions_100_element_ceiling():
+    # Beyond 100 chunks the property cannot be stored whole; raising beats
+    # resurrecting the silent truncation this chunking replaced.
+    import pytest
+    with pytest.raises(ValueError):
+        notion.rich_text("x" * 200_001)

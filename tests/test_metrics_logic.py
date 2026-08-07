@@ -276,3 +276,33 @@ def test_zero_streak_is_not_flagged_ultimate():
 def test_no_plan_pause_inside_all_ultimate_streak_still_flags_true():
     history = [_wk("2026-06-01", "ultimate"), _wk("2026-06-08", "no_plan"), _wk("2026-06-15", "ultimate")]
     assert ml.current_streak_is_all_ultimate(history) is True
+
+
+# ─── missed-session rescheduling × the rollup (services/scheduling.py) ─────
+
+def test_week_score_is_unchanged_by_a_reschedule_completed_within_the_same_week():
+    # The executable form of the design answer: a rescheduled-and-completed
+    # session counts for the week it was scheduled in, BECAUSE the carry
+    # never crosses the week boundary — performing the carried session on
+    # its target date yields the identical WeekScore to performing it on the
+    # original day. The day-number swap itself is invisible here: scheduled
+    # counts phase-covered dates (both stay inside 1..length_days) and
+    # completed counts logged dates, so neither term reads the overrides'
+    # content.
+    monday = date(2026, 6, 29)
+    today = date(2026, 7, 20)  # the 06-29 week has ended
+    wednesday, friday = monday + timedelta(days=2), monday + timedelta(days=4)
+    other_days = [{"date": (monday + timedelta(days=o)).isoformat()} for o in (0, 1, 3, 5, 6)]
+
+    original = Phase(2, "Stage 2", monday.isoformat(), 28, "active")
+    done_on_original_day = ml.compute_week_history(
+        today, [original], other_days + [{"date": wednesday.isoformat()}])[0]
+
+    rescheduled = Phase(2, "Stage 2", monday.isoformat(), 28, "active",
+                        date_overrides={wednesday.isoformat(): 5, friday.isoformat(): 3})
+    done_on_target_day = ml.compute_week_history(
+        today, [rescheduled], other_days + [{"date": friday.isoformat()}])[0]
+
+    assert done_on_original_day.scheduled == done_on_target_day.scheduled == 7
+    assert done_on_original_day.completed == done_on_target_day.completed
+    assert done_on_original_day.status == done_on_target_day.status

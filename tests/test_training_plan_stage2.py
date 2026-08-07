@@ -228,3 +228,52 @@ def test_non_band_exercises_never_carry_a_band_tier():
         for ex in day["exercises"]:
             if ex.get("equipment_type") not in (None, "band"):
                 assert ex.get("band_tier") is None, f"Day {day_num} {ex['name']!r} unexpectedly has band_tier"
+
+
+# ─── day_type — the session-priority taxonomy (services/scheduling.py) ──────
+# All-or-nothing by design: with recovery days typed but gym days not (or
+# vice versa), scheduling.swap_pairs_for_shift's hardened partner check sees
+# a known partner and an unknown mover and silently refuses every live
+# readiness shift. This coverage test makes partial adoption a test failure.
+
+def test_every_stage2_day_carries_a_valid_day_type():
+    from services import scheduling
+    for day_num, day in tp.PLAN_STAGE2.items():
+        assert day.get("day_type") in scheduling.SESSION_PRIORITY, (
+            f"Day {day_num} day_type={day.get('day_type')!r} is not a valid session type"
+        )
+
+
+def test_day_type_main_if_and_only_if_is_gym_session_true():
+    # Days 14/28 carry no is_gym_session key at all (an authoring accident
+    # day_type now makes explicit): absent reads False, and their type is
+    # "test", so the biconditional holds across all 28 days.
+    for day_num, day in tp.PLAN_STAGE2.items():
+        assert (day.get("day_type") == "main") == bool(day.get("is_gym_session")), (
+            f"Day {day_num}: day_type={day.get('day_type')!r} "
+            f"vs is_gym_session={day.get('is_gym_session')!r}"
+        )
+    assert tp.PLAN_STAGE2[14]["day_type"] == "test"
+    assert tp.PLAN_STAGE2[28]["day_type"] == "test"
+
+
+def test_stage1_plan_days_never_carry_day_type():
+    # Stage 1 is deliberately untyped: the priority machinery is inert for
+    # it, and typing it now would be a behaviour change to a finished block.
+    for day_num, day in tp.PLAN.items():
+        assert "day_type" not in day, f"Stage 1 day {day_num} unexpectedly carries day_type"
+
+
+def test_every_stage2_gym_day_is_followed_by_a_strictly_lower_priority_day():
+    # The live-plan property the readiness auto-shift's continued operation
+    # depends on: every gym day's swap partner (the next calendar day) must
+    # be strictly outranked, or the hardened partner check would refuse the
+    # swap and the auto-shift would silently stop firing.
+    from services import scheduling
+    for day_num, day in tp.PLAN_STAGE2.items():
+        if day.get("is_gym_session"):
+            neighbor = tp.PLAN_STAGE2.get(day_num + 1)
+            assert neighbor is not None, f"Gym day {day_num} has no next-day partner"
+            assert scheduling.can_overwrite(
+                scheduling.day_type(day), scheduling.day_type(neighbor)
+            ), f"Gym day {day_num}'s partner (day {day_num + 1}) is not strictly lower priority"

@@ -309,10 +309,31 @@ prescription under Structure is Stage 1 only; Stage 2A is externally loaded.
 - Day number derived from the ACTIVE PHASE's `start_date` (phases are one JSON
   blob under the Notion Config DB key `phases`), with a `date_overrides` entry
   for that date winning over the `(d - start).days + 1` formula — that is how
-  `services/scheduling.py`'s readiness auto-shift moves a session day, and
-  `day_number 0` means forced rest. The separate `plan_start_date` config key
-  does NOT drive the day number: it gates the first-run setup screen, seeds
-  Phase 1, and feeds the "Plan Start" metric
+  `services/scheduling.py`'s readiness auto-shift AND its missed-session
+  rescheduling move a session day, and `day_number 0` means forced rest. The
+  separate `plan_start_date` config key does NOT drive the day number: it
+  gates the first-run setup screen, seeds Phase 1, and feeds the "Plan Start"
+  metric
+- **Session priority + missed-session rescheduling (locked, 2026-08-07):**
+  `scheduling.SESSION_PRIORITY` ranks test > main > stretch > rest, one named
+  table, tests pin the strict order. A session missed earlier THIS Mon-Sun
+  week carries onto a later day of the SAME week holding strictly
+  lower-priority content — the reschedule is a SWAP of day-numbers (never a
+  cascade, never a deletion): the displaced session lands on the past missed
+  date and becomes the one that reads as missed. Carry never crosses the
+  week's Sunday nor the phase end (an override past the phase end would add
+  a scheduled day to a later week's rollup); a miss with no eligible target
+  is dropped visibly (`DROPPED_REASON_PREFIX` reason, self-map override).
+  Spacing at placement: no two mains adjacent, a main never lands the day
+  before a test, a test never the day after a main. Weekly Rollup needs no
+  change: same-week carry makes performed-week ≡ scheduled-week. Both
+  mechanisms share the `shift_reasons` ledger, so each date is scheduled at
+  most once — a reschedule claiming today suppresses today's auto-shift, and
+  an auto-shifted date later missed stays missed (both fail safe). The plan
+  authors `day_type` per day (`training_plan.PLAN_STAGE2`, all 28 days —
+  all-or-nothing, coverage test enforces); Stage 1 is untyped and inert. The
+  phases blob write is chunked (`clients/notion.py rich_text`) because the
+  growing overrides/reasons history crossed Notion's 2000-char element cap.
 - Session completion auto-logs all exercises to Notion Training DB
 
 ### Session Features

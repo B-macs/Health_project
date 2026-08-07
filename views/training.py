@@ -1204,7 +1204,11 @@ def _render_shift_banner(active, d: date) -> None:
         return
     reason = active.shift_reasons.get(d.isoformat())
     if reason:
-        st.info(f"Session moved — {reason}")
+        if reason.startswith(scheduling.DROPPED_REASON_PREFIX):
+            # A dropped miss did NOT move — "Session moved" would be a lie.
+            st.info(reason)
+        else:
+            st.info(f"Session moved — {reason}")
 
 
 def _render_day_strip(active: dict | None) -> None:
@@ -1997,6 +2001,51 @@ def render():
         _rm_bio = []
     _readiness_modifier = engine.readiness_training_modifier(_rm_bio)
     _volume_factor = _readiness_modifier.get("volume_factor", 1.0)
+
+    # ── Missed-session rescheduling — priority-based carry within the week ──────
+    # Runs BEFORE the readiness auto-shift so a carried session claims its slot
+    # first. The rerun on a successful write is LOAD-BEARING, not polish:
+    # phases/active were fetched once at the top of render(), so letting this
+    # render continue would hand the auto-shift block a stale `active` whose
+    # own merge (last-write-wins) silently drops the entries just written.
+    # Termination is structural, no separate guard needed: every evaluated
+    # miss — moved or dropped — leaves a shift_reasons entry, and
+    # missed_reschedules skips dates already in that ledger, so the rerun
+    # finds nothing left to do.
+    if active is not None:
+        _mr_write_succeeded = False
+        try:
+            _mr_plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
+            _mr_monday = date.today() - timedelta(days=date.today().weekday())
+            _mr_logged = _week_logged_dates(_mr_monday.isoformat())
+            _mr_overrides, _mr_reasons = scheduling.missed_reschedules(
+                active, _mr_plan_dict, _mr_logged, date.today())
+            if _mr_overrides:
+                # The cached logged set can be up to 5 minutes stale and this
+                # write is permanent — before trusting a "missed"
+                # classification, re-read the week's logged dates fresh
+                # (uncached; one Notion query, and only on the rare render
+                # that actually proposes a reschedule) and recompute.
+                _mr_logged = repo.get_repository().get_logged_session_dates(
+                    _mr_monday, _mr_monday + timedelta(days=6))
+                _mr_overrides, _mr_reasons = scheduling.missed_reschedules(
+                    active, _mr_plan_dict, _mr_logged, date.today())
+            if _mr_overrides:
+                _mr_active = replace(
+                    active,
+                    date_overrides={**active.date_overrides, **_mr_overrides},
+                    shift_reasons={**active.shift_reasons, **_mr_reasons},
+                )
+                _mr_phases = [
+                    _mr_active if p.phase_number == active.phase_number else p
+                    for p in phases
+                ]
+                repo.get_repository().set_phases(_mr_phases)
+                _mr_write_succeeded = True
+        except Exception:
+            pass  # never let a scheduling-check failure crash the page
+        if _mr_write_succeeded:
+            st.rerun()
 
     # ── Dynamic scheduling — readiness-based auto-shift ─────────────────────────
     # Reuses _rm_bio (already fetched above for the readiness modifier) as both

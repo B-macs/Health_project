@@ -34,7 +34,23 @@ def title(text: str) -> dict:
 
 
 def rich_text(text: str) -> dict:
-    return {"rich_text": [{"text": {"content": str(text or "")[:2000]}}]}
+    """Chunked, not truncated: Notion caps a rich_text ELEMENT at 2000 chars
+    but accepts up to 100 elements per property, and get_property already
+    joins every element on read — so a long value (the phases JSON blob is
+    the live case: every completed phase keeps its date_overrides and
+    shift_reasons forever) round-trips intact instead of silently losing its
+    tail and poisoning the next parse. Byte-identical to the old single-block
+    form for values ≤2000 chars. Beyond 100 chunks (200K chars) this raises:
+    a crash is recoverable, a silently truncated store is not — the same
+    reasoning as Repository.get_phases raising PhasesCorruptError."""
+    s = str(text or "")
+    chunks = [s[i:i + 2000] for i in range(0, len(s), 2000)] or [""]
+    if len(chunks) > 100:
+        raise ValueError(
+            f"rich_text value is {len(s)} chars — beyond Notion's 100-element "
+            "(200,000-char) property ceiling; refusing to truncate silently"
+        )
+    return {"rich_text": [{"text": {"content": c}} for c in chunks]}
 
 
 def number(val) -> dict:

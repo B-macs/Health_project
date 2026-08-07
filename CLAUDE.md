@@ -38,7 +38,7 @@ Expected: **1652/1652 passed** (or higher — this count grows as tests are adde
 
 A change is complete when:
 
-1. `python -m pytest tests/` → 1602/1602 (or higher if new tests were added)
+1. `python -m pytest tests/` → passes at the current floor in "Deterministic Gate" above (or higher if new tests were added)
 2. All affected imports resolve without error: `python -c "import app"` (or the relevant module)
 3. The change is committed with a descriptive message explaining the *why*
 4. No behaviour was changed without explicit approval — filing moves files and fixes imports only
@@ -76,7 +76,15 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     scheduling.py (readiness-based auto-shift of a scheduled
                     gym-session day — sleep debt/short sleep/consecutive-day
                     alcohol triggers a pairwise-adjacent-day swap for the
-                    rest of that calendar week) ·
+                    rest of that calendar week — plus SESSION_PRIORITY
+                    (test > main > stretch > rest, the one ranking table) and
+                    missed_reschedules: a session missed earlier this week
+                    carries onto a later same-week day of STRICTLY lower
+                    priority by SWAPPING day-numbers, so the displaced
+                    session becomes the missed one; spacing rules keep mains
+                    non-adjacent and off the day before a test; a miss with
+                    nowhere to go is dropped visibly, and nothing ever
+                    crosses the week's Sunday) ·
                     volume.py (weekly tonnage — Σ reps×weight — for Stage 2A+
                     double-progression exercises; no sector split, see
                     tonnage.py) ·

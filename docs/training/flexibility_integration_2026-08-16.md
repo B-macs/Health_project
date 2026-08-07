@@ -102,6 +102,15 @@ When the cluster session is added to the plan:
   here.
 - [ ] The session logs an honest sRPE (expect 4–6; it is training). Unloaded
   holds count in reps and seconds, never kilograms — existing tonnage rule.
+- [ ] **Every new plan day authors `day_type`** (`scheduling.SESSION_PRIORITY`
+  vocabulary: gym days `"main"`, the cluster session `"stretch"`, recovery
+  days `"rest"`, any assessment day `"test"`), on ALL days of the block in the
+  same commit — partial adoption silently kills the readiness auto-shift
+  (unknown mover vs known partner refuses every swap), and
+  `test_every_stage2_day_carries_a_valid_day_type` is the model for the
+  coverage test the new block needs. This is what makes a missed cluster
+  session reschedulable onto a rest day, and what keeps a carried main off
+  the day before the retest.
 
 ### 5 · Judge the holds at the same sitting
 

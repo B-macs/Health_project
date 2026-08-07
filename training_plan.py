@@ -1877,6 +1877,7 @@ def _s2_recovery_day(objective: str, template: str) -> dict:
         "phase": "Stage 2A — Gym Strength Block",
         "session_rpe_target": 3,
         "is_gym_session": False,
+        "day_type": "rest",
         "exercises": exercises,
     }
 
@@ -1895,6 +1896,7 @@ def _s2_session_a(week: int) -> dict:
         "phase": "Stage 2A — Gym Strength Block",
         "session_rpe_target": 6 if week < 4 else 7,
         "is_gym_session": True,
+        "day_type": "main",
         "exercises": [
             UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, COXA_SALTANS_DRILL,
             _ex(
@@ -1997,6 +1999,7 @@ def _s2_session_b(week: int) -> dict:
         "phase": "Stage 2A — Gym Strength Block",
         "session_rpe_target": 6 if week < 4 else 7,
         "is_gym_session": True,
+        "day_type": "main",
         "exercises": [
             UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, ISCHIAL_RELEASE,
             _ex(
@@ -2089,6 +2092,7 @@ def _s2_session_c(week: int) -> dict:
         "phase": "Stage 2A — Gym Strength Block",
         "session_rpe_target": 5 if week < 4 else 6,
         "is_gym_session": True,
+        "day_type": "main",
         "exercises": [
             UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF, RIGHT_HIP_CAPSULE_REVISED, COXA_SALTANS_DRILL,
             _ex(
@@ -2197,6 +2201,7 @@ PLAN_STAGE2[14] = {
     "objective": "Mid-Block Checkpoint — Light Functional Re-Check",
     "phase": "Stage 2A — Gym Strength Block",
     "session_rpe_target": 2,
+    "day_type": "test",
     "exercises": [
         UPPER_GLUTE_RELEASE, PIRIFORMIS_PNF,
         _ex(
@@ -2239,6 +2244,7 @@ PLAN_STAGE2[28] = {
     "objective": "Stage 2A Reassessment — Final Working Loads + Functional Screen",
     "phase": "Stage 2A — Gym Strength Block",
     "session_rpe_target": 4,
+    "day_type": "test",
     "exercises": [
         RIGHT_HIP_CAPSULE_REVISED,
         COXA_SALTANS_DRILL,
