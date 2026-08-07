@@ -11,9 +11,9 @@
 | Stage | **Stage 2** — Transition (external load) |
 | Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
 | Day | **Day 18 of 28** |
-| Gate | **1602/1602** — `python -m pytest tests/` |
-| Last code commit | Flexibility rebuilt as Cluster A — three layers, a four-slot battery that stops at the first failure, and `services/rules.py` taught the vocabulary it was blind to |
-| Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required |
+| Gate | **1647/1647** — `python -m pytest tests/` |
+| Last code commit | The flexibility ladder — the battery's decision path as rungs, tightest at the bottom, no scores and no numbers for unmeasured muscles |
+| Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required; run the battery cold BEFORE it |
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
 flare meant the Day 14 exit criteria were not met on the original schedule.
@@ -40,6 +40,15 @@ the physiotherapist *before* authoring the next block. Full context in
    under sustained low-load holding, not volume. Long isometric holds are a
    prescription change, hence a physio decision. Brief prepared:
    `docs/training/physio_brief_2026-08-16.md`.
+
+A **fourth workstream** lands the same day, and it is ours rather than the
+physiotherapist's: the flexibility cluster session joins the new block as
+designed-in training. The full protocol — slot reservation against the
+five-per-week ceiling, placement re-derived against the NEW week (running
+counts as leg loading), one-new-stressor-at-a-time staggering, the load
+accounting that keeps Strain honest, and the pre-written pull-back condition —
+is `docs/training/flexibility_integration_2026-08-16.md`. The only place it
+meets the physio's decisions is shared weekly capacity.
 
 ---
 
