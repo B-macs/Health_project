@@ -73,12 +73,41 @@ def _to_dt(value) -> datetime | None:
     return None
 
 
+def _comparable(*dts: datetime) -> tuple[datetime, ...]:
+    """Make a set of datetimes safe to compare with each other.
+
+    The two sides of a match come from different worlds and always have:
+    our per-set "ts" is TIMEZONE-AWARE (services.sessions.set_timestamp
+    stamps an explicit offset), while Garmin's "startTimeLocal" is a NAIVE
+    local string. Python refuses to order an aware datetime against a naive
+    one, and the resulting TypeError propagates out of match_activity into a
+    caller that treats any failure as "no activity matched" — so the whole
+    HR feature would have gone quietly dark on the first session logged after
+    timezones were introduced, reporting no match rather than an error.
+
+    When every bound is aware they are compared as INSTANTS, which is
+    strictly correct. When the set is mixed, all are reduced to WALL CLOCK,
+    which is the right reading here: our aware timestamp is rendered in the
+    athlete's own zone, and Garmin's local string is the wall clock where the
+    activity happened, so the two describe the same clock face.
+
+    (The one case that reads wrong is training abroad while HEALTH_TIMEZONE
+    still names home — then the athlete's rendered clock and the watch's
+    local clock genuinely differ. That is a configuration limit, not a
+    comparison bug, and it fails toward "no match" rather than a wrong one.)
+    """
+    if all(d.tzinfo is not None for d in dts):
+        return dts
+    return tuple(d.replace(tzinfo=None) if d.tzinfo is not None else d for d in dts)
+
+
 def overlap_seconds(a_start, a_end, b_start, b_end) -> float:
     """Seconds two time spans share. 0.0 if they don't intersect or any bound
     is unparseable."""
     a0, a1, b0, b1 = _to_dt(a_start), _to_dt(a_end), _to_dt(b_start), _to_dt(b_end)
     if None in (a0, a1, b0, b1):
         return 0.0
+    a0, a1, b0, b1 = _comparable(a0, a1, b0, b1)
     if a1 < a0:
         a0, a1 = a1, a0
     if b1 < b0:

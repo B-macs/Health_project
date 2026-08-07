@@ -226,3 +226,55 @@ def test_per_exercise_hr_attribution_end_to_end():
 
     assert loads[1] > loads[0]          # the hard block carries more load
     assert set(loads) == {0, 1}
+
+
+# ─── aware vs naive (2026-08-07) ────────────────────────────────────────────
+#
+# Our per-set "ts" became timezone-AWARE when set_timestamp landed; Garmin's
+# "startTimeLocal" is a NAIVE local string. Python refuses to order the two,
+# and match_activity's callers treat any failure as "no activity matched" —
+# so this would have taken the whole HR feature quietly dark on the first
+# session logged after timezones were introduced.
+
+_ACTS = [{"activity_id": "1", "type": "indoor_cardio",
+          "start_time_local": "2026-08-06 12:50:35", "duration_minutes": 61.2}]
+
+
+def test_aware_session_timestamps_still_match_a_naive_garmin_activity():
+    window = hm.session_window(
+        [{"ts": "2026-08-06T13:08:27+02:00"}, {"ts": "2026-08-06T13:48:57+02:00"}],
+        duration_minutes=64)
+    assert window[0].tzinfo is not None
+    act, overlap = hm.match_activity(_ACTS, window)
+    assert act is not None and overlap > 0
+
+
+def test_naive_timestamps_behave_exactly_as_before():
+    """Historical rows carry no offset and must be unaffected by the fix."""
+    aware = hm.match_activity(_ACTS, hm.session_window(
+        [{"ts": "2026-08-06T13:08:27+02:00"}, {"ts": "2026-08-06T13:48:57+02:00"}],
+        duration_minutes=64))
+    naive = hm.match_activity(_ACTS, hm.session_window(
+        [{"ts": "2026-08-06T13:08:27"}, {"ts": "2026-08-06T13:48:57"}],
+        duration_minutes=64))
+    assert aware[1] == naive[1]
+
+
+def test_overlap_never_raises_on_a_mixed_pair():
+    from datetime import datetime, timedelta, timezone
+    aware = datetime(2026, 8, 6, 13, 0, tzinfo=timezone(timedelta(hours=2)))
+    naive = datetime(2026, 8, 6, 13, 0)
+    assert hm.overlap_seconds(
+        aware, aware + timedelta(hours=1), naive, naive + timedelta(hours=1)) > 0
+
+
+def test_all_aware_bounds_compare_as_instants_not_wall_clock():
+    """When both sides carry offsets there is no ambiguity, so they must be
+    compared as real instants — two 13:00 starts in different zones are an
+    hour apart and must not read as simultaneous."""
+    from datetime import datetime, timedelta, timezone
+    berlin = datetime(2026, 8, 6, 13, 0, tzinfo=timezone(timedelta(hours=2)))
+    london = datetime(2026, 8, 6, 13, 0, tzinfo=timezone(timedelta(hours=1)))
+    ov = hm.overlap_seconds(
+        berlin, berlin + timedelta(hours=1), london, london + timedelta(hours=1))
+    assert ov == 0.0  # berlin 11:00-12:00 UTC vs london 12:00-13:00 UTC
