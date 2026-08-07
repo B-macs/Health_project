@@ -94,10 +94,16 @@ STACKS: dict[str, Stack] = {
         pattern="A", limiter="Bone",
         intro="No stretching stack. The only thing available is finding an orientation "
               "that clears the collision.",
+        # ER hold FIRST, triangle second — the source document's own order,
+        # which a transcription error had inverted (found in the 2026-08-07
+        # stacking audit). Isolated before integrated: groom the turn-out on a
+        # seat before spending it in the position.
         items=(
+            StackItem(_T["er_holds"].name, "5 × 20 s",
+                      "The turn-out in isolation, seat-supported — build the rotation "
+                      "before the next drill spends it."),
             StackItem(_T["triangle_split"].name, "5 × 20 s, partial depth",
                       "Turn the legs out; do not arch the back to find the room."),
-            StackItem(_T["er_holds"].name, "5 × 20 s"),
         ),
         outro="**Re-test gate 0 in two weeks, and stop sooner if it pinches.** A sharp "
               "anterior-hip pinch with a hard, unspringy stop is the one finding in this "

@@ -690,6 +690,16 @@ past what the evidence carries, and it is treated as motivation the way
 - **Cluster B is unbuilt.** The blueprint's Pike is defined as *"touching your
   toes; forward fold"*, wording that hits two contraindicated rules outright — a
   whole-cluster collision to resolve before that one is authored.
+- **The stacking rules are tests now (2026-08-07).** The source's rules —
+  isolated before integrated, full position last, bent knee before straight
+  except §E, each item serving the stack's diagnosis, the five-item ceiling —
+  had governed how the stacks were built but lived only as prose. The audit
+  that encoded them found §A transcribed in the wrong order (triangle before
+  the ER hold, inverting the source); restored. §F is pinned as deliberately
+  having NO full-position finisher — Pattern F means the position is not
+  reachable even with help, so a finisher would train the rounding; the
+  elevated hinge is the pancake regressed, and the block coming down is the
+  integration.
 
 
 ## BODY COMPOSITION (2026-08-05)

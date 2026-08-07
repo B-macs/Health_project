@@ -418,6 +418,137 @@ def test_the_deferred_squats_are_held_on_a_condition_not_a_date():
             f"{ex.name} is held until a date; hold it on the condition instead")
 
 
+# ── the stacking rules, encoded ──────────────────────────────────────────────
+#
+# The source's own rules (Prescription, "Stacking rules"): each exercise feeds
+# the next; ISOLATED BEFORE INTEGRATED — components open first, the full skill
+# comes last; bent knee before straight knee, except §E; triangle before
+# inline; the stack shrinks. They governed how the stacks were BUILT but lived
+# only as prose, so a stack edit could break them silently. Encoded 2026-08-07
+# on the athlete's request — and the audit that prompted it found §A
+# transcribed in the wrong order, which is the argument for the tests.
+
+#: The full-position expressions of the cluster's two skills.
+_INTEGRATED = {"triangle_split", "inline_split", "isometric_split",
+               "pancake_own_power", "cossack_bent", "cossack_straight",
+               "horse_stance", "horse_stance_weighted"}
+#: Bent-knee vs straight-knee adductor work, for the leverage-order rule.
+_BENT = {"tailors_pose", "frog_rocks", "butterfly_pir", "butterfly_active",
+         "butterfly_press_downs"}
+_STRAIGHT = {"wall_straddle", "triangle_split", "inline_split",
+             "isometric_split", "cossack_straight"}
+
+
+def _live_keys(stack) -> list:
+    """The stack's live items as library keys, in performed order."""
+    return [cm.LIBRARY_BY_NAME[i.exercise].key for i in stack.live_items]
+
+
+def test_stacks_open_with_a_component_not_the_full_position():
+    """Isolated before integrated — components open first. §G and §H are the
+    two documented exceptions: strength stacks whose opening triangle is a
+    door-opener, and the exemption must stay stated on the stack itself so it
+    reads as a decision rather than a drift."""
+    for pattern in ("A", "B", "C", "D", "E", "F", "I"):
+        first = _live_keys(cp.STACKS[pattern])[0]
+        assert first not in _INTEGRATED, (pattern, first)
+    for pattern in ("G", "H"):
+        assert _live_keys(cp.STACKS[pattern])[0] == "triangle_split"
+    assert "open the door" in cp.STACKS["H"].items[0].note.lower()
+    assert "end of the session" in cp.STACKS["G"].intro.lower()
+
+
+def test_stretching_stacks_end_in_the_full_position():
+    """Components open, the full skill comes last — the Daniel ladder's shape.
+    §G belongs here too: strength ordering in the middle, but it still closes
+    on the pancake under his own power."""
+    for pattern in ("B", "C", "D", "E", "G"):
+        last = _live_keys(cp.STACKS[pattern])[-1]
+        assert last in _INTEGRATED, (pattern, last)
+
+
+def test_f_integrates_through_the_block_not_a_finisher():
+    """§F deliberately contains NO full-position item. Pattern F means the
+    position is not reachable even with help, so a full-skill finisher would be
+    performed through the lumbar rounding — training the compensation. The
+    integration is the progression variable instead: the elevated hinge IS the
+    pancake, regressed, and the block coming down is what converges on it."""
+    keys = _live_keys(cp.STACKS["F"])
+    assert not set(keys) & _INTEGRATED, keys
+    assert keys[0] == "pelvic_rock", "the isolated movement opens the stack"
+    assert "elevated_hinge" in keys, "the regressed pancake is the integration"
+    assert "block" in cp.STACKS["F"].outro.lower(), (
+        "success must be stated as the block coming down, not the reach")
+
+
+def test_bent_knee_before_straight_knee_except_e():
+    """Bent-knee work opens the rest of the group so the straight-knee work can
+    reach gracilis instead of being capped before it gets there. §E is the
+    documented exception — straight-knee loading is its entire point, and its
+    intro must keep saying so."""
+    for pattern in ("C", "D"):
+        keys = _live_keys(cp.STACKS[pattern])
+        bent = [i for i, k in enumerate(keys) if k in _BENT]
+        straight = [i for i, k in enumerate(keys) if k in _STRAIGHT]
+        assert bent and straight, pattern
+        assert max(bent) < min(straight), (pattern, keys)
+    assert "straight" in cp.STACKS["E"].intro.lower()
+    assert not [k for k in _live_keys(cp.STACKS["E"]) if k in _BENT], (
+        "bent-leg work slackens the exact muscle §E exists to load")
+
+
+def test_triangle_before_inline_wherever_inline_appears():
+    """'Get the triangle position comfortable before adding inline drills.'
+    Inline is in no stack today; the guard exists for the day it is added."""
+    for pattern, stack in cp.STACKS.items():
+        keys = _live_keys(stack)
+        if "inline_split" in keys:
+            assert "triangle_split" in keys[:keys.index("inline_split")], pattern
+
+
+def test_every_item_tells_its_stacks_story():
+    """Each exercise feeds the next — it shares tissue with the stack or builds
+    a prerequisite for it. Tags cannot express 'prerequisite', so the checkable
+    form is a per-stack set of limiters an item may touch. What this catches is
+    the real failure mode: an exercise pasted into a stack whose diagnosis it
+    does not serve."""
+    relevant = {
+        "A": {"bone", "puller_strength", "adductor_length"},
+        "B": {"bone", "seated_tilt", "adductor_length"},
+        "C": {"adductor_length", "seated_tilt", "end_range_strength"},
+        "D": {"adductor_length", "puller_strength", "bone"},
+        "E": {"adductor_length", "end_range_strength", "bone"},
+        "F": {"seated_tilt", "puller_strength"},
+        "G": {"seated_tilt", "puller_strength", "end_range_strength",
+              "adductor_length", "bone"},
+        "H": {"end_range_strength", "adductor_length", "bone"},
+        "I": {"puller_strength", "adductor_length", "bone"},
+    }
+    for pattern, stack in cp.STACKS.items():
+        for item in stack.items:                      # deferred items included
+            ex = cm.exercise(item.exercise)
+            assert set(ex.limiters) & relevant[pattern], (pattern, ex.key)
+
+
+def test_the_stack_ceiling_holds():
+    """Three to five exercises, five a hard ceiling; the release block does not
+    count toward it. §A sits under the floor deliberately — it is not a
+    stretching stack, and padding it to three would invent work."""
+    for pattern, stack in cp.STACKS.items():
+        assert len(stack.live_items) <= 5, pattern
+        if pattern != "A":
+            assert len(stack.live_items) >= 3, pattern
+
+
+def test_a_grooms_the_turn_out_before_it_is_spent_in_the_position():
+    """RESTORED 2026-08-07. The source document's §A runs the ER hold first and
+    the triangle second; the Python transcription had inverted them, making §A
+    the one stack that opened with the integrated position. Isolated before
+    integrated, applied to the stack where the audit found it backwards."""
+    keys = _live_keys(cp.STACKS["A"])
+    assert keys.index("er_holds") < keys.index("triangle_split")
+
+
 # ── plain English, in the fields the athlete reads mid-test ──────────────────
 
 _JARGON = ("supine", "prone", "gluteal fold", "lateral aspect", "ulnar", "acromion",
