@@ -39,6 +39,20 @@ class Config:
     # (the default, and what the deployed app runs with) means live Sheets.
     # Deliberately NOT a fallback for a failed live read — see Repository._ws.
     datastore_path: str = ""
+    # IANA zone name for the ATHLETE's wall clock (e.g. "Europe/Berlin").
+    #
+    # Exists because the app does not run where the athlete trains. Per-set
+    # timestamps were stamped with a naive datetime.now(), which is the
+    # SERVER's clock — on a UTC host that recorded a 13:08 set as 11:08. The
+    # error is invisible in isolation (an ISO string with no offset looks
+    # local) and only surfaced when the sets were aligned against a Garmin
+    # activity and sat two hours off.
+    #
+    # Blank keeps the host's own zone, which is correct for local runs and is
+    # what the tests use. Set HEALTH_TIMEZONE in the deployed environment.
+    # An IANA name rather than a fixed offset so DST is handled — a
+    # +02:00 constant would be an hour wrong for half the year.
+    timezone: str = ""
 
 
 _STR_KEYS = (
@@ -98,4 +112,5 @@ def load_config(overrides: dict | None = None) -> Config:
         garmin_password=_resolve_optional_str("GARMIN_PASSWORD", overrides),
         oura_token=_resolve_optional_str("OURA_TOKEN", overrides),
         datastore_path=_resolve_optional_str("HEALTH_DATASTORE_PATH", overrides),
+        timezone=_resolve_optional_str("HEALTH_TIMEZONE", overrides),
     )

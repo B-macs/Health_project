@@ -2,7 +2,41 @@
 from views/training.py."""
 
 import ast
-from datetime import date
+from datetime import date, datetime, timezone
+
+
+# ─── set_timestamp — the 2026-08-06 two-hour skew ──────────────────────────
+
+def test_set_timestamp_renders_in_the_athletes_zone_not_the_hosts():
+    """The bug this replaces: a bare datetime.now() on a UTC host recorded a
+    13:08 local set as 11:08, and an offset-free ISO string gives no hint it
+    is wrong. Verified with the real instant from 2026-08-06."""
+    utc_instant = datetime(2026, 8, 6, 11, 8, 27, tzinfo=timezone.utc)
+    assert sessions.set_timestamp(utc_instant, "Europe/Berlin") == "2026-08-06T13:08:27+02:00"
+
+
+def test_set_timestamp_is_always_offset_aware():
+    """An instant carrying its offset can be converted by any reader; a naive
+    one cannot be recovered without knowing which host wrote it."""
+    for tz in ("Europe/Berlin", "UTC", ""):
+        out = sessions.set_timestamp(datetime(2026, 8, 6, 11, 8, 27, tzinfo=timezone.utc), tz)
+        assert datetime.fromisoformat(out).utcoffset() is not None
+        # Same instant regardless of how it is rendered.
+        assert datetime.fromisoformat(out) == datetime(2026, 8, 6, 11, 8, 27, tzinfo=timezone.utc)
+
+
+def test_set_timestamp_handles_dst_rather_than_a_fixed_offset():
+    """Berlin is +02:00 in August and +01:00 in January. A configured fixed
+    offset would be an hour wrong for half the year."""
+    summer = sessions.set_timestamp(datetime(2026, 8, 6, 11, 0, tzinfo=timezone.utc), "Europe/Berlin")
+    winter = sessions.set_timestamp(datetime(2026, 1, 6, 11, 0, tzinfo=timezone.utc), "Europe/Berlin")
+    assert summer.endswith("+02:00") and winter.endswith("+01:00")
+
+
+def test_set_timestamp_falls_back_rather_than_raising_on_a_bad_zone():
+    """A typo in config must not cost a logged set mid-session."""
+    out = sessions.set_timestamp(datetime(2026, 8, 6, 11, 8, 27, tzinfo=timezone.utc), "Not/AZone")
+    assert datetime.fromisoformat(out) == datetime(2026, 8, 6, 11, 8, 27, tzinfo=timezone.utc)
 
 from services import sessions
 from services.models import Phase

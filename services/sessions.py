@@ -15,7 +15,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import replace
-from datetime import date
+from datetime import date, datetime
+from zoneinfo import ZoneInfo
 
 import training_plan as tp
 from training_constants import EXERCISE_MOVEMENT_WEIGHT as _EXERCISE_MOVEMENT_WEIGHT
@@ -54,6 +55,53 @@ CHECKPOINT_FIELDS = (
 
 BAND_TIERS = engine.BAND_TIERS
 BAND_TIER_LABELS = engine.BAND_TIER_LABELS
+
+
+def set_timestamp(now: datetime, tz_name: str = "") -> str:
+    """The `ts` written on every per-set record, as an ISO string that CARRIES
+    ITS UTC OFFSET.
+
+    Pure, and `now` is an explicit parameter, per this module's contract --
+    the clock read stays in the Streamlit layer.
+
+    Why this exists. Sets used to be stamped with a bare
+    datetime.now().isoformat(), i.e. the naive wall clock of whatever host
+    runs the app. The app does not run where the athlete trains, so on a UTC
+    host a set completed at 13:08 local was recorded as "2026-08-06T11:08:27".
+    Nothing about that string looks wrong -- an offset-free ISO timestamp
+    reads as local -- and the error only surfaced when a session's sets were
+    aligned against a Garmin activity and every one of them sat exactly two
+    hours early.
+
+    It was never merely cosmetic. services/hr_matching.py attributes heart
+    rate to individual exercises by comparing these timestamps against a
+    Garmin activity's clock, so a two-hour skew silently produced no overlap
+    at all: the per-exercise HR feature could not work and failed quietly
+    rather than loudly.
+
+    Two properties, both load-bearing:
+      1. The result is TIMEZONE-AWARE. An instant with an offset can always
+         be converted; a naive one cannot be recovered without knowing which
+         host wrote it.
+      2. It is rendered in the ATHLETE's zone when tz_name is given, so the
+         stored string also reads correctly to a human scanning Notion.
+
+    `tz_name` is an IANA name so DST is handled; a fixed offset would be an
+    hour wrong for half the year. Unknown or blank falls back to the host's
+    own zone -- degrading to a still-aware local timestamp rather than
+    raising mid-session, because losing a logged set to a bad config string
+    would be a far worse outcome than a wrong-looking hour.
+    """
+    if now.tzinfo is None:
+        now = now.astimezone()
+    if tz_name:
+        try:
+            now = now.astimezone(ZoneInfo(tz_name))
+        except Exception:
+            now = now.astimezone()
+    else:
+        now = now.astimezone()
+    return now.isoformat(timespec="seconds")
 
 
 def coach_message(directive: dict, today_plan: dict) -> tuple[str, str]:

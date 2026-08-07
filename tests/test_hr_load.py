@@ -290,3 +290,67 @@ def test_session_hr_summary_survives_empty_zones():
     assert out["hr_strain"] == 0.0
     assert out["banister_trimp"] is None
     assert out["zone_minutes"] == {}
+
+
+# ─── HR-derived RPE (added 2026-08-07) ──────────────────────────────────────
+
+def test_hr_reserve_uses_the_athletes_own_range_not_percent_of_max():
+    """%HRmax and %HRR disagree most at the bottom of the range, which is
+    where "easy" and "moderate" are distinguished. 120 bpm is 74% of a
+    163 max but only 61% of the reserve above a 52 resting HR."""
+    assert round(hr_load.hr_reserve_fraction(120, 52, 163), 2) == 0.61
+    assert hr_load.hr_reserve_fraction(52, 52, 163) == 0.0
+    assert hr_load.hr_reserve_fraction(163, 52, 163) == 1.0
+
+
+def test_hr_reserve_refuses_impossible_inputs_rather_than_guessing():
+    assert hr_load.hr_reserve_fraction(120, 52, None) is None
+    assert hr_load.hr_reserve_fraction(None, 52, 163) is None
+    # Inverted/zero reserve — hr_max never properly observed.
+    assert hr_load.hr_reserve_fraction(120, 163, 163) is None
+    assert hr_load.hr_reserve_fraction(163, 170, 160) is None
+    # Implausible reading (strap dropout / spike).
+    assert hr_load.hr_reserve_fraction(0, 52, 163) is None
+    assert hr_load.hr_reserve_fraction(250, 52, 163) is None
+
+
+def test_rpe_from_hr_reserve_is_monotonic_and_anchored():
+    assert hr_load.rpe_from_hr_reserve(0.0) == 0.0
+    assert hr_load.rpe_from_hr_reserve(0.40) == 3.0     # ACSM moderate floor
+    assert hr_load.rpe_from_hr_reserve(0.60) == 5.0     # vigorous floor
+    assert hr_load.rpe_from_hr_reserve(0.90) == 9.0     # near-maximal
+    assert hr_load.rpe_from_hr_reserve(1.0) == 10.0
+    vals = [hr_load.rpe_from_hr_reserve(x / 20) for x in range(21)]
+    assert vals == sorted(vals)
+    assert hr_load.rpe_from_hr_reserve(None) is None
+
+
+def test_rpe_interpolates_rather_than_stepping():
+    """A one-bpm change must never jump a whole RPE point."""
+    mid = hr_load.rpe_from_hr_reserve(0.50)
+    assert 3.0 < mid < 5.0
+
+
+def test_exercise_hr_rpe_blends_mean_with_peak():
+    """Mean alone under-rates a top set that is over in fifteen seconds;
+    peak alone over-rates an exercise whose highest reading was a transition."""
+    r = hr_load.exercise_hr_rpe([100, 110, 120, 159], hr_rest=52, hr_max=163)
+    assert r["mean_hr"] == 122.2 and r["peak_hr"] == 159.0
+    mean_only = hr_load.rpe_from_hr_reserve(r["mean_hrr"])
+    peak_only = hr_load.rpe_from_hr_reserve(r["peak_hrr"])
+    assert mean_only < r["rpe"] < peak_only
+
+
+def test_exercise_hr_rpe_flags_low_confidence_when_the_peak_is_the_ceiling():
+    """estimate_hr_max under-estimates until a maximal effort is recorded. On
+    2026-08-06 the session's own peak WAS the observed max, so every reading
+    sat against a ceiling probably never actually reached — callers must be
+    able to see that rather than be handed a confident number."""
+    assert hr_load.exercise_hr_rpe([150, 163], 52, 163)["confident"] is False
+    assert hr_load.exercise_hr_rpe([120, 140], 52, 163)["confident"] is True
+
+
+def test_exercise_hr_rpe_returns_none_rather_than_zero_when_it_cannot_tell():
+    for args in (([], 52, 163), ([120], None, 163), ([120], 52, None)):
+        out = hr_load.exercise_hr_rpe(*args)
+        assert out["rpe"] is None and out["confident"] is False

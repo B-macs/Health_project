@@ -290,6 +290,122 @@ def estimate_hr_max(observed_max_hrs: list[float | None]) -> float | None:
     return max(plausible) if plausible else None
 
 
+# ─── HR-derived RPE, per exercise ────────────────────────────────────────────
+#
+# WHAT THIS IS AND IS NOT. This produces a CARDIOVASCULAR RPE: how hard an
+# exercise was metabolically. It is NOT a substitute for the athlete's own
+# set RPE, which measures proximity to failure, and the two genuinely differ.
+# A heavy triple at RPE 9 barely moves heart rate; a lighter set taken close
+# to failure with short rests pins it. Both numbers are real and they answer
+# different questions -- which is exactly why HR_BLEND_WEIGHT above keeps RPE
+# in the strain blend rather than replacing it with HR.
+#
+# The 2026-08-06 session is the worked example. Lat Pulldown and Single-Arm
+# DB Row peaked higher (159, 163) than a heavier Hip Thrust (149), and the
+# athlete's own explanation is the correct one: he works closer to true max
+# on the pulls he trusts, the single-arm row is right-then-left inside one
+# logged set with a single minute of rest after BOTH sides, and the pulls
+# come later when fatigue has accumulated. Relative effort and rest density
+# drive heart rate. Absolute load does not.
+#
+# BASIS: %HRR (Karvonen), not %HRmax. Heart-rate reserve subtracts resting
+# HR, so it measures how far into the athlete's OWN usable range a reading
+# sits. At a resting HR near 50 the two disagree by roughly 15 points at the
+# bottom of the range, which is the difference between "easy" and "moderate".
+# The Edwards zones above deliberately stay on %HRmax -- they implement a
+# published formula and must not be redefined -- so this is an addition
+# beside them, never a replacement.
+
+# %HRR -> RPE anchors, CR-10. From the ACSM intensity bands: <30% very light,
+# 30-39% light, 40-59% moderate, 60-89% vigorous, >=90% near-maximal.
+# Interpolated linearly between anchors rather than stepped, so a one-bpm
+# change never jumps an RPE point.
+_HRR_RPE_ANCHORS: tuple[tuple[float, float], ...] = (
+    (0.00, 0.0), (0.30, 2.0), (0.40, 3.0), (0.60, 5.0),
+    (0.75, 7.0), (0.90, 9.0), (1.00, 10.0),
+)
+
+
+def hr_reserve_fraction(hr: float, hr_rest: float, hr_max: float) -> float | None:
+    """(HR - rest) / (max - rest), clamped to 0..1. None when the inputs
+    cannot support the calculation -- an implausible reading, or a reserve
+    that is zero or inverted because hr_max was never properly observed."""
+    if hr is None or hr_rest is None or hr_max is None:
+        return None
+    if not (HR_PLAUSIBLE_MIN <= hr <= HR_PLAUSIBLE_MAX):
+        return None
+    reserve = float(hr_max) - float(hr_rest)
+    if reserve <= 0:
+        return None
+    return max(0.0, min(1.0, (float(hr) - float(hr_rest)) / reserve))
+
+
+def rpe_from_hr_reserve(hrr: float | None) -> float | None:
+    """CR-10 RPE for a heart-rate-reserve fraction, linearly interpolated
+    between the ACSM anchors. Returns None for None, so a missing reading
+    stays missing rather than becoming a confident 0."""
+    if hrr is None:
+        return None
+    x = max(0.0, min(1.0, float(hrr)))
+    pts = _HRR_RPE_ANCHORS
+    for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+        if x <= x1:
+            span = x1 - x0
+            return round(y0 + (y1 - y0) * ((x - x0) / span if span else 0.0), 1)
+    return float(pts[-1][1])
+
+
+def exercise_hr_rpe(
+    working_hrs: list[float], hr_rest: float | None, hr_max: float | None,
+    peak_hr: float | None = None, peak_weight: float = 0.5,
+) -> dict:
+    """HR-derived RPE for ONE exercise, from the heart-rate samples recorded
+    during its working sets.
+
+    Blends the exercise's MEAN working HR with its PEAK, because neither
+    alone describes a set. Mean alone under-rates a true top set that is over
+    in fifteen seconds; peak alone over-rates an exercise whose single
+    highest reading came during a transition. peak_weight is the peak's share.
+
+    Returns mean/peak HR, their reserve fractions, the blended RPE, and
+    `confident` -- False when hr_max is not trustworthy, which callers should
+    surface rather than silently presenting a number. estimate_hr_max's own
+    docstring is the reason: an observed max UNDER-estimates until a maximal
+    effort has actually been recorded, which inflates every intensity derived
+    from it. On 2026-08-06 the session's own peak WAS the observed max, so
+    every reading that day sits against a ceiling the athlete has probably
+    not truly reached.
+    """
+    samples = [
+        float(h) for h in (working_hrs or [])
+        if h is not None and HR_PLAUSIBLE_MIN <= float(h) <= HR_PLAUSIBLE_MAX
+    ]
+    if not samples or hr_rest is None or hr_max is None:
+        return {"mean_hr": None, "peak_hr": None, "mean_hrr": None,
+                "peak_hrr": None, "rpe": None, "confident": False,
+                "sample_count": len(samples)}
+    mean_hr = sum(samples) / len(samples)
+    pk = float(peak_hr) if peak_hr is not None else max(samples)
+    mean_hrr = hr_reserve_fraction(mean_hr, hr_rest, hr_max)
+    peak_hrr = hr_reserve_fraction(pk, hr_rest, hr_max)
+    w = min(max(peak_weight, 0.0), 1.0)
+    parts = [v for v in (mean_hrr, peak_hrr) if v is not None]
+    blended = (
+        (peak_hrr * w + mean_hrr * (1.0 - w))
+        if (mean_hrr is not None and peak_hrr is not None)
+        else (parts[0] if parts else None)
+    )
+    return {
+        "mean_hr": round(mean_hr, 1),
+        "peak_hr": round(pk, 1),
+        "mean_hrr": round(mean_hrr, 3) if mean_hrr is not None else None,
+        "peak_hrr": round(peak_hrr, 3) if peak_hrr is not None else None,
+        "rpe": rpe_from_hr_reserve(blended),
+        "confident": bool(hr_max and hr_max > HR_MAX_PLAUSIBLE_MIN and pk < hr_max),
+        "sample_count": len(samples),
+    }
+
+
 def session_hr_summary(
     seconds_in_zone: dict[int, float], avg_hr: float | None = None,
     max_hr: float | None = None, hr_rest: float | None = None,

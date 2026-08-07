@@ -13,7 +13,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import contextlib
 from dataclasses import asdict, replace
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 import json
 import time
 import nav
@@ -766,7 +766,12 @@ def _record_completed_set(idx: int, ex: dict, set_num: int) -> None:
         st.session_state.tp_set_log.setdefault(idx, []),
         sess.build_set_record(
             ex, set_num, st.session_state.tp_actuals.get(idx),
-            datetime.now().isoformat(timespec="seconds"),
+            # Aware, in the ATHLETE's zone — not the host's naive clock. See
+            # sess.set_timestamp: the bare datetime.now() this replaces put
+            # every set two hours early on a UTC host and silently broke
+            # per-exercise HR attribution.
+            sess.set_timestamp(datetime.now(timezone.utc),
+                                repo.get_repository().config.timezone),
         ),
     )
 
