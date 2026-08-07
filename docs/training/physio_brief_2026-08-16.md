@@ -440,6 +440,78 @@ Full record: `patient_profile.py` `symptom_log` 2026-08-07 and finding #6's
 
 ---
 
+## 14. Proposed: isometric micro-doses on recovery days — targeted at what the desk day does NOT load
+
+Added 2026-08-07, athlete's proposal. It extends the §1 ask rather than
+replacing it, and it exists because §10's refractory finding cuts both ways:
+if roughly ten minutes of loading saturates the connective-tissue signal and
+the tissue resets after ~6–8 hours, then short doses on non-gym days are the
+shape that finding recommends — and the athlete wants that shape considered
+for the block this reassessment authors.
+
+**The phasing proposed.**
+
+- **Phase 1** — one ~10-minute isometric dose on recovery days only. Conduct
+  rules from the same source: force ramped in and out over 3–5 s, holds at
+  "tension, not max" (~50% effort, no shaking), pain ≤ 2/10, stop on any
+  point-specific "ice pick" sensation; a diffuse warm burn is acceptable.
+- **Phase 2** — only if phase 1 earns it (two clean weeks, the same criteria
+  the block-build protocol uses to earn the second weekly cluster session): a
+  second dose on main-session days, separated from the gym session by ≥ 6–8 h.
+
+**The sitting audit, which changes the target list.** The desk day already
+holds some tissues continuously for ~6–8 hours. Per the same source those
+hours are wear, not training — continuous, trivial-load, no rest structure —
+which is exactly §10's stated tension: *"a twice-daily dose lands on top of a
+desk day that is already the identified driver."* The proposed resolution:
+the first doses go to the tissues the desk leaves **silent**, and the
+desk-loaded tissues receive structured holds only as §1 is prescribed by you.
+
+| Desk-loaded (yours to dose — the §1 ask) | Desk-silent (proposed phase-1 targets) |
+|---|---|
+| Cervical extensors / levator scapulae | Deep core / anterior chain — McGill Big 3-style holds (already the Day 28 functional screen) |
+| Scapular retractors (held lengthened all day) | Glute max / hip extension — bridge or hip-thrust holds |
+| Lumbar erectors (low-grade, position-dependent) | Rotator cuff — four-position holds (elbow abducted/adducted × internal/external rotation) |
+| Forearm extensors (typing) | Lower-limb tendons (wall sit, split-squat holds) — **gated on §12 question 2's Coxa Saltans outcome** |
+
+The desk-silent column is not new programming logic — it is the profile's own
+`underactive_weak` list (glute max, deep core) restated as targets, which is
+the main reason the proposal survives contact with the record. It also keeps
+the QL-strain precedent on the right side of the line: 30 seconds at high
+intent is the opposite exposure to eight hours at trivial load, which was
+§10's distinction.
+
+**What is claimed for the back, honestly.** §10's table stands: nothing
+tendon-tier reaches disc or endplate, so this is not "tendon repair for the
+spine." The back benefit proposed is endurance and recruitment of the
+documented underactive chain — the 2025 log's *"deep core turns off under
+fatigue"*, the same class as the §1 ask in a different region — with flare
+frequency as the real endpoint: the mid-back history re-injured on a roughly
+two-week cycle when untrained.
+
+**Sequencing against the block build** (per the integration protocol's
+one-new-stressor rule): the cluster session is week 1's stressor; the first
+micro-dose stream enters week 2 at the earliest; each further stream — or
+running, or the second cluster session — staggers by at least a week; phase 2
+is earned, never scheduled. Pull-back conditions are the protocol's
+pre-written set, unchanged. If approved, every named hold gets
+`EXERCISE_MOVEMENT_WEIGHT` and `EXERCISE_BODY_REGION` entries, and leg holds
+count as leg-loading days for the retest rule.
+
+**The asks.**
+
+1. Phase 1 yes/no — and if yes, **which stream enters first**: your §1
+   scapular holds, or the back-chain (core + glute) holds. One at a time, not
+   both.
+2. Dose and duration per stream. The 50–60 s figure (§11) anchors the
+   scapular holds; what should anchor the trunk and glute holds?
+3. Confirm the leg-tendon holds wait for §12 question 2's outcome.
+4. The phase-2 concept in principle — a second daily dose on gym days,
+   ≥ 6–8 h separated — so the boundary is on record before it is wanted,
+   the same reason §9 is here.
+
+---
+
 ## Also worth raising while here
 
 **Ferritin 29 ng/mL (Aug 2023), CRP 0.9** — a true low-normal reading rather

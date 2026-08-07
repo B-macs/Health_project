@@ -67,10 +67,11 @@ the day, re-derive:
 
 ### 3 · One new stressor at a time
 
-Up to four changes could land in the same week: the new block's loads, running,
-the scapular endurance holds, and the cluster session. This repo has already
-deferred a whole exercise family (horse stance / Cossacks) purely so that a
-change stays attributable — the same logic applies to weeks:
+Up to five changes could land in the same week: the new block's loads, running,
+the scapular endurance holds, the isometric micro-doses (physio brief §14), and
+the cluster session. This repo has already deferred a whole exercise family
+(horse stance / Cossacks) purely so that a change stays attributable — the same
+logic applies to weeks:
 
 - Week 1 of the new block: **cluster session once**, never twice.
 - If running starts in week 1, the cluster starts in week 2 (and vice versa).
@@ -81,6 +82,12 @@ change stays attributable — the same logic applies to weeks:
   readiness downtrend coinciding with it, and (c) no ACWR advisory flag
   (`volume_recommendation()["acwr_advisory"]`) in a cluster week — then go to
   2×/week per FREQUENCY.
+- Micro-dose streams (brief §14) follow the same stagger: if approved, ONE
+  stream enters no earlier than week 2, one stream at a time, and the phase-2
+  second daily dose is EARNED by the same two-clean-week criteria as the
+  second cluster session. Their exercise names go through step 4's mapping
+  like any other addition, and any leg-loading holds (wall sits, split-squat
+  holds) count as leg days for step 6's retest rule.
 
 ### 4 · Account for the load, or Strain lies
 
