@@ -1717,6 +1717,68 @@ def _fx_render_capture(accent: str) -> None:
 
 # ── state 3: populated ───────────────────────────────────────────────────────
 
+def _fx_render_ladder(report) -> None:
+    """The battery's decision path made visual (athlete's ask, 2026-08-07):
+    tightest at the bottom, the working rung highlighted. NOT the v2 rung model
+    returning — nothing is aggregated, an unmeasured muscle has no number, and
+    the working rung IS the pattern the battery already chose. Rendered in the
+    no-pattern state too: seeing what was measured is most useful exactly when
+    the battery stopped without an answer."""
+    if not report.ladder:
+        return
+    st.markdown('<div class="fx-cap" style="margin:18px 0 8px;">The ladder &mdash; '
+                'tightest at the bottom, work the marked rung first</div>',
+                unsafe_allow_html=True)
+    rows = []
+    for rung in reversed(report.ladder):          # top rung renders first
+        cls, tag_color, tag = "", _INK3, ""
+        fill, fill_color = 0.0, _GOOD
+        if rung.state == btry.RUNG_LIMITING:
+            cls, tag_color = " limit", _ACCENT_FLEX
+            tag = f"▶ work this first · §{rung.pattern}" if rung.pattern else \
+                  "▶ work this first"
+            fill, fill_color = rung.fraction or 0.0, _ACCENT_FLEX
+        elif rung.state == btry.RUNG_PASSED:
+            tag, tag_color = "✓ climbed", _GOOD
+            fill = rung.fraction if rung.fraction is not None else 1.0
+        elif rung.state == btry.RUNG_CONTEXT:
+            tag, tag_color = "context, not diagnosis", _WARN
+            fill, fill_color = rung.fraction or 0.0, _WARN
+        elif rung.state == btry.RUNG_UNREADABLE:
+            tag, tag_color = "botched — repeat", _BAD
+        else:
+            tag = "not measured"
+
+        if rung.fraction is not None:
+            value = (f"{rung.measured:g}{rung.unit} of {rung.target:g}{rung.unit}"
+                     f" · {rung.fraction * 100:.0f}%")
+        elif rung.measured is not None:
+            value = f"{rung.measured:g}{rung.unit}"
+        else:
+            value = "—"
+        prov = (' <span class="tag" style="color:{c};">provisional target</span>'
+                .format(c=_INK3) if rung.provisional and rung.fraction is not None
+                else "")
+        bar = (f'<div class="bar"><i style="width:{fill * 100:.0f}%;'
+               f'background:{fill_color};"></i></div>'
+               if rung.state not in (btry.RUNG_UNMEASURED, btry.RUNG_UNREADABLE)
+               else '<div class="bar"></div>')
+        detail = f'<div class="det">{rung.detail}</div>' if rung.detail else ""
+        rows.append(
+            f'<div class="fx-rung{cls}">'
+            f'<div class="top"><span><b>{rung.label}</b> '
+            f'<span class="mus">· {rung.muscle}</span></span>'
+            f'<span class="val">{value}{prov}</span></div>'
+            f'{bar}'
+            f'<div class="tag" style="color:{tag_color};margin-top:6px;">{tag}</div>'
+            f'{detail}</div>'
+        )
+    st.markdown("".join(rows), unsafe_allow_html=True)
+    st.caption("A grey rung is unknown, not zero — the battery stops at the first "
+               "failure, so rungs above it are unmeasured until you choose to keep "
+               "going. No rung is ever averaged with another.")
+
+
 def _fx_render_populated(report, accent: str) -> None:
     result = report.result
 
@@ -1731,6 +1793,7 @@ def _fx_render_populated(report, accent: str) -> None:
         )
         st.info("A missing measurement is not a pass. Re-run the slot that stopped, rather "
                 "than reading this as nothing being wrong.", icon="ℹ️")
+        _fx_render_ladder(report)
         return
 
     warm = "" if result.cold else (
@@ -1748,16 +1811,10 @@ def _fx_render_populated(report, accent: str) -> None:
     )
     st.caption(result.slots[-1].reason)
 
-    # TWO separate reasons a pattern may not be a verdict, and they need
-    # different fixes: more mornings for one, a validated threshold for the
-    # other. Shown separately so three repeat measurements cannot look like
-    # they confirmed a number nobody had checked.
-    if result.rests_on_an_invented_number:
-        st.error(
-            f"**This label rests on a cut point we invented.** "
-            f"{btry.BASIS_EXPLAINED[btry.BASIS_PROVISIONAL]}",
-            icon="🚧")
-
+    # The invented-cut-point FACEPLATE was removed on the athlete's request
+    # (2026-08-07) — understood, and it does not need a banner. The distinction
+    # itself survives where it belongs: per rung in the ladder ("provisional
+    # target") and per slot in the trail expander.
     if not report.trusted:
         st.warning(
             f"This is a **hypothesis, not a verdict**. A pattern is trusted after "
@@ -1767,86 +1824,23 @@ def _fx_render_populated(report, accent: str) -> None:
             f"and no single reading is a reason to change anything.",
             icon="⚠️")
 
-    # ── the ladder ──────────────────────────────────────────────────────────
-    #
-    # The battery's decision path made visual (athlete's ask, 2026-08-07):
-    # tightest at the bottom, the working rung highlighted. NOT the v2 rung
-    # model returning — nothing is aggregated, an unmeasured muscle has no
-    # number, and the working rung IS the pattern the battery already chose.
-    if report.ladder:
-        st.markdown('<div class="fx-cap" style="margin:18px 0 8px;">The ladder &mdash; '
-                    'tightest at the bottom, work the marked rung first</div>',
-                    unsafe_allow_html=True)
-        rows = []
-        for rung in reversed(report.ladder):          # top rung renders first
-            cls, tag_color, tag = "", _INK3, ""
-            fill, fill_color = 0.0, _GOOD
-            if rung.state == btry.RUNG_LIMITING:
-                cls, tag_color = " limit", _ACCENT_FLEX
-                tag = f"▶ work this first · §{rung.pattern}" if rung.pattern else \
-                      "▶ work this first"
-                fill, fill_color = rung.fraction or 0.0, _ACCENT_FLEX
-            elif rung.state == btry.RUNG_PASSED:
-                tag, tag_color = "✓ climbed", _GOOD
-                fill = rung.fraction if rung.fraction is not None else 1.0
-            elif rung.state == btry.RUNG_CONTEXT:
-                tag, tag_color = "context, not diagnosis", _WARN
-                fill, fill_color = rung.fraction or 0.0, _WARN
-            elif rung.state == btry.RUNG_UNREADABLE:
-                tag, tag_color = "botched — repeat", _BAD
-            else:
-                tag = "not measured"
-
-            if rung.fraction is not None:
-                value = (f"{rung.measured:g}{rung.unit} of {rung.target:g}{rung.unit}"
-                         f" · {rung.fraction * 100:.0f}%")
-            elif rung.measured is not None:
-                value = f"{rung.measured:g}{rung.unit}"
-            else:
-                value = "—"
-            prov = (' <span class="tag" style="color:{c};">provisional target</span>'
-                    .format(c=_INK3) if rung.provisional and rung.fraction is not None
-                    else "")
-            bar = (f'<div class="bar"><i style="width:{fill * 100:.0f}%;'
-                   f'background:{fill_color};"></i></div>'
-                   if rung.state not in (btry.RUNG_UNMEASURED, btry.RUNG_UNREADABLE)
-                   else '<div class="bar"></div>')
-            detail = f'<div class="det">{rung.detail}</div>' if rung.detail else ""
-            rows.append(
-                f'<div class="fx-rung{cls}">'
-                f'<div class="top"><span><b>{rung.label}</b> '
-                f'<span class="mus">· {rung.muscle}</span></span>'
-                f'<span class="val">{value}{prov}</span></div>'
-                f'{bar}'
-                f'<div class="tag" style="color:{tag_color};margin-top:6px;">{tag}</div>'
-                f'{detail}</div>'
-            )
-        st.markdown("".join(rows), unsafe_allow_html=True)
-        st.caption("A grey rung is unknown, not zero — the battery stops at the first "
-                   "failure, so rungs above it are unmeasured until you choose to keep "
-                   "going. No rung is ever averaged with another.")
+    _fx_render_ladder(report)
 
     # ── the stack ───────────────────────────────────────────────────────────
+    #
+    # 2026-08-07, on the athlete's review: the pre-session release block is the
+    # TRAINING PLAN's business and no longer renders here (the prescription
+    # layer keeps release_block() for the block build), and stack intros are
+    # why-material — the ladder and the slot reason already say what is
+    # stopping him, so the stack opens directly on the work.
     try:
         stack = fx.prescribe(report)
     except cluster_a_prescription.NoPatternError as exc:
         st.error(str(exc), icon="🚫")
         return
 
-    st.markdown('<div class="fx-cap" style="margin:18px 0 8px;">Before every session, '
-                'without exception</div>', unsafe_allow_html=True)
-    for item in fx.release_block_for(stack):
-        side = f" · **{item.laterality} only**" if item.laterality != "bilateral" else ""
-        st.markdown(f"- {item.name} — {item.dose}{side}")
-    st.caption("Inhibit, then activate. Overactive structures are released before the "
-               "underactive ones are asked to work; the other way round trains the "
-               "compensation. This comes from the clinical profile, not from the "
-               "flexibility method — which is why the source stacks all omitted it.")
-
     st.markdown(f'<div class="fx-cap" style="margin:18px 0 8px;">Your stack &mdash; '
                 f'&sect;{stack.pattern}, {stack.limiter}</div>', unsafe_allow_html=True)
-    if stack.intro:
-        st.markdown(stack.intro)
 
     for i, item in enumerate(stack.live_items, 1):
         ex = cluster_a_mechanics.exercise(item.exercise)
@@ -1864,11 +1858,16 @@ def _fx_render_populated(report, accent: str) -> None:
                     st.markdown(f"**You should feel** — {ex.feel}")
                     st.markdown(f"**Stop rule** — {ex.stop}")
                     st.markdown(f"**Progress is** — {ex.progress}")
+                # Readable ink by construction (fx-read), not by hoping the
+                # page-wide caption override wins — the dim grey these used to
+                # inherit is banned for anything the athlete actually reads.
                 if ex.note:
-                    st.caption(f"Why: {ex.note}")
+                    st.markdown(f'<div class="fx-read">Why — {_fx_bold(ex.note)}</div>',
+                                unsafe_allow_html=True)
                 if ex.adapted_from:
-                    st.caption(f"*Adapted for you — replaces {ex.adapted_from}. "
-                               f"Reverts when {ex.reverts_when}.*")
+                    st.markdown(f'<div class="fx-read"><i>Adapted for you — replaces '
+                                f'{ex.adapted_from}. Reverts when {ex.reverts_when}.</i>'
+                                f'</div>', unsafe_allow_html=True)
             if item.note:
                 st.markdown(_fx_bold(item.note))
 

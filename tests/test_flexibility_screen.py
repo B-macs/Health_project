@@ -168,14 +168,38 @@ def test_the_populated_state_says_a_single_session_is_a_hypothesis():
     assert "not a verdict" in body
 
 
-def test_the_mandatory_release_block_is_on_the_screen():
-    """It comes from the clinical profile rather than the flexibility method,
-    which is exactly why every source stack omitted it."""
+def test_the_release_block_is_the_training_plans_business_not_this_screens():
+    """INVERTED 2026-08-07 on the athlete's review: the pre-session release
+    protocol belongs to the main training plan, not the flexibility screen.
+    The prescription layer keeps release_block() — the 08-16 block build reads
+    it — but this screen no longer renders it."""
     at = _run(readings=_TILT_FAILS)
     body = _text(at)
-    assert "Before every session" in body
-    assert "Upper glute" in body
-    assert "inhibit" in body.lower()
+    assert "Before every session" not in body
+    assert "Upper glute" not in body
+
+
+def test_the_why_material_is_off_the_screen():
+    """The athlete's review (2026-08-07): the invented-cut-point faceplate and
+    the stack intro are why-material — understood, and not needed on the UI.
+    The provisional distinction survives per rung ('provisional target') and
+    per slot in the trail; the hypothesis warning stays."""
+    at = _run(readings=_TILT_FAILS)
+    body = _text(at)
+    assert "tilt-specific method" not in body.lower()
+    assert "direction to investigate" not in body.lower()   # the faceplate's text
+    assert "hypothesis" in body.lower()                     # this one stays
+    assert "provisional target" in body.lower()             # and the rung tag
+
+
+def test_the_ladder_renders_even_without_a_pattern():
+    """The no-pattern state is exactly when seeing what WAS measured helps —
+    hiding the ladder there reads as 'nothing was measured', which is false."""
+    at = _run(readings=_PASS_TO_TILT)          # stops indeterminate at the tilt
+    body = _text(at)
+    assert "No pattern reached" in body
+    assert "The ladder" in body
+    assert "not measured" in body.lower()
 
 
 def test_capture_stops_as_soon_as_the_battery_has_an_answer():

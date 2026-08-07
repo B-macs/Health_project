@@ -493,14 +493,9 @@ function done(){
   });
   h += '<div class="note">A grey rung is unknown, not zero — the battery stops at the first failure. No rung is ever averaged with another.</div>';
 
-  h += '<div class="cap" style="margin:18px 0 8px">Before every session, without exception</div>';
-  DATA.release.forEach(function(r){ h += '<div class="sm">&bull; '+r.name+' — '+r.dose
-    +(r.laterality!=='bilateral'?' &middot; <b style="color:var(--ink2)">'+r.laterality+' only</b>':'')+'</div>'; });
-  h += '<div class="sm">Inhibit, then activate. This comes from the clinical profile, not from the '
-    +'flexibility method — which is why the source stacks all omitted it.</div>';
-
+  // The release block is the TRAINING PLAN's business (athlete's review,
+  // 2026-08-07) and stack intros are why-material — neither renders here.
   h += '<div class="cap" style="margin:18px 0 8px">Your stack &mdash; &sect;'+ev.pattern+', '+st.limiter+'</div>';
-  if(st.intro) h += '<div class="sm">'+md(st.intro).replace(/\n\n/g,'<br><br>')+'</div>';
   st.items.filter(function(i){return !i.deferred;}).forEach(function(i,n){
     var tint = i.spectrum==='resisted' ? 'var(--good)' : 'var(--ink3)';
     h += '<details><summary>'+(n+1)+'. '+i.name+' &middot; '+i.dose+'</summary>'
@@ -510,7 +505,7 @@ function done(){
         +'<div class="sm"><b style="color:var(--ink2)">You should feel</b> — '+md(i.feel)+'</div>'
         +'<div class="sm"><b style="color:var(--ink2)">Stop rule</b> — '+md(i.stopRule)+'</div>'
         +'<div class="sm"><b style="color:var(--ink2)">Progress is</b> — '+md(i.progress)+'</div>':'')
-      +(i.why?'<div class="note">Why: '+md(i.why)+'</div>':'')
+      +(i.why?'<div class="sm">Why — '+md(i.why)+'</div>':'')
       +(i.note?'<div class="sm">'+md(i.note)+'</div>':'')
       +(i.adapted?'<div class="sm"><i>Adapted — replaces '+i.adapted+'. Reverts when '+i.reverts+'.</i></div>':'')
       +'</details>';
