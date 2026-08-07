@@ -670,8 +670,22 @@ _STATE = {
     "tp_ex_idx": 2, "tp_set": 1, "tp_rep_in_set": 1, "tp_phase": "resting",
     "tp_started": True, "tp_done_today": False, "tp_session_logged": False,
     "tp_side": "right", "tp_session_start_ts": 12345.0, "tp_actuals": {},
-    "tp_set_log": {},
+    "tp_set_log": {}, "tp_notes": {},
 }
+
+
+def test_per_exercise_notes_are_checkpointed():
+    """Regression, 2026-08-07. The per-exercise note field silently discarded
+    every note for six weeks: it lived only in its Streamlit widget's own
+    session_state entry, which Streamlit deletes as soon as that widget stops
+    rendering (i.e. the moment the flow advances to the next exercise), so
+    _auto_log_session always read back nothing. The fix mirrors tp_actuals --
+    checkpoint the note into a plain dict we own. If tp_notes ever leaves
+    CHECKPOINT_FIELDS, the notes silently stop persisting again and nothing
+    else fails, which is precisely how this went unnoticed."""
+    assert "tp_notes" in sessions.CHECKPOINT_FIELDS
+    payload = sessions.checkpoint_payload(3, {**_STATE, "tp_notes": {0: "felt tight"}})
+    assert payload["tp_notes"] == {0: "felt tight"}
 
 
 def test_checkpoint_state_fixture_covers_every_checkpoint_field():

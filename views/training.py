@@ -608,6 +608,7 @@ def _init_state(day_num: int | None = None):
         "tp_garmin_activity_detail": {}, # {exercise_idx: {avg_hr, max_hr, distance_km, calories}}
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
         "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
+        "tp_notes":            {},       # {exercise_idx: str} — the per-exercise note, checkpointed OUT of widget state (see _checkpoint_note)
         "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
@@ -624,7 +625,7 @@ def _init_state(day_num: int | None = None):
                 # tp_actuals/tp_set_log round-trip through JSON (Notion-backed
                 # checkpoint storage) which silently turns their int keys into
                 # strings -- cast back so exercise-index lookups still hit.
-                if k in ("tp_actuals", "tp_set_log") and isinstance(v, dict):
+                if k in ("tp_actuals", "tp_set_log", "tp_notes") and isinstance(v, dict):
                     v = {int(i): entry for i, entry in v.items()}
                 st.session_state[k] = v
         # Authoritative check, independent of the checkpoint above: if a session is
@@ -668,6 +669,30 @@ def _get_plan_start() -> date | None:
 #  orchestration (writing the session to Notion) stays here.
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _checkpoint_note(idx: int, day_num: int | None = None) -> None:
+    """Copy the per-exercise note out of Streamlit's widget state and into
+    st.session_state.tp_notes, which we own.
+
+    This exists because widget state is NOT storage. Streamlit garbage-
+    collects a keyed widget's session_state entry as soon as the widget stops
+    being rendered, and the training flow shows one exercise at a time — so
+    "tp_note_<idx>" is dropped the instant the athlete taps through to the
+    next exercise. Between 2026-06-29 and 2026-08-07 _auto_log_session read
+    that key back at save time and therefore logged an empty string every
+    time: 21 notes reached Notion over six weeks and every one of them was
+    the session-wide box, not a per-exercise note. The reps/weight steppers
+    were never affected because they had always checkpointed into a plain
+    dict (tp_actuals) instead.
+
+    Also persists immediately rather than waiting for the next set
+    completion, so a note written just before the phone is backgrounded
+    survives — the note is often the most perishable thing in the session and
+    the athlete cannot tell from the UI whether it was saved."""
+    st.session_state.tp_notes[idx] = st.session_state.get(f"tp_note_{idx}", "")
+    if day_num is not None:
+        _save_checkpoint(day_num)
+
+
 def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
                       duration_minutes: int, notes: str) -> None:
     r = repo.get_repository()
@@ -704,7 +729,13 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             f"Garmin-verified duration: {actual_min:.0f} min "
             f"(planned {ex.get('duration_minutes')} min)."
         ) if actual_min else ""
-        user_note = (st.session_state.get(f"tp_note_{idx}") or "").strip()
+        # Read the CHECKPOINTED note, never the widget key. Reading
+        # st.session_state[f"tp_note_{idx}"] here is what silently discarded
+        # every per-exercise note between 2026-06-29 and 2026-08-07: by the
+        # time this runs, the flow has advanced past every exercise, so
+        # Streamlit has already garbage-collected each of those widget
+        # entries. See _checkpoint_note and sessions.CHECKPOINT_FIELDS.
+        user_note = (st.session_state.get("tp_notes", {}).get(idx) or "").strip()
         note = "\n".join(n for n in (garmin_note, user_note) if n)
         detail = garmin_detail.get(idx) or {}
         # Real per-set records captured live by _record_completed_set as each
@@ -2393,14 +2424,26 @@ def render():
     if ex.get("warning"):
         st.error(f"⚠️ {ex['warning']}")
 
-    # Per-exercise note — one per exercise (keyed on _eidx, not on set/rep),
-    # so it persists across every set of this exercise and resets to blank
-    # once tp_ex_idx advances to the next one. Read back by _auto_log_session
-    # via this same key, independent of the session-wide notes field on the
-    # "Save Session to Log" screen at the end.
+    # Per-exercise note — one per exercise, independent of the session-wide
+    # notes field on the "Save Session to Log" screen at the end.
+    #
+    # THE WIDGET IS NOT THE STORAGE. Streamlit deletes a keyed widget's
+    # session_state entry as soon as that widget stops being rendered, and
+    # this flow renders exactly one exercise at a time — so the moment
+    # tp_ex_idx advances, "tp_note_<idx>" is gone. The previous version read
+    # that key back at save time and therefore logged nothing, for six weeks,
+    # silently (see sessions.CHECKPOINT_FIELDS). The durable copy is
+    # st.session_state.tp_notes, written on every keystroke-commit by
+    # _checkpoint_note and re-seeded into the widget below when the athlete
+    # navigates back to an exercise. Same shape as tp_actuals, for the same
+    # reason.
+    _note_key = f"tp_note_{_eidx}"
+    if _note_key not in st.session_state:
+        st.session_state[_note_key] = st.session_state.tp_notes.get(_eidx, "")
     with st.expander("📝 Add a note for this exercise"):
         st.text_area(
-            "Note", key=f"tp_note_{_eidx}", label_visibility="collapsed",
+            "Note", key=_note_key, label_visibility="collapsed",
+            on_change=_checkpoint_note, args=(_eidx, day_num),
             placeholder="e.g. right hip felt tight on the last set, form cue worked well...",
             height=68,
         )

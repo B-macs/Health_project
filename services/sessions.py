@@ -50,6 +50,17 @@ CHECKPOINT_FIELDS = (
     "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
     "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
     "tp_actuals", "tp_set_log",
+    # tp_notes joined 2026-08-07 and is the reason the per-exercise note
+    # field lost six weeks of input. The note used to live ONLY in its own
+    # widget's session_state entry (key "tp_note_<idx>"), and Streamlit
+    # discards a keyed widget's state the moment that widget stops being
+    # rendered -- which is the instant tp_ex_idx advances to the next
+    # exercise. Every note was therefore gone before _auto_log_session could
+    # read it back, and all 21 notes that reached Notion were the
+    # session-wide box instead. Checkpointing it here is what makes it
+    # durable, exactly as it already did for tp_actuals: a plain dict is
+    # state we own, a widget key is state Streamlit owns.
+    "tp_notes",
 )
 
 BAND_TIERS = engine.BAND_TIERS
