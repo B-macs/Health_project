@@ -912,7 +912,9 @@ class Repository:
                                 session_duration_minutes: int = 0, session_rpe: int = 0,
                                 session_au: float = 0.0, today: date | None = None,
                                 garmin_avg_hr: float | None = None, garmin_max_hr: float | None = None,
-                                garmin_distance_km: float | None = None, garmin_calories: float | None = None) -> str:
+                                garmin_distance_km: float | None = None, garmin_calories: float | None = None,
+                                actual_summary: str = "", actual_weight: str = "",
+                                volume_kg: float | None = None) -> str:
         today = today or date.today()
         sid = str(session_id) if not isinstance(session_id, dict) else session_id.get("session_id", "")
 
@@ -951,8 +953,38 @@ class Repository:
         if garmin_calories is not None:
             properties["Activity Calories"] = notion.number(garmin_calories)
 
+        # Human-readable projections of the `Sets` JSON above. That column is
+        # the record and these never become an input -- every reader still
+        # parses Sets. They exist because Notion renders a JSON blob as an
+        # unreadable string, so per-set variation that IS faithfully stored
+        # (10x15 / 10x17.5 / 13x17.5) was invisible next to Planned Sets and
+        # Planned Reps, which are one number for the whole exercise. Omitted
+        # rather than written blank when absent, so a bodyweight row shows an
+        # empty cell instead of a row of zeros that reads like a measurement.
+        # Callers must have run ensure_actual_set_columns() first -- Notion
+        # 400s on an unknown property, which would cost the whole session.
+        if actual_summary:
+            properties["Actual"] = notion.rich_text(actual_summary)
+        if actual_weight:
+            properties["Actual Weight"] = notion.rich_text(actual_weight)
+        if volume_kg:
+            properties["Volume (kg)"] = notion.number(volume_kg)
+
         page = notion.create_page(self._nc, self.config.notion_db_training, properties=properties)
         return page["id"]
+
+    def ensure_actual_set_columns(self) -> list[str]:
+        """One-time schema migration for the three derived per-set columns.
+        Safe to call repeatedly (a no-op once present). Mirrors
+        ensure_garmin_activity_columns, but unlike that one this MUST run
+        before save_training_exercise passes the matching arguments: Notion
+        rejects a create_page naming a property the database does not have,
+        and that would fail the write for the whole session."""
+        return notion.ensure_properties(self._nc, self.config.notion_db_training, {
+            "Actual":        {"rich_text": {}},
+            "Actual Weight": {"rich_text": {}},
+            "Volume (kg)":   {"number": {}},
+        })
 
     def ensure_garmin_activity_columns(self) -> list[str]:
         """One-time schema migration: adds the 4 Garmin-activity Number

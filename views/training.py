@@ -609,6 +609,7 @@ def _init_state(day_num: int | None = None):
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
         "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
         "tp_notes":            {},       # {exercise_idx: str} — the per-exercise note, checkpointed OUT of widget state (see _checkpoint_note)
+        "tp_last_perf":        {},       # {exercise_idx: str} — "what you did last time", every set. Lazily filled, see _seed_last_perf_if_needed
         "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
@@ -669,6 +670,32 @@ def _get_plan_start() -> date | None:
 #  orchestration (writing the session to Notion) stays here.
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _seed_last_perf_if_needed(idx: int, ex: dict) -> str:
+    """'What you did last time' for THIS exercise — every set, not just the
+    last one. Returns "" when the movement has never been logged.
+
+    Deliberately covers EVERY exercise, unlike _seed_actuals_if_needed which
+    only seeds exercises carrying an equipment_type: the question "am I
+    progressing?" applies just as much to a 31-second Pallof hold or a
+    bodyweight side bridge as to a loaded hip thrust, and those are exactly
+    the exercises the steppers never touch.
+
+    One Notion query per exercise per session, cached in session_state and
+    guarded so a re-render never re-queries. Not checkpointed — it is
+    re-derivable and a stale copy would be worse than a second lookup."""
+    cache = st.session_state.tp_last_perf
+    if idx in cache:
+        return cache[idx]
+    summary = ""
+    try:
+        sets = repo.get_repository().get_last_session_all_sets(ex["name"])
+        summary = sess.last_session_summary(sets)
+    except Exception:
+        summary = ""  # never block the flow on a lookup
+    cache[idx] = summary
+    return summary
+
+
 def _checkpoint_note(idx: int, day_num: int | None = None) -> None:
     """Copy the per-exercise note out of Streamlit's widget state and into
     st.session_state.tp_notes, which we own.
@@ -705,6 +732,15 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         duration_minutes=duration_minutes,
         session_rpe=session_rpe,
     )
+    # Add the three derived per-set columns to the Training Log schema if they
+    # aren't there yet — one retrieve per session, a no-op once present. If it
+    # fails for any reason we log WITHOUT them rather than risk a create_page
+    # 400 on an unknown property taking the session's real data with it.
+    try:
+        r.ensure_actual_set_columns()
+        _derived_cols_ok = True
+    except Exception:
+        _derived_cols_ok = False
     last_id = None
     for idx, ex in enumerate(exercises):
         actual_min = garmin_minutes.get(idx)
@@ -762,6 +798,12 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             garmin_max_hr=detail.get("max_hr"),
             garmin_distance_km=detail.get("distance_km"),
             garmin_calories=detail.get("calories"),
+            # Only populated once the schema call above succeeded — Notion
+            # 400s on an unknown property, and losing the whole session's log
+            # to a cosmetic column would be a bad trade.
+            actual_summary=sess.sets_actual_summary(logged_sets) if _derived_cols_ok else "",
+            actual_weight=sess.sets_weight_summary(logged_sets) if _derived_cols_ok else "",
+            volume_kg=sess.sets_volume_kg(logged_sets) if _derived_cols_ok else None,
         )
     if notes.strip() and last_id:
         r.save_session_notes(last_id, notes)
@@ -2420,6 +2462,23 @@ def render():
         f"{ex['mechanics']}</div>",
         unsafe_allow_html=True,
     )
+
+    # "Last time" — every set of the most recent logged session of this exact
+    # movement. Shown against the prescription above so progression can be
+    # judged in the moment rather than recalled, which is the whole reason
+    # per-set capture exists. Silent when there is no prior record: an empty
+    # panel reads as "no data", a zeroed one reads as a bad session.
+    _last_perf = _seed_last_perf_if_needed(_eidx, ex)
+    if _last_perf:
+        st.markdown(
+            f"<div style='background:#0E1117;border:1px solid #2A3138;border-left:3px solid #FFD700;"
+            f"border-radius:8px;padding:10px 14px;margin-bottom:12px;'>"
+            f"<span style='color:#8A99A3;font-size:10px;font-family:monospace;"
+            f"letter-spacing:2px;'>LAST TIME</span><br>"
+            f"<span style='color:#E8ECEF;font-size:15px;font-family:monospace;'>"
+            f"{_last_perf}</span></div>",
+            unsafe_allow_html=True,
+        )
 
     if ex.get("warning"):
         st.error(f"⚠️ {ex['warning']}")

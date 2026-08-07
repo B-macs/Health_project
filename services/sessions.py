@@ -450,6 +450,88 @@ def actual_caption(entry: dict) -> str:
     return f"Last time: {body}{date_part}"
 
 
+def _trim(n) -> str:
+    """42.5 -> '42.5', 40.0 -> '40'. Keeps the summaries readable rather than
+    littered with trailing zeros."""
+    f = float(n)
+    return str(int(f)) if f == int(f) else str(f)
+
+
+def set_display(s: dict) -> str:
+    """ONE completed set, rendered the way it was actually performed.
+
+    Three shapes exist in the stored `Sets` JSON and they must not be
+    conflated -- see build_set_record and CLAUDE.md's "a hold is not a rep":
+      loaded     reps=10 weight=42.5 tut=0   -> '10x42.5'
+      hold_reps  reps=8  weight=0    tut=5   -> '8x5s'
+      pure hold  reps=1  weight=0    tut=31  -> '31s'   (reps=1 is a
+                 storage convention, NOT one repetition -- rendering it as
+                 '1' is exactly the misreport the tonnage module refuses to
+                 make)
+      bodyweight reps=12 weight=0    tut=0   -> '12'
+    """
+    reps = s.get("reps") or 0
+    weight = s.get("weight") or 0
+    tut = s.get("tut") or 0
+    if weight:
+        return f"{reps}x{_trim(weight)}"
+    if tut:
+        return f"{reps}x{tut}s" if reps and reps > 1 else f"{tut}s"
+    return str(reps)
+
+
+def sets_actual_summary(sets: list[dict]) -> str:
+    """'10x40 / 10x42.5 / 10x42.5', or '31s / 31s / 31s' for a hold -- what
+    was ACTUALLY done, per set, which Planned Sets/Planned Reps cannot show
+    because each is one number for the whole exercise.
+
+    Renders via set_display rather than reading `reps` directly. A raw reps
+    column would print '1 / 1 / 1' for a 31-second Pallof hold, since reps=1
+    is the storage convention for a hold -- the precise misreport CLAUDE.md
+    names ('a hold is not a rep') and the reason holds get their own
+    treatment here instead of a fourth column."""
+    return " / ".join(set_display(s) for s in (sets or []))
+
+
+def sets_weight_summary(sets: list[dict]) -> str:
+    """'15 / 17.5 / 17.5' -- actual load per set. Empty string when nothing
+    in the exercise carried external load, so the Notion column stays blank
+    for bodyweight work rather than reading a misleading row of zeros."""
+    sets = sets or []
+    if not any(s.get("weight") for s in sets):
+        return ""
+    return " / ".join(_trim(s.get("weight") or 0) for s in sets)
+
+
+def sets_volume_kg(sets: list[dict]) -> float:
+    """Total reps x weight for this exercise. Unloaded work contributes 0 --
+    it is counted in reps and seconds elsewhere and is never converted to
+    kilograms (services/tonnage.py holds that line)."""
+    return round(sum((s.get("reps") or 0) * (s.get("weight") or 0) for s in (sets or [])), 2)
+
+
+def last_session_summary(sets: list[dict] | None) -> str:
+    """'10x40 / 10x42.5 / 10x42.5  (2026-08-06)' -- what was done last time,
+    every set, for display during the live session so progression can be
+    judged against it rather than remembered.
+
+    Deliberately shows ALL sets. actual_caption above shows only the last
+    set, because its job is seeding the steppers with where the athlete
+    ended up; that is the wrong summary for asking "am I progressing?", where
+    10x40/10x42.5/10x42.5 and 10x42.5/10x42.5/10x42.5 are different sessions
+    with the same final set.
+
+    The date comes from the set's own `ts`, which build_set_record stamps --
+    no extra query, and rows synthesized before per-set capture simply have
+    no ts and render without a date."""
+    sets = sets or []
+    if not sets:
+        return ""
+    body = sets_actual_summary(sets)
+    ts = next((s.get("ts") for s in sets if s.get("ts")), "")
+    return f"{body}  ({ts[:10]})" if ts else body
+
+
 def exercise_duration_seconds(ex: dict) -> int:
     """Estimated active time for a single exercise — sets x hold/rep time +
     rest between sets. Same per-type formulas as estimate_duration's inner

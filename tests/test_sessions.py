@@ -674,6 +674,68 @@ _STATE = {
 }
 
 
+def test_set_display_never_calls_a_hold_one_rep():
+    """The storage convention is reps=1 with the work in tut for a pure hold
+    (CLAUDE.md: 'a hold is not a rep'). Rendering a 31-second Pallof hold as
+    '1' would be the same misreport services/tonnage.py exists to refuse."""
+    assert sessions.set_display({"reps": 1, "weight": 0.0, "tut": 31}) == "31s"
+    assert sessions.set_display({"reps": 8, "weight": 0.0, "tut": 5}) == "8x5s"
+    assert sessions.set_display({"reps": 10, "weight": 42.5, "tut": 0}) == "10x42.5"
+    assert sessions.set_display({"reps": 10, "weight": 40.0, "tut": 0}) == "10x40"
+    assert sessions.set_display({"reps": 12, "weight": 0.0, "tut": 0}) == "12"
+
+
+def test_set_summaries_preserve_per_set_variation():
+    """The whole point of the derived columns: Planned Sets/Planned Reps are
+    one number for the whole exercise, so in the Notion UI a 15/17.5/17.5
+    session was indistinguishable from 17.5 across the board."""
+    sets = [
+        {"set_num": 1, "reps": 10, "weight": 15.0, "tut": 0},
+        {"set_num": 2, "reps": 10, "weight": 17.5, "tut": 0},
+        {"set_num": 3, "reps": 13, "weight": 17.5, "tut": 0},
+    ]
+    assert sessions.sets_actual_summary(sets) == "10x15 / 10x17.5 / 13x17.5"
+    assert sessions.sets_weight_summary(sets) == "15 / 17.5 / 17.5"
+    assert sessions.sets_volume_kg(sets) == 10 * 15.0 + 10 * 17.5 + 13 * 17.5
+
+
+def test_actual_summary_never_writes_one_rep_for_a_hold():
+    """The Notion 'Actual' column is built from set_display, not from the raw
+    reps field. Reading reps directly would print '1 / 1 / 1' for three
+    31-second Pallof holds -- a column that looks like a measurement and is
+    not one."""
+    holds = [{"reps": 1, "weight": 0.0, "tut": 31}] * 3
+    assert sessions.sets_actual_summary(holds) == "31s / 31s / 31s"
+    assert "1 / 1 / 1" not in sessions.sets_actual_summary(holds)
+
+
+def test_unloaded_work_never_becomes_kilograms():
+    """tonnage.py's standing rule, enforced at the display layer too: a
+    bodyweight exercise reports no weight column and zero volume rather than
+    a row of zeros that reads like a real measurement."""
+    sets = [{"reps": 1, "weight": 0.0, "tut": 31}, {"reps": 1, "weight": 0.0, "tut": 31}]
+    assert sessions.sets_weight_summary(sets) == ""
+    assert sessions.sets_volume_kg(sets) == 0
+
+
+def test_last_session_summary_shows_every_set_not_just_the_final_one():
+    """actual_caption shows only the last set (right for seeding a stepper,
+    wrong for judging progression): a 40/42.5/42.5 session and a
+    42.5/42.5/42.5 session share a final set but are not the same session."""
+    ramped = [
+        {"reps": 10, "weight": 40.0, "tut": 0, "ts": "2026-08-06T11:16:45"},
+        {"reps": 10, "weight": 42.5, "tut": 0, "ts": "2026-08-06T11:18:36"},
+        {"reps": 10, "weight": 42.5, "tut": 0, "ts": "2026-08-06T11:20:37"},
+    ]
+    flat = [dict(s, weight=42.5) for s in ramped]
+    assert sessions.last_session_summary(ramped) == "10x40 / 10x42.5 / 10x42.5  (2026-08-06)"
+    assert sessions.last_session_summary(ramped) != sessions.last_session_summary(flat)
+    assert sessions.last_session_summary([]) == ""
+    assert sessions.last_session_summary(None) == ""
+    # A row synthesized before per-set capture has no ts and simply omits the date.
+    assert sessions.last_session_summary([{"reps": 10, "weight": 40.0}]) == "10x40"
+
+
 def test_per_exercise_notes_are_checkpointed():
     """Regression, 2026-08-07. The per-exercise note field silently discarded
     every note for six weeks: it lived only in its Streamlit widget's own
