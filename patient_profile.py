@@ -165,6 +165,16 @@ PROFILE = {
                 "Self-release and PNF stretching must precede any glute activation work."
             ),
             "laterality": "bilateral — RIGHT significantly tighter",
+            "status_2026_08_07": (
+                "DOWNGRADED, NOT RESOLVED — athlete-reported. The 'constant' in `sensation` "
+                "above is no longer accurate: day-to-day tightness has fallen from roughly "
+                "8-9/10 gripping to about 3/10, and it is no longer present as a baseline "
+                "state. THE DECISIVE DETAIL IS THAT THE RELEASE WORK STILL PRODUCES A RELEASE. "
+                "The structure still holds tension that responds to the protocol, which is a "
+                "positive test, not a null one — so the drop is evidence the release block is "
+                "WORKING and is not an argument for removing it. See symptom_log 2026-08-07 "
+                "(finding review) for the reasoning and for the chain this sits in."
+            ),
         },
         {
             "id": 2,
@@ -186,6 +196,17 @@ PROFILE = {
                 "Single-leg RDL on right will eventually trigger — this is a healthy structural release."
             ),
             "laterality": "RIGHT — primary finding",
+            "status_2026_08_07": (
+                "STILL PRESENT, FREQUENCY HALVED — athlete-reported. The `timeline` field above "
+                "('every few days') is now stale: roughly ONCE A WEEK. Note this is the "
+                "finding's own mechanism behaving as written — the crack is described as "
+                "requiring ACCUMULATION of joint compression, so less compression accumulating "
+                "means longer to reach the trigger, and a lengthening interval is the expected "
+                "signature of improvement rather than a contradiction. The finding's "
+                "training_implication already treats the release itself as healthy. Opportunity "
+                "was not the limiter: Stage 2A runs RDL, Bulgarian split squat and single-leg "
+                "glute bridge weekly."
+            ),
         },
         {
             "id": 3,
@@ -206,6 +227,17 @@ PROFILE = {
                 "Lumbar base requires deliberate posterior pelvic tilt to decompress horizontal facet slides."
             ),
             "laterality": "bilateral",
+            "status_2026_08_07": (
+                "REPORTED CEASED — pending physiotherapist confirmation at the 2026-08-16 "
+                "reassessment. The athlete reports the release has not occurred for roughly a "
+                "month ('since my lower back relaxed'). The finding above is left UNEDITED on "
+                "purpose: an assessed finding is not overwritten by a self-report, and an absent "
+                "release is ambiguous between compression resolving and the segment stiffening "
+                "until someone examines it. Note the report does not separate this finding's TWO "
+                "sites, and the stated cause points at the lumbar one. Full reasoning, "
+                "corroborating evidence and the two decisions that depend on this: symptom_log "
+                "2026-08-07."
+            ),
         },
         {
             "id": 4,
@@ -248,6 +280,18 @@ PROFILE = {
                 "do not treat passive, floor-supported external rotation as a risk position. "
                 "Does not downgrade the finding — it narrows where it applies."
             ),
+            "status_2026_08_07": (
+                "UNCHANGED — athlete-reported, still snapping on EVERY attempt. This is the "
+                "only one of the five reviewed findings with no movement in either direction, "
+                "which is itself informative: findings #1, #2 and #3 all improved over the same "
+                "window while this one did not. Consistent with a tendon-path/mechanical "
+                "finding rather than a tone-driven one, and consistent with the "
+                "additional_evidence_2026_08_05 reading that the trigger is CONTRACTILE. "
+                "NOT separately re-confirmed: whether it remains completely PAINLESS. That is "
+                "the whole basis for treating it as benign, so do not carry it forward "
+                "unstated — the Stage 2 exit criterion measures frequency on 2026-08-16, and "
+                "pain status should be confirmed in the same breath."
+            ),
         },
         {
             "id": 5,
@@ -271,6 +315,14 @@ PROFILE = {
                 "Wide stance positions should be introduced slowly."
             ),
             "laterality": "bilateral",
+            "status_2026_08_07": (
+                "UNCHANGED — athlete-reported, 'still the same'. Note this does NOT conflict "
+                "with the 2026-08-05 flexibility baseline's 'no lumbar pops normally' in seated "
+                "twists: that is a different position. This finding is specifically a WIDE "
+                "STANCE with the pelvis anchored and dynamic rotational torque, which is the "
+                "mechanism above — a seated twist lets the hips share the rotation and does not "
+                "reproduce it. The two observations are compatible and neither settles the other."
+            ),
         },
         {
             "id": 6,
@@ -366,13 +418,181 @@ PROFILE = {
             "5-minute release block before every session."
         ),
         "always_include": [
-            "Upper Glute / TFL Self-Release (wall or fist) — 2 × 90s each side",
+            "Upper Glute / TFL Self-Release (BALL, seated on floor) — 2 × 90s each side",
             "Piriformis Contract-Relax PNF — 3 × 5 cycles each side",
         ],
         "add_when_hip_focused": [
-            "Right Posterior Hip Capsule Cross-Body Stretch — 3 × 60s right only",
+            "Right Posterior Hip Capsule Stretch (FLOOR VERSION — see method_substitutions) "
+            "— 3 × 60s RIGHT ONLY. Ran bilaterally in error until 2026-08-07; athlete "
+            "reverted to right-only on being shown the rule. Left capsule is not restricted.",
             "Ischial Tuberosity Hamstring Release — 2 × 90s each side",
         ],
+
+        # ── METHOD SUBSTITUTIONS, athlete-reported 2026-08-07 ────────────────
+        # Both are changes of METHOD, not of target, dose or sequencing. They
+        # are recorded here because the record must match what is actually
+        # being done: a protocol that has silently diverged from practice is
+        # worse than one that never specified the method. Carries the
+        # adapted_from / reason / reverts_when idiom used in
+        # cluster_a_mechanics.py. Neither was prescribed here — see
+        # symptom_log 2026-08-07 (finding review) for the sign-off question.
+        "method_substitutions_2026_08_07": {
+            "upper_glute_tfl_self_release": {
+                "adapted_from": "Wall or fist",
+                "now": "A ball, sitting on it on the floor",
+                "reason": (
+                    "Athlete-selected. Floor-seated bodyweight over a ball delivers markedly "
+                    "higher and more localised pressure than wall or fist, which are "
+                    "self-limiting by how hard you can push."
+                ),
+                "target_unchanged": "Gluteus medius upper fibres / TFL. Dose unchanged at 2 × 90s per side.",
+                "watch": (
+                    "Higher pressure over the piriformis region sits near the sciatic nerve, "
+                    "and this athlete has MODERATE right L5/S1 foraminal stenosis on MRI "
+                    "(10 Nov 2025). No neural symptoms are reported anywhere in the log to "
+                    "date. Any radiating, burning or tingling sensation down the leg means "
+                    "come off it — that is a different signal from the deep ache of a release "
+                    "and must not be trained through. Note the intensity went UP while "
+                    "finding #1's tightness went DOWN 8-9 -> 3, so the dose-to-tissue "
+                    "relationship has changed at both ends."
+                ),
+            },
+            "right_posterior_hip_capsule": {
+                "adapted_from": "Cross-body stretch, pulling the knee toward the chest",
+                "now": (
+                    "RECORDED IN THE ATHLETE'S OWN WORDS AND DELIBERATELY NOT GIVEN A POSE "
+                    "NAME. 2026-08-07: 'knee is on the ground and my knee is twisted outwards "
+                    "along with my other leg on top of it', clarified as 'knee pressed to the "
+                    "floor, body over it'. A first attempt to name this as a stacked "
+                    "figure-4/shoelace position was NOT recognised by the athlete and has been "
+                    "withdrawn — naming a position wrong in a clinical record is worse than "
+                    "describing it plainly, because the name is what a future reader "
+                    "reconstructs the movement from. CONFIRM THE POSITION VISUALLY with the "
+                    "physiotherapist on 2026-08-16 and only then give it a name."
+                ),
+                "reason": (
+                    "CORRECTED 2026-08-07, same day, before this entry was relied on. An "
+                    "earlier draft of this field said the 2026-07-08 re-evaluation 'never "
+                    "happened and the broken version ran for the whole block'. THAT WAS WRONG "
+                    "AND THE TRUTH IS MORE USEFUL.\n"
+                    "What actually happened: the 2026-07-08 session note recorded the original "
+                    "cross-body cue landing at the FRONT/middle of BOTH hips with nothing at "
+                    "the back — 'I feel the stretch isn't working as expected'. It was acted on "
+                    "PROMPTLY. training_plan.RIGHT_HIP_CAPSULE_REVISED was authored in direct "
+                    "response, first appearing at PLAN[15] (Stage 1 Week 3, flare recovery), "
+                    "and it is what runs throughout ALL of Stage 2A — all three session "
+                    "templates plus the reassessment day. The original broken cue does NOT run "
+                    "in this block.\n"
+                    "THE POINT THAT MATTERS: the revised cue's own biomechanical_focus calls "
+                    "itself 'a diagnostic adjustment based on direct session feedback, NOT A "
+                    "CONFIRMED FIX YET', and its mechanics text ends by asking the athlete to "
+                    "'note whether this version lands differently'. That is an open diagnostic "
+                    "question the exercise asked of itself. THE ATHLETE HAS NOW ANSWERED IT — "
+                    "by replacing the revised cue too, with a floor position he reports working "
+                    "better. So the flat-back-priority variant also did not fully land. Nobody "
+                    "collected the answer; it went into the per-exercise notes and stayed there "
+                    "(see the Notion notes item in symptom_log 2026-08-07's plan). The system "
+                    "asked a question, the athlete answered it in the field provided, and the "
+                    "loop was never closed."
+                ),
+                "coxa_saltans_check_done": (
+                    "The new position puts the right hip in FLEXION + EXTERNAL ROTATION, which "
+                    "is finding #4's trigger family and would have been a concern under the "
+                    "old reading. It is not one under the current reading: "
+                    "additional_evidence_2026_08_05 established the trigger is CONTRACTILE, "
+                    "not positional — no snap in 90/90 or half pigeon, both passive, "
+                    "floor-supported flexion + external rotation. This substitution is passive "
+                    "and floor-supported, i.e. exactly the case that evidence cleared. "
+                    "Recorded because the check was made, not assumed."
+                ),
+                "laterality_deviation_closed_by_athlete_2026_08_07": (
+                    "RAISED AND CLOSED THE SAME DAY. The athlete had been running this BOTH "
+                    "SIDES, having assumed it was bilateral. On being shown that Key Rule 7 "
+                    "makes it right-only he elected to return to RIGHT ONLY going forward. "
+                    "Recorded because the assumption is the reusable lesson, not the error: "
+                    "the original exercise text DOES say 'RIGHT SIDE ONLY — do not mirror on "
+                    "the left. Left posterior capsule is not restricted', so the instruction "
+                    "existed and was still read past. A laterality instruction buried in the "
+                    "middle of a mechanics paragraph is not a reliable place to put one.\n"
+                    "The reasoning below is retained because it is the answer to 'why the "
+                    "right at all', which the athlete asked directly and which nothing in the "
+                    "profile had stated in one place.\n"
+                    "THE CONCERN IS NOT THAT STRETCHING THE LEFT IS DANGEROUS — it is a passive "
+                    "floor stretch and the risk is low. It is that (a) the LEFT posterior "
+                    "capsule was never identified as restricted anywhere in this profile: "
+                    "finding #2 names the RIGHT capsule specifically, and finding #1 is "
+                    "bilateral but right-dominant; and (b) "
+                    "hypermobility.training_implication explicitly favours controlled-range "
+                    "strength over PASSIVE END-RANGE STRETCHING, so mobilising an already-lax "
+                    "and unrestricted capsule is the precise thing that rule warns against. At "
+                    "Beighton 6/9, adding range where no restriction was found is a cost, not "
+                    "a neutral act.\n"
+                    "CUTTING THE OTHER WAY: the 2026-08-05 flexibility baseline found NO "
+                    "left/right asymmetry in any passive position ('both half pigeons scored "
+                    "40 ... right and left are the same'), so the left is not obviously "
+                    "restricted AND the right is not obviously more so — in passive positioning "
+                    "the sides are indistinguishable. That entry also warned explicitly against "
+                    "reading absent asymmetry in a stretch as resolution of a LOADED/ACTIVE "
+                    "finding. The passive data therefore does not settle this either way.\n"
+                    "FOR THE PHYSIOTHERAPIST 2026-08-16, now a narrower question since the "
+                    "athlete has already reverted to right-only: was his 'it works better on "
+                    "both' evidence of a LEFT restriction the assessment missed, or simply "
+                    "that a well-executed stretch feels better on any hip? Only the first "
+                    "would justify changing the rule."
+                ),
+                "why_the_right_side_at_all": (
+                    "Asked directly by the athlete 2026-08-07 ('why am I even doing it for the "
+                    "right if there isn't any obvious restriction?'), and worth stating in one "
+                    "place because it was scattered across three files. THREE REASONS, all "
+                    "still live:\n"
+                    "(1) FINDING #2. The tight right posterior capsule is the identified "
+                    "MECHANISM of the standing hinge crack — 'femoral head glides backward "
+                    "against tight RIGHT posterior capsule' under load-bearing rotational "
+                    "torque. That finding was re-confirmed present on 2026-08-07 (still "
+                    "cracking, ~weekly). The justification is not historical; it is current.\n"
+                    "(2) A LOADED, ACTIVE OBSERVATION — BUT WEAKER THAN IT LOOKS, and this was "
+                    "corrected the same day after reading the raw note. "
+                    "training_plan.RIGHT_HIP_CAPSULE's biomechanical_focus cites 'the "
+                    "resistance felt during single-leg RDL on the right', which stands. What "
+                    "does NOT stand as corroboration is the 2026-07-01 session note, recorded "
+                    "elsewhere as confirming finding #2's right-side asymmetry. Its actual "
+                    "words: 'Right Posterior hip capsule stretch - there was a strong tightness "
+                    "in the GROIN. Uncomfortable feeling, it wasn't the case for the left "
+                    "side'. THE GROIN IS ANTERIOR. That is the same mistargeting complaint that "
+                    "got the exercise revised a week later on 2026-07-08 ('tightness at the "
+                    "front hip ... no feeling at the back of the hip or bum'). So 07-01 "
+                    "recorded a right-dominant ANTERIOR sensation during a stretch that was "
+                    "already failing to reach the posterior capsule — a real asymmetry, but "
+                    "not evidence of posterior capsule restriction. See the anterior-hip thread "
+                    "in symptom_log 2026-08-07 (note corpus review).\n"
+                    "(3) THE SPINE, NOT THE HIP — and this is the one nobody had surfaced. The "
+                    "same biomechanical_focus states it 'reduces the compressive force on the "
+                    "RIGHT L5/S1 FORAMEN by restoring femoral head position'. The Nov 2025 MRI "
+                    "reads moderate foraminal stenosis RIGHT, mild left, at L5/S1. So the "
+                    "exercise is asymmetric because the STENOSIS is asymmetric. There is no "
+                    "left-sided equivalent because there is no comparable left-sided "
+                    "narrowing.\n"
+                    "WHY 'NO OBVIOUS RESTRICTION' IS A FALSE PREMISE: it comes from the "
+                    "2026-08-05 flexibility baseline finding no left/right asymmetry in any "
+                    "PASSIVE position. That entry warned against exactly this inference — the "
+                    "asymmetry findings are drawn from LOADED and ACTIVE observations, and "
+                    "'do not read their absence in a stretch as resolution'. Finding #2 is "
+                    "triggered by load-bearing rotational torque and was never a passive "
+                    "finding, so passive screening could not have detected it either way."
+                ),
+                "note_on_key_rule_7s_other_half": (
+                    "Rule 7's first clause — 'all exercises involving right hip flexion >60 "
+                    "degrees require a neutral/internal rotation cue' — reads as violated by "
+                    "this position, which is deep right hip flexion in EXTERNAL rotation. It is "
+                    "not, under the current reading: finding #4's "
+                    "additional_evidence_2026_08_05 narrowed the trigger to CONTRACTILE load "
+                    "and stated explicitly 'do not treat passive, floor-supported external "
+                    "rotation as a risk position'. The rule text in CLAUDE.md has not been "
+                    "updated to carry that narrowing and so reads stricter than the evidence "
+                    "supports. Flagged as documentation drift; not edited here."
+                ),
+            },
+        },
         "add_when_right_hip_loaded": [
             "Right Hip Tendon Path Drill (Coxa Saltans) — 2 × 10 reps right only",
         ],
@@ -955,6 +1175,343 @@ PROFILE = {
                 "is a seated cross-legged side bend with a shoulder drop — lateral flexion, the "
                 "same mechanism as the two Seated Side Stretches, now tagged caution and caught "
                 "by a new 'side bend' keyword in services/rules.py.",
+            ],
+        },
+        {
+            "date":   "2026-08-07",
+            "status": "Finding change — reported ceased, pending physiotherapist confirmation 2026-08-16",
+            "region": "Mid-thoracic spine + lumbar base (biomechanical finding #3 territory)",
+            "title":  "Sitting Forward-Bend Releases Have CEASED — Finding #3 No Longer Reproducing",
+
+            "mechanism": (
+                "Athlete-reported 2026-08-07, unprompted: the seated forward-bend release "
+                "described in biomechanical finding #3 'doesn't happen anymore, not since maybe "
+                "one month, since my lower back relaxed'. This is a NEGATIVE finding — the "
+                "absence of a phenomenon the 2026-06-28 assessment recorded in the present "
+                "tense — and it is logged rather than left unrecorded because finding #3 drives "
+                "live decisions elsewhere in this profile, so its lapsing is not inert.\n"
+                "TIMING IS APPROXIMATE AND CANNOT BE PINNED. '~one month' brackets to roughly "
+                "2026-07-07; it is a recalled date, not an observed one, and no check-in field "
+                "tracks the release phenomenon, so there is no independent record of when it "
+                "stopped. What IS established: it postdates the 2026-06-28 assessment that "
+                "recorded the finding, and it falls in the same window as the Stage 1 -> Stage "
+                "2A transition (2026-07-20) and the documented low-back improvement."
+            ),
+
+            "findings": {
+                "two_readings_and_why_one_is_favoured": (
+                    "An absent release admits two readings and they have OPPOSITE meanings. "
+                    "(A) The chronic seated compression that produced the release has resolved, "
+                    "so there is nothing left to release — improvement. (B) The segment has "
+                    "stiffened and can no longer release — deterioration presenting as silence. "
+                    "(A) is favoured, because (B) would normally arrive with MORE symptoms and "
+                    "the symptom load in this region has fallen, not risen. The athlete's own "
+                    "attribution ('since my lower back relaxed') is also a causal claim in "
+                    "direction (A). This is a judgement, not a measurement — hence 'pending "
+                    "confirmation' rather than 'resolved'."
+                ),
+                "corroborating_evidence_already_on_record": (
+                    "Two independent lines, neither collected for this purpose, point the same "
+                    "way. (1) Morning check-in 2026-07-24: 'first morning in a while I woke up "
+                    "with no stiffness in my back or hips', and docs/training/"
+                    "physio_brief_2026-08-16.md section 3 records low back and hips as markedly "
+                    "improved. (2) The 2026-08-05 flexibility baseline above found thoracic "
+                    "rotation BETTER than finding #3 assumed — seated twists 66-68, 'most of the "
+                    "twist comes from the upper body', 'no lumbar pops normally'. That entry "
+                    "already flagged the tension with finding #3 without resolving it; this "
+                    "entry is the second, independent signal in the same direction."
+                ),
+                "what_it_changes_if_confirmed": (
+                    "Finding #3 is not dormant — it is load-bearing in two live places. (1) It "
+                    "is DRIVER 3 of the interscapular endurance mechanism in the 2026-08-03 "
+                    "entry above ('thoracic stiffness tilts the scapula forward off the ribcage, "
+                    "leaving the retractors holding lengthened all day'), which is the §1 ask "
+                    "going to the physiotherapist on 2026-08-16. If the thoracic component is "
+                    "resolving, that driver weakens and the four-driver picture becomes three. "
+                    "(2) It is the stated rationale for keeping Thoracic Extension (Rolled "
+                    "Towel) in the block — training_plan.py's comment justifies it explicitly by "
+                    "the recurring mid-back pattern. Neither should be changed self-directed; "
+                    "both should be re-derived once the physiotherapist rules on the finding."
+                ),
+                "unresolved_which_of_the_two_sites": (
+                    "Finding #3 names TWO distinct sites — mid-thoracic (T6-T10 facets) and the "
+                    "horizontal lumbar base (L5/S1). The report was of the phenomenon as a "
+                    "whole and does not separate them, while the stated cause ('since my lower "
+                    "back relaxed') points specifically at the lumbar component. It is therefore "
+                    "possible the lumbar site has settled and the thoracic site simply is not "
+                    "being provoked. This matters because it is the THORACIC site that feeds "
+                    "driver 3 above. Ask the physiotherapist to separate them."
+                ),
+            },
+
+            "plan": [
+                "No self-directed exercise changes, and specifically do NOT remove Thoracic "
+                "Extension (Rolled Towel) or amend finding #3 on the strength of this entry. A "
+                "finding that stops reproducing is a question for the physiotherapist, not a "
+                "licence to delete the work that may be why it stopped.",
+                "Raise at 2026-08-16 as a finding-status question, and ask for the two sites "
+                "(thoracic vs. lumbar base) to be assessed separately — see "
+                "docs/training/physio_brief_2026-08-16.md section 12.",
+                "If confirmed resolved, re-derive the 2026-08-03 interscapular mechanism from "
+                "three drivers rather than four before the next block is authored, and re-state "
+                "the rationale for thoracic extension work rather than silently dropping it.",
+                "Finding #3 itself is left UNEDITED and carries a status_2026_08_07 flag "
+                "instead — same convention as finding #4's additional_evidence fields. An "
+                "assessed finding is not overwritten by a self-report.",
+            ],
+
+            "notes": [
+                "Convention note: this profile has no established way to record a finding that "
+                "STOPS. The symptom_log is built for onsets, and biomechanical_findings is "
+                "written in the present tense with no status field. A finding quietly ceasing "
+                "and nobody noticing is the failure mode this entry exists to prevent — the "
+                "2026-06-28 assessment is otherwise carried forward indefinitely as current.",
+                "Not recorded here, deliberately: post-training soreness. Normal training "
+                "response belongs in the training log, not the clinical record.",
+            ],
+        },
+        {
+            "date":   "2026-08-07",
+            "status": "Finding review — self-reported; physiotherapist confirmation 2026-08-16",
+            "region": "All six biomechanical findings + pre-session release protocol",
+            "title":  "Biomechanical Findings Review — Three Improved, Two Unchanged, and They Split Along the Mechanism Line",
+
+            "mechanism": (
+                "Second entry dated 2026-08-07. Prompted by the finding #3 report above: if one "
+                "assessed finding had quietly stopped reproducing, the others had not been "
+                "checked either. THIS IS THE FIRST TIME THE SIX FINDINGS HAVE BEEN REVIEWED AS "
+                "A SET since the 2026-06-28 assessment recorded them — six weeks carried "
+                "forward as current without anything asking whether they still were.\n"
+                "All of it is athlete self-report against the finding descriptions, recalled "
+                "rather than measured. No measurement protocol exists for findings #1, #2 or "
+                "#5, which is a gap this entry exposes rather than closes."
+            ),
+
+            "findings": {
+                "results": (
+                    "#1 Upper glute / hip crest tightness — DOWNGRADED, NOT RESOLVED. From "
+                    "~8-9/10 constant gripping to ~3/10, no longer a day-to-day baseline state. "
+                    "Decisively, the release work STILL PRODUCES A RELEASE.\n"
+                    "#2 Standing leg hinge crack (right sit-bone) — STILL PRESENT, frequency "
+                    "from 'every few days' to roughly ONCE A WEEK.\n"
+                    "#3 Sitting forward-bend releases — CEASED. Second and firmer report the "
+                    "same day ('no longer there', vs. the earlier 'not since maybe one month'). "
+                    "See the preceding entry.\n"
+                    "#4 Right 90-degree hip click (Coxa Saltans) — UNCHANGED, every attempt.\n"
+                    "#5 Wide-stance windmill twist cracks — UNCHANGED, 'still the same'.\n"
+                    "#6 Right shoulder instability — NOT self-assessed. Maintenance-dependent "
+                    "by design and not expected to resolve; its live components (left-tilt "
+                    "compensation under pressing) are written Stage 2 exit criteria and are "
+                    "measured on 2026-08-16 regardless."
+                ),
+                "the_split_is_along_the_mechanism_line": (
+                    "THE MOST INTERESTING RESULT IS NOT ANY SINGLE FINDING, IT IS WHICH ONES "
+                    "MOVED. The three that improved — #1, #2, #3 — are precisely the three this "
+                    "profile links into ONE causal chain, and they eased in the order the chain "
+                    "predicts. #1 is named in its own mechanism as 'the primary anchor driving "
+                    "joint compression throughout the chain'; #2's mechanism requires "
+                    "'accumulation of joint compression' to trigger; #3 is compression-driven "
+                    "facet release. The anchor loosened, and both downstream compression "
+                    "phenomena eased — one halving in frequency, one stopping. The low back "
+                    "settling (2026-07-24 check-in) sits in the same window.\n"
+                    "The two that did NOT move — #4 and #5 — are the two that are not "
+                    "compression-accumulation driven: #4 is a tendon path over a bony ridge "
+                    "(and per 2026-08-05 a CONTRACTILE trigger), #5 is capsular/symphyseal "
+                    "cavitation under rotational torque with the pelvis anchored. Neither "
+                    "should have responded to reducing resting tone, and neither did.\n"
+                    "This is CONSISTENT WITH the profile's causal model, not proof of it — the "
+                    "sample is one athlete's recall over six weeks with several things changing "
+                    "at once (Stage 1 completing, Stage 2A starting, desk changes). But the "
+                    "model made a structural prediction about which findings share a driver, "
+                    "and the observed split matches it. Recorded because a model that predicts "
+                    "correctly is worth more than the individual readings."
+                ),
+                "what_this_does_not_license": (
+                    "IT DOES NOT LICENSE REMOVING THE PRE-SESSION RELEASE BLOCK. Finding #1 "
+                    "dropped 8-9 -> 3 while under five-days-a-week release work, and the "
+                    "release still produces a release — the most likely reading is that the "
+                    "protocol is why the tightness fell, which makes removing it the reliable "
+                    "way to get it back. Same reasoning as the thoracic extension note in the "
+                    "preceding entry. A finding that improved under treatment is not evidence "
+                    "the treatment was unnecessary."
+                ),
+                "protocol_method_substitutions": (
+                    "Two SELF-DIRECTED method changes were reported in the same conversation "
+                    "and are now recorded in pre_session_release.method_substitutions_2026_08_07: "
+                    "(1) upper glute / TFL self-release moved from wall-or-fist to a BALL sat on "
+                    "on the floor; (2) the posterior hip capsule stretch moved from the "
+                    "cross-body knee pull to a floor position recorded in the athlete's own "
+                    "words ('knee pressed to the floor, body over it') and DELIBERATELY LEFT "
+                    "UNNAMED — an attempt to name it was not recognised and was withdrawn. It "
+                    "is also now run BOTH SIDES, which deviates from Key Rule 7's right-only "
+                    "rule and is unresolved.\n"
+                    "(2) IS THE SECOND ATTEMPT AT THIS EXERCISE, NOT THE FIRST. The original "
+                    "cross-body cue was documented as mistargeting on 2026-07-08 and WAS acted "
+                    "on promptly — RIGHT_HIP_CAPSULE_REVISED (flat-back priority over stretch "
+                    "distance) replaced it from PLAN[15] and runs throughout Stage 2A. The "
+                    "revised cue described itself as 'not a confirmed fix yet' and asked the "
+                    "athlete to note whether it landed differently. His substitution IS the "
+                    "answer to that question: it did not fully land either. Both substitutions "
+                    "change METHOD only — same target, same dose, same position in the "
+                    "sequence — so neither is a prescription change in the sense the standing "
+                    "instruction restricts. Flagged to the physiotherapist as notification "
+                    "rather than as an ask."
+                ),
+            },
+
+            "plan": [
+                "LATERALITY IS ANSWERED AND IS A DEVIATION: the floor version is run BOTH "
+                "SIDES against CLAUDE.md Key Rule 7's right-only rule. Physiotherapist decides "
+                "on 2026-08-16; do not stop the left side before then on this log's authority. "
+                "Full reasoning both ways in "
+                "pre_session_release.method_substitutions_2026_08_07.",
+                "READ THE PER-EXERCISE NOTION NOTES. The athlete reports maintaining protocol "
+                "notes 'attached to every exercise ... during the exercise', which are the "
+                "`tp_note_<idx>` field in views/training.py, written to the Training Log row's "
+                "`Notes` property per exercise. THIS IS WHY THE PROTOCOL DRIFTED: a live "
+                "athlete-authored record of how exercises are actually executed exists, is "
+                "readable (Repository.get_recent_raw_notes / get_unparsed_session_notes), and "
+                "NOTHING feeds it back into this profile — only an AI sentiment pipeline "
+                "consumes it. CORRECTED SAME DAY after actually reading the corpus: an earlier "
+                "draft asserted both substitutions were already sitting in that field. THEY "
+                "ARE NOT — 21 notes span 2026-06-30 to 2026-08-06 and neither the ball nor the "
+                "floor capsule version appears in any of them. Wherever the athlete maintains "
+                "those, it is not the Training Log Notes property, and that is still an open "
+                "question. The corpus was worth reading regardless: see symptom_log 2026-08-07 "
+                "(note corpus review) for four findings that came out of it.",
+                "Confirm finding #4 is still completely PAINLESS when its frequency is measured "
+                "at the 2026-08-16 reassessment. Painlessness is the entire basis for treating "
+                "the snap as benign and it was not separately re-confirmed in this review.",
+                "Do not remove or reduce the pre-session release block on the strength of "
+                "finding #1's improvement — see what_this_does_not_license above.",
+                "Raise both method substitutions at 2026-08-16 as notification plus the one "
+                "laterality question — docs/training/physio_brief_2026-08-16.md section 12.",
+                "Build a repeatable way to re-measure findings #1, #2 and #5 before the next "
+                "block, even if crude (a 0-10 tightness rating for #1, a frequency count for #2 "
+                "and #5). This review had to run on recall because nothing instruments them, "
+                "and 'every few days' vs 'once a week' is exactly the kind of change that "
+                "should not depend on memory.",
+            ],
+
+            "notes": [
+                "Findings #1, #2, #4 and #5 now carry status_2026_08_07 flags and are otherwise "
+                "UNEDITED, matching the convention used for #3 in the preceding entry and for "
+                "#4's earlier additional_evidence fields. The 2026-06-28 assessment text stays "
+                "as assessed; self-report annotates it and never overwrites it.",
+                "Two of the six findings' own fields are now stale as written and the flags say "
+                "so rather than the fields being corrected: #1's sensation says 'constant', #2's "
+                "timeline says 'every few days'. Left in place deliberately — the original "
+                "wording is what the assessment found.",
+            ],
+        },
+        {
+            "date":   "2026-08-07",
+            "status": "Retrospective review of existing data — no new symptom",
+            "region": "Multiple — anterior right hip, interscapular, upper glute, lower back",
+            "title":  "Per-Exercise Note Corpus Read for the First Time — Four Findings, One Correction",
+
+            "mechanism": (
+                "Third entry dated 2026-08-07. The athlete identified during conversation that "
+                "he maintains notes 'attached to every exercise ... during the exercise'. Those "
+                "are the `tp_note_<idx>` field in views/training.py, written to each Training "
+                "Log row's `Notes` property in Notion and readable via "
+                "Repository.get_recent_raw_notes(). NOTHING HAD EVER READ THEM back into this "
+                "profile — only an AI sentiment pipeline consumes the field. Read in full on "
+                "2026-08-07: 21 notes spanning 2026-06-30 to 2026-08-06.\n"
+                "SCOPE CORRECTION: the substitutions the athlete described (ball; floor capsule "
+                "position) are NOT in this corpus. Wherever he maintains those, it is not this "
+                "field. That question is still open and the drift it caused is unexplained."
+            ),
+
+            "findings": {
+                "anterior_right_hip_is_a_thread_not_an_incident": (
+                    "THE MOST DECISION-RELEVANT ITEM, and it changes the reading of an existing "
+                    "record. THREE independent anterior-hip observations now line up:\n"
+                    "2026-07-01, during the right posterior capsule stretch: 'strong tightness "
+                    "in the GROIN. Uncomfortable feeling, it wasn't the case for the left side'. "
+                    "This was previously filed as confirming finding #2's right-side asymmetry "
+                    "— but the groin is ANTERIOR and the intended target is posterior.\n"
+                    "2026-07-08, same exercise: 'Tightness at the front hip, it's in the middle "
+                    "of the hip and it's happening on both sides, nearly pain in holding the "
+                    "stretch and no feeling at the back of the hip or bum'. Note 'NEARLY PAIN' "
+                    "— the strongest sensation word anywhere in the corpus.\n"
+                    "2026-08-05, butterfly forward fold: scored 82 but sensation reported in the "
+                    "HIP FLEXORS rather than the adductors, already flagged as 'as consistent "
+                    "with anterior compression as with a stretch'.\n"
+                    "The 2026-08-05 entry raised anterior compression as a one-off question. It "
+                    "is not a one-off: deep right hip flexion has produced anterior sensation "
+                    "across three separate months and two unrelated exercises. This should go "
+                    "to the physiotherapist as a THREAD with dates, not as a single curiosity — "
+                    "and it means the 07-01 observation cannot be double-counted as evidence "
+                    "for the posterior capsule finding it was filed under."
+                ),
+                "finding_1_corroborated_independently_and_contemporaneously": (
+                    "2026-08-06, i.e. YESTERDAY, unprompted: 'Right glute upper was tight going "
+                    "into training but feels good now'. This is finding #1 behaving exactly as "
+                    "the athlete described it in conversation the following day — no longer a "
+                    "constant baseline, still present pre-session, and RESOLVING WITH THE "
+                    "RELEASE WORK. Contemporaneous, written before the question was asked, and "
+                    "therefore stronger evidence than the recall it corroborates. It also "
+                    "independently supports the 'do not remove the release block' conclusion in "
+                    "the finding review entry above."
+                ),
+                "interscapular_series_extends_past_2026_07_31": (
+                    "The 2026-08-03 consolidation states severity 'flat and low throughout ... "
+                    "on every check-in 2026-07-16 -> 2026-07-31'. The corpus extends that "
+                    "series. 2026-08-04: 'Right shoulder at the back between the shoulder blade "
+                    "and the spine felt weak or tight or tired. DURING EXERCISE but now I can't "
+                    "feel anything wrong, it feels good now.' Two things are new: it is "
+                    "RIGHT-sided (the consolidation's CORRECTION 2 established bilateral with "
+                    "left dominance, so this supports bilateral), and it is EXERCISE-PROVOKED "
+                    "AND SELF-RESOLVING rather than desk-accumulated. 'Weak or tight or tired' "
+                    "is a fatigue description, which is consistent with the endurance-gap "
+                    "reading the §1 physio ask rests on. Carry this date into the brief — the "
+                    "presentation table currently stops at 07-31."
+                ),
+                "lower_back_improvement_dates_earlier_than_recorded": (
+                    "2026-07-14: 'Overall lower back tightness has improved DRAMATICALLY'. The "
+                    "improvement has been cited from the 2026-07-24 check-in ('first morning in "
+                    "a while ...'); it was already dramatic ten days earlier. This tightens the "
+                    "finding #3 timeline in the entry above — the athlete dated the cessation of "
+                    "the forward-bend releases to '~one month' ago, i.e. roughly 2026-07-07, and "
+                    "attributed it to the lower back relaxing. A 07-14 'dramatic' improvement "
+                    "sits directly between the two and makes the athlete's causal sequence "
+                    "chronologically coherent rather than merely plausible."
+                ),
+                "corpus_also_confirms_two_findings_unchanged": (
+                    "2026-07-21: 'Clicking still on right side during dead bug' — finding #4, "
+                    "consistent with today's 'every attempt' report and with the supine "
+                    "additional_evidence_2026_07_08. 2026-07-04: 'Tightness in the thoracic "
+                    "rotation' — predates the 07-07 mid-back flare."
+                ),
+            },
+
+            "plan": [
+                "Take the anterior-right-hip THREAD to 2026-08-16 with all three dates, not "
+                "just the 2026-08-05 butterfly question. Deep right hip flexion producing "
+                "anterior/groin sensation across three months and two exercises, in someone "
+                "who cannot achieve anterior pelvic tilt in sitting, is a different question "
+                "from a single odd stretch sensation.",
+                "Add 2026-08-04 to the interscapular presentation table in "
+                "docs/training/physio_brief_2026-08-16.md — the table stops at 07-31 and the "
+                "symptom did not.",
+                "Find where the protocol substitutions are actually recorded. They are not in "
+                "the Training Log Notes field. Until that is known, the profile can keep "
+                "diverging from practice with no way to detect it.",
+                "Wire this corpus into the review loop rather than reading it once. It took a "
+                "conversational aside to discover a readable, athlete-authored record that had "
+                "accumulated 21 entries over six weeks without ever being read.",
+            ],
+
+            "notes": [
+                "Read via Repository.get_recent_raw_notes(limit=200); 21 non-empty notes "
+                "returned. Notion is NOT covered by the offline datastore (see CLAUDE.md), so "
+                "this was a live API read.",
+                "Nothing in the corpus contradicts any finding. Its value was entirely in "
+                "dates, laterality and the athlete's own wording — 'groin', 'front hip', "
+                "'nearly pain', 'weak or tight or tired' — none of which survived into the "
+                "structured record, and one of which (groin) had been paraphrased into a "
+                "conclusion it does not support.",
             ],
         },
     ],

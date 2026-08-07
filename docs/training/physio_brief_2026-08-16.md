@@ -1,8 +1,8 @@
 # Physio Brief — Day 28 Reassessment, 2026-08-16
 
 **Topic:** Interscapular tightness — bilateral, left dominant
-**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · **Current block:** Stage 2A, Day 15 of 28
-**Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03, 2026-08-05
+**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · §12 added 2026-08-07 · **Current block:** Stage 2A, Day 19 of 28
+**Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03, 2026-08-05, 2026-08-07
 
 ---
 
@@ -38,6 +38,7 @@ Verbatim from morning check-ins:
 | 07-23 | right | 3/10 | 2/10 | "in between the shoulder blades right side and a little towards the bottom" |
 | 07-30 | left | 3/10 | 0/10 | formal cervical ROM self-assessment (see `symptom_log` 2026-07-31) |
 | 07-31 | left | 1/10 | 0/10 | "still tight in traps **left side down my spine when I put my head foreward**" |
+| 08-04 | right | — | 0/10 | session note: "right shoulder at the back between the shoulder blade and the spine felt **weak or tight or tired**. **During exercise** but now I can't feel anything wrong" |
 
 Static ache, no loading event, no acute onset at any point. Accumulates across
 the working day; provoked by cervical flexion. Present across **sitting,
@@ -382,6 +383,224 @@ strength that produces it, and a flat-back hinge to raise the hamstring ceiling.
 Progress is measured by the elevation coming down, not by reaching further.
 
 If that reading is wrong, most of the programme is aimed at the wrong thing.
+
+---
+
+## 12. Four items for authoring the next block
+
+All added 2026-08-07. None is urgent; all need settling *before* the next block
+is written rather than after. 12c is the one we would most like your eye on.
+
+### 12a. Hip-flexor work is absent from Stage 2A, and no reason is recorded
+
+Stage 1 contained two direct hip-flexor items — **Standing Hip Flexor Release**
+and **90/90 Hip Flexor Hold** — plus diaphragmatic breathing explicitly framed
+as psoas inhibition. **Stage 2A contains none**, and the pre-session release
+protocol covers glute medius, piriformis, posterior hip capsule and hamstring
+only. Nothing in the record explains the removal, so it reads as an oversight
+rather than a decision.
+
+It matters because hip-flexor tone is named as a *driver* in three places:
+`training_plan.py`'s own header (*"psoas/hip flexor hypertonicity amplifying
+L5/S1 compression"*), biomechanical finding #1 (tight hip flexors from sitting
+→ upper glutes over-fire, called *"the primary anchor driving joint compression
+throughout the chain"*), and `imbalances.overactive_tight` (*"Deep right hip
+flexors / TFL"*). The 2026-07-06 symptom_log entry also explicitly prescribed
+*"couch stretch, half-kneeling hip flexor stretch"* — which never reached a
+block.
+
+**The argument the other way, which is why we are asking rather than fixing
+it.** `overactive_tight` is a **tone** finding, not a length claim (see the
+2026-08-05 entry's second instrument caveat), so the answer may be to remove
+the driver rather than stretch the muscle — and Stage 2A does that hard, via
+hip thrust, single-leg glute bridge and Bulgarian split squat, the last of
+which loads the rear hip flexor in a lengthened position. At Beighton 6/9 the
+profile's own rule favours controlled-range loading over passive end-range
+stretching. So the absence may be correct.
+
+**The question:** should direct hip-flexor lengthening return in the next
+block, or is glute-max-driven reciprocal inhibition plus loaded lengthening
+the appropriate handling here? Related: the 2026-08-05 open question about
+anterior-hip sensation at deep hip flexion (§11) bears on this — if that is
+anterior compression rather than a stretch, it argues against adding
+end-range hip-flexor stretching.
+
+### 12b. Biomechanical finding #3 has stopped reproducing
+
+The athlete reports (2026-08-07) that the **seated forward-bend release** of
+finding #3 has not occurred for roughly a month — *"since my lower back
+relaxed."* Timing is recalled, not observed, and nothing tracks it.
+
+Two corroborating lines already on record, neither collected for this purpose:
+the 2026-07-24 check-in (*"first morning in a while I woke up with no stiffness
+in my back or hips"*, §3 above), and the 2026-08-05 flexibility baseline
+finding thoracic rotation better than finding #3 assumed (seated twists 66–68,
+*"most of the twist comes from the upper body"*, no lumbar pops).
+
+**Three things we would like from you.** First, is this compression resolving,
+or a segment that has stiffened and can no longer release? Both produce the
+same silence and they mean opposite things. Second, finding #3 names **two
+sites** — mid-thoracic T6–T10 and the horizontal lumbar base at L5/S1 — and the
+report does not separate them while the stated cause points at the lumbar one;
+we would like them assessed separately. Third, if the **thoracic** component is
+genuinely resolving, that is **driver 3 of the §5 interscapular mechanism**, and
+the four-driver picture becomes three — which bears directly on the §1 ask.
+
+Finding #3 has been left unedited in `patient_profile.py` with a status flag
+pending your view; nothing has been removed from the plan, including the
+thoracic extension work that may be why it settled.
+
+### 12c. All six findings reviewed — three improved, two unchanged, and the split follows the mechanism
+
+Prompted by 12b: if one finding had quietly stopped reproducing, nothing had
+checked the others either. This is the **first review of the six findings as a
+set since they were assessed on 2026-06-28** — six weeks carried forward as
+current without anything asking whether they still were. All self-reported and
+recalled, not measured.
+
+| # | Finding | Status 2026-08-07 |
+|---|---|---|
+| 1 | Upper glute / hip crest tightness | **Downgraded, not resolved** — ~8–9/10 constant gripping → ~3/10, no longer a baseline state. **The release work still produces a release.** |
+| 2 | Standing hinge crack, right sit-bone | **Still present, frequency halved** — "every few days" → ~once a week |
+| 3 | Sitting forward-bend releases | **Ceased** (see 12b) |
+| 4 | Right 90° hip click (Coxa Saltans) | **Unchanged** — every attempt |
+| 5 | Wide-stance windmill twist cracks | **Unchanged** |
+| 6 | Right shoulder instability | Not self-assessed — maintenance-dependent by design; its live components are Stage 2 exit criteria measured today |
+
+**The part we think is worth your attention is *which* ones moved.** The three
+that improved — #1, #2, #3 — are exactly the three this profile links into one
+causal chain, and they eased in the order it predicts: #1 is named in its own
+mechanism as *"the primary anchor driving joint compression throughout the
+chain,"* #2 requires *"accumulation of joint compression"* to trigger, and #3
+is compression-driven facet release. The anchor loosened and both downstream
+phenomena eased. The low back settling sits in the same window.
+
+The two that did **not** move are the two that are not
+compression-accumulation driven — #4 is a tendon path over a bony ridge with a
+contractile trigger, #5 is capsular/symphyseal cavitation under rotational
+torque with the pelvis anchored. Neither should have responded to reduced
+resting tone, and neither did.
+
+We are presenting this as *consistent with* the model rather than as proof —
+one athlete's recall over six weeks with several things changing at once. But
+the split is clean along a line the profile drew in advance.
+
+**Two questions.** First, does that reading hold, or is there a simpler
+explanation we are missing? Second — **finding #1 improved while under
+five-days-a-week release work and still responds to it**, which we read as the
+protocol working rather than as the protocol being unnecessary. We have not
+reduced it. Do you agree it stays as-is into the next block?
+
+One gap this exposed and did not close: **nothing instruments findings #1, #2
+or #5**, so the review ran on memory. "Every few days" versus "once a week" is
+exactly the kind of change that should not depend on recall. We plan to add
+something crude but repeatable before the next block unless you would rather
+specify it.
+
+### 12d. Two pre-session release substitutions, already made — notification, not an ask
+
+Both change **method only** — same target, same dose, same position in the
+sequence — which is why they are here as notification rather than under §1.
+
+1. **Upper glute / TFL self-release: wall-or-fist → a ball, sat on, on the
+   floor.** Athlete-selected. Materially higher and more localised pressure.
+   Flagged internally: it sits near the sciatic nerve and there is moderate
+   right L5/S1 foraminal stenosis on the Nov 2025 MRI. No neural symptoms
+   anywhere in the log to date, and the instruction recorded is to come off it
+   for anything radiating.
+2. **Posterior hip capsule: cross-body knee pull → a floor position**, which we
+   are recording in his own words rather than naming — *"knee pressed to the
+   floor, body over it,"* knee rotated outward. We tried to name the position
+   and got it wrong, so **please look at him doing it and name it properly.**
+
+   **This is the third version of this exercise, and that is the finding.**
+   On 2026-07-08 the original cross-body cue was recorded as landing at the
+   *front* of the hip, both sides, with nothing at the back — *"I feel the
+   stretch isn't working as expected."* That was acted on promptly: a revised
+   cue (flat lower back prioritised over cross-body distance) replaced it and
+   is what has run for all of Stage 2A. The revised version described itself as
+   *"a diagnostic adjustment ... not a confirmed fix yet"* and asked him to
+   note whether it landed differently.
+
+   **His substitution is the answer to that question: it did not.** He has now
+   replaced the revised cue too, with a floor position he reports finally
+   feeling in the right place. Two authored attempts at this stretch both
+   missed the target structure, and the version that works was found by the
+   athlete. Worth your eye on the position itself for that reason.
+
+   We checked it against finding #4 before recording it: the position is
+   flexion + external rotation, which *would* have been a concern under the old
+   reading, but §11's 2026-08-05 evidence established the trigger as
+   **contractile, not positional** — no snap in 90/90 or half pigeon, both
+   passive and floor-supported, which is what this is.
+
+**A laterality error, found and corrected the same day.** He had been running
+this **on both sides**, having assumed it was bilateral; the rule is right-only
+and he has reverted. Raised here anyway for two reasons.
+
+First, **the residual question:** he reports it worked *better* on both. Is
+that evidence of a **left** restriction the assessment missed, or simply that a
+well-executed stretch feels better on any hip? Only the first would justify
+changing the rule. Note §11's baseline found no left/right asymmetry in any
+passive position — which cuts both ways and settles neither, since finding #2
+is a loaded/active finding that passive screening cannot detect.
+
+Second, **why it is right-only matters and had never been stated in one
+place** — he asked directly, and the answer was scattered across three files.
+It rests on the right posterior capsule being the identified mechanism of the
+standing hinge crack (finding #2, confirmed still present this week); on the
+loaded observation of right-sided resistance in single-leg RDL, corroborated
+in session on 2026-07-01 (*"not present on the left"*); and — the reason
+nobody had surfaced — because it is credited with **reducing compressive load
+on the right L5/S1 foramen** by restoring femoral head position. The MRI reads
+**moderate foraminal stenosis right, mild left** at that level. The exercise is
+asymmetric because the stenosis is. Please confirm that third rationale still
+holds, since it is the one doing the most work.
+
+### 12f. Anterior right hip — a thread across three months, not a one-off
+
+§11 raised one odd observation: butterfly fold scored 82 but the sensation was
+reported in the **hip flexors**, not the adductors, and we flagged it as *"as
+consistent with anterior compression as with a stretch."* Reading his session
+notes for the first time (12e) turns that into a pattern.
+
+| Date | Context | His words |
+|---|---|---|
+| 07-01 | Right posterior capsule stretch | *"strong tightness in the **groin**. Uncomfortable feeling, it wasn't the case for the left side"* |
+| 07-08 | Same stretch | *"tightness at the **front hip**, in the middle of the hip, happening on both sides, **nearly pain** in holding the stretch, no feeling at the back of the hip or bum"* |
+| 08-05 | Butterfly forward fold | sensation in the **hip flexors**, not the adductors |
+
+Three separate months, two unrelated exercises, all producing **anterior** hip
+sensation under deep hip flexion — in someone who per §11 cannot achieve
+anterior pelvic tilt in sitting. *"Nearly pain"* on 07-08 is the strongest
+sensation word anywhere in six weeks of his notes.
+
+**This also retires a piece of evidence.** The 07-01 note has been filed as
+confirming the right-sided posterior capsule finding. It does not — the groin
+is anterior, and it is the same mistargeting complaint that had the exercise
+revised a week later. It is a real right-dominant asymmetry, but of anterior
+sensation, and should not be double-counted as posterior capsule restriction.
+
+**Question:** is this anterior compression, an iliopsoas/hip-flexor length
+issue, or an artefact of two mistargeted stretches? It bears on 12a (whether
+hip-flexor lengthening returns) and on 12d (what that stretch is doing).
+
+### 12e. A live athlete-authored record exists that the clinical profile never reads
+
+Worth knowing because it explains how 12d happened. He maintains notes
+**attached to each exercise, written during the session** — these are real and
+stored (the per-exercise `Notes` field on each Training Log row in Notion).
+Both substitutions in 12d had been recorded there before this conversation
+surfaced them.
+
+Nothing feeds that field back into the clinical profile; only an AI sentiment
+pipeline consumes it. So the profile can silently diverge from what is actually
+being done — which is exactly what happened with a stretch that had been
+documented as not working since 2026-07-08 and stayed in the protocol anyway.
+
+No question for you here. Flagged so that if you change anything today, we know
+the athlete's own execution notes are the place his adaptations land first, and
+we will review that backlog before authoring the next block.
 
 ---
 
