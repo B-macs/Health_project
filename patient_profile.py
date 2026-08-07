@@ -22,6 +22,14 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
   Saltans trigger is contractile rather than positional, and interscapular
   fatigue onset under bodyweight is measured at 50-60s.
 
+2026-08-07: first anterior-chest signal on the post-Latarjet right shoulder
+  (symptom_log entry + finding #6 addendum): a recurring, painless,
+  position-specific cramp/'lock-out' in the pec-minor region just medial to
+  the surgical scar, right only. The location is surgically altered anatomy —
+  the Latarjet transferred the coracoid, pec minor's insertion — so the plan
+  is tissue identification by the physio at 2026-08-16 (brief §13), not
+  self-treatment, and explicitly NO pec stretching until then.
+
 Stage 1 history: Rehab extended by 7 days (Days 15-21, "Week 3: Flare
   Recovery & Reassessment Prep" in training_plan.py) — decided 2026-07-13.
   Day 14's exit criteria were not met on the original schedule
@@ -303,6 +311,21 @@ PROFILE = {
                 "progression in Stage 2 should be conservative and scapular-control-first."
             ),
             "laterality": "RIGHT ONLY",
+            "additional_evidence_2026_08_07": (
+                "First ANTERIOR signal on this shoulder: a recurring, position-specific, "
+                "painless cramp / 'locking out' burn in the pec-minor region just medial to "
+                "the surgical scar — right only, the identical position on the left is "
+                "completely clear (prayer hands at the chest, fingers forward, forearms ~45° "
+                "up toward the face). Everything previously recorded here is "
+                "posterior/scapular. Reads as CONTRACTILE (active contraction in a shortened "
+                "position), not positional — finding #4's framing. Clinically loaded "
+                "location: the Latarjet transferred the coracoid, pec minor's insertion, so "
+                "the region contains surgically altered anatomy and tissue identification "
+                "belongs to the physio (2026-08-16, brief §13). Full entry: symptom_log "
+                "2026-08-07. Does not change the training implication above — "
+                "scapular-control-first, conservative pressing — but is direct new evidence "
+                "on the physio brief's §8 right-vs-left question."
+            ),
         },
     ],
 
@@ -955,6 +978,100 @@ PROFILE = {
                 "is a seated cross-legged side bend with a shoulder drop — lateral flexion, the "
                 "same mechanism as the two Seated Side Stretches, now tagged caution and caught "
                 "by a new 'side bend' keyword in services/rules.py.",
+            ],
+        },
+        {
+            "date":   "2026-08-07",
+            "status": "Active — monitoring",
+            "region": "Right anterior chest / front of the shoulder — upper right, just medial to the right-shoulder surgical scar",
+            "title":  "Right Pec-Minor-Region Cramp / Lock-Out (Position-Specific, Painless)",
+
+            "mechanism": (
+                "Recurring, and reliably reproduced by ONE specific position (first recorded "
+                "today; the sensation predates the record): hands together in a prayer "
+                "position in front of the chest, but with the fingers pointing FORWARD — away "
+                "from the body — rather than up, and the forearms angled ~45° upward toward "
+                "the face rather than sitting horizontal at 90° from the elbows. In that "
+                "position a strong burning, 'muscle locking out' sensation builds in the "
+                "upper right chest — just before the surgical scar, connecting toward the "
+                "shoulder — 'almost like a cramp'. No pain at any point, and the identical "
+                "position on the left produces nothing."
+            ),
+
+            "symptoms": {
+                "location": (
+                    "Upper right chest, just medial to the right-shoulder surgical scar, "
+                    "extending toward the shoulder. The athlete's own tissue read is PEC "
+                    "MINOR — recorded as self-identified, not diagnosed (see assessment)."
+                ),
+                "character":      "Strong burn + 'muscle locking out', cramp-like — a sensation, not pain",
+                "provoked_by":    ["Prayer hands at the chest, fingers forward, forearms ~45° up toward the face — reliably, right side only"],
+                "painful_with":   None,
+                "laterality":     "RIGHT ONLY — the identical position on the left is completely clear",
+                "neural":         "None reported — no numbness, tingling, or radiation into the arm",
+            },
+
+            "assessment": {
+                "likely_tissue": [
+                    "Right pectoralis minor — the athlete's own read, and anatomically plausible: "
+                    "the position combines shoulder flexion + horizontal adduction + an isometric "
+                    "palm press, i.e. pec activation in a SHORTENED position, and pec minor is "
+                    "also a scapular protractor (cramping in a shortened position under active "
+                    "contraction is classic contractile behaviour). A HYPOTHESIS, not a diagnosis.",
+                    "The region is not anatomically standard tissue: finding #6's Latarjet "
+                    "transferred the coracoid — pec minor's insertion — so the immediate area "
+                    "also contains the conjoint-tendon transfer site, pec major's upper fibres, "
+                    "and surgical scar tissue. Tissue identification belongs to the physio.",
+                ],
+                "mechanism": (
+                    "A cramp/lock under ACTIVE contraction in a shortened position, with no "
+                    "report from any passive or loaded context to date, reads as CONTRACTILE "
+                    "rather than positional — the same framing finding #4's "
+                    "additional_evidence_2026_08_05 established for the hip: position alone "
+                    "does not trigger it; contraction in a specific configuration does."
+                ),
+                "underlying_pattern": (
+                    "FIRST ANTERIOR-CHEST SIGNAL on the post-Latarjet shoulder — everything "
+                    "previously recorded for that shoulder (sag, eccentric-control weakness, "
+                    "left tilt under overhead load) is posterior/scapular. Right-only "
+                    "laterality is consistent with the documented right-side asymmetry under "
+                    "ACTIVE/loaded conditions (findings #1, #2, #4), and per the 2026-08-05 "
+                    "baseline's no_passive_lateral_asymmetry note, its absence in passive "
+                    "stretching would say nothing either way. Direct new evidence on the "
+                    "physio brief's §8 open question: a right-sided anterior finding supports "
+                    "the 'left load is downstream of a right-side deficit' reading."
+                ),
+            },
+
+            "plan": [
+                "No self-directed exercise or stretching changes — in particular NO pec "
+                "stretching: physio brief §11 already records that post-Latarjet a capsular "
+                "restriction changes the prescription from 'stretch it' to 'do not', and the "
+                "tissue here is not yet identified.",
+                "Raise with the physiotherapist at the 2026-08-16 Day 28 reassessment "
+                "(physio brief §13) — the position is easy to demonstrate in the room.",
+                "Do not deliberately re-provoke between now and then; note any appearance in "
+                "OTHER positions, or during the block's pressing work, if it happens on its own.",
+            ],
+
+            "escalation_criteria": [
+                "Any PAIN from the position or the region — the current presentation is "
+                "explicitly pain-free, so pain is a change of kind, not degree",
+                "Any neural signs — numbness, tingling, or radiation into the arm",
+                "Any instability sensation in the right shoulder (finding #6)",
+                "Appearance during Incline DB Press or other pressing work — interacts "
+                "directly with stage_2_exit_criteria's shoulder criterion",
+                "Spreading to new positions or to the left side",
+            ],
+
+            "notes": [
+                "Cross-references finding #6 (addendum additional_evidence_2026_08_07, added "
+                "the same day): the scar is the right-shoulder surgery scar, and the "
+                "sensation sits on surgically altered anatomy — which is exactly why the "
+                "plan is identification-first rather than self-treatment.",
+                "Painless + position-specific + reliably reproducible makes this a candidate "
+                "CLINICAL RE-CHECK, not just a symptom: if the physio names the tissue, the "
+                "position itself becomes a cheap repeatable test.",
             ],
         },
     ],

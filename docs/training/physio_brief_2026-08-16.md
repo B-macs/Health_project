@@ -1,8 +1,8 @@
 # Physio Brief — Day 28 Reassessment, 2026-08-16
 
 **Topic:** Interscapular tightness — bilateral, left dominant
-**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · **Current block:** Stage 2A, Day 15 of 28
-**Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03, 2026-08-05
+**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · §12 added 2026-08-06 · §13 added 2026-08-07 · **Current block:** Stage 2A, Day 15 of 28
+**Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03, 2026-08-05, 2026-08-07
 
 ---
 
@@ -382,6 +382,50 @@ strength that produces it, and a flat-back hinge to raise the hamstring ceiling.
 Progress is measured by the elevation coming down, not by reaching further.
 
 If that reading is wrong, most of the programme is aimed at the wrong thing.
+
+---
+
+## 13. Right anterior-chest cramp beside the surgical scar — new, painless, position-specific
+
+Added 2026-08-07. A recurring sensation, first put on the record today, and
+easy to demonstrate in the room:
+
+**The position:** hands together in a prayer position in front of the chest,
+but with the **fingers pointing forward** (away from the body) rather than up,
+and the **forearms angled ~45° upward toward the face** rather than sitting
+horizontal at 90° from the elbows.
+
+**The sensation:** a strong burning, "muscle locking out" feeling — almost
+like a cramp — in the upper right chest, just before the surgical scar,
+connecting toward the shoulder. The athlete's own tissue read is **pec
+minor**. **No pain**, no neural signs, and the identical position on the
+**left is completely clear**.
+
+Why we are bringing it to you rather than acting on it:
+
+1. **The location is surgically altered anatomy.** The Latarjet transferred
+   the coracoid — pec minor's insertion — so the immediate region also holds
+   the conjoint-tendon transfer site, pec major's upper fibres, and scar
+   tissue. Surface anatomy there is not standard, and our "pec minor" label
+   is the athlete's guess, not a finding.
+2. **§11's rule already covers the temptation.** Post-Latarjet, a capsular
+   restriction changes the prescription from "stretch it" to "do not" — so no
+   pec stretching has been added, and none will be until the tissue is named.
+3. **It bears on §8.** Everything previously recorded for this shoulder is
+   posterior/scapular; this is the first *anterior* signal, and it is
+   right-only — which supports the reading that the left-sided load is
+   downstream of a right-side deficit.
+
+The character — painless, provoked only by active contraction in a shortened
+position (shoulder flexion + horizontal adduction + an isometric palm press),
+reliably reproducible — reads to us as contractile rather than positional,
+the same distinction that reclassified the hip click on 2026-08-05.
+
+**The ask: reproduce it, name the tissue, and say whether it needs anything
+at all** — and if it does, whether addressing it is safe given the Latarjet.
+
+Full record: `patient_profile.py` `symptom_log` 2026-08-07 and finding #6's
+`additional_evidence_2026_08_07`.
 
 ---
 
