@@ -342,7 +342,14 @@ prescription under Structure is Stage 1 only; Stage 2A is externally loaded.
   holds, drops and declines (records that move nothing, `has_real_move`
   False) write unasked, and a decline (`declined_entries`,
   `DECLINED_REASON_PREFIX`) is remembered in the ledger so the question is
-  never re-asked. Neither writer runs while a guided session is in
+  never re-asked. The rule cuts both ways: the past-missed day view offers
+  "Swap with today's session" (`manual_swap_blockers` / `_warnings` /
+  `_entries`) — the athlete may swap ANY in-phase past missed day with
+  today, the automatic path's hard rules (strict priority, spacing, the
+  same-week horizon) demote to on-screen warnings because the click is the
+  permission, only structural impossibilities block (today already
+  trained, a date outside the plan, mid-guided-session), and the swap's
+  ledger entries close both automatic schedulers on both dates. Neither writer runs while a guided session is in
   progress — a mid-session remap of today would carry index-keyed session
   state onto a different session's exercises. The plan
   authors `day_type` per day (`training_plan.PLAN_STAGE2`, all 28 days —

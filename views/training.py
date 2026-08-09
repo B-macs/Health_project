@@ -1464,8 +1464,15 @@ def _render_past_completed(d: date) -> None:
     st.markdown(f"<div>{rows_html}</div>", unsafe_allow_html=True)
 
 
-def _render_past_missed(d: date, active) -> None:
-    """Read-only view of what was planned for a past date that wasn't completed."""
+def _render_past_missed(d: date, active, phases: list) -> None:
+    """View of what was planned for a past date that wasn't completed, plus
+    the one action it offers: swap this missed session with today's, by
+    explicit choice. The manual counterpart of the automatic carry — the
+    button press IS the permission, so the rules the automatic path
+    enforces hard (strict priority, spacing) render as warnings here and
+    never block. Structural impossibilities (today already trained, a date
+    outside the plan) do block, checked against the cached logged set for
+    display and re-checked FRESH before the one permanent write."""
     _day_overline(d)
     day_num = ph.day_number_in_phase(active, d)
     st.markdown(
@@ -1473,12 +1480,60 @@ def _render_past_missed(d: date, active) -> None:
         f"margin-bottom:16px;'>NOT COMPLETED</div>",
         unsafe_allow_html=True,
     )
-    today_plan = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
+    plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
+    today_plan = plan_dict.get(day_num)
     if not today_plan:
         st.info(f"Day {day_num} of {active.name} has no authored content on record.")
         return
     st.caption(f"Day {day_num} of {active.length_days} — {today_plan['objective']} (planned, not done)")
     _render_exercise_timeline(today_plan["exercises"])
+
+    # ── Swap with today ──────────────────────────────────────────────────────
+    _today = date.today()
+    if bool(st.session_state.get("tp_started")) and not st.session_state.get("tp_done_today"):
+        st.caption("Finish or exit today's session before swapping days.")
+        return
+    try:
+        _logged = _all_logged_dates(active.start_date, _today.isoformat())
+    except Exception:
+        return  # can't verify what's logged -> don't offer a permanent write
+    _blockers = scheduling.manual_swap_blockers(active, d, _today, _logged)
+    if _blockers:
+        for _b in _blockers:
+            st.caption(_b)
+        return
+    _today_num = ph.day_number_in_phase(active, _today)
+    _today_content = plan_dict.get(_today_num)
+    _today_obj = _today_content["objective"] if _today_content else f"Day {_today_num}"
+    st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
+    st.caption(
+        f"Today currently holds: {_today_obj}. Swapping brings this missed "
+        f"session to today, and records today's session on {d.isoformat()} "
+        f"as the one that was missed."
+    )
+    for _w in scheduling.manual_swap_warnings(active, plan_dict, d, _today):
+        st.warning(_w)
+    if st.button("Swap with today's session", key="pm_swap"):
+        _pm_write_ok = False
+        try:
+            _fresh = repo.get_repository().get_logged_session_dates(d, _today)
+            if not scheduling.manual_swap_blockers(active, d, _today, _fresh):
+                _ovr, _rsn = scheduling.manual_swap_entries(active, d, _today)
+                _new_active = replace(
+                    active,
+                    date_overrides={**active.date_overrides, **_ovr},
+                    shift_reasons={**active.shift_reasons, **_rsn},
+                )
+                repo.get_repository().set_phases([
+                    _new_active if p.phase_number == active.phase_number else p
+                    for p in phases
+                ])
+                _pm_write_ok = True
+        except Exception:
+            st.error("Couldn't save the swap — nothing was changed. Try again.")
+        if _pm_write_ok:
+            st.session_state.tp_selected_date = _today
+            st.rerun()
 
 
 def _render_future_day(d: date, active) -> None:
@@ -1617,7 +1672,7 @@ def _render_day_detail(d: date, active, phases: list) -> None:
     elif state == "past_completed":
         _render_past_completed(d)
     elif state == "past_missed":
-        _render_past_missed(d, active)
+        _render_past_missed(d, active, phases)
     else:  # "future"
         _render_future_day(d, active)
 

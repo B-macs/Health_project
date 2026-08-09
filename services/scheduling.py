@@ -215,6 +215,92 @@ def declined_entries(phase: Phase, dates: list[date],
     return overrides, reasons
 
 
+# ─── Manual swap: a past missed day traded with today, by choice ────────────
+# The user-initiated counterpart of missed_reschedules. Ask-first cuts both
+# ways: the automatic machinery never moves a session without the athlete's
+# button press, and the athlete's button press moves a session the automatic
+# machinery never would — so the rules that HARD-gate the automatic carry
+# (strict priority, spacing, the same-week horizon) demote to WARNINGS here.
+# Only structural impossibilities block.
+
+def manual_swap_blockers(phase: Phase, missed_date: date, today: date,
+                         logged_dates: set[str]) -> list[str]:
+    """DETERMINISTIC. Why a user-requested swap of a past missed day with
+    today CANNOT happen — empty means it can. Blockers are structural
+    impossibilities only (a day that isn't missed, a today that already
+    trained, a date the plan doesn't cover); judgement calls belong to
+    manual_swap_warnings, because the explicit choice IS the permission."""
+    blockers: list[str] = []
+    if missed_date >= today:
+        blockers.append("Only a past day can be swapped with today.")
+    if missed_date.isoformat() in logged_dates:
+        blockers.append("That day has a logged session — it was not missed.")
+    if today.isoformat() in logged_dates:
+        blockers.append("Today already has a logged session — nothing can move onto it.")
+    if not (1 <= plan.day_number_in_phase(phase, missed_date) <= phase.length_days):
+        blockers.append("That day is outside the current plan.")
+    if not (1 <= plan.day_number_in_phase(phase, today) <= phase.length_days):
+        blockers.append("Today is outside the current plan (or is a forced rest day).")
+    return blockers
+
+
+def manual_swap_warnings(phase: Phase, plan_dict: dict | None,
+                         missed_date: date, today: date) -> list[str]:
+    """DETERMINISTIC. Advisory cautions for a user-requested swap — shown
+    beside the button, never blocking it. These are the exact rules the
+    automatic carry enforces hard (strict priority, main/test spacing),
+    restated as consequences so the athlete decides with them in view."""
+    warnings: list[str] = []
+    plan_dict = plan_dict or {}
+
+    def _type_at(d: date) -> str | None:
+        return day_type(plan_dict.get(plan.day_number_in_phase(phase, d)))
+
+    incoming = _type_at(missed_date)   # what the swap brings to today
+    outgoing = _type_at(today)         # what it sends into the past as missed
+    if incoming is not None and outgoing is not None \
+            and not can_overwrite(incoming, outgoing):
+        warnings.append(
+            "Today's session is not lower priority than the missed one — "
+            "the swap records today's session as the one that was missed."
+        )
+    prev_t = _type_at(today - timedelta(days=1))
+    next_t = _type_at(today + timedelta(days=1))
+    if incoming == "main" and ("main" in (prev_t, next_t)):
+        warnings.append(
+            "This puts two hard training days back to back — the plan keeps them apart."
+        )
+    if incoming == "main" and next_t == "test":
+        warnings.append(
+            "This puts hard leg work the day before a test — the reading "
+            "would measure the training, not the baseline."
+        )
+    if incoming == "test" and prev_t == "main":
+        warnings.append(
+            "This puts the test the morning after hard training — the "
+            "reading would measure the training, not the baseline."
+        )
+    return warnings
+
+
+def manual_swap_entries(phase: Phase, missed_date: date,
+                        today: date) -> tuple[dict[str, int], dict[str, str]]:
+    """DETERMINISTIC. The swap the athlete asked for: the past missed date
+    and today trade day-numbers — the same honest-accounting swap the
+    automatic carry uses, so the displaced session becomes the one that
+    reads as missed. The reasons on both dates carry no no-movement prefix
+    (this IS a move, the banner should say so) and close both automatic
+    schedulers' guards, so neither ever re-proposes either date."""
+    miss_num = plan.day_number_in_phase(phase, missed_date)
+    today_num = plan.day_number_in_phase(phase, today)
+    overrides = {missed_date.isoformat(): today_num, today.isoformat(): miss_num}
+    reasons = {
+        missed_date.isoformat(): f"Swapped with {today.isoformat()} by choice",
+        today.isoformat(): f"Swapped with {missed_date.isoformat()} by choice",
+    }
+    return overrides, reasons
+
+
 def swap_pairs_for_shift(phase: Phase, from_date: date, plan_dict: dict) -> dict[str, int]:
     """Pairwise-adjacent-day swap of day-numbers, from_date through the end
     of its calendar week (Sunday), for the REMAINDER of that week only.

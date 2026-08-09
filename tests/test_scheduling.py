@@ -902,6 +902,97 @@ def test_declined_entries_are_self_maps_that_close_both_guards():
                 scheduling.DECLINED_REASON_PREFIX}) == 3
 
 
+def test_manual_swap_entries_trade_day_numbers_and_close_both_guards():
+    # The athlete's own swap: past missed Monday traded with today (Wed).
+    # Both dates get bare (unprefixed) reasons — this IS a move, the banner
+    # should say "Session moved" — and both automatic schedulers' guards
+    # close, so neither ever re-proposes either date.
+    plan_dict = {1: {"day_type": "main"}, **_rest_days(2, 3, 4, 5, 6, 7)}
+    monday, wednesday = _MONDAY, _MONDAY + timedelta(days=2)
+    phase = _phase(monday)
+
+    overrides, reasons = scheduling.manual_swap_entries(phase, monday, wednesday)
+
+    assert overrides == {monday.isoformat(): 3, wednesday.isoformat(): 1}
+    assert scheduling.has_real_move(phase, overrides) is True
+    for r in reasons.values():
+        assert not r.startswith((scheduling.DROPPED_REASON_PREFIX,
+                                 scheduling.HELD_REASON_PREFIX,
+                                 scheduling.DECLINED_REASON_PREFIX))
+    settled = replace(phase,
+                      date_overrides={**phase.date_overrides, **overrides},
+                      shift_reasons={**phase.shift_reasons, **reasons})
+    assert scheduling.missed_reschedules(settled, plan_dict, set(), wednesday) == ({}, {})
+    assert scheduling.should_evaluate_shift(
+        True, wednesday.isoformat(), settled.shift_reasons) is False
+
+
+def test_manual_swap_blockers_catch_structural_impossibilities():
+    monday = _MONDAY
+    tuesday, wednesday = monday + timedelta(days=1), monday + timedelta(days=2)
+    phase = _phase(monday)
+
+    # Clean case: past unlogged in-phase day, free today.
+    assert scheduling.manual_swap_blockers(phase, monday, wednesday, set()) == []
+    # A future (or same) day is not a miss.
+    assert scheduling.manual_swap_blockers(phase, wednesday, wednesday, set())
+    # A logged "missed" day was not missed.
+    assert scheduling.manual_swap_blockers(
+        phase, monday, wednesday, {monday.isoformat()})
+    # A logged today has nothing to receive.
+    assert scheduling.manual_swap_blockers(
+        phase, monday, wednesday, {wednesday.isoformat()})
+    # A date before the phase started is outside the plan.
+    assert scheduling.manual_swap_blockers(
+        phase, monday - timedelta(days=7), wednesday, set())
+    # A forced-rest today (0 override) is outside the plan's day range.
+    forced = _phase(monday, date_overrides={wednesday.isoformat(): 0})
+    assert scheduling.manual_swap_blockers(forced, monday, wednesday, set())
+
+
+def test_manual_swap_warnings_advise_but_never_block():
+    monday = _MONDAY
+    tuesday, wednesday = monday + timedelta(days=1), monday + timedelta(days=2)
+    phase = _phase(monday)
+
+    # Equal priority: swapping a missed main onto a main day warns...
+    plan_equal = {1: {"day_type": "main"}, 2: {"day_type": "rest"},
+                  3: {"day_type": "main"}, **_rest_days(4, 5, 6, 7)}
+    assert scheduling.manual_swap_warnings(phase, plan_equal, monday, wednesday)
+    # ...but does NOT block — the athlete's click is the permission.
+    assert scheduling.manual_swap_blockers(phase, monday, wednesday, set()) == []
+
+    # Spacing: a missed main arriving the day before a test warns.
+    plan_eve = {1: {"day_type": "main"}, 2: {"day_type": "rest"},
+                3: {"day_type": "rest"}, 4: {"day_type": "test"},
+                **_rest_days(5, 6, 7)}
+    warnings = scheduling.manual_swap_warnings(phase, plan_eve, monday, wednesday)
+    assert any("day before a test" in w for w in warnings)
+
+    # Spacing: a missed test arriving the morning after a main warns.
+    plan_after = {1: {"day_type": "test"}, 2: {"day_type": "main"},
+                  3: {"day_type": "rest"}, **_rest_days(4, 5, 6, 7)}
+    warnings = scheduling.manual_swap_warnings(phase, plan_after, monday, wednesday)
+    assert any("morning after" in w for w in warnings)
+
+    # A clean lower-priority swap warns about nothing.
+    plan_clean = {1: {"day_type": "main"}, **_rest_days(2, 3, 4, 5, 6, 7)}
+    assert scheduling.manual_swap_warnings(phase, plan_clean, monday, wednesday) == []
+
+
+def test_manual_swap_view_rechecks_blockers_fresh_before_writing():
+    # Source-scan pin: the past-missed view offers the swap button, gates it
+    # off mid-session, and re-checks blockers against a FRESH logged read
+    # before the one permanent write (the cached set can be 5 minutes old).
+    import pathlib
+    src = pathlib.Path(scheduling.__file__).parent.parent / "views" / "training.py"
+    text = src.read_text(encoding="utf-8")
+    assert '"Swap with today\'s session"' in text
+    assert text.count("scheduling.manual_swap_blockers(") >= 2  # display + fresh
+    assert "scheduling.manual_swap_entries(" in text
+    assert "scheduling.manual_swap_warnings(" in text
+
+
 def test_view_never_writes_a_real_move_without_a_button_press():
     # Source-scan pin: both writer blocks must route every real move through
     # an explicit confirmation button, gate their unasked writes on

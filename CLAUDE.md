@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1773/1773 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **1777/1777 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -90,7 +90,11 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     loudly the readings argue — has_real_move draws the
                     line, only no-movement records (holds, drops, declines)
                     persist unasked, and declined_entries remembers a "no"
-                    so the prompt never nags) ·
+                    so the prompt never nags. The rule cuts both ways:
+                    manual_swap_blockers/warnings/entries let the athlete
+                    swap any past missed day with today from its day-strip
+                    view — structural impossibilities block, the automatic
+                    path's priority/spacing rules demote to warnings) ·
                     volume.py (weekly tonnage — Σ reps×weight — for Stage 2A+
                     double-progression exercises; no sector split, see
                     tonnage.py) ·
