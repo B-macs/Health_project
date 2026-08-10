@@ -1450,17 +1450,28 @@ def _region_split_bar_html(data: dict) -> str:
     lower:upper localisation shows up as 2.34:1 once through the curve. The
     strain triple below is real, but it is not what answers his question."""
     s = _SKIN_BOARD
+
+    # SEGMENTS WITH GAPS AND NO TRACK BEHIND THEM, on purpose. This bar always
+    # spans the full width — it is a PARTITION of the day, not a level — and it
+    # sits directly above three region tracks that ARE partial fills of an
+    # 0-21 scale. Drawn as one continuous fill inside a track it read as a
+    # gauge pinned at maximum, which is the first thing a reader said about it.
+    # The gaps and the absent track are what make it read as a divided whole.
+    def _seg(pct: float, colour: str) -> str:
+        return (f'<i style="flex:0 1 {pct:.1f}%;min-width:3px;height:100%;'
+                f'border-radius:2px;background:{colour};"></i>')
+
     segs, key = "", ""
     for region in data["regions"]:
         meta = _tc.REGION_DISPLAY[region["id"]]
         pct = region["au_pct"] or 0.0
-        segs += f'<i style="width:{pct:.1f}%;background:{meta["colour"]};"></i>'
+        segs += _seg(pct, meta["colour"])
         key += (f'<span style="display:inline-flex;align-items:center;gap:6px;">'
                 f'<b style="width:8px;height:8px;border-radius:3px;display:inline-block;'
                 f'background:{meta["colour"]};"></b>{meta["short"]} {pct:.0f}%</span>')
     un_pct = data.get("unattributed_pct") or 0.0
     if un_pct > 0:
-        segs += f'<i style="width:{un_pct:.1f}%;background:{s["ink3"]};"></i>'
+        segs += _seg(un_pct, s["ink3"])
         key += (f'<span style="display:inline-flex;align-items:center;gap:6px;">'
                 f'<b style="width:8px;height:8px;border-radius:3px;display:inline-block;'
                 f'background:{s["ink3"]};"></b>Unattributed {un_pct:.0f}%</span>')
@@ -1472,8 +1483,7 @@ def _region_split_bar_html(data: dict) -> str:
         f'<div style="font:600 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;'
         f'letter-spacing:.14em;text-transform:uppercase;color:{s["ink3"]};'
         f'margin-bottom:8px;">{heading}</div>'
-        f'<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;'
-        f'background:rgba(255,255,255,0.06);">{segs}</div>'
+        f'<div style="display:flex;gap:3px;height:10px;">{segs}</div>'
         f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;'
         f'font-size:11px;color:{s["ink2"]};font-variant-numeric:tabular-nums;">{key}</div>'
     )
