@@ -53,7 +53,11 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
   release + active-reciprocation prescription expected to OUTPERFORM
   stretching (stretching permitted, not preferred — athlete's clarification
   of the physio's intent) — the one item cleared for self-directed use.
-  Ferritin stays with the GP. Prescriptions get encoded at the next block
+  Ferritin stays with the GP. Same day: the athlete resolved the brief's §15
+  follow-ups himself and two release protocols were authored as pre-registered
+  hypothesis tests (docs/training/release_protocols_2026-08-10.md) — the pec
+  work starts immediately, the anterior-hip work only AFTER the battery
+  baseline is captured. Prescriptions still get encoded at the next block
   build, not before.
 
 Stage 1 history: Rehab extended by 7 days (Days 15-21, "Week 3: Flare
@@ -1262,6 +1266,28 @@ PROFILE = {
                     "physio's overall view of the path: 'the patient just needs regular "
                     "targeted training to get back to clean active training.'"
                 ),
+                "athlete_decisions_same_day": (
+                    "The athlete resolved the five §15 follow-ups himself the same day, "
+                    "keeping only the hands-on assessment work for 2026-08-16: (1) the "
+                    "pec techniques are built IN-HOUSE from the Cluster D source "
+                    "documents and the Baar annex rather than waiting for a demo — "
+                    "docs/training/release_protocols_2026-08-10.md, a pre-registered "
+                    "two-week hypothesis test with the standardised prayer position as "
+                    "its instrument; (2) the anterior-hip pressure work is a second "
+                    "pre-registered hypothesis test in the same document, sequenced "
+                    "AFTER the battery baseline so it cannot contaminate the tilt "
+                    "measurement; (3) the ER cue for horse stance and Cossack is "
+                    "CONFIRMED by the athlete ('active external rotation of hips is "
+                    "correct') — noting the standing tension with Key Rule 7's "
+                    "neutral-rotation cue for active right hip flexion: if the Coxa "
+                    "Saltans click appears under either movement, the cue question "
+                    "REOPENS; (4) scapular programming trials ONE arm first and returns "
+                    "with data — recorded as right-biased emphasis, the interventional "
+                    "arm, since the physio named the right as weaker (flip at the block "
+                    "build if the intended arm was symmetric); (5) thoracic mobility "
+                    "stays as-is — the movement-break protocol already covers the "
+                    "stillness half."
+                ),
             },
 
             "plan": [
@@ -1284,8 +1310,12 @@ PROFILE = {
                 "the scapular holds is still a block-build prescription change, now with "
                 "the approval in hand.",
                 "Code consequences still open (each changes behaviour and needs its own "
-                "pass): the horse/Cossack deferrals in cluster_a_mechanics; the battery's "
-                "stop-and-record wording for the anterior-hip sensation.",
+                "pass): the horse/Cossack deferrals in cluster_a_mechanics — movement "
+                "AND cue are both cleared now, but the deferral holds until after the "
+                "2026-08-16 sitting regardless, because the exit criterion judged there "
+                "is Coxa-Saltans frequency under loaded squats and two new ER-cued "
+                "squats inside the assessment window would confound it; and the "
+                "battery's stop-and-record wording for the anterior-hip sensation.",
             ],
 
             "notes": [

@@ -30,9 +30,10 @@ asked. Outcomes at a glance:
 
 Not in this response: **§14's micro-dose asks** and the Day 28 stage-gate
 decisions (Stage 2B vs. extending 2A, running introduction, formal
-exit-criteria evaluation) — those still land at the 2026-08-16 sitting,
-along with **§15**, the five follow-ups these answers opened. Prescriptions
-are encoded at the next block build.
+exit-criteria evaluation) — those still land at the 2026-08-16 sitting.
+**§15's five follow-ups were resolved by the athlete the same day** (see §15)
+— nothing from §15 remains for the sitting. Prescriptions are encoded at the
+next block build.
 
 ---
 
@@ -546,10 +547,20 @@ count as leg-loading days for the retest rule.
 
 ---
 
-## 15. Follow-ups your 2026-08-10 answers opened — five short ones for the sitting
+## 15. Follow-ups your 2026-08-10 answers opened — RESOLVED same day by the athlete
 
-Added 2026-08-10. The responses closed §1–§13; these are the loose ends the
-answers themselves opened. None were urgent enough to send back early.
+Added 2026-08-10; resolved by the athlete the same day — **nothing in this
+section remains for the sitting.** Outcomes: (1) the pec techniques were built
+in-house from the shoulder-cluster source material and the tendon annex's
+conduct rules rather than waiting for a demo — see
+`docs/training/release_protocols_2026-08-10.md`, a pre-registered two-week
+test with the prayer position as its instrument; (2) the front-of-hip pressure
+work is a second pre-registered test in the same document, sequenced after the
+battery baseline; (3) the athlete confirms the external-rotation cue for horse
+stance and Cossack (the question reopens only if the hip click appears under
+them); (4) scapular programming trials right-biased emphasis first and returns
+with data; (5) thoracic mobility stays with the movement-break protocol. The
+original questions are preserved below for the record.
 
 1. **The pec protocol, hands-on.** Could you demonstrate both recommended
    interventions — the scar & pec minor self-myofascial release, and the
