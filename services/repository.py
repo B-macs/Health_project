@@ -226,6 +226,20 @@ _HOME_SNAPSHOT_KEY = "home_snapshots"
 #: losing the draft is the failure that actually matters.
 _FLEXIBILITY_KEY = "flexibility_assessments"
 _FLEXIBILITY_DRAFT_KEY = "flexibility_draft"
+
+#: Local MIRROR of the in-progress training checkpoint that set_config stores
+#: under "training_progress" in Notion. Same payload, written to local disk on
+#: EVERY checkpoint; Notion is written only at session transitions.
+#:
+#: Why a mirror rather than just writing Notion less often: the stepper value
+#: is not cosmetic. views/training.py's _record_completed_set reads
+#: st.session_state.tp_actuals LIVE at the moment a set is completed, and
+#: _auto_log_session writes exactly that blob — so a reconnect that restored a
+#: STALE load would log every subsequent set at the wrong weight, understating
+#: weekly tonnage and lowering the next session's clamp ceiling (which
+#: _seed_actuals_if_needed derives from get_last_session_all_sets). Dropping
+#: the tap-path write entirely was rejected for that reason.
+_TRAINING_CHECKPOINT_KEY = "training_checkpoint"
 _OURA_DAILY_HEADER = [
     "date",
     "sleep_score", "sleep_total_sleep", "sleep_efficiency", "sleep_restfulness",
@@ -4470,6 +4484,54 @@ class Repository:
             return
         data[_HOME_SNAPSHOT_KEY] = home_snapshot.drop(store, d)
         local_cache.write(data)
+
+    # ─── In-progress training checkpoint (local mirror) ──────────────────
+    #  The durable copy lives in Notion under set_config("training_progress").
+    #  One set_config is a find-then-write PAIR — a Notion query plus a page
+    #  update — so on the guided flow's hot path (a weight/reps stepper tap) it
+    #  cost two network round trips per tap, on a screen the athlete taps five
+    #  times to move 20 kg to 32.5 kg. These two methods are the fast tier:
+    #  every tap mirrors locally, and only session transitions also pay Notion.
+
+    def save_training_checkpoint_local(self, payload: str) -> bool:
+        """Mirror the checkpoint JSON to local disk. True when stored.
+
+        On failure the key is DELETED rather than left holding an older
+        payload. A stale mirror is the one genuinely dangerous state: it would
+        win over a newer Notion copy on restore and resurrect superseded state
+        — including a session the athlete explicitly discarded. An ABSENT
+        mirror is safe, because get_training_checkpoint_local returning None
+        simply falls back to Notion.
+        """
+        try:
+            local_cache.update({_TRAINING_CHECKPOINT_KEY: payload})
+            return True
+        except Exception:
+            try:
+                local_cache.update({_TRAINING_CHECKPOINT_KEY: None})
+            except Exception:
+                pass
+            return False
+
+    def get_training_checkpoint_local(self) -> str | None:
+        """The mirrored checkpoint JSON, or None if there isn't one.
+
+        None is not an error — it means "ask Notion", which is exactly what a
+        fresh process (a Community Cloud restart, where the local file is gone)
+        should do.
+        """
+        try:
+            raw = local_cache.read().get(_TRAINING_CHECKPOINT_KEY)
+        except Exception:
+            return None
+        return raw if isinstance(raw, str) else None
+
+    def clear_training_checkpoint_local(self) -> None:
+        """Drop the mirror. Used when the durable copy is authoritative."""
+        try:
+            local_cache.update({_TRAINING_CHECKPOINT_KEY: None})
+        except Exception:
+            pass
 
     # ─── Flexibility assessments ─────────────────────────────────────────
     #  One session of a cluster battery (see services/battery.py and

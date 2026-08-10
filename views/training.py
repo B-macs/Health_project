@@ -11,6 +11,7 @@ explicit Exit (with confirmation) ends the session.
 
 import streamlit as st
 import streamlit.components.v1 as components
+from streamlit.errors import StreamlitAPIException
 import contextlib
 from dataclasses import asdict, replace
 from datetime import date, datetime, timedelta, timezone
@@ -567,20 +568,100 @@ function pauseDur() {{
 #  Session State
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _save_checkpoint(day_num: int) -> None:
-    """Persist in-progress training state to Notion so it survives a dropped
-    Streamlit session (e.g. phone backgrounded for several minutes) — session_state
-    alone only lives as long as the browser's websocket connection stays open."""
+def _rerun_flow() -> None:
+    """Rerun just the guided-flow fragment, falling back to a full-app rerun.
+
+    Every handler INSIDE _render_guided_flow uses this instead of st.rerun().
+    A fragment-scoped rerun re-executes ~500 lines instead of the whole page,
+    which is what takes a stepper tap off the network and off the full
+    re-render — see _render_guided_flow's docstring for the round-trip counts.
+
+    The fallback is not defensive padding, it is required. Streamlit raises
+    StreamlitAPIException from st.rerun(scope="fragment") whenever the call
+    happens during a FULL script run rather than a fragment rerun — the guard
+    is `if not curr_queue: raise` in streamlit/commands/execution_control.py,
+    where curr_queue is ctx.fragment_ids_this_run and is empty on a full run.
+    That is reachable here (an app-scoped rerun re-executes the fragment body
+    inline), and it is also how streamlit.testing.v1.AppTest always runs, since
+    AppTest never populates fragment_id_queue — so without this fallback the
+    flow could not be tested at all.
+
+    Catching Exception is safe and does NOT swallow the rerun itself:
+    st.rerun's own control-flow unwind is RerunException, which derives from
+    BaseException, not Exception. The success path raises straight through.
+    """
+    try:
+        st.rerun(scope="fragment")
+    except StreamlitAPIException:
+        st.rerun()
+
+
+def _save_checkpoint(day_num: int, durable: bool = True) -> None:
+    """Persist in-progress training state so it survives a dropped Streamlit
+    session (e.g. phone backgrounded for several minutes) — session_state alone
+    only lives as long as the browser's websocket connection stays open.
+
+    TWO TIERS, and which one a call site uses is a latency decision, not a
+    correctness one — every call writes the local mirror, so no state is ever
+    only in RAM:
+
+      durable=True  (default) — local mirror AND Notion. Every transition:
+                    set completion, exercise advance, session start/end,
+                    "← Back", discard. Costs two Notion round trips
+                    (set_config is a find-then-write pair, see
+                    services/repository.py) and happens tens of times a
+                    session, not hundreds.
+
+      durable=False — local mirror ONLY, no network at all. The six weight /
+                    reps / band steppers, which fire on a rapid repeated tap.
+
+    Why not simply drop the write on the steppers: the stepper value is not
+    cosmetic. _record_completed_set reads tp_actuals LIVE when a set is
+    completed and _auto_log_session writes that blob, so restoring a stale
+    load would LOG every subsequent set at the wrong weight — understating
+    weekly tonnage and lowering the next session's clamp ceiling. The mirror
+    keeps the tap lossless while taking the network off the tap path.
+
+    The mirror is written FIRST so a Notion failure still leaves the fresher
+    copy on disk, and the mirror is therefore never older than Notion — which
+    is what makes _load_checkpoint's fixed precedence safe.
+    """
     try:
         state = {k: st.session_state[k] for k in sess.CHECKPOINT_FIELDS}
-        payload = sess.checkpoint_payload(day_num, state)
-        repo.get_repository().set_config("training_progress", json.dumps(payload))
+        payload = json.dumps(sess.checkpoint_payload(day_num, state))
     except Exception:
-        pass  # never block the training flow on a persistence failure
+        return  # never block the training flow on a persistence failure
+    try:
+        repo.get_repository().save_training_checkpoint_local(payload)
+    except Exception:
+        pass
+    if not durable:
+        return
+    try:
+        repo.get_repository().set_config("training_progress", payload)
+    except Exception:
+        pass
 
 
 def _load_checkpoint(day_num: int) -> dict | None:
-    raw = repo.get_repository().get_config_value("training_progress")
+    """The local mirror wins over Notion, and falls back to it.
+
+    Fixed precedence rather than a timestamp comparison is safe because of the
+    write ordering in _save_checkpoint: the mirror is written on EVERY
+    checkpoint and Notion on a subset of them, so the mirror can only ever be
+    the same age or newer. A mirror that cannot be written is deleted rather
+    than left stale (see Repository.save_training_checkpoint_local), so the
+    fallback below is reached exactly when there is nothing fresher on disk —
+    a fresh process after a Community Cloud restart, most often.
+    """
+    r = repo.get_repository()
+    raw = None
+    try:
+        raw = r.get_training_checkpoint_local()
+    except Exception:
+        raw = None
+    if not raw:
+        raw = r.get_config_value("training_progress")
     if not raw:
         return None
     try:
@@ -2568,10 +2649,20 @@ def render():
     st.title("Training Plan")
 
     # ── Status strip ──────────────────────────────────────────────────────────
+    # tp_started, not tp_ex_idx > 0. This strip renders OUTSIDE
+    # _render_guided_flow, so anything it reads that the fragment mutates would
+    # not repaint under a fragment-scoped rerun — tp_ex_idx crossing 0 -> 1 on
+    # the first completed exercise would have left "SESSION IN PROGRESS" (and
+    # the Exit Training button with it) missing until some later full rerun.
+    # tp_started is already True for every render that reaches the flow at all
+    # (the overview screen st.stop()s above while it is False), so it cannot go
+    # stale here. The visible consequence is deliberate: the strip now appears
+    # from the moment Start is tapped rather than after the first exercise is
+    # finished, which is also when Exit Training becomes useful.
     session_active = (
         1 <= day_num <= _plan_days
         and not st.session_state.tp_done_today
-        and st.session_state.tp_ex_idx > 0
+        and st.session_state.tp_started
     )
 
     _sc1, _sc2, _sc3 = st.columns(3)
@@ -2690,10 +2781,16 @@ def render():
         unsafe_allow_html=True,
     )
 
-    # Overall day progress bar
-    ex_idx = n_ex if st.session_state.tp_done_today else st.session_state.tp_ex_idx
-    _progress_bar("Today's session", f"{ex_idx}/{n_ex}", ex_idx / n_ex)
-    st.divider()
+    # Overall day progress bar — the FINISHED case only. While a session is
+    # running it is rendered as _render_guided_flow's first element instead,
+    # because it reads tp_ex_idx and the fragment is what moves tp_ex_idx: an
+    # instance out here would not repaint under a fragment-scoped rerun and
+    # would sit an exercise behind for the rest of the session. The cost is
+    # that mid-session it now draws just below the readiness badge instead of
+    # just above it.
+    if st.session_state.tp_done_today:
+        _progress_bar("Today's session", f"{n_ex}/{n_ex}", 1.0)
+        st.divider()
 
     # ── Session done for today ────────────────────────────────────────────────
     if st.session_state.tp_done_today:
@@ -2984,6 +3081,43 @@ def render():
             unsafe_allow_html=True,
         )
 
+
+    _render_guided_flow(day_num, exercises, n_ex,
+                        _policy, _readiness_modifier, _volume_factor)
+
+
+@st.fragment
+def _render_guided_flow(day_num, exercises, n_ex,
+                        _policy, _readiness_modifier, _volume_factor):
+    """The in-session guided flow: exercise list, steppers, timers, set
+    completion. Everything that changes when the athlete taps.
+
+    A FRAGMENT because this is the app's hot path. Before it, one stepper
+    tap cost FOUR uncached Notion round trips and a full page re-render:
+    two for the checkpoint (set_config is a find-then-write pair) and two
+    for render()'s prologue, _get_plan_start() and
+    _get_phases_and_active_phase(), neither of which is cached. Scoping the
+    rerun here skips the prologue entirely; _save_checkpoint(durable=False)
+    handles the other two. Together a stepper tap now touches no network.
+
+    The six parameters are render()'s locals, frozen for the fragment's
+    life. Freezing _policy is a small improvement rather than a
+    regression: _engine_directive() is cached for 1800s, so previously a
+    mid-session cache expiry could change the load policy between two taps
+    while tp_actuals had been seeded against the old one.
+
+    Handlers in here call _rerun_flow(), never st.rerun() -- with ONE
+    deliberate exception at the top, the tp_ex_idx >= n_ex hand-off, which
+    must rerun the whole app because the completion screen it hands off to
+    is rendered by render() ABOVE this fragment and would otherwise never
+    be reached."""
+    # Overall day progress bar — see render()'s note where the finished-case
+    # copy lives. This one is inside the fragment so it actually tracks
+    # tp_ex_idx as the athlete advances.
+    _ex_idx = st.session_state.tp_ex_idx
+    _progress_bar("Today's session", f"{_ex_idx}/{n_ex}", _ex_idx / n_ex)
+    st.divider()
+
     # ── Exercise progress list ────────────────────────────────────────────────
     with st.expander("Today's Exercises", expanded=False):
         for i, ex in enumerate(exercises):
@@ -3065,7 +3199,11 @@ def render():
     # ── Reps / weight / band-tier steppers — gym/free-weight/band exercises
     #     only (ex.get("equipment_type") truthy). Seeded once per exercise
     #     per session by _seed_actuals_if_needed above; every tap here just
-    #     mutates the seeded entry in place and checkpoints it. ───────────────
+    #     mutates the seeded entry in place and checkpoints it LOCALLY
+    #     (durable=False — mirror only, no Notion). This is the hot path: the
+    #     athlete taps + five times to move 20 kg to 32.5 kg, and each Notion
+    #     checkpoint was a find-then-write PAIR. The next transition writes
+    #     the same snapshot through to Notion. ─────────────────────────────
     _actual = st.session_state.tp_actuals.get(_eidx)
     if _actual is not None:
         st.caption(sess.actual_caption(_actual))
@@ -3114,8 +3252,8 @@ def render():
                 with rc1:
                     if st.button("−", key=f"tp_reps_dec_{_eidx}", use_container_width=True):
                         _actual["reps"] = sess.step_reps(_actual["reps"], -1)
-                        _save_checkpoint(day_num)
-                        st.rerun()
+                        _save_checkpoint(day_num, durable=False)
+                        _rerun_flow()
                 with rc2:
                     st.markdown(
                         f"<div style='text-align:center;font-size:40px;font-weight:700;"
@@ -3125,8 +3263,8 @@ def render():
                 with rc3:
                     if st.button("+", key=f"tp_reps_inc_{_eidx}", use_container_width=True):
                         _actual["reps"] = sess.step_reps(_actual["reps"], +1)
-                        _save_checkpoint(day_num)
-                        st.rerun()
+                        _save_checkpoint(day_num, durable=False)
+                        _rerun_flow()
 
             _equip = ex.get("equipment_type")
             if _equip == "band" and _actual["band_tier"]:
@@ -3140,8 +3278,8 @@ def render():
                 with bc1:
                     if st.button("−", key=f"tp_band_dec_{_eidx}", use_container_width=True):
                         _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], -1)
-                        _save_checkpoint(day_num)
-                        st.rerun()
+                        _save_checkpoint(day_num, durable=False)
+                        _rerun_flow()
                 with bc2:
                     st.markdown(
                         f"<div style='text-align:center;font-size:28px;font-weight:700;color:#E8ECEF;'>"
@@ -3152,8 +3290,8 @@ def render():
                 with bc3:
                     if st.button("+", key=f"tp_band_inc_{_eidx}", use_container_width=True):
                         _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], +1)
-                        _save_checkpoint(day_num)
-                        st.rerun()
+                        _save_checkpoint(day_num, durable=False)
+                        _rerun_flow()
             elif _equip and _equip != "band" and _actual["weight_kg"] is not None:
                 _incr = ex.get("increment_size", 2.5)
                 _incr_unit = ex.get("increment_unit", "kg")
@@ -3172,8 +3310,8 @@ def render():
                 with wc1:
                     if st.button("−", key=f"tp_wt_dec_{_eidx}", use_container_width=True):
                         _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], -1, increment=_incr)
-                        _save_checkpoint(day_num)
-                        st.rerun()
+                        _save_checkpoint(day_num, durable=False)
+                        _rerun_flow()
                 with wc2:
                     st.markdown(
                         f"<div style='text-align:center;font-size:40px;font-weight:700;"
@@ -3183,8 +3321,8 @@ def render():
                 with wc3:
                     if st.button("+", key=f"tp_wt_inc_{_eidx}", use_container_width=True):
                         _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], +1, increment=_incr)
-                        _save_checkpoint(day_num)
-                        st.rerun()
+                        _save_checkpoint(day_num, durable=False)
+                        _rerun_flow()
         st.divider()
 
     # ── Set progress and timers ───────────────────────────────────────────────
@@ -3303,7 +3441,7 @@ def render():
                 st.session_state.tp_side = "right"
                 st.session_state.tp_phase = "intro"
                 _save_checkpoint(day_num)
-                st.rerun()
+                _rerun_flow()
 
         elif ex_type == "reps":
             if phase == "resting":
@@ -3313,7 +3451,7 @@ def render():
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
                     _save_checkpoint(day_num)
-                    st.rerun()
+                    _rerun_flow()
             else:
                 # Clear any stale tp_auto_start from the rest timer — reps exercises have no
                 # hold timer to consume it, so it must not leak into the next exercise.
@@ -3346,7 +3484,7 @@ def render():
                             st.session_state.tp_set += 1
                             st.session_state.tp_phase = "resting"
                     _save_checkpoint(day_num)
-                    st.rerun()
+                    _rerun_flow()
 
         elif ex_type == "hold":
             if phase == "resting":
@@ -3356,7 +3494,7 @@ def render():
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
                     _save_checkpoint(day_num)
-                    st.rerun()
+                    _rerun_flow()
             else:
                 _hold_label = f"HOLD — {_side.upper()} SIDE" if is_uni else "HOLD"
                 # Right→left side transition has no rest timer, so the hold timer itself
@@ -3382,7 +3520,7 @@ def render():
                             st.session_state.tp_set += 1
                             st.session_state.tp_phase = "resting"
                     _save_checkpoint(day_num)
-                    st.rerun()
+                    _rerun_flow()
 
         elif ex_type == "hold_reps":
             reps_per_set = ex.get("reps_in_set", 5)
@@ -3394,7 +3532,7 @@ def render():
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
                     _save_checkpoint(day_num)
-                    st.rerun()
+                    _rerun_flow()
             else:
                 _side_suffix = f" — {_side.upper()}" if is_uni else ""
                 # More reps in this set → next rep's hold timer needs to auto-start.
@@ -3428,7 +3566,7 @@ def render():
                     else:
                         st.session_state.tp_rep_in_set += 1
                     _save_checkpoint(day_num)
-                    st.rerun()
+                    _rerun_flow()
 
         # ── Undo the last transition ──────────────────────────────────────────
         # Covers both accidental-completion cases: a set marked done by
@@ -3444,7 +3582,7 @@ def render():
                                "adding a second record."):
                 _pop_nav_state()
                 _save_checkpoint(day_num)
-                st.rerun()
+                _rerun_flow()
 
     # ── Clinical guidance section ─────────────────────────────────────────────
     st.divider()
@@ -3482,4 +3620,4 @@ def render():
             st.session_state.tp_rep_in_set = 1
             st.session_state.tp_phase = "intro"
             _save_checkpoint(day_num)
-            st.rerun()
+            _rerun_flow()
