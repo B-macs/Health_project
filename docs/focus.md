@@ -4,16 +4,16 @@
 
 ---
 
-## Current State (2026-08-06)
+## Current State (2026-08-10)
 
 | Item | Value |
 |------|-------|
 | Stage | **Stage 2** — Transition (external load) |
 | Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
-| Day | **Day 18 of 28** |
-| Gate | **1647/1647** — `python -m pytest tests/` |
-| Last code commit | The flexibility ladder — the battery's decision path as rungs, tightest at the bottom, no scores and no numbers for unmeasured muscles |
-| Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required; run the battery cold BEFORE it |
+| Day | **Day 22 of 28** |
+| Gate | **2437/2437** — `python -m pytest tests/` |
+| Last code commit | The literature review lands in the design: every rationale now carries its true evidence tier |
+| Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required; run the battery cold BEFORE it, and read the warm-up review (step 1b below) before authoring a single day |
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
 flare meant the Day 14 exit criteria were not met on the original schedule.
@@ -95,6 +95,36 @@ accounting that keeps Strain honest, and the pre-written pull-back condition —
 is `docs/training/flexibility_integration_2026-08-16.md`. The only place it
 meets the physio's decisions is shared weekly capacity.
 
+A **fifth workstream** is also ours: **the warm-up, which does not exist yet.**
+`docs/training/warmup_evidence_review_2026-08-10.md` is REQUIRED READING before
+the block is authored (see "What Happens at the Next Block Entry" step 1b). The
+next block is the first to run near-maximal loads, and today a gym day runs
+16–22 minutes of release work — labelled as 5 — and then goes straight into the
+first working set with no raise and no ramp. The review is evidence-graded
+throughout and settles the two questions that prompted it: at near-max loads a
+general warm-up under ~5 minutes is measurably no better than none, while at
+~10RM loads a specific warm-up is worth approximately nothing. **One item needs
+deciding WITH the physiotherapist on the day** — whether any of the release
+block's 16–22 minutes is re-allocatable, since the Right Posterior Hip Capsule
+Stretch (2 × 60 s) is the single item sitting at the stretch dose where the
+force deficit turns large.
+
+**The protocol is authored in this shape, and the review says so in three
+places:**
+
+```
+TODAY:    [ quiet things down ] → [ load ]
+
+REQUIRED: [ quiet things down ] → [ wake things back up ] → [ load ]
+```
+
+Phase 1 is the existing release block — it exists, it costs 16–22 minutes, and
+nothing in it needs deleting. **Phase 2 does not exist at all, and it is the
+entire deliverable:** its job is to undo phase 1's acute cost (stretching leaves
+tissue slack; a subsequent active warm-up buys it back) and to get glute max
+contracting before the bar asks it to. Use these three names in patient-facing
+text.
+
 ---
 
 ## Stage 2 Exit Criteria (`PROFILE["stage_2_exit_criteria"]`)
@@ -124,6 +154,15 @@ non-diagnostic until a stage has that many days behind it.
 1. Read every local clinical profile document and **state how each influenced
    the plan** — `patient_profile.py` plus every `Input_files/*.md`. This is
    CLAUDE.md Key Rule 11, and it is checkable, not a formality.
+1b. **Read `docs/training/warmup_evidence_review_2026-08-10.md` in full**, and
+   state how it influenced the plan the same way. Same gate, same standard.
+   This is the first block to run loads close to maximum, and the system
+   contains **no warm-up at all** today — a gym day goes from the last release
+   hold straight into the first working set. Two hard prerequisites live in
+   that document: ramp sets **corrupt tonnage, Strain and e1RM** unless a
+   per-set warm-up flag lands first (`services/tonnage.py`'s eligibility is
+   `if reps and weight`), and a warm-up change touches every session, so it
+   collides with the one-new-stressor-per-week rule.
 2. Update `patient_profile.py` with post-assessment findings, then append a
    `stage_transitions` record — that list is the evidence a transition's
    criteria were actually met, not merely stated.
@@ -134,7 +173,7 @@ non-diagnostic until a stage has that many days behind it.
    `training_constants.EXERCISE_MOVEMENT_WEIGHT` (or they fall back to
    `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflate Strain/ACWR — this already
    happened once, across 34 of 63 Stage 1 exercise names).
-5. Run `python -m pytest tests/` — 1602/1602 or higher.
+5. Run `python -m pytest tests/` — 2437/2437 or higher.
 6. Update this file: block, day, gate, next action.
 
 ---
