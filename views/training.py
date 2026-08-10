@@ -1496,11 +1496,14 @@ def _render_past_missed(d: date, active, phases: list) -> None:
     try:
         _logged = _all_logged_dates(active.start_date, _today.isoformat())
     except Exception:
-        return  # can't verify what's logged -> don't offer a permanent write
+        # Can't verify what's logged -> don't offer a permanent write, but
+        # SAY so — a silently absent button reads as "no option exists".
+        st.caption("Couldn't check logged sessions just now — the swap option is hidden until the page reloads.")
+        return
     _blockers = scheduling.manual_swap_blockers(active, d, _today, _logged)
     if _blockers:
         for _b in _blockers:
-            st.caption(_b)
+            st.info(f"Swap with today isn't available: {_b}")
         return
     _today_num = ph.day_number_in_phase(active, _today)
     _today_content = plan_dict.get(_today_num)

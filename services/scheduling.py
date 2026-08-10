@@ -229,7 +229,10 @@ def manual_swap_blockers(phase: Phase, missed_date: date, today: date,
     today CANNOT happen — empty means it can. Blockers are structural
     impossibilities only (a day that isn't missed, a today that already
     trained, a date the plan doesn't cover); judgement calls belong to
-    manual_swap_warnings, because the explicit choice IS the permission."""
+    manual_swap_warnings, because the explicit choice IS the permission.
+    A forced-rest today (0 override) is deliberately NOT a blocker — the
+    athlete's own rest record yields to the athlete's own click (it warned
+    the live 2026-08-09 swap attempt into a dead end when it blocked)."""
     blockers: list[str] = []
     if missed_date >= today:
         blockers.append("Only a past day can be swapped with today.")
@@ -239,8 +242,10 @@ def manual_swap_blockers(phase: Phase, missed_date: date, today: date,
         blockers.append("Today already has a logged session — nothing can move onto it.")
     if not (1 <= plan.day_number_in_phase(phase, missed_date) <= phase.length_days):
         blockers.append("That day is outside the current plan.")
-    if not (1 <= plan.day_number_in_phase(phase, today) <= phase.length_days):
-        blockers.append("Today is outside the current plan (or is a forced rest day).")
+    today_num = plan.day_number_in_phase(phase, today)
+    if not (1 <= today_num <= phase.length_days) \
+            and phase.date_overrides.get(today.isoformat()) != 0:
+        blockers.append("Today is outside the current plan.")
     return blockers
 
 
@@ -258,6 +263,11 @@ def manual_swap_warnings(phase: Phase, plan_dict: dict | None,
 
     incoming = _type_at(missed_date)   # what the swap brings to today
     outgoing = _type_at(today)         # what it sends into the past as missed
+    if phase.date_overrides.get(today.isoformat()) == 0:
+        warnings.append(
+            "Today is set as a forced rest day — the swap replaces it, and "
+            "the rest day moves onto the missed date instead."
+        )
     if incoming is not None and outgoing is not None \
             and not can_overwrite(incoming, outgoing):
         warnings.append(
@@ -288,9 +298,11 @@ def manual_swap_entries(phase: Phase, missed_date: date,
     """DETERMINISTIC. The swap the athlete asked for: the past missed date
     and today trade day-numbers — the same honest-accounting swap the
     automatic carry uses, so the displaced session becomes the one that
-    reads as missed. The reasons on both dates carry no no-movement prefix
-    (this IS a move, the banner should say so) and close both automatic
-    schedulers' guards, so neither ever re-proposes either date."""
+    reads as missed. A forced-rest today trades its 0 onto the missed date:
+    the rest day moves to where the rest actually happened. The reasons on
+    both dates carry no no-movement prefix (this IS a move, the banner
+    should say so) and close both automatic schedulers' guards, so neither
+    ever re-proposes either date."""
     miss_num = plan.day_number_in_phase(phase, missed_date)
     today_num = plan.day_number_in_phase(phase, today)
     overrides = {missed_date.isoformat(): today_num, today.isoformat(): miss_num}

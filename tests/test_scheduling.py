@@ -945,9 +945,31 @@ def test_manual_swap_blockers_catch_structural_impossibilities():
     # A date before the phase started is outside the plan.
     assert scheduling.manual_swap_blockers(
         phase, monday - timedelta(days=7), wednesday, set())
-    # A forced-rest today (0 override) is outside the plan's day range.
+    # A today beyond the phase end is outside the plan.
+    short = _phase(monday, length_days=1)
+    assert scheduling.manual_swap_blockers(short, monday, wednesday, set())
+    # A forced-rest today does NOT block — the athlete's own rest record
+    # yields to the athlete's own click (it warns instead; this exact case
+    # dead-ended the live 2026-08-09 swap attempt when it was a blocker).
     forced = _phase(monday, date_overrides={wednesday.isoformat(): 0})
-    assert scheduling.manual_swap_blockers(forced, monday, wednesday, set())
+    assert scheduling.manual_swap_blockers(forced, monday, wednesday, set()) == []
+
+
+def test_forced_rest_today_warns_and_the_swap_replaces_it():
+    # The live 2026-08-09 shape: Saturday's main missed, Sunday a forced
+    # rest (0 override). The swap must be OFFERED with a warning, and the
+    # trade sends the 0 onto the missed date — the rest day moves to where
+    # the rest actually happened.
+    plan_dict = {1: {"day_type": "main"}, **_rest_days(2, 3, 4, 5, 6, 7)}
+    monday, wednesday = _MONDAY, _MONDAY + timedelta(days=2)
+    forced = _phase(monday, date_overrides={wednesday.isoformat(): 0})
+
+    warnings = scheduling.manual_swap_warnings(forced, plan_dict, monday, wednesday)
+    assert any("forced rest" in w for w in warnings)
+
+    overrides, reasons = scheduling.manual_swap_entries(forced, monday, wednesday)
+    assert overrides == {monday.isoformat(): 0, wednesday.isoformat(): 1}
+    assert set(reasons) == {monday.isoformat(), wednesday.isoformat()}
 
 
 def test_manual_swap_warnings_advise_but_never_block():
