@@ -34,6 +34,24 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
   not self-treatment, and explicitly NO pec stretching until then. Trend was
   never observed before now; the entry is the baseline for watching it.
 
+2026-08-10: the physiotherapist answered ALL 13 questions in the Day-28 brief,
+  six days early (symptom_log 2026-08-10; the Day 28 stage-gate decisions are
+  NOT in it and still land 2026-08-16). Headlines: scapular holds APPROVED,
+  and the 50-60s interscapular fatigue onset is REFUTED — studio retest held
+  Down Dog 4+ minutes, arms would fail first, shoulder blades can train
+  normally to failure (the issue is stillness/stiffness, not weakness, and
+  the chair's forearm supports already removed most of the pressure). §8
+  settled: the right is weaker, the left overcompensates — train BOTH sides.
+  The Cluster A organising claim is CONFIRMED (hips drive the lumbar
+  rounding). The butterfly anterior-hip sensation is a normal short-hip-flexor
+  stretch, unblocking the battery's first test. Horse stance and Cossack are
+  cleared (no rotation cue named — the ER cue stands). The 25-point wide-gap
+  threshold holds; overhead reach shows NO capsular issue. The pec cramp is
+  diagnosed (positional ischemic cramp / scar adhesion lockout) with a
+  release + active-reciprocation prescription — the one item cleared for
+  self-directed use; stretching it remains off the table. Ferritin stays with
+  the GP. Prescriptions get encoded at the next block build, not before.
+
 Stage 1 history: Rehab extended by 7 days (Days 15-21, "Week 3: Flare
   Recovery & Reassessment Prep" in training_plan.py) — decided 2026-07-13.
   Day 14's exit criteria were not met on the original schedule
@@ -333,6 +351,21 @@ PROFILE = {
                 "§13). Full entry: symptom_log 2026-08-07. Does not change the training "
                 "implication above — scapular-control-first, conservative pressing — but is "
                 "direct new evidence on the physio brief's §8 right-vs-left question."
+            ),
+            "additional_evidence_2026_08_10": (
+                "The physiotherapist ANSWERED the 2026-08-07 question set (symptom_log "
+                "2026-08-10). The anterior cramp is diagnosed: POSITIONAL ISCHEMIC CRAMP / "
+                "SCAR ADHESION LOCKOUT — shortened tissue firing hard in a shortened range, "
+                "catching on dense surgical scar tissue and briefly cutting off blood flow; "
+                "no structural pain. Entirely safe to address; stretching is NOT the tool — "
+                "targeted scar & pec minor self-myofascial release plus subscapularis / "
+                "anterior-wall active reciprocation with isometric holds. Two further "
+                "answers touch this finding directly: overhead reach shows NO capsular "
+                "restriction (reach fully overhead, stretch as normal), and the §8 "
+                "question is settled — the RIGHT is the weaker side, the left is "
+                "overcompensating, and BOTH sides get strengthened rather than isolating "
+                "one side. The training implication above stands, now with sign-off "
+                "attached."
             ),
         },
     ],
@@ -1098,6 +1131,157 @@ PROFILE = {
                 "Painless + position-specific + reliably reproducible makes this a candidate "
                 "CLINICAL RE-CHECK, not just a symptom: if the physio names the tissue, the "
                 "position itself becomes a cheap repeatable test.",
+            ],
+        },
+        {
+            "date":   "2026-08-10",
+            "status": "Recorded — not a symptom; the physiotherapist's answers to the Day-28 brief",
+            "region": "Multiple — interscapular, right shoulder/anterior chest, proximal hamstring, anterior hip, hips/lumbar",
+            "title":  "Physiotherapist Responses — All 13 Brief Questions Answered (Ahead of the 2026-08-16 Reassessment)",
+
+            "mechanism": (
+                "Not an injury entry. The physiotherapist answered every question in "
+                "docs/training/physio_brief_2026-08-16.md, six days ahead of the Day 28 "
+                "reassessment, including an in-studio retest of the Down Dog fatigue "
+                "measurement. The stage-gate decisions themselves — Stage 2B vs. extending "
+                "2A, the running introduction — were NOT part of this response and remain "
+                "for the 2026-08-16 sitting. Recorded here because several answers correct "
+                "or close earlier entries in this log; per the append-only convention those "
+                "corrections live in this entry, not in the originals."
+            ),
+
+            "findings": {
+                "scapular_holds_approved": (
+                    "Brief §1 APPROVED: strengthening the interscapular muscles is "
+                    "recommended. Two additions from the physio: (1) the chair's side "
+                    "forearm supports have ALREADY taken away most of the pressure on the "
+                    "shoulder blades — the §6 ergonomic change is doing the load-bearing "
+                    "work; (2) the residual pressure is a ROUNDING pressure, and any "
+                    "exercise that strengthens those muscles will help it. 30-second hard "
+                    "holds are explicitly fine — 'patient has strength enough to do this.' "
+                    "The physio's reframe of the whole finding: the issue is STILLNESS and "
+                    "STIFFNESS, not weakness. That narrows the 2026-08-03 entry's "
+                    "endurance-gap hypothesis: strengthening is still the endorsed tool, "
+                    "but the driver is the stillness exposure, not a capacity deficit."
+                ),
+                "fatigue_onset_50_60s_refuted": (
+                    "MEASUREMENT CORRECTION, superseding the 2026-08-05 entry's headline "
+                    "number: the athlete was underestimating his Down Dog time. Retested "
+                    "in the studio: 4+ MINUTES without interscapular burn, and the "
+                    "physio's judgement was that the elbows and arms would fail before "
+                    "the shoulder blades. Verdict: no issue in the shoulder blades — they "
+                    "can be trained NORMALLY, TO FAILURE. The 50-60s figure that anchored "
+                    "the §1 dosing question (and the yoga catalogue's hold-duration "
+                    "caution) came from one self-observed hold inside a 15-minute flow, "
+                    "not a fresh maximal test — the same instrument lesson as the "
+                    "three-baseline-mornings rule: one casual self-observation is not a "
+                    "measurement."
+                ),
+                "left_vs_right_answered": (
+                    "Brief §8 ANSWERED: the left is overcompensating for the right, and "
+                    "the right is WEAKER than the left. Train BOTH — do not isolate one "
+                    "side; both need to be strengthened. This settles which side gets "
+                    "programmed in the next block: both, with the deficit understood to "
+                    "sit on the right."
+                ),
+                "hamstring_and_anterior_hip": (
+                    "Proximal hamstring: yes, isometric holds would help, combined with "
+                    "increased movement and high-rep strengthening to activate the "
+                    "movement. The existing Ischial Tuberosity Hamstring Release "
+                    "(sustained pressure, pre-session Days 3/10) is confirmed as right "
+                    "for that site. NEW RECOMMENDATION: sustained-pressure testing for "
+                    "the FRONT of the hip as well, to release the pressure from sitting — "
+                    "a candidate for the pre-session release block at the next block "
+                    "build."
+                ),
+                "organising_claim_confirmed": (
+                    "Brief §12's one-thing-to-check CONFIRMED: lack of flexibility in the "
+                    "hips is driving the lower back to 'fall inwards and be stuck in this "
+                    "position' (physio's words). The Cluster A organising claim — the "
+                    "lumbar rounding is the compensation, the pelvis that will not rotate "
+                    "forward is the problem — now carries the physiotherapist's "
+                    "endorsement, not just the athlete's own read."
+                ),
+                "anterior_hip_sensation_cleared": (
+                    "The butterfly-fold anterior-hip sensation is a NORMAL STRETCH "
+                    "SENSATION — 'exactly where you would expect the stretch to start for "
+                    "short hip flexors.' Not bone, not anterior compression. This "
+                    "adjudicates the question that was blocking the top of the "
+                    "flexibility battery (the stop-and-record rule on the first test was "
+                    "written pending exactly this answer)."
+                ),
+                "horse_and_cossack_cleared": (
+                    "Horse stance and Cossack squat can BOTH come off deferral — 'patient "
+                    "can comfortably do both.' Gap to note honestly: the brief also asked "
+                    "WITH WHAT ROTATION CUE, and the response does not name one — the "
+                    "external-rotation cue recorded in the cluster documents stands until "
+                    "the physio says otherwise. Lifting the deferral in "
+                    "cluster_a_mechanics is a code change that lands with the block "
+                    "build, not with this record."
+                ),
+                "thresholds_confirmed_no_capsular_issue": (
+                    "The 25-point wide-gap threshold is 'a good estimate — continue to "
+                    "test and re-evaluate later.' And the overhead-reach question closes "
+                    "cleanly: the patient can reach fully overhead, continue to stretch "
+                    "as normal, NO JOINT CAPSULE ISSUES — the post-Latarjet capsular "
+                    "worry that §11 flagged (which would have turned 'stretch it' into "
+                    "'do not') does not apply to overhead reach."
+                ),
+                "pec_cramp_diagnosed": (
+                    "The 2026-08-07 entry's question is ANSWERED. Diagnosis: POSITIONAL "
+                    "ISCHEMIC CRAMP / SCAR ADHESION LOCKOUT — the shortened tissue fires "
+                    "hard in a shortened range, catches on dense surgical scar tissue, "
+                    "and briefly cuts off blood flow, producing the deep, intense "
+                    "lock-out burn without structural pain. ENTIRELY SAFE to address. "
+                    "Stretching is NOT the correct tool. Recommended instead: (1) "
+                    "targeted scar & pectoralis minor self-myofascial release; (2) "
+                    "subscapularis / anterior-wall active reciprocation with isometric "
+                    "holds — active end-range isometric holds and control. Physio's "
+                    "words: these 'would greatly improve the situation.'"
+                ),
+                "specialization_trial_endorsed": (
+                    "Arms-only is a good trial. The physio adds a design point: trial "
+                    "not just fatigue but the patient's WANT and ABILITY to train every "
+                    "day — adherence and appetite are part of what the trial measures. "
+                    "Reconvene after the trial. Timing unchanged: after the 10 km on "
+                    "2026-10-11."
+                ),
+                "ferritin_out_of_scope": (
+                    "Unanswerable from the physio side — remains open with the GP. The "
+                    "physio's overall view of the path: 'the patient just needs regular "
+                    "targeted training to get back to clean active training.'"
+                ),
+            },
+
+            "plan": [
+                "The approved prescriptions get ENCODED AT THE NEXT BLOCK BUILD, after "
+                "the 2026-08-16 Day 28 reassessment settles the stage-gate decisions: "
+                "scapular strengthening on both sides (holds may go to failure), "
+                "proximal-hamstring isometrics plus high-rep activation work, "
+                "anterior-hip sustained-pressure testing in the release block, and the "
+                "two pec interventions — every new movement name run through "
+                "rules.check_movement and mapped in EXERCISE_MOVEMENT_WEIGHT / "
+                "EXERCISE_BODY_REGION per the integration protocol.",
+                "The pec release + active-reciprocation work is cleared for self-directed "
+                "use by the physio's explicit answer — the one exception to this log's "
+                "usual no-self-directed-changes rule, and stretching the region stays "
+                "off the table as before.",
+                "Code consequences flagged, NOT made here (each changes behaviour and "
+                "needs its own pass): the 50-60s premise inside services/yoga.py's "
+                "authored rationale strings and tests/test_yoga.py's hold-duration "
+                "constraint; the horse/Cossack deferrals in cluster_a_mechanics; the "
+                "battery's stop-and-record wording for the anterior-hip sensation.",
+            ],
+
+            "notes": [
+                "Append-only corrections landing in this entry: the 2026-08-05 entry's "
+                "'interscapular fatigue onset 50-60s' is superseded by the studio retest "
+                "(4+ minutes, arms fail first); the 2026-08-07 pec entry's "
+                "raise-with-physio plan is fulfilled and its entry stands as written.",
+                "The physio response arrived six days EARLY — nothing here is the Day 28 "
+                "reassessment itself. Stage 2B vs. extending 2A, the running "
+                "introduction, and the formal exit-criteria evaluation all still land on "
+                "2026-08-16.",
             ],
         },
     ],

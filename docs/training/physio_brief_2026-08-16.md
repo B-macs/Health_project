@@ -1,8 +1,35 @@
 # Physio Brief — Day 28 Reassessment, 2026-08-16
 
 **Topic:** Interscapular tightness — bilateral, left dominant
-**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · §12 added 2026-08-06 · §13 added 2026-08-07 · **Current block:** Stage 2A, Day 15 of 28
-**Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03, 2026-08-05, 2026-08-07
+**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · §12 added 2026-08-06 · §13 added 2026-08-07 · **responses received 2026-08-10** · **Current block:** Stage 2A, Day 15 of 28
+**Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03, 2026-08-05, 2026-08-07, 2026-08-10
+
+---
+
+## ✅ ANSWERED — responses received 2026-08-10, six days ahead of the sitting
+
+Every question below has been answered; the full record is
+`patient_profile.py` `symptom_log` **2026-08-10**. The sections that follow
+are preserved as asked. Outcomes at a glance:
+
+| Ask | Outcome |
+|---|---|
+| §1 scapular holds | **Approved.** Forearm supports already removed most of the pressure; the residual is a *rounding* pressure — any strengthening helps |
+| §11 the 50–60 s number | **Refuted on studio retest** — Down Dog held 4+ min, arms would fail first. Shoulder blades can train normally, **to failure**. Issue is stillness/stiffness, not weakness |
+| §10 hold safety | 30 s hard holds fine — strength is sufficient |
+| §8 left vs right | **Right is weaker; left overcompensates. Train BOTH** — never isolate one side |
+| §10 hamstring | Isometric holds yes, plus movement + high-rep activation; the ischial release is right — **and add sustained-pressure testing at the FRONT of the hip** (sitting pressure) |
+| §12 organising claim | **Confirmed** — hip inflexibility drives the lumbar rounding |
+| §12 anterior-hip pinch | **Normal stretch sensation** — exactly where short hip flexors start; battery unblocked |
+| §12 horse / Cossack | **Both cleared** (no rotation cue named — the ER cue stands until said otherwise) |
+| §11 thresholds | 25-point gap "a good estimate"; overhead reach full — **no capsular issue**, stretch as normal |
+| §13 pec cramp | **Diagnosed: positional ischemic cramp / scar adhesion lockout.** Safe to treat; NOT stretching — scar & pec minor self-myofascial release + subscapularis/anterior-wall active reciprocation with isometric holds |
+| §9 specialization | Arms-only trial endorsed; trial *want and ability* to train daily, not just fatigue; reconvene after |
+| Ferritin | Out of physio scope — stays with the GP |
+
+Not in this response: the Day 28 stage-gate decisions (Stage 2B vs. extending
+2A, running introduction, formal exit-criteria evaluation) — those still land
+at the 2026-08-16 sitting. Prescriptions are encoded at the next block build.
 
 ---
 
