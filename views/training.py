@@ -1966,9 +1966,9 @@ def _render_add_training_fab() -> None:
             st.rerun()
 
         st.markdown('<div class="stAddFabExtra" style="display:none"></div>', unsafe_allow_html=True)
-        if st.button("💪  Extra Workout", key="tp_fab_extra"):
+        if st.button("🥾  Hike / Walk", key="tp_fab_hike"):
+            st.session_state.tp_hike_select = True
             st.session_state.tp_fab_open = False
-            st.toast("Extra Workout logging is coming soon.")
             st.rerun()
 
 
@@ -2104,6 +2104,133 @@ def _render_yoga_select() -> None:
             st.rerun()
 
 
+def _log_outdoor_activity(d: date, act: dict, session_rpe: int) -> None:
+    """Persist a Garmin-imported outdoor activity as a training session —
+    mirrors _log_yoga_completion's shape. Type="Outdoor" keeps it
+    SUPPLEMENTARY (real AU toward strain/ACWR, never a substitute for the
+    plan day); the CANONICAL exercise name (sess.outdoor_exercise_name)
+    carries the movement weight and the leg-day classification, and the
+    Garmin identity lives in the note. AU = RPE x duration, weighted 0.5 by
+    the content multiplier — rule 2b untouched: the activity's HR numbers
+    are persisted as context, never fed into AU."""
+    r = repo.get_repository()
+    minutes = max(1, int(round(float(act.get("duration_minutes") or 0))))
+    session = r.create_training_session(
+        session_date=d, duration_minutes=minutes, session_rpe=session_rpe)
+    name = sess.outdoor_exercise_name(act.get("type"))
+    sets = sess.make_sets_data({"name": name, "type": "duration",
+                                "duration_minutes": minutes})
+
+    def _num(v):
+        try:
+            return float(v) if v not in (None, "") else None
+        except (TypeError, ValueError):
+            return None
+
+    r.save_training_exercise(
+        session_id=session["session_id"],
+        movement_name=name,
+        movement_type="Outdoor",
+        planned_sets=1, planned_reps=1, rpe=session_rpe,
+        sets=sets,
+        note=(f"Garmin import: {act.get('name') or act.get('type')} "
+              f"[{act.get('type')}], started {act.get('start_time_local')}, "
+              f"activity {act.get('activity_id')}"),
+        session_date=session["session_date"],
+        session_duration_minutes=session["duration_minutes"],
+        session_rpe=session["session_rpe"],
+        session_au=session["session_au"],
+        garmin_avg_hr=_num(act.get("avg_hr")),
+        garmin_max_hr=_num(act.get("max_hr")),
+        garmin_distance_km=_num(act.get("distance_km")),
+        garmin_calories=_num(act.get("calories")),
+    )
+    st.cache_data.clear()  # the day strip and AU caches must see it now
+
+
+def _render_hike_import() -> None:
+    """The Garmin outdoor importer sub-screen (+ menu -> Hike / Walk):
+    pick a day (today or any past day — the 2026-08-08 Mittenwald walk is
+    the founding case), search that day's Garmin activities, pick one, rate
+    it, log it. The hike/walk/trail-run family is surfaced first but ANY
+    activity of the day can be logged — the type filter is advice, the
+    athlete's pick is the decision. The explicit Search button press runs
+    inside the sync runner's lock per CLAUDE.md rule 16 (waiting form)."""
+    st.markdown(f"<div style='color:{_OV_TEXT_PRI};font-size:22px;font-weight:700;"
+                f"margin-bottom:12px;'>Add outdoor training</div>",
+                unsafe_allow_html=True)
+    if st.button("← Back", key="tp_hike_back"):
+        st.session_state.tp_hike_select = False
+        st.session_state.pop("tp_hike_results", None)
+        st.rerun()
+
+    picked = st.date_input("Day of the activity", value=date.today(),
+                           max_value=date.today(), key="tp_hike_date")
+    iso = picked.isoformat()
+    if st.button("Search Garmin", key="tp_hike_search", type="primary"):
+        try:
+            with st.spinner("Asking Garmin…"):
+                with repo.get_sync_runner().exclusive():
+                    rows = repo.get_repository().get_garmin_activities_for_date(picked)
+            st.session_state.tp_hike_results = {iso: rows}
+        except background_sync.SyncBusyError:
+            st.warning("A device sync is running — try again in a few seconds.")
+        except Exception as exc:
+            st.error(f"Garmin search failed ({exc}) — nothing was changed. "
+                     "If this keeps happening, Garmin may be rate-limiting; try later.")
+
+    rows = (st.session_state.get("tp_hike_results") or {}).get(iso)
+    if rows is None:
+        st.caption("Pick the day and search. Hike, walk and trail-run "
+                   "activities are matched first, but any activity Garmin "
+                   "recorded that day can be logged.")
+        return
+    if not rows:
+        st.info(f"Garmin has no activities recorded on {iso}.")
+        return
+
+    outdoor = [r for r in rows
+               if (r.get("type") or "").lower() in sess.OUTDOOR_EXERCISE_BY_TYPE]
+    ordered = outdoor + [r for r in rows if r not in outdoor]
+
+    def _label(i: int) -> str:
+        r = ordered[i]
+        return (f"{r.get('name') or r.get('type')} — {r.get('type')} · "
+                f"{float(r.get('duration_minutes') or 0):.0f} min · "
+                f"{float(r.get('distance_km') or 0):.1f} km · "
+                f"avg HR {r.get('avg_hr') or '—'}")
+
+    pick = st.radio("Activity", list(range(len(ordered))), format_func=_label,
+                    key=f"tp_hike_pick_{iso}")
+    act = ordered[pick]
+    if (act.get("type") or "").lower() not in sess.OUTDOOR_EXERCISE_BY_TYPE:
+        st.warning(f"'{act.get('type')}' isn't in the hike/walk/trail-run "
+                   f"family — it logs as {sess.OUTDOOR_FALLBACK_EXERCISE}, "
+                   "with the Garmin type kept in the note.")
+
+    rpe = st.slider("How hard was it? (session RPE)", 1, 10, 3,
+                    key=f"tp_hike_rpe_{iso}",
+                    help="Foster session RPE — this is what drives AU, strain "
+                         "and ACWR. The avg HR above is context; your rating "
+                         "is the record, same as every gym session.")
+    name = sess.outdoor_exercise_name(act.get("type"))
+    minutes = float(act.get("duration_minutes") or 0)
+    st.caption(f"Logs as **{name}** on {iso}: {minutes:.0f} min × RPE {rpe} "
+               f"= {rpe * minutes:.0f} AU into strain and ACWR. It counts as "
+               "a leg day, and never marks a plan day as done.")
+    if st.button(f"Log to training — {name}", key=f"tp_hike_log_{iso}",
+                 type="primary", use_container_width=True):
+        try:
+            _log_outdoor_activity(picked, act, rpe)
+        except Exception as exc:
+            st.error(f"Couldn't log it — nothing was saved: {exc}")
+        else:
+            st.session_state.tp_hike_select = False
+            st.session_state.pop("tp_hike_results", None)
+            st.toast(f"{name} on {iso} logged — {rpe * minutes:.0f} AU.")
+            st.rerun()
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 #  Main render() — entry point for app.py SPA routing
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2119,6 +2246,10 @@ def render():
     #     always-available training path down with it. ─────────────────────────
     if st.session_state.get("tp_yoga_select"):
         _render_yoga_select()
+        nav.inject("training")
+        st.stop()
+    if st.session_state.get("tp_hike_select"):
+        _render_hike_import()
         nav.inject("training")
         st.stop()
     _render_add_training_fab()

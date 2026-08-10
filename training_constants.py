@@ -218,6 +218,15 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Hip Thrust (Loaded)",
     "Bulgarian Split Squat",
     "Lateral Band Walk",
+    # Garmin-imported outdoor activities (services/sessions.py
+    # OUTDOOR_EXERCISE_BY_TYPE) — lower_body so an imported hike counts as
+    # a leg day everywhere one definition of "a leg day" is read
+    # (flexibility retest spacing, sector tonnage).
+    "Outdoor Hike",
+    "Outdoor Walk",
+    "Outdoor Trail Run",
+    "Outdoor Run",
+    "Outdoor Activity",
 )
 
 EXERCISE_BODY_REGION: dict[str, str] = {
@@ -366,4 +375,18 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Walking — Gait Focus":                     ("mobility_core", 0.25),
     "Wall-Supported Hip Hinge":                 ("mobility_core", 0.25),
     "Week 1 Self-Assessment":                   ("mobility_core", 0.25),
+
+    # ── Garmin-imported outdoor activities (never authored in any PLAN;
+    #    logged only by the hike/walk importer, services/sessions.py
+    #    OUTDOOR_EXERCISE_BY_TYPE). bodyweight_compound 0.5, NOT the
+    #    mobility 0.25 of the plan's short recovery strolls: a multi-hour
+    #    hike is sustained unloaded lower-body work — step-ups at scale —
+    #    and Foster AU already carries intensity via RPE and duration.
+    #    tests/test_movement_weight_coverage.py pins every importer name
+    #    into this dict, because no PLAN iteration will ever ask for them. ──
+    "Outdoor Hike":                             ("bodyweight_compound", 0.5),
+    "Outdoor Walk":                             ("bodyweight_compound", 0.5),
+    "Outdoor Trail Run":                        ("bodyweight_compound", 0.5),
+    "Outdoor Run":                              ("bodyweight_compound", 0.5),
+    "Outdoor Activity":                         ("bodyweight_compound", 0.5),
 }

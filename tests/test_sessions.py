@@ -1287,3 +1287,22 @@ def test_no_streamlit_import():
             assert not any(a.name.split(".")[0] == "streamlit" for a in node.names)
         if isinstance(node, ast.ImportFrom):
             assert node.module is None or node.module.split(".")[0] != "streamlit"
+
+
+# ─── outdoor_exercise_name (the Garmin hike importer's naming) ──────────────
+
+def test_outdoor_exercise_name_maps_the_family_and_falls_back():
+    # Fixed canonical names, never Garmin's free text — the name is the key
+    # into the movement-weight and body-region tables. Measured 2026-08-10:
+    # a real Alpine hike arrives typed "walking" ("Mittenwald Walking"),
+    # which is why walking maps to the same tier as hiking.
+    assert sessions.outdoor_exercise_name("walking") == "Outdoor Walk"
+    assert sessions.outdoor_exercise_name("casual_walking") == "Outdoor Walk"
+    assert sessions.outdoor_exercise_name("hiking") == "Outdoor Hike"
+    assert sessions.outdoor_exercise_name("trail_running") == "Outdoor Trail Run"
+    assert sessions.outdoor_exercise_name("running") == "Outdoor Run"
+    assert sessions.outdoor_exercise_name("TRAIL_RUNNING") == "Outdoor Trail Run"
+    # Anything else the athlete picks anyway logs under the fallback name —
+    # the type filter is advice, the pick is the decision.
+    assert sessions.outdoor_exercise_name("cycling") == "Outdoor Activity"
+    assert sessions.outdoor_exercise_name(None) == "Outdoor Activity"

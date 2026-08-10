@@ -314,6 +314,26 @@ prescription under Structure is Stage 1 only; Stage 2A is externally loaded.
   separate `plan_start_date` config key does NOT drive the day number: it
   gates the first-run setup screen, seeds Phase 1, and feeds the "Plan Start"
   metric
+- **Garmin outdoor importer (locked, 2026-08-10):** the + menu's Hike/Walk
+  entry searches Garmin for a chosen day's activities (date-scoped fetch,
+  explicit button inside the sync runner's waiting lock) and logs the pick
+  as a session. CANONICAL exercise names only (`sessions.
+  OUTDOOR_EXERCISE_BY_TYPE` + `OUTDOOR_FALLBACK_EXERCISE`), never Garmin's
+  free text — the name keys the movement weight and body region, and a
+  dynamic name would score at the unmapped 1.0 tier (the 2026-08-01 bug)
+  and vanish from the leg-day definition. All outdoor names:
+  `bodyweight_compound` 0.5 (a hike is step-ups at scale; RPE and duration
+  carry intensity — NOT the 0.25 of the plan's recovery strolls) and
+  `lower_body` (an imported hike IS a leg day for retest spacing). Sessions
+  log `Type="Outdoor"` — SUPPLEMENTARY like Yoga
+  (`Repository.SUPPLEMENTARY_SESSION_TYPES`): real AU into strain/ACWR,
+  never marks a plan day done, never blocks the manual swap. Rule 2b
+  untouched: AU = athlete's RPE × Garmin's duration; the activity's HR is
+  persisted as context only. The type filter (walk/hike/trail-run family
+  first — a real Alpine hike arrives typed "walking", measured 2026-08-10)
+  is advice: any activity of the day can be logged, under the fallback
+  name. Stored strain self-heals for dates inside the 7-day
+  sync_metrics_history window; older imports need rederive_metrics_history.
 - **Session priority + missed-session rescheduling (locked, 2026-08-07):**
   `scheduling.SESSION_PRIORITY` ranks test > main > stretch > rest, one named
   table, tests pin the strict order. A session missed earlier THIS Mon-Sun

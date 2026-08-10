@@ -1206,3 +1206,22 @@ def test_repository_and_models_never_import_streamlit():
                 assert not any(a.name.split(".")[0] == "streamlit" for a in node.names)
             if isinstance(node, ast.ImportFrom):
                 assert node.module is None or node.module.split(".")[0] != "streamlit"
+
+
+def test_outdoor_sessions_are_supplementary_like_yoga():
+    # An imported hike is real load (its AU reaches strain/ACWR) but never a
+    # substitute for the plan day: has_logged_session must not mark the day
+    # done, and the plan-day logged set must exclude it — same contract as
+    # Yoga, via SUPPLEMENTARY_SESSION_TYPES.
+    import datetime as _dt
+    outdoor_page = {"properties": {
+        "Session Date": _date_prop("2026-08-08"),
+        "Movement": _title_prop("Outdoor Walk"),
+        "Type": _select_prop("Outdoor"),
+    }}
+    repo = _repo({"db-training": [outdoor_page]})
+    assert repo.has_logged_session(_dt.date(2026, 8, 8)) is False
+    start, end = _dt.date(2026, 8, 8), _dt.date(2026, 8, 8)
+    assert repo.get_logged_session_dates(start, end) == {"2026-08-08"}
+    assert repo.get_logged_session_dates(
+        start, end, include_supplementary=False) == set()

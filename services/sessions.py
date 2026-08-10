@@ -36,6 +36,34 @@ _RUN_WALK_PATTERN = re.compile(r"\b(walk|run)\w*")
 # views/training.py's Garmin info banner and its "✓ Activity Complete" handler).
 GARMIN_ACTIVITY_BUFFER_MINUTES = 5
 
+#: Garmin activityType.typeKey -> the CANONICAL exercise name the outdoor
+#: importer logs. Fixed names, never Garmin's free-text activityName: the
+#: exercise NAME is the key into EXERCISE_MOVEMENT_WEIGHT and
+#: EXERCISE_BODY_REGION, and a dynamic name would score at the unmapped 1.0
+#: barbell tier (the 2026-08-01 Stage 1 bug by another door) and vanish from
+#: the leg-day definition. Measured 2026-08-10: a real Alpine hike arrives
+#: typed "walking" ("Mittenwald Walking"), which is why the walk family maps
+#: to the same tier as hiking rather than being second-guessed by name.
+OUTDOOR_EXERCISE_BY_TYPE: dict[str, str] = {
+    "hiking": "Outdoor Hike",
+    "walking": "Outdoor Walk",
+    "casual_walking": "Outdoor Walk",
+    "speed_walking": "Outdoor Walk",
+    "trail_running": "Outdoor Trail Run",
+    "running": "Outdoor Run",
+}
+
+#: Any OTHER activity the athlete picks anyway (never a wall — the type
+#: filter is advice, the athlete's pick is the decision) logs under this
+#: name, with the Garmin type recorded in the session note.
+OUTDOOR_FALLBACK_EXERCISE = "Outdoor Activity"
+
+
+def outdoor_exercise_name(type_key: str | None) -> str:
+    """DETERMINISTIC. The canonical exercise name for a Garmin activity
+    type — the fallback name for anything outside the outdoor family."""
+    return OUTDOOR_EXERCISE_BY_TYPE.get((type_key or "").lower(), OUTDOOR_FALLBACK_EXERCISE)
+
 # The pre-session release protocol (always the same shared exercises inserted
 # first in every plan day) — detected by name so this stays in sync with
 # whatever training_plan.py's shared release-exercise constants are named.

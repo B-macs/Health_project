@@ -105,3 +105,33 @@ def test_stage1_names_no_longer_hit_the_unmapped_fallback():
     result = cw.day_content_multiplier(day)
     assert result["unmapped_names"] == []
     assert result["multiplier"] < cw.UNMAPPED_EXERCISE_WEIGHT
+
+
+# ─── Garmin-imported outdoor activities ─────────────────────────────────────
+# These names never appear in any PLAN, so no plan-iterating completeness
+# test will ever ask for them — this is the test that does. An unmapped
+# importer name would score a multi-hour hike at the 1.0 barbell tier
+# (the 2026-08-01 bug by another door) and drop it from the leg-day
+# definition the flexibility retest reads.
+
+def test_every_outdoor_importer_name_is_mapped_in_both_dicts():
+    from services import sessions as sess
+    names = set(sess.OUTDOOR_EXERCISE_BY_TYPE.values()) | {sess.OUTDOOR_FALLBACK_EXERCISE}
+    assert names  # the importer exists
+    for name in sorted(names):
+        assert name in tc.EXERCISE_MOVEMENT_WEIGHT, (
+            f"{name!r} would fall back to the unmapped 1.0 weight"
+        )
+        assert tc.EXERCISE_BODY_REGION.get(name) == "lower_body", (
+            f"{name!r} must count as a leg day (retest spacing, sector tonnage)"
+        )
+
+
+def test_outdoor_names_share_the_bodyweight_compound_tier():
+    # Sustained unloaded lower-body work — step-ups at scale — NOT the 0.25
+    # of the plan's short recovery strolls, and never the loaded tiers:
+    # Foster AU already carries intensity via RPE and duration.
+    from services import sessions as sess
+    names = set(sess.OUTDOOR_EXERCISE_BY_TYPE.values()) | {sess.OUTDOOR_FALLBACK_EXERCISE}
+    for name in names:
+        assert tc.EXERCISE_MOVEMENT_WEIGHT[name] == ("bodyweight_compound", 0.5)

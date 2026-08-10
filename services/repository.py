@@ -1172,23 +1172,34 @@ class Repository:
         )
         return len(pages) > 0
 
-    def has_logged_session(self, d: date) -> bool:
-        """True only for a logged rehab-plan session — a logged Yoga (or other
-        supplementary) session must never mark the plan day itself as done.
+    #: Session Type values that are SUPPLEMENTARY training: real load, real
+    #: strain, but never a substitute for the plan day — a logged Yoga flow
+    #: or an imported outdoor activity (hike/walk/trail run from Garmin)
+    #: must not mark the rehab plan day as done, must not block the manual
+    #: day swap, and must not close the missed-session carry.
+    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor"})
 
-        Filters "Type" != "Yoga" in Python rather than in the Notion query:
-        a `select.does_not_equal` filter is validated against the property's
-        currently-configured options at query time, and 400s outright if
-        "Yoga" isn't one of them yet — which is exactly the state before the
-        very first Yoga session is ever logged (save_training_exercise's
-        Type="Yoga" write is what lazily creates that option in the first
-        place). Querying by date alone and excluding Yoga client-side works
-        regardless of whether that option exists yet."""
+    def has_logged_session(self, d: date) -> bool:
+        """True only for a logged rehab-plan session — a logged Yoga,
+        imported outdoor activity, or other supplementary session must never
+        mark the plan day itself as done.
+
+        Filters the Type client-side in Python rather than in the Notion
+        query: a `select.does_not_equal` filter is validated against the
+        property's currently-configured options at query time, and 400s
+        outright if the option doesn't exist yet — which is exactly the
+        state before the very first session of that type is ever logged
+        (save_training_exercise's Type write is what lazily creates the
+        option in the first place). Querying by date alone and excluding
+        client-side works regardless of whether the option exists yet."""
         pages = self._query(
             self.config.notion_db_training,
             filter_={"property": "Session Date", "date": {"equals": str(d)}},
         )
-        return any(notion.get_property(p, "Type", "select") != "Yoga" for p in pages)
+        return any(
+            notion.get_property(p, "Type", "select") not in self.SUPPLEMENTARY_SESSION_TYPES
+            for p in pages
+        )
 
     def get_logged_session_dates(self, start: date, end: date,
                                  include_supplementary: bool = True) -> set[str]:
@@ -1211,7 +1222,8 @@ class Repository:
         )
         if not include_supplementary:
             pages = [p for p in pages
-                     if notion.get_property(p, "Type", "select") != "Yoga"]
+                     if notion.get_property(p, "Type", "select")
+                     not in self.SUPPLEMENTARY_SESSION_TYPES]
         return {d for p in pages if (d := notion.get_property(p, "Session Date", "date"))}
 
     def get_daily_session_au(self, days: int = 28, today: date | None = None) -> list[dict]:
@@ -2555,6 +2567,19 @@ class Repository:
             except Exception:
                 continue
         return hr_load.estimate_hr_max(observed)
+
+    def get_garmin_activities_for_date(self, d: date | str) -> list[dict]:
+        """Every Garmin activity recorded on calendar date `d`, as normalised
+        rows (_garmin_activity_row's shape) — the hike/walk importer's fetch,
+        date-scoped so a past day (the 2026-08-08 Mittenwald walk that
+        motivated it) costs one API call instead of a guessed limit walk.
+        Returns [] when Garmin is unconfigured; API errors (incl. RateLimited)
+        propagate so the view can say what happened rather than silently
+        showing an empty day."""
+        if self._gc is None:
+            return []
+        return [self._garmin_activity_row(a)
+                for a in garmin.get_activities_for_date(self._gc, d)]
 
     def find_open_garmin_activity(self, day: str) -> dict | None:
         """Today's longest Garmin activity, or None.

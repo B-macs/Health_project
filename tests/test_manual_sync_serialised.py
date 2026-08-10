@@ -40,6 +40,9 @@ GUARDED_SYNC_METHODS = {
     "sync_sleep_fusion",
     "sync_metrics_history",
     "sync_session_hr_recent",
+    # Read-only but rate-limited: the hike importer's date-scoped Garmin
+    # fetch is an explicit button press, so it takes the waiting lock.
+    "get_garmin_activities_for_date",
 }
 
 # Names that, appearing in a `with` item, mean the lock is held for that

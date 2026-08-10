@@ -128,6 +128,16 @@ def get_recent_activities(client, limit: int = 20) -> list[dict]:
     return activities or []
 
 
+def get_activities_for_date(client, d) -> list[dict]:
+    """Every activity recorded on calendar date `d` — the date-scoped fetch
+    get_recent_activities cannot express (walking back from newest with a
+    guessed limit is fragile for a date days in the past). One API call;
+    garminconnect paginates internally. Raw Garmin dicts, same shape as
+    get_recent_activities."""
+    activities = _retrying(client.get_activities_by_date, str(d), str(d))
+    return activities or []
+
+
 def get_activity_hr_zones(client, activity_id) -> list[dict]:
     """Garmin's own per-activity time-in-heart-rate-zone summary.
 
