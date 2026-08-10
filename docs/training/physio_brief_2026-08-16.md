@@ -1,7 +1,7 @@
 # Physio Brief — Day 28 Reassessment, 2026-08-16
 
 **Topic:** Interscapular tightness — bilateral, left dominant
-**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · §12 added 2026-08-06 · §13 added 2026-08-07 · **responses received 2026-08-10** · **Current block:** Stage 2A, Day 15 of 28
+**Prepared:** 2026-08-03 · §9, §10, §11 added 2026-08-05 · §12 added 2026-08-06 · §13 added 2026-08-07 · **responses received 2026-08-10** · §15 follow-ups added 2026-08-10 · **Current block:** Stage 2A, Day 15 of 28
 **Source records:** `patient_profile.py` `symptom_log` 2026-07-21, 2026-07-31, 2026-08-03, 2026-08-05, 2026-08-07, 2026-08-10
 
 ---
@@ -30,8 +30,9 @@ asked. Outcomes at a glance:
 
 Not in this response: **§14's micro-dose asks** and the Day 28 stage-gate
 decisions (Stage 2B vs. extending 2A, running introduction, formal
-exit-criteria evaluation) — those still land at the 2026-08-16 sitting.
-Prescriptions are encoded at the next block build.
+exit-criteria evaluation) — those still land at the 2026-08-16 sitting,
+along with **§15**, the five follow-ups these answers opened. Prescriptions
+are encoded at the next block build.
 
 ---
 
@@ -542,6 +543,37 @@ count as leg-loading days for the retest rule.
 4. The phase-2 concept in principle — a second daily dose on gym days,
    ≥ 6–8 h separated — so the boundary is on record before it is wanted,
    the same reason §9 is here.
+
+---
+
+## 15. Follow-ups your 2026-08-10 answers opened — five short ones for the sitting
+
+Added 2026-08-10. The responses closed §1–§13; these are the loose ends the
+answers themselves opened. None were urgent enough to send back early.
+
+1. **The pec protocol, hands-on.** Could you demonstrate both recommended
+   interventions — the scar & pec minor self-myofascial release, and the
+   subscapularis / anterior-wall active reciprocation with isometric holds?
+   Specifically: the position, how much pressure into and around the scar,
+   how long and how often per week, and the stop rule. And is the prayer
+   position itself the right re-check — should the lock-out fade as the work
+   takes effect, and on roughly what timescale?
+2. **The front-of-hip sustained pressure.** Where exactly, how hard, and how
+   long? Is it an assessment (find the tender spots once) or a standing
+   release like the ischial one — and given the neurovascular structures at
+   the front of the hip, what should *not* be pressed?
+3. **Rotation cue for horse stance and Cossack.** You cleared both movements;
+   the cue question from §12 is still open. The cluster documents cue
+   external rotation, while finding #4 requires neutral/internal rotation on
+   the right wherever the hip flexes under its own effort. Which applies to
+   these two loaded squats?
+4. **Symmetric or right-biased?** "Train both" is clear. Should the weaker
+   right get deliberate extra volume — unilateral emphasis, an extra set — or
+   strictly symmetric programming with the right simply never skipped?
+5. **Stillness/stiffness, not weakness.** Does that reframe change what gets
+   programmed — should thoracic-extension mobility (finding #3's T6–T10
+   stiffness) sit alongside the strengthening, or is the movement-break
+   protocol already the treatment for the stillness half?
 
 ---
 
