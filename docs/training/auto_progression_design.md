@@ -5,7 +5,12 @@ implements this yet. Written 2026-08-10. The athlete's brief: after 3 consecutiv
 sessions of an exercise at the same working weight, progress the load automatically
 rather than waiting for a decision, with the full per-set prescription visible
 **before the first rep**. Deterministic throughout — no AI anywhere in the decision
-path (Key Rules 1/2; docs/resume.md "The Hard Boundary").*
+path (Key Rules 1/2; docs/resume.md "The Hard Boundary"). Revised 2026-08-10, same
+day, after an adversarially-verified literature review (13-agent sweep, every
+contested finding independently re-checked against primary sources): four rationale
+corrections (§3.2, §3.4 twice, §4.1/§8 arithmetic), the pain gate moved 2/10 → 5/10
+on the athlete's direction, a tissue-status cadence dimension (§4.2), and the
+no-intensity-ceiling principle made explicit (§4.3).*
 
 ---
 
@@ -87,9 +92,17 @@ Two deliberate properties fall out:
 - **Overshooting never skips rungs.** The target is what advances, +1 per qualifying
   session, no matter how many reps were actually done. Doing 12 on a target-10 day
   confirms the session; it does not jump the ladder. For a Beighton 6/9 athlete whose
-  connective tissue adapts slower than muscle (Baar annex §3.1: the growth signal is
-  magnitude-insensitive — *heavy is not the point*), capping the rate of advance is
-  the feature, not a limitation.
+  connective tissue adapts slower than muscle (Kubo 2010; Bohm/Mersmann/Arampatzis
+  2015 — tendon mechanical adaptation needs ~12+ weeks where strength moves in
+  weeks), capping the rate of advance is the feature, not a limitation. The Baar
+  annex's magnitude-insensitivity finding is cited here only at its true tier:
+  **engineered-ligament signaling evidence, contested for in-vivo tendon mechanics**
+  — in vivo, tendon *stiffness* adaptation is strain-magnitude-dependent, and the
+  best-evidenced stimulus is a heavy isometric hold (~85–90% MVC with 3 s ramps;
+  Arampatzis 2007's volume-matched legs adapted only on the high-strain side; Bohm
+  2015 meta-analysis; McMahon 2022 "No Strain, No Gain?"). The *rate* stays capped
+  for the signaling and turnover reasons; *intensity* is never capped for them
+  (§4.3).
 - **The minimum time-at-weight is tunable per exercise** by span width, which is how
   the block's fast-track/slow-track policy (training_plan.py:1754-1758) translates
   into the machine: narrow span = faster cadence.
@@ -123,7 +136,7 @@ the design — two readers evaluating in different orders must be impossible.
    **STEP-FAILURE** (→ rollback, §3.5); all sets ≥ target → the step **commits** and
    the session advances (`t = rep_min + 1`).
 7. **`w_session` = current `w`**: gates first — session RPE > the stage
-   `rpe_ceiling`, or the check-in pain score **as of the session date** > 2, or the
+   `rpe_ceiling`, or the check-in pain score **as of the session date** > 5, or the
    pain check-in missing → **HOLD with reason** (a measurement not taken is not
    evidence of health). Then: all sets ≥ `t` → **QUALIFYING** (`t + 1`, or arm the
    step at `rep_max`); any set `< rep_min` → **FAILURE** (§3.5); otherwise
@@ -136,16 +149,40 @@ the design — two readers evaluating in different orders must be impossible.
    bug `double_progression` was explicitly written to avoid.
 9. Anything else → **HOLD**.
 
+The pain threshold is **5/10** — the pain-monitoring model's validated acceptable
+zone (Silbernagel 2007: pain up to 5/10 permitted during loading provided it settles
+by next morning; Smith 2017 meta-analysis: protocols *allowing* pain slightly
+outperform pain-free ones short-term). Moved from an earlier 2/10 draft on the
+athlete's direction (2026-08-10 — his own record: pain at 3–4/10 has repeatedly been
+fine to train on a day later). The next morning's check-in *is* the settle test: a
+spike shows up as that day's score and gates that day's session by this same rule.
+Two neighbouring constructs are deliberately untouched: the Baar annex's ≤ 2/10
+ceiling (intra-exercise pain during tendon-rehab dosing — a different layer's
+prescription) and the Stage-2 exit criterion (≤ 2/10 across working lifts as a block
+*outcome*).
+
 Gates only ever demote QUALIFYING to HOLD. They never manufacture a failure.
 
 ### 3.4 Step preconditions (beyond `t == rep_max`)
 
 - **Calendar spacing: ≥ 5 days since this exercise's last committed step.** The
-  machine is exposure-indexed, but the physio's rate rule is per calendar week
-  ("keeping weekly increases under ~30% — the single biggest tendon mistake",
-  physio_brief_2026-08-16.md §10). A manual swap (`manual_swap_entries`) can pull two
-  exposures of one session into the same week; without this guard that is two steps
-  in seven days. A spacing-suppressed step is a HOLD with its reason on screen.
+  machine is exposure-indexed, but the physio brief's rate rule is per calendar week
+  ("keeping weekly increases under ~30%", physio_brief_2026-08-16.md §10). **Evidence
+  tier, recorded honestly (2026-08-10 review):** the 30% figure is a clinical
+  heuristic, not a validated tendon threshold — it traces through a popular summary
+  of Baar's work to novice-runner volume epidemiology (Nielsen 2014, where >30%/week
+  distance progression raised distance-injury risk but notably *not* Achilles
+  tendinopathy), the ACWR framework it is mapped onto is critiqued (Impellizzeri
+  2020/2021: mathematical coupling, no causal reading; no study validates a 1.3 cut
+  point), and Nielsen's 2025 cohort (5,205 runners) relocates running-injury risk to
+  *single-session spikes* rather than weekly aggregates. The rule is kept because its
+  direction — anti-spike — matches the newest data and its cost is one held session.
+  **Revisit after 2026-10-11** (post-race, once running load stabilises): re-derive
+  whether the 5-day constant and the 30% framing should stand, tighten, or be
+  replaced by a single-session-spike guard. A manual swap (`manual_swap_entries`) can
+  pull two exposures of one session into the same week; without this guard that is
+  two steps in seven days. A spacing-suppressed step is a HOLD with its reason on
+  screen.
 - **`REL_STEP_CAP`: if `inc / w > 0.25`, no step** — instead the lift enters
   **extended-rep mode**: `t` may climb past `rep_max` up to an authored absolute cap
   (e.g. Bulgarian Split Squat 8 → 15), converting the too-coarse step into rep
@@ -160,8 +197,15 @@ Gates only ever demote QUALIFYING to HOLD. They never manufacture a failure.
   proxy.
 - **Stale gap: > 21 days since the last exposure** → `t` resets to `rep_min` at the
   current `w` before proposing, captioned. Session-indexed streaks must not survive a
-  layoff untouched (Baar §6.1: detraining is fast — measurable collagen loss in
-  days); 21 days survives a reassessment week plus an illness week, not a month off.
+  layoff untouched. **Source: Bosquet 2013** (meta-analysis, 103 studies — the
+  decline in maximal force after training cessation becomes statistically significant
+  from the *third week* of inactivity), which lands the 21-day boundary almost
+  exactly; 21 days survives a reassessment week plus an illness week, not a month
+  off. The Baar annex §6.1 collagen figure is deliberately *not* the source
+  (corrected 2026-08-10): it is a casted-mouse total-immobilization result, and an
+  ambulatory human who merely stops lifting keeps loading tendons through gait —
+  under those conditions tendon stiffness takes ~2 months to revert (Kubo 2010), not
+  days.
   Revert condition, `HRV_GARMIN_HOLD` idiom: if this ever resets a streak the athlete
   judges still valid, re-examine the constant against the actual gap — on the
   measurement, not the complaint.
@@ -238,6 +282,15 @@ design owns that instead of pretending: light lifts get the widest spans the for
 allows, rollbacks there are **expected**, and the rollback path (§3.5) is sized as a
 routine mechanism, not an edge case.
 
+**The formula is a heuristic, not a guarantee** (recorded 2026-08-10): Epley's fixed
+r/30 slope is best-validated at ≤ 10 reps-to-failure, and the true load–reps relation
+is nonlinear, exercise-dependent and individually variable by more than these budgets
+(Nuzzo 2024 meta-regression, 7,289 individuals — cubic splines fit, separate curves
+per exercise). The budgets *size spans*; the *check* is empirical — a step commits
+only on performed evidence (§3.1), and rollback (§3.5) is the correction whenever the
+heuristic was wrong for a given lift. No number derived from this formula is a demand
+guarantee.
+
 ### 4.2 The per-exercise table (recommended; final numbers land at block build with the physio)
 
 Idiom: one explicit entry per lift with a why-string, coverage pinned by test — the
@@ -248,7 +301,7 @@ default: an unlisted loaded lift fails the gate, it does not silently get 2.5 kg
 |---|---|---|---|---|---|
 | Lat Pulldown | cable | 2.5 kg¹ | 10/12 | fast | Documented strength (2025 peak 60×12); ~5.6% step at 45 kg, near-neutral |
 | Hip Thrust (Loaded) | plate | 2.5 kg | 10/12 | fast | 1.25 kg plate pair; well-tolerated pattern |
-| Single-Arm DB Row | dumbbell | 2.5 kg | 10/12 | fast | DB rack quantum; ~12.5% step at 20 kg — mildly over budget, accepted for a fast-track lift |
+| Single-Arm DB Row | dumbbell | 2.5 kg | 10/12 | fast | DB rack quantum; ~12.5% step at 20 kg exceeds the 5% neutrality budget — accepted: no published increment ceiling exists (see below) and the rep-floor reset bounds the demand rise |
 | Romanian Deadlift (DB) | dumbbell | 2.5 kg | 8/12 | slow | Documented breakdown pattern; 20% step at 12.5 kg needs the widest span |
 | Goblet Squat | dumbbell | 2.5 kg | 8/12 | slow | Same; current 8/10 span widens |
 | Incline DB Press | dumbbell | 2.5 kg | 8/12 | slow | Over `REL_STEP_CAP` below 10 kg → extended-rep mode until then |
@@ -259,11 +312,51 @@ default: an unlisted loaded lift fails the gate, it does not silently get 2.5 kg
 ¹ Verify the actual pin quantum of the gym's stack before authoring; `increment_size`
 is per-machine for exactly this reason.
 
+**On increment ceilings (recorded 2026-08-10):** no current published guidance names
+a percentage these steps violate. ACSM's 2009 "2–10%" rule was expert opinion
+(Evidence Category B, resting on a single 1999 narrative review) and the 2026
+position stand that replaced it deliberately sets *no* increment percentage,
+prioritising individualised prescription. The binding constraints here are the
+hardware quantum, the §4.1 neutrality heuristic, and the demand arithmetic above.
+The actionable consequence: **where finer increments physically exist** — 1.25 kg
+micro-plates for the hip thrust bar, smaller cable pins — author them at block build
+for the over-budget lifts, pre-empting arithmetically predictable rollbacks instead
+of waiting for two step-failures to raise `NEEDS_REVIEW`.
+
+**Tissue status overrides track (added 2026-08-10, athlete's direction):** the
+fast/slow track above comes from the 2025 log's strength/breakdown patterns; a
+second, overriding dimension now sits on top of it. A lift loading a region with
+**documented pathology** (the lumbar spine's annular tears; the post-Latarjet right
+shoulder) keeps the wide span and slow cadence regardless of track. A lift loading
+**believed-healthy tissue** runs the standard cadence (narrow span) — the
+tendinopathy-rehab literature steps load every 1–3 weeks in *pathological* tendon
+(Kongsgaard 2009, Beyer 2015), so healthy tissue under a physio-confirmed assignment
+does not need wider margins than diseased tissue is given. The per-lift tissue-status
+assignment is the physio's call at the block build and lands in the table's final
+why-strings.
+
 The hypermobility profile's "smaller, slower jumps" lands in three places, not one:
 the +1/session target cap (§3.2), the span widths above, and the 5-day step spacing
-(§3.4). The physio's <30%/week rule is the named source for the spacing rule; the
-Baar annex's magnitude-insensitivity is the named source for preferring rep headroom
-over forced weight steps at light loads.
+(§3.4). The spacing rule's source is the physio brief's <30%/week heuristic, carried
+at the evidence tier recorded in §3.4; the preference for rep headroom over forced
+weight steps at light loads rests on the Baar annex's finding taken at *its* tier —
+engineered-ligament signaling evidence, contested for in-vivo tendon mechanics
+(§3.2) — and, independently, on the hardware-quantum arithmetic above, which stands
+regardless of which physiology is right.
+
+### 4.3 No intensity ceiling — heavy is never banned
+
+The machine caps *rate* (one rung per session, one step per ≥ 5 days) and never
+*intensity*: there is no weight at which stepping stops, and no rule in this design
+may be read as one (athlete's direction, 2026-08-10). The evidence is affirmative,
+not merely permissive: high-load, full-range strengthening beat low-load mid-range in
+the largest HSD/hEDS RCT with no excess pain (Liaghat 2022, n = 100; effect held at
+the 1-year follow-up), and in-vivo tendon stiffness adaptation *requires*
+high-magnitude loading — the best-evidenced stimulus being a heavy isometric hold at
+~85–90% MVC (Arampatzis 2007; Bohm 2015). Conservative cadence is the guard-rail; it
+must never become a ceiling on where the ladder eventually goes. If a future block
+ever needs a per-lift intensity cap, that is a clinical prescription belonging to the
+physio, recorded with its revert condition — never a property of this machine.
 
 ---
 
@@ -297,7 +390,9 @@ What changes and what is untouched, exactly:
   `True`, the machine still computes and *displays* its verdict as a caption but the
   seed falls back to last-time values — a breach is reported, never acted on. Same
   pattern and same reasoning as `ACWR_ADVISORY_MODE`/`HRV_GARMIN_HOLD`; flip on a
-  measurement (e.g. a pain-trend > 2/10 attributable to step cadence), restore with
+  measurement (e.g. a sustained pain-trend above the Stage-2 exit criterion's 2/10
+  working-lift ceiling, attributable to step cadence — that criterion's construct,
+  not §3.3's 5/10 session gate), restore with
   no other edit.
 
 ---
@@ -439,9 +534,13 @@ Config: span 10/12, increment 2.5 kg (cable pin), fast track.
 
 Three consecutive sessions at 45 kg — the athlete's trigger, emerging structurally.
 Pre-session screen for S4: `Set 1–3: 47.5 kg × 10 (last: 45 kg × 12)` — "3 sessions
-completed at 45 kg." Per-set demand at the step: e1RM 63.0 → 60.2, i.e. the step
-session is *easier* per set than the ceiling session before it; the climb back to 12
-is where the progress happens. Cadence: +2.5 kg per 3 qualifying sessions.
+completed at 45 kg." Per-set demand at the step, by the §4.1 heuristic: e1RM
+63.0 → **63.3** (+0.5%), near-neutral — the rep-floor reset absorbs almost all of the
+5.6% load step. (Corrected 2026-08-10: an earlier draft quoted 60.2 here, which is
+the 8/12-span figure (47.5 × 8) imported by mistake; on the 10/12 span the step is
+marginally *harder*, not easier, exactly as §4.2's "near-neutral" label says.) The
+climb back to 12 is where the progress happens. Cadence: +2.5 kg per 3 qualifying
+sessions.
 
 **Failure branch**: S4 = 47.5 × 10, 9, 8 → STEP-FAILURE → rollback, S5 proposes
 45 × 10; climb 10 → 11 → 12; a second failure at 47.5 → `NEEDS_REVIEW` ("two failed
@@ -534,12 +633,16 @@ Lands at the **post-2026-08-16 block build**, not mid-block:
 
 1. **Authoring debt** (training_plan.py): rep spans for the six unspanned lifts
    (RDL, Hip Thrust, Lat Pulldown, Single-Arm DB Row, BSS; Prone Y-Raise stays out);
-   the increment/span/track table (§4.2) with the gym's real pin quanta; **retire the
-   weekly `*_kg` ladders** — the plan authors starting weights, the machine owns the
-   trajectory from there.
-2. **Physio touchpoint**: the §4.2 table and the 5-day spacing rule are shown at the
-   2026-08-16 sitting — the <30%/week rule is theirs, and the block build is where
-   Key Rule 11's read-and-acknowledge checklist already runs.
+   the increment/span/track table (§4.2) with the gym's real pin quanta, the per-lift
+   **tissue-status assignments** (§4.2), and **micro-increments authored up front
+   where the hardware exists** (1.25 kg plates, finer pins) for the over-budget
+   lifts; **retire the weekly `*_kg` ladders** — the plan authors starting weights,
+   the machine owns the trajectory from there.
+2. **Physio touchpoint**: the §4.2 table, the 5-day spacing rule, the 5/10 pain gate
+   and the tissue-status assignments are shown at the 2026-08-16 sitting — the
+   <30%/week heuristic entered through their brief (its evidence tier is recorded in
+   §3.4, with a revisit due after 2026-10-11), and the block build is where Key
+   Rule 11's read-and-acknowledge checklist already runs.
 3. **Capture fix first**: the unilateral left-side overwrite (§7.1) merges before or
    with the machine, or DB Row ships excluded from scope until it does.
 4. **Migration order**: `ensure_prescription_column()` before the first save;
@@ -551,8 +654,18 @@ Lands at the **post-2026-08-16 block build**, not mid-block:
    physio wants the first block observed rather than acted on.
 
 *Sources traced: services/sessions.py:500-541 (LOAD RESOLUTION), services/engine.py:317-377
-(double_progression), physio_brief_2026-08-16.md §10 (<30%/week), Input_files/baar_tendon_annex.md
-§3.1/§6.1 (magnitude-insensitivity, detraining), docs/clinical_profile_weighting.md §2-§3
-(hypermobility weighting, ceilings-not-starting-points), services/scheduling.py:39-54 & 192-215
-(ASK-FIRST, declined_entries), CLAUDE.md Key Rules 1-3. No clinical number in this document is
-invented; every constant carries its source or is marked for block-build authoring.*
+(double_progression), physio_brief_2026-08-16.md §10 (<30%/week heuristic — evidence tier in §3.4),
+Input_files/baar_tendon_annex.md §3.1/§6.1 (cited at their evidence tiers per the 2026-08-10
+review), docs/clinical_profile_weighting.md §2-§3 (hypermobility weighting,
+ceilings-not-starting-points), services/scheduling.py:39-54 & 192-215 (ASK-FIRST,
+declined_entries), CLAUDE.md Key Rules 1-3. Literature (2026-08-10 review, each claim
+adversarially verified against primary sources): Bosquet 2013 (21-day boundary); Silbernagel 2007
+& Smith 2017 (5/10 pain gate); Liaghat 2022 + 2024 follow-up (heavy-load tolerance in HSD/hEDS);
+Arampatzis 2007, Bohm/Mersmann/Arampatzis 2015, McMahon 2022 (strain-magnitude threshold, heavy
+isometric holds); Kubo 2010 (tendon detraining timeline); Nuzzo 2024 (Epley limits); Kongsgaard
+2009 & Beyer 2015 (HSR cadence in pathological tendon); Impellizzeri 2020/2021 & Nielsen
+2014/2025 (ACWR and 30%-rule evidence tier); ACSM 2026 position stand (no increment percentage);
+Plotkin 2022 & Chaves 2024 (rep- vs load-progression equivalence); Coleman 2024 & Bell 2023
+(reactive over scheduled deloads); Robinson 2024 (proximity-to-failure meta-regression). No
+clinical number in this document is invented; every constant carries its source or is marked for
+block-build authoring.*
