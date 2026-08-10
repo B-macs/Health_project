@@ -1267,8 +1267,12 @@ PROFILE = {
                     "targeted training to get back to clean active training.'"
                 ),
                 "athlete_decisions_same_day": (
-                    "The athlete resolved the five §15 follow-ups himself the same day, "
-                    "keeping only the hands-on assessment work for 2026-08-16: (1) the "
+                    "The athlete resolved the five §15 follow-ups himself the same day. "
+                    "What remains for 2026-08-16 is NOT an appointment — it is "
+                    "PLAN_STAGE2[28], the plan's own self-administered test session, "
+                    "whose data then goes to the physio for the format-free sign-off "
+                    "stage_2_exit_criteria requires (remote is fine; the brief was "
+                    "answered remotely). The decisions: (1) the "
                     "pec techniques are built IN-HOUSE from the Cluster D source "
                     "documents and the Baar annex rather than waiting for a demo — "
                     "docs/training/release_protocols_2026-08-10.md, a pre-registered "

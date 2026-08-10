@@ -6,12 +6,12 @@
 
 ---
 
-## ✅ ANSWERED — responses received 2026-08-10, six days ahead of the sitting
+## ✅ ANSWERED — responses received 2026-08-10, six days ahead of the Day-28 reassessment
 
 The asks in **§1–§13 are answered**; the full record is `patient_profile.py`
 `symptom_log` **2026-08-10**. **§14's four asks were NOT part of this response
-and still land at the sitting.** The sections that follow are preserved as
-asked. Outcomes at a glance:
+and remain open.** The sections that follow are preserved as asked. Outcomes
+at a glance:
 
 | Ask | Outcome |
 |---|---|
@@ -29,11 +29,14 @@ asked. Outcomes at a glance:
 | Ferritin | Out of physio scope — stays with the GP |
 
 Not in this response: **§14's micro-dose asks** and the Day 28 stage-gate
-decisions (Stage 2B vs. extending 2A, running introduction, formal
-exit-criteria evaluation) — those still land at the 2026-08-16 sitting.
-**§15's five follow-ups were resolved by the athlete the same day** (see §15)
-— nothing from §15 remains for the sitting. Prescriptions are encoded at the
-next block build.
+decisions (Stage 2B vs. extending 2A, running introduction). Those rest on
+data that does not exist yet: the plan's own self-administered Day 28 test
+session (`PLAN_STAGE2[28]` — functional screen + final working loads),
+performed by the athlete on 2026-08-16. Once that data exists, the
+`stage_2_exit_criteria` sign-off is **format-free** — remote is fine, exactly
+as this brief was answered. **§15's five follow-ups were resolved by the
+athlete the same day** (see §15) — nothing from §15 remains open.
+Prescriptions are encoded at the next block build.
 
 ---
 
@@ -550,7 +553,7 @@ count as leg-loading days for the retest rule.
 ## 15. Follow-ups your 2026-08-10 answers opened — RESOLVED same day by the athlete
 
 Added 2026-08-10; resolved by the athlete the same day — **nothing in this
-section remains for the sitting.** Outcomes: (1) the pec techniques were built
+section remains open.** Outcomes: (1) the pec techniques were built
 in-house from the shoulder-cluster source material and the tendon annex's
 conduct rules rather than waiting for a demo — see
 `docs/training/release_protocols_2026-08-10.md`, a pre-registered two-week
