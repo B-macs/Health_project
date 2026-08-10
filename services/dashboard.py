@@ -376,6 +376,7 @@ def compute_region_strain_snapshot(
     overall_snapshot: dict | None = None,
     provenance: dict | None = None,
     acwr_results: dict | None = None,
+    window_row: dict | None = None,
 ) -> dict:
     """The regional companion to compute_daily_metrics_snapshot.
 
@@ -394,14 +395,30 @@ def compute_region_strain_snapshot(
     the rolling 7-day stand-in (there is no single day to divide), and on a
     day where nothing mapped — a pure yoga session. Callers must render "—"
     in that case, never 0.0.
+
+    `window_row` overrides the second of those on request: pass
+    strain_regions.rolling_prior_region_row(...) and the same renderer shows
+    the WEEK's shape instead of a blank panel. `window` in the result is then
+    "week" rather than "day", and the caller is expected to say so on screen —
+    a 7-day mean and a single session are not the same measurement.
     """
     provenance = provenance or {}
     overall_snapshot = overall_snapshot or {}
-    row = _strain_regions.region_au_for_date(region_rows, d)
-
     rolling = bool(overall_snapshot.get("strain_is_rolling"))
+
+    # On a rest day the headline is a 7-day trailing average, so there is no
+    # single day to divide and the panel is blank by default. `window_row`
+    # is the athlete opting IN to seeing the week's shape instead: the same
+    # renderer, fed 7-day means in a daily row's shape.
+    if rolling and window_row:
+        row, window = window_row, "week"
+    else:
+        row, window = _strain_regions.region_au_for_date(region_rows, d), "day"
+
     strains = _strain_regions.region_strain(row, stage)
-    has_split = bool(row) and not rolling and any(v is not None for v in strains.values())
+    has_split = bool(row) and any(v is not None for v in strains.values())
+    if rolling and window == "day":
+        has_split = False
 
     total_au = float((row or {}).get("total_au") or 0.0)
     unattributed_au = float((row or {}).get(_strain_regions.UNATTRIBUTED) or 0.0)
@@ -435,6 +452,14 @@ def compute_region_strain_snapshot(
         "unmapped_names": provenance.get("unmapped_names") or [],
         "shares_basis": _tc.REGION_SHARES_BASIS,
         "shares_version": _tc.REGION_SHARES_VERSION,
+        # "day" | "week" — what the split describes. The caller MUST surface
+        # this: the numbers look alike and mean different things.
+        "window": window,
+        "window_days": (row or {}).get("window_days"),
+        # True when a rest day HAS a week worth showing, so a caller can offer
+        # the toggle rather than a dead control.
+        "can_show_window": bool(rolling and window_row),
+        "is_rolling": rolling,
     }
 
 

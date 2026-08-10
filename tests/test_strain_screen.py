@@ -15,6 +15,7 @@ from pathlib import Path
 
 import pytest
 
+import app as app_module
 from services import dashboard, strain_regions as sr
 
 REGIONS = sr.REGIONS
@@ -128,6 +129,72 @@ def test_every_region_still_carries_an_acwr_verdict_when_there_is_no_split():
         assert region["acwr"]["value"] == "ACWR —"
 
 
+# ─── the rest-day week toggle ────────────────────────────────────────────────
+
+_WEEK_ROW = {"date": D.isoformat(), "upper_body": 11.9, "core": 13.1,
+             "lower_body": 25.2, "unattributed": 0.0, "total_au": 50.2,
+             "regions_known": True, "window_days": 3}
+
+
+def test_a_rest_day_stays_blank_until_the_week_is_asked_for():
+    """Off by default: a 7-day mean is a different measurement from a session,
+    so the screen offers it rather than asserting it."""
+    off = _snap(rolling=True)
+    assert off["has_split"] is False
+    assert off["window"] == "day"
+
+
+def test_asking_for_the_week_fills_the_same_panel():
+    on = _snap(rolling=True)
+    on = dashboard.compute_region_strain_snapshot(
+        D, _rows(), 2,
+        overall_snapshot={"strain": 10.0, "strain_is_rolling": True},
+        window_row=_WEEK_ROW,
+    )
+    assert on["has_split"] is True
+    assert on["window"] == "week"
+    assert on["window_days"] == 3
+    assert [r["id"] for r in on["regions"]] == list(REGIONS)
+
+
+def test_the_week_view_is_labelled_as_a_week_not_a_day():
+    """The numbers look alike and mean different things, so `window` has to
+    reach the renderer."""
+    on = dashboard.compute_region_strain_snapshot(
+        D, _rows(), 2,
+        overall_snapshot={"strain": 10.0, "strain_is_rolling": True},
+        window_row=_WEEK_ROW,
+    )
+    html = app_module._region_block(on, 10.0, 2)
+    assert "last 7 days" in html
+    assert "seven days before today" in html
+
+
+def test_a_window_row_is_ignored_on_a_day_that_is_not_rolling():
+    """A logged day has its own split; the week must never quietly replace it."""
+    on = dashboard.compute_region_strain_snapshot(
+        D, _rows(), 2,
+        overall_snapshot={"strain": 14.5, "strain_is_rolling": False},
+        window_row=_WEEK_ROW,
+    )
+    assert on["window"] == "day"
+    assert on["regions"][0]["au"] == 50.1
+
+
+def test_the_toggle_is_a_button_not_an_anchor():
+    """tests/test_spa_navigation.py's rule: an in-app anchor tears the page
+    down and reconnects the websocket. _go writes st.query_params instead, so
+    the rerun happens over the existing one."""
+    src = _app_source()
+    assert 'key="strain_week"' in src
+    assert "on_click=_go" in src
+    assert 'href="?rw=' not in src
+
+
+def test_the_toggle_is_only_offered_when_the_week_has_something_in_it():
+    assert _snap(rolling=True).get("can_show_window") is False
+
+
 # ─── the other two drill-downs are untouched ─────────────────────────────────
 
 def _app_source() -> str:
@@ -185,7 +252,7 @@ def test_the_region_reads_happen_only_on_the_strain_branch():
     mistaken for a call site."""
     tree = ast.parse(_app_source())
     detail = next(n for n in ast.walk(tree)
-                  if isinstance(n, ast.FunctionDef) and n.name == "_metric_detail")
+                  if isinstance(n, ast.FunctionDef) and n.name == "_metric_detail_parts")
     wanted = {"_region_au_history", "_stage_start_cached"}
 
     def _calls(node):

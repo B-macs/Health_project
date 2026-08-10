@@ -264,6 +264,74 @@ def test_rolling_is_all_none_when_the_window_is_empty():
     assert out == {r: None for r in REGIONS}
 
 
+# ─── the rest-day week ───────────────────────────────────────────────────────
+
+def _week_rows():
+    return [
+        {"date": "2026-07-14", "upper_body": 20.0, "core": 10.0,
+         "lower_body": 70.0, "unattributed": 0.0, "total_au": 100.0,
+         "regions_known": True},
+        {"date": "2026-07-17", "upper_body": 40.0, "core": 20.0,
+         "lower_body": 40.0, "unattributed": 0.0, "total_au": 100.0,
+         "regions_known": True},
+    ]
+
+
+def test_the_week_row_has_a_daily_rows_shape():
+    """One shape means one renderer — the week is fed through exactly the same
+    path a day is, rather than growing a parallel display."""
+    row = sr.rolling_prior_region_row(_week_rows(), date(2026, 7, 20))
+    assert set(REGIONS) <= set(row)
+    assert {"date", "total_au", "regions_known", sr.UNATTRIBUTED} <= set(row)
+
+
+def test_the_week_parts_sum_exactly_to_its_total():
+    row = sr.rolling_prior_region_row(_week_rows(), date(2026, 7, 20))
+    parts = sum(row[k] for k in list(REGIONS) + [sr.UNATTRIBUTED])
+    assert parts == pytest.approx(row["total_au"], abs=1e-9)
+
+
+def test_the_week_divides_by_seven_including_rest_days():
+    """Rest days count as a real 0. Averaging only over days that had a session
+    would measure how hard he trains, not how much load he carried in."""
+    row = sr.rolling_prior_region_row(_week_rows(), date(2026, 7, 20))
+    assert row["lower_body"] == pytest.approx((70.0 + 40.0) / 7, abs=0.05)
+    assert row["window_days"] == 2
+
+
+def test_a_week_with_nothing_in_it_is_none_not_zeros():
+    assert sr.rolling_prior_region_row([], date(2026, 7, 20)) is None
+    assert sr.rolling_prior_region_row(_week_rows(), date(2026, 9, 1)) is None
+
+
+def test_the_week_only_counts_the_seven_days_before_today():
+    """Today's own load is not part of the load carried INTO today."""
+    rows = _week_rows() + [
+        {"date": "2026-07-20", "upper_body": 999.0, "core": 0.0,
+         "lower_body": 0.0, "unattributed": 0.0, "total_au": 999.0,
+         "regions_known": True}]
+    row = sr.rolling_prior_region_row(rows, date(2026, 7, 20))
+    assert row["upper_body"] == pytest.approx((20.0 + 40.0) / 7, abs=0.05)
+
+
+def test_a_week_of_nothing_but_unmapped_work_still_reads_as_unknown():
+    rows = [{"date": "2026-07-17", "upper_body": 0.0, "core": 0.0,
+             "lower_body": 0.0, "unattributed": 90.0, "total_au": 90.0,
+             "regions_known": False}]
+    row = sr.rolling_prior_region_row(rows, date(2026, 7, 20))
+    assert row["regions_known"] is False
+    assert sr.region_strain(row, 2) == {r: None for r in REGIONS}
+
+
+def test_the_week_is_still_bounded_by_its_own_overall():
+    """The property that keeps the panel readable holds for the window too."""
+    row = sr.rolling_prior_region_row(_week_rows(), date(2026, 7, 20))
+    strains = sr.region_strain(row, 2)
+    overall = engine.au_to_strain(row["total_au"], 2)
+    for region, value in strains.items():
+        assert value <= overall, region
+
+
 # ─── the heart-rate term ─────────────────────────────────────────────────────
 
 def test_hr_load_is_divided_by_the_au_shares_and_says_so():

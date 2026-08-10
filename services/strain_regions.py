@@ -439,29 +439,63 @@ def additivity_gap(region_strains: dict[str, float | None],
     return round(sum(values) - overall_strain, 1)
 
 
-def rolling_prior_region_strain(
-    rows: list[dict], stage: int, today: date | None = None,
-) -> dict[str, float | None]:
-    """The regional analogue of dashboard.rolling_prior_strain: mean AU per
-    region over the 7 days BEFORE today (rest days count as 0), each through
-    the curve.
+def rolling_prior_region_row(
+    rows: list[dict], today: date | None = None,
+) -> dict | None:
+    """The 7 days BEFORE `today`, averaged per region — in the SAME SHAPE a
+    daily row has, so every renderer downstream consumes it unchanged.
 
-    All three are None when every region's 7-day mean is zero — matching the
-    overall's own None, so a screen never shows 0.0/0.0/0.0 under a headline
-    reading "No Readings".
+    Rest days count as a real 0, which is the whole point: this is the load
+    already carried into a day on which nothing has been trained yet, and a
+    week with two sessions in it should not average like a week with seven.
+
+    None when the window is empty, mirroring dashboard.rolling_prior_strain's
+    own None — so a screen never shows 0.0/0.0/0.0 under a headline reading
+    "No Readings".
+
+    The four parts still sum to total_au exactly, because total_au is computed
+    FROM the rounded parts rather than rounded independently of them.
     """
     today = today or date.today()
     by_date = {row.get("date"): row for row in rows or []}
-    means = {}
-    for r in REGIONS:
-        total = 0.0
-        for offset in range(1, 8):
-            row = by_date.get((today - timedelta(days=offset)).isoformat())
-            total += float((row or {}).get(r) or 0.0)
-        means[r] = total / 7
-    if sum(means.values()) <= 0:
+    window = [
+        by_date.get((today - timedelta(days=offset)).isoformat())
+        for offset in range(1, 8)
+    ]
+    dated = [row for row in window if row and all(k in row for k in REGIONS)]
+
+    parts = {r: round(sum(float(row.get(r) or 0.0) for row in dated) / 7, 1)
+             for r in REGIONS}
+    unattributed = round(
+        sum(float(row.get(UNATTRIBUTED) or 0.0) for row in dated) / 7, 1)
+    total = round(sum(parts.values()) + unattributed, 1)
+    if total <= 0:
+        return None
+    return {
+        "date": today.isoformat(), **parts, UNATTRIBUTED: unattributed,
+        "total_au": total,
+        # True as long as SOMETHING in the week mapped. A week of nothing but
+        # yoga stays False and renders as dashes, same as a single such day.
+        "regions_known": sum(parts.values()) > 0,
+        "window_days": sum(1 for row in dated if float(row.get("total_au") or 0.0) > 0),
+    }
+
+
+def rolling_prior_region_strain(
+    rows: list[dict], stage: int, today: date | None = None,
+) -> dict[str, float | None]:
+    """The regional analogue of dashboard.rolling_prior_strain: each region's
+    own 7-day mean AU through the curve.
+
+    Worth knowing before reading these: a 7-day mean sits far lower on the log
+    curve than a single day's load, and the curve is steepest near zero — so
+    the three values compress toward each other more than a training day's do.
+    The SHARE is unaffected and stays the honest comparison.
+    """
+    row = rolling_prior_region_row(rows, today)
+    if not row:
         return {r: None for r in REGIONS}
-    return {r: _engine.au_to_strain(means[r], stage) for r in REGIONS}
+    return {r: _engine.au_to_strain(float(row[r]), stage) for r in REGIONS}
 
 
 # ─── the heart-rate term ─────────────────────────────────────────────────────
