@@ -8,14 +8,15 @@
 
 ## ✅ ANSWERED — responses received 2026-08-10, six days ahead of the sitting
 
-Every question below has been answered; the full record is
-`patient_profile.py` `symptom_log` **2026-08-10**. The sections that follow
-are preserved as asked. Outcomes at a glance:
+The asks in **§1–§13 are answered**; the full record is `patient_profile.py`
+`symptom_log` **2026-08-10**. **§14's four asks were NOT part of this response
+and still land at the sitting.** The sections that follow are preserved as
+asked. Outcomes at a glance:
 
 | Ask | Outcome |
 |---|---|
 | §1 scapular holds | **Approved.** Forearm supports already removed most of the pressure; the residual is a *rounding* pressure — any strengthening helps |
-| §11 the 50–60 s number | **Refuted on studio retest** — Down Dog held 4+ min, arms would fail first. Shoulder blades can train normally, **to failure**. Issue is stillness/stiffness, not weakness |
+| §11 the 50–60 s number | **Removed from the record** — no basis, not reproducible: the studio retest held Down Dog 4+ min, arms would fail first. Shoulder blades can train normally, **to failure**. Issue is stillness/stiffness, not weakness |
 | §10 hold safety | 30 s hard holds fine — strength is sufficient |
 | §8 left vs right | **Right is weaker; left overcompensates. Train BOTH** — never isolate one side |
 | §10 hamstring | Isometric holds yes, plus movement + high-rep activation; the ischial release is right — **and add sustained-pressure testing at the FRONT of the hip** (sitting pressure) |
@@ -23,13 +24,14 @@ are preserved as asked. Outcomes at a glance:
 | §12 anterior-hip pinch | **Normal stretch sensation** — exactly where short hip flexors start; battery unblocked |
 | §12 horse / Cossack | **Both cleared** (no rotation cue named — the ER cue stands until said otherwise) |
 | §11 thresholds | 25-point gap "a good estimate"; overhead reach full — **no capsular issue**, stretch as normal |
-| §13 pec cramp | **Diagnosed: positional ischemic cramp / scar adhesion lockout.** Safe to treat; NOT stretching — scar & pec minor self-myofascial release + subscapularis/anterior-wall active reciprocation with isometric holds |
+| §13 pec cramp | **Diagnosed: positional ischemic cramp / scar adhesion lockout.** Safe to treat; release + active isometrics expected to **outperform** stretching (stretching permitted, not preferred) — scar & pec minor self-myofascial release + subscapularis/anterior-wall active reciprocation with isometric holds |
 | §9 specialization | Arms-only trial endorsed; trial *want and ability* to train daily, not just fatigue; reconvene after |
 | Ferritin | Out of physio scope — stays with the GP |
 
-Not in this response: the Day 28 stage-gate decisions (Stage 2B vs. extending
-2A, running introduction, formal exit-criteria evaluation) — those still land
-at the 2026-08-16 sitting. Prescriptions are encoded at the next block build.
+Not in this response: **§14's micro-dose asks** and the Day 28 stage-gate
+decisions (Stage 2B vs. extending 2A, running introduction, formal
+exit-criteria evaluation) — those still land at the 2026-08-16 sitting.
+Prescriptions are encoded at the next block build.
 
 ---
 
@@ -49,10 +51,13 @@ tendon loading, which bears directly on the §1 ask above and carries two
 questions (the proximal hamstring site, and the dose/frequency for any holds
 approved).
 
-**§11 is not background — it supplies a measured number for the §1 ask.**
+~~**§11 is not background — it supplies a measured number for the §1 ask.**
 Interscapular fatigue onset under bodyweight load is **50–60 seconds**. If long
-isometric holds are approved, that figure is the anchor for prescribing them,
-and it also carries a new hamstring finding that bears on §10's open question.
+isometric holds are approved, that figure is the anchor for prescribing them~~
+*[REMOVED 2026-08-10 — the figure had no basis and could not be reperformed:
+the in-studio retest held Down Dog past four minutes, arms failing first.]*
+§11 also carries a new hamstring finding that bears on §10's open question,
+which stands.
 
 ## 2. Presentation
 
@@ -249,7 +254,7 @@ a breach without capping volume). Restoring hard enforcement is a
 software-side decision the athlete controls, and it needs no prescription
 change.
 
-## 11. Flexibility baseline, 2026-08-05 — and the one number that dates the §1 ask
+## 11. Flexibility baseline, 2026-08-05 — its dosing number was removed 2026-08-10
 
 Added 2026-08-05. The athlete rated all 22 poses of a 15-minute hip/spine yoga
 flow on a 1–100 scale (1 = can barely enter the position, 100 = at the physical
@@ -258,15 +263,14 @@ structured flexibility baseline on record. Full table in
 `docs/training/Yoga_Library.md`; synthesis in `patient_profile.py` `symptom_log`
 2026-08-05.
 
-**The dosing number for §1.** Down Dog — bodyweight through the shoulder girdle
-— produces interscapular burn at **50–60 seconds**. Every other hold in the flow
-is 30 s and none of them provoke it. That is the first quantified endurance
-threshold for this region, and it says the current symptom lives on the far side
-of a roughly minute-long boundary under load. If §1's isometric holds are
-approved, **we would rather have the prescribed duration set relative to that
-measurement than guessed** — including whether the intent is to work below it
-(accumulating volume without fatigue) or through it (training the failure point
-directly). §10's short-frequent-dose consideration interacts with this choice.
+~~**The dosing number for §1.** Down Dog — bodyweight through the shoulder girdle
+— produces interscapular burn at **50–60 seconds**.~~ *[REMOVED 2026-08-10 —
+one casual self-observation inside a 15-minute flow, no basis as a measurement,
+and not reproducible: your in-studio retest held Down Dog past four minutes
+with no interscapular burn, the arms judged to fail first. Your verdict:
+shoulder blades can train normally, to failure.]* Every other hold in the flow
+is 30 s and none of them provoke it. §10's short-frequent-dose consideration
+still interacts with whatever dose is prescribed.
 
 **A second finding, bearing on §10's hamstring question.** The dominant
 restriction in the whole assessment is an inability to reach **anterior pelvic
@@ -530,8 +534,10 @@ count as leg-loading days for the retest rule.
 1. Phase 1 yes/no — and if yes, **which stream enters first**: your §1
    scapular holds, or the back-chain (core + glute) holds. One at a time, not
    both.
-2. Dose and duration per stream. The 50–60 s figure (§11) anchors the
-   scapular holds; what should anchor the trunk and glute holds?
+2. Dose and duration per stream. ~~The 50–60 s figure (§11) anchors the
+   scapular holds~~ *[figure removed 2026-08-10; the scapular answer is in —
+   train normally, to failure]* — what should anchor the trunk and glute
+   holds?
 3. Confirm the leg-tendon holds wait for §12 question 2's outcome.
 4. The phase-2 concept in principle — a second daily dose on gym days,
    ≥ 6–8 h separated — so the boundary is on record before it is wanted,

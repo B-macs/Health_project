@@ -19,8 +19,9 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
   is resting TONE, not shortness. Net new clinical content: seated anterior
   pelvic tilt is the dominant restriction (proximal hamstrings), the documented
   right>left asymmetry does not appear in passive stretch, finding #4's Coxa
-  Saltans trigger is contractile rather than positional, and interscapular
-  fatigue onset under bodyweight is measured at 50-60s.
+  Saltans trigger is contractile rather than positional. (A fourth claim —
+  an interscapular burn-onset time — was recorded here and REMOVED 2026-08-10:
+  no basis, not reproducible on retest; its tombstone is in the entry.)
 
 2026-08-07: first anterior-chest signal on the post-Latarjet right shoulder
   put on record (symptom_log entry + finding #6 addendum): a LONG-STANDING,
@@ -37,9 +38,10 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
 2026-08-10: the physiotherapist answered ALL 13 questions in the Day-28 brief,
   six days early (symptom_log 2026-08-10; the Day 28 stage-gate decisions are
   NOT in it and still land 2026-08-16). Headlines: scapular holds APPROVED,
-  and the 50-60s interscapular fatigue onset is REFUTED — studio retest held
-  Down Dog 4+ minutes, arms would fail first, shoulder blades can train
-  normally to failure (the issue is stillness/stiffness, not weakness, and
+  and the earlier interscapular burn-onset claim (50-60s) is REMOVED outright
+  — no basis, not reproducible: the studio retest held Down Dog 4+ minutes,
+  arms would fail first, shoulder blades can train normally to failure (the
+  issue is stillness/stiffness, not weakness, and
   the chair's forearm supports already removed most of the pressure). §8
   settled: the right is weaker, the left overcompensates — train BOTH sides.
   The Cluster A organising claim is CONFIRMED (hips drive the lumbar
@@ -48,9 +50,11 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
   cleared (no rotation cue named — the ER cue stands). The 25-point wide-gap
   threshold holds; overhead reach shows NO capsular issue. The pec cramp is
   diagnosed (positional ischemic cramp / scar adhesion lockout) with a
-  release + active-reciprocation prescription — the one item cleared for
-  self-directed use; stretching it remains off the table. Ferritin stays with
-  the GP. Prescriptions get encoded at the next block build, not before.
+  release + active-reciprocation prescription expected to OUTPERFORM
+  stretching (stretching permitted, not preferred — athlete's clarification
+  of the physio's intent) — the one item cleared for self-directed use.
+  Ferritin stays with the GP. Prescriptions get encoded at the next block
+  build, not before.
 
 Stage 1 history: Rehab extended by 7 days (Days 15-21, "Week 3: Flare
   Recovery & Reassessment Prep" in training_plan.py) — decided 2026-07-13.
@@ -357,7 +361,8 @@ PROFILE = {
                 "2026-08-10). The anterior cramp is diagnosed: POSITIONAL ISCHEMIC CRAMP / "
                 "SCAR ADHESION LOCKOUT — shortened tissue firing hard in a shortened range, "
                 "catching on dense surgical scar tissue and briefly cutting off blood flow; "
-                "no structural pain. Entirely safe to address; stretching is NOT the tool — "
+                "no structural pain. Entirely safe to address; release and active work are "
+                "expected to OUTPERFORM stretching (stretching permitted, not preferred) — "
                 "targeted scar & pec minor self-myofascial release plus subscapularis / "
                 "anterior-wall active reciprocation with isometric holds. Two further "
                 "answers touch this finding directly: overhead reach shows NO capsular "
@@ -965,13 +970,17 @@ PROFILE = {
                     "facets; it does not, at least unloaded. Mildly encouraging for the "
                     "interscapular question going to physio on 2026-08-16."
                 ),
-                "scapular_fatigue_onset_measured": (
-                    "MOST DECISION-RELEVANT NUMBER HERE. Down Dog (bodyweight through the "
-                    "shoulder girdle) produces interscapular burn at 50-60 SECONDS, not 20-30. "
-                    "That is the first quantified endurance threshold for the region in the "
-                    "2026-08-03 entry above, and it means the 30s holds elsewhere in this flow "
-                    "sit BELOW threshold. Carried into docs/training/physio_brief_2026-08-16.md "
-                    "as a dosing anchor for the endurance-biased scapular ask."
+                "scapular_fatigue_onset_removed": (
+                    "REMOVED 2026-08-10 on the athlete's direction. This finding claimed a "
+                    "measured interscapular burn onset in Down Dog and carried it into the "
+                    "physio brief as the dosing anchor for the scapular ask. It had no basis "
+                    "as a measurement — one casual self-observation inside a 15-minute flow, "
+                    "never a fresh test — and it could not be reperformed: the in-studio "
+                    "retest (2026-08-10 entry below) held Down Dog past FOUR MINUTES with no "
+                    "interscapular burn, the physio judging the arms would fail before the "
+                    "shoulder blades. Removed outright rather than left as superseded so no "
+                    "future reader treats it as a threshold; this tombstone is the recorded, "
+                    "deliberate exception to the log's append-only convention."
                 ),
                 "open_question_anterior_hip": (
                     "Butterfly forward fold scored 82 but with the sensation reported in the "
@@ -1164,18 +1173,18 @@ PROFILE = {
                     "endurance-gap hypothesis: strengthening is still the endorsed tool, "
                     "but the driver is the stillness exposure, not a capacity deficit."
                 ),
-                "fatigue_onset_50_60s_refuted": (
-                    "MEASUREMENT CORRECTION, superseding the 2026-08-05 entry's headline "
-                    "number: the athlete was underestimating his Down Dog time. Retested "
-                    "in the studio: 4+ MINUTES without interscapular burn, and the "
-                    "physio's judgement was that the elbows and arms would fail before "
-                    "the shoulder blades. Verdict: no issue in the shoulder blades — they "
-                    "can be trained NORMALLY, TO FAILURE. The 50-60s figure that anchored "
-                    "the §1 dosing question (and the yoga catalogue's hold-duration "
-                    "caution) came from one self-observed hold inside a 15-minute flow, "
-                    "not a fresh maximal test — the same instrument lesson as the "
-                    "three-baseline-mornings rule: one casual self-observation is not a "
-                    "measurement."
+                "fatigue_onset_claim_removed": (
+                    "MEASUREMENT CORRECTION: the athlete was underestimating his Down Dog "
+                    "time. Retested in the studio: 4+ MINUTES without interscapular burn, "
+                    "and the physio's judgement was that the elbows and arms would fail "
+                    "before the shoulder blades. Verdict: no issue in the shoulder "
+                    "blades — they can be trained NORMALLY, TO FAILURE. On the athlete's "
+                    "direction the original 50-60s claim is REMOVED from the 2026-08-05 "
+                    "entry outright (tombstoned in place), not merely superseded — there "
+                    "was no basis for it and it could not be reperformed. It came from "
+                    "one self-observed hold inside a 15-minute flow, not a fresh maximal "
+                    "test — the same instrument lesson as the three-baseline-mornings "
+                    "rule: one casual self-observation is not a measurement."
                 ),
                 "left_vs_right_answered": (
                     "Brief §8 ANSWERED: the left is overcompensating for the right, and "
@@ -1233,11 +1242,13 @@ PROFILE = {
                     "hard in a shortened range, catches on dense surgical scar tissue, "
                     "and briefly cuts off blood flow, producing the deep, intense "
                     "lock-out burn without structural pain. ENTIRELY SAFE to address. "
-                    "Stretching is NOT the correct tool. Recommended instead: (1) "
-                    "targeted scar & pectoralis minor self-myofascial release; (2) "
-                    "subscapularis / anterior-wall active reciprocation with isometric "
-                    "holds — active end-range isometric holds and control. Physio's "
-                    "words: these 'would greatly improve the situation.'"
+                    "Release and active work are expected to have a BETTER IMPACT than "
+                    "stretching — stretching is permitted, just the weaker tool here "
+                    "(athlete's clarification of the physio's intent, 2026-08-10). "
+                    "Recommended: (1) targeted scar & pectoralis minor self-myofascial "
+                    "release; (2) subscapularis / anterior-wall active reciprocation with "
+                    "isometric holds — active end-range isometric holds and control. "
+                    "Physio's words: these 'would greatly improve the situation.'"
                 ),
                 "specialization_trial_endorsed": (
                     "Arms-only is a good trial. The physio adds a design point: trial "
@@ -1264,20 +1275,26 @@ PROFILE = {
                 "EXERCISE_BODY_REGION per the integration protocol.",
                 "The pec release + active-reciprocation work is cleared for self-directed "
                 "use by the physio's explicit answer — the one exception to this log's "
-                "usual no-self-directed-changes rule, and stretching the region stays "
-                "off the table as before.",
-                "Code consequences flagged, NOT made here (each changes behaviour and "
-                "needs its own pass): the 50-60s premise inside services/yoga.py's "
-                "authored rationale strings and tests/test_yoga.py's hold-duration "
-                "constraint; the horse/Cossack deferrals in cluster_a_mechanics; the "
-                "battery's stop-and-record wording for the anterior-hip sensation.",
+                "usual no-self-directed-changes rule. Stretching the region is permitted "
+                "too; release and isometrics are simply expected to work better.",
+                "The removed burn-onset claim was scrubbed the same day from everywhere "
+                "it had propagated as a threshold: services/yoga.py's rationale and "
+                "retest strings, tests/test_yoga.py, docs/training/Yoga_Library.md and "
+                "the physio brief. Hold DURATIONS are unchanged everywhere — lengthening "
+                "the scapular holds is still a block-build prescription change, now with "
+                "the approval in hand.",
+                "Code consequences still open (each changes behaviour and needs its own "
+                "pass): the horse/Cossack deferrals in cluster_a_mechanics; the battery's "
+                "stop-and-record wording for the anterior-hip sensation.",
             ],
 
             "notes": [
-                "Append-only corrections landing in this entry: the 2026-08-05 entry's "
-                "'interscapular fatigue onset 50-60s' is superseded by the studio retest "
-                "(4+ minutes, arms fail first); the 2026-08-07 pec entry's "
-                "raise-with-physio plan is fulfilled and its entry stands as written.",
+                "Corrections landing with this entry: the 2026-08-05 burn-onset claim is "
+                "REMOVED at the athlete's direction — tombstoned in place rather than "
+                "left as superseded, a recorded exception to the append-only convention, "
+                "because a baseless number left standing reads as a threshold. The "
+                "2026-08-07 pec entry's raise-with-physio plan is fulfilled and that "
+                "entry stands as written.",
                 "The physio response arrived six days EARLY — nothing here is the Day 28 "
                 "reassessment itself. Stage 2B vs. extending 2A, the running "
                 "introduction, and the formal exit-criteria evaluation all still land on "

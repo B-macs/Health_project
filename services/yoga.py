@@ -209,17 +209,18 @@ YOGA_LIBRARY: list[YogaSession] = [
                 "left scapular retractors already flagged in the interscapular endurance "
                 "pattern (symptom_log 2026-08-03). Athlete reports the right shoulder "
                 "reaching back with a small whole-body twist to the right, i.e. the same "
-                "compensation finding #6 describes. Measured burn onset is 50-60s, so a "
-                "30s hold sits BELOW threshold — this is why the pose is tolerable, and "
-                "why lengthening it would change its character. Keep knees soft and back "
-                "flat for the secondary spinal-flexion component.",
-                retest="Time the burn. Baseline 2026-08-05: onset 50-60s, with the right "
-                       "shoulder reaching back and a small whole-body twist to the right. "
-                       "This is the ONLY quantified endurance figure for the interscapular "
-                       "gap (symptom_log 2026-08-03) and physio_brief_2026-08-16.md §11 "
-                       "asks for the hold prescription to be set against it — so a second "
-                       "reading is worth more here than anywhere else in the flow. Note "
-                       "whether onset moves and whether the rightward twist persists.",
+                "compensation finding #6 describes. (A 2026-08-05 self-reported burn "
+                "onset was recorded here and REMOVED 2026-08-10 as baseless — the "
+                "in-studio retest held Down Dog past four minutes with no interscapular "
+                "burn, arms judged to fail first.) Keep knees soft and back flat for the "
+                "secondary spinal-flexion component.",
+                retest="Baseline 2026-08-05: the right shoulder reaching back with a "
+                       "small whole-body twist to the right. The burn-onset half of this "
+                       "retest is CLOSED — the 2026-08-10 in-studio retest held the pose "
+                       "past four minutes with no interscapular burn, and the original "
+                       "onset claim was removed as baseless (symptom_log 2026-08-10). "
+                       "Still open: does the rightward twist and the right shoulder "
+                       "reaching back persist?",
             ),
             YogaPose(
                 "Deep Lunge (Left)", _t("07:40"), 30, "cleared",
@@ -299,8 +300,7 @@ YOGA_LIBRARY: list[YogaSession] = [
         # ── AUTHORED 2026-08-05, and the hold durations are the whole story ──
         #
         # Every scapular-loading hold here is kept UNDER 30 SECONDS, deliberately
-        # and against the first draft, which used 55s holds pitched at the
-        # measured 50-60s interscapular fatigue onset.
+        # and against the first draft, which used 55s holds.
         #
         # That draft was blocked in review against patient_profile.py's own
         # symptom_log 2026-08-03 plan: "No self-directed exercise changes —
@@ -310,17 +310,21 @@ YOGA_LIBRARY: list[YogaSession] = [
         #
         # A session of 55s scapular holds IS that prescription. Authoring one
         # here would have had the app quietly make a call reserved for the
-        # physio. Under 30s sits clearly below the measured threshold, so this
-        # session trains nothing of the endurance capacity and prejudges
-        # nothing. If the holds are approved on 2026-08-16, lengthen them then
-        # — and record that it was approved.
+        # physio. 2026-08-10 UPDATE: the physio has now ANSWERED — scapular
+        # loading is approved and the shoulder blades can train normally, to
+        # failure (symptom_log 2026-08-10; the 50-60s "fatigue onset" that the
+        # first draft was pitched at was removed the same day as baseless).
+        # The durations here stay under 30s anyway: lengthening them is the
+        # prescription change itself, and it lands at the block build as a
+        # recorded decision, not by a drive-by edit to a rest-day flow.
         #
         # There is also NO second timed Down Dog here. The first draft placed
-        # one at 14:05 to re-read the 50-60s burn onset, but it sat after three
-        # 55s holds and would have measured fatigue on top of fatigue while
-        # reporting it as a clean re-reading. The retest already lives on the
-        # 15-minute flow's Down Dog at 30s, uncontaminated; duplicating the
-        # instrument corrupts both.
+        # one at 14:05 to re-read the burn onset, but it sat after three 55s
+        # holds and would have measured fatigue on top of fatigue while
+        # reporting it as a clean re-reading. The onset question is now closed
+        # (in-studio retest, 4+ minutes), but the structural rule stands: the
+        # retest lives on the 15-minute flow's Down Dog, uncontaminated;
+        # duplicating the instrument corrupts both.
         poses=[
             YogaPose(
                 "Supported Diaphragmatic Breathing (Supine, Knees Bent)",
@@ -371,17 +375,17 @@ YOGA_LIBRARY: list[YogaSession] = [
                 "Prone Scapular Retraction Hold (Arms Low, Palms Down)",
                 _t("07:15"), 25, "caution",
                 "ARMS LOW, not a prone T — arms at 90 degrees of abduction would put the "
-                "post-Latarjet shoulder toward the apprehension position. 25s is "
-                "deliberately BELOW the measured 50-60s interscapular fatigue onset: this "
-                "is a positioning drill, not the endurance prescription, which is the "
-                "physiotherapist's call on 2026-08-16.",
+                "post-Latarjet shoulder toward the apprehension position. 25s as "
+                "authored: this is a positioning drill, not the endurance prescription — "
+                "the physio approved scapular loading 2026-08-10, and lengthening these "
+                "holds is that prescription, made at the block build, not here.",
             ),
             YogaPose(
                 "Wall Forearm Press Hold (Elbows Below Shoulder Height)",
                 _t("08:00"), 25, "caution",
                 "Elbows stay BELOW shoulder height — above it the same drill drifts toward "
-                "abduction plus external rotation. Serratus-biased. 25s, below threshold, "
-                "for the same reason as the pose above.",
+                "abduction plus external rotation. Serratus-biased. 25s as authored, for "
+                "the same reason as the pose above.",
             ),
             YogaPose(
                 "Supported Chest Opening over a Rolled Towel (Arms at 45 Degrees)",

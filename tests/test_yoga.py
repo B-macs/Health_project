@@ -133,9 +133,13 @@ def test_retests_are_attached_to_the_poses_that_can_answer_them():
     assert "Deep Lunge Hip Opener (Left)" in retests
 
     # Each must carry the baseline value it is a retest OF — a retest without
-    # the number to compare against is just a reminder.
+    # the baseline to compare against is just a reminder. Down Dog's baseline
+    # is the 2026-08-05 twist observation; its burn-onset number was removed
+    # 2026-08-10 as baseless, and the retest must record that closure rather
+    # than keep asking the dead question.
     assert "2026-08-05" in retests["Seated Cross-Legged Side Bend (Shoulder Drop)"]
-    assert "50-60s" in retests["Down Dog"]
+    assert "2026-08-05" in retests["Down Dog"]
+    assert "2026-08-10" in retests["Down Dog"]
     assert "2026-08-05" in retests["Deep Lunge Hip Opener (Left)"]
 
 
@@ -172,36 +176,45 @@ def test_upper_body_session_exists_and_its_timings_do_not_overlap():
         end = pose.start_seconds + pose.hold_seconds
 
 
-def test_scapular_loading_holds_stay_below_the_measured_fatigue_onset():
-    """THE governing constraint on this session. Interscapular fatigue onset is
-    measured at 50-60s, and patient_profile symptom_log 2026-08-03 reserves
-    endurance-biased scapular loading — long isometric holds — for the
-    physiotherapist at the 2026-08-16 reassessment. A session of 55s scapular
-    holds IS that prescription, so authoring one here would have the app make a
-    call that is explicitly not its to make. Under 30s trains none of that
-    capacity and prejudges nothing."""
+def test_scapular_loading_holds_stay_short_until_the_block_build_lengthens_them():
+    """THE governing constraint on this session. patient_profile symptom_log
+    2026-08-03 reserves endurance-biased scapular loading — long isometric
+    holds — for the physiotherapist, and a session of 55s scapular holds IS
+    that prescription, so authoring one here would have the app make a call
+    that is not its to make. The physio APPROVED the loading on 2026-08-10
+    (train normally, to failure — symptom_log 2026-08-10), which changes the
+    constraint's reason but not the constraint: lengthening these holds is the
+    prescription change itself, and it lands at the block build as a recorded
+    decision, never as a drive-by edit to a rest-day flow. (The 50-60s
+    'fatigue onset' the first draft was pitched against was removed 2026-08-10
+    as baseless — this test no longer cites it as a clinical ceiling.)"""
     s = yoga.get("shoulder_scapula_neck_flow_16min")
     loading = [p for p in s.poses
                if "Scapular Retraction" in p.name or "Wall Forearm Press" in p.name]
     assert len(loading) == 2
     for pose in loading:
         assert pose.hold_seconds < 30, (
-            f"{pose.name} is {pose.hold_seconds}s — at or above the measured 50-60s "
-            "threshold this becomes the endurance prescription reserved for physio"
+            f"{pose.name} is {pose.hold_seconds}s — lengthening a scapular hold is the "
+            "endurance prescription itself, a block-build decision to be recorded there, "
+            "not authored into a rest-day flow"
         )
 
 
-def test_the_burn_onset_retest_is_not_duplicated_into_the_new_session():
+def test_the_down_dog_retest_is_not_duplicated_into_the_new_session():
     """The first draft put a second timed Down Dog at 14:05, after three 55s
-    holds — it would have measured fatigue on top of fatigue and reported it as
-    a clean re-reading of the 50-60s baseline. The retest stays on the 15-minute
-    flow's Down Dog, uncontaminated."""
+    holds — it would have measured fatigue on top of fatigue and reported it
+    as a clean re-reading. The burn-onset question is now closed (in-studio
+    retest 2026-08-10, 4+ minutes, original figure removed as baseless), but
+    the structural rule stands: the retest lives on the 15-minute flow's Down
+    Dog only, and it must carry the closure rather than re-ask the dead
+    question."""
     upper = yoga.get("shoulder_scapula_neck_flow_16min")
     assert not any("Down Dog" in p.name for p in upper.poses)
 
     original = yoga.get("hip_spine_flow_15min")
     down_dog = next(p for p in original.poses if p.name == "Down Dog")
-    assert "50-60s" in down_dog.retest
+    assert "2026-08-10" in down_dog.retest
+    assert "50-60" not in down_dog.retest
 
 
 def test_the_new_session_avoids_the_apprehension_position():

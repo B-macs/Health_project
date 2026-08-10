@@ -81,14 +81,17 @@ nowhere, and the two live upper-body questions in the record — the interscapul
 endurance gap (`symptom_log` 2026-08-03) and the overhead restriction — had no
 unloaded session addressing them at all.
 
-**The dosing constraint that shaped this flow.** Down Dog produces interscapular
-burn at a measured **50–60 s**. Every scapular hold here is **25 s, deliberately
-below that threshold**. These are *positioning* drills, not the endurance
-prescription — long isometric holds are a prescription change and belong to the
-physiotherapist on 2026-08-16 (`docs/training/physio_brief_2026-08-16.md` §1).
-An earlier draft of this flow built 55 s holds *around* the measured onset; that
-was caught in review as pre-empting a decision that is not this codebase's to
-make. **Do not lengthen these holds without the physio's sign-off.**
+**The dosing constraint that shaped this flow.** Every scapular hold here is
+**25 s**. These are *positioning* drills, not the endurance prescription — long
+isometric holds are a prescription change, and an earlier draft that built 55 s
+holds was caught in review as pre-empting a decision that was not this
+codebase's to make. *Updated 2026-08-10:* the flow was originally sized against
+a self-reported 50–60 s burn onset, which has been **removed from the record as
+baseless** — the in-studio retest held Down Dog past four minutes with no
+interscapular burn — and the physio has **approved** scapular loading (train
+normally, to failure; `symptom_log` 2026-08-10). The holds stay 25 s anyway:
+**lengthening them is the prescription itself, and it lands at the block build
+as a recorded decision, not as an edit to a rest-day flow.**
 
 | # | Pose | Start | Hold | Tag | Why |
 |---|---|---|---|---|---|
@@ -99,8 +102,8 @@ make. **Do not lengthen these holds without the physio's sign-off.**
 | 5 | Thread the Needle (Right Arm Under) | 04:30 | 45s | cleared | Unloaded thoracic rotation — the family already used in the pre-session release protocol. |
 | 6 | Thread the Needle (Left Arm Under) | 05:25 | 45s | cleared | As above, other side. |
 | 7 | Extended Puppy Pose | 06:20 | 45s | caution | Passive shoulder flexion with the **lats on stretch** — the one pose here that reaches the lat, otherwise the gap in this athlete's overhead ladder. Let the chest sink rather than pushing into it. |
-| 8 | Prone Scapular Retraction Hold (Arms Low, Palms Down) | 07:15 | **25s** | caution | **Arms low, not a prone T** — 90° of abduction moves a post-Latarjet shoulder toward apprehension. 25 s is deliberately below the measured 50–60 s onset. |
-| 9 | Wall Forearm Press Hold (Elbows Below Shoulder Height) | 08:00 | **25s** | caution | **Elbows stay below shoulder height** — above it the drill drifts toward abduction + external rotation. Serratus-biased. Below threshold, same reason. |
+| 8 | Prone Scapular Retraction Hold (Arms Low, Palms Down) | 07:15 | **25s** | caution | **Arms low, not a prone T** — 90° of abduction moves a post-Latarjet shoulder toward apprehension. 25 s as authored — lengthening is a block-build decision (see the note above the table). |
+| 9 | Wall Forearm Press Hold (Elbows Below Shoulder Height) | 08:00 | **25s** | caution | **Elbows stay below shoulder height** — above it the drill drifts toward abduction + external rotation. Serratus-biased. 25 s as authored, same reason as pose 8. |
 | 10 | Supported Chest Opening over a Rolled Towel (Arms at 45°) | 08:45 | 60s | caution | **Arms at 45°, not a supine 90/90 T** — 90° abduction with external rotation is the apprehension position for anterior instability. The towel runs *along* the spine, so the load is gravity on an open chest rather than an external frame levering the joint. |
 | 11 | Seated Neck Tilt — Right Ear to Right Shoulder | 09:55 | 40s | caution | **Self-generated only, no hand overpressure** — at Beighton 6/9 the cervical spine is the last place to hang on ligament, and `symptom_log` 2026-07-31 records asymmetric flexion tightness with mechanical crepitus. |
 | 12 | Seated Neck Tilt — Left Ear to Left Shoulder | 10:45 | 40s | caution | As above. **Left is the documented dominant side** of the interscapular/cervical pattern, so expect asymmetry and do not chase it into end range. |
@@ -127,7 +130,7 @@ baseline:
 | Pose | Question | Baseline |
 |---|---|---|
 | Seated Cross-Legged Side Bend | Is the restriction still in the **hips** rather than the spine, and does the arm still refuse to straighten? Also confirm the movement is still as described — **the whole re-tag depends on it.** | 40/100, *"only can go about 60-70 percent down, restriction in hips"*, arm would not straighten at all. This is the pose that first showed the seated posterior-tilt pattern, so it is the cheapest place to see that pattern move. |
-| Down Dog | **Time the burn.** Note whether onset moves and whether the rightward twist persists. | Onset **50–60 s**, right shoulder reaching back, small whole-body twist right. The **only** quantified endurance figure for the interscapular gap, and physio brief §11 asks for the hold prescription to be set against it — so a second reading is worth more here than anywhere else in the flow. |
+| Down Dog | Does the rightward twist and the right shoulder reaching back persist? | Baseline 2026-08-05: right shoulder reaching back, small whole-body twist right. **The burn-onset half of this retest is CLOSED** — the 2026-08-10 in-studio retest held the pose past four minutes with no interscapular burn, and the self-reported onset figure was removed from the record as baseless (`symptom_log` 2026-08-10). |
 | Deep Lunge Hip Opener (Left) | Does the right shoulder still reach the back foot with ease, and does the front of the joint feel stable there? | Reaches easily, no instability, quad is the limiter at 46/100. Finding #6 says right-shoulder stability is **maintenance-dependent and regresses when training lapses** — so this is a cheap unloaded check on whether that has started, and a change here shows well before a loaded one does. |
 
 ---
@@ -220,7 +223,7 @@ before the athlete has tried it:
 | Passive, floor-supported, hamstrings slack | **80–88** |
 | Requires anterior pelvic tilt against hamstring length | **25–65** — the one true restriction |
 | Requires hip-flexor / rectus femoris length in extension | **40–57** — where tone findings legitimately apply |
-| Loaded through the shoulder girdle | **~64**, endurance-limited at ~50–60s, not range-limited |
+| Loaded through the shoulder girdle | **~64**, self-reported as endurance-limited, not range-limited (the specific onset time reported that day was removed 2026-08-10 — in-studio retest held 4+ min) |
 
 Synthesis and clinical implications: `patient_profile.py` `symptom_log`
 2026-08-05. Dosing consequences for the scapular ask:
@@ -282,6 +285,8 @@ No argument is required, so existing single-argument call sites keep working.
    `retest` field with the **baseline value written into the question** — a
    retest that does not carry what it is being compared against is a note, not
    a measurement.
-6. **Do not author a hold longer than the measured interscapular onset (50–60 s)
-   under shoulder-girdle load** without physiotherapist sign-off. That duration
-   is a prescription, and prescriptions are not this codebase's to write.
+6. **Do not lengthen a scapular-loading hold outside a block build.** Long
+   holds under shoulder-girdle load are the endurance prescription itself —
+   approved by the physio 2026-08-10 (train normally, to failure), but encoded
+   as a recorded block-build decision, never as a drive-by edit to a flow.
+   Prescriptions are not this codebase's to write on its own initiative.
