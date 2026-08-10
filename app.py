@@ -74,11 +74,18 @@ _page = st.session_state.get("_nav_page") or st.query_params.get("page", "home")
 # connection — none of which are rare on a phone). When that happens, the
 # user lands wherever the URL last pointed — which in practice is almost
 # always ?page=checkin, since the Check-in FAB (app.py's own '+' button) is
-# the only real <a href> link in the app, everything else being session-
-# state-only nav buttons. Diagnosed by reproducing it directly: Check-in ->
-# Training (works fine in-session, URL still said ?page=checkin) -> reload
-# -> silently back on Check-in. Syncing here, once, centrally, fixes every
-# nav path at once rather than patching each button's on_click individually.
+# the last remaining page-CHANGING <a href> link in the app, everything else
+# being session-state-only nav buttons. Diagnosed by reproducing it directly:
+# Check-in -> Training (works fine in-session, URL still said ?page=checkin)
+# -> reload -> silently back on Check-in. Syncing here, once, centrally, fixes
+# every nav path at once rather than patching each button's on_click
+# individually.
+#
+# NOTE the anchors that remain below (this file's day arrows, drill-down
+# cards and FAB, plus styles.py's chart hit bands) are page RELOADS, which is
+# the lag CLAUDE.md Key Rule 17 exists to remove — see
+# tests/test_spa_navigation.py's _KNOWN map for which are structural and
+# which are merely not converted yet. views/ is already fully converted.
 if st.query_params.get("page") != _page:
     st.query_params["page"] = _page
 

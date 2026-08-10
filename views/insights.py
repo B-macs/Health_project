@@ -90,28 +90,115 @@ def _bioage_b64(path_str: str) -> str:
     return f"data:{mime};base64,{base64.b64encode(p.read_bytes()).decode()}"
 
 
-def _bioage_card_html(key: str, href: str) -> str:
+# ─────────────────────────────────────────────────────────────────────────────
+#  BioAge category cards — a REAL st.button styled to look like the card.
+#
+#  These used to be an <a href="?page=insights&bioage=..."> wrapping a styled
+#  div, which meant every tap was a full browser navigation: page reload,
+#  websocket reconnect, session_state gone, every cache cold. On a phone that
+#  reads as "it opened a new page". See CLAUDE.md Key Rule 17 — in-app
+#  navigation never uses an anchor, and tests/test_spa_navigation.py fails if
+#  one comes back.
+#
+#  Styled the way nav.py styles the bottom bar: one layer, no invisible
+#  overlay, the button IS the card. st.button(key="bioage_card_strength")
+#  puts a .st-key-bioage_card_strength class on the wrapper, which is the
+#  documented hook (see streamlit's own theming reference). The overrides
+#  below are the same set nav.py needed — Streamlit's button styles plus
+#  styles.py's mobile defaults both have to be beaten, hence !important.
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: Which BioAge detail is open. SESSION-STATE PRIMARY, URL as the fallback —
+#: the same shape app.py's router uses for "page", and for the same reason:
+#: session_state gives an instant websocket rerun, while the synced query
+#: param is what survives a websocket reconnect (mobile screen lock, app
+#: backgrounding, dropped signal), which clears session_state entirely.
+#: Having both means navigation is instant AND a reconnect lands you back
+#: where you were instead of on the card list.
+_BIOAGE_STATE_KEY = "_bioage_detail"
+
+
+def _bioage_selected() -> str | None:
+    """The open category, or None for the card list."""
+    sel = st.session_state.get(_BIOAGE_STATE_KEY)
+    if sel is None:
+        sel = st.query_params.get("bioage")
+    return sel if sel in _BIOAGE_LABELS else None
+
+
+def _open_bioage(key: str) -> None:
+    st.session_state[_BIOAGE_STATE_KEY] = key
+
+
+def _close_bioage() -> None:
+    st.session_state[_BIOAGE_STATE_KEY] = None
+
+
+def _sync_bioage_url(selected: str | None) -> None:
+    """Keep ?bioage= in step with the real selection.
+
+    Writing st.query_params updates the address bar via the history API — it
+    does NOT reload the page, which is exactly why the anchor had to go and
+    this does not. Without the sync the URL goes stale the moment you navigate
+    by button, and the stale value would then win on the next reconnect.
+    """
+    if selected is None:
+        if "bioage" in st.query_params:
+            del st.query_params["bioage"]
+    elif st.query_params.get("bioage") != selected:
+        st.query_params["bioage"] = selected
+
+
+def _bioage_card_key(key: str) -> str:
+    return f"bioage_card_{key}"
+
+
+def _bioage_card_css(key: str) -> str:
+    """Scoped CSS turning this category's button into its 150px image card.
+
+    Kept visually identical to the anchor version it replaced: same height,
+    radius, gradient scrim, background image, neon label and right chevron.
+    The chevron is a ::after rather than a second element because a button's
+    label is markdown text, not markup.
+    """
     color = _BIOAGE_COLORS[key]
-    label = _BIOAGE_LABELS[key]
     bg    = _bioage_b64(str(_BIOAGE_BG[key]))
+    sel   = f".st-key-{_bioage_card_key(key)}"
     bg_css = (
         f"background-image:linear-gradient(90deg,#0B0F1A 0%,rgba(11,15,26,0.75) 45%,"
-        f"rgba(11,15,26,0.15) 80%),url('{bg}');background-size:cover;"
-        f"background-position:center right;"
-    ) if bg else "background:#0B0F1A;"
-    return (
-        f'<a href="{href}" style="text-decoration:none;">'
-        f'<div style="position:relative;height:150px;border-radius:14px;overflow:hidden;'
-        f'margin-bottom:14px;border:1px solid rgba(255,255,255,0.08);{bg_css}">'
-        f'<div style="position:relative;z-index:1;height:100%;display:flex;'
-        f'align-items:center;justify-content:space-between;padding:0 22px;">'
-        f'<span style="font-size:34px;font-weight:800;color:{color};'
-        f'text-shadow:0 0 18px {color}99,0 0 4px {color};letter-spacing:-0.5px;">{label}</span>'
-        f'<span style="font-size:26px;color:{color};font-weight:300;">&rsaquo;</span>'
-        f'</div>'
-        f'</div>'
-        f'</a>'
-    )
+        f"rgba(11,15,26,0.15) 80%),url('{bg}') !important;"
+        f"background-size:cover !important;background-position:center right !important;"
+    ) if bg else "background:#0B0F1A !important;"
+    return f"""<style>
+{sel} button {{
+    width:100% !important; height:150px !important; min-height:0 !important;
+    border-radius:14px !important; overflow:hidden !important;
+    border:1px solid rgba(255,255,255,0.08) !important;
+    padding:0 22px !important; margin-bottom:14px !important;
+    box-shadow:none !important;
+    display:flex !important; align-items:center !important;
+    justify-content:space-between !important;
+    {bg_css}
+}}
+{sel} button:hover {{ border:1px solid {color}66 !important; {bg_css} }}
+{sel} button:focus, {sel} button:focus-visible {{
+    outline:none !important; box-shadow:none !important;
+}}
+{sel} button p, {sel} button span {{
+    font-size:34px !important; font-weight:800 !important; color:{color} !important;
+    text-shadow:0 0 18px {color}99, 0 0 4px {color} !important;
+    letter-spacing:-0.5px !important; margin:0 !important; padding:0 !important;
+    line-height:1 !important; pointer-events:none !important;
+}}
+{sel} button::after {{
+    content:"\\203A"; font-size:26px; color:{color}; font-weight:300;
+    line-height:1; pointer-events:none;
+}}
+{sel} [data-testid="stBaseButton-secondary"],
+{sel} [data-testid="baseButton-secondary"] {{
+    {bg_css} border:1px solid rgba(255,255,255,0.08) !important;
+}}
+</style>"""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2124,16 +2211,14 @@ def render() -> None:
     # =========================================================================
 
     with tab_bioage:
-        selected = st.query_params.get("bioage")
+        selected = _bioage_selected()
+        _sync_bioage_url(selected)
 
-        if selected in _BIOAGE_LABELS:
+        if selected is not None:
             color = _BIOAGE_COLORS[selected]
             label = _BIOAGE_LABELS[selected]
-            st.markdown(
-                '<a href="?page=insights" style="text-decoration:none;color:#9AA3B2;'
-                'font-size:14px;">&larr; Back</a>',
-                unsafe_allow_html=True,
-            )
+            st.button("← Back", key="bioage_back", on_click=_close_bioage,
+                      type="tertiary")
             st.markdown(
                 f"<h2 style='color:{color};margin-top:8px;'>{label}</h2>",
                 unsafe_allow_html=True,
@@ -2149,9 +2234,15 @@ def render() -> None:
         else:
             st.caption("Select a category to see its biological age breakdown.")
             for key in _BIOAGE_CATEGORIES:
-                st.markdown(
-                    _bioage_card_html(key, f"?page=insights&bioage={key}"),
-                    unsafe_allow_html=True,
+                # CSS first, then the button it styles — one <style> per card
+                # because each carries its own base64 background and colour.
+                st.markdown(_bioage_card_css(key), unsafe_allow_html=True)
+                st.button(
+                    _BIOAGE_LABELS[key],
+                    key=_bioage_card_key(key),
+                    on_click=_open_bioage,
+                    args=(key,),
+                    use_container_width=True,
                 )
 
     # =========================================================================
