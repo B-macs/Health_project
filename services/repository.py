@@ -40,6 +40,7 @@ from services import readiness
 from services import sessions as training_sessions
 from services import sleep_fusion
 from services import sleep_movement
+from services import strain_regions
 from services.clients import datastore_reader
 from services.clients import garmin
 from services.clients import local_cache
@@ -1297,6 +1298,24 @@ class Repository:
         raw AU) — a known, visible scope boundary, not a silent bug; see
         content_weighting.day_content_multiplier's own docstring.
         """
+        return [
+            {"date": d, "total_au": round(v, 1)}
+            for d, v in sorted(self._weighted_au_by_date(days=days, today=today).items())
+        ]
+
+    def _weighted_sessions(self, days: int = 28, today: date | None = None) -> list[dict]:
+        """One entry per Session ID over the window — the ONE bucketing loop.
+
+        [{"session_id", "date", "au" (raw Foster), "multiplier",
+          "weighted_au", "elapsed_seconds", "exercise_seconds"}]
+        where exercise_seconds is content_weighting.day_content_multiplier's
+        own input shape, [{"name", "seconds"}, ...].
+
+        Extracted so get_daily_session_au_weighted and get_daily_region_au are
+        both consumers of it: the day's AU and the day's regional split can
+        then never be computed from two different readings of the same Notion
+        pages, and the regional split costs no extra API call.
+        """
         today = today or date.today()
         cutoff = (today - timedelta(days=days)).isoformat()
         pages = self._query(
@@ -1309,8 +1328,17 @@ class Repository:
             if not sid:
                 continue
             bucket = sessions_by_id.setdefault(sid, {
+                "session_id": sid,
                 "date": notion.get_property(p, "Session Date", "date") or "",
                 "au": notion.get_property(p, "Session AU", "number") or 0.0,
+                # Wall-clock length of the session, for the attributed-fraction
+                # figure services.strain_regions reports. Reconstructed
+                # exercise time covers only about half of it (measured: 50%
+                # over 23 sessions, ranging 6%-565%), and a split computed off
+                # a 6% sample should say so.
+                "elapsed_seconds": float(
+                    notion.get_property(p, "Session Duration", "number") or 0.0
+                ) * 60.0,
                 "exercise_seconds": [],
             })
             name = notion.get_property(p, "Movement", "title") or ""
@@ -1322,12 +1350,46 @@ class Repository:
             seconds = training_sessions.exercise_seconds_from_sets(sets)
             bucket["exercise_seconds"].append({"name": name, "seconds": seconds})
 
-        au_by_date: dict[str, float] = {}
+        out = []
         for bucket in sessions_by_id.values():
-            mult = content_weighting.day_content_multiplier(bucket["exercise_seconds"])["multiplier"]
-            au_by_date[bucket["date"]] = au_by_date.get(bucket["date"], 0.0) + bucket["au"] * mult
+            mult = content_weighting.day_content_multiplier(
+                bucket["exercise_seconds"],
+            )["multiplier"]
+            out.append({**bucket, "multiplier": mult,
+                        "weighted_au": bucket["au"] * mult})
+        return out
 
-        return [{"date": d, "total_au": round(v, 1)} for d, v in sorted(au_by_date.items())]
+    def _weighted_au_by_date(self, days: int = 28,
+                             today: date | None = None) -> dict[str, float]:
+        au_by_date: dict[str, float] = {}
+        for s in self._weighted_sessions(days=days, today=today):
+            au_by_date[s["date"]] = au_by_date.get(s["date"], 0.0) + s["weighted_au"]
+        return au_by_date
+
+    def get_daily_region_au(self, days: int = 28, today: date | None = None) -> dict:
+        """Regional counterpart to get_daily_session_au_weighted — the same
+        weighted AU, divided across upper_body / core / lower_body plus an
+        `unattributed` bucket.
+
+        {"rows": [{"date", "upper_body", "core", "lower_body", "unattributed",
+                   "total_au", "regions_known"}],
+         "unmapped_names", "renormalised_names", "attributed_fraction"}
+
+        Per date the four parts sum to that date's total_au EXACTLY, and
+        total_au matches get_daily_session_au_weighted's figure for the same
+        window because both read the same _weighted_sessions pass.
+
+        Self-healing over history for exactly the reason that method's
+        docstring gives: recomputed live from each day's own Sets JSON on every
+        call, so a day logged before this existed splits correctly the very
+        next time it is read. NOTHING here is persisted, deliberately — the
+        region weights are invented and expected to be revised, and a stored
+        column derived from constants you expect to change is the
+        does-not-self-heal failure that bit the Stage 1 strain over-count.
+        """
+        return strain_regions.daily_region_au(
+            self._weighted_sessions(days=days, today=today),
+        )
 
     def get_unparsed_session_notes(self) -> list[dict]:
         pages = self._query(

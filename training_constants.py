@@ -236,6 +236,228 @@ EXERCISE_BODY_REGION: dict[str, str] = {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+#  The regions' DISPLAY identity — one definition, read by views/insights.py's
+#  Strength screen and by the Strain drill-down. Colour, label and faceplate
+#  geometry live here beside EXERCISE_BODY_REGION because they name the same
+#  three things; two copies would eventually disagree, and a core that is one
+#  yellow on one screen and another yellow on the next is a bug the eye notices
+#  long before any test does.
+#
+#  `ratio` is each faceplate's NATIVE aspect ratio
+#  (background_templates/body_faceplates_v2/). The three plates stack into one
+#  continuous figure ONLY where they render at the same displayed width — true
+#  on the 1600px Strength screen, deliberately abandoned in the 480px Home
+#  column, where the text block is taller than two of the three plates.
+# ─────────────────────────────────────────────────────────────────────────────
+
+REGION_DISPLAY: dict[str, dict] = {
+    "upper_body": {"name": "Upper body", "short": "Upper",
+                   "colour": "#FF8C42", "ratio": "893/640"},
+    "core":       {"name": "Core",       "short": "Core",
+                   "colour": "#E8B04B", "ratio": "893/428"},
+    "lower_body": {"name": "Lower body", "short": "Lower",
+                   "colour": "#D9663A", "ratio": "893/534"},
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Exercise → how its load DISTRIBUTES across the three regions.
+#
+#  A REFINEMENT of EXERCISE_BODY_REGION, never a replacement. That map answers
+#  "which one sector owns this movement" and three things need exactly that
+#  answer: services/tonnage.py (splitting a lift's kilograms across regions
+#  would put fictional weight in a sector), services/strength.py (an e1RM is a
+#  property of one movement pattern), and services/flexibility.py's
+#  leg_loading_days, which reads == "lower_body" as the boolean that sets the
+#  retest calendar. This map answers a different question — "where did the
+#  STRAIN of this movement land" — and only services/strain_regions.py reads it.
+#
+#  The two are bound by test, not by convention: tests/test_region_shares_
+#  coverage.py asserts that every entry's dominant region equals its
+#  EXERCISE_BODY_REGION value, with a STRICT winner. They cannot drift.
+#
+#  ⚠ EVERY NUMBER BELOW IS INVENTED. No source supplies them; there is no
+#  per-region load measurement anywhere in this system to validate them
+#  against, and there is no ground truth to acquire (that is the same blocking
+#  problem services/sleep_fusion.py records for the quiet-wake rule). So they
+#  are flagged REGION_SHARES_BASIS = "provisional" in the
+#  services/battery.py BASIS_PROVISIONAL sense, the flag reaches the screen,
+#  and the REVERT CONDITION is written in the HRV_GARMIN_HOLD idiom:
+#  revise on the athlete's or the physiotherapist's review of this table, or on
+#  measured per-region evidence — never on a date.
+#
+#  Three authoring rules, all enforced by test:
+#
+#  1. ALL THREE KEYS ALWAYS PRESENT, explicit zeros. A sparse dict makes
+#     "0.00 because this genuinely does not load that region" indistinguishable
+#     from "the author forgot a key", and an unexplained absence must never be
+#     indistinguishable from an oversight (cluster_a_mechanics.REMOVED's rule).
+#  2. EVERY VALUE IS A MULTIPLE OF 0.05, and nothing lies strictly between 0.00
+#     and 0.05. A 0.02 in an invented table is false precision — it claims a
+#     resolution nobody has. 0.00 is permitted and MEANS something: "this does
+#     not load that region in any way worth counting". 0.05 is the floor for
+#     any non-zero claim.
+#  3. EVERY ENTRY SUMS TO 1.0 EXACTLY. That is what keeps
+#     upper + core + lower == the session's whole AU an identity rather than an
+#     approximation — the same property tonnage.py protects by never splitting
+#     a lift. services/strain_regions.py renormalises a non-unit vector at read
+#     time AND reports the name, so a typo degrades rather than crashing a
+#     health page; the test is what stops it living there forever.
+#
+#  A MOVEMENT FAMILY SHARES ONE TRIPLE. Both Right Posterior Hip Capsule
+#  Stretch entries, the three Wall Sits, the two Cat-Cows, the three Bird-Dogs,
+#  the two Dead Bugs, the two Single-Leg Balances, and the whole walking family
+#  (Controlled Walking / Walking — Gait Focus / the two walk assessments /
+#  Outdoor Walk) are identical, so the same movement never changes its split
+#  because a training block renamed it. Pinned by test.
+#
+#  "Week 1 Self-Assessment" is deliberately absent, exactly as it is absent
+#  from EXERCISE_BODY_REGION — it is a subjective checkpoint, not a movement.
+#  It falls to the even-thirds default and is NAMED in the result's
+#  unmapped_names, never silently zeroed.
+# ─────────────────────────────────────────────────────────────────────────────
+
+REGION_SHARES_BASIS: str = "provisional"
+#: Bump on ANY numeric revision below, so a stored or cached figure can be told
+#: apart from one computed under different weights.
+REGION_SHARES_VERSION: int = 1
+
+EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
+    # ── Upper body ──────────────────────────────────────────────────────────
+    # Scapular/thoracic work: the thoracic drills are half trunk and say so.
+    "Scapular Wall Slide":                    {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Prone Y-Raise (Scapular)":               {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Thoracic Extension (Rolled Towel)":      {"upper_body": 0.70, "core": 0.30, "lower_body": 0.00},
+    "Thread-the-Needle (Thoracic Rotation)":  {"upper_body": 0.65, "core": 0.35, "lower_body": 0.00},
+    # Loaded upper: bench-supported and pad-restrained lifts give the legs
+    # nothing to do; the standing/unilateral ones are anti-rotation tasks.
+    "Incline DB Press":                       {"upper_body": 0.85, "core": 0.15, "lower_body": 0.00},
+    "Lat Pulldown":                           {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Face Pull (Cable)":                      {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Single-Arm DB Row":                      {"upper_body": 0.75, "core": 0.20, "lower_body": 0.05},
+
+    # ── Core ────────────────────────────────────────────────────────────────
+    # The only 1.00s in the table: single-region by design, nothing else works.
+    "McGill Modified Curl-Up":                {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
+    "McGill Curl-Up (Progressed)":            {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
+    "Diaphragmatic Breathing":                {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
+    "Prone Decompression Breathing":          {"upper_body": 0.05, "core": 0.95, "lower_body": 0.00},
+    # Side bridges and planks: the SUPPORT SHOULDER takes real load — which is
+    # why the full version is regressed to bent-knee rather than to a shorter
+    # hold. A 0.00 upper here would deny the reason for the regression.
+    "Full Side Bridge":                       {"upper_body": 0.20, "core": 0.75, "lower_body": 0.05},
+    "Side Bridge with Hip Dip":               {"upper_body": 0.20, "core": 0.75, "lower_body": 0.05},
+    "Side Bridge (Modified — Bent Knee)":     {"upper_body": 0.15, "core": 0.80, "lower_body": 0.05},
+    "Forearm Plank":                          {"upper_body": 0.20, "core": 0.75, "lower_body": 0.05},
+    # Contralateral reach genuinely loads a shoulder and a glute.
+    "Bird-Dog":                               {"upper_body": 0.15, "core": 0.70, "lower_body": 0.15},
+    "Bird-Dog (Extended Hold)":               {"upper_body": 0.15, "core": 0.70, "lower_body": 0.15},
+    "Bird-Dog with Full Reach":               {"upper_body": 0.15, "core": 0.70, "lower_body": 0.15},
+    "Dead Bug":                               {"upper_body": 0.05, "core": 0.90, "lower_body": 0.05},
+    "Dead Bug (Progression — 3s Hold)":       {"upper_body": 0.05, "core": 0.90, "lower_body": 0.05},
+    # It IS the anti-rotation exercise; the arms hold the handle, the stance
+    # resists. Both Pallof variants share one triple.
+    "Pallof Press (Cable)":                   {"upper_body": 0.15, "core": 0.75, "lower_body": 0.10},
+    "Pallof Press Hold (Doorframe)":          {"upper_body": 0.15, "core": 0.75, "lower_body": 0.10},
+    "Cat-Cow":                                {"upper_body": 0.10, "core": 0.85, "lower_body": 0.05},
+    "Cat-Cow (Slow Flow)":                    {"upper_body": 0.10, "core": 0.85, "lower_body": 0.05},
+    # Supine knee-to-chest is lumbar decompression driven by hip flexion.
+    "Supine Knee-to-Chest":                   {"upper_body": 0.00, "core": 0.70, "lower_body": 0.30},
+    "Supine Knee-to-Chest (Bilateral)":       {"upper_body": 0.00, "core": 0.75, "lower_body": 0.25},
+    "Supine Knees-to-Chest (Bilateral Rock)": {"upper_body": 0.00, "core": 0.75, "lower_body": 0.25},
+    # Genuinely whole-body positions. Argmax still core, which is what keeps
+    # them agreeing with EXERCISE_BODY_REGION.
+    "Supine Full-Body Stretch":               {"upper_body": 0.20, "core": 0.55, "lower_body": 0.25},
+    "Child's Pose":                           {"upper_body": 0.20, "core": 0.55, "lower_body": 0.25},
+    "McGill Big 3 — Quality Screen":          {"upper_body": 0.05, "core": 0.90, "lower_body": 0.05},
+
+    # ── Lower body: the pre-session release protocol ────────────────────────
+    # Direct pressure on one structure, on the floor. The 0.00 UPPER is an
+    # assertion worth making. The 0.05-0.10 core is not a measurement — a hard
+    # 0.00 would read as "no trunk involvement at all", and this protocol is
+    # explicitly a lumbo-pelvic intervention, which is a stronger claim than
+    # the evidence supports in either direction.
+    "Upper Glute / TFL Self-Release":                    {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Piriformis Contract-Relax (PNF)":                   {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Right Posterior Hip Capsule Stretch":               {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Right Posterior Hip Capsule Stretch (Revised Cue)": {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Right Hip Tendon Path Drill (Coxa Saltans)":        {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    # The most local of the six: one tissue under direct pressure.
+    "Ischial Tuberosity Hamstring Release":              {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
+
+    # ── Lower body: hip mobility and activation ─────────────────────────────
+    "Standing Hip Flexor Release":            {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "90/90 Hip Flexor Hold":                  {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Hip 90/90 Flow":                         {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Supine Knee Fallout (Butterfly)":        {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Supine Hip Flexion (Marching)":          {"upper_body": 0.00, "core": 0.30, "lower_body": 0.70},
+    "Side-Lying Hip Abduction":               {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Clamshell":                              {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Lateral Band Walk":                      {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Lateral Step Walk":                      {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Sciatic Nerve Floss":                    {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Standing Calf Raise (Eccentric Focus)":  {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
+
+    # ── Lower body: bridges and hip extension ───────────────────────────────
+    # Unilateral bridging adds anti-rotation the bilateral version does not.
+    "Supine Glute Bridge (Bilateral)":        {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Glute Bridge":                           {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Glute Bridge March":                     {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    "Glute Bridge (Eccentric Single Load)":   {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    "Single-Leg Glute Bridge":                {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    "Prone Hip Extension (Single Leg)":       {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Prone Hip Extension (Slow Tempo — 4-3-5)": {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+
+    # ── Lower body: hinges, squats, steps ───────────────────────────────────
+    # A hinge is where the erectors work, and this body carries two annulus
+    # tears — the trunk share here is the highest of any lower-body family.
+    "Romanian Deadlift (DB)":                 {"upper_body": 0.10, "core": 0.25, "lower_body": 0.65},
+    "RDL Hip Hinge to Wall":                  {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Single-Leg RDL (Wall Support)":          {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Standing Hip Hinge (Wall Glute Touch)":  {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    "Wall-Supported Hip Hinge":               {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Hip Hinge Full Range Assessment":        {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    # The front-rack goblet position is a genuine anterior-core brace, and is
+    # most of why this squat variant is the one prescribed for this athlete.
+    "Goblet Squat":                           {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Bulgarian Split Squat":                  {"upper_body": 0.05, "core": 0.20, "lower_body": 0.75},
+    # The most isolated loaded lift in the block.
+    "Hip Thrust (Loaded)":                    {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Reverse Lunge":                          {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Lateral Lunge":                          {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Forward Step-Up (Stair)":                {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Lateral Step-Up (Single Stair)":         {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Chair Sit-to-Stand":                     {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Wall Sit":                               {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Wall Sit (Isometric Quad)":              {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    "Wall Sit (Extended Duration)":           {"upper_body": 0.00, "core": 0.15, "lower_body": 0.85},
+    # Balance is a trunk task as much as a foot task.
+    "Single-Leg Balance":                     {"upper_body": 0.00, "core": 0.30, "lower_body": 0.70},
+    "Single-Leg Balance (Eyes Closed)":       {"upper_body": 0.00, "core": 0.30, "lower_body": 0.70},
+
+    # ── Lower body: the walking family ──────────────────────────────────────
+    # ONE triple across every name for the same movement, including the
+    # Garmin-imported Outdoor Walk. A stroll does not change what it loads
+    # because a training block called it something else.
+    "Controlled Walking":                     {"upper_body": 0.05, "core": 0.10, "lower_body": 0.85},
+    "Walking — Gait Focus":                   {"upper_body": 0.05, "core": 0.10, "lower_body": 0.85},
+    "Assessment Walk + Stair Check":          {"upper_body": 0.05, "core": 0.10, "lower_body": 0.85},
+    "5-Minute Walk + Stair Assessment":       {"upper_body": 0.05, "core": 0.10, "lower_body": 0.85},
+    "Outdoor Walk":                           {"upper_body": 0.05, "core": 0.10, "lower_body": 0.85},
+
+    # ── Lower body: the rest of the Garmin outdoor imports ──────────────────
+    # The hike is the athlete's own worked example and is taken as given:
+    # uneven ground and a pack make trunk stabilisation real, arm swing does
+    # not. Trail running has the highest trunk demand of the five (impact plus
+    # terrain plus rotation). "Outdoor Activity" is the catch-all — its name
+    # means "we do not know what this was", so it is deliberately the LEAST
+    # committed of the five, pulled toward even. Pinned by test.
+    "Outdoor Hike":                           {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
+    "Outdoor Run":                            {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
+    "Outdoor Trail Run":                      {"upper_body": 0.05, "core": 0.20, "lower_body": 0.75},
+    "Outdoor Activity":                       {"upper_body": 0.10, "core": 0.20, "lower_body": 0.70},
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 #  Movement-category weight table — content-aware AU weighting for Strain/ACWR
 #  (extends the movement_multiplier sketch in docs/training/Training_System.md
 #  :104-105, which was never implemented and was itself weight_kg-based --

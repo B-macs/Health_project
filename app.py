@@ -24,11 +24,14 @@ import streamlit as st
 import nav
 import repo
 import styles
+import training_constants as _tc
 from services import dashboard as dash
 from services import engine
 from services import hr_load as _hr_load
+from services import plan as plan_svc
 from services import readiness as readiness_model
 from services import sleep_score as sleep_score_model
+from services import strain_regions as _sr
 
 # ─── Page config ─────────────────────────────────────────────────────────────
 
@@ -230,6 +233,31 @@ def _wake_adjustment_sources(days: int = 60) -> dict[str, str]:
 @st.cache_data(ttl=1800, show_spinner=False)
 def _current_stage_cached() -> int:
     return repo.get_repository().get_current_stage()
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _region_au_history(days: int = 31) -> dict:
+    """Per-region AU for the strain drill-down — upper/core/lower plus an
+    `unattributed` bucket, summing exactly to each day's own weighted AU.
+
+    Deliberately its OWN fetch rather than widening _au_history: this is
+    called only from the strain drill-down, so the three-card Home stream
+    never pays for it. Opening a drill-down is a deliberate click that can
+    afford a read, which is the same trade services/home_snapshot.py makes
+    when it declines to cache hr_detail.
+
+    31 days so the 30-day trend window is fully covered.
+    """
+    return repo.get_repository().get_daily_region_au(days)
+
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _stage_start_cached():
+    """Start date of the active phase — scopes the per-region ACWR's chronic
+    baseline to the current stage, exactly as views/insights.py does for the
+    overall one. None during a reassessment gap, where engine.acwr falls back
+    to the flat 28-day calendar window."""
+    return plan_svc.current_stage_start(repo.get_repository().get_phases(), date.today())
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -615,16 +643,48 @@ def _card_html(
 
 # ─── Metric drill-downs (Readiness / Sleep / Strain) ──────────────────────────
 
-def _panel(overline: str, body: str, caption: str = "") -> str:
-    """The detail-view panel every block on this screen sits in — same
-    #131929 / 12px surface _trend_block and _history_trend_block already use,
-    factored out so a new section can't drift from them."""
-    cap = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:10px;line-height:1.5;">{caption}</div>'
-           if caption else "")
+# The two skins these panels come in.
+#
+# _SKIN_HOME is what Readiness and Sleep have always looked like, and is the
+# DEFAULT everywhere, so those two screens are bit-identical after this change.
+# _SKIN_BOARD is views/insights.py's Strength-screen palette, adopted by the
+# STRAIN drill-down only. The values are that screen's _PANEL/_INK/_INK2/_INK3
+# and _HAIR — copied rather than imported because views/insights.py is a page
+# module and app.py must not import one, and re-declared rather than shared
+# because the two screens deliberately differ (see the note in
+# views/insights.py: a screen that does not inject _STRENGTH_CSS must own its
+# own classes).
+# `border` is a whole declaration, not just a colour: "none" is the div default,
+# so the home skin cannot shift an existing panel by the 2px a transparent 1px
+# border would have added.
+_SKIN_HOME: dict[str, str] = {
+    "panel": "#131929", "ink": "#D4DCEE", "ink2": "#6B7A9B",
+    # "#555" not "#555555" — the same colour, but the exact string
+    # _chart_block's subtitle already emitted, so Readiness and Sleep keep
+    # byte-identical markup rather than merely identical-looking markup.
+    "ink3": "#555", "border": "none", "radius": "12px",
+}
+_SKIN_BOARD: dict[str, str] = {
+    "panel": "#0E1018", "ink": "#F4F6FB", "ink2": "#9AA3B2",
+    "ink3": "#5A6377", "border": "1px solid rgba(255,255,255,0.06)",
+    "radius": "16px",
+}
+
+
+def _panel(overline: str, body: str, caption: str = "", skin: dict | None = None) -> str:
+    """The detail-view panel every block on this screen sits in, factored out
+    so a new section can't drift from them.
+
+    `skin` defaults to _SKIN_HOME — the #131929 / 12px surface this screen has
+    always used — so every existing call site renders exactly as before."""
+    s = skin or _SKIN_HOME
+    cap = (f'<div style="font-size:10px;color:{s["ink2"]};margin-top:10px;'
+           f'line-height:1.5;">{caption}</div>' if caption else "")
     return (
-        f'<div style="background:#131929;border-radius:12px;padding:16px 18px;margin-bottom:10px;">'
-        f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;text-transform:uppercase;'
-        f'font-weight:600;margin-bottom:10px;">{overline}</div>'
+        f'<div style="background:{s["panel"]};border:{s["border"]};'
+        f'border-radius:{s["radius"]};padding:16px 18px;margin-bottom:10px;">'
+        f'<div style="font-size:10px;color:{s["ink2"]};letter-spacing:2px;'
+        f'text-transform:uppercase;font-weight:600;margin-bottom:10px;">{overline}</div>'
         f'{body}{cap}</div>'
     )
 
@@ -1264,19 +1324,201 @@ def _strain_source_block() -> str:
     )
 
 
+_FACEPLATE_DIR = Path(__file__).resolve().parent / "background_templates" / "body_faceplates_v2"
+
+
+def _region_split_bar_html(data: dict) -> str:
+    """The AU share. THE exactly-additive quantity on this screen, which is
+    why it leads and why its label says so.
+
+    The athlete's ask was that a hike "adds PROPORTIONALLY more to the
+    lowerbody" — and share is the only figure here that carries a proportion
+    intact. engine.load_to_strain is logarithmic, so an intended 16:1
+    lower:upper localisation shows up as 2.34:1 once through the curve. The
+    strain triple below is real, but it is not what answers his question."""
+    s = _SKIN_BOARD
+    segs, key = "", ""
+    for region in data["regions"]:
+        meta = _tc.REGION_DISPLAY[region["id"]]
+        pct = region["au_pct"] or 0.0
+        segs += f'<i style="width:{pct:.1f}%;background:{meta["colour"]};"></i>'
+        key += (f'<span style="display:inline-flex;align-items:center;gap:6px;">'
+                f'<b style="width:8px;height:8px;border-radius:3px;display:inline-block;'
+                f'background:{meta["colour"]};"></b>{meta["short"]} {pct:.0f}%</span>')
+    un_pct = data.get("unattributed_pct") or 0.0
+    if un_pct > 0:
+        segs += f'<i style="width:{un_pct:.1f}%;background:{s["ink3"]};"></i>'
+        key += (f'<span style="display:inline-flex;align-items:center;gap:6px;">'
+                f'<b style="width:8px;height:8px;border-radius:3px;display:inline-block;'
+                f'background:{s["ink3"]};"></b>Unattributed {un_pct:.0f}%</span>')
+    # The label changes when coverage is partial. That one word swap is what
+    # keeps the additive claim true rather than silently renormalising.
+    heading = ("Load share &middot; adds to 100%" if un_pct <= 0
+               else "Load share &middot; adds to 100% of MAPPED load")
+    return (
+        f'<div style="font:600 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;'
+        f'letter-spacing:.14em;text-transform:uppercase;color:{s["ink3"]};'
+        f'margin-bottom:8px;">{heading}</div>'
+        f'<div style="display:flex;height:10px;border-radius:5px;overflow:hidden;'
+        f'background:rgba(255,255,255,0.06);">{segs}</div>'
+        f'<div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:9px;'
+        f'font-size:11px;color:{s["ink2"]};font-variant-numeric:tabular-nums;">{key}</div>'
+    )
+
+
+def _region_rows_html(data: dict, overall: float | None) -> str:
+    """One row per region: name, its own 0-21 reading, a track against 21 with
+    the OVERALL drawn on it as a tick, its advisory ACWR, and the faceplate.
+
+    The tick is what makes the non-additivity visible rather than merely
+    stated: it lands at the same x on all three tracks, every bar stops short
+    of it (regional AU <= total AU and the curve is monotonic, so a region can
+    never read above the headline), and the three bars together obviously
+    overrun the axis.
+
+    The continuous-figure join views/insights.py:151-153 requires is
+    deliberately abandoned here. At this column width the text block is taller
+    than two of the three plates, so they would float apart with gaps that read
+    as a broken join; each plate gets its own soft container instead."""
+    s = _SKIN_BOARD
+    tick = ""
+    if overall is not None:
+        pct = max(0.0, min(100.0, overall / 21.0 * 100.0))
+        tick = (f'<u style="position:absolute;left:{pct:.1f}%;top:-4px;bottom:-4px;'
+                f'width:1px;text-decoration:none;background:rgba(212,220,238,0.65);"></u>')
+
+    rows = ""
+    for region in data["regions"]:
+        meta = _tc.REGION_DISPLAY[region["id"]]
+        plate = _b64(str(_FACEPLATE_DIR / f'{region["id"]}.png'))
+        strain = region["strain"]
+        acwr = region["acwr"]
+        if strain is None:
+            value = f'<span style="color:{s["ink3"]};">&mdash;</span>'
+            fill = ""
+            dim = "opacity:.22;filter:grayscale(1);"
+        else:
+            value = (f'{strain:.1f}<u style="text-decoration:none;font-size:11px;'
+                     f'color:{s["ink2"]};margin-left:4px;">/21</u>'
+                     f'<s style="text-decoration:none;font-size:11px;color:{s["ink2"]};'
+                     f'margin-left:9px;">{region["au"]:,.0f} AU &middot; '
+                     f'{region["au_pct"]:.0f}%</s>')
+            fill = (f'<i style="display:block;height:100%;border-radius:4px;'
+                    f'width:{min(100.0, strain / 21.0 * 100.0):.1f}%;'
+                    f'background:{meta["colour"]};"></i>')
+            dim = ""
+        plate_html = (
+            f'<div style="width:100%;aspect-ratio:{meta["ratio"]};background-size:100% 100%;'
+            f'background-repeat:no-repeat;border-radius:10px;{dim}'
+            f'background-image:url(\'{plate}\');"></div>' if plate else
+            f'<div style="width:100%;aspect-ratio:{meta["ratio"]};border-radius:10px;'
+            f'background:rgba(255,255,255,0.02);"></div>'
+        )
+        rows += (
+            f'<div style="display:grid;grid-template-columns:minmax(0,1fr) 34%;'
+            f'gap:12px;align-items:center;padding:10px 0;'
+            f'border-bottom:1px solid rgba(255,255,255,0.05);" role="group" '
+            f'aria-label="{meta["name"]}, strain {strain if strain is not None else "not available"}">'
+            f'<div>'
+            f'<div style="font-size:13.5px;font-weight:700;color:{meta["colour"]};">'
+            f'{meta["name"]}</div>'
+            f'<div style="font-size:25px;font-weight:300;color:{s["ink"]};margin-top:3px;'
+            f'line-height:1.05;font-variant-numeric:tabular-nums;">{value}</div>'
+            f'<div style="position:relative;height:7px;border-radius:4px;margin:9px 0 8px;'
+            f'background:rgba(255,255,255,0.07);">{fill}{tick}</div>'
+            f'<div style="font:600 10px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace;'
+            f'letter-spacing:.05em;color:{acwr["colour"]};">{acwr["value"]}'
+            f'<em style="display:block;font-style:normal;font-size:9px;letter-spacing:.04em;'
+            f'text-transform:uppercase;opacity:.8;">{acwr["reason"]}</em></div>'
+            f'</div>{plate_html}</div>'
+        )
+    return f'<div>{rows}</div>'
+
+
+def _region_block(data: dict, overall: float | None, stage: int) -> str:
+    """The whole "where it landed" section, or the honest empty state.
+
+    A rest day, a yoga day and a day with no session each get a stated reason
+    rather than three zeros — an unmapped region has no number, never a 0.0,
+    the same rule the flexibility ladder applies to an unmeasured muscle."""
+    s = _SKIN_BOARD
+    if not data.get("has_split"):
+        names = data.get("unmapped_names") or []
+        listed = ("" if not names else
+                  f'<div style="font-size:11px;color:{s["ink3"]};margin-top:8px;'
+                  f'line-height:1.6;">Not in the region map: '
+                  f'{" &middot; ".join(names[:8])}'
+                  f'{f" +{len(names) - 8} more" if len(names) > 8 else ""}</div>')
+        return _panel(
+            "Where it landed",
+            f'<div style="font-size:12.5px;color:{s["ink2"]};line-height:1.6;">'
+            f'No regional split for this day. Either nothing was logged, the '
+            f'number above is the 7-day stand-in, or none of what was logged '
+            f'maps to a body region &mdash; so there is nothing to divide. '
+            f'The strain figure above is unaffected.</div>{listed}',
+            "An exercise with no region mapping is excluded from every sector "
+            "total, here and on the Strength screen.",
+            skin=s,
+        )
+
+    gap = data.get("additivity_gap")
+    gap_txt = (f" They total {gap + (overall or 0):.1f} against {overall:.1f}."
+               if gap is not None and overall is not None else "")
+    caveat = ""
+    frac = data.get("attributed_fraction")
+    if data.get("attributed_is_low") and frac is not None:
+        caveat = (f' Attributed from {frac * 100:.0f}% of logged session time, '
+                  f'so the split rests on a thin sample of the session.')
+    unmapped = data.get("unmapped_names") or []
+    unmapped_txt = ("" if not unmapped else
+                    f' {len(unmapped)} item(s) have no region mapping and sit '
+                    f'in the unattributed share: {" &middot; ".join(unmapped[:5])}'
+                    f'{f" +{len(unmapped) - 5} more" if len(unmapped) > 5 else ""}.')
+
+    body = (
+        _region_split_bar_html(data)
+        + f'<div style="font:600 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;'
+          f'letter-spacing:.14em;text-transform:uppercase;color:{s["ink3"]};'
+          f'margin:16px 0 8px;">Strain &middot; same 0&ndash;21 curve</div>'
+        + f'<div style="border-left:2px solid #BFA06A;padding:1px 0 1px 11px;'
+          f'margin:0 0 6px;font-size:11.5px;line-height:1.55;color:#9AA6BE;">'
+          f'{_sr.NON_ADDITIVE_NOTE}{gap_txt}</div>'
+        + _region_rows_html(data, overall)
+    )
+    ceiling = _rules_ceiling(stage)
+    return _panel(
+        "Where it landed",
+        body,
+        (f'Reported, never enforced &mdash; a regional ACWR informs, it never '
+         f'caps volume. Stage {stage} ceiling {ceiling:.2f}.{caveat}{unmapped_txt} '
+         f'The region weights are <b>{data["shares_basis"]}</b> (v{data["shares_version"]}): '
+         f'authored for this athlete, not measured.'),
+        skin=s,
+    )
+
+
+def _rules_ceiling(stage: int) -> float:
+    from services import rules as _rules
+    return _rules.STAGE_CONSTRAINTS.get(stage, {}).get("acwr_ceiling", 1.3)
+
+
 def _metric_detail(view: str) -> str:
+    # The strain drill-down is the one screen in the Strength-board palette.
+    # Readiness and Sleep keep _SKIN_HOME, so their markup is byte-identical.
+    skin = _SKIN_BOARD if view == "strain" else _SKIN_HOME
+
     def _chart_block(title: str, headline: str, subtitle: str, chart_html: str,
                      detail_html: str = "") -> str:
-        """The surface every chart on this screen sits in — same #131929 /
-        12px panel as _panel, with room for a headline figure and a subtitle
-        above the plot."""
-        sub = (f'<div style="font-size:10px;color:#555;margin-bottom:9px;">{subtitle}</div>'
+        """The surface every chart on this screen sits in — the same panel as
+        _panel, with room for a headline figure and a subtitle above the plot."""
+        sub = (f'<div style="font-size:10px;color:{skin["ink3"]};margin-bottom:9px;">{subtitle}</div>'
                if subtitle else '<div style="height:6px;"></div>')
         return (
-            f'<div style="background:#131929;border-radius:12px;padding:16px 18px;margin-bottom:10px;">'
-            f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;text-transform:uppercase;'
+            f'<div style="background:{skin["panel"]};border:{skin["border"]};'
+            f'border-radius:{skin["radius"]};padding:16px 18px;margin-bottom:10px;">'
+            f'<div style="font-size:10px;color:{skin["ink2"]};letter-spacing:2px;text-transform:uppercase;'
             f'font-weight:600;margin-bottom:4px;">{title}</div>'
-            f'<div style="font-size:28px;font-weight:700;color:#D4DCEE;margin-bottom:4px;">{headline}</div>'
+            f'<div style="font-size:28px;font-weight:700;color:{skin["ink"]};margin-bottom:4px;">{headline}</div>'
             f'{sub}{chart_html}{detail_html}</div>'
         )
 
@@ -1375,6 +1617,27 @@ def _metric_detail(view: str) -> str:
         detail_label = "STRAIN · 7D AVG" if _strain_is_rolling else f"STRAIN · {date_label}"
         hist_key, hist_unit, hist_title, hist_color = "strain", "", "Strain Trend", "#BFA06A"
         hist_metric = "Strain"
+        # WHERE IT LANDED leads, above the 30-day trend: it explains the number
+        # in the header, the way Sleep's contributor breakdown does. Every read
+        # below happens only on this branch, so the three-card Home stream
+        # never pays for it.
+        _region_data: dict = {"has_split": False, "unmapped_names": []}
+        try:
+            _regions = _region_au_history()
+            _acwr = _sr.region_acwr(
+                _regions["rows"], _current_stage, today=date.today(),
+                stage_start=_stage_start_cached(),
+            )
+            _region_data = dash.compute_region_strain_snapshot(
+                selected_date, _regions["rows"], _current_stage,
+                overall_snapshot=_snapshot, provenance=_regions,
+                acwr_results=_acwr,
+            )
+        except Exception:
+            # A failed read must not take the strain number down with it — the
+            # panel states its own absence instead.
+            pass
+        pre_blocks = _region_block(_region_data, _display_strain, _current_stage)
         # 21.0 is the same ceiling the strain arc is drawn against above
         # (_arc_svg(_display_strain, 21, ...)) and the one engine.load_to_strain
         # saturates at.

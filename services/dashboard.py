@@ -18,10 +18,12 @@ from __future__ import annotations
 import math
 from datetime import date, timedelta
 
+import training_constants as _tc
 from services import engine as _engine
 from services import hr_load as _hr_load
 from services import readiness as _readiness
 from services import sleep_score as _sleep_score
+from services import strain_regions as _strain_regions
 from services.readiness import NOT_COMPUTED as _NOT_COMPUTED
 
 SLEEP_NEED_HOURS_DEFAULT = 8.0
@@ -288,6 +290,152 @@ def strain_meta(score, is_rolling: bool = False) -> tuple:
             "Strenuous": "Max exertion. Full recovery required before your next training block.",
         }
     return c, f"{s:.1f}", lbl, heads[lbl], descs[lbl]
+
+
+# ─── Localised strain: a SIBLING of the snapshot above, never a widening ────
+#
+# compute_daily_metrics_snapshot's key set is read positionally or by literal
+# set in three places — Repository._metrics_history_row (bracket access, so a
+# rename raises), home_snapshot.build, and the Home page — and
+# tests/test_dashboard.py already asserts it exactly. Localised strain is
+# additive information beside the headline, so it gets its own function and
+# leaves that contract alone.
+
+_REGION_TONES: dict[str, str] = {
+    "green":  "#6BAF8B",
+    "yellow": "#BFA06A",
+    "red":    "#C47878",
+    "grey":   "#4A5568",
+}
+
+_ACWR_REASONS: dict[str, str] = {
+    "optimal":        "optimal",
+    "undertraining":  "below the optimal band",
+    "overreach_risk": "above the ceiling",
+}
+
+
+def strain_region_acwr_display(acwr_result: dict | None) -> dict:
+    """How one region's ACWR reads on screen: {"value", "reason", "colour",
+    "diagnostic"}.
+
+    TWO RULES, both already this codebase's habit.
+
+    A status with no verdict in it — baseline_establishing,
+    insufficient_regional_load, insufficient_chronic_data — takes the GREY
+    tone and its reason is PRINTED, never left to the colour alone. An
+    establishing baseline must not be distinguishable from a good score only
+    by a shade of grey on a phone in daylight.
+
+    A region with no ratio returns an em-dash and says why. Never a zero: a
+    region that was not trained is not a region whose ACWR is 0.0, the same
+    distinction services/battery.py draws between a failed reading and an
+    unmeasured one.
+    """
+    if not acwr_result:
+        return {"value": "ACWR —", "reason": "no load in window",
+                "colour": _REGION_TONES["grey"], "diagnostic": False}
+
+    status = acwr_result.get("status") or "insufficient_data"
+    ratio = acwr_result.get("acwr")
+    ceiling = acwr_result.get("ceiling", 1.3)
+
+    if ratio is None:
+        if status == "insufficient_regional_load":
+            loaded = acwr_result.get("loaded_days", 0)
+            floor = acwr_result.get("min_loaded_days", 0)
+            reason = f"loaded {loaded}/{floor} days — too thin to rate"
+        else:
+            reason = "not enough history"
+        return {"value": "ACWR —", "reason": reason,
+                "colour": _REGION_TONES["grey"], "diagnostic": False}
+
+    if status == "baseline_establishing":
+        have = acwr_result.get("in_stage_days", 0)
+        return {
+            "value": f"ACWR {ratio:.2f}",
+            "reason": (f"baseline {have}/{_engine.ACWR_MIN_IN_STAGE_DAYS} d "
+                       f"— not diagnostic"),
+            "colour": _REGION_TONES["grey"], "diagnostic": False,
+        }
+
+    reason = _ACWR_REASONS.get(status, status.replace("_", " "))
+    if status == "overreach_risk":
+        reason = f"above ceiling {ceiling:.2f}"
+    return {
+        "value": f"ACWR {ratio:.2f}", "reason": reason,
+        "colour": _REGION_TONES[_engine.ACWR_STATUS_COLORS.get(status, "grey")],
+        "diagnostic": True,
+    }
+
+
+def compute_region_strain_snapshot(
+    d: date,
+    region_rows: list[dict],
+    stage: int,
+    overall_snapshot: dict | None = None,
+    provenance: dict | None = None,
+    acwr_results: dict | None = None,
+) -> dict:
+    """The regional companion to compute_daily_metrics_snapshot.
+
+    `region_rows` is Repository.get_daily_region_au()["rows"].
+    `overall_snapshot` is passed IN rather than recomputed, so the stated
+    additivity gap is measured against the very number the card shows and the
+    two can never disagree by a rounding step.
+
+    Returns {"regions": [...ordered upper/core/lower...], "has_split",
+             "unattributed_au", "unattributed_pct", "total_au",
+             "additivity_gap", "non_additive_note", "attributed_fraction",
+             "attributed_is_low", "unmapped_names", "shares_basis",
+             "shares_version"}.
+
+    `has_split` is False on a day with no session, on a day whose strain is
+    the rolling 7-day stand-in (there is no single day to divide), and on a
+    day where nothing mapped — a pure yoga session. Callers must render "—"
+    in that case, never 0.0.
+    """
+    provenance = provenance or {}
+    overall_snapshot = overall_snapshot or {}
+    row = _strain_regions.region_au_for_date(region_rows, d)
+
+    rolling = bool(overall_snapshot.get("strain_is_rolling"))
+    strains = _strain_regions.region_strain(row, stage)
+    has_split = bool(row) and not rolling and any(v is not None for v in strains.values())
+
+    total_au = float((row or {}).get("total_au") or 0.0)
+    unattributed_au = float((row or {}).get(_strain_regions.UNATTRIBUTED) or 0.0)
+
+    regions = []
+    for name in _strain_regions.REGIONS:
+        au = float((row or {}).get(name) or 0.0) if row else 0.0
+        regions.append({
+            "id": name,
+            "au": au if has_split else None,
+            "au_pct": (au / total_au * 100.0) if (has_split and total_au > 0) else None,
+            "strain": strains[name] if has_split else None,
+            "acwr": strain_region_acwr_display((acwr_results or {}).get(name)),
+        })
+
+    frac = provenance.get("attributed_fraction")
+    return {
+        "regions": regions,
+        "has_split": has_split,
+        "total_au": total_au if has_split else None,
+        "unattributed_au": unattributed_au if has_split else None,
+        "unattributed_pct": ((unattributed_au / total_au * 100.0)
+                             if (has_split and total_au > 0) else None),
+        "additivity_gap": _strain_regions.additivity_gap(
+            strains, overall_snapshot.get("strain"),
+        ) if has_split else None,
+        "non_additive_note": _strain_regions.NON_ADDITIVE_NOTE,
+        "attributed_fraction": frac,
+        "attributed_is_low": (frac is not None
+                              and frac < _strain_regions.ATTRIBUTED_FRACTION_LOW),
+        "unmapped_names": provenance.get("unmapped_names") or [],
+        "shares_basis": _tc.REGION_SHARES_BASIS,
+        "shares_version": _tc.REGION_SHARES_VERSION,
+    }
 
 
 def sleep_meta(score, sleep_need_hours: float, sleep_base_window: int | None) -> tuple:
