@@ -1625,6 +1625,33 @@ def _rules_ceiling(stage: int) -> float:
     return _rules.STAGE_CONSTRAINTS.get(stage, {}).get("acwr_ceiling", 1.3)
 
 
+def _detail_header(detail_label: str, colour: str, display: str, tier: str) -> str:
+    """The drill-down's own masthead — overline, THE headline number, and the
+    tier word under it.
+
+    Extracted from _metric_detail rather than left inline because this is where
+    the overall strain value lives: the region panel below states shares and
+    three regional readings, and the number all of them are read against is
+    here. Anything rendering this screen outside app.py — a design review, a
+    walkthrough — needs the real markup rather than a copy that can drift.
+
+    No back control: the fixed header carries a real back BUTTON for these
+    three views, and being position:fixed it is on screen however far down the
+    panel you have scrolled, so a second one here was redundant as well as slow
+    (a page reload — CLAUDE.md Key Rule 17)."""
+    return (
+        f'<div style="display:flex;align-items:center;margin-bottom:20px;">'
+        f'<div>'
+        f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;'
+        f'text-transform:uppercase;margin-bottom:2px;">{detail_label}</div>'
+        f'<div style="font-size:30px;font-weight:800;color:{colour};'
+        f'line-height:1;">{display}</div>'
+        f'<div style="font-size:12px;color:#6B7A9B;margin-top:2px;">{tier}</div>'
+        f'</div>'
+        f'</div>'
+    )
+
+
 def _metric_detail(view: str) -> str:
     # The strain drill-down is the one screen in the Strength-board palette.
     # Readiness and Sleep keep _SKIN_HOME, so their markup is byte-identical.
@@ -1795,20 +1822,7 @@ def _metric_detail(view: str) -> str:
 
     return (
         f'<div style="padding:16px;">'
-        # The "←" that used to sit here was a second back control, and a page
-        # reload (CLAUDE.md Key Rule 17). The fixed header carries a real back
-        # BUTTON for exactly these three views (_DETAIL_VIEW_TITLES ==
-        # strain/readiness/sleep), and being position:fixed it is on screen
-        # however far down the panel you have scrolled — so this one was
-        # redundant as well as slow, and is simply gone.
-        f'<div style="display:flex;align-items:center;margin-bottom:20px;">'
-        f'<div>'
-        f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;'
-        f'text-transform:uppercase;margin-bottom:2px;">{detail_label}</div>'
-        f'<div style="font-size:30px;font-weight:800;color:{col};line-height:1;">{disp}</div>'
-        f'<div style="font-size:12px;color:#6B7A9B;margin-top:2px;">{lbl}</div>'
-        f'</div>'
-        f'</div>'
+        + _detail_header(detail_label, col, disp, lbl)
         + pre_blocks
         + _history_trend_block("hist", hist_title, hist_metric, hist_unit,
                                hist_dates, hist_values, hist_color, hist_key,
