@@ -89,7 +89,44 @@ def update(changes: dict, path: Path | None = None) -> dict:
         return data
 
 
+def mutate(key: str, fn, path: Path | None = None):
+    """Replace ONE key with fn(old_value), the whole read-modify-write held
+    under the lock. Returns the new value. Returning None from `fn` deletes
+    the key.
+
+    update() is enough when the new value is already known. This exists for
+    the callers that must COMPUTE it from the old one — the Home snapshot
+    store, the flexibility assessment list — where `read()`, then compute,
+    then `write()` is racy twice over:
+
+      * it rewrites the WHOLE file, so a different key written in between is
+        silently reverted. That is the one that bites hardest here, because
+        the background sync thread rewrites this file (see
+        Repository._mark_oura_tab_synced) while the Streamlit script thread
+        writes the in-progress training checkpoint on every stepper tap — the
+        sync would drop the athlete's last few reps on the floor.
+      * two writers of the SAME key interleave and one update is lost.
+
+    Doing the read, the compute and the write inside one lock acquisition
+    closes both. `fn` must not block or re-enter this module: the lock is
+    reentrant, but holding it across I/O would stall the other thread.
+    """
+    path = path or _DEFAULT_PATH
+    with _LOCK:
+        data = _read_unlocked(path)
+        new = fn(data.get(key))
+        if new is None:
+            data.pop(key, None)
+        else:
+            data[key] = new
+        _write_unlocked(data, path)
+        return new
+
+
 def write(data: dict, path: Path | None = None) -> None:
+    """Replace the ENTIRE file. Prefer update() or mutate() — this clobbers
+    every key it was not given, which is a lost update whenever another thread
+    owns a different key in the same file."""
     path = path or _DEFAULT_PATH
     with _LOCK:
         _write_unlocked(data, path)

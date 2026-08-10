@@ -4529,10 +4529,11 @@ class Repository:
         entry = home_snapshot.build(
             snapshot, sleep_need_hours, sleep_baseline_window, computed_at=computed_at,
         )
-        data = local_cache.read()
-        store = home_snapshot.put(data.get(_HOME_SNAPSHOT_KEY) or {}, d, entry)
-        data[_HOME_SNAPSHOT_KEY] = home_snapshot.prune(store, today or date.today())
-        local_cache.write(data)
+        local_cache.mutate(
+            _HOME_SNAPSHOT_KEY,
+            lambda store: home_snapshot.prune(
+                home_snapshot.put(store or {}, d, entry), today or date.today()),
+        )
         return entry
 
     def invalidate_home_snapshot(self, d: date) -> None:
@@ -4540,12 +4541,11 @@ class Repository:
         a card — a logged session (strain), a saved check-in, a wake-time
         correction (sleep score) — since this cache outlives the process and
         would otherwise survive the very events that invalidate it."""
-        data = local_cache.read()
-        store = data.get(_HOME_SNAPSHOT_KEY) or {}
-        if home_snapshot.get(store, d) is None:
-            return
-        data[_HOME_SNAPSHOT_KEY] = home_snapshot.drop(store, d)
-        local_cache.write(data)
+        local_cache.mutate(
+            _HOME_SNAPSHOT_KEY,
+            lambda store: store if home_snapshot.get(store or {}, d) is None
+            else home_snapshot.drop(store or {}, d),
+        )
 
     # ─── In-progress training checkpoint (local mirror) ──────────────────
     #  The durable copy lives in Notion under set_config("training_progress").
@@ -4628,14 +4628,15 @@ class Repository:
         a correction, and two entries for one date would let the model see a
         history that never happened.
         """
-        data = local_cache.read()
-        existing = data.get(_FLEXIBILITY_KEY) or []
         stamp = assessment.taken_on.isoformat()
-        kept = [d for d in existing
-                if not (isinstance(d, dict) and d.get("taken_on") == stamp)]
-        kept.append(flexibility.assessment_to_dict(assessment))
-        data[_FLEXIBILITY_KEY] = kept
-        local_cache.write(data)
+
+        def _replace_same_date(existing):
+            kept = [d for d in (existing or [])
+                    if not (isinstance(d, dict) and d.get("taken_on") == stamp)]
+            kept.append(flexibility.assessment_to_dict(assessment))
+            return kept
+
+        local_cache.mutate(_FLEXIBILITY_KEY, _replace_same_date)
 
     def get_flexibility_draft(self):
         """The in-progress assessment, or None. This is what makes the flow
@@ -4647,16 +4648,11 @@ class Repository:
     def save_flexibility_draft(self, assessment) -> None:
         """Called after EVERY step, not at the end. The whole point is that
         nothing is lost mid-flow."""
-        data = local_cache.read()
-        data[_FLEXIBILITY_DRAFT_KEY] = flexibility.assessment_to_dict(assessment)
-        local_cache.write(data)
+        local_cache.update(
+            {_FLEXIBILITY_DRAFT_KEY: flexibility.assessment_to_dict(assessment)})
 
     def clear_flexibility_draft(self) -> None:
-        data = local_cache.read()
-        if _FLEXIBILITY_DRAFT_KEY not in data:
-            return
-        data.pop(_FLEXIBILITY_DRAFT_KEY, None)
-        local_cache.write(data)
+        local_cache.update({_FLEXIBILITY_DRAFT_KEY: None})
 
     def _sync_oura_daily(self, token: str, start: str, end: str) -> int:
         """The Oura Daily tab alone (readiness/sleep/activity/SpO2 etc.
@@ -4706,22 +4702,27 @@ class Repository:
                               now: datetime | None = None) -> None:
         """Records one finished tab. Written after EACH tab rather than once
         at the end — the whole point is to survive the process disappearing
-        mid-run, which is precisely when an end-of-run write never happens."""
-        data = local_cache.read()
-        raw = data.get(_OURA_SYNC_PROGRESS_KEY) or {}
-        counts = dict(raw.get("counts") or {}) if raw.get("window") == window else {}
-        counts[tab] = count
-        data[_OURA_SYNC_PROGRESS_KEY] = {
-            "window": window,
-            "at": (now or datetime.now()).isoformat(timespec="seconds"),
-            "counts": counts,
-        }
-        local_cache.write(data)
+        mid-run, which is precisely when an end-of-run write never happens.
+
+        This is the one that most needed to become atomic: it runs on the
+        BACKGROUND sync thread, once per tab, while the Streamlit script
+        thread writes the in-progress training checkpoint into the same file
+        on every stepper tap. As a read()/write() pair it rewrote the WHOLE
+        file and reverted whatever the other thread had just stored."""
+        def _advance(raw):
+            raw = raw or {}
+            counts = dict(raw.get("counts") or {}) if raw.get("window") == window else {}
+            counts[tab] = count
+            return {
+                "window": window,
+                "at": (now or datetime.now()).isoformat(timespec="seconds"),
+                "counts": counts,
+            }
+
+        local_cache.mutate(_OURA_SYNC_PROGRESS_KEY, _advance)
 
     def _clear_oura_sync_progress(self) -> None:
-        data = local_cache.read()
-        if data.pop(_OURA_SYNC_PROGRESS_KEY, None) is not None:
-            local_cache.write(data)
+        local_cache.update({_OURA_SYNC_PROGRESS_KEY: None})
 
     def sync_oura_all(self, days: int = 7, today: date | None = None,
                       now: datetime | None = None) -> dict:
