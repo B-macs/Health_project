@@ -625,16 +625,30 @@ def test_movement_svg_defaults_unchanged_and_highlight_is_optional():
     assert "stroke" in styles.movement_svg("1234", highlight=(1, 3))
 
 
-def test_chart_hits_emits_one_anchor_per_item_with_its_href():
+def test_chart_hits_emits_one_data_nav_band_per_item():
+    """One tappable band per item, carrying its target — but NOT as a link.
+
+    These were <a href> until 2026-08-10, which meant selecting a point on a
+    chart navigated the browser: full reload, websocket reconnect, every cache
+    cold, to move a marker inside one chart (CLAUDE.md Key Rule 17). They are
+    now data-nav spans that styles._CHART_LINK_JS intercepts. The per-item
+    target, the single selected band and the tooltip are all still pinned —
+    only the element changed.
+    """
     html = styles.chart_hits([
         {"left": 0.0, "width": 0.5, "href": "?pt=hist:0", "title": "a"},
         {"left": 0.5, "width": 0.5, "href": "?pt=hist:1", "title": "b",
          "selected": True},
     ])
-    assert html.count("<a ") == 2
-    assert 'href="?pt=hist:0"' in html and 'href="?pt=hist:1"' in html
+    assert html.count("<span ") == 2
+    assert 'data-nav="?pt=hist:0"' in html and 'data-nav="?pt=hist:1"' in html
     assert html.count("hp-on") == 1
     assert 'title="b"' in html
+    # Never a link again — tests/test_spa_navigation.py enforces this repo-wide,
+    # this pins the generator itself.
+    assert "<a " not in html and "href=" not in html
+    # A span is not focusable on its own; the anchor gave that for free.
+    assert html.count('role="button"') == 2 and html.count('tabindex="0"') == 2
 
 
 def test_chart_hits_of_nothing_is_empty():
@@ -680,7 +694,22 @@ def test_chart_frame_axis_rules_do_not_participate_in_layout():
     assert "position:absolute" in frame
 
 
-def test_chart_link_script_targets_only_this_feature_s_classes():
-    """It must not change how any other link in the app behaves."""
-    assert "a.hp-hit[target], a.hp-link[target]" in styles._CHART_LINK_JS
-    assert "__healthChartNav" in styles._CHART_LINK_JS       # rerun guard
+def test_chart_link_script_touches_only_data_nav_elements():
+    """It must not change how anything else on the page behaves.
+
+    The script used to strip target= off a.hp-hit / a.hp-link so those anchors
+    navigated in place instead of opening a tab. It now PREVENTS the
+    navigation outright: a click on a data-nav element rewrites the query
+    string through the History API and clicks the hidden trigger, so the rerun
+    goes over the existing websocket. Its reach is still exactly one
+    attribute — nothing without data-nav is affected.
+    """
+    js = styles._CHART_LINK_JS
+    assert "data-nav" in js
+    assert "preventDefault" in js                            # no navigation
+    assert "history.replaceState" in js                      # URL, not a nav
+    assert styles.CHART_NAV_TRIGGER_LABEL in js              # what it clicks
+    assert "__healthChartNav" in js                          # install-once guard
+    # The listener must not be able to swallow ordinary clicks: the only
+    # elements it acts on are those carrying data-nav.
+    assert "getAttribute('data-nav')" in js

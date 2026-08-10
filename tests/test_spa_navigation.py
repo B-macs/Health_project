@@ -20,10 +20,9 @@ deliberately, because URL state is what survives a mobile reconnect — while
 still navigating by button rather than by anchor. The two are not in tension.
 
 WHAT THIS TEST ENFORCES
-  * views/ must contain ZERO page-navigating anchors. Fully clean today.
-  * app.py and styles.py may only contain the anchors named in _KNOWN below.
-    Anything new fails. The list is allowed to SHRINK without touching this
-    test; it may only grow by a deliberate edit here, with a reason.
+  * views/, app.py and styles.py must contain ZERO in-app anchors. _KNOWN is
+    empty — every one has been converted — so any anchor at all now fails.
+    It may only grow by a deliberate edit here, carrying a reason.
 
 Not flagged, because they navigate away from the app rather than within it:
 external http(s):// links, mailto:, and in-page "#" fragments.
@@ -54,29 +53,21 @@ _ANCHOR = re.compile(r"<a\b[^>]*href\s*=", re.I)
 #: STRUCTURAL means there is no Streamlit widget that can do the job; those
 #: need a different mechanism, not a find-and-replace. PENDING means it is
 #: ordinary work that simply has not been done yet.
-#: Everything convertible HAS been converted — these three are all that is
-#: left, and all three are STRUCTURAL for the same underlying reason: they are
-#: anchors inside an HTML STRING that some other element renders, so there is
-#: no point in the Streamlit element tree at which a button could be placed.
-_KNOWN: dict[str, str] = {
-    "styles.py:chart-hit-bands": (
-        "STRUCTURAL. The chart hit bands are up to 180 absolutely-positioned "
-        "click targets overlaid on a generated SVG, one per data point. A "
-        "Streamlit button cannot be positioned inside an SVG, and 180 of them "
-        "per chart is not a design. Fixing this means changing how charts "
-        "render (a real chart component with selection events), not swapping "
-        "the tag."
-    ),
-    "app.py:point-detail-open": (
-        "STRUCTURAL. Inside _point_detail_block, which returns an HTML STRING "
-        "composed into the chart's own markdown block. A Streamlit button "
-        "cannot be placed inside a string another element renders."
-    ),
-    "app.py:point-detail-clear": (
-        "STRUCTURAL. Same composed block as point-detail-open — the '×' that "
-        "closes the selected-point panel."
-    ),
-}
+#: EMPTY, and that is the point: there is no in-app anchor left anywhere in
+#: app.py, styles.py or views/. The three that survived the first two passes
+#: were the chart hit bands and the two controls inside _point_detail_block —
+#: all of them anchors inside an HTML STRING another element renders, with no
+#: place in the element tree to put a button. They are now `data-nav` spans
+#: that styles._CHART_LINK_JS intercepts: it rewrites the query string via the
+#: History API and clicks a hidden trigger button, whose rerun request carries
+#: the browser's live location.search (app_session.py:454). Same page, no
+#: reload. Verified in a real browser, not reasoned about — see
+#: tests/test_chart_nav_bridge.py.
+#:
+#: Anything added here needs a reason starting STRUCTURAL or PENDING. An
+#: EXTERNAL entry would be the place for a genuine outbound https:// link,
+#: of which the app currently has none.
+_KNOWN: dict[str, str] = {}
 
 
 def _docstring_nodes(tree: ast.AST) -> set[int]:

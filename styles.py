@@ -454,21 +454,31 @@ def chart_frame(plots: list[dict], *, x_labels=(), gutter_px: int = 40) -> str:
 
 
 def chart_hits(items: list[dict]) -> str:
-    """The clickable band overlay: one <a> per tappable slice of a chart.
+    """The clickable band overlay: one tappable slice per chart point.
 
     Each item is {"left", "width"} as fractions, plus "href", "title" and
     "selected". `title` becomes the native browser tooltip, so a desktop
     hover reads the point without a round trip while a tap still opens the
     full detail — the app is mobile-first and hover does not exist there.
+
+    NOT an <a>, deliberately — see CLAUDE.md Key Rule 17. These used to be
+    real anchors, so tapping a chart point navigated the browser: full reload,
+    websocket reconnect, every cache cold, just to move a selection marker
+    inside one chart. They are now spans carrying the target in `data-nav`,
+    and _CHART_LINK_JS turns a click into a same-page state change.
+
+    role/tabindex keep them reachable by keyboard, which the anchor gave for
+    free and a bare span does not; the bridge handles Enter and Space.
     """
     parts = []
     for it in items:
         cls = "hp-hit hp-on" if it.get("selected") else "hp-hit"
         title = str(it.get("title") or "")
         parts.append(
-            f'<a class="{cls}" href="{it["href"]}" title="{title}" '
+            f'<span class="{cls}" data-nav="{it["href"]}" title="{title}" '
+            f'role="button" tabindex="0" aria-label="{title}" '
             f'style="left:{max(0.0, float(it["left"])) * 100:.3f}%;'
-            f'width:{max(0.0, float(it["width"])) * 100:.3f}%;"></a>'
+            f'width:{max(0.0, float(it["width"])) * 100:.3f}%;"></span>'
         )
     return "".join(parts)
 
@@ -520,34 +530,97 @@ def chart_points(points: list[dict]) -> str:
 #  target, so the observer's own edits cannot retrigger it into a loop. Matches
 #  ONLY this feature's two classes; every other link in the app keeps whatever
 #  behaviour it already had.
-_CHART_LINK_JS = """
+#: Name of the hidden st.button the bridge clicks to provoke a rerun. Rendered
+#: by app.py right beside enable_chart_links(); CHART_NAV_TRIGGER_CSS hides it.
+CHART_NAV_TRIGGER_KEY = "chart_nav_trigger"
+CHART_NAV_TRIGGER_LABEL = "chart-nav-trigger"
+
+CHART_NAV_TRIGGER_CSS = f"""<style>
+.st-key-{CHART_NAV_TRIGGER_KEY} {{
+    position:absolute !important; width:1px !important; height:1px !important;
+    overflow:hidden !important; clip:rect(0 0 0 0) !important;
+    margin:-1px !important; padding:0 !important; border:0 !important;
+}}
+</style>"""
+
+#: Turns a chart-point tap into a SAME-PAGE state change.
+#:
+#: Two steps, and the ordering is the whole trick:
+#:   1. rewrite the query string with the History API, which changes the URL
+#:      without navigating;
+#:   2. click a hidden Streamlit button, whose rerun request carries the
+#:      browser's LIVE window.location.search in ClientState.query_string
+#:      (streamlit/runtime/app_session.py:454 feeds it straight into
+#:      RerunData). Python therefore reads the new ?pt= from st.query_params
+#:      on that rerun.
+#:
+#: Verified end to end in a real browser before being written: the param
+#: arrives in Python AND a marker planted on window survives, i.e. no reload.
+#: These used to be <a href> anchors, so every point tap tore the page down.
+_CHART_LINK_JS = f"""
 <script>
-(function () {
-  try {
+(function () {{
+  try {{
     var p = window.parent;
-    if (!p || !p.document || p.__healthChartNav) { return; }
+    if (!p || !p.document || p.__healthChartNav) {{ return; }}
     p.__healthChartNav = true;
-    var patch = function () {
-      var links = p.document.querySelectorAll(
-        'a.hp-hit[target], a.hp-link[target]');
-      for (var i = 0; i < links.length; i++) {
-        links[i].removeAttribute('target');
-      }
-    };
-    patch();
-    new p.MutationObserver(patch).observe(p.document.body, {
-      childList: true, subtree: true,
-      attributes: true, attributeFilter: ['target']
-    });
-  } catch (err) { /* cross-origin or no parent: links keep opening a tab */ }
-})();
+
+    var fire = function (nav) {{
+      if (!nav) {{ return; }}
+      // 1. the URL, without navigating
+      var url = new URL(p.location.href);
+      var next = new URL(nav, p.location.href);
+      url.search = next.search;
+      p.history.replaceState(null, '', url.toString());
+      // 2. the rerun, over the existing websocket
+      var btns = p.document.querySelectorAll('button');
+      for (var i = 0; i < btns.length; i++) {{
+        if ((btns[i].innerText || '').indexOf({CHART_NAV_TRIGGER_LABEL!r}) >= 0) {{
+          btns[i].click();
+          return;
+        }}
+      }}
+    }};
+
+    var target = function (e) {{
+      var el = e.target;
+      while (el && el !== p.document.body) {{
+        if (el.getAttribute && el.getAttribute('data-nav')) {{ return el; }}
+        el = el.parentNode;
+      }}
+      return null;
+    }};
+
+    p.document.addEventListener('click', function (e) {{
+      var el = target(e);
+      if (!el) {{ return; }}
+      e.preventDefault();
+      fire(el.getAttribute('data-nav'));
+    }}, true);
+
+    // Keyboard parity — these are spans with role="button", so Enter and
+    // Space are ours to handle; an anchor would have given them for free.
+    p.document.addEventListener('keydown', function (e) {{
+      if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') {{ return; }}
+      var el = target(e);
+      if (!el) {{ return; }}
+      e.preventDefault();
+      fire(el.getAttribute('data-nav'));
+    }}, true);
+  }} catch (err) {{ /* cross-origin or no parent: points simply do not select */ }}
+}})();
 </script>
 """
 
 
 def enable_chart_links() -> None:
-    """Make chart point links navigate in place. Call once per page that
-    renders chart_hits() output or an hp-link anchor."""
+    """Install the chart-point click bridge.
+
+    Call once per page that renders chart_hits() output or a data-nav element,
+    AND render the hidden trigger button beside it — see
+    CHART_NAV_TRIGGER_KEY. Without the button there is nothing to provoke the
+    rerun and a tap changes the URL but not the screen.
+    """
     import streamlit.components.v1 as _components
     _components.html(_CHART_LINK_JS, height=0)
 

@@ -141,6 +141,12 @@ view        = _params.get("view", "home")
 # select nothing.
 _point_chart, _point_index = dash.parse_point_selection(_params.get("pt"))
 
+# Strain drill-down, rest days only: show the PRIOR WEEK's regional shape
+# instead of a blank panel. In the URL for the same reason as `pt` above, and
+# off by default — a 7-day mean is a different measurement from a session, so
+# it is something the athlete opens rather than something the screen asserts.
+_strain_window_week = _params.get("rw") == "1"
+
 
 def _go(**params) -> None:
     """Navigate the Home screen by URL state, WITHOUT reloading the page.
@@ -622,12 +628,18 @@ def _point_detail_block(detail: dict | None, extra_rows=(), open_view: str = "")
     if not detail:
         return ""
     rows = _kv_rows(list(detail["rows"]) + list(extra_rows))
+    # data-nav spans rather than anchors — CLAUDE.md Key Rule 17. This block is
+    # returned as an HTML STRING composed into a chart's own markdown, so there
+    # is no point in the element tree at which a real st.button could sit;
+    # styles._CHART_LINK_JS intercepts the click instead and turns it into a
+    # same-page rerun. Same bridge the hit bands use.
     link = ""
     if detail.get("open_date") and open_view:
-        link = (f'<a class="hp-link" href="?d={detail["open_date"]}&view={open_view}" '
+        link = (f'<span class="hp-link" role="button" tabindex="0" '
+                f'data-nav="?d={detail["open_date"]}&view={open_view}" '
                 f'style="display:inline-block;margin-top:9px;font-size:11px;'
-                f'color:#8FCDF0;text-decoration:none;">'
-                f'Open {detail["open_date"]} &rarr;</a>')
+                f'color:#8FCDF0;cursor:pointer;">'
+                f'Open {detail["open_date"]} &rarr;</span>')
     return (
         f'<div style="background:#0E1424;border:1px solid #1E2840;border-radius:10px;'
         f'padding:11px 13px;margin-top:13px;">'
@@ -635,8 +647,9 @@ def _point_detail_block(detail: dict | None, extra_rows=(), open_view: str = "")
         f'gap:10px;margin-bottom:5px;">'
         f'<span style="font-size:11px;font-weight:700;color:#D4DCEE;'
         f'letter-spacing:0.05em;text-transform:uppercase;">{detail["title"]}</span>'
-        f'<a class="hp-link" href="{_clear_point_href()}" style="font-size:15px;'
-        f'color:#6B7A9B;text-decoration:none;line-height:1;">&#10005;</a></div>'
+        f'<span class="hp-link" role="button" tabindex="0" aria-label="Close" '
+        f'data-nav="{_clear_point_href()}" style="font-size:15px;'
+        f'color:#6B7A9B;cursor:pointer;line-height:1;">&#10005;</span></div>'
         f'{rows}{link}</div>'
     )
 
@@ -1558,13 +1571,62 @@ def _region_rows_html(data: dict, overall: float | None) -> str:
     return f'<div>{rows}</div>'
 
 
+# The rest-day toggle is a real st.button, not an anchor — see
+# tests/test_spa_navigation.py. An anchor pointing at the identical target
+# tears the page down and reconnects the websocket; assigning to
+# st.query_params through _go() reruns over the existing one. This CSS makes
+# the button look like the control the panel wants, using the .st-key-<key>
+# hook the same way _NAV_BUTTON_CSS already does for the metric cards.
+_WEEK_TOGGLE_CSS = """<style>
+.st-key-strain_week { margin-top:-6px; margin-bottom:14px; }
+.st-key-strain_week button {
+    background:transparent !important; border:1px solid #5A6377 !important;
+    color:#9AA3B2 !important; border-radius:9px !important;
+    font:600 10px/1 ui-monospace,SFMono-Regular,Menlo,monospace !important;
+    letter-spacing:.12em !important; text-transform:uppercase !important;
+    padding:10px 14px !important; width:auto !important; min-height:0 !important;
+}
+.st-key-strain_week button:hover { color:#F4F6FB !important;
+    border-color:#9AA3B2 !important; }
+.st-key-strain_week button[kind="primary"] {
+    background:rgba(217,102,58,.12) !important;
+    border-color:rgba(217,102,58,.5) !important; color:#D9663A !important; }
+</style>"""
+
+
+def _render_week_toggle(data: dict, showing_week: bool) -> None:
+    """Rest days only: open the prior week's regional shape, or close it again.
+
+    Off by default and opened deliberately, because a 7-day mean is a
+    different measurement from a session — the screen should not assert it as
+    though it were today's split."""
+    if not data.get("can_show_window"):
+        return
+    st.markdown(_WEEK_TOGGLE_CSS, unsafe_allow_html=True)
+    st.button(
+        "Hide the week" if showing_week else "Show the week's shape",
+        key="strain_week",
+        type="primary" if showing_week else "secondary",
+        on_click=_go,
+        kwargs={"rw": None if showing_week else 1},
+        help=("Back to the day, which logged no session"
+              if showing_week else
+              "Split the last 7 days by region — the load already carried in"),
+    )
+
+
 def _region_block(data: dict, overall: float | None, stage: int) -> str:
     """The whole "where it landed" section, or the honest empty state.
 
     A rest day, a yoga day and a day with no session each get a stated reason
     rather than three zeros — an unmapped region has no number, never a 0.0,
-    the same rule the flexibility ladder applies to an unmeasured muscle."""
+    the same rule the flexibility ladder applies to an unmeasured muscle.
+
+    A rest day is the one blank the athlete can open: the week behind it is
+    real load, already carried, and _render_week_toggle offers it."""
     s = _SKIN_BOARD
+    week = data.get("window") == "week"
+
     if not data.get("has_split"):
         names = data.get("unmapped_names") or []
         listed = ("" if not names else
@@ -1572,13 +1634,19 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
                   f'line-height:1.6;">Not in the region map: '
                   f'{" &middot; ".join(names[:8])}'
                   f'{f" +{len(names) - 8} more" if len(names) > 8 else ""}</div>')
+        reason = (
+            "No session logged for this day, so there is no day to divide. "
+            "The number above is the average of the last seven days &mdash; "
+            "the load already carried into today, before any training."
+            if data.get("is_rolling") else
+            "No regional split for this day. Either nothing was logged, or "
+            "none of what was logged maps to a body region &mdash; so there "
+            "is nothing to divide. The strain figure above is unaffected."
+        )
         return _panel(
             "Where it landed",
             f'<div style="font-size:12.5px;color:{s["ink2"]};line-height:1.6;">'
-            f'No regional split for this day. Either nothing was logged, the '
-            f'number above is the 7-day stand-in, or none of what was logged '
-            f'maps to a body region &mdash; so there is nothing to divide. '
-            f'The strain figure above is unaffected.</div>{listed}',
+            f'{reason}</div>{listed}',
             "An exercise with no region mapping is excluded from every sector "
             "total, here and on the Strength screen.",
             skin=s,
@@ -1598,11 +1666,26 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
                     f'in the unattributed share: {" &middot; ".join(unmapped[:5])}'
                     f'{f" +{len(unmapped) - 5} more" if len(unmapped) > 5 else ""}.')
 
+    # A 7-day mean and a single session look alike and are not the same
+    # measurement, so the week says so in three places: the panel title, the
+    # strain sub-heading, and a line of its own. The mean also sits far lower
+    # on the log curve, where it is steepest, so the three values compress
+    # toward each other — the share is what stays comparable.
+    week_note = ("" if not week else
+                 f'<div style="font-size:11.5px;line-height:1.55;color:{s["ink2"]};'
+                 f'margin:0 0 12px;">These are the seven days before today, averaged '
+                 f'&mdash; the load already carried in, before any training. '
+                 f'{data.get("window_days") or 0} of those 7 days had a session. '
+                 f'A weekly mean sits low on the strain curve, where it is steepest, '
+                 f'so the three readings crowd together; the share above does not.</div>')
+
     body = (
-        _region_split_bar_html(data)
+        week_note
+        + _region_split_bar_html(data)
         + f'<div style="font:600 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;'
           f'letter-spacing:.14em;text-transform:uppercase;color:{s["ink3"]};'
-          f'margin:16px 0 8px;">Strain &middot; same 0&ndash;21 curve</div>'
+          f'margin:16px 0 8px;">'
+          f'{"Weekly average" if week else "Strain"} &middot; same 0&ndash;21 curve</div>'
         + f'<div style="border-left:2px solid #BFA06A;padding:1px 0 1px 11px;'
           f'margin:0 0 6px;font-size:11.5px;line-height:1.55;color:#9AA6BE;">'
           f'{_sr.NON_ADDITIVE_NOTE}{gap_txt}</div>'
@@ -1610,7 +1693,7 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
     )
     ceiling = _rules_ceiling(stage)
     return _panel(
-        "Where it landed",
+        "Where it landed &mdash; last 7 days" if week else "Where it landed",
         body,
         (f'Reported, never enforced &mdash; a regional ACWR informs, it never '
          f'caps volume. Stage {stage} ceiling {ceiling:.2f}.{caveat}{unmapped_txt} '
@@ -1652,7 +1735,7 @@ def _detail_header(detail_label: str, colour: str, display: str, tier: str) -> s
     )
 
 
-def _metric_detail(view: str) -> str:
+def _metric_detail_parts(view: str) -> tuple[str, str]:
     # The strain drill-down is the one screen in the Strength-board palette.
     # Readiness and Sleep keep _SKIN_HOME, so their markup is byte-identical.
     skin = _SKIN_BOARD if view == "strain" else _SKIN_HOME
@@ -1771,22 +1854,31 @@ def _metric_detail(view: str) -> str:
         # in the header, the way Sleep's contributor breakdown does. Every read
         # below happens only on this branch, so the three-card Home stream
         # never pays for it.
-        _region_data: dict = {"has_split": False, "unmapped_names": []}
+        _region_data: dict = {"has_split": False, "unmapped_names": [],
+                              "is_rolling": _strain_is_rolling}
         try:
             _regions = _region_au_history()
             _acwr = _sr.region_acwr(
                 _regions["rows"], _current_stage, today=date.today(),
                 stage_start=_stage_start_cached(),
             )
+            # Computed whenever the day is rolling — not only when the toggle
+            # is on — because whether the week HAS anything to show is what
+            # decides between offering the control and rendering a dead one.
+            _week_row = (_sr.rolling_prior_region_row(_regions["rows"], selected_date)
+                         if _strain_is_rolling else None)
             _region_data = dash.compute_region_strain_snapshot(
                 selected_date, _regions["rows"], _current_stage,
                 overall_snapshot=_snapshot, provenance=_regions,
                 acwr_results=_acwr,
+                window_row=_week_row if _strain_window_week else None,
             )
+            _region_data["can_show_window"] = bool(_strain_is_rolling and _week_row)
         except Exception:
             # A failed read must not take the strain number down with it — the
             # panel states its own absence instead.
             pass
+        globals()["_STRAIN_REGION_DATA"] = _region_data
         pre_blocks = _region_block(_region_data, _display_strain, _current_stage)
         # 21.0 is the same ceiling the strain arc is drawn against above
         # (_arc_svg(_display_strain, 21, ...)) and the one engine.load_to_strain
@@ -1820,10 +1912,20 @@ def _metric_detail(view: str) -> str:
                 f'⚡ {adjusted_nights} night(s) wake-time adjusted in this window</div>'
             )
 
-    return (
+    # TWO parts, so a Streamlit control can be placed BETWEEN them.
+    # _metric_detail() below joins them and is what readiness and sleep render,
+    # unchanged. Strain renders them separately with the rest-day week toggle
+    # in the seam — a button cannot live inside a markdown string, and putting
+    # it after the whole block would strand it under two charts, a long way
+    # from the panel it acts on.
+    head = (
         f'<div style="padding:16px;">'
         + _detail_header(detail_label, col, disp, lbl)
         + pre_blocks
+        + f'</div>'
+    )
+    tail = (
+        f'<div style="padding:0 16px 16px;">'
         + _history_trend_block("hist", hist_title, hist_metric, hist_unit,
                                hist_dates, hist_values, hist_color, hist_key,
                                floor=hist_floor, cap=hist_cap,
@@ -1832,6 +1934,12 @@ def _metric_detail(view: str) -> str:
         + extra_blocks
         + f'</div>'
     )
+    return head, tail
+
+
+def _metric_detail(view: str) -> str:
+    """The whole drill-down as one string — what readiness and sleep render."""
+    return "".join(_metric_detail_parts(view))
 
 
 def _render_wake_time_control(d: date) -> None:
@@ -2005,10 +2113,25 @@ if _bio_rows_failed:
     )
 
 if view in ("strain", "readiness", "sleep"):
-    st.markdown(_metric_detail(view), unsafe_allow_html=True)
+    if view == "strain":
+        # Split render: the week toggle belongs beside the panel it acts on,
+        # and a Streamlit button cannot live inside a markdown string.
+        _head, _tail = _metric_detail_parts(view)
+        st.markdown(_head, unsafe_allow_html=True)
+        _render_week_toggle(globals().get("_STRAIN_REGION_DATA") or {},
+                            _strain_window_week)
+        st.markdown(_tail, unsafe_allow_html=True)
+    else:
+        st.markdown(_metric_detail(view), unsafe_allow_html=True)
     # Only the drill-downs carry chart links, so the iframe this installs is
     # never paid for on the three-card Home stream.
     styles.enable_chart_links()
+    # The bridge needs something to click to provoke a rerun — a chart point is
+    # a data-nav span, not a widget, so JS rewrites the URL and then clicks
+    # this. Visually hidden, never tabbable-into by accident (clip-rect, not
+    # display:none, because a display:none button cannot be clicked).
+    st.markdown(styles.CHART_NAV_TRIGGER_CSS, unsafe_allow_html=True)
+    st.button(styles.CHART_NAV_TRIGGER_LABEL, key=styles.CHART_NAV_TRIGGER_KEY)
     if view == "sleep":
         _render_wake_time_control(selected_date)
 else:
