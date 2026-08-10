@@ -84,11 +84,13 @@ _page = st.session_state.get("_nav_page") or st.query_params.get("page", "home")
 # every nav path at once rather than patching each button's on_click
 # individually.
 #
-# NOTE the anchors that remain below (this file's day arrows, drill-down
-# cards and FAB, plus styles.py's chart hit bands) are page RELOADS, which is
-# the lag CLAUDE.md Key Rule 17 exists to remove — see
-# tests/test_spa_navigation.py's _KNOWN map for which are structural and
-# which are merely not converted yet. views/ is already fully converted.
+# The day arrows, drill-down cards and FAB are BUTTONS now, and views/ is fully
+# converted (CLAUDE.md Key Rule 17). Three in-chart anchors remain and are page
+# RELOADS: styles.py's hit bands and the two controls in _point_detail_block.
+# All three are anchors inside an HTML string another element renders, so there
+# is nowhere to put a widget; tests/test_spa_navigation.py's _KNOWN map lists
+# them, and carries the warning about the JS bridge that was tried for them and
+# does not work.
 if st.query_params.get("page") != _page:
     st.query_params["page"] = _page
 
@@ -248,15 +250,9 @@ _NAV_BUTTON_CSS = """<style>
 .st-key-fab_checkin button:hover { background: #EDEFF5 !important; }
 .st-key-fab_checkin button:focus { outline: none !important; box-shadow: 0 4px 20px rgba(0,0,0,0.45) !important; }
 
-/* ── Detail-panel back control ──────────────────────────────────────────── */
-.st-key-detail_back button {
-    background: transparent !important; border: none !important;
-    box-shadow: none !important; padding: 0 !important; min-height: 0 !important;
-}
-.st-key-detail_back button p {
-    font-size: 22px !important; color: #6B7A9B !important; margin: 0 !important;
-}
-.st-key-detail_back button:focus { outline: none !important; box-shadow: none !important; }
+/* No .st-key-detail_back rules: the in-panel back control was REMOVED rather
+   than converted (see _detail_header), because the fixed header carries a real
+   back button for those three views and is on screen whatever the scroll. */
 </style>"""
 
 is_today    = (selected_date == _today)
@@ -598,12 +594,25 @@ def _arc_svg(score, max_score: float, fill_color: str, size: int = 220) -> str:
 _EMPTY_CHART_HEIGHT = 92
 
 
+# These are full navigations (see styles.enable_chart_links' docstring for why
+# the JS bridge that would have avoided that does not work), so whatever they
+# omit is DISCARDED. Every piece of drill-down URL state has to be listed here
+# or a chart-point tap silently resets it — `rw` was, and tapping a point on
+# the strain drill-down closed the rest-day week panel underneath the athlete.
+def _url_state(**overrides) -> str:
+    state = {"d": selected_date, "view": view}
+    if _strain_window_week:
+        state["rw"] = 1
+    state.update(overrides)
+    return "?" + "&".join(f"{k}={v}" for k, v in state.items() if v is not None)
+
+
 def _chart_href(chart: str, index: int) -> str:
-    return f"?d={selected_date}&view={view}&pt={dash.point_selection_key(chart, index)}"
+    return _url_state(pt=dash.point_selection_key(chart, index))
 
 
 def _clear_point_href() -> str:
-    return f"?d={selected_date}&view={view}"
+    return _url_state(pt=None)
 
 
 def _is_selected(chart: str, index: int) -> bool:
@@ -628,18 +637,13 @@ def _point_detail_block(detail: dict | None, extra_rows=(), open_view: str = "")
     if not detail:
         return ""
     rows = _kv_rows(list(detail["rows"]) + list(extra_rows))
-    # data-nav spans rather than anchors — CLAUDE.md Key Rule 17. This block is
-    # returned as an HTML STRING composed into a chart's own markdown, so there
-    # is no point in the element tree at which a real st.button could sit;
-    # styles._CHART_LINK_JS intercepts the click instead and turns it into a
-    # same-page rerun. Same bridge the hit bands use.
     link = ""
     if detail.get("open_date") and open_view:
-        link = (f'<span class="hp-link" role="button" tabindex="0" '
-                f'data-nav="?d={detail["open_date"]}&view={open_view}" '
+        link = (f'<a class="hp-link" '
+                f'href="{_url_state(d=detail["open_date"], view=open_view, pt=None)}" '
                 f'style="display:inline-block;margin-top:9px;font-size:11px;'
-                f'color:#8FCDF0;cursor:pointer;">'
-                f'Open {detail["open_date"]} &rarr;</span>')
+                f'color:#8FCDF0;text-decoration:none;">'
+                f'Open {detail["open_date"]} &rarr;</a>')
     return (
         f'<div style="background:#0E1424;border:1px solid #1E2840;border-radius:10px;'
         f'padding:11px 13px;margin-top:13px;">'
@@ -647,9 +651,8 @@ def _point_detail_block(detail: dict | None, extra_rows=(), open_view: str = "")
         f'gap:10px;margin-bottom:5px;">'
         f'<span style="font-size:11px;font-weight:700;color:#D4DCEE;'
         f'letter-spacing:0.05em;text-transform:uppercase;">{detail["title"]}</span>'
-        f'<span class="hp-link" role="button" tabindex="0" aria-label="Close" '
-        f'data-nav="{_clear_point_href()}" style="font-size:15px;'
-        f'color:#6B7A9B;cursor:pointer;line-height:1;">&#10005;</span></div>'
+        f'<a class="hp-link" href="{_clear_point_href()}" style="font-size:15px;'
+        f'color:#6B7A9B;text-decoration:none;line-height:1;">&#10005;</a></div>'
         f'{rows}{link}</div>'
     )
 
@@ -2013,8 +2016,11 @@ else:
 def _render_header_buttons() -> None:
     """The fixed header's navigation, as buttons rather than links."""
     if view in _DETAIL_VIEW_TITLES:
-        st.button("←", key="hdr_back", on_click=_go, kwargs={"view": None, "pt": None},
-                  help="Back")
+        # rw too: it is drill-down state. Left behind it means nothing on the
+        # Home stream, and the next tap on the Strain card would silently
+        # re-open the rest-day week panel the athlete had closed.
+        st.button("←", key="hdr_back", on_click=_go,
+                  kwargs={"view": None, "pt": None, "rw": None}, help="Back")
         return
     st.button("‹", key="hdr_prev", on_click=_go, kwargs={"d": prev_date},
               help="Previous day")
@@ -2126,12 +2132,6 @@ if view in ("strain", "readiness", "sleep"):
     # Only the drill-downs carry chart links, so the iframe this installs is
     # never paid for on the three-card Home stream.
     styles.enable_chart_links()
-    # The bridge needs something to click to provoke a rerun — a chart point is
-    # a data-nav span, not a widget, so JS rewrites the URL and then clicks
-    # this. Visually hidden, never tabbable-into by accident (clip-rect, not
-    # display:none, because a display:none button cannot be clicked).
-    st.markdown(styles.CHART_NAV_TRIGGER_CSS, unsafe_allow_html=True)
-    st.button(styles.CHART_NAV_TRIGGER_LABEL, key=styles.CHART_NAV_TRIGGER_KEY)
     if view == "sleep":
         _render_wake_time_control(selected_date)
 else:

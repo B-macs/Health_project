@@ -20,12 +20,19 @@ deliberately, because URL state is what survives a mobile reconnect — while
 still navigating by button rather than by anchor. The two are not in tension.
 
 WHAT THIS TEST ENFORCES
-  * views/, app.py and styles.py must contain ZERO in-app anchors. _KNOWN is
-    empty — every one has been converted — so any anchor at all now fails.
-    It may only grow by a deliberate edit here, carrying a reason.
+  * views/ must contain ZERO in-app anchors. Fully clean.
+  * app.py and styles.py may only contain the anchors named in _KNOWN below —
+    three, all in-chart, all STRUCTURAL. Anything new fails. The list may
+    SHRINK without touching this test; it may only grow by a deliberate edit
+    here, with a reason.
 
-Not flagged, because they navigate away from the app rather than within it:
-external http(s):// links, mailto:, and in-page "#" fragments.
+SCOPE, stated honestly: the detector flags ANY anchor carrying an href, not
+just relative ones. That is deliberate — see _ANCHOR — because these are built
+inside f-strings whose href is an expression, and a value-matching regex misses
+exactly the most dynamic cases. The repo currently has no outbound links at
+all, so the two coincide. If a genuine external https:// or mailto: link is
+ever added it will fail this test, and the fix is an EXTERNAL entry in _KNOWN
+rather than loosening the pattern.
 """
 
 from __future__ import annotations
@@ -53,21 +60,47 @@ _ANCHOR = re.compile(r"<a\b[^>]*href\s*=", re.I)
 #: STRUCTURAL means there is no Streamlit widget that can do the job; those
 #: need a different mechanism, not a find-and-replace. PENDING means it is
 #: ordinary work that simply has not been done yet.
-#: EMPTY, and that is the point: there is no in-app anchor left anywhere in
-#: app.py, styles.py or views/. The three that survived the first two passes
-#: were the chart hit bands and the two controls inside _point_detail_block —
-#: all of them anchors inside an HTML STRING another element renders, with no
-#: place in the element tree to put a button. They are now `data-nav` spans
-#: that styles._CHART_LINK_JS intercepts: it rewrites the query string via the
-#: History API and clicks a hidden trigger button, whose rerun request carries
-#: the browser's live location.search (app_session.py:454). Same page, no
-#: reload. Verified in a real browser, not reasoned about — see
-#: tests/test_chart_nav_bridge.py.
+#: The three that remain, all STRUCTURAL and all the same root cause: anchors
+#: inside an HTML STRING that another element renders, so there is nowhere in
+#: the Streamlit element tree to put a button.
+#:
+#: ⚠ A JS BRIDGE WAS TRIED FOR THESE AND DOES NOT WORK. Do not re-attempt it
+#: without reading styles.enable_chart_links' docstring. The shape was: make
+#: them data-nav spans, intercept the click, rewrite the query string with
+#: history.replaceState, then click a hidden button to force a rerun. It looks
+#: sound from the Python side — app_session.py does feed
+#: ClientState.query_string straight into RerunData — but the BROWSER end
+#: decides what goes in that field, and the shipped frontend's getQueryString
+#: is `state.queryParams || document.location.search`: it reads the live URL
+#: ONLY when its own cached copy is empty, and that cache is written solely by
+#: Python assigning st.query_params. app.py's router assigns `page` on every
+#: run, so the cache is never empty in the real app and replaceState is simply
+#: ignored. The selection reaches Python only via the full reload the bridge
+#: existed to avoid. Measured in Chromium: with a pre-existing query param the
+#: URL updates, the page does not reload, and Python still reads the OLD value.
 #:
 #: Anything added here needs a reason starting STRUCTURAL or PENDING. An
 #: EXTERNAL entry would be the place for a genuine outbound https:// link,
 #: of which the app currently has none.
-_KNOWN: dict[str, str] = {}
+_KNOWN: dict[str, str] = {
+    "styles.py:chart-hit-bands": (
+        "STRUCTURAL. Up to hit_bands' max_bands (48) absolutely-positioned "
+        "click targets overlaid on a generated SVG, one per data point. A "
+        "Streamlit button cannot be positioned inside an SVG, and 48 per "
+        "chart is not a design. Fixing this means changing how charts render "
+        "— a real chart component with selection events — not swapping the "
+        "tag, and NOT the JS bridge described above."
+    ),
+    "app.py:point-detail-open": (
+        "STRUCTURAL. Inside _point_detail_block, which returns an HTML STRING "
+        "composed into the chart's own markdown block. A Streamlit button "
+        "cannot be placed inside a string another element renders."
+    ),
+    "app.py:point-detail-clear": (
+        "STRUCTURAL. Same composed block as point-detail-open — the '×' that "
+        "closes the selected-point panel."
+    ),
+}
 
 
 def _docstring_nodes(tree: ast.AST) -> set[int]:
@@ -186,6 +219,37 @@ def test_the_bioage_cards_navigate_by_callback_not_by_url():
     # Comment lines are skipped — the module documents the anchor it replaced,
     # and the historical note is not a live link.
     assert _anchor_lines(VIEWS / "insights.py") == []
+
+
+def test_every_chart_href_is_built_from_the_whole_url_state():
+    """A chart-point tap is a full navigation, so anything its href OMITS is
+    discarded. That is how `rw` was lost: the other half of the app added a
+    rest-day week toggle carried in the URL, and tapping a point on the strain
+    drill-down silently closed the panel underneath the athlete because
+    _chart_href only ever listed d/view/pt.
+
+    Routing both builders through one _url_state() is what stops the next added
+    key repeating it, so pin that rather than the specific keys.
+    """
+    src = (ROOT / "app.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    for name in ("_chart_href", "_clear_point_href"):
+        fn = next(n for n in ast.walk(tree)
+                  if isinstance(n, ast.FunctionDef) and n.name == name)
+        body = ast.unparse(fn)
+        assert "_url_state(" in body, (
+            f"{name} builds its own query string instead of going through "
+            f"_url_state — a new URL key will be silently dropped by it"
+        )
+        assert "f'?" not in body and 'f"?' not in body, (
+            f"{name} still hand-assembles a query string"
+        )
+
+    state_fn = next(n for n in ast.walk(tree)
+                    if isinstance(n, ast.FunctionDef) and n.name == "_url_state")
+    state_src = ast.unparse(state_fn)
+    for key in ("'d'", "'view'", "'rw'"):
+        assert key in state_src, f"_url_state does not carry {key}"
 
 
 def test_bioage_selection_prefers_session_state_with_a_url_fallback():
