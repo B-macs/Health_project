@@ -22,7 +22,11 @@
       "Bash(git check-ignore *)",
       "PowerShell(git fetch origin)",
       "PowerShell(git push origin main)",
-      "Bash(python -m pytest tests/test_scheduling.py tests/test_training_plan_stage2.py tests/test_content_weighting.py tests/test_plan.py -q)"
+      "Bash(python -m pytest tests/test_scheduling.py tests/test_training_plan_stage2.py tests/test_content_weighting.py tests/test_plan.py -q)",
+      "Bash(python -c \"import patient_profile; print\\('symptom_log entries:', len\\(patient_profile.PROFILE['symptom_log']\\)\\); print\\('finding 6 keys:', list\\(patient_profile.PROFILE['biomechanical_findings'][5].keys\\(\\)\\)\\)\")",
+      "Bash(python -c \"import patient_profile; e = patient_profile.PROFILE['symptom_log'][-1]; print\\(e['date'], '|', e['status']\\); print\\('escalation items:', len\\(e['escalation_criteria']\\)\\)\")",
+      "Bash(HEALTH_DATASTORE_PATH=datastore.db python -m pytest tests/ -q)",
+      "PowerShell(python -m pytest tests/ -q 2>$null)"
     ]
   }
 }
