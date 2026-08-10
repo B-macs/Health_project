@@ -39,6 +39,18 @@
 > while keeping phase 1's clinical benefit. Phase 1 does not need anything
 > deleted for that to work. Full definition and the per-phase table in §3.3;
 > the reasoning in §2.3. **Use these three names in patient-facing text.**
+>
+> **🔒 LOCKED, athlete's direction 2026-08-10 (§3.0): phase 2 is MANDATORY and
+> is the fixed point of the block build.** It is specified first, from the
+> evidence, and everything else — including the release block's duration —
+> adjusts around it. Read §3.0 before §3's other items; it supersedes the
+> earlier framing that treated phase 2 as fitting into leftover time.
+>
+> **The trap §3.0 exists to prevent:** phase 2 has two jobs. **Job A
+> (restore)** is what the lock requires, the evidence is about its *presence*
+> and specifies **no duration**. **Job B (maximise)** is the 15-min raise, pays
+> only near 1RM, and is optional. Pricing Job A at Job B's 15 minutes would
+> spend the whole time budget on something Job A does not need.
 
 *Written 2026-08-10, six days before the block is authored (2026-08-16). This is
 a REVIEW AND A DESIGN BRIEF, not a protocol and not code. Nothing here is
@@ -475,6 +487,60 @@ session placement.
 Stated as constraints the eventual protocol has to satisfy. **No design is
 proposed here** — that is the 08-16 conversation.
 
+### 3.0 · LOCKED DECISION — phase 2 is the anchor, not the leftover
+
+> **ATHLETE'S DIRECTION, 2026-08-10:** *"If the science papers say it must be
+> woken back up then we need to make sure that is added back in, everything
+> works around that after."*
+>
+> **Phase 2 is mandatory and it is the FIXED POINT of the block build.** It is
+> specified first, from the evidence, and the rest of the session — including
+> the duration of the release block — adjusts around it. This inverts the
+> earlier framing in this document, which treated the release block as fixed
+> and left phase 2 to fit in whatever time remained. That framing is
+> superseded; where the two disagree, this section wins.
+
+**Why the "must" holds here specifically.** It is not a universal law, and it
+should not be quoted as one in a future block. It holds because two conditions
+are both true for this athlete in this block, and it weakens if either stops
+being true:
+
+1. Stretching work runs **immediately before load** with nothing between
+   (§0.1) — this is what creates the deficit that needs counteracting.
+2. The block runs **loads close to maximum** (§1.4) — the regime where warm-up
+   effects are measurable rather than absent.
+
+**⚠ Phase 2 has TWO jobs with very different price tags. Do not conflate them —
+conflating them is what would blow the time budget for no benefit.**
+
+| | **Job A — restore** | **Job B — maximise** |
+|---|---|---|
+| What it does | Undoes phase 1's slack; gets glute max contracting before the bar asks | Squeezes out peak force via muscle temperature |
+| Evidence | Warneke 2024, 83 studies: *"active warm-up routines can counteract the stretch-induced force deficit when performed subsequently"* (grade **A**) | Barroso 2013, Abad 2011: +3–8% on 1RM (grade **B**) |
+| What it costs | **Active work. No duration is specified by the evidence** — the finding is about *presence*, not minutes | **Expensive.** 15 min low-intensity; 5 min measured worthless |
+| When it pays | **Always, here** — condition 1 above | Only near 1RM. At ~10RM it is worth ≈nothing |
+| Status | **MANDATORY** — this is what the locked decision requires | **Optional, scales in as loads climb** |
+
+The 15-minute figure answers Job B, which is a *different question* (maximising
+1RM from a cold start). Importing it as the price of Job A would cost ~15
+minutes to buy something Job A does not need. **Job A is the thing that must be
+added back in, and there is no evidence it is expensive.**
+
+**The consequence, stated plainly.** ~16–22 min of phase 1 plus a phase 2 sized
+by Job B would put 30+ minutes in front of the first working set, which is
+rejected on its face. So this decision **forces** the release-block dose
+question that §4.2 previously listed as merely open. It is now unavoidable, and
+it is a physiotherapist question — see §4.2, which is upgraded from "worth
+asking" to "must be answered on the day."
+
+**What is NOT changed by this decision:** phase 2 is still scaled **per
+exercise**, not per session (item 1 below). "Mandatory" means the phase exists
+in every session, not that every exercise gets a ramp — ramping the face pull
+would be pure fatigue (§1.4), and that is failure mode 1, which this decision
+does not license.
+
+---
+
 1. **The warm-up must be scaled per exercise, not per session.** §1.4 is the
    whole game: ramp the squat and the hinge, do not ramp the face pull. A single
    session-level warm-up block is the wrong shape and would reproduce failure
@@ -557,11 +623,27 @@ Genuinely open — they change the design, and they are not mine to settle.
 1. **Modality for the raise**, given cycling is out on his own evidence (§2.2).
    Rowing, incline treadmill walk, and loaded carries all have different
    spine/hip-flexor profiles.
-2. **Time budget and where it comes from.** Is the ~16–22 min release block
-   fixed clinical prescription, or is some of it re-allocatable? The PNF dose in
-   particular (3 × 5 cycles *each side*) is large, and §1.5/§2.3 say it is the
-   item with the highest acute cost. **This is a physio question, not ours** —
-   it should go on the 08-16 list.
+2. **⛔ Time budget and where it comes from — UPGRADED BY §3.0 FROM "OPEN" TO
+   "MUST BE ANSWERED ON THE DAY."** Phase 2 is now mandatory and everything
+   works around it, so the release block's dose is the variable that has to
+   move. Is the ~16–22 min a fixed clinical prescription, or is some of it
+   re-allocatable? **This is a physiotherapist question and it is not ours to
+   answer** — nothing in the release block gets cut by this repo.
+
+   Take three specific items to the 08-16 conversation, in this order:
+
+   - **The PNF dose.** 3 sets × 5 cycles *each side* is ~8–10 min, the largest
+     single item by time. Its stretch bouts are only ~3 s, so it is **not** the
+     force-deficit problem (§1.5) — the question is purely whether the
+     inhibition it buys needs 30 cycles or fewer.
+   - **The `laterality` discrepancy** (§0.2). `UPPER_GLUTE_RELEASE` is coded
+     bilateral, its own text and the profile say *each side*. Resolving this
+     may free ~4 min on its own, and it is a transcription question before it
+     is a clinical one.
+   - **The Right Posterior Hip Capsule Stretch at 2 × 60 s.** The only item at
+     the ≥60 s dose where the force deficit turns large. Ask whether the
+     clinical effect survives 2 × 45 s, and whether it can be moved earlier in
+     phase 1 so the pressure work (no force cost) sits between it and load.
 3. **Morning or evening sessions in the new block** (§2.4) — this changes the
    spinal exposure more than anything the warm-up itself contains.
 

@@ -125,6 +125,18 @@ tissue slack; a subsequent active warm-up buys it back) and to get glute max
 contracting before the bar asks it to. Use these three names in patient-facing
 text.
 
+**🔒 LOCKED 2026-08-10, athlete's direction (review §3.0): phase 2 is MANDATORY
+and is the fixed point of the block build** — specified first from the evidence,
+with everything else adjusting around it, including the release block's
+duration. Two consequences. First, **do not price phase 2 at 15 minutes**: it
+has two jobs, and the mandatory one (undo phase 1's cost) is supported by
+evidence about its *presence* with **no duration specified**, while the 15-min
+figure answers a different, optional question that only pays near 1RM. Second,
+this **forces the release-block dose question** — it is no longer optional and
+**must be answered with the physiotherapist on 08-16**, with three specific
+items to take in (review §4.2). Nothing in the release block is cut by this
+repo; the answer is theirs.
+
 ---
 
 ## Stage 2 Exit Criteria (`PROFILE["stage_2_exit_criteria"]`)
