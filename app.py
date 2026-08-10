@@ -141,6 +141,118 @@ view        = _params.get("view", "home")
 # select nothing.
 _point_chart, _point_index = dash.parse_point_selection(_params.get("pt"))
 
+
+def _go(**params) -> None:
+    """Navigate the Home screen by URL state, WITHOUT reloading the page.
+
+    Use as an st.button on_click. A key set to None is removed.
+
+    This is what replaced the <a href="?d=..."> links — see CLAUDE.md Key
+    Rule 17. The state still lives in the URL, deliberately, for the reconnect
+    reason the router note above gives; what changed is HOW it gets there.
+    Assigning to st.query_params enqueues a page_info_changed ForwardMsg and
+    the frontend rewrites the address bar through the history API, so the
+    rerun runs over the existing websocket — no reload, no reconnect, no cold
+    caches (streamlit/runtime/state/query_params.py::_send_query_param_msg).
+    An anchor with the identical href tears the whole page down instead.
+
+    Callbacks run BEFORE the script reruns, so the values written here are
+    what the `_params` reads at the top of this file see on the next pass.
+    """
+    for key, value in params.items():
+        if value is None:
+            if key in st.query_params:
+                del st.query_params[key]
+        else:
+            st.query_params[key] = str(value)
+
+
+# CSS restyling the buttons that replaced those links so they look exactly
+# like the markup they came from. Same approach as nav.py's bottom bar and
+# views/insights.py's BioAge cards: st.button(key="x") emits a .st-key-x
+# class on its wrapper, which is the documented styling hook.
+#
+# The three metric cards are the one place a button cannot BE the visual: a
+# 460px card containing an SVG arc gauge cannot live inside a button's label,
+# which is markdown text. There the card HTML renders as before and an
+# invisible button is pulled over it. If that CSS ever fails to apply, the
+# button simply appears below its card as an ordinary labelled button — still
+# working, merely ugly — rather than the card becoming unclickable.
+_NAV_BUTTON_CSS = """<style>
+/* ── Metric cards: invisible full-card hit target ───────────────────────── */
+.st-key-card_readiness, .st-key-card_strain, .st-key-card_sleep {
+    margin-top: -464px !important;   /* card is 460px tall + 4px margin */
+    margin-bottom: 0 !important;
+    position: relative !important;
+    z-index: 5 !important;
+}
+.st-key-card_readiness button, .st-key-card_strain button, .st-key-card_sleep button {
+    width: 100% !important; height: 464px !important; min-height: 0 !important;
+    background: transparent !important; border: none !important;
+    box-shadow: none !important; padding: 0 !important;
+    color: transparent !important;
+}
+.st-key-card_readiness button p, .st-key-card_strain button p,
+.st-key-card_sleep button p {
+    opacity: 0 !important;           /* kept in the DOM for screen readers */
+    margin: 0 !important;
+}
+.st-key-card_readiness button:hover, .st-key-card_strain button:hover,
+.st-key-card_sleep button:hover { background: rgba(255,255,255,0.03) !important; }
+.st-key-card_readiness button:focus, .st-key-card_strain button:focus,
+.st-key-card_sleep button:focus { outline: none !important; box-shadow: none !important; }
+
+/* ── Fixed date-header arrows ───────────────────────────────────────────── */
+.st-key-hdr_prev, .st-key-hdr_next, .st-key-hdr_back {
+    position: fixed !important; top: 0 !important; z-index: 901 !important;
+    width: 44px !important; margin: 0 !important;
+}
+.st-key-hdr_prev, .st-key-hdr_back { left: max(14px, calc((100vw - 480px)/2 + 14px)) !important; }
+.st-key-hdr_next { right: max(14px, calc((100vw - 480px)/2 + 14px)) !important; }
+.st-key-hdr_prev button, .st-key-hdr_next button, .st-key-hdr_back button {
+    width: 44px !important; height: 56px !important; min-height: 0 !important;
+    background: transparent !important; border: none !important;
+    box-shadow: none !important; padding: 0 !important;
+}
+.st-key-hdr_prev button p, .st-key-hdr_next button p, .st-key-hdr_back button p {
+    font-size: 26px !important; color: #D4DCEE !important; line-height: 1 !important;
+    margin: 0 !important;
+}
+.st-key-hdr_back button p { font-size: 22px !important; color: #6B7A9B !important; }
+.st-key-hdr_next button:disabled p { color: #2A2A3A !important; }
+.st-key-hdr_prev button:focus, .st-key-hdr_next button:focus,
+.st-key-hdr_back button:focus { outline: none !important; box-shadow: none !important; }
+
+/* ── Check-in FAB ───────────────────────────────────────────────────────── */
+.st-key-fab_checkin {
+    position: fixed !important; top: 69px !important;
+    right: max(20px, calc((100vw - 480px)/2 + 16px)) !important;
+    z-index: 900 !important; width: 52px !important; margin: 0 !important;
+}
+.st-key-fab_checkin button {
+    width: 52px !important; height: 52px !important; min-height: 0 !important;
+    border-radius: 50% !important; background: #FFFFFF !important;
+    border: none !important; padding: 0 !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.45) !important;
+}
+.st-key-fab_checkin button p {
+    font-size: 28px !important; color: #0B0F1E !important;
+    font-weight: 300 !important; line-height: 1 !important; margin: 0 !important;
+}
+.st-key-fab_checkin button:hover { background: #EDEFF5 !important; }
+.st-key-fab_checkin button:focus { outline: none !important; box-shadow: 0 4px 20px rgba(0,0,0,0.45) !important; }
+
+/* ── Detail-panel back control ──────────────────────────────────────────── */
+.st-key-detail_back button {
+    background: transparent !important; border: none !important;
+    box-shadow: none !important; padding: 0 !important; min-height: 0 !important;
+}
+.st-key-detail_back button p {
+    font-size: 22px !important; color: #6B7A9B !important; margin: 0 !important;
+}
+.st-key-detail_back button:focus { outline: none !important; box-shadow: none !important; }
+</style>"""
+
 is_today    = (selected_date == _today)
 date_label  = "TODAY" if is_today else selected_date.isoformat()
 prev_date   = selected_date - timedelta(days=1)
@@ -591,7 +703,6 @@ def _card_html(
     header: str,
     description: str,
     tertiary: str = "",
-    click_href: str = "",
     gauge_size: int = 220,
 ) -> str:
     scrim  = "linear-gradient(180deg,rgba(0,0,0,0.18) 0%,rgba(0,0,0,0.60) 50%,rgba(0,0,0,0.80) 100%)"
@@ -636,8 +747,10 @@ def _card_html(
         f'</div>'
         f'</div>'
     )
-    if click_href:
-        return f'<a href="{click_href}" style="display:block;text-decoration:none;">{inner}</a>'
+    # No click wrapper: the card is made clickable by an invisible button laid
+    # over it at the render site (see _NAV_BUTTON_CSS and CLAUDE.md Key Rule
+    # 17). It used to return an <a href> here, which reloaded the whole app on
+    # every tap.
     return inner
 
 
@@ -1672,9 +1785,13 @@ def _metric_detail(view: str) -> str:
 
     return (
         f'<div style="padding:16px;">'
+        # The "←" that used to sit here was a second back control, and a page
+        # reload (CLAUDE.md Key Rule 17). The fixed header carries a real back
+        # BUTTON for exactly these three views (_DETAIL_VIEW_TITLES ==
+        # strain/readiness/sleep), and being position:fixed it is on screen
+        # however far down the panel you have scrolled — so this one was
+        # redundant as well as slow, and is simply gone.
         f'<div style="display:flex;align-items:center;margin-bottom:20px;">'
-        f'<a href="?d={selected_date}" style="color:#6B7A9B;font-size:22px;'
-        f'text-decoration:none;margin-right:14px;line-height:1;">←</a>'
         f'<div>'
         f'<div style="font-size:10px;color:#6B7A9B;letter-spacing:2px;'
         f'text-transform:uppercase;margin-bottom:2px;">{detail_label}</div>'
@@ -1741,28 +1858,36 @@ def _render_wake_time_control(d: date) -> None:
 
 # ─── Fixed UI elements ────────────────────────────────────────────────────────
 
-_next_style = "color:#D4DCEE;" if can_go_next else "color:#2A2A3A;pointer-events:none;"
-_next_href  = f"?d={next_date}" if can_go_next else "#"
-
+# The fixed header keeps its LABEL as markup; the two arrows (and the detail
+# view's back arrow) are real buttons, positioned into the same bar by
+# _NAV_BUTTON_CSS. They used to be <a href="?d=..."> links, i.e. a full page
+# reload per day stepped — see CLAUDE.md Key Rule 17. Rendered by
+# _render_header_buttons() below, after the header markup so they layer above it.
 _DETAIL_VIEW_TITLES = {"strain": "Strain History", "readiness": "Readiness History", "sleep": "Sleep History"}
 if view in _DETAIL_VIEW_TITLES:
     _header_inner = (
-        f'<a href="?d={selected_date}" style="color:#6B7A9B;text-decoration:none;'
-        f'font-size:22px;line-height:1;margin-right:14px;">←</a>'
-        f'<span style="color:#D4DCEE;font-weight:600;font-size:15px;">{_DETAIL_VIEW_TITLES[view]}</span>'
-        f'<div style="width:36px;"></div>'
+        f'<span style="color:#D4DCEE;font-weight:600;font-size:15px;'
+        f'margin-left:44px;">{_DETAIL_VIEW_TITLES[view]}</span>'
     )
     _header_justify = "flex-start"
 else:
     _header_inner = (
-        f'<a href="?d={prev_date}" style="color:#D4DCEE;text-decoration:none;'
-        f'font-size:26px;line-height:1;padding:4px 6px;">‹</a>'
-        f'<span style="color:#D4DCEE;font-weight:600;font-size:15px;letter-spacing:0.5px;">'
-        f'{date_label}</span>'
-        f'<a href="{_next_href}" style="{_next_style}text-decoration:none;'
-        f'font-size:26px;line-height:1;padding:4px 6px;">›</a>'
+        f'<span style="color:#D4DCEE;font-weight:600;font-size:15px;letter-spacing:0.5px;'
+        f'margin:0 auto;">{date_label}</span>'
     )
-    _header_justify = "space-between"
+    _header_justify = "center"
+
+
+def _render_header_buttons() -> None:
+    """The fixed header's navigation, as buttons rather than links."""
+    if view in _DETAIL_VIEW_TITLES:
+        st.button("←", key="hdr_back", on_click=_go, kwargs={"view": None, "pt": None},
+                  help="Back")
+        return
+    st.button("‹", key="hdr_prev", on_click=_go, kwargs={"d": prev_date},
+              help="Previous day")
+    st.button("›", key="hdr_next", on_click=_go, kwargs={"d": next_date},
+              disabled=not can_go_next, help="Next day")
 
 _header_html = (
     '<div style="position:fixed;top:0;left:0;right:0;z-index:900;'
@@ -1774,20 +1899,16 @@ _header_html = (
     '</div>'
 )
 
-# FAB — Morning Check-In (?page=checkin → SPA router dispatches views/checkin.py)
-# Anchored just below the fixed date header (57px tall) so it clears the
-# header's right-aligned "›" next-day arrow instead of overlapping it.
-_fab_html = (
-    '<a href="?page=checkin" style="text-decoration:none;">'
-    '<div style="position:fixed;top:69px;'
-    'right:max(20px,calc((100vw - 480px)/2 + 16px));'
-    'z-index:900;width:52px;height:52px;border-radius:50%;background:#FFFFFF;'
-    'display:flex;align-items:center;justify-content:center;'
-    'box-shadow:0 4px 20px rgba(0,0,0,0.45);cursor:pointer;">'
-    '<span style="font-size:28px;color:#0B0F1E;line-height:1;font-weight:300;">+</span>'
-    '</div>'
-    '</a>'
-)
+# FAB — Morning Check-In. Sets _nav_page, exactly like the bottom nav, so the
+# SPA router dispatches views/checkin.py over the existing websocket. It used
+# to be an <a href="?page=checkin">, which is the link the router note at the
+# top of this file blames for a reconnect landing the athlete on Check-in:
+# an anchor navigation left ?page=checkin in the address bar as the state the
+# next reconnect would read back. Positioned by _NAV_BUTTON_CSS.
+
+
+def _open_checkin() -> None:
+    st.session_state["_nav_page"] = "checkin"
 
 # ─── Home-specific CSS (home-page-only overrides) ─────────────────────────────
 
@@ -1818,7 +1939,6 @@ _card_readiness = _card_html(
     "READINESS", _bg["readiness"],
     _arc_svg(_readiness_score, 100, r_col),
     r_disp, r_lbl, r_col, r_hdr, r_desc, r_tert,
-    click_href=f"?d={selected_date}&view=readiness",
 )
 
 s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
@@ -1827,7 +1947,6 @@ _card_strain = _card_html(
     _strain_card_label, _bg["strain"],
     _arc_svg(_display_strain, 21, s_col),
     s_disp, s_lbl, s_col, s_hdr, s_desc,
-    click_href=f"?d={selected_date}&view=strain",
 )
 
 sl_col, sl_disp, sl_lbl, sl_hdr, sl_desc = dash.sleep_meta(_sleep_score, _sleep_need, _sleep_base_window)
@@ -1835,7 +1954,6 @@ _card_sleep = _card_html(
     "SLEEP", _bg["sleep"],
     _arc_svg(_sleep_score, 100, sl_col),
     sl_disp, sl_lbl, sl_col, sl_hdr, sl_desc,
-    click_href=f"?d={selected_date}&view=sleep",
 )
 
 # ─── Render ───────────────────────────────────────────────────────────────────
@@ -1843,8 +1961,11 @@ _card_sleep = _card_html(
 # CHROME_CSS already injected at top of script (before data fetching)
 styles.inject_css()                                # base styles (same as other pages)
 st.markdown(_home_css,    unsafe_allow_html=True)  # home-specific overrides (480px max-width etc.)
-st.markdown(_header_html, unsafe_allow_html=True)  # fixed date header
-st.markdown(_fab_html,    unsafe_allow_html=True)  # FAB → Check-In
+st.markdown(_header_html, unsafe_allow_html=True)  # fixed date header (label only)
+st.markdown(_NAV_BUTTON_CSS, unsafe_allow_html=True)  # positions the buttons below
+_render_header_buttons()                           # ‹ / › / ← , into the header bar
+st.button("+", key="fab_checkin", on_click=_open_checkin,
+          help="Morning check-in")                 # FAB → Check-In
 
 # A failed biometric read blanks every card on this page — the arcs go grey
 # and read "No Readings", which is indistinguishable from a night you simply
@@ -1867,7 +1988,21 @@ if view in ("strain", "readiness", "sleep"):
     if view == "sleep":
         _render_wake_time_control(selected_date)
 else:
-    st.markdown(_card_readiness + _card_strain + _card_sleep, unsafe_allow_html=True)
+    # Rendered card-by-card rather than as one concatenated blob: each needs
+    # its own invisible hit-target button pulled over it by _NAV_BUTTON_CSS,
+    # which replaced the <a href="?d=...&view=..."> wrapper the card markup
+    # used to carry (CLAUDE.md Key Rule 17). A 460px card containing an SVG
+    # arc gauge cannot be a button LABEL, so here — and only here — the button
+    # sits over the visual instead of being it.
+    for _ckey, _chtml, _cview in (
+        ("card_readiness", _card_readiness, "readiness"),
+        ("card_strain",    _card_strain,    "strain"),
+        ("card_sleep",     _card_sleep,     "sleep"),
+    ):
+        st.markdown(_chtml, unsafe_allow_html=True)
+        st.button(f"Open {_cview} detail", key=_ckey, on_click=_go,
+                  kwargs={"d": selected_date, "view": _cview},
+                  use_container_width=True)
 if not _oura_sync_ok and _oura_sync_err:
     st.caption("Oura sync unavailable — will retry next visit.")
 if not _garmin_sync_ok and _garmin_sync_err:

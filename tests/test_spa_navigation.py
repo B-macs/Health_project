@@ -40,63 +40,105 @@ import pytest
 ROOT = Path(__file__).resolve().parent.parent
 VIEWS = ROOT / "views"
 
-#: An anchor whose href is relative — starts with "?" or "/" — navigates this
-#: app and therefore reloads it. Anything absolute leaves the app and is fine.
-_ANCHOR = re.compile(r"""<a\s[^>]*href\s*=\s*["'](?P<href>[?/][^"']*|\{[^"']*\})""", re.I)
+#: An opening anchor tag carrying an href. Deliberately NOT trying to parse the
+#: href value: these are built inside f-strings where the value is itself an
+#: expression containing quotes (styles.py's hit bands are
+#: `href="{it["href"]}"`), and a value-matching regex silently fails to match
+#: exactly the most dynamic — i.e. most likely to be navigation — cases. The
+#: repo has no external <a> links at all, so "any anchor with an href" is the
+#: honest rule; if a genuine external link is ever added, allowlist it in
+#: _KNOWN with an EXTERNAL reason.
+_ANCHOR = re.compile(r"<a\b[^>]*href\s*=", re.I)
 
 #: Every in-app anchor that still exists, with why it has not been converted.
 #: STRUCTURAL means there is no Streamlit widget that can do the job; those
 #: need a different mechanism, not a find-and-replace. PENDING means it is
 #: ordinary work that simply has not been done yet.
+#: Everything convertible HAS been converted — these three are all that is
+#: left, and all three are STRUCTURAL for the same underlying reason: they are
+#: anchors inside an HTML STRING that some other element renders, so there is
+#: no point in the Streamlit element tree at which a button could be placed.
 _KNOWN: dict[str, str] = {
     "styles.py:chart-hit-bands": (
         "STRUCTURAL. The chart hit bands are up to 180 absolutely-positioned "
         "click targets overlaid on a generated SVG, one per data point. A "
         "Streamlit button cannot be positioned inside an SVG, and 180 of them "
         "per chart is not a design. Fixing this means changing how charts "
-        "render (e.g. a real chart component with selection events), not "
-        "swapping the tag."
+        "render (a real chart component with selection events), not swapping "
+        "the tag."
     ),
     "app.py:point-detail-open": (
         "STRUCTURAL. Inside _point_detail_block, which returns an HTML STRING "
         "composed into the chart's own markdown block. A Streamlit button "
         "cannot be placed inside a string another element renders."
     ),
-    "app.py:point-detail-clear": "STRUCTURAL. Same block as point-detail-open.",
-    "app.py:card-click-wrapper": (
-        "PENDING. _card_html's click wrapper — the Readiness / Strain / Sleep "
-        "drill-downs. Convertible: the card HTML stays and a keyed button is "
-        "positioned over it, the same shape as views/insights.py's BioAge "
-        "cards but with an overlay, since a 460px card containing an SVG "
-        "gauge cannot be a button LABEL."
-    ),
-    "app.py:detail-back-arrow": "PENDING. The '←' out of a detail view. Convertible.",
-    "app.py:header-back-arrow": "PENDING. The '←' in the fixed detail header. Convertible.",
-    "app.py:header-prev-day": "PENDING. The '‹' previous-day arrow. Convertible.",
-    "app.py:header-next-day": "PENDING. The '›' next-day arrow. Convertible.",
-    "app.py:checkin-fab": (
-        "PENDING. The Morning Check-In FAB. Convertible, and the one app.py's "
-        "own router note calls out as the reason a reconnect used to land the "
-        "athlete on Check-in."
+    "app.py:point-detail-clear": (
+        "STRUCTURAL. Same composed block as point-detail-open — the '×' that "
+        "closes the selected-point panel."
     ),
 }
 
 
-def _anchor_lines(path: Path) -> list[tuple[int, str]]:
-    """(line number, source line) for every relative-href anchor in a file.
+def _docstring_nodes(tree: ast.AST) -> set[int]:
+    """id() of every Constant that is a module/class/function docstring.
 
-    Reads the file as text rather than walking the AST because these anchors
-    live inside f-strings assembled across several source lines, where the AST
-    gives one JoinedStr node and loses the line the tag actually sits on.
-    Comments are excluded so this module's own prose does not match.
+    Excluded because several of these modules EXPLAIN the anchors they
+    replaced, and prose describing the rule must not trip the rule.
     """
-    out = []
-    for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-        if line.lstrip().startswith("#"):
-            continue
-        if _ANCHOR.search(line):
-            out.append((i, line.strip()))
+    out = set()
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
+            body = getattr(node, "body", None)
+            if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) \
+                    and isinstance(body[0].value.value, str):
+                out.add(id(body[0].value))
     return out
+
+
+def _anchor_lines(path: Path) -> list[tuple[int, str]]:
+    """(line number, snippet) for every anchor tag in real string literals.
+
+    AST-based rather than a line scan: comments and docstrings are skipped
+    automatically, and an f-string spanning several source lines is attributed
+    to the line its own fragment sits on rather than to the start of the
+    expression.
+    """
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    skip = _docstring_nodes(tree)
+    out: list[tuple[int, str]] = []
+    seen_inner: set[int] = set()
+
+    # f-strings FIRST, reconstructed whole. An f-string splits into alternating
+    # literal and expression nodes, so `<a class="{cls}" href="{h}"` contains
+    # the tag in one Constant and href= in another and NEITHER matches on its
+    # own. That is not hypothetical: it is exactly how styles.py builds the
+    # chart hit bands, i.e. the single most important thing for this test to
+    # see. Each expression collapses to "{}" so the tag reads as markup again.
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.JoinedStr):
+            continue
+        text = ""
+        for part in node.values:
+            if isinstance(part, ast.Constant) and isinstance(part.value, str):
+                text += part.value
+                seen_inner.add(id(part))
+            else:
+                text += "{}"
+                for sub in ast.walk(part):
+                    if isinstance(sub, ast.Constant) and isinstance(sub.value, str):
+                        seen_inner.add(id(sub))
+        if _ANCHOR.search(text):
+            out.append((node.lineno, text.strip()[:100]))
+
+    # ...then plain literals not already accounted for inside an f-string.
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Constant) or not isinstance(node.value, str):
+            continue
+        if id(node) in skip or id(node) in seen_inner:
+            continue
+        if _ANCHOR.search(node.value):
+            out.append((node.lineno, node.value.strip()[:100]))
+    return sorted(set(out))
 
 
 def test_views_contain_no_in_app_anchors():
