@@ -133,9 +133,20 @@ has two jobs, and the mandatory one (undo phase 1's cost) is supported by
 evidence about its *presence* with **no duration specified**, while the 15-min
 figure answers a different, optional question that only pays near 1RM. Second,
 this **forces the release-block dose question** — it is no longer optional and
-**must be answered with the physiotherapist on 08-16**, with three specific
-items to take in (review §4.2). Nothing in the release block is cut by this
-repo; the answer is theirs.
+must be answered with the physiotherapist, with three specific items to take in
+(review §4.2). Nothing in the release block is cut by this repo; the answer is
+theirs.
+
+**🔒 LOCKED 2026-08-10, athlete's direction (review §3.0-b): TOTAL preparation
+time is 10–15 minutes** — phases 1 and 2 together, first movement to first
+working rep, with 15 as a ceiling rather than a target. Today's ~30 min sits
+against a **~30 min working portion**, so preparation is half the session; the
+athlete's words were *"otherwise the entire time is just warming up"*, and at
+50% that is literally accurate. **The budget RESTORES the prescription rather
+than cutting it:** `patient_profile.py:439` says *"5-minute release block before
+every session"* and the coded doses drifted to 16–22 min. Indicative split —
+phase 1 ≈ 5 min (the profile's own figure), phase 2 ≈ 5–10 min. The ceiling is
+the athlete's; the split inside it is the physiotherapist's.
 
 ---
 
@@ -168,13 +179,16 @@ non-diagnostic until a stage has that many days behind it.
    CLAUDE.md Key Rule 11, and it is checkable, not a formality.
 1b. **Read `docs/training/warmup_evidence_review_2026-08-10.md` in full**, and
    state how it influenced the plan the same way. Same gate, same standard.
-   This is the first block to run loads close to maximum, and the system
-   contains **no warm-up at all** today — a gym day goes from the last release
-   hold straight into the first working set. Two hard prerequisites live in
-   that document: ramp sets **corrupt tonnage, Strain and e1RM** unless a
-   per-set warm-up flag lands first (`services/tonnage.py`'s eligibility is
-   `if reps and weight`), and a warm-up change touches every session, so it
-   collides with the one-new-stressor-per-week rule.
+   **Gated on this event, not on a date** — the plan is NOT being rebuilt on
+   2026-08-16 (athlete, 2026-08-10), so the document waits for the block build
+   rather than expiring with the reassessment. The next block is the first to
+   run loads close to maximum, and the system contains **no warm-up at all**
+   today — a gym day goes from the last release hold straight into the first
+   working set. Two hard prerequisites live in that document: ramp sets
+   **corrupt tonnage, Strain and e1RM** unless a per-set warm-up flag lands
+   first (`services/tonnage.py`'s eligibility is `if reps and weight`), and a
+   warm-up change touches every session, so it collides with the
+   one-new-stressor-per-week rule.
 2. Update `patient_profile.py` with post-assessment findings, then append a
    `stage_transitions` record — that list is the evidence a transition's
    criteria were actually met, not merely stated.

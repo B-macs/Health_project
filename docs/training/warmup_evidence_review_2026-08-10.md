@@ -1,11 +1,22 @@
 # Warm-up — the evidence, and what it means for the next block
 
-> ## ⛔ REQUIRED READING BEFORE THE 2026-08-16 BLOCK BUILD
+> ## ⛔ REQUIRED READING BEFORE THE NEXT BLOCK IS AUTHORED
 >
-> **Read this file in full before authoring a single day of the next block.**
-> It sits alongside CLAUDE.md Key Rule 11's clinical-document gate and is
-> checkable in the same way: state how it influenced the plan, or say plainly
-> that it did not and why.
+> **Gated on the EVENT, not on a date** — the `HRV_GARMIN_HOLD` idiom. Read
+> this file in full before authoring a single day of the next training block,
+> whenever that happens. It sits alongside CLAUDE.md Key Rule 11's
+> clinical-document gate and is checkable in the same way: state how it
+> influenced the plan, or say plainly that it did not and why.
+>
+> **⚠ Corrected 2026-08-10, athlete's direction: the training plan is NOT
+> being rebuilt on 2026-08-16.** An earlier draft of this banner gated on that
+> date. The Day 28 reassessment still happens then and still gates the three
+> deferred decisions, but a new block is not authored on the day — so this
+> document waits for the block build rather than expiring with the
+> reassessment. **If Stage 2A is extended rather than replaced, the budget in
+> §3.0-b and the shape in §3.3 can land in the extension** — they are guidance
+> until implemented, and nothing here depends on a block boundary. That is a
+> decision for the athlete, not an assumption this document makes.
 >
 > The next block is the first to run loads close to maximum. **This system
 > currently contains no warm-up at all** (§0.1) and the block that looks like
@@ -51,6 +62,15 @@
 > and specifies **no duration**. **Job B (maximise)** is the 15-min raise, pays
 > only near 1RM, and is optional. Pricing Job A at Job B's 15 minutes would
 > spend the whole time budget on something Job A does not need.
+>
+> **🔒 LOCKED, athlete's direction 2026-08-10 (§3.0-b): TOTAL preparation time
+> is 10–15 minutes**, phases 1 and 2 together, from first movement to first
+> working rep. 15 is a ceiling, not a target. At today's ~30 min against a
+> ~30 min working portion, preparation is **half the session**. Indicative
+> split: **phase 1 ≈ 5 min** — which is `patient_profile.py:439`'s own figure,
+> so this **restores the prescription rather than cutting it** — and **phase 2
+> ≈ 5–10 min**. The squeeze falls entirely on phase 1, and phase 1 is the part
+> that drifted.
 
 *Written 2026-08-10, six days before the block is authored (2026-08-16). This is
 a REVIEW AND A DESIGN BRIEF, not a protocol and not code. Nothing here is
@@ -487,6 +507,63 @@ session placement.
 Stated as constraints the eventual protocol has to satisfy. **No design is
 proposed here** — that is the 08-16 conversation.
 
+### 3.0-b · LOCKED — the TOTAL time budget is 10–15 minutes
+
+> **ATHLETE'S DIRECTION, 2026-08-10:** *"30 mins before the working set is too
+> much, can we put in a recommendation of 10–15 mins before the working set;
+> otherwise the entire time is just warming up."*
+>
+> **Total time from the start of preparation to the first working rep: 10–15
+> minutes. Treat 15 as a ceiling, not a target.** This covers phase 1 AND
+> phase 2 together, not phase 2 alone.
+
+**The ratio argument, made concrete.** A Stage 2A Session A working portion is
+**≈30 min** — derived by summing the coded tempos, rep counts and
+`rest_seconds` across its six exercises, excluding setup and transitions. So:
+
+| Preparation | Share of total session |
+|---|---|
+| 30 min (phase 1 today + a Job-B-sized phase 2) | **~50%** — half the session is preparation |
+| **10–15 min (this budget)** | **~25–33%** |
+
+At 50% the description *"the entire time is just warming up"* is literally
+accurate. This is the constraint that makes the budget a real number rather
+than a preference.
+
+#### ⚠ The budget is NOT a cut to the prescription — it RESTORES it
+
+This is the most important sentence in the section, and it changes who has to
+approve what.
+
+> **`patient_profile.py:439` — "5-minute release block before every session."**
+
+**The clinical intent was always 5 minutes.** The coded doses (§0.2) drifted to
+16–22 min. So compressing phase 1 back toward ~5 min is **returning to the
+documented prescription**, not overriding it. Nobody is being asked to accept
+less than what was prescribed; they are being asked which items carry the
+clinical effect *at the dose the profile itself states*.
+
+**Indicative allocation inside the budget** — the split is the
+physiotherapist's to confirm, the ceiling is not:
+
+| | Budget | Basis |
+|---|---|---|
+| **Phase 1 — quiet things down** | **~5 min** | `patient_profile.py:439`'s own figure |
+| **Phase 2 — wake things back up** | **~5–10 min** | Job A always; Job B scales in on the heaviest days only |
+| **Total** | **10–15 min** | This lock |
+
+Phase 2 fits comfortably: a per-exercise ramp is ~1 set of ~6 reps at ~60–65%
+of working load (§1.3) on the heavy compounds **only** — seconds of work plus
+one rest — and Job A specifies no duration at all (§3.0). The squeeze is
+entirely on phase 1, and phase 1 is the part that drifted.
+
+**What this does NOT authorise:** this repo still does not cut a single item
+from the release block. §4.2 is the conversation, and it is now a much easier
+one — *"your own note says 5 minutes; the code says 20; which items carry the
+effect at 5?"* rather than *"may we reduce your prescription?"*
+
+---
+
 ### 3.0 · LOCKED DECISION — phase 2 is the anchor, not the leftover
 
 > **ATHLETE'S DIRECTION, 2026-08-10:** *"If the science papers say it must be
@@ -623,14 +700,18 @@ Genuinely open — they change the design, and they are not mine to settle.
 1. **Modality for the raise**, given cycling is out on his own evidence (§2.2).
    Rowing, incline treadmill walk, and loaded carries all have different
    spine/hip-flexor profiles.
-2. **⛔ Time budget and where it comes from — UPGRADED BY §3.0 FROM "OPEN" TO
-   "MUST BE ANSWERED ON THE DAY."** Phase 2 is now mandatory and everything
-   works around it, so the release block's dose is the variable that has to
-   move. Is the ~16–22 min a fixed clinical prescription, or is some of it
-   re-allocatable? **This is a physiotherapist question and it is not ours to
-   answer** — nothing in the release block gets cut by this repo.
+2. **⛔ Time budget — SETTLED AS A CEILING (§3.0-b), still open as an
+   ALLOCATION.** Phase 2 is mandatory (§3.0) and the total is capped at 10–15
+   min (§3.0-b), so the release block's dose is the variable that has to move.
+   **The ceiling is the athlete's and is not in question. The split inside it
+   is the physiotherapist's, and nothing in the release block gets cut by this
+   repo.**
 
-   Take three specific items to the 08-16 conversation, in this order:
+   **Open with the drift, not with a request.** `patient_profile.py:439` says
+   *"5-minute release block before every session"* and the coded doses run
+   16–22 min — so the question is *"which items carry the clinical effect at
+   the 5 minutes your own note specifies?"*, not *"may we reduce this?"*. Take
+   three specific items, in this order:
 
    - **The PNF dose.** 3 sets × 5 cycles *each side* is ~8–10 min, the largest
      single item by time. Its stretch bouts are only ~3 s, so it is **not** the
