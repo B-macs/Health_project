@@ -296,6 +296,25 @@ def test_get_recent_sessions_computes_actual_sets_and_volume():
     assert ex.total_volume_kg == 320.0  # 8*20 + 8*20
 
 
+def test_get_logged_session_dates_can_exclude_supplementary_yoga():
+    # Default keeps the strip/rollup's historic yoga-inclusive meaning;
+    # include_supplementary=False is has_logged_session's stricter PLAN-day
+    # meaning, used by the manual swap so a yoga session never reads as
+    # "already trained" and blocks the athlete's own tool.
+    import datetime as _dt
+    plan_page = _exercise_page("2026-07-07", "Bird-Dog")
+    yoga_page = {"properties": {
+        "Session Date": _date_prop("2026-07-08"),
+        "Movement": _title_prop("Evening Wind-Down"),
+        "Type": _select_prop("Yoga"),
+    }}
+    repo = _repo({"db-training": [plan_page, yoga_page]})
+    start, end = _dt.date(2026, 7, 7), _dt.date(2026, 7, 8)
+    assert repo.get_logged_session_dates(start, end) == {"2026-07-07", "2026-07-08"}
+    assert repo.get_logged_session_dates(
+        start, end, include_supplementary=False) == {"2026-07-07"}
+
+
 # ─── get_all_training_exercises_raw (services.mirror's training source) ────
 
 def test_get_all_training_exercises_raw_computes_actual_sets_and_total_volume():

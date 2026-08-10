@@ -215,32 +215,38 @@ def declined_entries(phase: Phase, dates: list[date],
     return overrides, reasons
 
 
-# ─── Manual swap: a past missed day traded with today, by choice ────────────
-# The user-initiated counterpart of missed_reschedules. Ask-first cuts both
-# ways: the automatic machinery never moves a session without the athlete's
-# button press, and the athlete's button press moves a session the automatic
+# ─── Manual swap: any other plan day traded with today, by choice ───────────
+# The user-initiated counterpart of missed_reschedules, in BOTH directions: a
+# past missed day carried onto today, or a future day pulled forward to be
+# done today (the athlete's principle, 2026-08-10: there is never a
+# limitation the athlete cannot overwrite — "you can't begin a day out of
+# sequence" was exactly such a limitation). Ask-first cuts both ways: the
+# automatic machinery never moves a session without the athlete's button
+# press, and the athlete's button press moves a session the automatic
 # machinery never would — so the rules that HARD-gate the automatic carry
-# (strict priority, spacing, the same-week horizon) demote to WARNINGS here.
-# Only structural impossibilities block.
+# (strict priority, spacing, the same-week horizon, deferral-only direction)
+# demote to WARNINGS here. Only structural impossibilities block.
 
-def manual_swap_blockers(phase: Phase, missed_date: date, today: date,
+def manual_swap_blockers(phase: Phase, other_date: date, today: date,
                          logged_dates: set[str]) -> list[str]:
-    """DETERMINISTIC. Why a user-requested swap of a past missed day with
+    """DETERMINISTIC. Why a user-requested swap of another plan day with
     today CANNOT happen — empty means it can. Blockers are structural
-    impossibilities only (a day that isn't missed, a today that already
+    impossibilities only (a day already performed, a today that already
     trained, a date the plan doesn't cover); judgement calls belong to
     manual_swap_warnings, because the explicit choice IS the permission.
     A forced-rest today (0 override) is deliberately NOT a blocker — the
     athlete's own rest record yields to the athlete's own click (it warned
-    the live 2026-08-09 swap attempt into a dead end when it blocked)."""
+    the live 2026-08-09 swap attempt into a dead end when it blocked).
+    logged_dates must be the PLAN-day (yoga-excluding) set: a yoga session
+    on either date must not block the athlete's own tool."""
     blockers: list[str] = []
-    if missed_date >= today:
-        blockers.append("Only a past day can be swapped with today.")
-    if missed_date.isoformat() in logged_dates:
-        blockers.append("That day has a logged session — it was not missed.")
+    if other_date == today:
+        blockers.append("Pick a day other than today to swap with.")
+    if other_date.isoformat() in logged_dates:
+        blockers.append("That day already has a logged session — there is nothing to move.")
     if today.isoformat() in logged_dates:
         blockers.append("Today already has a logged session — nothing can move onto it.")
-    if not (1 <= plan.day_number_in_phase(phase, missed_date) <= phase.length_days):
+    if not (1 <= plan.day_number_in_phase(phase, other_date) <= phase.length_days):
         blockers.append("That day is outside the current plan.")
     today_num = plan.day_number_in_phase(phase, today)
     if not (1 <= today_num <= phase.length_days) \
@@ -250,7 +256,7 @@ def manual_swap_blockers(phase: Phase, missed_date: date, today: date,
 
 
 def manual_swap_warnings(phase: Phase, plan_dict: dict | None,
-                         missed_date: date, today: date) -> list[str]:
+                         other_date: date, today: date) -> list[str]:
     """DETERMINISTIC. Advisory cautions for a user-requested swap — shown
     beside the button, never blocking it. These are the exact rules the
     automatic carry enforces hard (strict priority, main/test spacing),
@@ -261,14 +267,14 @@ def manual_swap_warnings(phase: Phase, plan_dict: dict | None,
     def _type_at(d: date) -> str | None:
         return day_type(plan_dict.get(plan.day_number_in_phase(phase, d)))
 
-    incoming = _type_at(missed_date)   # what the swap brings to today
-    outgoing = _type_at(today)         # what it sends into the past as missed
+    incoming = _type_at(other_date)    # what the swap brings to today
+    outgoing = _type_at(today)         # what it sends to the other date
     if phase.date_overrides.get(today.isoformat()) == 0:
         warnings.append(
             "Today is set as a forced rest day — the swap replaces it, and "
-            "the rest day moves onto the missed date instead."
+            "the rest day moves onto the other date instead."
         )
-    if incoming is not None and outgoing is not None \
+    if other_date < today and incoming is not None and outgoing is not None \
             and not can_overwrite(incoming, outgoing):
         warnings.append(
             "Today's session is not lower priority than the missed one — "
@@ -293,22 +299,22 @@ def manual_swap_warnings(phase: Phase, plan_dict: dict | None,
     return warnings
 
 
-def manual_swap_entries(phase: Phase, missed_date: date,
+def manual_swap_entries(phase: Phase, other_date: date,
                         today: date) -> tuple[dict[str, int], dict[str, str]]:
-    """DETERMINISTIC. The swap the athlete asked for: the past missed date
-    and today trade day-numbers — the same honest-accounting swap the
-    automatic carry uses, so the displaced session becomes the one that
-    reads as missed. A forced-rest today trades its 0 onto the missed date:
-    the rest day moves to where the rest actually happened. The reasons on
-    both dates carry no no-movement prefix (this IS a move, the banner
-    should say so) and close both automatic schedulers' guards, so neither
-    ever re-proposes either date."""
-    miss_num = plan.day_number_in_phase(phase, missed_date)
+    """DETERMINISTIC. The swap the athlete asked for: the other date and
+    today trade day-numbers — the same honest-accounting swap the automatic
+    carry uses. With a PAST day, the displaced session becomes the one that
+    reads as missed; with a FUTURE day, the displaced session is postponed
+    to that date and nothing is lost. A forced-rest today trades its 0 onto
+    the other date. The reasons on both dates carry no no-movement prefix
+    (this IS a move, the banner should say so) and close both automatic
+    schedulers' guards, so neither ever re-proposes either date."""
+    other_num = plan.day_number_in_phase(phase, other_date)
     today_num = plan.day_number_in_phase(phase, today)
-    overrides = {missed_date.isoformat(): today_num, today.isoformat(): miss_num}
+    overrides = {other_date.isoformat(): today_num, today.isoformat(): other_num}
     reasons = {
-        missed_date.isoformat(): f"Swapped with {today.isoformat()} by choice",
-        today.isoformat(): f"Swapped with {missed_date.isoformat()} by choice",
+        other_date.isoformat(): f"Swapped with {today.isoformat()} by choice",
+        today.isoformat(): f"Swapped with {other_date.isoformat()} by choice",
     }
     return overrides, reasons
 

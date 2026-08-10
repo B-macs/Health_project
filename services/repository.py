@@ -1190,7 +1190,18 @@ class Repository:
         )
         return any(notion.get_property(p, "Type", "select") != "Yoga" for p in pages)
 
-    def get_logged_session_dates(self, start: date, end: date) -> set[str]:
+    def get_logged_session_dates(self, start: date, end: date,
+                                 include_supplementary: bool = True) -> set[str]:
+        """Dates with any logged session in [start, end]. The default includes
+        Yoga/supplementary rows (the day strip's and Weekly Rollup's historic
+        definition of a trained day). Pass include_supplementary=False for
+        has_logged_session's stricter PLAN-day meaning — the manual swap uses
+        it so a yoga session (including the rest-day screen's own suggestion)
+        never reads as "today already trained" and blocks the athlete's swap,
+        and a yoga'd past day still counts as missed, matching the day-detail
+        router that offers the swap in the first place. Same client-side Type
+        filter as has_logged_session, for the same lazily-created-option
+        reason documented there."""
         pages = self._query(
             self.config.notion_db_training,
             filter_={"and": [
@@ -1198,6 +1209,9 @@ class Repository:
                 {"property": "Session Date", "date": {"on_or_before": str(end)}},
             ]},
         )
+        if not include_supplementary:
+            pages = [p for p in pages
+                     if notion.get_property(p, "Type", "select") != "Yoga"]
         return {d for p in pages if (d := notion.get_property(p, "Session Date", "date"))}
 
     def get_daily_session_au(self, days: int = 28, today: date | None = None) -> list[dict]:

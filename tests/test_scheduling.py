@@ -1002,17 +1002,47 @@ def test_manual_swap_warnings_advise_but_never_block():
     assert scheduling.manual_swap_warnings(phase, plan_clean, monday, wednesday) == []
 
 
+def test_a_future_day_can_be_pulled_onto_today():
+    # The other direction of the athlete's override: tomorrow's session done
+    # today. Nothing is lost — today's content is postponed to the future
+    # date, not recorded as missed — and the same ledger entries close both
+    # automatic schedulers on both dates.
+    plan_dict = {1: {"day_type": "rest"}, 2: {"day_type": "rest"},
+                 3: {"day_type": "main"}, **_rest_days(4, 5, 6, 7)}
+    monday, wednesday = _MONDAY, _MONDAY + timedelta(days=2)
+    phase = _phase(monday)
+
+    assert scheduling.manual_swap_blockers(phase, wednesday, monday, set()) == []
+    overrides, reasons = scheduling.manual_swap_entries(phase, wednesday, monday)
+    assert overrides == {wednesday.isoformat(): 1, monday.isoformat(): 3}
+    assert scheduling.has_real_move(phase, overrides) is True
+    assert reasons[monday.isoformat()] == f"Swapped with {wednesday.isoformat()} by choice"
+
+    # Pulling a main to today still surfaces the spacing consequence when a
+    # neighbouring day holds another main — advice, never a block.
+    plan_adjacent = {1: {"day_type": "rest"}, 2: {"day_type": "main"},
+                     3: {"day_type": "main"}, **_rest_days(4, 5, 6, 7)}
+    warnings = scheduling.manual_swap_warnings(phase, plan_adjacent, wednesday, monday)
+    assert any("back to back" in w for w in warnings)
+    assert scheduling.manual_swap_blockers(phase, wednesday, monday, set()) == []
+
+
 def test_manual_swap_view_rechecks_blockers_fresh_before_writing():
-    # Source-scan pin: the past-missed view offers the swap button, gates it
-    # off mid-session, and re-checks blockers against a FRESH logged read
-    # before the one permanent write (the cached set can be 5 minutes old).
+    # Source-scan pin: both day views (past missed AND future) offer the
+    # swap through the shared helper, gate it off mid-session, use the
+    # PLAN-day (yoga-excluding) logged set so a yoga session never blocks
+    # the tool, and re-check blockers against a FRESH read before the one
+    # permanent write (the cached set can be 5 minutes old).
     import pathlib
     src = pathlib.Path(scheduling.__file__).parent.parent / "views" / "training.py"
     text = src.read_text(encoding="utf-8")
-    assert '"Swap with today\'s session"' in text
+    assert '"Swap with today\'s session"' in text        # past-missed label
+    assert '"Do this session today"' in text             # future-day label
+    assert text.count("_render_swap_with_today(") >= 3   # def + two callers
     assert text.count("scheduling.manual_swap_blockers(") >= 2  # display + fresh
     assert "scheduling.manual_swap_entries(" in text
     assert "scheduling.manual_swap_warnings(" in text
+    assert "include_supplementary=False" in text         # yoga never blocks
 
 
 def test_view_never_writes_a_real_move_without_a_button_press():

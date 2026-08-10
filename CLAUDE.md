@@ -25,7 +25,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **1778/1778 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **1780/1780 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -92,9 +92,13 @@ services/ — framework-agnostic backend + business logic. ZERO Streamlit
                     persist unasked, and declined_entries remembers a "no"
                     so the prompt never nags. The rule cuts both ways:
                     manual_swap_blockers/warnings/entries let the athlete
-                    swap any past missed day with today from its day-strip
-                    view — structural impossibilities block, the automatic
-                    path's priority/spacing rules demote to warnings) ·
+                    swap ANY other in-phase day with today from its
+                    day-strip view — a past missed day carried forward OR a
+                    future day pulled in ("Do this session today");
+                    structural impossibilities block, the automatic path's
+                    priority/spacing rules demote to warnings, and the
+                    logged check uses the PLAN-day yoga-excluding set so a
+                    yoga session never blocks the athlete's own tool) ·
                     volume.py (weekly tonnage — Σ reps×weight — for Stage 2A+
                     double-progression exercises; no sector split, see
                     tonnage.py) ·

@@ -994,6 +994,18 @@ def _all_logged_dates(start_iso: str, today_iso: str) -> set[str]:
     return repo.get_repository().get_logged_session_dates(start, today)
 
 
+@st.cache_data(ttl=300, show_spinner=False)
+def _plan_logged_dates(start_iso: str, today_iso: str) -> set[str]:
+    """PLAN-day (yoga-excluding) logged dates, for the manual swap's gates —
+    a yoga session, including the rest-day screen's own suggestion, must
+    never read as "already trained" and block the athlete's own swap tool
+    (see Repository.get_logged_session_dates's docstring)."""
+    start = date.fromisoformat(start_iso)
+    today = date.fromisoformat(today_iso)
+    return repo.get_repository().get_logged_session_dates(
+        start, today, include_supplementary=False)
+
+
 @st.cache_data(ttl=1800, show_spinner=False)
 def _sync_weekly_rollup_cached() -> tuple[bool, str | None]:
     """Persists ended weeks to the Weekly Rollup Sheet tab, throttled by the
@@ -1489,12 +1501,30 @@ def _render_past_missed(d: date, active, phases: list) -> None:
     _render_exercise_timeline(today_plan["exercises"])
 
     # ── Swap with today ──────────────────────────────────────────────────────
+    _render_swap_with_today(
+        d, active, phases,
+        intro=("Today currently holds: {today_obj}. Swapping brings this "
+               "missed session to today, and records today's session on "
+               "{other} as the one that was missed."),
+        button_label="Swap with today's session",
+    )
+
+
+def _render_swap_with_today(d: date, active, phases: list, *,
+                            intro: str, button_label: str) -> None:
+    """The swap-with-today offer shared by the past-missed and future day
+    views — the athlete's both-directions override (carry a missed day
+    forward, or pull a future day in to do it today). Blockers are
+    structural only and rendered visibly; the automatic path's hard rules
+    surface as warnings; the logged check uses the PLAN-day (yoga-excluding)
+    set so a yoga session never blocks the tool; and blockers are re-checked
+    against a FRESH read before the one permanent write."""
     _today = date.today()
     if bool(st.session_state.get("tp_started")) and not st.session_state.get("tp_done_today"):
         st.caption("Finish or exit today's session before swapping days.")
         return
     try:
-        _logged = _all_logged_dates(active.start_date, _today.isoformat())
+        _logged = _plan_logged_dates(active.start_date, _today.isoformat())
     except Exception:
         # Can't verify what's logged -> don't offer a permanent write, but
         # SAY so — a silently absent button reads as "no option exists".
@@ -1505,21 +1535,19 @@ def _render_past_missed(d: date, active, phases: list) -> None:
         for _b in _blockers:
             st.info(f"Swap with today isn't available: {_b}")
         return
+    plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
     _today_num = ph.day_number_in_phase(active, _today)
     _today_content = plan_dict.get(_today_num)
     _today_obj = _today_content["objective"] if _today_content else f"Day {_today_num}"
     st.markdown("<div style='height:8px;'></div>", unsafe_allow_html=True)
-    st.caption(
-        f"Today currently holds: {_today_obj}. Swapping brings this missed "
-        f"session to today, and records today's session on {d.isoformat()} "
-        f"as the one that was missed."
-    )
+    st.caption(intro.format(today_obj=_today_obj, other=d.isoformat()))
     for _w in scheduling.manual_swap_warnings(active, plan_dict, d, _today):
         st.warning(_w)
-    if st.button("Swap with today's session", key="pm_swap"):
-        _pm_write_ok = False
+    if st.button(button_label, key=f"swap_today_{d.isoformat()}"):
+        _sw_write_ok = False
         try:
-            _fresh = repo.get_repository().get_logged_session_dates(d, _today)
+            _fresh = repo.get_repository().get_logged_session_dates(
+                min(d, _today), max(d, _today), include_supplementary=False)
             if not scheduling.manual_swap_blockers(active, d, _today, _fresh):
                 _ovr, _rsn = scheduling.manual_swap_entries(active, d, _today)
                 _new_active = replace(
@@ -1531,17 +1559,20 @@ def _render_past_missed(d: date, active, phases: list) -> None:
                     _new_active if p.phase_number == active.phase_number else p
                     for p in phases
                 ])
-                _pm_write_ok = True
+                _sw_write_ok = True
         except Exception:
             st.error("Couldn't save the swap — nothing was changed. Try again.")
-        if _pm_write_ok:
+        if _sw_write_ok:
             st.session_state.tp_selected_date = _today
             st.rerun()
 
 
-def _render_future_day(d: date, active) -> None:
-    """Preview for a future date within the active phase. No Start action — you
-    can't begin a day out of sequence."""
+def _render_future_day(d: date, active, phases: list) -> None:
+    """Preview for a future date within the active phase, plus the pull-
+    forward override: "Do this session today" swaps the future day with
+    today, so a session is never locked behind its calendar date — the
+    athlete's principle (2026-08-10) that no limitation is beyond an
+    explicit overwrite."""
     day_num = ph.day_number_in_phase(active, d)
     _day_overline(d)
     today_plan = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
@@ -1563,6 +1594,12 @@ def _render_future_day(d: date, active) -> None:
         unsafe_allow_html=True,
     )
     _render_exercise_timeline(today_plan["exercises"])
+    _render_swap_with_today(
+        d, active, phases,
+        intro=("Today currently holds: {today_obj}. Swapping does this "
+               "session today instead, and moves today's session to {other}."),
+        button_label="Do this session today",
+    )
 
 
 def _render_rest_day(d: date) -> None:
@@ -1584,6 +1621,13 @@ def _render_rest_day(d: date) -> None:
             st.session_state.tp_yoga_detail = suggestion.slug
             st.session_state.tp_yoga_select = True
             st.rerun()
+    if d == date.today():
+        # The rest day is never a wall: any other plan day can be swapped
+        # onto today from its own day-strip view.
+        st.caption(
+            "To train anyway, open any other day in the strip above and "
+            "swap it onto today."
+        )
 
 
 def _stage2_offer_available(phases: list) -> bool:
@@ -1677,7 +1721,7 @@ def _render_day_detail(d: date, active, phases: list) -> None:
     elif state == "past_missed":
         _render_past_missed(d, active, phases)
     else:  # "future"
-        _render_future_day(d, active)
+        _render_future_day(d, active, phases)
 
 
 @st.dialog("Session Adaptation")
@@ -2068,6 +2112,17 @@ def render():
     st.markdown(_PAGE_CSS, unsafe_allow_html=True)
     _audio_unlock_component()
 
+    # ── "Add Training" — floating + menu on every state below; the yoga-picker
+    #     sub-screen short-circuits everything else (same page, no navigation).
+    #     Deliberately rendered BEFORE the phases fetch: yoga depends on no
+    #     phase data, so a PhasesCorruptError below must not take the one
+    #     always-available training path down with it. ─────────────────────────
+    if st.session_state.get("tp_yoga_select"):
+        _render_yoga_select()
+        nav.inject("training")
+        st.stop()
+    _render_add_training_fab()
+
     # ── Session state initialisation — restores from a saved Notion checkpoint
     #     if this is a fresh session (e.g. the browser dropped its connection
     #     while a training session was in progress) ───────────────────────────
@@ -2079,7 +2134,8 @@ def render():
             "Couldn't read your training phases — the stored data looks "
             "corrupted or a read just failed. Not auto-resetting your plan "
             "to avoid losing progress. Try reloading; if this keeps "
-            "happening, the stored 'phases' config value needs a look."
+            "happening, the stored 'phases' config value needs a look. "
+            "Yoga via the + menu still works meanwhile."
         )
         nav.inject("training")
         st.stop()
@@ -2096,14 +2152,6 @@ def render():
     # completes and logs, today is no longer claimable, and the evaluation
     # runs on the next render.
     _in_session = bool(st.session_state.get("tp_started")) and not st.session_state.get("tp_done_today")
-
-    # ── "Add Training" — floating + menu on every state below; the yoga-picker
-    #     sub-screen short-circuits everything else (same page, no navigation) ──
-    if st.session_state.get("tp_yoga_select"):
-        _render_yoga_select()
-        nav.inject("training")
-        st.stop()
-    _render_add_training_fab()
 
     # ── Readiness modifier — computed once per render, applied to prescriptions ─
     try:

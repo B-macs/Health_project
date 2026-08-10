@@ -342,14 +342,23 @@ prescription under Structure is Stage 1 only; Stage 2A is externally loaded.
   holds, drops and declines (records that move nothing, `has_real_move`
   False) write unasked, and a decline (`declined_entries`,
   `DECLINED_REASON_PREFIX`) is remembered in the ledger so the question is
-  never re-asked. The rule cuts both ways: the past-missed day view offers
-  "Swap with today's session" (`manual_swap_blockers` / `_warnings` /
-  `_entries`) — the athlete may swap ANY in-phase past missed day with
-  today, the automatic path's hard rules (strict priority, spacing, the
-  same-week horizon) demote to on-screen warnings because the click is the
-  permission, only structural impossibilities block (today already
-  trained, a date outside the plan, mid-guided-session), and the swap's
-  ledger entries close both automatic schedulers on both dates. Neither writer runs while a guided session is in
+  never re-asked. The rule cuts both ways: every non-today day view offers
+  a swap with today (`manual_swap_blockers` / `_warnings` / `_entries`,
+  shared `_render_swap_with_today`) — a past missed day carried forward
+  ("Swap with today's session") or a FUTURE day pulled in ("Do this
+  session today", the displaced session postponed, not lost). The
+  automatic path's hard rules (strict priority, spacing, the same-week
+  horizon, deferral-only direction) demote to on-screen warnings because
+  the click is the permission; only structural impossibilities block
+  (today already trained, a date outside the plan, mid-guided-session) —
+  and "trained" here means the PLAN-day yoga-EXCLUDING set
+  (`get_logged_session_dates(include_supplementary=False)`), so a yoga
+  session, including the rest-day screen's own suggestion, never blocks
+  the athlete's tool. The swap's ledger entries close both automatic
+  schedulers on both dates. The rest-day screen says the wall isn't one
+  ("open any other day in the strip and swap it onto today"), and the
+  yoga FAB renders BEFORE the phases fetch so a PhasesCorruptError can
+  never take the one always-available training path down with it. Neither writer runs while a guided session is in
   progress — a mid-session remap of today would carry index-keyed session
   state onto a different session's exercises. The plan
   authors `day_type` per day (`training_plan.PLAN_STAGE2`, all 28 days —
