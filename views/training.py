@@ -862,6 +862,33 @@ def _record_completed_set(idx: int, ex: dict, set_num: int) -> None:
     )
 
 
+def _sets_by_movement(exercises: list) -> dict[str, list[dict]]:
+    """tp_set_log re-keyed from plan-day index to MOVEMENT NAME, for
+    compute_session_hr.
+
+    The index is wrong to send across this boundary. tp_set_log is keyed by
+    position in TODAY'S plan day, gaps preserved where an exercise was
+    skipped; anything rebuilt from Notion afterwards
+    (Repository.get_session_sets_by_exercise) can only see the exercises that
+    were actually logged, renumbered from zero. Same session, two different
+    integers for the same movement — so per-exercise heart rate would be
+    attributed to whichever exercise happened to occupy that slot. The name
+    means the same thing on both sides.
+
+    An index with no matching exercise is dropped rather than guessed at.
+    """
+    out: dict[str, list[dict]] = {}
+    for idx, rows in (st.session_state.get("tp_set_log") or {}).items():
+        if not rows:
+            continue
+        try:
+            name = exercises[idx]["name"]
+        except (IndexError, KeyError, TypeError):
+            continue
+        out.setdefault(name, []).extend(rows)
+    return out
+
+
 # The guided flow's position — everything "← Back" has to put back.
 _NAV_SNAPSHOT_FIELDS = ("tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_side")
 _NAV_STACK_MAX = 30
@@ -2917,7 +2944,7 @@ def render():
                         try:
                             st.session_state.tp_hr_au = repo.get_repository().compute_session_hr(
                                 date.today(),
-                                {i: rows for i, rows in st.session_state.tp_set_log.items() if rows},
+                                _sets_by_movement(exercises),
                                 duration_minutes=elapsed_minutes,
                             )
                         except Exception:
@@ -2981,7 +3008,7 @@ def render():
                         try:
                             st.session_state.tp_hr_au = repo.get_repository().compute_session_hr(
                                 date.today(),
-                                {i: rows for i, rows in st.session_state.tp_set_log.items() if rows},
+                                _sets_by_movement(exercises),
                                 duration_minutes=elapsed_minutes,
                                 force_activity_id=_c["activity"].get("activity_id"),
                                 shift_hours=_c["shift_hours"],

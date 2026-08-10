@@ -2911,10 +2911,57 @@ class Repository:
         except Exception:
             return []
 
+    def get_session_sets_by_exercise(self, d: date) -> dict[str, list[dict]]:
+        """{movement name: per-set records} for the session logged on `d`.
+
+        The per-set "ts" timestamps in here are the only thing that makes
+        heart-rate matching possible, and they live in the "Sets" rich_text
+        JSON — NOT on models.ExerciseEntry, which carries the aggregates
+        (actual_sets, total_volume_kg) and no per-set detail at all.
+
+        Keyed by MOVEMENT NAME rather than by position. The two callers of
+        compute_session_hr count exercises differently — views/training.py
+        passes live plan-day indices, gaps preserved, while anything rebuilt
+        from Notion can only see the exercises that were actually logged,
+        renumbered from zero — so an integer key means two different things
+        depending on which path produced it, and per-exercise heart rate would
+        be attributed to the wrong movement. The name is the same in both.
+
+        One filtered query, not the unwindowed get_all_training_exercises_raw:
+        this runs on page open.
+        """
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"equals": str(d)}},
+        )
+        out: dict[str, list[dict]] = {}
+        for p in pages:
+            name = notion.get_property(p, "Movement", "title") or ""
+            if not name:
+                continue
+            try:
+                sets = json.loads(notion.get_property(p, "Sets", "rich_text") or "[]")
+            except Exception:
+                sets = []          # same defensive fallback as every other reader
+            if sets:
+                out.setdefault(name, []).extend(sets)
+        return out
+
     def sync_session_hr_for_date(self, d: date, hr_rest: float | None = None) -> bool:
         """Compute + persist HR load for the session logged on `d`. False when
         there's no session, no timestamps, or no matching Garmin activity —
-        all ordinary "fall back to RPE" outcomes, not errors."""
+        all ordinary "fall back to RPE" outcomes, not errors.
+
+        This raised AttributeError on EVERY call until 2026-08-10: it read
+        `ex.sets` off models.ExerciseEntry, which has no such field. Nothing
+        surfaced it — save_session_hr is its only caller's next statement, that
+        caller runs inside run_sync_if_due which catches and returns
+        (False, message), and the one test that touches it monkeypatches this
+        method itself. The consequence was total and silent:
+        get_session_hr_history() always returned [], blend_strain always fell
+        to SOURCE_RPE, and the Edwards'-TRIMP half of strain reached the
+        displayed number on zero days ever.
+        """
         # Narrow window deliberately: this runs on page open, and
         # get_recent_sessions is a full Notion query per call.
         lookback = max(2, (date.today() - d).days + 2)
@@ -2924,12 +2971,15 @@ class Repository:
         if not sessions_on_day:
             return False
         session = sessions_on_day[0]
-        by_exercise = {
-            i: (ex.sets or []) for i, ex in enumerate(session.exercises)
-        }
+        by_exercise = self.get_session_sets_by_exercise(d)
+        if not by_exercise:
+            return False           # logged before per-set capture existed
         summary = self.compute_session_hr(
             d, by_exercise,
-            duration_minutes=float(session.duration_minutes or 0),
+            # session_duration_minutes, not duration_minutes — a SECOND
+            # AttributeError sitting behind the first, on the same statement,
+            # and equally unreachable while the first one fired.
+            duration_minutes=float(session.session_duration_minutes or 0),
             hr_rest=hr_rest,
         )
         if not summary:
