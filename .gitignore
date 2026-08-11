@@ -1,5 +1,8 @@
 # Secrets — never commit API keys
-.streamlit/secrets.toml
+# Glob, not the bare filename: an editor's .swp/.bak, or a hand-made
+# secrets.toml.bak before an edit, carries exactly the same live credentials
+# and the exact-match pattern did not cover any of them.
+.streamlit/secrets.toml*
 .env
 .env.*
 
