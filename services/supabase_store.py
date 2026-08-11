@@ -1,0 +1,298 @@
+"""
+services/supabase_store.py -- pushes the local SQLite datastore into the
+Supabase (PostgreSQL) project, and reads it back to prove the copy is faithful.
+
+STEP 2 OF THE CUTOVER. Step 1 created the 21 tables
+(services/datastore_postgres.py). Nothing in the live app reads from Postgres
+yet -- this exists to get real data in and to check the schema is actually
+right, which a load of 2,900 real rows answers and no amount of reading the
+DDL does.
+
+NO NEW DEPENDENCY. Supabase's Data API is PostgREST, which is plain HTTP over
+JSON, so this uses urllib -- the same choice voice_training/voxplot/storage/
+supabase.py already made in this repo. Adding psycopg would buy a nicer API in
+exchange for a build-tooling dependency and a second credential (the database
+password), neither of which this needs.
+
+THE ACTUAL RISK IS TYPES, not transport. SQLite stores what it is given:
+gspread hands back "" for a blank cell, and the offline datastore preserves
+that verbatim because reading a hypnogram back as a number is unrecoverable
+(see clients/datastore_reader.py). PostgreSQL will not accept "" in a DOUBLE
+PRECISION column -- it is an error, not a coercion. So every value crosses
+through `_coerce`, and the rule is deliberate: an empty string becomes NULL in
+a numeric column, because "no reading" is what a blank cell has always meant
+here, while in a TEXT column it stays "" -- there, blank and absent are
+genuinely different and flattening them would rewrite history.
+
+The source is the SQLite file, not Repository. datastore.db is already a full
+copy, so pushing from it costs zero Notion/Sheets quota and makes the
+comparison a true round trip: the same rows, through Postgres, back out.
+"""
+from __future__ import annotations
+
+import json
+import sqlite3
+import urllib.error
+import urllib.parse
+import urllib.request
+from dataclasses import dataclass
+
+from services import datastore_postgres
+
+#: Parents before children. training_sets references training_exercises, which
+#: references training_sessions, and those foreign keys are ENFORCED in
+#: Postgres (unlike SQLite, where they are documentation) -- so a child
+#: inserted first is a hard error rather than an orphan row.
+LOAD_ORDER = ("training_sessions", "training_exercises", "training_sets")
+
+#: PostgREST accepts an array of objects as a bulk insert. 500 keeps a request
+#: comfortably under the payload limit even for oura_sleep_periods, whose rows
+#: carry whole hypnograms as strings.
+BATCH = 500
+
+_TIMEOUT = 60
+
+
+class SupabaseError(RuntimeError):
+    pass
+
+
+@dataclass(frozen=True)
+class LoadResult:
+    table: str
+    source_rows: int
+    loaded_rows: int
+
+    @property
+    def ok(self) -> bool:
+        return self.source_rows == self.loaded_rows
+
+
+class SupabaseStore:
+    """Thin PostgREST wrapper. Holds the secret key; never logs it."""
+
+    def __init__(self, url: str, secret_key: str):
+        if not url or not secret_key:
+            raise SupabaseError(
+                "Supabase is not configured — set SUPABASE_URL and "
+                "SUPABASE_SECRET_KEY (see services/config.py)."
+            )
+        self.url = url.rstrip("/")
+        self._key = secret_key
+
+    def _headers(self, extra: dict | None = None) -> dict:
+        h = {
+            "apikey": self._key,
+            "Authorization": f"Bearer {self._key}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        h.update(extra or {})
+        return h
+
+    def _request(self, method: str, path: str, body=None, headers=None):
+        data = json.dumps(body).encode() if body is not None else None
+        req = urllib.request.Request(
+            f"{self.url}/rest/v1/{path}", data=data, method=method,
+            headers=self._headers(headers),
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=_TIMEOUT) as r:
+                raw = r.read()
+                return r.headers, (json.loads(raw) if raw else None)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode(errors="replace")[:400]
+            # The key never appears in the message — only the path and Postgres'
+            # own complaint, which is what actually says what went wrong.
+            raise SupabaseError(f"{method} {path} → HTTP {exc.code}: {detail}") from None
+
+    # ─── reads ───────────────────────────────────────────────────────────
+
+    def count(self, table: str) -> int:
+        headers, _ = self._request(
+            "GET", f"{table}?select=*&limit=1",
+            headers={"Prefer": "count=exact", "Range": "0-0"},
+        )
+        content_range = headers.get("Content-Range", "")
+        return int(content_range.split("/")[-1]) if "/" in content_range else 0
+
+    def select(self, table: str, order: str = "", limit: int = 1000) -> list[dict]:
+        q = f"{table}?select=*&limit={limit}"
+        if order:
+            q += f"&order={urllib.parse.quote(order)}"
+        _headers, rows = self._request("GET", q)
+        return rows or []
+
+    def select_value(self, table: str, where: str, column: str):
+        """One column of the first row matching a PostgREST filter, or None.
+
+        Separate from select() because select() builds its own `?select=`;
+        handing it a string that already carried a filter produced a URL with
+        two `?` and a parse error from PostgREST.
+        """
+        _headers, rows = self._request(
+            "GET", f"{table}?{where}&select={column}&limit=1")
+        return rows[0][column] if rows else None
+
+    # ─── writes ──────────────────────────────────────────────────────────
+
+    def truncate(self, table: str) -> None:
+        """Delete every row.
+
+        PostgREST REFUSES an unfiltered DELETE — a safety feature, and one
+        worth not defeating with a wildcard. Each table gets an always-true
+        filter on its own primary key, so an unknown table raises here rather
+        than silently deleting nothing and leaving a half-replaced copy that
+        looks loaded.
+        """
+        try:
+            where = _ANY_ROW_FILTER[table]
+        except KeyError:
+            raise SupabaseError(
+                f"no delete filter for {table!r} — add one to _ANY_ROW_FILTER, "
+                f"or a push would silently leave its old rows in place"
+            ) from None
+        self._request("DELETE", f"{table}?{where}")
+
+    def insert(self, table: str, rows: list[dict]) -> int:
+        """Bulk insert in batches. Returns the number of rows sent."""
+        sent = 0
+        for i in range(0, len(rows), BATCH):
+            chunk = rows[i:i + BATCH]
+            self._request("POST", table, body=chunk,
+                          headers={"Prefer": "return=minimal"})
+            sent += len(chunk)
+        return sent
+
+
+#: PostgREST requires a WHERE clause on DELETE. Each table gets a filter on a
+#: column that is NOT NULL for every row — its primary key.
+_ANY_ROW_FILTER = {
+    "training_sets": "id=gte.0",
+    "training_exercises": "exercise_id=neq.__none__",
+    "training_sessions": "session_id=neq.__none__",
+    "readiness_checkins": "date=neq.__none__",
+    "garmin_daily": "date=neq.__none__",
+    "garmin_activities": "activity_id=neq.__none__",
+    "session_hr": "date=neq.__none__",
+    "oura_daily": "date=neq.__none__",
+    "oura_workouts": "workout_id=neq.__none__",
+    "oura_sleep_periods": "sleep_id=neq.__none__",
+    "garmin_sleep_stages": "date=neq.__none__",
+    "sleep_fusion": "date=neq.__none__",
+    "oura_sessions": "session_id=neq.__none__",
+    "oura_rest_mode": "rest_mode_id=neq.__none__",
+    "biometric_blend": "date=neq.__none__",
+    "metrics_history": "date=neq.__none__",
+    "wake_time_adjustments": "date=neq.__none__",
+    "weekly_rollup": "week_start=neq.__none__",
+    "sheet1_legacy_biometrics": "date=neq.__none__",
+    "config": "key=neq.__none__",
+    "datastore_meta": "key=neq.__none__",
+}
+
+
+# ─── SQLite → Postgres value coercion ────────────────────────────────────
+
+def numeric_columns(table: str, ddl: str | None = None) -> set[str]:
+    """Columns Postgres will treat as numbers, so "" has to become NULL."""
+    ddl = ddl if ddl is not None else datastore_postgres.to_postgres()
+    import re
+    m = re.search(rf"CREATE TABLE {table} \((.*?)\n\);", ddl, re.S)
+    if not m:
+        return set()
+    out = set()
+    for line in m.group(1).splitlines():
+        code, _ = datastore_postgres._split_code_and_comment(line)
+        code = code.strip().rstrip(",")
+        if not code:
+            continue
+        parts = code.split()
+        if len(parts) >= 2 and parts[1].upper() in ("DOUBLE", "BIGINT", "NUMERIC"):
+            out.add(parts[0])
+    return out
+
+
+#: gspread hands booleans back as the STRINGS 'TRUE'/'FALSE', and the offline
+#: datastore preserves them verbatim (clients/datastore_reader.py pins that as
+#: fidelity). SQLite stores them happily in an INTEGER column because it is
+#: loosely typed; PostgreSQL rejects them outright.
+#:
+#: Found by loading real data, not by reading the schema: 415 rows of
+#: oura_sleep_periods.low_battery_alert plus both of garmin_sleep_stages'
+#: boolean columns. 1/0 is the faithful mapping rather than a convenience —
+#: these columns are declared BIGINT with comments that call them booleans,
+#: and readiness_checkins already stores its booleans as 0/1.
+_BOOL_STRINGS = {"TRUE": 1, "FALSE": 0, "True": 1, "False": 0,
+                 "true": 1, "false": 0}
+
+
+def coerce_row(row: dict, numeric: set[str]) -> dict:
+    """One SQLite row as PostgreSQL will accept it.
+
+    Two transformations, both confined to NUMERIC columns:
+
+      ""            -> NULL. A blank cell has always meant "no reading" here
+                      (gspread returns "" for one, and the offline datastore
+                      keeps it verbatim), so NULL is the faithful reading.
+      TRUE / FALSE  -> 1 / 0. See _BOOL_STRINGS.
+
+    In a TEXT column both are LEFT ALONE. There, blank and absent are
+    genuinely different — a stored empty hypnogram is not the same as never
+    having recorded one — and collapsing them would rewrite history. A literal
+    "TRUE" in a text column is a value, not a boolean.
+    """
+    out = {}
+    for k, v in row.items():
+        if k in numeric and isinstance(v, str):
+            s = v.strip()
+            if s == "":
+                out[k] = None
+                continue
+            if s in _BOOL_STRINGS:
+                out[k] = _BOOL_STRINGS[s]
+                continue
+        out[k] = v
+    return out
+
+
+def rows_from_sqlite(conn: sqlite3.Connection, table: str) -> list[dict]:
+    conn.row_factory = sqlite3.Row
+    return [dict(r) for r in conn.execute(f"SELECT * FROM {table}")]
+
+
+def push(conn: sqlite3.Connection, store: SupabaseStore,
+         tables: list[str] | None = None, progress=None) -> list[LoadResult]:
+    """Replace the Supabase contents with the SQLite datastore's.
+
+    Wholesale replace, matching services/datastore.py's own contract for the
+    SQLite copy: this data is a regenerable projection of Notion and Sheets,
+    not a system of record, so there is nothing to merge. That stops being
+    true the day Postgres becomes the write path, at which point this becomes
+    a migration rather than a push.
+
+    Children are deleted before parents and inserted after them — the foreign
+    keys are enforced here, unlike in SQLite.
+    """
+    ddl = datastore_postgres.to_postgres()
+    all_tables = tables or datastore_postgres.table_names(ddl)
+    ordered = ([t for t in LOAD_ORDER if t in all_tables]
+               + [t for t in all_tables if t not in LOAD_ORDER])
+
+    for table in reversed(ordered):        # children first
+        store.truncate(table)
+
+    results = []
+    for table in ordered:
+        rows = rows_from_sqlite(conn, table)
+        numeric = numeric_columns(table, ddl)
+        payload = [coerce_row(r, numeric) for r in rows]
+        # training_sets.id is GENERATED ALWAYS — Postgres rejects a supplied
+        # value, and the surrogate key carries no meaning worth preserving.
+        if table == "training_sets":
+            payload = [{k: v for k, v in r.items() if k != "id"} for r in payload]
+        sent = store.insert(table, payload) if payload else 0
+        results.append(LoadResult(table, len(rows), sent))
+        if progress:
+            progress(results[-1])
+    return results

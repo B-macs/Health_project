@@ -39,6 +39,17 @@ class Config:
     # (the default, and what the deployed app runs with) means live Sheets.
     # Deliberately NOT a fallback for a failed live read — see Repository._ws.
     datastore_path: str = ""
+    # Optional — the Supabase (PostgreSQL) project the datastore is pushed to.
+    # Blank means "not configured", which is not an error: nothing in the live
+    # app reads from Postgres yet, so a checkout without these keys behaves
+    # exactly as before.
+    #
+    # supabase_secret_key is SERVER-ONLY and must never reach browser code.
+    # The publishable key is the one safe to expose, and is deliberately NOT
+    # carried here — nothing server-side has a use for it, and holding it
+    # would invite using the wrong one.
+    supabase_url: str = ""
+    supabase_secret_key: str = ""
     # IANA zone name for the ATHLETE's wall clock (e.g. "Europe/Berlin").
     #
     # Exists because the app does not run where the athlete trains. Per-set
@@ -112,5 +123,7 @@ def load_config(overrides: dict | None = None) -> Config:
         garmin_password=_resolve_optional_str("GARMIN_PASSWORD", overrides),
         oura_token=_resolve_optional_str("OURA_TOKEN", overrides),
         datastore_path=_resolve_optional_str("HEALTH_DATASTORE_PATH", overrides),
+        supabase_url=_resolve_optional_str("SUPABASE_URL", overrides),
+        supabase_secret_key=_resolve_optional_str("SUPABASE_SECRET_KEY", overrides),
         timezone=_resolve_optional_str("HEALTH_TIMEZONE", overrides),
     )
