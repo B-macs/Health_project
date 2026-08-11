@@ -340,3 +340,24 @@ def test_the_page_id_is_used_as_the_exercise_primary_key():
     body = src.split("def save_training_exercise")[1].split("\n    def ")[0]
     assert 'mirror_notion_write(notion_reader.TRAINING, page["id"]' in body
     assert body.index("notion.create_page") < body.index("mirror_notion_write")
+
+
+def test_the_volume_rounding_matches_the_getter_where_the_data_cannot_tell():
+    """A discriminating case, because the real log cannot supply one.
+
+    Every logged weight carries at most one decimal and every rep count is an
+    integer, so on real data round(x, 1) and round(x, 2) are indistinguishable
+    — a mutation of the rounding survives the convergence test for that reason
+    alone. This pins the mirror to get_all_training_exercises_raw's exact
+    expression using values that separate them.
+    """
+    awkward = [{"set_num": 1, "reps": 3, "weight": 0.33, "rest": 0, "tut": 0,
+                "velocity": "controlled"}]
+    getter_result = round(
+        sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in awkward), 1)
+    assert getter_result == 1.0                     # 0.99 -> 1.0 at one decimal
+
+    repo = _repo()
+    repo.mirror_notion_write(nr.TRAINING, "ex-round", _training_properties(),
+                             sets=awkward)
+    assert _rows("training_exercises")["ex-round"]["total_volume_kg"] == getter_result
