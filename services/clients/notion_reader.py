@@ -243,6 +243,97 @@ def page_from_row(kind: str, row: dict) -> dict:
     return {"id": _page_id(kind, row), "properties": props, "object": "page"}
 
 
+# ─── page -> row (the inverse, for the Supabase mirror) ──────────────────
+#
+# PROPERTIES is used in BOTH directions and that is the point: one map, so a
+# column cannot be read from one place and written to another. Above turns a
+# datastore row into a Notion page (for offline reads); below turns a Notion
+# property payload back into a datastore row (so a Notion WRITE can be
+# mirrored into Postgres without re-reading the page).
+#
+# ⚠ THE TWO NOTION SHAPES ARE NOT THE SAME. services/clients/notion.py's
+# BUILDERS produce what the API ACCEPTS -- {"text": {"content": ...}} -- while
+# get_property reads what the API SENDS -- {"plain_text": ...}. A decoder
+# written against the wrong one returns "" for every title and every note,
+# with no error anywhere. Both are accepted below, so a payload decodes
+# whether it came from a builder or from a live page.
+
+def _text_of(elements) -> str:
+    """Join a title/rich_text element list, from either shape.
+
+    Joining rather than taking [0] is required, not tidy: notion.rich_text
+    CHUNKS a value over 2000 chars into up to 100 elements, so the phases
+    JSON blob and a long note both arrive in pieces. get_property already
+    joins on the way in; this is the same rule on the way out.
+    """
+    out = []
+    for el in elements or []:
+        if not isinstance(el, dict):
+            continue
+        if "plain_text" in el:                      # API response shape
+            out.append(el.get("plain_text") or "")
+        else:                                       # builder / request shape
+            out.append((el.get("text") or {}).get("content") or "")
+    return "".join(out)
+
+
+def value_from_payload(prop_kind: str, payload: dict):
+    """One Notion property payload as the datastore stores that column.
+
+    The storage conventions are NOT arbitrary and are copied from the
+    Repository getters that populate these tables
+    (get_all_readiness_checkins_raw, get_all_training_exercises_raw):
+    a multi_select is stored as a JSON ARRAY STRING and a checkbox as 1/0,
+    not as a list and not as a bool. Getting either wrong produces a row that
+    looks right and compares unequal to every row built by the other path.
+    """
+    if prop_kind == "title" or prop_kind == "rich_text":
+        return _text_of(payload.get(prop_kind))
+    if prop_kind == "number":
+        return payload.get("number")
+    if prop_kind == "select":
+        sel = payload.get("select")
+        return sel.get("name") if isinstance(sel, dict) else None
+    if prop_kind == "multi_select":
+        names = [o.get("name") for o in (payload.get("multi_select") or [])
+                 if isinstance(o, dict)]
+        return json.dumps(names)
+    if prop_kind == "date":
+        d = payload.get("date")
+        return d.get("start") if isinstance(d, dict) else None
+    if prop_kind == "checkbox":
+        return 1 if payload.get("checkbox") else 0
+    raise NotionQueryUnsupportedError(f"unknown property kind {prop_kind!r}")
+
+
+def row_from_properties(kind: str, properties: dict) -> dict:
+    """A Notion write's property payload as a partial datastore row.
+
+    PARTIAL BY DESIGN. A Notion update_page sends only the properties it is
+    changing, and the mirror upserts only those columns —
+    `resolution=merge-duplicates` leaves the rest of the row alone (verified
+    against the live project). Inventing defaults for the absent columns would
+    blank real data on every partial update.
+
+    Properties with no datastore column (and the synthesized "Entry" title)
+    are skipped rather than raising: a Notion database may carry columns this
+    app does not mirror, and a write is not the place to discover that.
+    """
+    known = PROPERTIES[kind]
+    row = {}
+    for name, payload in (properties or {}).items():
+        mapped = known.get(name)
+        if mapped is None:
+            continue
+        column, prop_kind = mapped
+        if column is None:            # synthesized on read, nothing to store
+            continue
+        if not isinstance(payload, dict):
+            continue
+        row[column] = value_from_payload(prop_kind, payload)
+    return row
+
+
 # ─── filtering ───────────────────────────────────────────────────────────
 
 def _test(value, prop_kind: str, condition: dict) -> bool:

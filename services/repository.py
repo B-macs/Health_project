@@ -469,10 +469,11 @@ class Repository:
         # for values that reach it as a bare positional list.
         self._ws_headers: dict[str, list[str]] = {}
         self._supabase_store_obj = None
-        # {table: {key: row}} of rows written since the last flush. Keyed by
-        # primary key so re-writing the same date twice in one sync sends one
-        # row, not two.
-        self._mirror_buffer: dict[str, dict] = {}
+        # Rows written but not yet sent live in supabase_store.OUTBOX, which
+        # is PROCESS-WIDE rather than per-Repository. It has to be: the
+        # background sync builds its own Repository (key rule 12), so a
+        # per-instance buffer never sent anything written on the UI thread —
+        # every Notion write and every manual sync button. See MirrorOutbox.
         #: (table, message) of the last mirror failure, or None. Read by the
         #: Sync page — a mirror that quietly stopped working looks exactly
         #: like one that is up to date.
@@ -653,28 +654,63 @@ class Repository:
         if not table or not header:
             return
         row = dict(zip(header, values))
-        self._mirror_buffer.setdefault(table, {})[str(key_value)] = row
+        self.queue_mirror(table, key_value, row)
+
+    def queue_mirror(self, table: str, key_value, row: dict,
+                     mode: str = supabase_store.UPSERT) -> None:
+        """Queue one written row for Supabase.
+
+        `mode` is the important argument. A COMPLETE row upserts. A PARTIAL
+        one — a Notion update_page that touched four columns — must PATCH,
+        because upsert INSERTS when the key is absent and would create a row
+        holding those four columns and NULL for everything else. That orphan
+        looks like a real logged exercise to anything counting rows.
+        """
+        if not self.supabase_configured() or not row:
+            return
+        # Blank -> NULL on the way in, so a mirrored row is the row the next
+        # full rebuild would write. See blank_to_null.
+        supabase_store.OUTBOX.queue(
+            table, key_value, supabase_store.blank_to_null(row), mode=mode)
 
     def flush_supabase_mirror(self) -> dict[str, int]:
-        """Send every buffered row. Returns {table: rows sent}.
+        """Send everything in the outbox. Returns {table: rows sent}.
 
-        NEVER RAISES. The Sheets write it mirrors has already succeeded and
-        is the system of record; taking a sync down because a replica was
-        unreachable would trade a working app for a consistent copy nobody
-        reads yet. Failures are recorded on mirror_last_error and the rows are
-        DROPPED rather than retried forever — the full push is the repair
-        path, and an unbounded buffer on a long-lived Repository is a leak.
+        NEVER RAISES. The Notion or Sheets write it mirrors has already
+        succeeded and is the system of record; taking a sync down because a
+        replica was unreachable would trade a working app for a consistent
+        copy nothing reads yet. Failures are recorded on mirror_last_error and
+        the rows are DROPPED rather than retried forever — the full push is
+        the repair path, and an unbounded outbox is a leak in a process that
+        stays up for days.
         """
-        if not self._mirror_buffer or self._sb is None:
+        if self._sb is None:
+            return {}
+        drained = supabase_store.OUTBOX.drain()
+        if not drained:
             return {}
         sent: dict[str, int] = {}
-        buffered, self._mirror_buffer = self._mirror_buffer, {}
-        for table, rows in buffered.items():
+        for (table, mode), rows in drained.items():
             try:
                 numeric = supabase_store.numeric_columns(table)
+                if mode == supabase_store.PATCH:
+                    pk = supabase_store.primary_key(table)
+                    n = 0
+                    for key, row in rows.items():
+                        n += self._sb.patch(
+                            table, pk, key,
+                            supabase_store.coerce_row(row, numeric))
+                    sent[table] = sent.get(table, 0) + n
+                    continue
                 payload = [supabase_store.coerce_row(r, numeric)
                            for r in rows.values()]
-                sent[table] = self._sb.upsert(table, payload)
+                # One request per DISTINCT COLUMN SET: PostgREST requires
+                # uniform keys across a bulk body, and Notion writes to one
+                # table do not all carry the same columns.
+                n = 0
+                for batch in supabase_store.group_by_columns(payload):
+                    n += self._sb.upsert(table, batch)
+                sent[table] = sent.get(table, 0) + n
             except Exception as exc:
                 self.mirror_last_error = (table, str(exc)[:300])
         return sent

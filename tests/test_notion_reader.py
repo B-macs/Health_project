@@ -443,3 +443,115 @@ def test_an_unconfigured_database_id_raises_rather_than_guessing():
     assert repo._db_kind("db-training") == nr.TRAINING
     with pytest.raises(KeyError):
         repo._db_kind("some-other-database")
+
+
+# ─── page -> row: the inverse, used by the Supabase mirror ───────────────
+
+def test_a_real_row_survives_row_to_page_to_row():
+    """PROPERTIES is used in BOTH directions, so the strongest check is that
+    they compose to the identity on data this file did not invent."""
+    import sqlite3
+    if not LIVE_DATASTORE.exists():
+        pytest.skip("no datastore.db in this checkout")
+    conn = sqlite3.connect(LIVE_DATASTORE)
+    conn.row_factory = sqlite3.Row
+    stored = [dict(r) for r in conn.execute("SELECT * FROM readiness_checkins")]
+    assert stored, "no rows to check"
+    for row in stored:
+        page = nr.page_from_row(nr.READINESS, row)
+        back = nr.row_from_properties(nr.READINESS, page["properties"])
+        for column, want in row.items():
+            if column not in back:
+                continue
+            have = back[column]
+            # A blank decodes to "" and the datastore stores NULL; the mirror
+            # normalizes with supabase_store.blank_to_null, so compare the way
+            # the mirror will actually send it. Stepping around this instead
+            # is what let the ''-vs-NULL defect through the first time.
+            if have == "":
+                have = None
+            if want is None and have in (None, 0, "[]"):
+                continue
+            assert have == want, f"{row['date']}.{column}: {have!r} != {want!r}"
+
+
+def test_the_BUILDER_shape_decodes_too_not_just_the_response_shape():
+    """THE trap. services/clients/notion.py's builders emit
+    {"text": {"content": ...}}; get_property reads {"plain_text": ...}. A
+    decoder written against the wrong one returns "" for every title and note
+    — silently, since "" is a legitimate value."""
+    from services.clients import notion
+    props = {
+        "Movement": notion.title("Goblet Squat"),
+        "Notes": notion.rich_text("felt good"),
+        "Session Date": notion.date_prop("2026-08-10"),
+        "Type": notion.select("Squat"),
+        "Exercise RPE": notion.number(6),
+    }
+    row = nr.row_from_properties(nr.TRAINING, props)
+    assert row["movement_name"] == "Goblet Squat", "builder title decoded empty"
+    assert row["notes"] == "felt good", "builder rich_text decoded empty"
+    assert row["session_date"] == "2026-08-10"
+    assert row["movement_type"] == "Squat"
+    assert row["exercise_rpe"] == 6.0
+
+
+def test_a_chunked_rich_text_rejoins():
+    """notion.rich_text splits a value over 2000 chars into up to 100
+    elements. Taking element [0] would truncate the phases JSON blob and any
+    long note to exactly 2000 characters."""
+    from services.clients import notion
+    long_value = "x" * 4500
+    row = nr.row_from_properties(nr.CONFIG, {"Value": notion.rich_text(long_value)})
+    assert row["value"] == long_value
+    assert len(row["value"]) == 4500
+
+
+def test_multi_select_is_stored_as_a_json_array_string():
+    """Not as a list. get_all_readiness_checkins_raw does json.dumps, so a
+    list here would compare unequal to every row the other path builds."""
+    from services.clients import notion
+    row = nr.row_from_properties(
+        nr.READINESS, {"Body Areas": notion.multi_select(["lumbar", "hip"])})
+    assert row["anatomical_locations"] == '["lumbar", "hip"]'
+
+
+def test_a_checkbox_is_stored_as_one_or_zero_not_a_bool():
+    from services.clients import notion
+    assert nr.row_from_properties(
+        nr.READINESS, {"Travel": notion.checkbox(True)})["travel_flag"] == 1
+    assert nr.row_from_properties(
+        nr.READINESS, {"Travel": notion.checkbox(False)})["travel_flag"] == 0
+
+
+def test_an_update_decodes_to_ONLY_the_columns_it_wrote():
+    """A Notion update_page sends only what it changes, and the mirror upserts
+    only those columns. Inventing defaults for the rest would blank real data
+    on every partial update."""
+    from services.clients import notion
+    row = nr.row_from_properties(nr.READINESS, {
+        "Parsed Severity": notion.number(3),
+        "Parsed": notion.checkbox(True),
+    })
+    assert set(row) == {"parsed_severity", "parsed"}
+
+
+def test_an_unmapped_property_is_skipped_rather_than_raising():
+    """A Notion database may carry columns this app does not mirror, and a
+    write is not the place to discover that."""
+    assert nr.row_from_properties(
+        nr.READINESS, {"Some Manual Column": {"number": 1}}) == {}
+
+
+def test_a_synthesized_title_has_nothing_to_store():
+    from services.clients import notion
+    assert nr.row_from_properties(
+        nr.READINESS, {"Entry": notion.title("2026-08-10 Morning Check-In")}) == {}
+
+
+def test_an_empty_select_and_date_decode_to_none():
+    from services.clients import notion
+    row = nr.row_from_properties(nr.READINESS, {
+        "Condition": notion.select(""), "Date": notion.date_prop(None)})
+    assert row["current_condition"] is None
+    assert row["date"] is None

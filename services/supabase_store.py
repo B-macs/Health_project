@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import threading
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -206,6 +207,26 @@ class SupabaseStore:
             sent += len(chunk)
         return sent
 
+    def patch(self, table: str, pk_column: str, pk_value, row: dict) -> int:
+        """Update an EXISTING row only. Returns rows changed (0 or 1).
+
+        This is what a partial Notion update must use rather than upsert.
+        `resolution=merge-duplicates` INSERTS when the key is absent, so
+        mirroring `update_session_note_ai` against a page logged before the
+        mirror existed would create a training_exercises row holding four AI
+        columns and NULL for session_id, movement_name and every set — an
+        orphan that looks like a real logged exercise to anything counting
+        rows. PATCH with a filter changes nothing when the row is not there,
+        which is the correct outcome: the full push is what backfills history.
+        """
+        if not row:
+            return 0
+        where = f"{pk_column}=eq.{urllib.parse.quote(str(pk_value))}"
+        _headers, changed = self._request(
+            "PATCH", f"{table}?{where}", body=row,
+            headers={"Prefer": "return=representation"})
+        return len(changed or [])
+
     def insert(self, table: str, rows: list[dict]) -> int:
         """Bulk insert in batches. Returns the number of rows sent."""
         sent = 0
@@ -215,6 +236,103 @@ class SupabaseStore:
                           headers={"Prefer": "return=minimal"})
             sent += len(chunk)
         return sent
+
+
+#: A row is queued as one of these.
+UPSERT = "upsert"    #: a COMPLETE row — insert it or replace it
+PATCH = "patch"      #: a PARTIAL update — change these columns IF the row exists
+
+
+class MirrorOutbox:
+    """Rows written locally but not yet sent to Supabase.
+
+    PROCESS-WIDE, NOT PER-REPOSITORY, and that is the entire point. The first
+    version held the buffer on the Repository instance, which meant it never
+    sent anything written outside the background chain: services/
+    background_sync.py builds its OWN Repository per run (it must — a
+    Repository owns a gspread session and a Notion client, none of them
+    thread-safe, see CLAUDE.md key rule 12), while every Notion write and
+    every manual sync button runs on the UI thread's Repository from
+    repo.get_repository(). Rows queued there had no path to a flush. The
+    failure was completely silent: no error, no row, just a mirror quietly
+    missing everything a person did by hand.
+
+    So the OUTBOX is shared and the CLIENTS are not — which is the actual
+    distinction rule 12 is drawing. It is a plain dict behind an RLock,
+    exactly the pattern clients/local_cache.py already uses for the same
+    reason: the background thread writes while the script thread reads.
+    """
+
+    def __init__(self):
+        self._lock = threading.RLock()
+        #: {(table, mode): {primary key: row}} — keyed by PK so writing the
+        #: same date twice before a flush sends it once, last write winning.
+        self._rows: dict[tuple[str, str], dict] = {}
+
+    def queue(self, table: str, key, row: dict, mode: str = UPSERT) -> None:
+        if not row:
+            return
+        with self._lock:
+            self._rows.setdefault((table, mode), {})[str(key)] = row
+
+    def size(self) -> int:
+        with self._lock:
+            return sum(len(v) for v in self._rows.values())
+
+    def drain(self) -> dict[tuple[str, str], dict]:
+        """Take everything and empty the outbox in ONE atomic step, so a
+        concurrent queue() cannot have its row swept into a batch that has
+        already been sent."""
+        with self._lock:
+            taken, self._rows = self._rows, {}
+            return taken
+
+
+#: The one outbox. Module-level for the reason in MirrorOutbox's docstring.
+OUTBOX = MirrorOutbox()
+
+
+def blank_to_null(row: dict) -> dict:
+    """A blank becomes NULL in EVERY column, not just numeric ones.
+
+    This is services/datastore.py::_insert_rows' rule, copied deliberately
+    rather than reinvented: that is the function which decides what a row
+    LOOKS like in this datastore, and the mirror has to produce the same row
+    the next full rebuild would, or the two disagree on data neither of them
+    got wrong.
+
+    Measured against the real datastore 2026-08-11 — every Notion-backed TEXT
+    column uses NULL and NEVER the empty string: training_exercises.notes is
+    NULL on 173 of 194 rows and '' on 0, note_summary 175/0,
+    readiness_checkins.subjective_tightness 12/0. Meanwhile
+    repository.py writes `notion.rich_text(note or "")` on EVERY exercise, so
+    a mirror that preserved '' would put it in a column where nothing else
+    ever holds it — and `IS NULL` would stop matching the rows it wrote.
+
+    NOT the same rule as coerce_row, and the difference is the direction.
+    coerce_row serves the PUSH, whose rows come out of SQLite where
+    _insert_rows already did this; the only '' it can meet is inside a
+    numeric column, and preserving '' in TEXT there is right because a stored
+    empty hypnogram is not the same as an unrecorded one. The MIRROR's rows
+    come from gspread and from Notion payloads, where '' is what a blank
+    looks like before normalization.
+    """
+    return {k: (None if v == "" else v) for k, v in row.items()}
+
+
+def group_by_columns(rows: list[dict]) -> list[list[dict]]:
+    """Split rows so every batch carries the SAME column set.
+
+    PostgREST requires uniform keys across a bulk insert body. Sheet rows are
+    always full-width so this is a no-op for them, but Notion partial updates
+    are not: update_session_note_ai queues 4 columns and
+    save_training_exercise ~16, both into training_exercises, and one flush
+    would otherwise put them in one body.
+    """
+    batches: dict[frozenset, list[dict]] = {}
+    for row in rows:
+        batches.setdefault(frozenset(row), []).append(row)
+    return list(batches.values())
 
 
 #: PostgREST requires a WHERE clause on DELETE. Each table gets a filter on a
