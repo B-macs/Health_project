@@ -27,7 +27,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **2548/2548 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **2577/2577 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -377,6 +377,60 @@ HEALTH_DATASTORE_PATH=datastore.db python -m streamlit run app.py
   that is simply absent, with no error anywhere. `tests/test_notion_reader.py`
   scrapes `repository.py` for every `get_property` call and fails on any that
   is unmapped, so the two cannot drift silently.
+
+## Supabase — a live MIRROR, never a read path
+
+*Added 2026-08-11. Notion and Sheets are still the system of record and
+**nothing reads from Postgres**. This runs the new write path beside the old
+one, the same staging idiom as `HRV_GARMIN_HOLD`, ACWR advisory mode and
+measured-RPE-beside-self-reported: switch on evidence, not on a date.*
+
+**Reading from Postgres was measured and REJECTED.** All 22 tables: SQLite
+**32 ms**, PostgREST **4,284 ms** — 132×. The cost is *latency, not payload*:
+a single round trip is **~136 ms** and a 2-row table times the same as a
+600-row one. Live Notion+Sheets is 8,884 ms for 13 reads, so Postgres would
+be ~2× faster than today and **113× slower than the local datastore**. So:
+**Postgres holds the truth, SQLite serves the reads.**
+`tests/test_supabase_mirror.py` fails (AST-matched) if `repository.py` ever
+calls a read method on the Supabase client.
+
+- **One write seam.** All eleven upsert-by-key call sites go through
+  `Repository._upsert_sheet_row`, which writes the tab and queues the same
+  row for Supabase — the same shape as `_ws()` for Sheets reads and
+  `_query()` for Notion reads. A source test fails if a twelfth direct
+  `sheets.upsert_row_by_key` appears, because that row would be written and
+  never mirrored.
+- **Buffered, not per-row**, for the 136 ms reason above: rows accumulate per
+  table and flush in ONE request each, at the END of `run_home_syncs`.
+- **The sheet header IS the column list.** Already load-bearing —
+  `services/datastore.py` inserts `_read_records` output straight into these
+  tables — so a mirrored row is the header zipped onto the values just
+  written. A positional list would shift every value one column left the
+  first time a column was inserted.
+- **A flush NEVER raises**, and drops its rows on failure rather than
+  retrying forever (a `Repository` lives for a whole Streamlit process; the
+  full push is the repair path). The Sheets write it mirrors has already
+  succeeded, so failing a sync over an unreachable replica trades a working
+  app for a consistent copy nothing reads. Failures land on
+  `Repository.mirror_last_error` — a mirror that quietly stopped working
+  looks exactly like one that is up to date.
+- **Partial upserts are safe, verified live**: `resolution=merge-duplicates`
+  with a subset of columns updates only those columns and leaves the rest
+  alone (checked against a real row — `readiness_score` survived a
+  `strain`-only write).
+- **NOT mirrored:** `rebuild_tab`/`rewrite_worksheet` and the `append_rows`
+  batch path, which rewrite a tab wholesale, and every **Notion** write. Use
+  `scripts/push_datastore_to_supabase.py` after those.
+- **`scripts/pull_datastore_from_supabase.py`** fills `datastore.db` from
+  Supabase the way `build_datastore.py` fills it from Notion and Sheets —
+  the direction that makes the read cache independent of both. `--round-trip`
+  pushes, pulls back and diffs every cell; it is what found three columns
+  that were silently lossy (see the Known Open Issues row).
+- **Adding a table means Supabase needs the DDL** — PostgREST has no DDL
+  route, so `services/datastore_schema_postgres.sql` (or just the new
+  `CREATE TABLE`) is pasted into the SQL editor by hand. `push()` preflights
+  every table with a read before issuing a single DELETE, so a missing one
+  refuses with "Nothing was deleted" instead of half-emptying the project.
 
 ## Key Rules (non-negotiable)
 

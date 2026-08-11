@@ -41,6 +41,7 @@ from services import sessions as training_sessions
 from services import sleep_fusion
 from services import sleep_movement
 from services import strain_regions
+from services import supabase_store
 from services.clients import datastore_reader
 from services.clients import garmin
 from services.clients import local_cache
@@ -464,6 +465,18 @@ class Repository:
         # (monotonic_ts, {Key: page}) for the whole Config DB — see
         # _config_pages. None means "not fetched, or invalidated by a write".
         self._config_cache: tuple | None = None
+        # {tab_title: header} recorded by _ws — the mirror needs COLUMN NAMES
+        # for values that reach it as a bare positional list.
+        self._ws_headers: dict[str, list[str]] = {}
+        self._supabase_store_obj = None
+        # {table: {key: row}} of rows written since the last flush. Keyed by
+        # primary key so re-writing the same date twice in one sync sends one
+        # row, not two.
+        self._mirror_buffer: dict[str, dict] = {}
+        #: (table, message) of the last mirror failure, or None. Read by the
+        #: Sync page — a mirror that quietly stopped working looks exactly
+        #: like one that is up to date.
+        self.mirror_last_error: tuple[str, str] | None = None
 
     @property
     def _nc(self):
@@ -550,6 +563,7 @@ class Repository:
         fetch_sheet_metadata() round-trip. Caching here is safe in a way
         caching rows is not — a handle carries no data, so every read through
         it still goes to the API and no invalidation is needed."""
+        self._ws_headers[title] = header
         ws = self._ws_cache.get(title)
         if ws is not None:
             return ws
@@ -580,6 +594,90 @@ class Repository:
         if self._oura_token_obj is None:
             self._oura_token_obj = oura.make_client(self.config)
         return self._oura_token_obj
+
+    # ─── Supabase mirror ─────────────────────────────────────────────────
+    #  Every Sheets row this class writes is ALSO sent to Supabase, so the
+    #  Postgres copy stays current instead of being whatever the last manual
+    #  push left. Notion and Sheets remain the system of record; nothing
+    #  reads from Postgres. This is the same shape as every other staged
+    #  change here (HRV_GARMIN_HOLD, ACWR advisory mode, measured RPE beside
+    #  self-reported): run the new path beside the old one, and switch on
+    #  evidence rather than on a date.
+    #
+    #  BUFFERED, NOT PER-ROW. A round trip costs ~136 ms (measured
+    #  2026-08-11), so mirroring each row as it is written would add minutes
+    #  to a sync that writes a week of nights. Rows accumulate per table and
+    #  flush in ONE request each.
+
+    def supabase_configured(self) -> bool:
+        return bool(self.config.supabase_url and self.config.supabase_secret_key)
+
+    @property
+    def _sb(self):
+        """The Supabase client, or None when unconfigured — which is not an
+        error, exactly as an absent Garmin login is not."""
+        if not self.supabase_configured():
+            return None
+        if self._supabase_store_obj is None:
+            self._supabase_store_obj = supabase_store.SupabaseStore(
+                self.config.supabase_url, self.config.supabase_secret_key)
+        return self._supabase_store_obj
+
+    def _upsert_sheet_row(self, ws, key_value, values: list) -> None:
+        """THE Sheets row-write path: write the tab, then queue the same row
+        for Supabase. All eleven upsert-by-date/id call sites go through here,
+        so the mirror is one seam rather than eleven remembered obligations —
+        the same reasoning as _ws for reads.
+
+        Note what this does NOT cover: rebuild_tab/rewrite_worksheet and the
+        append_rows batch path, which rewrite a tab wholesale. Those are rare
+        maintenance operations, and a wholesale rewrite is what the full push
+        is for."""
+        sheets.upsert_row_by_key(ws, key_col=1, key_value=key_value,
+                                 row_values=values)
+        self._queue_mirror_row(getattr(ws, "title", ""), key_value, values)
+
+    def _queue_mirror_row(self, title: str, key_value, values: list) -> None:
+        """Buffer one written row against its datastore table.
+
+        The sheet's HEADER NAMES ARE the datastore's column names — already
+        load-bearing (services/datastore.py inserts _read_records output
+        straight into these tables) and pinned by
+        tests/test_repository_offline_datastore.py — so the row is the header
+        zipped onto the values it was just written from.
+        """
+        if not self.supabase_configured():
+            return
+        table = _DATASTORE_TABLE_BY_TAB.get(title)
+        header = self._ws_headers.get(title)
+        if not table or not header:
+            return
+        row = dict(zip(header, values))
+        self._mirror_buffer.setdefault(table, {})[str(key_value)] = row
+
+    def flush_supabase_mirror(self) -> dict[str, int]:
+        """Send every buffered row. Returns {table: rows sent}.
+
+        NEVER RAISES. The Sheets write it mirrors has already succeeded and
+        is the system of record; taking a sync down because a replica was
+        unreachable would trade a working app for a consistent copy nobody
+        reads yet. Failures are recorded on mirror_last_error and the rows are
+        DROPPED rather than retried forever — the full push is the repair
+        path, and an unbounded buffer on a long-lived Repository is a leak.
+        """
+        if not self._mirror_buffer or self._sb is None:
+            return {}
+        sent: dict[str, int] = {}
+        buffered, self._mirror_buffer = self._mirror_buffer, {}
+        for table, rows in buffered.items():
+            try:
+                numeric = supabase_store.numeric_columns(table)
+                payload = [supabase_store.coerce_row(r, numeric)
+                           for r in rows.values()]
+                sent[table] = self._sb.upsert(table, payload)
+            except Exception as exc:
+                self.mirror_last_error = (table, str(exc)[:300])
+        return sent
 
     def _db_kind(self, db_id: str) -> str:
         """Which of the four Notion databases an id refers to.
@@ -1936,7 +2034,7 @@ class Repository:
         garmin_daily_row) into the Garmin Daily tab, keyed by date — same
         upsert primitive sync_garmin_daily uses per-day."""
         values = [row.get(k, "") for k in _GARMIN_DAILY_HEADER]
-        sheets.upsert_row_by_key(self._garmin_daily_ws(), key_col=1, key_value=row["date"], row_values=values)
+        self._upsert_sheet_row(self._garmin_daily_ws(), row["date"], values)
 
     # ─────────────────────────────────────────────────────────────────────
     #  Blended Oura+Garmin — the engine's live biometric source
@@ -2271,7 +2369,7 @@ class Repository:
         if self._skip_unchanged(ws, _BIOMETRIC_BLEND_HEADER, "date",
                                 record.date, values, existing):
             return
-        sheets.upsert_row_by_key(ws, key_col=1, key_value=record.date, row_values=values)
+        self._upsert_sheet_row(ws, record.date, values)
 
     def sync_biometric_blend(self, days: int = 7, today: date | None = None) -> int:
         """Computes get_biometric_rolling(days, today) and persists every
@@ -2383,9 +2481,7 @@ class Repository:
         if self._skip_unchanged(ws, _METRICS_HISTORY_HEADER, "date",
                                 snapshot["date"], values, existing):
             return
-        sheets.upsert_row_by_key(
-            ws, key_col=1, key_value=snapshot["date"], row_values=values,
-        )
+        self._upsert_sheet_row(ws, snapshot["date"], values)
 
     def rebuild_metrics_history(self, fresh: dict[str, dict] | None = None) -> int:
         """Re-head the Metrics History tab so readiness_model_version stops
@@ -2555,9 +2651,7 @@ class Repository:
     def set_wake_time_adjustment(self, d: date, minutes: float) -> None:
         """Upsert-by-date, same call shape as upsert_metrics_history_row."""
         values = [d.isoformat(), minutes]
-        sheets.upsert_row_by_key(
-            self._wake_time_adjustments_ws(), key_col=1, key_value=d.isoformat(), row_values=values,
-        )
+        self._upsert_sheet_row(self._wake_time_adjustments_ws(), d.isoformat(), values)
 
     def get_wake_time_adjustments(self, start: str | None = None, end: str | None = None) -> dict[str, float]:
         """Every persisted adjustment, keyed by ISO date string, optionally
@@ -2987,8 +3081,7 @@ class Repository:
             "per_exercise_json": json.dumps(summary.get("per_exercise") or {}),
         }
         values = [row.get(k, "") if row.get(k) is not None else "" for k in _SESSION_HR_HEADER]
-        sheets.upsert_row_by_key(
-            self._session_hr_ws(), key_col=1, key_value=row["date"], row_values=values)
+        self._upsert_sheet_row(self._session_hr_ws(), row["date"], values)
 
     def get_session_hr_history(self, start: str | None = None) -> list[dict]:
         """Persisted per-session HR load, oldest first. `start` is an
@@ -3275,8 +3368,7 @@ class Repository:
 
     def upsert_garmin_sleep_stages_row(self, row: dict) -> None:
         values = [row.get(k, "") if row.get(k) is not None else "" for k in _GARMIN_SLEEP_STAGES_HEADER]
-        sheets.upsert_row_by_key(
-            self._garmin_sleep_stages_ws(), key_col=1, key_value=str(row["date"]), row_values=values)
+        self._upsert_sheet_row(self._garmin_sleep_stages_ws(), str(row["date"]), values)
 
     def rebuild_tab(self, worksheet, header: list[str], fresh: dict[str, dict] | None = None,
                     key: str = "date", numericise_ignore: list | None = None) -> int:
@@ -3772,8 +3864,7 @@ class Repository:
     def save_sleep_fusion(self, summary: dict) -> None:
         row = {**summary, "computed_at": datetime.now().isoformat(timespec="seconds")}
         values = [row.get(k, "") if row.get(k) is not None else "" for k in _SLEEP_FUSION_HEADER]
-        sheets.upsert_row_by_key(
-            self._sleep_fusion_ws(), key_col=1, key_value=str(row["date"]), row_values=values)
+        self._upsert_sheet_row(self._sleep_fusion_ws(), str(row["date"]), values)
 
     def sync_sleep_fusion(self, days: int = 7, today: date | None = None) -> dict:
         """Recompute and persist fused hypnograms for the last `days` days.
@@ -3965,7 +4056,7 @@ class Repository:
             raw = self._garmin_raw_day(client, d)
             row = self._garmin_daily_row_from_raw(raw, d)
             values = [row.get(k, "") for k in _GARMIN_DAILY_HEADER]
-            sheets.upsert_row_by_key(ws, key_col=1, key_value=str(d), row_values=values)
+            self._upsert_sheet_row(ws, str(d), values)
             self.upsert_garmin_sleep_stages_row(self._garmin_sleep_stages_row(raw, d))
             fetched += 1
         return fetched
@@ -4076,7 +4167,7 @@ class Repository:
         for act in activities:
             row = self._garmin_activity_row(act)
             values = [row.get(k, "") for k in _GARMIN_ACTIVITY_HEADER]
-            sheets.upsert_row_by_key(ws, key_col=1, key_value=row["activity_id"], row_values=values)
+            self._upsert_sheet_row(ws, row["activity_id"], values)
         return len(activities)
 
     def get_recent_garmin_activity_minutes(
@@ -4350,7 +4441,7 @@ class Repository:
         for entry in entries:
             row = row_mapper(entry)
             values = [row.get(k, "") for k in header]
-            sheets.upsert_row_by_key(worksheet, key_col=1, key_value=str(row[header[0]]), row_values=values)
+            self._upsert_sheet_row(worksheet, str(row[header[0]]), values)
         return len(entries)
 
     def _oura_event_specs(self) -> tuple:
@@ -4661,6 +4752,16 @@ class Repository:
         results["session_hr"] = self.sync_session_hr_recent_if_due(days=2, **kw)
         results["metrics_history"] = self.sync_metrics_history_if_due(days=7, **kw)
         results["sleep_fusion"] = self.sync_sleep_fusion_if_due(days=14, **kw)
+        # LAST, and unthrottled: it sends only what the steps above actually
+        # wrote, so an empty buffer costs nothing and a throttle would just
+        # delay rows that are already in hand. Never raises — see
+        # flush_supabase_mirror.
+        sent = self.flush_supabase_mirror()
+        results["supabase_mirror"] = (
+            self.mirror_last_error is None,
+            None if self.mirror_last_error is None
+            else f"{self.mirror_last_error[0]}: {self.mirror_last_error[1]}",
+        ) if sent or self.mirror_last_error else (True, None)
         return results
 
     def _garmin_daily_if_due_safe(self, days: int = 2, today: date | None = None,
@@ -4845,7 +4946,7 @@ class Repository:
         for d, group in by_date.items():
             row = self._oura_daily_row(d, group)
             values = [row.get(k, "") for k in _OURA_DAILY_HEADER]
-            sheets.upsert_row_by_key(daily_ws, key_col=1, key_value=d, row_values=values)
+            self._upsert_sheet_row(daily_ws, d, values)
         return len(by_date)
 
     def oura_sync_progress(self, window: str, now: datetime | None = None) -> dict:

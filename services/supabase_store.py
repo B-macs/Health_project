@@ -183,6 +183,29 @@ class SupabaseStore:
             ) from None
         self._request("DELETE", f"{table}?{where}")
 
+    def upsert(self, table: str, rows: list[dict]) -> int:
+        """Insert-or-update on the primary key, in batches.
+
+        `resolution=merge-duplicates` is PostgREST's ON CONFLICT DO UPDATE.
+        This is what lets the live mirror run repeatedly without truncating
+        anything — truncate-then-insert leaves a window in which the table is
+        EMPTY, which is tolerable for a one-shot migration and not for
+        something that runs on a background cadence beside a user's session.
+
+        A partial column set is deliberate and safe: an existing row has only
+        the supplied columns updated, and a new row takes NULL for the rest,
+        which is exactly what the sheet row it mirrors holds. Every row in one
+        request must carry the SAME keys, which is true because they all come
+        from one tab's header.
+        """
+        sent = 0
+        for i in range(0, len(rows), BATCH):
+            chunk = rows[i:i + BATCH]
+            self._request("POST", table, body=chunk, headers={
+                "Prefer": "resolution=merge-duplicates,return=minimal"})
+            sent += len(chunk)
+        return sent
+
     def insert(self, table: str, rows: list[dict]) -> int:
         """Bulk insert in batches. Returns the number of rows sent."""
         sent = 0
