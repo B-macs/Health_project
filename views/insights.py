@@ -2536,6 +2536,12 @@ def render() -> None:
                             body_parts=result["body_parts"],
                             sensation_type=result["sensation_type"],
                             warning_level=result["warning_level"],
+                            # readiness_checkins is keyed by DATE, not by
+                            # page id, so the Supabase mirror cannot name the
+                            # row without this. `timestamp` is the Date
+                            # property, read by the same call that populates
+                            # the `date` column.
+                            entry_date=entry.get("timestamp"),
                         )
                     except Exception as exc:
                         errors.append(f"Readiness {entry['id']}: {exc}")

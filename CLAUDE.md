@@ -27,7 +27,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **2577/2577 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **2613/2613 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -418,8 +418,48 @@ calls a read method on the Supabase client.
   with a subset of columns updates only those columns and leaves the rest
   alone (checked against a real row — `readiness_score` survived a
   `strain`-only write).
+- **Notion writes mirror too, via `mirror_notion_write`**, which decodes the
+  property payload with `notion_reader.row_from_properties` — the inverse of
+  the same `PROPERTIES` map the offline reader uses, so a column cannot be
+  read from one place and written to another. **Mirror the PROPERTIES, never
+  the record**: that is what makes a checkbox 1/0 and a multi_select a JSON
+  array *string* for free, because the decoder applies the getters' own
+  conventions. Mirroring a `CheckInRecord` would send Python bools into
+  BIGINT columns.
+- **⚠ Three Notion-specific hazards, all found by audit rather than by
+  running it, none of which raises:**
+  - **A partial update PATCHes, it never upserts.** `merge-duplicates`
+    INSERTs when the key is absent, so mirroring an AI note update against a
+    page logged before the mirror existed would create a `training_exercises`
+    row holding four AI columns and NULL `session_id`, `movement_name` and
+    every set — indistinguishable from a real logged exercise to anything
+    counting rows. PATCH changes nothing when the row is absent; the full
+    push backfills history.
+  - **One training page spans THREE tables.** Notion stores a session flat,
+    so `session_duration_minutes`/`session_rpe`/`session_au` decode out of an
+    *exercise* payload, and `"Sets"` maps to `_sets_json`, which is **not a
+    column of anything**. Posting the decoded row whole is a 400. A test
+    asserts every mirrored key is a real column of its table.
+  - **`actual_sets`/`total_volume_kg` have no Notion property** — they are
+    derived on read, and are recomputed at the write site using
+    `get_all_training_exercises_raw`'s own expression.
+- **`training_sets` is REPLACED (delete-by-`exercise_id` then insert), never
+  upserted**: its primary key is a surrogate the writer never supplies, so
+  `merge-duplicates` has nothing to conflict on and every re-log would
+  duplicate every set. A Notion write always carries the COMPLETE set list,
+  which is what makes replacement faithful. **An empty list still deletes** —
+  it means the exercise now has no sets. Verified live: re-logging with one
+  set left one row, not three.
+- **Parents flush before children** (`LOAD_ORDER`), because the foreign keys
+  are enforced in Postgres.
+- **`update_readiness_ai` needs its date passed in.** `readiness_checkins` is
+  keyed by DATE while that method is handed a Notion page id, and there is no
+  page-id→date index; the caller has it free as `entry["timestamp"]`. Omit it
+  and the Notion write still happens, only the mirror is skipped.
 - **NOT mirrored:** `rebuild_tab`/`rewrite_worksheet` and the `append_rows`
-  batch path, which rewrite a tab wholesale, and every **Notion** write. Use
+  batch path, which rewrite a tab wholesale; and `apply_check_in_merge`,
+  whose properties carry no Date and which runs only from
+  `scripts/merge_duplicate_checkins.py`. Use
   `scripts/push_datastore_to_supabase.py` after those.
 - **`scripts/pull_datastore_from_supabase.py`** fills `datastore.db` from
   Supabase the way `build_datastore.py` fills it from Notion and Sheets —

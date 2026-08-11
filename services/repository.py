@@ -666,12 +666,109 @@ class Repository:
         holding those four columns and NULL for everything else. That orphan
         looks like a real logged exercise to anything counting rows.
         """
-        if not self.supabase_configured() or not row:
+        if not self.supabase_configured():
             return
         # Blank -> NULL on the way in, so a mirrored row is the row the next
         # full rebuild would write. See blank_to_null.
-        supabase_store.OUTBOX.queue(
-            table, key_value, supabase_store.blank_to_null(row), mode=mode)
+        if mode == supabase_store.REPLACE:
+            # A child SET, and an EMPTY one is meaningful: it means this
+            # exercise now has no sets, which must still delete the old ones.
+            payload = [supabase_store.blank_to_null(r) for r in (row or [])]
+        elif not row:
+            return
+        else:
+            payload = supabase_store.blank_to_null(row)
+        supabase_store.OUTBOX.queue(table, key_value, payload, mode=mode)
+
+    #: Which datastore table each Notion database writes to. Training is
+    #: absent because ONE training page spans three tables — see
+    #: _mirror_training_write.
+    _NOTION_TABLE = {
+        notion_reader.READINESS: "readiness_checkins",
+        notion_reader.BIOMETRICS: "notion_biometrics",
+        notion_reader.CONFIG: "config",
+    }
+
+    #: training_sessions' own columns, which arrive denormalised on every
+    #: training page and must NOT be posted to training_exercises.
+    _SESSION_COLUMNS = ("session_duration_minutes", "session_rpe", "session_au")
+
+    def mirror_notion_write(self, kind: str, pk_value, properties: dict,
+                            mode: str = supabase_store.UPSERT,
+                            sets: list | None = None) -> None:
+        """Queue one Notion page write for Supabase.
+
+        CALL THIS AFTER THE NOTION CALL RETURNS, never before and never in a
+        `finally`. A create_page that raised must not leave a row queued for
+        Postgres that Notion does not hold — the mirror's job is to say what
+        the system of record says.
+
+        `mode` is supabase_store.PATCH for an update_page that touched only
+        some properties, which is most of them: a partial UPSERT would insert
+        an orphan row for a page logged before the mirror existed.
+        """
+        if not self.supabase_configured():
+            return
+        row = notion_reader.row_from_properties(kind, properties)
+        if kind == notion_reader.TRAINING:
+            self._mirror_training_write(pk_value, row, mode=mode, sets=sets)
+            return
+        self.queue_mirror(self._NOTION_TABLE[kind], pk_value, row, mode=mode)
+
+    def _mirror_training_write(self, exercise_id, row: dict,
+                               mode: str = supabase_store.UPSERT,
+                               sets: list | None = None) -> None:
+        """One Notion training page fans out to THREE datastore tables.
+
+        Notion stores a session flat — every exercise row carries the session's
+        duration/RPE/AU — and services/datastore.py::_populate_training
+        normalises that into training_sessions -> training_exercises ->
+        training_sets. The mirror has to do the same split, because posting the
+        decoded row whole would send session columns and a `_sets_json` key
+        that is not a column at all to training_exercises, which is a 400.
+
+        actual_sets and total_volume_kg have NO Notion property — they are
+        derived on read (get_all_training_exercises_raw). They are recomputed
+        here from the same sets list, using that function's own expression, or
+        Postgres would hold NULL where a rebuild holds real numbers.
+        """
+        session_id = row.get("session_id")
+        if mode == supabase_store.UPSERT and session_id:
+            session_row = {"session_id": session_id,
+                           "session_date": row.get("session_date")}
+            session_row.update({c: row[c] for c in self._SESSION_COLUMNS if c in row})
+            self.queue_mirror("training_sessions", session_id, session_row)
+
+        exercise_row = {k: v for k, v in row.items()
+                        if k not in self._SESSION_COLUMNS and k != "_sets_json"}
+        if sets is None and "_sets_json" in row:
+            try:
+                sets = json.loads(row["_sets_json"] or "[]")
+            except (ValueError, TypeError):
+                sets = []
+        if sets is not None:
+            exercise_row["actual_sets"] = len(sets)
+            exercise_row["total_volume_kg"] = round(
+                sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in sets), 1)
+        if mode == supabase_store.UPSERT:
+            exercise_row["exercise_id"] = exercise_id
+        if exercise_row:
+            self.queue_mirror("training_exercises", exercise_id, exercise_row,
+                              mode=mode)
+
+        if sets is not None:
+            # REPLACE, not upsert: training_sets' key is a surrogate the writer
+            # never supplies, so an insert-only mirror would duplicate every
+            # set on every re-log. A Notion write always carries the COMPLETE
+            # set list for that exercise, so replacing them is faithful.
+            self.queue_mirror("training_sets", exercise_id, [
+                {"exercise_id": exercise_id, "set_num": s.get("set_num"),
+                 "reps": s.get("reps"), "weight": s.get("weight"),
+                 "rest": s.get("rest"), "tut": s.get("tut"),
+                 "velocity": s.get("velocity"), "band_tier": s.get("band_tier"),
+                 "ts": s.get("ts")}
+                for s in sets
+            ], mode=supabase_store.REPLACE)
 
     def flush_supabase_mirror(self) -> dict[str, int]:
         """Send everything in the outbox. Returns {table: rows sent}.
@@ -690,9 +787,34 @@ class Repository:
         if not drained:
             return {}
         sent: dict[str, int] = {}
-        for (table, mode), rows in drained.items():
+        # PARENTS BEFORE CHILDREN, explicitly. The foreign keys are ENFORCED
+        # in Postgres (unlike SQLite, where they are documentation), so a
+        # training_sets insert before its exercise exists is a hard error.
+        # Insertion order happens to be right today because the fan-out queues
+        # in that order — but that is an accident of one function, and this is
+        # the guarantee.
+        def _rank(entry):
+            table = entry[0][0]
+            order = supabase_store.LOAD_ORDER
+            return order.index(table) if table in order else len(order)
+
+        for (table, mode), rows in sorted(drained.items(), key=_rank):
             try:
                 numeric = supabase_store.numeric_columns(table)
+                if mode == supabase_store.REPLACE:
+                    parent = supabase_store.REPLACE_PARENT_COLUMN[table]
+                    n = 0
+                    for parent_key, children in rows.items():
+                        # Delete first, ALWAYS — including when the new list
+                        # is empty, which is how "this exercise now has no
+                        # sets" reaches Postgres.
+                        self._sb.delete_where(table, parent, parent_key)
+                        payload = [supabase_store.coerce_row(c, numeric)
+                                   for c in children]
+                        if payload:
+                            n += self._sb.insert(table, payload)
+                    sent[table] = sent.get(table, 0) + n
+                    continue
                 if mode == supabase_store.PATCH:
                     pk = supabase_store.primary_key(table)
                     n = 0
@@ -838,10 +960,19 @@ class Repository:
     def save_check_in(self, record: models.CheckInRecord) -> None:
         existing_page = self._find_check_in_page(record.date)
         if existing_page is None:
+            properties = self._check_in_properties(record)
             notion.create_page(
-                self._nc, self.config.notion_db_readiness,
-                properties=self._check_in_properties(record),
+                self._nc, self.config.notion_db_readiness, properties=properties,
             )
+            # A brand-new page carries no "Parsed" property at all, and
+            # get_property reads an absent checkbox as None, which the
+            # datastore stores as 0 (`1 if g("Parsed","checkbox") else 0`).
+            # Without this the INSERT would leave NULL where a rebuild holds
+            # 0. The other four AI columns are genuinely absent-not-zero, so
+            # they stay NULL, which is what a rebuild writes for them too.
+            self.mirror_notion_write(
+                notion_reader.READINESS, record.date,
+                {**properties, "Parsed": notion.checkbox(False)})
             return
 
         merged, note_changed = self._merge_check_in(record, existing_page)
@@ -849,6 +980,11 @@ class Repository:
         if note_changed:
             properties["Parsed"] = notion.checkbox(False)
         notion.update_page(self._nc, existing_page["id"], properties=properties)
+        # PATCH, not upsert: this writes 19 of 24 columns and must not touch
+        # the AI-parser ones (update_readiness_ai owns those), nor reset
+        # `parsed` on an update that did not change the note.
+        self.mirror_notion_write(notion_reader.READINESS, record.date,
+                                 properties, mode=supabase_store.PATCH)
 
     # ─── One-off cleanup: pre-upsert same-day duplicate check-ins ─────────
     # (scripts/merge_duplicate_checkins.py) — save_check_in() above is now
@@ -1041,14 +1177,29 @@ class Repository:
         return out
 
     def update_readiness_ai(self, row_id: str, severity: float, body_parts: list,
-                             sensation_type: list, warning_level: str) -> None:
-        notion.update_page(self._nc, row_id, properties={
+                             sensation_type: list, warning_level: str,
+                             entry_date: str | None = None) -> None:
+        """`entry_date` exists ONLY for the Supabase mirror, and is optional so
+        no existing caller breaks.
+
+        readiness_checkins is keyed by DATE while this method is handed a
+        Notion PAGE ID, and there is no page-id-to-date index anywhere — so
+        without it the mirror cannot name the row it just changed. The caller
+        has the date for free: get_unparsed_readiness returns it as
+        `timestamp`, read with the same get_property call that populates the
+        `date` column, so the keys match by construction. Omit it and the
+        Notion write still happens; only the mirror is skipped."""
+        properties = {
             "Parsed Severity":   notion.number(severity),
             "Parsed Areas":      notion.rich_text(json.dumps(body_parts or [])),
             "Parsed Sensations": notion.rich_text(json.dumps(sensation_type or [])),
             "Warning":           notion.select(warning_level),
             "Parsed":            notion.checkbox(True),
-        })
+        }
+        notion.update_page(self._nc, row_id, properties=properties)
+        if entry_date:
+            self.mirror_notion_write(notion_reader.READINESS, entry_date,
+                                     properties, mode=supabase_store.PATCH)
 
     def get_parsed_readiness(self, limit: int = 90) -> list[dict]:
         pages = self._query(
@@ -1157,6 +1308,12 @@ class Repository:
             properties["Activity Calories"] = notion.number(garmin_calories)
 
         page = notion.create_page(self._nc, self.config.notion_db_training, properties=properties)
+        # AFTER the create, because the page id IS training_exercises' primary
+        # key and because a create that raised must not leave a row queued for
+        # Postgres that Notion does not hold. `sets` is passed explicitly so
+        # the fan-out does not have to re-parse the JSON it was just given.
+        self.mirror_notion_write(notion_reader.TRAINING, page["id"], properties,
+                                 sets=sets or [])
         return page["id"]
 
     def ensure_garmin_activity_columns(self) -> list[str]:
@@ -1184,9 +1341,13 @@ class Repository:
             (existing.strip() + "\n\n" + raw_text.strip()).strip()
             if existing.strip() else raw_text.strip()
         )
-        notion.update_page(self._nc, training_log_id, properties={
-            "Notes": notion.rich_text(combined[:2000]),
-        })
+        properties = {"Notes": notion.rich_text(combined[:2000])}
+        notion.update_page(self._nc, training_log_id, properties=properties)
+        # ONE property, so PATCH — an upsert would insert a training_exercises
+        # row holding nothing but a note for any page logged before the mirror
+        # existed. training_log_id IS exercise_id (the Notion page id).
+        self.mirror_notion_write(notion_reader.TRAINING, training_log_id,
+                                 properties, mode=supabase_store.PATCH)
 
     def get_recent_sessions(self, days: int = 60, today: date | None = None) -> list[models.SessionRecord]:
         """One SessionRecord per calendar date, exercises grouped under it —
@@ -1601,12 +1762,15 @@ class Repository:
 
     def update_session_note_ai(self, note_id: str, summary: str, sentiment_score: float,
                                 flagged_body_parts: list, warning_level: str) -> None:
-        notion.update_page(self._nc, note_id, properties={
+        properties = {
             "Note Summary":  notion.rich_text(summary or ""),
             "Sentiment":     notion.number(sentiment_score),
             "Flagged Areas": notion.rich_text(json.dumps(flagged_body_parts or [])),
             "Warning":       notion.select(warning_level),
-        })
+        }
+        notion.update_page(self._nc, note_id, properties=properties)
+        self.mirror_notion_write(notion_reader.TRAINING, note_id, properties,
+                                 mode=supabase_store.PATCH)
 
     def get_recent_raw_notes(self, limit: int = 20) -> list[dict]:
         pages = self._query(
@@ -1722,6 +1886,7 @@ class Repository:
             notion.update_page(self._nc, existing[0]["id"], props)
         else:
             notion.create_page(self._nc, db_id, props)
+        self.mirror_notion_write(notion_reader.BIOMETRICS, date_str, props)
 
     # ─────────────────────────────────────────────────────────────────────
     #  App Config (flat key/value store — plan_start_date, current_stage,
@@ -1795,6 +1960,13 @@ class Repository:
                 notion.update_page(self._nc, page["id"], props)
             else:
                 notion.create_page(self._nc, self.config.notion_db_config, props)
+            # Inside the try and AFTER the write, never in the finally: a
+            # Notion failure propagates here, and queueing in the finally
+            # would ship a row to Postgres that Notion does not hold. `props`
+            # also reuses the `today` resolved above rather than reading the
+            # clock again, so a write near midnight cannot stamp two
+            # different `updated` dates in the two backends.
+            self.mirror_notion_write(notion_reader.CONFIG, key, props)
         finally:
             # Always, even on a failed write: the cached page may be exactly
             # what is wrong (deleted upstream, or a duplicate we picked the

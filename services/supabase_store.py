@@ -227,6 +227,13 @@ class SupabaseStore:
             headers={"Prefer": "return=representation"})
         return len(changed or [])
 
+    def delete_where(self, table: str, column: str, value) -> None:
+        """Delete the rows of one parent. Narrower than truncate() on purpose:
+        the filter is built from a named column and a single value, so a bug
+        here removes one exercise's sets rather than a table."""
+        where = f"{column}=eq.{urllib.parse.quote(str(value))}"
+        self._request("DELETE", f"{table}?{where}")
+
     def insert(self, table: str, rows: list[dict]) -> int:
         """Bulk insert in batches. Returns the number of rows sent."""
         sent = 0
@@ -241,6 +248,16 @@ class SupabaseStore:
 #: A row is queued as one of these.
 UPSERT = "upsert"    #: a COMPLETE row — insert it or replace it
 PATCH = "patch"      #: a PARTIAL update — change these columns IF the row exists
+REPLACE = "replace"  #: a whole CHILD SET — delete by parent key, then insert
+
+#: For REPLACE: which column names the parent. Only training_sets needs this,
+#: and it is the one table the row-at-a-time pattern cannot serve: its primary
+#: key is a surrogate the writer never supplies, so merge-duplicates has
+#: nothing to conflict on and every re-log of a session would insert a second
+#: copy of every set. Notion stores the whole Sets JSON in one property, so a
+#: write always carries the COMPLETE set list for that exercise — which makes
+#: delete-then-insert the faithful operation rather than a workaround.
+REPLACE_PARENT_COLUMN = {"training_sets": "exercise_id"}
 
 
 class MirrorOutbox:
@@ -269,8 +286,12 @@ class MirrorOutbox:
         #: same date twice before a flush sends it once, last write winning.
         self._rows: dict[tuple[str, str], dict] = {}
 
-    def queue(self, table: str, key, row: dict, mode: str = UPSERT) -> None:
-        if not row:
+    def queue(self, table: str, key, row, mode: str = UPSERT) -> None:
+        # `is None`, not falsy: an EMPTY child list is meaningful under
+        # REPLACE — it means this parent now has no children, and dropping it
+        # would leave the previous write's rows attached forever. Callers
+        # screen out empty single rows before they get here.
+        if row is None:
             return
         with self._lock:
             self._rows.setdefault((table, mode), {})[str(key)] = row
