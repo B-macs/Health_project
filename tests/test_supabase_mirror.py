@@ -329,11 +329,27 @@ def test_every_sheet_row_write_goes_through_the_one_seam():
     assert fn.lineno < direct[0] <= (fn.end_lineno or direct[0])
 
 
-def test_the_flush_runs_at_the_end_of_the_sync_chain():
+def test_the_flush_runs_at_the_end_of_the_sync_chain_and_is_UNTHROTTLED():
+    """Last, so it sends everything the chain wrote in one pass per table —
+    and OUTSIDE the six *_if_due steps, which is what keeps the window short.
+
+    app.py runs _run_startup_sync() on EVERY render, which fires a background
+    run. The sync steps are individually throttled to 2h and no-op cheaply
+    when not due; the flush is not throttled, so a row queued on the UI thread
+    reaches Postgres on the next render rather than the next 2-hour cadence.
+    Wrapping it in run_sync_if_due would make that window two hours again,
+    silently — the rows would still be there, just late."""
     src = (ROOT / "services" / "repository.py").read_text(encoding="utf-8")
     body = src.split("def run_home_syncs")[1].split("\n    def ")[0]
     assert "flush_supabase_mirror()" in body
     assert body.index("sleep_fusion") < body.index("flush_supabase_mirror")
+
+    call = [l for l in body.splitlines()
+            if "flush_supabase_mirror()" in l and not l.strip().startswith("#")][0]
+    assert "if_due" not in call, (
+        "the flush is throttled — rows would sit in the outbox for the "
+        "throttle window instead of leaving on the next render"
+    )
 
 
 def test_the_mirror_is_write_only_and_nothing_reads_from_postgres():
