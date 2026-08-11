@@ -460,6 +460,9 @@ class Repository:
         self._read_cache: dict = {}
         # {tab_title: worksheet handle} — see _ws.
         self._ws_cache: dict = {}
+        # (monotonic_ts, {Key: page}) for the whole Config DB — see
+        # _config_pages. None means "not fetched, or invalidated by a write".
+        self._config_cache: tuple | None = None
 
     @property
     def _nc(self):
@@ -1519,12 +1522,51 @@ class Repository:
     #  phases, training_progress, diagnostic_profile, movement risk)
     # ─────────────────────────────────────────────────────────────────────
 
+    _CONFIG_CACHE_TTL_SECONDS = 30.0
+
+    def _config_pages(self) -> dict[str, dict]:
+        """Every Config row, keyed by its Key, in ONE query.
+
+        This was an N+1 and it sat on every page's critical path. Each key was
+        its own filtered database query — plan_start_date, current_stage,
+        phases, diagnostic_profile, latest_movement_risk, training_progress —
+        so six methods meant six HTTP round trips against one tiny table.
+        Measured 2026-08-10: three of them (get_phases, get_current_stage,
+        get_config_value) cost 1.33s of a 4.62s page open, and Notion was 92%
+        of that wall time. An unfiltered fetch of the same table costs the same
+        as one filtered fetch — the table holds a handful of rows — so this is
+        6 round trips traded for 1.
+
+        Cached for _CONFIG_CACHE_TTL_SECONDS, the same shape and TTL as the
+        Sheets _read_cache, and INVALIDATED by set_config so a write is always
+        visible to the next read. The TTL is what bounds staleness against the
+        other writer this cache cannot see: the Notion UI. A Repository is
+        process-wide (repo.get_repository is @st.cache_resource), so an
+        unbounded memo would hide an edit made in Notion until the process
+        restarted.
+
+        Duplicate rows for one Key resolve first-wins, which is what the
+        per-key filtered query already did (`pages[0]`); Notion returns no
+        guaranteed order either way, so a duplicated key was already
+        nondeterministic and this does not make it worse.
+        """
+        now = time.monotonic()
+        entry = self._config_cache
+        if entry is not None and now - entry[0] < self._CONFIG_CACHE_TTL_SECONDS:
+            return entry[1]
+        by_key: dict[str, dict] = {}
+        for page in self._query(self.config.notion_db_config):
+            key = notion.get_property(page, "Key", "title") or ""
+            if key and key not in by_key:
+                by_key[key] = page
+        self._config_cache = (now, by_key)
+        return by_key
+
+    def _invalidate_config_cache(self) -> None:
+        self._config_cache = None
+
     def _config_page(self, key: str) -> dict | None:
-        pages = self._query(
-            self.config.notion_db_config,
-            filter_={"property": "Key", "title": {"equals": key}},
-        )
-        return pages[0] if pages else None
+        return self._config_pages().get(key)
 
     def get_current_stage(self) -> int:
         page = self._config_page("current_stage")
@@ -1542,10 +1584,16 @@ class Repository:
             "Key": notion.title(key), "Value": notion.rich_text(str(value)),
             "Updated": notion.date_prop(str(today)),
         }
-        if page:
-            notion.update_page(self._nc, page["id"], props)
-        else:
-            notion.create_page(self._nc, self.config.notion_db_config, props)
+        try:
+            if page:
+                notion.update_page(self._nc, page["id"], props)
+            else:
+                notion.create_page(self._nc, self.config.notion_db_config, props)
+        finally:
+            # Always, even on a failed write: the cached page may be exactly
+            # what is wrong (deleted upstream, or a duplicate we picked the
+            # wrong side of), and serving it again would repeat the failure.
+            self._invalidate_config_cache()
 
     def get_config_value(self, key: str) -> str | None:
         page = self._config_page(key)
