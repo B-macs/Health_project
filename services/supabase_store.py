@@ -405,6 +405,32 @@ def primary_key(table: str, ddl: str | None = None) -> str:
     raise SupabaseError(f"{table} has no PRIMARY KEY to page by")
 
 
+def table_columns(table: str, ddl: str | None = None) -> set[str]:
+    """Every column the table actually has.
+
+    The mirror filters rows through this, which is not defensive padding —
+    it is services/datastore.py::_insert_rows' own behaviour
+    (`{c: row.get(c) for c in columns}`), so the mirror keeps producing the
+    row a rebuild would. It matters most for the tabs rebuilt against their
+    OWN header rather than the current constant: a sheet that has gained a
+    column the datastore has not would otherwise send an unknown key, and
+    PostgREST rejects the WHOLE batch on one.
+    """
+    import re
+    ddl = ddl if ddl is not None else datastore_postgres.to_postgres()
+    m = re.search(rf"CREATE TABLE {table} \((.*?)\n\);", ddl, re.S)
+    if not m:
+        return set()
+    out = set()
+    for line in m.group(1).splitlines():
+        code, _ = datastore_postgres._split_code_and_comment(line)
+        code = code.strip().rstrip(",")
+        parts = code.split()
+        if len(parts) >= 2 and parts[0] not in ("FOREIGN", "PRIMARY", "UNIQUE", "CONSTRAINT"):
+            out.add(parts[0])
+    return out
+
+
 def numeric_columns(table: str, ddl: str | None = None) -> set[str]:
     """Columns Postgres will treat as numbers, so "" has to become NULL."""
     ddl = ddl if ddl is not None else datastore_postgres.to_postgres()

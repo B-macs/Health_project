@@ -22,6 +22,8 @@ prior per-call `Client()` construction in db.py/sync_sheets.py.
 
 from __future__ import annotations
 
+import atexit
+
 import dataclasses
 import json
 import time
@@ -449,6 +451,10 @@ _DATASTORE_TABLE_BY_TAB = {
 }
 
 
+#: Set once per process by Repository._register_mirror_flush_at_exit.
+_MIRROR_ATEXIT_REGISTERED = False
+
+
 class Repository:
     def __init__(self, config: Config):
         self.config = config
@@ -613,6 +619,38 @@ class Repository:
     def supabase_configured(self) -> bool:
         return bool(self.config.supabase_url and self.config.supabase_secret_key)
 
+    def _register_mirror_flush_at_exit(self) -> None:
+        """Flush whatever is still queued when the PROCESS ends.
+
+        The Streamlit app flushes at the end of every sync chain, but a CLI
+        script never calls one — scripts/merge_duplicate_checkins.py and the
+        four backfills all write mirrored tables and then simply exit, which
+        would drop every row they queued. Five scripts today, and the sixth
+        would have to remember; a hook is one place instead of an obligation.
+
+        Registered lazily on first queue and once per process, holding the
+        Config rather than the Repository: a Repository owns clients that are
+        not thread-safe and the background sync builds its own, so capturing
+        one here would keep an arbitrary instance alive for the whole run.
+        Failures are swallowed — the system of record already has the data,
+        and raising during interpreter shutdown helps nobody.
+        """
+        global _MIRROR_ATEXIT_REGISTERED
+        if _MIRROR_ATEXIT_REGISTERED:
+            return
+        _MIRROR_ATEXIT_REGISTERED = True
+        config = self.config
+
+        def _flush_on_exit():
+            if supabase_store.OUTBOX.size() == 0:
+                return
+            try:
+                Repository(config).flush_supabase_mirror()
+            except Exception:
+                pass
+
+        atexit.register(_flush_on_exit)
+
     @property
     def _sb(self):
         """The Supabase client, or None when unconfigured — which is not an
@@ -638,7 +676,39 @@ class Repository:
                                  row_values=values)
         self._queue_mirror_row(getattr(ws, "title", ""), key_value, values)
 
-    def _queue_mirror_row(self, title: str, key_value, values: list) -> None:
+    def _rewrite_sheet(self, ws, header: list[str], rows: list[list]) -> None:
+        """A whole-tab rewrite, mirrored.
+
+        Safe to mirror as plain upserts because every caller here MERGES:
+        rebuild_tab carries each existing row through and applies `fresh` over
+        it, sync_sleep_fusion and rebuild_oura_tabs do the same. The rewrite
+        is always a superset of what the tab held, so no row disappears and
+        there is nothing to delete. A rewrite that could SHRINK a tab would
+        need delete-then-insert, the way training_sets does.
+        """
+        sheets.rewrite_worksheet(ws, header, rows)
+        self._queue_mirror_rows(ws, header, rows)
+
+    def _append_sheet_rows(self, ws, header: list[str], values: list[list]) -> None:
+        sheets.append_rows(ws, values)
+        self._queue_mirror_rows(ws, header, values)
+
+    def _queue_mirror_rows(self, ws, header: list[str], rows: list[list]) -> None:
+        """Queue a batch of positional rows against an EXPLICIT header.
+
+        The header is passed rather than read from _ws_headers because these
+        paths deliberately use the tab's own header, which can differ from the
+        current constant — that is the whole point of rebuild_tab. Every one
+        of these tabs is keyed on its first column."""
+        title = getattr(ws, "title", "")
+        if not self.supabase_configured() or not _DATASTORE_TABLE_BY_TAB.get(title):
+            return
+        for values in rows:
+            if values:
+                self._queue_mirror_row(title, values[0], values, header=header)
+
+    def _queue_mirror_row(self, title: str, key_value, values: list,
+                          header: list[str] | None = None) -> None:
         """Buffer one written row against its datastore table.
 
         The sheet's HEADER NAMES ARE the datastore's column names — already
@@ -650,10 +720,15 @@ class Repository:
         if not self.supabase_configured():
             return
         table = _DATASTORE_TABLE_BY_TAB.get(title)
-        header = self._ws_headers.get(title)
+        header = header or self._ws_headers.get(title)
         if not table or not header:
             return
-        row = dict(zip(header, values))
+        # Filtered to the table's real columns, which is _insert_rows' own
+        # behaviour rather than caution — a sheet that has gained a column the
+        # datastore has not would otherwise send an unknown key, and PostgREST
+        # rejects the whole batch on one.
+        known = supabase_store.table_columns(table)
+        row = {c: v for c, v in zip(header, values) if c in known}
         self.queue_mirror(table, key_value, row)
 
     def queue_mirror(self, table: str, key_value, row: dict,
@@ -668,6 +743,7 @@ class Repository:
         """
         if not self.supabase_configured():
             return
+        self._register_mirror_flush_at_exit()
         # Blank -> NULL on the way in, so a mirrored row is the row the next
         # full rebuild would write. See blank_to_null.
         if mode == supabase_store.REPLACE:
@@ -1031,6 +1107,17 @@ class Repository:
         primary = pages_sorted[0]
         properties: dict = {}
 
+        # The Date, written back unchanged. _CHECKIN_FIELD_MAP has no entry
+        # for it, so without this the merged properties carry no date at all —
+        # and readiness_checkins is keyed BY date, so the Supabase mirror
+        # could not name the row it had just rewritten. A no-op in Notion
+        # (find_duplicate_check_in_dates groups on this exact value, so every
+        # page in the group already holds it), and it makes the merged
+        # property set self-identifying the same way save_check_in's is.
+        merged_date = notion.get_property(primary, "Date", "date")
+        if merged_date:
+            properties["Date"] = notion.date_prop(merged_date)
+
         for field, (prop_name, kind, default) in _CHECKIN_FIELD_MAP.items():
             values = [notion.get_property(p, prop_name, kind) for p in pages_sorted]
 
@@ -1081,6 +1168,18 @@ class Repository:
         notion.update_page(self._nc, primary_page_id, properties=properties)
         for page_id in archive_ids:
             notion.archive_page(self._nc, page_id)
+
+        # The archived duplicates need NO delete. readiness_checkins is keyed
+        # by date and every page in the group carries the SAME date
+        # (find_duplicate_check_in_dates groups on it), so the duplicates
+        # never had rows of their own — datastore.py already collapses them
+        # last-one-wins. Only the surviving merged row has to be mirrored, or
+        # Postgres keeps whichever duplicate the last rebuild happened to pick.
+        merged_date = notion_reader.row_from_properties(
+            notion_reader.READINESS, properties).get("date")
+        if merged_date:
+            self.mirror_notion_write(notion_reader.READINESS, merged_date,
+                                     properties, mode=supabase_store.PATCH)
 
     def get_recent_readiness(self, days: int = 60, today: date | None = None) -> list[dict]:
         today = today or date.today()
@@ -3611,7 +3710,7 @@ class Repository:
             ["" if merged[d].get(c) is None else merged[d].get(c, "") for c in header]
             for d in sorted(merged)
         ]
-        sheets.rewrite_worksheet(worksheet, header, rows)
+        self._rewrite_sheet(worksheet, header, rows)
         return len(rows)
 
     def rebuild_garmin_sleep_stages(self, fresh: dict[str, dict] | None = None) -> int:
@@ -4145,7 +4244,7 @@ class Repository:
             ["" if merged[d].get(c) is None else merged[d].get(c, "") for c in _SLEEP_FUSION_HEADER]
             for d in sorted(merged)
         ]
-        sheets.rewrite_worksheet(ws, _SLEEP_FUSION_HEADER, rows)
+        self._rewrite_sheet(ws, _SLEEP_FUSION_HEADER, rows)
         return counts
 
     def sync_sleep_fusion_if_due(self, days: int = 14, today: date | None = None,
@@ -5369,7 +5468,7 @@ class Repository:
                 ["" if r.get(k) is None else r.get(k) for k in header]
                 for r in new_rows
             ]
-            sheets.append_rows(ws, values)
+            self._append_sheet_rows(ws, header, values)
             out[key] = {"written": len(new_rows), "skipped": len(candidates) - len(new_rows)}
         return out
 
@@ -5427,7 +5526,7 @@ class Repository:
                 ["" if r.get(c) is None else r.get(c) for c in header]
                 for r in merged
             ]
-            sheets.rewrite_worksheet(ws, header, values)
+            self._rewrite_sheet(ws, header, values)
             refreshed = sum(1 for k in seen if k in fresh)
             out[key] = {
                 "total": len(merged), "refreshed": refreshed,

@@ -27,7 +27,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **2623/2623 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **2638/2638 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -456,11 +456,22 @@ calls a read method on the Supabase client.
   keyed by DATE while that method is handed a Notion page id, and there is no
   page-id→date index; the caller has it free as `entry["timestamp"]`. Omit it
   and the Notion write still happens, only the mirror is skipped.
-- **NOT mirrored:** `rebuild_tab`/`rewrite_worksheet` and the `append_rows`
-  batch path, which rewrite a tab wholesale; and `apply_check_in_merge`,
-  whose properties carry no Date and which runs only from
-  `scripts/merge_duplicate_checkins.py`. Use
-  `scripts/push_datastore_to_supabase.py` after those.
+- **Whole-tab rewrites mirror too** (`_rewrite_sheet`/`_append_sheet_rows`),
+  as plain upserts — correct ONLY because every one of those callers MERGES
+  (`rebuild_tab`, `sync_sleep_fusion`, `rebuild_oura_tabs` each carry the
+  existing rows through), so a rewrite is always a **superset** and no row
+  disappears. **A rewrite that could SHRINK a tab needs delete-then-insert**,
+  the way `training_sets` does. Rows are filtered to the table's real columns,
+  matching `_insert_rows` — `rebuild_oura_tabs` rewrites against the tab's OWN
+  header, and PostgREST rejects the whole batch on one unknown key.
+- **`apply_check_in_merge` mirrors**: `merge_check_in_group` now writes the
+  Date back explicitly (a no-op in Notion, since every page in the group was
+  grouped on that exact value) so the merged property set can name its own
+  row. **The archived duplicates need no delete** — they share the survivor's
+  primary key, so deleting would remove the surviving merged row.
+- **CLI scripts flush at process exit** (`atexit`, once per process). Five
+  scripts write mirrored tables and then simply exit without running a sync
+  chain; without the hook every row they queued is dropped.
 - **`scripts/pull_datastore_from_supabase.py`** fills `datastore.db` from
   Supabase the way `build_datastore.py` fills it from Notion and Sheets —
   the direction that makes the read cache independent of both. `--round-trip`
