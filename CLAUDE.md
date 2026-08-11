@@ -27,7 +27,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **2437/2437 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **2548/2548 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -349,13 +349,34 @@ HEALTH_DATASTORE_PATH=datastore.db python -m streamlit run app.py
   present even when empty. Verified end-to-end against 2026-07-28: score,
   contributors, hypnogram, movement strip, κ, cut points and vitals all
   identical to the live values.
-- **Not covered: Notion.** `readiness_checkins`/`training_*` are in the
-  datastore but reshaped, so Notion-backed getters still hit the network.
-  Sleep/biometrics work is 100% Sheets, which is why this was worth doing
-  without solving Notion too. `get_raw_sheet_rows()` (Sheet1 raw
-  passthrough) also raises offline — the datastore holds Sheet1 mapped.
+- **Notion is covered too, as of 2026-08-11 — offline now means offline.**
+  `Repository._query` is the Notion analogue of `_ws()`: all 29 Notion reads
+  already went through it, so `clients/notion_reader.py` slots in behind one
+  branch rather than a rewrite of forty getters. It returns PAGE-shaped
+  dicts, duck-typed against `notion.query_database` exactly as
+  `OfflineWorksheet` is against gspread, so `notion.get_property` stays the
+  one place a Notion property is decoded and the two lanes cannot drift.
+  Measured 2026-08-11 over 13 representative reads: **8,884 ms live → 38 ms
+  offline (232×)**, with **zero field mismatches** across all 24 shared
+  readiness dates and all 29 shared sessions (per-exercise set counts and
+  volumes included). Notion's query language is huge; these four databases
+  use five operators (`equals`, `on_or_after`, `on_or_before`, `is_empty`,
+  `is_not_empty`) over five property kinds plus `and`/`or`. That closed set
+  is implemented exactly and **anything outside it RAISES** — a silently
+  ignored filter returns every row, which reads as a successful query over a
+  wider window. `get_raw_sheet_rows()` (Sheet1 raw passthrough) still raises
+  offline — the datastore holds Sheet1 mapped.
+- **Notion WRITES raise offline** (`Repository._nc`), matching the Sheets
+  contract. Reading a local snapshot while writing to the live backend is
+  the worst of the three options, and it is the one that became possible the
+  moment reads stopped going to Notion.
 - **Adding a tab means adding a row to `_DATASTORE_TABLE_BY_TAB` AND a table
   to `datastore_schema.sql`**, or offline reads of it return `[]` forever.
+  The Notion equivalent is `notion_reader.PROPERTIES` — a property Repository
+  reads but that map does not carry reads as `None` offline, i.e. as data
+  that is simply absent, with no error anywhere. `tests/test_notion_reader.py`
+  scrapes `repository.py` for every `get_property` call and fails on any that
+  is unmapped, so the two cannot drift silently.
 
 ## Key Rules (non-negotiable)
 

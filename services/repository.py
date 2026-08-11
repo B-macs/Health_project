@@ -45,6 +45,7 @@ from services.clients import datastore_reader
 from services.clients import garmin
 from services.clients import local_cache
 from services.clients import notion
+from services.clients import notion_reader
 from services.clients import oura
 from services.clients import sheets
 from services.config import Config
@@ -466,6 +467,23 @@ class Repository:
 
     @property
     def _nc(self):
+        """The live Notion client — WRITES ONLY, once offline mode covers
+        Notion reads.
+
+        Raises offline for the reason datastore_reader.py's docstring names
+        as the worst of the three options: reading a local snapshot while
+        writing to the live backend. Every read now goes through _query, so
+        everything still reaching this property is a create/update/archive
+        (plus save_session_notes' read-modify-write, which is a write path
+        whichever half you look at). Letting those through would push a
+        value derived from a stale snapshot into the real database."""
+        if self.offline:
+            raise datastore_reader.DatastoreReadOnlyError(
+                "a Notion write was attempted while offline (datastore_path "
+                f"= {self.config.datastore_path!r}). Offline mode is "
+                "read-only: unset datastore_path / HEALTH_DATASTORE_PATH to "
+                "run against live Notion."
+            )
         if self._notion_client is None:
             self._notion_client = notion.make_client(self.config)
         return self._notion_client
@@ -563,7 +581,38 @@ class Repository:
             self._oura_token_obj = oura.make_client(self.config)
         return self._oura_token_obj
 
+    def _db_kind(self, db_id: str) -> str:
+        """Which of the four Notion databases an id refers to.
+
+        Offline needs a NAME, since a Notion database id means nothing to a
+        SQLite table. An unrecognised id raises rather than defaulting: a
+        wrong guess here would serve one database's rows in answer to
+        another's query, and every property lookup would return None — which
+        renders as an empty screen, not as an error."""
+        for kind, configured in (
+            (notion_reader.READINESS, self.config.notion_db_readiness),
+            (notion_reader.TRAINING, self.config.notion_db_training),
+            (notion_reader.BIOMETRICS, self.config.notion_db_biometrics),
+            (notion_reader.CONFIG, self.config.notion_db_config),
+        ):
+            if db_id == configured:
+                return kind
+        raise KeyError(
+            f"Notion database id {db_id!r} is not one of the four configured "
+            f"databases, so offline mode has no table for it"
+        )
+
     def _query(self, db_id: str, filter_: dict | None = None, sorts: list | None = None) -> list[dict]:
+        """Every Notion read in this class goes through here — which is what
+        made offline mode for Notion one branch rather than forty rewrites,
+        exactly as _ws did for the fourteen Sheets tabs.
+
+        Either/or on config, never a fallback, for the same reason as _ws: a
+        failed live read keeps failing rather than quietly serving a
+        snapshot."""
+        if self.offline:
+            return notion_reader.query(
+                self._ds, self._db_kind(db_id), filter_=filter_, sorts=sorts)
         return notion.query_database(self._nc, db_id, filter_=filter_, sorts=sorts)
 
     # ─────────────────────────────────────────────────────────────────────
@@ -1499,6 +1548,29 @@ class Repository:
                 sleep_deep_hours=g("Deep Sleep Hours", "number"), active_kcal=g("Active kcal", "number"),
                 weight_kg=g("Weight kg", "number"), steps=g("Steps", "number"),
             ))
+        return out
+
+    def get_all_notion_biometrics_rows(self) -> list[dict]:
+        """Every row of the Notion Biometrics DB, unwindowed — the datastore's
+        notion_biometrics table, whose columns these keys match exactly.
+
+        Distinct from get_all_sheet1_biometric_records() despite the matching
+        shape: that is Apple Health via Sheet1, this is the Notion database.
+        Two sources, two tables."""
+        out = []
+        for p in self._query(self.config.notion_db_biometrics):
+            g = lambda name, kind: notion.get_property(p, name, kind)
+            out.append({
+                "date":                 g("Log Date", "date"),
+                "hrv_ms":               g("HRV", "number"),
+                "resting_heart_rate":   g("RHR", "number"),
+                "hr_average":           g("HR Average", "number"),
+                "sleep_duration_hours": g("Sleep Hours", "number"),
+                "sleep_deep_hours":     g("Deep Sleep Hours", "number"),
+                "active_kcal":          g("Active kcal", "number"),
+                "weight_kg":            g("Weight kg", "number"),
+                "steps":                g("Steps", "number"),
+            })
         return out
 
     def save_biometrics_today(self, date_str: str, rhr=None, hrv=None, sleep_hours=None,

@@ -110,6 +110,8 @@ def test_every_boolean_string_in_the_real_datastore_is_covered():
     conn.row_factory = sqlite3.Row
     unhandled = {}
     for table in dp.table_names(ddl):
+        if not ss.table_exists(conn, table):
+            continue      # in the schema, not in this snapshot — see push()
         numeric = ss.numeric_columns(table, ddl)
         if not numeric:
             continue
@@ -145,6 +147,60 @@ def test_every_table_has_a_delete_filter():
     look like a successful push over a stale table."""
     for table in dp.table_names(dp.to_postgres()):
         assert table in ss._ANY_ROW_FILTER, f"{table} has no delete filter"
+
+
+def test_a_table_missing_from_the_snapshot_is_skipped_not_truncated():
+    """The dangerous case: a schema gains a table, the local datastore has
+    not been rebuilt yet, and a push runs. Truncating there would delete good
+    Supabase rows because the LOCAL copy is stale. It must be skipped whole
+    and reported, not silently emptied."""
+    calls = {"truncate": [], "insert": []}
+
+    class _Store:
+        def count(self, t): return 0          # preflight: exists remotely
+        def truncate(self, t): calls["truncate"].append(t)
+        def insert(self, t, rows): calls["insert"].append(t); return len(rows)
+
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE config (key TEXT PRIMARY KEY, value TEXT, updated TEXT)")
+    conn.execute("INSERT INTO config VALUES ('current_stage', '2', '2026-07-20')")
+
+    results = ss.push(conn, _Store(), ["config", "metrics_history"])
+    by_table = {r.table: r for r in results}
+
+    assert by_table["metrics_history"].source_missing is True
+    assert by_table["metrics_history"].ok is False, "a skipped table is not a success"
+    assert "metrics_history" not in calls["truncate"], "stale snapshot deleted live rows"
+    assert "metrics_history" not in calls["insert"]
+    # ...while the table that IS present still loads normally.
+    assert by_table["config"].ok is True
+    assert calls["truncate"] == ["config"]
+
+
+def test_a_table_missing_REMOTELY_stops_the_push_before_anything_is_deleted():
+    """The failure that actually happened: the schema gained a table, the
+    Supabase project had not been given it, and truncate 404'd — after the
+    reverse-order loop had already emptied config and datastore_meta. A push
+    that cannot complete must delete nothing at all."""
+    deleted = []
+
+    class _Store:
+        def count(self, t):
+            if t == "metrics_history":
+                raise ss.SupabaseError(
+                    "GET metrics_history -> HTTP 404: "
+                    '{"code":"PGRST205","message":"Could not find the table"}')
+            return 0
+        def truncate(self, t): deleted.append(t)
+        def insert(self, t, rows): return len(rows)
+
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE config (key TEXT PRIMARY KEY, value TEXT, updated TEXT)")
+    conn.execute("CREATE TABLE metrics_history (date TEXT PRIMARY KEY)")
+
+    with pytest.raises(ss.SupabaseError, match="Nothing was deleted"):
+        ss.push(conn, _Store(), ["config", "metrics_history"])
+    assert deleted == [], f"a failed push deleted {deleted}"
 
 
 def test_truncate_refuses_an_unknown_table():

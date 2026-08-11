@@ -419,6 +419,27 @@ CREATE TABLE sheet1_legacy_biometrics (
     steps                 INTEGER
 );
 
+-- The Notion Biometrics database. SEPARATE from sheet1_legacy_biometrics
+-- above despite the near-identical columns: that one is Apple Health via
+-- Sheet1, this one is the Notion DB, and merging two sources into one lane
+-- is the mistake this codebase keeps a rule about. Written only by
+-- Repository.save_biometrics_today, which has no live caller — the engine's
+-- biometric source is the Oura+Garmin blend (see CLAUDE.md key rule 4). Kept
+-- because views/insights.py's macro-trend panel still reads it, and a panel
+-- that goes blank offline is a worse answer than a table nobody writes.
+DROP TABLE IF EXISTS notion_biometrics;
+CREATE TABLE notion_biometrics (
+    date                  TEXT PRIMARY KEY,   -- "Log Date"
+    hrv_ms                REAL,
+    resting_heart_rate    REAL,
+    hr_average            REAL,               -- always NULL: written as number(None)
+    sleep_duration_hours  REAL,
+    sleep_deep_hours      REAL,
+    active_kcal           REAL,
+    weight_kg             REAL,
+    steps                 REAL
+);
+
 DROP TABLE IF EXISTS config;
 CREATE TABLE config (
     key      TEXT PRIMARY KEY,   -- e.g. "phases", "diagnostic_profile", "current_stage"

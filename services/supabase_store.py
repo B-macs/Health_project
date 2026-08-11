@@ -62,10 +62,14 @@ class LoadResult:
     table: str
     source_rows: int
     loaded_rows: int
+    #: The table is in the schema but not in this SQLite snapshot — a
+    #: datastore built before the table was added. It is SKIPPED ENTIRELY,
+    #: truncate included; see push().
+    source_missing: bool = False
 
     @property
     def ok(self) -> bool:
-        return self.source_rows == self.loaded_rows
+        return not self.source_missing and self.source_rows == self.loaded_rows
 
 
 class SupabaseStore:
@@ -187,6 +191,7 @@ _ANY_ROW_FILTER = {
     "wake_time_adjustments": "date=neq.__none__",
     "weekly_rollup": "week_start=neq.__none__",
     "sheet1_legacy_biometrics": "date=neq.__none__",
+    "notion_biometrics": "date=neq.__none__",
     "config": "key=neq.__none__",
     "datastore_meta": "key=neq.__none__",
 }
@@ -256,6 +261,12 @@ def coerce_row(row: dict, numeric: set[str]) -> dict:
     return out
 
 
+def table_exists(conn: sqlite3.Connection, table: str) -> bool:
+    return conn.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+    ).fetchone() is not None
+
+
 def rows_from_sqlite(conn: sqlite3.Connection, table: str) -> list[dict]:
     conn.row_factory = sqlite3.Row
     return [dict(r) for r in conn.execute(f"SELECT * FROM {table}")]
@@ -273,17 +284,48 @@ def push(conn: sqlite3.Connection, store: SupabaseStore,
 
     Children are deleted before parents and inserted after them — the foreign
     keys are enforced here, unlike in SQLite.
+
+    A table in the schema but ABSENT from this snapshot is skipped whole —
+    not truncated, not inserted — and reported as source_missing. Truncating
+    it would delete live Supabase rows because the LOCAL copy is out of date,
+    which is a stale snapshot destroying good data. Rebuild with
+    scripts/build_datastore.py and push again.
     """
     ddl = datastore_postgres.to_postgres()
     all_tables = tables or datastore_postgres.table_names(ddl)
     ordered = ([t for t in LOAD_ORDER if t in all_tables]
                + [t for t in all_tables if t not in LOAD_ORDER])
+    present = [t for t in ordered if table_exists(conn, t)]
+    missing = [t for t in ordered if t not in present]
 
-    for table in reversed(ordered):        # children first
+    # PREFLIGHT, before a single DELETE. A table the schema declares but the
+    # project has not been given yet 404s on truncate — and discovering that
+    # halfway through has already emptied whatever came earlier in the order,
+    # which leaves Supabase worse than not running at all. Measured: a first
+    # attempt wiped config and datastore_meta before failing on the new
+    # table. Reading is free; deleting is not.
+    absent_remotely = []
+    for table in present:
+        try:
+            store.count(table)
+        except SupabaseError as exc:
+            if "PGRST205" in str(exc) or "404" in str(exc):
+                absent_remotely.append(table)
+            else:
+                raise
+    if absent_remotely:
+        raise SupabaseError(
+            f"these tables do not exist in the Supabase project yet: "
+            f"{', '.join(absent_remotely)}. Nothing was deleted. Apply "
+            f"services/datastore_schema_postgres.sql (or just the missing "
+            f"CREATE TABLE statements) in the SQL editor, then push again."
+        )
+
+    for table in reversed(present):        # children first
         store.truncate(table)
 
-    results = []
-    for table in ordered:
+    results = [LoadResult(t, 0, 0, source_missing=True) for t in missing]
+    for table in present:
         rows = rows_from_sqlite(conn, table)
         numeric = numeric_columns(table, ddl)
         payload = [coerce_row(r, numeric) for r in rows]

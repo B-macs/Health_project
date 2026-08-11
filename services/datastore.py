@@ -89,6 +89,8 @@ def rebuild(repo: Repository, conn: sqlite3.Connection, now: datetime | None = N
         counts["wake_time_adjustments"] = _populate_wake_time_adjustments(repo, conn)
         counts["weekly_rollup"] = _populate_weekly_rollup(repo, conn)
         counts["sheet1_legacy_biometrics"] = _populate_sheet1_legacy(repo, conn)
+        counts["notion_biometrics"] = _insert_rows(
+            conn, "notion_biometrics", repo.get_all_notion_biometrics_rows(), replace=True)
         counts["config"] = _insert_rows(conn, "config", repo.get_all_config_rows())
 
         conn.execute("INSERT INTO datastore_meta (key, value) VALUES (?, ?)", ("built_at", now.isoformat()))
@@ -120,12 +122,14 @@ def _insert_rows(conn: sqlite3.Connection, table: str, rows: list[dict], replace
     Sheets cells ("") are normalized to NULL; everything else passes
     through as-is (gspread has already done int/float coercion).
 
-    `replace`: INSERT OR REPLACE instead of plain INSERT, for the one
-    table (readiness_checkins) where a pre-existing, not-yet-merged
-    duplicate Notion page for the same date is a known possible
-    data-quality issue (see scripts/merge_duplicate_checkins.py) rather
-    than a bug in this module -- last-one-wins there rather than raising
-    and rolling back the whole datastore build over it. Every other table
+    `replace`: INSERT OR REPLACE instead of plain INSERT, for the two
+    Notion-backed tables (readiness_checkins, notion_biometrics) where a
+    pre-existing, not-yet-merged duplicate Notion page for the same date is
+    a known possible data-quality issue (see
+    scripts/merge_duplicate_checkins.py; save_biometrics_today upserts by
+    querying first, which two writers can race) rather than a bug in this
+    module -- last-one-wins there rather than raising and rolling back the
+    whole datastore build over it. Every other table
     here is upserted-by-key at write time by Repository already, so a
     PRIMARY KEY collision on plain INSERT is a genuine, worth-surfacing
     bug rather than something to paper over."""

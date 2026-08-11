@@ -40,6 +40,11 @@ def _verify(conn, store, tables) -> int:
     print("-" * 60)
     bad = 0
     for t in tables:
+        if not supabase_store.table_exists(conn, t):
+            # In the schema, not in this snapshot — see push()'s docstring.
+            print(f"{t:<28}{'—':>8}{store.count(t):>10}   NOT IN SNAPSHOT")
+            bad += 1
+            continue
         local = conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
         remote = store.count(t)
         ok = local == remote
@@ -100,13 +105,17 @@ def main() -> int:
 
     if args.dry_run:
         total = sum(conn.execute(f"SELECT COUNT(*) FROM {t}").fetchone()[0]
-                    for t in tables)
+                    for t in tables if supabase_store.table_exists(conn, t))
         print(f"{len(tables)} tables, {total} rows in {args.db} — nothing sent")
         return 0
 
     if not args.verify:
         print(f"pushing {len(tables)} tables from {Path(args.db).name} …")
         for r in supabase_store.push(conn, store, tables):
+            if r.source_missing:
+                print(f"  {r.table:<28}{'—':>7}      ⚠ NOT IN SNAPSHOT — skipped "
+                      f"whole (rebuild with scripts/build_datastore.py)")
+                continue
             flag = "" if r.ok else "   ⚠ SHORT"
             print(f"  {r.table:<28}{r.loaded_rows:>7} rows{flag}")
 

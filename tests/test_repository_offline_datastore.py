@@ -71,6 +71,7 @@ class _StubRepo:
     def get_all_oura_sessions_rows(self): return self._rows("oura_sessions")
     def get_all_oura_rest_mode_rows(self): return self._rows("oura_rest_mode")
     def get_all_config_rows(self): return self._rows("config")
+    def get_all_notion_biometrics_rows(self): return self._rows("notion_biometrics")
     def get_biometric_blend_history(self): return []
     def get_metrics_history(self): return self._rows("metrics_history")
     def get_wake_time_adjustments(self): return {}
