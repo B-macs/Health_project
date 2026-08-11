@@ -71,7 +71,13 @@ _IDENTITY = "BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY"
 _DROP_RE = re.compile(r"^\s*DROP TABLE IF EXISTS\s+(\w+)\s*;", re.I | re.M)
 _AUTOINC_RE = re.compile(r"\bINTEGER\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b", re.I)
 _REFERENCES_RE = re.compile(r"\s+REFERENCES\s+(\w+)\s*\(\s*(\w+)\s*\)", re.I)
-_CREATE_RE = re.compile(r"CREATE TABLE\s+(\w+)", re.I)
+#: \b matters: without it, case-insensitive "CREATE TABLE" also matches the
+#: middle of the schema's own comment "DROP+reCREATE TABLE FOR no real safety
+#: benefit", inventing a table called `for`. It did — the phantom reached a
+#: live Supabase existence check before anything caught it, because comparing
+#: the SQLite and Postgres table lists to each other passes happily when BOTH
+#: contain the same phantom.
+_CREATE_RE = re.compile(r"\bCREATE TABLE\s+(\w+)", re.I)
 
 
 def _split_code_and_comment(line: str) -> tuple[str, str]:
@@ -153,8 +159,11 @@ def to_postgres(sqlite_ddl: str | None = None) -> str:
 
 
 def table_names(ddl: str) -> list[str]:
-    """Every table a DDL string creates, in order."""
-    return _CREATE_RE.findall(ddl)
+    """Every table a DDL string creates, in order. Comments are stripped
+    first — this schema documents itself heavily, and prose about creating
+    tables is not a table."""
+    code = "\n".join(_split_code_and_comment(l)[0] for l in ddl.splitlines())
+    return _CREATE_RE.findall(code)
 
 
 def column_names(ddl: str, table: str) -> list[str]:

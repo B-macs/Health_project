@@ -42,8 +42,27 @@ def test_every_column_of_every_table_survives():
 
 
 def test_the_translation_is_not_empty_or_truncated():
-    assert len(dp.table_names(POSTGRES)) >= 21
+    assert len(dp.table_names(POSTGRES)) == 21
     assert POSTGRES.rstrip().endswith(";")
+
+
+def test_no_phantom_tables_are_parsed_out_of_comments():
+    """Every name must be a table that really is CREATEd, not prose.
+
+    This is a real bug that shipped: case-insensitively, "CREATE TABLE" also
+    matches inside the schema's own comment "DROP+reCREATE TABLE FOR no real
+    safety benefit", so `for` was reported as a table and went as far as being
+    checked for existence against the live Supabase project. Comparing the
+    SQLite and Postgres lists to EACH OTHER could never catch it — both
+    contained the same phantom — so this asserts against the real world
+    instead: every name must appear as an actual CREATE TABLE statement.
+    """
+    for name in dp.table_names(POSTGRES):
+        assert re.search(rf"^CREATE TABLE {name} \(", POSTGRES, re.M), (
+            f"{name!r} is not a real table — it was parsed out of a comment"
+        )
+    assert "for" not in dp.table_names(POSTGRES)
+    assert "for" not in dp.table_names(SQLITE)
 
 
 # ─── the type mapping ────────────────────────────────────────────────────────
