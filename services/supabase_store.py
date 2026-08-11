@@ -127,6 +127,31 @@ class SupabaseStore:
         _headers, rows = self._request("GET", q)
         return rows or []
 
+    def select_all(self, table: str, order: str = "") -> list[dict]:
+        """EVERY row, following Range pages.
+
+        select() takes a limit and is honest about it; this one must not,
+        because it backs the pull into the local datastore and a silently
+        truncated table there is a read cache that is quietly missing history.
+        Supabase caps a single response (max-rows, 1000 by default), so a
+        table over that ceiling comes back short with no error at all — the
+        same shape of failure as a throttled Sheets read.
+        """
+        # Paging by offset REQUIRES a total order. Without one Postgres may
+        # return rows in any order per request, so page 2 can repeat or skip
+        # what page 1 held — and the result still looks like a full table.
+        order = order or primary_key(table)
+        rows: list[dict] = []
+        while True:
+            q = (f"{table}?select=*&limit={BATCH}&offset={len(rows)}"
+                 f"&order={urllib.parse.quote(order)}")
+            _headers, page = self._request("GET", q)
+            if not page:
+                return rows
+            rows.extend(page)
+            if len(page) < BATCH:
+                return rows
+
     def select_value(self, table: str, where: str, column: str):
         """One column of the first row matching a PostgREST filter, or None.
 
@@ -199,6 +224,25 @@ _ANY_ROW_FILTER = {
 
 # ─── SQLite → Postgres value coercion ────────────────────────────────────
 
+def primary_key(table: str, ddl: str | None = None) -> str:
+    """The table's primary-key column, read off the schema.
+
+    Used to give select_all a total order. Derived rather than listed beside
+    _ANY_ROW_FILTER because a second hand-maintained table-to-column map is
+    the duplication this whole schema-derivation exists to avoid.
+    """
+    import re
+    ddl = ddl if ddl is not None else datastore_postgres.to_postgres()
+    m = re.search(rf"CREATE TABLE {table} \((.*?)\n\);", ddl, re.S)
+    if not m:
+        raise SupabaseError(f"no CREATE TABLE for {table!r}")
+    for line in m.group(1).splitlines():
+        code, _ = datastore_postgres._split_code_and_comment(line)
+        if "PRIMARY KEY" in code.upper():
+            return code.split()[0]
+    raise SupabaseError(f"{table} has no PRIMARY KEY to page by")
+
+
 def numeric_columns(table: str, ddl: str | None = None) -> set[str]:
     """Columns Postgres will treat as numbers, so "" has to become NULL."""
     ddl = ddl if ddl is not None else datastore_postgres.to_postgres()
@@ -265,6 +309,55 @@ def table_exists(conn: sqlite3.Connection, table: str) -> bool:
     return conn.execute(
         "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
     ).fetchone() is not None
+
+
+def pull(store: SupabaseStore, conn: sqlite3.Connection,
+         tables: list[str] | None = None, progress=None) -> dict[str, int]:
+    """Rebuild the local SQLite datastore FROM Supabase — the reverse of
+    push(), and the piece that makes the read cache independent of Notion and
+    Google Sheets.
+
+    This is the direction that matters once Supabase is the system of record.
+    Reads must stay local: measured 2026-08-11, a single PostgREST round trip
+    costs ~136 ms whatever the table's size (a 2-row table times the same as a
+    600-row one, so it is latency, not payload), which puts a full 22-table
+    read at 4,284 ms against 32 ms from SQLite. Serving the app straight from
+    Postgres would be 113x slower than the local path. So Postgres holds the
+    truth and SQLite serves the reads, refreshed by this function.
+
+    Wholesale replace, like rebuild(): DROP+CREATE from the same schema file,
+    so the two paths cannot produce differently-shaped databases.
+    """
+    ddl = datastore_postgres.to_postgres()
+    all_tables = tables or datastore_postgres.table_names(ddl)
+
+    conn.executescript(
+        (datastore_postgres.SCHEMA_PATH).read_text(encoding="utf-8"))
+    conn.execute("BEGIN")
+    try:
+        counts: dict[str, int] = {}
+        for table in all_tables:
+            rows = store.select_all(table)
+            if rows:
+                cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
+                # training_sets.id is assigned by each store's own identity
+                # column and carries no meaning; let SQLite mint its own, the
+                # same way rebuild() does.
+                if table == "training_sets":
+                    cols = [c for c in cols if c != "id"]
+                placeholders = ", ".join(f":{c}" for c in cols)
+                conn.executemany(
+                    f"INSERT INTO {table} ({', '.join(cols)}) VALUES ({placeholders})",
+                    [{c: r.get(c) for c in cols} for r in rows],
+                )
+            counts[table] = len(rows)
+            if progress:
+                progress(table, len(rows))
+        conn.commit()
+        return counts
+    except Exception:
+        conn.rollback()
+        raise
 
 
 def rows_from_sqlite(conn: sqlite3.Connection, table: str) -> list[dict]:

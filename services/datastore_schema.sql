@@ -252,7 +252,7 @@ CREATE TABLE oura_sleep_periods (
     readiness_score_delta            REAL,
     sleep_algorithm_version          TEXT,
     sleep_analysis_reason            TEXT,
-    low_battery_alert                INTEGER,
+    low_battery_alert                TEXT,   -- gspread's verbatim 'TRUE'/'FALSE', NOT numeric
     sleep_phase_5_min                TEXT,   -- digit-coded hypnogram string, NOT numeric
     sleep_phase_30_sec               TEXT,   -- digit-coded hypnogram string, NOT numeric
     movement_30_sec                  TEXT,   -- digit-coded string, NOT numeric
@@ -286,12 +286,26 @@ CREATE TABLE garmin_sleep_stages (
     dto_light_seconds          REAL,
     dto_rem_seconds            REAL,
     dto_awake_seconds          REAL,
-    totals_match               INTEGER,
+    -- TEXT, not INTEGER, and the three columns like it in this file are the
+    -- same story. The value here is a Google Sheets cell as gspread returns
+    -- it, which is the STRING 'TRUE'/'FALSE' -- clients/datastore_reader.py
+    -- pins preserving that verbatim as a fidelity rule. SQLite's loose typing
+    -- stored the string in an INTEGER column without complaint, so the
+    -- mis-declaration was invisible until the Postgres copy: there the
+    -- declared type is enforced, the value had to be coerced to 1/0, and a
+    -- pull back returned 1 where 'TRUE' went in. That is not merely untidy --
+    -- _garmin_sleep_stages_row reads movement_contiguous as
+    -- `str(v).upper() != "FALSE"`, so a coerced 0 reads as "0" and inverts to
+    -- CONTIGUOUS, silently reporting a night that needed gap-filling as
+    -- clean. Found by round-tripping the real datastore through Supabase
+    -- (scripts/pull_datastore_from_supabase.py --round-trip), not by reading.
+    totals_match               TEXT,
     sleep_levels_json          TEXT,    -- lossless segment list, JSON, NOT numeric
     movement_start_gmt         TEXT,
     movement_interval_seconds  REAL,
     movement_slot_count        INTEGER,
-    movement_contiguous        INTEGER, -- False = the series needed gap-filling
+    movement_contiguous        TEXT,    -- 'FALSE' = the series needed gap-filling;
+                                        -- see totals_match above for why TEXT
     movement_gap_slots         INTEGER,
     movement_levels            TEXT,    -- comma-joined floats, NOT numeric
     sleep_hr_json              TEXT,    -- JSON, NOT numeric

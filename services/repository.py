@@ -3386,7 +3386,14 @@ class Repository:
                     _float_or_none(r.get("movement_interval_seconds"))
                     or sleep_movement.GARMIN_INTERVAL_SECONDS),
                 "levels": sleep_movement.decode_levels(r.get("movement_levels")),
-                "contiguous": str(r.get("movement_contiguous", "")).upper() != "FALSE",
+                # Falsey spellings listed EXPLICITLY rather than testing
+                # `!= "FALSE"`. That test treats every unrecognised value as
+                # contiguous, so a stored 0 reads as "0", misses the compare
+                # and INVERTS to clean — silently claiming a night needed no
+                # gap-filling when it did. The two totals_match reads below
+                # already guard the same way by naming their true spellings.
+                "contiguous": str(r.get("movement_contiguous", "")).strip().lower()
+                              not in ("false", "0"),
                 "gap_slots": int(_float_or_none(r.get("movement_gap_slots")) or 0),
             }
             out[d] = row
