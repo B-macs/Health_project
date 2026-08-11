@@ -440,3 +440,18 @@ def test_the_mirror_row_matches_what_a_rebuild_would_write():
     rebuilt = {k: (None if v == "" else v) for k, v in rebuilt.items()}
 
     assert decoded == rebuilt
+
+
+def test_a_mirror_failure_is_actually_RENDERED_not_just_recorded():
+    """The attribute existed for a commit before anything displayed it, which
+    made "failures are visible" false. Nothing reads from Postgres, so a
+    broken mirror produces no wrong number and no error anywhere in the app —
+    it is invisible by construction unless something shows it."""
+    src = (ROOT / "views" / "insights.py").read_text(encoding="utf-8")
+    assert "mirror_last_error" in src, (
+        "no view renders mirror_last_error — a mirror that stopped working "
+        "looks exactly like one that is up to date"
+    )
+    assert "supabase_configured()" in src, (
+        "the panel must not claim anything when Supabase is unconfigured"
+    )

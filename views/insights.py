@@ -2988,6 +2988,24 @@ def render() -> None:
     # =========================================================================
 
     with tab_sync:
+        # The Supabase mirror's health. It runs behind every sync and nothing
+        # reads from Postgres yet, so a mirror that stopped working is
+        # INVISIBLE by construction — it looks exactly like one that is up to
+        # date. This is the only place that difference is shown.
+        _mirror_repo = repo.get_repository()
+        if _mirror_repo.supabase_configured():
+            _mirror_err = _mirror_repo.mirror_last_error
+            if _mirror_err:
+                st.warning(
+                    f"**Supabase mirror failing on `{_mirror_err[0]}`** — "
+                    f"Notion and Sheets are unaffected and still hold "
+                    f"everything; the Postgres copy is behind. Repair with "
+                    f"`python scripts/push_datastore_to_supabase.py`.\n\n"
+                    f"```\n{_mirror_err[1]}\n```"
+                )
+            else:
+                st.caption("Supabase mirror: no errors recorded this session.")
+
         st.caption(
             "Legacy Apple Health export (Sheet1) — no longer read by the engine. "
             "Kept for historical reference and the one-time Garmin backfill "
