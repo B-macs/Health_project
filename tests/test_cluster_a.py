@@ -191,8 +191,8 @@ _LEVERAGE_PASS = [b.Reading("leverage_bent", 8.0, "cm", side="left"),
                   b.Reading("leverage_bent", 9.0, "cm", side="right"),
                   b.Reading("leverage_straight", 95.0, "cm", side="left"),
                   b.Reading("leverage_straight", 94.0, "cm", side="right")]
-_TILT_PASS = [b.Reading("tilt_production", 25.0, "°"),
-              b.Reading("tilt_range", 30.0, "°")]
+_TILT_PASS = [b.Reading("tilt_production", 70.0, "°"),
+              b.Reading("tilt_range", 60.0, "°")]
 
 
 def test_a_failing_slot_stops_the_battery_and_the_rest_is_never_evaluated():
@@ -213,8 +213,8 @@ def test_each_slot_can_be_the_one_that_stops_it():
     cases = [
         ([b.Reading("leverage_bent", 20.0, "cm"),
                         b.Reading("leverage_straight", 40.0, "cm")], "C", b.SLOT_REGRESSED, 1),
-        (_LEVERAGE_PASS + [b.Reading("tilt_range", 8.0, "°"),
-                                         b.Reading("tilt_production", 4.0, "°")],
+        (_LEVERAGE_PASS + [b.Reading("tilt_range", 95.0, "°"),
+                                         b.Reading("tilt_production", 100.0, "°")],
          "F", b.SLOT_PREREQUISITE, 2),
         (_LEVERAGE_PASS + _TILT_PASS + [
             b.Reading("spectrum_active", 40.0, "°", side="left"),
@@ -311,7 +311,7 @@ def test_a_change_inside_twice_the_noise_is_not_a_result():
 
 def test_a_pattern_from_one_morning_is_a_hypothesis_not_a_verdict():
     a = _assessment(_LEVERAGE_PASS + [
-        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+        b.Reading("tilt_range", 95.0, "°"), b.Reading("tilt_production", 100.0, "°")])
     assert b.run("a", cb.SLOT_EVALUATORS, a, baseline_sessions=1).trusted is False
     assert b.run("a", cb.SLOT_EVALUATORS, a, baseline_sessions=3).trusted is True
 
@@ -324,7 +324,7 @@ def test_the_athletes_own_baseline_routes_him_to_the_expected_pattern():
     in flexion with tail bone down, back fully rounds' — is a slot 2 failure."""
     assert cb.EXPECTED_PATTERN == "F"
     a = _assessment(_LEVERAGE_PASS + [
-        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+        b.Reading("tilt_range", 95.0, "°"), b.Reading("tilt_production", 100.0, "°")])
     assert b.run("a", cb.SLOT_EVALUATORS, a).pattern == cb.EXPECTED_PATTERN
 
 
@@ -1079,7 +1079,7 @@ def test_the_tilt_is_an_angle_and_bigger_is_better():
         assert test.unit == "°", key
         assert test.smaller_is_better is False, key
     a = _assessment(_LEVERAGE_PASS + [
-        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+        b.Reading("tilt_range", 95.0, "°"), b.Reading("tilt_production", 100.0, "°")])
     assert b.run("a", cb.SLOT_EVALUATORS, a).pattern == "F"
 
 
@@ -1134,14 +1134,15 @@ def test_the_ladder_reads_bottom_up_and_marks_the_working_rung():
     working rung, its own-power twin is context, and everything above is
     unmeasured."""
     rungs = _ladder_for(_LEVERAGE_PASS + [
-        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+        b.Reading("tilt_range", 95.0, "°"), b.Reading("tilt_production", 100.0, "°")])
     assert tuple(r.key for r in rungs) == _LADDER_KEYS
     by = {r.key: r for r in rungs}
     assert by["group_length"].state == b.RUNG_PASSED
     assert by["gracilis"].state == b.RUNG_PASSED
     assert by["tilt_range"].state == b.RUNG_LIMITING
     assert by["tilt_range"].pattern == "F"
-    assert by["tilt_range"].fraction == pytest.approx(0.4)     # 8° of 20°
+    # 90° line over a 95° reading: he is 5° short of even reaching upright.
+    assert by["tilt_range"].fraction == pytest.approx(90.0 / 95.0)
     assert by["tilt_production"].state == b.RUNG_CONTEXT
     assert by["end_range"].state == b.RUNG_UNMEASURED
     assert by["pullers"].state == b.RUNG_UNMEASURED
@@ -1152,7 +1153,7 @@ def test_an_unmeasured_rung_has_no_number_ever():
     would read as 'terrible' when the truth is 'unknown' — the v1 failure with
     the sign flipped."""
     rungs = _ladder_for(_LEVERAGE_PASS + [
-        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+        b.Reading("tilt_range", 95.0, "°"), b.Reading("tilt_production", 100.0, "°")])
     for rung in rungs:
         if rung.state == b.RUNG_UNMEASURED:
             assert rung.fraction is None, rung.key
@@ -1163,7 +1164,7 @@ def test_keep_going_readings_surface_as_context_not_diagnosis():
     """The athlete's choice (2026-08-07): rungs above the failure fill in when
     he keeps going, labelled context — and the pattern must not move."""
     full = _LEVERAGE_PASS + [
-        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°"),
+        b.Reading("tilt_range", 95.0, "°"), b.Reading("tilt_production", 100.0, "°"),
         b.Reading("spectrum_active", 40.0, "°", side="left"),
         b.Reading("spectrum_active", 38.0, "°", side="right"),
         _spectrum(30.0, "spectrum_isometric"),
@@ -1222,7 +1223,7 @@ def test_the_ladder_produces_no_aggregate():
     """Rungs are never combined: no total, no average, no overall number. The
     battery's output stays one pattern label — the ladder only shows the path."""
     rungs = _ladder_for(_LEVERAGE_PASS + [
-        b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
+        b.Reading("tilt_range", 95.0, "°"), b.Reading("tilt_production", 100.0, "°")])
     assert isinstance(rungs, tuple)
     for banned in ("overall", "total_", "combined", "average"):
         assert not any(banned in dir(r) for r in rungs), banned
@@ -1419,8 +1420,8 @@ def test_patterns_a_and_b_are_unreachable_but_still_defined():
 def test_the_battery_still_runs_end_to_end_without_gate_zero():
     """The expected pattern is F, a slot 2 failure, and it must still come out
     of a session that now opens on the bent-knee leverage."""
-    a = _assessment(_LEVERAGE_PASS + [b.Reading("tilt_range", 8.0, "°"),
-                                      b.Reading("tilt_production", 4.0, "°")])
+    a = _assessment(_LEVERAGE_PASS + [b.Reading("tilt_range", 95.0, "°"),
+                                      b.Reading("tilt_production", 100.0, "°")])
     result = b.run("a", cb.SLOT_EVALUATORS, a)
     assert result.pattern == cb.EXPECTED_PATTERN == "F"
     assert cb.AVAILABLE_TESTS[0] == "leverage_bent", "the session now opens here"

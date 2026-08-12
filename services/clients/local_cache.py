@@ -79,7 +79,7 @@ def update(changes: dict, path: Path | None = None) -> dict:
     """
     path = path or _DEFAULT_PATH
     with _LOCK:
-        data = _read_unlocked(path)
+        data = _read_unlocked(path, strict=True)
         for key, value in changes.items():
             if value is None:
                 data.pop(key, None)
@@ -113,7 +113,7 @@ def mutate(key: str, fn, path: Path | None = None):
     """
     path = path or _DEFAULT_PATH
     with _LOCK:
-        data = _read_unlocked(path)
+        data = _read_unlocked(path, strict=True)
         new = fn(data.get(key))
         if new is None:
             data.pop(key, None)
@@ -132,20 +132,45 @@ def write(data: dict, path: Path | None = None) -> None:
         _write_unlocked(data, path)
 
 
-def _read_unlocked(path: Path) -> dict:
+class CacheUnreadable(Exception):
+    """The file exists but could not be read. Distinct from "no file yet"."""
+
+
+def _read_unlocked(path: Path, strict: bool = False) -> dict:
+    """Load the file. `strict` decides what a FAILED read means.
+
+    ⚠ THE STRICT FLAG IS DATA SAFETY, NOT TIDINESS. This is a read-modify-WRITE
+    store, so a read that quietly returns {} on failure does not degrade — it
+    DELETES. update() would write {} plus its own key, dropping every key it was
+    not given, atomically and with no error anywhere.
+
+    That is not hypothetical: on 2026-08-12 this file came back holding five
+    sync-timestamp keys and nothing else, and the athlete's first flexibility
+    assessment — the only copy, taken that morning — was not in it. A missing
+    file is genuinely "nothing synced yet" and still returns {}; a file that
+    exists and will not parse is a fault, and callers about to write must fail
+    rather than treat it as empty.
+
+    The in-process _LOCK cannot help here. The Streamlit app, the background
+    sync thread and any CLI script are separate PROCESSES; only the atomic
+    replace guards them, and returning {} on a failed read defeats it.
+    """
     for attempt in range(_RETRIES):
         try:
             return json.loads(path.read_text())
         except FileNotFoundError:
+            return {}                      # genuinely nothing synced yet
+        except json.JSONDecodeError as exc:
+            # Reachable for a hand-edit, a file from an older version, or a
+            # partially-written one left by a crash.
+            if strict:
+                raise CacheUnreadable(f"{path} exists but is not valid JSON") from exc
             return {}
-        except json.JSONDecodeError:
-            # Only reachable for a genuinely corrupt file now that writes are
-            # atomic — a hand-edit, or one left by an older version.
-            return {}
-        except OSError:
-            # Another process replacing the file right now. Reporting {} here
-            # would read as "never synced"; retrying is the honest answer.
+        except OSError as exc:
+            # Another process replacing the file right now.
             if attempt == _RETRIES - 1:
+                if strict:
+                    raise CacheUnreadable(f"{path} could not be read") from exc
                 return {}
             time.sleep(_RETRY_SECONDS)
     return {}

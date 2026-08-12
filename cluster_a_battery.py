@@ -58,6 +58,28 @@ THE ADAPTATIONS, each with what reverts it
       where he is not (8.8 cm at 5 cm), which is the opposite of the obvious
       worry. Reverts: when a reading lands inside ~25 cm the spectrum
       comparison needs a directly measured gap again. Gated on the READING.
+  B9  THE TILT IS THE ATHLETE'S OWN ANGLE, and it amends B7 rather than
+      replacing it (athlete, 2026-08-12). He measures the angle between his
+      straight legs and his torso: 0 is the stomach on the floor, 90 is bolt
+      upright, 180 is flat on the back. SMALLER IS BETTER. He read 93 under his
+      own power — "I cant even get over my hips to start the pancake stretch, I
+      am slightly behind" — and 89 with help.
+      The field had been asking for something else entirely: degrees the PELVIS
+      moved between sitting tall and the deepest tip, bigger better, target 20.
+      So a 93 was read as 93 degrees of pelvic rotation and scored 100%, on a
+      screen that then said "no pattern reached" for an unrelated reason. A
+      number in the right unit, in the wrong direction, against the wrong
+      denominator, is the exact failure the plain-English rule at the top of
+      this file exists to prevent, and it survived because nothing cross-checks
+      a reading against the range a human could plausibly produce.
+      ⚠ IT RE-ADMITS THE CONFOUND B7 REMOVED, and that is the cost. A torso
+      angle can be bought by rounding the spine, which is his documented
+      compensation; the pelvic reading could not be. It is handled in the LOCK
+      instead of by choosing a different measurement — both tilt trials now void
+      on a rounded back and say why. Watch it: if his readings improve while the
+      rounding is unchanged, the lock is not holding and B7's measurement comes
+      back as the arbiter.
+      Reverts: on that evidence, not on a date.
   B7  The tilt is measured as an ANGLE at the pelvis, not as forehead height
       (athlete's call, 2026-08-07). Forehead height is exactly the number a
       rounding spine can fake, and his rounding is the documented compensation
@@ -277,26 +299,30 @@ TESTS: dict[str, BatteryTest] = {
               "hands, no strap, nothing to pull on.** Now tip your hips forward — as if "
               "your waistband were a bowl of water you are pouring out the front — as far "
               "as you can under your own power, and hold it there.",
-        lock="Arms stay crossed, knees stay straight, kneecaps stay pointing up. **The "
-             "tell: if a hand comes down to the floor, even briefly, the trial is void.** "
-             "Steadying the phone against your lower back with one hand is fine — it is "
-             "the floor you must not touch.",
-        measurement="Your phone, flat against your lower back just above the tailbone, "
-                    "with a level app open. Sitting tall, note the angle. Tip as far as "
-                    "you can, hold it, and read the angle again in the same spot. **The "
-                    "reading is how many degrees it moved. Bigger is better.** One number "
-                    "is enough — a rounding back cannot fake this one, which is why the "
-                    "old two-number version is gone.",
-        input_hint="How many degrees the phone reading moved between sitting tall and "
-                   "your deepest tip",
+        lock="Arms stay crossed, knees stay straight, kneecaps stay pointing up, **and "
+             "your back stays flat**. The tell for the hands: if one comes down to the "
+             "floor, even briefly, the trial is void. **The tell for the back: if it "
+             "rounds, the trial is void** — the angle is read to your torso, so a folded "
+             "spine buys degrees your hips never gave, and rounding is your documented "
+             "compensation for exactly this.",
+        measurement="The angle between your legs and your torso at your deepest tip. "
+                    "**Smaller is better, and the scale runs 0 to 180: 0 is your stomach "
+                    "on the floor with your legs straight, 90 is sitting bolt upright, "
+                    "180 is lying flat on your back.** Above 90 you are leaning backwards "
+                    "and have not started the fold at all. Take it from the side — a "
+                    "phone photo against a wall, or a level app laid along your "
+                    "breastbone.",
+        input_hint="The angle between your legs and your torso at your deepest tip, in "
+                   "degrees — 90 is upright, less is further over",
         setup_input="Straddle width — inside of one heel to the inside of the other (cm)",
         what_youre_testing="Whether you can PRODUCE the position, not just be placed in "
                            "it. This is the half that matters most for you: your file "
                            "records that you cannot roll the pelvis forward in sitting, "
                            "and that the rounding everyone notices is the compensation "
-                           "for it rather than the problem itself. Measured at the pelvis "
-                           "because the pelvis is the thing being tested — a forehead "
-                           "height is exactly what a rounding spine fakes. Taken before "
+                           "for it rather than the problem itself. **The lock is what "
+                           "stops a rounding spine faking this** — the angle is read to "
+                           "your torso, so a folded back would buy degrees your hips "
+                           "never gave. Taken before "
                            "the helped version, because help flatters whatever follows "
                            "it. If this fails and the helped test passes, the fix is "
                            "strength at the end of the range, done last in the session.",
@@ -308,13 +334,15 @@ TESTS: dict[str, BatteryTest] = {
               "time use help: walk your hands forward on the floor, or pull on a strap "
               "anchored in front of you, to tip your hips further forward than you could "
               "on your own.",
-        lock="Your knees stay straight and your kneecaps stay pointing up. **The tell: if "
-             "your knees bend or roll inward, the trial is void.**",
-        measurement="The same phone reading: flat against your lower back, sitting tall "
-                    "first, then at your deepest helped tip. **The reading is how many "
-                    "degrees it moved. Bigger is better.**",
-        input_hint="How many degrees the phone reading moved, sitting tall to your "
-                   "deepest helped tip",
+        lock="Your knees stay straight, your kneecaps stay pointing up **and your back "
+             "stays flat**. **The tell: if your knees bend or roll inward, or your back "
+             "rounds, the trial is void** — with help the spine is what gives first, and "
+             "it would buy degrees the hips never gave.",
+        measurement="The same angle, read the same way: legs to torso at your deepest "
+                    "helped tip. **Smaller is better — 90 is upright, 0 is flat on your "
+                    "stomach.**",
+        input_hint="The angle between your legs and your torso at your deepest helped "
+                   "tip, in degrees",
         what_youre_testing="Whether the position exists at all when something else helps. "
                            "Paired with the test before it, this separates 'cannot reach "
                            "it' from 'can reach it but cannot produce it' — and those two "
@@ -479,10 +507,20 @@ LEVERAGE_TARGETS: dict[str, float] = {
     "leverage_straight": 90.0,    # cm ankle-to-ankle, bigger is better
 }
 
-#: Degrees of pelvic tip produced, sitting tall to deepest. Bigger is better.
-#: PROVISIONAL like the rest — invented so the code can run, and it moves once
-#: three baseline mornings show what his own numbers look like.
-TILT_TARGET_DEG: float = 20.0
+#: The torso-to-leg angle, sitting with the legs straight. SMALLER IS BETTER,
+#: and the scale is the athlete's own (2026-08-12): 0° is the stomach on the
+#: floor with the legs straight, 90° is sitting bolt upright, 180° is lying flat
+#: on the back. He measured 93° under his own power — "I cant even get over my
+#: hips to start the pancake stretch, I am slightly behind".
+#:
+#: 90° IS NOT INVENTED, which makes it the least arbitrary threshold in this
+#: file. It is the geometric point where the movement begins: past it the torso
+#: is forward of vertical and the fold has started; short of it you are leaning
+#: backwards and have not begun. His own framing, used as the line.
+#: PROVISIONAL still, in the B5 sense — it moves once three baseline mornings
+#: show his spread, and note his helped reading of 89° clears it by 1°, which is
+#: inside any plausible noise floor. That is what BatteryResult.trusted is for.
+TILT_TARGET_DEG: float = 90.0
 
 
 def floor_gap_from_span(span_cm, leg_length_cm):
@@ -619,16 +657,18 @@ def evaluate_prerequisite(assessment):
                                    "— a tilt recorded in centimetres is from the old "
                                    "protocol and cannot be read.)")
 
-    # PROVISIONAL for the same reason — TILT_TARGET_DEG is ours, not the
-    # source's. Bigger is better: the reading is degrees of pelvic tip produced.
-    if rng.value < TILT_TARGET_DEG:
+    # SMALLER IS BETTER: the reading is the angle between the legs and the
+    # torso, so 0° is folded flat and 90° is upright. A reading ABOVE the target
+    # means he has not got over his hips at all. Flipped 2026-08-12 with the
+    # measurement itself — see B9.
+    if rng.value > TILT_TARGET_DEG:
         return b.SlotResult(slot=b.SLOT_PREREQUISITE, passed=False, pattern="F",
                             basis=b.BASIS_PROVISIONAL,
                             reason="The position is not available even with help. Tilt work "
                                    "goes FIRST in the session and starts assisted — you "
                                    "cannot train actively into a position you cannot reach.",
                             readings=(rng, prod))
-    if prod.value < TILT_TARGET_DEG:
+    if prod.value > TILT_TARGET_DEG:
         return b.SlotResult(slot=b.SLOT_PREREQUISITE, passed=False, pattern="G",
                             basis=b.BASIS_PROVISIONAL,
                             reason="You can reach it, you cannot produce it. Tilt work moves "
@@ -793,8 +833,10 @@ def ladder(assessment, result) -> tuple:
     rng = rng if rng is not None and rng.unit == "°" else None
     prod = assessment.reading("tilt_production")
     prod = prod if prod is not None and prod.unit == "°" else None
-    rng_frac = b.fraction_of_target(rng.value if rng else None, TILT_TARGET_DEG)
-    prod_frac = b.fraction_of_target(prod.value if prod else None, TILT_TARGET_DEG)
+    rng_frac = b.fraction_of_target(rng.value if rng else None, TILT_TARGET_DEG,
+                                    smaller_is_better=True)
+    prod_frac = b.fraction_of_target(prod.value if prod else None, TILT_TARGET_DEG,
+                                     smaller_is_better=True)
 
     if slot2 is not None and not slot2.indeterminate:
         if slot2.pattern == "F":

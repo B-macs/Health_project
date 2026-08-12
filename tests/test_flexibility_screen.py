@@ -94,8 +94,8 @@ _PASS_TO_TILT = [
     {"test_key": "leverage_straight", "value": 94.0, "unit": "cm", "side": "right"},
 ]
 _TILT_FAILS = _PASS_TO_TILT + [
-    {"test_key": "tilt_range", "value": 8.0, "unit": "°"},
-    {"test_key": "tilt_production", "value": 4.0, "unit": "°"},
+    {"test_key": "tilt_range", "value": 95.0, "unit": "°"},
+    {"test_key": "tilt_production", "value": 100.0, "unit": "°"},
 ]
 # The earliest failure the battery can now reach: both leverages short -> C at
 # slot 1. Gate 0 used to sit above this and was removed on 2026-08-12.
@@ -392,8 +392,9 @@ def test_the_ladder_is_on_the_populated_screen_with_honest_states():
     assert "The ladder" in body
     assert "work this first" in body.lower()
     assert "not measured" in body.lower()
-    assert "8° of 20°" in body
-    assert "40%" in body
+    assert "95° of 90°" in body
+    # 90 degrees over a 95 degree reading — 5 short of even reaching upright.
+    assert "95%" in body
     assert "hip abductors" in body.lower()
     assert "ever averaged" in body.lower()
 
