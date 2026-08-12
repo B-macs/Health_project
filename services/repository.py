@@ -45,6 +45,7 @@ from services import sleep_movement
 from services import strain_regions
 from services import supabase_store
 from services.clients import datastore_reader
+from services.clients import datastore_writer
 from services.clients import garmin
 from services.clients import local_cache
 from services.clients import notion
@@ -468,6 +469,9 @@ class Repository:
         self._read_cache: dict = {}
         # {tab_title: worksheet handle} — see _ws.
         self._ws_cache: dict = {}
+        # Cache mode only: the LIVE tab handles, kept apart from the
+        # offline read handles above. See _write_target.
+        self._live_ws_cache: dict = {}
         # (monotonic_ts, {Key: page}) for the whole Config DB — see
         # _config_pages. None means "not fetched, or invalidated by a write".
         self._config_cache: tuple | None = None
@@ -521,14 +525,40 @@ class Repository:
         page has to be able to say so on screen — a page that looks live but
         is reading a snapshot is the failure mode this whole thing has to
         avoid."""
+        return bool(self.config.datastore_path
+                    and self.config.datastore_mode != "cache")
+
+    @property
+    def cached(self) -> bool:
+        """True in the HOSTED mode: reads served locally, writes going through
+        to the backend AND to the local copy in the same call.
+
+        The distinction from `offline` is the whole point. Offline refuses
+        writes because reading a snapshot while writing live is the worst of
+        the three options — a session logged into Notion that the cache has
+        never heard of makes the next strain and ACWR quietly wrong. Cache
+        mode gets the 32 ms reads without that hazard by WRITING THROUGH, so
+        the cache cannot be behind the backend for a value this app wrote.
+        """
+        return bool(self.config.datastore_path
+                    and self.config.datastore_mode == "cache")
+
+    @property
+    def local_datastore(self) -> bool:
+        """Reads come from the local datastore, in either mode."""
         return bool(self.config.datastore_path)
 
     @property
     def _ds(self):
-        """Lazy read-only connection to the datastore. Opened once per
-        Repository lifetime, like every other client here."""
+        """Lazy connection to the datastore. Opened once per Repository
+        lifetime, like every other client here — read-only in offline mode so
+        a bug that reaches a write path fails at SQLite too, read-WRITE in
+        cache mode because that is where write-through lands."""
         if self._datastore_conn is None:
-            self._datastore_conn = datastore_reader.connect(self.config.datastore_path)
+            self._datastore_conn = (
+                datastore_writer.connect_rw(self.config.datastore_path)
+                if self.cached
+                else datastore_reader.connect(self.config.datastore_path))
         return self._datastore_conn
 
     def datastore_built_at(self) -> str | None:
@@ -574,7 +604,7 @@ class Repository:
         ws = self._ws_cache.get(title)
         if ws is not None:
             return ws
-        if self.offline:
+        if self.local_datastore:
             ws = datastore_reader.OfflineWorksheet(
                 self._ds, title, _DATASTORE_TABLE_BY_TAB[title])
         else:
@@ -615,6 +645,15 @@ class Repository:
     #  2026-08-11), so mirroring each row as it is written would add minutes
     #  to a sync that writes a week of nights. Rows accumulate per table and
     #  flush in ONE request each.
+
+    def _mirror_sinks_active(self) -> bool:
+        """True when a written row has anywhere to go.
+
+        TWO independent sinks, and gating on Supabase alone was a real bug:
+        in cache mode without Supabase configured, nothing was written through
+        to the local datastore, so every read after a write served stale rows
+        — silently, which is the exact hazard cache mode exists to remove."""
+        return self.supabase_configured() or self.cached
 
     def supabase_configured(self) -> bool:
         return bool(self.config.supabase_url and self.config.supabase_secret_key)
@@ -662,6 +701,26 @@ class Repository:
                 self.config.supabase_url, self.config.supabase_secret_key)
         return self._supabase_store_obj
 
+    def _write_target(self, ws):
+        """The worksheet a WRITE should go to.
+
+        In cache mode `_ws()` hands back an OfflineWorksheet — correct for
+        reads, and its writes raise. So the write seam resolves the LIVE tab
+        by title instead. Two handles for one tab is the honest shape of
+        "read local, write live": one object that silently did both would hide
+        which side of the split any given call was on.
+        """
+        if not self.cached:
+            return ws
+        title = getattr(ws, "title", "")
+        live = self._live_ws_cache.get(title)
+        if live is None:
+            live = sheets.get_or_create_worksheet(
+                self._sc, self.config.google_sheets_id, title,
+                self._ws_headers.get(title, []))
+            self._live_ws_cache[title] = live
+        return live
+
     def _upsert_sheet_row(self, ws, key_value, values: list) -> None:
         """THE Sheets row-write path: write the tab, then queue the same row
         for Supabase. All eleven upsert-by-date/id call sites go through here,
@@ -672,8 +731,8 @@ class Repository:
         append_rows batch path, which rewrite a tab wholesale. Those are rare
         maintenance operations, and a wholesale rewrite is what the full push
         is for."""
-        sheets.upsert_row_by_key(ws, key_col=1, key_value=key_value,
-                                 row_values=values)
+        sheets.upsert_row_by_key(self._write_target(ws), key_col=1,
+                                 key_value=key_value, row_values=values)
         self._queue_mirror_row(getattr(ws, "title", ""), key_value, values)
 
     def _rewrite_sheet(self, ws, header: list[str], rows: list[list]) -> None:
@@ -686,11 +745,11 @@ class Repository:
         there is nothing to delete. A rewrite that could SHRINK a tab would
         need delete-then-insert, the way training_sets does.
         """
-        sheets.rewrite_worksheet(ws, header, rows)
+        sheets.rewrite_worksheet(self._write_target(ws), header, rows)
         self._queue_mirror_rows(ws, header, rows)
 
     def _append_sheet_rows(self, ws, header: list[str], values: list[list]) -> None:
-        sheets.append_rows(ws, values)
+        sheets.append_rows(self._write_target(ws), values)
         self._queue_mirror_rows(ws, header, values)
 
     def _queue_mirror_rows(self, ws, header: list[str], rows: list[list]) -> None:
@@ -701,7 +760,7 @@ class Repository:
         current constant — that is the whole point of rebuild_tab. Every one
         of these tabs is keyed on its first column."""
         title = getattr(ws, "title", "")
-        if not self.supabase_configured() or not _DATASTORE_TABLE_BY_TAB.get(title):
+        if not self._mirror_sinks_active() or not _DATASTORE_TABLE_BY_TAB.get(title):
             return
         for values in rows:
             if values:
@@ -717,7 +776,7 @@ class Repository:
         tests/test_repository_offline_datastore.py — so the row is the header
         zipped onto the values it was just written from.
         """
-        if not self.supabase_configured():
+        if not self._mirror_sinks_active():
             return
         table = _DATASTORE_TABLE_BY_TAB.get(title)
         header = header or self._ws_headers.get(title)
@@ -741,9 +800,6 @@ class Repository:
         holding those four columns and NULL for everything else. That orphan
         looks like a real logged exercise to anything counting rows.
         """
-        if not self.supabase_configured():
-            return
-        self._register_mirror_flush_at_exit()
         # Blank -> NULL on the way in, so a mirrored row is the row the next
         # full rebuild would write. See blank_to_null.
         if mode == supabase_store.REPLACE:
@@ -754,7 +810,63 @@ class Repository:
             return
         else:
             payload = supabase_store.blank_to_null(row)
-        supabase_store.OUTBOX.queue(table, key_value, payload, mode=mode)
+        # TWO SINKS, and the split is deliberate. The local cache is written
+        # SYNCHRONOUSLY because the very next read must see it — that is the
+        # whole reason cache mode is safe where offline mode was not. Supabase
+        # is BUFFERED because it is a network round trip (~136 ms) and being a
+        # few seconds behind costs nothing: nothing reads from it.
+        self._write_through(table, key_value, payload, mode)
+        if self.supabase_configured():
+            self._register_mirror_flush_at_exit()
+            supabase_store.OUTBOX.queue(table, key_value, payload, mode=mode)
+
+    def _write_through(self, table: str, key_value, payload, mode: str) -> None:
+        """Apply one written row to the LOCAL datastore.
+
+        Only in cache mode: offline refuses writes outright, and with no
+        datastore there is nothing to keep current.
+
+        Applies the SAME row the mirror sends, through the same three modes,
+        because the two copies disagreeing is exactly the failure this whole
+        arc has been chasing. SQLite's ON CONFLICT DO UPDATE has PostgREST's
+        merge-duplicates semantics, verified: a partial upsert leaves the
+        columns it did not name alone.
+
+        UNLIKE the Supabase flush, a failure here RAISES. A mirror falling
+        behind leaves a replica stale; a cache falling behind leaves the thing
+        the app READS FROM disagreeing with the system of record, and the next
+        page renders a number that is quietly wrong.
+        """
+        if not self.cached:
+            return
+        try:
+            conn = self._ds
+            with conn:
+                if mode == supabase_store.REPLACE:
+                    datastore_writer.replace_children(
+                        conn, table,
+                        supabase_store.REPLACE_PARENT_COLUMN[table],
+                        key_value, payload)
+                elif mode == supabase_store.PATCH:
+                    datastore_writer.patch(
+                        conn, table, supabase_store.primary_key(table),
+                        key_value, payload)
+                else:
+                    datastore_writer.upsert(
+                        conn, table, supabase_store.primary_key(table), payload)
+            # Every cached read is now stale, PROCESS-WIDE. Per-instance
+            # invalidation would not do: the background sync writes through
+            # on its own Repository (key rule 12) while the script thread
+            # holds its own read cache, and that thread is the one about to
+            # render the number.
+            sheets.bump_write_generation()
+        except Exception as exc:
+            raise datastore_writer.DatastoreWriteError(
+                f"could not write {table} row {key_value!r} through to the "
+                f"local datastore ({self.config.datastore_path}): {exc}. The "
+                f"backend write already succeeded, so the cache is now BEHIND "
+                f"— rebuild it with scripts/pull_datastore_from_supabase.py."
+            ) from exc
 
     #: Which datastore table each Notion database writes to. Training is
     #: absent because ONE training page spans three tables — see
@@ -782,7 +894,7 @@ class Repository:
         some properties, which is most of them: a partial UPSERT would insert
         an orphan row for a page logged before the mirror existed.
         """
-        if not self.supabase_configured():
+        if not self._mirror_sinks_active():
             return
         row = notion_reader.row_from_properties(kind, properties)
         if kind == notion_reader.TRAINING:
@@ -940,7 +1052,7 @@ class Repository:
         Either/or on config, never a fallback, for the same reason as _ws: a
         failed live read keeps failing rather than quietly serving a
         snapshot."""
-        if self.offline:
+        if self.local_datastore:
             return notion_reader.query(
                 self._ds, self._db_kind(db_id), filter_=filter_, sorts=sorts)
         return notion.query_database(self._nc, db_id, filter_=filter_, sorts=sorts)
@@ -2201,7 +2313,7 @@ class Repository:
         raw. Returning the mapped columns under this method's name would be
         a lie about what "raw passthrough" means, and returning [] would
         read as "the legacy export is empty"."""
-        if self.offline:
+        if self.local_datastore:
             raise datastore_reader.DatastoreReadOnlyError(
                 "get_raw_sheet_rows() has no offline equivalent — the "
                 "datastore holds Sheet1 mapped (sheet1_legacy_biometrics), "
@@ -2225,7 +2337,7 @@ class Repository:
         _populate_sheet1_legacy wrote it from this very method), so the
         mapping below has already been applied and re-applying it to the
         mapped names would map everything to None."""
-        if self.offline:
+        if self.local_datastore:
             rows = datastore_reader.OfflineWorksheet(
                 self._ds, sheets.WORKSHEET, "sheet1_legacy_biometrics").get_all_records()
             return [models.BiometricRecord(

@@ -44,13 +44,77 @@ datastore_schema.sql's header comment.
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+import tempfile
 from datetime import datetime
 from pathlib import Path
 
 from services.repository import Repository
 
 SCHEMA_PATH = Path(__file__).resolve().parent / "datastore_schema.sql"
+
+
+def ensure_local_cache(config, store_factory=None) -> str | None:
+    """Build the local read cache from Supabase if it is not there.
+
+    THE HOSTING CASE. A hosted filesystem is typically ephemeral: a redeploy
+    wipes datastore.db, and cache mode would then serve every read from an
+    empty database — which returns [] rather than an error, so the app would
+    render as though the athlete had never logged anything. This makes a cold
+    start hydrate itself.
+
+    FROM SUPABASE, NOT FROM NOTION AND SHEETS. That is the direction that
+    makes the cache independent of them, and it is ~4-5 s for every table
+    against minutes for a full Notion/Sheets read pass.
+
+    Returns the path it filled, or None when it did nothing. Only acts in
+    cache mode, and only when the file is missing or holds no tables — a
+    present cache is never silently replaced, because it may hold
+    written-through rows this process just made. Refresh an existing one
+    deliberately with scripts/pull_datastore_from_supabase.py.
+    """
+    if not (config.datastore_path and config.datastore_mode == "cache"):
+        return None
+    if not (config.supabase_url and config.supabase_secret_key):
+        raise RuntimeError(
+            "datastore_mode='cache' needs SUPABASE_URL and SUPABASE_SECRET_KEY: "
+            "the cache is rebuilt from Supabase, and without it a cold start "
+            "would serve reads from an empty database and render as though "
+            "nothing had ever been logged."
+        )
+
+    from services import supabase_store
+
+    path = Path(config.datastore_path)
+    if path.exists():
+        probe = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+        try:
+            has_tables = probe.execute(
+                "SELECT COUNT(*) FROM sqlite_master WHERE type='table'"
+            ).fetchone()[0] > 0
+        finally:
+            probe.close()
+        if has_tables:
+            return None
+
+    store = supabase_store.SupabaseStore(
+        config.supabase_url, config.supabase_secret_key)
+    # Into a temp file, then os.replace — the same contract
+    # scripts/build_datastore.py has, so a failed hydration never leaves a
+    # half-filled cache that reads as real data.
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent or "."), suffix=".hydrating")
+    os.close(fd)
+    conn = sqlite3.connect(tmp)
+    try:
+        supabase_store.pull(store, conn)
+    except BaseException:
+        conn.close()          # Windows will not unlink an open file
+        Path(tmp).unlink(missing_ok=True)
+        raise
+    conn.close()
+    os.replace(tmp, path)
+    return str(path)
 
 
 def rebuild(repo: Repository, conn: sqlite3.Connection, now: datetime | None = None) -> dict[str, int]:

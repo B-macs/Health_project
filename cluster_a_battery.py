@@ -127,7 +127,7 @@ TESTS: dict[str, BatteryTest] = {
     # ── Slot 0 — Structure ──────────────────────────────────────────────────
     "gate0_neutral": BatteryTest(
         key="gate0_neutral", slot=_b.SLOT_STRUCTURE,
-        label="Side split, legs neutral", unit="cm", smaller_is_better=True,
+        label="Side split, legs neutral", unit="cm", smaller_is_better=False,
         setup="Slide into a side split with your legs in a **neutral rotation** — kneecaps "
               "pointing forward, not turned up. Go to where it stops, not past it. Hands on "
               "blocks in front of you so your chest stays up.",
@@ -136,9 +136,9 @@ TESTS: dict[str, BatteryTest] = {
              "anything else that moves contaminates it. **The tell: if your back position "
              "changes between the two attempts, the trial is void** — reset and take both "
              "again.",
-        measurement="Measure the gap from the floor up to your crotch. Smaller is deeper. "
+        measurement="Measure along the floor from one heel to the other. Bigger is deeper. "
                     "To the nearest half centimetre.",
-        input_hint="The gap between the floor and your crotch, in cm",
+        input_hint="The distance along the floor between your two heels, in cm",
         what_youre_testing="Whether the thing stopping you is the shape of your hip joint "
                            "rather than tissue length. The neck of the thigh bone eventually "
                            "meets the rim of the socket, and where that happens varies a lot "
@@ -159,16 +159,16 @@ TESTS: dict[str, BatteryTest] = {
     ),
     "gate0_turned_out": BatteryTest(
         key="gate0_turned_out", slot=_b.SLOT_STRUCTURE,
-        label="Side split, legs turned out", unit="cm", smaller_is_better=True,
+        label="Side split, legs turned out", unit="cm", smaller_is_better=False,
         setup="The same position, but now **turn both legs out from the hips** — let the "
               "kneecaps rotate toward the ceiling. Keep your back exactly as it was in the "
               "first attempt.",
         lock="As above: pelvis and lower back unchanged between the two. **The tell is the "
              "same** — if your back moves, the comparison is void.",
-        measurement="Same measurement: floor to crotch, to the nearest half centimetre. "
-                    "**The reading is the difference between the two attempts.**",
-        input_hint="The gap between the floor and your crotch, in cm — same spot and "
-                   "same tape as the first attempt",
+        measurement="Same measurement: heel to heel along the floor, to the nearest half "
+                    "centimetre. **The reading is the difference between the two attempts.**",
+        input_hint="The distance along the floor between your two heels, in cm — same "
+                   "spot and same tape as the first attempt",
         what_youre_testing="The same question, asked with the joint aligned differently. "
                            "There are two ways to give the hip more room — turn the leg out, "
                            "or tilt the pelvis — and they reach the same place. This uses the "

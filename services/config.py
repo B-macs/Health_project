@@ -42,6 +42,19 @@ class Config:
     # (the default, and what the deployed app runs with) means live Sheets.
     # Deliberately NOT a fallback for a failed live read — see Repository._ws.
     datastore_path: str = ""
+    # How that datastore is used. Only meaningful when datastore_path is set.
+    #
+    #   "readonly"  (default) reads are served locally and every write RAISES.
+    #               The testing/offline mode, unchanged since 2026-08-01.
+    #   "cache"     reads are served locally AND writes go through to the
+    #               backend, with the local copy written through in the same
+    #               call so the next read sees them. This is the HOSTED mode:
+    #               a server needs 32 ms reads without the stale-cache hazard
+    #               that made "readonly" refuse writes in the first place.
+    #
+    # Defaulting to "readonly" keeps every existing checkout, script and test
+    # behaving exactly as before — the new mode is opt-in.
+    datastore_mode: str = "readonly"
     # Optional — the Supabase (PostgreSQL) project the datastore is pushed to.
     # Blank means "not configured", which is not an error: nothing in the live
     # app reads from Postgres yet, so a checkout without these keys behaves
@@ -124,6 +137,7 @@ def load_config(overrides: dict | None = None) -> Config:
         garmin_password=_resolve_optional_str("GARMIN_PASSWORD", overrides),
         oura_token=_resolve_optional_str("OURA_TOKEN", overrides),
         datastore_path=_resolve_optional_str("HEALTH_DATASTORE_PATH", overrides),
+        datastore_mode=_resolve_optional_str("HEALTH_DATASTORE_MODE", overrides) or "readonly",
         supabase_url=_resolve_optional_str("SUPABASE_URL", overrides),
         supabase_secret_key=_resolve_optional_str("SUPABASE_SECRET_KEY", overrides),
         timezone=_resolve_optional_str("HEALTH_TIMEZONE", overrides),

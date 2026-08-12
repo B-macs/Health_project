@@ -76,6 +76,18 @@ def write_generation() -> int:
     return _WRITE_GENERATION
 
 
+def bump_write_generation() -> None:
+    """Invalidate every cached read, process-wide.
+
+    Public because a Sheets write is no longer the only thing that changes
+    what a read returns: in cache mode Repository writes rows THROUGH to the
+    local datastore, and reads come from there. Relying on the live Sheets
+    write to bump this as a side effect would leave a Notion write-through
+    invisible to the next read, and would make local-cache coherence depend
+    on a completely different backend having been touched."""
+    _bump_write_generation()
+
+
 def _bump_write_generation() -> None:
     global _WRITE_GENERATION
     _WRITE_GENERATION += 1

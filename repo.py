@@ -14,6 +14,7 @@ prior per-call Client() construction, not a user-visible behavior change.
 
 import streamlit as st
 
+from services import datastore
 from services.background_sync import BackgroundSyncRunner
 from services.config import load_config
 from services.repository import Repository
@@ -30,7 +31,20 @@ def get_config():
 
 @st.cache_resource(show_spinner=False)
 def get_repository() -> Repository:
-    return Repository(get_config())
+    """The one Repository per process.
+
+    In cache mode this also HYDRATES the local read cache from Supabase when
+    it is missing, before anything can read through it. A hosted filesystem is
+    typically ephemeral, so a redeploy wipes datastore.db — and an empty
+    datastore returns [] rather than raising, which would render as though the
+    athlete had never logged anything. Here rather than in Repository because
+    it must happen once per process, and @st.cache_resource is what guarantees
+    that; it is a no-op in every other mode."""
+    config = get_config()
+    filled = datastore.ensure_local_cache(config)
+    if filled:
+        st.toast(f"Rebuilt the local read cache from Supabase ({filled}).")
+    return Repository(config)
 
 
 @st.cache_resource(show_spinner=False)

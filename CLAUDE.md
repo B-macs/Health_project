@@ -27,7 +27,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **2639/2639 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **2667/2667 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -377,6 +377,50 @@ HEALTH_DATASTORE_PATH=datastore.db python -m streamlit run app.py
   that is simply absent, with no error anywhere. `tests/test_notion_reader.py`
   scrapes `repository.py` for every `get_property` call and fails on any that
   is unmapped, so the two cannot drift silently.
+
+## Cache mode — the HOSTED runtime (added 2026-08-12)
+
+*Key rule 18 says the app runs on a hosted server. That needed a third mode,
+because the two that existed were mutually exclusive: `datastore_path` unset
+meant live reads (~8,884 ms) and live writes; `datastore_path` set meant local
+reads (**32 ms**) and writes that RAISE. A server wants local reads AND live
+writes — the combination `clients/datastore_reader.py` calls "worse still".*
+
+**`HEALTH_DATASTORE_MODE=cache`** (default `readonly`, so every existing
+checkout, script and test is unchanged). It is safe where a snapshot is not,
+because the cache is **WRITTEN THROUGH, not merely refreshed**: every write
+lands in the local copy synchronously, in the same call as the backend write.
+Measured end-to-end on the real datastore: reads **30.9 ms**, and a written
+row — through both the Sheets seam and the Notion three-table fan-out — is
+visible to the very next read.
+
+- **Why a snapshot was refused and this is not.** Stale cache + live writes
+  means a logged session the next page has never heard of, so strain, ACWR and
+  tomorrow's prescription compute from data already wrong — no error, entirely
+  plausible numbers. Write-through removes exactly that.
+- **The rows already existed.** Every write fans into `supabase_store.OUTBOX`
+  in datastore-row shape, so the cache is a SECOND sink for the SAME rows.
+  `clients/datastore_writer.py` applies them through the same three modes, and
+  SQLite's `ON CONFLICT DO UPDATE` has PostgREST's merge-duplicates semantics
+  — verified: a partial upsert leaves unnamed columns alone.
+- **A failed cache write RAISES**, unlike a failed Supabase flush. A mirror
+  falling behind leaves a replica stale; the cache falling behind leaves the
+  thing the app READS FROM disagreeing with the system of record.
+- **Write-through bumps `sheets.bump_write_generation()`**, process-wide.
+  Per-instance invalidation would not do — the background sync writes through
+  on its own `Repository` (key rule 12) while the script thread holds its own
+  read cache and is the one about to render the number. Relying on the live
+  Sheets write to bump it as a side effect would leave a NOTION write-through
+  invisible to the next read.
+- **Two handles per tab**: `_ws()` returns the offline read handle, and
+  `_write_target()` resolves the LIVE tab for writes. One object doing both
+  would hide which side of the split a call was on.
+- **`repo.get_repository()` hydrates a missing cache from Supabase**
+  (`datastore.ensure_local_cache`) before anything can read through it — a
+  hosted redeploy wipes the disk, and an empty datastore returns `[]` rather
+  than raising, so the app would render as though nothing had ever been
+  logged. An EXISTING cache is never silently replaced; refresh it
+  deliberately with `scripts/pull_datastore_from_supabase.py`.
 
 ## Supabase — a live MIRROR, never a read path
 
