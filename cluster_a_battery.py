@@ -136,9 +136,10 @@ TESTS: dict[str, BatteryTest] = {
              "anything else that moves contaminates it. **The tell: if your back position "
              "changes between the two attempts, the trial is void** — reset and take both "
              "again.",
-        measurement="Measure along the floor from one heel to the other. Bigger is deeper. "
-                    "To the nearest half centimetre.",
-        input_hint="The distance along the floor between your two heels, in cm",
+        measurement="Measure along the floor from the inside of one heel to the inside "
+                    "of the other. Bigger is deeper. To the nearest half centimetre.",
+        input_hint="The distance between the inside of one heel and the inside of the "
+                   "other, in cm",
         what_youre_testing="Whether the thing stopping you is the shape of your hip joint "
                            "rather than tissue length. The neck of the thigh bone eventually "
                            "meets the rim of the socket, and where that happens varies a lot "
@@ -165,10 +166,11 @@ TESTS: dict[str, BatteryTest] = {
               "first attempt.",
         lock="As above: pelvis and lower back unchanged between the two. **The tell is the "
              "same** — if your back moves, the comparison is void.",
-        measurement="Same measurement: heel to heel along the floor, to the nearest half "
-                    "centimetre. **The reading is the difference between the two attempts.**",
-        input_hint="The distance along the floor between your two heels, in cm — same "
-                   "spot and same tape as the first attempt",
+        measurement="Same measurement: inside heel to inside heel along the floor, to "
+                    "the nearest half centimetre. **The reading is the difference "
+                    "between the two attempts.**",
+        input_hint="The distance between the inside of one heel and the inside of the "
+                   "other, in cm — same tape as the first attempt",
         what_youre_testing="The same question, asked with the joint aligned differently. "
                            "There are two ways to give the hip more room — turn the leg out, "
                            "or tilt the pelvis — and they reach the same place. This uses the "

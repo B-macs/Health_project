@@ -6,9 +6,13 @@ Training, Config), and the Google Sheets ID + service-account JSON.
 
 The Notion BIOMETRICS database was retired on 2026-08-12 -- it held ten pages
 with every column NULL and had no live writer. NOTION_DB_BIOMETRICS is no
-longer read, so an existing secrets.toml can keep or drop it freely. load_config() reads them from OS
-environment variables first, falling back to an injected `overrides` dict —
-the Streamlit layer builds that dict from st.secrets at startup. This module
+longer read, so an existing secrets.toml can keep or drop it freely. load_config() reads them from the injected
+`overrides` dict FIRST — the Streamlit layer builds that from st.secrets at
+startup — and falls back to OS environment variables. That order matters when
+choosing where to put a setting: anything present in secrets.toml CANNOT be
+overridden per-environment by an env var, so host-specific settings
+(HEALTH_DATASTORE_PATH, HEALTH_DATASTORE_MODE) belong in the environment and
+credentials belong in secrets. This module
 itself never imports streamlit, so the identical services/ code works
 unmodified behind FastAPI + env vars later.
 

@@ -793,10 +793,8 @@ def _leg_session(*names, on="2026-09-12"):
                                     for n in names])
 
 
-def _loaded_category(name) -> bool:
-    import training_constants as tc
-    entry = tc.EXERCISE_MOVEMENT_WEIGHT.get(name)
-    return entry is None or entry[0] not in fx.RELEASE_MOVEMENT_CATEGORIES
+def _counts_as_leg_work(name) -> bool:
+    return name not in fx.RELEASE_EXERCISES
 
 
 def test_leg_days_are_judged_by_the_same_map_the_sectors_read():
@@ -805,7 +803,7 @@ def test_leg_days_are_judged_by_the_same_map_the_sectors_read():
     already depend on — rather than inventing a second definition."""
     import training_constants as tc
     lower = next(n for n, r in tc.EXERCISE_BODY_REGION.items()
-                 if r == "lower_body" and _loaded_category(n))
+                 if r == "lower_body" and _counts_as_leg_work(n))
     upper = next(n for n, r in tc.EXERCISE_BODY_REGION.items() if r == "upper_body")
 
     assert fx.leg_loading_days([_leg_session(lower)]) == {date(2026, 9, 12)}
@@ -881,21 +879,76 @@ def test_an_exercise_missing_from_the_weight_map_counts_as_loaded():
         assert fx.leg_loading_days([_leg_session(name)]) == {date(2026, 9, 12)}
 
 
-def test_the_release_line_is_drawn_by_category_not_by_weight():
-    """The exclusion names a CATEGORY so the weights stay retunable. That only
-    holds while every excluded category really does sit below every loaded one
-    — pin the ORDERING, so a retune that inverted it fails here instead of
-    silently changing which mornings are clean."""
+def test_end_range_hamstring_work_is_a_leg_day_however_cheap_its_strain_weight():
+    """WHY THIS IS A NAME LIST AND NOT A CATEGORY. An earlier version excluded
+    the whole `mobility_core` weight tier, which cleared these four — and
+    `RDL Hip Hinge to Wall` is 3 x 15 on a 3-1-2 tempo whose own mechanics text
+    reads "Feel the HAMSTRINGS load as the primary sensation". Slow eccentric
+    work at long muscle length is the most reliable producer of next-day
+    hamstring stiffness there is, and hamstring length is exactly what the
+    straight-knee leverage rung and the seated tilt angle measure. The tier is
+    right about STRAIN and says nothing about the tissue under test."""
+    for name in ("Hip Hinge Full Range Assessment", "RDL Hip Hinge to Wall",
+                 "Standing Hip Hinge (Wall Glute Touch)", "Wall-Supported Hip Hinge"):
+        assert fx.leg_loading_days([_leg_session(name)]) == {date(2026, 9, 12)}, name
+
+
+def test_the_reassessment_morning_is_guarded():
+    """PLAN_STAGE2 day 28 IS the 2026-08-16 reassessment, and its only
+    lower-body item is the full-range hip hinge. Under the category rule that
+    day contained no leg-day exercise at all, so the morning after the block's
+    own test session read as clean. Pinned against the real plan, not a
+    fixture, so a plan edit that reintroduced the gap fails here."""
+    import training_plan as tp
+    from services.models import ExerciseEntry, SessionRecord
+    for day in (14, 28):
+        names = [e["name"] for e in tp.PLAN_STAGE2[day]["exercises"]]
+        session = SessionRecord(session_date="2026-08-16",
+                                session_duration_minutes=60.0, session_rpe=4.0,
+                                session_au=240.0,
+                                exercises=[ExerciseEntry(name=n, movement_type="Mobility")
+                                           for n in names])
+        assert fx.leg_loading_days([session]) == {date(2026, 8, 16)}, (
+            f"PLAN_STAGE2 day {day} must count as a leg day; it contains {names}")
+
+
+def test_every_lower_body_mobility_name_is_classified_explicitly():
+    """The mobility tier is the ambiguous zone — it holds both a TFL pressure
+    release and 45 reps of eccentric hamstring work. Each name is therefore
+    classified by hand into exactly one of the two sets, and this test fails
+    when a new block adds one nobody has judged. An unexplained absence must
+    never be indistinguishable from an oversight (cluster_a_mechanics.REMOVED's
+    rule). Until it is judged, an unlisted name counts as LOADED and warns —
+    the safe direction, but a decision owed rather than a decision made."""
     import training_constants as tc
-    weights = {cat: w for cat, w in tc.EXERCISE_MOVEMENT_WEIGHT.values()}
-    assert fx.RELEASE_MOVEMENT_CATEGORIES, "an empty set would disable the rule"
-    assert fx.RELEASE_MOVEMENT_CATEGORIES <= set(weights), \
-        "every excluded category must be a real category of the weight table"
-    released = {weights[c] for c in fx.RELEASE_MOVEMENT_CATEGORIES}
-    loaded = {w for c, w in weights.items() if c not in fx.RELEASE_MOVEMENT_CATEGORIES}
-    assert max(released) < min(loaded), (
-        f"release tier {sorted(released)} must sit strictly below the loaded "
-        f"tiers {sorted(loaded)}")
+    tier = {n for n, r in tc.EXERCISE_BODY_REGION.items()
+            if r == "lower_body"
+            and (tc.EXERCISE_MOVEMENT_WEIGHT.get(n) or ("", 0))[0] == "mobility_core"}
+    classified = fx.RELEASE_EXERCISES | fx.MOBILITY_TIER_LOADS_LEGS
+
+    assert not (tier - classified), (
+        f"unclassified lower-body mobility names: {sorted(tier - classified)} — "
+        f"decide whether each leaves the tested tissue tighter, then add it to "
+        f"RELEASE_EXERCISES or MOBILITY_TIER_LOADS_LEGS")
+    assert not (classified - tier), (
+        f"names classified but no longer in the map: {sorted(classified - tier)}")
+    assert not (fx.RELEASE_EXERCISES & fx.MOBILITY_TIER_LOADS_LEGS), \
+        "a name cannot both release and load"
+
+
+def test_the_allow_list_fails_safe_for_anything_it_does_not_name():
+    """The fail-safe lives in the STRUCTURE, not in a lookup that can fail open
+    — which is how the category version let the hinge drills through. An
+    unclassified lower-body name warns; only an explicitly named release clears
+    the morning. A warning nobody needed costs a morning; a retest silently
+    taken on worked tissue costs the reading and every comparison built on it.
+    """
+    import training_constants as tc
+    name = "Nordic Hamstring Curl (unmapped, next block)"
+    assert name not in fx.RELEASE_EXERCISES
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setitem(tc.EXERCISE_BODY_REGION, name, "lower_body")
+        assert fx.leg_loading_days([_leg_session(name)]) == {date(2026, 9, 12)}
 
 
 def test_the_window_reads_the_training_log():

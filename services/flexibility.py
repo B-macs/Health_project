@@ -320,47 +320,98 @@ RETEST_TOMORROW = "tomorrow"
 RETEST_READY = "ready"
 RETEST_BLOCKED = "blocked"
 
-#: Movement categories that do NOT make a day a leg day, however plainly the
-#: sector map calls them lower body.
-#:
-#: THE RULE IS ABOUT LOADING, AND THE SECTOR MAP DOES NOT ANSWER THAT. Sector
-#: answers "which one region owns this movement", which is the right question
-#: for tonnage and for an e1RM and the wrong one here: the pre-session release
-#: block is lower_body by sector, and it runs before EVERY session. Judging on
-#: sector alone flagged a piriformis PNF, a TFL self-release and a walk as leg
-#: training — measured on the real log, 25 of the 52 lower-body names, and both
-#: 2026-08-10 and 2026-08-11, neither of which loaded anything (RPE 2, 94 and
-#: 102 AU). A warning that fires on nearly every morning has stopped carrying
-#: information, and it was ALSO backwards on mechanism: the stated reason is
-#: "reads TIGHTER than your real baseline", and release work is the one thing
-#: in the log that does the opposite.
-#:
-#: Named by CATEGORY rather than by its 0.25 weight so retuning the number
-#: cannot silently move the line. The line sits immediately below `isolation`
-#: (0.3) deliberately — an eccentric calf raise and a clamshell are light, but
-#: they are still work the tested tissue did yesterday, and `Outdoor Run` /
-#: `Outdoor Hike` are `bodyweight_compound` (0.5) and keep flagging, which is
-#: what matters once running enters the block.
-RELEASE_MOVEMENT_CATEGORIES: frozenset[str] = frozenset({"mobility_core"})
+# ── what "a leg day" means, and why it is a NAME LIST ────────────────────────
+#
+# THE RULE IS ABOUT LOADING, AND NO EXISTING MAP ANSWERS THAT QUESTION.
+#
+# `EXERCISE_BODY_REGION` answers "which one sector owns this movement" — right
+# for tonnage and for an e1RM, wrong here: the pre-session release block is
+# lower_body by sector and runs before EVERY session, so judging on sector alone
+# flagged a piriformis PNF, a TFL self-release and a walk as leg training. That
+# fired on nearly every morning, and was backwards on mechanism — the warning
+# says "reads TIGHTER than your real baseline" and release work does the
+# opposite.
+#
+# `EXERCISE_MOVEMENT_WEIGHT`'s category was tried next and IS ALSO WRONG, which
+# is the more interesting failure. Excluding the whole `mobility_core` tier
+# cleared `Hip Hinge Full Range Assessment` (2 x 10 at maximum range, 3-1-3
+# tempo) and `RDL Hip Hinge to Wall` (3 x 15, 3-1-2, whose own mechanics text
+# reads "Feel the HAMSTRINGS load as the primary sensation"). Slow eccentric
+# work at long muscle length is the most reliable producer of next-day hamstring
+# stiffness there is, and hamstring length is precisely what the straight-knee
+# leverage rung and the seated tilt angle measure. The tier is right about
+# STRAIN — a wall-supported hinge really is cheap in AU — and that is a
+# different question from whether the tissue under test was worked.
+# `PLAN_STAGE2` day 28, the 2026-08-16 reassessment, contains no other
+# lower-body item, so the category rule left that morning unguarded entirely.
+#
+# So the judgement is an explicit ALLOW-LIST of names, which puts the fail-safe
+# in the structure rather than in a lookup that can fail open: anything
+# lower_body and not named below counts as loaded, including every name nobody
+# has classified yet. The two sets below are exhaustive over the lower-body
+# mobility tier and a test fails if a new name joins it unclassified — an
+# unexplained absence must never be indistinguishable from an oversight.
+
+#: Lower-body work that does NOT dirty the next morning's reading: pressure
+#: release, PNF, nerve glides, unloaded mobility, balance and walking. These
+#: leave the tested tissue no shorter than they found it.
+RELEASE_EXERCISES: frozenset[str] = frozenset({
+    # Pressure release and stretch — the pre-session release block
+    "Upper Glute / TFL Self-Release",
+    "Piriformis Contract-Relax (PNF)",
+    "Ischial Tuberosity Hamstring Release",
+    "Standing Hip Flexor Release",
+    "Right Posterior Hip Capsule Stretch",
+    "Right Posterior Hip Capsule Stretch (Revised Cue)",
+    "Right Hip Tendon Path Drill (Coxa Saltans)",
+    # Unloaded mobility — moved through range, not worked at it
+    "Hip 90/90 Flow",
+    "Supine Knee Fallout (Butterfly)",
+    "Sciatic Nerve Floss",
+    # Balance and gait — no end-range loading of anything the battery tests
+    "Single-Leg Balance",
+    "Single-Leg Balance (Eyes Closed)",
+    "Controlled Walking",
+    "Walking — Gait Focus",
+    "Lateral Step Walk",
+    "Assessment Walk + Stair Check",
+    "5-Minute Walk + Stair Assessment",
+})
+
+#: Lower-body names that are CHEAP IN STRAIN BUT STILL WORK THE TESTED TISSUE.
+#: Nothing reads this set — `leg_loading_days` needs only the allow-list above.
+#: It exists so the mobility tier is classified exhaustively and visibly, and so
+#: the reason each of these flags is written down next to the decision rather
+#: than inferred from an absence.
+MOBILITY_TIER_LOADS_LEGS: frozenset[str] = frozenset({
+    # End-range eccentric hamstring work — the case that broke the category rule
+    "Hip Hinge Full Range Assessment",
+    "RDL Hip Hinge to Wall",
+    "Standing Hip Hinge (Wall Glute Touch)",
+    "Wall-Supported Hip Hinge",
+    # Hip flexors, which are what the tilt-production slot measures
+    "90/90 Hip Flexor Hold",
+    "Supine Hip Flexion (Marching)",
+    # Loaded posterior chain and abductors — the "pullers" of pattern I
+    "Single-Leg Glute Bridge",
+    "Lateral Band Walk",
+})
 
 
 def leg_loading_days(sessions) -> set[date]:
-    """Dates whose logged session LOADED the legs, judged by exercise NAME
-    against two maps the rest of the app already depends on — no third,
-    private definition of 'a leg day'.
+    """Dates whose logged session LOADED the legs.
 
-    `training_constants.EXERCISE_BODY_REGION` says WHICH region (the map
-    strength and tonnage read), and `EXERCISE_MOVEMENT_WEIGHT` says whether it
-    was load or release (the map Strain/ACWR read). Both conditions must hold:
-    a lower-body name in a `RELEASE_MOVEMENT_CATEGORIES` category is release
-    work and does not make the morning after it dirty.
+    `training_constants.EXERCISE_BODY_REGION` selects the lower-body names — the
+    same map strength and tonnage read, so the region half of "a leg day" means
+    one thing everywhere — and `RELEASE_EXERCISES` then names the ones that do
+    not leave the tested tissue tighter.
 
-    An exercise absent from the weight map counts as LOADED — the same
-    conservative direction `services/content_weighting.UNMAPPED_EXERCISE_WEIGHT`
-    takes, so a new block's exercise can never silently clear a retest morning
-    by being added to one map and not the other. A session with no loaded
-    lower-body exercise is not a leg day, and an unparseable session is skipped
-    rather than guessed at."""
+    ALLOW-LIST, NOT DENY-LIST. An unclassified lower-body name counts as LOADED,
+    the same conservative direction `content_weighting.UNMAPPED_EXERCISE_WEIGHT`
+    takes for the ACWR chain: a warning nobody needed costs a morning, and a
+    retest silently taken on worked tissue costs the reading and every
+    comparison built on it. A session with no loaded lower-body exercise is not
+    a leg day, and an unparseable session is skipped rather than guessed at."""
     days: set[date] = set()
     for s in sessions or ():
         try:
@@ -371,8 +422,7 @@ def leg_loading_days(sessions) -> set[date]:
             name = getattr(ex, "name", "")
             if _tc.EXERCISE_BODY_REGION.get(name) != "lower_body":
                 continue
-            entry = _tc.EXERCISE_MOVEMENT_WEIGHT.get(name)
-            if entry is not None and entry[0] in RELEASE_MOVEMENT_CATEGORIES:
+            if name in RELEASE_EXERCISES:
                 continue
             days.add(d)
             break

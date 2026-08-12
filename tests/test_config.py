@@ -62,3 +62,36 @@ def test_config_never_imports_streamlit():
             assert not any(a.name.split(".")[0] == "streamlit" for a in node.names)
         if isinstance(node, ast.ImportFrom):
             assert node.module is None or node.module.split(".")[0] != "streamlit"
+
+
+def test_secrets_override_environment_variables_not_the_other_way_round():
+    """The docstring claimed env-first for a long time and the code has always
+    been overrides-first. It decides where a setting can live: anything in
+    secrets.toml cannot be varied per environment by an env var, which is why
+    HEALTH_DATASTORE_PATH/MODE belong in the environment and credentials
+    belong in secrets."""
+    import os
+    from services import config as config_mod
+
+    os.environ["HEALTH_DATASTORE_MODE"] = "from-env"
+    try:
+        assert config_mod._resolve_optional_str(
+            "HEALTH_DATASTORE_MODE", {"HEALTH_DATASTORE_MODE": "from-secrets"}
+        ) == "from-secrets"
+        assert config_mod._resolve_optional_str("HEALTH_DATASTORE_MODE", {}) == "from-env"
+    finally:
+        del os.environ["HEALTH_DATASTORE_MODE"]
+
+
+def test_cache_mode_needs_a_datastore_path_to_mean_anything():
+    """Setting the mode alone does nothing — datastore_mode is only read when
+    datastore_path is set. Worth pinning, because setting one and not the
+    other looks like it should work and silently leaves the app on live."""
+    from services.repository import Repository
+    from services.config import Config
+
+    cfg = Config(notion_api_key="k", notion_db_readiness="a", notion_db_training="b",
+                 notion_db_config="d", google_sheets_id="e", google_service_account={},
+                 datastore_mode="cache")
+    repo = Repository(cfg)
+    assert repo.cached is False and repo.local_datastore is False
