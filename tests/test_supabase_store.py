@@ -237,3 +237,31 @@ def test_the_publishable_key_is_not_carried_in_config():
     use, and holding both invites reaching for the wrong one."""
     from services.config import Config
     assert not any("publishable" in f.lower() for f in Config.__dataclass_fields__)
+
+
+def test_rows_with_a_null_primary_key_are_dropped_and_counted():
+    """SQLite allows a NULL TEXT primary key — only INTEGER PRIMARY KEY is
+    implicitly NOT NULL there — so a table can sit for months holding rows
+    PostgreSQL rejects outright. Real case: notion_biometrics held 10 blank
+    Notion pages, every column NULL including the date.
+
+    Dropped rather than sent, and COUNTED, because loading 0 of 10 rows looks
+    exactly like a table that was simply empty.
+    """
+    sent = []
+
+    class _Store:
+        def count(self, t): return 0
+        def truncate(self, t): pass
+        def insert(self, t, rows): sent.append((t, rows)); return len(rows)
+
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE config (key TEXT PRIMARY KEY, value TEXT, updated TEXT)")
+    conn.execute("INSERT INTO config VALUES ('real', 'v', '2026-08-11')")
+    conn.execute("INSERT INTO config VALUES (NULL, NULL, NULL)")
+    conn.execute("INSERT INTO config VALUES (NULL, NULL, NULL)")
+
+    result = ss.push(conn, _Store(), ["config"])[0]
+    assert result.loaded_rows == 1
+    assert result.skipped_no_key == 2
+    assert [r["key"] for r in sent[0][1]] == ["real"]

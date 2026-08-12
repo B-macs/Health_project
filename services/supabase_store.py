@@ -67,6 +67,10 @@ class LoadResult:
     #: datastore built before the table was added. It is SKIPPED ENTIRELY,
     #: truncate included; see push().
     source_missing: bool = False
+    #: Rows dropped for having a NULL/blank primary key — never loadable in
+    #: Postgres, and worth REPORTING rather than silently omitting: loading 0
+    #: of 10 rows looks identical to a table that was simply empty.
+    skipped_no_key: int = 0
 
     @property
     def ok(self) -> bool:
@@ -608,6 +612,17 @@ def push(conn: sqlite3.Connection, store: SupabaseStore,
     results = [LoadResult(t, 0, 0, source_missing=True) for t in missing]
     for table in present:
         rows = rows_from_sqlite(conn, table)
+        # A NULL primary key is never a loadable row. SQLite allows it — only
+        # INTEGER PRIMARY KEY is implicitly NOT NULL there — so a table can
+        # sit for months holding rows Postgres will reject outright. Found in
+        # notion_biometrics, whose 10 rows are blank Notion pages with a NULL
+        # date on every one. Dropped rather than sent, and COUNTED: the caller
+        # prints it, because silently loading 0 of 10 rows looks identical to
+        # a table that was simply empty.
+        pk = primary_key(table)
+        keyed = [r for r in rows if r.get(pk) not in (None, "")]
+        skipped = len(rows) - len(keyed)
+        rows = keyed
         numeric = numeric_columns(table, ddl)
         payload = [coerce_row(r, numeric) for r in rows]
         # training_sets.id is GENERATED ALWAYS — Postgres rejects a supplied
@@ -615,7 +630,7 @@ def push(conn: sqlite3.Connection, store: SupabaseStore,
         if table == "training_sets":
             payload = [{k: v for k, v in r.items() if k != "id"} for r in payload]
         sent = store.insert(table, payload) if payload else 0
-        results.append(LoadResult(table, len(rows), sent))
+        results.append(LoadResult(table, len(rows), sent, skipped_no_key=skipped))
         if progress:
             progress(results[-1])
     return results

@@ -116,7 +116,10 @@ def main() -> int:
                 print(f"  {r.table:<28}{'—':>7}      ⚠ NOT IN SNAPSHOT — skipped "
                       f"whole (rebuild with scripts/build_datastore.py)")
                 continue
-            flag = "" if r.ok else "   ⚠ SHORT"
+            flag = "" if r.ok else "   !! SHORT"
+            if r.skipped_no_key:
+                flag += (f"   !! {r.skipped_no_key} row(s) dropped: NULL primary "
+                         f"key, not loadable in Postgres")
             print(f"  {r.table:<28}{r.loaded_rows:>7} rows{flag}")
 
     bad = _verify(conn, store, tables)
