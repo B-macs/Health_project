@@ -183,6 +183,12 @@ def _gate0(gap_cm, key="gate0_neutral"):
     return b.Reading(key, round(span, 1), "cm", setup_value=_LEG_LENGTH)
 
 
+def _spectrum(gap_cm, key):
+    """A spectrum split reading that puts the athlete `gap_cm` off the floor."""
+    span = 2.0 * math.sqrt(_LEG_LENGTH ** 2 - gap_cm ** 2)
+    return b.Reading(key, round(span, 1), "cm")
+
+
 _GATE0_PASS = [_gate0(28.0), _gate0(25.0, "gate0_turned_out")]
 _LEVERAGE_PASS = [b.Reading("leverage_bent", 8.0, "cm", side="left"),
                   b.Reading("leverage_bent", 9.0, "cm", side="right"),
@@ -218,8 +224,8 @@ def test_each_slot_can_be_the_one_that_stops_it():
         (_GATE0_PASS + _LEVERAGE_PASS + _TILT_PASS + [
             b.Reading("spectrum_active", 40.0, "°", side="left"),
             b.Reading("spectrum_active", 38.0, "°", side="right"),
-            b.Reading("spectrum_isometric", 30.0, "cm"),
-            b.Reading("spectrum_passive", 10.0, "cm")], "H", b.SLOT_SPECTRUM, 4),
+            _spectrum(30.0, "spectrum_isometric"),
+            _spectrum(10.0, "spectrum_passive")], "H", b.SLOT_SPECTRUM, 4),
     ]
     for readings, expected, slot, slots_run in cases:
         result = b.run("a", cb.SLOT_EVALUATORS, _assessment(readings))
@@ -275,8 +281,8 @@ def test_an_isometric_as_deep_as_passive_means_the_load_was_too_light():
     gap of zero as if it meant something."""
     a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + _TILT_PASS + [
         b.Reading("spectrum_active", 40.0, "°"),
-        b.Reading("spectrum_isometric", 10.0, "cm"),
-        b.Reading("spectrum_passive", 10.0, "cm")])
+        _spectrum(10.0, "spectrum_isometric"),
+        _spectrum(10.0, "spectrum_passive")])
     slot = b.run("a", cb.SLOT_EVALUATORS, a).slots[-1]
     assert slot.indeterminate is True
     assert "too light" in slot.reason
@@ -1227,14 +1233,22 @@ def test_keep_going_readings_surface_as_context_not_diagnosis():
         b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°"),
         b.Reading("spectrum_active", 40.0, "°", side="left"),
         b.Reading("spectrum_active", 38.0, "°", side="right"),
-        b.Reading("spectrum_isometric", 30.0, "cm"),
-        b.Reading("spectrum_passive", 10.0, "cm")]
+        _spectrum(30.0, "spectrum_isometric"),
+        _spectrum(10.0, "spectrum_passive")]
     a = _assessment(full)
     result = b.run("a", cb.SLOT_EVALUATORS, a)
     assert result.pattern == "F", "extra readings must never move the pattern"
     by = {r.key: r for r in cb.ladder(a, result)}
     assert by["end_range"].state == b.RUNG_CONTEXT
-    assert by["end_range"].fraction == pytest.approx(10.0 / 30.0)
+    # The rung is the athlete's own passive depth over his own held depth. The
+    # fixtures are widths rounded to the half-centimetre the protocol asks for,
+    # and 0.1 cm of width is ~0.44 cm of depth down at 10 cm off the floor, so
+    # the tolerance IS the amplification floor_gap_from_span documents rather
+    # than slack in the assertion.
+    iso_gap = cb.floor_gap_from_span(_spectrum(30.0, "x").value, _LEG_LENGTH)
+    passive_gap = cb.floor_gap_from_span(_spectrum(10.0, "x").value, _LEG_LENGTH)
+    assert by["end_range"].fraction == pytest.approx(passive_gap / iso_gap)
+    assert by["end_range"].fraction == pytest.approx(10.0 / 30.0, abs=0.01)
     assert by["pullers"].state == b.RUNG_CONTEXT
     assert by["pullers"].fraction == pytest.approx(78.0 / 180.0)
 
@@ -1378,3 +1392,87 @@ def test_at_the_athletes_real_depth_the_turned_out_step_is_skipped():
     slot0 = b.run("a", cb.SLOT_EVALUATORS, his).slots[0]
     assert slot0.passed and not slot0.indeterminate
     assert "off the floor" in slot0.reason
+
+
+# ── every side split is measured at the heels ────────────────────────────────
+#
+# The athlete, 2026-08-12, mid-capture: "last test passive should have cm
+# distance from heels". Gate 0 had already moved; the spectrum pair had not, so
+# the landmark he asked to be rid of was still there — and still asked TWICE.
+
+_SIDE_SPLITS = ("gate0_neutral", "gate0_turned_out",
+                "spectrum_isometric", "spectrum_passive")
+
+
+def test_no_side_split_asks_you_to_find_your_crotch():
+    """The whole point of the change. The one surviving crotch measurement is
+    the leg length, taken once, standing — never in a split."""
+    for key in _SIDE_SPLITS:
+        t = cb.TESTS[key]
+        assert "heel" in t.input_hint.lower(), f"{key} does not name the heels"
+        assert "crotch" not in t.input_hint.lower(), \
+            f"{key} still asks for the crotch at the input"
+        assert "crotch" not in t.measurement.lower() or "standing" in t.measurement.lower()
+
+
+def test_the_leg_length_is_asked_once_a_session_not_once_a_split():
+    """Four splits asking for one number invites four differently-eyeballed
+    values for it. Gate 0 always runs, so it owns the setup number and the rest
+    read it off the assessment."""
+    assert "leg length" in cb.TESTS["gate0_neutral"].setup_input.lower()
+    for key in ("gate0_turned_out", "spectrum_isometric", "spectrum_passive"):
+        assert "leg length" not in cb.TESTS[key].setup_input.lower(), \
+            f"{key} asks for the leg length a second time"
+
+    a = _assessment(_GATE0_PASS)
+    assert cb.leg_length(a) == _LEG_LENGTH
+    assert cb.leg_length(_assessment([])) is None
+
+
+def test_the_three_side_splits_are_told_apart_by_what_holds_you_up():
+    """His complaint, 2026-08-12: "im doing isometric side splits twice". They
+    are three different tests and the only thing separating them is the support
+    — hands on blocks, then hands off everything, then a bench taking your
+    weight. If the text does not make that unmissable the athlete is right to
+    read them as the same test, which is the straddle-lift-offs complaint of
+    2026-08-07 in a new place."""
+    gate = cb.TESTS["gate0_neutral"]
+    iso = cb.TESTS["spectrum_isometric"]
+    passive = cb.TESTS["spectrum_passive"]
+    assert "blocks" in gate.setup.lower() and "hands on" in gate.setup.lower()
+    assert "hands off everything" in iso.setup.lower()
+    assert "nothing supports you" in iso.setup.lower()
+    assert "taking your upper body weight" in passive.setup.lower()
+    # And each says what it is NOT, since that is the confusion being fixed.
+    assert "bench" in iso.setup.lower() or "blocks" in iso.setup.lower()
+    assert "hands-off" in passive.setup.lower()
+
+
+def test_the_spectrum_pair_is_compared_as_depths_not_widths():
+    """SPECTRUM_GAP_CM is a distance off the floor, and the same depth gap is a
+    different width at every depth — the same reason gate 0's gain converts."""
+    length = _LEG_LENGTH
+    iso, passive = _spectrum(30.0, "spectrum_isometric"), _spectrum(10.0, "spectrum_passive")
+    depth_gap = (cb.floor_gap_from_span(iso.value, length)
+                 - cb.floor_gap_from_span(passive.value, length))
+    width_gap = passive.value - iso.value          # passive is DEEPER, so wider
+    # 0.2 rather than 0.05 because the fixtures round to the half-centimetre the
+    # protocol asks for, and down at 10 cm off the floor 0.1 cm of width is
+    # ~0.44 cm of depth. The tolerance is the amplification, not slack.
+    assert depth_gap == pytest.approx(20.0, abs=0.2)
+    assert width_gap != pytest.approx(depth_gap, abs=1.0), \
+        "if width and depth agreed here the test would prove nothing"
+    assert depth_gap >= cb.SPECTRUM_GAP_CM         # -> pattern H, on depths
+
+
+def test_a_spectrum_width_with_no_leg_length_is_indeterminate():
+    """Gate 0 carries the leg length. Without it the widths cannot become
+    depths, and a missing measurement is not a pass."""
+    readings = [b.Reading("gate0_neutral", _gate0(28.0).value, "cm")]   # no setup_value
+    readings += _LEVERAGE_PASS + _TILT_PASS + [
+        b.Reading("spectrum_active", 40.0, "°", side="left"),
+        b.Reading("spectrum_active", 38.0, "°", side="right"),
+        _spectrum(30.0, "spectrum_isometric"), _spectrum(10.0, "spectrum_passive")]
+    slot3 = cb.evaluate_spectrum(_assessment(readings))
+    assert slot3.indeterminate and not slot3.passed
+    assert "leg length" in slot3.reason.lower()

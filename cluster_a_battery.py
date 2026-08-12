@@ -375,34 +375,40 @@ TESTS: dict[str, BatteryTest] = {
     ),
     "spectrum_isometric": BatteryTest(
         key="spectrum_isometric", slot=_b.SLOT_SPECTRUM,
-        label="Isometric — split, hands off", unit="cm", smaller_is_better=True,
+        label="Isometric — split, hands off", unit="cm",
         setup="Slide into a side split at depth and **take your hands off everything**, "
-              "holding your own weight. Five seconds, then measure.",
+              "holding your own weight. Five seconds, then measure. **This is the one "
+              "split where nothing supports you** — not the blocks you used at the start, "
+              "not the bench you use next.",
         lock="Hands off. **The tell is obvious and that is the point** — if a hand goes back "
              "down, the trial is void.",
-        measurement="Floor to crotch. **If you are using any added load, write the load down "
-                    "beside the number** — they are one measurement and neither means "
-                    "anything alone.",
-        input_hint="The gap between the floor and your crotch, in cm — plus the load "
-                   "beside it if you used one",
+        measurement="Measure along the floor from the inside of one heel to the inside of "
+                    "the other. Bigger is deeper. **If you are using any added load, write "
+                    "the load down beside the number** — they are one measurement and "
+                    "neither means anything alone.",
+        input_hint="The distance between the inside of one heel and the inside of the "
+                   "other, in cm — plus the load beside it if you used one",
         what_youre_testing="Whether the range is defended by muscle or only propped up from "
                            "outside. Your body will not let a muscle relax into a position it "
                            "cannot support, so end-range strength is not something running "
                            "alongside flexibility — it is what permits it.",
-        safety="**If your isometric number comes out as deep as your passive one, the load "
+        safety="**If your isometric number comes out as wide as your passive one, the load "
                "is too light** and passive tissue absorbed it — you have measured passive "
                "twice. Take weight off and repeat.",
     ),
     "spectrum_passive": BatteryTest(
         key="spectrum_passive", slot=_b.SLOT_SPECTRUM,
-        label="Passive — split, supported", unit="cm", smaller_is_better=True,
+        label="Passive — split, supported", unit="cm",
         setup="Side split with a bench or blocks taking your upper body weight, legs "
-              "relaxed. **Go to firm resistance, not to the floor.**",
+              "relaxed. **Go to firm resistance, not to the floor.** Unlike the hands-off "
+              "hold you just did, here the support carries you and the legs do nothing.",
         lock="Legs stay relaxed — this is the one trial where you are not holding yourself "
              "up. **The tell: if you are working to stay there, you are measuring the "
              "isometric again and the trial is void.** Let the support take the weight.",
-        measurement="Floor to crotch, to the nearest half centimetre.",
-        input_hint="The gap between the floor and your crotch, in cm",
+        measurement="Measure along the floor from the inside of one heel to the inside of "
+                    "the other, to the nearest half centimetre. Bigger is deeper.",
+        input_hint="The distance between the inside of one heel and the inside of the "
+                   "other, in cm",
         what_youre_testing="Your ceiling — the furthest the joint goes when something else "
                            "does the work. On its own it says little; its value is as the "
                            "reference the other two are compared against.",
@@ -551,6 +557,28 @@ def _gap(reading):
     if reading is None:
         return None
     return floor_gap_from_span(reading.value, reading.setup_value)
+
+
+def leg_length(assessment):
+    """The athlete's recorded leg length for this session, off the gate 0 reading.
+
+    ASKED ONCE PER SESSION, NOT ONCE PER SPLIT. Gate 0 always runs — it is the
+    first test and nothing below it is reachable without it — so its
+    `setup_value` is the natural home for a number that is the same for every
+    split in the session. Re-asking it at the spectrum would invite a second,
+    differently-eyeballed value for one quantity, which is the failure the
+    recorded-setup convention exists to prevent.
+    """
+    r = assessment.reading("gate0_neutral") if assessment is not None else None
+    return r.setup_value if r is not None else None
+
+
+def _spectrum_gap(reading, leg_length_cm):
+    """A spectrum split width as a floor-to-crotch gap. Same conversion and same
+    reason as gate 0 — the athlete measures heels, the thresholds are depths."""
+    if reading is None:
+        return None
+    return floor_gap_from_span(reading.value, leg_length_cm)
 
 #: Why a test that applicable_tests dropped was dropped, in the athlete's
 #: language — the capture flow shows this instead of the step.
@@ -765,9 +793,23 @@ def evaluate_spectrum(assessment):
                             reason="All three measures are needed; the spectrum is a "
                                    "comparison, not three separate numbers.")
 
+    # Both splits are recorded as WIDTHS and compared as DEPTHS, for the reason
+    # gate 0 is: SPECTRUM_GAP_CM is a distance off the floor, and the same depth
+    # difference is a different width at every depth. See floor_gap_from_span.
+    length = leg_length(assessment)
+    iso_gap = _spectrum_gap(iso, length)
+    passive_gap = _spectrum_gap(passive, length)
+    if iso_gap is None or passive_gap is None:
+        return b.SlotResult(slot=b.SLOT_SPECTRUM, passed=False, indeterminate=True,
+                            reason="The split widths cannot be turned into depths without "
+                                   "the leg length recorded at gate 0, and the comparison "
+                                   "below is a distance off the floor. A missing "
+                                   "measurement is not a pass.",
+                            readings=(iso, passive))
+
     # Split depths: smaller is deeper. The isometric must come out SHALLOWER
     # than passive, or the load was too light and passive tissue absorbed it.
-    if not b.isometric_is_shallower(passive.value, iso.value, smaller_is_better=True):
+    if not b.isometric_is_shallower(passive_gap, iso_gap, smaller_is_better=True):
         return b.SlotResult(slot=b.SLOT_SPECTRUM, passed=False, indeterminate=True,
                             basis=b.BASIS_RELATIVE,
                             reason="The isometric reading is as deep as the passive one, so "
@@ -775,7 +817,7 @@ def evaluate_spectrum(assessment):
                                    "Take weight off and repeat before reading this slot.",
                             readings=(iso, passive))
 
-    gap = iso.value - passive.value
+    gap = iso_gap - passive_gap
     if gap >= SPECTRUM_GAP_CM:
         return b.SlotResult(slot=b.SLOT_SPECTRUM, passed=False, pattern="H",
                             reason=f"Passive goes {gap:.1f} cm deeper than you can hold. The "
@@ -960,28 +1002,34 @@ def ladder(assessment, result) -> tuple:
     by_side = {r.side: r.value for r in actives}
     active_sum = sum(by_side.values()) if len(by_side) >= 2 else None
 
+    # Shown as DEPTHS, like gate 0's rung: the widths are what he measured, the
+    # depths are what the rung is read against.
+    length = leg_length(assessment)
+    iso_gap = _spectrum_gap(iso, length)
+    passive_gap = _spectrum_gap(passive, length)
+
     # RELATIVE, and the one rung that needs no invented number: the fraction is
     # the athlete's own held depth over his own passive depth.
     depth_frac = None
-    if iso is not None and passive is not None and iso.value > 0:
-        depth_frac = max(0.0, min(1.0, passive.value / iso.value))
+    if iso_gap is not None and passive_gap is not None and iso_gap > 0:
+        depth_frac = max(0.0, min(1.0, passive_gap / iso_gap))
     open_frac = b.fraction_of_target(active_sum, 180.0)
 
     unreadable = (slot3 is not None and slot3.indeterminate
                   and "too light" in slot3.reason)
     if unreadable:
-        add("end_range", b.RUNG_UNREADABLE, measured=iso.value, target=passive.value,
+        add("end_range", b.RUNG_UNREADABLE, measured=iso_gap, target=passive_gap,
             detail="The load was too light — passive measured twice. Repeat "
                    "before reading this rung.")
-    elif slot3 is not None and not slot3.indeterminate:
+    elif slot3 is not None and not slot3.indeterminate and iso_gap is not None:
         add("end_range",
             b.RUNG_LIMITING if slot3.pattern == "H" else b.RUNG_PASSED,
             pattern="H" if slot3.pattern == "H" else "",
-            measured=iso.value, target=passive.value, fraction=depth_frac,
-            detail=f"Holds {iso.value:g} cm against a passive {passive.value:g} cm "
-                   f"— your own reading is the yardstick.")
-    elif iso is not None and passive is not None:
-        add("end_range", b.RUNG_CONTEXT, measured=iso.value, target=passive.value,
+            measured=iso_gap, target=passive_gap, fraction=depth_frac,
+            detail=f"Holds {iso_gap:.0f} cm off the floor against a passive "
+                   f"{passive_gap:.0f} cm — your own reading is the yardstick.")
+    elif iso_gap is not None and passive_gap is not None:
+        add("end_range", b.RUNG_CONTEXT, measured=iso_gap, target=passive_gap,
             fraction=depth_frac,
             detail="Measured below a failure — context, not diagnosis.")
     else:
