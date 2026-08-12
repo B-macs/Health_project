@@ -87,22 +87,7 @@ V._render_flexibility_detail()
 
 # Gate 0 and the leverages pass; the tilt fails on both halves -> Pattern F,
 # which is what this athlete's 2026-08-05 baseline predicts.
-# Gate 0 records the WIDTH of the split while its thresholds are heights off the
-# floor, so these say the DEPTH they mean and convert. See cluster_a_battery.
-# floor_gap_from_span; 86 cm is a plausible standing inseam at his 182 cm.
-_LEG_LENGTH = 86.0
-
-
-def _gate0(gap_cm, key="gate0_neutral"):
-    """A gate 0 reading dict that puts the athlete `gap_cm` off the floor."""
-    span = 2.0 * math.sqrt(_LEG_LENGTH ** 2 - gap_cm ** 2)
-    return {"test_key": key, "value": round(span, 1), "unit": "cm",
-            "setup_value": _LEG_LENGTH}
-
-
 _PASS_TO_TILT = [
-    _gate0(28.0),
-    _gate0(25.0, "gate0_turned_out"),
     {"test_key": "leverage_bent", "value": 8.0, "unit": "cm", "side": "left"},
     {"test_key": "leverage_bent", "value": 9.0, "unit": "cm", "side": "right"},
     {"test_key": "leverage_straight", "value": 95.0, "unit": "cm", "side": "left"},
@@ -112,12 +97,11 @@ _TILT_FAILS = _PASS_TO_TILT + [
     {"test_key": "tilt_range", "value": 8.0, "unit": "°"},
     {"test_key": "tilt_production", "value": 4.0, "unit": "°"},
 ]
-# Gate 0 alone, failing on orientation -> Pattern B at the very first slot.
-# The neutral reading must sit INSIDE the 15 cm relevance line — above it, bone
-# is not a live question and slot 0 passes on the height alone.
-_GATE0_FAILS = [
-    _gate0(14.0),
-    _gate0(3.0, "gate0_turned_out"),
+# The earliest failure the battery can now reach: both leverages short -> C at
+# slot 1. Gate 0 used to sit above this and was removed on 2026-08-12.
+_SLOT1_FAILS = [
+    {"test_key": "leverage_bent", "value": 20.0, "unit": "cm"},
+    {"test_key": "leverage_straight", "value": 40.0, "unit": "cm"},
 ]
 
 
@@ -233,15 +217,15 @@ def test_the_ladder_renders_even_without_a_pattern():
 
 
 def test_capture_stops_as_soon_as_the_battery_has_an_answer():
-    """THE ONE THIS FILE EXISTS FOR. Gate 0 failing on orientation is a Pattern
-    B at the very first slot — the remaining eight tests measure things below a
-    failure and cannot be interpreted, so the screen must say stop rather than
-    walk him through them."""
-    at = _run(draft=_GATE0_FAILS, mode="capture")
+    """THE ONE THIS FILE EXISTS FOR. Both leverages short is a Pattern C at the
+    first slot — every remaining test measures something below a failure and
+    cannot be interpreted, so the screen must say stop rather than walk him
+    through them."""
+    at = _run(draft=_SLOT1_FAILS, mode="capture")
     assert not at.exception
     body = _text(at)
     assert "stop here" in body.lower()
-    assert "Pattern B" in body
+    assert "Pattern C" in body
     assert "Save assessment" in [b.label for b in at.button]
     assert "nothing more to collect" in body.lower()
 
@@ -250,7 +234,7 @@ def test_the_early_exit_can_be_overridden_but_is_not_the_default():
     """Offered, because a curious athlete taking extra readings is harmless and
     forbidding it would be paternalistic. Not the default, because the readings
     are uninterpretable and the time is real."""
-    at = _run(draft=_GATE0_FAILS, mode="capture")
+    at = _run(draft=_SLOT1_FAILS, mode="capture")
     labels = [b.label for b in at.button]
     assert "Keep going anyway" in labels
     assert labels.index("Save assessment") < labels.index("Keep going anyway")
@@ -326,26 +310,12 @@ def test_the_cold_gate_carries_the_two_record_but_never_chase_notes():
 def test_the_capture_step_asks_for_the_setup_number_where_a_test_has_one():
     """The bent-knee leverage needs its heel distance, and that number decides
     which pattern comes out."""
-    started = [_gate0(28.0), _gate0(25.0, "gate0_turned_out")]
-    # The step index comes from the LIVE order: a 28 cm neutral reading puts
-    # the turned-out comparison out of scope, which shifts every later step.
+    started = []
     step = list(cba.applicable_tests(_as_assessment(started))).index("leverage_bent")
     at = _run(draft=started, mode="capture", step=step)
     labels = " ".join(str(n.label) for n in at.number_input)
     assert "heel" in labels.lower(), labels
 
-
-def test_a_neutral_reading_off_the_floor_skips_the_turned_out_step():
-    """The athlete's call (2026-08-07): bone only engages in the last few
-    centimetres of a full split. After a 28 cm neutral reading the turned-out
-    comparison is out of scope — the flow must move straight to the bent-knee
-    leverage and say why, not walk him through a comparison that answers
-    nothing."""
-    started = [_gate0(28.0)]
-    at = _run(draft=started, mode="capture", step=1)
-    body = _text(at)
-    assert "Knees fully bent" in body
-    assert "not yet a factor" in body.lower()
 
 
 def test_the_tilt_asks_for_one_number_in_degrees_plus_the_straddle_width():
@@ -454,8 +424,6 @@ def test_a_pattern_from_an_invented_cut_point_says_so_on_the_screen():
     line nobody had validated. The screen has to distinguish 'your gracilis is
     short' from 'your straddle fell below a number we chose'."""
     gracilis = [
-        _gate0(28.0),
-        _gate0(25.0, "gate0_turned_out"),
         {"test_key": "leverage_bent", "value": 8.0, "unit": "cm"},
         {"test_key": "leverage_straight", "value": 40.0, "unit": "cm"},
     ]

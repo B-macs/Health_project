@@ -14,6 +14,7 @@ is a boundary that erodes on the first inconvenient afternoon.
 import ast
 import inspect
 import math
+import re
 from datetime import date
 
 import pytest
@@ -177,55 +178,49 @@ def _assessment(readings, taken_on=TODAY):
 _LEG_LENGTH = 86.0
 
 
-def _gate0(gap_cm, key="gate0_neutral"):
-    """A gate 0 reading that puts the athlete `gap_cm` off the floor."""
-    span = 2.0 * math.sqrt(_LEG_LENGTH ** 2 - gap_cm ** 2)
-    return b.Reading(key, round(span, 1), "cm", setup_value=_LEG_LENGTH)
-
-
 def _spectrum(gap_cm, key):
-    """A spectrum split reading that puts the athlete `gap_cm` off the floor."""
+    """A spectrum split reading that puts the athlete `gap_cm` off the floor.
+    The leg length rides on the ISOMETRIC, which is where the battery reads it
+    now that gate 0 is gone."""
     span = 2.0 * math.sqrt(_LEG_LENGTH ** 2 - gap_cm ** 2)
-    return b.Reading(key, round(span, 1), "cm")
+    setup = _LEG_LENGTH if key == "spectrum_isometric" else None
+    return b.Reading(key, round(span, 1), "cm", setup_value=setup)
 
 
-_GATE0_PASS = [_gate0(28.0), _gate0(25.0, "gate0_turned_out")]
 _LEVERAGE_PASS = [b.Reading("leverage_bent", 8.0, "cm", side="left"),
                   b.Reading("leverage_bent", 9.0, "cm", side="right"),
                   b.Reading("leverage_straight", 95.0, "cm", side="left"),
                   b.Reading("leverage_straight", 94.0, "cm", side="right")]
 _TILT_PASS = [b.Reading("tilt_production", 25.0, "°"),
               b.Reading("tilt_range", 30.0, "°")]
-#: Pattern B needs the neutral reading INSIDE the relevance line — above it,
-#: bone is not a live question and slot 0 passes on the height alone.
-_GATE0_BONY = [_gate0(14.0), _gate0(3.0, "gate0_turned_out")]
 
 
 def test_a_failing_slot_stops_the_battery_and_the_rest_is_never_evaluated():
     """THE WHOLE DESIGN. Slots below a failure are not lower priority, they are
-    meaningless — there is no value in a spectrum profile for a skill a bony
-    block had already made unavailable."""
-    # Gate 0 fails: turning out gains far more than the threshold.
-    a = _assessment(_GATE0_BONY + _LEVERAGE_PASS + _TILT_PASS)
+    meaningless — there is no value in a spectrum profile for a skill an earlier
+    slot has already made unavailable."""
+    # Slot 1 fails on both leverages, so the tilt and spectrum are never read —
+    # even though the readings for them are present.
+    a = _assessment([b.Reading("leverage_bent", 20.0, "cm"),
+                     b.Reading("leverage_straight", 40.0, "cm")] + _TILT_PASS)
     result = b.run("a", cb.SLOT_EVALUATORS, a)
-    assert result.pattern == "B"
-    assert result.stopped_at == b.SLOT_STRUCTURE
+    assert result.pattern == "C"
+    assert result.stopped_at == b.SLOT_REGRESSED
     assert len(result.slots) == 1, "slots below the failure were evaluated anyway"
 
 
 def test_each_slot_can_be_the_one_that_stops_it():
     cases = [
-        (list(_GATE0_BONY), "B", b.SLOT_STRUCTURE, 1),
-        (_GATE0_PASS + [b.Reading("leverage_bent", 20.0, "cm"),
-                        b.Reading("leverage_straight", 40.0, "cm")], "C", b.SLOT_REGRESSED, 2),
-        (_GATE0_PASS + _LEVERAGE_PASS + [b.Reading("tilt_range", 8.0, "°"),
+        ([b.Reading("leverage_bent", 20.0, "cm"),
+                        b.Reading("leverage_straight", 40.0, "cm")], "C", b.SLOT_REGRESSED, 1),
+        (_LEVERAGE_PASS + [b.Reading("tilt_range", 8.0, "°"),
                                          b.Reading("tilt_production", 4.0, "°")],
-         "F", b.SLOT_PREREQUISITE, 3),
-        (_GATE0_PASS + _LEVERAGE_PASS + _TILT_PASS + [
+         "F", b.SLOT_PREREQUISITE, 2),
+        (_LEVERAGE_PASS + _TILT_PASS + [
             b.Reading("spectrum_active", 40.0, "°", side="left"),
             b.Reading("spectrum_active", 38.0, "°", side="right"),
             _spectrum(30.0, "spectrum_isometric"),
-            _spectrum(10.0, "spectrum_passive")], "H", b.SLOT_SPECTRUM, 4),
+            _spectrum(10.0, "spectrum_passive")], "H", b.SLOT_SPECTRUM, 3),
     ]
     for readings, expected, slot, slots_run in cases:
         result = b.run("a", cb.SLOT_EVALUATORS, _assessment(readings))
@@ -239,7 +234,7 @@ def test_gracilis_is_named_by_the_difference_between_two_leverages():
     pass-bent / fail-straight pattern names it — which is why length is tested
     at more than one leverage and why the deferred middle one costs resolution
     rather than the diagnosis."""
-    a = _assessment(_GATE0_PASS + [b.Reading("leverage_bent", 8.0, "cm"),
+    a = _assessment([b.Reading("leverage_bent", 8.0, "cm"),
                                    b.Reading("leverage_straight", 40.0, "cm")])
     assert b.run("a", cb.SLOT_EVALUATORS, a).pattern == "E"
 
@@ -255,7 +250,7 @@ def test_a_missing_reading_is_indeterminate_and_never_a_pass():
 
 
 def test_the_worse_side_decides_and_sides_are_never_averaged():
-    a = _assessment(_GATE0_PASS + [
+    a = _assessment([
         b.Reading("leverage_bent", 8.0, "cm", side="left"),
         b.Reading("leverage_bent", 22.0, "cm", side="right"),   # this one fails
         b.Reading("leverage_straight", 95.0, "cm", side="left"),
@@ -264,22 +259,13 @@ def test_the_worse_side_decides_and_sides_are_never_averaged():
     assert b.run("a", cb.SLOT_EVALUATORS, a).pattern == "D"
 
 
-def test_a_voided_trial_is_not_used():
-    # Inside the relevance line so the turned-out attempt is REQUIRED — voiding
-    # it must leave the slot unanswerable, not quietly passed.
-    a = _assessment([_gate0(14.0),
-                     b.Reading("gate0_turned_out", _gate0(3.0).value, "cm",
-                               setup_value=_LEG_LENGTH, voided=True)])
-    assert b.run("a", cb.SLOT_EVALUATORS, a).slots[0].indeterminate is True
-
-
 # ── the load window ──────────────────────────────────────────────────────────
 
 def test_an_isometric_as_deep_as_passive_means_the_load_was_too_light():
     """Not a result, a botched measurement: passive tissue absorbed the load and
     you measured passive twice. The slot must say so rather than reporting a
     gap of zero as if it meant something."""
-    a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + _TILT_PASS + [
+    a = _assessment(_LEVERAGE_PASS + _TILT_PASS + [
         b.Reading("spectrum_active", 40.0, "°"),
         _spectrum(10.0, "spectrum_isometric"),
         _spectrum(10.0, "spectrum_passive")])
@@ -324,7 +310,7 @@ def test_a_change_inside_twice_the_noise_is_not_a_result():
 
 
 def test_a_pattern_from_one_morning_is_a_hypothesis_not_a_verdict():
-    a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + [
+    a = _assessment(_LEVERAGE_PASS + [
         b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
     assert b.run("a", cb.SLOT_EVALUATORS, a, baseline_sessions=1).trusted is False
     assert b.run("a", cb.SLOT_EVALUATORS, a, baseline_sessions=3).trusted is True
@@ -337,7 +323,7 @@ def test_the_athletes_own_baseline_routes_him_to_the_expected_pattern():
     read toward the answer already in mind. His 2026-08-05 report — 'hips stuck
     in flexion with tail bone down, back fully rounds' — is a slot 2 failure."""
     assert cb.EXPECTED_PATTERN == "F"
-    a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + [
+    a = _assessment(_LEVERAGE_PASS + [
         b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
     assert b.run("a", cb.SLOT_EVALUATORS, a).pattern == cb.EXPECTED_PATTERN
 
@@ -709,7 +695,7 @@ def test_the_nerve_check_is_a_differentiator_not_a_provocation():
 # ── serialisation ────────────────────────────────────────────────────────────
 
 def test_an_assessment_round_trips():
-    a = _assessment(_GATE0_PASS + _TILT_PASS)
+    a = _assessment(_TILT_PASS)
     assert fx.assessment_from_dict(fx.assessment_to_dict(a)) == a
 
 
@@ -728,10 +714,11 @@ def test_unreadable_payloads_degrade_to_none_rather_than_half_parsing():
 
 
 def test_a_reading_for_a_retired_test_is_dropped_not_kept():
-    payload = fx.assessment_to_dict(_assessment(_GATE0_PASS))
+    payload = fx.assessment_to_dict(_assessment(_LEVERAGE_PASS))
     payload["readings"].append({"test_key": "no_such_test", "value": 1.0, "unit": "cm"})
     back = fx.assessment_from_dict(payload)
-    assert [r.test_key for r in back.readings] == ["gate0_neutral", "gate0_turned_out"]
+    assert [r.test_key for r in back.readings] == (
+        ["leverage_bent"] * 2 + ["leverage_straight"] * 2)
 
 
 def test_re_entering_a_test_overwrites_and_carries_every_field_through():
@@ -1043,20 +1030,10 @@ def test_the_source_gives_no_numbers_for_the_leverage_test():
     assert "Fails both" in table and "fails straight badly" in table
 
 
-def test_gate_zero_is_the_only_slot_that_needs_no_invented_number():
-    """Inside the relevance line it compares two of his own readings taken
-    minutes apart, so it carries its own reference. Every other slot measures
-    against a line we drew."""
-    result = b.run("a", cb.SLOT_EVALUATORS, _assessment(list(_GATE0_BONY)))
-    assert result.pattern == "B"
-    assert result.basis == b.BASIS_RELATIVE
-    assert result.rests_on_an_invented_number is False
-
-
 def test_a_leverage_verdict_declares_that_it_rests_on_an_invented_number():
     """Pattern E specifically — the one that actually came out — must carry the
     caveat rather than reading as a finding about his gracilis."""
-    a = _assessment(_GATE0_PASS + [b.Reading("leverage_bent", 8.0, "cm"),
+    a = _assessment([b.Reading("leverage_bent", 8.0, "cm"),
                                    b.Reading("leverage_straight", 40.0, "cm")])
     result = b.run("a", cb.SLOT_EVALUATORS, a)
     assert result.pattern == "E"
@@ -1068,7 +1045,7 @@ def test_the_two_reasons_a_pattern_is_untrusted_are_kept_separate():
     """More mornings fixes one; a validated threshold fixes the other. Conflating
     them would let three repeat measurements look like they had confirmed a
     number nobody had checked."""
-    a = _assessment(_GATE0_PASS + [b.Reading("leverage_bent", 8.0, "cm"),
+    a = _assessment([b.Reading("leverage_bent", 8.0, "cm"),
                                    b.Reading("leverage_straight", 40.0, "cm")])
     settled = b.run("a", cb.SLOT_EVALUATORS, a, baseline_sessions=3)
     assert settled.trusted is True                       # enough mornings
@@ -1084,49 +1061,6 @@ def test_a_slot_that_forgets_to_declare_its_basis_reads_as_provisional():
 # ── the relevance line: when is bone even a live question? ───────────────────
 #
 # THE ATHLETE'S CALL (2026-08-07): the neck of the thigh bone meets the socket
-# only in the last few centimetres of a FULL side split. At his current height,
-# tissue stops him long before bone can — so asking the two-orientation
-# comparison up there answers nothing, and the original version of gate 0 was
-# wrong to ask it unconditionally.
-
-def test_the_bone_check_is_skipped_above_the_relevance_line():
-    """A 28 cm neutral reading passes slot 0 on its own: bone cannot be what
-    stops him at that height, and the turned-out attempt is not asked for."""
-    alone = _assessment([_gate0(28.0)])
-    slot = cb.evaluate_structure(alone)
-    assert slot.passed is True
-    assert slot.indeterminate is False
-    assert "cannot be what stops you" in slot.reason
-    assert cb.applicable_tests(alone) == tuple(
-        k for k in cb.AVAILABLE_TESTS if k != "gate0_turned_out")
-
-
-def test_the_bone_check_is_required_inside_the_relevance_line():
-    """Under the line the question is live, and a missing turned-out attempt is
-    indeterminate — not a pass. And with no neutral reading yet, the session
-    plans for both attempts rather than assuming."""
-    inside = _assessment([_gate0(14.0)])
-    slot = cb.evaluate_structure(inside)
-    assert slot.passed is False and slot.indeterminate is True
-    assert cb.applicable_tests(inside) == cb.AVAILABLE_TESTS
-    assert cb.applicable_tests(None) == cb.AVAILABLE_TESTS
-
-
-def test_progress_total_shrinks_when_the_bone_check_is_out_of_scope():
-    """Counting the skipped comparison would show '8 of 9' forever on a
-    finished session."""
-    a = _assessment([_gate0(28.0)])
-    done, total = fx.capture_progress(a)
-    assert done == 1
-    assert total == len(cb.AVAILABLE_TESTS) - 1
-
-
-def test_the_skip_carries_its_reason_in_the_athletes_language():
-    note = cb.SKIP_NOTES["gate0_turned_out"]
-    assert "not yet a factor" in note
-    assert "come back by itself" in note
-
-
 # ── the tilt: an angle, own power first ──────────────────────────────────────
 
 def test_the_tilt_runs_under_own_power_first():
@@ -1144,7 +1078,7 @@ def test_the_tilt_is_an_angle_and_bigger_is_better():
         test = cb.TESTS[key]
         assert test.unit == "°", key
         assert test.smaller_is_better is False, key
-    a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + [
+    a = _assessment(_LEVERAGE_PASS + [
         b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
     assert b.run("a", cb.SLOT_EVALUATORS, a).pattern == "F"
 
@@ -1153,7 +1087,7 @@ def test_an_old_centimetre_tilt_reading_is_unreadable_not_misread():
     """40 cm of forehead height is not 40 degrees of tilt. A reading from the
     retired protocol must come back indeterminate rather than be compared
     against the angle target — where it would score, loudly and wrongly."""
-    a = _assessment(_GATE0_PASS + _LEVERAGE_PASS + [
+    a = _assessment(_LEVERAGE_PASS + [
         b.Reading("tilt_range", 40.0, "cm"), b.Reading("tilt_production", 55.0, "cm")])
     slot = b.run("a", cb.SLOT_EVALUATORS, a).slots[-1]
     assert slot.indeterminate is True
@@ -1186,7 +1120,7 @@ def test_every_test_says_where_its_number_comes_from():
 # aggregate, no number for an unmeasured muscle, every fraction over a NAMED
 # denominator, and the ladder never decides — it displays what run() decided.
 
-_LADDER_KEYS = ("bone", "group_length", "gracilis", "tilt_range",
+_LADDER_KEYS = ("group_length", "gracilis", "tilt_range",
                 "tilt_production", "end_range", "pullers")
 
 
@@ -1199,11 +1133,10 @@ def test_the_ladder_reads_bottom_up_and_marks_the_working_rung():
     """Pattern F: everything below the tilt is climbed, the helped tilt is the
     working rung, its own-power twin is context, and everything above is
     unmeasured."""
-    rungs = _ladder_for(_GATE0_PASS + _LEVERAGE_PASS + [
+    rungs = _ladder_for(_LEVERAGE_PASS + [
         b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
     assert tuple(r.key for r in rungs) == _LADDER_KEYS
     by = {r.key: r for r in rungs}
-    assert by["bone"].state == b.RUNG_PASSED
     assert by["group_length"].state == b.RUNG_PASSED
     assert by["gracilis"].state == b.RUNG_PASSED
     assert by["tilt_range"].state == b.RUNG_LIMITING
@@ -1218,7 +1151,7 @@ def test_an_unmeasured_rung_has_no_number_ever():
     """None, never zero. Showing 0/100 for a muscle the battery never reached
     would read as 'terrible' when the truth is 'unknown' — the v1 failure with
     the sign flipped."""
-    rungs = _ladder_for(_GATE0_PASS + _LEVERAGE_PASS + [
+    rungs = _ladder_for(_LEVERAGE_PASS + [
         b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
     for rung in rungs:
         if rung.state == b.RUNG_UNMEASURED:
@@ -1229,7 +1162,7 @@ def test_an_unmeasured_rung_has_no_number_ever():
 def test_keep_going_readings_surface_as_context_not_diagnosis():
     """The athlete's choice (2026-08-07): rungs above the failure fill in when
     he keeps going, labelled context — and the pattern must not move."""
-    full = _GATE0_PASS + _LEVERAGE_PASS + [
+    full = _LEVERAGE_PASS + [
         b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°"),
         b.Reading("spectrum_active", 40.0, "°", side="left"),
         b.Reading("spectrum_active", 38.0, "°", side="right"),
@@ -1256,7 +1189,7 @@ def test_keep_going_readings_surface_as_context_not_diagnosis():
 def test_two_muscles_can_share_the_bottom_of_the_ladder():
     """Pattern C fails both leverages, so both rungs read limiting — exactly
     the 'it could be two muscles at the same time' case."""
-    by = {r.key: r for r in _ladder_for(_GATE0_PASS + [
+    by = {r.key: r for r in _ladder_for([
         b.Reading("leverage_bent", 20.0, "cm"),
         b.Reading("leverage_straight", 40.0, "cm")])}
     assert by["group_length"].state == b.RUNG_LIMITING
@@ -1282,13 +1215,13 @@ def test_the_ladder_names_its_denominators_honestly():
     assert provisional["tilt_range"] and provisional["tilt_production"]
     assert not provisional["end_range"]
     assert not provisional["pullers"]
-    assert not provisional["bone"]
+    assert "bone" not in provisional, "the bone rung went with gate 0"
 
 
 def test_the_ladder_produces_no_aggregate():
     """Rungs are never combined: no total, no average, no overall number. The
     battery's output stays one pattern label — the ladder only shows the path."""
-    rungs = _ladder_for(_GATE0_PASS + _LEVERAGE_PASS + [
+    rungs = _ladder_for(_LEVERAGE_PASS + [
         b.Reading("tilt_range", 8.0, "°"), b.Reading("tilt_production", 4.0, "°")])
     assert isinstance(rungs, tuple)
     for banned in ("overall", "total_", "combined", "average"):
@@ -1345,18 +1278,6 @@ def test_the_width_and_the_height_are_the_same_split_from_two_ends():
         == pytest.approx(0.0, abs=1e-3)
 
 
-def test_a_width_with_no_leg_length_is_indeterminate_not_a_pass():
-    """A width alone cannot say how high off the floor it puts you, and the
-    thresholds are heights. A missing measurement is not evidence of health —
-    the same rule the rest of the battery runs on."""
-    orphan = _assessment([b.Reading("gate0_neutral", 162.6, "cm")])
-    result = b.run("a", cb.SLOT_EVALUATORS, orphan)
-    slot0 = result.slots[0]
-    assert slot0.indeterminate and not slot0.passed
-    assert "leg length" in slot0.reason.lower()
-    assert cb.floor_gap_from_span(162.6, None) is None
-
-
 def test_a_width_wider_than_two_legs_is_refused_rather_than_squared():
     """sqrt of a negative is the crash; returning a number anyway is worse. A
     split cannot be wider than the two legs making it, so this is a mismeasure
@@ -1365,43 +1286,13 @@ def test_a_width_wider_than_two_legs_is_refused_rather_than_squared():
     assert cb.floor_gap_from_span(0.0, _LEG_LENGTH) is None
 
 
-def test_the_orientation_gain_is_compared_as_heights_not_as_widths():
-    """WHY THE CONVERSION EARNS ITS KEEP. The same 10 cm of depth is about 5.9 cm
-    of width at 30 cm off the floor and 2.3 cm at 15 cm, so a width threshold
-    would mean something different at every depth. Two pairs with a near-equal
-    WIDTH difference must therefore land on opposite verdicts."""
-    deep = _assessment([_gate0(14.0), _gate0(3.0, "gate0_turned_out")])
-    assert b.run("a", cb.SLOT_EVALUATORS, deep).pattern == "B"
-
-    # Same widths, ~2.4 cm apart, but taken high up where that is a small gain.
-    shallow_n, shallow_t = _gate0(45.0), _gate0(43.0, "gate0_turned_out")
-    width_gain = shallow_t.value - shallow_n.value
-    assert width_gain < cb.GATE0_ORIENTATION_GAIN_CM, "the point is a SMALL width step"
-    gap_gain = (cb.floor_gap_from_span(shallow_n.value, _LEG_LENGTH)
-                - cb.floor_gap_from_span(shallow_t.value, _LEG_LENGTH))
-    assert gap_gain == pytest.approx(2.0, abs=0.2)
-
-
-def test_at_the_athletes_real_depth_the_turned_out_step_is_skipped():
-    """He reported "over 60cm in the air" on 2026-08-12 and calls a full split
-    "2 years or more" away, so the bony question is not live and slot 0 passes
-    on the neutral width alone — which is the whole reason the conversion's
-    imprecision near the floor does not bite yet."""
-    his = _assessment([_gate0(60.0)])
-    assert "gate0_turned_out" not in cb.applicable_tests(his)
-    slot0 = b.run("a", cb.SLOT_EVALUATORS, his).slots[0]
-    assert slot0.passed and not slot0.indeterminate
-    assert "off the floor" in slot0.reason
-
-
 # ── every side split is measured at the heels ────────────────────────────────
 #
 # The athlete, 2026-08-12, mid-capture: "last test passive should have cm
 # distance from heels". Gate 0 had already moved; the spectrum pair had not, so
 # the landmark he asked to be rid of was still there — and still asked TWICE.
 
-_SIDE_SPLITS = ("gate0_neutral", "gate0_turned_out",
-                "spectrum_isometric", "spectrum_passive")
+_SIDE_SPLITS = ("spectrum_isometric", "spectrum_passive")
 
 
 def test_no_side_split_asks_you_to_find_your_crotch():
@@ -1416,37 +1307,34 @@ def test_no_side_split_asks_you_to_find_your_crotch():
 
 
 def test_the_leg_length_is_asked_once_a_session_not_once_a_split():
-    """Four splits asking for one number invites four differently-eyeballed
-    values for it. Gate 0 always runs, so it owns the setup number and the rest
-    read it off the assessment."""
-    assert "leg length" in cb.TESTS["gate0_neutral"].setup_input.lower()
-    for key in ("gate0_turned_out", "spectrum_isometric", "spectrum_passive"):
+    """Two splits asking for one number invites two differently-eyeballed values
+    for it. It lived on gate 0 until gate 0 was removed; the isometric is now the
+    first split that runs, so it owns the number and the passive reads it back."""
+    assert "leg length" in cb.TESTS["spectrum_isometric"].setup_input.lower()
+    for key in ("leverage_bent", "leverage_straight", "spectrum_passive"):
         assert "leg length" not in cb.TESTS[key].setup_input.lower(), \
             f"{key} asks for the leg length a second time"
 
-    a = _assessment(_GATE0_PASS)
+    a = _assessment([_spectrum(30.0, "spectrum_isometric")])
     assert cb.leg_length(a) == _LEG_LENGTH
     assert cb.leg_length(_assessment([])) is None
 
 
-def test_the_three_side_splits_are_told_apart_by_what_holds_you_up():
-    """His complaint, 2026-08-12: "im doing isometric side splits twice". They
-    are three different tests and the only thing separating them is the support
-    — hands on blocks, then hands off everything, then a bench taking your
-    weight. If the text does not make that unmissable the athlete is right to
-    read them as the same test, which is the straddle-lift-offs complaint of
+def test_the_two_side_splits_are_told_apart_by_what_holds_you_up():
+    """His complaint, 2026-08-12: "im doing isometric side splits twice". It was
+    three splits then and is two now that gate 0 is gone, and the only thing
+    separating them is the support — hands off everything, then a bench taking
+    your weight. If the text does not make that unmissable the athlete is right
+    to read them as the same test, which is the straddle-lift-offs complaint of
     2026-08-07 in a new place."""
-    gate = cb.TESTS["gate0_neutral"]
     iso = cb.TESTS["spectrum_isometric"]
     passive = cb.TESTS["spectrum_passive"]
-    assert "blocks" in gate.setup.lower() and "hands on" in gate.setup.lower()
     assert "hands off everything" in iso.setup.lower()
     assert "nothing supports you" in iso.setup.lower()
     assert "taking your upper body weight" in passive.setup.lower()
     # And each says what it is NOT, since that is the confusion being fixed.
     assert "bench" in iso.setup.lower() or "blocks" in iso.setup.lower()
     assert "hands-off" in passive.setup.lower()
-
 
 def test_the_spectrum_pair_is_compared_as_depths_not_widths():
     """SPECTRUM_GAP_CM is a distance off the floor, and the same depth gap is a
@@ -1466,13 +1354,73 @@ def test_the_spectrum_pair_is_compared_as_depths_not_widths():
 
 
 def test_a_spectrum_width_with_no_leg_length_is_indeterminate():
-    """Gate 0 carries the leg length. Without it the widths cannot become
+    """The isometric carries the leg length. Without it the widths cannot become
     depths, and a missing measurement is not a pass."""
-    readings = [b.Reading("gate0_neutral", _gate0(28.0).value, "cm")]   # no setup_value
-    readings += _LEVERAGE_PASS + _TILT_PASS + [
+    bare = b.Reading("spectrum_isometric",
+                     _spectrum(30.0, "spectrum_isometric").value, "cm")  # no setup_value
+    readings = _LEVERAGE_PASS + _TILT_PASS + [
         b.Reading("spectrum_active", 40.0, "°", side="left"),
         b.Reading("spectrum_active", 38.0, "°", side="right"),
-        _spectrum(30.0, "spectrum_isometric"), _spectrum(10.0, "spectrum_passive")]
+        bare, _spectrum(10.0, "spectrum_passive")]
     slot3 = cb.evaluate_spectrum(_assessment(readings))
     assert slot3.indeterminate and not slot3.passed
     assert "leg length" in slot3.reason.lower()
+
+
+# ── gate 0 is gone, and the absence is explained ─────────────────────────────
+
+def test_gate_zero_is_gone_from_every_layer():
+    """The athlete's instruction, 2026-08-12, stated twice. His reason is a
+    measurement one: gate 0 was a passive end-range side split under another
+    name, run FIRST, against the battery's own active -> isometric -> passive
+    rule — so it left the two leverages, both tilt trials and all three spectrum
+    measures reading looser than they are."""
+    for key in ("gate0_neutral", "gate0_turned_out"):
+        assert key not in cb.TESTS
+        assert key not in cb.TEST_ORDER
+        assert key not in cb.AVAILABLE_TESTS
+    assert not hasattr(cb, "evaluate_structure")
+    assert not hasattr(cb, "GATE0_BONE_RELEVANT_CM")
+    assert not hasattr(cb, "GATE0_ORIENTATION_GAIN_CM")
+    assert "bone" not in {i["key"] for i in cb.LADDER_INFO}
+    assert len(cb.SLOT_EVALUATORS) == 3
+    assert b.SLOT_STRUCTURE not in {cb.TESTS[k].slot for k in cb.TESTS}
+
+
+def test_the_removal_says_what_would_put_it_back():
+    """cluster_a_mechanics.REMOVED's rule: an unexplained absence is
+    indistinguishable from an oversight. Someone reading this file in a year
+    must find the reason and the revert condition, not a hole."""
+    note = cb.REMOVED_GATE_0
+    assert "2026-08-12" in note
+    assert "WHAT WOULD PUT IT BACK" in note
+    assert "passive" in note and "FIRST" in note, "the ordering argument must survive"
+    assert "15 cm" in note, "the revert condition needs its number"
+
+
+def test_patterns_a_and_b_are_unreachable_but_still_defined():
+    """They are the source's material and their stacks are authored, so they
+    stay — but the battery cannot emit them with slot 0 gone, and a reader must
+    not mistake their presence for a live outcome."""
+    assert cb.PATTERNS["A"] and cb.PATTERNS["B"]
+    assert cp.prescribe("A") and cp.prescribe("B"), "the stacks must still resolve"
+
+    emitted = set()
+    for name in dir(cb):
+        fn = getattr(cb, name)
+        if name.startswith("evaluate_") and callable(fn):
+            src = inspect.getsource(fn)
+            emitted |= set(re.findall(r'pattern="([A-I])"', src))
+    assert emitted, "no evaluator emits any pattern — the scan is broken"
+    assert "A" not in emitted and "B" not in emitted, (
+        f"slot 0 is gone, so A and B cannot be produced; found {sorted(emitted)}")
+
+
+def test_the_battery_still_runs_end_to_end_without_gate_zero():
+    """The expected pattern is F, a slot 2 failure, and it must still come out
+    of a session that now opens on the bent-knee leverage."""
+    a = _assessment(_LEVERAGE_PASS + [b.Reading("tilt_range", 8.0, "°"),
+                                      b.Reading("tilt_production", 4.0, "°")])
+    result = b.run("a", cb.SLOT_EVALUATORS, a)
+    assert result.pattern == cb.EXPECTED_PATTERN == "F"
+    assert cb.AVAILABLE_TESTS[0] == "leverage_bent", "the session now opens here"

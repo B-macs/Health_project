@@ -1,5 +1,5 @@
 """
-cluster_a_battery.py — Cluster A's four slots. Side split and pancake.
+cluster_a_battery.py — Cluster A's three slots. Side split and pancake.
 
 The machine-readable form of `Input_files/assessment_battery.md` Part 2, adapted
 for this athlete on 2026-08-06. Part 1 of that document — the general method —
@@ -21,9 +21,12 @@ scans for both.
 
 THE ADAPTATIONS, each with what reverts it
 ------------------------------------------
-  B1  Gate 0 turns the legs out instead of arching the back. The Mechanics
-      document calls the two routes equivalent, and only one collides with an
-      L5/S1 retrolisthesis. Reverts: never — it is an equal option.
+  B1  SUPERSEDED by REMOVED_GATE_0 — it adapted a test that no longer exists.
+      Kept as a numbered line rather than deleted so B2-B8 keep their names.
+      It read: gate 0 turns the legs out instead of arching the back, because
+      the Mechanics document calls the two routes equivalent and only one
+      collides with an L5/S1 retrolisthesis. Still true, and it comes back with
+      gate 0 if gate 0 ever does.
   B2  The 90° leverage is HELD until the right hip has been observed under the
       loaded squat work already in the block. It is an externally-rotated loaded
       squat and the right hip has an open snapping question; adding a second
@@ -37,24 +40,23 @@ THE ADAPTATIONS, each with what reverts it
       it. That is a different category of event, not a permission gate.
   B5  Every threshold is provisional until three baseline mornings exist, and
       they are OURS to set from his own readings rather than borrowed.
-  B6  Gate 0's two-orientation comparison only runs within
-      GATE0_BONE_RELEVANT_CM of the floor. The athlete's call (2026-08-07):
-      bone meets socket in the last few centimetres of a FULL side split, so at
-      his current height tissue stops him long before bone can, and the
-      comparison answers nothing up there. Above the line, slot 0 passes on the
-      neutral reading alone and the turned-out attempt is skipped.
-      Reverts: if a reading taken inside the line ever contradicts the claim.
-  B8  Gate 0 records the WIDTH of the split, not the gap from the floor to the
-      crotch (athlete's call, 2026-08-12: "it is hard to gauge each time where
-      exactly the crotch reads"). The heels are unambiguous and the width is
-      what he can repeat. Every threshold stayed a HEIGHT off the floor — the
-      claim they encode is about the last few centimetres of a full split — so
-      floor_gap_from_span converts, using a leg length measured ONCE standing
-      and carried on the reading as its setup_value. Read that function before
-      touching any of it: the conversion is sharp where he is (0.5 cm of height
-      per cm of width at 60 cm off the floor) and blunt where he is not (8.8 cm
-      at 5 cm), which is the opposite of the obvious worry.
-      Reverts: when a reading lands inside ~25 cm the two-orientation
+  B6  SUPERSEDED by REMOVED_GATE_0, same as B1. It scoped gate 0's
+      two-orientation comparison to the last 15 cm of the floor, on the
+      athlete's 2026-08-07 call that bone meets socket only in the last few
+      centimetres of a FULL side split. That claim is still the reason gate 0
+      was removable rather than merely unwanted, so it is restated in
+      REMOVED_GATE_0 and comes back with the slot.
+  B8  Every side split records the WIDTH between the heels, not the gap from
+      the floor to the crotch (athlete's call, 2026-08-12: "it is hard to gauge
+      each time where exactly the crotch reads"). The heels are unambiguous and
+      the width is what he can repeat. SPECTRUM_GAP_CM stayed a HEIGHT off the
+      floor, because the same depth difference is a different width at every
+      depth, so floor_gap_from_span converts using a leg length measured ONCE
+      standing and carried on the isometric reading as its setup_value. Read
+      that function before touching any of it: the conversion is sharp where he
+      is (0.5 cm of height per cm of width at 60 cm off the floor) and blunt
+      where he is not (8.8 cm at 5 cm), which is the opposite of the obvious
+      worry. Reverts: when a reading lands inside ~25 cm the spectrum
       comparison needs a directly measured gap again. Gated on the READING.
   B7  The tilt is measured as an ANGLE at the pelvis, not as forehead height
       (athlete's call, 2026-08-07). Forehead height is exactly the number a
@@ -88,6 +90,48 @@ PATTERNS: dict[str, str] = {
     "H": "Adductor end-range strength",
     "I": "Puller strength — hip abductors",
 }
+
+#: What was taken out entirely, and what would put it back — the convention
+#: cluster_a_mechanics.REMOVED establishes, because an unexplained absence is
+#: indistinguishable from an oversight.
+REMOVED_GATE_0: str = """
+Slot 0 (Structure) and both of its side splits were REMOVED on 2026-08-12, on
+the athlete's instruction, stated twice: "Remove Gate 0, its not required" and
+"I dont want it".
+
+HIS REASON, which is a measurement argument and is the part worth keeping:
+gate 0 was a passive end-range side split under another name, and it ran FIRST.
+The battery already encodes the opposite rule everywhere else — MEASURE_ORDER is
+active -> isometric -> passive, and spectrum_passive's own safety text says
+passive work "leaves tissue looser for an hour or more, so doing it first would
+flatter every reading after it". Gate 0 did exactly that to the two leverages,
+both tilt trials and all three spectrum measures, and the bias is optimistic:
+everything below it read looser than it is.
+
+It was also, for this athlete, nearly inert. B6's relevance line meant the
+turned-out comparison only ran inside 15 cm of the floor; he is over 60 cm up
+and calls a full split "2 years or more" away (2026-08-12), so the comparison
+was skipped every session and slot 0 could only ever return pass. One passive
+split, taken at the worst possible moment, for a verdict that could not vary.
+
+WHAT WENT WITH IT: tests gate0_neutral and gate0_turned_out, evaluate_structure,
+GATE0_ORIENTATION_GAIN_CM, GATE0_BONE_RELEVANT_CM, the SKIP_NOTES entry,
+applicable_tests' only rule, and the ladder's "bone" rung.
+
+WHAT DID NOT: patterns A (Bone) and B (Orientation) keep their entries here and
+their stacks in cluster_a_prescription — they are the source's material and the
+battery simply cannot emit them now. A test pins that they are unreachable so
+nobody reads their presence as a live outcome. floor_gap_from_span stayed too;
+the spectrum splits still need it.
+
+WHAT WOULD PUT IT BACK: a bony end-feel finding — the sharp anterior pinch with
+a hard stop that patient_profile logs for 2026-08-05 and has never explained —
+or any reading landing inside ~15 cm of the floor, where the question stops
+being hypothetical. Restoring means the two tests, evaluate_structure at the
+head of SLOT_EVALUATORS, and the bone rung; B1 and B6 come back with them. If it
+returns it should be measured LAST and read first, which is the ordering
+objection answered rather than reintroduced.
+"""
 
 #: Written down BEFORE measuring, so a borderline reading cannot be quietly read
 #: toward the answer already in mind. His 2026-08-05 straddle report — "hips
@@ -137,70 +181,6 @@ class BatteryTest:
 
 TESTS: dict[str, BatteryTest] = {
 
-    # ── Slot 0 — Structure ──────────────────────────────────────────────────
-    "gate0_neutral": BatteryTest(
-        key="gate0_neutral", slot=_b.SLOT_STRUCTURE,
-        label="Side split, legs neutral", unit="cm", smaller_is_better=False,
-        setup="Slide into a side split with your legs in a **neutral rotation** — kneecaps "
-              "pointing forward, not turned up. Go to where it stops, not past it. Hands on "
-              "blocks in front of you so your chest stays up.",
-        lock="Your pelvis and lower back must be **identical between this attempt and the "
-             "next one**. The whole reading is the difference the leg rotation makes, so "
-             "anything else that moves contaminates it. **The tell: if your back position "
-             "changes between the two attempts, the trial is void** — reset and take both "
-             "again.",
-        measurement="Measure along the floor from the inside of one heel to the inside "
-                    "of the other. Bigger is deeper. To the nearest half centimetre. "
-                    "**Record your leg length once, standing** — floor to crotch with "
-                    "your heels down, the way a tailor measures an inseam. That number "
-                    "is what turns the width into how high off the floor you are, and "
-                    "it is the same number every session.",
-        input_hint="The distance between the inside of one heel and the inside of the "
-                   "other, in cm",
-        setup_input="Leg length — standing, floor to crotch (cm)",
-        what_youre_testing="Whether the thing stopping you is the shape of your hip joint "
-                           "rather than tissue length. The neck of the thigh bone eventually "
-                           "meets the rim of the socket, and where that happens varies a lot "
-                           "between healthy people. Bone does not stretch, so if this is your "
-                           "limit the answer is alignment rather than more stretching. That "
-                           "collision only happens in the last few centimetres of a full "
-                           "split, though — so this reading doubles as the check on whether "
-                           "the question is even live yet. More than 15 cm off the floor, "
-                           "tissue is stopping you long before any bone could, and the "
-                           "turned-out comparison is skipped until you are closer.",
-        safety="**A sharp pinch at the front of the hip with a sudden hard stop is a "
-               "finding, not a result — stop and record it.** It is not a pattern to train "
-               "against and it is not a number. The same sensation was reported in a deep "
-               "butterfly on 2026-08-05 and has never been explained; if it appears again, "
-               "note what position produced it and go no further into that position today. "
-               "Repeated collision with a bony end causes joint irritation, and it is the "
-               "reason people stall permanently rather than slowly.",
-    ),
-    "gate0_turned_out": BatteryTest(
-        key="gate0_turned_out", slot=_b.SLOT_STRUCTURE,
-        label="Side split, legs turned out", unit="cm", smaller_is_better=False,
-        setup="The same position, but now **turn both legs out from the hips** — let the "
-              "kneecaps rotate toward the ceiling. Keep your back exactly as it was in the "
-              "first attempt.",
-        lock="As above: pelvis and lower back unchanged between the two. **The tell is the "
-             "same** — if your back moves, the comparison is void.",
-        measurement="Same measurement: inside heel to inside heel along the floor, to "
-                    "the nearest half centimetre. **The reading is the difference "
-                    "between the two attempts.**",
-        input_hint="The distance between the inside of one heel and the inside of the "
-                   "other, in cm — same tape as the first attempt",
-        what_youre_testing="The same question, asked with the joint aligned differently. "
-                           "There are two ways to give the hip more room — turn the leg out, "
-                           "or tilt the pelvis — and they reach the same place. This uses the "
-                           "turn-out because tilting means arching your lower back under your "
-                           "full bodyweight, which your imaging rules out. A large jump "
-                           "between the two attempts means alignment was the limit, not "
-                           "tissue. This attempt only runs when your neutral reading lands "
-                           "within 15 cm of the floor — higher than that, bone cannot be "
-                           "what stops you and the comparison answers nothing.",
-        adapted_from="the original asked for a deliberate anterior pelvic tilt with the "
-                     "back arched",
-    ),
 
     # ── Slot 1 — Regressed, at multiple leverages ───────────────────────────
     "leverage_bent": BatteryTest(
@@ -388,6 +368,7 @@ TESTS: dict[str, BatteryTest] = {
                     "neither means anything alone.",
         input_hint="The distance between the inside of one heel and the inside of the "
                    "other, in cm — plus the load beside it if you used one",
+        setup_input="Leg length — standing, floor to crotch (cm)",
         what_youre_testing="Whether the range is defended by muscle or only propped up from "
                            "outside. Your body will not let a muscle relax into a position it "
                            "cannot support, so end-range strength is not something running "
@@ -426,7 +407,6 @@ TESTS: dict[str, BatteryTest] = {
 #: passive. NEITHER is the order the source writes them in, and both exist for
 #: the same reason: an assisted or passive trial flatters whatever follows it.
 TEST_ORDER: tuple[str, ...] = (
-    "gate0_neutral", "gate0_turned_out",
     "leverage_bent", "leverage_straight",          # leverage_90 deferred
     "tilt_production", "tilt_range",
     "spectrum_active", "spectrum_isometric", "spectrum_passive",
@@ -439,16 +419,12 @@ DEFERRED_TESTS: tuple[str, ...] = tuple(k for k, t in TESTS.items() if not t.ava
 def applicable_tests(assessment=None) -> tuple[str, ...]:
     """The tests a SESSION actually asks for, given what it has measured so far.
 
-    One rule today: the turned-out attempt only runs when the neutral
-    side-split reading is within GATE0_BONE_RELEVANT_CM of the floor — above
-    that, bone cannot be what stops him and the comparison answers nothing.
-    Owned here rather than by the screen, so the capture flow and the evaluator
-    cannot disagree about when the comparison matters.
+    NO RULES TODAY. The only one there has ever been belonged to gate 0, which
+    was removed on 2026-08-12 (see REMOVED_GATE_0) — every remaining test is
+    asked every session. Kept as the seam rather than inlined at the call sites:
+    when a rule comes back it belongs here, so the capture flow and the
+    evaluators cannot disagree about which tests a session owes.
     """
-    neutral = assessment.reading("gate0_neutral") if assessment is not None else None
-    gap = _gap(neutral)
-    if gap is not None and gap > GATE0_BONE_RELEVANT_CM:
-        return tuple(k for k in AVAILABLE_TESTS if k != "gate0_turned_out")
     return AVAILABLE_TESTS
 
 
@@ -491,105 +467,9 @@ def test_for(key: str) -> BatteryTest | None:
 # honestly different from "you passed" and must never collapse into it — a
 # missing measurement is not evidence of health.
 
-#: How much deeper the turned-out attempt must be for orientation to be the
-#: limiter. PROVISIONAL: from the source, not from this athlete's own spread.
-GATE0_ORIENTATION_GAIN_CM: float = 10.0
-
-#: The height off the floor below which the bony question becomes live. THE
-#: ATHLETE'S CALL (2026-08-07): the neck of the thigh bone meets the socket only
-#: in the last few centimetres of a FULL side split, so at his current height
-#: tissue stops him long before bone can, and asking the two-orientation
-#: comparison up there answers nothing. Above this line slot 0 passes on the
-#: neutral reading alone and the turned-out attempt is skipped. A claim about
-#: where in the range the mechanism operates, not a preference — re-open it only
-#: if a reading taken inside the line contradicts it.
-#:
-#: STILL IN CENTIMETRES OFF THE FLOOR after the 2026-08-12 switch to measuring
-#: the split's WIDTH — see floor_gap_from_span. It is also the athlete's own
-#: stated success target ("15 cm or less and I'll consider it a success",
-#: 2026-08-12), so it is now two claims in one number and both are his.
-GATE0_BONE_RELEVANT_CM: float = 15.0
-
-
-def floor_gap_from_span(span_cm, leg_length_cm):
-    """How high off the floor a side split of `span_cm` puts you, given the
-    athlete's standing leg length. Returns None when it cannot be computed.
-
-    WHY THE READING IS A WIDTH AND THE THRESHOLDS ARE STILL HEIGHTS (athlete,
-    2026-08-12): finding the crotch by eye mid-split is not repeatable, and it
-    is the number he was asked for every session. The heels are unambiguous. So
-    he measures the width, and the one crotch measurement that survives is taken
-    ONCE, standing, where a tailor takes it.
-
-    Each leg is the hypotenuse from crotch to floor contact, so with half the
-    span as one side, `gap = sqrt(L^2 - (span/2)^2)`.
-
-    THE CONVERSION IS SHARP WHERE HE IS AND BLUNT WHERE HE IS NOT, which is the
-    opposite of the worry and worth writing down. Per 1 cm of error in the width,
-    at leg length 84-88 cm:
-
-        60 cm off the floor   0.5 cm of height     <- him today
-        30 cm                 1.3 cm
-        15 cm                 2.9 cm               <- the line above
-         5 cm                 8.8 cm
-
-    So the whole zone this threshold governs is about 2.6 cm of width, and down
-    there a width reading cannot answer the question at all. That does not bite
-    yet — he is over 60 cm off the floor and calls a full split "2 years or
-    more" away (2026-08-12), and the turned-out attempt is skipped that whole
-    time. REVERT CONDITION, in the HRV_GARMIN_HOLD idiom: when a reading lands
-    inside ~25 cm, this stops being good enough and the two-orientation
-    comparison needs a directly measured floor-to-crotch gap rather than one
-    derived from a width. Gated on the READING, not on a date.
-    """
-    if not span_cm or not leg_length_cm or leg_length_cm <= 0:
-        return None
-    half = float(span_cm) / 2.0
-    if half >= float(leg_length_cm):
-        return None            # wider than two legs — a mismeasure, not a split
-    return math.sqrt(float(leg_length_cm) ** 2 - half ** 2)
-
-
-def _gap(reading):
-    """The floor-to-crotch gap a gate 0 reading implies, or None. The leg length
-    rides on the reading as its `setup_value` — load and measurement are ONE
-    DATUM, the same rule as the heel distance and the straddle width."""
-    if reading is None:
-        return None
-    return floor_gap_from_span(reading.value, reading.setup_value)
-
-
-def leg_length(assessment):
-    """The athlete's recorded leg length for this session, off the gate 0 reading.
-
-    ASKED ONCE PER SESSION, NOT ONCE PER SPLIT. Gate 0 always runs — it is the
-    first test and nothing below it is reachable without it — so its
-    `setup_value` is the natural home for a number that is the same for every
-    split in the session. Re-asking it at the spectrum would invite a second,
-    differently-eyeballed value for one quantity, which is the failure the
-    recorded-setup convention exists to prevent.
-    """
-    r = assessment.reading("gate0_neutral") if assessment is not None else None
-    return r.setup_value if r is not None else None
-
-
-def _spectrum_gap(reading, leg_length_cm):
-    """A spectrum split width as a floor-to-crotch gap. Same conversion and same
-    reason as gate 0 — the athlete measures heels, the thresholds are depths."""
-    if reading is None:
-        return None
-    return floor_gap_from_span(reading.value, leg_length_cm)
-
 #: Why a test that applicable_tests dropped was dropped, in the athlete's
 #: language — the capture flow shows this instead of the step.
-SKIP_NOTES: dict[str, str] = {
-    "gate0_turned_out": (
-        f"Skipped: legs turned out. At your height off the floor, bone is not yet "
-        f"a factor — the comparison starts mattering under "
-        f"{GATE0_BONE_RELEVANT_CM:.0f} cm, and it will come back by itself once a "
-        f"neutral reading lands inside that line."
-    ),
-}
+SKIP_NOTES: dict[str, str] = {}
 
 #: A leverage reading at or past its target counts as a pass. PROVISIONAL for
 #: the same reason — every threshold here moves once three baseline mornings
@@ -603,6 +483,63 @@ LEVERAGE_TARGETS: dict[str, float] = {
 #: PROVISIONAL like the rest — invented so the code can run, and it moves once
 #: three baseline mornings show what his own numbers look like.
 TILT_TARGET_DEG: float = 20.0
+
+
+def floor_gap_from_span(span_cm, leg_length_cm):
+    """How high off the floor a side split of `span_cm` puts you, given the
+    athlete's standing leg length. Returns None when it cannot be computed.
+
+    WHY THE READINGS ARE WIDTHS AND THE THRESHOLDS ARE STILL HEIGHTS (athlete,
+    2026-08-12): finding the crotch by eye mid-split is not repeatable, and it
+    was the number he was asked for every session. The heels are unambiguous. So
+    he measures the width, and the one crotch measurement that survives is taken
+    ONCE, standing, where a tailor takes it.
+
+    Each leg is the hypotenuse from crotch to floor contact, so with half the
+    span as one side, `gap = sqrt(L^2 - (span/2)^2)`.
+
+    THE CONVERSION IS SHARP WHERE HE IS AND BLUNT WHERE HE IS NOT, which is the
+    opposite of the worry and worth writing down. Per 1 cm of error in the width,
+    at leg length 84-88 cm:
+
+        60 cm off the floor   0.5 cm of height     <- him today
+        30 cm                 1.3 cm
+        15 cm                 2.9 cm
+         5 cm                 8.8 cm
+
+    REVERT CONDITION, in the HRV_GARMIN_HOLD idiom: when a reading lands inside
+    ~25 cm this stops being good enough and the spectrum comparison needs a
+    directly measured floor-to-crotch gap rather than one derived from a width.
+    Gated on the READING, not on a date.
+    """
+    if not span_cm or not leg_length_cm or leg_length_cm <= 0:
+        return None
+    half = float(span_cm) / 2.0
+    if half >= float(leg_length_cm):
+        return None            # wider than two legs — a mismeasure, not a split
+    return math.sqrt(float(leg_length_cm) ** 2 - half ** 2)
+
+
+def leg_length(assessment):
+    """The athlete's recorded leg length for this session.
+
+    ASKED ONCE PER SESSION, NOT ONCE PER SPLIT. It lived on gate 0 until gate 0
+    was removed (REMOVED_GATE_0, 2026-08-12); the spectrum is now the only thing
+    that needs it, and spectrum_isometric is the first split that runs, so it
+    owns the number and the passive trial reads it back. Re-asking at the
+    passive would invite a second, differently-eyeballed value for one quantity,
+    which is the failure the recorded-setup convention exists to prevent.
+    """
+    r = assessment.reading("spectrum_isometric") if assessment is not None else None
+    return r.setup_value if r is not None else None
+
+
+def _spectrum_gap(reading, leg_length_cm):
+    """A spectrum split width as a floor-to-crotch gap — the athlete measures
+    heels, the thresholds are depths."""
+    if reading is None:
+        return None
+    return floor_gap_from_span(reading.value, leg_length_cm)
 
 #: Centimetres between the passive and isometric split depths before end-range
 #: strength rather than puller strength is called the limiter.
@@ -625,86 +562,6 @@ def _better(readings) -> float | None:
     values = [r.value for r in readings if r.usable]
     return min(values) if values else None
 
-
-def evaluate_structure(assessment):
-    from services import battery as b
-    neutral = assessment.reading("gate0_neutral")
-    turned = assessment.reading("gate0_turned_out")
-
-    if neutral is None:
-        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, indeterminate=True,
-                            reason="Gate 0 was not completed, so nothing below it can be "
-                                   "read. A missing measurement is not a pass.")
-
-    # The reading is the WIDTH of the split; every threshold below is a height
-    # off the floor. Without the leg length recorded beside it the width cannot
-    # be turned into one, and a width alone is not evidence of anything — say so
-    # rather than passing on a number nothing can interpret.
-    neutral_gap = _gap(neutral)
-    if neutral_gap is None:
-        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, indeterminate=True,
-                            reason="The split width was recorded without a leg length "
-                                   "beside it, so how high off the floor you are cannot "
-                                   "be worked out. Measure it once standing — floor to "
-                                   "crotch, heels down — and it is the same number every "
-                                   "session after that.")
-
-    # THE RELEVANCE LINE (athlete's call, 2026-08-07). Bone meets socket only in
-    # the last few centimetres of a full split; above the line, tissue stops him
-    # long before bone can, so the two-orientation comparison answers nothing
-    # and is skipped rather than asked. PROVISIONAL in the formal sense — no
-    # measurement validates 15 over 12 — but the number is his, from the
-    # mechanics of the test, not one invented to make the code run.
-    if neutral_gap > GATE0_BONE_RELEVANT_CM:
-        extra = ""
-        turned_gap = _gap(turned)
-        if turned_gap is not None:
-            diff = neutral_gap - turned_gap
-            extra = (f" Turning out changed it by {diff:.1f} cm — noted, but at this "
-                     f"height that is tissue following the alignment, not bone.")
-        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=True, basis=b.BASIS_PROVISIONAL,
-                            reason=f"A {neutral.value:.1f} cm split puts you "
-                                   f"{neutral_gap:.1f} cm off the floor, and bone cannot be "
-                                   f"what stops you up there — that contact only happens in "
-                                   f"the last few centimetres of a full split. The "
-                                   f"two-orientation check starts mattering under "
-                                   f"{GATE0_BONE_RELEVANT_CM:.0f} cm; it comes back by "
-                                   f"itself once you are inside that line.{extra}",
-                            readings=(neutral,) if turned is None else (neutral, turned))
-
-    if turned is None:
-        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, indeterminate=True,
-                            reason=f"Within {GATE0_BONE_RELEVANT_CM:.0f} cm of the floor "
-                                   f"the bony question is live, and it needs the turned-out "
-                                   f"attempt. A missing measurement is not a pass.")
-
-    turned_gap = _gap(turned)
-    if turned_gap is None:
-        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, indeterminate=True,
-                            reason="The turned-out width has no leg length beside it, so "
-                                   "the two attempts cannot be compared as depths. A "
-                                   "missing measurement is not a pass.")
-
-    # A turned-out attempt that goes MUCH deeper means the joint was misaligned
-    # rather than the tissue short. Compared as HEIGHTS, not as widths: the same
-    # gain is 5.9 cm of width at 30 cm off the floor and 2.3 cm at 15 cm, so a
-    # width threshold would mean something different at every depth. See
-    # floor_gap_from_span.
-    # RELATIVE: this compares two of his own readings taken minutes apart, so it
-    # carries its own reference and no invented norm is involved. The only slot
-    # in the battery that is sound on a first morning.
-    gain = neutral_gap - turned_gap
-    if gain >= GATE0_ORIENTATION_GAIN_CM:
-        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, pattern="B",
-                            basis=b.BASIS_RELATIVE,
-                            reason=f"Turning the legs out gained {gain:.1f} cm. Orientation "
-                                   f"is the limiter, not tissue length.",
-                            readings=(neutral, turned))
-    return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=True, basis=b.BASIS_RELATIVE,
-                        reason=f"Turning out changed the depth by {gain:.1f} cm — below the "
-                               f"threshold for calling alignment the limiter, so this is a "
-                               f"genuine tissue restriction.",
-                        readings=(neutral, turned))
 
 
 def evaluate_regressed(assessment):
@@ -831,7 +688,6 @@ def evaluate_spectrum(assessment):
 
 #: Passed to services.battery.run, in order. The list IS the method.
 SLOT_EVALUATORS = [
-    evaluate_structure,
     evaluate_regressed,
     evaluate_prerequisite,
     evaluate_spectrum,
@@ -852,8 +708,6 @@ SLOT_EVALUATORS = [
 
 #: Display metadata, bottom rung first. The prototype reads this too.
 LADDER_INFO: tuple[dict, ...] = (
-    {"key": "bone", "label": "Bone & orientation",
-     "muscle": "the shape of the hip joint", "unit": "cm", "provisional": False},
     {"key": "group_length", "label": "Adductor group — bent knee",
      "muscle": "inner thigh group", "unit": "cm", "provisional": True},
     {"key": "gracilis", "label": "Gracilis — straight knee",
@@ -895,26 +749,6 @@ def ladder(assessment, result) -> tuple:
             unit=info["unit"], measured=measured, target=target,
             fraction=fraction, detail=detail, pattern=pattern,
             provisional=info["provisional"]))
-
-    # ── bone & orientation (slot 0) ─────────────────────────────────────────
-    slot0 = ran.get(b.SLOT_STRUCTURE)
-    neutral = assessment.reading("gate0_neutral")
-    # The rung shows the DERIVED height, not the width, because the target it is
-    # read against is a height and a bar mixing the two would be meaningless.
-    neutral_gap = _gap(neutral)
-    if slot0 is None or slot0.indeterminate:
-        add("bone", b.RUNG_UNMEASURED, detail="Gate 0 incomplete.")
-    elif not slot0.passed:
-        add("bone", b.RUNG_LIMITING, pattern=slot0.pattern, measured=neutral_gap,
-            detail="Turning the legs out changes the depth — alignment, not tissue.")
-    elif neutral_gap is not None and neutral_gap > GATE0_BONE_RELEVANT_CM:
-        add("bone", b.RUNG_PASSED, measured=neutral_gap,
-            detail=f"Not a factor at {neutral_gap:.0f} cm off the floor, which is what "
-                   f"a {neutral.value:g} cm split comes to — the question goes live "
-                   f"under {GATE0_BONE_RELEVANT_CM:g} cm.")
-    else:
-        add("bone", b.RUNG_PASSED, measured=neutral_gap,
-            detail="Turning out changed little — tissue, not bone.")
 
     # ── the two leverages (slot 1) ──────────────────────────────────────────
     slot1 = ran.get(b.SLOT_REGRESSED)

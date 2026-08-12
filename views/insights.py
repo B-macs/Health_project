@@ -1508,14 +1508,19 @@ def _fx_render_empty(accent: str) -> None:
         unsafe_allow_html=True,
     )
 
-    with st.expander("The four slots, and why they run in order"):
-        for slot in (btry.SLOT_STRUCTURE, btry.SLOT_REGRESSED,
+    # THREE slots, not four: gate 0 was removed on the athlete's instruction,
+    # 2026-08-12 — see cluster_a_battery.REMOVED_GATE_0. The slot vocabulary in
+    # services/battery.py still carries SLOT_STRUCTURE because it is the general
+    # layer and another cluster may use it; this screen shows the slots THIS
+    # cluster actually runs, which is what the evaluator list decides.
+    with st.expander("The slots, and why they run in order"):
+        for slot in (btry.SLOT_REGRESSED,
                      btry.SLOT_PREREQUISITE, btry.SLOT_SPECTRUM):
             st.markdown(f"**{slot}. {btry.SLOT_LABELS[slot]}** — "
                         f"{btry.SLOT_QUESTIONS[slot]}")
             st.caption(f"Decides: {btry.SLOT_DECIDES[slot]}")
         st.caption("Stop at the first failure. There is no value in measuring a spectrum "
-                   "profile for a skill that a bony block had already made unavailable.")
+                   "profile for a skill an earlier slot has already made unavailable.")
 
     # The expected-outcome expander was REMOVED from this screen on the
     # athlete's request (2026-08-07). The prediction itself stays in

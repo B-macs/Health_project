@@ -31,10 +31,6 @@ import flexibility_baselines as fb      # noqa: E402
 from services import battery as b       # noqa: E402
 
 FAKE = {
-    "gate0_neutral":      {"": 28.0},
-    # Never reached in the demo path: 28 cm is above the relevance line, so the
-    # turned-out step skips itself — which is the behaviour being demonstrated.
-    "gate0_turned_out":   {"": 25.0},
     "leverage_bent":      {"left": 8.0, "right": 9.5},
     "leverage_straight":  {"left": 95.0, "right": 94.0},
     "tilt_production":    {"": 4.0},
@@ -108,9 +104,7 @@ DATA = json.dumps({
     "deferredTests": [{"label": cb.TESTS[k].label, "why": cb.TESTS[k].safety}
                       for k in cb.DEFERRED_TESTS],
     "baselinesRequired": b.BASELINE_SESSIONS_REQUIRED,
-    "th": {"gate0Gain": cb.GATE0_ORIENTATION_GAIN_CM,
-           "bone": cb.GATE0_BONE_RELEVANT_CM,
-           "bent": cb.LEVERAGE_TARGETS["leverage_bent"],
+    "th": {"bent": cb.LEVERAGE_TARGETS["leverage_bent"],
            "straight": cb.LEVERAGE_TARGETS["leverage_straight"],
            "tilt": cb.TILT_TARGET_DEG,
            "gap": cb.SPECTRUM_GAP_CM},
@@ -203,30 +197,12 @@ function worst(k){ const o=S.r[k]||{}; const v=Object.values(o).filter(x=>x!==''
 function best(k){ const o=S.r[k]||{}; const v=Object.values(o).filter(x=>x!==''&&x!=null).map(Number);
   return v.length?Math.min.apply(null,v):null; }
 
-// The LIVE order: above the relevance line the turned-out comparison answers
-// nothing and its step skips itself — mirroring cluster_a_battery.applicable_tests.
-function liveOrder(){ const n=val('gate0_neutral');
-  return (n!==null && n>DATA.th.bone)
-    ? DATA.order.filter(function(k){return k!=='gate0_turned_out';})
-    : DATA.order; }
+// The LIVE order. No rule drops a step any more — gate 0 was removed on
+// 2026-08-12 and it owned the only one. Mirrors cluster_a_battery.applicable_tests.
+function liveOrder(){ return DATA.order; }
 
 function evaluate(){
   const out=[];
-  const n=val('gate0_neutral'), t=val('gate0_turned_out');
-  if(n===null) return {slots:out, pattern:null, stopped:0, indet:true};
-  if(n>DATA.th.bone){
-    out.push({slot:0,pass:true,reason:'At '+n.toFixed(1)+' cm off the floor, bone cannot be what stops you — '
-      +'that contact only happens in the last few centimetres of a full split. The two-orientation check '
-      +'starts mattering under '+DATA.th.bone.toFixed(0)+' cm; it comes back by itself once you are inside that line.'});
-  } else {
-    if(t===null) return {slots:out, pattern:null, stopped:0, indet:true};
-    const gain=n-t;
-    if(gain>=DATA.th.gate0Gain){ out.push({slot:0,pass:false,pattern:'B',
-        reason:'Turning the legs out gained '+gain.toFixed(1)+' cm. Orientation is the limiter, not tissue length.'});
-      return {slots:out, pattern:'B', stopped:0}; }
-    out.push({slot:0,pass:true,reason:'Turning out changed the depth by '+gain.toFixed(1)+' cm — below the threshold, so this is a genuine tissue restriction.'});
-  }
-
   const bent=worst('leverage_bent'), str=best('leverage_straight');
   if(bent===null||str===null) return {slots:out, pattern:null, stopped:1, indet:true};
   const bf=bent>DATA.th.bent, sf=str<DATA.th.straight;
@@ -257,7 +233,6 @@ function frac(m,t,smaller){ if(m==null||t==null||m<=0||t<=0) return null;
 
 function ladderRungs(ev){
   const ran={}; ev.slots.forEach(function(s){ ran[s.slot]=s; });
-  const n=val('gate0_neutral');
   const bent=worst('leverage_bent'), str=best('leverage_straight');
   const rg=val('tilt_range'), pr=val('tilt_production');
   const iso=val('spectrum_isometric'), pas=val('spectrum_passive');
@@ -270,9 +245,6 @@ function ladderRungs(ev){
     out.push({key:k,label:i.label,muscle:i.muscle,unit:i.unit,provisional:i.provisional,
               state:state,measured:m,target:t,fraction:f,pattern:pat||''}); }
 
-  if(!(0 in ran)) add('bone','unmeasured',null,null,null);
-  else if(!ran[0].pass) add('bone','limiting',n,null,null,'B');
-  else add('bone','passed',n,null,null);
 
   const s1=ran[1], bf=frac(bent,DATA.th.bent,true), sf=frac(str,DATA.th.straight,false);
   if(s1){ const p=s1.pattern||'';
