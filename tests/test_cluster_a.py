@@ -13,6 +13,7 @@ is a boundary that erodes on the first inconvenient afternoon.
 
 import ast
 import inspect
+import math
 from datetime import date
 
 import pytest
@@ -169,8 +170,20 @@ def _assessment(readings, taken_on=TODAY):
     return b.Assessment(cluster="a", taken_on=taken_on, readings=tuple(readings))
 
 
-_GATE0_PASS = [b.Reading("gate0_neutral", 28.0, "cm"),
-               b.Reading("gate0_turned_out", 25.0, "cm")]
+#: Gate 0 records the WIDTH of the split and the thresholds are heights off the
+#: floor, so the fixtures below are written as the DEPTH they mean and converted
+#: — a bare 162.6 would say nothing about which side of the relevance line it
+#: falls on. A plausible standing inseam for this athlete's 182 cm.
+_LEG_LENGTH = 86.0
+
+
+def _gate0(gap_cm, key="gate0_neutral"):
+    """A gate 0 reading that puts the athlete `gap_cm` off the floor."""
+    span = 2.0 * math.sqrt(_LEG_LENGTH ** 2 - gap_cm ** 2)
+    return b.Reading(key, round(span, 1), "cm", setup_value=_LEG_LENGTH)
+
+
+_GATE0_PASS = [_gate0(28.0), _gate0(25.0, "gate0_turned_out")]
 _LEVERAGE_PASS = [b.Reading("leverage_bent", 8.0, "cm", side="left"),
                   b.Reading("leverage_bent", 9.0, "cm", side="right"),
                   b.Reading("leverage_straight", 95.0, "cm", side="left"),
@@ -179,8 +192,7 @@ _TILT_PASS = [b.Reading("tilt_production", 25.0, "°"),
               b.Reading("tilt_range", 30.0, "°")]
 #: Pattern B needs the neutral reading INSIDE the relevance line — above it,
 #: bone is not a live question and slot 0 passes on the height alone.
-_GATE0_BONY = [b.Reading("gate0_neutral", 14.0, "cm"),
-               b.Reading("gate0_turned_out", 3.0, "cm")]
+_GATE0_BONY = [_gate0(14.0), _gate0(3.0, "gate0_turned_out")]
 
 
 def test_a_failing_slot_stops_the_battery_and_the_rest_is_never_evaluated():
@@ -249,8 +261,9 @@ def test_the_worse_side_decides_and_sides_are_never_averaged():
 def test_a_voided_trial_is_not_used():
     # Inside the relevance line so the turned-out attempt is REQUIRED — voiding
     # it must leave the slot unanswerable, not quietly passed.
-    a = _assessment([b.Reading("gate0_neutral", 14.0, "cm"),
-                     b.Reading("gate0_turned_out", 3.0, "cm", voided=True)])
+    a = _assessment([_gate0(14.0),
+                     b.Reading("gate0_turned_out", _gate0(3.0).value, "cm",
+                               setup_value=_LEG_LENGTH, voided=True)])
     assert b.run("a", cb.SLOT_EVALUATORS, a).slots[0].indeterminate is True
 
 
@@ -1073,7 +1086,7 @@ def test_a_slot_that_forgets_to_declare_its_basis_reads_as_provisional():
 def test_the_bone_check_is_skipped_above_the_relevance_line():
     """A 28 cm neutral reading passes slot 0 on its own: bone cannot be what
     stops him at that height, and the turned-out attempt is not asked for."""
-    alone = _assessment([b.Reading("gate0_neutral", 28.0, "cm")])
+    alone = _assessment([_gate0(28.0)])
     slot = cb.evaluate_structure(alone)
     assert slot.passed is True
     assert slot.indeterminate is False
@@ -1086,7 +1099,7 @@ def test_the_bone_check_is_required_inside_the_relevance_line():
     """Under the line the question is live, and a missing turned-out attempt is
     indeterminate — not a pass. And with no neutral reading yet, the session
     plans for both attempts rather than assuming."""
-    inside = _assessment([b.Reading("gate0_neutral", 14.0, "cm")])
+    inside = _assessment([_gate0(14.0)])
     slot = cb.evaluate_structure(inside)
     assert slot.passed is False and slot.indeterminate is True
     assert cb.applicable_tests(inside) == cb.AVAILABLE_TESTS
@@ -1096,7 +1109,7 @@ def test_the_bone_check_is_required_inside_the_relevance_line():
 def test_progress_total_shrinks_when_the_bone_check_is_out_of_scope():
     """Counting the skipped comparison would show '8 of 9' forever on a
     finished session."""
-    a = _assessment([b.Reading("gate0_neutral", 28.0, "cm")])
+    a = _assessment([_gate0(28.0)])
     done, total = fx.capture_progress(a)
     assert done == 1
     assert total == len(cb.AVAILABLE_TESTS) - 1
@@ -1298,3 +1311,70 @@ def test_the_setup_value_round_trips_and_older_payloads_still_parse():
     recovered = fx.assessment_from_dict(stale)
     assert recovered is not None
     assert recovered.readings[0].setup_value is None
+
+
+# ── gate 0 measures a WIDTH and is judged as a HEIGHT ────────────────────────
+#
+# The athlete's call, 2026-08-12: finding the crotch by eye mid-split is not
+# repeatable and it was asked for every session. The heels are unambiguous, so
+# the reading became the width of the split. Every threshold stayed a height off
+# the floor, because that is what the mechanism claim is about.
+
+def test_the_width_and_the_height_are_the_same_split_from_two_ends():
+    """The conversion is plain geometry — each leg is the hypotenuse from crotch
+    to floor — so it must round-trip."""
+    for gap in (60.0, 28.0, 15.0, 5.0):
+        span = 2.0 * math.sqrt(_LEG_LENGTH ** 2 - gap ** 2)
+        assert cb.floor_gap_from_span(span, _LEG_LENGTH) == pytest.approx(gap, abs=1e-6)
+    # A full split is two legs laid end to end, and puts you on the floor.
+    assert cb.floor_gap_from_span(2 * _LEG_LENGTH - 1e-9, _LEG_LENGTH) \
+        == pytest.approx(0.0, abs=1e-3)
+
+
+def test_a_width_with_no_leg_length_is_indeterminate_not_a_pass():
+    """A width alone cannot say how high off the floor it puts you, and the
+    thresholds are heights. A missing measurement is not evidence of health —
+    the same rule the rest of the battery runs on."""
+    orphan = _assessment([b.Reading("gate0_neutral", 162.6, "cm")])
+    result = b.run("a", cb.SLOT_EVALUATORS, orphan)
+    slot0 = result.slots[0]
+    assert slot0.indeterminate and not slot0.passed
+    assert "leg length" in slot0.reason.lower()
+    assert cb.floor_gap_from_span(162.6, None) is None
+
+
+def test_a_width_wider_than_two_legs_is_refused_rather_than_squared():
+    """sqrt of a negative is the crash; returning a number anyway is worse. A
+    split cannot be wider than the two legs making it, so this is a mismeasure
+    or a wrong leg length, and either way it is not a reading."""
+    assert cb.floor_gap_from_span(2 * _LEG_LENGTH + 5.0, _LEG_LENGTH) is None
+    assert cb.floor_gap_from_span(0.0, _LEG_LENGTH) is None
+
+
+def test_the_orientation_gain_is_compared_as_heights_not_as_widths():
+    """WHY THE CONVERSION EARNS ITS KEEP. The same 10 cm of depth is about 5.9 cm
+    of width at 30 cm off the floor and 2.3 cm at 15 cm, so a width threshold
+    would mean something different at every depth. Two pairs with a near-equal
+    WIDTH difference must therefore land on opposite verdicts."""
+    deep = _assessment([_gate0(14.0), _gate0(3.0, "gate0_turned_out")])
+    assert b.run("a", cb.SLOT_EVALUATORS, deep).pattern == "B"
+
+    # Same widths, ~2.4 cm apart, but taken high up where that is a small gain.
+    shallow_n, shallow_t = _gate0(45.0), _gate0(43.0, "gate0_turned_out")
+    width_gain = shallow_t.value - shallow_n.value
+    assert width_gain < cb.GATE0_ORIENTATION_GAIN_CM, "the point is a SMALL width step"
+    gap_gain = (cb.floor_gap_from_span(shallow_n.value, _LEG_LENGTH)
+                - cb.floor_gap_from_span(shallow_t.value, _LEG_LENGTH))
+    assert gap_gain == pytest.approx(2.0, abs=0.2)
+
+
+def test_at_the_athletes_real_depth_the_turned_out_step_is_skipped():
+    """He reported "over 60cm in the air" on 2026-08-12 and calls a full split
+    "2 years or more" away, so the bony question is not live and slot 0 passes
+    on the neutral width alone — which is the whole reason the conversion's
+    imprecision near the floor does not bite yet."""
+    his = _assessment([_gate0(60.0)])
+    assert "gate0_turned_out" not in cb.applicable_tests(his)
+    slot0 = b.run("a", cb.SLOT_EVALUATORS, his).slots[0]
+    assert slot0.passed and not slot0.indeterminate
+    assert "off the floor" in slot0.reason

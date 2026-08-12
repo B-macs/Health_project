@@ -44,6 +44,18 @@ THE ADAPTATIONS, each with what reverts it
       comparison answers nothing up there. Above the line, slot 0 passes on the
       neutral reading alone and the turned-out attempt is skipped.
       Reverts: if a reading taken inside the line ever contradicts the claim.
+  B8  Gate 0 records the WIDTH of the split, not the gap from the floor to the
+      crotch (athlete's call, 2026-08-12: "it is hard to gauge each time where
+      exactly the crotch reads"). The heels are unambiguous and the width is
+      what he can repeat. Every threshold stayed a HEIGHT off the floor — the
+      claim they encode is about the last few centimetres of a full split — so
+      floor_gap_from_span converts, using a leg length measured ONCE standing
+      and carried on the reading as its setup_value. Read that function before
+      touching any of it: the conversion is sharp where he is (0.5 cm of height
+      per cm of width at 60 cm off the floor) and blunt where he is not (8.8 cm
+      at 5 cm), which is the opposite of the obvious worry.
+      Reverts: when a reading lands inside ~25 cm the two-orientation
+      comparison needs a directly measured gap again. Gated on the READING.
   B7  The tilt is measured as an ANGLE at the pelvis, not as forehead height
       (athlete's call, 2026-08-07). Forehead height is exactly the number a
       rounding spine can fake, and his rounding is the documented compensation
@@ -55,6 +67,7 @@ THE ADAPTATIONS, each with what reverts it
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 import flexibility_baselines as _fb
@@ -137,9 +150,14 @@ TESTS: dict[str, BatteryTest] = {
              "changes between the two attempts, the trial is void** — reset and take both "
              "again.",
         measurement="Measure along the floor from the inside of one heel to the inside "
-                    "of the other. Bigger is deeper. To the nearest half centimetre.",
+                    "of the other. Bigger is deeper. To the nearest half centimetre. "
+                    "**Record your leg length once, standing** — floor to crotch with "
+                    "your heels down, the way a tailor measures an inseam. That number "
+                    "is what turns the width into how high off the floor you are, and "
+                    "it is the same number every session.",
         input_hint="The distance between the inside of one heel and the inside of the "
                    "other, in cm",
+        setup_input="Leg length — standing, floor to crotch (cm)",
         what_youre_testing="Whether the thing stopping you is the shape of your hip joint "
                            "rather than tissue length. The neck of the thigh bone eventually "
                            "meets the rim of the socket, and where that happens varies a lot "
@@ -422,7 +440,8 @@ def applicable_tests(assessment=None) -> tuple[str, ...]:
     cannot disagree about when the comparison matters.
     """
     neutral = assessment.reading("gate0_neutral") if assessment is not None else None
-    if neutral is not None and neutral.value > GATE0_BONE_RELEVANT_CM:
+    gap = _gap(neutral)
+    if gap is not None and gap > GATE0_BONE_RELEVANT_CM:
         return tuple(k for k in AVAILABLE_TESTS if k != "gate0_turned_out")
     return AVAILABLE_TESTS
 
@@ -478,7 +497,60 @@ GATE0_ORIENTATION_GAIN_CM: float = 10.0
 #: neutral reading alone and the turned-out attempt is skipped. A claim about
 #: where in the range the mechanism operates, not a preference — re-open it only
 #: if a reading taken inside the line contradicts it.
+#:
+#: STILL IN CENTIMETRES OFF THE FLOOR after the 2026-08-12 switch to measuring
+#: the split's WIDTH — see floor_gap_from_span. It is also the athlete's own
+#: stated success target ("15 cm or less and I'll consider it a success",
+#: 2026-08-12), so it is now two claims in one number and both are his.
 GATE0_BONE_RELEVANT_CM: float = 15.0
+
+
+def floor_gap_from_span(span_cm, leg_length_cm):
+    """How high off the floor a side split of `span_cm` puts you, given the
+    athlete's standing leg length. Returns None when it cannot be computed.
+
+    WHY THE READING IS A WIDTH AND THE THRESHOLDS ARE STILL HEIGHTS (athlete,
+    2026-08-12): finding the crotch by eye mid-split is not repeatable, and it
+    is the number he was asked for every session. The heels are unambiguous. So
+    he measures the width, and the one crotch measurement that survives is taken
+    ONCE, standing, where a tailor takes it.
+
+    Each leg is the hypotenuse from crotch to floor contact, so with half the
+    span as one side, `gap = sqrt(L^2 - (span/2)^2)`.
+
+    THE CONVERSION IS SHARP WHERE HE IS AND BLUNT WHERE HE IS NOT, which is the
+    opposite of the worry and worth writing down. Per 1 cm of error in the width,
+    at leg length 84-88 cm:
+
+        60 cm off the floor   0.5 cm of height     <- him today
+        30 cm                 1.3 cm
+        15 cm                 2.9 cm               <- the line above
+         5 cm                 8.8 cm
+
+    So the whole zone this threshold governs is about 2.6 cm of width, and down
+    there a width reading cannot answer the question at all. That does not bite
+    yet — he is over 60 cm off the floor and calls a full split "2 years or
+    more" away (2026-08-12), and the turned-out attempt is skipped that whole
+    time. REVERT CONDITION, in the HRV_GARMIN_HOLD idiom: when a reading lands
+    inside ~25 cm, this stops being good enough and the two-orientation
+    comparison needs a directly measured floor-to-crotch gap rather than one
+    derived from a width. Gated on the READING, not on a date.
+    """
+    if not span_cm or not leg_length_cm or leg_length_cm <= 0:
+        return None
+    half = float(span_cm) / 2.0
+    if half >= float(leg_length_cm):
+        return None            # wider than two legs — a mismeasure, not a split
+    return math.sqrt(float(leg_length_cm) ** 2 - half ** 2)
+
+
+def _gap(reading):
+    """The floor-to-crotch gap a gate 0 reading implies, or None. The leg length
+    rides on the reading as its `setup_value` — load and measurement are ONE
+    DATUM, the same rule as the heel distance and the straddle width."""
+    if reading is None:
+        return None
+    return floor_gap_from_span(reading.value, reading.setup_value)
 
 #: Why a test that applicable_tests dropped was dropped, in the athlete's
 #: language — the capture flow shows this instead of the step.
@@ -536,23 +608,38 @@ def evaluate_structure(assessment):
                             reason="Gate 0 was not completed, so nothing below it can be "
                                    "read. A missing measurement is not a pass.")
 
+    # The reading is the WIDTH of the split; every threshold below is a height
+    # off the floor. Without the leg length recorded beside it the width cannot
+    # be turned into one, and a width alone is not evidence of anything — say so
+    # rather than passing on a number nothing can interpret.
+    neutral_gap = _gap(neutral)
+    if neutral_gap is None:
+        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, indeterminate=True,
+                            reason="The split width was recorded without a leg length "
+                                   "beside it, so how high off the floor you are cannot "
+                                   "be worked out. Measure it once standing — floor to "
+                                   "crotch, heels down — and it is the same number every "
+                                   "session after that.")
+
     # THE RELEVANCE LINE (athlete's call, 2026-08-07). Bone meets socket only in
     # the last few centimetres of a full split; above the line, tissue stops him
     # long before bone can, so the two-orientation comparison answers nothing
     # and is skipped rather than asked. PROVISIONAL in the formal sense — no
     # measurement validates 15 over 12 — but the number is his, from the
     # mechanics of the test, not one invented to make the code run.
-    if neutral.value > GATE0_BONE_RELEVANT_CM:
+    if neutral_gap > GATE0_BONE_RELEVANT_CM:
         extra = ""
-        if turned is not None:
-            diff = neutral.value - turned.value
+        turned_gap = _gap(turned)
+        if turned_gap is not None:
+            diff = neutral_gap - turned_gap
             extra = (f" Turning out changed it by {diff:.1f} cm — noted, but at this "
                      f"height that is tissue following the alignment, not bone.")
         return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=True, basis=b.BASIS_PROVISIONAL,
-                            reason=f"At {neutral.value:.1f} cm off the floor, bone cannot be "
-                                   f"what stops you — that contact only happens in the last "
-                                   f"few centimetres of a full split. The two-orientation "
-                                   f"check starts mattering under "
+                            reason=f"A {neutral.value:.1f} cm split puts you "
+                                   f"{neutral_gap:.1f} cm off the floor, and bone cannot be "
+                                   f"what stops you up there — that contact only happens in "
+                                   f"the last few centimetres of a full split. The "
+                                   f"two-orientation check starts mattering under "
                                    f"{GATE0_BONE_RELEVANT_CM:.0f} cm; it comes back by "
                                    f"itself once you are inside that line.{extra}",
                             readings=(neutral,) if turned is None else (neutral, turned))
@@ -563,12 +650,22 @@ def evaluate_structure(assessment):
                                    f"the bony question is live, and it needs the turned-out "
                                    f"attempt. A missing measurement is not a pass.")
 
-    # Smaller is deeper. A turned-out attempt that goes MUCH deeper means the
-    # joint was misaligned rather than the tissue short.
+    turned_gap = _gap(turned)
+    if turned_gap is None:
+        return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, indeterminate=True,
+                            reason="The turned-out width has no leg length beside it, so "
+                                   "the two attempts cannot be compared as depths. A "
+                                   "missing measurement is not a pass.")
+
+    # A turned-out attempt that goes MUCH deeper means the joint was misaligned
+    # rather than the tissue short. Compared as HEIGHTS, not as widths: the same
+    # gain is 5.9 cm of width at 30 cm off the floor and 2.3 cm at 15 cm, so a
+    # width threshold would mean something different at every depth. See
+    # floor_gap_from_span.
     # RELATIVE: this compares two of his own readings taken minutes apart, so it
     # carries its own reference and no invented norm is involved. The only slot
     # in the battery that is sound on a first morning.
-    gain = neutral.value - turned.value
+    gain = neutral_gap - turned_gap
     if gain >= GATE0_ORIENTATION_GAIN_CM:
         return b.SlotResult(slot=b.SLOT_STRUCTURE, passed=False, pattern="B",
                             basis=b.BASIS_RELATIVE,
@@ -760,18 +857,21 @@ def ladder(assessment, result) -> tuple:
     # ── bone & orientation (slot 0) ─────────────────────────────────────────
     slot0 = ran.get(b.SLOT_STRUCTURE)
     neutral = assessment.reading("gate0_neutral")
+    # The rung shows the DERIVED height, not the width, because the target it is
+    # read against is a height and a bar mixing the two would be meaningless.
+    neutral_gap = _gap(neutral)
     if slot0 is None or slot0.indeterminate:
         add("bone", b.RUNG_UNMEASURED, detail="Gate 0 incomplete.")
     elif not slot0.passed:
-        add("bone", b.RUNG_LIMITING, pattern=slot0.pattern,
-            measured=neutral.value if neutral else None,
+        add("bone", b.RUNG_LIMITING, pattern=slot0.pattern, measured=neutral_gap,
             detail="Turning the legs out changes the depth — alignment, not tissue.")
-    elif neutral is not None and neutral.value > GATE0_BONE_RELEVANT_CM:
-        add("bone", b.RUNG_PASSED, measured=neutral.value,
-            detail=f"Not a factor at {neutral.value:g} cm off the floor — the "
-                   f"question goes live under {GATE0_BONE_RELEVANT_CM:g} cm.")
+    elif neutral_gap is not None and neutral_gap > GATE0_BONE_RELEVANT_CM:
+        add("bone", b.RUNG_PASSED, measured=neutral_gap,
+            detail=f"Not a factor at {neutral_gap:.0f} cm off the floor, which is what "
+                   f"a {neutral.value:g} cm split comes to — the question goes live "
+                   f"under {GATE0_BONE_RELEVANT_CM:g} cm.")
     else:
-        add("bone", b.RUNG_PASSED, measured=neutral.value if neutral else None,
+        add("bone", b.RUNG_PASSED, measured=neutral_gap,
             detail="Turning out changed little — tissue, not bone.")
 
     # ── the two leverages (slot 1) ──────────────────────────────────────────

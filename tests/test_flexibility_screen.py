@@ -15,6 +15,7 @@ readings that cannot be interpreted.
 from __future__ import annotations
 
 import os
+import math
 from datetime import date
 
 import pytest
@@ -86,9 +87,22 @@ V._render_flexibility_detail()
 
 # Gate 0 and the leverages pass; the tilt fails on both halves -> Pattern F,
 # which is what this athlete's 2026-08-05 baseline predicts.
+# Gate 0 records the WIDTH of the split while its thresholds are heights off the
+# floor, so these say the DEPTH they mean and convert. See cluster_a_battery.
+# floor_gap_from_span; 86 cm is a plausible standing inseam at his 182 cm.
+_LEG_LENGTH = 86.0
+
+
+def _gate0(gap_cm, key="gate0_neutral"):
+    """A gate 0 reading dict that puts the athlete `gap_cm` off the floor."""
+    span = 2.0 * math.sqrt(_LEG_LENGTH ** 2 - gap_cm ** 2)
+    return {"test_key": key, "value": round(span, 1), "unit": "cm",
+            "setup_value": _LEG_LENGTH}
+
+
 _PASS_TO_TILT = [
-    {"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"},
-    {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"},
+    _gate0(28.0),
+    _gate0(25.0, "gate0_turned_out"),
     {"test_key": "leverage_bent", "value": 8.0, "unit": "cm", "side": "left"},
     {"test_key": "leverage_bent", "value": 9.0, "unit": "cm", "side": "right"},
     {"test_key": "leverage_straight", "value": 95.0, "unit": "cm", "side": "left"},
@@ -102,8 +116,8 @@ _TILT_FAILS = _PASS_TO_TILT + [
 # The neutral reading must sit INSIDE the 15 cm relevance line — above it, bone
 # is not a live question and slot 0 passes on the height alone.
 _GATE0_FAILS = [
-    {"test_key": "gate0_neutral", "value": 14.0, "unit": "cm"},
-    {"test_key": "gate0_turned_out", "value": 3.0, "unit": "cm"},
+    _gate0(14.0),
+    _gate0(3.0, "gate0_turned_out"),
 ]
 
 
@@ -312,8 +326,7 @@ def test_the_cold_gate_carries_the_two_record_but_never_chase_notes():
 def test_the_capture_step_asks_for_the_setup_number_where_a_test_has_one():
     """The bent-knee leverage needs its heel distance, and that number decides
     which pattern comes out."""
-    started = [{"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"},
-               {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"}]
+    started = [_gate0(28.0), _gate0(25.0, "gate0_turned_out")]
     # The step index comes from the LIVE order: a 28 cm neutral reading puts
     # the turned-out comparison out of scope, which shifts every later step.
     step = list(cba.applicable_tests(_as_assessment(started))).index("leverage_bent")
@@ -328,7 +341,7 @@ def test_a_neutral_reading_off_the_floor_skips_the_turned_out_step():
     comparison is out of scope — the flow must move straight to the bent-knee
     leverage and say why, not walk him through a comparison that answers
     nothing."""
-    started = [{"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"}]
+    started = [_gate0(28.0)]
     at = _run(draft=started, mode="capture", step=1)
     body = _text(at)
     assert "Knees fully bent" in body
@@ -441,8 +454,8 @@ def test_a_pattern_from_an_invented_cut_point_says_so_on_the_screen():
     line nobody had validated. The screen has to distinguish 'your gracilis is
     short' from 'your straddle fell below a number we chose'."""
     gracilis = [
-        {"test_key": "gate0_neutral", "value": 28.0, "unit": "cm"},
-        {"test_key": "gate0_turned_out", "value": 25.0, "unit": "cm"},
+        _gate0(28.0),
+        _gate0(25.0, "gate0_turned_out"),
         {"test_key": "leverage_bent", "value": 8.0, "unit": "cm"},
         {"test_key": "leverage_straight", "value": 40.0, "unit": "cm"},
     ]
