@@ -1425,3 +1425,64 @@ def test_the_battery_still_runs_end_to_end_without_gate_zero():
     result = b.run("a", cb.SLOT_EVALUATORS, a)
     assert result.pattern == cb.EXPECTED_PATTERN == "F"
     assert cb.AVAILABLE_TESTS[0] == "leverage_bent", "the session now opens here"
+
+
+# ── say WHICH measurement is missing, not "re-run the slot" ──────────────────
+
+def test_the_battery_names_the_reading_it_is_waiting_on():
+    """The athlete's ask, 2026-08-12: "if a value is missing at the end then
+    provide me a place to input the value". The screen used to say re-run the
+    slot, which is a bad trade — he has already done the work, is already cold,
+    and one number is missing, not a slot."""
+    a = _assessment([b.Reading("leverage_bent", 20.0, "cm", side="left")])
+    result = b.run("a", cb.SLOT_EVALUATORS, a)
+    assert result.pattern is None
+    waiting = cb.missing_inputs(a, result)
+    assert [(m.test_key, m.side) for m in waiting] == [
+        ("leverage_bent", "right"), ("leverage_straight", "")]
+    # Every item can name itself on screen without the view knowing anatomy.
+    for m in waiting:
+        assert m.label and m.hint
+
+
+def test_nothing_is_owed_once_a_slot_has_actually_answered():
+    """A FAILURE is an answer. Only an indeterminate slot is waiting on
+    anything, and a reached pattern is waiting on nothing at all."""
+    failed = _assessment([b.Reading("leverage_bent", 20.0, "cm", side="left"),
+                          b.Reading("leverage_bent", 21.5, "cm", side="right"),
+                          b.Reading("leverage_straight", 141.0, "cm")])
+    result = b.run("a", cb.SLOT_EVALUATORS, failed)
+    assert result.pattern == "D"
+    assert cb.missing_inputs(failed, result) == ()
+    assert cb.missing_inputs(None, result) == ()
+    assert cb.missing_inputs(failed, None) == ()
+
+
+def test_the_spectrum_asks_for_the_leg_length_as_a_setup_number():
+    """The widths are useless without it, and it is not a reading of its own —
+    it rides on the isometric. The missing item has to say so, or the screen
+    would offer a box that overwrote the measurement."""
+    readings = _LEVERAGE_PASS + _TILT_PASS + [
+        b.Reading("spectrum_active", 40.0, "°", side="left"),
+        b.Reading("spectrum_active", 38.0, "°", side="right"),
+        b.Reading("spectrum_isometric", 152.0, "cm"),      # no setup_value
+        b.Reading("spectrum_passive", 161.0, "cm")]
+    a = _assessment(readings)
+    result = b.run("a", cb.SLOT_EVALUATORS, a)
+    waiting = cb.missing_inputs(a, result)
+    assert [(m.test_key, m.setup) for m in waiting] == [("spectrum_isometric", True)]
+    assert "leg length" in waiting[0].label.lower()
+
+
+def test_every_slots_needs_are_declared_and_none_are_invented():
+    """SLOT_TESTS is what lets the screen ask for one number instead of a slot,
+    so it must not drift from the evaluators. Every key it lists is a real test
+    of that slot, and every available test belongs to exactly one slot's list."""
+    listed = {k for keys in cb.SLOT_TESTS.values() for k in keys}
+    available = set(cb.AVAILABLE_TESTS)
+    assert listed == available, (
+        f"declared but not asked: {sorted(listed - available)}; "
+        f"asked but not declared: {sorted(available - listed)}")
+    for slot, keys in cb.SLOT_TESTS.items():
+        for key in keys:
+            assert cb.TESTS[key].slot == slot, f"{key} is not a slot {slot} test"

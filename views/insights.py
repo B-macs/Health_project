@@ -1871,6 +1871,84 @@ def _fx_render_ladder(report) -> None:
                "going. No rung is ever averaged with another.")
 
 
+def _fx_fill_missing(report) -> None:
+    """Take the one or two readings the battery is waiting on, right here.
+
+    THE ALTERNATIVE WAS "go back and do the slot again", which is what the
+    screen used to say, and it is a bad trade: the athlete has already done the
+    work, is already cold, and a slot he mostly completed does not need
+    repeating — one number does. The battery decides WHICH number
+    (cluster_a_battery.missing_inputs); this only renders it.
+
+    Nothing here judges anything. The values are merged into the stored
+    assessment and the battery is re-run over the result, so a filled-in
+    reading reaches a pattern by exactly the path a live one does.
+    """
+    repo_ = repo.get_repository()
+    spec = fx.CLUSTERS[fx.DEFAULT_CLUSTER]
+    battery_mod = spec["battery"]
+
+    try:
+        stored = repo_.get_flexibility_assessments()
+    except Exception:                                          # noqa: BLE001
+        return
+    if not stored:
+        return
+    assessment = stored[-1]
+    missing = battery_mod.missing_inputs(assessment, report.result)
+    if not missing:
+        return
+
+    st.markdown(
+        f'<div class="fx-cap" style="margin-top:14px;">Fill in what is missing</div>'
+        f'<div class="fx-sm">The slot stopped because {"this reading was" if len(missing) == 1 else "these readings were"} '
+        f'never recorded, not because anything was wrong. Add '
+        f'{"it" if len(missing) == 1 else "them"} and the battery runs again from '
+        f'here &mdash; there is no need to repeat the rest of the slot.</div>',
+        unsafe_allow_html=True,
+    )
+
+    with st.form(key="fx_fill_missing", border=False):
+        entered: dict = {}
+        for item in missing:
+            st.markdown(f'<div class="fx-read"><b>{item.label}</b> &mdash; {item.hint}</div>',
+                        unsafe_allow_html=True)
+            entered[item] = st.number_input(
+                item.label, value=None, step=0.5, format="%.1f",
+                key=f"fx_fill_{item.test_key}_{item.side}_{int(item.setup)}",
+                label_visibility="collapsed",
+            )
+        if not st.form_submit_button("Add and re-run", use_container_width=True):
+            return
+
+    updated = assessment
+    for item, value in entered.items():
+        if value is None:
+            continue
+        if item.setup:
+            # The setup number belongs to a reading that already exists; carry
+            # every other field through rather than rebuilding it.
+            existing = updated.reading(item.test_key)
+            if existing is None:
+                continue
+            updated = fx.merge_reading(updated, btry.Reading(
+                test_key=existing.test_key, value=existing.value, unit=existing.unit,
+                side=existing.side, load_kg=existing.load_kg,
+                setup_value=float(value), note=existing.note, voided=existing.voided))
+        else:
+            test = battery_mod.TESTS[item.test_key]
+            updated = fx.merge_reading(updated, btry.Reading(
+                test_key=item.test_key, value=float(value), unit=test.unit,
+                side=item.side))
+
+    if updated is assessment:
+        st.warning("Nothing was entered, so nothing changed.", icon="⚠️")
+        return
+    repo_.save_flexibility_assessment(updated)
+    _flexibility_screen_data.clear()
+    st.rerun()
+
+
 def _fx_render_populated(report, accent: str) -> None:
     result = report.result
 
@@ -1885,6 +1963,7 @@ def _fx_render_populated(report, accent: str) -> None:
         )
         st.info("A missing measurement is not a pass. Re-run the slot that stopped, rather "
                 "than reading this as nothing being wrong.", icon="ℹ️")
+        _fx_fill_missing(report)
         _fx_render_ladder(report)
         return
 

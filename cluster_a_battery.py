@@ -456,6 +456,71 @@ def applicable_tests(assessment=None) -> tuple[str, ...]:
     return AVAILABLE_TESTS
 
 
+
+#: Which tests each slot needs before it can answer anything. The evaluators
+#: already encode this in their guard clauses; stating it once here is what lets
+#: a screen ASK for what is missing instead of telling the athlete to re-run the
+#: whole slot. If an evaluator's needs change, change this with it — a test
+#: fails if a slot's evaluator reads a key this map does not list.
+SLOT_TESTS: dict[int, tuple[str, ...]] = {
+    _b.SLOT_REGRESSED: ("leverage_bent", "leverage_straight"),
+    _b.SLOT_PREREQUISITE: ("tilt_production", "tilt_range"),
+    _b.SLOT_SPECTRUM: ("spectrum_active", "spectrum_isometric", "spectrum_passive"),
+}
+
+
+@dataclass(frozen=True)
+class MissingInput:
+    """One reading the battery is waiting on before it can answer."""
+    test_key: str
+    side: str = ""
+    #: True when the SETUP number is what is missing rather than the reading —
+    #: the leg length, without which a split width cannot become a depth.
+    setup: bool = False
+
+    @property
+    def label(self) -> str:
+        test = TESTS[self.test_key]
+        if self.setup:
+            return test.setup_input
+        return f"{test.label} — {self.side}" if self.side else test.label
+
+    @property
+    def hint(self) -> str:
+        test = TESTS[self.test_key]
+        return test.setup_input if self.setup else test.input_hint
+
+
+def missing_inputs(assessment, result) -> tuple[MissingInput, ...]:
+    """What the battery is WAITING ON, or () if it is not waiting.
+
+    A slot that stops INDETERMINATE has not judged anything — it lacks a
+    reading. "A missing measurement is not a pass" is the rule, and this is the
+    other half of honouring it: say WHICH measurement, so the athlete can supply
+    that one number rather than repeat a slot he mostly completed. Empty when a
+    pattern was reached, and empty when the slot FAILED — a failure is an
+    answer, and nothing is owed.
+    """
+    if assessment is None or result is None or result.pattern:
+        return ()
+    stopped = next((s for s in result.slots if s.indeterminate), None)
+    if stopped is None:
+        return ()
+
+    missing: list[MissingInput] = []
+    for key in SLOT_TESTS.get(stopped.slot, ()):
+        test = TESTS.get(key)
+        if test is None or not test.available:
+            continue
+        for side in (("left", "right") if test.bilateral else ("",)):
+            if assessment.reading(key, side) is None:
+                missing.append(MissingInput(key, side))
+    # The spectrum's widths are useless without the leg length that turns them
+    # into depths, and it rides on the isometric reading.
+    if stopped.slot == _b.SLOT_SPECTRUM and leg_length(assessment) is None:
+        missing.append(MissingInput("spectrum_isometric", setup=True))
+    return tuple(missing)
+
 # ── extras recorded alongside, never scored ──────────────────────────────────
 
 NERVE_CHECK: str = (

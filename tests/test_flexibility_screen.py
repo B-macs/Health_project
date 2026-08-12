@@ -434,3 +434,33 @@ def test_a_pattern_from_an_invented_cut_point_says_so_on_the_screen():
     assert "cut point we invented" in body.lower()
     # And the two reasons stay separate on screen, not merged into one caveat.
     assert "hypothesis" in body.lower()
+
+
+def test_the_report_offers_a_box_for_the_missing_reading():
+    """The athlete's ask, 2026-08-12. A slot that stopped indeterminate is
+    waiting on ONE number, and telling him to re-run the slot spends a whole
+    cold morning to collect it."""
+    partial = [{"test_key": "leverage_bent", "value": 20.0, "unit": "cm", "side": "left"}]
+    at = _run(readings=partial)
+    assert not at.exception
+    body = _text(at)
+    assert "No pattern reached" in body
+    assert "Fill in what is missing" in body
+    assert "Add and re-run" in [b.label for b in at.button]
+    # It names the readings rather than the slot, and asks only for what is absent.
+    labels = " ".join(str(n.label) for n in at.number_input)
+    assert "right" in labels.lower(), labels
+    assert "Knees fully straight" in labels, labels
+    assert "left" not in labels.lower(), "the side already recorded must not be re-asked"
+
+
+def test_a_finished_assessment_offers_no_fill_in_box():
+    """A FAILURE is an answer, not a gap — nothing is owed, and offering a box
+    would invite him to keep adding readings below a limiter that has already
+    been named."""
+    done = [{"test_key": "leverage_bent", "value": 20.0, "unit": "cm", "side": "left"},
+            {"test_key": "leverage_bent", "value": 21.5, "unit": "cm", "side": "right"},
+            {"test_key": "leverage_straight", "value": 141.0, "unit": "cm"}]
+    body = _text(_run(readings=done))
+    assert "Short adductors and rotators" in body   # pattern D, named
+    assert "Fill in what is missing" not in body
