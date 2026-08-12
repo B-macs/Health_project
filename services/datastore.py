@@ -98,6 +98,19 @@ def ensure_local_cache(config, store_factory=None) -> str | None:
         if has_tables:
             return None
 
+    # The cache is WRITTEN, not just read, so an unwritable directory is a
+    # hosting misconfiguration that has to say so plainly. Left to fail on its
+    # own it surfaces as an OSError from tempfile deep inside a page render,
+    # which reads like a bug in the app rather than a setting on the server.
+    parent = path.parent if str(path.parent) else Path(".")
+    if not os.access(parent, os.W_OK):
+        raise RuntimeError(
+            f"datastore_mode='cache' needs a WRITABLE HEALTH_DATASTORE_PATH, "
+            f"and {parent}/ is not writable. The local cache is rebuilt there "
+            f"on a cold start and written through on every save. Point "
+            f"HEALTH_DATASTORE_PATH at a writable directory."
+        )
+
     store = supabase_store.SupabaseStore(
         config.supabase_url, config.supabase_secret_key)
     # Into a temp file, then os.replace — the same contract

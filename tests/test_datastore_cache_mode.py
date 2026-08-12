@@ -343,3 +343,14 @@ def test_the_bootstrap_hydrates_before_handing_back_a_repository():
     body = src.split("def get_repository")[1].split("\ndef ")[0]
     assert "ensure_local_cache" in body
     assert body.index("ensure_local_cache") < body.index("return Repository")
+
+
+def test_hydration_names_an_unwritable_path_as_a_setting_not_a_crash(tmp_path, monkeypatch):
+    """The most likely hosting misconfiguration. Left to fail on its own it
+    surfaces as an OSError from tempfile in the middle of a page render, which
+    reads like a bug in the app rather than a setting on the server."""
+    monkeypatch.setattr("os.access", lambda p, mode: False)
+    cfg = _config(str(tmp_path / "c.db"), "cache",
+                  supabase_url="https://x", supabase_secret_key="k")
+    with pytest.raises(RuntimeError, match="WRITABLE"):
+        datastore.ensure_local_cache(cfg)
