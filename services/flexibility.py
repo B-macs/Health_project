@@ -320,13 +320,47 @@ RETEST_TOMORROW = "tomorrow"
 RETEST_READY = "ready"
 RETEST_BLOCKED = "blocked"
 
+#: Movement categories that do NOT make a day a leg day, however plainly the
+#: sector map calls them lower body.
+#:
+#: THE RULE IS ABOUT LOADING, AND THE SECTOR MAP DOES NOT ANSWER THAT. Sector
+#: answers "which one region owns this movement", which is the right question
+#: for tonnage and for an e1RM and the wrong one here: the pre-session release
+#: block is lower_body by sector, and it runs before EVERY session. Judging on
+#: sector alone flagged a piriformis PNF, a TFL self-release and a walk as leg
+#: training — measured on the real log, 25 of the 52 lower-body names, and both
+#: 2026-08-10 and 2026-08-11, neither of which loaded anything (RPE 2, 94 and
+#: 102 AU). A warning that fires on nearly every morning has stopped carrying
+#: information, and it was ALSO backwards on mechanism: the stated reason is
+#: "reads TIGHTER than your real baseline", and release work is the one thing
+#: in the log that does the opposite.
+#:
+#: Named by CATEGORY rather than by its 0.25 weight so retuning the number
+#: cannot silently move the line. The line sits immediately below `isolation`
+#: (0.3) deliberately — an eccentric calf raise and a clamshell are light, but
+#: they are still work the tested tissue did yesterday, and `Outdoor Run` /
+#: `Outdoor Hike` are `bodyweight_compound` (0.5) and keep flagging, which is
+#: what matters once running enters the block.
+RELEASE_MOVEMENT_CATEGORIES: frozenset[str] = frozenset({"mobility_core"})
+
 
 def leg_loading_days(sessions) -> set[date]:
-    """Dates whose logged session loaded the legs, judged by exercise NAME
-    against `training_constants.EXERCISE_BODY_REGION` — the same mapping the
-    strength and tonnage sectors read, so 'a leg day' means the same thing
-    everywhere. A session with no mapped lower-body exercise is not a leg day,
-    and an unparseable session is skipped rather than guessed at."""
+    """Dates whose logged session LOADED the legs, judged by exercise NAME
+    against two maps the rest of the app already depends on — no third,
+    private definition of 'a leg day'.
+
+    `training_constants.EXERCISE_BODY_REGION` says WHICH region (the map
+    strength and tonnage read), and `EXERCISE_MOVEMENT_WEIGHT` says whether it
+    was load or release (the map Strain/ACWR read). Both conditions must hold:
+    a lower-body name in a `RELEASE_MOVEMENT_CATEGORIES` category is release
+    work and does not make the morning after it dirty.
+
+    An exercise absent from the weight map counts as LOADED — the same
+    conservative direction `services/content_weighting.UNMAPPED_EXERCISE_WEIGHT`
+    takes, so a new block's exercise can never silently clear a retest morning
+    by being added to one map and not the other. A session with no loaded
+    lower-body exercise is not a leg day, and an unparseable session is skipped
+    rather than guessed at."""
     days: set[date] = set()
     for s in sessions or ():
         try:
@@ -334,9 +368,14 @@ def leg_loading_days(sessions) -> set[date]:
         except ValueError:
             continue
         for ex in getattr(s, "exercises", None) or ():
-            if _tc.EXERCISE_BODY_REGION.get(getattr(ex, "name", "")) == "lower_body":
-                days.add(d)
-                break
+            name = getattr(ex, "name", "")
+            if _tc.EXERCISE_BODY_REGION.get(name) != "lower_body":
+                continue
+            entry = _tc.EXERCISE_MOVEMENT_WEIGHT.get(name)
+            if entry is not None and entry[0] in RELEASE_MOVEMENT_CATEGORIES:
+                continue
+            days.add(d)
+            break
     return days
 
 

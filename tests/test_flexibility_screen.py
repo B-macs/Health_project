@@ -54,17 +54,16 @@ class _Stub:
     def get_recent_sessions(self, days=3):
         return list(_recent)
 
-# A logged leg session YESTERDAY (real yesterday — the view compares against
-# date.today()), built from the same region map the view reads.
-if {recent_legs}:
-    import training_constants as _tc
+# A session logged YESTERDAY (real yesterday — the view compares against
+# date.today()), built from exercise names the view's own maps resolve.
+_YESTERDAY_EXERCISES = {recent_exercises}
+if _YESTERDAY_EXERCISES:
     from services import models as _m
-    _lower = next(n for n, r in _tc.EXERCISE_BODY_REGION.items()
-                  if r == "lower_body")
     _recent.append(_m.SessionRecord(
         session_date=(date.today() - timedelta(days=1)).isoformat(),
         session_duration_minutes=60.0, session_rpe=6.0, session_au=360.0,
-        exercises=[_m.ExerciseEntry(name=_lower, movement_type="Strength")]))
+        exercises=[_m.ExerciseEntry(name=_n, movement_type="Strength")
+                   for _n in _YESTERDAY_EXERCISES]))
 
 READINGS = {readings}
 if READINGS:
@@ -113,10 +112,27 @@ def _as_assessment(readings) -> sb.Assessment:
                          readings=tuple(sb.Reading(**r) for r in readings))
 
 
-def _run(readings=(), draft=None, mode=None, step=0, recent_legs=False) -> AppTest:
+# Genuinely LOADED lower-body work, which is what the day-before rule is about.
+# Not just any lower_body name: the pre-session release block is lower_body by
+# sector too, and picking the first entry of that map (a TFL self-release) was
+# how this harness came to assert the warning fires on a rest-day release
+# session. See tests/test_cluster_a.py::test_the_release_block_is_not_a_leg_day.
+_LOADED_LEG_WORK = ["Romanian Deadlift (DB)", "Hip Thrust (Loaded)"]
+
+# The 2026-08-11 session, verbatim — a walk plus the release block, RPE 2.
+_RELEASE_ONLY = ["Controlled Walking", "Child's Pose", "Full Side Bridge",
+                 "Thread-the-Needle (Thoracic Rotation)", "Scapular Wall Slide",
+                 "Piriformis Contract-Relax (PNF)", "Upper Glute / TFL Self-Release"]
+
+
+def _run(readings=(), draft=None, mode=None, step=0, recent_legs=False,
+         recent_exercises=None) -> AppTest:
+    if recent_exercises is None:
+        recent_exercises = _LOADED_LEG_WORK if recent_legs else []
     script = _SCRIPT.format(root=_ROOT, readings=list(readings),
                             draft=list(draft) if draft is not None else None,
-                            mode=mode, step=step, recent_legs=bool(recent_legs))
+                            mode=mode, step=step,
+                            recent_exercises=list(recent_exercises))
     return AppTest.from_string(script, default_timeout=90).run()
 
 
@@ -259,7 +275,7 @@ def test_a_draft_is_offered_for_resume_rather_than_lost():
 def test_the_screen_survives_a_repository_failure():
     """A read failure must render an error, not a stack trace."""
     script = _SCRIPT.format(root=_ROOT, readings=[], draft=None, mode=None, step=0,
-                            recent_legs=False).replace(
+                            recent_exercises=[]).replace(
         "def get_flexibility_assessments(self):\n        return tuple(_saved)",
         "def get_flexibility_assessments(self):\n        raise RuntimeError('cache gone')")
     at = AppTest.from_string(script, default_timeout=90).run()
@@ -361,6 +377,16 @@ def test_the_cold_gate_warns_when_yesterday_loaded_the_legs():
     assert "not comparable" in body.lower()
     # And a clean morning stays clean — no warning invented from nothing.
     assert "loaded your legs" not in _text(_run(mode="capture")).lower()
+
+
+def test_the_cold_gate_does_not_warn_after_a_release_only_session():
+    """Found live on 2026-08-12, the morning of the first battery capture: the
+    gate warned against a session that was a walk plus the pre-session release
+    block. That block is lower_body by sector and runs before EVERY session, so
+    the warning fired on nearly every morning — and its own text ("read
+    tighter") is the opposite of what a piriformis PNF and a TFL release do."""
+    body = _text(_run(mode="capture", recent_exercises=_RELEASE_ONLY)).lower()
+    assert "loaded your legs" not in body
 
 
 def test_the_populated_screen_says_when_the_retest_falls():

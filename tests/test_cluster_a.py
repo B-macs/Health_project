@@ -785,23 +785,117 @@ def test_the_day_before_warns_to_stay_off_the_legs():
     assert status == fx.RETEST_NOT_DUE
 
 
+def _leg_session(*names, on="2026-09-12"):
+    from services.models import ExerciseEntry, SessionRecord
+    return SessionRecord(session_date=on, session_duration_minutes=60.0,
+                         session_rpe=6.0, session_au=360.0,
+                         exercises=[ExerciseEntry(name=n, movement_type="Strength")
+                                    for n in names])
+
+
+def _loaded_category(name) -> bool:
+    import training_constants as tc
+    entry = tc.EXERCISE_MOVEMENT_WEIGHT.get(name)
+    return entry is None or entry[0] not in fx.RELEASE_MOVEMENT_CATEGORIES
+
+
 def test_leg_days_are_judged_by_the_same_map_the_sectors_read():
     """'A leg day' must mean one thing everywhere, so the judgement reads
     training_constants.EXERCISE_BODY_REGION — the map strength and tonnage
     already depend on — rather than inventing a second definition."""
     import training_constants as tc
-    from services.models import ExerciseEntry, SessionRecord
-    lower = next(n for n, r in tc.EXERCISE_BODY_REGION.items() if r == "lower_body")
+    lower = next(n for n, r in tc.EXERCISE_BODY_REGION.items()
+                 if r == "lower_body" and _loaded_category(n))
     upper = next(n for n, r in tc.EXERCISE_BODY_REGION.items() if r == "upper_body")
 
-    def session(name):
-        return SessionRecord(session_date="2026-09-12", session_duration_minutes=60.0,
-                             session_rpe=6.0, session_au=360.0,
-                             exercises=[ExerciseEntry(name=name, movement_type="Strength")])
-
-    assert fx.leg_loading_days([session(lower)]) == {date(2026, 9, 12)}
-    assert fx.leg_loading_days([session(upper)]) == set()
+    assert fx.leg_loading_days([_leg_session(lower)]) == {date(2026, 9, 12)}
+    assert fx.leg_loading_days([_leg_session(upper)]) == set()
     assert fx.leg_loading_days(None) == set()
+
+
+def test_the_release_block_is_not_a_leg_day():
+    """MEASURED FAILURE, 2026-08-12, found by the athlete on the capture screen
+    the morning he was about to take his first battery readings.
+
+    The cold gate warned "yesterday's session loaded your legs" against
+    2026-08-11 — a walk plus the pre-session release block, RPE 2, 102 AU,
+    nothing loaded in it. Sector alone calls a piriformis PNF, a TFL
+    self-release and Controlled Walking lower_body, and that release block runs
+    before EVERY session, so the warning fired on nearly every morning. Worse,
+    its stated mechanism ("reads TIGHTER than your real baseline") is backwards
+    for the only three items that triggered it.
+    """
+    assert fx.leg_loading_days([_leg_session(
+        "Controlled Walking",
+        "Child's Pose",
+        "Full Side Bridge",
+        "Thread-the-Needle (Thoracic Rotation)",
+        "Scapular Wall Slide",
+        "Piriformis Contract-Relax (PNF)",
+        "Upper Glute / TFL Self-Release",
+        on="2026-08-11")]) == set()
+
+
+def test_loaded_lower_body_work_is_still_a_leg_day():
+    """The contamination the rule actually exists for — the real 2026-08-06
+    session, RPE 7, 448 AU. The release items are present here too, so this
+    also pins that release work does not SUPPRESS a genuine leg day."""
+    assert fx.leg_loading_days([_leg_session(
+        "Pallof Press Hold (Doorframe)",
+        "Single-Arm DB Row",
+        "Lat Pulldown",
+        "Hip Thrust (Loaded)",
+        "Romanian Deadlift (DB)",
+        "Piriformis Contract-Relax (PNF)",
+        "Upper Glute / TFL Self-Release",
+        on="2026-08-06")]) == {date(2026, 8, 6)}
+
+
+def test_running_and_hiking_are_still_leg_days():
+    """The case the exclusion must not swallow. Stage 2B introduces running
+    (10 km, 2026-10-11) and the outdoor importer logs it as a real session; a
+    run the day before a retest is exactly the tightness the rule guards
+    against. These sit at bodyweight_compound (0.5), above the release line."""
+    for name in ("Outdoor Run", "Outdoor Trail Run", "Outdoor Hike", "Outdoor Walk"):
+        assert fx.leg_loading_days([_leg_session(name)]) == {date(2026, 9, 12)}, name
+
+
+def test_light_lower_body_isolation_is_still_a_leg_day():
+    """The line sits below `isolation`, not below "light". An eccentric calf
+    raise and a clamshell are small, but they are still work the tested tissue
+    did yesterday — only release and mobility work is excluded."""
+    for name in ("Standing Calf Raise (Eccentric Focus)", "Clamshell", "Glute Bridge"):
+        assert fx.leg_loading_days([_leg_session(name)]) == {date(2026, 9, 12)}, name
+
+
+def test_an_exercise_missing_from_the_weight_map_counts_as_loaded():
+    """Fail-safe direction, the same one content_weighting.UNMAPPED_EXERCISE_
+    WEIGHT takes for the ACWR chain. A new block adds names to both maps and
+    the gap between those two edits must read as a dirty morning, never as a
+    clean one — silently clearing a retest morning is the expensive error."""
+    import training_constants as tc
+    name = "Barbell Back Squat (unmapped, next block)"
+    assert name not in tc.EXERCISE_MOVEMENT_WEIGHT
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setitem(tc.EXERCISE_BODY_REGION, name, "lower_body")
+        assert fx.leg_loading_days([_leg_session(name)]) == {date(2026, 9, 12)}
+
+
+def test_the_release_line_is_drawn_by_category_not_by_weight():
+    """The exclusion names a CATEGORY so the weights stay retunable. That only
+    holds while every excluded category really does sit below every loaded one
+    — pin the ORDERING, so a retune that inverted it fails here instead of
+    silently changing which mornings are clean."""
+    import training_constants as tc
+    weights = {cat: w for cat, w in tc.EXERCISE_MOVEMENT_WEIGHT.values()}
+    assert fx.RELEASE_MOVEMENT_CATEGORIES, "an empty set would disable the rule"
+    assert fx.RELEASE_MOVEMENT_CATEGORIES <= set(weights), \
+        "every excluded category must be a real category of the weight table"
+    released = {weights[c] for c in fx.RELEASE_MOVEMENT_CATEGORIES}
+    loaded = {w for c, w in weights.items() if c not in fx.RELEASE_MOVEMENT_CATEGORIES}
+    assert max(released) < min(loaded), (
+        f"release tier {sorted(released)} must sit strictly below the loaded "
+        f"tiers {sorted(loaded)}")
 
 
 def test_the_window_reads_the_training_log():

@@ -263,12 +263,15 @@ REGION_DISPLAY: dict[str, dict] = {
 #  Exercise → how its load DISTRIBUTES across the three regions.
 #
 #  A REFINEMENT of EXERCISE_BODY_REGION, never a replacement. That map answers
-#  "which one sector owns this movement" and three things need exactly that
+#  "which one sector owns this movement" and two things need exactly that
 #  answer: services/tonnage.py (splitting a lift's kilograms across regions
-#  would put fictional weight in a sector), services/strength.py (an e1RM is a
-#  property of one movement pattern), and services/flexibility.py's
-#  leg_loading_days, which reads == "lower_body" as the boolean that sets the
-#  retest calendar. This map answers a different question — "where did the
+#  would put fictional weight in a sector) and services/strength.py (an e1RM is
+#  a property of one movement pattern). A third, services/flexibility.py's
+#  leg_loading_days, reads == "lower_body" as ONE HALF of the boolean that sets
+#  the retest calendar — sector says which region, EXERCISE_MOVEMENT_WEIGHT
+#  below says whether it was load or release, and only both together make a
+#  morning dirty (the release block is lower_body by sector and runs before
+#  every session). This map answers a different question — "where did the
 #  STRAIN of this movement land" — and only services/strain_regions.py reads it.
 #
 #  The two are bound by test, not by convention: tests/test_region_shares_
@@ -477,6 +480,13 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
 #    covered pushing), isolation=0.3, mobility_core=0.25 (NEW -- release
 #    protocol + core/scapular finishers + walking/assessment work the doc
 #    never covered).
+#
+#  SECOND READER, added 2026-08-12: services/flexibility.py's leg_loading_days
+#  asks this table whether a lower-body exercise was LOAD or RELEASE, because
+#  the sector map alone called a piriformis PNF a leg day. It reads the
+#  CATEGORY name (mobility_core), never the number, so the weights can be
+#  retuned without moving the retest calendar. Its fail-safe direction matches
+#  content_weighting's: an unmapped name counts as loaded.
 #
 #  Prone Y-Raise (Scapular): fixed at mobility_core/0.25 regardless of its
 #  real weight_kg from Week 3 onward (1.0-2.5kg) -- NOT load-dependent. The
