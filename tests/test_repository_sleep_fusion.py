@@ -32,7 +32,6 @@ def _config(**overrides) -> Config:
         notion_api_key="ntn_test",
         notion_db_readiness="db-readiness",
         notion_db_training="db-training",
-        notion_db_biometrics="db-biometrics",
         notion_db_config="db-config",
         google_sheets_id="sheet-id",
         google_service_account={"type": "service_account"},

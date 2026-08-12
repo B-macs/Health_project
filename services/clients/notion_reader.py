@@ -66,11 +66,10 @@ import sqlite3
 
 from services.clients.notion import get_property
 
-#: The four Notion databases, as Repository names them. Repository._db_kind
+#: The three Notion databases, as Repository names them. Repository._db_kind
 #: maps a configured database id onto one of these.
 READINESS = "readiness"
 TRAINING = "training"
-BIOMETRICS = "biometrics"
 CONFIG = "config"
 
 #: Notion property name -> (datastore column, property kind).
@@ -78,7 +77,7 @@ CONFIG = "config"
 #: A column of None is SYNTHESIZED — see _synthesize below. This map is the
 #: exact inverse of the Repository getters that populate the datastore
 #: (get_all_readiness_checkins_raw, get_all_training_exercises_raw,
-#: get_all_notion_biometrics_rows, get_all_config_rows); a test walks both
+#: get_all_config_rows); a test walks both
 #: directions so neither side can gain a field alone.
 PROPERTIES: dict[str, dict[str, tuple[str | None, str]]] = {
     READINESS: {
@@ -130,18 +129,6 @@ PROPERTIES: dict[str, dict[str, tuple[str | None, str]]] = {
         "Activity Distance (km)": ("garmin_distance_km", "number"),
         "Activity Calories":      ("garmin_calories", "number"),
     },
-    BIOMETRICS: {
-        "Entry":             (None, "title"),
-        "Log Date":          ("date", "date"),
-        "RHR":               ("resting_heart_rate", "number"),
-        "HR Average":        ("hr_average", "number"),
-        "HRV":               ("hrv_ms", "number"),
-        "Sleep Hours":       ("sleep_duration_hours", "number"),
-        "Deep Sleep Hours":  ("sleep_deep_hours", "number"),
-        "Active kcal":       ("active_kcal", "number"),
-        "Weight kg":         ("weight_kg", "number"),
-        "Steps":             ("steps", "number"),
-    },
     CONFIG: {
         "Key":     ("key", "title"),
         "Value":   ("value", "rich_text"),
@@ -153,7 +140,6 @@ PROPERTIES: dict[str, dict[str, tuple[str | None, str]]] = {
 TABLES = {
     READINESS: "readiness_checkins",
     TRAINING: "training_exercises",
-    BIOMETRICS: "notion_biometrics",
     CONFIG: "config",
 }
 
@@ -185,8 +171,6 @@ def _synthesize(kind: str, name: str, row: dict):
     """The value of a property that has no column of its own."""
     if name == "Entry" and kind == READINESS:
         return f"{row.get('date') or ''} Morning Check-In"
-    if name == "Entry" and kind == BIOMETRICS:
-        return str(row.get("date") or "")
     raise NotionQueryUnsupportedError(
         f"{kind}.{name!r} is mapped to no column and has no synthesizer"
     )
@@ -230,7 +214,7 @@ def _payload(prop_kind: str, value):
 def _page_id(kind: str, row: dict) -> str:
     if kind == TRAINING:
         return row.get("exercise_id") or f"{ID_PREFIX}training:?"
-    key = {READINESS: "date", BIOMETRICS: "date", CONFIG: "key"}[kind]
+    key = {READINESS: "date", CONFIG: "key"}[kind]
     return f"{ID_PREFIX}{kind}:{row.get(key)}"
 
 

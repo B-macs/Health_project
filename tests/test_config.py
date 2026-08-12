@@ -8,7 +8,6 @@ _OVERRIDES = {
     "NOTION_API_KEY": "ntn_test",
     "NOTION_DB_READINESS": "db-readiness",
     "NOTION_DB_TRAINING": "db-training",
-    "NOTION_DB_BIOMETRICS": "db-biometrics",
     "NOTION_DB_CONFIG": "db-config",
     "GOOGLE_SHEETS_ID": "sheet-id",
     "google_service_account": {"type": "service_account", "project_id": "p"},
@@ -20,7 +19,6 @@ def test_load_config_from_overrides():
     assert cfg.notion_api_key == "ntn_test"
     assert cfg.notion_db_readiness == "db-readiness"
     assert cfg.notion_db_training == "db-training"
-    assert cfg.notion_db_biometrics == "db-biometrics"
     assert cfg.notion_db_config == "db-config"
     assert cfg.google_sheets_id == "sheet-id"
     assert cfg.google_service_account == {"type": "service_account", "project_id": "p"}

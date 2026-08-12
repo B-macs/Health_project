@@ -1,8 +1,12 @@
 """
 services/config.py — Credentials/settings loader.
 
-Backend access needs 6 values: the Notion API key + 4 database IDs, and the
-Google Sheets ID + service-account JSON. load_config() reads them from OS
+Backend access needs 5 values: the Notion API key + 3 database IDs (Readiness,
+Training, Config), and the Google Sheets ID + service-account JSON.
+
+The Notion BIOMETRICS database was retired on 2026-08-12 -- it held ten pages
+with every column NULL and had no live writer. NOTION_DB_BIOMETRICS is no
+longer read, so an existing secrets.toml can keep or drop it freely. load_config() reads them from OS
 environment variables first, falling back to an injected `overrides` dict —
 the Streamlit layer builds that dict from st.secrets at startup. This module
 itself never imports streamlit, so the identical services/ code works
@@ -23,7 +27,6 @@ class Config:
     notion_api_key: str
     notion_db_readiness: str
     notion_db_training: str
-    notion_db_biometrics: str
     notion_db_config: str
     google_sheets_id: str
     google_service_account: dict
@@ -70,7 +73,6 @@ _STR_KEYS = (
     "NOTION_API_KEY",
     "NOTION_DB_READINESS",
     "NOTION_DB_TRAINING",
-    "NOTION_DB_BIOMETRICS",
     "NOTION_DB_CONFIG",
     "GOOGLE_SHEETS_ID",
 )
@@ -115,7 +117,6 @@ def load_config(overrides: dict | None = None) -> Config:
         notion_api_key=_resolve_str("NOTION_API_KEY", overrides),
         notion_db_readiness=_resolve_str("NOTION_DB_READINESS", overrides),
         notion_db_training=_resolve_str("NOTION_DB_TRAINING", overrides),
-        notion_db_biometrics=_resolve_str("NOTION_DB_BIOMETRICS", overrides),
         notion_db_config=_resolve_str("NOTION_DB_CONFIG", overrides),
         google_sheets_id=_resolve_str("GOOGLE_SHEETS_ID", overrides),
         google_service_account=_resolve_service_account(overrides),

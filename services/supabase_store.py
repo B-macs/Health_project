@@ -382,7 +382,6 @@ _ANY_ROW_FILTER = {
     "wake_time_adjustments": "date=neq.__none__",
     "weekly_rollup": "week_start=neq.__none__",
     "sheet1_legacy_biometrics": "date=neq.__none__",
-    "notion_biometrics": "date=neq.__none__",
     "config": "key=neq.__none__",
     "datastore_meta": "key=neq.__none__",
 }

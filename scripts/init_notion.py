@@ -109,7 +109,6 @@ def main():
         api_key      = _secret("NOTION_API_KEY")
         db_readiness = _secret("NOTION_DB_READINESS")
         db_training  = _secret("NOTION_DB_TRAINING")
-        db_biometrics= _secret("NOTION_DB_BIOMETRICS")
         db_config    = _secret("NOTION_DB_CONFIG")
     except EnvironmentError as exc:
         print(f"\nERROR: {exc}")

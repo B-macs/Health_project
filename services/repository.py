@@ -761,7 +761,6 @@ class Repository:
     #: _mirror_training_write.
     _NOTION_TABLE = {
         notion_reader.READINESS: "readiness_checkins",
-        notion_reader.BIOMETRICS: "notion_biometrics",
         notion_reader.CONFIG: "config",
     }
 
@@ -924,7 +923,6 @@ class Repository:
         for kind, configured in (
             (notion_reader.READINESS, self.config.notion_db_readiness),
             (notion_reader.TRAINING, self.config.notion_db_training),
-            (notion_reader.BIOMETRICS, self.config.notion_db_biometrics),
             (notion_reader.CONFIG, self.config.notion_db_config),
         ):
             if db_id == configured:
@@ -1928,64 +1926,8 @@ class Repository:
     #  see get_biometric_rolling below. Kept for parity; see REFACTOR_NOTES.md.)
     # ─────────────────────────────────────────────────────────────────────
 
-    def get_biometrics(self, days: int = 60, today: date | None = None) -> list[models.BiometricRecord]:
-        today = today or date.today()
-        cutoff = (today - timedelta(days=days)).isoformat()
-        pages = self._query(
-            self.config.notion_db_biometrics,
-            filter_={"property": "Log Date", "date": {"on_or_after": cutoff}},
-            sorts=[{"property": "Log Date", "direction": "descending"}],
-        )
-        out = []
-        for p in pages:
-            g = lambda name, kind: notion.get_property(p, name, kind)
-            out.append(models.BiometricRecord(
-                date=g("Log Date", "date"), hrv_ms=g("HRV", "number"),
-                resting_heart_rate=g("RHR", "number"), sleep_duration_hours=g("Sleep Hours", "number"),
-                sleep_deep_hours=g("Deep Sleep Hours", "number"), active_kcal=g("Active kcal", "number"),
-                weight_kg=g("Weight kg", "number"), steps=g("Steps", "number"),
-            ))
-        return out
 
-    def get_all_notion_biometrics_rows(self) -> list[dict]:
-        """Every row of the Notion Biometrics DB, unwindowed — the datastore's
-        notion_biometrics table, whose columns these keys match exactly.
 
-        Distinct from get_all_sheet1_biometric_records() despite the matching
-        shape: that is Apple Health via Sheet1, this is the Notion database.
-        Two sources, two tables."""
-        out = []
-        for p in self._query(self.config.notion_db_biometrics):
-            g = lambda name, kind: notion.get_property(p, name, kind)
-            out.append({
-                "date":                 g("Log Date", "date"),
-                "hrv_ms":               g("HRV", "number"),
-                "resting_heart_rate":   g("RHR", "number"),
-                "hr_average":           g("HR Average", "number"),
-                "sleep_duration_hours": g("Sleep Hours", "number"),
-                "sleep_deep_hours":     g("Deep Sleep Hours", "number"),
-                "active_kcal":          g("Active kcal", "number"),
-                "weight_kg":            g("Weight kg", "number"),
-                "steps":                g("Steps", "number"),
-            })
-        return out
-
-    def save_biometrics_today(self, date_str: str, rhr=None, hrv=None, sleep_hours=None,
-                               sleep_deep=None, active_kcal=None, weight_kg=None, steps=None) -> None:
-        db_id = self.config.notion_db_biometrics
-        existing = self._query(db_id, filter_={"property": "Log Date", "date": {"equals": date_str}})
-        props = {
-            "Entry": notion.title(date_str), "Log Date": notion.date_prop(date_str),
-            "RHR": notion.number(rhr), "HR Average": notion.number(None), "HRV": notion.number(hrv),
-            "Sleep Hours": notion.number(sleep_hours), "Deep Sleep Hours": notion.number(sleep_deep),
-            "Active kcal": notion.number(active_kcal), "Weight kg": notion.number(weight_kg),
-            "Steps": notion.number(steps),
-        }
-        if existing:
-            notion.update_page(self._nc, existing[0]["id"], props)
-        else:
-            notion.create_page(self._nc, db_id, props)
-        self.mirror_notion_write(notion_reader.BIOMETRICS, date_str, props)
 
     # ─────────────────────────────────────────────────────────────────────
     #  App Config (flat key/value store — plan_start_date, current_stage,
@@ -2163,23 +2105,25 @@ class Repository:
         today = today or date.today()
         cutoff = (today - timedelta(days=days)).isoformat()
 
-        bio_pages = self._query(
-            self.config.notion_db_biometrics,
-            filter_={"property": "Log Date", "date": {"on_or_after": cutoff}},
-            sorts=[{"property": "Log Date", "direction": "ascending"}],
-        )
+        # The Oura+Garmin blend — the engine's actual biometric source (key
+        # rule 4). This used to read the Notion Biometrics database, which was
+        # RETIRED on 2026-08-12: it held ten pages with every column NULL, had
+        # no live writer, and so this panel reported "Biometric days available:
+        # 0" and refused to compute for as long as it has existed. Same eight
+        # fields, from data that is actually there.
         biometrics = [
             {
-                "date": notion.get_property(p, "Log Date", "date"),
-                "hrv_ms": notion.get_property(p, "HRV", "number"),
-                "resting_heart_rate": notion.get_property(p, "RHR", "number"),
-                "sleep_duration_hours": notion.get_property(p, "Sleep Hours", "number"),
-                "sleep_deep_hours": notion.get_property(p, "Deep Sleep Hours", "number"),
-                "active_energy_kcal": notion.get_property(p, "Active kcal", "number"),
-                "weight_kg": notion.get_property(p, "Weight kg", "number"),
-                "steps": notion.get_property(p, "Steps", "number"),
+                "date": r.date,
+                "hrv_ms": r.hrv_ms,
+                "resting_heart_rate": r.resting_heart_rate,
+                "sleep_duration_hours": r.sleep_duration_hours,
+                "sleep_deep_hours": r.sleep_deep_hours,
+                "active_energy_kcal": r.active_kcal,
+                "weight_kg": r.weight_kg,
+                "steps": r.steps,
             }
-            for p in bio_pages
+            for r in self.get_biometric_rolling(days=days, today=today)
+            if r.date and r.date >= cutoff
         ]
 
         read_pages = self._query(

@@ -48,8 +48,7 @@ def _empty_outbox():
 
 def _repo(store=None) -> Repository:
     repo = Repository(Config(
-        notion_api_key="k", notion_db_readiness="a", notion_db_training="b",
-        notion_db_biometrics="c", notion_db_config="d", google_sheets_id="e",
+        notion_api_key="k", notion_db_readiness="a", notion_db_training="b", notion_db_config="d", google_sheets_id="e",
         google_service_account={},
         supabase_url="https://x.supabase.co", supabase_secret_key="secret",
     ))
@@ -272,12 +271,6 @@ def test_every_mirrored_column_is_a_real_column_of_its_table():
         "Value": notion.rich_text("2"),
         "Updated": notion.date_prop("2026-07-20"),
     })
-    repo.mirror_notion_write(nr.BIOMETRICS, "2026-08-10", {
-        "Entry": notion.title("2026-08-10"),
-        "Log Date": notion.date_prop("2026-08-10"),
-        "HRV": notion.number(58),
-    })
-
     with supabase_store.OUTBOX._lock:
         queued = dict(supabase_store.OUTBOX._rows)
     assert queued, "nothing was queued"

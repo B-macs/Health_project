@@ -292,8 +292,8 @@ def test_a_missing_table_reads_as_no_rows(conn):
     """Same tolerance OfflineWorksheet has: a datastore built before a table
     existed reads as "nothing logged yet", which is what an empty Notion
     database returns."""
-    conn.execute("DROP TABLE notion_biometrics")
-    assert nr.query(conn, nr.BIOMETRICS) == []
+    conn.execute("DROP TABLE config")
+    assert nr.query(conn, nr.CONFIG) == []
 
 
 # ─── the mapping cannot drift from what Repository reads ─────────────────
@@ -353,7 +353,7 @@ def _offline_repo():
     from services.repository import Repository
     return Repository(Config(
         notion_api_key="unused", notion_db_readiness="db-readiness",
-        notion_db_training="db-training", notion_db_biometrics="db-biometrics",
+        notion_db_training="db-training",
         notion_db_config="db-config", google_sheets_id="unused",
         google_service_account={}, datastore_path=str(LIVE_DATASTORE),
     ))

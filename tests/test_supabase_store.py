@@ -224,8 +224,7 @@ def test_supabase_settings_are_optional_in_config():
     nothing in the live app reads from Postgres yet."""
     from services.config import Config
     cfg = Config(
-        notion_api_key="k", notion_db_readiness="a", notion_db_training="b",
-        notion_db_biometrics="c", notion_db_config="d", google_sheets_id="e",
+        notion_api_key="k", notion_db_readiness="a", notion_db_training="b", notion_db_config="d", google_sheets_id="e",
         google_service_account={},
     )
     assert cfg.supabase_url == ""

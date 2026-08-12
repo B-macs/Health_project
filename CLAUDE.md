@@ -418,6 +418,15 @@ calls a read method on the Supabase client.
   with a subset of columns updates only those columns and leaves the rest
   alone (checked against a real row — `readiness_score` survived a
   `strain`-only write).
+- **The Notion BIOMETRICS database was RETIRED 2026-08-12.** It held ten pages
+  with every column NULL — including `date`, its primary key — and had no live
+  writer, so the Multi-Week Trend Analysis panel that read it had always
+  reported "Biometric days available: 0" and refused to compute.
+  `get_macro_trend_data` now reads the **Oura+Garmin blend** (key rule 4's
+  actual biometric source, same eight fields): 49 days instead of 0, so that
+  panel computes for the first time. `NOTION_DB_BIOMETRICS` is no longer read
+  by `config.py` — an existing secrets.toml can keep or drop it freely. Three
+  Notion databases remain: Readiness, Training, Config.
 - **Notion writes mirror too, via `mirror_notion_write`**, which decodes the
   property payload with `notion_reader.row_from_properties` — the inverse of
   the same `PROPERTIES` map the offline reader uses, so a column cannot be

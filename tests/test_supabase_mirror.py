@@ -90,8 +90,7 @@ class FakeStore:
 
 def _repo(supabase=True, store=None) -> Repository:
     repo = Repository(Config(
-        notion_api_key="k", notion_db_readiness="a", notion_db_training="b",
-        notion_db_biometrics="c", notion_db_config="d", google_sheets_id="e",
+        notion_api_key="k", notion_db_readiness="a", notion_db_training="b", notion_db_config="d", google_sheets_id="e",
         google_service_account={},
         supabase_url="https://x.supabase.co" if supabase else "",
         supabase_secret_key="secret" if supabase else "",

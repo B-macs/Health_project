@@ -128,14 +128,10 @@ class _StubRepository:
         self._maybe_fail("get_all_config_rows")
         return self._config_rows
 
-    def get_all_notion_biometrics_rows(self):
-        self._maybe_fail("get_all_notion_biometrics_rows")
-        return getattr(self, "_notion_biometrics", [])
 
 
 _ALL_TABLES = [
     "readiness_checkins", "training_sessions", "training_exercises", "training_sets",
-    "notion_biometrics",
     "garmin_daily", "garmin_activities", "garmin_sleep_stages", "sleep_fusion",
     "session_hr", "oura_daily", "oura_workouts",
     "oura_sleep_periods", "oura_sessions", "oura_rest_mode", "biometric_blend",

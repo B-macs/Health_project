@@ -56,7 +56,7 @@ def _empty_outbox():
 def repo():
     return Repository(Config(
         notion_api_key="unused", notion_db_readiness="db-readiness",
-        notion_db_training="db-training", notion_db_biometrics="db-biometrics",
+        notion_db_training="db-training",
         notion_db_config="db-config", google_sheets_id="unused",
         google_service_account={}, datastore_path=str(LIVE),
         supabase_url="https://x.supabase.co", supabase_secret_key="secret",
@@ -262,16 +262,14 @@ def test_no_real_page_ever_queues_a_column_that_does_not_exist(repo, conn):
     fresh.executescript(schema)
     columns = {t: {r[1] for r in fresh.execute(f"PRAGMA table_info({t})")}
                for t in ("readiness_checkins", "training_exercises",
-                         "training_sessions", "training_sets", "config",
-                         "notion_biometrics")}
+                         "training_sessions", "training_sets", "config")}
 
     supabase_store.OUTBOX.drain()
     for page in nr.query(repo._ds, nr.TRAINING):
         decoded = nr.row_from_properties(nr.TRAINING, page["properties"])
         repo.mirror_notion_write(nr.TRAINING, page["id"], page["properties"],
                                  sets=json.loads(decoded.get("_sets_json") or "[]"))
-    for kind, key_column in ((nr.READINESS, "date"), (nr.CONFIG, "key"),
-                             (nr.BIOMETRICS, "date")):
+    for kind, key_column in ((nr.READINESS, "date"), (nr.CONFIG, "key")):
         for page in nr.query(repo._ds, kind):
             row = nr.row_from_properties(kind, page["properties"])
             repo.mirror_notion_write(kind, row.get(key_column), page["properties"])
