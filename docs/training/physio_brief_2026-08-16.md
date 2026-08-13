@@ -83,6 +83,33 @@ standing and treadmill** use alike.
 Relieved by a ~20-minute natural-pace walk — after which the tightness
 reappeared at the base of the neck, posterior left, along the same corridor.
 
+### ⚠ Location and tissue CORRECTED 2026-08-13 — read this before the sections below
+
+The athlete marked the area on a posterior anatomy plate and ran discriminating
+tests. Two things this brief previously carried are wrong:
+
+- **Location.** It is a vertical band **~2–4 cm lateral to the spinous
+  processes, C7/T1 to ~T4/T5** — the paraspinal corridor. **Not** the medial
+  scapular border, which is two finger-widths further out. The 07-31 check-in
+  in the table above had it right in the athlete's own words — *"down my
+  spine"*.
+- **Tissue.** **Left trapezius** — upper/middle fibres and the C7–T3
+  aponeurosis. **Rhomboid is ruled out** (a protraction stretch with the neck
+  neutral lengthens it and does not reproduce the symptom), and **levator
+  scapulae is ruled out as the local generator** (it inserts at the superior
+  angle, outside the marked band). Both were carried through this brief from
+  the earlier entries.
+
+Also corrected: *"sitting, standing and treadmill alike"* does **not** show the
+driver is duration rather than posture. All three load the same tissue by
+different routes — sitting drives head-forward, standing lets the arms dangle
+(unsupported arm weight at its maximum), and the treadmill desk fixes the hands
+while the legs move. **A standing desk is worse than sitting here** unless the
+arms are supported.
+
+Full reasoning and the named tests: `patient_profile.py` `symptom_log`
+2026-08-13.
+
 ## 3. Timeline — it predates the loaded block
 
 **Onset 2026-07-16. Stage 2A began 2026-07-20.** Four days clear. The loaded
@@ -94,26 +121,38 @@ It is not progressing.
 Concurrently, low back and hips have improved markedly — 07-24 check-in:
 *"first morning in a while I woke up with no stiffness in my back or hips."*
 
-## 4. What already runs — and why that is the finding
+## 4. What already runs — CORRECTED 2026-08-13, the earlier claim was false
 
-Stage 2A already includes scapular work **five days out of seven**:
+~~Stage 2A already includes scapular work **five days out of seven**~~ — that
+was read off `training_plan.py`. **The log says otherwise.** Counted from
+`training_exercises` on 2026-08-13:
 
-| Day | Work |
-|---|---|
-| 1 | Face Pull (cable) — 3×12 |
-| 3 | Lat Pulldown; Single-Arm DB Row |
-| 4 | Scapular Wall Slide — 2×10 |
-| 5 | Scapular Wall Slide; Prone Y-Raise |
-| 7 | Scapular Wall Slide — 2×10 |
+| Week | Scapular days actually logged | What ran |
+|---|---|---|
+| 07-20 → 07-26 | **4** | Face Pull; Pulldown + Row; Wall Slide; Y-Raise + Wall Slide |
+| 07-27 → 08-02 | **3** | Face Pull; Pulldown + Row; Wall Slide |
+| 08-03 → 08-09 | **2** | Face Pull; Pulldown + Row |
+| 08-10 → | **0** | — |
 
-The symptom persists **through** that dose. Every one of those is a short,
-high-quality set. The provocation is roughly eight continuous hours of
-low-load holding. Nothing in the block trains that capacity.
+Never five, and **declining**. **Scapular Wall Slide last ran 2026-07-31;
+Prone Y-Raise last ran 2026-07-24** — both gone a fortnight. Only the loaded
+gym pulls survive, on gym days. The cause is visible: there are two
+active-recovery templates, only one carries Wall Slide, and only the one
+*without* it has run since July.
 
-Hence the framing: **an endurance gap, not a volume gap.** This is the same
-pattern the 2025 movement-pattern analysis already documents in the trunk —
-*"lumbar endurance low, deep core turns off under fatigue"* — presenting in a
-new region.
+**This inverts the old conclusion.** The two items that dropped out are exactly
+the low-load holding ones — the work closest to what this symptom needs — and
+the worst day on record (2026-08-12) fell in the week with zero. So *"an
+endurance gap, not a volume gap"* rested on a false premise: **volume was never
+actually ruled out.**
+
+The mechanism is also sharper than "endurance". Testing on 2026-08-13 (see
+`patient_profile.py` `symptom_log` 2026-08-13) points to **perfusion**:
+sustained low-level contraction occludes flow, which is why movement, face
+pulls and heat all relieve it while eight hours of holding does not.
+
+**Method note:** the original figure came from the plan, not the log. Verify a
+dose against `training_exercises`.
 
 ## 5. Four converging drivers
 

@@ -60,6 +60,36 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
   baseline is captured. Prescriptions still get encoded at the next block
   build, not before.
 
+2026-08-13: THE INTERSCAPULAR SYMPTOM IS SOLVED TO A TISSUE, and this file's
+  append-only convention changed to let that land. The athlete marked the area
+  on an anatomy plate and ran discriminating tests; the answer is LEFT
+  TRAPEZIUS (upper/middle fibres and the C7-T3 aponeurosis), position-loaded
+  and PERFUSION-limited — sustained low-level contraction occludes flow, which
+  is why movement and heat relieve it and eight hours of holding does not.
+  Rhomboid, levator scapulae and the deep cervicothoracic layer are each ruled
+  out by a named test. CONVENTION CHANGE, the athlete's direction — "this was
+  all guess work; what we are doing now should overwrite that as it is real
+  planning and tests": ASSESSMENTS that testing has refuted are now replaced
+  IN PLACE with a tombstone naming what went and what would reinstate it,
+  while OBSERVATIONS are still never overwritten. Four things in this file were
+  wrong and are corrected: the location was NOT the medial scapular border (it
+  is ~2-4cm lateral to the spinous processes, and the 2026-07-31 entry had it
+  right before the 2026-08-03 entry moved it); "sitting, standing AND treadmill
+  alike" does NOT mean duration-not-posture (all three load the same tissue by
+  different routes, and a standing desk is WORSE than sitting here); driver (1)
+  of the 2026-08-03 entry is now MEASURED rather than inferred (at matched lift
+  height the left works harder than the right — that is why it is the left);
+  and "five days a week of scapular work" IS FALSE — the log says 4, then 3,
+  then 2, then 0, with Scapular Wall Slide last run 2026-07-31 and Prone
+  Y-Raise last run 2026-07-24, so VOLUME WAS NEVER RULED OUT. Training is
+  exonerated by the log (six interscapular reports, six weekdays; three clean
+  weekends; a 10km hike with no symptoms), which also means running is not
+  implicated for Stage 2B. The tendon question is answered LESS LIKELY, NOT
+  EXCLUDED, with two cheap tests still open. Everything prescribed is
+  self-directed and already cleared: the physiotherapist may not be available
+  until September or later, so questions are worked out here rather than
+  deferred.
+
 Stage 1 history: Rehab extended by 7 days (Days 15-21, "Week 3: Flare
   Recovery & Reassessment Prep" in training_plan.py) — decided 2026-07-13.
   Day 14's exit criteria were not met on the original schedule
@@ -90,13 +120,18 @@ Current block: Stage 2A — 28-Day Gym Strength Block (Phase 2, Days 1-28,
   reassessment alongside the Stage 2B decision.
 Next block: reassess at Day 28 (2026-08-16) against stage_2_exit_criteria
   below — decide Stage 2B vs. extending Stage 2A, the running-introduction
-  question, AND endurance-biased scapular programming (see the 2026-08-03
-  symptom_log entry: five days a week of scapular work already runs and the
-  interscapular symptom persists through it, so the gap is endurance under
-  sustained low-load holding, not volume — this needs long isometric holds,
-  which is a prescription change and therefore a physio decision, not a
-  self-directed one). All three are explicit deferred decisions, not
-  oversights; settle them with the physiotherapist before authoring the block.
+  question, AND endurance-biased scapular programming (see the 2026-08-13
+  symptom_log entry, which REPLACES the 2026-08-03 framing: the claim that
+  five days a week of scapular work already runs is false — the log shows 4,
+  3, 2 then 0, and the two low-load holding items dropped out entirely — so
+  volume was never ruled out, and the mechanism is perfusion rather than an
+  endurance shortfall. The isometric-hold direction for Stage 2B is already
+  physio-confirmed, so this points an agreed decision at this region rather
+  than opening a new one). All three are explicit deferred decisions, not
+  oversights; settle them at the block build. NOTE the physiotherapist is not
+  available on demand — possibly not until September or later (athlete,
+  2026-08-13) — so a decision that can be reasoned from the log and the
+  clinical documents is made here rather than deferred indefinitely.
 """
 
 PROFILE = {
@@ -114,9 +149,10 @@ PROFILE = {
                       "deferred decision (see next_reassessment), not an oversight.",
     "next_reassessment": "Day 28 (2026-08-16) — reassess against stage_2_exit_criteria; decide "
                           "Stage 2B vs. extending Stage 2A, the running-introduction question, and "
-                          "endurance-biased scapular programming (2026-08-03 symptom_log entry — an "
-                          "endurance gap, not a volume gap), with the physiotherapist — see module "
-                          "docstring and docs/training/physio_brief_2026-08-16.md",
+                          "endurance-biased scapular programming (2026-08-13 symptom_log entry, "
+                          "which supersedes the 2026-08-03 'endurance gap, not volume gap' framing "
+                          "— the five-days-a-week premise is false and the mechanism is perfusion) "
+                          "— see module docstring and docs/training/physio_brief_2026-08-16.md",
 
     # ─────────────────────────────────────────────────────────────────────────
     #  MRI Findings
@@ -636,31 +672,48 @@ PROFILE = {
             },
 
             "assessment": {
+                # ─── ASSESSMENT REPLACED 2026-08-13 ──────────────────────────
+                # The athlete's direction: "this was all guess work; what we
+                # are doing now should overwrite that as it is real planning
+                # and tests." Observations in this entry are UNTOUCHED — only
+                # the reasoning below was replaced, because it was inferred
+                # from a symptom description and has since been refuted by
+                # testing. See the 2026-08-13 entry for the tested finding;
+                # it is the single place that finding lives.
+                # ────────────────────────────────────────────────────────────
                 "likely_tissue": [
-                    "Left rhomboid / mid-trapezius — same region flagged in finding #6's Jul 2025 "
-                    "left rhomboid strain, now presenting as a static ache rather than a loading injury",
-                    "Left levator scapulae — anatomically bridges the cervical spine (base of neck) "
-                    "and the medial scapular border, a plausible link between the two symptom sites "
-                    "given they sit along the same left-sided line",
+                    "SUPERSEDED 2026-08-13 — the tissue is left TRAPEZIUS (upper/middle fibres "
+                    "and the C7-T3 aponeurosis). See the 2026-08-13 entry.",
+                    "REMOVED: 'left rhomboid / mid-trapezius'. A protraction stretch with the "
+                    "neck neutral lengthens rhomboid directly and does NOT reproduce the "
+                    "symptom (tested 2026-08-13). REINSTATE IF that test turns positive.",
+                    "REMOVED: 'left levator scapulae' as the local generator. Levator inserts at "
+                    "the SUPERIOR ANGLE of the scapula — outside the band the athlete marked on "
+                    "an anatomy plate (~2-4cm lateral to the spinous processes, C7/T1 to T4/T5). "
+                    "It cannot generate pain there, though it may still explain the neck-base "
+                    "migration. REINSTATE IF the marked location moves to the superior angle.",
                 ],
                 "mechanism": (
-                    "Occurring across sitting, standing, AND treadmill use (not posture-specific) "
-                    "points toward under-recruitment of the left scapular stabilizers during "
-                    "prolonged low-load positions, rather than a fresh acute strain — consistent "
-                    "with finding #6's documented weak scapular control (right eccentric control "
-                    "flagged there; this is the left side, same underlying stability deficit). "
-                    "That walking relieved the interscapular tightness (dynamic movement rhythmically "
-                    "engaging the same stabilizers that seize up under static holding) supports a "
-                    "stiffness-from-stillness pattern over a structural issue — the neck-base tightness "
-                    "appearing afterward, along the same corridor, reads as the same underlying pattern "
-                    "shifting location rather than a second, unrelated finding."
+                    "SUPERSEDED 2026-08-13. What was removed: the reading that symptoms across "
+                    "sitting, standing AND treadmill prove the driver is DURATION rather than "
+                    "posture. It is not. The athlete described the three positions on 2026-08-13 "
+                    "and each loads the same tissue by a DIFFERENT route — sitting drives head "
+                    "forward; standing lets the arms dangle, which is unsupported arm weight at "
+                    "its maximum; the treadmill fixes the hands on a keyboard while the legs "
+                    "move, so the shoulder girdle cancels every footfall. Changing position "
+                    "never helped because all three converge on trapezius. The 'stiffness-from-"
+                    "stillness over a structural issue' half of the old text SURVIVES and was "
+                    "correct — see the 2026-08-13 entry, which sharpens it to a perfusion "
+                    "mechanism rather than an endurance one."
                 ),
                 "underlying_pattern": (
-                    "Finding #6 explicitly frames scapular control work as 'a STANDING requirement, "
-                    "not optional conditioning.' Current Stage 2A active-recovery day rotation only "
-                    "includes scapular-specific work (Scapular Wall Slide) within Session C (Friday), "
-                    "not in the daily active-recovery templates — a gap worth raising with physio "
-                    "given this symptom's timing."
+                    "VINDICATED, not removed — and the 2026-08-03 entry below was WRONG to "
+                    "overrule it. This entry's observation that scapular work sits in the gym "
+                    "sessions rather than in the daily active-recovery templates is confirmed by "
+                    "the training log (counted 2026-08-13): there are two active-recovery "
+                    "templates, only one carries Scapular Wall Slide, and only the one WITHOUT "
+                    "it has run since 2026-07-31. The gap this entry flagged on 2026-07-21 has "
+                    "since widened rather than closed."
                 ),
             },
 
@@ -725,23 +778,37 @@ PROFILE = {
             },
 
             "assessment": {
+                # ─── ASSESSMENT REPLACED 2026-08-13 ──────────────────────────
+                # Same treatment as the 2026-07-21 entry above: the athlete's
+                # ROM observations here are UNTOUCHED, only the reasoning was
+                # replaced. See the 2026-08-13 entry for the tested finding.
+                # ────────────────────────────────────────────────────────────
                 "likely_tissue": [
-                    "Left posterior cervical extensors/paraspinals, or left levator scapulae — "
-                    "flexion tightness lateral to the spine on the left matches the same "
-                    "left-sided corridor already flagged in the 2026-07-21 entry above "
-                    "(levator scapulae bridges the cervical spine base and the medial "
-                    "scapular border)",
+                    "SUPERSEDED 2026-08-13 — left TRAPEZIUS (upper/middle fibres and the C7-T3 "
+                    "aponeurosis). See the 2026-08-13 entry.",
+                    "REMOVED: 'left levator scapulae'. It inserts at the superior angle of the "
+                    "scapula, outside the marked band — it cannot be the local generator.",
+                    "REMOVED: 'left posterior cervical extensors/paraspinals' as the primary. "
+                    "Splenius cervicis and semispinalis attach spine-to-spine with NO "
+                    "shoulder-girdle connection, so stabilising the shoulder blade could not "
+                    "change a stretch of them. On 2026-08-13 it did — pinning the blade "
+                    "abolished the symptom at the identical neck end-range. REINSTATE IF that "
+                    "blade-pinned test turns positive.",
                 ],
                 "mechanism": (
-                    "The left-sided flexion pull points to tightness/strain in the posterior "
-                    "cervical extensors/paraspinals or levator scapulae on the left."
+                    "SUPERSEDED 2026-08-13. THIS ENTRY'S OBSERVATION IS THE ONE THAT WAS RIGHT "
+                    "ALL ALONG and it is worth reading before the later entries: 'flexion "
+                    "tightness … localized immediately lateral to the spine' describes exactly "
+                    "the band the athlete marked on an anatomy plate on 2026-08-13. The "
+                    "2026-08-03 entry below then relocated it to the 'medial scapular border', "
+                    "which is two finger-widths further out and is wrong. Raw observations here "
+                    "beat the interpretations layered on them."
                 ),
                 "underlying_pattern": (
-                    "Extends the 2026-07-21 entry (left interscapular region and base of neck, "
-                    "desk-posture triggered) with a formal ROM breakdown — this confirms that "
-                    "entry's left-sided flexion/tightness component in more detail, consistent "
-                    "with finding #6's documented left scapular-stabilizer under-recruitment "
-                    "(levator scapulae link)."
+                    "SUPERSEDED 2026-08-13. The levator-scapulae link is withdrawn (see above). "
+                    "This entry and the 2026-08-03 one may be describing ONE finding rather than "
+                    "two: both place the symptom in the same paraspinal band, and the 2026-08-13 "
+                    "testing found a single tissue that accounts for both presentations."
                 ),
             },
 
@@ -812,20 +879,41 @@ PROFILE = {
             },
 
             "assessment": {
+                # ─── likely_tissue AND underlying_pattern REPLACED 2026-08-13 ─
+                # The four drivers below SURVIVE and are annotated in place —
+                # driver (1) is now directly MEASURED rather than inferred.
+                # Observations in this entry are untouched.
+                # ────────────────────────────────────────────────────────────
                 "likely_tissue": [
-                    "Left rhomboid major/minor and mid-trapezius at the medial scapular border "
-                    "— same tissue reasoned in the 2026-07-21 entry, not re-derived here",
-                    "Levator scapulae — the anatomical bridge between the cervical spine and the "
-                    "superior medial scapular angle, and why the ache migrates between the two "
-                    "sites along one corridor (established in the 2026-07-21 and 2026-07-31 entries)",
+                    "SUPERSEDED 2026-08-13 — left TRAPEZIUS (upper/middle fibres and the C7-T3 "
+                    "aponeurosis). See the 2026-08-13 entry.",
+                    "REMOVED: 'rhomboid major/minor'. Ruled out by a protraction stretch test.",
+                    "REMOVED: 'at the medial scapular border' — THE LOCATION IN THIS ENTRY IS "
+                    "WRONG. On 2026-08-13 the athlete marked the area on an anatomy plate: a "
+                    "vertical band ~2-4cm lateral to the spinous processes, C7/T1 to T4/T5. The "
+                    "medial scapular border is two finger-widths further out. The 2026-07-31 "
+                    "entry above had it right ('immediately lateral to the spine') and this "
+                    "entry moved it.",
+                    "REMOVED: 'levator scapulae' — inserts at the superior angle, outside the "
+                    "marked band.",
                 ],
                 "mechanism": (
-                    "FOUR CONVERGING DRIVERS, all already documented elsewhere in this profile:\n"
+                    "FOUR CONVERGING DRIVERS, all already documented elsewhere in this profile. "
+                    "ALL FOUR STAND as of 2026-08-13; driver (1) is now measured, not inferred:\n"
                     "(1) The right post-Latarjet shoulder sag shifts postural work onto the LEFT. "
                     "The tell is injury_profile.md #11 — the July 2025 rhomboid strain was on the "
                     "LEFT despite the damaged shoulder being the RIGHT — together with the 2025 "
                     "log's documented left TILT under overhead load. Cross-references finding #6; "
-                    "do not double-count as a separate caution.\n"
+                    "do not double-count as a separate caution. *** MEASURED DIRECTLY "
+                    "2026-08-13: prone single-arm raise, arm out at shoulder height, thumb up — "
+                    "the athlete reports the LEFT side working harder than the right AT THE SAME "
+                    "LIFT HEIGHT, i.e. matched for range. That is this driver, observed rather "
+                    "than deduced, and it is the answer to 'why the left'. Separately the left "
+                    "lifts 40cm and the right only 20cm; read the right's ceiling as the LATARJET "
+                    "restricting horizontal extension plus external rotation — the exact arc a "
+                    "transferred coracoid and its tendon sling limit — NOT as weakness to train "
+                    "through. This does not contradict the physio's 2026-08-10 'no capsular "
+                    "restriction': that was tested OVERHEAD, a different plane. ***\n"
                     "(2) Confirmed hypermobility (Beighton 6/9) means stability is muscular rather "
                     "than ligamentous, so sustained low-load holding is the worst load case — "
                     "muscle fatigues, ligament does not. Identical mechanism to the mid-back "
@@ -834,15 +922,34 @@ PROFILE = {
                     "(3) Finding #3's sitting-driven T6-T10 thoracic stiffness tilts the scapula "
                     "forward off the ribcage, leaving the retractors holding LENGTHENED all day — "
                     "a mechanically losing position.\n"
-                    "(4) Desk exposure with unsupported forearms (above) is the unchanged variable."
+                    "(4) Desk exposure with unsupported forearms (above) is the unchanged "
+                    "variable. *** REFINED 2026-08-13: the athlete switched to supported "
+                    "forearms and got IMMEDIATE relief, then it recurred — which confirms the "
+                    "mechanism rather than refuting it, because only ONE of two loads was "
+                    "removed and head-forward was never addressed. The measurable cause is that "
+                    "THE DESK IS TOO LOW: below elbow height the forearms cannot carry their own "
+                    "weight without dropping and rounding the shoulders, so the reach goes down "
+                    "and forward, holding the scapula protracted and depressed — which IS driver "
+                    "(3)'s losing position, arriving by a second route. Set the surface at "
+                    "standing elbow height measured ON the treadmill deck (the deck adds 10-15cm; "
+                    "a desk set from floor-standing height is exactly one deck-height too low), "
+                    "and raise the monitor by the same amount or load A is simply traded for "
+                    "load B. ***"
                 ),
                 "underlying_pattern": (
-                    "NOT a volume gap — an ENDURANCE gap. Scapular work already runs five days a "
-                    "week (see notes), and the symptom persists through all of it, because every "
-                    "one of those is a short high-quality set while the provocation is ~8 hours of "
-                    "continuous low-load holding. Nothing in the block trains that capacity. This "
-                    "is the 2025 movement-pattern analysis's documented 'lumbar endurance low / "
-                    "deep core turns off under fatigue' finding appearing in a new region."
+                    "REPLACED 2026-08-13 — the old text read 'NOT a volume gap, an ENDURANCE "
+                    "gap', resting on the claim that scapular work runs five days a week and the "
+                    "symptom persists through it. THE PREMISE IS FALSE ON BOTH HALVES. Counted "
+                    "from the training log on 2026-08-13, Stage 2A ran scapular work on 4 days "
+                    "in week 1, then 3, then 2, then 0 — never five, and DECLINING. Scapular "
+                    "Wall Slide last ran 2026-07-31 and Prone Y-Raise last ran 2026-07-24; only "
+                    "the loaded gym pulls survive. The two items that dropped out are precisely "
+                    "the low-load holding ones, i.e. the ones closest to what this symptom needs, "
+                    "and the worst day on record (2026-08-12) fell in the week with zero. "
+                    "VOLUME WAS THEREFORE NEVER ACTUALLY RULED OUT — do not treat it as settled. "
+                    "The mechanism is also sharper than 'endurance': see the 2026-08-13 entry, "
+                    "which finds a PERFUSION pattern (sustained low-level contraction is "
+                    "ischaemic; movement and heat relieve it) rather than a capacity shortfall."
                 ),
             },
 
@@ -888,13 +995,23 @@ PROFILE = {
                 "2026-07-21 on. A bilateral migrating presentation favours a postural-endurance "
                 "driver over a discrete left-sided strain, and the left-lateralised framing is "
                 "what obscured that.",
-                "CORRECTION 3 — the 2026-07-21 entry's claim that scapular-specific work appears "
-                "only in Session C is wrong. training_plan.PLAN_STAGE2 runs Face Pull (Day 1), "
-                "Lat Pulldown + Single-Arm DB Row (Day 3), Scapular Wall Slide (Days 4, 5 and 7) "
-                "and Prone Y-Raise (Day 5) — five days a week. That the symptom persists THROUGH "
-                "that dose is the finding, and is what reframes it as endurance rather than volume.",
-                "Entries above are left as written per the append-only convention — these "
-                "corrections live here, not in the original entries.",
+                "CORRECTION 3 — ITSELF RETRACTED 2026-08-13, and it had the argument backwards. "
+                "It claimed the 2026-07-21 entry was wrong that scapular work sits in the gym "
+                "sessions rather than the daily templates, citing PLAN_STAGE2's five prescribed "
+                "days. But the PLAN is not the LOG. Counted from training_exercises on "
+                "2026-08-13: 4 scapular days in week 1, then 3, then 2, then 0. Scapular Wall "
+                "Slide last ran 2026-07-31; Prone Y-Raise last ran 2026-07-24. There are two "
+                "active-recovery templates, only one carries Wall Slide, and only the one "
+                "WITHOUT it has run since July — which is exactly the gap the 2026-07-21 entry "
+                "identified. That entry was right and this correction was wrong. The lesson is "
+                "general: never verify a dose against training_plan.py when the log is queryable.",
+                "CONVENTION CHANGED 2026-08-13, at the athlete's direction — 'this was all guess "
+                "work; what we are doing now should overwrite that as it is real planning and "
+                "tests.' The append-only rule no longer applies to ASSESSMENTS: reasoning that "
+                "testing has refuted is replaced in place, with a tombstone naming what was "
+                "removed and what would reinstate it. OBSERVATIONS are still never overwritten — "
+                "verbatim check-ins, dates, severity scores and locations stay exactly as "
+                "recorded, and they are what proved the case.",
                 "Positive signal, unchanged from 2026-07-21: lower back and hip symptoms have "
                 "improved markedly since Stage 2A began (2026-07-24 check-in: 'first morning in a "
                 "while I woke up with no stiffness in my back or hips'). The block is helping; "
@@ -1333,6 +1450,219 @@ PROFILE = {
                 "reassessment itself. Stage 2B vs. extending 2A, the running "
                 "introduction, and the formal exit-criteria evaluation all still land on "
                 "2026-08-16.",
+            ],
+        },
+        {
+            "date":   "2026-08-13",
+            "status": "Tested — supersedes the assessments in the 2026-07-21, 2026-07-31 and 2026-08-03 entries",
+            "region": "Left paraspinal band, C7/T1 to T4/T5 (~2-4cm lateral to the spinous processes)",
+            "title":  "Interscapular Symptom SOLVED to a Tissue — Left Trapezius, Position-Loaded, Perfusion-Limited",
+
+            "mechanism": (
+                "The athlete marked the area on a posterior anatomy plate, then ran a series of "
+                "discriminating tests. This entry replaces guesswork with measurement and is the "
+                "single place the finding lives; the three earlier entries carry tombstones "
+                "pointing here. IT IS A LOAD PROBLEM, NOT AN INJURY: there has never been an "
+                "incident, pain has been 0/10 for a month, and nothing reproduces it except "
+                "sustained position. The absence of a singular moment is not a puzzle — it is the "
+                "diagnosis. A damaged tissue has a moment; an overworked one accumulates.\n"
+                "WHY THIS REGION, WHY NOW: the driver is not the lumbar injury and not the "
+                "training block (onset 2026-07-16, four days BEFORE Stage 2A). At Beighton 6/9 "
+                "stability is muscular everywhere, so whichever region holds longest fails first. "
+                "The lumbar went first because sitting loads it hardest; it has since improved "
+                "markedly (2026-07-24: 'first morning in a while I woke up with no stiffness in "
+                "my back or hips') and the next region still holding all day is the one now "
+                "complaining. Same body, same laxity, same failure mode, different region because "
+                "the exposure moved."
+            ),
+
+            "symptoms": {
+                "location": (
+                    "LEFT, a vertical band ~2-4cm lateral to the spinous processes running C7/T1 "
+                    "to about T4/T5. NOT the medial scapular border, which is two finger-widths "
+                    "further out and is what the 2026-08-03 entry wrongly recorded. The "
+                    "2026-07-31 entry's 'immediately lateral to the spine' was correct."
+                ),
+                "painful_with": [
+                    "Sustained head-forward desk posture — the dominant exposure",
+                    "Reaching the neck down and to the right (contralateral side-bend)",
+                    "Shrugging while in that neck position — worse during, WORSE AGAIN AFTER RELEASE",
+                    "Standing with the arms dangling; treadmill-desk walking with hands fixed",
+                    "Holding a phone unsupported, especially while walking",
+                ],
+                "pain_free_with": [
+                    "Natural-pace walking",
+                    "Face pulls — acute relief, observed the week of 2026-08-03",
+                    "Heat applied before bed — abolished it entirely ('couldn't feel it')",
+                    "A 10km weekend hike — no symptoms at all",
+                ],
+                "neural":   "None — no arm symptoms, numbness or tingling",
+                "severity": "Unchanged: tightness 1-3/10, pain 0/10. Worst day on record 2026-08-12.",
+            },
+
+            "assessment": {
+                "likely_tissue": [
+                    "LEFT TRAPEZIUS — upper and middle fibres and the C7-T3 aponeurosis they "
+                    "converge on. The only candidate that (i) lies in the marked band, (ii) "
+                    "lengthens as the neck goes forward and away, AND (iii) is loaded by "
+                    "unsupported arm weight. The athlete named it himself on 2026-07-31 before "
+                    "any of this: 'still tight in TRAPS left side down my spine when I put my "
+                    "head foreward'.",
+                    "RULED OUT — rhomboid: a protraction stretch with the neck neutral lengthens "
+                    "it directly and does not reproduce the symptom.",
+                    "RULED OUT — levator scapulae as the local generator: it inserts at the "
+                    "superior angle, outside the marked band. It may still explain the "
+                    "neck-base migration.",
+                    "RULED OUT — splenius cervicis / semispinalis: they attach spine-to-spine "
+                    "with no shoulder-girdle connection, so pinning the shoulder blade could not "
+                    "change a stretch of them. It abolished the symptom at identical neck "
+                    "end-range. THIS IS THE DECISIVE TEST.",
+                    "RULED OUT as primary — thoracic facet / deep rotators: rotation toward the "
+                    "sore side does not reproduce it.",
+                ],
+                "mechanism": (
+                    "PERFUSION, NOT CAPACITY — this supersedes the 2026-08-03 entry's 'endurance "
+                    "gap'. Sustained low-level contraction occludes flow through the muscle; "
+                    "movement pumps it. That is why a 20-minute walk relieves it and eight hours "
+                    "of holding does not, and it is a sharper claim than a capacity shortfall.\n"
+                    "THE SHRUG TEST IS THE TELL: head down-and-right, then shrug and hold 20-30s "
+                    "— worse during, and WORSE AGAIN AFTER RELEASE, in the marked band. A "
+                    "post-release increase is reperfusion. This is the physiotherapist's own "
+                    "diagnosed mechanism from 2026-08-10, applied to a different muscle: "
+                    "'positional ischemic cramp — shortened tissue firing hard in a shortened "
+                    "range … briefly cutting off blood flow; no structural pain.'\n"
+                    "24-HOUR COURSE, 2026-08-12/13, seven transitions all one direction: sore "
+                    "after sleep (stillness) -> walk, not clearly worse -> CONSIDERABLY WORSE "
+                    "1-3pm at the desk -> gym at 3pm, tolerated, then migrated to mid-back -> "
+                    "HEAT ABOLISHED IT before bed -> sore again at 4am (stillness) -> resolved "
+                    "this morning on getting up and moving. Stillness and holding worsen it; "
+                    "movement and heat relieve it."
+                ),
+                "underlying_pattern": (
+                    "THREE POSITIONS, THREE ROUTES TO THE SAME TISSUE (athlete, 2026-08-13) — "
+                    "which is why changing between them never helped, and why the 2026-08-03 "
+                    "entry's reading of 'sitting, standing AND treadmill alike' as proof of "
+                    "DURATION rather than posture is wrong. Sitting drives head-forward. "
+                    "Standing lets the arms dangle, which is unsupported arm weight at its "
+                    "MAXIMUM — so for this problem a standing desk is WORSE than sitting unless "
+                    "the arms are supported, inverting the usual advice. The treadmill desk "
+                    "fixes the hands on a keyboard while the legs move, so the girdle cancels "
+                    "every footfall: continuous low-load stabilisation, the worst case at "
+                    "Beighton 6/9.\n"
+                    "WHY THE LEFT: driver (1) of the 2026-08-03 entry, now measured rather than "
+                    "inferred — at matched lift height the left works harder than the right. "
+                    "The right post-Latarjet side is not carrying its share, and the left has "
+                    "been absorbing it all day, in all three positions."
+                ),
+                "tendon_question": (
+                    "The athlete asked whether the tissue is tendon, and whether that explains "
+                    "slow resolution. Honest answer: LESS LIKELY, NOT EXCLUDED — and an earlier "
+                    "reading in this conversation OVERCLAIMED, which he correctly challenged.\n"
+                    "WHAT DOES NOT DISCRIMINATE: heat helping (a non-specific analgesic that "
+                    "relieves tendinopathy too, and symptomatic tendons often show "
+                    "neovascularisation rather than ischaemia); morning stiffness easing with "
+                    "movement (that IS the classic tendinopathy history, not evidence against "
+                    "it); and insidious onset with no incident (also typical of tendinopathy).\n"
+                    "WHAT ACTUALLY ARGUES AGAINST IT: (a) loading the C7-T3 sheet in NEUTRAL — "
+                    "prone single-arm retraction — leaves the ache present but UNCHANGED, 'no "
+                    "major change during or after'. Tendinopathy escalates under load. (b) Pain "
+                    "0/10 for a month with tightness as the dominant descriptor; tendinopathy is "
+                    "a pain condition. (c) The dissociation: the tissue that DID escalate was "
+                    "upper trapezius loaded in the provocative position, not the sheet loaded in "
+                    "neutral.\n"
+                    "STILL OPEN, and cheap to close: a three-round retraction hold a minute "
+                    "apart (round 3 worse than round 1 is the specific tendinopathy signal — the "
+                    "athlete may have run only one round), and palpation for a FOCAL coin-sized "
+                    "tender point reproducing the familiar symptom versus broad even tenderness.\n"
+                    "IT DOES NOT CHANGE THE PRESCRIPTION EITHER WAY, which is why the "
+                    "uncertainty is tolerable: perfusion wants a pump, an aponeurotic component "
+                    "wants the saturating dose, and both are brief light ramped isometrics "
+                    "repeated through the day. See the Baar annex note in `plan` below."
+                ),
+                "training_is_exonerated": (
+                    "Established from the log on 2026-08-13, not by argument. SIX interscapular "
+                    "reports, six WEEKDAYS; three weekend check-ins, three clean (2026-08-08 "
+                    "reads tightness 1 but the athlete himself wrote 'not between the shoulders "
+                    "but lower'). Training AU predicts nothing: 290 AU on 2026-07-24 produced "
+                    "the no-stiffness morning, 402 AU on 2026-07-30 came with tightness 3, 0 AU "
+                    "on 2026-07-25 with 0. A 10km weekend hike — more exertion, arm swing and "
+                    "ventilation than the 3x3 interval walk that preceded a bad day — produced "
+                    "nothing. And the exception seals it: 2026-08-03 is a MONDAY reading 'after "
+                    "sitting alot yesterday', a Sunday. It is not work, it is the POSITION, "
+                    "wherever it occurs.\n"
+                    "CONSEQUENCE FOR THE BLOCK: running is NOT implicated. Stage 2B introduces "
+                    "running for the 10km on 2026-10-11 and this symptom does not constrain it."
+                ),
+            },
+
+            "plan": [
+                "RAISE THE DESK — the athlete reports it is too LOW, which is worse than too "
+                "high. Target the surface at standing elbow height measured ON the treadmill "
+                "deck (the deck adds 10-15cm), upper arm vertical, shoulders relaxed, elbow ~90 "
+                "degrees. RAISE THE MONITOR BY THE SAME AMOUNT, or arm-weight load is simply "
+                "traded for head-forward load and a real fix will read as a failed one. "
+                "Self-directed; the 2026-08-03 entry already records desk changes as needing no "
+                "sign-off.",
+                "Phone: raise it to chest/eye level, brace the holding elbow into the ribs or "
+                "rest that forearm across the chest, increase text size, and not while walking. "
+                "A SECONDARY exposure — the athlete is normally lying down with forearms and "
+                "neck supported (the unloaded position, found by feel) and under 30 min/day is "
+                "unsupported — but potent while it runs.",
+                "Movement breaks BEFORE onset, not after. The proven dose is already in the "
+                "2026-08-03 entry and was simply mistimed.",
+                "HEAT is now a tool as well as evidence — it abolished the symptom on 2026-08-12 "
+                "and does so for the right reason.",
+                "REINSTATE THE LOW-LOAD SCAPULAR HOLDS that have silently dropped out — Scapular "
+                "Wall Slide (last run 2026-07-31) and Prone Y-Raise (last run 2026-07-24). Only "
+                "one of the two active-recovery templates carries Wall Slide and only the one "
+                "WITHOUT it has run since July. This is the item closest to the symptom and it "
+                "is the one that disappeared.",
+                "LOAD IN NEUTRAL, NEVER IN THE PROVOCATIVE POSITION — neutral retraction is "
+                "asymptomatic, the shrug in the head-down-and-right position is not.",
+                "TENDON LOADING, recorded here for the SHOULDER work at the athlete's direction "
+                "(2026-08-13) rather than actioned now: Input_files/baar_tendon_annex.md §7.5 "
+                "(brief light isometrics as a decongestant — written for precisely what the "
+                "shrug test demonstrated), §2.2/§6.3 (connective-tissue signal saturates at ~10 "
+                "min and resets after 6-8h, so a 10-minute routine is a COMPLETE dose and fits "
+                "INSIDE the working day rather than competing with training), §4 (ramp 3-5s in "
+                "and out, 'tension not max' at ~50 percent effort, overcoming over yielding). "
+                "DOSE AND FREQUENCY ARE DELIBERATELY NOT WRITTEN HERE — the annex forbids taking "
+                "them directly from itself; that belongs to the Prescription layer at the block "
+                "build. Nothing new needs approving: Stage 2B's isometric-hold direction is "
+                "already physio-confirmed and this only points it at this region.",
+                "Right side: read the 20cm prone-raise ceiling as a Latarjet restriction in that "
+                "plane, NOT as weakness to train through.",
+            ],
+
+            "escalation_criteria": [
+                "Any radiating pain into the arm, numbness, or tingling",
+                "Sharp pain or any acute onset, as opposed to the current dull gradual ache",
+                "Headache, dizziness, or any symptom suggesting cervical involvement",
+                "Pain rising above the flat 0/10, or tightness trending above 3/10",
+                "No improvement after the desk height change → the load model is wrong and the "
+                "tendon question reopens",
+            ],
+
+            "notes": [
+                "CONVENTION: this entry supersedes the ASSESSMENTS in the 2026-07-21, 2026-07-31 "
+                "and 2026-08-03 entries, at the athlete's direction ('this was all guess work'). "
+                "Every observation in those entries is untouched — and the observations are what "
+                "proved the case, twice over: the 2026-07-31 'immediately lateral to the spine' "
+                "was the correct location all along, and the 2026-07-21 note about scapular work "
+                "missing from the daily templates was correct and was wrongly overruled.",
+                "UNRECORDED OBSERVATION RECOVERED — the athlete noticed the week of 2026-08-03 "
+                "that it felt better AFTER face pulls than before. His notes for that period "
+                "were lost, so this entry is its only record. Face pulls are rhythmic contraction "
+                "of the congested group, i.e. the same pump as walking applied directly.",
+                "This dissolves an apparent contradiction rather than adding one: acute relief "
+                "from face pulls and an eight-hour daily load answer different questions. The "
+                "scapular work was never failing — it simply was not aimed at the driver.",
+                "METHOD NOTE for future entries: 'five days a week of scapular work' was taken "
+                "from training_plan.py and was false in the log. Verify a dose against "
+                "training_exercises, never against the plan.",
+                "The physiotherapist is not available on demand — possibly not until September or "
+                "later (athlete, 2026-08-13). Everything in `plan` above is self-directed and "
+                "already cleared; none of it waits on a visit.",
             ],
         },
     ],
