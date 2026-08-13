@@ -80,11 +80,23 @@ the physiotherapist *before* authoring the next block. Full context in
    start was ~9 days later, so the timeline needs re-deriving rather than
    re-using. Note `historical_injuries_low_weight`'s carve-out: the left
    Sartorius strain recurred once, so running volume progresses conservatively.
-3. **Endurance-biased scapular programming** — the interscapular symptom
-   persists through a five-day-a-week scapular dose, so the gap is endurance
-   under sustained low-load holding, not volume. Long isometric holds are a
-   prescription change, hence a physio decision. Brief prepared:
-   `docs/training/physio_brief_2026-08-16.md`.
+3. **Endurance-biased scapular programming** — the symptom persists through the
+   scapular dose that is actually being run, so the gap is not volume. Long
+   isometric holds are a prescription change, hence a physio decision. Brief
+   prepared: `docs/training/physio_brief_2026-08-16.md`.
+   **⚠ Two corrections, 2026-08-13, both already in CLAUDE.md** — do not
+   re-derive the originals. (a) *"a five-day-a-week scapular dose"* is **false**:
+   the log says **4, then 3, then 2, then 2**. That figure came from
+   `training_plan.py` rather than `training_exercises`; verify a dose against
+   the log, and rebuild the datastore snapshot first. The conclusion survives —
+   Wall Slide ran 2026-08-11, Face Pull 2026-08-12, and **2026-08-12 is the
+   worst day on record** — only the arithmetic was inflated. (b) The mechanism
+   is **perfusion, not endurance capacity**: the tissue is named as left
+   trapezius, position-loaded, where sustained low-level contraction occludes
+   flow. That reframes the ask — see `physio_brief_2026-08-16.md` **§10b**, added
+   2026-08-13, where the primary tendon literature says **four 3-second efforts
+   beat one 12-second hold at matched loading time** and intensity rather than
+   duration is the variable.
 
 A **fourth workstream** lands the same day, and it is ours rather than the
 physiotherapist's: the flexibility cluster session joins the new block as
@@ -147,6 +159,38 @@ than cutting it:** `patient_profile.py:439` says *"5-minute release block before
 every session"* and the coded doses drifted to 16–22 min. Indicative split —
 phase 1 ≈ 5 min (the profile's own figure), phase 2 ≈ 5–10 min. The ceiling is
 the athlete's; the split inside it is the physiotherapist's.
+
+**⚠ Corrected 2026-08-13 — the "~30 min working portion" above is short.**
+`services/sessions.py`'s `estimate_duration` **never reads `laterality`**, so
+every gym session's estimate omits the second side of every unilateral exercise
+— **5.5–6.9 minutes each**. The real working portion is **~41–47 min**, not ~30.
+This makes the 10–15 min lock **better** supported, not worse: preparation moves
+from 25–33% of the session to 18–27%. **The ceiling is unchanged and is not
+re-opened.** Recorded so the next person to do this arithmetic does not
+"discover" a discrepancy and re-litigate a settled decision. Detail in
+`docs/training/rest_interval_evidence_review_2026-08-13.md` §0.2 and §3.5.
+
+A **sixth workstream**, also ours: **rest intervals, reviewed 2026-08-13.**
+`docs/training/rest_interval_evidence_review_2026-08-13.md` is REQUIRED READING
+before the block is authored, in Key Rule 11's gate beside the warm-up review
+and on the same EVENT-not-date basis. It answers a question the athlete asked
+three days before Day 28 — should rest go to 3–5 min, and should the right and
+left sides of a unilateral exercise be separated — and **the premise turned out
+to be the finding**: there is no rest timer on the right→left transition, so the
+other side's working time IS the first side's rest, and actual per-side rest is
+**75–105 s rather than the coded 45–60**. Both proposals are refused on evidence
+and priced (**+9/+9/+11 min** for the split, against a pooled non-local-fatigue
+effect of **SMD −0.02**; **+23.5 min** for 3–5 min, against an ACSM 2026
+umbrella review that issues no rest prescription at all). **One change is
+supported: 90 s → 120–180 s on Goblet Squat and RDL, Stage 2B only, once the
+loads are genuinely near-maximal** — it costs 1–3 min and does not apply at the
+current 12.5 kg. **It is blocked on a per-set rest field that does not exist**,
+for the same reason the ramp sets are blocked on the warm-up flag: `session_au`
+comes from RPE, short rest inflates RPE without changing work, and the two are
+indistinguishable in the data. **Both fields land in one migration.** The review
+also raises a Day 28 question for the physiotherapist about the isometric hold
+*structure* — see `physio_brief_2026-08-16.md` §10b — and it competes for the
+same clock as phase 2, so sequence phase 2 first.
 
 ---
 

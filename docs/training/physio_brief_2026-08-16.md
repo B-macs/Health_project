@@ -305,6 +305,65 @@ a breach without capping volume). Restoring hard enforcement is a
 software-side decision the athlete controls, and it needs no prescription
 change.
 
+### 10b. Added 2026-08-13 — the primary literature, and it changes the shape of the ask
+
+*Source: `docs/training/rest_interval_evidence_review_2026-08-13.md` §1.8 and
+§2.4, which went to the primary trials rather than the popular summary §10 was
+built from. Two things above are refined rather than overturned, and one row of
+§10's fit table is now stale.*
+
+**§10's "ten minutes then refractory" is cell culture, not human tendon.**
+Paxton et al. 2012 is an **in vitro engineered ligament** (ERK1/2 maximal at 10
+min of stretch, refractory up to 6 h). It is the sole origin of that rule.
+Robling 2001, sometimes cited beside it, is **rat bone**. The argument for
+short frequent doses may still be right; it should be presented as mechanistic
+reasoning, not as a measured human finding.
+
+**Hold STRUCTURE has better evidence than hold DURATION, and it points the
+other way from a long hold.** In humans, at **matched total loading time**:
+
+| Study | Design | Finding |
+|---|---|---|
+| Bohm et al. 2014, *J Exp Biol* 217(22):4010-7 | n=39, 14 wk, loading time matched | **Four 3-second contractions with 3-s rests: stiffness +57%, modulus +51%. One 12-second hold: +25% and +17%** (p=0.025, p=0.021). **The long hold was worse.** |
+| Kubo et al. 2001, *J Physiol* 536:649-55 | n=8, 12 wk, volume-matched | 20-s holds raised stiffness; **1-s contractions did not**, despite equal strength and hypertrophy gains. Sets a **floor** on contraction duration. |
+| Tsai et al. 2024, *Sci Rep* 14:6875 | n=52, 16 wk, five protocols | 90% MVC, **4 × 3 s per set, 2 min between sets**, total loading **180–300 s per WEEK**. Temporal coordination of loading and recovery did **not** affect outcomes; **low volume beat high volume** for stiffness (p=0.04). |
+| Bohm et al. 2015, *Sports Med Open* 1:7 | Meta-analysis, 27 studies | **Intensity is the variable, not duration:** >70% MVC gives stiffness **SMD 0.90 [0.71, 1.08], I²=0%**; ≤70% gives **0.04 [−0.46, 0.53]** (difference p<0.00001). No rest-interval guidance exists anywhere in the review. |
+
+**The 45-second hold has less behind it than its currency suggests.** It
+originates in Rio et al. 2015 — **n=6**, in-season volleyball, and about
+**analgesia rather than adaptation**. §10 already notes it has not replicated;
+the specifics are worth having: Holden 2020 (n=21, not sustained at 45 min),
+**van der Vlist 2020 (n=91, outright null** on essentially the same dose), and
+Clifford 2020 (meta-analysis, 10 RCTs, n=294, p=0.19). The **30-second** hold
+traces to a single **n=1** case study. We are not arguing against isometrics —
+only against the assumption that a specific hold length is what the literature
+prescribes.
+
+**⚠ §10's interscapular row is now stale.** It reads *"the consolidated finding
+is muscular endurance, not tendinopathy."* The 2026-08-13 discriminating tests
+(see the §2 correction banner) name the tissue as **left trapezius,
+position-loaded and perfusion-limited** — the mechanism is occlusion under
+sustained low-level contraction, not endurance capacity. Movement, face pulls
+and heat all relieve it; eight hours of holding does not; and a shrug held
+20–30 s in the provocative position is worse *after* release, i.e. on
+reperfusion. That is the physio's own 2026-08-10 "positional ischemic cramp"
+mechanism in a different muscle.
+
+**So the question we would like settled is narrower than §1's.** Not *may we
+lengthen the holds* — that was asked and answered — but:
+
+> **Are the scapular holds intended as tendon-adaptation work?** If yes, the
+> human evidence favours **short repeated high-intensity efforts** (4 × 3 s at
+> >70% MVC) over a sustained hold at the same total loading time — and given
+> the tissue is perfusion-limited, a sustained hold is also the exposure the
+> symptom is provoked by. If they are intended as something else (motor
+> control, positional tolerance, or the analgesic effect), the duration
+> question is a different one and the tendon literature does not govern it.
+
+**Nothing in `training_plan.py` is changed by this.** Hold durations are
+unchanged everywhere, as recorded on 2026-08-10. This is a question for the
+sitting, not a proposal.
+
 ## 11. Flexibility baseline, 2026-08-05 — its dosing number was removed 2026-08-10
 
 Added 2026-08-05. The athlete rated all 22 poses of a 15-minute hip/spine yoga
