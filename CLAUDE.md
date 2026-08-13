@@ -27,7 +27,7 @@ Run after every change before committing:
 python -m pytest tests/
 ```
 
-Expected: **2673/2673 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests)
+Expected: **2691/2691 passed** (or higher — this count grows as tests are added; treat it as a floor, not an exact match. Measure the number for a commit message against the committed tree only — a shared working tree can carry another session's uncommitted tests. Re-measured against `e067cf5` on 2026-08-13; the floor had drifted 18 behind. **A CONCURRENT SESSION IS THE NORMAL CASE, not the exception** — a reading of 2686 taken minutes earlier was correct for its own commit and looked like flakiness until `git log` showed another session had landed `tests/test_no_replay_unsafe_cached_elements.py` (+5) in between. Before diagnosing a changed count as non-determinism, run `git log --oneline -4`.)
 
 - Never delete or weaken a test to make the gate pass.
 - Never weaken a `services/rules.py` guardrail.
@@ -304,7 +304,7 @@ Reference data:
                            services/bioage.py (PROFILE["imbalances"], for the
                            muscle-imbalance count)
 
-tests/       — pytest suite (1602 tests), the sole deterministic gate
+tests/       — pytest suite (2691 tests), the sole deterministic gate
 _pages/      — removed; SPA router handles all routing; Streamlit 1.36+ auto-detects this dir
 scripts/     — one-shot CLI tools (init_notion.py, backfill_oura_history.py,
                backfill_garmin_sleep_stages.py — probe before spending calls)
