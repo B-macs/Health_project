@@ -421,6 +421,23 @@ visible to the very next read.
   than raising, so the app would render as though nothing had ever been
   logged. An EXISTING cache is never silently replaced; refresh it
   deliberately with `scripts/pull_datastore_from_supabase.py`.
+- **⚠ Nothing inside `get_repository()` may call `st.toast` (or
+  `st.chat_input`) — fixed 2026-08-13, and it took the hosted app down.** A
+  cache-decorated function RECORDS the st elements it emits and REPLAYS them on
+  every later cache hit, and the replay seeds its DeltaGenerator map with the
+  main and sidebar containers ONLY. Toast renders on the EVENT container, so
+  the lookup raises `KeyError` and Streamlit re-raises it as
+  `CacheReplayClosureError` — at `app.py`'s first line of work, on the SECOND
+  script run and every one after. **The failure is shaped to hide**: it fires
+  only where the hydration actually runs (cache mode, after a redeploy wiped
+  the disk), i.e. only on the hosted deploy and never in a local checkout; the
+  first paint looks healthy and the first navigation dies, which reads as "the
+  Training page is broken" when nothing in `views/training.py` is involved. The
+  notice is now recorded by `repo.pop_cache_hydration_notice()` and rendered by
+  the CALLER. Ordinary elements (`st.warning`, `st.write`) replay fine — this
+  is not a general ban on drawing from a cached function.
+  `tests/test_no_replay_unsafe_cached_elements.py` AST-scans the whole app for
+  the pattern, because no local run reproduces it.
 
 ## Supabase — a live MIRROR, never a read path
 

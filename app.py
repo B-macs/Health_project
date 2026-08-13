@@ -52,8 +52,25 @@ st.markdown(nav.CHROME_CSS, unsafe_allow_html=True)
 # BEFORE the router, so it appears at the top of every page: an app that
 # looks live while serving a snapshot of last night's sleep is the one
 # failure this mode must never produce silently. Costs nothing when unset.
-if repo.get_repository().offline:
-    _built = repo.get_repository().datastore_built_at() or "unknown"
+#
+# This is also the first touch of the Repository in any script run, which is
+# where cache mode hydrates datastore.db from Supabase if a redeploy wiped the
+# disk. Bind it once, THEN drain the notice: the hydration happens inside the
+# call, so popping before it would find nothing on the very run that rebuilt
+# and fire the toast a run late. Rendered here rather than inside
+# get_repository because a toast emitted from a cache-decorated function is
+# replayed on every later cache hit and raises CacheReplayClosureError — see
+# repo.get_repository's docstring. Outside the offline branch, deliberately:
+# `offline` is False in cache mode (Repository.offline is
+# `datastore_mode != "cache"`), and cache mode is the only mode that hydrates.
+_repository = repo.get_repository()
+
+_hydration_notice = repo.pop_cache_hydration_notice()
+if _hydration_notice:
+    st.toast(_hydration_notice)
+
+if _repository.offline:
+    _built = _repository.datastore_built_at() or "unknown"
     st.warning(
         f"**Offline** — reading the local datastore, not Google Sheets. "
         f"Snapshot built {_built}. Writes are disabled and today's data may "
