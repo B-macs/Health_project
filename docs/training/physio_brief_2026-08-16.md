@@ -132,27 +132,34 @@ was read off `training_plan.py`. **The log says otherwise.** Counted from
 | 07-20 → 07-26 | **4** | Face Pull; Pulldown + Row; Wall Slide; Y-Raise + Wall Slide |
 | 07-27 → 08-02 | **3** | Face Pull; Pulldown + Row; Wall Slide |
 | 08-03 → 08-09 | **2** | Face Pull; Pulldown + Row |
-| 08-10 → | **0** | — |
+| 08-10 → (in progress) | **2** | Wall Slide (08-11); Face Pull (08-12) |
 
-Never five, and **declining**. **Scapular Wall Slide last ran 2026-07-31;
-Prone Y-Raise last ran 2026-07-24** — both gone a fortnight. Only the loaded
-gym pulls survive, on gym days. The cause is visible: there are two
-active-recovery templates, only one carries Wall Slide, and only the one
-*without* it has run since July.
+**Never five** — that figure came from `training_plan.py`, not the log.
 
-**This inverts the old conclusion.** The two items that dropped out are exactly
-the low-load holding ones — the work closest to what this symptom needs — and
-the worst day on record (2026-08-12) fell in the week with zero. So *"an
-endurance gap, not a volume gap"* rested on a false premise: **volume was never
-actually ruled out.**
+**But the conclusion built on it survives, and is if anything strengthened.**
+Scapular Wall Slide ran **2026-08-11** and Face Pull **2026-08-12** — and
+2026-08-12 is the **worst day on record** (tightness 3, pain 1, the first pain
+above 0/10 in three weeks). The symptom peaked the day after a wall-slide
+session and on the same day as face pulls. So *"the symptom persists through
+that dose"* holds. Only the arithmetic was inflated.
 
-The mechanism is also sharper than "endurance". Testing on 2026-08-13 (see
-`patient_profile.py` `symptom_log` 2026-08-13) points to **perfusion**:
-sustained low-level contraction occludes flow, which is why movement, face
-pulls and heat all relieve it while eight hours of holding does not.
+**One genuine omission:** **Prone Y-Raise, last run 2026-07-24** — three weeks
+stale. Wall Slide and Face Pull are both current.
 
-**Method note:** the original figure came from the plan, not the log. Verify a
-dose against `training_exercises`.
+The mechanism is sharper than "endurance", which refines this rather than
+refuting it. Testing on 2026-08-13 (see `patient_profile.py` `symptom_log`
+2026-08-13) points to **perfusion**: sustained low-level contraction occludes
+flow, which is why movement, face pulls and heat all relieve it while eight
+hours of holding does not — and why an adequate dose of short high-quality
+sets can coexist with a persisting symptom.
+
+**⚠ Method note, which cost a wrong conclusion.** The original figure came
+from the plan rather than the log. The first attempt to correct it then counted
+off a datastore snapshot built **two days earlier**, reported "0 scapular days
+this week", and briefly overturned the correct conclusion above — the missing
+rows being the two most recent sessions. Verify a dose against
+`training_exercises`, **and rebuild the snapshot first**
+(`scripts/build_datastore.py`).
 
 ## 5. Four converging drivers
 

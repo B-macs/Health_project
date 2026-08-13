@@ -80,8 +80,15 @@ is NOT duplicated here — see Input_files/stage1_recent_data_summary.md.
   of the 2026-08-03 entry is now MEASURED rather than inferred (at matched lift
   height the left works harder than the right — that is why it is the left);
   and "five days a week of scapular work" IS FALSE — the log says 4, then 3,
-  then 2, then 0, with Scapular Wall Slide last run 2026-07-31 and Prone
-  Y-Raise last run 2026-07-24, so VOLUME WAS NEVER RULED OUT. Training is
+  then 2, then 2, a figure taken from training_plan.py rather than from
+  training_exercises. NOTE the second half of that claim was itself corrected
+  the same day: a first pass counted off a two-day-stale datastore snapshot,
+  read "0 scapular days this week", and wrongly overturned the 2026-08-03
+  entry's "the symptom persists through the dose" — which is CORRECT. Scapular
+  Wall Slide ran 2026-08-11 and Face Pull 2026-08-12, and 2026-08-12 is the
+  worst day on record (first pain above 0/10 in three weeks). Prone Y-Raise,
+  last run 2026-07-24, is the one genuine omission. REBUILD THE SNAPSHOT
+  BEFORE COUNTING. Training is
   exonerated by the log (six interscapular reports, six weekdays; three clean
   weekends; a 10km hike with no symptoms), which also means running is not
   implicated for Stage 2B. The tendon question is answered LESS LIKELY, NOT
@@ -937,19 +944,26 @@ PROFILE = {
                     "load B. ***"
                 ),
                 "underlying_pattern": (
-                    "REPLACED 2026-08-13 — the old text read 'NOT a volume gap, an ENDURANCE "
-                    "gap', resting on the claim that scapular work runs five days a week and the "
-                    "symptom persists through it. THE PREMISE IS FALSE ON BOTH HALVES. Counted "
-                    "from the training log on 2026-08-13, Stage 2A ran scapular work on 4 days "
-                    "in week 1, then 3, then 2, then 0 — never five, and DECLINING. Scapular "
-                    "Wall Slide last ran 2026-07-31 and Prone Y-Raise last ran 2026-07-24; only "
-                    "the loaded gym pulls survive. The two items that dropped out are precisely "
-                    "the low-load holding ones, i.e. the ones closest to what this symptom needs, "
-                    "and the worst day on record (2026-08-12) fell in the week with zero. "
-                    "VOLUME WAS THEREFORE NEVER ACTUALLY RULED OUT — do not treat it as settled. "
-                    "The mechanism is also sharper than 'endurance': see the 2026-08-13 entry, "
-                    "which finds a PERFUSION pattern (sustained low-level contraction is "
-                    "ischaemic; movement and heat relieve it) rather than a capacity shortfall."
+                    "AMENDED 2026-08-13, then CORRECTED THE SAME DAY against fresh data — read "
+                    "the correction, because the first pass overturned this entry wrongly.\n"
+                    "WHAT IS WRONG HERE: the 'five days a week' figure. Counted from the log, "
+                    "Stage 2A actually ran scapular work on 4 days in week 1, then 3, then 2, "
+                    "then 2 — never five. That number came from training_plan.py rather than "
+                    "from training_exercises.\n"
+                    "WHAT IS RIGHT HERE, and was briefly and wrongly overturned: 'the symptom "
+                    "persists THROUGH that dose'. It does. Scapular Wall Slide ran 2026-08-11 "
+                    "and Face Pull ran 2026-08-12 — and 2026-08-12 is the worst day on record "
+                    "(tightness 3, pain 1). The symptom peaked the day after a wall-slide "
+                    "session and on the same day as face pulls. So the endurance-over-volume "
+                    "reading STANDS on its substance; only its arithmetic was inflated.\n"
+                    "THE ONE GENUINE OMISSION: Prone Y-Raise, last run 2026-07-24 and three "
+                    "weeks stale. Wall Slide and Face Pull are both current.\n"
+                    "The mechanism is nonetheless sharper than 'endurance' — see the 2026-08-13 "
+                    "entry, which finds a PERFUSION pattern (sustained low-level contraction is "
+                    "ischaemic; movement, face pulls and heat all relieve it) rather than a "
+                    "capacity shortfall. That refines this entry rather than refuting it, and it "
+                    "explains why the dose can be adequate and the symptom persist anyway: short "
+                    "high-quality sets pump the tissue for minutes, against eight hours of load."
                 ),
             },
 
@@ -995,16 +1009,18 @@ PROFILE = {
                 "2026-07-21 on. A bilateral migrating presentation favours a postural-endurance "
                 "driver over a discrete left-sided strain, and the left-lateralised framing is "
                 "what obscured that.",
-                "CORRECTION 3 — ITSELF RETRACTED 2026-08-13, and it had the argument backwards. "
-                "It claimed the 2026-07-21 entry was wrong that scapular work sits in the gym "
-                "sessions rather than the daily templates, citing PLAN_STAGE2's five prescribed "
-                "days. But the PLAN is not the LOG. Counted from training_exercises on "
-                "2026-08-13: 4 scapular days in week 1, then 3, then 2, then 0. Scapular Wall "
-                "Slide last ran 2026-07-31; Prone Y-Raise last ran 2026-07-24. There are two "
-                "active-recovery templates, only one carries Wall Slide, and only the one "
-                "WITHOUT it has run since July — which is exactly the gap the 2026-07-21 entry "
-                "identified. That entry was right and this correction was wrong. The lesson is "
-                "general: never verify a dose against training_plan.py when the log is queryable.",
+                "CORRECTION 3 — PARTLY RETRACTED 2026-08-13. Its FIGURE is wrong: it cited "
+                "PLAN_STAGE2's five prescribed days, but the plan is not the log, and "
+                "training_exercises shows 4 scapular days in week 1, then 3, then 2, then 2. "
+                "Its CONCLUSION stands: scapular work does run through the symptom. Wall Slide "
+                "ran 2026-08-11 and Face Pull 2026-08-12, and 2026-08-12 is the worst day on "
+                "record. Prone Y-Raise is the one real omission, last run 2026-07-24. The "
+                "lesson is general: never verify a dose against training_plan.py when the log "
+                "is queryable — AND make sure the log you query is current. An earlier pass on "
+                "2026-08-13 counted off a datastore snapshot built two days prior, concluded "
+                "'0 scapular days this week', and overturned this correction on that basis. "
+                "Both the 2026-08-11 and 2026-08-12 sessions were missing from that snapshot. "
+                "Rebuild before counting: scripts/build_datastore.py.",
                 "CONVENTION CHANGED 2026-08-13, at the athlete's direction — 'this was all guess "
                 "work; what we are doing now should overwrite that as it is real planning and "
                 "tests.' The append-only rule no longer applies to ASSESSMENTS: reasoning that "
@@ -1497,7 +1513,16 @@ PROFILE = {
                     "A 10km weekend hike — no symptoms at all",
                 ],
                 "neural":   "None — no arm symptoms, numbness or tingling",
-                "severity": "Unchanged: tightness 1-3/10, pain 0/10. Worst day on record 2026-08-12.",
+                "severity": (
+                    "Tightness 1-3/10 throughout. Pain had been 0/10 on every check-in since "
+                    "2026-07-23 — and 2026-08-12 broke that at PAIN 1/10, tightness 3, the worst "
+                    "day on record. Still low, but it is the first movement off zero in three "
+                    "weeks and is the number to watch. That day's check-in, verbatim: 'Left side "
+                    "between the shoulder blade and the spine, was ok in the morning but now "
+                    "tired after working until 2pm' — sensation tags Dull Ache and Mild "
+                    "Tiredness. Note it says the morning was OK, which is contemporaneous and "
+                    "more reliable than the same-day recollection of being sore before the walk."
+                ),
             },
 
             "assessment": {
@@ -1612,11 +1637,10 @@ PROFILE = {
                 "2026-08-03 entry and was simply mistimed.",
                 "HEAT is now a tool as well as evidence — it abolished the symptom on 2026-08-12 "
                 "and does so for the right reason.",
-                "REINSTATE THE LOW-LOAD SCAPULAR HOLDS that have silently dropped out — Scapular "
-                "Wall Slide (last run 2026-07-31) and Prone Y-Raise (last run 2026-07-24). Only "
-                "one of the two active-recovery templates carries Wall Slide and only the one "
-                "WITHOUT it has run since July. This is the item closest to the symptom and it "
-                "is the one that disappeared.",
+                "REINSTATE PRONE Y-RAISE — last run 2026-07-24 and the one scapular item that "
+                "has genuinely lapsed. Scapular Wall Slide (2026-08-11) and Face Pull "
+                "(2026-08-12) are both current, so this is a single gap, not the collapse an "
+                "earlier reading of stale data claimed.",
                 "LOAD IN NEUTRAL, NEVER IN THE PROVOCATIVE POSITION — neutral retraction is "
                 "asymptomatic, the shrug in the head-down-and-right position is not.",
                 "TENDON LOADING, recorded here for the SHOULDER work at the athlete's direction "
@@ -1657,9 +1681,19 @@ PROFILE = {
                 "This dissolves an apparent contradiction rather than adding one: acute relief "
                 "from face pulls and an eight-hour daily load answer different questions. The "
                 "scapular work was never failing — it simply was not aimed at the driver.",
-                "METHOD NOTE for future entries: 'five days a week of scapular work' was taken "
-                "from training_plan.py and was false in the log. Verify a dose against "
-                "training_exercises, never against the plan.",
+                "METHOD NOTE, and it cost a wrong conclusion the same day it was written. "
+                "'Five days a week of scapular work' was taken from training_plan.py and is "
+                "false in the log (4/3/2/2). But the first attempt to correct it counted off a "
+                "datastore snapshot built two days earlier, reported '0 scapular days this "
+                "week', and used that to overturn the 2026-08-03 entry's 'the symptom persists "
+                "through the dose' — which is CORRECT and should not have been overturned. The "
+                "missing rows were 2026-08-11 (Scapular Wall Slide) and 2026-08-12 (Face Pull), "
+                "i.e. the two most recent sessions, and 2026-08-12 is the worst symptom day on "
+                "record. So: verify a dose against training_exercises rather than the plan, AND "
+                "rebuild the snapshot first (scripts/build_datastore.py). A stale local read "
+                "does not look like an error, it looks like absent data — the exact failure "
+                "mode the offline datastore was introduced to prevent, arriving by the other "
+                "door.",
                 "The physiotherapist is not available on demand — possibly not until September or "
                 "later (athlete, 2026-08-13). Everything in `plan` above is self-directed and "
                 "already cleared; none of it waits on a visit.",
