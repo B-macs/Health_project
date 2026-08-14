@@ -2456,6 +2456,48 @@ RIGHT_HIP_CAPSULE_5MIN = _ex(
     regression="Still felt at the front → reduce the range further; the flat back beats the depth.",
 )
 
+ANTERIOR_HIP_RELEASE = _ex(
+    name="Anterior Hip Pressure Release",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=1, hold_seconds=60, rest_seconds=0,
+    mechanics=(
+        "Only run this once the daily front-of-hip protocol has shown tender points that "
+        "actually quiet down — if two weeks of it found nothing to respond to, skip this and "
+        "record that, because the null is the finding. "
+        "Lie face down with a massage ball between the floor and the front of the hip, on the "
+        "meaty pocket-corner just below and outside the point of the hip bone. Settle your "
+        "weight onto it slowly and wait 60 seconds, breathing, until the tissue lets go under "
+        "you. Then a few slow knee-bends of that leg with the pressure still on. "
+        "GO STRAIGHT TO THE OTHER SIDE — no pause between right and left. "
+        "One zone per side here; the second zone stays in the daily protocol, which has the "
+        "time for it."
+    ),
+    biomechanical_focus=(
+        "The one overactive structure in the profile with no release anywhere in the block "
+        "until now. The MRI names psoas and hip-flexor hypertonicity as what amplifies the "
+        "L5/S1 compression, and 'deep right hip flexors / TFL' sits on the overactive list — "
+        "yet the release block inhibited the glute medius, the piriformis and the posterior "
+        "capsule and left the front of the hip alone. Added on the physiotherapist's own "
+        "recommendation (2026-08-10): sustained pressure at the front of the hip, to release "
+        "the pressure from sitting. Six to eight hours a day holds this tissue short; that is "
+        "wear, not training, and part of the seated tilt deficit is held TONE rather than "
+        "tissue length."
+    ),
+    progression=("Tender points quieting and standing up straight after sitting getting easier "
+                 "→ it is working; the daily protocol keeps doing the volume."),
+    regression=("Nothing tender to find, or no change after four weeks → retire it and record "
+                "the null. It would mean the sitting-tone hypothesis is wrong for this body."),
+    warning=(
+        "THE SHARP EDGE OF THIS ONE. The inner front of the hip carries the leg's main artery "
+        "and nerve. NEVER press anywhere you can feel a pulse. Stop immediately on any "
+        "tingling, numbness or electric feeling down the leg. Stay on the OUTER half of the "
+        "front of the hip, on tissue that pushes back like muscle — the crease at the very "
+        "front, middle third, is off-limits entirely. Pain never above 2/10."
+    ),
+)
+
+
 # ─── PHASE 2: wake things back up.  NEW — the deliverable of this block ──────
 #
 # JOB A (restore) runs in every session and is what "mandatory" means: undo the
@@ -2785,11 +2827,27 @@ def _s2b_prep(lower: bool) -> list:
     return [PREP_RAISE, PREP_SCAPULAR, PRONE_Y_RAISE]
 
 
-def _s2b_release(hip_loaded: bool) -> list:
+def _s2b_release(hip_loaded: bool, anterior: bool = False) -> list:
     """Phase 1. Capsule stretch FIRST on hip-loaded days, pressure releases
-    after it — the warm-up review's free win. About 5 min, 7.5 on hip days."""
+    after it — the warm-up review's free win. About 5 min, 7.5 on hip days,
+    9.5 once the anterior-hip item joins in week 3.
+
+    `anterior` adds the front-of-hip release, and it is deliberately NOT on from
+    day 1. The daily protocol that establishes whether there is anything there
+    to release cannot start until the day after the flexibility battery is
+    captured, because the seated tilt is the battery's central measurement and
+    starting a new intervention first would contaminate it. Two weeks of that
+    protocol lands in week 3, which is when this appears — gated on the
+    protocol's own verdict rather than on the calendar, which is why the
+    condition is written into the exercise's own text.
+
+    It is also off on the day-28 assessment: that screen's value is
+    comparability with the Stage 1 and Stage 2A versions of itself, and a new
+    hip-flexor release immediately before a hinge assessment would move the
+    number for a reason that has nothing to do with the athlete."""
     head = [RIGHT_HIP_CAPSULE_5MIN, COXA_SALTANS_DRILL] if hip_loaded else []
-    return head + [UPPER_GLUTE_RELEASE_5MIN, PIRIFORMIS_PNF_5MIN]
+    tail = [ANTERIOR_HIP_RELEASE] if anterior else []
+    return head + [UPPER_GLUTE_RELEASE_5MIN, PIRIFORMIS_PNF_5MIN] + tail
 
 
 def _s2b_gym_a(week: int) -> dict:
@@ -2822,7 +2880,8 @@ def _s2b_gym_a(week: int) -> dict:
         "session_rpe_target": 7 if week == 4 else 6,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _s2b_release(hip_loaded=True) + _s2b_prep(lower=True) + ramp + [
+        "exercises": _s2b_release(hip_loaded=True, anterior=week >= 3)
+                      + _s2b_prep(lower=True) + ramp + [
             _ex(
                 name="Goblet Squat",
                 ex_type="reps",
@@ -3122,14 +3181,15 @@ def _s2b_band_b(week: int) -> dict:
 # three; one variable moves at a time.
 
 def _s2b_run(day_label: str, name: str, minutes: int, mechanics: str,
-             focus: str, progression: str, regression: str, rpe: int = 4) -> dict:
+             focus: str, progression: str, regression: str, rpe: int = 4,
+             anterior: bool = False) -> dict:
     return {
         "objective": f"Stage 2B — {day_label}",
         "phase": _S2B_PHASE,
         "session_rpe_target": rpe,
         "is_gym_session": False,
         "day_type": "stretch",
-        "exercises": _s2b_release(hip_loaded=True) + [
+        "exercises": _s2b_release(hip_loaded=True, anterior=anterior) + [
             PREP_RAISE, PREP_GLUTE_ACTIVATION,
             _ex(
                 name=name,
@@ -3201,7 +3261,7 @@ _RUN_DAYS = {
 def _s2b_run_day(day: int) -> dict:
     label, name, minutes, mech, focus, prog, regr, *rest = _RUN_DAYS[day]
     return _s2b_run(label, name, minutes, mech, focus, prog, regr,
-                    rpe=rest[0] if rest else 4)
+                    rpe=rest[0] if rest else 4, anterior=day >= 15)
 
 
 def _s2b_mobility(week: int, away: bool = False) -> dict:
@@ -3313,7 +3373,7 @@ def _s2b_cluster(week: int) -> dict:
         "session_rpe_target": 4,
         "is_gym_session": False,
         "day_type": "stretch",
-        "exercises": _s2b_release(hip_loaded=True) + [PREP_RAISE] + [
+        "exercises": _s2b_release(hip_loaded=True, anterior=week >= 3) + [PREP_RAISE] + [
             _ex(
                 name="Cluster A Flexibility Session",
                 ex_type="duration",

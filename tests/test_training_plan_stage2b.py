@@ -337,3 +337,60 @@ def test_the_cluster_starts_in_week_two_not_week_one():
                            for e in PLAN[d]["exercises"])]
     assert min(cluster_days) > 7, cluster_days
     assert len([d for d in cluster_days if d <= 14]) == 1, "week 2 gets exactly one"
+
+
+# ── the anterior-hip release ────────────────────────────────────────────────
+
+ANTERIOR = "Anterior Hip Pressure Release"
+_ANTERIOR_DAYS = [d for d in DAYS
+                  if any(e["name"] == ANTERIOR for e in PLAN[d]["exercises"])]
+
+
+def test_the_block_releases_the_front_of_the_hip_at_all():
+    """The gap this closes. The MRI names psoas/hip-flexor hypertonicity as what
+    amplifies the L5/S1 compression and "deep right hip flexors / TFL" sits on
+    the overactive list — yet the release block inhibited the glute medius, the
+    piriformis and the posterior capsule and left the front of the hip alone.
+    Stage 1 had three hip-flexor items; all three vanished at the 2A transition
+    and nothing replaced them until now."""
+    assert _ANTERIOR_DAYS, "no anterior-hip release anywhere in the block"
+
+
+def test_it_waits_for_week_three():
+    """The daily protocol that establishes whether there is anything there to
+    release cannot start until the day after the battery is captured — the
+    seated tilt is the battery's central measurement. Two weeks of that lands in
+    week 3."""
+    assert min(_ANTERIOR_DAYS) >= 15, _ANTERIOR_DAYS
+
+
+def test_it_is_off_on_the_assessment_day():
+    """Day 28's whole value is comparability with the Stage 1 and Stage 2A
+    versions of the same screen. A new hip-flexor release immediately before a
+    hinge assessment moves the number for a reason that is not the athlete."""
+    assert 28 not in _ANTERIOR_DAYS
+
+
+def test_no_pause_between_right_and_left():
+    """Athlete's instruction, 2026-08-14. One set per side and zero rest, so
+    there is no pause anywhere in it — which also matches how the guided flow
+    already behaves, since the right-to-left transition has no rest timer."""
+    ex = tp.ANTERIOR_HIP_RELEASE
+    assert ex["sets"] == 1
+    assert ex["rest_seconds"] == 0
+    assert ex["laterality"] == "unilateral"
+
+
+def test_it_carries_the_neurovascular_warning():
+    """The sharp edge of this protocol: the inner front of the hip carries the
+    leg's main artery and nerve. The warning is not optional decoration."""
+    warning = (tp.ANTERIOR_HIP_RELEASE["warning"] or "").lower()
+    assert "pulse" in warning
+    assert "artery" in warning or "nerve" in warning
+
+
+def test_it_counts_as_a_release_not_as_leg_loading():
+    """It leaves the tissue quieter than it found it, which is the opposite of
+    what the retest-spacing rule guards against."""
+    assert ANTERIOR in fx.RELEASE_EXERCISES
+    assert ANTERIOR in sess.RELEASE_EXERCISE_NAMES

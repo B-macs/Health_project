@@ -524,7 +524,48 @@ PROFILE = {
             "Right Posterior Hip Capsule Cross-Body Stretch — 3 × 60s right only",
             "Ischial Tuberosity Hamstring Release — 2 × 90s each side",
         ],
-        "add_when_right_hip_loaded": [
+        # ── AS BUILT IN STAGE 2B (2026-08-14) ────────────────────────────────
+    # The block runs this list at ~5 min, which is the dose this file has
+    # specified all along. Recording it here because two prescribed items are
+    # NOT in it, and an unexplained absence is indistinguishable from an
+    # oversight.
+    #
+    # WHAT RUNS, in order. Hip-loaded days: Right Posterior Hip Capsule Stretch
+    # (Revised Cue) 2 x 45 s right -> Coxa Saltans path drill 2 x 10 right ->
+    # Upper Glute / TFL Self-Release 1 x 90 s EACH SIDE -> Piriformis PNF 1 x 5
+    # cycles each side. From week 3, Anterior Hip Pressure Release 1 x 60 s each
+    # side with no pause between them. Other days: the last two only.
+    #
+    # The capsule stretch leads because it is the only >= 60 s stretch in the
+    # block, so the pressure releases sit between it and the first loaded rep.
+    #
+    # ⚠ TWO REMOVALS, both consequences of the 5-minute budget rather than
+    # clinical judgements, both owed to the physiotherapist at the next contact:
+    #
+    #   Ischial Tuberosity Hamstring Release (2 x 90 s each side = ~6 min).
+    #   Present in Stage 2A, absent in 2B. The physio CONFIRMED this site as
+    #   right for the proximal hamstring on 2026-08-10, so this is a real
+    #   trade-off and not a correction. REVERT: restore it the moment the
+    #   preparation budget grows, or if proximal hamstring symptoms return —
+    #   it costs 6 min at the prescribed dose, which is the whole budget, so
+    #   restoring it means something else leaves.
+    #
+    #   Hip-flexor work (Standing Hip Flexor Release, 90/90 Hip Flexor Hold).
+    #   Present in Stage 1, absent from Stage 2A onward, and nobody recorded
+    #   why. PARTLY REVERTED 2026-08-14: Anterior Hip Pressure Release now
+    #   covers the front of the hip from week 3, on the physio's own
+    #   2026-08-10 recommendation ("sustained-pressure testing for the FRONT
+    #   of the hip as well, to release the pressure from sitting — a candidate
+    #   for the pre-session release block at the next block build"). It is
+    #   sustained pressure rather than a stretch, and it is one zone per side
+    #   rather than the daily protocol's two.
+    #
+    # The daily front-of-hip protocol (docs/training/release_protocols_
+    # 2026-08-10.md, Protocol 2) continues alongside and is the larger dose:
+    # it runs on desk days, which is the exposure being treated, rather than
+    # only on the five days a week that carry a session.
+
+    "add_when_right_hip_loaded": [
             "Right Hip Tendon Path Drill (Coxa Saltans) — 2 × 10 reps right only",
         ],
     },
@@ -1836,6 +1877,27 @@ PROFILE = {
                      "written at that severity — it is now caution from stage 2, which is "
                      "what its own stage_cap and reason text always said.",
             "signed_off_by": "athlete (block design and the rules correction, 2026-08-14)",
+        },
+        {
+            "date": "2026-08-14",
+            "event": "ANTERIOR HIP PRESSURE RELEASE added to the pre-session release block "
+                     "from week 3 of Stage 2B, closing the physiotherapist's 2026-08-10 "
+                     "recommendation that sustained pressure at the FRONT of the hip be a "
+                     "candidate for the release block at the next block build. Found by the "
+                     "athlete asking whether the block contained a psoas release: it did not, "
+                     "and neither did Stage 2A — Stage 1's three hip-flexor items vanished at "
+                     "the 2A transition with no recorded reason, leaving the deep hip flexors "
+                     "the only structure on the overactive list with no release anywhere, "
+                     "while the MRI names psoas hypertonicity as what amplifies the L5/S1 "
+                     "compression. One zone, 60 s per side, NO PAUSE between right and left "
+                     "(athlete's direction). Week 3 rather than day 1 because the daily "
+                     "protocol that establishes whether there is anything there to release "
+                     "cannot start until after the flexibility battery is captured. Off on "
+                     "the day-28 screen, to keep it comparable with its own history. "
+                     "Measured cost: preparation goes 11.8 -> 13.8 min, inside the 15-minute "
+                     "ceiling, so nothing was cut to pay for it.",
+            "signed_off_by": "athlete (2026-08-14), on the physiotherapist's 2026-08-10 "
+                              "recommendation",
         },
     ],
 }

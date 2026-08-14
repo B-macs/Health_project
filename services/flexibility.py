@@ -383,6 +383,10 @@ RELEASE_EXERCISES: frozenset[str] = frozenset({
     # training day a leg day and leave no clean morning for a retest anywhere
     # in the calendar.
     "Walking Raise (Incline)",
+    # Sustained pressure at the front of the hip, added to the release block in
+    # week 3. Pressure release, not loading: it leaves the tissue quieter than
+    # it found it, which is the opposite of what the retest rule guards against.
+    "Anterior Hip Pressure Release",
 })
 
 #: Lower-body names that are CHEAP IN STRAIN BUT STILL WORK THE TESTED TISSUE.

@@ -11,8 +11,8 @@
 | Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
 | Block | **Stage 2B — 28-Day Block**, starts **2026-08-17** (`training_plan.PLAN_STAGE2B`, Phase 3) |
 | Day | Block A day 0 — starts Monday |
-| Gate | **2885/2885** — `python -m pytest tests/` |
-| Last code commit | Stage 2B built, with the two prerequisites it could not run without |
+| Gate | **2898/2898** — `python -m pytest tests/` |
+| Last code commit | Stage 2B built; anterior-hip release added to the release block from week 3 |
 | Next action | **Sun 16 Aug: run `PLAN_STAGE2[28]`, and take the first battery baseline that morning** |
 
 ### The two blocks, and why the dates are what they are

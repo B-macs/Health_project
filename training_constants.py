@@ -261,6 +261,9 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     # cluster loads. It DOES count as a leg day, deliberately -- a retest
     # the morning after a flexibility session is a contaminated reading.
     "Cluster A Flexibility Session",
+    # Sustained pressure at the front of the hip. A release, not loading — it
+    # is in services/flexibility.RELEASE_EXERCISES for exactly that reason.
+    "Anterior Hip Pressure Release",
 )
 
 EXERCISE_BODY_REGION: dict[str, str] = {
@@ -517,6 +520,7 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # The cluster is hip-dominant with a real trunk demand -- the F-stack's
     # whole subject is the pelvis, not the hamstrings.
     "Cluster A Flexibility Session":          {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    "Anterior Hip Pressure Release":          {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -711,4 +715,5 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Walking Raise (Incline)":                  ("mobility_core", 0.25),
     "Scapular Retraction Isometric":            ("isolation", 0.3),
     "Cluster A Flexibility Session":            ("mobility_core", 0.25),
+    "Anterior Hip Pressure Release":            ("mobility_core", 0.25),
 }

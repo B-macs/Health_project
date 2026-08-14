@@ -80,6 +80,7 @@ RELEASE_EXERCISE_NAMES = frozenset({
     "Piriformis Contract-Relax (PNF)",
     "Ischial Tuberosity Hamstring Release",
     "Right Hip Tendon Path Drill (Coxa Saltans)",
+    "Anterior Hip Pressure Release",
 })
 
 CHECKPOINT_FIELDS = (
