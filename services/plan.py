@@ -77,6 +77,34 @@ def day_number_in_phase(phase: Phase, d: date) -> int:
     return (d - _start(phase)).days + 1
 
 
+def stranded_override_days(phase: Phase) -> list[tuple[str, int]]:
+    """Overrides that schedule a plan day PAST the phase's own last date.
+
+    Every reschedule pushes day numbers later without lengthening the phase, so
+    a block that absorbs enough shifts runs out of calendar before it runs out
+    of content — and nothing said so. `active_phase` stops matching on the last
+    date, so from the next morning the athlete gets the reassessment-gap screen
+    and the stranded days are simply never presented. It is silent in both
+    directions: the override map still claims those dates, and the day-number
+    formula still agrees with it.
+
+    Found live on 2026-08-14. Stage 2A had absorbed a forced rest day and one
+    session that had nowhere to move, which shifted its numbering two days; its
+    overrides put day 27 on 2026-08-17 and **day 28 — the reassessment, which
+    produces the final working loads and the functional screen two exit criteria
+    are judged on — on 2026-08-18**, while the phase's own calendar ended
+    2026-08-16. Both days would have vanished without anyone being told.
+
+    Returns (iso_date, day_number) pairs, sorted, for dates after the phase's
+    last day. Empty for a phase that fits, which is the normal case.
+    """
+    last = _end(phase)
+    return sorted(
+        (iso, day) for iso, day in phase.date_overrides.items()
+        if day and date.fromisoformat(iso) > last
+    )
+
+
 def _monday(d: date) -> date:
     return d - timedelta(days=d.weekday())
 

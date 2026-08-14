@@ -5,6 +5,7 @@ of dict-key access now that Phase/DayCell are typed.
 """
 
 import ast
+from dataclasses import replace
 from datetime import date, timedelta
 
 from services import plan
@@ -273,3 +274,31 @@ def test_no_active_phase_reassessment_gap_is_all_rest():
 
 def test_weekday_label_is_a_3_letter_uppercase_abbreviation():
     assert cells[0].weekday_label == _p_start.strftime("%a").upper()[:3]
+
+
+# ─── stranded overrides ────────────────────────────────────────────────────
+
+def test_a_phase_that_fits_strands_nothing():
+    assert plan.stranded_override_days(p28) == []
+
+
+def test_an_override_past_the_last_date_is_reported():
+    """The live case, 2026-08-14. Stage 2A absorbed a forced rest and a session
+    that had nowhere to move, which shifted its numbering two days — putting
+    day 28, the reassessment, on 2026-08-18 while the phase's own calendar ended
+    2026-08-16. Both stranded days would have vanished in silence."""
+    phase = plan.default_phase(date(2026, 7, 20), length_days=28, phase_number=2,
+                                name="Stage 2A")
+    phase = replace(phase, date_overrides={
+        "2026-08-14": 24, "2026-08-16": 26, "2026-08-17": 27, "2026-08-18": 28,
+    })
+    assert plan.phase_end_date(phase) == date(2026, 8, 16)
+    assert plan.stranded_override_days(phase) == [("2026-08-17", 27), ("2026-08-18", 28)]
+
+
+def test_a_forced_rest_past_the_end_is_not_stranded_work():
+    """date_overrides value 0 means forced rest, not plan day 0. There is
+    nothing to strand."""
+    phase = plan.default_phase(date(2026, 7, 20), length_days=28, phase_number=2)
+    phase = replace(phase, date_overrides={"2026-08-20": 0})
+    assert plan.stranded_override_days(phase) == []

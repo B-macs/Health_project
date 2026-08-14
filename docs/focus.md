@@ -11,9 +11,9 @@
 | Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
 | Block | **Stage 2B — 28-Day Block**, starts **2026-08-17** (`training_plan.PLAN_STAGE2B`, Phase 3) |
 | Day | Block A day 0 — starts Monday |
-| Gate | **2898/2898** — `python -m pytest tests/` |
+| Gate | **2903/2903** — `python -m pytest tests/` |
 | Last code commit | Stage 2B built; anterior-hip release added to the release block from week 3 |
-| Next action | **Sun 16 Aug: run `PLAN_STAGE2[28]`, and take the first battery baseline that morning** |
+| Next action | **Sun 16 Aug: Stage 2A's last day (day 26). Run the day-28 screen YOURSELF — the app will not offer it** |
 
 ### The two blocks, and why the dates are what they are
 
@@ -30,8 +30,15 @@ rather than somewhere inside it.
 
 ### Next actions, in order — the athlete's, not the code's
 
-1. **Sun 16 Aug** — run `PLAN_STAGE2[28]`. Two of the six Stage 2A exit criteria
-   (final working loads, functional screen) cannot be judged without it.
+1. **Sun 16 Aug — Stage 2A's final day.** The app shows **day 26** (Unilateral/Glute
+   + Scapular + Core), which is the last authored day it can reach.
+   **⚠ The day-28 reassessment is not in the app's reach and never was.** Stage 2A
+   absorbed two days of reschedules, so its own overrides put day 28 on 2026-08-18
+   while the block's calendar ended 2026-08-16. The two stranded entries were
+   removed on 2026-08-14 so the block finishes cleanly on the Sunday; the athlete
+   runs the screen by hand. It is short — McGill Big 3, single-leg balance eyes
+   closed, hip hinge full range, 5-minute walk + stairs — and two of the six exit
+   criteria (final working loads, functional screen) come from it.
 2. **Battery baseline mornings: 16, 19 and 20 Aug.** Cold, first thing, before
    anything else that day. The cluster stack cannot be authored without a
    pattern — `prescribe(None)` raises by design — and the battery has still

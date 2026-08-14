@@ -1869,7 +1869,28 @@ def _render_no_active_phase(phases: list) -> None:
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-    _render_begin_next_phase_button(phases)
+
+    # A block that absorbed enough reschedules runs out of calendar before it
+    # runs out of content, and the days past its last date are never presented.
+    # This screen is where that becomes visible — it is the one the athlete is
+    # looking at on the morning the phase lapsed, which is exactly when a
+    # dropped reassessment still costs nothing to run by hand.
+    for lapsed in sorted(phases, key=lambda p: p.start_date, reverse=True):
+        stranded = ph.stranded_override_days(lapsed)
+        if not stranded:
+            continue
+        plan_days = sess.plan_dict_for_phase(lapsed.phase_number) or {}
+        lines = ", ".join(
+            f"day {n} ({(plan_days.get(n) or {}).get('day_type', 'unknown')}) on {iso}"
+            for iso, n in stranded
+        )
+        st.warning(
+            f"**{lapsed.name} ended before its last days were reached.** Its schedule "
+            f"still lists {lines} — after the block's final date of "
+            f"{ph.phase_end_date(lapsed)}. Those sessions were never shown. Run anything "
+            f"that matters by hand before starting the next block."
+        )
+        break
 
 
 def _render_day_detail(d: date, active, phases: list) -> None:
