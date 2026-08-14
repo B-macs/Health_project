@@ -11,7 +11,7 @@
 | Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
 | Block | **Stage 2B — 28-Day Block**, starts **2026-08-17** (`training_plan.PLAN_STAGE2B`, Phase 3) |
 | Day | Block A day 0 — starts Monday |
-| Gate | **2903/2903** — `python -m pytest tests/` |
+| Gate | **2911/2911** — `python -m pytest tests/` |
 | Last code commit | Stage 2B built; anterior-hip release added to the release block from week 3 |
 | Next action | **Sun 16 Aug: Stage 2A's last day (day 26). Run the day-28 screen YOURSELF — the app will not offer it** |
 

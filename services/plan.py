@@ -105,6 +105,81 @@ def stranded_override_days(phase: Phase) -> list[tuple[str, int]]:
     )
 
 
+# ── THE WEEK IS ITSELF A BLOCK ───────────────────────────────────────────────
+#
+# Athlete's rule, 2026-08-14: a rescheduled day may move WITHIN its week and
+# nowhere else. "Every week is itself a block" — the seven days are a unit of
+# training design (two gym days, two runs, the flexibility slot, the spacing
+# between them), and a day that slides into the following week does not arrive
+# in a week that had room for it. It arrives in a week already carrying its own
+# full complement, and pushes that week's last day into the week after.
+#
+# That is exactly how Stage 2A ended up two days out of step: a forced rest on
+# 2026-08-09 renumbered the tail, week 3's days 20 and 21 were run in week 4's
+# calendar slots, and the far end of the block walked off its own last date
+# taking the day-28 reassessment with it.
+#
+# services/scheduling.py already treats the week's Sunday as "the hard boundary
+# no scheduling move ever crosses" for the day it is MOVING. What it does not
+# bound is the cumulative renumbering that a forced rest leaves behind. This is
+# that bound, applied where overrides are written rather than where they are
+# generated, so no path can reach the stored phase without passing it.
+
+def week_of_day_number(day_number: int) -> int:
+    """1-indexed week a plan day belongs to. Day 1-7 -> 1, 8-14 -> 2, ..."""
+    return (day_number - 1) // 7 + 1
+
+
+def week_of_phase_date(phase: Phase, d: date) -> int:
+    """1-indexed week a DATE falls in, counted from the phase's start."""
+    return (d - _start(phase)).days // 7 + 1
+
+
+def override_violations(phase: Phase,
+                        overrides: dict[str, int] | None = None) -> list[dict]:
+    """Every override that breaks one of the two rules, with its reason.
+
+    `overrides` defaults to the phase's own. Pass a PROPOSED map to check it
+    before it is written — which is what reject_violating_overrides does.
+
+    Value 0 is a forced rest, not plan day 0. It schedules nothing, so it can
+    break neither rule and is always allowed.
+    """
+    last, out = _end(phase), []
+    for iso, day in sorted((overrides if overrides is not None
+                            else phase.date_overrides).items()):
+        if not day:
+            continue
+        d = date.fromisoformat(iso)
+        if d > last:
+            out.append({"date": iso, "day": day, "rule": "past_block_end",
+                        "detail": f"day {day} falls on {iso}, after the block's "
+                                  f"last date {last.isoformat()}"})
+            continue
+        want, got = week_of_phase_date(phase, d), week_of_day_number(day)
+        if want != got:
+            out.append({"date": iso, "day": day, "rule": "crossed_week",
+                        "detail": f"day {day} belongs to week {got} but {iso} is "
+                                  f"in week {want} of the block"})
+    return out
+
+
+def reject_violating_overrides(phase: Phase,
+                               proposed: dict[str, int]) -> tuple[dict[str, int], list[dict]]:
+    """Split a proposed override map into (allowed, rejected).
+
+    Rejects rather than clamps. A day number nudged to fit is a different
+    session from the one the athlete was offered, silently substituted; a
+    rejected move leaves the schedule as it was, which is a state they can see
+    and act on. The caller is expected to surface the rejections.
+    """
+    merged = {**phase.date_overrides, **proposed}
+    bad = {v["date"] for v in override_violations(phase, merged)
+           if v["date"] in proposed}
+    return ({k: v for k, v in proposed.items() if k not in bad},
+            [v for v in override_violations(phase, merged) if v["date"] in bad])
+
+
 def _monday(d: date) -> date:
     return d - timedelta(days=d.weekday())
 

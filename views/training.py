@@ -1707,6 +1707,16 @@ def _render_swap_with_today(d: date, active, phases: list, *,
                 min(d, _today), max(d, _today), include_supplementary=False)
             if not scheduling.manual_swap_blockers(active, d, _today, _fresh):
                 _ovr, _rsn = scheduling.manual_swap_entries(active, d, _today)
+                # THE WEEK IS ITSELF A BLOCK. A move that would put a day in a
+                # different week of the block, or past the block's last date, is
+                # refused here rather than written — see plan.override_violations.
+                _ovr, _rejected = ph.reject_violating_overrides(active, _ovr)
+                for _v in _rejected:
+                    st.warning(
+                        f"That swap was not saved: {_v['detail']}. Every week is "
+                        f"its own block, so a session can move within its week "
+                        f"but not into the next one."
+                    )
                 _new_active = replace(
                     active,
                     date_overrides={**active.date_overrides, **_ovr},
@@ -2523,6 +2533,11 @@ def render():
                     active, _mr_plan_dict, _fresh, _mr_today)
 
             def _mr_write(_ovr, _rsn):
+                # THE WEEK IS ITSELF A BLOCK — refuse anything that would carry
+                # a session out of its own week or past the block's last date.
+                _ovr, _rej = ph.reject_violating_overrides(active, _ovr)
+                for _v in _rej:
+                    st.warning(f"Carry-forward not saved: {_v['detail']}.")
                 _mr_active = replace(
                     active,
                     date_overrides={**active.date_overrides, **_ovr},
@@ -2604,6 +2619,11 @@ def render():
                         _new_overrides, _reason, phase=active)
 
                     def _rs_write(_ovr, _rsn):
+                        # THE WEEK IS ITSELF A BLOCK — same refusal as the
+                        # manual swap and the missed-session carry.
+                        _ovr, _rej = ph.reject_violating_overrides(active, _ovr)
+                        for _v in _rej:
+                            st.warning(f"Readiness shift not saved: {_v['detail']}.")
                         _shifted_active = replace(
                             active,
                             date_overrides={**active.date_overrides, **_ovr},
