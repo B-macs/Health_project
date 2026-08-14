@@ -808,7 +808,23 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             movement_type=sess.movement_category(ex),
             planned_sets=ex.get("sets", 1),
             planned_reps=sess.planned_reps(ex),
-            rpe=session_rpe,
+            # NOT session_rpe. Copying the session's single slider value onto
+            # every exercise asserted a per-exercise measurement nobody made,
+            # and it was visibly false at both ends: a 90-second pressure
+            # release and a top set of RDLs both read 8 because the session did.
+            # It also fed services/strength.py's 1RM estimates, which take
+            # exercise_rpe first and fall back to session_rpe — so the fallback
+            # was never reached and every lift was estimated at the session
+            # figure regardless.
+            #
+            # None until the heart-rate sync can assign a real one per exercise
+            # (Repository.reassign_exercise_rpe_from_hr). That sync runs after
+            # the fact by necessity: HR attribution needs the Garmin activity,
+            # which is not on the watch's servers when the last set is logged.
+            # Until it lands, strength.py's fallback to session_rpe gives the
+            # numbers this line used to write — identical arithmetic, minus the
+            # claim that each exercise was rated.
+            rpe=None,
             sets=logged_sets,
             note=note,
             session_date=session_info["session_date"],

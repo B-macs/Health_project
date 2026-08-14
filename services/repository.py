@@ -3476,6 +3476,65 @@ class Repository:
         values = [row.get(k, "") if row.get(k) is not None else "" for k in _SESSION_HR_HEADER]
         self._upsert_sheet_row(self._session_hr_ws(), row["date"], values)
 
+    def reassign_exercise_rpe_from_hr(self, d: date, per_exercise: dict) -> int:
+        """Write each exercise's HR-DERIVED RPE onto its own Notion row.
+
+        The session slider is one number for a whole hour. It is the athlete's
+        honest answer to "how hard was that session" and it stays exactly where
+        it is — it feeds session_au, and through it Strain and ACWR, and key
+        rule 2b is emphatic that nothing heart-rate-derived may go near that.
+        What it is NOT is a per-exercise rating, and it used to be copied onto
+        every exercise as though it were: a 90-second pressure release and a set
+        of RDLs both recorded RPE 8 on 2026-08-14 because the session did.
+
+        This assigns the real per-exercise figure, from the heart rate actually
+        recorded during that exercise's own working sets (%HRR, mean blended
+        with peak — services/hr_load.exercise_hr_rpe). On the 2026-08-10 session
+        it separates the pressure release (1.4) from the Pallof hold (5.2),
+        which is the distinction the flat value erased.
+
+        WHY THIS RUNS AFTER THE FACT rather than at save time: HR attribution
+        needs the Garmin activity, and the activity is not on Garmin's servers
+        when the last set is logged. So the exercise row is written with a null
+        RPE and this fills it in on the next sync.
+
+        MATCHED BY MOVEMENT NAME, which is the only key both callers of
+        compute_session_hr agree on — get_session_sets_by_exercise's docstring
+        has the reason: an integer key means the plan-day index on the live path
+        and a renumbering-from-zero on the rebuilt path, so it would attribute
+        heart rate to the wrong movement.
+
+        Skips an exercise whose block has no samples (`covered` False) or no
+        derivable rate: a null RPE is "not measured", and overwriting it with a
+        guess is the failure this whole change exists to undo. Returns the
+        number of rows actually updated.
+        """
+        usable = {name: v.get("hr_rpe") for name, v in (per_exercise or {}).items()
+                  if v.get("covered") and v.get("hr_rpe") is not None}
+        if not usable:
+            return 0
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"equals": str(d)}},
+        )
+        updated = 0
+        for page in pages:
+            name = notion.get_property(page, "Movement", "title") or ""
+            rpe = usable.get(name)
+            if rpe is None:
+                continue
+            properties = {"Exercise RPE": notion.number(round(float(rpe), 1))}
+            notion.update_page(self._nc, page["id"], properties=properties)
+            # PATCH, never UPSERT. This touches one property of an existing
+            # page; a partial upsert would insert an orphan training_exercises
+            # row carrying an RPE and nothing else — no session_id, no movement,
+            # no sets — indistinguishable from a real logged exercise to
+            # anything counting rows.
+            self.mirror_notion_write(notion_reader.TRAINING, page["id"],
+                                     properties, mode=supabase_store.PATCH)
+            updated += 1
+        return updated
+
     def get_session_hr_history(self, start: str | None = None) -> list[dict]:
         """Persisted per-session HR load, oldest first. `start` is an
         inclusive ISO date filter."""
@@ -3590,7 +3649,25 @@ class Repository:
         )
         if not summary:
             return False
+        if summary.get("needs_choice"):
+            # The day HAS activities but none aligns convincingly — the travel
+            # case compute_session_hr documents. That dict carries candidates,
+            # not a load summary, and has no "date": save_session_hr would raise
+            # KeyError building its row, which run_sync_if_due then swallows as
+            # a failed sync. Refusing here makes it what it actually is — no
+            # match, fall back to RPE — and leaves the choice to the screen that
+            # can ask.
+            return False
         self.save_session_hr(summary)
+        # Assign each exercise its own RPE from its own heart rate. Deliberately
+        # after save_session_hr: the HR record is the measurement and lands
+        # first, this is a derived convenience written onto the training rows.
+        try:
+            self.reassign_exercise_rpe_from_hr(d, summary.get("per_exercise") or {})
+        except Exception:
+            # Never fail the HR sync over the write-back. The measurement is
+            # saved either way, and per_exercise_json keeps the same numbers.
+            pass
         return True
 
     def sync_session_hr_recent_if_due(self, days: int = 2, today: date | None = None,
