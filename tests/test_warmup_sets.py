@@ -215,3 +215,40 @@ def test_the_json_a_ramp_set_stores_is_the_json_that_comes_back():
     rec = sessions.build_set_record(_reps_ex(warmup=True), 1, None, "ts",
                                     rest_taken_seconds=95)
     assert json.loads(json.dumps(rec)) == rec
+
+
+def test_the_supabase_migration_matches_the_schema_it_migrates_to():
+    """PostgREST has no DDL route, so the Supabase side of this change is a
+    hand-pasted file. That makes it the one piece of the migration nothing can
+    verify at runtime — a typo in a column name there produces a table that
+    disagrees with the schema, and the mirror then fails quietly (a rejected
+    batch is caught and recorded on mirror_last_error, never raised).
+
+    So pin it here: every column the migration adds must be a real column of
+    training_sets in the generated Postgres schema."""
+    import re
+    from pathlib import Path
+
+    from services import datastore_postgres as dp
+
+    migration = (Path(__file__).resolve().parent.parent / "scripts"
+                 / "migrate_2026-08-14_training_sets_per_set_fields.sql")
+    assert migration.exists(), "the migration file the Known Open Issues row points at is gone"
+
+    added = set(re.findall(r"ADD COLUMN IF NOT EXISTS (\w+)", migration.read_text(encoding="utf-8")))
+    assert added == {"is_warmup", "rest_taken_seconds", "reps_left", "weight_left"}, added
+
+    block = re.search(r"CREATE TABLE training_sets \((.*?)\n\);", dp.to_postgres(), re.S).group(1)
+    schema_columns = {m.group(1) for m in re.finditer(r"^\s{4}(\w+)\s+[A-Z]", block, re.M)}
+    assert added <= schema_columns, f"migration adds columns the schema does not have: {added - schema_columns}"
+
+
+def test_the_full_postgres_schema_is_not_a_migration():
+    """It opens with DROP TABLE ... CASCADE for every table. Pasting it into a
+    populated Supabase project deletes everything. The migration file says so in
+    its own header; this fails if that stops being true and the warning becomes
+    misleading."""
+    from services import datastore_postgres as dp
+    ddl = dp.to_postgres()
+    assert ddl.count("DROP TABLE IF EXISTS") >= 20
+    assert "DROP TABLE IF EXISTS training_sets CASCADE;" in ddl
