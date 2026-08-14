@@ -90,7 +90,10 @@ def test_only_the_self_assessment_is_weighted_but_unshared():
 def test_every_planned_exercise_name_has_shares():
     missing = {
         ex["name"]
-        for plan in (tp.PLAN, tp.PLAN_STAGE2)
+        # Every authored plan, not a list that has to be remembered — a block
+        # missing from this tuple silently stops being covered, which reads
+        # exactly like coverage that passed.
+        for plan in (tp.PLAN, tp.PLAN_STAGE2, tp.PLAN_STAGE2B)
         for day in plan.values()
         for ex in day.get("exercises", [])
         if ex["name"] not in SHARES and ex["name"] != "Week 1 Self-Assessment"

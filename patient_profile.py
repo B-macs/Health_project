@@ -5,6 +5,29 @@ Single source of truth for MRI findings and biomechanical assessment.
 Referenced by training_plan.py when designing sessions.
 Update this file before generating each new training block.
 
+2026-08-14: STAGE 2B IS AUTHORED AND THE BLOCK STARTS 2026-08-17. It replaces
+  Stage 2A rather than extending it (athlete + physio, 2026-08-12) and runs as
+  Phase 3 at CLINICAL STAGE 2 — the block changes, the ACWR/RPE/volume ceilings
+  do not. `current_block`, `next_reassessment`, a new `stage_2b_exit_criteria`
+  and two `stage_transitions` records below carry the detail; three things are
+  worth reading here first.
+  (1) THE SESSION SHAPE CHANGED, and this is the part that touches every day:
+  it used to be [quiet things down] -> [load], with nothing in between. It is
+  now [quiet things down] -> [WAKE THINGS BACK UP] -> [load]. The middle phase
+  is new, mandatory, and was specified first with everything else fitted around
+  it. Its cost is paid by RESTORING the release block to the five minutes this
+  file has specified all along (line ~439) rather than the 16-22 minutes the
+  coded doses had drifted to — so the total is 10-15 min, 15 a ceiling. Two
+  corrections ride along: `UPPER_GLUTE_RELEASE` was coded bilateral while its
+  own text and this file both say EACH SIDE, and the one >=60 s stretch now runs
+  FIRST so four minutes of other work sits between it and the first loaded rep.
+  (2) RUNNING IS IN, and the constraint on it is not the race. Six runs, three
+  of them run/walk, reaching 35 minutes continuous — well short of 10 km,
+  because `historical_injuries_low_weight`'s Sartorius carve-out is live the
+  moment a plan re-stresses that tissue, and it has gone twice.
+  (3) TWELVE DAYS WITH NO GYM (2026-08-19 -> 08-30, bands and bodyweight only).
+  Those weeks hold ground and do not progress. Loads resume one increment down.
+
 Updated 2026-07-13 against docs/clinical_profile_weighting.md, incorporating
 Input_files/injury_profile.md, Input_files/hypermobility-profile.md, and
 Input_files/2025-training-year.md (all local-only, gitignored — read those
@@ -149,17 +172,29 @@ PROFILE = {
 
     "patient": "Patient",
     "current_stage": 2,
-    "current_block": "Stage 2A — 28-Day Gym Strength Block (Days 1-28, started 2026-07-20). "
-                      "Goblet/DB squat, RDL, hip thrust, incline DB press, lat pulldown/row, "
-                      "Bulgarian split squat, scapular + lumbar-endurance core work. No overhead "
-                      "pressing (finding #6) and no running this block — running is an explicit "
-                      "deferred decision (see next_reassessment), not an oversight.",
-    "next_reassessment": "Day 28 (2026-08-16) — reassess against stage_2_exit_criteria; decide "
-                          "Stage 2B vs. extending Stage 2A, the running-introduction question, and "
-                          "endurance-biased scapular programming (2026-08-13 symptom_log entry, "
-                          "which supersedes the 2026-08-03 'endurance gap, not volume gap' framing "
-                          "— the five-days-a-week premise is false and the mechanism is perfusion) "
-                          "— see module docstring and docs/training/physio_brief_2026-08-16.md",
+    "current_block": "Stage 2B — 28-Day Block (Days 1-28, starts 2026-08-17), training_plan."
+                      "PLAN_STAGE2B, Phase 3 at clinical stage 2. THREE things make it unlike "
+                      "2A. (1) Days 3-14 are Ireland with BANDS AND BODYWEIGHT ONLY — those two "
+                      "weeks hold ground and do not progress; the progression in them is the "
+                      "running. (2) RUNNING IS INTRODUCED from day 5, toward the 10 km on "
+                      "2026-10-11, which is day 28 of the NEXT block. Six runs, three of them "
+                      "run/walk, reaching 35 min continuous — deliberately short of the "
+                      "distance, because the left Sartorius has strained twice from running "
+                      "overuse and clinical_profile_weighting #1 makes that full-weight again "
+                      "the moment a plan re-stresses it. (3) EVERY SESSION IS NOW THREE PHASES: "
+                      "quiet things down (~5 min, the release block restored to the dose this "
+                      "file always specified) -> wake things back up (~5 min, NEW) -> load. "
+                      "Total preparation 10-15 min, 15 a ceiling. Still no overhead pressing "
+                      "(finding #6).",
+    "next_reassessment": "Day 28 (2026-09-13) — reassess against stage_2b_exit_criteria and "
+                          "author Block B, which runs 2026-09-14 -> 2026-10-11 with RACE DAY as "
+                          "its own day 28. The decisions that land: how the band fortnight "
+                          "actually went, whether the running introduction produced any left hip "
+                          "flexor signal, the Coxa Saltans verdict that gates the horse-stance "
+                          "and Cossack deferrals, and whether ACWR enforcement comes off advisory "
+                          "mode (deferred to Block B on 2026-08-14 — the chronic window over "
+                          "Block A is 12/14 travel days, so a breach there would be an artefact "
+                          "of the trip rather than of training).",
 
     # ─────────────────────────────────────────────────────────────────────────
     #  MRI Findings
@@ -1718,8 +1753,8 @@ PROFILE = {
         "physio_sign_off": "Required before advancing to Stage 2",
     },
 
-    # Draft — evaluated at the Day 28 reassessment (2026-08-16), mirroring
-    # stage_1_exit_criteria's shape. Not yet evaluated.
+    # Evaluated at the Stage 2A Day 28 reassessment. Physiotherapist sign-off
+    # for Stage 2B was obtained 2026-08-12 — see stage_transitions below.
     "stage_2_exit_criteria": {
         "pain": "≤ 2/10 across all working lifts, no worsening trend through the block",
         "hip_click": "No increase in Coxa Saltans frequency under loaded squat/split-squat work",
@@ -1727,6 +1762,34 @@ PROFILE = {
         "working_loads": "Final working loads logged on all six primary lifts (Goblet Squat, Incline DB Press, RDL, Hip Thrust, Lat Pulldown, Single-Arm DB Row) as the new baseline",
         "functional_screen": "McGill Big 3, Single-Leg Balance, Hip Hinge Full Range, Walk+Stair — matching or beating the Day 21 Stage 1 screen",
         "physio_sign_off": "Required before deciding Stage 2B vs. extending Stage 2A, and before introducing running",
+    },
+
+    # Draft — evaluated at the Stage 2B Day 28 reassessment (2026-09-13), which
+    # is also where Block B is authored. Mirrors stage_2_exit_criteria's shape.
+    # Not yet evaluated.
+    #
+    # Note what is NOT here: a distance target. Block A is not trying to reach
+    # 10 km, and judging it against the race would be judging the wrong block.
+    "stage_2b_exit_criteria": {
+        "pain": "≤ 2/10 across all working lifts and all runs, no worsening trend through the block",
+        "running_tolerance": "NO left anterior hip / Sartorius signal at any point in the six-run "
+                             "progression. This is the criterion the whole running introduction is "
+                             "conditional on — it has strained twice before, both times from "
+                             "running volume, and a signal here stops the build rather than slowing it",
+        "hip_click": "No increase in Coxa Saltans frequency under loaded squat work OR under "
+                     "running. A clean verdict releases the horse-stance and Cossack deferrals in "
+                     "cluster_a_mechanics; record the outcome either way, since the hold is judged "
+                     "on its condition and never expires by date",
+        "shoulder": "No instability sensation or left-tilt compensation under incline press",
+        "interscapular": "Tightness ≤ 3/10 and pain 0/10, with the desk raised — the 2026-08-12 "
+                         "reading of pain 1/10 is the number to beat, and the intervention being "
+                         "tested is the desk height, not the training",
+        "load_recovery": "Working loads back at or above their pre-travel values by the end of "
+                         "week 4, having stepped down one increment on re-entry",
+        "flexibility_baseline": "Battery run cold on three separate mornings, a pattern label "
+                                "recorded, and at least two cluster sessions completed",
+        "physio_sign_off": "Format-free and remote is fine, as the 2026-08-10 brief was answered. "
+                            "Required before Block B's race build is authored",
     },
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -1743,6 +1806,36 @@ PROFILE = {
                      "for Stage 1 -> Stage 2 advancement (external load cleared).",
             "signed_off_by": "physiotherapist (per user confirmation to this app; "
                               "not independently verified by the app itself)",
+        },
+        {
+            "date": "2026-08-12",
+            "event": "Stage 2A Day 28 signed off; Stage 2B CONFIRMED to REPLACE Stage 2A "
+                     "rather than extend it. All three deferred decisions settled at the "
+                     "same sitting: running is introduced (10 km, 2026-10-11); isometric "
+                     "hold durations follow the tendon-adaptation literature dosed across "
+                     "~10 minutes; and the 5-minute release block is confirmed at that "
+                     "dose, closing the dose question the warm-up review raised. Clinical "
+                     "stage remains 2 — the BLOCK changes, the ACWR/RPE/volume ceilings "
+                     "do not.",
+            "signed_off_by": "athlete + physiotherapist (per user confirmation to this app; "
+                              "not independently verified by the app itself)",
+        },
+        {
+            "date": "2026-08-14",
+            "event": "Stage 2B block authored as training_plan.PLAN_STAGE2B and registered "
+                     "as Phase 3, starting 2026-08-17. Two software prerequisites shipped "
+                     "with it because the block could not be run without them: a generic "
+                     "next-phase route (there was NO path to a Phase 3 at all — the offer "
+                     "was hard-wired to the Stage 1->2 transition), and the per-set fields "
+                     "the two evidence reviews named as blocking (is_warmup, so ramp sets "
+                     "do not inflate tonnage and 1RM estimates; rest_taken_seconds, so a "
+                     "rest change can be told apart from harder training). One safety rule "
+                     "corrected with the athlete's explicit sign-off: services/rules.py had "
+                     "running contraindicated at EVERY stage, because check_movement can "
+                     "only upgrade a verdict to contraindicated and the rule was already "
+                     "written at that severity — it is now caution from stage 2, which is "
+                     "what its own stage_cap and reason text always said.",
+            "signed_off_by": "athlete (block design and the rules correction, 2026-08-14)",
         },
     ],
 }

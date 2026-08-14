@@ -14,11 +14,18 @@ rounded into the others.
     weekly tonnage[r] = sum of eligible loaded sets in sector r, Mon-Sun
     overall           = upper_body + core + lower_body
 
-ELIGIBILITY, stated honestly. A set counts when it carries both reps and a real
-external load. Warm-ups are NOT excluded, because the log has no way to mark
-one — there is no per-set warm-up flag today, so "working sets only" is an
-assumption, not something this module can enforce. Every unloaded rehab drill
-falls out naturally, since its sets carry no weight.
+ELIGIBILITY. A set counts when it carries both reps and a real external load AND
+is not flagged `is_warmup`. Every unloaded rehab drill falls out naturally, since
+its sets carry no weight.
+
+The warm-up exclusion arrived 2026-08-14 with Stage 2B's ramp sets, and it had
+to: a ramp is one set of six at 60-65% of the working weight, which is real reps
+at a real load, so before the flag existed "working sets only" was an assumption
+this module could not enforce. AN ABSENT KEY MEANS WORKING — every set logged
+before that date has no key at all and every one of them was work. This module
+imports nothing from services/ on purpose, so the expression is repeated inline
+rather than shared; tests/test_warmup_sets.py pins that it agrees with
+services.sessions.is_working_set and with services/strength.py's own copy.
 
 UNLOADED WORK IS COUNTED IN ITS OWN UNITS AND NEVER CONVERTED. Dead bugs,
 planks, bird-dogs, side bridges and glute bridges produce real training and zero
@@ -149,6 +156,11 @@ def weekly_tonnage(
         all_days[wk].add(raw_date)
         loaded_kg, loaded_sets, reps_only, seconds_only = 0.0, 0, 0.0, 0.0
         for s in (row.get("sets") or []):
+            if s.get("is_warmup"):
+                # A ramp set carries real reps at a real weight and is not work.
+                # Absent key = working set, which is every set logged before the
+                # flag existed — see services.sessions.is_working_set.
+                continue
             reps = float(s.get("reps") or 0)
             weight = float(s.get("weight") or 0)
             tut = float(s.get("tut") or 0)

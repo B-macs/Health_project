@@ -1126,6 +1126,7 @@ _STATE = {
     "tp_started": True, "tp_done_today": False, "tp_session_logged": False,
     "tp_side": "right", "tp_session_start_ts": 12345.0, "tp_actuals": {},
     "tp_set_log": {}, "tp_garmin_declared": False,
+    "tp_rest_started_at": 12400.0,
 }
 
 
@@ -1306,3 +1307,43 @@ def test_outdoor_exercise_name_maps_the_family_and_falls_back():
     # the type filter is advice, the pick is the decision.
     assert sessions.outdoor_exercise_name("cycling") == "Outdoor Activity"
     assert sessions.outdoor_exercise_name(None) == "Outdoor Activity"
+
+
+# ─── next_phase_offer ──────────────────────────────────────────────────────
+
+def _ph(number, start="2026-07-20", length=28, status="completed"):
+    return Phase(phase_number=number, name=f"P{number}", start_date=start,
+                 length_days=length, status=status)
+
+
+def test_next_phase_offer_returns_the_next_authored_block():
+    assert sessions.next_phase_offer([_ph(1), _ph(2)]) == 3
+
+
+def test_next_phase_offer_never_re_offers_an_existing_block():
+    assert sessions.next_phase_offer([_ph(1), _ph(2), _ph(3)]) is None
+
+
+def test_next_phase_offer_will_not_skip_a_block():
+    """A Phase 3 with no Phase 2 would leave a hole in the day numbering and in
+    the stage history."""
+    assert sessions.next_phase_offer([_ph(1)]) == 2
+
+
+def test_next_phase_offer_is_silent_when_no_phase_exists_yet():
+    """Seeding the very first phase belongs to the plan-start screen, which
+    collects a start date this function has no way to ask for."""
+    assert sessions.next_phase_offer([]) is None
+
+
+def test_every_offerable_phase_has_content_and_a_clinical_stage():
+    for number, meta in sessions.PHASE_META.items():
+        assert meta["stage"] in (1, 2, 3), number
+        assert meta["name"] and meta["button"], number
+
+
+def test_stage_2b_is_a_new_block_at_the_same_clinical_stage():
+    """Phase and Stage are separate systems. Reading "2B" as stage 3 would hand
+    over Performance-and-Growth ceilings (ACWR 1.5, RPE 10) on a block name."""
+    assert sessions.PHASE_META[3]["stage"] == 2
+    assert sessions.plan_dict_for_phase(3) is not None

@@ -34,8 +34,16 @@ CREATE TABLE training_sets (
     tut          DOUBLE PRECISION,
     velocity     TEXT,
     band_tier    TEXT,   -- NULL when the exercise has no band tier
-    ts           TEXT    -- NULL for synthesized (make_sets_data) sets; ISO
+    ts           TEXT,   -- NULL for synthesized (make_sets_data) sets; ISO
                          -- datetime string for real captured sets (build_set_record)
+    is_warmup    BIGINT DEFAULT 0,  -- 1 = ramp set. Excluded from weekly tonnage
+                         -- and from every 1RM estimate. 0/NULL = a working set,
+                         -- which is what all history before 2026-08 is.
+    rest_taken_seconds DOUBLE PRECISION,  -- wall-clock rest that FOLLOWED this set. NULL means
+                         -- not measured (last set of an exercise, pre-2026-08
+                         -- history, or an interrupted rest) — never "no rest"
+    reps_left    DOUBLE PRECISION,   -- the weaker side's own numbers, present ONLY when the
+    weight_left  DOUBLE PRECISION    -- athlete edited the left side away from the right
 );
 CREATE INDEX idx_training_sets_exercise ON training_sets(exercise_id);
 

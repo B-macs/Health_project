@@ -695,6 +695,7 @@ def _init_state(day_num: int | None = None):
         "tp_reported_au":      None,
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
         "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
+        "tp_rest_started_at":  0,        # Unix timestamp, stamped when a rest phase BEGINS — see _record_rest_taken
         "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
@@ -860,6 +861,54 @@ def _record_completed_set(idx: int, ex: dict, set_num: int) -> None:
                                 repo.get_repository().config.timezone),
         ),
     )
+
+
+#: Anything longer than this was an interruption, not an inter-set rest — the
+#: athlete put the phone down, took a call, or the tab sat open over lunch. The
+#: raw wall-clock reading is still what gets recorded up to this point; past it
+#: the value is dropped entirely rather than stored as a rest that never
+#: happened. Twenty minutes is far above any prescribed rest in the repo (the
+#: ceiling is 90 s, rising to 180 s in Stage 2B) and far below a session gap.
+_REST_TAKEN_MAX_SECONDS = 1200
+
+
+def _begin_rest() -> None:
+    """Enter the rest phase and start the clock on it.
+
+    The rest timer itself is a sandboxed components.html iframe whose countdown
+    lives in the browser and can never hand a value back to Python. So the
+    measurement is taken on THIS side instead: stamp the wall clock when the
+    rest begins, take the difference when the athlete taps "→ Next Set". That
+    reads early taps, late taps and the timer's own auto-advance identically,
+    because all three go through the same handler."""
+    st.session_state.tp_phase = "resting"
+    st.session_state.tp_rest_started_at = time.time()
+
+
+def _record_rest_taken(idx: int) -> None:
+    """Attach the rest just taken to the set it FOLLOWED, then stop the clock.
+
+    Patches the highest set_num already recorded for exercise `idx`, which is
+    the set the athlete just finished — matching the existing `rest` field's own
+    "rest after set N" meaning, so the prescribed and the measured number sit on
+    the same row and describe the same interval.
+
+    Silent no-op when no rest was timed, when the exercise has no recorded sets
+    yet, or when the gap exceeds _REST_TAKEN_MAX_SECONDS. An absent key means
+    "not measured", which is the truth in all three cases and is what keeps this
+    distinguishable from a genuinely short rest."""
+    started = st.session_state.get("tp_rest_started_at") or 0
+    st.session_state.tp_rest_started_at = 0
+    if not started:
+        return
+    elapsed = int(time.time() - started)
+    if elapsed <= 0 or elapsed > _REST_TAKEN_MAX_SECONDS:
+        return
+    rows = st.session_state.tp_set_log.get(idx) or []
+    if not rows:
+        return
+    last = max(rows, key=lambda r: r.get("set_num") or 0)
+    last["rest_taken_seconds"] = elapsed
 
 
 def _sets_by_movement(exercises: list) -> dict[str, list[dict]]:
@@ -1169,7 +1218,7 @@ def _get_phases_and_active_phase() -> tuple[list, object | None]:
     date_overrides) is unacceptable collateral for a retryable glitch. This
     happened twice in one week. Phase 1's creation is now an explicit,
     user-confirmed action tied to the "Begin 14-Day Plan" button (same
-    pattern _render_begin_stage2_button already used correctly for Stage 2)
+    pattern _render_begin_next_phase_button already uses)
     — this function only ever reads."""
     phases = repo.get_repository().get_phases()
     return phases, ph.active_phase(phases, date.today())
@@ -1739,48 +1788,58 @@ def _render_rest_day(d: date) -> None:
 
 
 def _stage2_offer_available(phases: list) -> bool:
-    """True once Phase 1 exists, Phase 2 hasn't been created yet, and Stage 2
-    content is actually authored. Deliberately specific to the Stage 1 -> 2
-    transition (the only one authored so far), not a generic 'any phase'
-    mechanism — matches this codebase's existing pattern of hardcoding each
-    stage's own plan rather than a generalised phase-progression system."""
-    existing_numbers = {p.phase_number for p in phases}
-    return (1 in existing_numbers and 2 not in existing_numbers
-            and sess.plan_dict_for_phase(2) is not None)
+    """Whether a next block can be started from here. Thin wrapper over
+    sess.next_phase_offer, kept as a named predicate because two screens ask."""
+    return sess.next_phase_offer(phases) is not None
 
 
-def _render_begin_stage2_button(phases: list) -> None:
-    """Offers to start Stage 2 once Phase 1 exists and Phase 2 hasn't been
-    created yet. Phase 1's length_days and its authored PLAN day count match
-    exactly, so its calendar range always lapses at the same moment its
-    content would — meaning _render_no_active_phase's reassessment-gap
-    screen is what actually fires in practice, not the 'ran out of days
-    while still in-phase' branch this was originally (and still is, for a
-    phase whose calendar outlasts its content) wired into. Called from both."""
-    if not _stage2_offer_available(phases):
+def _render_begin_next_phase_button(phases: list) -> None:
+    """Offers to start the next authored block, whichever one that is.
+
+    Was hard-wired to Stage 1 -> 2. It is generic now because Stage 2B is Phase
+    3 and the old check could never have offered it: with Phases 1 and 2 both
+    present it returned False forever, and the app would have sat with no active
+    phase from the day Stage 2A lapsed.
+
+    Every phase's length_days and its authored day count match exactly, so a
+    block's calendar range always lapses at the same moment its content would —
+    meaning _render_no_active_phase's reassessment-gap screen is what actually
+    fires in practice, not the 'ran out of days while still in-phase' branch
+    this is also wired into. Called from both."""
+    number = sess.next_phase_offer(phases)
+    if number is None:
         return
+    meta = sess.PHASE_META[number]
+    plan_days = len(sess.plan_dict_for_phase(number))
     st.caption(
-        "Confirm Stage 1 → 2 criteria are met and your physiotherapist has "
-        "signed off before beginning."
+        f"Confirm the exit criteria for the block you have just finished are met "
+        f"and your physiotherapist has signed off before beginning."
     )
     # Advancing Phase (content/day-numbering) and Stage (ACWR/RPE/volume
     # ceilings) must happen together — services/plan.py's Phase and
     # services/rules.py's Stage are deliberately decoupled systems, and
     # authoring one without the other leaves the engine enforcing the wrong
-    # ceiling against the wrong content. This writes to the live Notion
-    # config — a deliberate action the user takes by clicking, never
-    # triggered automatically just because the calendar ran out.
-    if st.button("Begin Stage 2 — 4-Week Transition Block", type="primary",
-                 use_container_width=True, key="tp_begin_stage2"):
+    # ceiling against the wrong content. Note the two numbers differ from Phase
+    # 3 on: Stage 2B is a new BLOCK at the same clinical stage 2, so the
+    # ceilings deliberately do not move. This writes to the live Notion config —
+    # a deliberate action the user takes by clicking, never triggered
+    # automatically just because the calendar ran out.
+    if st.button(meta["button"], type="primary",
+                 use_container_width=True, key=f"tp_begin_phase_{number}"):
+        # length_days comes from the authored content rather than a literal, so
+        # a block of a different length needs no code change here.
         new_phase = ph.default_phase(
-            date.today(), length_days=28, phase_number=2,
-            name="Stage 2 — Transition (Work Capacity)",
+            date.today(), length_days=plan_days, phase_number=number,
+            name=meta["name"],
         )
         updated_phases = sess.begin_new_phase(phases, new_phase)
         r = repo.get_repository()
         r.set_phases(updated_phases)
-        r.set_config("current_stage", "2")
-        st.success("Stage 2 begins today. Come back for Day 1 of your 28-day gym block.")
+        r.set_config("current_stage", str(meta["stage"]))
+        st.success(
+            f"{meta['name']} begins today. Come back for Day 1 of your "
+            f"{plan_days}-day block."
+        )
         st.rerun()
 
 
@@ -1810,7 +1869,7 @@ def _render_no_active_phase(phases: list) -> None:
         unsafe_allow_html=True,
     )
     st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
-    _render_begin_stage2_button(phases)
+    _render_begin_next_phase_button(phases)
 
 
 def _render_day_detail(d: date, active, phases: list) -> None:
@@ -2604,7 +2663,7 @@ def render():
             # and silently destroyed a real, in-progress Phase 2 (including a
             # manual reschedule) twice in one week whenever a transient Notion
             # read hiccup made "phases" look empty. Explicit, user-triggered
-            # creation is the same pattern _render_begin_stage2_button already
+            # creation is the same pattern _render_begin_next_phase_button already
             # correctly uses for Stage 2 — Phase 1 now matches it.
             seeded = sess.seed_default_phase([], start_input)
             if seeded:
@@ -2732,7 +2791,7 @@ def render():
                 "Open **Autoregulation** to check Stage 1 → 2 progression criteria. "
                 "If criteria are met, confirm with your physiotherapist before advancing."
             )
-            _render_begin_stage2_button(phases)
+            _render_begin_next_phase_button(phases)
         elif active.phase_number == 2:
             st.success(
                 f"**{_plan_days}-Day Stage 2A Gym Strength Block Complete.**\n\n"
@@ -3248,28 +3307,47 @@ def _render_guided_flow(day_num, exercises, n_ex,
             and ex.get("laterality") == "unilateral"
             and _side == "left"
         )
+        # The left side gets its OWN entries rather than overwriting the right's.
+        # Editing used to write straight back into "reps"/"weight_kg", so a
+        # weaker left arm rewrote the whole set record and the session read as
+        # though the prescribed weight had been declined outright — on the very
+        # movement (Single-Arm DB Row) where the two sides differ most.
+        # build_set_record emits them only when they actually differ, so a
+        # symmetric set is byte-identical to what it was before these existed.
+        if _mirror_left:
+            _actual.setdefault("reps_left", _actual.get("reps"))
+            _actual.setdefault("weight_kg_left", _actual.get("weight_kg"))
+        _rk = "reps_left" if _mirror_left else "reps"
+        _wk = "weight_kg_left" if _mirror_left else "weight_kg"
+
         if _mirror_left:
             _mirror_bits = []
-            if _actual["reps"] is not None:
-                _mirror_bits.append(f"{_actual['reps']} reps")
+            if _actual[_rk] is not None:
+                _mirror_bits.append(f"{_actual[_rk]} reps")
             _equip = ex.get("equipment_type")
             if _equip == "band" and _actual["band_tier"]:
+                # Band tier is NOT split by side: it is one physical band, and
+                # a tier per side would describe equipment that isn't there.
                 _tier_label = sess.BAND_TIER_LABELS.get(_actual["band_tier"], "")
                 _mirror_bits.append(
                     f"{_actual['band_tier']} band ({_tier_label})" if _tier_label
                     else f"{_actual['band_tier']} band"
                 )
-            elif _equip and _equip != "band" and _actual["weight_kg"] is not None:
+            elif _equip and _equip != "band" and _actual[_wk] is not None:
                 _unit_label = "kg" if ex.get("increment_unit", "kg") == "kg" else "units"
-                _mirror_bits.append(f"{_actual['weight_kg']} {_unit_label}")
+                _mirror_bits.append(f"{_actual[_wk]} {_unit_label}")
             _mirror_summary = " @ ".join(_mirror_bits) if _mirror_bits else "same as right side"
-            st.caption(f"Left side: mirrored — {_mirror_summary}")
+            _differs = (_actual.get("reps_left") != _actual.get("reps")
+                        or _actual.get("weight_kg_left") != _actual.get("weight_kg"))
+            st.caption(
+                f"Left side: {'edited' if _differs else 'mirrored'} — {_mirror_summary}"
+            )
             _stepper_ctx = st.expander("Edit left side")
         else:
             _stepper_ctx = contextlib.nullcontext()
 
         with _stepper_ctx:
-            if ex["type"] == "reps" and _actual["reps"] is not None:
+            if ex["type"] == "reps" and _actual[_rk] is not None:
                 st.markdown(
                     "<div style='text-align:center;font-size:11px;color:#8A99A3;"
                     "font-family:monospace;letter-spacing:2px;'>REPS</div>",
@@ -3278,18 +3356,18 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 rc1, rc2, rc3 = st.columns([1, 2, 1])
                 with rc1:
                     if st.button("−", key=f"tp_reps_dec_{_eidx}", use_container_width=True):
-                        _actual["reps"] = sess.step_reps(_actual["reps"], -1)
+                        _actual[_rk] = sess.step_reps(_actual[_rk], -1)
                         _save_checkpoint(day_num, durable=False)
                         _rerun_flow()
                 with rc2:
                     st.markdown(
                         f"<div style='text-align:center;font-size:40px;font-weight:700;"
-                        f"color:#E8ECEF;'>{_actual['reps']}</div>",
+                        f"color:#E8ECEF;'>{_actual[_rk]}</div>",
                         unsafe_allow_html=True,
                     )
                 with rc3:
                     if st.button("+", key=f"tp_reps_inc_{_eidx}", use_container_width=True):
-                        _actual["reps"] = sess.step_reps(_actual["reps"], +1)
+                        _actual[_rk] = sess.step_reps(_actual[_rk], +1)
                         _save_checkpoint(day_num, durable=False)
                         _rerun_flow()
 
@@ -3319,7 +3397,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                         _actual["band_tier"] = sess.step_band_tier(_actual["band_tier"], +1)
                         _save_checkpoint(day_num, durable=False)
                         _rerun_flow()
-            elif _equip and _equip != "band" and _actual["weight_kg"] is not None:
+            elif _equip and _equip != "band" and _actual[_wk] is not None:
                 _incr = ex.get("increment_size", 2.5)
                 _incr_unit = ex.get("increment_unit", "kg")
                 _wt_label = "WEIGHT (KG)" if _incr_unit == "kg" else "WEIGHT (MACHINE UNITS)"
@@ -3336,18 +3414,18 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 wc1, wc2, wc3 = st.columns([1, 2, 1])
                 with wc1:
                     if st.button("−", key=f"tp_wt_dec_{_eidx}", use_container_width=True):
-                        _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], -1, increment=_incr)
+                        _actual[_wk] = sess.step_weight_kg(_actual[_wk], -1, increment=_incr)
                         _save_checkpoint(day_num, durable=False)
                         _rerun_flow()
                 with wc2:
                     st.markdown(
                         f"<div style='text-align:center;font-size:40px;font-weight:700;"
-                        f"color:#E8ECEF;'>{_actual['weight_kg']}</div>",
+                        f"color:#E8ECEF;'>{_actual[_wk]}</div>",
                         unsafe_allow_html=True,
                     )
                 with wc3:
                     if st.button("+", key=f"tp_wt_inc_{_eidx}", use_container_width=True):
-                        _actual["weight_kg"] = sess.step_weight_kg(_actual["weight_kg"], +1, increment=_incr)
+                        _actual[_wk] = sess.step_weight_kg(_actual[_wk], +1, increment=_incr)
                         _save_checkpoint(day_num, durable=False)
                         _rerun_flow()
         st.divider()
@@ -3474,6 +3552,10 @@ def _render_guided_flow(day_num, exercises, n_ex,
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
+                    # Before _push_nav_state: the rest belongs to the set that
+                    # just ended, so it must be on that record before the record
+                    # is snapshotted for "← Back".
+                    _record_rest_taken(_eidx)
                     _push_nav_state()
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
@@ -3509,7 +3591,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                             st.session_state.tp_phase = "intro"
                         else:
                             st.session_state.tp_set += 1
-                            st.session_state.tp_phase = "resting"
+                            _begin_rest()
                     _save_checkpoint(day_num)
                     _rerun_flow()
 
@@ -3517,6 +3599,10 @@ def _render_guided_flow(day_num, exercises, n_ex,
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
+                    # Before _push_nav_state: the rest belongs to the set that
+                    # just ended, so it must be on that record before the record
+                    # is snapshotted for "← Back".
+                    _record_rest_taken(_eidx)
                     _push_nav_state()
                     st.session_state.tp_side = "right"
                     st.session_state.tp_phase = "intro"
@@ -3545,7 +3631,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                             st.session_state.tp_phase = "intro"
                         else:
                             st.session_state.tp_set += 1
-                            st.session_state.tp_phase = "resting"
+                            _begin_rest()
                     _save_checkpoint(day_num)
                     _rerun_flow()
 
@@ -3554,6 +3640,10 @@ def _render_guided_flow(day_num, exercises, n_ex,
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
+                    # Before _push_nav_state: the rest belongs to the set that
+                    # just ended, so it must be on that record before the record
+                    # is snapshotted for "← Back".
+                    _record_rest_taken(_eidx)
                     _push_nav_state()
                     st.session_state.tp_rep_in_set = 1
                     st.session_state.tp_side = "right"
@@ -3589,7 +3679,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                             else:
                                 st.session_state.tp_set += 1
                                 st.session_state.tp_rep_in_set = 1
-                                st.session_state.tp_phase = "resting"
+                                _begin_rest()
                     else:
                         st.session_state.tp_rep_in_set += 1
                     _save_checkpoint(day_num)

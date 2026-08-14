@@ -376,6 +376,13 @@ RELEASE_EXERCISES: frozenset[str] = frozenset({
     "Lateral Step Walk",
     "Assessment Walk + Stair Check",
     "5-Minute Walk + Stair Assessment",
+    # Stage 2B's phase-2 raise. Four minutes of brisk incline walking, whose
+    # whole design brief is to cost nothing — it raises muscle temperature and
+    # moves the hips through range under their own power. It appears in EVERY
+    # session of the block, so classifying it as leg loading would mark every
+    # training day a leg day and leave no clean morning for a retest anywhere
+    # in the calendar.
+    "Walking Raise (Incline)",
 })
 
 #: Lower-body names that are CHEAP IN STRAIN BUT STILL WORK THE TESTED TISSUE.
@@ -395,6 +402,11 @@ MOBILITY_TIER_LOADS_LEGS: frozenset[str] = frozenset({
     # Loaded posterior chain and abductors — the "pullers" of pattern I
     "Single-Leg Glute Bridge",
     "Lateral Band Walk",
+    # The cluster session itself, added with Stage 2B. It is the most obvious
+    # member of this set and the easiest to forget: the stack works the exact
+    # tissue the battery measures, at end range, on purpose. A retest the
+    # morning after one would be measuring the session, not the athlete.
+    "Cluster A Flexibility Session",
 })
 
 

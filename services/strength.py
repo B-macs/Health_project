@@ -171,9 +171,12 @@ def qualifying_rows(rows: list[dict], today: date):
             continue
         if day > today:
             continue
+        # `not s.get("is_warmup")`: a ramp set is six reps at ~62% and would
+        # drag every 1RM estimate down as though it were a failed working set.
+        # Absent key = working, which is all history before 2026-08.
         loaded = [
             s for s in (row.get("sets") or [])
-            if (s.get("reps") or 0) and (s.get("weight") or 0)
+            if (s.get("reps") or 0) and (s.get("weight") or 0) and not s.get("is_warmup")
         ]
         if not loaded:
             continue
@@ -442,7 +445,8 @@ def weekly_measured_index(
         if wk < first or wk > last:
             continue
         loaded = [s for s in (row.get("sets") or [])
-                  if (s.get("reps") or 0) and (s.get("weight") or 0)]
+                  if (s.get("reps") or 0) and (s.get("weight") or 0)
+                  and not s.get("is_warmup")]
         if not loaded:
             continue
         rpe = row.get("exercise_rpe")

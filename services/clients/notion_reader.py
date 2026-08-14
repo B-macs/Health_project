@@ -148,7 +148,7 @@ TABLES = {
 #: stores them REAL and hands them back as floats; restoring the int keeps a
 #: seeded stepper reading "10" rather than "10.0". `weight` is absent on
 #: purpose: make_sets_data emits a float there.
-_INTEGRAL_SET_FIELDS = ("set_num", "reps", "rest", "tut")
+_INTEGRAL_SET_FIELDS = ("set_num", "reps", "rest", "tut", "rest_taken_seconds", "reps_left")
 
 #: Written into a synthesized page id. Not a valid Notion UUID, so a write
 #: that somehow reached one fails at the API naming this string, instead of
@@ -415,16 +415,36 @@ def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
 
 
 def _restore_set(row: sqlite3.Row) -> dict:
-    """One training_sets row as the dict the Sets JSON originally held."""
+    """One training_sets row as the dict the Sets JSON originally held.
+
+    Column reads go through `_col` rather than row[...] because a datastore.db
+    built before a column existed simply does not have it, and indexing a
+    missing key on a sqlite3.Row raises IndexError. That file is a cache the
+    athlete may not have rebuilt yet, and the whole point of the offline lane is
+    that it degrades to "this field wasn't recorded", not to a crash on every
+    read. Rebuild with scripts/build_datastore.py to populate the newer ones."""
+    def _col(name):
+        return row[name] if name in row.keys() else None
+
     out = {}
     for field in ("set_num", "reps", "weight", "rest", "tut", "velocity"):
-        v = row[field]
+        v = _col(field)
         if field in _INTEGRAL_SET_FIELDS and isinstance(v, float) and v.is_integer():
             v = int(v)
         out[field] = v
-    for optional in ("band_tier", "ts"):
-        if row[optional] is not None:
-            out[optional] = row[optional]
+    for optional in ("band_tier", "ts", "rest_taken_seconds", "reps_left", "weight_left"):
+        v = _col(optional)
+        if v is not None:
+            if optional in _INTEGRAL_SET_FIELDS and isinstance(v, float) and v.is_integer():
+                v = int(v)
+            out[optional] = v
+    # SQLite has no boolean: is_warmup comes back 0/1 and has a DEFAULT of 0, so
+    # unlike the fields above it is never NULL. Restore it as the bool the Sets
+    # JSON held, and only when True — build_set_record omits it otherwise, and a
+    # round-trip that added `is_warmup: False` to every historical set would not
+    # be the same document.
+    if _col("is_warmup"):
+        out["is_warmup"] = True
     return out
 
 

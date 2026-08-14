@@ -216,6 +216,22 @@ _OURA_DAILY_ENDPOINTS = (
 # with the historical backfill and pinned by its own test.
 _OURA_SYNC_ORDER = ("daily", "sleep_periods", "workouts", "sessions", "rest_mode_periods")
 
+
+def _working_volume_kg(sets: list[dict]) -> float:
+    """Sum of reps x weight across WORKING sets only — the value written to
+    every `total_volume_kg`, and the one services/volume.py adds up.
+
+    Warm-up sets are excluded because this is a claim about work done, matching
+    services/tonnage.py's own eligibility rule; without that the two weekly
+    kilogram figures in the app would disagree the first time a ramp set is
+    logged. `actual_sets` deliberately does NOT get the same treatment: it
+    counts sets performed, and a ramp set really was performed.
+
+    An absent `is_warmup` reads as a working set, which is what every set logged
+    before 2026-08 is."""
+    return round(sum((s.get("reps") or 0) * (s.get("weight") or 0.0)
+                     for s in sets if not s.get("is_warmup")), 1)
+
 # .sync_state.json key holding an unfinished run's per-tab counts, and how
 # long that marker stays resumable. See Repository.oura_sync_progress.
 _OURA_SYNC_PROGRESS_KEY = "oura_sync_progress"
@@ -935,8 +951,7 @@ class Repository:
                 sets = []
         if sets is not None:
             exercise_row["actual_sets"] = len(sets)
-            exercise_row["total_volume_kg"] = round(
-                sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in sets), 1)
+            exercise_row["total_volume_kg"] = _working_volume_kg(sets)
         if mode == supabase_store.UPSERT:
             exercise_row["exercise_id"] = exercise_id
         if exercise_row:
@@ -953,7 +968,15 @@ class Repository:
                  "reps": s.get("reps"), "weight": s.get("weight"),
                  "rest": s.get("rest"), "tut": s.get("tut"),
                  "velocity": s.get("velocity"), "band_tier": s.get("band_tier"),
-                 "ts": s.get("ts")}
+                 "ts": s.get("ts"),
+                 # A key absent from this projection is dropped without raising —
+                 # so every field added to services.sessions.build_set_record has
+                 # to be added here too, and to services/datastore.py's own
+                 # projection, and to the two schema files.
+                 "is_warmup": 1 if s.get("is_warmup") else 0,
+                 "rest_taken_seconds": s.get("rest_taken_seconds"),
+                 "reps_left": s.get("reps_left"),
+                 "weight_left": s.get("weight_left")}
                 for s in sets
             ], mode=supabase_store.REPLACE)
 
@@ -1578,7 +1601,7 @@ class Repository:
             except Exception:
                 sets = []
             actual_sets = len(sets)
-            total_volume = round(sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in sets), 1)
+            total_volume = _working_volume_kg(sets)
 
             d = g("Session Date", "date") or ""
             bucket = by_date.setdefault(d, {
@@ -1651,6 +1674,13 @@ class Repository:
         ALL prescribed sets hit the top of the rep range, not just the last
         set logged.
 
+        Warm-up sets are deliberately NOT filtered here. A ramp is authored as
+        its own exercise (training_plan._ex(warmup=True)) sitting beside the lift
+        it prepares, so a movement's sets are either all ramp or none — and
+        filtering would empty the ramp's own history, losing the last weight its
+        stepper should seed from. Double progression is unaffected either way:
+        ramp exercises carry no rep_min/rep_max, so it never runs on them.
+
         Returns None if the movement has never been logged, or its most
         recent logged page has an empty/unparseable Sets JSON."""
         pages = self._query(
@@ -1714,7 +1744,7 @@ class Repository:
                 "planned_reps": g("Planned Reps", "number"),
                 "exercise_rpe": g("Exercise RPE", "number"),
                 "actual_sets": len(sets),
-                "total_volume_kg": round(sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in sets), 1),
+                "total_volume_kg": _working_volume_kg(sets),
                 "session_duration_minutes": g("Session Duration", "number"),
                 "session_rpe": g("Session RPE", "number"),
                 "session_au": g("Session AU", "number"),

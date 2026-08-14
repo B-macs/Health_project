@@ -4,16 +4,63 @@
 
 ---
 
-## Current State (2026-08-10)
+## Current State (2026-08-14)
 
 | Item | Value |
 |------|-------|
-| Stage | **Stage 2** — Transition (external load) |
-| Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
-| Day | **Day 22 of 28** |
-| Gate | **2437/2437** — `python -m pytest tests/` |
-| Last code commit | The literature review lands in the design: every rationale now carries its true evidence tier |
-| Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required; run the battery cold BEFORE it, and read the warm-up review (step 1b below) before authoring a single day |
+| Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
+| Block | **Stage 2B — 28-Day Block**, starts **2026-08-17** (`training_plan.PLAN_STAGE2B`, Phase 3) |
+| Day | Block A day 0 — starts Monday |
+| Gate | **2885/2885** — `python -m pytest tests/` |
+| Last code commit | Stage 2B built, with the two prerequisites it could not run without |
+| Next action | **Sun 16 Aug: run `PLAN_STAGE2[28]`, and take the first battery baseline that morning** |
+
+### The two blocks, and why the dates are what they are
+
+| | Runs | Ends |
+|---|---|---|
+| **Block A** | 2026-08-17 (Mon) → 2026-09-13 (Sun) | reassess, and author Block B from its real data |
+| **Block B** | 2026-09-14 (Mon) → 2026-10-11 (Sun) | **race day is Block B's own day 28** |
+
+Starting on the Monday is what makes this work. Both blocks land Mon–Sun, which
+`services/plan.py`'s multiple-of-7 invariant and every spacing rule assume; the
+Ireland trip falls on days **3–14**, so gym work resumes exactly at the top of
+week 3 with nothing stranded mid-week; and the 10 km lands as day 28 of Block B
+rather than somewhere inside it.
+
+### Next actions, in order — the athlete's, not the code's
+
+1. **Sun 16 Aug** — run `PLAN_STAGE2[28]`. Two of the six Stage 2A exit criteria
+   (final working loads, functional screen) cannot be judged without it.
+2. **Battery baseline mornings: 16, 19 and 20 Aug.** Cold, first thing, before
+   anything else that day. The cluster stack cannot be authored without a
+   pattern — `prescribe(None)` raises by design — and the battery has still
+   never been run. **Verify each morning with `flexibility.leg_loading_days`
+   against the real log rather than by eye**: Saturday's walk may classify as a
+   leg day and block the 16th. Capture the straddle width and heel distance at
+   the same sitting — the number is the record.
+3. **Fri 21 Aug** — the anterior-hip pressure protocol starts, the day AFTER the
+   battery baseline and not before. Contaminating the tilt measurement is the
+   pre-declared failure mode.
+4. **~24 Aug** — two-week verdict on the pec/scar protocol, in the standardised
+   prayer position.
+5. **This week** — raise the desk to standing elbow height measured ON the
+   treadmill deck, and raise the monitor by the same amount. Dominant driver of
+   the trapezius symptom; costs nothing.
+6. **Before ~Sept** — the InBody bridge scan. Unrecoverable once the gym swaps
+   machines.
+
+### Held deliberately
+
+- **ACWR stays advisory through Block A** (athlete, 2026-08-14). A new phase
+  resets the stage-scoped chronic window, so from 2026-08-30 that window is
+  **12 of 14 travel days**; a breach during the ramp back would be an artefact
+  of the trip, not of training. Evaluate at Block B against normal loading.
+- **The auto-progression machine is deferred.** Block A keeps the weekly load
+  ladders one more block; `docs/training/auto_progression_design.md` is
+  unchanged and still design-only.
+- **`rest_taken_seconds` feeds nothing** (`sessions.REST_TAKEN_FEEDS_DURATION`).
+  Recorded from day one, wired in on a measurement rather than a date.
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
 flare meant the Day 14 exit criteria were not met on the original schedule.

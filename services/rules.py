@@ -158,10 +158,32 @@ MOVEMENT_RULES: list[MovementRule] = [
         reason="Axial impact loads activate L5/S1 osteochondrosis.",
         stage_cap=1, severity="contraindicated", laterality="axial",
     ),
+    # RUNNING: contraindicated below Stage 2, CAUTION from Stage 2 on.
+    #
+    # Corrected 2026-08-14, with the athlete's sign-off, and it is a correction
+    # rather than a relaxation. check_movement only ever UPGRADES a verdict to
+    # contraindicated when the stage is too low — `severity if stage_ok else
+    # "contraindicated"` — so a rule already written at that severity can never
+    # lift, whatever its stage_cap says. This rule carried stage_cap=2 and its
+    # own reason text said "contraindicated in Stage 1", both of which say the
+    # block was meant to end at Stage 2; the code could not express it, and
+    # returned contraindicated at Stage 2 AND Stage 3 alike.
+    #
+    # It surfaced because Stage 2B introduces running (physio-confirmed
+    # 2026-08-12; 10 km on 2026-10-11). The alternative — naming the sessions so
+    # they miss the keyword — is the vocabulary failure this file has already
+    # been burned by, where one hyphen turned a hard block into silence.
+    #
+    # REVERT CONDITION: any recurrence of the left Sartorius strain (twice, from
+    # running overuse) or lumbar symptoms that track running volume. Then this
+    # goes back to stage_cap=3, which is a real block again rather than a
+    # no-op, and the running days come out of the plan.
     MovementRule(
         movement="running",
-        reason="Repetitive axial impact — contraindicated in Stage 1 with active osteochondrosis.",
-        stage_cap=2, severity="contraindicated", laterality="axial",
+        reason=("Repetitive axial impact — contraindicated in Stage 1 with active "
+                "osteochondrosis. From Stage 2: cleared with monitoring, and volume "
+                "progresses conservatively given the twice-recurred left hip flexor."),
+        stage_cap=2, severity="caution", laterality="axial",
     ),
 
     # ── Caution: Stage 1 — cleared from Stage 2 with monitoring ─────────────
