@@ -87,6 +87,14 @@ CHECKPOINT_FIELDS = (
     "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
     "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
     "tp_actuals", "tp_set_log", "tp_garmin_declared", "tp_rest_started_at",
+    # The accessory session's whole day dict, because unlike a plan day it
+    # cannot be looked up again from a day number — it was CHOSEN, from
+    # regional strain readings that will have moved by the time a dropped
+    # phone reconnects. `None` on a plan session, and it must stay in
+    # _init_state's defaults: the checkpoint payload is built by indexing
+    # session_state with every name here, and a missing one silently stops
+    # the whole checkpoint saving.
+    "tp_accessory_plan",
 )
 
 #: Read-time HOLD, the biometrics.HRV_GARMIN_HOLD idiom. `rest_taken_seconds`

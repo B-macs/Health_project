@@ -3591,3 +3591,342 @@ PLAN_STAGE2B[28] = {
         ),
     ],
 }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  THE ACCESSORY SESSION — content only.  Added 2026-08-16.
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# A second, short session offered on the training page's "+" button, chosen
+# automatically from today's and yesterday's REGIONAL strain. This module holds
+# the WHAT; services/accessory.py holds the choosing, and views/training.py
+# renders it through the same guided flow the plan session uses. The split is
+# the mechanics -> battery -> prescription idiom the flexibility cluster already
+# runs on, and a test fails if the choosing leaks in here.
+#
+# WHY IT IS NOT A SIXTH SESSION. STAGE_CONSTRAINTS[2]["session_freq_max"] is 5
+# and weeks 3-4 of this block already sit at exactly 5. What this session is,
+# instead, is the family the repo already runs daily and the physiotherapist
+# already cleared: release work at ~50% effort inside a ~10-minute dose, which
+# docs/training/release_protocols_2026-08-10.md states in terms is "not a
+# training stressor". Two such protocols were already prescribed and lived only
+# in a document, i.e. only in memory. This puts them in the app and lets the
+# regional strain decide what, if anything, gets ACTIVATED beside them.
+#
+# THREE RULES SHAPE EVERY ITEM BELOW, and none of them is a preference:
+#
+#   1. NEVER A HELD CORRECTED POSTURE. The athlete asked for a fix for rounded
+#      shoulders and an arched back, and the obvious answer — hold the corrected
+#      position — is the one route the record already shows failing: the
+#      2026-07-06 entry is a genuine left iliocostalis/QL strain produced by
+#      carrying a swayback correction through a whole walk, and its own lesson
+#      is that "a comfortable posture change is not a conditioned one". So the
+#      fix here is release plus SHORT-EFFORT activation, and nothing is cued to
+#      be carried into the rest of the day.
+#
+#   2. SHORT EFFORTS, NOT LONG HOLDS. SCAPULAR_ISOMETRIC carries the argument in
+#      full: at matched loading time four 3-second contractions more than
+#      doubled the stiffness gain of one 12-second hold, the 45-second hold is
+#      n=6 about analgesia with three failed replications, and the tissue here
+#      is perfusion-limited left trapezius, where a sustained low-level
+#      contraction is the PROVOCATIVE mechanism. Scapular holds stay under 30 s.
+#
+#   3. ~50% EFFORT, PAIN <=2/10, RAMP IN AND OUT OVER 3-5 s. The annex's shared
+#      conduct rules. This is the line between a release session and a sixth
+#      training session, and it is why the session RPE target is 2-3.
+#
+# NAMES ARE REUSED DELIBERATELY. Where an exercise already exists in a plan its
+# NAME is kept exactly, even where the accessory dose is shorter, so that
+# training_constants' three maps and services/flexibility's leg-day allow-list
+# carry one definition of each name rather than two that can drift.
+
+# ─── Slot 1: decompress.  THE HANG LADDER ────────────────────────────────────
+#
+# Cluster D section A prescribes hanging outright, names feet-supported hangs as
+# a legitimate starting point, and says daily short exposures beat one long
+# weekly block. Against that: three anterior dislocations, a failed capsular
+# wrap and a Latarjet on a shallow glenoid, with stability now MUSCULAR rather
+# than ligamentous — so a fully passive hang asks the restraint that is not
+# there to hold the joint, which is also what the hypermobility profile says to
+# avoid.
+#
+# Both are true, so the hang is a LADDER rather than a yes or a no. Step 3 is
+# authored but held: services/accessory.HANG_MAX_STEP keeps it out of any
+# session until it is earned, in the cluster_a_mechanics.DEFERRED idiom, because
+# it is the only step that is genuinely passive end-range loading on a
+# stabilised shoulder.
+#
+# ADVANCE ON TWO CLEAN WEEKS, never on a good day. Drop a step on any
+# apprehension, any instability sensation, any right-shoulder ache that outlasts
+# the session, or any rise in the interscapular reading; twice means back to
+# step 1 and an entry in symptom_log. Re-test at EIGHT weeks, not four — the
+# source's own timescale, and it says to treat a null as informative rather than
+# as a reason to try harder.
+
+HANG_FEET_SUPPORTED = _ex(
+    name="Dead Hang (Feet Supported)",
+    ex_type="hold",
+    sets=3, hold_seconds=20, rest_seconds=45,
+    mechanics=(
+        "Set the bar low enough, or use a box, that your feet stay on the ground and take "
+        "some of your weight. Take an overhand grip a little wider than your shoulders. "
+        "BOTH HANDS, ALWAYS. Let the weight come onto your arms gradually — never a "
+        "shrug-and-drop — and keep the shoulders ACTIVE: shoulder blades gently pulled down "
+        "away from your ears, not collapsed up around them. Twenty seconds, then stand up "
+        "and let go. Take as much weight through the feet as you need to keep that position."
+    ),
+    biomechanical_focus=(
+        "Axial decompression and overhead exposure, entered at the step the shoulder cluster "
+        "itself names as a legitimate start. Feet on the floor is what makes this a "
+        "controlled-range position rather than passive end-range loading — which at Beighton "
+        "6/9, on a shoulder whose stability is muscular rather than ligamentous, is the "
+        "distinction that matters."
+    ),
+    progression=("Two clean weeks at this step, no apprehension and no right-shoulder ache "
+                 "afterwards -> Active Hang. Never advance on one good day."),
+    regression=("Anything at the right shoulder -> take more weight through the feet and "
+                "shorten to 10 seconds. There is no rush; this works on a months timescale."),
+    warning=(
+        "STOP the hang for the day on any of these at the RIGHT shoulder: a hard, abrupt, "
+        "unspringy end-feel; any sense the joint might go; any apprehension. On a stabilised "
+        "shoulder a hard end-feel may be doing load-bearing work, and it is not something to "
+        "push on. Never hang from one arm."
+    ),
+)
+
+HANG_ACTIVE = _ex(
+    name="Active Hang",
+    ex_type="hold",
+    sets=3, hold_seconds=15, rest_seconds=60,
+    mechanics=(
+        "Full bodyweight now, feet off the floor, overhand grip, BOTH HANDS. Step up to the "
+        "bar rather than jumping to it. Keep the shoulders ON the whole time — blades pulled "
+        "down and back so your ears stay clear of your shoulders — and hold that. Fifteen "
+        "seconds. Step down under control; do not drop off."
+    ),
+    biomechanical_focus=(
+        "The same exposure with the muscles doing the holding. This is the step that suits "
+        "this body: control rather than range is where the return is on a post-Latarjet "
+        "shoulder, and the cluster's own reading is that the scapular, cuff and puller "
+        "patterns — all control — are the likely priorities here."
+    ),
+    progression=("Two clean weeks holding the shoulders on for the full fifteen seconds -> "
+                 "the passive step becomes reviewable. It is held, not scheduled."),
+    regression="Shoulders creep up toward the ears -> back to the feet-supported step.",
+    warning=(
+        "STOP the hang for the day on a hard, abrupt end-feel at the right shoulder, on any "
+        "apprehension, or on any instability sensation. Never one arm at a time."
+    ),
+)
+
+HANG_PASSIVE = _ex(
+    name="Passive Dead Hang",
+    ex_type="hold",
+    sets=3, hold_seconds=30, rest_seconds=60,
+    mechanics=(
+        "Full bodyweight, BOTH HANDS, and this time the shoulders are allowed to relax up "
+        "toward the ears. Step up to the bar, settle, and let the tissue take it for thirty "
+        "seconds. Accumulate two to three minutes across the sets. Step down under control."
+    ),
+    biomechanical_focus=(
+        "The source's own endpoint, and the only step that is genuinely passive end-range "
+        "loading. Held out of the session by services/accessory.HANG_MAX_STEP until the "
+        "active step has run clean for two weeks — not because the physio prohibited it, but "
+        "because nobody has been asked, and this is the one item here where the shoulder "
+        "history and the source document disagree."
+    ),
+    progression="Accumulating 2-3 minutes comfortably -> that is the dose asked for; hold there.",
+    regression="Any right-shoulder complaint -> straight back to the active step and stay there.",
+    warning=(
+        "HELD BY DESIGN. If this ever appears in a session, the two-clean-week condition was "
+        "met deliberately. Both hands always — never one arm, at any step of this ladder. "
+        "Stop on any apprehension, any instability sensation, or any hard, abrupt end-feel "
+        "on the right."
+    ),
+)
+
+#: The three steps, easiest first. services/accessory.py picks one; it never
+#: picks more than one, and HANG_MAX_STEP bounds which are reachable.
+ACCESSORY_HANG_LADDER = (HANG_FEET_SUPPORTED, HANG_ACTIVE, HANG_PASSIVE)
+
+
+# ─── Slot 3: release B, upper.  Protocol 1, out of the document ──────────────
+#
+# docs/training/release_protocols_2026-08-10.md Techniques A and B, which the
+# physiotherapist prescribed on 2026-08-10 and which have run daily from a
+# document ever since. They are one prescription in two techniques and are kept
+# together for that reason, which is why the upper recipe is the only one that
+# runs to seven items.
+
+PEC_SCAR_RELEASE = _ex(
+    name="Pec & Scar Release (Right)",
+    ex_type="hold",
+    sets=2, hold_seconds=60, rest_seconds=15,
+    mechanics=(
+        "Stand facing a wall with a massage ball between the wall and the upper-RIGHT chest, "
+        "just below the outer third of the collarbone, angled in toward the bony knob at the "
+        "front of the shoulder. This is not rolling. Pin one tender spot with steady pressure "
+        "and then MOVE THE ARM slowly — from resting at your side to reaching forward and "
+        "slightly up, palm turning out — five or six slow passes, then find the next spot. "
+        "For the scar itself: lie on your back and use fingertips beside the scar line, not "
+        "raking along it, with small slow circles and gentle skin-glide each way."
+    ),
+    biomechanical_focus=(
+        "The diagnosis is scar adhesion plus high resting tone in a shortened range — not a "
+        "short muscle — which is why release applied THROUGH movement is expected to "
+        "outperform stretching here. This is also the front half of the rounded-shoulder "
+        "answer: the retractors are being asked to work against a front wall that is gripping."
+    ),
+    progression="Spots that talked back going quiet -> drop to twice a week; that is the endpoint.",
+    regression=("A week of finding nothing tender -> the local job is done. Unchanged after two "
+                "weeks means self-release is not enough and it goes to the physio for hands-on "
+                "work, which is the shoulder cluster's own answer."),
+    warning=(
+        "Pain never above 2/10. Move off immediately on any point-specific ice-pick feeling, on "
+        "any tingling, numbness or ache running into the arm — that is nerve — and on any pulse "
+        "under the pressure, which is a vessel. Never press into the hollow of the armpit."
+    ),
+)
+
+ANTERIOR_SHOULDER_RECIPROCATION = _ex(
+    name="Anterior Shoulder Reciprocation (Right)",
+    ex_type="reps",
+    sets=3, reps=1, rest_seconds=30,
+    mechanics=(
+        "Sit with the RIGHT elbow resting on the right knee, forearm hanging, elbow and "
+        "shoulder in one vertical line — the arm stays LOW and close to the body throughout. "
+        "One cycle: press the palm gently inward against your other hand, building over 3-5 "
+        "seconds, hold 5 seconds at tension rather than maximum — about half effort, no "
+        "shaking — then ease out over 3-5 seconds. Then actively rotate the forearm OUTWARD "
+        "to its comfortable end range under its own power and HOLD ten seconds. That is one "
+        "cycle. Three of them, varying the elbow angle each time — more open, more closed — "
+        "biased toward wherever the front of the shoulder feels LONG."
+    ),
+    biomechanical_focus=(
+        "Active work biased toward the long position, which is the opposite of the position "
+        "that cramps. The arm stays low because external rotation at 90 degrees of abduction "
+        "is the apprehension position the Latarjet exists to protect, and that is a geometric "
+        "limit rather than a matter of load."
+    ),
+    progression="Comfortable at ten seconds -> build the outward hold toward thirty over two weeks.",
+    regression=("The lock-out cramp appears -> the position has drifted too short. Open the "
+                "elbow angle rather than pushing through it."),
+    warning=(
+        "NEVER external rotation at 90 degrees of abduction on this side. Stop on any "
+        "ice-pick sensation, anything running into the arm, any instability feeling, or any "
+        "hard, abrupt, unspringy end-feel on the outward rotation — on a stabilised shoulder "
+        "that restriction may be load-bearing."
+    ),
+)
+
+
+# ─── Slot 3: release B, lower.  The other half of the arched back ────────────
+#
+# Stage 1 carried three hip-flexor items; they vanished at the Stage 2A
+# transition with no recorded reason, leaving the deep hip flexors the only
+# structure on the overactive list with no release anywhere in the block — while
+# the imaging names psoas hypertonicity as what amplifies the L5/S1 compression.
+# ANTERIOR_HIP_RELEASE closed half of that in week 3. This closes the other half
+# at a dose the accessory budget can carry: 45 s a side rather than Stage 1's 90.
+
+ACC_STANDING_HIP_FLEXOR = _ex(
+    name="Standing Hip Flexor Release",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=1, hold_seconds=45, rest_seconds=15,
+    mechanics=(
+        "Stand facing a wall and step ONE foot forward onto a low step or a thick book, that "
+        "knee at about 90 degrees. Back foot on the floor, back knee soft. TUCK THE PELVIS "
+        "UNDER FIRST — tailbone down, lower back long — and only then shift the hips forward "
+        "until you feel a deep stretch at the FRONT of the back hip. The tuck is the "
+        "exercise; if you arch the lower back to get more range you have taken the stretch "
+        "off the hip flexor and put it into the spine. Forty-five seconds, then the other side."
+    ),
+    biomechanical_focus=(
+        "Psoas lengthening at its L1-L4 anterior attachment. This is the direct answer to the "
+        "arched back: the habitual standing pattern is anterior pelvic tilt with short psoas, "
+        "iliacus and rectus femoris against relatively underactive glutes and anterior core, "
+        "so the correction is to lengthen the front and switch on the back — never to hold a "
+        "corrected posture."
+    ),
+    progression="Comfortable and the tuck holds -> deepen the tuck rather than reaching further forward.",
+    regression="Lower back complains -> shorten the forward shift; the tuck matters, the range does not.",
+    warning=(
+        "Your sense of neutral is calibrated to the habitual anterior tilt, so a genuinely "
+        "neutral pelvis will feel further tucked than it is. Trust the cue, not the feeling."
+    ),
+)
+
+
+# ─── Slot 4: activate.  Shorter doses of the block's own items ───────────────
+#
+# Every name here already exists in the block. The doses are cut so the session
+# lands in the release family rather than becoming training: this is meant to
+# support the day's real session, not compete with it.
+
+ACC_THORACIC_EXTENSION = _ex(
+    name="Thoracic Extension (Rolled Towel)",
+    ex_type="hold",
+    sets=2, hold_seconds=45, rest_seconds=20,
+    mechanics=(
+        "Lie back over a rolled towel placed across the MID-back, knees bent, arms overhead. "
+        "Breathe into it for forty-five seconds, then move the towel a few centimetres up or "
+        "down the spine and repeat. Ribs stay down — if they flare, or the lower back starts "
+        "taking it, bend the knees more and breathe out longer."
+    ),
+    biomechanical_focus=(
+        "The T6-T10 segments that sitting stiffens. A thoracic spine stuck in flexion tilts "
+        "the shoulder blade forward off the ribcage and leaves the retractors holding "
+        "LENGTHENED all day, which is a mechanically losing position — so this is the "
+        "mobility half of the rounded-shoulder answer and the retraction work is the strength "
+        "half."
+    ),
+    progression="Comfortable -> reach the arms further overhead, not further into extension.",
+    regression="Ribs flare or the low back arches -> more knee bend, longer exhale, smaller range.",
+    warning=(
+        "THORACIC ONLY. End-range lumbar extension is contraindicated against the L5/S1 "
+        "retrolisthesis and the narrowed right foramen. Stop where the lower back starts to "
+        "take it."
+    ),
+)
+
+ACC_SIDE_BRIDGE_SHORT = _ex(
+    name="Full Side Bridge",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=2, hold_seconds=20, rest_seconds=30,
+    mechanics=(
+        "On your side, elbow under the shoulder, feet stacked. Lift the hips until head, hips "
+        "and feet are in one line and hold twenty seconds. Then the other side. Deliberately "
+        "well short of the block's own dose — this is a reminder for the lateral trunk, not a "
+        "set."
+    ),
+    biomechanical_focus=(
+        "Lateral trunk endurance at a dose that costs nothing. The deep core stabilisers are "
+        "the second of the two underactive structures, and the record shows them turning off "
+        "under fatigue rather than being absent."
+    ),
+    progression="Twenty seconds a side is easy -> that is the block's job, not this session's.",
+    regression="Hips sag -> drop to the knees and keep the line.",
+)
+
+ACC_BREATHING = _ex(
+    name="Prone Decompression Breathing",
+    ex_type="duration",
+    sets=1, duration_minutes=2, rest_seconds=0,
+    mechanics=(
+        "Lie face down, arms by your sides or folded under your forehead. Breathe deeply into "
+        "your lower back and let the belly expand into the floor on each inhale. Completely "
+        "passive — no movement at all. Two minutes. A folded towel under the abdomen if it is "
+        "uncomfortable."
+    ),
+    biomechanical_focus=(
+        "The close. Diaphragmatic breathing inhibits the psoas — they sit against each other "
+        "at L1-L4 — so this both finishes the session and re-states its whole point: this "
+        "session down-regulates, and the day's real session is where the work happens."
+    ),
+    progression="Comfortable -> stay for the full two minutes rather than adding anything.",
+    regression=("Uncomfortable face down -> towel under the abdomen, or lie on your back with "
+                "the knees bent instead."),
+    warning="Stop immediately on any tingling or numbness in a leg in this position.",
+)

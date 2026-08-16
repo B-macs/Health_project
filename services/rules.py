@@ -570,6 +570,129 @@ MOVEMENT_RULES: list[MovementRule] = [
                "here so it is not caught by the lumbar 'back extension' rule.",
         stage_cap=1, severity="cleared", laterality="bilateral",
     ),
+
+    # ── The accessory session ────────────────────────────────────────────────
+    # Added 2026-08-16 with services/accessory.py. Every one of these movements
+    # returned `unknown` before this block existed, and `unknown` is not a block
+    # — the same silence that let a loaded lumbar-flexion movement through on a
+    # single hyphen. A hang in particular is a shoulder prescription on a twice-
+    # operated joint, so it is ruled before it is ever offered.
+    MovementRule(
+        movement="hang",
+        reason="Hanging from a bar. BOTH ARMS ALWAYS — a single-arm hang is never "
+               "prescribed. The right shoulder has had three anterior dislocations, a "
+               "failed capsular wrap and a Latarjet on a shallow glenoid, and its "
+               "stability is now muscular rather than ligamentous, so a passive hang asks "
+               "the restraint that is not there to hold the joint. Enter with the "
+               "shoulders ACTIVE and the feet taking weight; never a shrug-and-drop into "
+               "the bottom of the sag. Stop on the right for the session at any hard, "
+               "abrupt, unspringy end-feel, any apprehension, or any instability "
+               "sensation. Cleared to progress only on two clean weeks per step.",
+        stage_cap=2, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="pec scar release",
+        reason="Pectoral and surgical-scar self-release, right side. Physio-cleared "
+               "2026-08-10 for self-directed use and expected to OUTPERFORM stretching "
+               "here — the diagnosis is scar adhesion plus high resting tone in a "
+               "shortened range, not a short muscle. Inhibitory and unloaded. Never press "
+               "into the hollow of the armpit, and move off anything that pulses or sends "
+               "sensation into the arm.",
+        stage_cap=1, severity="cleared", laterality="right",
+    ),
+    MovementRule(
+        movement="anterior shoulder reciprocation",
+        reason="Active anterior-wall work on the stabilised right shoulder — press in, "
+               "then rotate out under its own power and hold. THE ARM STAYS LOW "
+               "THROUGHOUT: elbow on knee, elbow and shoulder in one vertical line. Never "
+               "external rotation at 90° abduction, which is the apprehension position "
+               "the Latarjet exists to protect. Ramp in and out over 3-5 s at ~50% "
+               "effort. Stop on any hard, abrupt end-feel on the outward rotation — on a "
+               "stabilised shoulder that restriction may be doing load-bearing work.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="standing hip flexor",
+        reason="Standing hip-flexor release. Lengthens the deep right hip flexors and "
+               "psoas, which the imaging names as amplifying the L5/S1 compression. Keep "
+               "the pelvis TUCKED — the range comes from the hip, and letting it come "
+               "from the lower back is the arch this exercise exists to undo.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="thoracic extension",
+        reason="Extension over a support, THORACIC ONLY. The mid-back is the target; the "
+               "lower back is not, and end-range lumbar extension is contraindicated "
+               "against the L5/S1 retrolisthesis and the narrowed right foramen. Ribs "
+               "down, no rib flare, and stop where the lower back starts to take it.",
+        stage_cap=1, severity="caution", laterality="axial",
+    ),
+    MovementRule(
+        movement="prone decompression",
+        reason="Prone decompression breathing. Unloaded, position-only, and the "
+               "down-regulating close to a session rather than a stressor in it.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    # Five names the accessory session emits that were already live in the block
+    # and already returning `unknown`. They are ruled here because this session
+    # offers them, not because they are new. ⚠ Sixteen OTHER Stage 2B names are
+    # still unknown — a pre-existing gap, out of scope here, and tracked
+    # separately rather than half-closed.
+    MovementRule(
+        movement="anterior hip pressure",
+        reason="Sustained pressure at the front of the hip. Inhibitory rather than "
+               "loading, and prescribed by the physiotherapist on 2026-08-10 to release "
+               "what sitting holds short. CAUTION rather than cleared for one reason: the "
+               "inner front of the hip carries the leg's main artery and nerve. Stay on "
+               "the OUTER half, never press where you feel a pulse, and stop on any "
+               "tingling, numbness or electric sensation down the leg.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="single leg glute bridge",
+        reason="Single-leg glute bridge. Glute max activation — the primary underactive "
+               "muscle in the profile — unloaded, supine, spine neutral. Named separately "
+               "because a cleared rule must head the name it clears, and 'glute bridge' "
+               "does not head this one.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="full side bridge",
+        reason="Full side bridge. Lateral trunk endurance in a neutral spine, one of "
+               "McGill's own three, with no flexion and no rotation under load. Named "
+               "separately from the modified version for the same heading reason.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="side bridge",
+        reason="Side bridge, any variant. Lateral trunk endurance in a neutral spine — "
+               "the flexion-free alternative to the contraindicated sit-up and crunch.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="prone y raise",
+        reason="Prone Y-raise. Lower-trapezius strengthening, which is the standing "
+               "requirement for maintaining the Latarjet repair's stability, and the one "
+               "scapular item the log shows genuinely lapsing. Keep the low back relaxed "
+               "— this is a shoulder-blade movement, not a back extension.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="scapular wall slide",
+        reason="Scapular wall slide. Upward rotation and lower trapezius against a wall, "
+               "unloaded, arms tracking within contact. Stop where contact is lost rather "
+               "than arching off neutral to get the arms higher.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="scapular retraction",
+        reason="Scapular retraction isometric. Physio-approved 2026-08-10, both sides, "
+               "right-biased. LOAD IN NEUTRAL ONLY, never in the head-down-and-right "
+               "position that provokes the symptom, and as short repeated efforts rather "
+               "than a sustained hold — the left trapezius is perfusion-limited, where "
+               "sustained low-level contraction is the provocative mechanism.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
 ]
 
 

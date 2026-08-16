@@ -20,6 +20,7 @@ import time
 import nav
 import repo
 import training_plan as tp
+from services import accessory as acc
 from services import background_sync
 from services import engine
 from services import metrics
@@ -27,6 +28,7 @@ from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
 from services import scheduling
 from services import sessions as sess
+from services import strain_regions
 from services import flexibility as fx
 from services import yoga as yg
 from services.repository import PhasesCorruptError
@@ -697,6 +699,7 @@ def _init_state(day_num: int | None = None):
         "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
         "tp_rest_started_at":  0,        # Unix timestamp, stamped when a rest phase BEGINS — see _record_rest_taken
         "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
+        "tp_accessory_plan":   None,     # the accessory session's day dict while one is running; None on a plan session. MUST have a default — it is in sess.CHECKPOINT_FIELDS, and building that payload indexes session_state directly
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
     for k, v in defaults.items():
@@ -704,6 +707,12 @@ def _init_state(day_num: int | None = None):
             st.session_state[k] = v
     if is_fresh_session and day_num is not None:
         checkpoint = _load_checkpoint(day_num)
+        # A connection dropped mid-ACCESSORY session left its checkpoint under
+        # acc.ACCESSORY_DAY_KEY, which the plan-day lookup above cannot match
+        # (that is the point of the key). Look there before giving up, or a
+        # backgrounded phone silently loses the session it was in.
+        if checkpoint is None:
+            checkpoint = _load_checkpoint(acc.ACCESSORY_DAY_KEY)
         if checkpoint:
             for k in sess.CHECKPOINT_FIELDS:
                 if k not in checkpoint:
@@ -715,15 +724,35 @@ def _init_state(day_num: int | None = None):
                 if k in ("tp_actuals", "tp_set_log") and isinstance(v, dict):
                     v = {int(i): entry for i, entry in v.items()}
                 st.session_state[k] = v
+        # A restored accessory session must be TODAY'S. Unlike a plan day
+        # number, acc.ACCESSORY_DAY_KEY is the same every day, so
+        # `restore_from_checkpoint`'s day match cannot tell a session abandoned
+        # yesterday from one in progress now — and the app would reopen a dead
+        # session every morning. The date on the day dict is what separates
+        # them; a stale one clears the whole flow rather than only its plan, so
+        # nothing is left half-restored.
+        _acc_day = st.session_state.get("tp_accessory_plan") or {}
+        if _acc_day and _acc_day.get("accessory_date") != date.today().isoformat():
+            for k in ("tp_accessory_plan", "tp_started", "tp_done_today",
+                      "tp_session_logged", "tp_ex_idx", "tp_set", "tp_rep_in_set",
+                      "tp_actuals", "tp_set_log"):
+                st.session_state[k] = defaults[k]
         # Authoritative check, independent of the checkpoint above: if a session is
         # already logged in Notion for today, never allow re-entering the exercise
         # flow — a missing/stale/lost checkpoint must not let a second session start.
-        try:
-            if repo.get_repository().has_logged_session(date.today()):
-                st.session_state.tp_done_today = True
-                st.session_state.tp_session_logged = True
-        except Exception:
-            pass
+        #
+        # SKIPPED while an accessory session is live. has_logged_session is a
+        # question about the PLAN day (it filters supplementary types out on
+        # purpose), so applying its answer here would end a session it is not
+        # talking about — and the accessory session is expressly allowed to run
+        # on a day whose plan session is already done.
+        if not st.session_state.get("tp_accessory_plan"):
+            try:
+                if repo.get_repository().has_logged_session(date.today()):
+                    st.session_state.tp_done_today = True
+                    st.session_state.tp_session_logged = True
+            except Exception:
+                pass
 
 
 def _reset_session(day_num: int | None = None):
@@ -757,7 +786,18 @@ def _get_plan_start() -> date | None:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
-                      duration_minutes: int, notes: str) -> None:
+                      duration_minutes: int, notes: str,
+                      movement_type_override: str | None = None) -> None:
+    """Write a completed session to Notion, one row per exercise.
+
+    `movement_type_override` forces the `Type` select on every row, which is
+    how the accessory session logs as `acc.ACCESSORY_TYPE` rather than as a
+    per-exercise movement category. That single string is the whole
+    supplementary mechanism: `Repository.SUPPLEMENTARY_SESSION_TYPES` reads it,
+    and `has_logged_session` therefore keeps returning False, so an accessory
+    session can never mark a plan day done. Yoga and the Garmin outdoor import
+    do exactly the same thing with their own literals.
+    """
     r = repo.get_repository()
     garmin_minutes = st.session_state.get("tp_garmin_minutes", {})
     garmin_detail = st.session_state.get("tp_garmin_activity_detail", {})
@@ -805,7 +845,7 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         last_id = r.save_training_exercise(
             session_id=session_info["session_id"],
             movement_name=ex["name"],
-            movement_type=sess.movement_category(ex),
+            movement_type=movement_type_override or sess.movement_category(ex),
             planned_sets=ex.get("sets", 1),
             planned_reps=sess.planned_reps(ex),
             # NOT session_rpe. Copying the session's single slider value onto
@@ -2094,8 +2134,9 @@ def _render_overview(day_num: int, active, today_plan: dict,
 #  this page's 840px column (see _PAGE_CSS above).
 # ─────────────────────────────────────────────────────────────────────────────
 
-_ADD_FAB_YOGA_BG  = "linear-gradient(135deg, #6BCB77, #2E8B57)"
-_ADD_FAB_EXTRA_BG = "linear-gradient(135deg, #FF7A45, #E8402C)"
+_ADD_FAB_YOGA_BG      = "linear-gradient(135deg, #6BCB77, #2E8B57)"
+_ADD_FAB_EXTRA_BG     = "linear-gradient(135deg, #FF7A45, #E8402C)"
+_ADD_FAB_ACCESSORY_BG = "linear-gradient(135deg, #7C8CF8, #4A5AD8)"
 
 _ADD_FAB_CSS = f"""<style>
 [data-testid="stElementContainer"]:has(.stAddFabToggle) + [data-testid="stElementContainer"] {{
@@ -2156,13 +2197,34 @@ _ADD_FAB_CSS = f"""<style>
     font-weight: 600 !important;
     box-shadow: 0 4px 14px rgba(0,0,0,0.35) !important;
 }}
+[data-testid="stElementContainer"]:has(.stAddFabAccessory) + [data-testid="stElementContainer"] {{
+    position: fixed !important;
+    top: 182px !important;
+    right: max(20px, calc((100vw - 840px)/2 + 16px)) !important;
+    z-index: 900 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+}}
+[data-testid="stElementContainer"]:has(.stAddFabAccessory) + [data-testid="stElementContainer"]
+    [data-testid="stBaseButton-secondary"] {{
+    background: {_ADD_FAB_ACCESSORY_BG} !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 22px !important;
+    height: 44px !important;
+    font-weight: 600 !important;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35) !important;
+}}
 </style>"""
 
 
 def _render_add_training_fab() -> None:
     """Floating "+" menu, fixed top-right, present across every training-page
-    state. Expands to Yoga (→ yoga-picker, same page) and Extra Workout (stub —
-    no destination yet)."""
+    state. Three entries: Yoga (→ yoga-picker), Hike / Walk (→ the Garmin
+    outdoor importer) and Accessory (→ a strain-chosen short second session).
+
+    The three CSS blocks position by hard-coded `top`, not by stacking, so a
+    fourth entry needs its own block at 234px rather than only a button here."""
     st.markdown(_ADD_FAB_CSS, unsafe_allow_html=True)
 
     open_ = st.session_state.get("tp_fab_open", False)
@@ -2171,6 +2233,14 @@ def _render_add_training_fab() -> None:
     if st.button("×" if open_ else "+", key="tp_fab_toggle"):
         st.session_state.tp_fab_open = not open_
         st.rerun()
+
+    if st.session_state.pop("tp_accessory_blocked", False):
+        st.warning(
+            "There's a session in progress. Finish it or exit it first — an accessory "
+            "session shares the same saved progress, so starting one now would lose "
+            "where you are.",
+            icon="⛔",
+        )
 
     if open_:
         st.markdown('<div class="stAddFabYoga" style="display:none"></div>', unsafe_allow_html=True)
@@ -2184,6 +2254,224 @@ def _render_add_training_fab() -> None:
             st.session_state.tp_hike_select = True
             st.session_state.tp_fab_open = False
             st.rerun()
+
+        st.markdown('<div class="stAddFabAccessory" style="display:none"></div>',
+                    unsafe_allow_html=True)
+        if st.button("🧩  Accessory", key="tp_fab_accessory"):
+            st.session_state.tp_fab_open = False
+            _start_accessory_session()
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  The accessory session — a short second training, chosen by regional strain.
+#  services/accessory.py decides WHAT; everything here is presentation, and it
+#  deliberately runs through the SAME guided flow as the plan session rather
+#  than a second screen that would drift away from the first one.
+# ─────────────────────────────────────────────────────────────────────────────
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _region_rows(days: int = 31) -> list[dict]:
+    """Per-day regional AU. Its own fetch, and cached: the accessory session is
+    the only thing on this page that reads it, and it is read on a button press
+    rather than on every render."""
+    return repo.get_repository().get_daily_region_au(days=days)["rows"]
+
+
+def _accessory_choice(active, day_num: int | None, policy_directive: dict):
+    """Everything services/accessory.choose needs, gathered defensively.
+
+    Every read here is wrapped, and each failure degrades to the conservative
+    side rather than to an error: no regional history means the tie-break
+    decides, no battery record means the front-of-hip protocol stays held, and
+    an unreadable phase means today is treated as unplanned. A health page that
+    crashes because a Sheets read timed out is worse than one that offers a
+    slightly blunter session.
+    """
+    r = repo.get_repository()
+    today = date.today()
+
+    plan_day = None
+    if active is not None and day_num is not None:
+        plan_day = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
+
+    try:
+        rows = _region_rows()
+    except Exception:
+        rows = []
+
+    region_acwr = None
+    try:
+        # PHASE_META's stage, never the phase number — Phase 3 is Stage 2B at
+        # clinical stage 2, and indexing STAGE_CONSTRAINTS by the phase number
+        # would read it as a Stage 3 ceiling.
+        stage = int(sess.PHASE_META.get(getattr(active, "phase_number", 0), {})
+                    .get("stage") or r.get_current_stage())
+        region_acwr = strain_regions.region_acwr(
+            rows, stage, today=today,
+            stage_start=ph.current_stage_start(r.get_phases(), today))
+    except Exception:
+        region_acwr = None
+
+    baseline_captured, legs_clean = False, False
+    try:
+        stored = r.get_flexibility_assessments()
+        baseline_captured = bool(stored)
+        if stored:
+            status, _ = fx.retest_readiness(
+                stored[-1].taken_on, today,
+                fx.leg_loading_days(r.get_recent_sessions(days=3)))
+            legs_clean = status == fx.RETEST_TOMORROW
+    except Exception:
+        pass
+
+    return acc.choose(plan_day=plan_day, region_rows=rows, region_acwr=region_acwr,
+                      volume_rec=policy_directive,
+                      battery_baseline_captured=baseline_captured,
+                      legs_must_stay_clean=legs_clean, today=today)
+
+
+def _start_accessory_session() -> None:
+    """Build today's accessory session and hand it to the guided flow.
+
+    ⚠ REFUSES WHILE A PLAN SESSION IS IN FLIGHT. There is one checkpoint slot,
+    so entering here mid-session would overwrite the plan session's saved
+    progress — and `_reset_session` below would clear the live state that
+    checkpoint was mirroring. Saying so is better than silently losing a
+    half-finished workout.
+    """
+    if st.session_state.get("tp_started") and not st.session_state.get("tp_session_logged"):
+        st.session_state.tp_accessory_blocked = True
+        st.rerun()
+
+    try:
+        _, active = _get_phases_and_active_phase()
+    except Exception:
+        active = None
+    day_num = ph.day_number_in_phase(active, date.today()) if active else None
+    choice = _accessory_choice(active, day_num, _engine_directive())
+
+    _reset_session()
+    st.session_state.tp_accessory_plan = acc.build_day(choice)
+    st.rerun()
+
+
+def _clear_training_state() -> None:
+    for k in [k for k in st.session_state.keys() if k.startswith("tp_")]:
+        del st.session_state[k]
+
+
+def _exit_accessory_session() -> None:
+    """Leave the accessory session and hand the page back to the plan day.
+
+    TWO STEPS, and skipping either one leaves the session un-exitable:
+
+    1. OVERWRITE THE PERSISTED CHECKPOINT with cleared state. `_init_state`
+       restores an accessory checkpoint by a CONSTANT key, so clearing only
+       `session_state` means the very next render reads the live session
+       straight back off disk — Discard appears to do nothing at all. The plan
+       session never had this problem because its key is a day number that
+       stops matching tomorrow. Same overwrite `_reset_session(day_num)`
+       already does for a plan day, for the same reason.
+
+    2. THEN delete the `tp_*` keys again, leaving them ABSENT rather than
+       re-seeded. That is what makes the next render's `_init_state(day_num)`
+       see a fresh session and re-run the authoritative `has_logged_session`
+       check — otherwise the page would believe today's plan session had not
+       been done, on a day it may well have been.
+    """
+    _clear_training_state()
+    _init_state()                              # defaults, so the payload can be built
+    _save_checkpoint(acc.ACCESSORY_DAY_KEY)    # cleared state, under the accessory key
+    _clear_training_state()
+    st.rerun()
+
+
+def _render_accessory_session(policy: dict, readiness_modifier: float,
+                              volume_factor: float) -> None:
+    """Overview -> guided flow -> completion, for the accessory session.
+
+    The middle stage is `_render_guided_flow` itself, unchanged and shared: it
+    already takes its checkpoint handle as a parameter, so passing
+    `acc.ACCESSORY_DAY_KEY` (negative, and every real plan day is >= 1) keeps
+    the two sessions' checkpoints from ever being mistaken for one another.
+    Only the chrome around it is written here, because the plan session's
+    chrome is day-numbered and a day number is the one thing this session has
+    no meaningful value for.
+    """
+    day = st.session_state.get("tp_accessory_plan") or {}
+    exercises = day.get("exercises") or []
+    n_ex = len(exercises)
+
+    st.markdown(
+        f"<h2 style='margin-bottom:2px;'>{day.get('objective', 'Accessory')}</h2>"
+        f"<p style='color:{_OV_TEXT_SEC};font-size:14px;margin-top:0;'>"
+        f"{day.get('phase', '')} — RPE target ≤{day.get('session_rpe_target', 3)}/10</p>",
+        unsafe_allow_html=True,
+    )
+
+    # ── Completion ──────────────────────────────────────────────────────────
+    if st.session_state.get("tp_done_today"):
+        if st.session_state.get("tp_session_logged"):
+            st.success("Accessory session logged.")
+            if st.button("Done", type="primary", use_container_width=True):
+                _exit_accessory_session()
+            return
+
+        started = st.session_state.get("tp_session_start_ts") or 0
+        elapsed = (max(3, int((time.time() - started) / 60)) if started
+                   else sess.estimate_duration(exercises))
+        with st.form("log_accessory_form"):
+            session_rpe = st.slider(
+                "Session RPE — how hard did it feel?", min_value=1, max_value=10,
+                value=day.get("session_rpe_target", 3),
+                help="This one should be low. If it is climbing past about 4 it has stopped "
+                     "being an accessory session and is competing with the real one.",
+            )
+            st.caption(f"Duration: **{elapsed} min** (auto-timed)")
+            extra = st.text_area("Session Notes (optional)", height=80)
+            if st.form_submit_button("Save Accessory Session", type="primary",
+                                     use_container_width=True):
+                notes = day.get("accessory_note") or ""
+                if extra.strip():
+                    notes = f"{notes}\n{extra.strip()}".strip()
+                try:
+                    _auto_log_session(acc.ACCESSORY_DAY_KEY, exercises, session_rpe,
+                                      elapsed, notes,
+                                      movement_type_override=acc.ACCESSORY_TYPE)
+                except Exception as exc:
+                    st.error(f"Couldn't save the session: {exc}")
+                else:
+                    st.session_state.tp_session_logged = True
+                    _save_checkpoint(acc.ACCESSORY_DAY_KEY)
+                    st.rerun()
+        if st.button("Discard", use_container_width=True):
+            _exit_accessory_session()
+        return
+
+    # ── Overview, until Start is tapped ─────────────────────────────────────
+    if not st.session_state.get("tp_started"):
+        st.caption(
+            f"{n_ex} items · about {sess.estimate_duration(exercises)} min "
+            f"(reads low — per-side work is counted once)"
+        )
+        _render_exercise_timeline(exercises)
+        with st.expander("Why this session", expanded=False):
+            for reason in day.get("accessory_reasons") or ():
+                st.markdown(f"- {reason}")
+        c_start, c_cancel = st.columns([3, 1])
+        if c_start.button("Start", type="primary", use_container_width=True):
+            st.session_state.tp_started = True
+            _save_checkpoint(acc.ACCESSORY_DAY_KEY)
+            st.rerun()
+        if c_cancel.button("Cancel", use_container_width=True):
+            _exit_accessory_session()
+        return
+
+    # ── In progress ─────────────────────────────────────────────────────────
+    if st.button("Exit accessory session", use_container_width=True):
+        _exit_accessory_session()
+    _render_guided_flow(acc.ACCESSORY_DAY_KEY, exercises, n_ex,
+                        policy, readiness_modifier, volume_factor)
 
 
 def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> None:
@@ -2512,6 +2800,18 @@ def render():
     # services/sessions.py's LOAD RESOLUTION section.
     _policy = sess.load_policy(_engine_directive(), _readiness_modifier)
     _volume_factor = _policy["volume_factor"]
+
+    # ── The accessory session owns the page while one is running ────────────
+    # Placed AFTER _policy because it renders through the same guided flow and
+    # therefore needs the same load resolution, and BEFORE the two scheduling
+    # writer blocks because those remap today's day-number and this session has
+    # no day-number to remap. It deliberately does not draw the "+" FAB: the
+    # one thing that must not be reachable from inside a session is the button
+    # that starts another one.
+    if st.session_state.get("tp_accessory_plan"):
+        _render_accessory_session(_policy, _readiness_modifier, _volume_factor)
+        nav.inject("training")
+        st.stop()
 
     # ── Missed-session rescheduling — priority-based carry within the week ──────
     # ASK-FIRST (the athlete's rule, 2026-08-07): a proposal that would MOVE a

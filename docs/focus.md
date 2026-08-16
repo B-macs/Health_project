@@ -11,8 +11,8 @@
 | Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
 | Block | **Stage 2B — 28-Day Block**, starts **2026-08-17** (`training_plan.PLAN_STAGE2B`, Phase 3) |
 | Day | Block A day 0 — starts Monday |
-| Gate | **2920/2920** — `python -m pytest tests/` |
-| Last code commit | Per-exercise RPE now comes from heart rate, not from the session slider |
+| Gate | **3020/3020** — `python -m pytest tests/` |
+| Last code commit | The accessory session — a strain-chosen second training on the "+" button |
 | Next action | **Sun 16 Aug: Stage 2A's last day (day 26). Run the day-28 screen YOURSELF — the app will not offer it** |
 
 ### The two blocks, and why the dates are what they are
@@ -56,6 +56,49 @@ rather than somewhere inside it.
    the trapezius symptom; costs nothing.
 6. **Before ~Sept** — the InBody bridge scan. Unrecoverable once the gym swaps
    machines.
+
+### The accessory session — new 2026-08-16, on the "+" button
+
+A second, short session (10–20 min), offered any day, chosen automatically from
+today's and yesterday's **regional** strain. `services/accessory.py` decides,
+`training_plan.py` holds the content, `views/training.py` renders it through the
+SAME guided flow as the plan session.
+
+- **It is not a sixth session.** `session_freq_max` is 5 and weeks 3–4 already
+  sit at 5. This is authored in the family the physio already cleared and you
+  already run daily — release work at ~50 % effort inside ~10 min, which
+  `release_protocols_2026-08-10.md` states in terms is *not a training
+  stressor*. Both of those protocols now live in the app instead of in memory.
+- **It still counts.** Logs as `Type="Accessory"`, feeds Foster AU → Strain and
+  ACWR, and **never** marks a plan day done (`SUPPLEMENTARY_SESSION_TYPES`).
+- **Two tiers.** FULL (~19 min) on moderate days; SHRUNK (~10 min, release only,
+  zero adaptation-seeking work) on rest days, assessment days, gym days at RPE
+  ≥6, and any day the engine has already cut volume. Over the 28-day block that
+  is 15 shrunk / 13 full.
+- **Today is projected, not read** — it assumes the day's real session happens
+  whether or not it is logged yet, which is what stops it stacking work onto a
+  region the block is about to load.
+- **Regional ACWR may swap a region; it may never refuse a session.**
+
+**Three things to decide, and they are yours:**
+
+1. **`HANG_MAX_STEP = 2`.** The hang is a three-step ladder and step 3 (Passive
+   Dead Hang) is **held** — the only genuinely passive end-range loading on a
+   shoulder with three dislocations, a failed wrap and a Latarjet on a shallow
+   glenoid. Cluster D prescribes it; the clinical record argues against it;
+   nobody has asked the physio. Raise to 3 only after two clean weeks at step 2
+   **and** the question has been put. Raise `HANG_STEP` (currently 1) on two
+   clean weeks alone.
+2. **The interscapular exit criterion is being confounded.** Its own text says
+   the intervention under test is the **desk height, not the training**. Upper
+   activation days now add scapular work, and the session note says so, so the
+   confound is visible at the reassessment rather than found afterwards.
+3. **One new stressor per week.** The shrunk tier is release-family and clears
+   that bar from day 1. If you want the activation tier staggered, that is a
+   single constant away — say so and it gets one.
+
+**Not yet exercised:** the save path. It was verified by source test, not by
+writing a session you did not do.
 
 ### Held deliberately
 

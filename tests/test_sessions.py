@@ -1127,6 +1127,10 @@ _STATE = {
     "tp_side": "right", "tp_session_start_ts": 12345.0, "tp_actuals": {},
     "tp_set_log": {}, "tp_garmin_declared": False,
     "tp_rest_started_at": 12400.0,
+    # None on a plan session; the accessory session's whole day dict while one
+    # is running. Present-but-None rather than absent is the point — see
+    # CHECKPOINT_FIELDS' own note on why a missing key kills the checkpoint.
+    "tp_accessory_plan": None,
 }
 
 

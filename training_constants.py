@@ -148,6 +148,15 @@ _UPPER_BODY_EXERCISES: tuple[str, ...] = (
     "Band Single-Arm Row",
     "Band Face Pull",
     "Scapular Retraction Isometric",
+    # The accessory session (services/accessory.py). Hangs are upper body by
+    # sector even though the whole body is on the bar — the grip, the lats and
+    # the shoulder girdle are what is working, and the legs are cargo. The two
+    # releases are the right shoulder's own protocol.
+    "Dead Hang (Feet Supported)",
+    "Active Hang",
+    "Passive Dead Hang",
+    "Pec & Scar Release (Right)",
+    "Anterior Shoulder Reciprocation (Right)",
 )
 
 _CORE_EXERCISES: tuple[str, ...] = (
@@ -521,6 +530,18 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # whole subject is the pelvis, not the hamstrings.
     "Cluster A Flexibility Session":          {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
     "Anterior Hip Pressure Release":          {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    # ── The accessory session ───────────────────────────────────────────────
+    # A hang is the whole body on a bar, but only the top of it is working: the
+    # grip, the lats and the shoulder girdle hold, the trunk resists the swing,
+    # and the legs are cargo. The passive step gives the trunk less to do than
+    # the active one, which is the entire difference between them. The two
+    # releases are point pressure and low-arm active work at one shoulder, so
+    # they sit where the other unloaded upper-body drills sit.
+    "Dead Hang (Feet Supported)":             {"upper_body": 0.80, "core": 0.20, "lower_body": 0.00},
+    "Active Hang":                            {"upper_body": 0.80, "core": 0.20, "lower_body": 0.00},
+    "Passive Dead Hang":                      {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Pec & Scar Release (Right)":             {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
+    "Anterior Shoulder Reciprocation (Right)": {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -716,4 +737,17 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Scapular Retraction Isometric":            ("isolation", 0.3),
     "Cluster A Flexibility Session":            ("mobility_core", 0.25),
     "Anterior Hip Pressure Release":            ("mobility_core", 0.25),
+    # ── The accessory session ───────────────────────────────────────────────
+    # The two full-bodyweight hangs are the athlete's own mass held by the
+    # shoulder girdle across several joints, which is what bodyweight_compound
+    # describes -- the same tier the step-ups and wall sits sit at. The
+    # feet-supported step is deliberately a tier lower: the feet are carrying
+    # enough of the weight that calling it the same work would overstate it,
+    # and it is the step that runs on the heavy days when the session shrinks.
+    # The two releases are unloaded point pressure and half-effort active work.
+    "Dead Hang (Feet Supported)":               ("mobility_core", 0.25),
+    "Active Hang":                              ("bodyweight_compound", 0.5),
+    "Passive Dead Hang":                        ("bodyweight_compound", 0.5),
+    "Pec & Scar Release (Right)":               ("mobility_core", 0.25),
+    "Anterior Shoulder Reciprocation (Right)":  ("mobility_core", 0.25),
 }

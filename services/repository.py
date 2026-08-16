@@ -1774,11 +1774,17 @@ class Repository:
         return len(pages) > 0
 
     #: Session Type values that are SUPPLEMENTARY training: real load, real
-    #: strain, but never a substitute for the plan day — a logged Yoga flow
-    #: or an imported outdoor activity (hike/walk/trail run from Garmin)
-    #: must not mark the rehab plan day as done, must not block the manual
-    #: day swap, and must not close the missed-session carry.
-    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor"})
+    #: strain, but never a substitute for the plan day — a logged Yoga flow,
+    #: an imported outdoor activity (hike/walk/trail run from Garmin), or an
+    #: accessory session (services/accessory.py) must not mark the rehab plan
+    #: day as done, must not block the manual day swap, and must not close the
+    #: missed-session carry.
+    #:
+    #: This frozenset IS the mechanism, for all three. Everything else follows
+    #: from membership here, which is why the accessory session needs no
+    #: special case anywhere in `has_logged_session`, the swap gates or the
+    #: reschedule logic — only its own literal on the write.
+    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor", "Accessory"})
 
     def has_logged_session(self, d: date) -> bool:
         """True only for a logged rehab-plan session — a logged Yoga,
