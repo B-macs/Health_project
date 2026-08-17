@@ -357,12 +357,38 @@ def test_the_block_releases_the_front_of_the_hip_at_all():
     assert _ANTERIOR_DAYS, "no anterior-hip release anywhere in the block"
 
 
-def test_it_waits_for_week_three():
-    """The daily protocol that establishes whether there is anything there to
-    release cannot start until the day after the battery is captured — the
-    seated tilt is the battery's central measurement. Two weeks of that lands in
-    week 3."""
-    assert min(_ANTERIOR_DAYS) >= 15, _ANTERIOR_DAYS
+def test_it_no_longer_waits_for_week_three():
+    """This test used to assert `min(_ANTERIOR_DAYS) >= 15`, and the constraint
+    it encoded was real: the seated tilt is the flexibility battery's central
+    measurement, and starting a new anterior-hip intervention before the
+    baseline was captured would contaminate it. Two weeks of the daily protocol
+    landed in week 3.
+
+    THE CONDITION IS NOW MET, so the gate is lifted rather than weakened. The
+    athlete ran the battery cold on four separate mornings; the app lost every
+    recording but the last, which is the same persistence failure that lost the
+    per-exercise notes. His direction (2026-08-17): the surviving reading is the
+    record and the baseline is complete. Requiring four more cold mornings
+    because this system dropped the first four is a bug charging interest, not a
+    clinical requirement.
+
+    ⚠ What no instruction repairs, and what this test does NOT claim: three
+    mornings established the NOISE FLOOR as well as the baseline. With one
+    stored reading the spread is unknown, so BatteryResult.trusted stays False
+    and a future change cannot be judged against ~2x the observed spread.
+
+    REVERT: if the battery baseline is ever re-run from scratch, this gate comes
+    back — restore `anterior=week >= 3` at the four call sites in
+    training_plan._s2b_gym_a, _s2b_gym_a_bands, _s2b_run_day and _s2b_cluster.
+    """
+    assert min(_ANTERIOR_DAYS) == 1, _ANTERIOR_DAYS
+    # The reason it moved is hip-flexor coverage, so it must be on every
+    # hip-loaded day rather than merely present somewhere.
+    hip_days = [d for d in DAYS
+                if any(e["name"] == "Ischial Tuberosity Hamstring Release"
+                       for e in PLAN[d]["exercises"])]
+    missing = [d for d in hip_days if d not in _ANTERIOR_DAYS and d != 28]
+    assert not missing, f"hip-loaded days with no front-of-hip release: {missing}"
 
 
 def test_it_is_off_on_the_assessment_day():

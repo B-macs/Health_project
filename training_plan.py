@@ -2480,9 +2480,11 @@ ANTERIOR_HIP_RELEASE = _ex(
     laterality="unilateral",
     sets=1, hold_seconds=60, rest_seconds=0,
     mechanics=(
-        "Only run this once the daily front-of-hip protocol has shown tender points that "
-        "actually quiet down — if two weeks of it found nothing to respond to, skip this and "
-        "record that, because the null is the finding. "
+        "UNGATED 2026-08-17 (athlete): this waited on the flexibility battery baseline, and "
+        "he has captured it — four cold mornings, of which the app lost all but the last. "
+        "The surviving reading is the record. Running the release IS how you find out "
+        "whether there is anything here to respond; if two weeks find no tender point that "
+        "quiets down, skip it from then on and record that, because the null is the finding. "
         "Lie face down with a massage ball between the floor and the front of the hip, on the "
         "meaty pocket-corner just below and outside the point of the hip bone. Settle your "
         "weight onto it slowly and wait 60 seconds, breathing, until the tissue lets go under "
@@ -2847,8 +2849,8 @@ def _s2b_prep(lower: bool) -> list:
 
 def _s2b_release(hip_loaded: bool, anterior: bool = False) -> list:
     """Phase 1. Pressure releases, with the ischial-tuberosity release leading
-    on hip-loaded days. About 5 min, 8.5 on hip days, 10.5 once the anterior-hip
-    item joins in week 3.
+    on hip-loaded days. About 5 min, 9.4 on hip days — the anterior-hip item now
+    runs from DAY 1 rather than week 3.
 
     ── 2026-08-17: THE HIP-LOADED HEAD WAS REPLACED, ON MEASUREMENT ──────────
     It was [capsule stretch, Coxa Saltans drill]. Both were retired the same
@@ -2893,14 +2895,30 @@ def _s2b_release(hip_loaded: bool, anterior: bool = False) -> list:
 
     ── original note ────────────────────────────────────────────────────────
 
-    `anterior` adds the front-of-hip release, and it is deliberately NOT on from
-    day 1. The daily protocol that establishes whether there is anything there
-    to release cannot start until the day after the flexibility battery is
-    captured, because the seated tilt is the battery's central measurement and
-    starting a new intervention first would contaminate it. Two weeks of that
-    protocol lands in week 3, which is when this appears — gated on the
-    protocol's own verdict rather than on the calendar, which is why the
-    condition is written into the exercise's own text.
+    `anterior` adds the front-of-hip release. It USED to wait until week 3, on
+    one condition only: the seated tilt is the flexibility battery's central
+    measurement, and starting a new anterior-hip intervention before the
+    baseline was captured would contaminate it. That condition is now MET —
+    the athlete ran the battery cold on four separate mornings and the app
+    lost every recording but the last (the same persistence failure that lost
+    the session notes). His direction, 2026-08-17: the surviving reading is the
+    record, treat the baseline as complete. Making him repeat four cold
+    mornings because this system dropped them is not a clinical requirement,
+    it is a bug charging interest.
+
+    ⚠ WHAT IS GENUINELY LOST, and no instruction repairs it: three mornings
+    established the NOISE FLOOR, not just the baseline value. With one stored
+    reading there is no measured spread, so `BatteryResult.trusted` stays False
+    and a future change cannot be judged against ~2x the observed spread the
+    way services/battery.py intends. Future deltas need either a rebuilt
+    spread or a deliberately wider margin — they cannot be read as results on
+    a single point.
+
+    It brings the release forward to day 1 for a second reason on the same day:
+    the athlete's psoas hypothesis for the standing hinge crack. Finding #4 is
+    already an iliopsoas tendon on the right, the MRI names psoas hypertonicity
+    as what amplifies the L5/S1 compression, and 'deep right hip flexors / TFL'
+    sits on the overactive list. This is the only release aimed there.
 
     It is also off on the day-28 assessment: that screen's value is
     comparability with the Stage 1 and Stage 2A versions of itself, and a new
@@ -2941,7 +2959,7 @@ def _s2b_gym_a(week: int) -> dict:
         "session_rpe_target": 7 if week == 4 else 6,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _s2b_release(hip_loaded=True, anterior=week >= 3)
+        "exercises": _s2b_release(hip_loaded=True, anterior=True)
                       + _s2b_prep(lower=True) + ramp + [
             _ex(
                 name="Goblet Squat",
@@ -3163,7 +3181,7 @@ def _s2b_band_a(week: int) -> dict:
         "session_rpe_target": 5,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _s2b_release(hip_loaded=True) + _s2b_prep(lower=True) + [
+        "exercises": _s2b_release(hip_loaded=True, anterior=True) + _s2b_prep(lower=True) + [
             BAND_FRONT_SQUAT,
             BAND_RDL,
             BAND_HIP_THRUST,
@@ -3322,7 +3340,7 @@ _RUN_DAYS = {
 def _s2b_run_day(day: int) -> dict:
     label, name, minutes, mech, focus, prog, regr, *rest = _RUN_DAYS[day]
     return _s2b_run(label, name, minutes, mech, focus, prog, regr,
-                    rpe=rest[0] if rest else 4, anterior=day >= 15)
+                    rpe=rest[0] if rest else 4, anterior=True)
 
 
 def _s2b_mobility(week: int, away: bool = False) -> dict:
@@ -3434,7 +3452,7 @@ def _s2b_cluster(week: int) -> dict:
         "session_rpe_target": 4,
         "is_gym_session": False,
         "day_type": "stretch",
-        "exercises": _s2b_release(hip_loaded=True, anterior=week >= 3) + [PREP_RAISE] + [
+        "exercises": _s2b_release(hip_loaded=True, anterior=True) + [PREP_RAISE] + [
             _ex(
                 name="Cluster A Flexibility Session",
                 ex_type="duration",
