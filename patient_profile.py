@@ -1775,6 +1775,84 @@ PROFILE = {
                 "already cleared; none of it waits on a visit.",
             ],
         },
+        {
+            "date":   "2026-08-17",
+            "status": "Measured — FIRST reassessment of findings #1, #2 and #4 since 2026-06-28",
+            "region": "Right hip — upper glute, posterior capsule, iliopsoas tendon path",
+            "title":  "Findings #1 / #2 / #4 Re-Read Cold, Day 1 of Stage 2B",
+
+            "why_this_exists": (
+                "Findings #1-#6 were established 2026-06-28 and NONE had been re-measured in the "
+                "seven weeks since — through a whole Stage 2A block and its sign-off. The audit "
+                "that produced these readings found the reason: the functional screen named in "
+                "both stage-exit criteria was prescribed 20 times across three blocks, performed "
+                "4 times, and produced a recorded value ZERO times. So no stage transition has "
+                "ever been judged against the evidence it names. These four readings are, "
+                "literally, the first data any of these findings has generated since the day "
+                "they were written."
+            ),
+
+            "readings": {
+                "coxa_saltans_finding_4": (
+                    "NO CRACKING. ⚠ Needs one clarification before it is acted on: the drill is "
+                    "performed in NEUTRAL/internal rotation, which is designed to avoid the snap, "
+                    "so absence there is expected and tests nothing. The finding's own trigger is "
+                    "flexion + EXTERNAL rotation. If the reading was taken with ER, finding #4 has "
+                    "materially changed and the drill has met its authored progression."
+                ),
+                "upper_glute_finding_1": (
+                    "Slight resting grip, RIGHT side. Still present, described as slight. "
+                    "Consistent with the 2026-08-06 exercise note ('Right glute upper was tight "
+                    "going into training but feels good now') and with the check-in series, where "
+                    "glute medius last appears 2026-07-17 and is absent from the 26 check-ins "
+                    "since. Direction of travel is down; it is not gone."
+                ),
+                "standing_hinge_crack_finding_2": (
+                    "PRESENT — slight crack in BOTH directions on the right, better than before. "
+                    "This is the first recorded observation of finding #2 in the entire history: "
+                    "the crack had never once been reported in a session note across 33 sessions. "
+                    "⚠ Read carefully against the original: the finding's timeline is 'only occurs "
+                    "every few days — requires accumulation of joint compression', i.e. a "
+                    "SPONTANEOUS frequency. This reading is from DELIBERATE provocation, so it is "
+                    "not the same measurement and must not be scored as 'more frequent than "
+                    "before'. What it establishes is that the finding is LIVE."
+                ),
+                "posterior_capsule": (
+                    "NOT MEASURED — the test as posed ('quadruped, both sides, any asymmetry?') "
+                    "was not a test, and the athlete said so. It named no position, no unit and no "
+                    "threshold. The real instrument is hip INTERNAL ROTATION range, which the "
+                    "posterior capsule is what restricts — and which nothing in this system "
+                    "currently measures, the flexibility battery included."
+                ),
+            },
+
+            "what_this_changes": [
+                "Finding #2 is LIVE and now has a baseline. The quadruped capsule stretch "
+                "authored the same day is the intervention under test, and this is the reading it "
+                "is judged against.",
+                "Finding #1 is present but slight, and its Stage 1 exit criterion "
+                "('measurable reduction in resting grip/tightness of upper glute') was already MET "
+                "on 2026-07-19. The open question is not whether it reduced — it did — but whether "
+                "it holds without a daily release, which cannot be answered while the release runs "
+                "28 days out of 28.",
+                "Finding #4 is pending the ER clarification above. If clean, the drill's own "
+                "progression fires ('10 reps without snap -> single-leg stand at 90 degrees hip "
+                "flexion with neutral rotation'), and the 2B hip_click exit criterion needs "
+                "rewriting: 'no INCREASE in frequency' is a no-worsening test that cannot detect "
+                "resolution and would pass identically either way.",
+            ],
+
+            "method_note": (
+                "THE TESTS PROPOSED WERE TOO VAGUE TO BE TESTS, and the athlete rejected them on "
+                "that basis — correctly. 'Is the right still tighter, and by how much?' has no "
+                "position, no unit and no threshold, so it collects an impression and records it "
+                "as a measurement. His counter-proposal is the Bunkie Test: five timed positional "
+                "holds, both sides, which is a CAPACITY measure. That is the class of instrument "
+                "this system has never had — everything here is range or symptom, while the "
+                "compensation pattern the whole rehab rests on is a capacity claim (glute max "
+                "underactive, upper glute over-gripping to compensate)."
+            ),
+        },
     ],
 
     # ─────────────────────────────────────────────────────────────────────────
