@@ -73,7 +73,18 @@ from services.clients import oura                    # noqa: E402
 from services.config import load_config              # noqa: E402
 from services.repository import Repository           # noqa: E402
 
-DEFAULT_REDIRECT_URI = "http://localhost:8765/callback"
+#: The URI actually registered on this Oura application, discovered on
+#: 2026-08-17 by reading where a real consent redirect landed. It is the
+#: HOSTED APP, which is the sensible choice (key rule 18) and is why every
+#: localhost variant probed was rejected.
+#:
+#: ⚠ It must be sent at BOTH authorize and token exchange. Oura accepts an
+#: authorize request that omits it — that is what the first attempt did — but
+#: then rejects the exchange with a bare `400 invalid_request` naming
+#: nothing, and appears to burn the authorization code in the process, so the
+#: retry with the URI present fails identically and the failure looks like a
+#: wrong URI rather than a spent code. Send it always.
+DEFAULT_REDIRECT_URI = "https://healthproject.streamlit.app/"
 
 
 def _load_overrides() -> dict:
@@ -267,12 +278,11 @@ def _finish(repo: Repository, config, landed: str) -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--redirect-uri", default="",
-                    help="must match the Oura application EXACTLY. Default is blank, "
-                         "which omits the parameter and lets Oura use the application's "
-                         "own registered URI — the only flow this application currently "
-                         f"accepts. Pass e.g. {DEFAULT_REDIRECT_URI} only after "
-                         "registering it at cloud.ouraring.com/oauth/applications.")
+    ap.add_argument("--redirect-uri", default=DEFAULT_REDIRECT_URI,
+                    help=f"must match the Oura application EXACTLY (default "
+                         f"{DEFAULT_REDIRECT_URI}, the URI actually registered). "
+                         "Required: a blank one is refused, because Oura issues a code "
+                         "for it and then refuses to exchange that code.")
     ap.add_argument("--manual", action="store_true",
                     help="print the URL and paste the redirect back, instead of serving. "
                          "Implied when --redirect-uri is blank, since there is no known "

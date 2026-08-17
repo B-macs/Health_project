@@ -262,21 +262,29 @@ def test_authorize_url_carries_every_required_parameter():
     assert "state=st4te" in url
 
 
-def test_a_blank_redirect_uri_omits_the_parameter_in_both_halves(monkeypatch):
-    """Measured against the live application on 2026-08-17: omitting
-    redirect_uri reaches the consent screen, every localhost variant is a
-    bare 400. Omission is therefore the only flow that works without first
-    editing the Oura application registration — and the authorize and token
-    requests have to agree, or the exchange is an invalid_grant that reads
-    like a bad code."""
-    url = oura.authorize_url("cid", "", ("daily",), "st")
-    assert "redirect_uri" not in url
+def test_a_blank_redirect_uri_is_refused_in_both_halves(monkeypatch):
+    """MEASURED THE HARD WAY, 2026-08-17, at the cost of two live codes.
 
-    seen = {}
-    monkeypatch.setattr(oura.requests, "post", lambda u, data=None, **k: (
-        seen.update(data), _Resp(200, {"access_token": "a", "expires_in": 60}))[1])
-    oura.exchange_code("cid", "sec", "code", "")
-    assert "redirect_uri" not in seen
+    Oura serves the consent screen for an authorize request with no
+    redirect_uri (302, and a real user can complete consent) — but the code
+    it issues can never be exchanged: the token endpoint requires
+    redirect_uri in the payload and matches it against the authorization
+    request, so every exchange returns a bare `400 invalid_request` naming
+    nothing. An earlier version of this file asserted the opposite, having
+    verified only the authorize half.
+
+    Refusing up front is the point. The failure otherwise lands at the token
+    endpoint minutes later, after a human has already been to a browser, and
+    reads like a wrong URI or an expired code rather than a request that was
+    malformed from the start.
+    """
+    with pytest.raises(oura.OuraAuthError, match="redirect_uri"):
+        oura.authorize_url("cid", "", ("daily",), "st")
+
+    monkeypatch.setattr(oura.requests, "post",
+                        lambda *a, **k: pytest.fail("must refuse before calling out"))
+    with pytest.raises(oura.OuraAuthError, match="redirect_uri"):
+        oura.exchange_code("cid", "sec", "code", "")
 
 
 def test_a_supplied_redirect_uri_is_sent_in_both_halves(monkeypatch):

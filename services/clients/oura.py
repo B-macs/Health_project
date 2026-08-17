@@ -74,29 +74,37 @@ def authorize_url(client_id: str, redirect_uri: str, scopes, state: str) -> str:
     a default value would be the same for every caller, which is the same as
     not having one.
 
-    A BLANK `redirect_uri` OMITS THE PARAMETER, which is a supported flow and
-    the one this project needs. OAuth2 lets a client with a single registered
-    redirect URI leave it out, and Oura then uses the registered value.
-    Measured against this application on 2026-08-17: omitting it reaches the
-    consent screen (302), while http/https localhost and 127.0.0.1 are all
-    rejected (400 invalid_request) — so the registered URI is something else,
-    and Oura's error names neither the expected nor the supplied value. Being
-    able to omit it is what makes authorisation possible without first
-    editing the application registration.
+    ⚠ `redirect_uri` IS REQUIRED HERE, and a blank one is refused rather than
+    omitted. Oura will happily serve the consent screen without it — measured
+    2026-08-17, a no-redirect_uri authorize returns 302 and a real user can
+    complete consent — but the resulting code CANNOT BE EXCHANGED. Oura's
+    token endpoint requires redirect_uri in the payload and matches it against
+    the authorization request, so an omitted one yields a code that fails
+    every exchange with a bare `400 invalid_request` naming nothing.
 
-    ⚠ Omitting here means omitting at exchange_code too. The spec requires
-    the two requests to agree, and sending it in only one is an
-    invalid_grant that reads like a bad code.
+    That cost two live authorization codes before it was understood, which is
+    why this refuses up front: the failure surfaces at the token endpoint,
+    minutes later, after a human has already been to a browser, and it looks
+    like a wrong URI or an expired code rather than a request that was
+    malformed from the start.
     """
     if not client_id:
         raise OuraAuthError("no Oura client_id configured")
     if not state:
         raise OuraAuthError("authorize_url needs a state value — see its docstring")
-    params = {"client_id": client_id, "response_type": "code",
-              "scope": " ".join(scopes), "state": state}
-    if redirect_uri:
-        params["redirect_uri"] = redirect_uri
-    return f"{AUTHORIZE_URL}?" + urlencode(params)
+    if not redirect_uri:
+        raise OuraAuthError(
+            "authorize_url needs a redirect_uri. Oura serves the consent screen "
+            "without one but then refuses to exchange the resulting code — see "
+            "this function's docstring."
+        )
+    return f"{AUTHORIZE_URL}?" + urlencode({
+        "client_id": client_id,
+        "response_type": "code",
+        "scope": " ".join(scopes),
+        "state": state,
+        "redirect_uri": redirect_uri,
+    })
 
 
 def _post_token(client_id: str, client_secret: str, form: dict) -> dict:
@@ -142,16 +150,26 @@ def exchange_code(client_id: str, client_secret: str, code: str,
     """Trade an authorization code for the first token pair. The code is
     single-use and short-lived; a second attempt with the same one is a 400.
 
-    A blank `redirect_uri` omits the parameter, and MUST be blank here
-    whenever it was blank at authorize_url — see that function. The two
-    requests have to agree; disagreeing is an invalid_grant that looks like a
-    bad or expired code, sending the reader to re-run the flow that will fail
-    identically.
+    `redirect_uri` is mandatory and must be the SAME one the code was issued
+    against — Oura requires it in the payload and matches it. Refused when
+    blank for the reason authorize_url gives: a code that cannot be exchanged
+    is worth catching before the call, not after.
+
+    ⚠ DO NOT RETRY THIS WITH A DIFFERENT redirect_uri WHEN IT FAILS. A failed
+    exchange appears to consume the code, so a loop over plausible URIs turns
+    one recoverable error into a spent code and a second trip to the browser.
+    Fix the authorize request instead.
     """
-    form = {"grant_type": "authorization_code", "code": code}
-    if redirect_uri:
-        form["redirect_uri"] = redirect_uri
-    return _post_token(client_id, client_secret, form)
+    if not redirect_uri:
+        raise OuraAuthError(
+            "exchange_code needs the same redirect_uri the code was issued "
+            "against; Oura matches them and rejects a payload without one."
+        )
+    return _post_token(client_id, client_secret, {
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri,
+    })
 
 
 def refresh_access_token(client_id: str, client_secret: str,
