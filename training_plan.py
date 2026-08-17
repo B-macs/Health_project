@@ -3494,8 +3494,98 @@ def _s2b_cluster(week: int) -> dict:
 PLAN_STAGE2B: dict[int, dict] = {}
 
 # ── Week 1: two days at home, then the flight. Running is week 1's stressor. ─
-PLAN_STAGE2B[1] = _s2b_gym_a(1)
-PLAN_STAGE2B[2] = _s2b_mobility(1)
+#
+# REBUILT 2026-08-17 (day 1 itself, athlete's direction). Day 1 was the loaded
+# session; by the time the day's decisions were settled it was too late to
+# train it, so the loaded session moved to day 2 and day 1 became the
+# measurement day below. A content swap rather than a date_overrides entry
+# because the WEEK is what matters (key rule 18b) and both days stay inside
+# it; the travel days and everything after are untouched. The cost is week 1's
+# thoracic mobility day (the old day 2), which returns on days 10, 17 and 24.
+PLAN_STAGE2B[1] = {
+    "objective": "Stage 2B Week 1 — Measurement + Release (moved: the loaded "
+                 "session runs tomorrow)",
+    "phase": _S2B_PHASE,
+    "session_rpe_target": 2,
+    "is_gym_session": False,
+    "day_type": "rest",
+    # TESTS FIRST, RELEASE SECOND — the one ordering that matters today.
+    # Finding #5's test counts cracks and finding #3's counts releases; running
+    # pressure work first would quiet the very tissues being counted, so the
+    # session would measure the release instead of the athlete. Same
+    # contamination rule as the battery's cold-morning requirement, one hour
+    # earlier.
+    "exercises": [
+        _ex(
+            name="Seated Fold Release Count (Test)",
+            ex_type="reps",
+            laterality="bilateral",
+            sets=1, reps=5, rest_seconds=0,
+            mechanics=(
+                "Sit tall on a firm chair, feet flat on the floor. Fold forward "
+                "slowly to the end of comfortable range and come back up. Five "
+                "folds. COUNT the clicks or releases you feel, and note WHERE "
+                "each one happens — mid-back, or the very base of your low "
+                "back. Write the count and the locations in the note."
+            ),
+            biomechanical_focus=(
+                "Finding #3's re-measurement — its first ever. The location is "
+                "the whole reading: thoracic releases and L5/S1 releases mean "
+                "different things, and only one of them is benign."
+            ),
+            progression="This is a measurement — there is nothing to progress.",
+            regression="Any pain beyond a click → stop and note it.",
+        ),
+        _ex(
+            name="Wide-Stance Rotation Count (Test)",
+            ex_type="reps",
+            laterality="bilateral",
+            sets=1, reps=5, rest_seconds=0,
+            mechanics=(
+                "Stand with your feet wider than your shoulders, arms out to "
+                "the sides. Rotate your torso slowly to one side as far as it "
+                "goes, then back. Five each way. COUNT the cracks and note "
+                "whether each one is at your low back or at your hip. Write "
+                "counts and locations in the note."
+            ),
+            biomechanical_focus=(
+                "Finding #5's re-measurement — its first ever, and the most "
+                "overdue in the file: its own named treatments (lateral lunge, "
+                "90/90 flow) vanished at the 2A transition with no reason "
+                "recorded, so this finding is currently neither treated nor "
+                "retired. This count is what decides which."
+            ),
+            progression="This is a measurement — there is nothing to progress.",
+            regression="Any pain beyond a crack → stop and note it.",
+        ),
+        _ex(
+            name="Prone Y-Raise Hold (Timed Test)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=1, hold_seconds=60, rest_seconds=60,
+            mechanics=(
+                "Lie face down, phone timer ready. ONE arm at a time, thumb "
+                "up: raise the arm off the floor at about 45 degrees out from "
+                "your head and HOLD. Stop the clock when the arm drops or the "
+                "shoulder blade gives up its position — not when it burns. "
+                "Time the RIGHT, rest a minute, time the LEFT. Write both "
+                "times in the note. The 60 seconds shown is a placeholder; "
+                "the real number is whatever the clock says."
+            ),
+            biomechanical_focus=(
+                "Finding #6's re-measurement — its first ever number. The "
+                "right is the documented weaker side; a right-left gap over "
+                "15% is the positive threshold. Chosen over a posture photo "
+                "because capacity moves in 28 days and posture does not, and "
+                "over the scapular slide test because this one needs no "
+                "second person."
+            ),
+            progression="This is a measurement — there is nothing to progress.",
+            regression="Shoulder instability sensation → stop, note it, done.",
+        ),
+    ] + _s2b_release(hip_loaded=True, anterior=True),
+}
+PLAN_STAGE2B[2] = _s2b_gym_a(1)
 PLAN_STAGE2B[3] = _s2b_travel_day(
     "Travel day — Ireland",
     "Post-flight decompression. Sitting still for hours is the exact exposure the lumbar "

@@ -127,10 +127,27 @@ def test_running_actually_reaches_the_movement_rules():
 
 def test_the_release_block_precedes_every_single_session():
     """resume.md rule 8, and it holds on rest days and travel days too — those
-    are exactly the days the habit erodes on."""
+    are exactly the days the habit erodes on.
+
+    ONE exemption, day 1 only (2026-08-17): its three finding-test
+    measurements run BEFORE the release, because finding #5's test counts
+    cracks and finding #3's counts releases — pressure work first would quiet
+    the very tissues being counted, so the session would measure the release
+    rather than the athlete. The release block must still be PRESENT and must
+    open the remainder: measurement first is not release optional."""
     for d in DAYS:
-        first = PLAN[d]["exercises"][0]["name"]
-        assert first in sess.RELEASE_EXERCISE_NAMES, f"day {d} opens with {first}"
+        names = [e["name"] for e in PLAN[d]["exercises"]]
+        if d == 1:
+            non_test = [n for n in names if "(Test)" not in n and "(Timed Test)" not in n]
+            assert non_test, "day 1 has nothing but tests"
+            assert non_test[0] in sess.RELEASE_EXERCISE_NAMES, (
+                f"day 1's first non-test item is {non_test[0]}")
+            first_release = names.index(non_test[0])
+            assert all("(Test)" in n or "(Timed Test)" in n
+                       for n in names[:first_release]), (
+                "day 1 may only put TESTS ahead of the release block")
+            continue
+        assert names[0] in sess.RELEASE_EXERCISE_NAMES, f"day {d} opens with {names[0]}"
 
 
 def test_the_long_stretch_runs_first_on_hip_loaded_days():
@@ -262,9 +279,11 @@ def test_the_gym_lifts_resume_one_step_down_after_the_travel_weeks():
     def load(day, name):
         return next(e["weight_kg"] for e in PLAN[day]["exercises"] if e["name"] == name)
 
+    # Day 2, not day 1: the week-1 loaded session moved there on 2026-08-17
+    # when day 1 became the measurement day.
     for name in ("Goblet Squat", "Romanian Deadlift (DB)", "Hip Thrust (Loaded)"):
-        assert load(15, name) < load(1, name), f"{name} did not step down on re-entry"
-        assert load(22, name) == load(1, name), f"{name} did not return to full load"
+        assert load(15, name) < load(2, name), f"{name} did not step down on re-entry"
+        assert load(22, name) == load(2, name), f"{name} did not return to full load"
 
 
 # ── rest intervals ──────────────────────────────────────────────────────────

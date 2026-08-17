@@ -133,6 +133,7 @@ SENSATION_TAGS: list[str] = [
 _UPPER_BODY_EXERCISES: tuple[str, ...] = (
     "Scapular Wall Slide",
     "Prone Y-Raise (Scapular)",
+    "Prone Y-Raise Hold (Timed Test)",
     "Thoracic Extension (Rolled Towel)",
     "Thread-the-Needle (Thoracic Rotation)",
     # Stage 2A additions
@@ -160,6 +161,9 @@ _UPPER_BODY_EXERCISES: tuple[str, ...] = (
 )
 
 _CORE_EXERCISES: tuple[str, ...] = (
+    # Finding-test measurements (2026-08-17): unloaded diagnostic counts.
+    "Seated Fold Release Count (Test)",
+    "Wide-Stance Rotation Count (Test)",
     # Stage 2B addition
     "Band Pallof Press",
     "Supine Knee-to-Chest",
@@ -379,6 +383,7 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # Scapular/thoracic work: the thoracic drills are half trunk and say so.
     "Scapular Wall Slide":                    {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
     "Prone Y-Raise (Scapular)":               {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Prone Y-Raise Hold (Timed Test)":        {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
     "Thoracic Extension (Rolled Towel)":      {"upper_body": 0.70, "core": 0.30, "lower_body": 0.00},
     "Thread-the-Needle (Thoracic Rotation)":  {"upper_body": 0.65, "core": 0.35, "lower_body": 0.00},
     # Loaded upper: bench-supported and pad-restrained lifts give the legs
@@ -392,6 +397,8 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # The only 1.00s in the table: single-region by design, nothing else works.
     "McGill Modified Curl-Up":                {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
     "McGill Curl-Up (Progressed)":            {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
+    "Seated Fold Release Count (Test)":       {"upper_body": 0.00, "core": 0.90, "lower_body": 0.10},
+    "Wide-Stance Rotation Count (Test)":      {"upper_body": 0.10, "core": 0.80, "lower_body": 0.10},
     "Diaphragmatic Breathing":                {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
     "Prone Decompression Breathing":          {"upper_body": 0.05, "core": 0.95, "lower_body": 0.00},
     # Side bridges and planks: the SUPPORT SHOULDER takes real load — which is
@@ -612,6 +619,9 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Single-Leg Glute Bridge":           ("mobility_core", 0.25),
     "Scapular Wall Slide":               ("mobility_core", 0.25),
     "Prone Y-Raise (Scapular)":          ("mobility_core", 0.25),
+    "Prone Y-Raise Hold (Timed Test)":   ("mobility_core", 0.25),
+    "Seated Fold Release Count (Test)":  ("mobility_core", 0.25),
+    "Wide-Stance Rotation Count (Test)": ("mobility_core", 0.25),
     "Lateral Band Walk":                 ("mobility_core", 0.25),
     "Bird-Dog":                          ("mobility_core", 0.25),
     "Side Bridge with Hip Dip":          ("mobility_core", 0.25),
