@@ -110,6 +110,72 @@ def test_the_offer_exists_for_the_real_stage_2b_case():
     assert len(sess.plan_dict_for_phase(3)) == 28
 
 
+# ─── and the door must say why it would not open ─────────────────────────
+#
+# The second half of the same failure. Once the button existed, pressing it on
+# the hosted app raised an uncaught APIResponseError — which Streamlit Cloud
+# renders with the message REDACTED, so the athlete got a dead screen and an
+# error naming no cause. Diagnosing it needed a line-number fingerprint of the
+# traceback. A caught exception rendered through st.error is not redacted.
+
+
+def _writes_outside_try(func: ast.FunctionDef) -> list[str]:
+    """Repository writes in `func` that are not inside a try/except."""
+    guarded = set()
+    for node in ast.walk(func):
+        if isinstance(node, ast.Try):
+            for inner in ast.walk(node):
+                guarded.add(id(inner))
+    out = []
+    for node in ast.walk(func):
+        if not isinstance(node, ast.Call) or id(node) in guarded:
+            continue
+        f = node.func
+        if isinstance(f, ast.Attribute) and f.attr in ("set_phases", "set_config"):
+            out.append(f.attr)
+    return out
+
+
+def test_the_block_writes_are_caught_rather_than_crashing_the_page():
+    bad = _writes_outside_try(_func("_render_begin_next_phase_button"))
+    assert not bad, (
+        f"{bad} can raise out of the button — on the hosted app that takes the "
+        f"whole page down AND redacts the message, leaving the athlete with no "
+        f"route into the block and no cause to act on"
+    )
+
+
+def test_the_two_writes_are_reported_separately():
+    """set_phases then set_config are not one transaction. A failure between
+    them starts the block at the PREVIOUS stage's ACWR/RPE/volume ceilings —
+    real state, and the one outcome that must never read as success."""
+    src = ast.get_source_segment(
+        _SRC.read_text(encoding="utf-8"),
+        _func("_render_begin_next_phase_button")) or ""
+    assert src.count("except Exception") >= 2, (
+        "one try around both writes cannot tell 'nothing was written' from "
+        "'the block started at the wrong ceilings'"
+    )
+
+
+def test_the_failure_detail_names_the_cause_not_just_the_type():
+    """status and code are what separate a 401 from a 404 from a 400, and
+    neither is a secret."""
+    from views.training import _write_failure_detail
+
+    class FakeAPIError(Exception):
+        status = 400
+        code = "validation_error"
+
+    detail = _write_failure_detail(FakeAPIError("path.page_id should be a uuid"))
+    assert "FakeAPIError" in detail
+    assert "400" in detail and "validation_error" in detail
+    assert "path.page_id should be a uuid" in detail
+
+    plain = _write_failure_detail(ValueError("no status, no code"))
+    assert plain == "ValueError · no status, no code"
+
+
 @pytest.mark.parametrize("phase_number", [1, 2])
 def test_beginning_the_next_phase_retires_the_previous_one(phase_number):
     """A lapsed phase left 'active' alongside a new one would make
