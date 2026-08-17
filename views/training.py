@@ -794,6 +794,7 @@ def _init_state(day_num: int | None = None):
         "tp_reported_au":      None,
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
         "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
+        "tp_notes":            {},       # {exercise_idx: note text} — the DURABLE copy of the per-exercise notes; see _record_note
         "tp_rest_started_at":  0,        # Unix timestamp, stamped when a rest phase BEGINS — see _record_rest_taken
         "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
         "tp_accessory_plan":   None,     # the accessory session's day dict while one is running; None on a plan session. MUST have a default — it is in sess.CHECKPOINT_FIELDS, and building that payload indexes session_state directly
@@ -818,7 +819,7 @@ def _init_state(day_num: int | None = None):
                 # tp_actuals/tp_set_log round-trip through JSON (Notion-backed
                 # checkpoint storage) which silently turns their int keys into
                 # strings -- cast back so exercise-index lookups still hit.
-                if k in ("tp_actuals", "tp_set_log") and isinstance(v, dict):
+                if k in ("tp_actuals", "tp_set_log", "tp_notes") and isinstance(v, dict):
                     v = {int(i): entry for i, entry in v.items()}
                 st.session_state[k] = v
         # A restored accessory session must be TODAY'S. Unlike a plan day
@@ -832,7 +833,7 @@ def _init_state(day_num: int | None = None):
         if _acc_day and _acc_day.get("accessory_date") != date.today().isoformat():
             for k in ("tp_accessory_plan", "tp_started", "tp_done_today",
                       "tp_session_logged", "tp_ex_idx", "tp_set", "tp_rep_in_set",
-                      "tp_actuals", "tp_set_log"):
+                      "tp_actuals", "tp_set_log", "tp_notes"):
                 st.session_state[k] = defaults[k]
         # Authoritative check, independent of the checkpoint above: if a session is
         # already logged in Notion for today, never allow re-entering the exercise
@@ -929,7 +930,12 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             f"Garmin-verified duration: {actual_min:.0f} min "
             f"(planned {ex.get('duration_minutes')} min)."
         ) if actual_min else ""
-        user_note = (st.session_state.get(f"tp_note_{idx}") or "").strip()
+        # tp_notes, NOT the tp_note_<idx> widget key this used to read. By the
+        # time this runs the flow is on the save screen, where tp_ex_idx >=
+        # n_ex and therefore NOT ONE note widget is instantiated — so every
+        # widget lookup returned None and every per-exercise note ever written
+        # was dropped on the floor. See _record_note.
+        user_note = (st.session_state.get("tp_notes", {}).get(idx) or "").strip()
         note = "\n".join(n for n in (garmin_note, user_note) if n)
         detail = garmin_detail.get(idx) or {}
         # Real per-set records captured live by _record_completed_set as each
@@ -983,6 +989,48 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     # session you just finished would not appear for up to half an hour.
     # Mirrors views/checkin.py's clear after a check-in save.
     st.cache_data.clear()
+
+
+def _record_note(idx: int, day_num: int | None) -> None:
+    """Mirror exercise `idx`'s note out of WIDGET state into `tp_notes`.
+
+    THIS IS THE FIX FOR TWO ROUNDS OF SILENT NOTE LOSS (2026-08-17). The note
+    was typed into a widget keyed `tp_note_<idx>` and read back at save time
+    from that same key, which looks correct and never worked:
+
+      * Streamlit removes a widget's value from session_state on any run in
+        which that widget is not instantiated.
+      * This flow renders exactly ONE exercise per run — `_eidx` is
+        `st.session_state.tp_ex_idx`, and only that exercise's block is drawn.
+
+    So `tp_note_3` ceased to exist the instant the athlete advanced to
+    exercise 4, and by the save screen (`tp_ex_idx >= n_ex`) not one note
+    widget was on the page at all. `_auto_log_session` therefore read None for
+    every index, on every session that has ever been logged. The single note
+    that did survive each session was the session-wide field, written onto the
+    last exercise row by `save_session_notes` — which is why the log shows
+    exactly one note per session and NEVER two, across all 24 noted sessions.
+
+    `tp_notes` is a plain dict, so no widget lifecycle touches it, and it is in
+    `sess.CHECKPOINT_FIELDS`, so a backgrounded phone no longer loses notes
+    either — the second, independent way they were being dropped.
+
+    Called on every run of the exercise screen as well as on the widget's
+    on_change, because a change that is still only in the browser when the
+    athlete taps "Complete set" arrives in the same batch: the value is
+    already in session_state by the time this runs.
+    """
+    text = (st.session_state.get(f"tp_note_{idx}") or "").strip()
+    before = st.session_state.tp_notes.get(idx, "")
+    if text:
+        st.session_state.tp_notes[idx] = text
+    else:
+        st.session_state.tp_notes.pop(idx, None)
+    # Checkpoint only on a real change — this runs on every rerun of the
+    # exercise screen, and an unconditional write would put a Notion round
+    # trip on the hot path (the same reason the steppers use durable=False).
+    if text != before and day_num is not None:
+        _save_checkpoint(day_num)
 
 
 def _record_completed_set(idx: int, ex: dict, set_num: int) -> None:
@@ -3766,16 +3814,28 @@ def _render_guided_flow(day_num, exercises, n_ex,
         st.error(f"⚠️ {ex['warning']}")
 
     # Per-exercise note — one per exercise (keyed on _eidx, not on set/rep),
-    # so it persists across every set of this exercise and resets to blank
-    # once tp_ex_idx advances to the next one. Read back by _auto_log_session
-    # via this same key, independent of the session-wide notes field on the
-    # "Save Session to Log" screen at the end.
+    # so it persists across every set of this exercise. The WIDGET is only the
+    # input; the durable copy lives in tp_notes, which is what
+    # _auto_log_session reads and what the checkpoint carries. Independent of
+    # the session-wide notes field on the "Save Session to Log" screen.
+    _note_key = f"tp_note_{_eidx}"
+    if _note_key not in st.session_state:
+        # Absent either because this exercise has not been seen yet, or
+        # because Streamlit collected the widget while another exercise was on
+        # screen — a "← Back", or a restored checkpoint. Seed from the durable
+        # copy so an existing note is still in the box.
+        st.session_state[_note_key] = st.session_state.tp_notes.get(_eidx, "")
     with st.expander("📝 Add a note for this exercise"):
         st.text_area(
-            "Note", key=f"tp_note_{_eidx}", label_visibility="collapsed",
+            "Note", key=_note_key, label_visibility="collapsed",
             placeholder="e.g. right hip felt tight on the last set, form cue worked well...",
             height=68,
+            on_change=_record_note, args=(_eidx, day_num),
         )
+    # Harvest on EVERY run, not only on_change: the widget is live right now,
+    # and this is the last moment before the advance/complete buttons below
+    # can move tp_ex_idx and take the widget with it.
+    _record_note(_eidx, day_num)
 
     # ── Reps / weight / band-tier steppers — gym/free-weight/band exercises
     #     only (ex.get("equipment_type") truthy). Seeded once per exercise

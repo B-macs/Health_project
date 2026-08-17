@@ -87,6 +87,13 @@ CHECKPOINT_FIELDS = (
     "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
     "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
     "tp_actuals", "tp_set_log", "tp_garmin_declared", "tp_rest_started_at",
+    # Per-exercise notes, {exercise_idx: text}. A PLAIN dict rather than the
+    # `tp_note_<idx>` WIDGET keys they are typed into, because Streamlit drops
+    # a widget's value from session_state on any run in which that widget is
+    # not instantiated — and views/training.py renders exactly ONE exercise
+    # per run. Every per-exercise note written before 2026-08-17 was lost that
+    # way; see _record_note there for the full mechanism.
+    "tp_notes",
     # The accessory session's whole day dict, because unlike a plan day it
     # cannot be looked up again from a day number — it was CHOSEN, from
     # regional strain readings that will have moved by the time a dropped
