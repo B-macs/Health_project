@@ -845,3 +845,151 @@ def movement_safety_summary(stage: int) -> dict:
         "cleared":            get_cleared_for_stage(stage),
         "caution":            get_caution_movements(stage),
     }
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  CONTRAINDICATION EXITS — added 2026-08-17, on the athlete's challenge.
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# He asked two questions the list could not answer: "at what stage do any of
+# these items get opened?" (answer: NEVER — no stage, date or measurement
+# re-opens a contraindicated rule) and "there is no physio appointment, so
+# these will just stay unanswered — we need a better way."
+#
+# Both stick. The 15 contraindicated rules rest on one undated MRI, the block
+# is authored under them (so they are invisible and self-confirming), and by
+# the standard the findings now meet — every claim carries a test — they were
+# unfalsifiable. This table is the fix: every contraindicated movement carries
+# what it rests on, what it costs against the athlete's actual goals, and the
+# EXIT — evidence obtainable by the athlete ALONE, no physio required, that
+# would downgrade it. The template is the running rule: graded exposure with a
+# pre-declared stop condition, downgraded on the result with the decision
+# recorded.
+#
+# THIS TABLE CHANGES NO VERDICT. check_movement never reads it. A downgrade
+# happens the way running's did — an explicit severity edit, with the exit
+# evidence quoted in the commit — never as a side effect. That is what keeps
+# "never weaken a guardrail" true while ending "held forever by default":
+# rules are now held ON somеthing, and each one says what.
+#
+# Shared exit protocols (several rules rest on one mechanism, so they share
+# one exit rather than inventing fifteen):
+_EXIT_FLEXION = (
+    "GRADED LUMBAR-FLEXION EXPOSURE, 4 weeks, the conservative-care standard "
+    "for covered annular tears: (1) unloaded seated folds — ALREADY TOLERATED, "
+    "measured 2026-08-17: five slow folds, zero releases, zero pain; "
+    "(2) 2 weeks of daily bodyweight fold-and-return, 10 slow reps; "
+    "(3) 2 weeks adding light load held at the chest. STOP: any lumbar-base "
+    "release or pain — finding #3's own test is the instrument, re-run weekly "
+    "during the trial. Clean at 4 weeks → downgrade to caution with a load "
+    "ceiling, which also unblocks Cluster B's pike via the flat-back route "
+    "the pancake already took."
+)
+_EXIT_LOAD_CEILING = (
+    "THE RULE IS REALLY A LOAD CEILING WEARING A NAME. The athlete already "
+    "hinges 45 kg and a 52.5 kg top set is authored for day 22 — 'deadlift' "
+    "is not banned, the barbell magnitudes are. EXIT: symptom-free top-set "
+    "progression across blocks (the day-22 sets are the first data point); "
+    "when loads exceed what dumbbells carry, the barbell enters at the same "
+    "weight the dumbbells left, stepped, with the RDL's existing stop "
+    "condition (any back signal ends the set). Downgrade then names the "
+    "ceiling instead of the implement."
+)
+_EXIT_IMPACT = (
+    "THE SIX-RUN PROGRESSION IS THE GRADED IMPACT TRIAL, already running. "
+    "Running is axial impact at ~2.5x bodyweight per stride, thousands of "
+    "strides per session — a completed block of it with zero lumbar signal "
+    "is stronger impact evidence than any single jump test. EXIT: the "
+    "running introduction completes clean (stage_2b_exit_criteria's own "
+    "running_tolerance line) → downgrade jumping/impact to caution with "
+    "dose limits. Note the 10 km build needs no plyometrics, so this exit "
+    "is about honesty, not access."
+)
+_EXIT_ZERO_COST = (
+    "NO EXIT PROTOCOL, BY CHOICE NOT NEGLECT: no goal on record wants this "
+    "movement, so running a graded-exposure trial to earn it back would be "
+    "risk spent on nothing. Held at zero cost. If a goal ever names it, an "
+    "exit is designed then — this entry is re-visited at every block build."
+)
+
+#: movement (must match a contraindicated MOVEMENT_RULES entry exactly) →
+#: {rests_on, cost_today, exit, single_person}. Pinned both ways by
+#: tests/test_contraindication_exits.py: every contraindicated rule needs an
+#: entry here, and every entry here must name a contraindicated rule.
+CONTRAINDICATION_EXITS: dict[str, dict] = {
+    "heavy deadlift": {
+        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, undated)",
+        "cost_today": "None — DB RDL at 45 kg runs freely; only barbell magnitudes are held.",
+        "exit": _EXIT_LOAD_CEILING, "single_person": True,
+    },
+    "barbell deadlift": {
+        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, undated)",
+        "cost_today": "None yet — becomes real when progression outgrows dumbbells.",
+        "exit": _EXIT_LOAD_CEILING, "single_person": True,
+    },
+    "conventional deadlift": {
+        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, undated)",
+        "cost_today": "None yet — same ceiling as the barbell entry.",
+        "exit": _EXIT_LOAD_CEILING, "single_person": True,
+    },
+    "hyperextension": {
+        "rests_on": "Retrolisthesis — extension narrows the narrowed right foramen (MRI, undated)",
+        "cost_today": "Zero — no goal on record loads end-range lumbar extension.",
+        "exit": _EXIT_ZERO_COST, "single_person": True,
+    },
+    "back extension": {
+        "rests_on": "Retrolisthesis, as above",
+        "cost_today": "Zero — as above.",
+        "exit": _EXIT_ZERO_COST, "single_person": True,
+    },
+    "seated forward fold": {
+        "rests_on": "Covered annulus tears L3/4 + L4/5 (MRI, undated)",
+        "cost_today": "REAL — blocks Cluster B's pike, the one live goal-cost on the list.",
+        "exit": _EXIT_FLEXION, "single_person": True,
+    },
+    "forward fold": {
+        "rests_on": "Covered annulus tears L3/4 + L4/5 (MRI, undated)",
+        "cost_today": "REAL — same Cluster B collision.",
+        "exit": _EXIT_FLEXION, "single_person": True,
+    },
+    "toe touch": {
+        "rests_on": "Covered annulus tears L3/4 + L4/5 (MRI, undated)",
+        "cost_today": "Low — same family, no goal names it directly.",
+        "exit": _EXIT_FLEXION, "single_person": True,
+    },
+    "sit up": {
+        "rests_on": "Covered annulus tears — loaded spinal flexion (MRI, undated)",
+        "cost_today": "Zero — McGill curl-up covers the pattern without the flexion.",
+        "exit": _EXIT_FLEXION, "single_person": True,
+    },
+    "crunch": {
+        "rests_on": "Covered annulus tears — loaded spinal flexion (MRI, undated)",
+        "cost_today": "Zero — as above.",
+        "exit": _EXIT_FLEXION, "single_person": True,
+    },
+    "leg press": {
+        "rests_on": "End-range hip flexion under load → intradiscal pressure L3-L5 (MRI, undated)",
+        "cost_today": "Zero — no plan has ever used one, squat pattern is covered.",
+        "exit": _EXIT_ZERO_COST, "single_person": True,
+    },
+    "impact": {
+        "rests_on": "Axial impact on activated L5/S1 osteochondrosis (MRI, undated)",
+        "cost_today": "Zero while running covers the impact exposure the goals need.",
+        "exit": _EXIT_IMPACT, "single_person": True,
+    },
+    "jumping": {
+        "rests_on": "Axial impact on activated L5/S1 osteochondrosis (MRI, undated)",
+        "cost_today": "Zero — the 10 km build needs no plyometrics.",
+        "exit": _EXIT_IMPACT, "single_person": True,
+    },
+    "box jump": {
+        "rests_on": "Axial impact on activated L5/S1 osteochondrosis (MRI, undated)",
+        "cost_today": "Zero — as above.",
+        "exit": _EXIT_IMPACT, "single_person": True,
+    },
+    "weight behind": {
+        "rests_on": "Axial load in a seated fold over the annulus tears (source-document adaptation)",
+        "cost_today": "Zero — no goal names it, and the loaded variants have safer forms.",
+        "exit": _EXIT_ZERO_COST, "single_person": True,
+    },
+}
+
