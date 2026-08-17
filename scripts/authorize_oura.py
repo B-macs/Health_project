@@ -68,6 +68,7 @@ for _stream in (sys.stdout, sys.stderr):
         pass
 
 from services import oura_auth                       # noqa: E402
+from services.clients import local_cache             # noqa: E402
 from services.clients import oura                    # noqa: E402
 from services.config import load_config              # noqa: E402
 from services.repository import Repository           # noqa: E402
@@ -187,6 +188,82 @@ def _report(repo: Repository, probe: bool = False) -> None:
         print("  -> re-authorisation required (run this script without --check)")
 
 
+#: Where --start leaves the state for --finish to check. Local only, and
+#: short-lived by nature: it is meaningless once redeemed.
+_PENDING_KEY = "oura_oauth_pending"
+
+
+def _remember_pending(state: str, redirect_uri: str) -> None:
+    local_cache.update({_PENDING_KEY: {"state": state, "redirect_uri": redirect_uri}})
+
+
+def _complete(repo: Repository, config, query: dict, expected_state: str | None,
+              redirect_uri: str) -> int:
+    """Exchange the code, store the pair, and PROVE it authenticates.
+
+    Shared by the one-shot and two-step flows so the checks cannot drift
+    apart — in particular the verify, which is the whole point: this script
+    exists because a credential that looked fine and was not cost five nights
+    of data.
+    """
+    if query.get("error"):
+        print(f"Oura refused authorisation: {query.get('error')} "
+              f"{query.get('error_description', '')}".strip(), file=sys.stderr)
+        return 1
+    code = query.get("code")
+    if not code:
+        print(f"No authorization code in that URL. Saw: {sorted(query) or 'nothing'}",
+              file=sys.stderr)
+        return 1
+    if expected_state is not None and query.get("state") != expected_state:
+        # Refuse rather than warn. A mismatched state means this redirect is
+        # not the answer to the request that was made, and exchanging it would
+        # bind the app to a credential of unknown origin.
+        print("State mismatch - this redirect does not belong to the request that "
+              "started it. Nothing was stored; run the script again.", file=sys.stderr)
+        return 1
+
+    print("Exchanging the code for a token pair...")
+    try:
+        payload = oura.exchange_code(config.oura_client_id, config.oura_client_secret,
+                                     code, redirect_uri)
+    except oura.OuraAuthError as exc:
+        print(f"Exchange failed: {exc}", file=sys.stderr)
+        return 1
+
+    token = repo.save_oura_oauth_token(payload)
+    try:
+        oura.verify_token(token.access_token)
+    except oura.OuraAuthError as exc:
+        print(f"[!] Stored, but the new token did not authenticate: {exc}", file=sys.stderr)
+        return 1
+
+    local_cache.update({_PENDING_KEY: None})
+    repo._clear_oura_auth_failure()          # the banner must not outlive the fix
+    print("\nOK - Authorised, stored and verified against /personal_info.\n")
+    _report(repo)
+    print("\nNext: the missed nights are inside sync_oura_all's rolling 7-day")
+    print("window, so opening the app recovers them. For an older gap:")
+    print("  python scripts/backfill_oura_history.py --apply --range <start>:<end>")
+    return 0
+
+
+def _finish(repo: Repository, config, landed: str) -> int:
+    """Complete an authorisation started by an earlier --start."""
+    pending = local_cache.read().get(_PENDING_KEY) or {}
+    if not pending.get("state"):
+        print("No authorisation is pending - run the script without --finish first.",
+              file=sys.stderr)
+        return 2
+    query = dict(urllib.parse.parse_qsl(urllib.parse.urlparse(landed.strip()).query))
+    if not query:
+        print(f"No query string in that URL, so it carries no code:\n  {landed[:120]}",
+              file=sys.stderr)
+        return 1
+    return _complete(repo, config, query, pending["state"],
+                     pending.get("redirect_uri", ""))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -202,6 +279,15 @@ def main() -> int:
                          "local port to listen on.")
     ap.add_argument("--check", action="store_true",
                     help="report the stored credential's status and exit")
+    ap.add_argument("--start", action="store_true",
+                    help="print the authorisation URL, remember the state, and exit "
+                         "without waiting. Pair with --finish.")
+    ap.add_argument("--finish", metavar="URL",
+                    help="complete an authorisation started by --start, using the full "
+                         "URL the browser landed on. Splits the flow across two "
+                         "invocations so the consent click and the token exchange need "
+                         "not happen in one terminal session — or even by the same "
+                         "person.")
     ap.add_argument("--timeout", type=float, default=180.0,
                     help="seconds to wait for the redirect (default 180)")
     ap.add_argument("--scopes", default=" ".join(oura_auth.DEFAULT_SCOPES),
@@ -223,11 +309,20 @@ def main() -> int:
               "https://cloud.ouraring.com/oauth/applications.", file=sys.stderr)
         return 2
 
+    if args.finish:
+        return _finish(repo, config, args.finish)
+
     # A fresh random state per run, checked on the way back. This is the only
     # thing tying the redirect to the request that caused it.
     state = secrets.token_urlsafe(24)
     url = oura.authorize_url(config.oura_client_id, args.redirect_uri,
                              args.scopes.split(), state)
+
+    # Remembered even in the one-shot flow, not only for --finish. The consent
+    # click happens outside this process, so a closed terminal, a Ctrl-C or a
+    # browser that takes too long would otherwise lose the state and force the
+    # whole round trip again.
+    _remember_pending(state, args.redirect_uri)
 
     # Blank redirect URI means Oura picks the registered one, so there is no
     # port here to listen on — serving would wait for a redirect that is
@@ -248,6 +343,11 @@ def main() -> int:
         print("the authorization code is in the query string, which is all that")
         print("is needed here.\n")
 
+    if args.start:
+        print("Started. When you have the URL, finish with:\n")
+        print('  python scripts/authorize_oura.py --finish "<the URL you landed on>"\n')
+        return 0
+
     if manual:
         try:
             webbrowser.open(url)
@@ -263,46 +363,7 @@ def main() -> int:
         print(f"Waiting up to {args.timeout:.0f}s for the redirect...")
         query = _catch_redirect(args.redirect_uri, args.timeout)
 
-    if query.get("error"):
-        print(f"Oura refused authorisation: {query.get('error')} "
-              f"{query.get('error_description', '')}".strip(), file=sys.stderr)
-        return 1
-    code = query.get("code")
-    if not code:
-        print(f"No authorization code came back. Received: {sorted(query)}", file=sys.stderr)
-        return 1
-    if query.get("state") != state:
-        # Refuse rather than warn. A mismatched state means this redirect is
-        # not the answer to the request just made, and exchanging it would
-        # bind the app to a credential of unknown origin.
-        print("State mismatch - this redirect does not belong to this request. "
-              "Nothing was stored; run the script again.", file=sys.stderr)
-        return 1
-
-    print("Exchanging the code for a token pair...")
-    try:
-        payload = oura.exchange_code(config.oura_client_id, config.oura_client_secret,
-                                     code, args.redirect_uri)
-    except oura.OuraAuthError as exc:
-        print(f"Exchange failed: {exc}", file=sys.stderr)
-        return 1
-
-    token = repo.save_oura_oauth_token(payload)
-
-    # Prove it works before claiming success - the whole reason this script
-    # exists is that a credential which looks fine and is not cost five days
-    # of data.
-    try:
-        oura.verify_token(token.access_token)
-    except oura.OuraAuthError as exc:
-        print(f"[!] Stored, but the new token did not authenticate: {exc}", file=sys.stderr)
-        return 1
-
-    print("\nOK - Authorised, stored and verified against /personal_info.\n")
-    _report(repo)
-    print("\nNext: backfill the nights missed while the old credential was dead:")
-    print("  python scripts/backfill_oura_history.py --apply --range <start>:<end>")
-    return 0
+    return _complete(repo, config, query, state, args.redirect_uri)
 
 
 if __name__ == "__main__":
