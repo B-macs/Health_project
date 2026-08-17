@@ -52,17 +52,24 @@ def test_rules_check_movement():
     # Contraindicated list
     always_contra = rules.get_contraindicated_always()
     check("heavy deadlift always contraindicated",     "heavy deadlift" in always_contra, True)
-    check("jumping always contraindicated",            "jumping" in always_contra, True)
+    # 2026-08-17: jumping downgraded to caution (athlete's decision; the
+    # six-run progression is the live graded impact trial).
+    check("jumping no longer always contraindicated",  "jumping" in always_contra, False)
 
 
 def test_forward_fold_rule_matches_named_variants():
     # Generic "forward fold" rule must catch pose names that aren't the exact
     # "seated forward fold" keyword (e.g. yoga poses authored in services/yoga.py).
+    # 2026-08-17: the forward-fold family is CAUTION, not contraindicated —
+    # the athlete's final decision, on a ~1-year-old MRI and a same-day
+    # reading of five folds / zero releases / zero pain. The vocabulary
+    # matching is what this test pins, and that is unchanged: both variants
+    # must still FIND the rule rather than falling to unknown.
     butterfly = rules.check_movement("Butterfly Forward Fold", current_stage=1)
-    assert butterfly["severity"] == "contraindicated"
+    assert butterfly["severity"] == "caution"
 
     straddle = rules.check_movement("Straddle Forward Fold", current_stage=3)
-    assert straddle["severity"] == "contraindicated"  # stage_cap=1, always contraindicated
+    assert straddle["severity"] == "caution"
 
 
 def test_side_bend_rule_matches_named_variants():
@@ -233,19 +240,27 @@ def test_an_axial_load_behind_the_neck_is_contraindicated_however_it_is_spelled(
     for name in ("Elevated-hip pancake, weight behind the neck",
                  "Elevated-hip pancake, weight behind neck",
                  "Seated fold with weight behind the head"):
-        assert rules.check_movement(name, 2)["severity"] == "contraindicated", name
+        # Caution since 2026-08-17 (athlete's decision) — the spelling
+        # tolerance is what this test exists for, and it still must never
+        # fall to unknown.
+        assert rules.check_movement(name, 2)["severity"] == "caution", name
 
 
 def test_adding_vocabulary_never_loosened_an_existing_verdict():
     """Every rule added on 2026-08-06 is a bridge to a mechanism already ruled
     on. None of them may make anything MORE permissive than it was."""
-    for name, expected in (("seated forward fold", "contraindicated"),
-                           ("Straddle Forward Fold", "contraindicated"),
-                           ("Butterfly Forward Fold", "contraindicated"),
-                           ("toe touch", "contraindicated"),
-                           ("hyperextension", "contraindicated"),
+    # Updated 2026-08-17 with the list decision: the test's job is that the
+    # 2026-08-06 vocabulary bridges still land on their target rules, so it
+    # asserts against the rules' CURRENT severities — caution for the
+    # downgraded families, contraindicated for the deadlift family the
+    # athlete kept.
+    for name, expected in (("seated forward fold", "caution"),
+                           ("Straddle Forward Fold", "caution"),
+                           ("Butterfly Forward Fold", "caution"),
+                           ("toe touch", "caution"),
+                           ("hyperextension", "caution"),
                            ("barbell deadlift", "contraindicated"),
-                           ("box jump", "contraindicated")):
+                           ("box jump", "caution")):
         assert rules.check_movement(name, 3)["severity"] == expected, name
 
 
@@ -266,9 +281,14 @@ def test_running_clears_to_caution_from_stage_2():
         assert rules.check_movement("running", stage)["severity"] == "caution", stage
 
 
-def test_axial_impact_is_still_blocked_at_every_stage_reachable_today():
-    """The correction is scoped to running. Jumping and impact keep stage_cap=1
-    with contraindicated severity, so they stay blocked — the L5/S1 finding has
-    not changed."""
+def test_axial_impact_downgraded_with_the_list_decision():
+    """This test used to pin impact/jumping/box jump as blocked at every
+    stage. 2026-08-17, the athlete's final decision downgraded them to
+    caution — the six-run progression is the live graded impact trial, and
+    each rule carries its dated note and revert condition. What must still
+    hold: they resolve to CAUTION, never to unknown, and they are no longer
+    in the always-contraindicated set."""
+    always = rules.get_contraindicated_always()
     for movement in ("impact", "jumping", "box jump"):
-        assert movement in rules.get_contraindicated_always(), movement
+        assert movement not in always, movement
+        assert rules.check_movement(movement, 2)["severity"] == "caution", movement

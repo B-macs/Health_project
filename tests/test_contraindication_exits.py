@@ -93,6 +93,22 @@ def test_a_deliberate_zero_cost_hold_is_a_stated_choice_not_an_absence():
             )
 
 
+def test_the_downgrade_record_matches_reality():
+    """2026-08-17, the athlete's final decision: keep the deadlift family,
+    downgrade the other twelve to caution. The record must match the rules —
+    every listed name must exist, be caution now, and carry its dated
+    downgrade note with a revert condition in its own reason text."""
+    by_name = {r.movement: r for r in rules.MOVEMENT_RULES}
+    for movement in rules.DOWNGRADED_2026_08_17:
+        r = by_name.get(movement)
+        assert r is not None, movement
+        assert r.severity == "caution", movement
+        assert "DOWNGRADED" in r.reason and "2026-08-17" in r.reason, movement
+        assert "REVERT" in r.reason, (
+            f"{movement!r} downgraded without a revert condition — that is a "
+            f"deletion wearing a downgrade's clothes")
+
+
 def test_the_table_changes_no_verdict():
     """check_movement must not consult the exits — a downgrade is an explicit
     severity edit with the evidence cited, never a side effect."""

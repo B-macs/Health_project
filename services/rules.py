@@ -104,59 +104,70 @@ MOVEMENT_RULES: list[MovementRule] = [
     ),
     MovementRule(
         movement="hyperextension",
-        reason="L5/S1 retrolisthesis — lumbar hyperextension compresses already-narrowed right foramen.",
-        stage_cap=1, severity="contraindicated", laterality="right",
+        reason="L5/S1 retrolisthesis — lumbar hyperextension compresses already-narrowed right foramen."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. No goal loads end-range lumbar extension, so exposure stays rare by content rather than by ban. REVERT on any right-leg neural sign or foraminal symptom under extension.",
+        stage_cap=1, severity="caution", laterality="right",
     ),
     MovementRule(
         movement="back extension",
-        reason="L5/S1 retrolisthesis — lumbar hyperextension compresses already-narrowed right foramen.",
-        stage_cap=1, severity="contraindicated", laterality="right",
+        reason="L5/S1 retrolisthesis — lumbar hyperextension compresses already-narrowed right foramen."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. No goal loads end-range lumbar extension, so exposure stays rare by content rather than by ban. REVERT on any right-leg neural sign or foraminal symptom under extension.",
+        stage_cap=1, severity="caution", laterality="right",
     ),
     MovementRule(
         movement="seated forward fold",
-        reason="End-range lumbar flexion loads covered annulus tears at L3/4 and L4/5.",
-        stage_cap=1, severity="contraindicated", laterality="bilateral",
+        reason="End-range lumbar flexion loads covered annulus tears at L3/4 and L4/5."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. Measured the same day: five unloaded seated folds, zero releases, zero pain. Build any load gradually. REVERT to contraindicated on any lumbar-base release or pain under flexion load.",
+        stage_cap=1, severity="caution", laterality="bilateral",
     ),
     MovementRule(
         movement="forward fold",
         reason="End-range lumbar flexion loads covered annulus tears at L3/4 and L4/5. "
-               "Generalizes 'seated forward fold' to catch named variants (e.g. yoga poses).",
-        stage_cap=1, severity="contraindicated", laterality="bilateral",
+               "Generalizes 'seated forward fold' to catch named variants (e.g. yoga poses)."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. Measured the same day: five unloaded seated folds, zero releases, zero pain. Build any load gradually. REVERT to contraindicated on any lumbar-base release or pain under flexion load.",
+        stage_cap=1, severity="caution", laterality="bilateral",
     ),
     MovementRule(
         movement="toe touch",
-        reason="End-range lumbar flexion loads covered annulus tears at L3/4 and L4/5.",
-        stage_cap=1, severity="contraindicated", laterality="bilateral",
+        reason="End-range lumbar flexion loads covered annulus tears at L3/4 and L4/5."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. Measured the same day: five unloaded seated folds, zero releases, zero pain. Build any load gradually. REVERT to contraindicated on any lumbar-base release or pain under flexion load.",
+        stage_cap=1, severity="caution", laterality="bilateral",
     ),
     MovementRule(
         movement="leg press",
-        reason="Hip flexion at end-range under load increases intradiscal pressure at L3-L5.",
-        stage_cap=1, severity="contraindicated", laterality="bilateral",
+        reason="Hip flexion at end-range under load increases intradiscal pressure at L3-L5."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. Unused by any plan; the squat pattern covers the goal. REVERT on any lumbar signal under deep loaded hip flexion.",
+        stage_cap=1, severity="caution", laterality="bilateral",
     ),
     MovementRule(
         movement="sit up",
-        reason="Spinal flexion under load — contraindicated with covered annulus tears.",
-        stage_cap=1, severity="contraindicated", laterality="bilateral",
+        reason="Spinal flexion under load — contraindicated with covered annulus tears."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. Measured the same day: five unloaded seated folds, zero releases, zero pain. Build any load gradually. REVERT to contraindicated on any lumbar-base release or pain under flexion load.",
+        stage_cap=1, severity="caution", laterality="bilateral",
     ),
     MovementRule(
         movement="crunch",
-        reason="Spinal flexion under load — contraindicated with covered annulus tears.",
-        stage_cap=1, severity="contraindicated", laterality="bilateral",
+        reason="Spinal flexion under load — contraindicated with covered annulus tears."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. Measured the same day: five unloaded seated folds, zero releases, zero pain. Build any load gradually. REVERT to contraindicated on any lumbar-base release or pain under flexion load.",
+        stage_cap=1, severity="caution", laterality="bilateral",
     ),
     MovementRule(
         movement="impact",
-        reason="Axial impact loads activate L5/S1 osteochondrosis.",
-        stage_cap=1, severity="contraindicated", laterality="axial",
+        reason="Axial impact loads activate L5/S1 osteochondrosis."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. The six-run progression is the live graded impact trial; keep impact doses low until it completes clean. REVERT on any lumbar signal from running or impact.",
+        stage_cap=1, severity="caution", laterality="axial",
     ),
     MovementRule(
         movement="jumping",
-        reason="Axial impact loads activate L5/S1 osteochondrosis.",
-        stage_cap=1, severity="contraindicated", laterality="axial",
+        reason="Axial impact loads activate L5/S1 osteochondrosis."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. The six-run progression is the live graded impact trial; keep impact doses low until it completes clean. REVERT on any lumbar signal from running or impact.",
+        stage_cap=1, severity="caution", laterality="axial",
     ),
     MovementRule(
         movement="box jump",
-        reason="Axial impact loads activate L5/S1 osteochondrosis.",
-        stage_cap=1, severity="contraindicated", laterality="axial",
+        reason="Axial impact loads activate L5/S1 osteochondrosis."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. The six-run progression is the live graded impact trial; keep impact doses low until it completes clean. REVERT on any lumbar signal from running or impact.",
+        stage_cap=1, severity="caution", laterality="axial",
     ),
     # RUNNING: contraindicated below Stage 2, CAUTION from Stage 2 on.
     #
@@ -349,8 +360,9 @@ MOVEMENT_RULES: list[MovementRule] = [
         reason="Axial load carried behind the neck or across the shoulders while seated "
                "and folding. The load, not the athlete's own tilt, produces the depth — "
                "over covered annulus tears at L3/4 and L4/5, and with a placement the "
-               "post-Latarjet right shoulder should not be holding either.",
-        stage_cap=1, severity="contraindicated", laterality="bilateral",
+               "post-Latarjet right shoulder should not be holding either."
+               " DOWNGRADED contraindicated -> caution 2026-08-17, the athlete's final decision: the MRI is ~1 year old (Nov 2025) and no longer determining. The seated-fold placement also sits on the post-Latarjet right shoulder, which is why this stays a LOUD caution. REVERT on any shoulder or lumbar signal.",
+        stage_cap=1, severity="caution", laterality="bilateral",
     ),
     MovementRule(
         movement="pancake",
@@ -871,8 +883,11 @@ def movement_safety_summary(stage: int) -> dict:
 # "never weaken a guardrail" true while ending "held forever by default":
 # rules are now held ON somеthing, and each one says what.
 #
-# Shared exit protocols (several rules rest on one mechanism, so they share
-# one exit rather than inventing fifteen):
+# Shared exit protocols. After the 2026-08-17 downgrade only the deadlift
+# family still uses one; _EXIT_FLEXION and _EXIT_IMPACT are retained as the
+# DESIGNS of the graded trials the downgraded rules now recommend in their
+# own reason texts (the flexion exposure has a start decision pending, the
+# impact trial is the running block already underway).
 _EXIT_FLEXION = (
     "GRADED LUMBAR-FLEXION EXPOSURE, 4 weeks, the conservative-care standard "
     "for covered annular tears: (1) unloaded seated folds — ALREADY TOLERATED, "
@@ -917,79 +932,35 @@ _EXIT_ZERO_COST = (
 #: entry here, and every entry here must name a contraindicated rule.
 CONTRAINDICATION_EXITS: dict[str, dict] = {
     "heavy deadlift": {
-        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, undated)",
+        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, Nov 2025)",
         "cost_today": "None — DB RDL at 45 kg runs freely; only barbell magnitudes are held.",
         "exit": _EXIT_LOAD_CEILING, "single_person": True,
     },
     "barbell deadlift": {
-        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, undated)",
+        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, Nov 2025)",
         "cost_today": "None yet — becomes real when progression outgrows dumbbells.",
         "exit": _EXIT_LOAD_CEILING, "single_person": True,
     },
     "conventional deadlift": {
-        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, undated)",
+        "rests_on": "L5/S1 osteochondrosis + retrolisthesis (MRI, Nov 2025)",
         "cost_today": "None yet — same ceiling as the barbell entry.",
         "exit": _EXIT_LOAD_CEILING, "single_person": True,
     },
-    "hyperextension": {
-        "rests_on": "Retrolisthesis — extension narrows the narrowed right foramen (MRI, undated)",
-        "cost_today": "Zero — no goal on record loads end-range lumbar extension.",
-        "exit": _EXIT_ZERO_COST, "single_person": True,
-    },
-    "back extension": {
-        "rests_on": "Retrolisthesis, as above",
-        "cost_today": "Zero — as above.",
-        "exit": _EXIT_ZERO_COST, "single_person": True,
-    },
-    "seated forward fold": {
-        "rests_on": "Covered annulus tears L3/4 + L4/5 (MRI, undated)",
-        "cost_today": "REAL — blocks Cluster B's pike, the one live goal-cost on the list.",
-        "exit": _EXIT_FLEXION, "single_person": True,
-    },
-    "forward fold": {
-        "rests_on": "Covered annulus tears L3/4 + L4/5 (MRI, undated)",
-        "cost_today": "REAL — same Cluster B collision.",
-        "exit": _EXIT_FLEXION, "single_person": True,
-    },
-    "toe touch": {
-        "rests_on": "Covered annulus tears L3/4 + L4/5 (MRI, undated)",
-        "cost_today": "Low — same family, no goal names it directly.",
-        "exit": _EXIT_FLEXION, "single_person": True,
-    },
-    "sit up": {
-        "rests_on": "Covered annulus tears — loaded spinal flexion (MRI, undated)",
-        "cost_today": "Zero — McGill curl-up covers the pattern without the flexion.",
-        "exit": _EXIT_FLEXION, "single_person": True,
-    },
-    "crunch": {
-        "rests_on": "Covered annulus tears — loaded spinal flexion (MRI, undated)",
-        "cost_today": "Zero — as above.",
-        "exit": _EXIT_FLEXION, "single_person": True,
-    },
-    "leg press": {
-        "rests_on": "End-range hip flexion under load → intradiscal pressure L3-L5 (MRI, undated)",
-        "cost_today": "Zero — no plan has ever used one, squat pattern is covered.",
-        "exit": _EXIT_ZERO_COST, "single_person": True,
-    },
-    "impact": {
-        "rests_on": "Axial impact on activated L5/S1 osteochondrosis (MRI, undated)",
-        "cost_today": "Zero while running covers the impact exposure the goals need.",
-        "exit": _EXIT_IMPACT, "single_person": True,
-    },
-    "jumping": {
-        "rests_on": "Axial impact on activated L5/S1 osteochondrosis (MRI, undated)",
-        "cost_today": "Zero — the 10 km build needs no plyometrics.",
-        "exit": _EXIT_IMPACT, "single_person": True,
-    },
-    "box jump": {
-        "rests_on": "Axial impact on activated L5/S1 osteochondrosis (MRI, undated)",
-        "cost_today": "Zero — as above.",
-        "exit": _EXIT_IMPACT, "single_person": True,
-    },
-    "weight behind": {
-        "rests_on": "Axial load in a seated fold over the annulus tears (source-document adaptation)",
-        "cost_today": "Zero — no goal names it, and the loaded variants have safer forms.",
-        "exit": _EXIT_ZERO_COST, "single_person": True,
-    },
 }
+
+#: The twelve that LEFT this table on 2026-08-17, the athlete's final decision:
+#: "Keep 1-3, remove everything else from the list." Each was downgraded to
+#: caution — never deleted — with its mechanism text intact and a dated REVERT
+#: condition written into its own reason string, which is where the exit
+#: knowledge now lives. The deadlift family stays contraindicated at his own
+#: instruction, which is worth noticing: shown the full list, he kept the
+#: three with the highest axial load on the L5/S1 segment.
+DOWNGRADED_2026_08_17: tuple[str, ...] = (
+    "hyperextension", "back extension",
+    "seated forward fold", "forward fold", "toe touch",
+    "sit up", "crunch", "leg press",
+    "impact", "jumping", "box jump",
+    "weight behind",
+)
+
 

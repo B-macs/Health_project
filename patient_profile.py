@@ -201,6 +201,14 @@ PROFILE = {
     # ─────────────────────────────────────────────────────────────────────────
 
     "mri": {
+        # Acquisition date recovered 2026-08-17, from the athlete: "nearly one
+        # year old" — the November 2025 scan (injury #12's MRI is dated 10 Nov
+        # 2025 and is the only imaging in the record). Until then this section
+        # carried no date at all, which mattered: covered annular tears follow
+        # a 12-24 month healing course, so the age of the scan is part of the
+        # evidence, and every safety decision citing "the MRI" was citing a
+        # document of unknown vintage.
+        "acquired": "~November 2025 (athlete, 2026-08-17)",
         "primary": {
             "level": "L5/S1",
             "pathology": "Activated osteochondrosis + retrolisthesis",
@@ -2093,8 +2101,13 @@ PROFILE = {
                          "week 4, having stepped down one increment on re-entry",
         "flexibility_baseline": "Battery run cold on three separate mornings, a pattern label "
                                 "recorded, and at least two cluster sessions completed",
-        "physio_sign_off": "Format-free and remote is fine, as the 2026-08-10 brief was answered. "
-                            "Required before Block B's race build is authored",
+        "sign_off": "THE ATHLETE'S OWN, against the recorded measurements. No "
+                    "physiotherapist confirmation is required now or in the future — his "
+                    "standing decision, 2026-08-17, superseding the physio_sign_off line "
+                    "that used to sit here. The reasoning channel it replaces it with is "
+                    "docs/hypothesis.md: pre-registered predictions scored at every block "
+                    "boundary, so decisions rest on what was measured rather than on an "
+                    "appointment that does not exist.",
     },
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -2141,6 +2154,40 @@ PROFILE = {
                      "written at that severity — it is now caution from stage 2, which is "
                      "what its own stage_cap and reason text always said.",
             "signed_off_by": "athlete (block design and the rules correction, 2026-08-14)",
+        },
+        {
+            "date": "2026-08-17",
+            "event": "MOVEMENT RULES REDUCED TO THREE, the athlete's final decision after "
+                     "reviewing the full contraindicated list ('Keep 1-3 — remove everything "
+                     "else from list'). The deadlift family (heavy/barbell/conventional) "
+                     "stays contraindicated — notably the three with the highest axial "
+                     "L5/S1 load, kept at his own instruction. The other twelve are "
+                     "DOWNGRADED to caution, never deleted: each keeps its mechanism text "
+                     "and carries a dated note with an explicit REVERT condition in "
+                     "services/rules.py. Basis: the MRI is ~1 year old (Nov 2025) and, in "
+                     "his words, 'not a determining factor' at that age; the flexion "
+                     "family additionally carries the same-day reading of five unloaded "
+                     "folds, zero releases, zero pain; the impact family rides the six-run "
+                     "progression as its live graded trial. rules.DOWNGRADED_2026_08_17 "
+                     "holds the list; tests pin that every downgrade carries its revert.",
+            "signed_off_by": "athlete (2026-08-17) — final decision, stated as such",
+        },
+        {
+            "date": "2026-08-17",
+            "event": "PHYSIOTHERAPIST CONFIRMATION RETIRED AS A GATE, now and in the "
+                     "future — the athlete's standing decision. The physio is not "
+                     "available on demand (recorded 2026-08-13: possibly not until "
+                     "September or later), so every requirement phrased as 'confirm with "
+                     "the physio' was a requirement that stayed permanently unanswered — "
+                     "the same unfalsifiable state the findings and the movement rules "
+                     "were in before this week. Clinical questions settle HERE, on "
+                     "measurements the athlete can take alone, with tested findings "
+                     "overwriting guesswork. What replaces the gate is docs/hypothesis.md: "
+                     "a working hypothesis with pre-registered predictions, scored at "
+                     "every block boundary. Historical entries recording past physio "
+                     "input are untouched — they are history; this ends the FORWARD "
+                     "dependency.",
+            "signed_off_by": "athlete (2026-08-17)",
         },
         {
             "date": "2026-08-14",

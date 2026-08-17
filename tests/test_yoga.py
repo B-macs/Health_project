@@ -27,12 +27,13 @@ def test_effective_safety_keeps_authored_tag_when_no_rule_matches():
 
 
 def test_effective_safety_escalates_via_shared_rules_engine():
-    # Not authored as contraindicated here, but "forward fold" is a
-    # contraindicated keyword in services.rules — the cross-check must catch it
-    # even if this catalogue entry were ever mis-tagged.
+    # Not authored with any warning here, but "forward fold" carries a
+    # caution rule in services.rules (contraindicated until the athlete's
+    # 2026-08-17 list decision) — the cross-check must still catch a
+    # mis-tagged entry and escalate it off "cleared".
     pose = yoga.YogaPose("Some New Forward Fold Variant", 0, 30, "cleared")
     severity, note = yoga.effective_safety(pose, stage=1)
-    assert severity == "contraindicated"
+    assert severity == "caution"
 
 
 def test_cautions_returns_only_non_cleared_poses():
