@@ -164,6 +164,8 @@ _CORE_EXERCISES: tuple[str, ...] = (
     # Finding-test measurements (2026-08-17): unloaded diagnostic counts.
     "Seated Fold Release Count (Test)",
     "Wide-Stance Rotation Count (Test)",
+    "Reassessment Wrap-Up (Notes)",
+    "Bunkie — Anterior Power Line (Timed)",
     # Stage 2B addition
     "Band Pallof Press",
     "Supine Knee-to-Chest",
@@ -194,6 +196,11 @@ _CORE_EXERCISES: tuple[str, ...] = (
 
 _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Upper Glute / TFL Self-Release",
+    "Upper Glute Grip Grade (Test)",
+    "Bunkie — Posterior Power Line (Timed)",
+    "Bunkie — Posterior Stabilizing Line (Timed)",
+    "Bunkie — Lateral Stabilizing Line (Timed)",
+    "Bunkie — Medial Stabilizing Line (Timed)",
     "Right Posterior Hip Capsule Stretch",
     "Piriformis Contract-Relax (PNF)",
     "Ischial Tuberosity Hamstring Release",
@@ -241,7 +248,9 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Wall-Supported Hip Hinge",
     # Stage 2A additions
     "Goblet Squat",
+    "Goblet Squat (Heavy Top Set)",
     "Romanian Deadlift (DB)",
+    "Romanian Deadlift (Heavy Top Set)",
     "Hip Thrust (Loaded)",
     "Bulgarian Split Squat",
     "Lateral Band Walk",
@@ -398,6 +407,13 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "McGill Modified Curl-Up":                {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
     "McGill Curl-Up (Progressed)":            {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
     "Seated Fold Release Count (Test)":       {"upper_body": 0.00, "core": 0.90, "lower_body": 0.10},
+    "Reassessment Wrap-Up (Notes)":           {"upper_body": 0.00, "core": 0.80, "lower_body": 0.20},
+    "Upper Glute Grip Grade (Test)":          {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Bunkie — Posterior Power Line (Timed)":  {"upper_body": 0.05, "core": 0.35, "lower_body": 0.60},
+    "Bunkie — Anterior Power Line (Timed)":   {"upper_body": 0.20, "core": 0.60, "lower_body": 0.20},
+    "Bunkie — Posterior Stabilizing Line (Timed)": {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Bunkie — Lateral Stabilizing Line (Timed)":   {"upper_body": 0.10, "core": 0.40, "lower_body": 0.50},
+    "Bunkie — Medial Stabilizing Line (Timed)":    {"upper_body": 0.10, "core": 0.30, "lower_body": 0.60},
     "Wide-Stance Rotation Count (Test)":      {"upper_body": 0.10, "core": 0.80, "lower_body": 0.10},
     "Diaphragmatic Breathing":                {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
     "Prone Decompression Breathing":          {"upper_body": 0.05, "core": 0.95, "lower_body": 0.00},
@@ -472,6 +488,7 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # A hinge is where the erectors work, and this body carries two annulus
     # tears — the trunk share here is the highest of any lower-body family.
     "Romanian Deadlift (DB)":                 {"upper_body": 0.10, "core": 0.25, "lower_body": 0.65},
+    "Romanian Deadlift (Heavy Top Set)":      {"upper_body": 0.10, "core": 0.25, "lower_body": 0.65},
     "RDL Hip Hinge to Wall":                  {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
     "Single-Leg RDL (Wall Support)":          {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
     "Standing Hip Hinge (Wall Glute Touch)":  {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
@@ -480,6 +497,7 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # The front-rack goblet position is a genuine anterior-core brace, and is
     # most of why this squat variant is the one prescribed for this athlete.
     "Goblet Squat":                           {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Goblet Squat (Heavy Top Set)":           {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
     "Bulgarian Split Squat":                  {"upper_body": 0.05, "core": 0.20, "lower_body": 0.75},
     # The most isolated loaded lift in the block.
     "Hip Thrust (Loaded)":                    {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
@@ -596,8 +614,10 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
 EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     # -- Loaded, Session A/B/C --
     "Goblet Squat":                ("squat", 1.3),
+    "Goblet Squat (Heavy Top Set)": ("squat", 1.3),
     "Bulgarian Split Squat":       ("squat", 1.3),
     "Romanian Deadlift (DB)":      ("hinge", 1.0),
+    "Romanian Deadlift (Heavy Top Set)": ("hinge", 1.0),
     "Hip Thrust (Loaded)":         ("hinge", 1.0),
     "Incline DB Press":            ("upper_push", 0.7),
     "Lat Pulldown":                ("pull", 0.7),
@@ -622,6 +642,13 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Prone Y-Raise Hold (Timed Test)":   ("mobility_core", 0.25),
     "Seated Fold Release Count (Test)":  ("mobility_core", 0.25),
     "Wide-Stance Rotation Count (Test)": ("mobility_core", 0.25),
+    "Upper Glute Grip Grade (Test)":     ("mobility_core", 0.25),
+    "Reassessment Wrap-Up (Notes)":      ("mobility_core", 0.25),
+    "Bunkie — Posterior Power Line (Timed)":       ("bodyweight_compound", 0.5),
+    "Bunkie — Anterior Power Line (Timed)":        ("bodyweight_compound", 0.5),
+    "Bunkie — Posterior Stabilizing Line (Timed)": ("bodyweight_compound", 0.5),
+    "Bunkie — Lateral Stabilizing Line (Timed)":   ("bodyweight_compound", 0.5),
+    "Bunkie — Medial Stabilizing Line (Timed)":    ("bodyweight_compound", 0.5),
     "Lateral Band Walk":                 ("mobility_core", 0.25),
     "Bird-Dog":                          ("mobility_core", 0.25),
     "Side Bridge with Hip Dip":          ("mobility_core", 0.25),

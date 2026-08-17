@@ -2626,6 +2626,53 @@ PREP_SCAPULAR = _ex(
 # — the accounting hazard the warm-up review calls a prerequisite rather than a
 # follow-up (services/tonnage.py, services/strength.py).
 
+GOBLET_TOP_SET = _ex(
+    name="Goblet Squat (Heavy Top Set)",
+    ex_type="reps",
+    sets=1, reps=5, tempo="3-1-1", rest_seconds=150,
+    weight_kg=25.0, equipment_type="dumbbell",
+    mechanics=(
+        "ONE set of five, heavier than the working weight, after the ramp and "
+        "before the working sets. Same movement, same depth, same flat back. "
+        "It should feel like RPE 7-8 — two or three good reps left, never a "
+        "grind. If 25 kg is not that, change the weight and log what you "
+        "actually used; the honest number is the entire point of this set."
+    ),
+    biomechanical_focus=(
+        "The block's first Epley-VALID strength datum. Every 1RM estimate in "
+        "the system sits outside the formula's ~10-effective-rep range because "
+        "the working sets run 10-12 reps at RPE 5-6; five reps at RPE 7-8 is "
+        "~7-8 effective reps, inside it. Week 4 only, after the ramp the same "
+        "session already carries, and legal against stage 2's RPE ceiling of "
+        "8. One set — the working sets that follow are unchanged."
+    ),
+    progression="Five clean reps at RPE 7 → next block starts its estimate here.",
+    regression="Brace loss or a grind → rack it, log the reps you got, and say so.",
+)
+
+RDL_TOP_SET = _ex(
+    name="Romanian Deadlift (Heavy Top Set)",
+    ex_type="reps",
+    sets=1, reps=5, tempo="3-1-1", rest_seconds=150,
+    weight_kg=52.5, equipment_type="dumbbell",
+    mechanics=(
+        "ONE set of five, heavier than the working weight, after the ramp and "
+        "before the working sets. Hinge back, flat back, bar path down the "
+        "thighs. RPE 7-8 — two or three good reps left. If 52.5 kg is not "
+        "that, change the weight and log what you actually used."
+    ),
+    biomechanical_focus=(
+        "Same purpose as the squat's top set, on the hinge — and the lift "
+        "that most needs a valid estimate, since it sits over the annular "
+        "tears and its loading decisions deserve a real number. The 2025 log "
+        "says the back complains FIRST in this pattern when tired or cold: "
+        "this set runs early in the session, ramped, and never to a grind."
+    ),
+    progression="Five clean reps at RPE 7 → next block starts its estimate here.",
+    regression="Any back signal → stop the set, log the reps, keep the working "
+               "sets light today.",
+)
+
 GOBLET_RAMP = _ex(
     name="Goblet Squat (Ramp Set)",
     ex_type="reps",
@@ -2847,7 +2894,8 @@ def _s2b_prep(lower: bool) -> list:
     return [PREP_RAISE, PREP_SCAPULAR, PRONE_Y_RAISE]
 
 
-def _s2b_release(hip_loaded: bool, anterior: bool = False) -> list:
+def _s2b_release(hip_loaded: bool, anterior: bool = False,
+                 training: bool = True) -> list:
     """Phase 1. Pressure releases, with the ischial-tuberosity release leading
     on hip-loaded days. About 5 min, 9.4 on hip days — the anterior-hip item now
     runs from DAY 1 rather than week 3.
@@ -2924,6 +2972,21 @@ def _s2b_release(hip_loaded: bool, anterior: bool = False) -> list:
     comparability with the Stage 1 and Stage 2A versions of itself, and a new
     hip-flexor release immediately before a hinge assessment would move the
     number for a reason that has nothing to do with the athlete."""
+    # ── 2026-08-17, WITHDRAWAL TRIAL (athlete's decision, from three options)
+    # training=False — rest, travel and mobility days — now returns NOTHING.
+    # The daily pair ran 28 days out of 28, finding #1's exit criterion was
+    # already MET on 2026-07-19, and the release stayed anyway with no reason
+    # recorded; whether the reduction HOLDS without daily release is
+    # unanswerable while it runs every day. Training days keep the block
+    # (Key Rule 6, physio-confirmed 2026-08-12); the withdrawal is judged by
+    # the weekly Upper Glute Grip Grade test on the mobility days, and its
+    # slot is deliberately NOT refilled — replacement work on a rest day would
+    # be adaptation-seeking load on the one day defined by its absence, the
+    # same rule that keeps cluster sessions and the accessory's full tier off
+    # rest days. REVERT: grip grade reaching 2, or hip-crest symptoms
+    # returning, puts the pair back on every day.
+    if not training:
+        return []
     head = [ISCHIAL_RELEASE] if hip_loaded else []
     tail = [ANTERIOR_HIP_RELEASE] if anterior else []
     return head + [UPPER_GLUTE_RELEASE_5MIN, PIRIFORMIS_PNF_5MIN] + tail
@@ -2948,6 +3011,10 @@ def _s2b_gym_a(week: int) -> dict:
     # at 12.5 kg and RPE 6, which is why this is conditional on the week.
     heavy_rest = 120 if week == 4 else 90
     ramp = [GOBLET_RAMP, RDL_RAMP] if week == 4 else []
+    # Week 4 only: one heavy 5-rep top set per heavy compound, between the
+    # ramp and the working sets. Athlete's decision 2026-08-17; the WHY is
+    # on the exercises themselves.
+    top = [GOBLET_TOP_SET, RDL_TOP_SET] if week == 4 else []
     objective = {
         1: "Stage 2B Week 1 — Squat + Hinge + Core (last loaded session before travel)",
         3: "Stage 2B Week 3 — Squat + Hinge + Core (re-entry, one step down)",
@@ -2960,7 +3027,7 @@ def _s2b_gym_a(week: int) -> dict:
         "is_gym_session": True,
         "day_type": "main",
         "exercises": _s2b_release(hip_loaded=True, anterior=True)
-                      + _s2b_prep(lower=True) + ramp + [
+                      + _s2b_prep(lower=True) + ramp + top + [
             _ex(
                 name="Goblet Squat",
                 ex_type="reps",
@@ -3355,7 +3422,31 @@ def _s2b_mobility(week: int, away: bool = False) -> dict:
         "session_rpe_target": 3,
         "is_gym_session": False,
         "day_type": "rest",
-        "exercises": _s2b_release(hip_loaded=False) + [
+        "exercises": _s2b_release(hip_loaded=False, training=False) + [
+            _ex(
+                name="Upper Glute Grip Grade (Test)",
+                ex_type="reps",
+                laterality="unilateral",
+                sets=1, reps=1, rest_seconds=0,
+                mechanics=(
+                    "First thing, before the walk warms anything. Stand side-on "
+                    "to a wall corner and press the shelf of the upper outer "
+                    "hip — just below the crest — into it, one side then the "
+                    "other. Grade what you feel 0-3: 0 nothing, 1 slight grip, "
+                    "2 clear grip, 3 marked. Write both grades in the note, "
+                    "right first."
+                ),
+                biomechanical_focus=(
+                    "THE WITHDRAWAL TRIAL'S INSTRUMENT (finding #1). The daily "
+                    "release left the rest days on 2026-08-17; this weekly "
+                    "grade is what judges that decision instead of a feeling. "
+                    "A right grade of 2 or more puts the release back on every "
+                    "day — that revert condition is written at the release "
+                    "block itself."
+                ),
+                progression="This is a measurement — there is nothing to progress.",
+                regression="Grade 2+ on the right → say so; the daily release returns.",
+            ),
             _ex(
                 name="Thoracic Extension (Rolled Towel)",
                 ex_type="hold",
@@ -3420,7 +3511,7 @@ def _s2b_travel_day(day_label: str, note: str) -> dict:
         "session_rpe_target": 2,
         "is_gym_session": False,
         "day_type": "rest",
-        "exercises": _s2b_release(hip_loaded=False) + [
+        "exercises": _s2b_release(hip_loaded=False, training=False) + [
             _ex(
                 name="Controlled Walking",
                 ex_type="duration",
@@ -3600,17 +3691,19 @@ PLAN_STAGE2B[7] = {
     "session_rpe_target": 2,
     "is_gym_session": False,
     "day_type": "rest",
-    "exercises": _s2b_release(hip_loaded=False) + [
+    "exercises": _s2b_release(hip_loaded=False, training=False) + [
         _ex(
             name="Controlled Walking",
             ex_type="duration",
             sets=1, duration_minutes=20, rest_seconds=0,
             mechanics="Twenty minutes, easy, outdoors. Nothing else is prescribed today.",
-            biomechanical_focus="A genuine rest day with the release block kept, because the "
-                                "release block precedes every session and skipping it on the "
-                                "quiet days is how the habit erodes.",
+            biomechanical_focus="A genuine rest day, and since 2026-08-17 that includes the "
+                                "release: the daily pair is withdrawn from rest days so the "
+                                "weekly grip grade can tell whether the reduction holds "
+                                "without it. The walk stays — it is the trapezius perfusion "
+                                "mechanism, not filler.",
             progression="Feeling good → a longer walk is fine. Running is not.",
-            regression="Tired → the release block alone is a complete day.",
+            regression="Tired → the walk alone is a complete day.",
         ),
     ],
 }
@@ -3641,7 +3734,7 @@ PLAN_STAGE2B[21] = {
     "session_rpe_target": 2,
     "is_gym_session": False,
     "day_type": "rest",
-    "exercises": _s2b_release(hip_loaded=False) + [
+    "exercises": _s2b_release(hip_loaded=False, training=False) + [
         _ex(
             name="Controlled Walking",
             ex_type="duration",
@@ -3671,7 +3764,7 @@ PLAN_STAGE2B[27] = {
     "session_rpe_target": 2,
     "is_gym_session": False,
     "day_type": "rest",
-    "exercises": _s2b_release(hip_loaded=False) + [
+    "exercises": _s2b_release(hip_loaded=False, training=False) + [
         _ex(
             name="Controlled Walking",
             ex_type="duration",
@@ -3687,36 +3780,25 @@ PLAN_STAGE2B[27] = {
 }
 
 PLAN_STAGE2B[28] = {
-    "objective": "Stage 2B Reassessment — Final Working Loads + Functional Screen",
+    # REBUILT 2026-08-17, before the block's own day 2. The old screen was
+    # Stage 1's battery carried forward twice: prescribed 20 times across
+    # three blocks, performed 4, and it produced a recorded value ZERO times —
+    # so no stage transition has ever been judged on it. Retired from it:
+    # McGill Big 3 (never once performed), Single-Leg Balance (no finding
+    # behind it — zero instability events in 26 check-ins, no balance deficit
+    # anywhere in the record) and the 5-minute walk (a floor test the block's
+    # own 35-minute runs clear daily). What replaced them is the athlete's own
+    # choice of instrument, all five lines as standard: the Bunkie's timed
+    # holds — CAPACITY, the axis nothing in this system had ever measured,
+    # while the compensation pattern the whole rehab rests on is a capacity
+    # claim. No prior numbers exist (the physio session's results are gone),
+    # so day 28 is the baseline, scored within-athlete on the left-right gap;
+    # 40 s is carried as a reference, flagged provisional.
+    "objective": "Stage 2B Reassessment — Bunkie Baseline + Hip-Click Verdict",
     "phase": _S2B_PHASE,
     "session_rpe_target": 4,
     "day_type": "test",
     "exercises": _s2b_release(hip_loaded=True) + [
-        _ex(
-            name="McGill Big 3 — Quality Screen",
-            ex_type="reps",
-            sets=1, reps=8, rest_seconds=60,
-            mechanics=(
-                "Curl-up, side bridge and bird-dog, eight quality reps of each. Judge the "
-                "QUALITY, not the count: does the brace hold, does the pelvis stay level, does "
-                "anything shake that did not last time."
-            ),
-            biomechanical_focus="Trunk control screen, comparable to the Stage 1 Day 21 and "
-                                "Stage 2A Day 28 versions of the same test.",
-            progression="Matching or beating the last screen → the trunk work is doing its job.",
-            regression="Worse → say so before the next block is authored, not after.",
-        ),
-        _ex(
-            name="Single-Leg Balance (Eyes Closed)",
-            ex_type="hold",
-            laterality="unilateral",
-            sets=2, hold_seconds=60, rest_seconds=45,
-            mechanics="Stand on one leg, eyes closed, 60 seconds each side. Record which side "
-                      "is worse and by how much.",
-            biomechanical_focus="Proprioceptive control, and a standing requirement at Beighton 6/9.",
-            progression="Both sides steady → unchanged; this is a monitor, not a target.",
-            regression="Markedly worse on one side → record it against the hip findings.",
-        ),
         _ex(
             name="Hip Hinge Full Range Assessment",
             ex_type="reps",
@@ -3737,26 +3819,121 @@ PLAN_STAGE2B[28] = {
                        "about it.",
         ),
         _ex(
-            name="5-Minute Walk + Stair Assessment",
-            ex_type="duration",
-            sets=1, duration_minutes=7, rest_seconds=0,
+            name="Bunkie — Posterior Power Line (Timed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=1, hold_seconds=40, rest_seconds=60,
             mechanics=(
-                "Walk briskly five minutes, then up and down a flight of stairs twice. Rate pain "
-                "at each point and compare against the Stage 2A Day 28 numbers. Log the final "
-                "working loads on all six primary lifts here as the new baseline. If the second "
-                "weekly cluster session has been earned by two clean weeks, this evening is "
-                "where it goes — the integration protocol's same-day-evening slot, rather than "
-                "a sixth session in the week."
+                "Lie on your back, both heels on a sturdy bench or chair (about 40 cm), arms "
+                "crossed on your chest. Lift the hips until shoulders, hips and heels make one "
+                "straight line, then lift one leg off the bench and HOLD on the other. Stop the "
+                "clock when the hips drop out of the line — not when it burns. Time each side, "
+                "write both in the note. 40 seconds is the reference; your score is the clock "
+                "and the left-right gap."
             ),
             biomechanical_focus=(
-                "Integrated functional outcome, plus the data Block B is authored from: final "
-                "loads, the hip-click verdict, how the band fortnight actually went, and "
-                "whether the running introduction produced any left hip flexor signal."
+                "Glute max and hamstring capacity on one leg — the primary underactive muscle, "
+                "tested rather than assumed for the first time."
             ),
-            progression="Pain <=2/10 throughout and the run progression on track → Block B builds "
-                        "toward the 10 km from here.",
-            regression="Pain >3/10, or a left hip flexor signal from the running → Block B starts "
-                       "with more run/walk, and that is a normal outcome rather than a setback.",
+            progression="This is a measurement — there is nothing to progress.",
+            regression="Cramp or back signal → stop, log the seconds you got.",
+        ),
+        _ex(
+            name="Bunkie — Anterior Power Line (Timed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=1, hold_seconds=40, rest_seconds=60,
+            mechanics=(
+                "Front support on your forearms, both feet up on the bench. One straight line "
+                "from shoulders to heels — brace so the low back neither sags nor arches; that "
+                "line IS the test. Lift one leg a few centimetres and HOLD. Stop the clock the "
+                "moment the line breaks at the low back. Time each side, write both in the note."
+            ),
+            biomechanical_focus=(
+                "Anterior chain and brace endurance — the brace the 2025 log records collapsing "
+                "from rep 6 in the squat, finally measured on a clock. Run as standard, all "
+                "five lines, on the athlete's decision; the line-break stop rule is what "
+                "protects the back, so hold the line, not the burn."
+            ),
+            progression="This is a measurement — there is nothing to progress.",
+            regression="Low back sag or any back signal → stop instantly, log the seconds.",
+        ),
+        _ex(
+            name="Bunkie — Posterior Stabilizing Line (Timed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=1, hold_seconds=40, rest_seconds=60,
+            mechanics=(
+                "As the posterior power line — on your back, hips bridged, one heel on the "
+                "bench — but with the support KNEE STRAIGHT and the toes pulled toward you, so "
+                "the hamstring carries the line alone. Lift the other leg and HOLD. Stop when "
+                "the hips drop. Time each side, write both in the note."
+            ),
+            biomechanical_focus=(
+                "Hamstring capacity in isolation — the tissue at the ischial attachment finding "
+                "#2 now points at, measured rather than only released."
+            ),
+            progression="This is a measurement — there is nothing to progress.",
+            regression="Hamstring cramp is common here — stop, shake it out, log the seconds.",
+        ),
+        _ex(
+            name="Bunkie — Lateral Stabilizing Line (Timed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=1, hold_seconds=40, rest_seconds=60,
+            mechanics=(
+                "Side support on one forearm, BOTH feet stacked on the bench, body in one "
+                "straight line seen from the front. Lift the top leg and HOLD. Stop when the "
+                "hips drop toward the floor. Time each side, write both in the note."
+            ),
+            biomechanical_focus=(
+                "Glute medius and lateral-line capacity — finding #1's capacity test, the half "
+                "its 2026-08-17 re-read could not take because this test was not built yet. "
+                "The right is the documented over-gripping side; what this reads is whether it "
+                "is also the weaker one."
+            ),
+            progression="This is a measurement — there is nothing to progress.",
+            regression="Supporting shoulder unhappy → drop to the floor version, note the change.",
+        ),
+        _ex(
+            name="Bunkie — Medial Stabilizing Line (Timed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=1, hold_seconds=40, rest_seconds=60,
+            mechanics=(
+                "Side support on one forearm with the TOP foot on the bench and the lower leg "
+                "hanging free, body in one line. HOLD. The inner thigh of the bench leg is "
+                "what works. Stop when the hips drop. Time each side, write both in the note."
+            ),
+            biomechanical_focus=(
+                "Adductor capacity — Cluster A's end-range-strength limiter given a number, "
+                "and the line most likely to surprise given the battery's Pattern D "
+                "(adductor-group) reading."
+            ),
+            progression="This is a measurement — there is nothing to progress.",
+            regression="Groin cramp → stop, log the seconds; a short first score is a finding, "
+                       "not a failure.",
+        ),
+        _ex(
+            name="Reassessment Wrap-Up (Notes)",
+            ex_type="duration",
+            sets=1, duration_minutes=3, rest_seconds=0,
+            mechanics=(
+                "Three minutes with the note field, while it is fresh. Write: the final "
+                "working loads on the six primary lifts (days 22 and 26 hold them); how the "
+                "band fortnight actually felt; whether the running introduction produced ANY "
+                "left front-of-hip signal; and the hip-click verdict from the hinge assessment "
+                "above. If the second weekly cluster session was earned by two clean weeks, "
+                "this evening is its slot."
+            ),
+            biomechanical_focus=(
+                "This note IS the data Block B is authored from. The last two blocks' "
+                "assessment output went into a field that silently discarded it; this block's "
+                "goes here, on purpose, in the field that now keeps it."
+            ),
+            progression="Done → Block B has its inputs.",
+            regression="Short on time → the final loads and the hip-click verdict are the two "
+                       "that cannot be skipped.",
         ),
     ],
 }

@@ -188,6 +188,16 @@ MOVEMENT_RULES: list[MovementRule] = [
 
     # ── Caution: Stage 1 — cleared from Stage 2 with monitoring ─────────────
     MovementRule(
+        movement="bunkie",
+        reason="Timed capacity holds to FORM failure, not burn — added 2026-08-17 with the "
+               "day-28 Bunkie baseline so these five names cannot read as unknown, which "
+               "looks exactly like cleared. The anterior power line is a feet-elevated "
+               "front support: the brace must hold the low back neutral over the two "
+               "annular tears, so the stop rule is the line breaking at the low back, "
+               "instantly. All five lines: stop at line break, log the seconds, both sides.",
+        stage_cap=2, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
         movement="romanian deadlift",
         reason="Hip hinge with light load acceptable. Watch for right-side L5/S1 symptoms. No lumbar rounding.",
         stage_cap=2, severity="caution", laterality="bilateral",

@@ -125,16 +125,26 @@ def test_running_actually_reaches_the_movement_rules():
         assert rules.check_movement(name, 2)["severity"] == "caution", name
 
 
-def test_the_release_block_precedes_every_single_session():
-    """resume.md rule 8, and it holds on rest days and travel days too — those
-    are exactly the days the habit erodes on.
+def test_the_release_block_precedes_every_training_session_and_is_absent_from_rest_days():
+    """This test used to assert the release opened all 28 days, rest days
+    included. Since 2026-08-17 it pins the WITHDRAWAL TRIAL instead, in both
+    directions:
 
-    ONE exemption, day 1 only (2026-08-17): its three finding-test
-    measurements run BEFORE the release, because finding #5's test counts
-    cracks and finding #3's counts releases — pressure work first would quiet
-    the very tissues being counted, so the session would measure the release
-    rather than the athlete. The release block must still be PRESENT and must
-    open the remainder: measurement first is not release optional."""
+    * every TRAINING day (main, stretch, and the day-28 test screen) still
+      opens with a release exercise — Key Rule 6, physio-confirmed;
+    * every REST day carries NO release-pair work at all. Finding #1's exit
+      criterion was met on 2026-07-19 and the pair ran 28/28 anyway; whether
+      the reduction holds without daily release is unanswerable while it runs
+      daily. The weekly Upper Glute Grip Grade on the mobility days is the
+      trial's instrument, and it must not be quietly re-treated between
+      readings — release creeping back onto a rest day would corrupt the
+      trial while looking like diligence.
+
+    ONE exemption, day 1 only: its three finding-test measurements run BEFORE
+    the release, because finding #5's test counts cracks and finding #3's
+    counts releases — pressure work first would quiet the very tissues being
+    counted. The release must still be present and nothing but tests may sit
+    ahead of it."""
     for d in DAYS:
         names = [e["name"] for e in PLAN[d]["exercises"]]
         if d == 1:
@@ -146,6 +156,12 @@ def test_the_release_block_precedes_every_single_session():
             assert all("(Test)" in n or "(Timed Test)" in n
                        for n in names[:first_release]), (
                 "day 1 may only put TESTS ahead of the release block")
+            continue
+        if PLAN[d]["day_type"] == "rest":
+            leaked = [n for n in names if n in sess.RELEASE_EXERCISE_NAMES]
+            assert not leaked, (
+                f"day {d} is a rest day inside the withdrawal trial and "
+                f"carries release work: {leaked}")
             continue
         assert names[0] in sess.RELEASE_EXERCISE_NAMES, f"day {d} opens with {names[0]}"
 
@@ -293,7 +309,14 @@ def test_only_the_two_heavy_compounds_change_rest_and_only_in_week_four():
     is conditional on the loads actually being near-maximal."""
     long_rests = {(d, ex["name"]) for d, ex in ALL_EXERCISES
                   if (ex.get("rest_seconds") or 0) > 90}
-    assert long_rests == {(22, "Goblet Squat"), (22, "Romanian Deadlift (DB)")}, long_rests
+    # The two heavy TOP SETS (added 2026-08-17) rest 150 s — near-maximal
+    # 5-rep work is exactly the condition Grgic 2018's ">2 min" applies to,
+    # so they belong in this set rather than being an exception to it.
+    assert long_rests == {
+        (22, "Goblet Squat"), (22, "Romanian Deadlift (DB)"),
+        (22, "Goblet Squat (Heavy Top Set)"),
+        (22, "Romanian Deadlift (Heavy Top Set)"),
+    }, long_rests
 
 
 def test_core_and_scapular_rest_is_left_alone():

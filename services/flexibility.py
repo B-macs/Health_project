@@ -358,6 +358,11 @@ RETEST_BLOCKED = "blocked"
 RELEASE_EXERCISES: frozenset[str] = frozenset({
     # Pressure release and stretch — the pre-session release block
     "Upper Glute / TFL Self-Release",
+    # A 10-second per-side grading press, not loading — the withdrawal
+    # trial's weekly instrument (2026-08-17). Classified here so a mobility
+    # day carrying it never reads as a leg-loading day before a cluster
+    # session or a retest.
+    "Upper Glute Grip Grade (Test)",
     "Piriformis Contract-Relax (PNF)",
     "Ischial Tuberosity Hamstring Release",
     "Standing Hip Flexor Release",
