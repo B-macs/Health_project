@@ -1867,11 +1867,17 @@ def _render_begin_next_phase_button(phases: list) -> None:
     present it returned False forever, and the app would have sat with no active
     phase from the day Stage 2A lapsed.
 
-    Every phase's length_days and its authored day count match exactly, so a
-    block's calendar range always lapses at the same moment its content would —
-    meaning _render_no_active_phase's reassessment-gap screen is what actually
-    fires in practice, not the 'ran out of days while still in-phase' branch
-    this is also wired into. Called from both."""
+    A block's calendar range lapses at or before the moment its content does —
+    and EARLIER whenever days were removed from a phase without shortening
+    length_days, which is what happened to Stage 2A (28 authored days, 26
+    reachable, two stranded entries removed on 2026-08-14). So
+    _render_no_active_phase's reassessment-gap screen is what fires in
+    practice, not the 'ran out of days while still in-phase' branch.
+
+    ⚠ Called from BOTH, and that has to stay true. This docstring asserted it
+    while only the plan-complete branch actually called it, so the screen that
+    really fires offered no way to start the next block — see
+    _render_no_active_phase. A test pins both call sites."""
     number = sess.next_phase_offer(phases)
     if number is None:
         return
@@ -1957,6 +1963,21 @@ def _render_no_active_phase(phases: list) -> None:
             f"that matters by hand before starting the next block."
         )
         break
+
+    # THE DOOR THIS SCREEN PROMISES. Without it the header says "Ready to begin
+    # the next block below" and there is nothing below: the button lived only
+    # on the plan-complete branch, which needs an ACTIVE phase, while this
+    # screen fires precisely because no phase is active any more. Every route
+    # to starting a block therefore ran through a screen that could not offer
+    # one, and the app sat with no active phase from the morning Stage 2A
+    # lapsed (2026-08-17, the day Stage 2B was due to start) with no way
+    # forward but editing Notion by hand.
+    #
+    # _render_begin_next_phase_button's own docstring already claimed it was
+    # "called from both" and named THIS screen as the one that fires in
+    # practice. It was called from one. Rendered last, after any stranded-day
+    # warning, so the thing to read comes before the thing to press.
+    _render_begin_next_phase_button(phases)
 
 
 def _render_day_detail(d: date, active, phases: list) -> None:

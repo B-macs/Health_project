@@ -23,10 +23,26 @@ NOW = datetime(2026, 8, 17, 12, 0, 0, tzinfo=timezone.utc)
 
 
 def _token(**kw):
+    """A token for the PURE-LOGIC tests, which always pass `now=NOW`.
+
+    The default expiry is anchored to the REAL clock, not to NOW. Repository
+    tests reach _oc, which reads datetime.now() and cannot be told otherwise
+    — so a fixture expiring at a fixed instant turns into a time bomb that
+    detonates when wall-clock time passes it. One did, hours after being
+    written. Use _live_token for anything whose expiry must be read against
+    the real clock.
+    """
     base = dict(access_token="acc", refresh_token="ref",
-                expires_at=NOW + timedelta(days=30), scope="daily", obtained_at=NOW)
+                expires_at=datetime.now(timezone.utc) + timedelta(days=30),
+                scope="daily", obtained_at=NOW)
     base.update(kw)
     return oura_auth.OAuthToken(**base)
+
+
+def _live_token(hours: float, **kw):
+    """A token whose expiry sits `hours` from the REAL now — negative for
+    already-expired. For every test that goes through Repository._oc."""
+    return _token(expires_at=datetime.now(timezone.utc) + timedelta(hours=hours), **kw)
 
 
 # ─── from_response ────────────────────────────────────────────────────────
@@ -451,7 +467,7 @@ def test_concurrent_refreshes_redeem_the_token_exactly_once(monkeypatch):
     import time as _time
 
     repo = _repo(monkeypatch)
-    repo._store_oura_token(_token(expires_at=NOW - timedelta(days=1)))
+    repo._store_oura_token(_live_token(-24))
 
     calls = []
     barrier = threading.Barrier(2, timeout=5)
@@ -487,7 +503,7 @@ def test_a_refresh_is_persisted_to_both_stores_before_it_is_returned(monkeypatch
     from services.clients import local_cache
 
     repo = _repo(monkeypatch)
-    repo._store_oura_token(_token(expires_at=NOW - timedelta(days=1)))
+    repo._store_oura_token(_live_token(-24))
     monkeypatch.setattr(oura, "refresh_access_token", lambda *a: {
         "access_token": "new-acc", "refresh_token": "new-ref", "expires_in": 2_592_000})
 
@@ -500,7 +516,7 @@ def test_a_failed_refresh_keeps_serving_a_still_valid_access_token(monkeypatch):
     """The 24-hour skew exists so a transient failure has retries left. Raising
     on the first one would take the sync down for a credential that works."""
     repo = _repo(monkeypatch)
-    repo._store_oura_token(_token(expires_at=NOW + timedelta(hours=1)))
+    repo._store_oura_token(_live_token(1))
 
     def boom(*a):
         raise RuntimeError("Oura is down")
@@ -513,7 +529,7 @@ def test_a_failed_refresh_on_an_already_expired_token_does_raise(monkeypatch):
     """Past expiry there is nothing left to serve, and returning the dead
     token would produce the mystery 401 this work exists to remove."""
     repo = _repo(monkeypatch)
-    repo._store_oura_token(_token(expires_at=NOW - timedelta(days=1)))
+    repo._store_oura_token(_live_token(-24))
     monkeypatch.setattr(oura, "refresh_access_token",
                         lambda *a: (_ for _ in ()).throw(oura.OuraAuthError("dead")))
     with pytest.raises(oura.OuraAuthError):
@@ -586,7 +602,7 @@ def test_oura_configured_is_true_for_a_stale_oauth_credential(monkeypatch):
     """Reporting unconfigured would route the athlete to 'add OURA_TOKEN to
     secrets.toml' — now the wrong repair, and no longer even possible."""
     repo = _repo(monkeypatch, oura_token="")
-    repo._store_oura_token(_token(expires_at=NOW - timedelta(days=90)))
+    repo._store_oura_token(_live_token(-24 * 90))
     assert repo.oura_configured()
 
 
