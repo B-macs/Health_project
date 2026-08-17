@@ -76,7 +76,18 @@ DEFAULT_EXPIRES_IN_SECONDS = 30 * 86_400
 #: because widening scope later costs a full re-authorisation and these are
 #: the two endpoints most likely to be wanted next. `email` is NOT requested
 #: — nothing here reads it.
-DEFAULT_SCOPES = ("personal", "daily", "heartrate", "workout", "tag", "session", "spo2")
+#:
+#: ⚠ `stress` and `heart_health` ARE NOT IN OURA'S PUBLISHED SCOPE LIST, and
+#: were found by 401 rather than by documentation: a grant covering all eight
+#: documented scopes still failed on daily_resilience ("not authorized access
+#: stress scope" — note it names `stress` while daily_STRESS itself works
+#: fine under `daily`) and on daily_cardiovascular_age ("heart_health").
+#: Measured 2026-08-17 by probing all sixteen endpoints against a live token.
+#: They are requested here so the next authorisation picks them up; a grant
+#: that predates this simply leaves those two endpoints in
+#: Repository.oura_scope_gaps rather than failing.
+DEFAULT_SCOPES = ("personal", "daily", "heartrate", "workout", "tag", "session",
+                  "spo2", "stress", "heart_health")
 
 
 class OuraTokenError(ValueError):

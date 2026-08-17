@@ -40,6 +40,22 @@ TOKEN_URL = "https://api.ouraring.com/oauth/token"
 _TIMEOUT_SECONDS = 20
 
 
+class OuraScopeError(RuntimeError):
+    """THIS ENDPOINT is not covered by the grant. The credential is fine.
+
+    A subclass of nothing — deliberately NOT an OuraAuthError, even though
+    Oura returns both as 401. They demand opposite responses, and conflating
+    them cost the whole sync: `daily_resilience` needs an undocumented
+    `stress` scope and `daily_cardiovascular_age` a `heart_health` one, so a
+    grant covering Oura's eight published scopes still 401s on two archival
+    endpoints — and that killed the entire run, sleep included, on a
+    credential that reads sleep perfectly well.
+
+    Callers should skip the endpoint and carry on. Re-authorising with wider
+    scopes is the fix for the missing data, not for the sync.
+    """
+
+
 class OuraAuthError(RuntimeError):
     """The credential itself is the problem — not the network, not Oura.
 
@@ -204,16 +220,40 @@ def verify_token(token: str) -> dict:
         timeout=_TIMEOUT_SECONDS,
     )
     if resp.status_code == 401:
-        raise OuraAuthError(_unauthorised_detail(resp))
+        _raise_401(resp, "personal_info")
     resp.raise_for_status()
     return resp.json()
 
 
-def _unauthorised_detail(resp) -> str:
+def _detail_of(resp) -> str:
     try:
-        return f"Oura rejected the access token (401): {resp.json().get('detail') or resp.text}"
+        return str(resp.json().get("detail") or resp.text)
     except ValueError:
-        return f"Oura rejected the access token (401): {resp.text}"
+        return resp.text
+
+
+def _raise_401(resp, endpoint: str = "") -> None:
+    """Turn a 401 into the RIGHT exception.
+
+    Oura uses one status code for two unrelated conditions, distinguishable
+    only by the prose:
+
+      "Token is not authorized access <name> scope."  -> this endpoint only
+      "The access token provided is expired, revoked" -> the whole credential
+
+    Matching on prose is fragile and normally worth avoiding, but the
+    alternative is worse than fragile — it is treating a missing archival
+    scope as a dead credential, which is what took the entire sync (sleep
+    included) down on a perfectly good token. The match is deliberately loose
+    and falls through to the FATAL reading when unsure: mistaking a real
+    revocation for a scope gap would restore the silent-failure bug this work
+    exists to remove.
+    """
+    detail = _detail_of(resp)
+    low = detail.lower()
+    if "scope" in low and ("not authorized" in low or "not authorised" in low):
+        raise OuraScopeError(f"{endpoint or 'endpoint'} not covered by the grant: {detail}")
+    raise OuraAuthError(f"Oura rejected the access token (401): {detail}")
 
 
 def get_collection(token: str, endpoint: str, start_date: str, end_date: str) -> list[dict]:
@@ -238,7 +278,7 @@ def get_collection(token: str, endpoint: str, start_date: str, end_date: str) ->
         if resp.status_code == 404:
             return out
         if resp.status_code == 401:
-            raise OuraAuthError(_unauthorised_detail(resp))
+            _raise_401(resp, endpoint)
         resp.raise_for_status()
         payload = resp.json()
         out.extend(payload.get("data") or [])

@@ -312,6 +312,109 @@ def test_the_authorize_and_token_hosts_differ_and_are_not_swapped():
     assert oura.TOKEN_URL.startswith("https://api.ouraring.com/")
 
 
+# ─── scope gaps must not read as a dead credential ────────────────────────
+#
+#  MEASURED 2026-08-17 against a live token holding all eight of Oura's
+#  PUBLISHED scopes: daily_resilience returns 401 "Token is not authorized
+#  access stress scope" and daily_cardiovascular_age 401 "...heart_health
+#  scope". Both are archival. Because that 401 was indistinguishable from a
+#  revoked token, the whole sync died at the first of them — sleep included,
+#  on a credential that had just been verified and reads sleep perfectly.
+
+def test_a_scope_401_is_not_an_auth_error(monkeypatch):
+    monkeypatch.setattr(oura.requests, "get", lambda *a, **k: _Resp(
+        401, {"detail": "Token is not authorized access stress scope."}))
+    with pytest.raises(oura.OuraScopeError):
+        oura.get_collection("t", "daily_resilience", "a", "b")
+
+
+def test_a_revocation_401_is_still_fatal(monkeypatch):
+    """The loose prose match must fall through to FATAL when unsure —
+    mistaking a real revocation for a scope gap restores the silent failure
+    this whole change exists to remove."""
+    monkeypatch.setattr(oura.requests, "get", lambda *a, **k: _Resp(
+        401, {"detail": "The access token provided is expired, revoked, malformed..."}))
+    with pytest.raises(oura.OuraAuthError):
+        oura.get_collection("t", "sleep", "a", "b")
+
+
+def test_an_unrecognised_401_is_treated_as_fatal(monkeypatch):
+    monkeypatch.setattr(oura.requests, "get", lambda *a, **k: _Resp(401, {"detail": "nope"}))
+    with pytest.raises(oura.OuraAuthError):
+        oura.get_collection("t", "sleep", "a", "b")
+
+
+def test_a_scope_error_is_not_catchable_as_an_auth_error():
+    """They demand opposite handling, so the type hierarchy must not let a
+    broad `except OuraAuthError` quietly swallow a scope gap as a dead
+    credential."""
+    assert not issubclass(oura.OuraScopeError, oura.OuraAuthError)
+
+
+def test_one_blocked_endpoint_does_not_stop_the_others(monkeypatch):
+    """The actual 2026-08-17 failure: daily_resilience 401'd and took sleep
+    with it."""
+    from services.repository import Repository
+
+    repo = _repo(monkeypatch, oura_token="pat")
+    seen = []
+
+    def fake(token, endpoint, start, end):
+        seen.append(endpoint)
+        if endpoint in ("daily_resilience", "daily_cardiovascular_age"):
+            raise oura.OuraScopeError(f"{endpoint} not covered")
+        return [{"day": "2026-08-17", "score": 80}]
+
+    monkeypatch.setattr("services.repository.oura.get_collection", fake)
+    monkeypatch.setattr(Repository, "_ws", lambda self, *a, **k: None)
+    monkeypatch.setattr(Repository, "_upsert_sheet_row", lambda self, *a, **k: None)
+
+    written = repo._sync_oura_daily("tok", "2026-08-17", "2026-08-17")
+    assert written == 1, "the day must still be written"
+    assert "daily_sleep" in seen and "vo2_max" in seen, "must not stop at the failure"
+    assert repo.oura_scope_gaps() == ["daily_cardiovascular_age", "daily_resilience"]
+
+
+def test_a_full_sync_clears_gaps_a_wider_grant_has_closed(monkeypatch):
+    """The reset belongs to sync_oura_all, the only call that covers every
+    endpoint — so it is the only scope at which "no longer missing" can be
+    observed. Doing it inside _sync_oura_daily would wipe the event
+    endpoints' gaps instead."""
+    from services.repository import Repository
+
+    repo = _repo(monkeypatch, oura_token="pat")
+    repo._record_oura_scope_gap("daily_resilience")
+    monkeypatch.setattr("services.repository.oura.get_collection", lambda *a: [])
+    monkeypatch.setattr(Repository, "_ws", lambda self, *a, **k: None)
+    monkeypatch.setattr(Repository, "_mark_oura_tab_synced", lambda self, *a, **k: None)
+    repo.sync_oura_all(days=1)
+    assert repo.oura_scope_gaps() == []
+
+
+def test_a_blocked_event_endpoint_returns_zero_rather_than_raising(monkeypatch):
+    from services.repository import Repository
+
+    repo = _repo(monkeypatch, oura_token="pat")
+    monkeypatch.setattr("services.repository.oura.get_collection",
+                        lambda *a: (_ for _ in ()).throw(oura.OuraScopeError("no")))
+    assert repo._sync_oura_events("tok", "workout", "a", "b", None, ["id"], dict) == 0
+    assert "workout" in repo.oura_scope_gaps()
+
+
+def test_a_scope_gap_does_NOT_mark_the_credential_as_needing_reauthorisation(monkeypatch):
+    """It is a data gap, not a login problem. Raising the Home banner for it
+    would send the athlete to a browser to fix two archival columns."""
+    repo = _repo(monkeypatch, oura_token="pat")
+    repo._record_oura_scope_gap("daily_resilience")
+    assert not repo.oura_auth_status()["needs_authorisation"]
+
+
+def test_the_undocumented_scopes_are_requested():
+    """Found by 401, not by documentation - Oura publishes neither."""
+    assert "stress" in oura_auth.DEFAULT_SCOPES
+    assert "heart_health" in oura_auth.DEFAULT_SCOPES
+
+
 # ─── the concurrency hazard, end to end ───────────────────────────────────
 
 def _repo(monkeypatch, **cfg):

@@ -265,6 +265,12 @@ _OURA_TOKEN_PERSIST_ERROR_KEY = "oura_token_persist_error"
 # banner would never fire on the exact state it was written for.
 _OURA_AUTH_FAILURE_KEY = "oura_auth_failure"
 
+# Daily endpoints the current grant does not cover, recorded by
+# _sync_oura_daily. Their Oura Daily columns stay permanently blank, which is
+# a fact worth being able to answer without re-probing the API — and worth
+# distinguishing from "Oura had no data", which looks identical in the sheet.
+_OURA_SCOPE_GAPS_KEY = "oura_scope_gaps"
+
 # ⚠ PROCESS-WIDE, not per-Repository, and that is the entire point.
 #
 # Oura's refresh tokens are SINGLE USE (services/oura_auth.py). The
@@ -813,6 +819,20 @@ class Repository:
         if self._oura_token_obj is None:
             self._oura_token_obj = oura.make_client(self.config)
         return self._oura_token_obj
+
+    def _record_oura_scope_gap(self, endpoint: str) -> None:
+        """Add `endpoint` to the recorded scope gaps, keeping the rest."""
+        local_cache.mutate(
+            _OURA_SCOPE_GAPS_KEY,
+            lambda old: sorted(set(old or []) | {endpoint}),
+        )
+
+    def oura_scope_gaps(self) -> list[str]:
+        """Endpoints the current grant does not cover. Empty is the normal
+        case; a non-empty list means those columns are blank by permission
+        rather than because Oura had no data — indistinguishable in the sheet
+        and worth being able to answer without re-probing."""
+        return list(local_cache.read().get(_OURA_SCOPE_GAPS_KEY) or [])
 
     def _record_oura_auth_failure(self, exc: Exception) -> None:
         """Remember that Oura rejected the credential, with when and why.
@@ -5153,8 +5173,16 @@ class Repository:
                            worksheet, header: list[str], row_mapper) -> int:
         """Shared upsert loop for the 4 event-based Oura endpoints (0-N
         entries per day, keyed by the event's own id — header[0] is always
-        that id column, by construction of every _OURA_*_HEADER above)."""
-        entries = oura.get_collection(token, endpoint, start, end)
+        that id column, by construction of every _OURA_*_HEADER above).
+
+        An endpoint outside the grant is skipped, not fatal — same reasoning
+        as _sync_oura_daily, and applied here too so a future scope change
+        cannot take the sleep tabs down from the other side."""
+        try:
+            entries = oura.get_collection(token, endpoint, start, end)
+        except oura.OuraScopeError:
+            self._record_oura_scope_gap(endpoint)
+            return 0
         for entry in entries:
             row = row_mapper(entry)
             values = [row.get(k, "") for k in header]
@@ -5655,7 +5683,26 @@ class Repository:
         one resumable step alongside the four event tabs."""
         by_date: dict[str, dict] = {}
         for endpoint in _OURA_DAILY_ENDPOINTS:
-            for entry in oura.get_collection(token, endpoint, start, end):
+            try:
+                entries = oura.get_collection(token, endpoint, start, end)
+            except oura.OuraScopeError:
+                # ONE endpoint outside the grant must not cost the other
+                # eight. Measured 2026-08-17: a grant covering all eight of
+                # Oura's PUBLISHED scopes still 401s on daily_resilience
+                # (wants an undocumented `stress` scope) and
+                # daily_cardiovascular_age (`heart_health`) — and because
+                # that 401 propagated, the whole sync died at the first of
+                # them, taking sleep with it on a credential that reads
+                # sleep perfectly well. Both are archival: nothing outside
+                # the Oura Daily tab's own columns reads either.
+                #
+                # Recorded, not swallowed: a column that is permanently blank
+                # because of a scope should be answerable without re-probing
+                # the API, and is indistinguishable in the sheet from Oura
+                # simply having no data.
+                self._record_oura_scope_gap(endpoint)
+                continue
+            for entry in entries:
                 d = entry.get("day")
                 if d:
                     by_date.setdefault(d, {})[endpoint] = entry
@@ -5771,6 +5818,15 @@ class Repository:
             key: (endpoint, ws_getter, header, mapper)
             for key, endpoint, ws_getter, header, mapper in self._oura_event_specs()
         }
+
+        # Cleared here rather than in the two recorders, because THIS is the
+        # call that covers every endpoint — so it is the only scope at which
+        # "no longer missing" can be observed. Accumulating per-endpoint
+        # without a reset would keep reporting a gap that a wider
+        # re-authorisation had already closed; resetting inside
+        # _sync_oura_daily would wipe the event endpoints' gaps instead.
+        if not already:
+            local_cache.update({_OURA_SCOPE_GAPS_KEY: None})
 
         result: dict[str, int] = {}
         try:
