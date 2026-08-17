@@ -454,7 +454,7 @@ def test_stacks_open_with_a_component_not_the_full_position():
     two documented exceptions: strength stacks whose opening triangle is a
     door-opener, and the exemption must stay stated on the stack itself so it
     reads as a decision rather than a drift."""
-    for pattern in ("A", "B", "C", "D", "E", "F", "I"):
+    for pattern in ("C", "D", "E", "F", "I"):
         first = _live_keys(cp.STACKS[pattern])[0]
         assert first not in _INTEGRATED, (pattern, first)
     for pattern in ("G", "H"):
@@ -467,7 +467,7 @@ def test_stretching_stacks_end_in_the_full_position():
     """Components open, the full skill comes last — the Daniel ladder's shape.
     §G belongs here too: strength ordering in the middle, but it still closes
     on the pancake under his own power."""
-    for pattern in ("B", "C", "D", "E", "G"):
+    for pattern in ("C", "D", "E", "G"):
         last = _live_keys(cp.STACKS[pattern])[-1]
         assert last in _INTEGRATED, (pattern, last)
 
@@ -518,17 +518,17 @@ def test_every_item_tells_its_stacks_story():
     the real failure mode: an exercise pasted into a stack whose diagnosis it
     does not serve."""
     relevant = {
-        "A": {"bone", "puller_strength", "adductor_length"},
-        "B": {"bone", "seated_tilt", "adductor_length"},
         "C": {"adductor_length", "seated_tilt", "end_range_strength"},
-        "D": {"adductor_length", "puller_strength", "bone"},
-        "E": {"adductor_length", "end_range_strength", "bone"},
+        "D": {"adductor_length", "puller_strength"},
+        "E": {"adductor_length", "end_range_strength"},
         "F": {"seated_tilt", "puller_strength"},
         "G": {"seated_tilt", "puller_strength", "end_range_strength",
-              "adductor_length", "bone"},
-        "H": {"end_range_strength", "adductor_length", "bone"},
-        "I": {"puller_strength", "adductor_length", "bone"},
+              "adductor_length"},
+        "H": {"end_range_strength", "adductor_length"},
+        "I": {"puller_strength", "adductor_length"},
     }
+    assert set(relevant) == set(cp.STACKS), (
+        "this map must cover exactly the live stacks")
     for pattern, stack in cp.STACKS.items():
         for item in stack.items:                      # deferred items included
             ex = cm.exercise(item.exercise)
@@ -541,17 +541,27 @@ def test_the_stack_ceiling_holds():
     stretching stack, and padding it to three would invent work."""
     for pattern, stack in cp.STACKS.items():
         assert len(stack.live_items) <= 5, pattern
-        if pattern != "A":
-            assert len(stack.live_items) >= 3, pattern
+        # The floor used to carry an exemption for §A, which was not a
+        # stretching stack and would have had to invent work to reach three.
+        # §A is gone (2026-08-17), so every remaining stack meets the floor.
+        assert len(stack.live_items) >= 3, pattern
 
 
-def test_a_grooms_the_turn_out_before_it_is_spent_in_the_position():
-    """RESTORED 2026-08-07. The source document's §A runs the ER hold first and
-    the triangle second; the Python transcription had inverted them, making §A
-    the one stack that opened with the integrated position. Isolated before
-    integrated, applied to the stack where the audit found it backwards."""
-    keys = _live_keys(cp.STACKS["A"])
-    assert keys.index("er_holds") < keys.index("triangle_split")
+def test_the_isolated_before_integrated_rule_outlived_stack_a():
+    """This was test_a_grooms_the_turn_out_before_it_is_spent_in_the_position,
+    which pinned §A's internal ordering after the 2026-08-07 audit found the
+    Python transcription had inverted the source document — ER hold first,
+    triangle second. §A was removed with the bone limiter on 2026-08-17, so
+    the specific assertion has nothing left to address.
+
+    THE RULE IT PROTECTED IS NOT GONE, which is why this is a replacement and
+    not a deletion: isolated work opens a stack, the integrated position does
+    not. test_stacks_open_with_a_component_not_the_full_position enforces that
+    across every surviving stack, and this asserts the coverage did not shrink
+    quietly when §A left."""
+    covered = {"C", "D", "E", "F", "I"} | {"G", "H"}
+    assert covered == set(cp.STACKS), (
+        "a stack exists that no opening-order test covers")
 
 
 # ── plain English, in the fields the athlete reads mid-test ──────────────────
@@ -1399,12 +1409,24 @@ def test_the_removal_says_what_would_put_it_back():
     assert "15 cm" in note, "the revert condition needs its number"
 
 
-def test_patterns_a_and_b_are_unreachable_but_still_defined():
-    """They are the source's material and their stacks are authored, so they
-    stay — but the battery cannot emit them with slot 0 gone, and a reader must
-    not mistake their presence for a live outcome."""
-    assert cb.PATTERNS["A"] and cb.PATTERNS["B"]
-    assert cp.prescribe("A") and cp.prescribe("B"), "the stacks must still resolve"
+def test_patterns_a_and_b_are_gone_entirely():
+    """They were kept as unreachable-but-defined after slot 0 was retired — the
+    source's material, preserved in case a bony finding ever arrived. Removed
+    outright on the athlete's instruction, 2026-08-17: "remove the bone
+    limitation from the cluster A, that needs to be completely removed."
+
+    The removal is recorded with its revert condition in
+    cluster_a_mechanics.REMOVED, so it stays a decision rather than becoming an
+    unexplained absence — the failure this repo has now been bitten by twice,
+    with Stage 1's hip-flexor items and with finding #5's lateral lunge."""
+    assert "A" not in cb.PATTERNS and "B" not in cb.PATTERNS
+    assert "A" not in cp.STACKS and "B" not in cp.STACKS
+    assert "bone" not in {l.key for l in cm.LIMITERS}
+
+    removals = " ".join(r.name + " " + r.mechanism + " " + r.reverts_when
+                        for r in cm.REMOVED)
+    assert "bone" in removals.lower(), "the removal is not on the record"
+    assert "15 cm" in removals, "the revert condition needs its number"
 
     emitted = set()
     for name in dir(cb):
@@ -1415,6 +1437,8 @@ def test_patterns_a_and_b_are_unreachable_but_still_defined():
     assert emitted, "no evaluator emits any pattern — the scan is broken"
     assert "A" not in emitted and "B" not in emitted, (
         f"slot 0 is gone, so A and B cannot be produced; found {sorted(emitted)}")
+    assert emitted <= set(cp.STACKS), (
+        f"an evaluator emits a pattern with no stack: {sorted(emitted - set(cp.STACKS))}")
 
 
 def test_the_battery_still_runs_end_to_end_without_gate_zero():

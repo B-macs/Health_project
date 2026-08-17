@@ -102,8 +102,6 @@ CLUSTER_KEY = "a"
 # ── pattern labels ───────────────────────────────────────────────────────────
 
 PATTERNS: dict[str, str] = {
-    "A": "Bone",
-    "B": "Orientation",
     "C": "Whole adductor group",
     "D": "Short adductors and rotators",
     "E": "Gracilis",

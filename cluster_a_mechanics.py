@@ -57,17 +57,6 @@ class Limiter:
 #: with components that need different work.
 LIMITERS: tuple[Limiter, ...] = (
     Limiter(
-        key="bone", label="Bone",
-        responds_to="Orientation. Not trainable.",
-        detail="The neck of the femur contacts the rim of the hip socket and stops you. "
-               "Where that happens is individual — normal femoral inclination spans about "
-               "20° between two healthy people — and forcing it causes joint microtrauma "
-               "rather than progress. Two routes reach the same clearance: turning the leg "
-               "out, or tilting the pelvis. Neither is more correct. For this athlete only "
-               "the turn-out is available, because the tilt route means lumbar extension "
-               "against an L5/S1 retrolisthesis and a narrowed right foramen.",
-    ),
-    Limiter(
         key="adductor_length", label="Adductor length",
         responds_to="Stretching, at the right leverage.",
         detail="Adductor magnus, longus, pectineus and gracilis. Gracilis is the one that "
@@ -353,7 +342,7 @@ LIBRARY: tuple[Exercise, ...] = (
              adapted_from="Supine wall straddle with ankle weights",
              reverts_when="as tailors_pose — the same loaded-passive-end-range question"),
     Exercise("triangle_split", "Triangle side split, external-rotation cue", _A,
-             ("bone", "adductor_length"),
+             ("adductor_length",),
              note="Hips on a separate line to the feet. Turn the legs out from the hips to "
                   "clear the joint; sit the hips back, weight in the heels, chest high. "
                   "Train the triangle before any inline work.",
@@ -364,7 +353,11 @@ LIBRARY: tuple[Exercise, ...] = (
              movement="Turn both legs out from the hips — kneecaps rotating toward the "
                       "ceiling — then slide the feet apart, sitting the hips back with "
                       "the weight in the heels. Go to where it stops. The turn-out is "
-                      "what makes the room; never arch the back to find more.",
+                      "what makes the room; never arch the back to find more. THE CUE "
+                      "IS THE POINT: arching opens the same angle a different way, and "
+                      "it opens it by bending your lower back backwards under load — "
+                      "which is the one thing your back cannot afford. Turn out "
+                      "instead, every time.",
              feel="A stretch along the inside of the thighs, with the hips feeling "
                   "clear, not pinched.",
              stop="A sharp pinch at the front of a hip with a hard, sudden stop ends "
@@ -375,7 +368,7 @@ LIBRARY: tuple[Exercise, ...] = (
              reverts_when="never — the source calls the two routes equivalent, so this is "
                           "the other of two equal options rather than a lesser version"),
     Exercise("inline_split", "Inline side split, external-rotation cue", _A,
-             ("bone", "adductor_length"),
+             ("adductor_length",),
              note="Only once the triangle is comfortable.",
              position="The same wide position with straight legs, but now the hips press "
                       "forward onto the same line as the feet.",
@@ -697,6 +690,26 @@ class Removal:
 
 
 REMOVED: tuple[Removal, ...] = (
+    Removal(name="The 'bone' limiter, and patterns A (Bone) and B (Orientation)",
+            mechanism="Removed on the athlete's instruction, 2026-08-17: 'remove the bone "
+                      "limitation from the cluster A, that needs to be completely removed.' "
+                      "It was already half gone — slot 0 was retired earlier, so the battery "
+                      "could not emit A or B, and the two-orientation comparison only ran "
+                      "inside 15 cm of the floor while he is over 60 cm up. What remained was "
+                      "a limiter nothing could diagnose and two prescriptions nothing could "
+                      "reach. ⚠ THE EXTERNAL-ROTATION CUE IS NOT REMOVED WITH IT. The cue used "
+                      "to be justified as the orientation route around a bony collision; it is "
+                      "now anchored on its own terms, in triangle_split's own movement text — "
+                      "the alternative is arching, and arching means lumbar extension against "
+                      "an L5/S1 retrolisthesis and a narrowed right foramen. That reason "
+                      "stands whether or not bone is a limiter, and losing it is how the "
+                      "arch cue propagated into nine places before the 2026-08-07 audit.",
+            reverts_when="a bony end-feel finding — the sharp anterior pinch with a hard, "
+                         "unspringy stop that patient_profile logs for 2026-08-05 and has "
+                         "never explained — or any straddle reading landing inside ~15 cm of "
+                         "the floor, where the question stops being hypothetical. Restoring "
+                         "means this limiter, slot 0's two tests, evaluate_structure at the "
+                         "head of SLOT_EVALUATORS, and stacks A and B."),
     Removal("Tailor's pose with weight plates on the knees",
             "External load onto a passively held end-range hip — the practice the "
             "hypermobility profile rules out. The source asked for up to 4 × 90 s, six "
