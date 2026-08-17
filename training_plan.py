@@ -2434,26 +2434,44 @@ PIRIFORMIS_PNF_5MIN = _ex(
 )
 
 RIGHT_HIP_CAPSULE_5MIN = _ex(
-    name="Right Posterior Hip Capsule Stretch (Revised Cue)",
+    name="Right Posterior Hip Capsule Stretch (Quadruped)",
     ex_type="hold",
     laterality="unilateral",
     sets=2, hold_seconds=45, rest_seconds=20,
     mechanics=(
-        "FIRST item of the session, before anything else. Lie on your back, RIGHT knee bent. "
-        "Tilt the pelvis back slightly and keep your LOWER BACK FLAT on the floor throughout — "
-        "that is the priority, not how far the knee travels. Draw the right knee across toward "
-        "the left shoulder only as far as the flat back holds, and stop the moment it wants to "
-        "arch or twist off the floor. You want it deep in the BACK of the right hip. "
-        "Front-of-groin sensation means the range is too big. RIGHT SIDE ONLY."
+        "FIRST item of the session, before anything else. On your hands and knees on a mat. "
+        "Bring the RIGHT knee slightly inward, across the midline, and let the right shin trail "
+        "out behind you — knee in, foot out. That shin angle keeps the hip in neutral or slight "
+        "INTERNAL rotation, which is the rotation that does not snap. Take the LEFT leg straight "
+        "back or out wide for balance. Chest tall. Now shift your weight slowly BACKWARD and "
+        "across toward the RIGHT — think of the thigh bone gliding back into the socket rather "
+        "than of bending further. Stop at deep tension in the back pocket of the right hip and "
+        "breathe there for 45 seconds; do not push into it. Pinching at the FRONT of the groin "
+        "means you have gone too far back — come forward until it moves to the back pocket. "
+        "RIGHT SIDE ONLY."
     ),
     biomechanical_focus=(
         "Right posterior hip capsule (finding #2), the cause of the standing hinge crack. "
         "Runs first so that the block's only long stretch is followed by four minutes of other "
         "work before anything is loaded — stretch-induced slack matters most at Beighton 6/9, "
-        "where muscle is the primary restraint."
+        "where muscle is the primary restraint. "
+        "QUADRUPED, NOT SUPINE, from 2026-08-17 on the athlete's own report: the supine "
+        "cross-body version was run for seven weeks and the 2026-07-08 session note records it "
+        "reaching the wrong tissue — 'no feeling at the back of the hip or bum. So I feel the "
+        "stretch isn't working as expected', with the sensation at the front of the hip and "
+        "BILATERAL, which a right-only capsule stretch cannot produce. The (Revised Cue) "
+        "rewrite answered that note by changing the CUES and keeping the position, and the "
+        "report did not change. Bodyweight over the joint loads the capsule in a way an arm "
+        "pulling the knee across does not. REVERT to the supine version if the quadruped one "
+        "provokes the Coxa Saltans click, which the supine position cannot reach."
     ),
-    progression="Deep posterior-hip sensation with a flat back → grow the cross-body range gradually.",
-    regression="Still felt at the front → reduce the range further; the flat back beats the depth.",
+    progression="Deep back-pocket tension with no groin pinch → sit further back before shifting across.",
+    regression="Felt at the front of the groin, or the click appears → less backward shift, and check the shin is trailing OUT.",
+    warning=(
+        "Neutral or slightly internal rotation at the right hip, never external — this is the "
+        "position the Coxa Saltans snap lives in (key rule 7). Knee in, foot out. If the hip "
+        "clicks as you settle, come out and reset the shin."
+    ),
 )
 
 ANTERIOR_HIP_RELEASE = _ex(

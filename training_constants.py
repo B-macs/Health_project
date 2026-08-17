@@ -195,6 +195,10 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Ischial Tuberosity Hamstring Release",
     "Right Hip Tendon Path Drill (Coxa Saltans)",
     "Right Posterior Hip Capsule Stretch (Revised Cue)",
+    # Supersedes (Revised Cue) in Stage 2B from 2026-08-17 — same structure,
+    # same sector, quadruped instead of supine. Both stay mapped: the older
+    # names are still on 15 logged sessions.
+    "Right Posterior Hip Capsule Stretch (Quadruped)",
     "Standing Hip Flexor Release",
     "90/90 Hip Flexor Hold",
     "Side-Lying Hip Abduction",
@@ -429,6 +433,7 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Piriformis Contract-Relax (PNF)":                   {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     "Right Posterior Hip Capsule Stretch":               {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     "Right Posterior Hip Capsule Stretch (Revised Cue)": {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Right Posterior Hip Capsule Stretch (Quadruped)":   {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     "Right Hip Tendon Path Drill (Coxa Saltans)":        {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     # The most local of the six: one tissue under direct pressure.
     "Ischial Tuberosity Hamstring Release":              {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
@@ -596,6 +601,7 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Upper Glute / TFL Self-Release":                    ("mobility_core", 0.25),
     "Piriformis Contract-Relax (PNF)":                   ("mobility_core", 0.25),
     "Right Posterior Hip Capsule Stretch (Revised Cue)": ("mobility_core", 0.25),
+    "Right Posterior Hip Capsule Stretch (Quadruped)":   ("mobility_core", 0.25),
     "Ischial Tuberosity Hamstring Release":              ("mobility_core", 0.25),
     "Right Hip Tendon Path Drill (Coxa Saltans)":        ("mobility_core", 0.25),
     # -- Core / scapular finishers, Session A/B/C --

@@ -180,6 +180,7 @@ def test_the_raise_is_never_cycling():
 #: here in exactly the same way.
 _RIGHT_ONLY = {
     "Right Posterior Hip Capsule Stretch (Revised Cue)",
+    "Right Posterior Hip Capsule Stretch (Quadruped)",
     "Right Hip Tendon Path Drill (Coxa Saltans)",
 }
 

@@ -363,6 +363,7 @@ RELEASE_EXERCISES: frozenset[str] = frozenset({
     "Standing Hip Flexor Release",
     "Right Posterior Hip Capsule Stretch",
     "Right Posterior Hip Capsule Stretch (Revised Cue)",
+    "Right Posterior Hip Capsule Stretch (Quadruped)",
     "Right Hip Tendon Path Drill (Coxa Saltans)",
     # Unloaded mobility — moved through range, not worked at it
     "Hip 90/90 Flow",
