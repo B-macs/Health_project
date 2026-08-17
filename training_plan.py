@@ -59,6 +59,7 @@ def _ex(
     rep_max: int | None = None,
     increment_size: float = 2.5,
     increment_unit: str = "kg",
+    warmup: bool = False,
 ) -> dict:
     return {
         "name": name,
@@ -89,6 +90,18 @@ def _ex(
         # increment_unit="unit" until the real kg-per-unit conversion is measured.
         "increment_size": increment_size,
         "increment_unit": increment_unit,
+        # RAMP SET. True marks this whole exercise as preparation, not work:
+        # every set it logs carries is_warmup, which weekly tonnage and every
+        # 1RM estimate then exclude (services/sessions.py::is_working_set).
+        #
+        # A ramp is authored as its OWN exercise sitting immediately before the
+        # lift it prepares, rather than as the first N sets of that lift. Its
+        # weight is a different number from the working weight, and the guided
+        # flow carries one weight and one stepper per exercise — folding both
+        # into one entry would need a per-set weight machine for the sake of a
+        # single set. As separate entries the athlete also SEES the ramp in the
+        # session timeline, which is the point of the phase-2 change.
+        "warmup": warmup,
     }
 
 
@@ -2299,3 +2312,1621 @@ PLAN_STAGE2[28] = {
         ),
     ],
 }
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  STAGE 2B — 28-DAY BLOCK, PHASE 3.  2026-08-17 (Mon) → 2026-09-13 (Sun)
+#
+#  Confirmed by athlete + physiotherapist 2026-08-12: Stage 2B REPLACES Stage
+#  2A rather than extending it. Clinical stage stays 2 — the block changes, the
+#  ACWR/RPE/volume ceilings do not (services/sessions.py::PHASE_META).
+#
+#  THREE THINGS MAKE THIS BLOCK UNLIKE 2A, and all three are why it starts on a
+#  Monday rather than the day after 2A's last day:
+#
+#  1. TWELVE DAYS WITHOUT A GYM. The athlete is in Ireland 2026-08-19 -> 08-30
+#     with long bands and mini-bands only. That is days 3-14 — the back half of
+#     week 1 and all of week 2 — so gym work resumes exactly at the top of week
+#     3 and no session is stranded mid-week. Weeks 1-2 hold ground; they do not
+#     progress. The progression during them is the running.
+#  2. RUNNING IS INTRODUCED, from day 5, toward a 10 km on 2026-10-11 (which is
+#     day 28 of the NEXT block — the race is that block's own test day). Volume
+#     progresses conservatively: the left Sartorius strain has recurred once
+#     already, from running overuse, and docs/clinical_profile_weighting.md #1's
+#     re-stress carve-out makes that a full-weight finding again the moment
+#     running enters a plan.
+#  3. THE SESSION SHAPE CHANGES. Every day is authored as
+#         [ quiet things down ] -> [ wake things back up ] -> [ load ]
+#     Phase 2 did not exist before and is the deliverable of
+#     docs/training/warmup_evidence_review_2026-08-10.md. It is mandatory in
+#     every session and was specified FIRST, with everything else fitted around
+#     it (review section 3.0, athlete's direction). Total preparation, first
+#     movement to first working rep: 10-15 min, 15 a ceiling not a target.
+#
+#  WEEK SHAPE (athlete's decision, 2026-08-14): 2 gym + 2 runs + flexibility.
+#      Mon  main    gym/band, lower
+#      Tue  stretch run
+#      Wed  rest    mobility
+#      Thu  stretch cluster flexibility session
+#      Fri  main    gym/band, upper
+#      Sat  stretch run
+#      Sun  rest
+#  Five sessions, inside STAGE_CONSTRAINTS[2]["session_freq_max"]. The cluster
+#  sits on Thursday because leg-loading days are Monday and the run days — and
+#  RUNNING COUNTS AS LEG LOADING (services/flexibility.py::leg_loading_days) —
+#  so Thursday is the only day two clear days after leg work that is not itself
+#  a rest day, which is the top of flexibility_window's ranking.
+#
+#  ONE NEW STRESSOR PER WEEK. Running is week 1's, so the cluster session does
+#  not start until week 2 (flexibility_integration_2026-08-16.md step 3). The
+#  SECOND weekly cluster session is earned, never scheduled — two clean weeks —
+#  which is why it can only appear in week 4, and then folded onto day 28's
+#  evening rather than added as a sixth session.
+#
+#  REST: unchanged from 2A except Goblet Squat and RDL, which step 90 -> 120 s
+#  in WEEK 4 ONLY, and only once the load is genuinely near-maximal
+#  (rest_interval_evidence_review_2026-08-13.md section 3.0 — Grgic 2018).
+#  Everything else stays; core, scapular and release work stay at 45 s
+#  deliberately, because there is no evidence bearing on them in either
+#  direction. Both the right/left split and the 3-5 min proposal were refused
+#  on evidence and priced in minutes.
+# ═════════════════════════════════════════════════════════════════════════════
+
+_S2B_PHASE = "Stage 2B — Strength + Running Build"
+
+# ─── PHASE 1: quiet things down, at the 5 minutes the profile always said ────
+#
+# patient_profile.py prescribes a "5-minute release block before every
+# session"; the coded doses had drifted to 16-22 min. The physiotherapist
+# confirmed the 5 minutes on 2026-08-12 and the dose question is CLOSED, so
+# these are the same items at the documented dose. This is a RESTORATION, not a
+# cut — and it is what buys the room phase 2 needs inside a 10-15 min ceiling.
+#
+# Two corrections ride along:
+#   - UPPER_GLUTE_RELEASE was coded laterality="bilateral" while its own
+#     mechanics text and the profile both say EACH SIDE. Unilateral here, which
+#     is what makes the guided flow actually run both sides.
+#   - Order. The capsule stretch is the only >=60 s stretch in the block and now
+#     runs FIRST, with the pressure releases after it, putting four minutes
+#     between the one stiffness-reducing item and the first loaded rep. The
+#     warm-up review calls this the free win: it costs nothing.
+
+UPPER_GLUTE_RELEASE_5MIN = _ex(
+    name="Upper Glute / TFL Self-Release",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=1, hold_seconds=90, rest_seconds=15,
+    mechanics=(
+        "Stand side-on to a wall, 10-15 cm away. Press the UPPER outer hip — the shelf just "
+        "below the hip crest, not the side of the thigh — into the wall corner. Adjust until "
+        "you find the exact area of grip. Hold 90 seconds of steady pressure and let the "
+        "tissue soften; do not fight it. The RIGHT side will feel tighter. Then the LEFT. "
+        "One round per side at this dose — the block is five minutes, not twenty."
+    ),
+    biomechanical_focus=(
+        "Autogenic inhibition of the overactive glute medius and TFL — the primary anchor of "
+        "the compression pattern. Must precede glute activation, or the overactive fibres "
+        "compete with the muscle you are trying to wake up."
+    ),
+    progression="Release felt inside 60 s → hold the pressure and add 5 slow hip circles.",
+    regression="Wall pressure too intense → lie on your side and use your own fist instead.",
+)
+
+PIRIFORMIS_PNF_5MIN = _ex(
+    name="Piriformis Contract-Relax (PNF)",
+    ex_type="reps",
+    laterality="unilateral",
+    sets=1, reps=5, rest_seconds=15,
+    mechanics=(
+        "Lie on your back, right ankle crossed over the left knee (figure-4). Five cycles per "
+        "side: push the RIGHT knee away from you for 5 seconds against your LEFT hand — "
+        "isometric, nothing moves — then release completely and draw both legs 5-10% deeper "
+        "toward your chest. Hold 3 seconds. That post-contraction window is the whole point. "
+        "Five cycles on the right, then five on the left."
+    ),
+    biomechanical_focus=(
+        "Post-isometric inhibition of the chronically overactive piriformis and deep hip "
+        "rotators — more effective than passive stretch, and the direct counter to the "
+        "upper-glute gripping pattern."
+    ),
+    progression="Gaining range every cycle → run it seated in 90/90 for more hip flexion bias.",
+    regression="Sharp buttock pain on the contraction → drop the pressing phase, passive figure-4 only.",
+)
+
+RIGHT_HIP_CAPSULE_5MIN = _ex(
+    name="Right Posterior Hip Capsule Stretch (Revised Cue)",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=2, hold_seconds=45, rest_seconds=20,
+    mechanics=(
+        "FIRST item of the session, before anything else. Lie on your back, RIGHT knee bent. "
+        "Tilt the pelvis back slightly and keep your LOWER BACK FLAT on the floor throughout — "
+        "that is the priority, not how far the knee travels. Draw the right knee across toward "
+        "the left shoulder only as far as the flat back holds, and stop the moment it wants to "
+        "arch or twist off the floor. You want it deep in the BACK of the right hip. "
+        "Front-of-groin sensation means the range is too big. RIGHT SIDE ONLY."
+    ),
+    biomechanical_focus=(
+        "Right posterior hip capsule (finding #2), the cause of the standing hinge crack. "
+        "Runs first so that the block's only long stretch is followed by four minutes of other "
+        "work before anything is loaded — stretch-induced slack matters most at Beighton 6/9, "
+        "where muscle is the primary restraint."
+    ),
+    progression="Deep posterior-hip sensation with a flat back → grow the cross-body range gradually.",
+    regression="Still felt at the front → reduce the range further; the flat back beats the depth.",
+)
+
+ANTERIOR_HIP_RELEASE = _ex(
+    name="Anterior Hip Pressure Release",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=1, hold_seconds=60, rest_seconds=0,
+    mechanics=(
+        "Only run this once the daily front-of-hip protocol has shown tender points that "
+        "actually quiet down — if two weeks of it found nothing to respond to, skip this and "
+        "record that, because the null is the finding. "
+        "Lie face down with a massage ball between the floor and the front of the hip, on the "
+        "meaty pocket-corner just below and outside the point of the hip bone. Settle your "
+        "weight onto it slowly and wait 60 seconds, breathing, until the tissue lets go under "
+        "you. Then a few slow knee-bends of that leg with the pressure still on. "
+        "GO STRAIGHT TO THE OTHER SIDE — no pause between right and left. "
+        "One zone per side here; the second zone stays in the daily protocol, which has the "
+        "time for it."
+    ),
+    biomechanical_focus=(
+        "The one overactive structure in the profile with no release anywhere in the block "
+        "until now. The MRI names psoas and hip-flexor hypertonicity as what amplifies the "
+        "L5/S1 compression, and 'deep right hip flexors / TFL' sits on the overactive list — "
+        "yet the release block inhibited the glute medius, the piriformis and the posterior "
+        "capsule and left the front of the hip alone. Added on the physiotherapist's own "
+        "recommendation (2026-08-10): sustained pressure at the front of the hip, to release "
+        "the pressure from sitting. Six to eight hours a day holds this tissue short; that is "
+        "wear, not training, and part of the seated tilt deficit is held TONE rather than "
+        "tissue length."
+    ),
+    progression=("Tender points quieting and standing up straight after sitting getting easier "
+                 "→ it is working; the daily protocol keeps doing the volume."),
+    regression=("Nothing tender to find, or no change after four weeks → retire it and record "
+                "the null. It would mean the sitting-tone hypothesis is wrong for this body."),
+    warning=(
+        "THE SHARP EDGE OF THIS ONE. The inner front of the hip carries the leg's main artery "
+        "and nerve. NEVER press anywhere you can feel a pulse. Stop immediately on any "
+        "tingling, numbness or electric feeling down the leg. Stay on the OUTER half of the "
+        "front of the hip, on tissue that pushes back like muscle — the crease at the very "
+        "front, middle third, is off-limits entirely. Pain never above 2/10."
+    ),
+)
+
+
+# ─── PHASE 2: wake things back up.  NEW — the deliverable of this block ──────
+#
+# JOB A (restore) runs in every session and is what "mandatory" means: undo the
+# acute slack phase 1 leaves and get glute max and the deep core contracting
+# before the bar asks. Warneke 2024 (83 studies) is about the PRESENCE of a
+# subsequent active warm-up and specifies no duration, so this is short.
+#
+# JOB B (maximise) is the 15-min low-intensity raise that buys +3-8% near 1RM
+# and is worth about nothing at ten reps. It is NOT bought here. What is bought
+# is a per-exercise ramp on the heavy compounds only, in week 4 — see
+# GOBLET_RAMP / RDL_RAMP. "Mandatory" means the phase exists every session, not
+# that every exercise gets a ramp: ramping the face pull is pure fatigue.
+#
+# MODALITY. The literature's best general raise is 15 min of low-intensity
+# cycling. The athlete's own 2025 log names cycling as what tightens his hip
+# flexors and inhibits his glutes — the exact muscle this phase exists to wake
+# up — so cycling is excluded on his own evidence and the raise is a walk.
+
+PREP_RAISE = _ex(
+    name="Walking Raise (Incline)",
+    ex_type="duration",
+    sets=1, duration_minutes=4, rest_seconds=0,
+    mechanics=(
+        "Four minutes of brisk walking on an incline — treadmill at a real gradient, or any "
+        "uphill outdoors. Warm enough to notice, nowhere near breathless. You are raising "
+        "muscle temperature and getting the hips moving through range under your own power, "
+        "not training."
+    ),
+    biomechanical_focus=(
+        "General raise, biased toward the pattern about to be trained. Deliberately NOT "
+        "cycling: the 2025 log names cycling as what tightens the hip flexors and inhibits "
+        "the glutes, which is the one muscle this phase exists to switch on."
+    ),
+    progression="Feels like nothing → raise the gradient, never the speed. This is not conditioning.",
+    regression="Breathing hard → slow down. If it costs anything, it is too hard.",
+)
+
+PREP_GLUTE_ACTIVATION = _ex(
+    name="Single-Leg Glute Bridge",
+    ex_type="hold_reps",
+    laterality="unilateral",
+    sets=1, reps_in_set=8, hold_seconds=2, rest_seconds=20,
+    mechanics=(
+        "Lie on your back, one foot planted, the other leg held off the floor. Drive through "
+        "the planted heel and lift the hips until the body is in one line. Squeeze the glute "
+        "hard for 2 seconds at the top, then lower with control. Eight per side. The hips stay "
+        "level — if the free side drops, you have lost the muscle you came for."
+    ),
+    biomechanical_focus=(
+        "Glute max activation, and the single most load-bearing item in phase 2. The 2025 log "
+        "names 'glutes not warmed up before squats' as a direct cause of the squat breakdown, "
+        "and glute max is the primary underactive muscle in the profile. This is the muscle "
+        "the release block just made room for."
+    ),
+    progression="Both sides clean with level hips → hold the top for 3 seconds.",
+    regression="Hamstring cramps or the hip drops → go to a two-leg bridge for the same 8 reps.",
+)
+
+PREP_DEAD_BUG = _ex(
+    name="Dead Bug",
+    ex_type="reps",
+    laterality="alternating",
+    sets=1, reps=6, rest_seconds=20,
+    mechanics=(
+        "On your back, knees and hips at 90 degrees, arms up. Press the lower back gently into "
+        "the floor and keep it there. Lower the opposite arm and leg slowly, only as far as the "
+        "back stays flat, then return. Six each side. Breathe out on the way down."
+    ),
+    biomechanical_focus=(
+        "Deep core switched on before the spine is loaded — the second of the two underactive "
+        "structures, and the one the 2025 log records as turning off under fatigue."
+    ),
+    progression="Six clean each side with a flat back → extend the leg further before returning.",
+    regression="Back lifts off the floor → keep the heel closer, or move only the legs.",
+    warning=("Keep the right hip cued neutral or slightly internally rotated as the leg extends — "
+             "the Coxa Saltans click has been reported in this pattern at around 45 degrees."),
+)
+
+PREP_SCAPULAR = _ex(
+    name="Scapular Wall Slide",
+    ex_type="reps",
+    sets=1, reps=8, tempo="3-1-3", rest_seconds=20,
+    mechanics=(
+        "Head, upper back and arms against a wall, elbows and wrists touching in a goalpost. "
+        "Slide the arms up toward a Y, keeping wrists and elbows on the wall the whole way. No "
+        "shrugging, no arching off neutral to help the arms up. Only go as high as contact holds."
+    ),
+    biomechanical_focus=(
+        "Scapular upward rotation and lower trapezius before anything is pressed or pulled — "
+        "the maintenance-dependent right shoulder (finding #6) gets its stability from muscular "
+        "control, and symptoms recur specifically when this work lapses."
+    ),
+    progression="Full contact to Y, pain-free → add a 2-second hold at the top.",
+    regression="Contact lost early → shorten the range to where it holds, or do it seated.",
+)
+
+# ─── RAMP SETS.  Week 4's Gym A only, and they carry warmup=True ─────────────
+#
+# One set of six at ~62% of the working weight, reps MATCHED to the working set
+# rather than reduced (Ribeiro 2020 — load comes down, volume does not). Only
+# the two heavy compounds: the ramp pays near maximal loads and pays about
+# nothing at ten reps, so scaling is per exercise, never per session.
+#
+# warmup=True is what keeps these out of weekly tonnage and out of every 1RM
+# estimate. Without it a ramp set is reps at a real load and would read as work
+# — the accounting hazard the warm-up review calls a prerequisite rather than a
+# follow-up (services/tonnage.py, services/strength.py).
+
+GOBLET_RAMP = _ex(
+    name="Goblet Squat (Ramp Set)",
+    ex_type="reps",
+    sets=1, reps=6, tempo="3-1-1", rest_seconds=90,
+    weight_kg=12.5, equipment_type="dumbbell", warmup=True,
+    mechanics=(
+        "One set of six at about 62% of today's working weight, at the same tempo and the same "
+        "depth you intend to use. This is a rehearsal of the pattern under light load, not a "
+        "set. Rest fully afterwards, then start the working sets."
+    ),
+    biomechanical_focus=(
+        "The per-exercise half of phase 2. Ramps the two heavy compounds only, and only in the "
+        "week the loads are actually near-maximal."
+    ),
+    progression="Working weight goes up → the ramp goes up with it, staying near 62%.",
+    regression=("Anything feels off in the ramp → that is the ramp doing its job. Reduce the "
+                "working weight rather than pressing on."),
+)
+
+RDL_RAMP = _ex(
+    name="Romanian Deadlift (Ramp Set)",
+    ex_type="reps",
+    sets=1, reps=6, tempo="3-1-1", rest_seconds=90,
+    weight_kg=27.5, equipment_type="dumbbell", warmup=True,
+    mechanics=(
+        "One set of six at about 62% of today's working weight, same tempo, same range. Feel "
+        "the hamstrings take the load and the back stay neutral. Rest fully, then work."
+    ),
+    biomechanical_focus=(
+        "Hinge rehearsal under light load. The 2025 log records that when tired or cold the "
+        "back is the first thing to complain in this pattern — this is the cold half of that."
+    ),
+    progression="Working weight goes up → the ramp goes up with it.",
+    regression=("Back rounds under the ramp → stop and reduce the working weight; do not train "
+                "into it."),
+)
+
+SCAPULAR_ISOMETRIC = _ex(
+    name="Scapular Retraction Isometric",
+    ex_type="hold_reps",
+    sets=3, reps_in_set=4, hold_seconds=3, rest_seconds=45,
+    mechanics=(
+        "Sit or stand tall, arms by your sides, head in NEUTRAL — never in the position that "
+        "provokes the symptom. Draw the shoulder blades down and together, building the effort "
+        "over 3 seconds, hold hard for 3, then release over 3. Four of those per set. Change "
+        "the arm angle between sets. High intent, not a long squeeze."
+    ),
+    biomechanical_focus=(
+        "FOUR SHORT EFFORTS, NOT ONE LONG HOLD, and that is the whole point. At matched loading "
+        "time four 3-second contractions more than doubled the stiffness gain of one 12-second "
+        "hold (Bohm 2014, +57% vs +25%); intensity is the variable, not duration. The "
+        "45-second hold in circulation is n=6, about analgesia, and has failed to replicate "
+        "three times. And the target tissue here is not a tendon — it is left trapezius, "
+        "position-loaded and perfusion-limited, where a sustained low-level contraction is the "
+        "PROVOCATIVE mechanism (symptom_log 2026-08-13). Both sides, right-biased: the right is "
+        "the weaker and the left is overcompensating."
+    ),
+    progression="Four clean efforts at full intent → add a fourth set, never a longer hold.",
+    regression=("Symptom rises during or after → shorten to 2 seconds and check the head "
+                "position first; the position is usually the problem, not the load."),
+    warning=("Load in NEUTRAL only. If the interscapular area is symptomatic today this is still "
+             "fine — but stop if it climbs during the set rather than after it."),
+)
+
+
+# ─── Band work.  Weeks 1-2, Ireland: HOLD GROUND, do not progress ────────────
+#
+# Bands were already a first-class path — equipment_type="band" plus band_tier
+# on services/engine.py's Green/Blue/Yellow/Red/Black ladder — so none of this
+# needs new engine code, only names in the three training_constants maps.
+#
+# A band set writes weight=0, so these weeks read 0 kg of tonnage with real
+# unloaded reps. That is true rather than alarming (services/tonnage.py) and is
+# the honest record of a fortnight with no external load.
+#
+# TIERS ARE PRESCRIBED BY FEEL, not by colour, because the athlete's own bands
+# have not been measured against this ladder. Pick the band where the last two
+# reps are genuinely hard at the prescribed count, then record the colour — the
+# recorded colour is what the stepper progresses from next time.
+
+def _band(name, reps, *, tier="Blue", sets=3, laterality="bilateral",
+          rest_seconds=60, mechanics="", focus="", progression="", regression="",
+          warning=None):
+    return _ex(
+        name=name, ex_type="reps", laterality=laterality,
+        sets=sets, reps=reps, rest_seconds=rest_seconds,
+        equipment_type="band", band_tier=tier,
+        mechanics=mechanics, biomechanical_focus=focus,
+        progression=progression, regression=regression, warning=warning,
+    )
+
+
+BAND_FRONT_SQUAT = _band(
+    "Band Front Squat", 12, tier="Blue", rest_seconds=75,
+    mechanics=(
+        "Stand on the middle of a long band, feet shoulder-width. Bring the ends up over the "
+        "shoulders and hold them at collarbone height, elbows up. Squat to the depth you own "
+        "with a flat back, then stand and squeeze the glutes. The band fights you hardest at "
+        "the top, which is where the glutes should finish the movement."
+    ),
+    focus=(
+        "Keeps the squat pattern alive for twelve days without a rack. The band's resistance "
+        "curve is the opposite of a dumbbell's — hardest at lockout, easiest in the hole — "
+        "which suits a back whose injuries all came from the bottom of the squat."
+    ),
+    progression="12 clean reps with a flat back → step to the next band up.",
+    regression="Back rounds or the heels lift → shorten the range, or step to a lighter band.",
+)
+
+BAND_RDL = _band(
+    "Band Romanian Deadlift", 12, tier="Blue", rest_seconds=75,
+    mechanics=(
+        "Stand on the middle of the band, hold an end in each hand at thigh height. Push the "
+        "hips back with a flat back and soft knees, feel the hamstrings load, then drive the "
+        "hips forward and squeeze the glutes. Hinge, never round."
+    ),
+    focus=(
+        "Hinge maintenance. The pattern the 2025 log flags as the one where the back complains "
+        "first when tired or cold, so it keeps running even in a week with no external load."
+    ),
+    progression="12 reps with the back flat throughout → next band up.",
+    regression="Any lumbar rounding → reduce the range and go back to a lighter band.",
+    warning="Stop at the first sign of the back taking over from the hamstrings.",
+)
+
+BAND_HIP_THRUST = _band(
+    "Band Hip Thrust", 15, tier="Blue",
+    mechanics=(
+        "Sit with your upper back against a sofa or bed, band across the hips and both ends "
+        "anchored under your feet. Drive through the heels, lift the hips to a straight line "
+        "from knee to shoulder, and squeeze hard for a beat at the top. Ribs down."
+    ),
+    focus="Direct glute max loading — the primary underactive muscle, and the one that has "
+          "moved most this year.",
+    progression="15 reps with a hard squeeze at the top → next band up.",
+    regression="Cramping hamstrings → move the feet closer and think about pushing the floor away.",
+)
+
+BAND_PALLOF = _band(
+    "Band Pallof Press", 10, tier="Green", laterality="unilateral", rest_seconds=45,
+    mechanics=(
+        "Anchor the band at chest height — a door handle or a post. Stand side-on, hands "
+        "together at the chest, and press straight out. The band tries to rotate you; do not "
+        "let it. Hold the press for a beat, return. Ten each side."
+    ),
+    focus="Anti-rotation trunk control, unchanged in intent from the cable version.",
+    progression="Rock solid at 10 → step further from the anchor.",
+    regression="Trunk rotates → step closer to the anchor.",
+)
+
+BAND_CHEST_PRESS = _band(
+    "Band Chest Press", 12, tier="Green", rest_seconds=75,
+    mechanics=(
+        "Anchor the band behind you at chest height, or run it across your back. Press both "
+        "hands forward and slightly together, elbows at about 45 degrees from the ribs — not "
+        "flared. Control the way back. Keep the shoulder blades set down and back."
+    ),
+    focus=(
+        "Pressing pattern maintenance with the scapula controlled. The right shoulder's "
+        "stability is maintenance-dependent, so twelve days without pressing is not the plan."
+    ),
+    progression="12 controlled reps → next band up.",
+    regression="Shoulder feels unstable → shorten the range and keep the hands lower.",
+    warning="Never press from a position with the arm out at 90 degrees and turned outward — "
+            "that is the position the right shoulder's repair exists to protect.",
+)
+
+BAND_LAT_PULLDOWN = _band(
+    "Band Lat Pulldown", 12, tier="Green", rest_seconds=60,
+    mechanics=(
+        "Anchor the band high — a door top, a beam, a banister. Kneel or sit far enough back "
+        "that the band is tight with the arms overhead. Pull the elbows down and toward the "
+        "ribs, leading with the shoulder blades rather than the hands. Control the way up."
+    ),
+    focus="Vertical pull, and the closest a band gets to the movement bands do worst.",
+    progression="12 reps leading with the shoulder blades → next band up.",
+    regression="Shrugging to start the pull → lighter band, and start from a set scapula.",
+)
+
+BAND_ROW = _band(
+    "Band Single-Arm Row", 12, tier="Green", laterality="unilateral", rest_seconds=60,
+    mechanics=(
+        "Anchor the band at waist height. One hand, stand in a split stance, pull the elbow "
+        "back past the ribs and squeeze the shoulder blade in. Control the return all the way "
+        "to a full stretch. Twelve each side."
+    ),
+    focus=(
+        "Horizontal pull, both sides. The right is the weaker side and the left overcompensates "
+        "— train both, and expect the left to want more."
+    ),
+    progression="12 each side with a clean squeeze → next band up.",
+    regression="Trunk rotates to help → shorten the range, lighter band.",
+)
+
+BAND_FACE_PULL = _band(
+    "Band Face Pull", 15, tier="Green", rest_seconds=45,
+    mechanics=(
+        "Anchor the band at face height. Pull the ends toward your forehead, elbows high and "
+        "wide, and finish with the shoulder blades drawn down and together. Slow on the way "
+        "back. Fifteen reps."
+    ),
+    focus=(
+        "The one movement the symptom log records as giving ACUTE RELIEF to the interscapular "
+        "area — and a band is the ideal tool for it, so this is one item that does not degrade "
+        "at all away from a gym."
+    ),
+    progression="15 easy reps with the blades finishing down → next band up.",
+    regression="Upper traps take over → drop a band and lower the anchor slightly.",
+)
+
+
+# ─── The three session shapes, and their two equipment variants ──────────────
+
+def _s2b_prep(lower: bool) -> list:
+    """Phase 2. Job A only — restore, in every session. The raise leads, then
+    the pattern about to be trained."""
+    if lower:
+        return [PREP_RAISE, PREP_GLUTE_ACTIVATION, PREP_DEAD_BUG]
+    return [PREP_RAISE, PREP_SCAPULAR, PRONE_Y_RAISE]
+
+
+def _s2b_release(hip_loaded: bool, anterior: bool = False) -> list:
+    """Phase 1. Capsule stretch FIRST on hip-loaded days, pressure releases
+    after it — the warm-up review's free win. About 5 min, 7.5 on hip days,
+    9.5 once the anterior-hip item joins in week 3.
+
+    `anterior` adds the front-of-hip release, and it is deliberately NOT on from
+    day 1. The daily protocol that establishes whether there is anything there
+    to release cannot start until the day after the flexibility battery is
+    captured, because the seated tilt is the battery's central measurement and
+    starting a new intervention first would contaminate it. Two weeks of that
+    protocol lands in week 3, which is when this appears — gated on the
+    protocol's own verdict rather than on the calendar, which is why the
+    condition is written into the exercise's own text.
+
+    It is also off on the day-28 assessment: that screen's value is
+    comparability with the Stage 1 and Stage 2A versions of itself, and a new
+    hip-flexor release immediately before a hinge assessment would move the
+    number for a reason that has nothing to do with the athlete."""
+    head = [RIGHT_HIP_CAPSULE_5MIN, COXA_SALTANS_DRILL] if hip_loaded else []
+    tail = [ANTERIOR_HIP_RELEASE] if anterior else []
+    return head + [UPPER_GLUTE_RELEASE_5MIN, PIRIFORMIS_PNF_5MIN] + tail
+
+
+def _s2b_gym_a(week: int) -> dict:
+    """Squat + Hinge + Core. Weeks 1, 3 and 4.
+
+    Week 3 is the re-entry session and runs one increment down on the squat and
+    thrust and two on the RDL. Twelve days without external load costs almost
+    no strength — decay is suspended and the first week without stimulus is a
+    documented grace period — but "weight increased too quickly" is a named
+    cause of the squat breakdown in the athlete's own log, and the RDL is both
+    the lift sitting at RPE 7 and the one loading the segment with the annular
+    tears, so it takes the deeper step back.
+    """
+    squat_kg = {1: 20.0, 3: 17.5, 4: 20.0}[week]
+    rdl_kg = {1: 45.0, 3: 40.0, 4: 45.0}[week]
+    thrust_kg = {1: 42.5, 3: 40.0, 4: 42.5}[week]
+    # 90 s everywhere except week 4, where the loads are genuinely near-maximal
+    # and Grgic 2018's ">2 min to maximise strength" applies. It does not apply
+    # at 12.5 kg and RPE 6, which is why this is conditional on the week.
+    heavy_rest = 120 if week == 4 else 90
+    ramp = [GOBLET_RAMP, RDL_RAMP] if week == 4 else []
+    objective = {
+        1: "Stage 2B Week 1 — Squat + Hinge + Core (last loaded session before travel)",
+        3: "Stage 2B Week 3 — Squat + Hinge + Core (re-entry, one step down)",
+        4: "Stage 2B Week 4 — Squat + Hinge + Core (full load, ramped)",
+    }[week]
+    return {
+        "objective": objective,
+        "phase": _S2B_PHASE,
+        "session_rpe_target": 7 if week == 4 else 6,
+        "is_gym_session": True,
+        "day_type": "main",
+        "exercises": _s2b_release(hip_loaded=True, anterior=week >= 3)
+                      + _s2b_prep(lower=True) + ramp + [
+            _ex(
+                name="Goblet Squat",
+                ex_type="reps",
+                sets=3, reps=10, tempo="3-1-1", rest_seconds=heavy_rest,
+                weight_kg=squat_kg, equipment_type="dumbbell", rep_min=8, rep_max=12,
+                mechanics=(
+                    "Dumbbell held at the chest, feet shoulder-width. Sit down between the hips "
+                    "to the depth you own with a flat back, then stand and finish with the "
+                    "glutes. Three seconds down, a beat at the bottom, drive up."
+                ),
+                biomechanical_focus=(
+                    "The primary lower-body strength lift of the block. Brace quality is the "
+                    "thing being watched: the 2025 log records the brace collapsing from rep 6 "
+                    "onward, and phase 2 exists partly to move that number."
+                ),
+                progression="All three sets at 12 clean reps → add 2.5 kg and drop back to 8.",
+                regression="Brace collapses before rep 8 → stop the set there and reduce the load.",
+                warning="Back injuries have all come from the bottom of the squat. Stop the set at "
+                        "the first loss of a flat back rather than finishing the reps.",
+            ),
+            _ex(
+                name="Romanian Deadlift (DB)",
+                ex_type="reps",
+                sets=3, reps=10, tempo="3-1-1", rest_seconds=heavy_rest,
+                weight_kg=rdl_kg, equipment_type="dumbbell", rep_min=8, rep_max=12,
+                mechanics=(
+                    "A dumbbell in each hand, soft knees. Push the hips back and let the weight "
+                    "travel down the thighs, back flat throughout. Go as far as the hamstrings "
+                    "allow without the back moving, then drive the hips forward. Hinge, never "
+                    "round."
+                ),
+                biomechanical_focus=(
+                    "Hinge strength and hamstring load. This lift sits over the annular tears, "
+                    "which is why it steps back furthest after the travel weeks and progresses "
+                    "on the widest rep span."
+                ),
+                progression="All three sets at 12 with a flat back → add 2.5 kg and drop back to 8.",
+                regression="Any rounding → reduce the range first, the load second.",
+            ),
+            _ex(
+                name="Hip Thrust (Loaded)",
+                ex_type="reps",
+                sets=3, reps=10, rest_seconds=75,
+                weight_kg=thrust_kg, equipment_type="plate", rep_min=10, rep_max=12,
+                mechanics=(
+                    "Upper back on a bench, bar or plate across the hips with a pad. Drive "
+                    "through the heels to a straight line from knee to shoulder, squeeze hard "
+                    "for a beat, lower with control. Ribs down, chin tucked."
+                ),
+                biomechanical_focus="Direct glute max loading in the range the squat does not reach.",
+                progression="All three sets at 12 → add 2.5 kg and drop back to 10.",
+                regression="Lower back does the lifting → reduce the load and shorten the top range.",
+            ),
+            _ex(
+                name="Pallof Press (Cable)",
+                ex_type="reps",
+                laterality="unilateral",
+                sets=3, reps=10, rest_seconds=45,
+                weight_kg=5.0, equipment_type="cable",
+                increment_size=1, increment_unit="unit", rep_min=10, rep_max=12,
+                mechanics=(
+                    "Cable at chest height, stand side-on, hands together at the chest. Press "
+                    "straight out and refuse to rotate. Hold a beat at full extension. Ten each "
+                    "side."
+                ),
+                biomechanical_focus="Anti-rotation trunk control under load, without loaded spinal rotation.",
+                progression="Rock solid at 12 → up one unit on the stack.",
+                regression="Trunk rotates → down one unit, or step closer to the machine.",
+            ),
+            _ex(
+                name="McGill Curl-Up (Progressed)",
+                ex_type="hold_reps",
+                sets=3, reps_in_set=8, hold_seconds=10, rest_seconds=45,
+                mechanics=(
+                    "Lie on your back, one knee bent, hands under the small of the back to keep "
+                    "the natural curve. Lift the head and shoulders as one unit — no neck "
+                    "flexion, no flattening the back into the floor. Hold 10 seconds, lower. "
+                    "Eight of those."
+                ),
+                biomechanical_focus="Lumbar endurance without lumbar flexion — the one abdominal "
+                                    "pattern safe over the annular tears.",
+                progression="Eight clean 10-second holds → swap the bent knee halfway through.",
+                regression="Neck fatigues first → shorten to 6 seconds and keep the head heavier "
+                           "in the hands.",
+            ),
+            _ex(
+                name="Full Side Bridge",
+                ex_type="hold",
+                laterality="unilateral",
+                sets=3, hold_seconds=45, rest_seconds=45,
+                mechanics=(
+                    "On your side, forearm down, body in one straight line from ankle to head. "
+                    "Hips high, do not let them sag or roll. Hold 45 seconds each side."
+                ),
+                biomechanical_focus="Lateral trunk endurance — the quadratus and obliques that "
+                                    "stop the pelvis dropping in single-leg stance and in running.",
+                progression="45 s solid both sides → add 10 s, never load it.",
+                regression="Hips sag → drop to the bent-knee version for the same time.",
+            ),
+        ],
+    }
+
+
+def _s2b_gym_b(week: int) -> dict:
+    """Press + Pull + Scapular. Weeks 3 and 4 only — there is no loaded upper
+    session in weeks 1-2 because the flight lands on day 3.
+
+    Incline DB Press does NOT step. It has sat at 15 kg for three sessions and
+    dropped a rep on the last one; the rep span is the axis that moves here,
+    not the load.
+    """
+    return {
+        "objective": f"Stage 2B Week {week} — Press + Pull + Scapular",
+        "phase": _S2B_PHASE,
+        "session_rpe_target": 7 if week == 4 else 6,
+        "is_gym_session": True,
+        "day_type": "main",
+        "exercises": _s2b_release(hip_loaded=False) + _s2b_prep(lower=False) + [
+            _ex(
+                name="Incline DB Press",
+                ex_type="reps",
+                sets=3, reps=10, rest_seconds=75,
+                weight_kg=15.0, equipment_type="dumbbell", rep_min=10, rep_max=12,
+                mechanics=(
+                    "Bench at about 30 degrees, a dumbbell in each hand. Set the shoulder blades "
+                    "down and back into the bench and keep them there. Elbows about 45 degrees "
+                    "from the ribs, never flared wide. Press up and slightly together."
+                ),
+                biomechanical_focus=(
+                    "The block's pressing lift, and the one being watched for the left tilt the "
+                    "2025 log records under overhead load. Held at 15 kg on purpose: three "
+                    "sessions without moving and a dropped rep say add reps, not kilograms."
+                ),
+                progression="All three sets at 12 clean reps → then, and only then, add 2.5 kg.",
+                regression="Shoulder blades lose contact with the bench → reduce the load.",
+                warning="Stop on any instability sensation or a left-side tilt appearing under the "
+                        "press — that is a Stage 2 exit criterion, not a training sensation.",
+            ),
+            _ex(
+                name="Lat Pulldown",
+                ex_type="reps",
+                sets=3, reps=11, rest_seconds=60,
+                weight_kg=45.0, equipment_type="cable", rep_min=10, rep_max=12,
+                mechanics=(
+                    "Set the knees under the pad. Start from a full stretch with the shoulder "
+                    "blades relaxed up, then pull the elbows down and in, leading with the "
+                    "blades. Chest tall, no leaning back to finish the rep."
+                ),
+                biomechanical_focus=(
+                    "Vertical pull, and the lift with the most documented 2025 history behind it "
+                    "(60 kg × 12). Scapular depression is the specific weak link — lead with the "
+                    "blades, not the hands."
+                ),
+                progression="All three sets at 12 → up one increment and back to 10.",
+                regression="Leaning back to finish → reduce the load; the range is the point.",
+            ),
+            _ex(
+                name="Single-Arm DB Row",
+                ex_type="reps",
+                laterality="unilateral",
+                sets=3, reps=10, rest_seconds=60,
+                weight_kg=22.5, equipment_type="dumbbell", rep_min=10, rep_max=12,
+                mechanics=(
+                    "One knee and one hand on a bench, flat back. Pull the dumbbell to the ribs, "
+                    "elbow past the body, and squeeze the shoulder blade in. Lower all the way "
+                    "to a full stretch. Ten each side."
+                ),
+                biomechanical_focus=(
+                    "Horizontal pull, both sides. The right is the weaker side and the left "
+                    "overcompensates — if the left side needs a different number, use the Edit "
+                    "left side control so the log records both rather than overwriting one."
+                ),
+                progression="All three sets at 12 both sides → add 2.5 kg and back to 10.",
+                regression="Trunk rotates to help → reduce the load.",
+            ),
+            _ex(
+                name="Face Pull (Cable)",
+                ex_type="reps",
+                sets=3, reps=12, rest_seconds=45,
+                weight_kg=6.0, equipment_type="cable",
+                increment_size=1, increment_unit="unit", rep_min=12, rep_max=15,
+                mechanics=(
+                    "Rope at face height. Pull toward the forehead with the elbows high and "
+                    "wide, finishing with the shoulder blades down and together. Slow on the "
+                    "way back."
+                ),
+                biomechanical_focus=(
+                    "Deliberately paired with the pressing work — a clinical pairing for the "
+                    "right shoulder, not a time-efficiency one. Also the movement the symptom "
+                    "log records as giving acute relief to the interscapular area."
+                ),
+                progression="All three sets at 15 with the blades finishing down → up one unit.",
+                regression="Upper traps take over → down one unit and lower the rope slightly.",
+            ),
+            SCAPULAR_ISOMETRIC,
+            _ex(
+                name="Full Side Bridge",
+                ex_type="hold",
+                laterality="unilateral",
+                sets=3, hold_seconds=45, rest_seconds=45,
+                mechanics=(
+                    "On your side, forearm down, body in one straight line from ankle to head. "
+                    "Hips high, do not let them sag or roll. Hold 45 seconds each side."
+                ),
+                biomechanical_focus="Lateral trunk endurance, carried on every session type.",
+                progression="45 s solid both sides → add 10 s, never load it.",
+                regression="Hips sag → drop to the bent-knee version for the same time.",
+            ),
+        ],
+    }
+
+
+def _s2b_band_a(week: int) -> dict:
+    """Ireland, lower body. Holds ground — no progression targets."""
+    return {
+        "objective": f"Stage 2B Week {week} — Bands: Squat + Hinge + Core (away)",
+        "phase": _S2B_PHASE,
+        "session_rpe_target": 5,
+        "is_gym_session": True,
+        "day_type": "main",
+        "exercises": _s2b_release(hip_loaded=True) + _s2b_prep(lower=True) + [
+            BAND_FRONT_SQUAT,
+            BAND_RDL,
+            BAND_HIP_THRUST,
+            BAND_PALLOF,
+            _ex(
+                name="McGill Curl-Up (Progressed)",
+                ex_type="hold_reps",
+                sets=3, reps_in_set=8, hold_seconds=10, rest_seconds=45,
+                mechanics=(
+                    "Lie on your back, one knee bent, hands under the small of the back to keep "
+                    "the natural curve. Lift the head and shoulders as one unit, hold 10 "
+                    "seconds, lower. Eight of those."
+                ),
+                biomechanical_focus="Lumbar endurance without lumbar flexion — unchanged away from home.",
+                progression="Eight clean holds → swap the bent knee halfway through.",
+                regression="Neck fatigues first → shorten to 6 seconds.",
+            ),
+            _ex(
+                name="Full Side Bridge",
+                ex_type="hold",
+                laterality="unilateral",
+                sets=3, hold_seconds=45, rest_seconds=45,
+                mechanics=("On your side, forearm down, one straight line from ankle to head. "
+                           "Hips high. 45 seconds each side."),
+                biomechanical_focus="Lateral trunk endurance — needs nothing but a floor.",
+                progression="45 s solid → add 10 s.",
+                regression="Hips sag → bent-knee version, same time.",
+            ),
+        ],
+    }
+
+
+def _s2b_band_b(week: int) -> dict:
+    """Ireland, upper body. The one session type that loses least to a band."""
+    return {
+        "objective": f"Stage 2B Week {week} — Bands: Press + Pull + Scapular (away)",
+        "phase": _S2B_PHASE,
+        "session_rpe_target": 5,
+        "is_gym_session": True,
+        "day_type": "main",
+        "exercises": _s2b_release(hip_loaded=False) + _s2b_prep(lower=False) + [
+            BAND_CHEST_PRESS,
+            BAND_LAT_PULLDOWN,
+            BAND_ROW,
+            BAND_FACE_PULL,
+            SCAPULAR_ISOMETRIC,
+            _ex(
+                name="Full Side Bridge",
+                ex_type="hold",
+                laterality="unilateral",
+                sets=3, hold_seconds=45, rest_seconds=45,
+                mechanics=("On your side, forearm down, one straight line from ankle to head. "
+                           "Hips high. 45 seconds each side."),
+                biomechanical_focus="Lateral trunk endurance — needs nothing but a floor.",
+                progression="45 s solid → add 10 s.",
+                regression="Hips sag → bent-knee version, same time.",
+            ),
+        ],
+    }
+
+
+# ─── Running.  Introduced day 5, conservatively, and here is why ─────────────
+#
+# The names all contain "running" on purpose. services/rules.py matches
+# movement keywords by substring, so "Easy Run" would return `unknown` — not a
+# block, but not the caution verdict either. Naming a session so it misses a
+# safety keyword is the vocabulary failure this repo has already been burned
+# by; these names make check_movement actually fire and return caution.
+# They also match services/sessions.py::is_run_or_walk, so the guided flow
+# pulls the real duration off the watch on Complete.
+#
+# THE PROGRESSION IS DELIBERATELY SLOW. The left Sartorius has strained twice,
+# both times from running overuse, and clinical_profile_weighting.md #1 makes a
+# resolved injury full-weight again the moment a plan would re-stress it. Three
+# run/walk sessions before the first continuous run; two runs a week, never
+# three; one variable moves at a time.
+
+def _s2b_run(day_label: str, name: str, minutes: int, mechanics: str,
+             focus: str, progression: str, regression: str, rpe: int = 4,
+             anterior: bool = False) -> dict:
+    return {
+        "objective": f"Stage 2B — {day_label}",
+        "phase": _S2B_PHASE,
+        "session_rpe_target": rpe,
+        "is_gym_session": False,
+        "day_type": "stretch",
+        "exercises": _s2b_release(hip_loaded=True, anterior=anterior) + [
+            PREP_RAISE, PREP_GLUTE_ACTIVATION,
+            _ex(
+                name=name,
+                ex_type="duration",
+                sets=1, duration_minutes=minutes, rest_seconds=0,
+                mechanics=mechanics,
+                biomechanical_focus=focus,
+                progression=progression,
+                regression=regression,
+                warning=("Stop and walk home at any front-of-hip or groin pain on the LEFT — that "
+                         "is the Sartorius, it has gone twice before, and both times it was "
+                         "running volume. A missed run costs nothing; a third strain costs the "
+                         "race."),
+            ),
+        ],
+    }
+
+
+_RUN_DAYS = {
+    5: ("Run 1 — first run/walk", "Running Intervals (Run/Walk)", 20,
+        "Twenty minutes total: one minute of easy running, two minutes of walking, seven times "
+        "through. The running should feel almost too easy — you should be able to talk in full "
+        "sentences. This is the first running in months; the point is that the tissue meets it, "
+        "not that it is hard.",
+        "First exposure. Run/walk keeps the total impact low while the pattern is re-learned, "
+        "which is the conservative introduction the twice-strained left hip flexor requires.",
+        "Twenty minutes finished comfortably with no next-day hip flexor soreness → the next "
+        "session lengthens the run interval.",
+        "Any left front-hip soreness the next day → repeat this session rather than progressing."),
+    9: ("Run 2 — run/walk", "Running Intervals (Run/Walk)", 25,
+        "Twenty-five minutes: two minutes of easy running, two minutes of walking, six times "
+        "through. Same easy pace as the first session — the interval got longer, the effort did "
+        "not.",
+        "One variable moves per session, and this session moves duration only.",
+        "Clean and comfortable → the walk shortens next time.",
+        "Anything sore on the left hip flexor → go back to one-minute intervals."),
+    13: ("Run 3 — run/walk", "Running Intervals (Run/Walk)", 30,
+         "Thirty minutes: three minutes of easy running, one minute of walking. The walk is now "
+         "a break rather than half the session. Still conversational throughout.",
+         "The last run/walk session. If this is comfortable the next one is continuous.",
+         "Comfortable, no next-day soreness → first continuous run next week.",
+         "Not comfortable → stay on run/walk another week. The race is eight weeks out; there "
+         "is room."),
+    16: ("Run 4 — first continuous run", "Easy Running", 20,
+         "Twenty minutes of continuous easy running. No walk breaks. Slower than you think — if "
+         "you cannot talk, you are running too fast for this block.",
+         "First continuous run. The step from run/walk is the one most likely to produce "
+         "soreness, which is why it lands the week after the travel block rather than during it.",
+         "Comfortable → extend the duration, never the pace.",
+         "Sore → drop back to three-minute intervals for one session."),
+    20: ("Run 5 — easy", "Easy Running", 30,
+         "Thirty minutes continuous, conversational throughout. This one follows an upper-body "
+         "gym day rather than a squat day, which is why it is the week's longer run.",
+         "Building continuous time on feet. Pace stays where it is for the whole block.",
+         "Comfortable → 35 minutes next week.",
+         "Fatigue accumulating across the week → shorten this one rather than the gym session."),
+    23: ("Run 6 — the block's longest", "Long Easy Running", 35,
+         "Thirty-five minutes, easy the whole way. This is the block's longest run and the last "
+         "one before the reassessment — roughly 4.5 km at this pace.",
+         "The block's endurance checkpoint. Note what it does NOT do: it does not go near the "
+         "race distance. Block A gets to 35 minutes continuous and Block B builds from there, "
+         "which is the pace the twice-strained left hip flexor sets rather than the calendar.",
+         "Comfortable at 35 minutes → Block B extends the long run toward the distance.",
+         "Struggled → Block B starts with more run/walk, and that is a normal outcome rather "
+         "than a setback.", 5),
+}
+
+
+def _s2b_run_day(day: int) -> dict:
+    label, name, minutes, mech, focus, prog, regr, *rest = _RUN_DAYS[day]
+    return _s2b_run(label, name, minutes, mech, focus, prog, regr,
+                    rpe=rest[0] if rest else 4, anterior=day >= 15)
+
+
+def _s2b_mobility(week: int, away: bool = False) -> dict:
+    """Wednesday. The release block, thoracic work and a walk — no loading.
+
+    Deliberately not called a rest day in the objective: it is the day the desk
+    interventions and the two release protocols actually get run.
+    """
+    return {
+        "objective": f"Stage 2B Week {week} — Mobility + Release" + (" (away)" if away else ""),
+        "phase": _S2B_PHASE,
+        "session_rpe_target": 3,
+        "is_gym_session": False,
+        "day_type": "rest",
+        "exercises": _s2b_release(hip_loaded=False) + [
+            _ex(
+                name="Thoracic Extension (Rolled Towel)",
+                ex_type="hold",
+                sets=3, hold_seconds=45, rest_seconds=30,
+                mechanics=(
+                    "Lie back over a rolled towel placed across the mid-back, arms overhead, "
+                    "knees bent. Breathe into the position for 45 seconds, then move the towel "
+                    "a few centimetres and repeat. Three positions up the thoracic spine."
+                ),
+                biomechanical_focus=(
+                    "Thoracic extension over the T6-T10 segments that release in the seated "
+                    "forward bend (finding #3). Also the counter to the desk position that is "
+                    "the dominant driver of the interscapular symptom."
+                ),
+                progression="Comfortable → hold the arms further overhead.",
+                regression="Ribs flare or the low back arches → bend the knees more and breathe out longer.",
+            ),
+            _ex(
+                name="Thread-the-Needle (Thoracic Rotation)",
+                ex_type="hold_reps",
+                laterality="unilateral",
+                sets=2, reps_in_set=6, hold_seconds=3, rest_seconds=30,
+                mechanics=(
+                    "On hands and knees, slide one arm under the body and let the shoulder and "
+                    "head follow to the floor. Hold three seconds, then open back up reaching "
+                    "the same arm toward the ceiling. Six each side. Rotation comes from the "
+                    "ribs, not the lower back."
+                ),
+                biomechanical_focus="Thoracic rotation, unloaded — the segment that should rotate "
+                                    "so the lumbar spine does not have to.",
+                progression="Easy → pause three seconds at the top of the open position too.",
+                regression="Lower back twists → shorten the range and keep the hips square.",
+            ),
+            _ex(
+                name="Controlled Walking",
+                ex_type="duration",
+                sets=1, duration_minutes=25, rest_seconds=0,
+                mechanics=(
+                    "Twenty-five minutes at a natural pace, outdoors if possible. Not a "
+                    "workout — this is the movement dose that the symptom log records as the "
+                    "one thing that reliably settles the interscapular area."
+                ),
+                biomechanical_focus=(
+                    "Perfusion, not conditioning. The mechanism behind the left trapezius "
+                    "symptom is occlusion under sustained low-level contraction, and movement "
+                    "is what pumps it — which is why walking helps and eight hours of holding "
+                    "still does not."
+                ),
+                progression="Fine → take it earlier in the day, before the symptom appears "
+                            "rather than after.",
+                regression="Time-limited → three 8-minute walks beat one 25-minute one for this.",
+            ),
+        ],
+    }
+
+
+def _s2b_travel_day(day_label: str, note: str) -> dict:
+    """Flight days. The release block and a walk, nothing else."""
+    return {
+        "objective": f"Stage 2B — {day_label}",
+        "phase": _S2B_PHASE,
+        "session_rpe_target": 2,
+        "is_gym_session": False,
+        "day_type": "rest",
+        "exercises": _s2b_release(hip_loaded=False) + [
+            _ex(
+                name="Controlled Walking",
+                ex_type="duration",
+                sets=1, duration_minutes=20, rest_seconds=0,
+                mechanics=("Twenty minutes of walking, broken up however the day allows. After a "
+                           "flight, several short walks beat one long one."),
+                biomechanical_focus=note,
+                progression="Feeling good on arrival → take the full twenty in one go.",
+                regression="No time → even ten minutes counts. Do not skip it entirely.",
+            ),
+        ],
+    }
+
+
+def _s2b_cluster(week: int) -> dict:
+    """Thursday. The Cluster A flexibility session joins the block here.
+
+    THE STACK IS NOT AUTHORED IN THIS FILE, and that is deliberate. The battery
+    has never been run, and cluster_a_prescription.prescribe(None) raises rather
+    than guessing — a prescription without a pattern is a guess. What this day
+    does is RESERVE THE SLOT inside the five-per-week ceiling, which is the
+    integration protocol's step 1: capacity does not depend on which stack ends
+    up filling it. The Flexibility screen renders the real stack once three cold
+    baseline mornings have produced a pattern.
+    """
+    return {
+        "objective": f"Stage 2B Week {week} — Cluster A Flexibility Session",
+        "phase": _S2B_PHASE,
+        "session_rpe_target": 4,
+        "is_gym_session": False,
+        "day_type": "stretch",
+        "exercises": _s2b_release(hip_loaded=True, anterior=week >= 3) + [PREP_RAISE] + [
+            _ex(
+                name="Cluster A Flexibility Session",
+                ex_type="duration",
+                sets=1, duration_minutes=25, rest_seconds=0,
+                mechanics=(
+                    "Open the Flexibility screen and follow the stack it shows. Three to five "
+                    "exercises, in the order given — isolated work first, the full position "
+                    "last. The release block above is the precondition and does not count "
+                    "toward those five. If the screen has no stack yet, the battery has not been "
+                    "run: do that instead, cold, first thing on a morning that did not follow "
+                    "leg training."
+                ),
+                biomechanical_focus=(
+                    "The organising claim, now physio-endorsed: the lack of hip flexibility is "
+                    "what drives the lower back to sit stuck in position. Success here is the "
+                    "block coming down, not the reach going further — the number that should "
+                    "move first is the height at which the lower back stops being flat."
+                ),
+                progression=("Two clean weeks — no symptom entry attributable to this work, no "
+                             "readiness downtrend, no ACWR advisory — earns a second session a "
+                             "week. It is earned, never scheduled."),
+                regression=("Any of those three appear → back to one session a week, or pause. "
+                            "A pause is a hold on evidence, not a deletion."),
+            ),
+        ],
+    }
+
+
+# ─── The 28 days ─────────────────────────────────────────────────────────────
+#
+# Assembled explicitly rather than in a week loop, because this block's weeks
+# are NOT the same shape as each other: the flight lands mid-week 1, weeks 1-2
+# are band-only, and the cluster does not start until week 2. A loop would hide
+# exactly the thing that makes this block what it is.
+#
+# EVERY DAY CARRIES A day_type, in this one commit. Partial adoption silently
+# disables the readiness auto-shift (services/scheduling.py).
+
+PLAN_STAGE2B: dict[int, dict] = {}
+
+# ── Week 1: two days at home, then the flight. Running is week 1's stressor. ─
+PLAN_STAGE2B[1] = _s2b_gym_a(1)
+PLAN_STAGE2B[2] = _s2b_mobility(1)
+PLAN_STAGE2B[3] = _s2b_travel_day(
+    "Travel day — Ireland",
+    "Post-flight decompression. Sitting still for hours is the exact exposure the lumbar "
+    "findings and the trapezius symptom both respond worst to.",
+)
+PLAN_STAGE2B[4] = _s2b_band_a(1)
+PLAN_STAGE2B[5] = _s2b_run_day(5)
+PLAN_STAGE2B[6] = _s2b_band_b(1)
+PLAN_STAGE2B[7] = {
+    "objective": "Stage 2B Week 1 — Rest",
+    "phase": _S2B_PHASE,
+    "session_rpe_target": 2,
+    "is_gym_session": False,
+    "day_type": "rest",
+    "exercises": _s2b_release(hip_loaded=False) + [
+        _ex(
+            name="Controlled Walking",
+            ex_type="duration",
+            sets=1, duration_minutes=20, rest_seconds=0,
+            mechanics="Twenty minutes, easy, outdoors. Nothing else is prescribed today.",
+            biomechanical_focus="A genuine rest day with the release block kept, because the "
+                                "release block precedes every session and skipping it on the "
+                                "quiet days is how the habit erodes.",
+            progression="Feeling good → a longer walk is fine. Running is not.",
+            regression="Tired → the release block alone is a complete day.",
+        ),
+    ],
+}
+
+# ── Week 2: all away. The cluster joins here — one stressor per week. ────────
+PLAN_STAGE2B[8] = _s2b_band_a(2)
+PLAN_STAGE2B[9] = _s2b_run_day(9)
+PLAN_STAGE2B[10] = _s2b_mobility(2, away=True)
+PLAN_STAGE2B[11] = _s2b_cluster(2)
+PLAN_STAGE2B[12] = _s2b_band_b(2)
+PLAN_STAGE2B[13] = _s2b_run_day(13)
+PLAN_STAGE2B[14] = _s2b_travel_day(
+    "Travel day — home",
+    "The return flight. Same reasoning as the outbound: get up and walk, and run the release "
+    "block whatever else the day does.",
+)
+
+# ── Week 3: home, gym resumes, one step down on the loads. ───────────────────
+PLAN_STAGE2B[15] = _s2b_gym_a(3)
+PLAN_STAGE2B[16] = _s2b_run_day(16)
+PLAN_STAGE2B[17] = _s2b_mobility(3)
+PLAN_STAGE2B[18] = _s2b_cluster(3)
+PLAN_STAGE2B[19] = _s2b_gym_b(3)
+PLAN_STAGE2B[20] = _s2b_run_day(20)
+PLAN_STAGE2B[21] = {
+    "objective": "Stage 2B Week 3 — Rest",
+    "phase": _S2B_PHASE,
+    "session_rpe_target": 2,
+    "is_gym_session": False,
+    "day_type": "rest",
+    "exercises": _s2b_release(hip_loaded=False) + [
+        _ex(
+            name="Controlled Walking",
+            ex_type="duration",
+            sets=1, duration_minutes=20, rest_seconds=0,
+            mechanics="Twenty minutes, easy. A restorative yoga flow is fine today if you want one.",
+            biomechanical_focus="Rest between the re-entry week and the block's heaviest week.",
+            progression="Feeling good → nothing changes. This day is doing its job.",
+            regression="Tired → the release block alone is a complete day.",
+        ),
+    ],
+}
+
+# ── Week 4: full loads, ramp sets, and the reassessment. ─────────────────────
+PLAN_STAGE2B[22] = _s2b_gym_a(4)
+PLAN_STAGE2B[23] = _s2b_run_day(23)
+PLAN_STAGE2B[24] = _s2b_mobility(4)
+PLAN_STAGE2B[25] = _s2b_cluster(4)
+PLAN_STAGE2B[26] = _s2b_gym_b(4)
+# Day 27 is a REST day, not the block's seventh run. Week 4 already holds two
+# gym days, a run, the cluster session and the day-28 assessment — five, which
+# is STAGE_CONSTRAINTS[2]["session_freq_max"] exactly. A run here would make it
+# six. It is also the better methodology: the functional screen on day 28
+# should measure the block, not the previous day.
+PLAN_STAGE2B[27] = {
+    "objective": "Stage 2B Week 4 — Rest (day before the reassessment)",
+    "phase": _S2B_PHASE,
+    "session_rpe_target": 2,
+    "is_gym_session": False,
+    "day_type": "rest",
+    "exercises": _s2b_release(hip_loaded=False) + [
+        _ex(
+            name="Controlled Walking",
+            ex_type="duration",
+            sets=1, duration_minutes=20, rest_seconds=0,
+            mechanics=("Twenty minutes, easy. Nothing else — tomorrow's screen is only worth "
+                       "running on a rested body."),
+            biomechanical_focus=("Deliberate rest before the reassessment. A functional screen "
+                                 "taken on fatigue measures the fatigue."),
+            progression="Feeling good → still nothing. This day is doing its job.",
+            regression="Tired → the release block alone is a complete day.",
+        ),
+    ],
+}
+
+PLAN_STAGE2B[28] = {
+    "objective": "Stage 2B Reassessment — Final Working Loads + Functional Screen",
+    "phase": _S2B_PHASE,
+    "session_rpe_target": 4,
+    "day_type": "test",
+    "exercises": _s2b_release(hip_loaded=True) + [
+        _ex(
+            name="McGill Big 3 — Quality Screen",
+            ex_type="reps",
+            sets=1, reps=8, rest_seconds=60,
+            mechanics=(
+                "Curl-up, side bridge and bird-dog, eight quality reps of each. Judge the "
+                "QUALITY, not the count: does the brace hold, does the pelvis stay level, does "
+                "anything shake that did not last time."
+            ),
+            biomechanical_focus="Trunk control screen, comparable to the Stage 1 Day 21 and "
+                                "Stage 2A Day 28 versions of the same test.",
+            progression="Matching or beating the last screen → the trunk work is doing its job.",
+            regression="Worse → say so before the next block is authored, not after.",
+        ),
+        _ex(
+            name="Single-Leg Balance (Eyes Closed)",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=2, hold_seconds=60, rest_seconds=45,
+            mechanics="Stand on one leg, eyes closed, 60 seconds each side. Record which side "
+                      "is worse and by how much.",
+            biomechanical_focus="Proprioceptive control, and a standing requirement at Beighton 6/9.",
+            progression="Both sides steady → unchanged; this is a monitor, not a target.",
+            regression="Markedly worse on one side → record it against the hip findings.",
+        ),
+        _ex(
+            name="Hip Hinge Full Range Assessment",
+            ex_type="reps",
+            sets=2, reps=10, tempo="3-1-3", rest_seconds=60,
+            mechanics=(
+                "Ten slow unloaded hinges to full range. Note whether the standing hinge crack "
+                "appears, and whether the Coxa Saltans click has changed under a block that "
+                "loaded squats and split squats."
+            ),
+            biomechanical_focus=(
+                "THE HIP-CLICK EXIT CRITERION. No increase in Coxa Saltans frequency under "
+                "loaded squat work is what releases the horse-stance and Cossack deferrals in "
+                "the flexibility cluster. Record a clean or not-clean verdict either way — the "
+                "hold is judged on its condition, never expired by a date."
+            ),
+            progression="No increase in click frequency → the deferred movements can be reconsidered.",
+            regression="More frequent or newly painful → the deferrals stand and the physio hears "
+                       "about it.",
+        ),
+        _ex(
+            name="5-Minute Walk + Stair Assessment",
+            ex_type="duration",
+            sets=1, duration_minutes=7, rest_seconds=0,
+            mechanics=(
+                "Walk briskly five minutes, then up and down a flight of stairs twice. Rate pain "
+                "at each point and compare against the Stage 2A Day 28 numbers. Log the final "
+                "working loads on all six primary lifts here as the new baseline. If the second "
+                "weekly cluster session has been earned by two clean weeks, this evening is "
+                "where it goes — the integration protocol's same-day-evening slot, rather than "
+                "a sixth session in the week."
+            ),
+            biomechanical_focus=(
+                "Integrated functional outcome, plus the data Block B is authored from: final "
+                "loads, the hip-click verdict, how the band fortnight actually went, and "
+                "whether the running introduction produced any left hip flexor signal."
+            ),
+            progression="Pain <=2/10 throughout and the run progression on track → Block B builds "
+                        "toward the 10 km from here.",
+            regression="Pain >3/10, or a left hip flexor signal from the running → Block B starts "
+                       "with more run/walk, and that is a normal outcome rather than a setback.",
+        ),
+    ],
+}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  THE ACCESSORY SESSION — content only.  Added 2026-08-16.
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# A second, short session offered on the training page's "+" button, chosen
+# automatically from today's and yesterday's REGIONAL strain. This module holds
+# the WHAT; services/accessory.py holds the choosing, and views/training.py
+# renders it through the same guided flow the plan session uses. The split is
+# the mechanics -> battery -> prescription idiom the flexibility cluster already
+# runs on, and a test fails if the choosing leaks in here.
+#
+# WHY IT IS NOT A SIXTH SESSION. STAGE_CONSTRAINTS[2]["session_freq_max"] is 5
+# and weeks 3-4 of this block already sit at exactly 5. What this session is,
+# instead, is the family the repo already runs daily and the physiotherapist
+# already cleared: release work at ~50% effort inside a ~10-minute dose, which
+# docs/training/release_protocols_2026-08-10.md states in terms is "not a
+# training stressor". Two such protocols were already prescribed and lived only
+# in a document, i.e. only in memory. This puts them in the app and lets the
+# regional strain decide what, if anything, gets ACTIVATED beside them.
+#
+# THREE RULES SHAPE EVERY ITEM BELOW, and none of them is a preference:
+#
+#   1. NEVER A HELD CORRECTED POSTURE. The athlete asked for a fix for rounded
+#      shoulders and an arched back, and the obvious answer — hold the corrected
+#      position — is the one route the record already shows failing: the
+#      2026-07-06 entry is a genuine left iliocostalis/QL strain produced by
+#      carrying a swayback correction through a whole walk, and its own lesson
+#      is that "a comfortable posture change is not a conditioned one". So the
+#      fix here is release plus SHORT-EFFORT activation, and nothing is cued to
+#      be carried into the rest of the day.
+#
+#   2. SHORT EFFORTS, NOT LONG HOLDS. SCAPULAR_ISOMETRIC carries the argument in
+#      full: at matched loading time four 3-second contractions more than
+#      doubled the stiffness gain of one 12-second hold, the 45-second hold is
+#      n=6 about analgesia with three failed replications, and the tissue here
+#      is perfusion-limited left trapezius, where a sustained low-level
+#      contraction is the PROVOCATIVE mechanism. Scapular holds stay under 30 s.
+#
+#   3. ~50% EFFORT, PAIN <=2/10, RAMP IN AND OUT OVER 3-5 s. The annex's shared
+#      conduct rules. This is the line between a release session and a sixth
+#      training session, and it is why the session RPE target is 2-3.
+#
+# NAMES ARE REUSED DELIBERATELY. Where an exercise already exists in a plan its
+# NAME is kept exactly, even where the accessory dose is shorter, so that
+# training_constants' three maps and services/flexibility's leg-day allow-list
+# carry one definition of each name rather than two that can drift.
+
+# ─── Slot 1: decompress.  THE HANG LADDER ────────────────────────────────────
+#
+# Cluster D section A prescribes hanging outright, names feet-supported hangs as
+# a legitimate starting point, and says daily short exposures beat one long
+# weekly block. Against that: three anterior dislocations, a failed capsular
+# wrap and a Latarjet on a shallow glenoid, with stability now MUSCULAR rather
+# than ligamentous — so a fully passive hang asks the restraint that is not
+# there to hold the joint, which is also what the hypermobility profile says to
+# avoid.
+#
+# Both are true, so the hang is a LADDER rather than a yes or a no. Step 3 is
+# authored but held: services/accessory.HANG_MAX_STEP keeps it out of any
+# session until it is earned, in the cluster_a_mechanics.DEFERRED idiom, because
+# it is the only step that is genuinely passive end-range loading on a
+# stabilised shoulder.
+#
+# ADVANCE ON TWO CLEAN WEEKS, never on a good day. Drop a step on any
+# apprehension, any instability sensation, any right-shoulder ache that outlasts
+# the session, or any rise in the interscapular reading; twice means back to
+# step 1 and an entry in symptom_log. Re-test at EIGHT weeks, not four — the
+# source's own timescale, and it says to treat a null as informative rather than
+# as a reason to try harder.
+
+HANG_FEET_SUPPORTED = _ex(
+    name="Dead Hang (Feet Supported)",
+    ex_type="hold",
+    sets=3, hold_seconds=20, rest_seconds=45,
+    mechanics=(
+        "Set the bar low enough, or use a box, that your feet stay on the ground and take "
+        "some of your weight. Take an overhand grip a little wider than your shoulders. "
+        "BOTH HANDS, ALWAYS. Let the weight come onto your arms gradually — never a "
+        "shrug-and-drop — and keep the shoulders ACTIVE: shoulder blades gently pulled down "
+        "away from your ears, not collapsed up around them. Twenty seconds, then stand up "
+        "and let go. Take as much weight through the feet as you need to keep that position."
+    ),
+    biomechanical_focus=(
+        "Axial decompression and overhead exposure, entered at the step the shoulder cluster "
+        "itself names as a legitimate start. Feet on the floor is what makes this a "
+        "controlled-range position rather than passive end-range loading — which at Beighton "
+        "6/9, on a shoulder whose stability is muscular rather than ligamentous, is the "
+        "distinction that matters."
+    ),
+    progression=("Two clean weeks at this step, no apprehension and no right-shoulder ache "
+                 "afterwards -> Active Hang. Never advance on one good day."),
+    regression=("Anything at the right shoulder -> take more weight through the feet and "
+                "shorten to 10 seconds. There is no rush; this works on a months timescale."),
+    warning=(
+        "STOP the hang for the day on any of these at the RIGHT shoulder: a hard, abrupt, "
+        "unspringy end-feel; any sense the joint might go; any apprehension. On a stabilised "
+        "shoulder a hard end-feel may be doing load-bearing work, and it is not something to "
+        "push on. Never hang from one arm."
+    ),
+)
+
+HANG_ACTIVE = _ex(
+    name="Active Hang",
+    ex_type="hold",
+    sets=3, hold_seconds=15, rest_seconds=60,
+    mechanics=(
+        "Full bodyweight now, feet off the floor, overhand grip, BOTH HANDS. Step up to the "
+        "bar rather than jumping to it. Keep the shoulders ON the whole time — blades pulled "
+        "down and back so your ears stay clear of your shoulders — and hold that. Fifteen "
+        "seconds. Step down under control; do not drop off."
+    ),
+    biomechanical_focus=(
+        "The same exposure with the muscles doing the holding. This is the step that suits "
+        "this body: control rather than range is where the return is on a post-Latarjet "
+        "shoulder, and the cluster's own reading is that the scapular, cuff and puller "
+        "patterns — all control — are the likely priorities here."
+    ),
+    progression=("Two clean weeks holding the shoulders on for the full fifteen seconds -> "
+                 "the passive step becomes reviewable. It is held, not scheduled."),
+    regression="Shoulders creep up toward the ears -> back to the feet-supported step.",
+    warning=(
+        "STOP the hang for the day on a hard, abrupt end-feel at the right shoulder, on any "
+        "apprehension, or on any instability sensation. Never one arm at a time."
+    ),
+)
+
+HANG_PASSIVE = _ex(
+    name="Passive Dead Hang",
+    ex_type="hold",
+    sets=3, hold_seconds=30, rest_seconds=60,
+    mechanics=(
+        "Full bodyweight, BOTH HANDS, and this time the shoulders are allowed to relax up "
+        "toward the ears. Step up to the bar, settle, and let the tissue take it for thirty "
+        "seconds. Accumulate two to three minutes across the sets. Step down under control."
+    ),
+    biomechanical_focus=(
+        "The source's own endpoint, and the only step that is genuinely passive end-range "
+        "loading. Held out of the session by services/accessory.HANG_MAX_STEP until the "
+        "active step has run clean for two weeks — not because the physio prohibited it, but "
+        "because nobody has been asked, and this is the one item here where the shoulder "
+        "history and the source document disagree."
+    ),
+    progression="Accumulating 2-3 minutes comfortably -> that is the dose asked for; hold there.",
+    regression="Any right-shoulder complaint -> straight back to the active step and stay there.",
+    warning=(
+        "HELD BY DESIGN. If this ever appears in a session, the two-clean-week condition was "
+        "met deliberately. Both hands always — never one arm, at any step of this ladder. "
+        "Stop on any apprehension, any instability sensation, or any hard, abrupt end-feel "
+        "on the right."
+    ),
+)
+
+#: The three steps, easiest first. services/accessory.py picks one; it never
+#: picks more than one, and HANG_MAX_STEP bounds which are reachable.
+ACCESSORY_HANG_LADDER = (HANG_FEET_SUPPORTED, HANG_ACTIVE, HANG_PASSIVE)
+
+
+# ─── Slot 3: release B, upper.  Protocol 1, out of the document ──────────────
+#
+# docs/training/release_protocols_2026-08-10.md Techniques A and B, which the
+# physiotherapist prescribed on 2026-08-10 and which have run daily from a
+# document ever since. They are one prescription in two techniques and are kept
+# together for that reason, which is why the upper recipe is the only one that
+# runs to seven items.
+
+PEC_SCAR_RELEASE = _ex(
+    name="Pec & Scar Release (Right)",
+    ex_type="hold",
+    sets=2, hold_seconds=60, rest_seconds=15,
+    mechanics=(
+        "Stand facing a wall with a massage ball between the wall and the upper-RIGHT chest, "
+        "just below the outer third of the collarbone, angled in toward the bony knob at the "
+        "front of the shoulder. This is not rolling. Pin one tender spot with steady pressure "
+        "and then MOVE THE ARM slowly — from resting at your side to reaching forward and "
+        "slightly up, palm turning out — five or six slow passes, then find the next spot. "
+        "For the scar itself: lie on your back and use fingertips beside the scar line, not "
+        "raking along it, with small slow circles and gentle skin-glide each way."
+    ),
+    biomechanical_focus=(
+        "The diagnosis is scar adhesion plus high resting tone in a shortened range — not a "
+        "short muscle — which is why release applied THROUGH movement is expected to "
+        "outperform stretching here. This is also the front half of the rounded-shoulder "
+        "answer: the retractors are being asked to work against a front wall that is gripping."
+    ),
+    progression="Spots that talked back going quiet -> drop to twice a week; that is the endpoint.",
+    regression=("A week of finding nothing tender -> the local job is done. Unchanged after two "
+                "weeks means self-release is not enough and it goes to the physio for hands-on "
+                "work, which is the shoulder cluster's own answer."),
+    warning=(
+        "Pain never above 2/10. Move off immediately on any point-specific ice-pick feeling, on "
+        "any tingling, numbness or ache running into the arm — that is nerve — and on any pulse "
+        "under the pressure, which is a vessel. Never press into the hollow of the armpit."
+    ),
+)
+
+ANTERIOR_SHOULDER_RECIPROCATION = _ex(
+    name="Anterior Shoulder Reciprocation (Right)",
+    ex_type="reps",
+    sets=3, reps=1, rest_seconds=30,
+    mechanics=(
+        "Sit with the RIGHT elbow resting on the right knee, forearm hanging, elbow and "
+        "shoulder in one vertical line — the arm stays LOW and close to the body throughout. "
+        "One cycle: press the palm gently inward against your other hand, building over 3-5 "
+        "seconds, hold 5 seconds at tension rather than maximum — about half effort, no "
+        "shaking — then ease out over 3-5 seconds. Then actively rotate the forearm OUTWARD "
+        "to its comfortable end range under its own power and HOLD ten seconds. That is one "
+        "cycle. Three of them, varying the elbow angle each time — more open, more closed — "
+        "biased toward wherever the front of the shoulder feels LONG."
+    ),
+    biomechanical_focus=(
+        "Active work biased toward the long position, which is the opposite of the position "
+        "that cramps. The arm stays low because external rotation at 90 degrees of abduction "
+        "is the apprehension position the Latarjet exists to protect, and that is a geometric "
+        "limit rather than a matter of load."
+    ),
+    progression="Comfortable at ten seconds -> build the outward hold toward thirty over two weeks.",
+    regression=("The lock-out cramp appears -> the position has drifted too short. Open the "
+                "elbow angle rather than pushing through it."),
+    warning=(
+        "NEVER external rotation at 90 degrees of abduction on this side. Stop on any "
+        "ice-pick sensation, anything running into the arm, any instability feeling, or any "
+        "hard, abrupt, unspringy end-feel on the outward rotation — on a stabilised shoulder "
+        "that restriction may be load-bearing."
+    ),
+)
+
+
+# ─── Slot 3: release B, lower.  The other half of the arched back ────────────
+#
+# Stage 1 carried three hip-flexor items; they vanished at the Stage 2A
+# transition with no recorded reason, leaving the deep hip flexors the only
+# structure on the overactive list with no release anywhere in the block — while
+# the imaging names psoas hypertonicity as what amplifies the L5/S1 compression.
+# ANTERIOR_HIP_RELEASE closed half of that in week 3. This closes the other half
+# at a dose the accessory budget can carry: 45 s a side rather than Stage 1's 90.
+
+ACC_STANDING_HIP_FLEXOR = _ex(
+    name="Standing Hip Flexor Release",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=1, hold_seconds=45, rest_seconds=15,
+    mechanics=(
+        "Stand facing a wall and step ONE foot forward onto a low step or a thick book, that "
+        "knee at about 90 degrees. Back foot on the floor, back knee soft. TUCK THE PELVIS "
+        "UNDER FIRST — tailbone down, lower back long — and only then shift the hips forward "
+        "until you feel a deep stretch at the FRONT of the back hip. The tuck is the "
+        "exercise; if you arch the lower back to get more range you have taken the stretch "
+        "off the hip flexor and put it into the spine. Forty-five seconds, then the other side."
+    ),
+    biomechanical_focus=(
+        "Psoas lengthening at its L1-L4 anterior attachment. This is the direct answer to the "
+        "arched back: the habitual standing pattern is anterior pelvic tilt with short psoas, "
+        "iliacus and rectus femoris against relatively underactive glutes and anterior core, "
+        "so the correction is to lengthen the front and switch on the back — never to hold a "
+        "corrected posture."
+    ),
+    progression="Comfortable and the tuck holds -> deepen the tuck rather than reaching further forward.",
+    regression="Lower back complains -> shorten the forward shift; the tuck matters, the range does not.",
+    warning=(
+        "Your sense of neutral is calibrated to the habitual anterior tilt, so a genuinely "
+        "neutral pelvis will feel further tucked than it is. Trust the cue, not the feeling."
+    ),
+)
+
+
+# ─── Slot 4: activate.  Shorter doses of the block's own items ───────────────
+#
+# Every name here already exists in the block. The doses are cut so the session
+# lands in the release family rather than becoming training: this is meant to
+# support the day's real session, not compete with it.
+
+ACC_THORACIC_EXTENSION = _ex(
+    name="Thoracic Extension (Rolled Towel)",
+    ex_type="hold",
+    sets=2, hold_seconds=45, rest_seconds=20,
+    mechanics=(
+        "Lie back over a rolled towel placed across the MID-back, knees bent, arms overhead. "
+        "Breathe into it for forty-five seconds, then move the towel a few centimetres up or "
+        "down the spine and repeat. Ribs stay down — if they flare, or the lower back starts "
+        "taking it, bend the knees more and breathe out longer."
+    ),
+    biomechanical_focus=(
+        "The T6-T10 segments that sitting stiffens. A thoracic spine stuck in flexion tilts "
+        "the shoulder blade forward off the ribcage and leaves the retractors holding "
+        "LENGTHENED all day, which is a mechanically losing position — so this is the "
+        "mobility half of the rounded-shoulder answer and the retraction work is the strength "
+        "half."
+    ),
+    progression="Comfortable -> reach the arms further overhead, not further into extension.",
+    regression="Ribs flare or the low back arches -> more knee bend, longer exhale, smaller range.",
+    warning=(
+        "THORACIC ONLY. End-range lumbar extension is contraindicated against the L5/S1 "
+        "retrolisthesis and the narrowed right foramen. Stop where the lower back starts to "
+        "take it."
+    ),
+)
+
+ACC_SIDE_BRIDGE_SHORT = _ex(
+    name="Full Side Bridge",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=2, hold_seconds=20, rest_seconds=30,
+    mechanics=(
+        "On your side, elbow under the shoulder, feet stacked. Lift the hips until head, hips "
+        "and feet are in one line and hold twenty seconds. Then the other side. Deliberately "
+        "well short of the block's own dose — this is a reminder for the lateral trunk, not a "
+        "set."
+    ),
+    biomechanical_focus=(
+        "Lateral trunk endurance at a dose that costs nothing. The deep core stabilisers are "
+        "the second of the two underactive structures, and the record shows them turning off "
+        "under fatigue rather than being absent."
+    ),
+    progression="Twenty seconds a side is easy -> that is the block's job, not this session's.",
+    regression="Hips sag -> drop to the knees and keep the line.",
+)
+
+ACC_BREATHING = _ex(
+    name="Prone Decompression Breathing",
+    ex_type="duration",
+    sets=1, duration_minutes=2, rest_seconds=0,
+    mechanics=(
+        "Lie face down, arms by your sides or folded under your forehead. Breathe deeply into "
+        "your lower back and let the belly expand into the floor on each inhale. Completely "
+        "passive — no movement at all. Two minutes. A folded towel under the abdomen if it is "
+        "uncomfortable."
+    ),
+    biomechanical_focus=(
+        "The close. Diaphragmatic breathing inhibits the psoas — they sit against each other "
+        "at L1-L4 — so this both finishes the session and re-states its whole point: this "
+        "session down-regulates, and the day's real session is where the work happens."
+    ),
+    progression="Comfortable -> stay for the full two minutes rather than adding anything.",
+    regression=("Uncomfortable face down -> towel under the abdomen, or lie on your back with "
+                "the knees bent instead."),
+    warning="Stop immediately on any tingling or numbness in a leg in this position.",
+)

@@ -140,9 +140,28 @@ _UPPER_BODY_EXERCISES: tuple[str, ...] = (
     "Face Pull (Cable)",
     "Lat Pulldown",
     "Single-Arm DB Row",
+    # Stage 2B additions. The four band pulls/presses are the twelve travel
+    # days' whole upper-body universe; the isometric is the scapular work
+    # dosed as four 3-second efforts rather than one long hold.
+    "Band Chest Press",
+    "Band Lat Pulldown",
+    "Band Single-Arm Row",
+    "Band Face Pull",
+    "Scapular Retraction Isometric",
+    # The accessory session (services/accessory.py). Hangs are upper body by
+    # sector even though the whole body is on the bar — the grip, the lats and
+    # the shoulder girdle are what is working, and the legs are cargo. The two
+    # releases are the right shoulder's own protocol.
+    "Dead Hang (Feet Supported)",
+    "Active Hang",
+    "Passive Dead Hang",
+    "Pec & Scar Release (Right)",
+    "Anterior Shoulder Reciprocation (Right)",
 )
 
 _CORE_EXERCISES: tuple[str, ...] = (
+    # Stage 2B addition
+    "Band Pallof Press",
     "Supine Knee-to-Chest",
     "Supine Knee-to-Chest (Bilateral)",
     "Cat-Cow",
@@ -227,6 +246,33 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Outdoor Trail Run",
     "Outdoor Run",
     "Outdoor Activity",
+    # -- Stage 2B additions ----------------------------------------------
+    # The three running names are lower_body so a run counts as a LEG DAY
+    # everywhere one definition of that is read -- which is what keeps a
+    # flexibility retest off the morning after one.
+    "Running Intervals (Run/Walk)",
+    "Easy Running",
+    "Long Easy Running",
+    "Band Front Squat",
+    "Band Romanian Deadlift",
+    "Band Hip Thrust",
+    # The two ramp sets sit with the lifts they prepare. They carry
+    # warmup=True, so weekly tonnage and every 1RM estimate skip their sets
+    # anyway -- but the region still has to be right, or the SECONDS they
+    # take go to no sector at all.
+    "Goblet Squat (Ramp Set)",
+    "Romanian Deadlift (Ramp Set)",
+    # Four minutes of incline walking as the phase-2 raise. Lower body
+    # honestly, and listed in services/flexibility.RELEASE_EXERCISES so it
+    # does not turn every session into a leg day for retest purposes.
+    "Walking Raise (Incline)",
+    # The Cluster A session, placed lower_body because that is what the
+    # cluster loads. It DOES count as a leg day, deliberately -- a retest
+    # the morning after a flexibility session is a contaminated reading.
+    "Cluster A Flexibility Session",
+    # Sustained pressure at the front of the hip. A release, not loading — it
+    # is in services/flexibility.RELEASE_EXERCISES for exactly that reason.
+    "Anterior Hip Pressure Release",
 )
 
 EXERCISE_BODY_REGION: dict[str, str] = {
@@ -458,6 +504,44 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Outdoor Run":                            {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
     "Outdoor Trail Run":                      {"upper_body": 0.05, "core": 0.20, "lower_body": 0.75},
     "Outdoor Activity":                       {"upper_body": 0.10, "core": 0.20, "lower_body": 0.70},
+
+    # -- Stage 2B ---------------------------------------------------------
+    # Running mirrors Outdoor Run exactly: it is the same activity under a
+    # prescribed name rather than an imported one.
+    "Running Intervals (Run/Walk)":           {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
+    "Easy Running":                           {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
+    "Long Easy Running":                      {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
+    # Band versions carry the same distribution as the loaded lifts they
+    # stand in for -- the movement is the same, only the resistance differs.
+    "Band Front Squat":                       {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Band Romanian Deadlift":                 {"upper_body": 0.10, "core": 0.25, "lower_body": 0.65},
+    "Band Hip Thrust":                        {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Band Pallof Press":                      {"upper_body": 0.15, "core": 0.75, "lower_body": 0.10},
+    "Band Chest Press":                       {"upper_body": 0.85, "core": 0.15, "lower_body": 0.00},
+    "Band Lat Pulldown":                      {"upper_body": 0.85, "core": 0.15, "lower_body": 0.00},
+    "Band Single-Arm Row":                    {"upper_body": 0.80, "core": 0.20, "lower_body": 0.00},
+    "Band Face Pull":                         {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    # Ramps share their parent lift's distribution exactly.
+    "Goblet Squat (Ramp Set)":                {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Romanian Deadlift (Ramp Set)":           {"upper_body": 0.10, "core": 0.25, "lower_body": 0.65},
+    "Walking Raise (Incline)":                {"upper_body": 0.05, "core": 0.10, "lower_body": 0.85},
+    "Scapular Retraction Isometric":          {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    # The cluster is hip-dominant with a real trunk demand -- the F-stack's
+    # whole subject is the pelvis, not the hamstrings.
+    "Cluster A Flexibility Session":          {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    "Anterior Hip Pressure Release":          {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    # ── The accessory session ───────────────────────────────────────────────
+    # A hang is the whole body on a bar, but only the top of it is working: the
+    # grip, the lats and the shoulder girdle hold, the trunk resists the swing,
+    # and the legs are cargo. The passive step gives the trunk less to do than
+    # the active one, which is the entire difference between them. The two
+    # releases are point pressure and low-arm active work at one shoulder, so
+    # they sit where the other unloaded upper-body drills sit.
+    "Dead Hang (Feet Supported)":             {"upper_body": 0.80, "core": 0.20, "lower_body": 0.00},
+    "Active Hang":                            {"upper_body": 0.80, "core": 0.20, "lower_body": 0.00},
+    "Passive Dead Hang":                      {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Pec & Scar Release (Right)":             {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
+    "Anterior Shoulder Reciprocation (Right)": {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -621,4 +705,49 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Outdoor Trail Run":                        ("bodyweight_compound", 0.5),
     "Outdoor Run":                              ("bodyweight_compound", 0.5),
     "Outdoor Activity":                         ("bodyweight_compound", 0.5),
+
+    # -- Stage 2B ---------------------------------------------------------
+    # Running sits at the same tier as the imported outdoor names, which is
+    # the point: a prescribed run and an imported one are the same activity
+    # and must not weigh differently depending on which door they came in.
+    "Running Intervals (Run/Walk)":             ("bodyweight_compound", 0.5),
+    "Easy Running":                             ("bodyweight_compound", 0.5),
+    "Long Easy Running":                        ("bodyweight_compound", 0.5),
+    # BAND WORK SITS AT bodyweight_compound, NOT AT ITS LOADED TIER. A band
+    # front squat is not a 1.3 squat -- scoring it there would repeat the
+    # Stage 1 over-count in the other direction, inflating a maintenance
+    # fortnight into a loaded block. 0.5 is the tier that exists for exactly
+    # this: multi-joint work without real external load.
+    "Band Front Squat":                         ("bodyweight_compound", 0.5),
+    "Band Romanian Deadlift":                   ("bodyweight_compound", 0.5),
+    "Band Hip Thrust":                          ("bodyweight_compound", 0.5),
+    "Band Chest Press":                         ("bodyweight_compound", 0.5),
+    "Band Lat Pulldown":                        ("bodyweight_compound", 0.5),
+    "Band Single-Arm Row":                      ("bodyweight_compound", 0.5),
+    # Single-joint band work stays at the isolation tier its cable twin uses.
+    "Band Pallof Press":                        ("isolation", 0.3),
+    "Band Face Pull":                           ("isolation", 0.3),
+    # Ramp sets carry their parent lift's tier -- they really are that
+    # movement, just lighter, and their SETS are already excluded from
+    # tonnage and 1RM by is_warmup rather than by a weight fiddle here.
+    "Goblet Squat (Ramp Set)":                  ("squat", 1.3),
+    "Romanian Deadlift (Ramp Set)":             ("hinge", 1.0),
+    # Preparation and mobility, not training.
+    "Walking Raise (Incline)":                  ("mobility_core", 0.25),
+    "Scapular Retraction Isometric":            ("isolation", 0.3),
+    "Cluster A Flexibility Session":            ("mobility_core", 0.25),
+    "Anterior Hip Pressure Release":            ("mobility_core", 0.25),
+    # ── The accessory session ───────────────────────────────────────────────
+    # The two full-bodyweight hangs are the athlete's own mass held by the
+    # shoulder girdle across several joints, which is what bodyweight_compound
+    # describes -- the same tier the step-ups and wall sits sit at. The
+    # feet-supported step is deliberately a tier lower: the feet are carrying
+    # enough of the weight that calling it the same work would overstate it,
+    # and it is the step that runs on the heavy days when the session shrinks.
+    # The two releases are unloaded point pressure and half-effort active work.
+    "Dead Hang (Feet Supported)":               ("mobility_core", 0.25),
+    "Active Hang":                              ("bodyweight_compound", 0.5),
+    "Passive Dead Hang":                        ("bodyweight_compound", 0.5),
+    "Pec & Scar Release (Right)":               ("mobility_core", 0.25),
+    "Anterior Shoulder Reciprocation (Right)":  ("mobility_core", 0.25),
 }

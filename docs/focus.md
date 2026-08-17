@@ -4,16 +4,113 @@
 
 ---
 
-## Current State (2026-08-10)
+## Current State (2026-08-14)
 
 | Item | Value |
 |------|-------|
-| Stage | **Stage 2** — Transition (external load) |
-| Block | **Stage 2A — 28-Day Gym Strength Block**, started 2026-07-20 (`training_plan.PLAN_STAGE2`) |
-| Day | **Day 22 of 28** |
-| Gate | **2437/2437** — `python -m pytest tests/` |
-| Last code commit | The literature review lands in the design: every rationale now carries its true evidence tier |
-| Next action | **Day 28 reassessment, 2026-08-16** — physiotherapist sign-off required; run the battery cold BEFORE it, and read the warm-up review (step 1b below) before authoring a single day |
+| Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
+| Block | **Stage 2B — 28-Day Block**, starts **2026-08-17** (`training_plan.PLAN_STAGE2B`, Phase 3) |
+| Day | Block A day 0 — starts Monday |
+| Gate | **3020/3020** — `python -m pytest tests/` |
+| Last code commit | The accessory session — a strain-chosen second training on the "+" button |
+| Next action | **Sun 16 Aug: Stage 2A's last day (day 26). Run the day-28 screen YOURSELF — the app will not offer it** |
+
+### The two blocks, and why the dates are what they are
+
+| | Runs | Ends |
+|---|---|---|
+| **Block A** | 2026-08-17 (Mon) → 2026-09-13 (Sun) | reassess, and author Block B from its real data |
+| **Block B** | 2026-09-14 (Mon) → 2026-10-11 (Sun) | **race day is Block B's own day 28** |
+
+Starting on the Monday is what makes this work. Both blocks land Mon–Sun, which
+`services/plan.py`'s multiple-of-7 invariant and every spacing rule assume; the
+Ireland trip falls on days **3–14**, so gym work resumes exactly at the top of
+week 3 with nothing stranded mid-week; and the 10 km lands as day 28 of Block B
+rather than somewhere inside it.
+
+### Next actions, in order — the athlete's, not the code's
+
+1. **Sun 16 Aug — Stage 2A's final day.** The app shows **day 26** (Unilateral/Glute
+   + Scapular + Core), which is the last authored day it can reach.
+   **⚠ The day-28 reassessment is not in the app's reach and never was.** Stage 2A
+   absorbed two days of reschedules, so its own overrides put day 28 on 2026-08-18
+   while the block's calendar ended 2026-08-16. The two stranded entries were
+   removed on 2026-08-14 so the block finishes cleanly on the Sunday; the athlete
+   runs the screen by hand. It is short — McGill Big 3, single-leg balance eyes
+   closed, hip hinge full range, 5-minute walk + stairs — and two of the six exit
+   criteria (final working loads, functional screen) come from it.
+2. **Battery baseline mornings: 16, 19 and 20 Aug.** Cold, first thing, before
+   anything else that day. The cluster stack cannot be authored without a
+   pattern — `prescribe(None)` raises by design — and the battery has still
+   never been run. **Verify each morning with `flexibility.leg_loading_days`
+   against the real log rather than by eye**: Saturday's walk may classify as a
+   leg day and block the 16th. Capture the straddle width and heel distance at
+   the same sitting — the number is the record.
+3. **Fri 21 Aug** — the anterior-hip pressure protocol starts, the day AFTER the
+   battery baseline and not before. Contaminating the tilt measurement is the
+   pre-declared failure mode.
+4. **~24 Aug** — two-week verdict on the pec/scar protocol, in the standardised
+   prayer position.
+5. **This week** — raise the desk to standing elbow height measured ON the
+   treadmill deck, and raise the monitor by the same amount. Dominant driver of
+   the trapezius symptom; costs nothing.
+6. **Before ~Sept** — the InBody bridge scan. Unrecoverable once the gym swaps
+   machines.
+
+### The accessory session — new 2026-08-16, on the "+" button
+
+A second, short session (10–20 min), offered any day, chosen automatically from
+today's and yesterday's **regional** strain. `services/accessory.py` decides,
+`training_plan.py` holds the content, `views/training.py` renders it through the
+SAME guided flow as the plan session.
+
+- **It is not a sixth session.** `session_freq_max` is 5 and weeks 3–4 already
+  sit at 5. This is authored in the family the physio already cleared and you
+  already run daily — release work at ~50 % effort inside ~10 min, which
+  `release_protocols_2026-08-10.md` states in terms is *not a training
+  stressor*. Both of those protocols now live in the app instead of in memory.
+- **It still counts.** Logs as `Type="Accessory"`, feeds Foster AU → Strain and
+  ACWR, and **never** marks a plan day done (`SUPPLEMENTARY_SESSION_TYPES`).
+- **Two tiers.** FULL (~19 min) on moderate days; SHRUNK (~10 min, release only,
+  zero adaptation-seeking work) on rest days, assessment days, gym days at RPE
+  ≥6, and any day the engine has already cut volume. Over the 28-day block that
+  is 15 shrunk / 13 full.
+- **Today is projected, not read** — it assumes the day's real session happens
+  whether or not it is logged yet, which is what stops it stacking work onto a
+  region the block is about to load.
+- **Regional ACWR may swap a region; it may never refuse a session.**
+
+**Three things to decide, and they are yours:**
+
+1. **`HANG_MAX_STEP = 2`.** The hang is a three-step ladder and step 3 (Passive
+   Dead Hang) is **held** — the only genuinely passive end-range loading on a
+   shoulder with three dislocations, a failed wrap and a Latarjet on a shallow
+   glenoid. Cluster D prescribes it; the clinical record argues against it;
+   nobody has asked the physio. Raise to 3 only after two clean weeks at step 2
+   **and** the question has been put. Raise `HANG_STEP` (currently 1) on two
+   clean weeks alone.
+2. **The interscapular exit criterion is being confounded.** Its own text says
+   the intervention under test is the **desk height, not the training**. Upper
+   activation days now add scapular work, and the session note says so, so the
+   confound is visible at the reassessment rather than found afterwards.
+3. **One new stressor per week.** The shrunk tier is release-family and clears
+   that bar from day 1. If you want the activation tier staggered, that is a
+   single constant away — say so and it gets one.
+
+**Not yet exercised:** the save path. It was verified by source test, not by
+writing a session you did not do.
+
+### Held deliberately
+
+- **ACWR stays advisory through Block A** (athlete, 2026-08-14). A new phase
+  resets the stage-scoped chronic window, so from 2026-08-30 that window is
+  **12 of 14 travel days**; a breach during the ramp back would be an artefact
+  of the trip, not of training. Evaluate at Block B against normal loading.
+- **The auto-progression machine is deferred.** Block A keeps the weekly load
+  ladders one more block; `docs/training/auto_progression_design.md` is
+  unchanged and still design-only.
+- **`rest_taken_seconds` feeds nothing** (`sessions.REST_TAKEN_FEEDS_DURATION`).
+  Recorded from day one, wired in on a measurement rather than a date.
 
 Stage 1 ran to 2026-07-19, extended by 7 days (Days 15–21) after a mid-back
 flare meant the Day 14 exit criteria were not met on the original schedule.

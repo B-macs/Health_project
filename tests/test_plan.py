@@ -5,6 +5,7 @@ of dict-key access now that Phase/DayCell are typed.
 """
 
 import ast
+from dataclasses import replace
 from datetime import date, timedelta
 
 from services import plan
@@ -273,3 +274,103 @@ def test_no_active_phase_reassessment_gap_is_all_rest():
 
 def test_weekday_label_is_a_3_letter_uppercase_abbreviation():
     assert cells[0].weekday_label == _p_start.strftime("%a").upper()[:3]
+
+
+# ─── stranded overrides ────────────────────────────────────────────────────
+
+def test_a_phase_that_fits_strands_nothing():
+    assert plan.stranded_override_days(p28) == []
+
+
+def test_an_override_past_the_last_date_is_reported():
+    """The live case, 2026-08-14. Stage 2A absorbed a forced rest and a session
+    that had nowhere to move, which shifted its numbering two days — putting
+    day 28, the reassessment, on 2026-08-18 while the phase's own calendar ended
+    2026-08-16. Both stranded days would have vanished in silence."""
+    phase = plan.default_phase(date(2026, 7, 20), length_days=28, phase_number=2,
+                                name="Stage 2A")
+    phase = replace(phase, date_overrides={
+        "2026-08-14": 24, "2026-08-16": 26, "2026-08-17": 27, "2026-08-18": 28,
+    })
+    assert plan.phase_end_date(phase) == date(2026, 8, 16)
+    assert plan.stranded_override_days(phase) == [("2026-08-17", 27), ("2026-08-18", 28)]
+
+
+def test_a_forced_rest_past_the_end_is_not_stranded_work():
+    """date_overrides value 0 means forced rest, not plan day 0. There is
+    nothing to strand."""
+    phase = plan.default_phase(date(2026, 7, 20), length_days=28, phase_number=2)
+    phase = replace(phase, date_overrides={"2026-08-20": 0})
+    assert plan.stranded_override_days(phase) == []
+
+
+# ─── the week is itself a block ────────────────────────────────────────────
+
+_P2 = plan.default_phase(date(2026, 7, 20), length_days=28, phase_number=2, name="Stage 2A")
+
+
+def test_a_day_belongs_to_the_week_its_number_says():
+    assert plan.week_of_day_number(1) == 1
+    assert plan.week_of_day_number(7) == 1
+    assert plan.week_of_day_number(8) == 2
+    assert plan.week_of_day_number(28) == 4
+
+
+def test_a_date_belongs_to_the_week_its_offset_says():
+    assert plan.week_of_phase_date(_P2, date(2026, 7, 20)) == 1
+    assert plan.week_of_phase_date(_P2, date(2026, 7, 26)) == 1
+    assert plan.week_of_phase_date(_P2, date(2026, 7, 27)) == 2
+    assert plan.week_of_phase_date(_P2, date(2026, 8, 16)) == 4
+
+
+def test_a_move_inside_its_own_week_is_allowed():
+    """Swapping two days of the same week is the whole point of the
+    rescheduling machinery and must stay possible."""
+    ok, rejected = plan.reject_violating_overrides(
+        _P2, {"2026-07-21": 3, "2026-07-22": 2})
+    assert ok == {"2026-07-21": 3, "2026-07-22": 2}
+    assert rejected == []
+
+
+def test_a_day_pushed_into_the_following_week_is_refused():
+    """The live failure. Stage 2A's forced rest on 2026-08-09 renumbered the
+    tail, so week 3's days 20 and 21 were run in week 4's calendar slots."""
+    ok, rejected = plan.reject_violating_overrides(_P2, {"2026-08-10": 20})
+    assert ok == {}
+    assert len(rejected) == 1
+    assert rejected[0]["rule"] == "crossed_week"
+    assert "week 3" in rejected[0]["detail"] and "week 4" in rejected[0]["detail"]
+
+
+def test_a_day_pushed_past_the_block_end_is_refused():
+    ok, rejected = plan.reject_violating_overrides(_P2, {"2026-08-18": 28})
+    assert ok == {}
+    assert rejected[0]["rule"] == "past_block_end"
+
+
+def test_a_forced_rest_is_never_a_violation():
+    """0 means forced rest, not plan day 0 — it schedules nothing, so it can
+    break neither rule."""
+    ok, rejected = plan.reject_violating_overrides(
+        _P2, {"2026-08-09": 0, "2026-08-25": 0})
+    assert ok == {"2026-08-09": 0, "2026-08-25": 0}
+    assert rejected == []
+
+
+def test_a_rejected_move_never_partially_applies():
+    """Rejects rather than clamps: a day number nudged to fit is a different
+    session from the one the athlete was offered, silently substituted."""
+    ok, rejected = plan.reject_violating_overrides(
+        _P2, {"2026-07-21": 3, "2026-08-10": 20})
+    assert ok == {"2026-07-21": 3}
+    assert [r["date"] for r in rejected] == ["2026-08-10"]
+
+
+def test_every_override_write_site_passes_through_the_rule():
+    """Three places write date_overrides — the manual swap, the missed-session
+    carry, and the readiness auto-shift. A fourth added without this guard puts
+    the block back where Stage 2A was."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parent.parent / "views" / "training.py").read_text(encoding="utf-8")
+    assert src.count("date_overrides={**active.date_overrides") == 3
+    assert src.count("reject_violating_overrides") == 3

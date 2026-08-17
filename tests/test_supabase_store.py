@@ -116,7 +116,16 @@ def test_every_boolean_string_in_the_real_datastore_is_covered():
         if not numeric:
             continue
         for row in conn.execute(f"SELECT * FROM {table}"):
+            present = set(row.keys())
             for col in numeric:
+                # A column added to the schema after this snapshot was built is
+                # simply absent from it — the same "in the schema, not in this
+                # snapshot" case the table check above already skips, one level
+                # down. Indexing it would raise IndexError, which reads as a
+                # coercion bug when it is only a stale datastore.db (rebuild
+                # with scripts/build_datastore.py).
+                if col not in present:
+                    continue
                 v = row[col]
                 if not isinstance(v, str) or v.strip() == "":
                     continue

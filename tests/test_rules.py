@@ -247,3 +247,28 @@ def test_adding_vocabulary_never_loosened_an_existing_verdict():
                            ("barbell deadlift", "contraindicated"),
                            ("box jump", "contraindicated")):
         assert rules.check_movement(name, 3)["severity"] == expected, name
+
+
+# ─── running: contraindicated below Stage 2, caution from Stage 2 ───────────
+
+def test_running_is_contraindicated_in_stage_1():
+    assert rules.check_movement("running", 1)["severity"] == "contraindicated"
+
+
+def test_running_clears_to_caution_from_stage_2():
+    """The rule always MEANT this — it carried stage_cap=2 and its own reason
+    said "contraindicated in Stage 1" — but check_movement only ever upgrades a
+    verdict TO contraindicated, so a rule already written at that severity could
+    never lift. It returned contraindicated at every stage, which is why Stage
+    2B could not author a run at all. Corrected 2026-08-14 with the athlete's
+    sign-off, the physio having cleared running on 2026-08-12."""
+    for stage in (2, 3):
+        assert rules.check_movement("running", stage)["severity"] == "caution", stage
+
+
+def test_axial_impact_is_still_blocked_at_every_stage_reachable_today():
+    """The correction is scoped to running. Jumping and impact keep stage_cap=1
+    with contraindicated severity, so they stay blocked — the L5/S1 finding has
+    not changed."""
+    for movement in ("impact", "jumping", "box jump"):
+        assert movement in rules.get_contraindicated_always(), movement

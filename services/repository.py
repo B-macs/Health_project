@@ -26,6 +26,7 @@ import atexit
 
 import dataclasses
 import json
+import threading
 import time
 import uuid
 from datetime import date, datetime, timedelta
@@ -38,6 +39,8 @@ from services import home_snapshot
 from services import hr_load
 from services import hr_matching
 from services import models
+from services import oura_auth
+from services import plan
 from services import readiness
 from services import sessions as training_sessions
 from services import sleep_fusion
@@ -216,10 +219,73 @@ _OURA_DAILY_ENDPOINTS = (
 # with the historical backfill and pinned by its own test.
 _OURA_SYNC_ORDER = ("daily", "sleep_periods", "workouts", "sessions", "rest_mode_periods")
 
+
+def _working_volume_kg(sets: list[dict]) -> float:
+    """Sum of reps x weight across WORKING sets only — the value written to
+    every `total_volume_kg`, and the one services/volume.py adds up.
+
+    Warm-up sets are excluded because this is a claim about work done, matching
+    services/tonnage.py's own eligibility rule; without that the two weekly
+    kilogram figures in the app would disagree the first time a ramp set is
+    logged. `actual_sets` deliberately does NOT get the same treatment: it
+    counts sets performed, and a ramp set really was performed.
+
+    An absent `is_warmup` reads as a working set, which is what every set logged
+    before 2026-08 is."""
+    return round(sum((s.get("reps") or 0) * (s.get("weight") or 0.0)
+                     for s in sets if not s.get("is_warmup")), 1)
+
 # .sync_state.json key holding an unfinished run's per-tab counts, and how
 # long that marker stays resumable. See Repository.oura_sync_progress.
 _OURA_SYNC_PROGRESS_KEY = "oura_sync_progress"
 _OURA_SYNC_RESUME_MINUTES = 30
+
+# Where the OAuth credential lives, under the SAME key in two stores.
+#
+# Notion's Config DB is the durable copy: the hosted filesystem is wiped on
+# redeploy (key rule 18), and a refresh token lost that way costs a manual
+# browser re-authorisation, not just a slow first read. .sync_state.json is
+# the fast local copy that every request actually reads — exactly the
+# training-checkpoint arrangement two constants above, and for the same
+# reason: the durable store is ~136 ms away and this value is read on every
+# sync.
+_OURA_TOKEN_KEY = "oura_oauth_token"
+
+# Set when persisting a refreshed credential to Notion fails. Surfaced by
+# oura_auth_status: the local copy still works, so the sync keeps running,
+# but the credential is now one redeploy away from being lost and that must
+# not be silent.
+_OURA_TOKEN_PERSIST_ERROR_KEY = "oura_token_persist_error"
+
+# Set when Oura answers 401 during a sync, cleared when one succeeds.
+#
+# The only way to learn that a STATIC token has been revoked. A PAT carries no
+# expiry, so nothing about the stored value distinguishes a working one from
+# the dead one this project ran on from 2026-08-12 — without this marker,
+# oura_auth_status would keep calling that credential healthy and the Home
+# banner would never fire on the exact state it was written for.
+_OURA_AUTH_FAILURE_KEY = "oura_auth_failure"
+
+# Daily endpoints the current grant does not cover, recorded by
+# _sync_oura_daily. Their Oura Daily columns stay permanently blank, which is
+# a fact worth being able to answer without re-probing the API — and worth
+# distinguishing from "Oura had no data", which looks identical in the sheet.
+_OURA_SCOPE_GAPS_KEY = "oura_scope_gaps"
+
+# ⚠ PROCESS-WIDE, not per-Repository, and that is the entire point.
+#
+# Oura's refresh tokens are SINGLE USE (services/oura_auth.py). The
+# background sync thread builds its OWN Repository (key rule 12) while the
+# script thread holds another, so an instance lock would serialise nothing —
+# both would refresh, one would win, and the loser would persist a token
+# Oura had already invalidated. That failure is unrecoverable without a human
+# in a browser, which is why this is a module global rather than an attribute.
+#
+# It does NOT cover two PROCESSES. That is accepted rather than solved: the
+# hosted app runs one, and the repair for the cross-process race (a lease in
+# the durable store) costs a Notion round trip on every sync to prevent
+# something no current deployment can do.
+_OURA_REFRESH_LOCK = threading.Lock()
 
 # .sync_state.json key holding the durable Home-card snapshot, keyed by ISO
 # date. See services/home_snapshot.py.
@@ -624,13 +690,216 @@ class Repository:
             self._garmin_client_obj = garmin.make_client(self.config)
         return self._garmin_client_obj
 
+    # ─── Oura credential ─────────────────────────────────────────────────
+    #  Was one line: return the static PAT. It is now a lifecycle, because
+    #  Oura retired PATs and OAuth access tokens expire. Everything below
+    #  exists to keep `_oc` returning a plain string, so the ~10 call sites
+    #  that pass it to oura.get_collection stay untouched.
+
+    def _load_oura_token(self) -> oura_auth.OAuthToken | None:
+        """The stored OAuth credential: fast local copy first, durable Notion
+        copy as the fallback that survives a redeploy.
+
+        A hit in Notion is written back to local disk, so the ~136 ms round
+        trip is paid once per process rather than once per sync — the same
+        hydrate-on-miss shape as repo.get_repository filling an empty
+        datastore from Supabase.
+
+        Never raises. A Config read can fail (offline mode, a Notion blip)
+        and the honest answer then is "no credential I can see", which the
+        caller already has to handle.
+        """
+        local = oura_auth.from_json(local_cache.read().get(_OURA_TOKEN_KEY))
+        if local:
+            return local
+        try:
+            stored = self.get_config_value(_OURA_TOKEN_KEY)
+        except Exception:
+            return None
+        token = oura_auth.from_json(stored)
+        if token:
+            local_cache.update({_OURA_TOKEN_KEY: oura_auth.to_json(token)})
+        return token
+
+    def _store_oura_token(self, token: oura_auth.OAuthToken,
+                          today: date | None = None) -> None:
+        """Persist a credential to BOTH stores, local first.
+
+        Local first because it cannot meaningfully fail and because it is
+        what the next read in this process uses — getting it written closes
+        the window in which a second thread refreshes again. Notion second
+        because it is the copy that survives a redeploy, and because it is
+        the one that can fail.
+
+        ⚠ A failed durable write is recorded, NOT raised. By the time this is
+        called the refresh has already happened and the old refresh token is
+        already dead, so raising would abort a sync while leaving the app
+        holding the only copy of a credential it just declined to use. The
+        marker is what stops that being invisible.
+        """
+        blob = oura_auth.to_json(token)
+        local_cache.update({_OURA_TOKEN_KEY: blob})
+        if self.offline:
+            # Notion writes raise offline by contract (_nc). Refusing to
+            # record the failure here would be noise, not information: the
+            # caller deliberately chose a read-only backend.
+            return
+        try:
+            self.set_config(_OURA_TOKEN_KEY, blob, today=today)
+            local_cache.update({_OURA_TOKEN_PERSIST_ERROR_KEY: None})
+        except Exception as exc:
+            local_cache.update({
+                _OURA_TOKEN_PERSIST_ERROR_KEY:
+                    f"{datetime.now().isoformat(timespec='seconds')}: {exc}"
+            })
+
+    def _refresh_oura_token(self, token: oura_auth.OAuthToken
+                            ) -> oura_auth.OAuthToken:
+        """Redeem the refresh token and persist the replacement.
+
+        PERSIST BEFORE RETURN, unconditionally. The refresh token is spent
+        the instant Oura answers, so the response is the only copy of the
+        next one in existence — returning it to a caller that might not store
+        it is how a credential gets destroyed by a successful call.
+        """
+        payload = oura.refresh_access_token(
+            self.config.oura_client_id, self.config.oura_client_secret,
+            token.refresh_token,
+        )
+        fresh = oura_auth.from_response(payload, previous=token)
+        self._store_oura_token(fresh)
+        return fresh
+
     @property
     def _oc(self) -> str | None:
-        """The bearer token itself — no session/login step for a personal
-        access token, unlike Garmin. None if unconfigured."""
+        """A currently-valid Oura bearer token, or None when unconfigured.
+
+        Still returns a plain string — every caller passes it straight to
+        oura.get_collection and none of them needs to know which credential
+        kind it came from, or that a network round trip may have happened
+        here.
+
+        Order is OAuth first, PAT second. A PAT is only reached when no OAuth
+        credential is stored, so a working legacy token keeps working and a
+        dead one (this project's, since 2026-08-12) is superseded the moment
+        the browser flow is run.
+
+        Refresh is guarded by _OURA_REFRESH_LOCK with a re-read inside it —
+        classic double-checked locking, and load-bearing here rather than an
+        optimisation. Two threads reaching this together must produce ONE
+        refresh: the second has to see the first's result instead of spending
+        a refresh token that Oura has already invalidated.
+
+        A failed refresh does NOT raise while the current access token is
+        still valid. REFRESH_SKEW_SECONDS is a day wide precisely so that a
+        transient failure has many retries before anything breaks; turning
+        the first one into an exception would throw that away and take the
+        sync down for a credential that still works.
+        """
+        token = self._load_oura_token()
+        if token and not oura_auth.needs_refresh(token):
+            return token.access_token
+        if token and oura_auth.can_refresh(token):
+            with _OURA_REFRESH_LOCK:
+                # Re-read: another thread may have refreshed while this one
+                # waited, in which case its result is the live credential and
+                # ours would be a second, fatal redemption.
+                token = self._load_oura_token() or token
+                if oura_auth.needs_refresh(token):
+                    try:
+                        token = self._refresh_oura_token(token)
+                    except Exception:
+                        if not oura_auth.is_expired(token):
+                            return token.access_token
+                        raise
+                return token.access_token
+        if token and token.access_token and not oura_auth.is_expired(token):
+            # Stored, unexpired, but with nothing to refresh with. Usable
+            # now; oura_auth_status is what says it is a dead end.
+            return token.access_token
         if self._oura_token_obj is None:
             self._oura_token_obj = oura.make_client(self.config)
         return self._oura_token_obj
+
+    def _record_oura_scope_gap(self, endpoint: str) -> None:
+        """Add `endpoint` to the recorded scope gaps, keeping the rest."""
+        local_cache.mutate(
+            _OURA_SCOPE_GAPS_KEY,
+            lambda old: sorted(set(old or []) | {endpoint}),
+        )
+
+    def oura_scope_gaps(self) -> list[str]:
+        """Endpoints the current grant does not cover. Empty is the normal
+        case; a non-empty list means those columns are blank by permission
+        rather than because Oura had no data — indistinguishable in the sheet
+        and worth being able to answer without re-probing."""
+        return list(local_cache.read().get(_OURA_SCOPE_GAPS_KEY) or [])
+
+    def _record_oura_auth_failure(self, exc: Exception) -> None:
+        """Remember that Oura rejected the credential, with when and why.
+
+        Local-only, and that is enough: the marker is re-created by the very
+        next sync attempt, so losing it to a redeploy costs one page load of
+        accuracy rather than the credential itself.
+        """
+        local_cache.update({
+            _OURA_AUTH_FAILURE_KEY:
+                f"{datetime.now().isoformat(timespec='seconds')}: {exc}"
+        })
+
+    def _clear_oura_auth_failure(self) -> None:
+        local_cache.update({_OURA_AUTH_FAILURE_KEY: None})
+
+    def oura_auth_status(self, now: datetime | None = None) -> dict:
+        """What credential Oura sync is running on, and whether it is healthy.
+
+        For display — it never includes a token value, so it is safe to
+        render and safe to screenshot. `kind` is "oauth", "pat" or "none";
+        `state` is oura_auth.status's, plus "pat" for the legacy path.
+
+        This exists because the failure it describes was invisible. A dead
+        credential and a flaky network produced the same grey caption for
+        five days, over a stretch where the missing data did not read as
+        missing — readiness renormalised onto its one surviving component and
+        went UP. `needs_authorisation` is the single flag a caller should
+        branch on to say so out loud.
+        """
+        cache = local_cache.read()
+        rejected = cache.get(_OURA_AUTH_FAILURE_KEY)
+        common = {
+            "oauth_configured": bool(self.config.oura_client_id
+                                     and self.config.oura_client_secret),
+            "persist_error": cache.get(_OURA_TOKEN_PERSIST_ERROR_KEY),
+            "rejected": rejected,
+        }
+        token = self._load_oura_token()
+        if token:
+            st = dict(oura_auth.status(token, now=now), kind="oauth", **common)
+            # An observed 401 outranks anything the stored token claims about
+            # itself: a refresh token can be revoked while still looking
+            # perfectly refreshable.
+            st["needs_authorisation"] = bool(rejected) or st["state"] in (
+                "unauthenticated", "expired")
+            if rejected:
+                st["state"] = "rejected"
+            return st
+        if self.config.oura_token:
+            return {"kind": "pat", "state": "rejected" if rejected else "pat",
+                    "expires_at": None, "can_refresh": False, "scope": "",
+                    "seconds_remaining": None,
+                    "needs_authorisation": bool(rejected), **common}
+        return {"kind": "none", "state": "unauthenticated", "expires_at": None,
+                "can_refresh": False, "scope": "", "seconds_remaining": None,
+                "needs_authorisation": True, **common}
+
+    def save_oura_oauth_token(self, payload: dict,
+                              today: date | None = None) -> oura_auth.OAuthToken:
+        """Store the token pair a fresh authorisation produced. The entry
+        point scripts/authorize_oura.py uses, kept here so the storage rules
+        (both stores, local first) have exactly one implementation."""
+        token = oura_auth.from_response(payload, previous=self._load_oura_token())
+        self._store_oura_token(token, today=today)
+        return token
 
     # ─── Supabase mirror ─────────────────────────────────────────────────
     #  Every Sheets row this class writes is ALSO sent to Supabase, so the
@@ -935,8 +1204,7 @@ class Repository:
                 sets = []
         if sets is not None:
             exercise_row["actual_sets"] = len(sets)
-            exercise_row["total_volume_kg"] = round(
-                sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in sets), 1)
+            exercise_row["total_volume_kg"] = _working_volume_kg(sets)
         if mode == supabase_store.UPSERT:
             exercise_row["exercise_id"] = exercise_id
         if exercise_row:
@@ -953,7 +1221,15 @@ class Repository:
                  "reps": s.get("reps"), "weight": s.get("weight"),
                  "rest": s.get("rest"), "tut": s.get("tut"),
                  "velocity": s.get("velocity"), "band_tier": s.get("band_tier"),
-                 "ts": s.get("ts")}
+                 "ts": s.get("ts"),
+                 # A key absent from this projection is dropped without raising —
+                 # so every field added to services.sessions.build_set_record has
+                 # to be added here too, and to services/datastore.py's own
+                 # projection, and to the two schema files.
+                 "is_warmup": 1 if s.get("is_warmup") else 0,
+                 "rest_taken_seconds": s.get("rest_taken_seconds"),
+                 "reps_left": s.get("reps_left"),
+                 "weight_left": s.get("weight_left")}
                 for s in sets
             ], mode=supabase_store.REPLACE)
 
@@ -1578,7 +1854,7 @@ class Repository:
             except Exception:
                 sets = []
             actual_sets = len(sets)
-            total_volume = round(sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in sets), 1)
+            total_volume = _working_volume_kg(sets)
 
             d = g("Session Date", "date") or ""
             bucket = by_date.setdefault(d, {
@@ -1651,6 +1927,13 @@ class Repository:
         ALL prescribed sets hit the top of the rep range, not just the last
         set logged.
 
+        Warm-up sets are deliberately NOT filtered here. A ramp is authored as
+        its own exercise (training_plan._ex(warmup=True)) sitting beside the lift
+        it prepares, so a movement's sets are either all ramp or none — and
+        filtering would empty the ramp's own history, losing the last weight its
+        stepper should seed from. Double progression is unaffected either way:
+        ramp exercises carry no rep_min/rep_max, so it never runs on them.
+
         Returns None if the movement has never been logged, or its most
         recent logged page has an empty/unparseable Sets JSON."""
         pages = self._query(
@@ -1714,7 +1997,7 @@ class Repository:
                 "planned_reps": g("Planned Reps", "number"),
                 "exercise_rpe": g("Exercise RPE", "number"),
                 "actual_sets": len(sets),
-                "total_volume_kg": round(sum((s.get("reps") or 0) * (s.get("weight") or 0.0) for s in sets), 1),
+                "total_volume_kg": _working_volume_kg(sets),
                 "session_duration_minutes": g("Session Duration", "number"),
                 "session_rpe": g("Session RPE", "number"),
                 "session_au": g("Session AU", "number"),
@@ -1744,11 +2027,17 @@ class Repository:
         return len(pages) > 0
 
     #: Session Type values that are SUPPLEMENTARY training: real load, real
-    #: strain, but never a substitute for the plan day — a logged Yoga flow
-    #: or an imported outdoor activity (hike/walk/trail run from Garmin)
-    #: must not mark the rehab plan day as done, must not block the manual
-    #: day swap, and must not close the missed-session carry.
-    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor"})
+    #: strain, but never a substitute for the plan day — a logged Yoga flow,
+    #: an imported outdoor activity (hike/walk/trail run from Garmin), or an
+    #: accessory session (services/accessory.py) must not mark the rehab plan
+    #: day as done, must not block the manual day swap, and must not close the
+    #: missed-session carry.
+    #:
+    #: This frozenset IS the mechanism, for all three. Everything else follows
+    #: from membership here, which is why the accessory session needs no
+    #: special case anywhere in `has_logged_session`, the swap gates or the
+    #: reschedule logic — only its own literal on the write.
+    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor", "Accessory"})
 
     def has_logged_session(self, d: date) -> bool:
         """True only for a logged rehab-plan session — a logged Yoga,
@@ -2155,6 +2444,36 @@ class Repository:
             ) from exc
 
     def set_phases(self, phases: list[models.Phase], today: date | None = None) -> None:
+        """Persist the phase list, refusing any block that would not run
+        Monday to Sunday.
+
+        The gate is HERE as well as in plan.default_phase because this is the
+        only way a phase reaches storage, and a constructor check alone can be
+        walked around — by building a Phase directly, by an edit made in the
+        Notion UI and re-saved, or by a future caller that assembles the
+        dataclass itself. Key rule 18b's protection against a block drifting
+        into the following week is defined in terms of weeks counted from the
+        phase start, so it only means Monday-to-Sunday while this holds; see
+        services/plan.py's assert_week_aligned.
+
+        Raises rather than repairing. A start nudged to the nearest Monday
+        moves every authored day onto a different date, and a length padded to
+        a whole week invents sessions — both silent, both worse than a refusal
+        the athlete can see.
+        """
+        for p in phases:
+            try:
+                start = date.fromisoformat(p.start_date)
+            except (TypeError, ValueError) as exc:
+                raise plan.WeekAlignmentError(
+                    f"phase {p.phase_number} has an unreadable start_date "
+                    f"{p.start_date!r}"
+                ) from exc
+            errors = plan.week_alignment_errors(start, p.length_days)
+            if errors:
+                raise plan.WeekAlignmentError(
+                    f"phase {p.phase_number} ({p.name}): " + "; ".join(errors)
+                )
         payload = [
             {"phase_number": p.phase_number, "name": p.name, "start_date": p.start_date,
              "length_days": p.length_days, "status": p.status,
@@ -3446,6 +3765,65 @@ class Repository:
         values = [row.get(k, "") if row.get(k) is not None else "" for k in _SESSION_HR_HEADER]
         self._upsert_sheet_row(self._session_hr_ws(), row["date"], values)
 
+    def reassign_exercise_rpe_from_hr(self, d: date, per_exercise: dict) -> int:
+        """Write each exercise's HR-DERIVED RPE onto its own Notion row.
+
+        The session slider is one number for a whole hour. It is the athlete's
+        honest answer to "how hard was that session" and it stays exactly where
+        it is — it feeds session_au, and through it Strain and ACWR, and key
+        rule 2b is emphatic that nothing heart-rate-derived may go near that.
+        What it is NOT is a per-exercise rating, and it used to be copied onto
+        every exercise as though it were: a 90-second pressure release and a set
+        of RDLs both recorded RPE 8 on 2026-08-14 because the session did.
+
+        This assigns the real per-exercise figure, from the heart rate actually
+        recorded during that exercise's own working sets (%HRR, mean blended
+        with peak — services/hr_load.exercise_hr_rpe). On the 2026-08-10 session
+        it separates the pressure release (1.4) from the Pallof hold (5.2),
+        which is the distinction the flat value erased.
+
+        WHY THIS RUNS AFTER THE FACT rather than at save time: HR attribution
+        needs the Garmin activity, and the activity is not on Garmin's servers
+        when the last set is logged. So the exercise row is written with a null
+        RPE and this fills it in on the next sync.
+
+        MATCHED BY MOVEMENT NAME, which is the only key both callers of
+        compute_session_hr agree on — get_session_sets_by_exercise's docstring
+        has the reason: an integer key means the plan-day index on the live path
+        and a renumbering-from-zero on the rebuilt path, so it would attribute
+        heart rate to the wrong movement.
+
+        Skips an exercise whose block has no samples (`covered` False) or no
+        derivable rate: a null RPE is "not measured", and overwriting it with a
+        guess is the failure this whole change exists to undo. Returns the
+        number of rows actually updated.
+        """
+        usable = {name: v.get("hr_rpe") for name, v in (per_exercise or {}).items()
+                  if v.get("covered") and v.get("hr_rpe") is not None}
+        if not usable:
+            return 0
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"equals": str(d)}},
+        )
+        updated = 0
+        for page in pages:
+            name = notion.get_property(page, "Movement", "title") or ""
+            rpe = usable.get(name)
+            if rpe is None:
+                continue
+            properties = {"Exercise RPE": notion.number(round(float(rpe), 1))}
+            notion.update_page(self._nc, page["id"], properties=properties)
+            # PATCH, never UPSERT. This touches one property of an existing
+            # page; a partial upsert would insert an orphan training_exercises
+            # row carrying an RPE and nothing else — no session_id, no movement,
+            # no sets — indistinguishable from a real logged exercise to
+            # anything counting rows.
+            self.mirror_notion_write(notion_reader.TRAINING, page["id"],
+                                     properties, mode=supabase_store.PATCH)
+            updated += 1
+        return updated
+
     def get_session_hr_history(self, start: str | None = None) -> list[dict]:
         """Persisted per-session HR load, oldest first. `start` is an
         inclusive ISO date filter."""
@@ -3560,7 +3938,25 @@ class Repository:
         )
         if not summary:
             return False
+        if summary.get("needs_choice"):
+            # The day HAS activities but none aligns convincingly — the travel
+            # case compute_session_hr documents. That dict carries candidates,
+            # not a load summary, and has no "date": save_session_hr would raise
+            # KeyError building its row, which run_sync_if_due then swallows as
+            # a failed sync. Refusing here makes it what it actually is — no
+            # match, fall back to RPE — and leaves the choice to the screen that
+            # can ask.
+            return False
         self.save_session_hr(summary)
+        # Assign each exercise its own RPE from its own heart rate. Deliberately
+        # after save_session_hr: the HR record is the measurement and lands
+        # first, this is a derived convenience written onto the training rows.
+        try:
+            self.reassign_exercise_rpe_from_hr(d, summary.get("per_exercise") or {})
+        except Exception:
+            # Never fail the HR sync over the write-back. The measurement is
+            # saved either way, and per_exercise_json keeps the same numbers.
+            pass
         return True
 
     def sync_session_hr_recent_if_due(self, days: int = 2, today: date | None = None,
@@ -4594,7 +4990,16 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def oura_configured(self) -> bool:
-        return bool(self.config.oura_token)
+        """True when Oura sync has SOMETHING to authenticate with — a stored
+        OAuth credential, or the legacy PAT.
+
+        Deliberately not "is the credential valid": a stale OAuth token is
+        configured and refreshable, and reporting it as unconfigured would
+        route the athlete to "add OURA_TOKEN to secrets.toml", which is now
+        the wrong repair and no longer even possible. oura_auth_status is
+        what answers health.
+        """
+        return bool(self.config.oura_token) or self._load_oura_token() is not None
 
     def _oura_daily_ws(self):
         return self._ws(sheets.OURA_DAILY_WORKSHEET, _OURA_DAILY_HEADER)
@@ -4799,8 +5204,16 @@ class Repository:
                            worksheet, header: list[str], row_mapper) -> int:
         """Shared upsert loop for the 4 event-based Oura endpoints (0-N
         entries per day, keyed by the event's own id — header[0] is always
-        that id column, by construction of every _OURA_*_HEADER above)."""
-        entries = oura.get_collection(token, endpoint, start, end)
+        that id column, by construction of every _OURA_*_HEADER above).
+
+        An endpoint outside the grant is skipped, not fatal — same reasoning
+        as _sync_oura_daily, and applied here too so a future scope change
+        cannot take the sleep tabs down from the other side."""
+        try:
+            entries = oura.get_collection(token, endpoint, start, end)
+        except oura.OuraScopeError:
+            self._record_oura_scope_gap(endpoint)
+            return 0
         for entry in entries:
             row = row_mapper(entry)
             values = [row.get(k, "") for k in header]
@@ -5301,7 +5714,26 @@ class Repository:
         one resumable step alongside the four event tabs."""
         by_date: dict[str, dict] = {}
         for endpoint in _OURA_DAILY_ENDPOINTS:
-            for entry in oura.get_collection(token, endpoint, start, end):
+            try:
+                entries = oura.get_collection(token, endpoint, start, end)
+            except oura.OuraScopeError:
+                # ONE endpoint outside the grant must not cost the other
+                # eight. Measured 2026-08-17: a grant covering all eight of
+                # Oura's PUBLISHED scopes still 401s on daily_resilience
+                # (wants an undocumented `stress` scope) and
+                # daily_cardiovascular_age (`heart_health`) — and because
+                # that 401 propagated, the whole sync died at the first of
+                # them, taking sleep with it on a credential that reads
+                # sleep perfectly well. Both are archival: nothing outside
+                # the Oura Daily tab's own columns reads either.
+                #
+                # Recorded, not swallowed: a column that is permanently blank
+                # because of a scope should be answerable without re-probing
+                # the API, and is indistinguishable in the sheet from Oura
+                # simply having no data.
+                self._record_oura_scope_gap(endpoint)
+                continue
+            for entry in entries:
                 d = entry.get("day")
                 if d:
                     by_date.setdefault(d, {})[endpoint] = entry
@@ -5401,7 +5833,12 @@ class Repository:
         """
         token = self._oc
         if token is None:
-            raise RuntimeError("Oura is not configured — add OURA_TOKEN to .streamlit/secrets.toml.")
+            raise RuntimeError(
+                "Oura is not authorised — run `python scripts/authorize_oura.py`. "
+                "(Oura retired Personal Access Tokens in December 2025, so adding "
+                "OURA_TOKEN to secrets.toml is no longer a route in: new credentials "
+                "come from the OAuth flow.)"
+            )
         today = today or date.today()
         start = (today - timedelta(days=days - 1)).isoformat()
         end = today.isoformat()
@@ -5413,21 +5850,39 @@ class Repository:
             for key, endpoint, ws_getter, header, mapper in self._oura_event_specs()
         }
 
-        result: dict[str, int] = {}
-        for tab in _OURA_SYNC_ORDER:
-            if tab in already:
-                result[tab] = already[tab]
-                continue
-            if tab == "daily":
-                count = self._sync_oura_daily(token, start, end)
-            else:
-                endpoint, ws_getter, header, mapper = events[tab]
-                count = self._sync_oura_events(
-                    token, endpoint, start, end, ws_getter(), header, mapper,
-                )
-            result[tab] = count
-            self._mark_oura_tab_synced(window, tab, count, now=now)
+        # Cleared here rather than in the two recorders, because THIS is the
+        # call that covers every endpoint — so it is the only scope at which
+        # "no longer missing" can be observed. Accumulating per-endpoint
+        # without a reset would keep reporting a gap that a wider
+        # re-authorisation had already closed; resetting inside
+        # _sync_oura_daily would wipe the event endpoints' gaps instead.
+        if not already:
+            local_cache.update({_OURA_SCOPE_GAPS_KEY: None})
 
+        result: dict[str, int] = {}
+        try:
+            for tab in _OURA_SYNC_ORDER:
+                if tab in already:
+                    result[tab] = already[tab]
+                    continue
+                if tab == "daily":
+                    count = self._sync_oura_daily(token, start, end)
+                else:
+                    endpoint, ws_getter, header, mapper = events[tab]
+                    count = self._sync_oura_events(
+                        token, endpoint, start, end, ws_getter(), header, mapper,
+                    )
+                result[tab] = count
+                self._mark_oura_tab_synced(window, tab, count, now=now)
+        except oura.OuraAuthError as exc:
+            # RECORD, then re-raise unchanged. A 401 here is the only evidence
+            # that a static PAT has been revoked — nothing about the stored
+            # credential itself can reveal it, so without this the athlete's
+            # actual 2026-08-12 state (a dead PAT) still reports healthy and
+            # the Home banner still never fires.
+            self._record_oura_auth_failure(exc)
+            raise
+        self._clear_oura_auth_failure()
         self._clear_oura_sync_progress()
         return result
 
@@ -5477,7 +5932,12 @@ class Repository:
         _oura_daily_row."""
         token = self._oc
         if token is None:
-            raise RuntimeError("Oura is not configured — add OURA_TOKEN to .streamlit/secrets.toml.")
+            raise RuntimeError(
+                "Oura is not authorised — run `python scripts/authorize_oura.py`. "
+                "(Oura retired Personal Access Tokens in December 2025, so adding "
+                "OURA_TOKEN to secrets.toml is no longer a route in: new credentials "
+                "come from the OAuth flow.)"
+            )
 
         raw: dict[str, list[dict]] = {}
         by_date: dict[str, dict] = {}

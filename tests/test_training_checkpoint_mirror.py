@@ -188,13 +188,17 @@ def test_every_stepper_tap_is_local_only():
     """The six weight/reps/band steppers are the hot path — the whole point of
     the mirror. Each must pass durable=False, or the Notion pair is back."""
     src = _view_source()
+    # The reps and weight steppers write through _rk/_wk rather than a literal
+    # key: on a unilateral exercise's LEFT pass those resolve to reps_left /
+    # weight_kg_left, so editing the weaker side no longer overwrites the right
+    # side's record. Band tier is not split by side — one physical band.
     steppers = [
-        'sess.step_reps(_actual["reps"], -1)',
-        'sess.step_reps(_actual["reps"], +1)',
+        'sess.step_reps(_actual[_rk], -1)',
+        'sess.step_reps(_actual[_rk], +1)',
         'sess.step_band_tier(_actual["band_tier"], -1)',
         'sess.step_band_tier(_actual["band_tier"], +1)',
-        'sess.step_weight_kg(_actual["weight_kg"], -1, increment=_incr)',
-        'sess.step_weight_kg(_actual["weight_kg"], +1, increment=_incr)',
+        'sess.step_weight_kg(_actual[_wk], -1, increment=_incr)',
+        'sess.step_weight_kg(_actual[_wk], +1, increment=_incr)',
     ]
     for call in steppers:
         assert call in src, f"stepper moved or was renamed: {call}"

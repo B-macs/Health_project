@@ -274,6 +274,14 @@ def _populate_training(repo: Repository, conn: sqlite3.Connection) -> tuple[int,
                 "reps": s.get("reps"), "weight": s.get("weight"), "rest": s.get("rest"),
                 "tut": s.get("tut"), "velocity": s.get("velocity"),
                 "band_tier": s.get("band_tier"), "ts": s.get("ts"),
+                # _insert_rows iterates the TABLE's columns, so a key missing
+                # here is dropped in silence and the offline copy lies by
+                # omission. Keep in step with build_set_record and with
+                # Repository._mirror_training_write's own projection.
+                "is_warmup": 1 if s.get("is_warmup") else 0,
+                "rest_taken_seconds": s.get("rest_taken_seconds"),
+                "reps_left": s.get("reps_left"),
+                "weight_left": s.get("weight_left"),
             })
 
     n_sessions = _insert_rows(conn, "training_sessions", list(sessions.values()))

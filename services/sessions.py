@@ -70,16 +70,67 @@ def outdoor_exercise_name(type_key: str | None) -> str:
 RELEASE_EXERCISE_NAMES = frozenset({
     "Upper Glute / TFL Self-Release",
     "Right Posterior Hip Capsule Stretch",
+    # The revised-cue variant was missing here from the day it was authored,
+    # so every Stage 2A gym session has been rendering its capsule stretch in
+    # the "Workout" accordion rather than the release block — display-only, but
+    # it puts a release item where the working sets are listed. Found 2026-08-14
+    # by the Stage 2B block test, which asserts every session OPENS with a
+    # release exercise.
+    "Right Posterior Hip Capsule Stretch (Revised Cue)",
     "Piriformis Contract-Relax (PNF)",
     "Ischial Tuberosity Hamstring Release",
     "Right Hip Tendon Path Drill (Coxa Saltans)",
+    "Anterior Hip Pressure Release",
 })
 
 CHECKPOINT_FIELDS = (
     "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
     "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
-    "tp_actuals", "tp_set_log", "tp_garmin_declared",
+    "tp_actuals", "tp_set_log", "tp_garmin_declared", "tp_rest_started_at",
+    # The accessory session's whole day dict, because unlike a plan day it
+    # cannot be looked up again from a day number — it was CHOSEN, from
+    # regional strain readings that will have moved by the time a dropped
+    # phone reconnects. `None` on a plan session, and it must stay in
+    # _init_state's defaults: the checkpoint payload is built by indexing
+    # session_state with every name here, and a missing one silently stops
+    # the whole checkpoint saving.
+    "tp_accessory_plan",
 )
+
+#: Read-time HOLD, the biometrics.HRV_GARMIN_HOLD idiom. `rest_taken_seconds`
+#: is RECORDED on every set from the day this ships, and feeds NOTHING —
+#: exercise_seconds_from_sets keeps summing the PRESCRIBED `rest`.
+#:
+#: The reason is key rule 2b's, one level down. Session AU is computed from a
+#: duration, and switching the duration's rest term from prescribed to measured
+#: would move Strain and ACWR on *whether the field exists* rather than on
+#: training: every session before this commit has prescribed rest only, every
+#: session after has measured, and the two would sit in the same 7/28-day ACWR
+#: window in different units. That is the identical failure the HR-vs-RPE strain
+#: split is held for.
+#:
+#: LIFT IT ON A MEASUREMENT, NOT A DATE: once enough sessions carry real rest,
+#: compare measured against prescribed per set — if the two agree closely the
+#: switch is a no-op and can just be made; if they diverge, the divergence is
+#: itself the finding the rest-interval review wanted, and the series needs
+#: re-deriving over a stated window rather than stepping mid-stream.
+REST_TAKEN_FEEDS_DURATION = False
+
+
+def is_working_set(s: dict) -> bool:
+    """False for a warm-up / ramp set, True for everything else.
+
+    THE DEFAULT IS 'WORKING'. Every set logged before the flag existed has no
+    `is_warmup` key at all, and those were all working sets — so an absent key
+    must read as work, never as a warm-up. Getting that backwards would silently
+    empty the entire pre-2026-08 tonnage and strength history.
+
+    services/tonnage.py and services/strength.py deliberately import nothing
+    from services/, so each repeats this one expression inline rather than
+    taking a dependency on this module; tests/test_warmup_sets.py pins that all
+    three agree.
+    """
+    return not s.get("is_warmup")
 
 BAND_TIERS = engine.BAND_TIERS
 BAND_TIER_LABELS = engine.BAND_TIER_LABELS
@@ -278,7 +329,7 @@ def planned_reps(ex: dict) -> int:
 
 
 def build_set_record(ex: dict, set_num: int, actual: dict | None,
-                      completed_at: str) -> dict:
+                      completed_at: str, rest_taken_seconds: int | None = None) -> dict:
     """One ACTUALLY-COMPLETED set, captured at the moment the user taps the
     set's completion button.
 
@@ -298,6 +349,29 @@ def build_set_record(ex: dict, set_num: int, actual: dict | None,
     exercise the guided flow actually captured: that function REPLICATES the
     plan's prescription `sets` times, so all N rows are identical by
     construction and a 10/9/8 session was indistinguishable from 10/10/10.
+
+    THREE OPTIONAL KEYS, all written only when they carry real information, in
+    the same omit-when-absent idiom `band_tier` and `ts` already use:
+
+      is_warmup           True when the PLAN authored this exercise as a ramp
+                          (training_plan._ex(warmup=True)). It is a property of
+                          the authored exercise, not a per-set toggle, because a
+                          ramp set is prescribed rather than decided in the
+                          moment — see the warm-up review's phase 2. Excluded
+                          from weekly tonnage and from every 1RM estimate.
+      rest_taken_seconds  Wall-clock rest that FOLLOWED this set, matching the
+                          existing `rest` field's own "rest after set N"
+                          meaning. Absent on the last set of an exercise, which
+                          has no rest phase after it, and absent whenever the
+                          rest was never entered. Recorded only — see
+                          REST_TAKEN_FEEDS_DURATION.
+      reps_left /         The weaker side's own numbers, written ONLY when the
+      weight_left         athlete edited the left side to something different
+                          from the right. One set record still covers both
+                          sides; these say the two were not equal. Without them
+                          an "Edit left side" tap overwrote the whole row, so a
+                          lighter left arm read as the athlete declining the
+                          prescribed weight outright.
     """
     t = ex["type"]
     actual = actual or {}
@@ -329,6 +403,19 @@ def build_set_record(ex: dict, set_num: int, actual: dict | None,
     band_tier = actual.get("band_tier") or ex.get("band_tier")
     if band_tier:
         record["band_tier"] = band_tier
+    if ex.get("warmup"):
+        record["is_warmup"] = True
+    if rest_taken_seconds is not None:
+        record["rest_taken_seconds"] = int(rest_taken_seconds)
+    # Only when the sides genuinely differ — equal sides carry no extra keys, so
+    # the overwhelmingly common bilateral/symmetric case is byte-identical to
+    # what this function produced before the fields existed.
+    reps_left = actual.get("reps_left")
+    if reps_left is not None and reps_left != reps:
+        record["reps_left"] = reps_left
+    weight_left = actual.get("weight_kg_left")
+    if weight_left is not None and weight_left != weight:
+        record["weight_left"] = weight_left
     return record
 
 
@@ -364,6 +451,11 @@ def make_sets_data(ex: dict) -> list[dict]:
     weight = ex.get("weight_kg") or 0.0
     band_tier = ex.get("band_tier")
     extra = {"band_tier": band_tier} if band_tier else {}
+    # A ramp exercise stays a ramp however it was logged — a session saved
+    # straight from the day-overview screen must not launder its warm-up sets
+    # into working ones. No rest_taken_seconds here: nothing was measured.
+    if ex.get("warmup"):
+        extra = {**extra, "is_warmup": True}
     out = []
     if t == "duration":
         out.append({"set_num": 1, "reps": 1, "weight": weight, "rest": 0,
@@ -917,7 +1009,13 @@ def exercise_seconds_from_sets(sets: list[dict]) -> int:
         own `sets * 20` term exactly.
 
     Rest: summed across every row except the last (mirrors
-    exercise_duration_seconds' `(sets - 1) * rest`)."""
+    exercise_duration_seconds' `(sets - 1) * rest`). This is the PRESCRIBED
+    `rest`, deliberately, even on rows that now also carry a measured
+    `rest_taken_seconds` — see REST_TAKEN_FEEDS_DURATION for why switching it
+    mid-series would move Strain and ACWR on the field's existence rather than
+    on training. Warm-up rows ARE counted here: a ramp set takes real time and
+    the session really was that long. Excluding them belongs to tonnage and to
+    1RM estimation, which are claims about work and about strength."""
     if not sets:
         return 0
     active = 0
@@ -964,7 +1062,27 @@ def seed_default_phase(phases: list[Phase], plan_start: date | None) -> list[Pha
     return [_plan.default_phase(plan_start)]
 
 
-_PLAN_BY_PHASE_NUMBER: dict[int, dict[int, dict]] = {1: tp.PLAN, 2: tp.PLAN_STAGE2}
+_PLAN_BY_PHASE_NUMBER: dict[int, dict[int, dict]] = {
+    1: tp.PLAN, 2: tp.PLAN_STAGE2, 3: tp.PLAN_STAGE2B,
+}
+
+#: Everything needed to CREATE a phase, per phase number. Only consulted when a
+#: new block is being started, so it never renames a phase already stored.
+#:
+#: `stage` is the CLINICAL stage (services/rules.py's ceilings), and it is a
+#: separate number from the phase on purpose. Phase 3 is Stage 2B — a different
+#: block at the SAME clinical stage 2, because the content changes while the
+#: ACWR ceiling, the RPE cap and the volume cap do not. Reading "2B" as "stage
+#: 3" would hand the athlete Performance-and-Growth ceilings (ACWR 1.5, RPE 10)
+#: on the strength of a block name.
+PHASE_META: dict[int, dict] = {
+    1: {"name": "Stage 1 Rehab", "stage": 1,
+        "button": "Begin Stage 1 — Rehab Block"},
+    2: {"name": "Stage 2 — Transition (Work Capacity)", "stage": 2,
+        "button": "Begin Stage 2 — 4-Week Transition Block"},
+    3: {"name": "Stage 2B — Strength + Running Build", "stage": 2,
+        "button": "Begin Stage 2B — 4-Week Block"},
+}
 
 
 def plan_dict_for_phase(phase_number: int) -> dict[int, dict] | None:
@@ -972,6 +1090,36 @@ def plan_dict_for_phase(phase_number: int) -> dict[int, dict] | None:
     nothing's been authored for it yet (legitimate — not every phase has
     content written)."""
     return _PLAN_BY_PHASE_NUMBER.get(phase_number)
+
+
+def next_phase_offer(phases: list[Phase]) -> int | None:
+    """The phase number the athlete can start next, or None if there isn't one.
+
+    Generalises what used to be a hard-wired Stage-1-to-2 check. That check read
+    `1 in existing and 2 not in existing`, which meant that on the day Stage 2A
+    lapsed there was NO route to a Phase 3 at all: the app simply had no active
+    phase, rendered every day as rest, and quietly dropped the ACWR chronic
+    window back to a flat calendar window.
+
+    Three conditions, all of which have to hold:
+      - the phase does not already exist (never re-offer a block)
+      - its PREDECESSOR does exist (blocks are not skippable — a Phase 4 with no
+        Phase 3 would leave the day numbering and the stage history with a hole)
+      - its content is authored (plan_dict_for_phase is not None)
+
+    Returns None for an empty phase list: seeding the very first phase is
+    seed_default_phase's job and goes through the plan-start screen, which
+    collects a start date this function has no way to ask for."""
+    if not phases:
+        return None
+    existing = {p.phase_number for p in phases}
+    for number in sorted(PHASE_META):
+        if number in existing:
+            continue
+        if (number - 1) not in existing:
+            return None
+        return number if plan_dict_for_phase(number) is not None else None
+    return None
 
 
 def begin_new_phase(phases: list[Phase], new_phase: Phase) -> list[Phase]:
