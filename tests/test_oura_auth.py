@@ -262,6 +262,34 @@ def test_authorize_url_carries_every_required_parameter():
     assert "state=st4te" in url
 
 
+def test_a_blank_redirect_uri_omits_the_parameter_in_both_halves(monkeypatch):
+    """Measured against the live application on 2026-08-17: omitting
+    redirect_uri reaches the consent screen, every localhost variant is a
+    bare 400. Omission is therefore the only flow that works without first
+    editing the Oura application registration — and the authorize and token
+    requests have to agree, or the exchange is an invalid_grant that reads
+    like a bad code."""
+    url = oura.authorize_url("cid", "", ("daily",), "st")
+    assert "redirect_uri" not in url
+
+    seen = {}
+    monkeypatch.setattr(oura.requests, "post", lambda u, data=None, **k: (
+        seen.update(data), _Resp(200, {"access_token": "a", "expires_in": 60}))[1])
+    oura.exchange_code("cid", "sec", "code", "")
+    assert "redirect_uri" not in seen
+
+
+def test_a_supplied_redirect_uri_is_sent_in_both_halves(monkeypatch):
+    assert "redirect_uri=http" in oura.authorize_url(
+        "cid", "http://localhost:8765/callback", ("daily",), "st")
+
+    seen = {}
+    monkeypatch.setattr(oura.requests, "post", lambda u, data=None, **k: (
+        seen.update(data), _Resp(200, {"access_token": "a", "expires_in": 60}))[1])
+    oura.exchange_code("cid", "sec", "code", "http://localhost:8765/callback")
+    assert seen["redirect_uri"] == "http://localhost:8765/callback"
+
+
 def test_authorize_url_refuses_a_blank_state():
     """State is the only thing tying a redirect to the request that caused
     it; a default would be identical for every caller."""
