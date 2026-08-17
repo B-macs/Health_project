@@ -41,7 +41,7 @@ def test_the_three_endings_are_named_constants():
 
 
 def test_each_ending_has_its_own_bell():
-    for fn in ("_bellDouble", "_bellSwitch", "_bellFinish"):
+    for fn in ("_bellContinue", "_bellSwitch", "_bellFinish"):
         assert f"function {fn}()" in _SRC, f"{fn} missing from the shared audio block"
 
 
@@ -52,32 +52,58 @@ def _bell_pitches(fn_name: str) -> list[float]:
     return [float(m) for m in re.findall(r"_bellStrike\(\s*([0-9.]+)", body.group(1))]
 
 
-def test_continue_rises_and_switch_falls():
-    """Contour is what carries the message over gym noise — the two are the
-    same interval in opposite directions, so they are told apart by direction
-    rather than by remembering two unrelated jingles."""
-    rising = _bell_pitches("_bellDouble")
-    falling = _bell_pitches("_bellSwitch")
-    assert rising == sorted(rising), "continue must ascend"
-    assert falling == sorted(falling, reverse=True), "switch must descend"
-    assert set(rising) == set(falling), "same two notes, reversed"
+def test_the_endings_are_counted_one_two_three():
+    """The primary signal is HOW MANY strikes, not which pitches: counting
+    survives gym noise, one earbud and a half-heard first strike, where
+    remembering whether a pair rose or fell does not."""
+    assert len(_bell_pitches("_bellContinue")) == 1, "another rep = one strike"
+    assert len(_bell_pitches("_bellSwitch")) == 2, "swap sides = two strikes"
+    assert len(_bell_pitches("_bellFinish")) == 3, "set over = three strikes"
 
 
-def test_finish_is_three_strikes_and_descends_furthest():
-    """Three-and-descending cannot be mistaken for either pair, even if the
-    first strike is missed."""
-    finish = _bell_pitches("_bellFinish")
-    assert len(finish) == 3, "finish is three strikes"
-    assert finish == sorted(finish, reverse=True), "finish must descend"
-    assert finish[-1] < min(_bell_pitches("_bellSwitch")), (
-        "finish must end lower than the switch pair, so the end of a set is "
-        "unmistakably the lowest thing you hear"
+def test_both_stopping_signals_fall():
+    """Reinforcement, not the signal itself — nothing depends on hearing it."""
+    for fn in ("_bellSwitch", "_bellFinish"):
+        p = _bell_pitches(fn)
+        assert p == sorted(p, reverse=True), f"{fn} must descend"
+
+
+def test_the_continue_bell_dies_before_the_next_rep_starts():
+    """THE DEAD BUG DEFECT. The old completion bell rang 2.06s while the next
+    rep auto-starts 0.7s later, so on a 3-second hold every bell was still
+    sounding through the following rep's ticks — eight reps of one continuous
+    smear, with nothing for the last bell to stand out against."""
+    body = re.search(r"function _bellContinue\(\)\s*\{(.*?)\n\}", _SRC, re.S).group(1)
+    strikes = re.findall(r"_bellStrike\(\s*[0-9.]+,\s*([0-9.]+),\s*[0-9.]+,\s*([0-9.]+)\)", body)
+    assert strikes, "could not read the continue strike"
+    gap = float(re.search(r"_AUTOSTART_GAP_S = ([0-9.]+)", _SRC).group(1))
+    ring_out = max(float(off) + float(dur) for off, dur in strikes)
+    assert ring_out <= gap, (
+        f"continue bell rings {ring_out}s but the next rep starts in {gap}s — "
+        f"it will bleed into the following rep and the count becomes unreadable"
     )
+
+
+def test_the_stopping_bells_may_ring_on():
+    """Both are followed by silence (the other side's timer, or rest), so the
+    long ring-out that would smear a rep is exactly what makes them carry."""
+    for fn in ("_bellSwitch", "_bellFinish"):
+        body = re.search(rf"function {fn}\(\)\s*\{{(.*?)\n\}}", _SRC, re.S).group(1)
+        longest = max(float(d) for d in re.findall(r",\s*([0-9.]+)\)\s*;", body))
+        assert longest > 1.0, f"{fn} should ring on"
+
+
+def test_the_rest_timers_go_signal_is_not_one_of_the_endings():
+    """_bellDouble rises where both stopping signals fall, and never plays
+    while a hold timer is running."""
+    rest = _bell_pitches("_bellDouble")
+    assert rest == sorted(rest), "the rest timer's signal rises"
+    assert tuple(rest) != tuple(_bell_pitches("_bellSwitch"))
 
 
 def test_all_three_are_distinct_sequences():
     seqs = [tuple(_bell_pitches(f)) for f in
-            ("_bellDouble", "_bellSwitch", "_bellFinish")]
+            ("_bellContinue", "_bellSwitch", "_bellFinish")]
     assert len(set(seqs)) == 3, f"two endings sound identical: {seqs}"
 
 
@@ -108,7 +134,7 @@ def test_done_beep_branches_on_all_three():
     beep = re.search(r"function _doneBeep\(\)\s*\{\{(.*?)\n\}\}", _SRC, re.S)
     assert beep, "could not read _doneBeep"
     body = beep.group(1)
-    for fn in ("_bellSwitch", "_bellFinish", "_bellDouble"):
+    for fn in ("_bellSwitch", "_bellFinish", "_bellContinue"):
         assert fn in body, f"_doneBeep never plays {fn}"
 
 
@@ -214,6 +240,92 @@ def test_every_timed_exercise_in_the_live_plans_gets_a_reachable_ending():
                         f"{ex['name']} is unilateral and must signal the swap")
                 seen.add(ex["name"])
     assert len(seen) >= 8, f"expected the timed catalogue, walked only {len(seen)}"
+
+
+# ─── future exercises get the same treatment ──────────────────────────────
+#
+# Athlete's rule, 2026-08-17: "make sure that future exercises that are added
+# like this get the same treatment." A timed exercise whose end is not
+# announced is one he has to open his eyes to find the end of, which is the
+# whole complaint — so this is enforced against the authored content rather
+# than left to whoever adds the next block remembering.
+
+def test_every_authored_exercise_with_a_hold_is_a_routed_type():
+    """The catch-all. A new exercise carrying hold_seconds under some new
+    `type` would render with no hold timer and therefore no ending bell — and
+    nothing else in the suite would notice, because the exercise would still
+    log fine."""
+    import training_plan as tp
+
+    from views import training as V
+
+    unrouted = []
+    for plan_name in ("PLAN", "PLAN_STAGE2", "PLAN_STAGE2B"):
+        for day, content in (getattr(tp, plan_name, None) or {}).items():
+            for ex in (content.get("exercises") or []):
+                if ex.get("hold_seconds") and ex.get("type") not in V.HOLD_TIMER_TYPES:
+                    unrouted.append(f"{plan_name} day {day}: {ex['name']} (type={ex['type']!r})")
+    assert not unrouted, (
+        "these exercises are timed but their type gets no hold timer, so their "
+        "end is never announced:\n  " + "\n  ".join(unrouted) +
+        f"\nEither give them a type in {V.HOLD_TIMER_TYPES} or route the new "
+        "type through _hold_timer with an `ending`."
+    )
+
+
+def test_the_routed_types_are_the_ones_the_view_actually_branches_on():
+    """HOLD_TIMER_TYPES is only a guarantee while it matches reality. If a
+    third timed branch is added to render() without joining the constant, the
+    catch-all above silently stops covering it."""
+    from views import training as V
+
+    # AST, not a regex: the if/elif chain is long and a line-window match
+    # happily reads a _hold_timer call out of a LATER branch, which is exactly
+    # the false positive the first version of this test produced.
+    tree = ast.parse(_SRC)
+
+    def _calls_hold_timer(nodes) -> bool:
+        return any(
+            isinstance(n, ast.Call) and isinstance(n.func, ast.Name)
+            and n.func.id == "_hold_timer"
+            for stmt in nodes for n in ast.walk(stmt)
+        )
+
+    def _ex_type_compared_to(test) -> str | None:
+        if (isinstance(test, ast.Compare) and isinstance(test.left, ast.Name)
+                and test.left.id == "ex_type" and len(test.comparators) == 1
+                and isinstance(test.comparators[0], ast.Constant)):
+            return test.comparators[0].value
+        return None
+
+    branched = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.If):
+            name = _ex_type_compared_to(node.test)
+            if name and _calls_hold_timer(node.body):
+                branched.add(name)
+
+    assert branched == set(V.HOLD_TIMER_TYPES), (
+        f"render() calls _hold_timer under {sorted(branched)} but "
+        f"HOLD_TIMER_TYPES says {sorted(V.HOLD_TIMER_TYPES)}"
+    )
+
+
+def test_a_new_unilateral_timed_exercise_would_signal_its_swap():
+    """Simulates authoring one, rather than trusting that today's content
+    happens to be covered."""
+    from views import training as V
+
+    for reps in (1, 3, 6, 12):
+        endings = {_ending_for_hold_reps(r, reps, is_uni=True, side=s)
+                   for r in range(1, reps + 1) for s in ("right", "left")}
+        assert V.HOLD_ENDING_SWITCH in endings and V.HOLD_ENDING_FINISH in endings, reps
+
+
+def test_a_single_rep_timed_exercise_finishes_rather_than_continuing():
+    """The degenerate shape a new block is most likely to introduce: one rep,
+    one set. It must announce the end, not promise another rep."""
+    assert _ending_for_hold_reps(1, 1, is_uni=False, side="right") == "finish"
 
 
 def test_both_hold_timer_call_sites_pass_an_ending():

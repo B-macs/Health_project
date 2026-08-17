@@ -131,44 +131,62 @@ function _bellStrike(root, atOffset, vol, dur) {
   });
 }
 
-// ── THREE ENDINGS, TOLD APART BY CONTOUR ──────────────────────────────────
+// ── THREE ENDINGS, COUNTED ────────────────────────────────────────────────
 //
 // Athlete's request, 2026-08-17: the last timer of a run must not sound like
-// the ones before it. Mid-set he is holding a side bridge with his eyes shut
-// and cannot look at the screen, so the bell is the only channel that says
-// what happens next -- and one bell for "another rep", "swap sides" and
-// "that's the set" makes all three the same instruction.
+// the ones before it. Mid-set he is holding a position with his eyes shut and
+// cannot look at the screen, so the bell is the only channel that says what
+// happens next -- and one bell for "another rep", "swap sides" and "that's
+// the set" makes all three the same instruction.
 //
-// PITCH CONTOUR carries it, not timbre or volume: rising / falling / falling
-// further is audible over gym noise and through one earbud, where a change of
-// tone colour is not. All three reuse _bellStrike so they stay recognisably
-// the same instrument -- the message is the shape, not a different sound
-// effect.
+// THE SIGNAL IS HOW MANY STRIKES, not which pitches: 1 = another rep,
+// 2 = swap sides, 3 = the set is over. Counting survives gym noise, a single
+// earbud and a half-heard first strike, where remembering whether a pair rose
+// or fell does not. Falling pitch reinforces the two endings that stop
+// something, but nothing depends on hearing it.
+//
+// ⚠ AND THE COUNT ONLY WORKS IF EACH BELL STOPS BEFORE THE NEXT REP STARTS.
+// That is what made Dead Bug unreadable and is the real defect here: the
+// completion bell rang 2.06s (second strike at +0.16 over a 1.9s tail) while
+// the next rep auto-starts 0.7s later, so on a 3-second hold every bell was
+// still sounding through the following rep's countdown ticks. Eight reps of
+// that is one continuous smear with nothing for the last bell to stand out
+// against. _bellContinue is therefore ONE short strike, sized to die inside
+// the auto-start gap; the long ring-outs are kept for the two endings that
+// are followed by silence.
 //
 // Scheduled on the audio clock (not setTimeout) so the intervals are exact.
 
-// RISING pair, race-start style: another timer follows immediately.
-function _bellDouble() {
-  _bellStrike(784.0, 0.00, 0.95, 1.5);   // G5
-  _bellStrike(1174.7, 0.16, 1.00, 1.9);  // D6 -- a fifth up, longer ring-out
+// How long the flow waits before the next rep begins (setTimeout(_autoComplete,
+// 700) below). Any bell that is followed by another rep must fit inside it.
+var _AUTOSTART_GAP_S = 0.7;
+
+// ONE strike: another rep follows. Short on purpose -- see the warning above.
+function _bellContinue() {
+  _bellStrike(1174.7, 0.00, 0.90, 0.45);  // D6, decayed well inside the gap
 }
 
-// FALLING pair -- the same two notes, reversed: that side is finished, swap.
-// Deliberately the exact inversion of _bellDouble, so the two are told apart
-// by direction alone rather than by remembering two unrelated jingles.
+// TWO falling strikes: that side is finished, swap. Followed by the other
+// side's timer rather than an immediate rep, so it can ring on.
 function _bellSwitch() {
   _bellStrike(1174.7, 0.00, 0.95, 1.2);  // D6
   _bellStrike(784.0, 0.16, 1.00, 1.9);   // G5 -- a fifth down
 }
 
-// THREE falling strikes down a full octave, the last one ringing out roughly
-// twice as long as anything else here: the set is over and rest has started.
-// Three-and-descending cannot be mistaken for either pair above even when the
-// first strike is missed.
+// THREE falling strikes down a full octave, the last ringing roughly twice as
+// long as anything else here: the set is over and rest has started.
 function _bellFinish() {
   _bellStrike(1046.5, 0.00, 0.90, 1.0);  // C6
   _bellStrike(784.0,  0.18, 0.95, 1.2);  // G5
   _bellStrike(523.3,  0.36, 1.00, 2.6);  // C5 -- long ring-out
+}
+
+// RISING pair -- the REST timer's "go" signal, not one of the three endings
+// above. Rising where both stopping signals fall, and it never plays while a
+// hold timer is running, so it cannot be confused with the swap.
+function _bellDouble() {
+  _bellStrike(784.0, 0.00, 0.95, 1.5);   // G5
+  _bellStrike(1174.7, 0.16, 1.00, 1.9);  // D6 -- a fifth up, longer ring-out
 }
 
 function _notify(title, body) {
@@ -258,6 +276,18 @@ HOLD_ENDING_SWITCH = "switch"       # that side is done; swap to the other
 HOLD_ENDING_FINISH = "finish"       # the set is done; rest (or next exercise)
 HOLD_ENDINGS = (HOLD_ENDING_CONTINUE, HOLD_ENDING_SWITCH, HOLD_ENDING_FINISH)
 
+#: Exercise `type` values whose work is measured by a hold timer, and which
+#: therefore get the three-bell treatment.
+#:
+#: Named rather than left as two string literals in the render branches so a
+#: NEW timed exercise cannot be authored without the endings following it.
+#: tests/test_hold_timer_endings.py fails if any authored exercise carries
+#: hold_seconds while its type is absent from here — the athlete's rule,
+#: 2026-08-17: "make sure that future exercises that are added like this get
+#: the same treatment". A timed exercise whose end is not announced is one he
+#: has to open his eyes to find the end of, which is the whole complaint.
+HOLD_TIMER_TYPES = ("hold", "hold_reps")
+
 
 def _hold_timer(seconds: int, label: str = "HOLD", timer_key: str = "tp_h",
                 set_auto_start: bool = False,
@@ -315,7 +345,7 @@ function _doneBeep() {{
     _bellFinish();
     _notify('Set complete', 'Rest now.');
   }} else {{
-    _bellDouble();
+    _bellContinue();
     _notify('Hold complete', 'Next rep.');
   }}
 }}
