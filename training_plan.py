@@ -3139,6 +3139,55 @@ def _s2b_gym_b(week: int) -> dict:
     dropped a rep on the last one; the rep span is the axis that moves here,
     not the load.
     """
+    # Weeks 3-4: the two movements finding #5 names, returned 2026-08-17 on
+    # the athlete's instruction WITH the finding's first-ever reading taken the
+    # same evening (0 cracks in 5 rotations each way) — so they return as
+    # MOVEMENT CONTENT at gentle doses, not as treatment. They live HERE, on
+    # the press/pull day, because the first placement tried the mobility days
+    # and the block's own test refused it: days 17 and 24 precede the cluster
+    # sessions, and the athlete's retest rule bars day-before leg work — the
+    # contamination that makes a flexibility reading unreadable. A run follows
+    # this day instead, which no rule minds.
+    returning = [] if week < 3 else [
+        _ex(
+            name="Hip 90/90 Flow",
+            ex_type="reps",
+            laterality="alternating",
+            sets=2, reps=5, tempo="3-1-3", rest_seconds=60,
+            mechanics=(
+                "Sit with the front shin across at 90 degrees and the back shin out at 90 "
+                "behind. Chest tall, then rotate the knees together across to the other "
+                "side and sit into it. Five slow crossings each way. Neutral or slightly "
+                "internal rotation on the RIGHT as it lifts — the standing rule applies "
+                "here too."
+            ),
+            biomechanical_focus=(
+                "Returned from Stage 1 (finding #5's named movement) as movement content "
+                "after its test read 0 cracks — the finding is quiet, and this keeps the "
+                "rotation range that made it quiet."
+            ),
+            progression="Smooth both ways → sit taller through the crossing.",
+            regression="A crack returns → count it, note it, keep moving.",
+        ),
+        _ex(
+            name="Lateral Lunge",
+            ex_type="reps",
+            laterality="alternating",
+            sets=2, reps=8, tempo="3-1-1", rest_seconds=60,
+            mechanics=(
+                "Step wide, sit back and down over one leg with the other leg straight, "
+                "chest tall, then push back to the middle. Eight each side, alternating. "
+                "Bodyweight only this block. Keep the weight in the heel of the bent leg."
+            ),
+            biomechanical_focus=(
+                "Returned from Stage 1 with the 90/90 flow, same reading, same reason. "
+                "Two sets rather than Stage 1's three: wide-stance re-introduction, not "
+                "leg training."
+            ),
+            progression="Easy and quiet at the hips → full Stage 1 dose next block.",
+            regression="Hip or groin pinch at width → narrow the step and note it.",
+        ),
+    ]
     return {
         "objective": f"Stage 2B Week {week} — Press + Pull + Scapular",
         "phase": _S2B_PHASE,
@@ -3236,7 +3285,7 @@ def _s2b_gym_b(week: int) -> dict:
                 progression="45 s solid both sides → add 10 s, never load it.",
                 regression="Hips sag → drop to the bent-knee version for the same time.",
             ),
-        ],
+        ] + returning,
     }
 
 

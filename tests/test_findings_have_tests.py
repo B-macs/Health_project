@@ -145,15 +145,12 @@ def test_every_finding_the_plan_treats_has_a_test_defined():
 #: freely; it may only grow by a deliberate edit, which is the point — a new
 #: untested finding cannot arrive quietly. Dated so the age is visible.
 #:
-#: 3 — seated fold release count, never run.
-#: 5 — wide-stance rotation count, never run. ⚠ The sharpest one: this
-#:     finding's own named treatments (lateral lunge, 90/90 flow) were in
-#:     Stage 1 and are in neither 2A nor 2B, and vanished with no reason
-#:     recorded. It is currently neither treated nor retired.
-#: 6 — single-arm prone Y hold, never run. The finding IS live and
-#:     physio-corroborated; what is missing is a number, so "maintenance-
-#:     dependent" has been asserted rather than measured.
-UNRUN_AS_OF_2026_08_17 = {3, 5, 6}
+#: EMPTY since the evening of 2026-08-17: the athlete ran #3 (0 releases),
+#: #5 (0 cracks — the finding the audit called neither-treated-nor-retired is
+#: now measured QUIET, and its two movements returned as content) and #6
+#: (right 105 s to failure, left capped with reserve) on the block's new day-1
+#: measurement day. All six findings now carry at least one reading.
+UNRUN_AS_OF_2026_08_17 = set()
 
 
 def test_the_unrun_set_has_not_grown():

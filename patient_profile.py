@@ -385,8 +385,14 @@ PROFILE = {
                     "per five folds"
                 ),
                 "single_person": True,
-                "last_run": None,
-                "last_result": None,
+                "last_run": "2026-08-17",
+                "last_result": (
+                    "ZERO releases in five folds — negative on both thresholds. The "
+                    "finding described releases in ordinary sitting forward bends; "
+                    "today none were provocable on demand. Not closed on one reading "
+                    "(the original phenomenon was frequent, not constant), but the "
+                    "first data point says quiet."
+                ),
             },
             "title": "Sitting Forward-Bend Releases",
             "location": "Two distinct sites: mid-thoracic spine + horizontal lumbar base",
@@ -490,8 +496,18 @@ PROFILE = {
                 "unit": "cracks per 5 rotations each direction, with location",
                 "positive_if": "any crack, or any pain accompanying one",
                 "single_person": True,
-                "last_run": None,
-                "last_result": None,
+                "last_run": "2026-08-17",
+                "last_result": (
+                    "ZERO cracks, five rotations each way — negative. First reading "
+                    "this finding has ever had, and it resolves the worst-of-three "
+                    "states the audit flagged (neither treated nor retired): the "
+                    "finding is QUIET. Its two named movements, Lateral Lunge and Hip "
+                    "90/90 Flow, return to the block's home mobility days (17, 24) "
+                    "the same evening on the athlete's instruction — as movement "
+                    "content at gentle doses, NOT as treatment, since there is "
+                    "nothing measured left to treat. If the crack returns under the "
+                    "wide stance, the count is re-run and this entry updated."
+                ),
                 "why_it_is_urgent": (
                     "This finding's OWN named treatments - the lateral lunge and the "
                     "90/90 flow - were in Stage 1 and are in neither Stage 2A nor 2B. "
@@ -540,8 +556,17 @@ PROFILE = {
                     "under pressing"
                 ),
                 "single_person": True,
-                "last_run": None,
-                "last_result": None,
+                "last_run": "2026-08-17",
+                "last_result": (
+                    "RIGHT 105 s (1:45, to failure); LEFT stopped at 105 s WITH "
+                    "reserve — 'left can go longer'. Direction matches the record "
+                    "(right is the weaker side), but the GAP is unmeasured because "
+                    "the left was capped rather than failed; next run takes the left "
+                    "to failure so the 15% threshold can actually be judged. What IS "
+                    "answered: absolute capacity is high — 105 s against a 40 s "
+                    "reference — so the scapular prescription stays as authored, and "
+                    "no plan change rides on this reading."
+                ),
                 "why_this_and_not_a_photo": (
                     "The shoulder sag this finding names is a slow postural marker and "
                     "will not move visibly across a 28-day block; capacity will, and "
