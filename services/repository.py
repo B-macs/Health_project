@@ -5825,13 +5825,43 @@ class Repository:
     def get_flexibility_assessments(self) -> tuple:
         """Every completed assessment, oldest first.
 
+        TWO SINKS, LOCAL FIRST — the training checkpoint's exact idiom, and it
+        exists here for the same reason the checkpoint got it: this data was
+        local-only (.sync_state.json, gitignored, wiped by any hosted redeploy)
+        and it has ALREADY cost real measurements twice. The athlete captured
+        the cold-morning battery FOUR times; three vanished, and the one
+        surviving entry is itself stamped "RECONSTRUCTED after the only copy
+        was lost". Three baseline mornings were the noise floor, so what was
+        lost is not only data but the ability to call a future change a
+        result.
+
+        The local mirror wins when both exist (it is written first on save, so
+        it is never older than Notion); the Notion Config row is what survives
+        a redeploy. A local read that comes back empty falls through to
+        config, which is the redeploy-recovery path.
+
         Unreadable entries are DROPPED rather than raising or being partially
         recovered — flexibility.assessment_from_dict returns None for an
         unknown schema or a rung that no longer exists, and "no assessment" is
         a state the screen already renders honestly.
         """
-        raw = local_cache.read().get(_FLEXIBILITY_KEY) or []
-        parsed = [flexibility.assessment_from_dict(d) for d in raw]
+        raw = local_cache.read().get(_FLEXIBILITY_KEY)
+        if not raw:
+            stored = self.get_config_value(_FLEXIBILITY_KEY)
+            if stored:
+                try:
+                    raw = json.loads(stored)
+                except Exception:
+                    raw = []
+                else:
+                    # Heal the local mirror so the NEXT read is local again.
+                    # A failure here must not cost the read — the data is in
+                    # hand either way.
+                    try:
+                        local_cache.update({_FLEXIBILITY_KEY: raw})
+                    except Exception:
+                        pass
+        parsed = [flexibility.assessment_from_dict(d) for d in (raw or [])]
         good = [a for a in parsed if a is not None]
         return tuple(sorted(good, key=lambda a: a.taken_on))
 
@@ -5841,6 +5871,16 @@ class Repository:
         Same date replaces rather than appending: re-running on the same day is
         a correction, and two entries for one date would let the model see a
         history that never happened.
+
+        LOCAL MIRROR FIRST, THEN NOTION CONFIG — mirroring _save_checkpoint's
+        order, and for its reason: a Notion failure still leaves the fresher
+        copy on disk, so the local mirror is never older than Notion and
+        get_flexibility_assessments' fixed local-first precedence stays safe.
+        The Notion write is NOT swallowed: a 40-minute assessment that only
+        landed on an ephemeral disk is exactly the loss this method exists to
+        prevent, so the caller must hear about it. notion.rich_text chunks to
+        Notion's 200K property ceiling — the same lane the phases blob and the
+        training checkpoint already live in.
         """
         stamp = assessment.taken_on.isoformat()
 
@@ -5850,7 +5890,8 @@ class Repository:
             kept.append(flexibility.assessment_to_dict(assessment))
             return kept
 
-        local_cache.mutate(_FLEXIBILITY_KEY, _replace_same_date)
+        merged = local_cache.mutate(_FLEXIBILITY_KEY, _replace_same_date)
+        self.set_config(_FLEXIBILITY_KEY, json.dumps(merged))
 
     def get_flexibility_draft(self):
         """The in-progress assessment, or None. This is what makes the flow
