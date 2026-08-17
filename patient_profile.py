@@ -267,6 +267,33 @@ PROFILE = {
     "biomechanical_findings": [
         {
             "id": 1,
+            # ── HOW THIS FINDING IS RE-MEASURED ──────────────────────────
+            "test": {
+                "name": "Lateral hold asymmetry + resting grip grade",
+                "protocol": (
+                    "TWO PARTS, both sides. (a) CAPACITY - Bunkie Lateral Stabilizing "
+                    "Line: side-lying, feet on a box about 40 cm, body in one straight "
+                    "line, supported on the forearm, top leg lifted and held. Stop the "
+                    "clock when the LINE BREAKS, not when it burns. Time each side. "
+                    "(b) TONE - press the upper outer hip, the shelf just below the "
+                    "crest, into a wall corner on each side and grade the resting grip "
+                    "0-3 (0 nothing, 1 slight, 2 clear, 3 marked)."
+                ),
+                "unit": "seconds each side; plus a 0-3 grip grade each side",
+                "positive_if": (
+                    "a right-left hold-time gap over 10%, or a right grip grade of 2 "
+                    "or more"
+                ),
+                "single_person": True,
+                "last_run": "2026-08-17",
+                "last_result": (
+                    "GRIP ONLY: slight resting grip on the RIGHT, left clear (grade 1). "
+                    "Hold times NOT taken - the Bunkie is not built yet. Note that "
+                    "Stage 1's exit criterion for this finding ('measurable reduction "
+                    "in resting grip/tightness of upper glute') was MET and signed off "
+                    "2026-07-19, and the release stayed anyway with no reason recorded."
+                ),
+            },
             "title": "Upper Glute / Hip Crest Tightness",
             "location": "Top shelf of buttock, horizontal band just below posterior pelvic crest",
             "sensation": "Constant deep muscular tightness and gripping tension",
@@ -284,6 +311,42 @@ PROFILE = {
         },
         {
             "id": 2,
+            # ── HOW THIS FINDING IS RE-MEASURED ──────────────────────────
+            "test": {
+                "name": "Hinge provocation + rotation sweep",
+                "protocol": (
+                    "TWO PARTS, right side. (a) Ten slow single-leg RDLs on the right; "
+                    "count how many produce the crack. (b) Lie on your back, right hip "
+                    "flexed to 90 degrees, and rotate the leg slowly through its full "
+                    "EXTERNAL rotation range and back through INTERNAL rotation. "
+                    "Record whether it snaps, in WHICH DIRECTION, and WHERE you feel "
+                    "it - groin, sit bone, or the side of the hip. Direction and "
+                    "location are the whole point: they are what separate the "
+                    "candidate structures from each other."
+                ),
+                "unit": "snaps per 10 hinges; plus direction and location on the sweep",
+                "positive_if": "any snap in either part",
+                "single_person": True,
+                "last_run": "2026-08-17",
+                "last_result": (
+                    "HINGE: slight crack in both directions on the right, better than "
+                    "before. SWEEP: NO click on internal rotation; snap on EXTERNAL "
+                    "rotation only, felt near the SIT BONE. "
+                    "THIS LOCALISES IT, and it eliminates two of the three candidates. "
+                    "Posterior hip capsule is REFUTED by a separate measurement the "
+                    "same morning - prone internal rotation past 45 degrees on BOTH "
+                    "sides with no clear asymmetry, i.e. at or above normal, so there "
+                    "is no capsular restriction to treat. Iliopsoas is unlikely: the "
+                    "internal snapping hip snaps during the INTERNAL rotation phase "
+                    "and is felt anteriorly in the groin, and neither is true here. "
+                    "What remains sits within a few centimetres at the ischium - "
+                    "proximal hamstring origin, the external rotators passing the "
+                    "ischium (obturator internus / conjoint tendon), or ischiofemoral "
+                    "impingement - all three provoked by external rotation, and all "
+                    "three addressed first by the ischial-tuberosity release now "
+                    "leading the block's hip-day release."
+                ),
+            },
             "title": "Standing Leg Hinge Crack (Sit-Bone Area)",
             "location": "Deep at base of pelvis — ischial tuberosity / sit-bone area",
             "method": "Single-leg RDL / standing hinge with opposite leg extended behind",
@@ -305,6 +368,26 @@ PROFILE = {
         },
         {
             "id": 3,
+            # ── HOW THIS FINDING IS RE-MEASURED ──────────────────────────
+            "test": {
+                "name": "Seated fold release count",
+                "protocol": (
+                    "Sit tall on a firm chair, feet flat on the floor. Fold forward "
+                    "slowly to the end of comfortable range and come back up. Five "
+                    "folds. Count the audible or palpable releases and note WHERE each "
+                    "one is - mid-back, or the base of the low back. The location is "
+                    "what matters: the thoracic releases and the L5/S1 ones mean "
+                    "different things and only one of them is benign."
+                ),
+                "unit": "releases per 5 folds, with location",
+                "positive_if": (
+                    "any release at the lumbar base, or two or more thoracic releases "
+                    "per five folds"
+                ),
+                "single_person": True,
+                "last_run": None,
+                "last_result": None,
+            },
             "title": "Sitting Forward-Bend Releases",
             "location": "Two distinct sites: mid-thoracic spine + horizontal lumbar base",
             "structures": [
@@ -325,6 +408,34 @@ PROFILE = {
         },
         {
             "id": 4,
+            # ── HOW THIS FINDING IS RE-MEASURED ──────────────────────────
+            "test": {
+                "name": "Two-condition knee lift",
+                "protocol": (
+                    "Standing, fingertip on a wall for balance. Lift the RIGHT knee to "
+                    "90 degrees five times keeping the hip in NEUTRAL rotation. Then "
+                    "five more times deliberately adding EXTERNAL rotation. Count "
+                    "snaps out of five in EACH condition SEPARATELY - running the two "
+                    "together is what makes this test useless, because the difference "
+                    "between the conditions IS the finding."
+                ),
+                "unit": "snaps out of 5 neutral; snaps out of 5 external rotation",
+                "positive_if": (
+                    "any snap in the NEUTRAL condition. External-rotation snapping "
+                    "ALONE is not a training target - it is a tendon crossing a bony "
+                    "ridge, the ridge does not move, and this finding records the snap "
+                    "as painless"
+                ),
+                "single_person": True,
+                "last_run": "2026-08-17",
+                "last_result": (
+                    "NEUTRAL: none. EXTERNAL ROTATION: present. Originally present in "
+                    "BOTH conditions, so this is resolved to the endpoint that matters "
+                    "- daily movement happens in neutral. The tendon path drill was "
+                    "retired on this reading. Key rule 7's neutral-rotation CUE on "
+                    "every other right-hip-flexion exercise stands and is untouched."
+                ),
+            },
             "title": "90-Degree Active Hip Click — Right Side Only",
             "location": "Deep in right groin crease",
             "method": "Standing, lift right knee to 90°, add external rotation",
@@ -367,6 +478,29 @@ PROFILE = {
         },
         {
             "id": 5,
+            # ── HOW THIS FINDING IS RE-MEASURED ──────────────────────────
+            "test": {
+                "name": "Wide-stance rotation count",
+                "protocol": (
+                    "Stand with the feet wider than the shoulders, arms out to the "
+                    "sides. Rotate the torso slowly to one side to the end of range "
+                    "and back. Five rotations each way. Count the cracks per side and "
+                    "note whether each one is at the low back or at the hip."
+                ),
+                "unit": "cracks per 5 rotations each direction, with location",
+                "positive_if": "any crack, or any pain accompanying one",
+                "single_person": True,
+                "last_run": None,
+                "last_result": None,
+                "why_it_is_urgent": (
+                    "This finding's OWN named treatments - the lateral lunge and the "
+                    "90/90 flow - were in Stage 1 and are in neither Stage 2A nor 2B. "
+                    "They vanished at the transition with no reason recorded anywhere. "
+                    "Running this test is what decides whether they come back or the "
+                    "finding is closed. Right now it is neither treated nor retired, "
+                    "which is the worst of the three states."
+                ),
+            },
             "title": "Wide-Stance Windmill Torso Twist Cracks",
             "location": "Deep groin / inner thigh + smaller pops along lumbar spine",
             "method": "Wide stance, slight forward lean, dynamic torso rotation (windmill arms)",
@@ -390,6 +524,33 @@ PROFILE = {
         },
         {
             "id": 6,
+            # ── HOW THIS FINDING IS RE-MEASURED ──────────────────────────
+            "test": {
+                "name": "Single-arm prone Y hold, and instability under press",
+                "protocol": (
+                    "Lie face down. ONE arm at a time, thumb up, lifted off the floor "
+                    "at roughly 45 degrees out from the head. Hold until the arm drops "
+                    "or the shoulder blade gives up its position. Time each side. "
+                    "Separately, record yes or no: did any instability sensation or "
+                    "left-side tilt appear during that session's incline press."
+                ),
+                "unit": "seconds each side; plus instability yes/no under press",
+                "positive_if": (
+                    "a right-left hold-time gap over 15%, or any instability sensation "
+                    "under pressing"
+                ),
+                "single_person": True,
+                "last_run": None,
+                "last_result": None,
+                "why_this_and_not_a_photo": (
+                    "The shoulder sag this finding names is a slow postural marker and "
+                    "will not move visibly across a 28-day block; capacity will, and "
+                    "capacity is what the scapular work actually trains. The lateral "
+                    "scapular slide test was considered and REJECTED: it needs a "
+                    "second person with a tape measure, and every test in this file "
+                    "must be runnable alone (athlete, 2026-08-17)."
+                ),
+            },
             "title": "Right Shoulder Instability — Maintenance-Dependent, Full Weight",
             "location": "Right glenohumeral joint / scapula",
             "history": (
