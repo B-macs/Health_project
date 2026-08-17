@@ -163,6 +163,8 @@ _UPPER_BODY_EXERCISES: tuple[str, ...] = (
 _CORE_EXERCISES: tuple[str, ...] = (
     # Finding-test measurements (2026-08-17): unloaded diagnostic counts.
     "Seated Fold Release Count (Test)",
+    "Seated Forward Fold Exposure (Trial)",
+    "Seated Forward Fold Exposure — Loaded (Trial)",
     "Wide-Stance Rotation Count (Test)",
     "Reassessment Wrap-Up (Notes)",
     "Bunkie — Anterior Power Line (Timed)",
@@ -407,6 +409,8 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "McGill Modified Curl-Up":                {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
     "McGill Curl-Up (Progressed)":            {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
     "Seated Fold Release Count (Test)":       {"upper_body": 0.00, "core": 0.90, "lower_body": 0.10},
+    "Seated Forward Fold Exposure (Trial)":   {"upper_body": 0.00, "core": 0.90, "lower_body": 0.10},
+    "Seated Forward Fold Exposure — Loaded (Trial)": {"upper_body": 0.00, "core": 0.90, "lower_body": 0.10},
     "Reassessment Wrap-Up (Notes)":           {"upper_body": 0.00, "core": 0.80, "lower_body": 0.20},
     "Upper Glute Grip Grade (Test)":          {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     "Bunkie — Posterior Power Line (Timed)":  {"upper_body": 0.05, "core": 0.35, "lower_body": 0.60},
@@ -641,6 +645,8 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Prone Y-Raise (Scapular)":          ("mobility_core", 0.25),
     "Prone Y-Raise Hold (Timed Test)":   ("mobility_core", 0.25),
     "Seated Fold Release Count (Test)":  ("mobility_core", 0.25),
+    "Seated Forward Fold Exposure (Trial)":          ("mobility_core", 0.25),
+    "Seated Forward Fold Exposure — Loaded (Trial)": ("mobility_core", 0.25),
     "Wide-Stance Rotation Count (Test)": ("mobility_core", 0.25),
     "Upper Glute Grip Grade (Test)":     ("mobility_core", 0.25),
     "Reassessment Wrap-Up (Notes)":      ("mobility_core", 0.25),

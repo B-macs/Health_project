@@ -103,7 +103,7 @@ before its data exists — and the instrument that scores it.
 | # | Trial (instrument) | Prediction if the hypothesis is TRUE | What BREAKS it |
 |---|---|---|---|
 | P1 | **Release withdrawal** — rest days release-free; weekly grip grade, days 10/17/24 | Grip stays ≤ grade 1 for the whole block without daily release: the tone was compensable, not load-bearing | Right grip climbs to 2+ or hip-crest symptoms return → the release was doing structural work; H1 weakens, the pair returns daily |
-| P2 | **Graded flexion exposure** (start pending) — finding #3's fold count, weekly | Four weeks of progressive flexion stays at zero releases, zero pain: the disc is not the governor | Lumbar-base releases or pain return under load → the Nov-2025 MRI is still determining; the list decision gets revisited, and that is written here in advance |
+| P2 | **Graded flexion exposure** — IN THE BLOCK, days 2–27: bodyweight folds to day 14, loaded from day 15, first slot of every session; finding #3's fold count, from the exercise's own notes | Four weeks of progressive flexion stays at zero releases, zero pain: the disc is not the governor | Lumbar-base releases or pain return under load → the Nov-2025 MRI is still determining; the list decision gets revisited, and that is written here in advance |
 | P3 | **Running introduction** — six runs, stage_2b running_tolerance | All six clean; no Sartorius signal. Historic strains were overuse dose errors, not tissue fragility | Any left anterior-hip signal → a true local vulnerability (H3 grows, H2 shrinks); the build stops per its own rule |
 | P4 | **Heavy top sets** — day 22, first Epley-valid e1RMs | Top sets come in AT or ABOVE prescription at RPE ≤ 8: capacity was underrated by symptom-era caution | Prescribed weights grind or fail → capacity genuinely low; H2 takes the hit |
 | P5 | **Bunkie baseline** — day 28, five lines timed | High absolute times; right below left on the lateral line by a modest gap (mirrors the Y-hold) | Short holds across the board, or asymmetry opposite to the symptom side → capacity or attribution is wrong |
@@ -167,6 +167,12 @@ symptom-era caution.
 
 ## Version history
 
+- **v1.1, 2026-08-17 (same evening)** — P2 authored into Block A days 2–27
+  on the athlete's requirement that the training itself runs the trials:
+  *"I don't want the hypothesis to be a standalone thing that needs to be
+  reviewed separately and other exercises added, it needs to all be one
+  flow."* All seven predictions are now scored by scheduled training or
+  by data that already flows (P7's check-ins).
 - **v1, 2026-08-17** — first statement. Written the evening of the day the
   system first measured anything: six findings tested, two treatments retired
   on readings, one restored, the movement-rule list reduced to three on the

@@ -140,30 +140,33 @@ def test_the_release_block_precedes_every_training_session_and_is_absent_from_re
       readings — release creeping back onto a rest day would corrupt the
       trial while looking like diligence.
 
-    ONE exemption, day 1 only: its three finding-test measurements run BEFORE
-    the release, because finding #5's test counts cracks and finding #3's
-    counts releases — pressure work first would quiet the very tissues being
-    counted. The release must still be present and nothing but tests may sit
+    MEASUREMENTS AND TRIALS MAY LEAD, on any day — day 1's finding tests and
+    P2's fold exposure carry a "(Test)"/"(Timed Test)"/"(Trial)" suffix, and
+    they run BEFORE the release for one reason: the release changes the tissue
+    being counted (the ischial release presses on the exact attachment the
+    fold loads), so a count taken after it measures the release rather than
+    the athlete. After the measurement prefix, a training day's first item
+    must still be the release; nothing but suffixed measurements may sit
     ahead of it."""
+
+    def _is_measurement(n):
+        return "(Test)" in n or "(Timed Test)" in n or "(Trial)" in n
+
     for d in DAYS:
         names = [e["name"] for e in PLAN[d]["exercises"]]
-        if d == 1:
-            non_test = [n for n in names if "(Test)" not in n and "(Timed Test)" not in n]
-            assert non_test, "day 1 has nothing but tests"
-            assert non_test[0] in sess.RELEASE_EXERCISE_NAMES, (
-                f"day 1's first non-test item is {non_test[0]}")
-            first_release = names.index(non_test[0])
-            assert all("(Test)" in n or "(Timed Test)" in n
-                       for n in names[:first_release]), (
-                "day 1 may only put TESTS ahead of the release block")
-            continue
-        if PLAN[d]["day_type"] == "rest":
-            leaked = [n for n in names if n in sess.RELEASE_EXERCISE_NAMES]
+        body = [n for n in names if not _is_measurement(n)]
+        prefix_len = names.index(body[0]) if body else len(names)
+        assert all(_is_measurement(n) for n in names[:prefix_len]), (
+            f"day {d}: a non-measurement item sits inside the measurement prefix")
+        if d == 1 or PLAN[d]["day_type"] != "rest":
+            assert body and body[0] in sess.RELEASE_EXERCISE_NAMES, (
+                f"day {d}'s first non-measurement item is "
+                f"{body[0] if body else 'nothing'}")
+        else:
+            leaked = [n for n in body if n in sess.RELEASE_EXERCISE_NAMES]
             assert not leaked, (
                 f"day {d} is a rest day inside the withdrawal trial and "
                 f"carries release work: {leaked}")
-            continue
-        assert names[0] in sess.RELEASE_EXERCISE_NAMES, f"day {d} opens with {names[0]}"
 
 
 def test_the_long_stretch_runs_first_on_hip_loaded_days():
@@ -231,8 +234,16 @@ def test_preparation_stays_inside_the_fifteen_minute_ceiling():
         "Scapular Wall Slide", "Prone Y-Raise (Scapular)",
     }
     for d in DAYS:
+        # Skip the measurement prefix (finding tests, P2's fold trial) rather
+        # than letting it end the walk at item zero — a leading test name used
+        # to make this whole day's count vacuous, which quietly disarmed the
+        # ceiling on exactly the days that gained items.
+        exercises = [ex for ex in PLAN[d]["exercises"]
+                     if "(Test)" not in ex["name"]
+                     and "(Timed Test)" not in ex["name"]
+                     and "(Trial)" not in ex["name"]]
         seconds = 0
-        for ex in PLAN[d]["exercises"]:
+        for ex in exercises:
             if ex["name"] not in prep_names:
                 break
             sides = 2 if (ex.get("laterality") == "unilateral"

@@ -2626,6 +2626,67 @@ PREP_SCAPULAR = _ex(
 # — the accounting hazard the warm-up review calls a prerequisite rather than a
 # follow-up (services/tonnage.py, services/strength.py).
 
+FOLD_EXPOSURE = _ex(
+    name="Seated Forward Fold Exposure (Trial)",
+    ex_type="reps",
+    laterality="bilateral",
+    sets=1, reps=10, tempo="3-1-3", rest_seconds=0,
+    mechanics=(
+        "FIRST thing in every session, before the release block — the same "
+        "slot every time is what makes the counts comparable. Sit tall on a "
+        "firm chair, feet flat. Exhale and fold forward slowly to the end of "
+        "comfortable range, pause a breath, come back up tall. Ten slow "
+        "reps, never forced. COUNT any clicks or releases and note WHERE — "
+        "mid-back or the base of the low back — in the note. "
+        "STOP THE TRIAL: any lumbar-base release or any pain ends it today; "
+        "write what happened. That is the trial working, not failing."
+    ),
+    biomechanical_focus=(
+        "HYPOTHESIS TRIAL P2 (docs/hypothesis.md) — graded lumbar-flexion "
+        "exposure, the conservative-care standard for covered annular tears, "
+        "authored INTO the block on 2026-08-17 so the training itself runs "
+        "the trial rather than a document waiting for a separate review. "
+        "Baseline the same day: five folds, zero releases, zero pain. "
+        "Prediction, registered in advance: four weeks of this stays at "
+        "zero. A positive re-opens the movement-list decision — written in "
+        "the hypothesis before the data exists."
+    ),
+    progression="Days 2-14 bodyweight. From day 15 the loaded variant takes over.",
+    regression="Any lumbar-base signal → stop, note it, the trial reverts.",
+)
+
+FOLD_EXPOSURE_LOADED = _ex(
+    name="Seated Forward Fold Exposure — Loaded (Trial)",
+    ex_type="reps",
+    laterality="bilateral",
+    sets=1, reps=10, tempo="3-1-3", rest_seconds=0,
+    weight_kg=2.5, equipment_type="dumbbell",
+    mechanics=(
+        "Same slot, same movement, same counting — now holding a light "
+        "dumbbell (2.5-5 kg) against the chest. The load is a probe, not "
+        "training: it should change NOTHING about how the fold feels. Ten "
+        "slow reps, count and locate any releases in the note. "
+        "STOP THE TRIAL: any lumbar-base release or any pain — write it."
+    ),
+    biomechanical_focus=(
+        "P2's second stage, from day 15: light load on the pattern the "
+        "bodyweight fortnight cleared. Clean at day 27 completes the trial "
+        "inside Block A, and day 28 scores it."
+    ),
+    progression="Clean through day 27 → P2 scores CONFIRMED at the day-28 review.",
+    regression="Any lumbar-base signal → stop, note it, the trial reverts.",
+)
+
+
+def _p2_fold(loaded: bool) -> list:
+    """P2 runs days 2-27, every session, first slot — before the release, so
+    the fold counts stay comparable (the ischial release presses directly on
+    the tissue the fold loads, and a count taken after it measures the
+    release, not the athlete). Day 28 is exempt so the assessment screen
+    stays clean; day 1 predates the trial."""
+    return [FOLD_EXPOSURE_LOADED if loaded else FOLD_EXPOSURE]
+
+
 GOBLET_TOP_SET = _ex(
     name="Goblet Squat (Heavy Top Set)",
     ex_type="reps",
@@ -3026,7 +3087,7 @@ def _s2b_gym_a(week: int) -> dict:
         "session_rpe_target": 7 if week == 4 else 6,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _s2b_release(hip_loaded=True, anterior=True)
+        "exercises": _p2_fold(week >= 3) + _s2b_release(hip_loaded=True, anterior=True)
                       + _s2b_prep(lower=True) + ramp + top + [
             _ex(
                 name="Goblet Squat",
@@ -3194,7 +3255,7 @@ def _s2b_gym_b(week: int) -> dict:
         "session_rpe_target": 7 if week == 4 else 6,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _s2b_release(hip_loaded=False) + _s2b_prep(lower=False) + [
+        "exercises": _p2_fold(week >= 3) + _s2b_release(hip_loaded=False) + _s2b_prep(lower=False) + [
             _ex(
                 name="Incline DB Press",
                 ex_type="reps",
@@ -3297,7 +3358,7 @@ def _s2b_band_a(week: int) -> dict:
         "session_rpe_target": 5,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _s2b_release(hip_loaded=True, anterior=True) + _s2b_prep(lower=True) + [
+        "exercises": _p2_fold(False) + _s2b_release(hip_loaded=True, anterior=True) + _s2b_prep(lower=True) + [
             BAND_FRONT_SQUAT,
             BAND_RDL,
             BAND_HIP_THRUST,
@@ -3338,7 +3399,7 @@ def _s2b_band_b(week: int) -> dict:
         "session_rpe_target": 5,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _s2b_release(hip_loaded=False) + _s2b_prep(lower=False) + [
+        "exercises": _p2_fold(False) + _s2b_release(hip_loaded=False) + _s2b_prep(lower=False) + [
             BAND_CHEST_PRESS,
             BAND_LAT_PULLDOWN,
             BAND_ROW,
@@ -3377,14 +3438,14 @@ def _s2b_band_b(week: int) -> dict:
 
 def _s2b_run(day_label: str, name: str, minutes: int, mechanics: str,
              focus: str, progression: str, regression: str, rpe: int = 4,
-             anterior: bool = False) -> dict:
+             anterior: bool = False, loaded_fold: bool = False) -> dict:
     return {
         "objective": f"Stage 2B — {day_label}",
         "phase": _S2B_PHASE,
         "session_rpe_target": rpe,
         "is_gym_session": False,
         "day_type": "stretch",
-        "exercises": _s2b_release(hip_loaded=True, anterior=anterior) + [
+        "exercises": _p2_fold(loaded_fold) + _s2b_release(hip_loaded=True, anterior=anterior) + [
             PREP_RAISE, PREP_GLUTE_ACTIVATION,
             _ex(
                 name=name,
@@ -3456,7 +3517,8 @@ _RUN_DAYS = {
 def _s2b_run_day(day: int) -> dict:
     label, name, minutes, mech, focus, prog, regr, *rest = _RUN_DAYS[day]
     return _s2b_run(label, name, minutes, mech, focus, prog, regr,
-                    rpe=rest[0] if rest else 4, anterior=True)
+                    rpe=rest[0] if rest else 4, anterior=True,
+                    loaded_fold=day >= 15)
 
 
 def _s2b_mobility(week: int, away: bool = False) -> dict:
@@ -3471,7 +3533,7 @@ def _s2b_mobility(week: int, away: bool = False) -> dict:
         "session_rpe_target": 3,
         "is_gym_session": False,
         "day_type": "rest",
-        "exercises": _s2b_release(hip_loaded=False, training=False) + [
+        "exercises": _p2_fold(week >= 3) + _s2b_release(hip_loaded=False, training=False) + [
             _ex(
                 name="Upper Glute Grip Grade (Test)",
                 ex_type="reps",
@@ -3560,7 +3622,7 @@ def _s2b_travel_day(day_label: str, note: str) -> dict:
         "session_rpe_target": 2,
         "is_gym_session": False,
         "day_type": "rest",
-        "exercises": _s2b_release(hip_loaded=False, training=False) + [
+        "exercises": _p2_fold(False) + _s2b_release(hip_loaded=False, training=False) + [
             _ex(
                 name="Controlled Walking",
                 ex_type="duration",
@@ -3592,7 +3654,7 @@ def _s2b_cluster(week: int) -> dict:
         "session_rpe_target": 4,
         "is_gym_session": False,
         "day_type": "stretch",
-        "exercises": _s2b_release(hip_loaded=True, anterior=True) + [PREP_RAISE] + [
+        "exercises": _p2_fold(week >= 3) + _s2b_release(hip_loaded=True, anterior=True) + [PREP_RAISE] + [
             _ex(
                 name="Cluster A Flexibility Session",
                 ex_type="duration",
@@ -3740,7 +3802,7 @@ PLAN_STAGE2B[7] = {
     "session_rpe_target": 2,
     "is_gym_session": False,
     "day_type": "rest",
-    "exercises": _s2b_release(hip_loaded=False, training=False) + [
+    "exercises": _p2_fold(False) + _s2b_release(hip_loaded=False, training=False) + [
         _ex(
             name="Controlled Walking",
             ex_type="duration",
@@ -3783,7 +3845,7 @@ PLAN_STAGE2B[21] = {
     "session_rpe_target": 2,
     "is_gym_session": False,
     "day_type": "rest",
-    "exercises": _s2b_release(hip_loaded=False, training=False) + [
+    "exercises": _p2_fold(True) + _s2b_release(hip_loaded=False, training=False) + [
         _ex(
             name="Controlled Walking",
             ex_type="duration",
@@ -3813,7 +3875,7 @@ PLAN_STAGE2B[27] = {
     "session_rpe_target": 2,
     "is_gym_session": False,
     "day_type": "rest",
-    "exercises": _s2b_release(hip_loaded=False, training=False) + [
+    "exercises": _p2_fold(True) + _s2b_release(hip_loaded=False, training=False) + [
         _ex(
             name="Controlled Walking",
             ex_type="duration",
