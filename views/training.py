@@ -1883,10 +1883,26 @@ def _render_begin_next_phase_button(phases: list) -> None:
         return
     meta = sess.PHASE_META[number]
     plan_days = len(sess.plan_dict_for_phase(number))
+    # EVERY BLOCK RUNS MONDAY TO SUNDAY, so the start is the next Monday and
+    # not the day the button happens to be pressed. plan.default_phase refuses
+    # anything else outright; naming the date here is what stops the refusal
+    # being a surprise, and what makes a wait visible before it is agreed to
+    # rather than after. See plan.assert_week_aligned for why the alignment is
+    # the same rule as key rule 18b rather than a tidiness preference.
+    start = ph.next_block_start(date.today())
+    last = start + timedelta(days=plan_days - 1)
     st.caption(
         f"Confirm the exit criteria for the block you have just finished are met "
         f"and your physiotherapist has signed off before beginning."
     )
+    if start == date.today():
+        st.caption(f"Starts **today**, {start:%a %d %b}, and runs to {last:%a %d %b}.")
+    else:
+        st.caption(
+            f"Blocks run Monday to Sunday, so this one starts **{start:%a %d %b}** "
+            f"and runs to {last:%a %d %b} — {(start - date.today()).days} day(s) from "
+            f"today. Nothing is scheduled in between."
+        )
     # Advancing Phase (content/day-numbering) and Stage (ACWR/RPE/volume
     # ceilings) must happen together — services/plan.py's Phase and
     # services/rules.py's Stage are deliberately decoupled systems, and
@@ -1899,17 +1915,21 @@ def _render_begin_next_phase_button(phases: list) -> None:
     if st.button(meta["button"], type="primary",
                  use_container_width=True, key=f"tp_begin_phase_{number}"):
         # length_days comes from the authored content rather than a literal, so
-        # a block of a different length needs no code change here.
+        # a block of a different length needs no code change here. `start` is
+        # the Monday resolved above, never date.today() — default_phase would
+        # refuse a mid-week start, and refusing at the moment of the click is
+        # far worse than never offering one.
         new_phase = ph.default_phase(
-            date.today(), length_days=plan_days, phase_number=number,
+            start, length_days=plan_days, phase_number=number,
             name=meta["name"],
         )
         updated_phases = sess.begin_new_phase(phases, new_phase)
         r = repo.get_repository()
         r.set_phases(updated_phases)
         r.set_config("current_stage", str(meta["stage"]))
+        when = "today" if start == date.today() else f"on {start:%a %d %b}"
         st.success(
-            f"{meta['name']} begins today. Come back for Day 1 of your "
+            f"{meta['name']} begins {when}. Come back for Day 1 of your "
             f"{plan_days}-day block."
         )
         st.rerun()

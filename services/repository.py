@@ -40,6 +40,7 @@ from services import hr_load
 from services import hr_matching
 from services import models
 from services import oura_auth
+from services import plan
 from services import readiness
 from services import sessions as training_sessions
 from services import sleep_fusion
@@ -2443,6 +2444,36 @@ class Repository:
             ) from exc
 
     def set_phases(self, phases: list[models.Phase], today: date | None = None) -> None:
+        """Persist the phase list, refusing any block that would not run
+        Monday to Sunday.
+
+        The gate is HERE as well as in plan.default_phase because this is the
+        only way a phase reaches storage, and a constructor check alone can be
+        walked around — by building a Phase directly, by an edit made in the
+        Notion UI and re-saved, or by a future caller that assembles the
+        dataclass itself. Key rule 18b's protection against a block drifting
+        into the following week is defined in terms of weeks counted from the
+        phase start, so it only means Monday-to-Sunday while this holds; see
+        services/plan.py's assert_week_aligned.
+
+        Raises rather than repairing. A start nudged to the nearest Monday
+        moves every authored day onto a different date, and a length padded to
+        a whole week invents sessions — both silent, both worse than a refusal
+        the athlete can see.
+        """
+        for p in phases:
+            try:
+                start = date.fromisoformat(p.start_date)
+            except (TypeError, ValueError) as exc:
+                raise plan.WeekAlignmentError(
+                    f"phase {p.phase_number} has an unreadable start_date "
+                    f"{p.start_date!r}"
+                ) from exc
+            errors = plan.week_alignment_errors(start, p.length_days)
+            if errors:
+                raise plan.WeekAlignmentError(
+                    f"phase {p.phase_number} ({p.name}): " + "; ".join(errors)
+                )
         payload = [
             {"phase_number": p.phase_number, "name": p.name, "start_date": p.start_date,
              "length_days": p.length_days, "status": p.status,

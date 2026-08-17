@@ -20,8 +20,85 @@ from datetime import date, timedelta
 from services.models import DayCell, Phase
 
 
+# ── EVERY BLOCK RUNS MONDAY TO SUNDAY ────────────────────────────────────────
+#
+# Athlete's rule, 2026-08-17. The module docstring has always described a phase
+# as "a fixed-length, multiple-of-7-days training block", and every phase ever
+# stored has in fact started on a Monday — but nothing enforced either half,
+# and both are load-bearing rather than tidy.
+#
+# WHY IT MATTERS MORE THAN IT LOOKS: week_of_phase_date counts weeks from the
+# PHASE START, not from calendar Mondays. So key rule 18b — "a rescheduled day
+# moves within its week or not at all" — only means a Monday-to-Sunday week
+# when the phase starts on a Monday. Start a block on a Tuesday and its
+# "weeks" are Tue-Mon windows that straddle every calendar weekend, so the one
+# guard against drift silently starts guarding the wrong boundary. The rule and
+# the alignment are the same rule.
+#
+# The hole was reachable: default_phase took whatever date the caller passed,
+# and views/training.py passed date.today() — the day the button happened to
+# be pressed. Stage 2B was begun on a Monday by luck, not by construction.
+#
+# REFUSED, NOT CLAMPED, matching reject_violating_overrides. Silently shifting
+# a start to the nearest Monday changes which day the athlete's content lands
+# on without telling them, and silently padding length_days to a multiple of 7
+# invents training days that were never authored.
+_MONDAY = 0
+
+
+class WeekAlignmentError(ValueError):
+    """A phase that would not run Monday to Sunday."""
+
+
+def week_alignment_errors(start_date: date, length_days: int) -> list[str]:
+    """Every way (start_date, length_days) breaks the Monday-to-Sunday rule.
+
+    Returns reasons rather than a bool so a caller can say WHICH half is
+    wrong — "starts on a Tuesday" and "is 26 days long" need different fixes,
+    and a bare False sends the reader to check both.
+    """
+    out = []
+    if start_date.weekday() != _MONDAY:
+        out.append(
+            f"a block must start on a Monday; {start_date.isoformat()} is a "
+            f"{start_date.strftime('%A')}"
+        )
+    if length_days <= 0 or length_days % 7:
+        out.append(
+            f"a block must be a whole number of weeks so it ends on a Sunday; "
+            f"{length_days} days is {length_days / 7:.2f} weeks"
+        )
+    return out
+
+
+def assert_week_aligned(start_date: date, length_days: int) -> None:
+    """Raise WeekAlignmentError unless the block runs Monday to Sunday."""
+    errors = week_alignment_errors(start_date, length_days)
+    if errors:
+        raise WeekAlignmentError("; ".join(errors))
+
+
+def next_block_start(today: date) -> date:
+    """The Monday a block beginning "now" must start on — today when today is
+    already a Monday, otherwise the NEXT one.
+
+    Forward, never backward. Rewinding to the Monday just past would make the
+    block silently already-underway, skipping days 1..N of authored content
+    that were never presented; going forward costs a short gap that is visible
+    on the calendar and can be discussed, which is the failure worth having.
+    """
+    return today + timedelta(days=(_MONDAY - today.weekday()) % 7)
+
+
 def default_phase(start_date: date, length_days: int = 14,
                    phase_number: int = 1, name: str = "Stage 1 Rehab") -> Phase:
+    """Build a Phase, refusing anything that would not run Monday to Sunday.
+
+    The check lives here rather than only at the call site because this is the
+    one constructor every path goes through — see assert_week_aligned's block
+    comment for why the alignment and key rule 18b are the same rule.
+    """
+    assert_week_aligned(start_date, length_days)
     return Phase(
         phase_number=phase_number,
         name=name,
