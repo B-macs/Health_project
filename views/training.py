@@ -2004,6 +2004,33 @@ def _stage2_offer_available(phases: list) -> bool:
     return sess.next_phase_offer(phases) is not None
 
 
+def _write_failure_detail(exc: Exception) -> str:
+    """Everything the backend told us, in a form the HOSTED app will show.
+
+    Streamlit Cloud redacts the message of any UNCAUGHT exception — that is
+    what "The original error message is redacted to prevent data leaks" means,
+    and it is why this button failed twice reporting nothing but
+    `notion_client.errors.APIResponseError`. Diagnosing it took a line-number
+    fingerprint of the traceback instead of just reading the error.
+
+    A CAUGHT exception rendered through st.error is not redacted. `status` and
+    `code` are the two fields that actually name the cause (a 401 unauthorized,
+    a 404 object_not_found and a 400 validation_error all arrive here looking
+    identical otherwise), and neither is a secret.
+    """
+    parts = [type(exc).__name__]
+    status = getattr(exc, "status", None)
+    code = getattr(exc, "code", None)
+    if status is not None:
+        parts.append(f"HTTP {status}")
+    if code:
+        parts.append(str(code))
+    detail = " ".join(str(exc).split())
+    if detail:
+        parts.append(detail)
+    return " · ".join(parts)
+
+
 def _render_begin_next_phase_button(phases: list) -> None:
     """Offers to start the next authored block, whichever one that is.
 
@@ -2038,7 +2065,7 @@ def _render_begin_next_phase_button(phases: list) -> None:
     last = start + timedelta(days=plan_days - 1)
     st.caption(
         f"Confirm the exit criteria for the block you have just finished are met "
-        f"and your physiotherapist has signed off before beginning."
+        f"before beginning."
     )
     if start == date.today():
         st.caption(f"Starts **today**, {start:%a %d %b}, and runs to {last:%a %d %b}.")
@@ -2070,8 +2097,34 @@ def _render_begin_next_phase_button(phases: list) -> None:
         )
         updated_phases = sess.begin_new_phase(phases, new_phase)
         r = repo.get_repository()
-        r.set_phases(updated_phases)
-        r.set_config("current_stage", str(meta["stage"]))
+        # CAUGHT, not allowed to propagate: an uncaught exception here takes
+        # the whole page down AND has its message redacted on the hosted app,
+        # so the athlete is left on a dead screen holding an error that names
+        # no cause. The two halves are reported separately because a failure
+        # between them leaves real state: the block started at the wrong
+        # ceilings, which is worse than not starting at all and must never be
+        # reported as success.
+        try:
+            r.set_phases(updated_phases)
+        except Exception as exc:
+            st.error(
+                f"**{meta['name']} was not started — nothing was written.** "
+                f"Your current phase list is unchanged, so pressing this again "
+                f"is safe once the cause below is fixed.\n\n"
+                f"`{_write_failure_detail(exc)}`"
+            )
+            return
+        try:
+            r.set_config("current_stage", str(meta["stage"]))
+        except Exception as exc:
+            st.error(
+                f"**{meta['name']} started, but the clinical stage was NOT "
+                f"updated to {meta['stage']}.** The block's content is live "
+                f"while the ACWR, RPE and volume ceilings are still the "
+                f"previous stage's — check the stage before training on it.\n\n"
+                f"`{_write_failure_detail(exc)}`"
+            )
+            return
         when = "today" if start == date.today() else f"on {start:%a %d %b}"
         st.success(
             f"{meta['name']} begins {when}. Come back for Day 1 of your "
@@ -2092,7 +2145,7 @@ def _render_no_active_phase(phases: list) -> None:
             f"— starts {upcoming[0].start_date}."
         )
     elif _stage2_offer_available(phases):
-        next_line = "Ready to begin the next block below, once you and your physiotherapist confirm."
+        next_line = "Ready to begin the next block below, once the exit criteria are confirmed."
     else:
         next_line = "No upcoming phase configured yet."
     st.markdown(
