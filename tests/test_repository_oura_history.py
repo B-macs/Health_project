@@ -48,9 +48,14 @@ def test_sheet_key_leaves_uuids_and_blanks_alone():
 # ─── fetch_oura_history ─────────────────────────────────────────────────────
 
 def test_fetch_oura_history_requires_configuration():
+    """Still raises with no credential — but the message now names the OAuth
+    script rather than OURA_TOKEN. Oura retired Personal Access Tokens in
+    December 2025, so 'add OURA_TOKEN to secrets.toml' sends the reader at a
+    repair that no longer exists; the error has to name a route that does."""
     repo = Repository(_config(oura_token=""))
-    with pytest.raises(RuntimeError, match="not configured"):
+    with pytest.raises(RuntimeError, match="not authorised") as exc:
         repo.fetch_oura_history("2023-07-04", "2023-07-05")
+    assert "scripts/authorize_oura.py" in str(exc.value)
 
 
 def _fake_collection(payloads: dict[str, list[dict]], calls: list | None = None):

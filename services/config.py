@@ -37,8 +37,23 @@ class Config:
     # Optional — Garmin sync is disabled (not an error) when either is blank.
     garmin_email: str = ""
     garmin_password: str = ""
-    # Optional — Oura sync is disabled (not an error) when blank.
+    # Optional — the LEGACY Oura Personal Access Token. Oura deprecated PATs
+    # in December 2025 and this one stopped authenticating on 2026-08-12, so
+    # it is no longer the primary path: repository.py prefers OAuth whenever
+    # oura_client_id/secret are set, and falls back here only for a PAT that
+    # still works. Blank disables Oura sync, which is not an error.
     oura_token: str = ""
+    # Optional — the Oura OAuth2 application. New PATs cannot be created, so
+    # this is the only way to authenticate a fresh install.
+    #
+    # ⚠ These are the STATIC half of the credential. The access and refresh
+    # tokens the flow produces are NOT here and must not be: a refresh token
+    # rotates on every use (see services/oura_auth.py), and a value that
+    # changes cannot live in a file the deploy treats as immutable. Those are
+    # stored through Repository.set_config so they survive the hosted
+    # filesystem being wiped on redeploy (key rule 18).
+    oura_client_id: str = ""
+    oura_client_secret: str = ""
     # Optional — path to a locally-built datastore.db (scripts/build_datastore.py).
     # When set, Repository serves every Google Sheets READ from it and makes no
     # Google API call at all; writes raise. For testing and offline iteration
@@ -113,6 +128,24 @@ def _resolve_optional_str(key: str, overrides: dict) -> str:
     return os.getenv(key) or ""
 
 
+def _resolve_first_optional_str(keys: tuple[str, ...], overrides: dict) -> str:
+    """First non-empty value among `keys`, or "".
+
+    Exists for the Oura OAuth credentials specifically. The registered
+    application predates this code and its keys are in secrets.toml under the
+    bare names CLIENT_ID / CLIENT_SECRET — generic enough to belong to
+    anything, which is why the OURA_-prefixed names are checked first and are
+    the ones to use going forward. Accepting both means the existing
+    secrets.toml authenticates untouched instead of needing a hand-edit on
+    the hosted deploy at the same moment the credential is already broken.
+    """
+    for key in keys:
+        val = _resolve_optional_str(key, overrides)
+        if val:
+            return val
+    return ""
+
+
 def _resolve_service_account(overrides: dict) -> dict:
     if overrides.get("google_service_account"):
         return dict(overrides["google_service_account"])
@@ -140,6 +173,10 @@ def load_config(overrides: dict | None = None) -> Config:
         garmin_email=_resolve_optional_str("GARMIN_EMAIL", overrides),
         garmin_password=_resolve_optional_str("GARMIN_PASSWORD", overrides),
         oura_token=_resolve_optional_str("OURA_TOKEN", overrides),
+        oura_client_id=_resolve_first_optional_str(
+            ("OURA_CLIENT_ID", "CLIENT_ID"), overrides),
+        oura_client_secret=_resolve_first_optional_str(
+            ("OURA_CLIENT_SECRET", "CLIENT_SECRET"), overrides),
         datastore_path=_resolve_optional_str("HEALTH_DATASTORE_PATH", overrides),
         datastore_mode=_resolve_optional_str("HEALTH_DATASTORE_MODE", overrides) or "readonly",
         supabase_url=_resolve_optional_str("SUPABASE_URL", overrides),

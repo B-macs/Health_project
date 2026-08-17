@@ -26,6 +26,7 @@ import atexit
 
 import dataclasses
 import json
+import threading
 import time
 import uuid
 from datetime import date, datetime, timedelta
@@ -38,6 +39,7 @@ from services import home_snapshot
 from services import hr_load
 from services import hr_matching
 from services import models
+from services import oura_auth
 from services import readiness
 from services import sessions as training_sessions
 from services import sleep_fusion
@@ -236,6 +238,47 @@ def _working_volume_kg(sets: list[dict]) -> float:
 # long that marker stays resumable. See Repository.oura_sync_progress.
 _OURA_SYNC_PROGRESS_KEY = "oura_sync_progress"
 _OURA_SYNC_RESUME_MINUTES = 30
+
+# Where the OAuth credential lives, under the SAME key in two stores.
+#
+# Notion's Config DB is the durable copy: the hosted filesystem is wiped on
+# redeploy (key rule 18), and a refresh token lost that way costs a manual
+# browser re-authorisation, not just a slow first read. .sync_state.json is
+# the fast local copy that every request actually reads — exactly the
+# training-checkpoint arrangement two constants above, and for the same
+# reason: the durable store is ~136 ms away and this value is read on every
+# sync.
+_OURA_TOKEN_KEY = "oura_oauth_token"
+
+# Set when persisting a refreshed credential to Notion fails. Surfaced by
+# oura_auth_status: the local copy still works, so the sync keeps running,
+# but the credential is now one redeploy away from being lost and that must
+# not be silent.
+_OURA_TOKEN_PERSIST_ERROR_KEY = "oura_token_persist_error"
+
+# Set when Oura answers 401 during a sync, cleared when one succeeds.
+#
+# The only way to learn that a STATIC token has been revoked. A PAT carries no
+# expiry, so nothing about the stored value distinguishes a working one from
+# the dead one this project ran on from 2026-08-12 — without this marker,
+# oura_auth_status would keep calling that credential healthy and the Home
+# banner would never fire on the exact state it was written for.
+_OURA_AUTH_FAILURE_KEY = "oura_auth_failure"
+
+# ⚠ PROCESS-WIDE, not per-Repository, and that is the entire point.
+#
+# Oura's refresh tokens are SINGLE USE (services/oura_auth.py). The
+# background sync thread builds its OWN Repository (key rule 12) while the
+# script thread holds another, so an instance lock would serialise nothing —
+# both would refresh, one would win, and the loser would persist a token
+# Oura had already invalidated. That failure is unrecoverable without a human
+# in a browser, which is why this is a module global rather than an attribute.
+#
+# It does NOT cover two PROCESSES. That is accepted rather than solved: the
+# hosted app runs one, and the repair for the cross-process race (a lease in
+# the durable store) costs a Notion round trip on every sync to prevent
+# something no current deployment can do.
+_OURA_REFRESH_LOCK = threading.Lock()
 
 # .sync_state.json key holding the durable Home-card snapshot, keyed by ISO
 # date. See services/home_snapshot.py.
@@ -640,13 +683,202 @@ class Repository:
             self._garmin_client_obj = garmin.make_client(self.config)
         return self._garmin_client_obj
 
+    # ─── Oura credential ─────────────────────────────────────────────────
+    #  Was one line: return the static PAT. It is now a lifecycle, because
+    #  Oura retired PATs and OAuth access tokens expire. Everything below
+    #  exists to keep `_oc` returning a plain string, so the ~10 call sites
+    #  that pass it to oura.get_collection stay untouched.
+
+    def _load_oura_token(self) -> oura_auth.OAuthToken | None:
+        """The stored OAuth credential: fast local copy first, durable Notion
+        copy as the fallback that survives a redeploy.
+
+        A hit in Notion is written back to local disk, so the ~136 ms round
+        trip is paid once per process rather than once per sync — the same
+        hydrate-on-miss shape as repo.get_repository filling an empty
+        datastore from Supabase.
+
+        Never raises. A Config read can fail (offline mode, a Notion blip)
+        and the honest answer then is "no credential I can see", which the
+        caller already has to handle.
+        """
+        local = oura_auth.from_json(local_cache.read().get(_OURA_TOKEN_KEY))
+        if local:
+            return local
+        try:
+            stored = self.get_config_value(_OURA_TOKEN_KEY)
+        except Exception:
+            return None
+        token = oura_auth.from_json(stored)
+        if token:
+            local_cache.update({_OURA_TOKEN_KEY: oura_auth.to_json(token)})
+        return token
+
+    def _store_oura_token(self, token: oura_auth.OAuthToken,
+                          today: date | None = None) -> None:
+        """Persist a credential to BOTH stores, local first.
+
+        Local first because it cannot meaningfully fail and because it is
+        what the next read in this process uses — getting it written closes
+        the window in which a second thread refreshes again. Notion second
+        because it is the copy that survives a redeploy, and because it is
+        the one that can fail.
+
+        ⚠ A failed durable write is recorded, NOT raised. By the time this is
+        called the refresh has already happened and the old refresh token is
+        already dead, so raising would abort a sync while leaving the app
+        holding the only copy of a credential it just declined to use. The
+        marker is what stops that being invisible.
+        """
+        blob = oura_auth.to_json(token)
+        local_cache.update({_OURA_TOKEN_KEY: blob})
+        if self.offline:
+            # Notion writes raise offline by contract (_nc). Refusing to
+            # record the failure here would be noise, not information: the
+            # caller deliberately chose a read-only backend.
+            return
+        try:
+            self.set_config(_OURA_TOKEN_KEY, blob, today=today)
+            local_cache.update({_OURA_TOKEN_PERSIST_ERROR_KEY: None})
+        except Exception as exc:
+            local_cache.update({
+                _OURA_TOKEN_PERSIST_ERROR_KEY:
+                    f"{datetime.now().isoformat(timespec='seconds')}: {exc}"
+            })
+
+    def _refresh_oura_token(self, token: oura_auth.OAuthToken
+                            ) -> oura_auth.OAuthToken:
+        """Redeem the refresh token and persist the replacement.
+
+        PERSIST BEFORE RETURN, unconditionally. The refresh token is spent
+        the instant Oura answers, so the response is the only copy of the
+        next one in existence — returning it to a caller that might not store
+        it is how a credential gets destroyed by a successful call.
+        """
+        payload = oura.refresh_access_token(
+            self.config.oura_client_id, self.config.oura_client_secret,
+            token.refresh_token,
+        )
+        fresh = oura_auth.from_response(payload, previous=token)
+        self._store_oura_token(fresh)
+        return fresh
+
     @property
     def _oc(self) -> str | None:
-        """The bearer token itself — no session/login step for a personal
-        access token, unlike Garmin. None if unconfigured."""
+        """A currently-valid Oura bearer token, or None when unconfigured.
+
+        Still returns a plain string — every caller passes it straight to
+        oura.get_collection and none of them needs to know which credential
+        kind it came from, or that a network round trip may have happened
+        here.
+
+        Order is OAuth first, PAT second. A PAT is only reached when no OAuth
+        credential is stored, so a working legacy token keeps working and a
+        dead one (this project's, since 2026-08-12) is superseded the moment
+        the browser flow is run.
+
+        Refresh is guarded by _OURA_REFRESH_LOCK with a re-read inside it —
+        classic double-checked locking, and load-bearing here rather than an
+        optimisation. Two threads reaching this together must produce ONE
+        refresh: the second has to see the first's result instead of spending
+        a refresh token that Oura has already invalidated.
+
+        A failed refresh does NOT raise while the current access token is
+        still valid. REFRESH_SKEW_SECONDS is a day wide precisely so that a
+        transient failure has many retries before anything breaks; turning
+        the first one into an exception would throw that away and take the
+        sync down for a credential that still works.
+        """
+        token = self._load_oura_token()
+        if token and not oura_auth.needs_refresh(token):
+            return token.access_token
+        if token and oura_auth.can_refresh(token):
+            with _OURA_REFRESH_LOCK:
+                # Re-read: another thread may have refreshed while this one
+                # waited, in which case its result is the live credential and
+                # ours would be a second, fatal redemption.
+                token = self._load_oura_token() or token
+                if oura_auth.needs_refresh(token):
+                    try:
+                        token = self._refresh_oura_token(token)
+                    except Exception:
+                        if not oura_auth.is_expired(token):
+                            return token.access_token
+                        raise
+                return token.access_token
+        if token and token.access_token and not oura_auth.is_expired(token):
+            # Stored, unexpired, but with nothing to refresh with. Usable
+            # now; oura_auth_status is what says it is a dead end.
+            return token.access_token
         if self._oura_token_obj is None:
             self._oura_token_obj = oura.make_client(self.config)
         return self._oura_token_obj
+
+    def _record_oura_auth_failure(self, exc: Exception) -> None:
+        """Remember that Oura rejected the credential, with when and why.
+
+        Local-only, and that is enough: the marker is re-created by the very
+        next sync attempt, so losing it to a redeploy costs one page load of
+        accuracy rather than the credential itself.
+        """
+        local_cache.update({
+            _OURA_AUTH_FAILURE_KEY:
+                f"{datetime.now().isoformat(timespec='seconds')}: {exc}"
+        })
+
+    def _clear_oura_auth_failure(self) -> None:
+        local_cache.update({_OURA_AUTH_FAILURE_KEY: None})
+
+    def oura_auth_status(self, now: datetime | None = None) -> dict:
+        """What credential Oura sync is running on, and whether it is healthy.
+
+        For display — it never includes a token value, so it is safe to
+        render and safe to screenshot. `kind` is "oauth", "pat" or "none";
+        `state` is oura_auth.status's, plus "pat" for the legacy path.
+
+        This exists because the failure it describes was invisible. A dead
+        credential and a flaky network produced the same grey caption for
+        five days, over a stretch where the missing data did not read as
+        missing — readiness renormalised onto its one surviving component and
+        went UP. `needs_authorisation` is the single flag a caller should
+        branch on to say so out loud.
+        """
+        cache = local_cache.read()
+        rejected = cache.get(_OURA_AUTH_FAILURE_KEY)
+        common = {
+            "oauth_configured": bool(self.config.oura_client_id
+                                     and self.config.oura_client_secret),
+            "persist_error": cache.get(_OURA_TOKEN_PERSIST_ERROR_KEY),
+            "rejected": rejected,
+        }
+        token = self._load_oura_token()
+        if token:
+            st = dict(oura_auth.status(token, now=now), kind="oauth", **common)
+            # An observed 401 outranks anything the stored token claims about
+            # itself: a refresh token can be revoked while still looking
+            # perfectly refreshable.
+            st["needs_authorisation"] = bool(rejected) or st["state"] in (
+                "unauthenticated", "expired")
+            if rejected:
+                st["state"] = "rejected"
+            return st
+        if self.config.oura_token:
+            return {"kind": "pat", "state": "rejected" if rejected else "pat",
+                    "expires_at": None, "can_refresh": False, "scope": "",
+                    "seconds_remaining": None,
+                    "needs_authorisation": bool(rejected), **common}
+        return {"kind": "none", "state": "unauthenticated", "expires_at": None,
+                "can_refresh": False, "scope": "", "seconds_remaining": None,
+                "needs_authorisation": True, **common}
+
+    def save_oura_oauth_token(self, payload: dict,
+                              today: date | None = None) -> oura_auth.OAuthToken:
+        """Store the token pair a fresh authorisation produced. The entry
+        point scripts/authorize_oura.py uses, kept here so the storage rules
+        (both stores, local first) have exactly one implementation."""
+        token = oura_auth.from_response(payload, previous=self._load_oura_token())
+        self._store_oura_token(token, today=today)
+        return token
 
     # ─── Supabase mirror ─────────────────────────────────────────────────
     #  Every Sheets row this class writes is ALSO sent to Supabase, so the
@@ -4707,7 +4939,16 @@ class Repository:
     # ─────────────────────────────────────────────────────────────────────
 
     def oura_configured(self) -> bool:
-        return bool(self.config.oura_token)
+        """True when Oura sync has SOMETHING to authenticate with — a stored
+        OAuth credential, or the legacy PAT.
+
+        Deliberately not "is the credential valid": a stale OAuth token is
+        configured and refreshable, and reporting it as unconfigured would
+        route the athlete to "add OURA_TOKEN to secrets.toml", which is now
+        the wrong repair and no longer even possible. oura_auth_status is
+        what answers health.
+        """
+        return bool(self.config.oura_token) or self._load_oura_token() is not None
 
     def _oura_daily_ws(self):
         return self._ws(sheets.OURA_DAILY_WORKSHEET, _OURA_DAILY_HEADER)
@@ -5514,7 +5755,12 @@ class Repository:
         """
         token = self._oc
         if token is None:
-            raise RuntimeError("Oura is not configured — add OURA_TOKEN to .streamlit/secrets.toml.")
+            raise RuntimeError(
+                "Oura is not authorised — run `python scripts/authorize_oura.py`. "
+                "(Oura retired Personal Access Tokens in December 2025, so adding "
+                "OURA_TOKEN to secrets.toml is no longer a route in: new credentials "
+                "come from the OAuth flow.)"
+            )
         today = today or date.today()
         start = (today - timedelta(days=days - 1)).isoformat()
         end = today.isoformat()
@@ -5527,20 +5773,29 @@ class Repository:
         }
 
         result: dict[str, int] = {}
-        for tab in _OURA_SYNC_ORDER:
-            if tab in already:
-                result[tab] = already[tab]
-                continue
-            if tab == "daily":
-                count = self._sync_oura_daily(token, start, end)
-            else:
-                endpoint, ws_getter, header, mapper = events[tab]
-                count = self._sync_oura_events(
-                    token, endpoint, start, end, ws_getter(), header, mapper,
-                )
-            result[tab] = count
-            self._mark_oura_tab_synced(window, tab, count, now=now)
-
+        try:
+            for tab in _OURA_SYNC_ORDER:
+                if tab in already:
+                    result[tab] = already[tab]
+                    continue
+                if tab == "daily":
+                    count = self._sync_oura_daily(token, start, end)
+                else:
+                    endpoint, ws_getter, header, mapper = events[tab]
+                    count = self._sync_oura_events(
+                        token, endpoint, start, end, ws_getter(), header, mapper,
+                    )
+                result[tab] = count
+                self._mark_oura_tab_synced(window, tab, count, now=now)
+        except oura.OuraAuthError as exc:
+            # RECORD, then re-raise unchanged. A 401 here is the only evidence
+            # that a static PAT has been revoked — nothing about the stored
+            # credential itself can reveal it, so without this the athlete's
+            # actual 2026-08-12 state (a dead PAT) still reports healthy and
+            # the Home banner still never fires.
+            self._record_oura_auth_failure(exc)
+            raise
+        self._clear_oura_auth_failure()
         self._clear_oura_sync_progress()
         return result
 
@@ -5590,7 +5845,12 @@ class Repository:
         _oura_daily_row."""
         token = self._oc
         if token is None:
-            raise RuntimeError("Oura is not configured — add OURA_TOKEN to .streamlit/secrets.toml.")
+            raise RuntimeError(
+                "Oura is not authorised — run `python scripts/authorize_oura.py`. "
+                "(Oura retired Personal Access Tokens in December 2025, so adding "
+                "OURA_TOKEN to secrets.toml is no longer a route in: new credentials "
+                "come from the OAuth flow.)"
+            )
 
         raw: dict[str, list[dict]] = {}
         by_date: dict[str, dict] = {}

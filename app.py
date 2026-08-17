@@ -2167,7 +2167,31 @@ else:
         st.button(f"Open {_cview} detail", key=_ckey, on_click=_go,
                   kwargs={"d": selected_date, "view": _cview},
                   use_container_width=True)
-if not _oura_sync_ok and _oura_sync_err:
+# A DEAD CREDENTIAL AND A FLAKY NETWORK ARE NOT THE SAME NOTICE, and
+# collapsing them into one grey caption is what let the Oura token die on
+# 2026-08-12 and go unnoticed for five days. "will retry next visit" was
+# actively wrong: no number of retries fixes a revoked token, and the gap did
+# not read as a gap — readiness renormalised onto its one surviving component
+# (services/readiness.py:309-317) and went UP, so the screen looked healthier
+# than the week it was hiding.
+#
+# Checked INDEPENDENTLY of this run's sync result, not nested inside it. The
+# sync is throttled to 2 hours and backs off after a failure, so most opens
+# during an outage carry a (True, None) status — nesting the check would
+# restore the silence by the other door.
+try:
+    _oura_auth = repo.get_repository().oura_auth_status()
+except Exception:
+    _oura_auth = {"needs_authorisation": False}
+if _oura_auth.get("needs_authorisation"):
+    st.error(
+        "**Oura is not authorised — your sleep is not being recorded.** Readiness "
+        "and HRV are running without it, so today's numbers are not comparable "
+        "with last week's. Re-authorise with `python scripts/authorize_oura.py`, "
+        "then backfill the missed nights.",
+        icon="🔴",
+    )
+elif not _oura_sync_ok and _oura_sync_err:
     st.caption("Oura sync unavailable — will retry next visit.")
 if not _garmin_sync_ok and _garmin_sync_err:
     st.caption("Garmin sync unavailable — will retry next visit.")
