@@ -1706,19 +1706,68 @@ class Repository:
             })
         return out
 
-    def get_pain_free_streak(self) -> int:
+    #: How long a pain-free streak keeps growing after the last check-in.
+    #:
+    #: The streak is the ONLY thing that decays injury weight, and injury
+    #: weight caps volume even on a green day. So if silence accrued days
+    #: freely, NOT LOGGING would be the way to unlock progressive overload —
+    #: a perverse incentive on the one input that exists to protect healing
+    #: tissue. Freezing after this many days means an unlogged stretch stops
+    #: the clock rather than running it forward on no evidence.
+    PAIN_STREAK_STALE_DAYS = 3
+
+    def get_pain_free_streak(self, today: date | None = None) -> int:
+        """CALENDAR DAYS since the last check-in that reported pain, frozen
+        when check-ins lapse.
+
+        ⚠ THIS USED TO COUNT CHECK-IN RECORDS, and its one caller passes the
+        result to engine.injury_weight as `days_pain_free`. The athlete checks
+        in about every three days, so a record count ran roughly 3x short:
+        measured 2026-08-17, the streak read 1 where 5 calendar days had
+        passed since the last pain report, and the >0.7 injury-weight cap
+        (which needs 8) would have taken ~24 calendar days to clear instead of
+        8. That is why a green-metrics day kept prescribing CONSERVATIVE LOAD
+        — the cap never got the chance to lift.
+
+        Days rather than records, per the athlete's decision 2026-08-17, with
+        the silence freeze that decision named: see PAIN_STREAK_STALE_DAYS for
+        why an unlogged day must not advance the clock.
+
+        A day with no check-in inside the grace window counts as pain-free —
+        it is the absence of a REPORT, not the absence of pain, and the freeze
+        is what stops that assumption running away.
+        """
+        today = today or date.today()
         pages = self._query(
             self.config.notion_db_readiness,
             sorts=[{"property": "Date", "direction": "descending"}],
         )
-        streak = 0
+        entries = []
         for p in pages:
-            pain = notion.get_property(p, "Pain", "number") or 0
-            if pain == 0:
-                streak += 1
-            else:
-                break
-        return streak
+            iso = notion.get_property(p, "Date", "date")
+            if not iso:
+                continue
+            try:
+                entries.append((date.fromisoformat(str(iso)[:10]),
+                                notion.get_property(p, "Pain", "number") or 0))
+            except ValueError:
+                continue
+        if not entries:
+            return 0
+        entries.sort(reverse=True)
+
+        # Anchor: the day pain was last reported. With no pain ever reported,
+        # the streak runs from the FIRST check-in — there is no evidence of
+        # pain-free time before any observation was made.
+        anchor = next((d for d, pain in entries if pain > 0), None)
+        if anchor is None:
+            anchor = entries[-1][0]
+
+        # The streak stops advancing once check-ins stop, so silence freezes
+        # it instead of decaying injury weight for free.
+        latest_checkin = entries[0][0]
+        end = min(today, latest_checkin + timedelta(days=self.PAIN_STREAK_STALE_DAYS))
+        return max(0, (end - anchor).days)
 
     def get_avg_tightness(self, days: int = 14, today: date | None = None) -> float:
         today = today or date.today()

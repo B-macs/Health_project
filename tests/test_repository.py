@@ -1161,15 +1161,79 @@ def test_get_weekly_rollup_history_skips_malformed_rows():
 
 # ─── Long-tail dict-returning functions (spot checks) ──────────────────────
 
-def test_get_pain_free_streak_counts_until_first_pain_day():
+def _checkin(iso, pain):
+    return {"properties": {"Date": {"date": {"start": iso}},
+                           "Pain": _number_prop(pain)}}
+
+
+def test_get_pain_free_streak_counts_days_not_check_in_records():
+    """⚠ THIS TEST INVERTED ON 2026-08-17, deliberately.
+
+    It used to assert the streak was the number of consecutive pain-free
+    CHECK-IN ROWS. Its one caller passes the result to engine.injury_weight as
+    `days_pain_free`, and the athlete checks in about every three days — so
+    the record count ran roughly 3x short and the >0.7 injury-weight cap,
+    which needs 8, took ~24 calendar days to clear instead of 8. That is what
+    kept prescribing CONSERVATIVE LOAD on days every biometric was green.
+
+    The three pain-free rows below span six calendar days from the pain
+    report, and six is the answer.
+    """
+    import datetime
+
     pages = [
-        {"properties": {"Pain": _number_prop(0)}},
-        {"properties": {"Pain": _number_prop(0)}},
-        {"properties": {"Pain": _number_prop(2)}},
-        {"properties": {"Pain": _number_prop(0)}},
+        _checkin("2026-08-17", 0),
+        _checkin("2026-08-15", 0),
+        _checkin("2026-08-13", 0),
+        _checkin("2026-08-11", 2),
+        _checkin("2026-08-09", 0),
     ]
     repo = _repo({"db-readiness": pages})
-    assert repo.get_pain_free_streak() == 2
+    assert repo.get_pain_free_streak(today=datetime.date(2026, 8, 17)) == 6
+
+
+def test_pain_free_streak_freezes_when_check_ins_lapse():
+    """Silence must not decay injury weight. The streak is the only thing that
+    lifts the volume cap, so if unlogged days accrued freely then NOT LOGGING
+    would be the way to unlock progressive overload — on the one input that
+    exists to protect healing tissue."""
+    import datetime
+
+    pages = [_checkin("2026-08-13", 0), _checkin("2026-08-10", 1)]
+    repo = _repo({"db-readiness": pages})
+    grace = repo.PAIN_STREAK_STALE_DAYS
+
+    # Still checking in: the clock runs.
+    assert repo.get_pain_free_streak(today=datetime.date(2026, 8, 13)) == 3
+    # A fortnight of silence buys only the grace window, not a fortnight.
+    frozen = repo.get_pain_free_streak(today=datetime.date(2026, 8, 27))
+    assert frozen == 3 + grace
+    assert frozen < (datetime.date(2026, 8, 27) - datetime.date(2026, 8, 10)).days
+
+
+def test_pain_free_streak_with_no_pain_ever_runs_from_the_first_check_in():
+    """There is no evidence of pain-free time before any observation was
+    made, so the streak cannot predate the first check-in."""
+    import datetime
+
+    pages = [_checkin("2026-08-16", 0), _checkin("2026-08-14", 0)]
+    repo = _repo({"db-readiness": pages})
+    assert repo.get_pain_free_streak(today=datetime.date(2026, 8, 16)) == 2
+
+
+def test_pain_free_streak_is_zero_with_no_check_ins():
+    import datetime
+
+    repo = _repo({"db-readiness": []})
+    assert repo.get_pain_free_streak(today=datetime.date(2026, 8, 17)) == 0
+
+
+def test_pain_free_streak_ignores_undated_rows_rather_than_crashing():
+    import datetime
+
+    pages = [{"properties": {"Pain": _number_prop(0)}}, _checkin("2026-08-15", 1)]
+    repo = _repo({"db-readiness": pages})
+    assert repo.get_pain_free_streak(today=datetime.date(2026, 8, 17)) == 2
 
 
 def test_get_avg_tightness_rounds_to_one_decimal():

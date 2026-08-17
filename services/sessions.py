@@ -77,6 +77,9 @@ RELEASE_EXERCISE_NAMES = frozenset({
     # by the Stage 2B block test, which asserts every session OPENS with a
     # release exercise.
     "Right Posterior Hip Capsule Stretch (Revised Cue)",
+    # Same omission would put the quadruped version in the "Workout"
+    # accordion instead of the release block.
+    "Right Posterior Hip Capsule Stretch (Quadruped)",
     "Piriformis Contract-Relax (PNF)",
     "Ischial Tuberosity Hamstring Release",
     "Right Hip Tendon Path Drill (Coxa Saltans)",
@@ -655,6 +658,22 @@ _REST_BANNER = (
     "Rest day recommended today — mobility and walking only. No loaded "
     "exercises."
 )
+# THE SAME CLAMP, TOLD TRUTHFULLY. Athlete, 2026-08-17: "if my strain is at 2.3
+# then it shouldn't say reduced load in training, that is a contradiction."
+#
+# _REDUCED_BANNER is a statement about how he IS -- keep it controlled, don't
+# push. On an injury-cap day that is simply false: the biometrics are green and
+# the engine agrees they are. What is true is that the numbers are held at his
+# last session because tissue is still healing, which is a standing constraint
+# and not news about this morning.
+#
+# ⚠ The numbers are clamped identically either way. This changes the sentence
+# and the colour, never the ceiling -- see load_policy.
+_CAPPED_BANNER = (
+    "Your recovery metrics are green. Volume is still held at your last "
+    "session because the injury cap is active — this is the healing timeline, "
+    "not today's readings. Nothing below will ask you to add load."
+)
 
 
 class PrescriptionContradiction(RuntimeError):
@@ -729,8 +748,22 @@ def load_policy(directive: dict | None, readiness_modifier: dict | None) -> dict
     else:
         note = readiness_modifier.get("description", "") or ""
 
+    # WHICH SENTENCE, AND WHICH COLOUR. `reduced` and the clamp below it are
+    # unchanged — a capped day is still capped, whatever drove it. What the
+    # driver decides is whether the athlete is told he is under-recovered,
+    # because on a green-metrics injury-cap day that would be untrue.
+    #
+    # An unknown or missing driver falls through to the WARNING wording. That
+    # is the conservative default: under-warning about fatigue is the worse
+    # error, and a directive that cannot say what drove it has not earned the
+    # reassurance.
+    driver = directive.get("driver")
+    standing_cap = driver in engine.STANDING_CAP_DRIVERS
+
     if signal == "red":
         kind, text = "error", _REST_BANNER
+    elif reduced and standing_cap:
+        kind, text = "info", _CAPPED_BANNER
     elif reduced:
         kind, text = "warning", _REDUCED_BANNER
     else:
@@ -743,6 +776,10 @@ def load_policy(directive: dict | None, readiness_modifier: dict | None) -> dict
         "volume_note":   note,
         "banner_kind":   kind,
         "banner_text":   text,
+        # Named so the view can colour by what is actually true, and so a test
+        # can assert the fatigue wording never appears on a green day.
+        "driver":        driver,
+        "standing_cap":  standing_cap,
     }
 
 

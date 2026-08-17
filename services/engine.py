@@ -989,6 +989,46 @@ def volume_recommendation(
     return rec
 
 
+# ── WHAT DECIDED TODAY'S DIRECTIVE ───────────────────────────────────────────
+#
+# Athlete, 2026-08-17, on being told "Reduced load today" with every metric
+# green and strain at 2.3: "I want to ensure that the colours match — if my
+# strain is at 2.3 then it shouldn't say reduced load in training, that is a
+# contradiction."
+#
+# He is right, and the contradiction is real rather than cosmetic. A directive
+# can be lowered by things that have NOTHING to do with how recovered he is —
+# the injury-weight cap, an ACWR lock, observation mode — but every one of them
+# arrived at the screen wearing the same warning colour and the same
+# fatigue-shaped sentence. On a green day that tells him his body is struggling
+# when the engine believes no such thing.
+#
+# `driver` names which of them decided, so the caller can hold the numbers down
+# (which is the safety behaviour, and does not change) while saying something
+# TRUE about why. See services/sessions.load_policy for the split it enables.
+#
+# THE MULTIPLIER IS UNTOUCHED BY THIS. A capped day is still capped.
+DRIVER_NONE = "none"                  # all clear, nothing is holding load back
+DRIVER_BIOMETRICS = "biometrics"      # HRV/RHR/sleep/temp vs baseline
+DRIVER_ACWR = "acwr"                  # acute:chronic ratio hard lock
+DRIVER_INJURY_WEIGHT = "injury_weight"  # tissue still healing; independent of today
+DRIVER_OBSERVATION = "observation"    # still collecting baseline
+DRIVER_NO_DATA = "no_data"            # nothing to judge on
+
+#: Drivers that are a statement about TODAY'S RECOVERY. These justify telling
+#: the athlete to hold back because of how he is.
+RECOVERY_DRIVERS = (DRIVER_BIOMETRICS, DRIVER_ACWR)
+
+#: Drivers that cap volume for reasons having nothing to do with how recovered
+#: he is today. An ALLOWLIST, not "everything that isn't a recovery driver":
+#: the two mistakes are not symmetric. Telling him he is fine on a genuinely
+#: bad day is dangerous; telling him a good day is capped is merely honest. So
+#: an unrecognised driver — a new branch someone forgets to classify — must
+#: fall through to the cautious wording, which "not in RECOVERY_DRIVERS" would
+#: not do.
+STANDING_CAP_DRIVERS = (DRIVER_INJURY_WEIGHT,)
+
+
 def _volume_recommendation_core(
     traffic: dict,
     acwr_result: dict,
@@ -1016,6 +1056,7 @@ def _volume_recommendation_core(
     if observation_days_remaining > 0:
         return {
             "label":              "OBSERVATION MODE",
+            "driver":             DRIVER_OBSERVATION,
             "multiplier":         1.0,
             "action":             f"Collecting baseline data. Recommendations activate in "
                                   f"{observation_days_remaining} more day(s). Train at comfortable "
@@ -1034,6 +1075,7 @@ def _volume_recommendation_core(
     if tl_status == "insufficient_data":
         return {
             "label":              "OBSERVATION MODE",
+            "driver":             DRIVER_NO_DATA,
             "multiplier":         1.0,
             "action":             traffic.get("message", "Log biometrics daily to activate the engine."),
             "signal_color":       "grey",
@@ -1044,6 +1086,7 @@ def _volume_recommendation_core(
     if overall == "red":
         return {
             "label":              "REST / DELOAD",
+            "driver":             DRIVER_BIOMETRICS,
             "multiplier":         0.0,
             "action":             "Biometrics indicate systemic fatigue or distress. "
                                   "No loaded training. Mobility and light walking only.",
@@ -1055,10 +1098,20 @@ def _volume_recommendation_core(
     if hard_locked and acwr_val is not None:
         return {
             "label":              "VOLUME HARD-LOCKED",
+            "driver":             DRIVER_ACWR,
             "multiplier":         0.75,
             "action":             f"ACWR {acwr_val:.2f} exceeds Stage {stage} ceiling of {ceiling}. "
                                   f"Upper training limits capped. Maintain current loads — no increases.",
-            "signal_color":       "red",
+            # ORANGE, NOT RED. "red" routes load_policy to the REST banner
+            # ("mobility and walking only, no loaded exercises") on a branch
+            # whose own action text says "maintain current loads" and whose
+            # multiplier is 0.75, not 0.0 — the red branch above is the one
+            # that means rest, and it says so with a zero. Found 2026-08-17
+            # while removing the same contradiction from the injury-weight
+            # branch. DORMANT today (ACWR_ADVISORY_MODE forces hard_locked
+            # False), which is exactly why it is worth correcting before
+            # enforcement is evaluated at Stage 2B rather than after.
+            "signal_color":       "orange",
             "injury_weight_active": False,
         }
 
@@ -1066,6 +1119,7 @@ def _volume_recommendation_core(
     if overall == "yellow":
         return {
             "label":              "REDUCED VOLUME  (−25%)",
+            "driver":             DRIVER_BIOMETRICS,
             "multiplier":         0.75,
             "action":             "Biometrics are below baseline. Scale total volume down 20–30%. "
                                   "Hold intensity targets unchanged — do not increase load today.",
@@ -1080,6 +1134,7 @@ def _volume_recommendation_core(
         iw_pct = int(injury_weight_val * 100)
         return {
             "label":              f"CONSERVATIVE LOAD  (injury weight {iw_pct}%)",
+            "driver":             DRIVER_INJURY_WEIGHT,
             "multiplier":         0.85,
             "action":             f"Biometrics nominal but injury baseline weight is {iw_pct}% — "
                                   f"tissue tolerance is still primary. Maintain current load. "
@@ -1091,6 +1146,7 @@ def _volume_recommendation_core(
     # All clear — standard progressive overload
     return {
         "label":              "PROGRESSIVE OVERLOAD",
+        "driver":             DRIVER_NONE,
         "multiplier":         1.05,
         "action":             "All systems nominal. Apply standard progressive overload: "
                               "+2.5 kg (Stage 2+) or +1 rep per set (Stage 1).",

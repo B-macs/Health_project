@@ -3362,6 +3362,13 @@ def render():
         st.error(_policy["banner_text"])
     elif _policy["banner_kind"] == "warning":
         st.warning(_policy["banner_text"])
+    elif _policy["banner_kind"] == "info":
+        # A STANDING CAP, NOT A BAD MORNING. Blue rather than amber, because
+        # the amber was the contradiction the athlete reported: green metrics
+        # and low strain under a warning that reads as "you are under-
+        # recovered". The numbers below are clamped exactly as they would be
+        # under the warning — only the claim about WHY has changed.
+        st.info(_policy["banner_text"])
     # green / grey: no banner — train normally, nothing to flag
     # ACWR is advisory while engine.ACWR_ADVISORY_MODE is set: it annotates the
     # day, it does not decide it.
