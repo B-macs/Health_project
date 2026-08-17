@@ -2846,9 +2846,52 @@ def _s2b_prep(lower: bool) -> list:
 
 
 def _s2b_release(hip_loaded: bool, anterior: bool = False) -> list:
-    """Phase 1. Capsule stretch FIRST on hip-loaded days, pressure releases
-    after it — the warm-up review's free win. About 5 min, 7.5 on hip days,
-    9.5 once the anterior-hip item joins in week 3.
+    """Phase 1. Pressure releases, with the ischial-tuberosity release leading
+    on hip-loaded days. About 5 min, 8.5 on hip days, 10.5 once the anterior-hip
+    item joins in week 3.
+
+    ── 2026-08-17: THE HIP-LOADED HEAD WAS REPLACED, ON MEASUREMENT ──────────
+    It was [capsule stretch, Coxa Saltans drill]. Both were retired the same
+    morning, each for its own reason, and both reasons are readings rather than
+    judgements:
+
+    CAPSULE STRETCH OUT — its target was refuted. Finding #2 attributes the
+    standing hinge crack to a tight RIGHT posterior hip capsule, which had never
+    once been measured in the seven weeks it was being treated. A tight
+    posterior capsule is what restricts hip INTERNAL rotation, so that is the
+    test; run prone on 2026-08-17 it came back **past 45 degrees on BOTH sides
+    with no clear asymmetry** — at or above normal range, and no side
+    difference. There is no capsular restriction to treat.
+      REVERT: a measured right-left internal-rotation gap beyond ~10 degrees, or
+      a firm abrupt capsular end-feel on the right. The exercise itself is kept
+      (RIGHT_HIP_CAPSULE_QUADRUPED) rather than deleted, so restoring it is one
+      line. Note the deep squat CANNOT be used as the test either way — it is
+      flexion + abduction + EXTERNAL rotation, the directions a posterior
+      capsule does not restrict, so a full squat is silent on the question.
+
+    COXA SALTANS DRILL OUT — it achieved its stated purpose. Its own mechanics
+    say the job is to "retrain the motor pattern to avoid the snap during daily
+    movement", and daily movement is neutral rotation. Athlete, 2026-08-17: the
+    click is GONE in neutral and remains only under deliberate external
+    rotation, where originally it was present in both. The residual is a tendon
+    crossing a bony ridge — painless per finding #4, and the ridge does not
+    move, so it is not a training target.
+      NOTE the cue survives the drill: key rule 7 still requires neutral or
+      slight internal rotation on every right hip flexion past 60 degrees. That
+      is a cue on other exercises, not this drill.
+      REVERT: the click reappearing in neutral rotation.
+
+    ISCHIAL TUBEROSITY RELEASE IN — finding #2 names TWO structures, and
+    clearing the capsule leaves the other one: "proximal hamstring tendon at
+    the ischial tuberosity". The crack itself is still present (athlete,
+    2026-08-17: slight, both directions, right, better than before), so the
+    symptom is real and now has one candidate mechanism instead of two. This
+    item was in Stage 2A, was cut from 2B on the five-minute budget rather than
+    on evidence, and pre_session_release records it as physio-confirmed for
+    this site and owed back at the next contact. The two removals above pay for
+    it almost exactly: 3.2 min out, 3.75 min in.
+
+    ── original note ────────────────────────────────────────────────────────
 
     `anterior` adds the front-of-hip release, and it is deliberately NOT on from
     day 1. The daily protocol that establishes whether there is anything there
@@ -2863,7 +2906,7 @@ def _s2b_release(hip_loaded: bool, anterior: bool = False) -> list:
     comparability with the Stage 1 and Stage 2A versions of itself, and a new
     hip-flexor release immediately before a hinge assessment would move the
     number for a reason that has nothing to do with the athlete."""
-    head = [RIGHT_HIP_CAPSULE_5MIN, COXA_SALTANS_DRILL] if hip_loaded else []
+    head = [ISCHIAL_RELEASE] if hip_loaded else []
     tail = [ANTERIOR_HIP_RELEASE] if anterior else []
     return head + [UPPER_GLUTE_RELEASE_5MIN, PIRIFORMIS_PNF_5MIN] + tail
 
