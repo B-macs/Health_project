@@ -153,7 +153,32 @@ _INTEGRAL_SET_FIELDS = ("set_num", "reps", "rest", "tut", "rest_taken_seconds", 
 #: Written into a synthesized page id. Not a valid Notion UUID, so a write
 #: that somehow reached one fails at the API naming this string, instead of
 #: quietly updating a real page.
+#:
+#: ⚠ "somehow reached one" turned out to be the NORMAL case in cache mode,
+#: which reads locally and writes live — see Repository._live_page_id. Only
+#: READINESS and CONFIG synthesize; a TRAINING page id IS its exercise_id, the
+#: real Notion UUID, which is why the training write paths were never bitten.
 ID_PREFIX = "offline:"
+
+
+def is_synthesized_page_id(page_id) -> bool:
+    """True for a page id this module invented rather than read from Notion."""
+    return isinstance(page_id, str) and page_id.startswith(ID_PREFIX)
+
+
+def synthesized_page_key(page_id: str) -> tuple[str, str]:
+    """('config', 'phases') out of 'offline:config:phases'.
+
+    Split on the first two colons only: a CONFIG key or a READINESS date is
+    the whole remainder, so a key that itself contained a colon still comes
+    back whole.
+    """
+    if not is_synthesized_page_id(page_id):
+        raise ValueError(f"{page_id!r} is not a synthesized page id")
+    kind, _, key = page_id[len(ID_PREFIX):].partition(":")
+    if kind not in PROPERTIES:
+        raise ValueError(f"{page_id!r} names no known database")
+    return kind, key
 
 
 class NotionQueryUnsupportedError(RuntimeError):

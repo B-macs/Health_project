@@ -1333,6 +1333,63 @@ class Repository:
                 self._ds, self._db_kind(db_id), filter_=filter_, sorts=sorts)
         return notion.query_database(self._nc, db_id, filter_=filter_, sorts=sorts)
 
+    #: How to find a page LIVE from the key its synthesized id carries. One
+    #: entry per database whose page ids are invented — TRAINING is absent
+    #: because its page id IS the real Notion UUID (notion_reader._page_id).
+    _LIVE_PAGE_FILTER = {
+        notion_reader.CONFIG:
+            lambda key: {"property": "Key", "title": {"equals": key}},
+        notion_reader.READINESS:
+            lambda key: {"property": "Date", "date": {"equals": key}},
+    }
+
+    def _live_db_id(self, kind: str) -> str:
+        return {
+            notion_reader.READINESS: self.config.notion_db_readiness,
+            notion_reader.TRAINING:  self.config.notion_db_training,
+            notion_reader.CONFIG:    self.config.notion_db_config,
+        }[kind]
+
+    def _live_page_id(self, page_id: str | None) -> str | None:
+        """The REAL Notion page id to write to, for an id that came off a read.
+
+        This is `_write_target` for Notion, and it exists for the same reason:
+        cache mode reads locally and writes live, so the two halves need two
+        handles. Every Notion read goes through `_query`, which offline and in
+        cache mode returns datastore rows wearing SYNTHESIZED page ids
+        ("offline:config:phases"). Those ids are deliberately not UUIDs, so a
+        write built on one is rejected by the API rather than landing on some
+        other page — which is exactly what happened when the Stage 2B block was
+        started on the hosted app: `set_phases` raised APIResponseError out of
+        `pages.update`, from a screen whose entire job is that one button.
+
+        Returns None when the page does not exist live. That is a real answer,
+        not a failure: the local row can exist where the Notion page does not
+        (a page deleted upstream, a cache hydrated from Supabase), and the
+        caller's response is to CREATE rather than to update. Callers that
+        cannot create say so themselves.
+
+        A live id passes straight through untouched, so live mode and every
+        TRAINING write path are byte-identical to before and cost no round
+        trip. Only a synthesized id pays for the lookup — once per write, on
+        writes that are already going over the network.
+        """
+        if not notion_reader.is_synthesized_page_id(page_id):
+            return page_id
+        kind, key = notion_reader.synthesized_page_key(page_id)
+        make_filter = self._LIVE_PAGE_FILTER.get(kind)
+        if make_filter is None or not key:
+            raise ValueError(
+                f"cannot resolve {page_id!r} to a live Notion page — no key to "
+                f"look it up by"
+            )
+        pages = notion.query_database(
+            self._nc, self._live_db_id(kind), filter_=make_filter(key))
+        # First-wins on a duplicated key, matching _config_pages and
+        # _find_check_in_page — Notion guarantees no order either way, so a
+        # duplicate was already nondeterministic and this does not add to it.
+        return pages[0]["id"] if pages else None
+
     # ─────────────────────────────────────────────────────────────────────
     #  Daily Readiness / Check-In
     # ─────────────────────────────────────────────────────────────────────
@@ -1421,7 +1478,20 @@ class Repository:
 
     def save_check_in(self, record: models.CheckInRecord) -> None:
         existing_page = self._find_check_in_page(record.date)
-        if existing_page is None:
+        # Resolved BEFORE the branch, because in cache mode a local row proves
+        # only that the datastore has this date — the Notion page behind it is
+        # what decides create-vs-update, and its id is the only one writable.
+        # The merge below still reads `existing_page`: those values are
+        # written through, so the local copy is current by construction.
+        existing_id = (self._live_page_id(existing_page["id"])
+                       if existing_page is not None else None)
+        if existing_id is None:
+            # Merge even here when a local row exists: the Notion page is gone
+            # but its values are not, and dropping them would let an untouched
+            # widget default overwrite a real earlier reading — the exact thing
+            # _merge_check_in exists to prevent.
+            if existing_page is not None:
+                record, _ = self._merge_check_in(record, existing_page)
             properties = self._check_in_properties(record)
             notion.create_page(
                 self._nc, self.config.notion_db_readiness, properties=properties,
@@ -1441,7 +1511,7 @@ class Repository:
         properties = self._check_in_properties(merged)
         if note_changed:
             properties["Parsed"] = notion.checkbox(False)
-        notion.update_page(self._nc, existing_page["id"], properties=properties)
+        notion.update_page(self._nc, existing_id, properties=properties)
         # PATCH, not upsert: this writes 19 of 24 columns and must not touch
         # the AI-parser ones (update_readiness_ai owns those), nor reset
         # `parsed` on an update that did not change the note.
@@ -1460,7 +1530,21 @@ class Repository:
 
     def find_duplicate_check_in_dates(self) -> dict[str, list[dict]]:
         """Every date in the Readiness DB with more than one page, raw
-        pages keyed by ISO date — input for merge_check_in_group()."""
+        pages keyed by ISO date — input for merge_check_in_group().
+
+        Refuses to run off the local datastore, rather than returning {}.
+        readiness_checkins is keyed BY date, so duplicates were already
+        collapsed last-one-wins on the way in and are structurally
+        unrepresentable there — an empty result would read as "checked, all
+        clean" when the question was never asked. This is a live-Notion repair
+        tool; unset HEALTH_DATASTORE_PATH to run it."""
+        if self.local_datastore:
+            raise datastore_reader.DatastoreReadOnlyError(
+                "duplicate check-in pages cannot be found through the local "
+                "datastore — it stores one row per date, so duplicates are "
+                "already collapsed. Unset datastore_path / "
+                "HEALTH_DATASTORE_PATH and run this against live Notion."
+            )
         pages = self._query(self.config.notion_db_readiness)
         by_date: dict[str, list[dict]] = {}
         for p in pages:
@@ -1550,7 +1634,20 @@ class Repository:
         """Writes merge_check_in_group()'s result: updates the surviving
         page with the merged fields, then archives the now-redundant
         duplicate(s). Notion's archive is a soft-delete (restorable from
-        its own trash), never a hard delete."""
+        its own trash), never a hard delete.
+
+        Ids must be real. Unlike the other write paths there is nothing to
+        resolve a synthesized one against — the whole input is a set of
+        SIBLING pages sharing one date, and the datastore holds a single row
+        for that date, so the archive list cannot even be named. Its only
+        caller already refuses to get this far (find_duplicate_check_in_dates
+        raises), and this is the second line of that defence."""
+        for pid in [primary_page_id, *archive_ids]:
+            if notion_reader.is_synthesized_page_id(pid):
+                raise ValueError(
+                    f"refusing to merge check-ins with a datastore-synthesized "
+                    f"page id ({pid!r}) — run this against live Notion"
+                )
         notion.update_page(self._nc, primary_page_id, properties=properties)
         for page_id in archive_ids:
             notion.archive_page(self._nc, page_id)
@@ -1681,7 +1778,15 @@ class Repository:
             "Warning":           notion.select(warning_level),
             "Parsed":            notion.checkbox(True),
         }
-        notion.update_page(self._nc, row_id, properties=properties)
+        # get_unparsed_readiness hands back whatever _query produced, so in
+        # cache mode row_id is synthesized. A page that no longer exists live
+        # is skipped rather than created: this method only ever ANNOTATES a
+        # check-in someone else wrote, and a page holding five AI columns and
+        # no reading is worse than no page at all.
+        page_id = self._live_page_id(row_id)
+        if page_id is None:
+            return
+        notion.update_page(self._nc, page_id, properties=properties)
         if entry_date:
             self.mirror_notion_write(notion_reader.READINESS, entry_date,
                                      properties, mode=supabase_store.PATCH)
@@ -2447,8 +2552,14 @@ class Repository:
             "Updated": notion.date_prop(str(today)),
         }
         try:
-            if page:
-                notion.update_page(self._nc, page["id"], props)
+            # The page came from _query, so in cache mode its id is
+            # synthesized and cannot be written to. Resolving it live is what
+            # makes "begin the next block" work on the hosted app; a None here
+            # means the row exists locally but the Notion page does not, and
+            # creating is the right repair rather than an error.
+            page_id = self._live_page_id(page["id"]) if page else None
+            if page_id:
+                notion.update_page(self._nc, page_id, props)
             else:
                 notion.create_page(self._nc, self.config.notion_db_config, props)
             # Inside the try and AFTER the write, never in the finally: a
