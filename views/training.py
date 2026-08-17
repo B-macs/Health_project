@@ -131,11 +131,44 @@ function _bellStrike(root, atOffset, vol, dur) {
   });
 }
 
-// The finish signal: two crisp ascending strikes, race-start style. Scheduled
-// on the audio clock (not setTimeout) so the interval between them is exact.
+// ── THREE ENDINGS, TOLD APART BY CONTOUR ──────────────────────────────────
+//
+// Athlete's request, 2026-08-17: the last timer of a run must not sound like
+// the ones before it. Mid-set he is holding a side bridge with his eyes shut
+// and cannot look at the screen, so the bell is the only channel that says
+// what happens next -- and one bell for "another rep", "swap sides" and
+// "that's the set" makes all three the same instruction.
+//
+// PITCH CONTOUR carries it, not timbre or volume: rising / falling / falling
+// further is audible over gym noise and through one earbud, where a change of
+// tone colour is not. All three reuse _bellStrike so they stay recognisably
+// the same instrument -- the message is the shape, not a different sound
+// effect.
+//
+// Scheduled on the audio clock (not setTimeout) so the intervals are exact.
+
+// RISING pair, race-start style: another timer follows immediately.
 function _bellDouble() {
   _bellStrike(784.0, 0.00, 0.95, 1.5);   // G5
   _bellStrike(1174.7, 0.16, 1.00, 1.9);  // D6 -- a fifth up, longer ring-out
+}
+
+// FALLING pair -- the same two notes, reversed: that side is finished, swap.
+// Deliberately the exact inversion of _bellDouble, so the two are told apart
+// by direction alone rather than by remembering two unrelated jingles.
+function _bellSwitch() {
+  _bellStrike(1174.7, 0.00, 0.95, 1.2);  // D6
+  _bellStrike(784.0, 0.16, 1.00, 1.9);   // G5 -- a fifth down
+}
+
+// THREE falling strikes down a full octave, the last one ringing out roughly
+// twice as long as anything else here: the set is over and rest has started.
+// Three-and-descending cannot be mistaken for either pair above even when the
+// first strike is missed.
+function _bellFinish() {
+  _bellStrike(1046.5, 0.00, 0.90, 1.0);  // C6
+  _bellStrike(784.0,  0.18, 0.95, 1.2);  // G5
+  _bellStrike(523.3,  0.36, 1.00, 2.6);  // C5 -- long ring-out
 }
 
 function _notify(title, body) {
@@ -217,12 +250,35 @@ def _audio_unlock_component() -> None:
 """, height=0)
 
 
+#: What happens after a hold timer reaches zero, and therefore which bell it
+#: rings. See _AUDIO_JS's "three endings" block for why the distinction is by
+#: pitch contour.
+HOLD_ENDING_CONTINUE = "continue"   # another rep of the same thing follows
+HOLD_ENDING_SWITCH = "switch"       # that side is done; swap to the other
+HOLD_ENDING_FINISH = "finish"       # the set is done; rest (or next exercise)
+HOLD_ENDINGS = (HOLD_ENDING_CONTINUE, HOLD_ENDING_SWITCH, HOLD_ENDING_FINISH)
+
+
 def _hold_timer(seconds: int, label: str = "HOLD", timer_key: str = "tp_h",
-                set_auto_start: bool = False) -> None:
+                set_auto_start: bool = False,
+                ending: str = HOLD_ENDING_CONTINUE) -> None:
     """Isometric hold countdown. Auto-completes at 0 (clicks the ✓ button in parent).
     set_auto_start=True writes tp_auto_start to localStorage so the NEXT hold timer
     (same exercise, next rep/side) auto-starts without a button press.
-    Reads tp_auto_start on load to auto-start when flagged by rest timer or previous hold."""
+    Reads tp_auto_start on load to auto-start when flagged by rest timer or previous hold.
+
+    `ending` picks the completion bell — see HOLD_ENDINGS. It is what the
+    athlete hears while holding a side bridge with his eyes shut, so it has to
+    say which of the three things comes next rather than merely that the timer
+    ran out.
+
+    Defaults to CONTINUE because that is the only ending that promises nothing:
+    a caller that forgets to pass one gets "another rep follows", and the
+    athlete looks at the screen. Defaulting to FINISH would announce a set was
+    over when it was not, which is the mistake that actually costs a rep.
+    """
+    if ending not in HOLD_ENDINGS:
+        raise ValueError(f"unknown hold ending {ending!r}; expected one of {HOLD_ENDINGS}")
     _flag_js = "try { localStorage.setItem('tp_auto_start', '1'); } catch(e) {}" if set_auto_start else ""
     components.html(f"""
 <div style="text-align:center;padding:12px 0;font-family:monospace;">
@@ -248,9 +304,20 @@ var _TKEY = "{timer_key}";
 // than shared — see the restore block below for what it guards against.
 var _STALE_GRACE_MS = 5 * 60 * 1000;
 {_AUDIO_JS}
+var _ENDING = "{ending}";
 function _doneBeep() {{
-  _bellDouble();
-  _notify('Hold complete', 'Time for the next set.');
+  // The notification text tracks the bell, so a glance at a phone that DID
+  // get the notification says the same thing the ear was told.
+  if (_ENDING === 'switch') {{
+    _bellSwitch();
+    _notify('Side complete', 'Swap sides and go again.');
+  }} else if (_ENDING === 'finish') {{
+    _bellFinish();
+    _notify('Set complete', 'Rest now.');
+  }} else {{
+    _bellDouble();
+    _notify('Hold complete', 'Next rep.');
+  }}
 }}
 
 function _save(running) {{
@@ -4011,8 +4078,15 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 # Right→left side transition has no rest timer, so the hold timer itself
                 # must flag the left side's timer to auto-start.
                 _set_auto_start = is_uni and _side == "right"
+                # One hold IS one set here (Full Side Bridge), so the only
+                # mid-exercise ending is the side swap; everything else ends
+                # the set. Derived from the same condition the completion
+                # handler below branches on, so the bell cannot promise
+                # something different from what the button then does.
+                _ending = (HOLD_ENDING_SWITCH if _set_auto_start
+                           else HOLD_ENDING_FINISH)
                 _hold_timer(ex["hold_seconds"], label=_hold_label, timer_key=_hold_key,
-                            set_auto_start=_set_auto_start)
+                            set_auto_start=_set_auto_start, ending=_ending)
                 _btn_label = "✓ Right Side Done" if (is_uni and _side == "right") else f"✓ Set {cur_set} Complete"
                 if st.button(_btn_label, type="primary", use_container_width=True):
                     _mark_start()
@@ -4056,8 +4130,20 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 _set_auto_start = (cur_rep < reps_per_set) or (
                     cur_rep >= reps_per_set and is_uni and _side == "right"
                 )
+                # Three endings, matching the completion handler below exactly:
+                # another rep, the right→left swap, or the set is over. This is
+                # the case the request was actually about — rep 8 of 8 on the
+                # McGill Curl-Up and the Dead Bug ends the set, and rep 8 on the
+                # RIGHT of the Single-Leg Glute Bridge means swap, not stop.
+                if cur_rep < reps_per_set:
+                    _ending = HOLD_ENDING_CONTINUE
+                elif is_uni and _side == "right":
+                    _ending = HOLD_ENDING_SWITCH
+                else:
+                    _ending = HOLD_ENDING_FINISH
                 _hold_timer(ex["hold_seconds"], label=f"REP {cur_rep} of {reps_per_set}{_side_suffix}",
-                            timer_key=_hold_key, set_auto_start=_set_auto_start)
+                            timer_key=_hold_key, set_auto_start=_set_auto_start,
+                            ending=_ending)
                 if st.button(f"✓ Rep {cur_rep} Done", type="primary", use_container_width=True):
                     _mark_start()
                     _push_nav_state()
