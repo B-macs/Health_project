@@ -1418,9 +1418,11 @@ def _get_phases_and_active_phase() -> tuple[list, object | None]:
     overwriting real phase data (including a manual reschedule's
     date_overrides) is unacceptable collateral for a retryable glitch. This
     happened twice in one week. Phase 1's creation is now an explicit,
-    user-confirmed action tied to the "Begin 14-Day Plan" button (same
-    pattern _render_begin_next_phase_button already uses)
-    — this function only ever reads."""
+    user-confirmed action tied to the "Begin 14-Day Plan" button — this
+    function only ever reads. (Later blocks need no button at all: they are
+    seeded before their Monday and plan.active_phase picks them up on the
+    date. Phase 1 keeps its screen because it is the one that has to ASK for
+    a start date.)"""
     phases = repo.get_repository().get_phases()
     return phases, ph.active_phase(phases, date.today())
 
@@ -1998,156 +2000,29 @@ def _render_rest_day(d: date) -> None:
         )
 
 
-def _stage2_offer_available(phases: list) -> bool:
-    """Whether a next block can be started from here. Thin wrapper over
-    sess.next_phase_offer, kept as a named predicate because two screens ask."""
-    return sess.next_phase_offer(phases) is not None
-
-
-def _write_failure_detail(exc: Exception) -> str:
-    """Everything the backend told us, in a form the HOSTED app will show.
-
-    Streamlit Cloud redacts the message of any UNCAUGHT exception — that is
-    what "The original error message is redacted to prevent data leaks" means,
-    and it is why this button failed twice reporting nothing but
-    `notion_client.errors.APIResponseError`. Diagnosing it took a line-number
-    fingerprint of the traceback instead of just reading the error.
-
-    A CAUGHT exception rendered through st.error is not redacted. `status` and
-    `code` are the two fields that actually name the cause (a 401 unauthorized,
-    a 404 object_not_found and a 400 validation_error all arrive here looking
-    identical otherwise), and neither is a secret.
-    """
-    parts = [type(exc).__name__]
-    status = getattr(exc, "status", None)
-    code = getattr(exc, "code", None)
-    if status is not None:
-        parts.append(f"HTTP {status}")
-    if code:
-        parts.append(str(code))
-    detail = " ".join(str(exc).split())
-    if detail:
-        parts.append(detail)
-    return " · ".join(parts)
-
-
-def _render_begin_next_phase_button(phases: list) -> None:
-    """Offers to start the next authored block, whichever one that is.
-
-    Was hard-wired to Stage 1 -> 2. It is generic now because Stage 2B is Phase
-    3 and the old check could never have offered it: with Phases 1 and 2 both
-    present it returned False forever, and the app would have sat with no active
-    phase from the day Stage 2A lapsed.
-
-    A block's calendar range lapses at or before the moment its content does —
-    and EARLIER whenever days were removed from a phase without shortening
-    length_days, which is what happened to Stage 2A (28 authored days, 26
-    reachable, two stranded entries removed on 2026-08-14). So
-    _render_no_active_phase's reassessment-gap screen is what fires in
-    practice, not the 'ran out of days while still in-phase' branch.
-
-    ⚠ Called from BOTH, and that has to stay true. This docstring asserted it
-    while only the plan-complete branch actually called it, so the screen that
-    really fires offered no way to start the next block — see
-    _render_no_active_phase. A test pins both call sites."""
-    number = sess.next_phase_offer(phases)
-    if number is None:
-        return
-    meta = sess.PHASE_META[number]
-    plan_days = len(sess.plan_dict_for_phase(number))
-    # EVERY BLOCK RUNS MONDAY TO SUNDAY, so the start is the next Monday and
-    # not the day the button happens to be pressed. plan.default_phase refuses
-    # anything else outright; naming the date here is what stops the refusal
-    # being a surprise, and what makes a wait visible before it is agreed to
-    # rather than after. See plan.assert_week_aligned for why the alignment is
-    # the same rule as key rule 18b rather than a tidiness preference.
-    start = ph.next_block_start(date.today())
-    last = start + timedelta(days=plan_days - 1)
-    st.caption(
-        f"Confirm the exit criteria for the block you have just finished are met "
-        f"before beginning."
-    )
-    if start == date.today():
-        st.caption(f"Starts **today**, {start:%a %d %b}, and runs to {last:%a %d %b}.")
-    else:
-        st.caption(
-            f"Blocks run Monday to Sunday, so this one starts **{start:%a %d %b}** "
-            f"and runs to {last:%a %d %b} — {(start - date.today()).days} day(s) from "
-            f"today. Nothing is scheduled in between."
-        )
-    # Advancing Phase (content/day-numbering) and Stage (ACWR/RPE/volume
-    # ceilings) must happen together — services/plan.py's Phase and
-    # services/rules.py's Stage are deliberately decoupled systems, and
-    # authoring one without the other leaves the engine enforcing the wrong
-    # ceiling against the wrong content. Note the two numbers differ from Phase
-    # 3 on: Stage 2B is a new BLOCK at the same clinical stage 2, so the
-    # ceilings deliberately do not move. This writes to the live Notion config —
-    # a deliberate action the user takes by clicking, never triggered
-    # automatically just because the calendar ran out.
-    if st.button(meta["button"], type="primary",
-                 use_container_width=True, key=f"tp_begin_phase_{number}"):
-        # length_days comes from the authored content rather than a literal, so
-        # a block of a different length needs no code change here. `start` is
-        # the Monday resolved above, never date.today() — default_phase would
-        # refuse a mid-week start, and refusing at the moment of the click is
-        # far worse than never offering one.
-        new_phase = ph.default_phase(
-            start, length_days=plan_days, phase_number=number,
-            name=meta["name"],
-        )
-        updated_phases = sess.begin_new_phase(phases, new_phase)
-        r = repo.get_repository()
-        # CAUGHT, not allowed to propagate: an uncaught exception here takes
-        # the whole page down AND has its message redacted on the hosted app,
-        # so the athlete is left on a dead screen holding an error that names
-        # no cause. The two halves are reported separately because a failure
-        # between them leaves real state: the block started at the wrong
-        # ceilings, which is worse than not starting at all and must never be
-        # reported as success.
-        try:
-            r.set_phases(updated_phases)
-        except Exception as exc:
-            st.error(
-                f"**{meta['name']} was not started — nothing was written.** "
-                f"Your current phase list is unchanged, so pressing this again "
-                f"is safe once the cause below is fixed.\n\n"
-                f"`{_write_failure_detail(exc)}`"
-            )
-            return
-        try:
-            r.set_config("current_stage", str(meta["stage"]))
-        except Exception as exc:
-            st.error(
-                f"**{meta['name']} started, but the clinical stage was NOT "
-                f"updated to {meta['stage']}.** The block's content is live "
-                f"while the ACWR, RPE and volume ceilings are still the "
-                f"previous stage's — check the stage before training on it.\n\n"
-                f"`{_write_failure_detail(exc)}`"
-            )
-            return
-        when = "today" if start == date.today() else f"on {start:%a %d %b}"
-        st.success(
-            f"{meta['name']} begins {when}. Come back for Day 1 of your "
-            f"{plan_days}-day block."
-        )
-        st.rerun()
-
-
 def _render_no_active_phase(phases: list) -> None:
     """Reassessment gap — no phase covers today. Never shows a placeholder workout."""
+    # BLOCKS START THEMSELVES. Since 2026-08-18 a phase is seeded before its
+    # Monday and plan.active_phase picks it up on the date, so this screen has
+    # nothing to offer and nothing to press — it reports a gap rather than
+    # asking the athlete to close one. A gap now means only one thing: no
+    # block was seeded for these dates.
     upcoming = sorted(
-        (p for p in phases if p.status == "upcoming"),
+        (p for p in phases if p.status != "completed"
+         and date.fromisoformat(p.start_date) > date.today()),
         key=lambda p: p.start_date,
     )
     if upcoming:
+        nxt = upcoming[0]
+        days = (date.fromisoformat(nxt.start_date) - date.today()).days
         next_line = (
-            f"Next phase — <strong style='color:{_OV_TEXT_PRI};'>{upcoming[0].name}</strong> "
-            f"— starts {upcoming[0].start_date}."
+            f"Next block — <strong style='color:{_OV_TEXT_PRI};'>{nxt.name}</strong> "
+            f"— starts {nxt.start_date}, {days} day(s) from today. It begins on its "
+            f"own; there is nothing to press."
         )
-    elif _stage2_offer_available(phases):
-        next_line = "Ready to begin the next block below, once the exit criteria are confirmed."
     else:
-        next_line = "No upcoming phase configured yet."
+        next_line = ("No block is scheduled for these dates. Blocks are authored "
+                     "and seeded before they start.")
     st.markdown(
         f"""
 <div style='background:{_OV_BG_ELEV};border-radius:16px;padding:28px 24px;text-align:center;'>
@@ -2181,22 +2056,6 @@ def _render_no_active_phase(phases: list) -> None:
             f"that matters by hand before starting the next block."
         )
         break
-
-    # THE DOOR THIS SCREEN PROMISES. Without it the header says "Ready to begin
-    # the next block below" and there is nothing below: the button lived only
-    # on the plan-complete branch, which needs an ACTIVE phase, while this
-    # screen fires precisely because no phase is active any more. Every route
-    # to starting a block therefore ran through a screen that could not offer
-    # one, and the app sat with no active phase from the morning Stage 2A
-    # lapsed (2026-08-17, the day Stage 2B was due to start) with no way
-    # forward but editing Notion by hand.
-    #
-    # _render_begin_next_phase_button's own docstring already claimed it was
-    # "called from both" and named THIS screen as the one that fires in
-    # practice. It was called from one. Rendered last, after any stranded-day
-    # warning, so the thing to read comes before the thing to press.
-    _render_begin_next_phase_button(phases)
-
 
 def _render_day_detail(d: date, active, phases: list) -> None:
     """Dispatcher for any selected date other than today — active is guaranteed
@@ -3259,8 +3118,9 @@ def render():
             # and silently destroyed a real, in-progress Phase 2 (including a
             # manual reschedule) twice in one week whenever a transient Notion
             # read hiccup made "phases" look empty. Explicit, user-triggered
-            # creation is the same pattern _render_begin_next_phase_button already
-            # correctly uses for Stage 2 — Phase 1 now matches it.
+            # creation is what replaced it. Later blocks go further and need
+            # no press at all — seeded ahead, activated by date — but Phase 1
+            # is the one that must ask for a start date, so it keeps a screen.
             seeded = sess.seed_default_phase([], start_input)
             if seeded:
                 r.set_phases(seeded)
@@ -3384,10 +3244,8 @@ def render():
                 f"**{_plan_days}-Day Stage 1 Rehab Complete.**\n\n"
                 "Your objectives: tissue tolerance established, neural desensitisation, "
                 "gluteal activation, hip hinge pattern, and spinal stability foundation.\n\n"
-                "Open **Autoregulation** to check Stage 1 → 2 progression criteria. "
-                "If criteria are met, confirm with your physiotherapist before advancing."
+                "Open **Autoregulation** to check Stage 1 → 2 progression criteria."
             )
-            _render_begin_next_phase_button(phases)
         elif active.phase_number == 2:
             st.success(
                 f"**{_plan_days}-Day Stage 2A Gym Strength Block Complete.**\n\n"

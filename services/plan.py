@@ -124,10 +124,37 @@ def phase_end_date(phase: Phase) -> date:
 
 
 def active_phase(phases: list[Phase], today: date) -> Phase | None:
-    """The phase whose date range covers today and whose status is 'active'.
-    None during a reassessment gap between phases."""
+    """The phase whose date range covers today and which has not been
+    completed. None during a reassessment gap between phases.
+
+    THE DATE DECIDES, NOT THE STATUS — changed 2026-08-18, on the athlete's
+    instruction that blocks always start on a Monday and are seeded before it:
+    "lets remove this begin button from now on, its not required ... it is
+    seemless."
+
+    Previously this required `status == "active"`, which meant a phase seeded
+    ahead of time sat inert on its own start date until somebody pressed a
+    button to flip it. That button was the only route into a new block, and it
+    was a liability twice over: it was unreachable from the screen that
+    actually fires when a phase lapses (fixed 2026-08-17), and on 2026-08-18 it
+    offered to start a block already running — with a stale phase list it
+    would have written a SECOND Stage 2B beginning the following Monday, over
+    the real one.
+
+    With activation on the date, an upcoming phase becomes today's phase the
+    morning it starts and nothing has to happen for that to be true.
+
+    'completed' still excludes, and that is the one status that must: a block
+    abandoned early keeps its nominal length, so its date range can still cover
+    today, and a pure date match would resurrect it. Marking it completed is
+    how a block is ended before its calendar runs out.
+
+    Overlapping non-completed ranges would make this depend on list order;
+    Repository.set_phases refuses to store them, which is what keeps the first
+    match here the only match.
+    """
     for ph in phases:
-        if ph.status == "active" and _start(ph) <= today <= _end(ph):
+        if ph.status != "completed" and _start(ph) <= today <= _end(ph):
             return ph
     return None
 

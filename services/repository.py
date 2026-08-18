@@ -2668,6 +2668,30 @@ class Repository:
                 raise plan.WeekAlignmentError(
                     f"phase {p.phase_number} ({p.name}): " + "; ".join(errors)
                 )
+        # NO TWO LIVE PHASES MAY OVERLAP. Added 2026-08-18 with the move to
+        # date-based activation (plan.active_phase): now that a phase becomes
+        # today's phase because its range covers today, two overlapping
+        # non-completed phases would make "which block am I in" depend on list
+        # order — silently, and differently on any day in the overlap. Blocks
+        # are seeded ahead of time now, so the overlap this guards against is a
+        # realistic typo rather than a hypothetical.
+        #
+        # Refuses rather than repairing, for set_phases' stated reason: nudging
+        # a start or trimming a length moves authored days onto different dates.
+        live = sorted(
+            ((date.fromisoformat(p.start_date), plan.phase_end_date(p), p)
+             for p in phases if p.status != "completed"),
+            key=lambda t: t[0],
+        )
+        for (a_start, a_end, a), (b_start, b_end, b) in zip(live, live[1:]):
+            if b_start <= a_end:
+                raise plan.WeekAlignmentError(
+                    f"phase {a.phase_number} ({a.name}) runs {a_start}..{a_end} "
+                    f"and phase {b.phase_number} ({b.name}) starts {b_start} — "
+                    f"overlapping live phases make the active block depend on "
+                    f"list order. Mark the earlier one 'completed' or move the "
+                    f"later one."
+                )
         payload = [
             {"phase_number": p.phase_number, "name": p.name, "start_date": p.start_date,
              "length_days": p.length_days, "status": p.status,
