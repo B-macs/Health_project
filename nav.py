@@ -182,12 +182,47 @@ def _set_page(page: str) -> None:
     st.session_state["_nav_page"] = page
 
 
+#: Once-per-run guard. app.py clears it at the top of every script run and
+#: inject() sets it, so the FIRST call in a run draws the bar and every later
+#: one is a no-op.
+#:
+#: It exists because app.py now injects the nav in a `finally` (see its page
+#: dispatch) while views/training.py already injects its own before each of its
+#: ten st.stop()s. Without the guard those pages would draw two stacked bars.
+#: First call wins, which is the right way round: the view knows which tab is
+#: active on its own screen, and app.py's fallback only has to guarantee that
+#: SOME bar exists.
+#:
+#: In st.session_state rather than a module global because a module global is
+#: process-wide and shared across every concurrent session's script thread,
+#: while this is per session, per run — the same reasoning as CLAUDE.md key
+#: rule 12 applies to a Repository.
+_RUN_FLAG = "_nav_injected_this_run"
+
+
+def start_run() -> None:
+    """Clear the once-per-run guard. app.py calls this at the top of every
+    script run, before any page dispatch. Without it the flag would survive
+    into the next run and the bar would render once and then never again."""
+    st.session_state[_RUN_FLAG] = False
+
+
+def injected_this_run() -> bool:
+    """Whether the bar has already been drawn in this script run."""
+    return bool(st.session_state.get(_RUN_FLAG))
+
+
 def inject(active: str = "", max_width: int = 0) -> None:
     """
     Render sidebar-suppression CSS and fixed bottom nav buttons.
     Must be called after all page content is rendered.
     max_width is accepted for API compatibility but ignored (buttons span full width).
+
+    IDEMPOTENT WITHIN A SCRIPT RUN — a second call draws nothing. See _RUN_FLAG.
     """
+    if injected_this_run():
+        return
+    st.session_state[_RUN_FLAG] = True
     st.markdown(CHROME_CSS, unsafe_allow_html=True)
     # Marker: :has(.stNavRow) in CHROME_CSS identifies the nav container that follows.
     st.markdown('<div class="stNavRow" style="display:none"></div>', unsafe_allow_html=True)

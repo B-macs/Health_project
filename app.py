@@ -113,18 +113,56 @@ _page = st.session_state.get("_nav_page") or st.query_params.get("page", "home")
 if st.query_params.get("page") != _page:
     st.query_params["page"] = _page
 
+# Clear the nav's once-per-run guard before anything can draw it — this is the
+# top of every script run, and the flag lives in session_state so it survives
+# the run that set it. See nav._RUN_FLAG.
+nav.start_run()
+
+# ⚠ nav.inject RUNS IN A `finally`, AND THAT IS THE WHOLE POINT. The bottom bar
+# is the only way off a page, so a view that fails must not take the navigation
+# down with it. Before this, any exception inside render() left the screen
+# showing an error box and NO Home/Training/Insights/Voice buttons — the athlete
+# was stranded on the broken page with hand-editing the URL as the only escape.
+# Reported 2026-08-18 against insights' UnserializableReturnValueError, which is
+# a separate bug; this is the reason that bug was unrecoverable rather than
+# merely annoying.
+#
+# It covers st.stop() too. StopException and RerunException derive from
+# BaseException, not Exception, so they skipped the old inline `nav.inject(...)`
+# exactly as an error did. views/training.py already works around that with ten
+# explicit nav.inject calls of its own — and the one before its plan-start
+# st.stop() (after seeding phase 1) was missing, so that screen has been
+# rendering with no nav at all. nav.inject is idempotent within a run, so those
+# ten still win and keep their own active-tab argument.
+#
+# ⚠ STILL UNCOVERED: the HOME page. Its own nav.inject sits at the very bottom
+# of this module's top-level code, so an exception in the home body skips it the
+# same way. Wrapping ~2000 lines of module-level statements is not a change to
+# make in the same pass as a bug fix; the escape from a broken Home is still
+# ?page=insights in the URL.
+_view = None
 if _page == "training":
-    from views import training as _v
-    styles.inject_css(); _v.render(); nav.inject("training"); st.stop()
+    from views import training as _view
 elif _page == "insights":
-    from views import insights as _v
-    styles.inject_css(); _v.render(); nav.inject("insights"); st.stop()
+    from views import insights as _view
 elif _page == "sync":
-    from views import sync as _v
-    styles.inject_css(); _v.render(); nav.inject("sync"); st.stop()
+    from views import sync as _view
 elif _page == "checkin":
-    from views import checkin as _v
-    styles.inject_css(); _v.render(); nav.inject(""); st.stop()
+    from views import checkin as _view
+
+if _view is not None:
+    styles.inject_css()
+    try:
+        _view.render()
+    finally:
+        try:
+            nav.inject("" if _page == "checkin" else _page)
+        except Exception:
+            # Never let a failure in the escape hatch replace the error it
+            # exists to escape from — that would swap a diagnosable traceback
+            # for a misleading one pointing at the nav bar.
+            pass
+    st.stop()
 
 # ─── Constants ────────────────────────────────────────────────────────────────
 
