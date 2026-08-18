@@ -2544,6 +2544,32 @@ class Repository:
                 pass
         return 1
 
+    #: Config keys whose mirror row is flushed to Supabase IMMEDIATELY rather
+    #: than waiting for the end of run_home_syncs.
+    #:
+    #: WHY THIS EXISTS — found live 2026-08-18, and it had already bitten. The
+    #: mirror had exactly ONE flush site (run_home_syncs' last step) against
+    #: NINE config write sites in views/training.py. A write from a UI button
+    #: therefore sat in a process-memory outbox until some later sync ran, and
+    #: if the process ended first the row was simply gone: Notion kept the
+    #: write, Supabase did not.
+    #:
+    #: That is worse than a lost backup, because the hosted app READS from a
+    #: cache hydrated out of Supabase. Phase 3 was created, written to Notion,
+    #: and never mirrored; a redeploy then wiped the disk, re-hydrated from a
+    #: mirror last updated four days earlier, and the app came back showing
+    #: "no phase active" with Stage 2A still marked active — silently REVERTED
+    #: to an older state while the system of record disagreed. The athlete
+    #: opened it on day 2 of his block and was offered a button that would have
+    #: started the same block again a week late, overwriting the real one.
+    #:
+    #: These keys are rare, tiny, and load-bearing enough that one extra
+    #: request at write time is the obvious trade. `training_progress` is
+    #: deliberately NOT here: it is written on every guided-flow transition
+    #: (the hot path Repository._save_checkpoint keeps off the network), it is
+    #: regenerated continuously, and it already has a durable local mirror.
+    _FLUSH_IMMEDIATELY = frozenset({"phases", "current_stage", "plan_start_date"})
+
     def set_config(self, key: str, value: str, today: date | None = None) -> None:
         today = today or date.today()
         page = self._config_page(key)
@@ -2569,6 +2595,14 @@ class Repository:
             # clock again, so a write near midnight cannot stamp two
             # different `updated` dates in the two backends.
             self.mirror_notion_write(notion_reader.CONFIG, key, props)
+            # Structural keys go to Supabase NOW, not at the end of some later
+            # sync — see _FLUSH_IMMEDIATELY. Inside the try and after the
+            # Notion write, so a Notion failure never ships a row Notion does
+            # not hold. flush_supabase_mirror never raises (it records on
+            # mirror_last_error), so this cannot turn a successful config
+            # write into an exception.
+            if key in self._FLUSH_IMMEDIATELY:
+                self.flush_supabase_mirror()
         finally:
             # Always, even on a failed write: the cached page may be exactly
             # what is wrong (deleted upstream, or a duplicate we picked the
