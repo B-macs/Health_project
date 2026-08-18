@@ -214,12 +214,24 @@ def test_a_moderate_day_gets_the_full_version():
 
 
 def test_the_shrunk_version_has_no_adaptation_seeking_work():
-    """Release, decompress, breathe. Nothing that asks for an adaptation, which
-    is what lets it sit beside a heavy gym day without becoming a sixth
-    session."""
+    """Release and decompress. Nothing that asks for an adaptation, which is
+    what lets it sit beside a heavy gym day without becoming a sixth session.
+
+    REFINED 2026-08-18, when the shrunk tier gained a 10-minute floor and
+    started filling from the release lists. A plain intersection with
+    _ACTIVATE gives a FALSE POSITIVE: Thoracic Extension (Rolled Towel) is in
+    both — it is mobility, and lying back over a towel breathing into the
+    position asks for no adaptation. What must never appear is something only
+    an activation list offers, so that is what this asserts. Narrower on
+    purpose, and the exercise it now allows is one the release lists already
+    contained."""
     shrunk = acc.choose(plan_day=_plan_day(day_type="rest", rpe=2), today=TODAY)
     activation = {ex["name"] for group in acc._ACTIVATE.values() for ex in group}
-    assert not (set(shrunk.names) & activation)
+    release = ({ex["name"] for ex in acc._SHRUNK_FILL}
+               | {ex["name"] for ex in tp.ACCESSORY_HANG_LADDER})
+    activation_only = activation - release
+    assert not (set(shrunk.names) & activation_only), sorted(
+        set(shrunk.names) & activation_only)
 
 
 def test_both_tiers_land_inside_the_ten_to_twenty_minute_ask():

@@ -25,7 +25,7 @@ cleared and the athlete already runs daily: release work at ~50% effort inside
 a ~10 minute dose, which docs/training/release_protocols_2026-08-10.md states
 in terms is "not a training stressor". What the regional strain decides is
 whether anything gets ACTIVATED beside the release — and on a heavy day the
-answer is nothing, which is what TIER_SHRUNK is.
+answer is nothing, which is what TIER_SHRUNK is — release only, never adaptation-seeking, and since 2026-08-18 held to a 10-minute working floor.
 
 ⚠ IT STILL COUNTS. The session logs like any other, feeds Foster AU and
 therefore Strain and ACWR, and appears in the day's regional split. Volume
@@ -235,8 +235,65 @@ _RELEASE_A: tuple[dict, ...] = (tp.ANTERIOR_HIP_RELEASE, tp.ACC_STANDING_HIP_FLE
 _RELEASE_A_PRE_BASELINE: tuple[dict, ...] = (tp.ACC_STANDING_HIP_FLEXOR,
                                              tp.UPPER_GLUTE_RELEASE_5MIN)
 
-#: Slot 5, every session, both tiers.
-_DOWN_REGULATE = tp.ACC_BREATHING
+#: RETIRED FROM THE RECIPE 2026-08-18 — athlete: "decompression breathing is
+#: not training". It closed every accessory session as a down-regulating slot,
+#: and on the shrunk tier it was two of about six working minutes: a third of
+#: the session was lying still. The exercise itself is untouched in
+#: training_plan (Stage 1 uses it twice) and the name stays mapped; what
+#: changed is that a session offered as training no longer counts it as such.
+#: RESTORE only with a stated reason — this was a deliberate removal, not an
+#: oversight.
+_RETIRED_DOWN_REGULATE = tp.ACC_BREATHING
+
+#: THE SHRUNK TIER'S FLOOR, in seconds of WORK — athlete, 2026-08-18: "the
+#: extra training set is too short it should be at least 10 mins".
+#:
+#: It was hang + one release + two minutes of breathing, which on a gym day
+#: (where the block's own release block has already taken the glute, piriformis
+#: and hip items) collapsed to two real exercises. The screen said "about 10
+#: min" because estimate_duration counts a per-side item ONCE; the truth was
+#: nearer six, and two of those were breathing.
+#:
+#: Measured in laterality-aware working time, which is what the athlete
+#: experiences and what estimate_duration under-reports. The tier fills from
+#: release-only candidates until it clears this, so a thin day extends the
+#: session rather than shortening it.
+SHRUNK_MIN_WORK_SECONDS: int = 600
+
+def work_seconds(exercises) -> int:
+    """Working time with BOTH SIDES counted.
+
+    services.sessions.estimate_duration deliberately does not do this (a
+    recorded open issue), and the accessory screen even says so out loud —
+    "reads low — per-side work is counted once". A duration FLOOR cannot be
+    built on a number known to read low, so this counts what the athlete
+    actually performs. Every unilateral item in the accessory pools genuinely
+    runs both sides; the block's right-only items are not in them.
+    """
+    total = 0
+    for ex in exercises:
+        secs = sess.exercise_duration_seconds(ex)
+        if ex.get("laterality") == "unilateral":
+            secs *= 2
+        total += secs
+    return total
+
+
+#: What the shrunk tier reaches for, in order, once its two fixed slots are
+#: placed. RELEASE ONLY — the tier's contract is "no adaptation-seeking work",
+#: so filling it must never reach into _ACTIVATE. Ordered: the chosen region's
+#: own release work first, then the other regions', then whatever is left of
+#: slot 2. Each list ends somewhere the block does not use, which is what keeps
+#: it fillable on a gym day when the release block has already taken the hip
+#: items.
+_SHRUNK_FILL: tuple[dict, ...] = (
+    *_RELEASE_B["upper_body"],
+    *_RELEASE_B["core"],
+    *_RELEASE_B["lower_body"],
+    *_RELEASE_A,
+    tp.ACC_THORACIC_EXTENSION,
+)
+
 
 #: Deterministic tie-break, and the order is a clinical judgement rather than
 #: alphabetical: with nothing to choose between regions, the shoulder work is
@@ -492,8 +549,27 @@ def choose(*,
                 f"only {len(activation)} activation item(s) left after today's own session — "
                 f"the right answer there is to add less, not to reach further down the list"
             )
-
-    items.extend(_free((_DOWN_REGULATE,)))
+    else:
+        # FILL TO THE FLOOR. The shrunk tier used to be hang + one release +
+        # breathing, and on a gym day — where the block's release block has
+        # already taken the hip items — that left two real exercises. Reaching
+        # for MORE RELEASE keeps the tier's contract intact: nothing here is
+        # adaptation-seeking, so a longer session is still not a training
+        # stressor. Region-ordered rather than arbitrary, and it stops the
+        # moment the floor is cleared rather than emptying the pool.
+        for candidate in _SHRUNK_FILL:
+            if work_seconds(items) >= SHRUNK_MIN_WORK_SECONDS:
+                break
+            items.extend(_free((candidate,)))
+        short_by = SHRUNK_MIN_WORK_SECONDS - work_seconds(items)
+        if short_by > 0:
+            reasons.append(
+                f"today's own session already uses most of the release list, so this "
+                f"comes in {short_by // 60} min under the {SHRUNK_MIN_WORK_SECONDS // 60}-minute "
+                f"floor — the honest outcome, since the alternative is repeating work "
+                f"already done today or reaching into adaptation-seeking work this tier "
+                f"exists to exclude"
+            )
 
     if substituted:
         reasons.append(
@@ -524,11 +600,12 @@ def build_day(choice: AccessoryChoice) -> dict:
     adoption that silently kills the readiness auto-shift.
     """
     # ⚠ THE SHRUNK TIER DOES NOT NAME THE REGION, and that is not cosmetic.
-    # A shrunk session is a hang, a release and two minutes of breathing —
-    # there is no region-specific work in it at all, so a heading of
-    # "Shoulders & Posture" would promise shoulder work the session does not
-    # contain. The region is still CHOSEN and still recorded (it is what the
-    # tier would have used), it is simply not claimed on screen.
+    # A shrunk session is a hang and release work drawn from every region's
+    # list until it clears its floor — so it contains no region-specific
+    # PROGRAMME, and a heading of "Shoulders & Posture" would promise work the
+    # session does not centre on. The region is still CHOSEN and still recorded
+    # (it decides what the fill reaches for first), it is simply not claimed on
+    # screen.
     if choice.tier == TIER_SHRUNK:
         objective = "Accessory — Release Only"
     else:
@@ -582,7 +659,6 @@ ACCESSORY_LIBRARY: tuple[dict, ...] = (
     *_RELEASE_A_PRE_BASELINE,
     *(ex for group in _RELEASE_B.values() for ex in group),
     *(ex for group in _ACTIVATE.values() for ex in group),
-    _DOWN_REGULATE,
 )
 
 
