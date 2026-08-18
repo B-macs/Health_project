@@ -3655,30 +3655,76 @@ def _s2b_cluster(week: int) -> dict:
         "is_gym_session": False,
         "day_type": "stretch",
         "exercises": _p2_fold(week >= 3) + _s2b_release(hip_loaded=True, anterior=True) + [PREP_RAISE] + [
-            _ex(
-                name="Cluster A Flexibility Session",
-                ex_type="duration",
-                sets=1, duration_minutes=25, rest_seconds=0,
-                mechanics=(
-                    "Open the Flexibility screen and follow the stack it shows. Three to five "
-                    "exercises, in the order given — isolated work first, the full position "
-                    "last. The release block above is the precondition and does not count "
-                    "toward those five. If the screen has no stack yet, the battery has not been "
-                    "run: do that instead, cold, first thing on a morning that did not follow "
-                    "leg training."
-                ),
-                biomechanical_focus=(
-                    "The organising claim, now physio-endorsed: the lack of hip flexibility is "
-                    "what drives the lower back to sit stuck in position. Success here is the "
-                    "block coming down, not the reach going further — the number that should "
-                    "move first is the height at which the lower back stops being flat."
-                ),
-                progression=("Two clean weeks — no symptom entry attributable to this work, no "
-                             "readiness downtrend, no ACWR advisory — earns a second session a "
-                             "week. It is earned, never scheduled."),
-                regression=("Any of those three appear → back to one session a week, or pause. "
-                            "A pause is a hold on evidence, not a deletion."),
+        _ex(
+            name="Tailor's pose, unloaded",
+            ex_type='hold',
+            laterality='bilateral',
+            sets=4, hold_seconds=90, rest_seconds=30,
+            mechanics=(
+                'Sit with your back flat against a wall, soles of your feet together, heels pulled in to your recorded heel distance. Press your knees down toward the floor using only your leg muscles — no hands — and hold the press steady while you breathe. FEEL: Working effort along the inside of the thighs. It is an exercise, not a passive sit. STOP: Your back stays flat on the wall. A sharp pinch at the front of a hip ends the set — record it.'
             ),
+            biomechanical_focus=(
+                "Cluster A, pattern D (Short adductors and rotators) — item 1 of 5 in the prescribed stack, at its prescribed dose of 4 × 90 s. Broken out of the single 'Cluster A Flexibility Session' block on 2026-08-18: as one 25-minute duration entry the guided flow showed a label and a timer, nothing was logged per exercise, and none of it reached strain, the regional split or the notes. PROGRESS: The knees sit closer to the floor at the same heel distance — the same number the assessment measures."
+            ),
+            progression='Stack progresses on its own terms — The knees sit closer to the floor at the same heel distance — the same number the assessment measures.',
+            regression='Any sharp pinch at the front of a hip ends that set; record it. Your back stays flat on the wall. A sharp pinch at the front of a hip ends the set — record it.',
+        ),
+            _ex(
+            name='Frog rocks',
+            ex_type='reps',
+            laterality='bilateral',
+            sets=3, reps=10, tempo='3-1-3', rest_seconds=45,
+            mechanics=(
+                'On all fours on a mat, knees spread wide, feet in line with the knees, shins flat on the floor. Drop to your forearms if that is more comfortable. Rock your hips slowly backward toward your heels until the stretch arrives, pause for a breath, rock forward again. Small, slow rocks — the floor carries your weight the whole time. FEEL: A stretch along the inside of both thighs, deepening as the hips travel back. STOP: Rock only as far as stays comfortable. A pinch at the front of a hip ends the set — come forward and keep later rocks shallower.'
+            ),
+            biomechanical_focus=(
+                "Cluster A, pattern D (Short adductors and rotators) — item 2 of 5 in the prescribed stack, at its prescribed dose of 3 × 10. Broken out of the single 'Cluster A Flexibility Session' block on 2026-08-18: as one 25-minute duration entry the guided flow showed a label and a timer, nothing was logged per exercise, and none of it reached strain, the regional split or the notes. PROGRESS: The hips travel further back before the stretch arrives."
+            ),
+            progression='Stack progresses on its own terms — The hips travel further back before the stretch arrives.',
+            regression='Any sharp pinch at the front of a hip ends that set; record it. Rock only as far as stays comfortable. A pinch at the front of a hip ends the set — come forward and keep later rocks shallower.',
+        ),
+            _ex(
+            name='Butterfly PIR',
+            ex_type='reps',
+            laterality='bilateral',
+            sets=1, reps=5, rest_seconds=0,
+            mechanics=(
+                'Sit on the floor with your back against a wall, soles of your feet together, knees dropped out to the sides, hands resting on top of your knees. Press your knees UP into your hands for about five seconds — the hands hold still, the legs push against them. Then let the effort go completely and let the knees sink for about fifteen seconds. That is one round. FEEL: Work on the inside of the thighs during the press; a deeper, easier sink just after you let go. STOP: The hands only resist — they never push the knees down. When a sink gains nothing over the one before, the set is done.'
+            ),
+            biomechanical_focus=(
+                "Cluster A, pattern D (Short adductors and rotators) — item 3 of 5 in the prescribed stack, at its prescribed dose of 5 rounds of 5 s contract, 15 s relax. Broken out of the single 'Cluster A Flexibility Session' block on 2026-08-18: as one 25-minute duration entry the guided flow showed a label and a timer, nothing was logged per exercise, and none of it reached strain, the regional split or the notes. PROGRESS: The knees rest lower at the start of a session than they did last session."
+            ),
+            progression='Stack progresses on its own terms — The knees rest lower at the start of a session than they did last session.',
+            regression='Any sharp pinch at the front of a hip ends that set; record it. The hands only resist — they never push the knees down. When a sink gains nothing over the one before, the set is done.',
+        ),
+            _ex(
+            name='90/90 hip rotations with lift-offs',
+            ex_type='reps',
+            laterality='unilateral',
+            sets=3, reps=8, rest_seconds=45,
+            mechanics=(
+                'Sit on the floor with the front leg bent to a right angle in front of you and the back leg bent to a right angle out to the side. Sweep both knees together across to the other side so the legs swap roles, and at each side lift the back knee off the floor for a second before travelling on. FEEL: Work deep around the hips doing the rotating and the lifting. Nothing sharp. STOP: On the right, the kneecap stays neutral or slightly inward on every lift. A snap or click at the right hip ends the set — record it. Neutral or slight internal rotation on the right.'
+            ),
+            biomechanical_focus=(
+                "Cluster A, pattern D (Short adductors and rotators) — item 4 of 5 in the prescribed stack, at its prescribed dose of 3 × 8 per side. Broken out of the single 'Cluster A Flexibility Session' block on 2026-08-18: as one 25-minute duration entry the guided flow showed a label and a timer, nothing was logged per exercise, and none of it reached strain, the regional split or the notes. PROGRESS: Higher lifts and smoother sweeps."
+            ),
+            progression='Stack progresses on its own terms — Higher lifts and smoother sweeps.',
+            regression='Any sharp pinch at the front of a hip ends that set; record it. On the right, the kneecap stays neutral or slightly inward on every lift. A snap or click at the right hip ends the set — record it.',
+        ),
+            _ex(
+            name='Triangle side split, external-rotation cue',
+            ex_type='hold',
+            laterality='bilateral',
+            sets=3, hold_seconds=30, rest_seconds=45,
+            mechanics=(
+                "Standing, then sliding the feet wide apart with your hips kept BACK behind the line of the feet — hips and feet make a triangle seen from above, not one line. Hands on blocks or the floor in front of you, chest high, legs straight. Turn both legs out from the hips — kneecaps rotating toward the ceiling — then slide the feet apart, sitting the hips back with the weight in the heels. Go to where it stops. The turn-out is what makes the room; never arch the back to find more. THE CUE IS THE POINT: arching opens the same angle a different way, and it opens it by bending your lower back backwards under load — which is the one thing your back cannot afford. Turn out instead, every time. FEEL: A stretch along the inside of the thighs, with the hips feeling clear, not pinched. STOP: A sharp pinch at the front of a hip with a hard, sudden stop ends today's depth work — record it."
+            ),
+            biomechanical_focus=(
+                "Cluster A, pattern D (Short adductors and rotators) — item 5 of 5 in the prescribed stack, at its prescribed dose of 3 × 30 s. Broken out of the single 'Cluster A Flexibility Session' block on 2026-08-18: as one 25-minute duration entry the guided flow showed a label and a timer, nothing was logged per exercise, and none of it reached strain, the regional split or the notes. PROGRESS: Lower hips at the same stance, without the pinch."
+            ),
+            progression='Stack progresses on its own terms — Lower hips at the same stance, without the pinch.',
+            regression="Any sharp pinch at the front of a hip ends that set; record it. A sharp pinch at the front of a hip with a hard, sudden stop ends today's depth work — record it.",
+        ),
         ],
     }
 

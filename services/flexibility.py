@@ -412,11 +412,22 @@ MOBILITY_TIER_LOADS_LEGS: frozenset[str] = frozenset({
     # Loaded posterior chain and abductors — the "pullers" of pattern I
     "Single-Leg Glute Bridge",
     "Lateral Band Walk",
-    # The cluster session itself, added with Stage 2B. It is the most obvious
-    # member of this set and the easiest to forget: the stack works the exact
-    # tissue the battery measures, at end range, on purpose. A retest the
-    # morning after one would be measuring the session, not the athlete.
+    # The cluster session itself. It is the most obvious member of this set
+    # and the easiest to forget: the stack works the exact tissue the battery
+    # measures, at end range, on purpose. A retest the morning after one would
+    # be measuring the session, not the athlete.
+    #
+    # NAMED PER EXERCISE since 2026-08-18, when the single "Cluster A
+    # Flexibility Session" block was broken into the five items pattern D
+    # actually prescribes. The old label is KEPT: it is still the right answer
+    # for any session logged under it before that date, and dropping it would
+    # silently reclassify history.
     "Cluster A Flexibility Session",
+    "Tailor's pose, unloaded",
+    "Frog rocks",
+    "Butterfly PIR",
+    "90/90 hip rotations with lift-offs",
+    "Triangle side split, external-rotation cue",
 })
 
 

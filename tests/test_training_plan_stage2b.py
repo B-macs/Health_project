@@ -369,9 +369,11 @@ def test_running_counts_as_leg_loading():
 def test_the_cluster_session_never_lands_on_a_rest_day_or_after_leg_work():
     """flexibility_window ranks a rest day POOR — a cluster session is
     adaptation-seeking by definition — and the day after leg work worst of all."""
-    cluster_days = [d for d in DAYS
-                    if any(e["name"] == "Cluster A Flexibility Session"
-                           for e in PLAN[d]["exercises"])]
+    # Identified by the day's OBJECTIVE since 2026-08-18: the session is no
+    # longer one exercise called "Cluster A Flexibility Session" but the five
+    # items pattern D prescribes, so a name check would find nothing and this
+    # test would pass vacuously on a block with no flexibility slot at all.
+    cluster_days = [d for d in DAYS if "Cluster A" in (PLAN[d].get("objective") or "")]
     assert cluster_days, "the block reserves no flexibility slot at all"
     leg_days = {
         d for d in DAYS
@@ -386,9 +388,8 @@ def test_the_cluster_session_never_lands_on_a_rest_day_or_after_leg_work():
 
 def test_the_cluster_starts_in_week_two_not_week_one():
     """One new stressor per week. Running is week 1's, so the cluster waits."""
-    cluster_days = [d for d in DAYS
-                    if any(e["name"] == "Cluster A Flexibility Session"
-                           for e in PLAN[d]["exercises"])]
+    cluster_days = [d for d in DAYS if "Cluster A" in (PLAN[d].get("objective") or "")]
+    assert cluster_days, "no cluster day found — see the note on identification above"
     assert min(cluster_days) > 7, cluster_days
     assert len([d for d in cluster_days if d <= 14]) == 1, "week 2 gets exactly one"
 
