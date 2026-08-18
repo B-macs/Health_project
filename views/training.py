@@ -794,6 +794,15 @@ def _init_state(day_num: int | None = None):
         "tp_reported_rpe":     None,     # the athlete's own rating, kept for the measured-vs-reported comparison
         "tp_reported_au":      None,
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
+        # {exercise_idx: sess.previous_performance(...)} — the PREVIOUS session's
+        # own completed sets, per exercise. Deliberately NOT in
+        # sess.CHECKPOINT_FIELDS: it is a reading of the training log, not
+        # session state, so it cannot go stale in a way a restore must preserve,
+        # and carrying every exercise's set array through the Notion rich_text
+        # checkpoint beside tp_set_log would grow the payload for nothing.
+        # _seed_actuals_if_needed re-fetches it when it is missing, which is
+        # exactly what a restored checkpoint leaves behind.
+        "tp_previous":         {},
         "tp_set_log":          {},       # {exercise_idx: [sess.build_set_record(...), ...]} — one entry per COMPLETED set
         "tp_notes":            {},       # {exercise_idx: note text} — the DURABLE copy of the per-exercise notes; see _record_note
         "tp_rest_started_at":  0,        # Unix timestamp, stamped when a rest phase BEGINS — see _record_rest_taken
@@ -834,7 +843,7 @@ def _init_state(day_num: int | None = None):
         if _acc_day and _acc_day.get("accessory_date") != date.today().isoformat():
             for k in ("tp_accessory_plan", "tp_started", "tp_done_today",
                       "tp_session_logged", "tp_ex_idx", "tp_set", "tp_rep_in_set",
-                      "tp_actuals", "tp_set_log", "tp_notes"):
+                      "tp_actuals", "tp_previous", "tp_set_log", "tp_notes"):
                 st.session_state[k] = defaults[k]
         # Authoritative check, independent of the checkpoint above: if a session is
         # already logged in Notion for today, never allow re-entering the exercise
@@ -1203,8 +1212,25 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
     the double-progression ones: it is what the clamp's ceiling is derived
     from, and get_last_performance alone returns the LAST set rather than the
     top one. Same Notion query either way, and the guard above means it runs
-    once per exercise per session."""
-    if idx in st.session_state.tp_actuals or not ex.get("equipment_type"):
+    once per exercise per session.
+
+    TWO THINGS ARE SEEDED FROM THE SAME PAIR OF READS, and they are kept apart
+    on purpose. tp_actuals[idx] is the PROPOSAL — nudged by readiness, clamped
+    to the ceiling, and mutated by every stepper tap after that. tp_previous[idx]
+    is the RAW previous session, never touched by any of that, because it is the
+    number the athlete checks the proposal against. Deriving the second from the
+    first is the bug this replaced: actual_caption used to print the proposal
+    under a "Last time:" label, so a genuine +2.5 kg step displayed as no change.
+
+    The two guards are independent. A restored checkpoint carries tp_actuals but
+    not tp_previous (the latter is a reading of the log, not session state, so it
+    is re-fetched rather than persisted), and an exercise whose entry is already
+    seeded must still be able to fill in its previous reading."""
+    if not ex.get("equipment_type"):
+        return
+    need_actuals  = idx not in st.session_state.tp_actuals
+    need_previous = idx not in st.session_state.tp_previous
+    if not (need_actuals or need_previous):
         return
     last = None
     try:
@@ -1216,6 +1242,9 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
         last_session_sets = repo.get_repository().get_last_session_all_sets(ex["name"])
     except Exception:
         pass  # never block the live flow on a lookup failure
+    st.session_state.tp_previous[idx] = sess.previous_performance(last, last_session_sets)
+    if not need_actuals:
+        return
     try:
         entry = sess.resolve_prescription(
             ex, last, readiness_modifier.get("streak_label", "unknown"),
@@ -3748,6 +3777,43 @@ def _render_guided_flow(day_num, exercises, n_ex,
         f"{sess.prescription_label(_shown)}</div></div>",
         unsafe_allow_html=True,
     )
+
+    # ── Previous session, and what today's prescription changes about it ──
+    #   Rendered DIRECTLY BENEATH the prescribed values, always, never behind a
+    #   tap or an expander. This is a human-in-the-loop verification step: the
+    #   athlete accepts or overrides the engine's proposed increase by reading
+    #   the two numbers together, and a previous reading one tap away cannot do
+    #   that job.
+    #
+    #   The delta is computed against the LIVE stepper entry, not against the
+    #   engine's opening proposal, so it keeps telling the truth after the
+    #   athlete has overridden the number by hand.
+    #
+    #   Only steppered exercises get the block. An exercise with no
+    #   equipment_type has no resolved entry and no proposed increase to check
+    #   — ten of the fourteen items on a Stage 2B gym day are fixed-protocol
+    #   release and activation work, and "No previous data" against each of them
+    #   would bury the four lines that actually carry a decision.
+    _prev = st.session_state.tp_previous.get(_eidx)
+    if _prev is not None:
+        _entry     = st.session_state.tp_actuals.get(_eidx)
+        _delta_txt = sess.prescription_delta(_entry, _prev)
+        _delta_col = {"up": "#3FD07A", "down": "#C9A227", "mixed": "#FFD700"}.get(
+            sess.delta_direction(_entry, _prev), "#8A99A3")
+        _delta_html = (
+            f"<span style='color:#5A6470;'> &middot; vs prescribed </span>"
+            f"<span style='color:{_delta_col};font-weight:700;'>{_delta_txt}</span>"
+        ) if _delta_txt else ""
+        st.markdown(
+            f"<div style='background:#0E1117;border:1px solid #333;"
+            f"border-left:3px solid #4A5A66;border-radius:8px;"
+            f"padding:10px 14px;margin-bottom:12px;font-size:13px;"
+            f"font-family:monospace;color:#C8CAD0;line-height:1.7;'>"
+            f"<span style='color:#8A99A3;font-size:10px;letter-spacing:2px;'>"
+            f"PREVIOUS SESSION</span><br>"
+            f"{sess.previous_caption(_prev)}{_delta_html}</div>",
+            unsafe_allow_html=True,
+        )
 
     # Mechanics cue
     st.markdown(

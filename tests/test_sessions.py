@@ -1003,6 +1003,13 @@ def test_header_text_and_printed_numbers_agree_on_the_bug_day():
 
 
 # ─── actual_caption ─────────────────────────────────────────────────────────
+#
+# actual_caption states PROVENANCE and nothing else. Until 2026-08-18 it
+# rendered entry["reps"]/entry["weight_kg"] under a "Last time:" label, but
+# those fields have already been through the readiness nudge and the ceiling
+# clamp by the time an entry reaches it — so it reported today's proposal as
+# last session's reading. The previous session's real numbers now come from
+# previous_performance/previous_caption, tested below.
 
 def test_actual_caption_reports_a_held_prescription():
     entry = {"source": "last_time", "reps": 10, "weight_kg": 45.0, "band_tier": None,
@@ -1016,23 +1023,158 @@ def test_actual_caption_reports_a_held_prescription():
 def test_actual_caption_says_nothing_extra_when_nothing_was_held():
     entry = {"source": "last_time", "reps": 8, "weight_kg": 12.5, "band_tier": None,
              "last_seen_date": "2026-07-14", "clamped": {}}
-    assert sessions.actual_caption(entry) == "Last time: 8 reps @ 12.5 kg (2026-07-14)"
+    assert sessions.actual_caption(entry) == \
+        "Starting from your last logged session (2026-07-14)."
 
 
-def test_actual_caption_last_time_weight():
-    entry = {"source": "last_time", "reps": 8, "weight_kg": 12.5, "band_tier": None,
-             "last_seen_date": "2026-07-14"}
-    assert sessions.actual_caption(entry) == "Last time: 8 reps @ 12.5 kg (2026-07-14)"
-
-
-def test_actual_caption_last_time_band_tier():
-    entry = {"source": "last_time", "reps": 10, "weight_kg": None, "band_tier": "Blue",
-             "last_seen_date": "2026-07-14"}
-    assert sessions.actual_caption(entry) == "Last time: 10 reps @ Blue (Medium) (2026-07-14)"
+def test_actual_caption_names_double_progression_and_its_date():
+    entry = {"source": "double_progression", "reps": 8, "weight_kg": 25.0,
+             "band_tier": None, "last_seen_date": "2026-08-10"}
+    caption = sessions.actual_caption(entry)
+    assert "Double progression" in caption and "(2026-08-10)" in caption
+    # The bug this replaced: double progression fires only BECAUSE there is a
+    # logged session behind it, yet the caption claimed there was none.
+    assert "No prior record" not in caption
 
 
 def test_actual_caption_plan_default():
     assert sessions.actual_caption({"source": "plan_default"}) == "No prior record — using plan default."
+
+
+def test_actual_caption_never_prints_a_number_that_could_be_read_as_history():
+    """The regression guard. A readiness-high day proposes 25 kg off a 22.5 kg
+    last session; the caption must not put "25" on screen under any wording
+    that reads as a previous reading."""
+    entry = {"source": "last_time", "reps": 8, "weight_kg": 25.0, "band_tier": None,
+             "last_seen_date": "2026-08-10"}
+    caption = sessions.actual_caption(entry)
+    assert "25" not in caption and "8 reps" not in caption
+    assert "Last time" not in caption
+
+
+# ─── previous_performance / previous_caption / prescription_delta ───────────
+
+_LP = {"session_date": "2026-08-10", "reps": 8, "weight_kg": 42.5, "band_tier": None}
+_SETS = [{"set_num": 1, "reps": 10, "weight": 45.0},
+         {"set_num": 2, "reps": 10, "weight": 45.0},
+         {"set_num": 3, "reps": 8,  "weight": 42.5}]
+
+
+def test_previous_performance_reads_the_log_not_the_proposal():
+    prev = sessions.previous_performance(_LP, _SETS)
+    assert prev["have"] is True
+    assert prev["per_set"] is True
+    assert prev["session_date"] == "2026-08-10"
+    # Top WORKING set: top weight, and the reps completed AT that weight —
+    # never 45 x 10 paired with a rep count from a lighter set.
+    assert prev["top"] == {"weight_kg": 45.0, "reps": 10, "band_tier": None}
+    assert [s["weight_kg"] for s in prev["sets"]] == [45.0, 45.0, 42.5]
+
+
+def test_previous_caption_renders_every_set_in_order():
+    prev = sessions.previous_performance(_LP, _SETS)
+    assert sessions.previous_caption(prev) == \
+        "Last: 45kg × 10, 45kg × 10, 42.5kg × 8 (2026-08-10)"
+
+
+def test_previous_caption_falls_back_to_the_top_set_without_per_set_data():
+    prev = sessions.previous_performance(_LP, None)
+    assert prev["per_set"] is False
+    assert sessions.previous_caption(prev) == "Last: 42.5kg × 8 (2026-08-10)"
+
+
+def test_previous_caption_says_no_previous_data_in_words():
+    prev = sessions.previous_performance(None, None)
+    assert prev["have"] is False
+    caption = sessions.previous_caption(prev)
+    assert caption == sessions.PREVIOUS_NONE_TEXT == "No previous data"
+    # The athlete's rule: never a 0, never a bare "-" in a numeric slot, never
+    # an interpolated value — each reads as a real reading rather than as none.
+    assert "0" not in caption and "kg" not in caption
+
+
+def test_previous_caption_bands_and_holds():
+    band = sessions.previous_performance(
+        {"session_date": "2026-08-12", "reps": 12, "band_tier": "Green"},
+        [{"reps": 12, "weight": 0, "band_tier": "Green"}])
+    assert sessions.previous_caption(band) == "Last: Green × 12 (2026-08-12)"
+    # A hold is logged as reps=1 with the work in `tut` — printing its rep
+    # count would render a 45-second plank as "1".
+    hold = sessions.previous_performance(
+        {"session_date": "2026-08-09", "reps": 1, "weight_kg": 0},
+        [{"reps": 1, "weight": 0, "tut": 45}])
+    assert sessions.previous_caption(hold) == "Last: 45s (2026-08-09)"
+
+
+def test_prescription_delta_states_the_change_explicitly():
+    prev = sessions.previous_performance(_LP, _SETS)
+    assert sessions.prescription_delta({"weight_kg": 47.5, "reps": 10}, prev) == "+2.5kg"
+    assert sessions.prescription_delta({"weight_kg": 45.0, "reps": 11}, prev) == "+1 rep"
+    assert sessions.prescription_delta({"weight_kg": 45.0, "reps": 8}, prev) == "-2 reps"
+    assert sessions.prescription_delta({"weight_kg": 47.5, "reps": 8}, prev) == "+2.5kg, -2 reps"
+
+
+def test_prescription_delta_is_an_em_dash_when_nothing_moved():
+    prev = sessions.previous_performance(_LP, _SETS)
+    assert sessions.prescription_delta({"weight_kg": 45.0, "reps": 10}, prev) == "—"
+    assert sessions.DELTA_NONE_TEXT == "—"
+
+
+def test_prescription_delta_is_empty_without_history():
+    """Never "+45kg against nothing" — that is the interpolated value the
+    athlete ruled out. The caller has already said "No previous data"."""
+    prev = sessions.previous_performance(None, None)
+    assert sessions.prescription_delta({"weight_kg": 45.0, "reps": 10}, prev) == ""
+
+
+def test_prescription_delta_names_a_band_tier_move():
+    prev = sessions.previous_performance(
+        {"session_date": "2026-08-12", "band_tier": "Green", "reps": 12},
+        [{"reps": 12, "weight": 0, "band_tier": "Green"}])
+    assert sessions.prescription_delta({"band_tier": "Blue", "reps": 12}, prev) == \
+        "Green → Blue band"
+
+
+def test_delta_direction_colours_only():
+    prev = sessions.previous_performance(_LP, _SETS)
+    assert sessions.delta_direction({"weight_kg": 47.5, "reps": 10}, prev) == "up"
+    assert sessions.delta_direction({"weight_kg": 42.5, "reps": 10}, prev) == "down"
+    assert sessions.delta_direction({"weight_kg": 47.5, "reps": 8}, prev) == "mixed"
+    assert sessions.delta_direction({"weight_kg": 45.0, "reps": 10}, prev) == "same"
+    assert sessions.delta_direction({"weight_kg": 45.0}, sessions.previous_performance(None, None)) == ""
+
+
+def test_previous_is_not_moved_by_the_readiness_nudge_end_to_end():
+    """THE REGRESSION THIS FEATURE EXISTS FOR. Resolve a real prescription on a
+    readiness-high day and check the previous reading beside it still reports
+    what was actually lifted, not what is being proposed."""
+    ex = {"name": "Goblet Squat", "type": "reps", "reps": 10, "sets": 3,
+          "equipment_type": "dumbbell", "weight_kg": 20.0}
+    entry = sessions.resolve_prescription(
+        ex, _LP, "high", {"reduced": False}, weight_increment=2.5,
+        last_session_sets=_SETS)
+    prev = sessions.previous_performance(_LP, _SETS)
+    assert entry["weight_kg"] == 45.0            # 42.5 + one increment
+    assert prev["top"]["weight_kg"] == 45.0      # unchanged by the nudge
+    assert "45kg × 10, 45kg × 10, 42.5kg × 8" in sessions.previous_caption(prev)
+
+
+def test_double_progression_still_reports_its_previous_session():
+    """The branch that raises the weight is the branch that used to claim there
+    was no history at all."""
+    ex = {"name": "Goblet Squat", "type": "reps", "reps": 10, "sets": 3,
+          "equipment_type": "dumbbell", "weight_kg": 20.0, "rep_min": 8, "rep_max": 12}
+    maxed = [{"reps": 12, "weight": 22.5}] * 3
+    lp = {"session_date": "2026-08-10", "reps": 12, "weight_kg": 22.5}
+    entry = sessions.resolve_prescription(
+        ex, lp, "normal", {"reduced": False}, weight_increment=2.5,
+        last_session_sets=maxed)
+    prev = sessions.previous_performance(lp, maxed)
+    assert entry["source"] == "double_progression"
+    assert entry["last_seen_date"] == "2026-08-10"
+    assert sessions.previous_caption(prev) == \
+        "Last: 22.5kg × 12, 22.5kg × 12, 22.5kg × 12 (2026-08-10)"
+    assert sessions.prescription_delta(entry, prev) == "+2.5kg, -4 reps"
 
 
 def test_estimate_duration_floor_is_10_minutes():

@@ -121,7 +121,12 @@ def test_note_int_keys_are_restored_from_json():
 def test_a_stale_accessory_session_clears_its_notes():
     src = _training_source()
     start = src.index("_acc_day = st.session_state.get")
-    assert '"tp_actuals", "tp_set_log", "tp_notes"' in src[start:start + 700]
+    window = src[start:start + 700]
+    # Each name checked on its own rather than as one contiguous tuple string,
+    # so adding a further per-exercise slot to the reset (tp_previous did) does
+    # not break a test that is about tp_notes being cleared.
+    for field in ("tp_actuals", "tp_previous", "tp_set_log", "tp_notes"):
+        assert f'"{field}"' in window, field
 
 
 # ── behaviour of the mirror itself ───────────────────────────────────────────

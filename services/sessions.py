@@ -632,6 +632,13 @@ def seed_actual_entry(
             entry["weight_kg"] = progressed_weight
             entry["reps"] = progressed_reps
             entry["source"] = "double_progression"
+            # The date is recorded on THIS branch too. Double progression only
+            # fires BECAUSE there is a logged session behind it -- every
+            # prescribed set hit the top of the rep range -- so leaving
+            # last_seen_date None made actual_caption fall through to its
+            # "No prior record" wording on the one branch where the history is
+            # most load-bearing, and it is the branch that raises the weight.
+            entry["last_seen_date"] = (last_performance or {}).get("session_date")
             return entry
 
     if last_performance:
@@ -1083,24 +1090,201 @@ def displayed_prescription(ex: dict, actual: dict | None) -> dict:
 
 
 def actual_caption(entry: dict) -> str:
-    """The small 'last time' / 'plan default' caption shown next to the
-    steppers -- pure so it's unit-testable without Streamlit."""
+    """Where today's numbers CAME FROM, and whether they were held down. Pure,
+    so it's unit-testable without Streamlit.
+
+    IT PRINTS NO NUMBERS, DELIBERATELY. It used to render entry["reps"] and
+    entry["weight_kg"] under a "Last time:" label -- but by the time an entry
+    reaches here those fields have been through seed_actual_entry's readiness
+    nudge and clamp_to_ceiling, so the line reported TODAY'S PROPOSAL as last
+    session's reading. A real +2.5 kg step displayed as "Last time: 25.0 kg"
+    beside a prescribed 25.0 kg, i.e. as no change at all -- destroying exactly
+    the comparison the caption existed to support. The previous session's real
+    numbers come from previous_performance()/previous_caption(), which read the
+    log and nothing else, and the difference between the two is
+    prescription_delta().
+    """
     held = entry.get("clamped") or {}
-    if entry.get("source") != "last_time":
-        base = "No prior record — using plan default."
-        return f"{base} {_held_caption(held)}" if held else base
-    parts = []
-    if entry.get("reps") is not None:
-        parts.append(f"{entry['reps']} reps")
-    if entry.get("band_tier"):
-        label = BAND_TIER_LABELS.get(entry["band_tier"], "")
-        parts.append(f"{entry['band_tier']} ({label})" if label else entry["band_tier"])
-    elif entry.get("weight_kg"):
-        parts.append(f"{entry['weight_kg']} kg")
-    body = " @ ".join(parts) if parts else "logged"
+    source = entry.get("source")
     date_part = f" ({entry['last_seen_date']})" if entry.get("last_seen_date") else ""
-    caption = f"Last time: {body}{date_part}"
-    return f"{caption} {_held_caption(held)}" if held else caption
+    if source == "double_progression":
+        base = ("Double progression — every prescribed set hit the top of the "
+                f"rep range last session{date_part}.")
+    elif source == "last_time":
+        base = f"Starting from your last logged session{date_part}."
+    else:
+        base = "No prior record — using plan default."
+    return f"{base} {_held_caption(held)}" if held else base
+
+
+# ─── The previous session, shown beside today's prescription ─────────────
+
+#: Rendered when a movement has no logged history at all. The athlete's rule:
+#: an absent previous session is said in WORDS -- never 0, never "-" in a
+#: numeric slot, never an interpolated value, each of which reads as a genuine
+#: reading of zero rather than as the absence of one.
+PREVIOUS_NONE_TEXT = "No previous data"
+
+#: Rendered when there IS a previous session and today's prescription matches it
+#: on every axis. A blank would read as "not computed"; this reads as "no
+#: change", which is the fact.
+DELTA_NONE_TEXT = "—"
+
+
+def previous_performance(last_performance: dict | None,
+                          last_session_sets: list[dict] | None) -> dict:
+    """The previous session's ACTUAL COMPLETED WORK, raw.
+
+    Nothing in here has been through seed_actual_entry, the readiness nudge or
+    clamp_to_ceiling. That is the whole point: this is the number the athlete
+    checks the engine's proposal against, so it must be a reading of the log
+    and not a second view of the proposal.
+
+    Returns
+      have          False when the movement has never been logged. The caller
+                    renders PREVIOUS_NONE_TEXT and no delta.
+      session_date  the date the work was done, or None.
+      sets          the full per-set array, normalised onto this module's own
+                    field names ("weight" -> "weight_kg"). EMPTY when only the
+                    single-reading fallback was available.
+      top           last_completed_ceiling's top working set -- top weight, and
+                    the reps actually completed AT that weight. This is what
+                    the delta is measured against, and it is already the
+                    quantity a reduced-load day is clamped to, so the number
+                    shown and the number enforced are one number.
+      per_set       True when `sets` is populated, i.e. when a per-set line can
+                    be rendered rather than the top set alone.
+
+    WARM-UP SETS ARE NOT FILTERED, matching Repository.get_last_session_all_sets'
+    own decision and for its reason: a ramp is authored as its OWN exercise
+    beside the lift it prepares, so a movement's sets are all ramp or none, and
+    filtering would blank a ramp exercise's own history -- the one place its
+    stepper needs a previous reading.
+    """
+    top = last_completed_ceiling(last_performance, last_session_sets)
+    sets = [
+        {
+            "reps":      s.get("reps"),
+            "weight_kg": s.get("weight"),
+            "band_tier": s.get("band_tier"),
+            "tut":       s.get("tut"),
+            "is_warmup": bool(s.get("is_warmup")),
+        }
+        for s in (last_session_sets or [])
+    ]
+    top_only = {k: top.get(k) for k in ("weight_kg", "reps", "band_tier")}
+    have = bool(sets) or any(v is not None for v in top_only.values())
+    return {
+        "have":         have,
+        "session_date": top.get("session_date"),
+        "sets":         sets,
+        "top":          top_only,
+        "per_set":      bool(sets),
+    }
+
+
+def _previous_set_token(s: dict) -> str:
+    """One completed set as "45kg × 10" / "Blue × 12" / "20kg × 45s" / "45s" /
+    "10 reps". A load carries the rep count for it; a bare rep count spells the
+    word out, so a lone integer is never left to be read as a weight."""
+    reps   = s.get("reps")
+    weight = s.get("weight_kg")
+    tier   = s.get("band_tier")
+    tut    = s.get("tut")
+    load = tier or (f"{float(weight):g}kg" if weight else None)
+    # A hold is logged as reps=1 with the work in `tut` (see make_sets_data), so
+    # printing its rep count would render a 45-second plank as "1".
+    if tut and (reps is None or int(reps) <= 1):
+        work, bare = f"{float(tut):g}s", f"{float(tut):g}s"
+    elif reps is not None:
+        work, bare = f"{int(reps)}", f"{int(reps)} reps"
+    else:
+        return load or ""
+    return f"{load} × {work}" if load else bare
+
+
+def previous_caption(previous: dict | None) -> str:
+    """previous_performance()'s output as one line. Per set when the per-set
+    array exists, the top working set otherwise, PREVIOUS_NONE_TEXT when there
+    is no history."""
+    if not previous or not previous.get("have"):
+        return PREVIOUS_NONE_TEXT
+    date_part = f" ({previous['session_date']})" if previous.get("session_date") else ""
+    tokens = [t for t in (_previous_set_token(s) for s in previous.get("sets") or []) if t]
+    if tokens:
+        return f"Last: {', '.join(tokens)}{date_part}"
+    token = _previous_set_token(previous.get("top") or {})
+    return f"Last: {token}{date_part}" if token else PREVIOUS_NONE_TEXT
+
+
+def prescription_delta(entry: dict | None, previous: dict | None) -> str:
+    """Today's RESOLVED prescription minus the previous session's top working
+    set, stated explicitly: "+2.5kg", "+1 rep", "+2.5kg, -1 rep",
+    "Green → Blue band", or DELTA_NONE_TEXT when nothing moved.
+
+    `entry` is the live stepper entry, so the delta tracks the athlete's own
+    taps as well as the engine's proposal -- the number on screen is always the
+    difference between what is about to be performed and what was performed.
+
+    Empty string when there is no history: the caller has already said
+    PREVIOUS_NONE_TEXT, and "+25kg against nothing" is exactly the interpolated
+    value that must never be rendered.
+    """
+    if not previous or not previous.get("have"):
+        return ""
+    top   = previous.get("top") or {}
+    entry = entry or {}
+    parts: list[str] = []
+
+    pw, cw = top.get("weight_kg"), entry.get("weight_kg")
+    if pw is not None and cw is not None:
+        d = round(float(cw) - float(pw), 2)
+        if d:
+            parts.append(f"{d:+g}kg")
+
+    pr, cr = top.get("reps"), entry.get("reps")
+    if pr is not None and cr is not None:
+        d = int(cr) - int(pr)
+        if d:
+            parts.append(f"{d:+d} rep" + ("" if abs(d) == 1 else "s"))
+
+    pt, ct = top.get("band_tier"), entry.get("band_tier")
+    if pt and ct and pt != ct:
+        parts.append(f"{pt} → {ct} band")
+
+    return ", ".join(parts) if parts else DELTA_NONE_TEXT
+
+
+def delta_direction(entry: dict | None, previous: dict | None) -> str:
+    """"up" | "down" | "mixed" | "same" | "" -- FOR COLOURING ONLY. The text
+    prescription_delta() returns is the statement; this only decides whether it
+    is drawn as a step up, a step down or neither, and "" means there is nothing
+    to draw."""
+    if not previous or not previous.get("have"):
+        return ""
+    top   = previous.get("top") or {}
+    entry = entry or {}
+    signs: list[int] = []
+
+    pw, cw = top.get("weight_kg"), entry.get("weight_kg")
+    if pw is not None and cw is not None and float(cw) != float(pw):
+        signs.append(1 if float(cw) > float(pw) else -1)
+
+    pr, cr = top.get("reps"), entry.get("reps")
+    if pr is not None and cr is not None and int(cr) != int(pr):
+        signs.append(1 if int(cr) > int(pr) else -1)
+
+    pt, ct = top.get("band_tier"), entry.get("band_tier")
+    if pt in engine.BAND_TIERS and ct in engine.BAND_TIERS and pt != ct:
+        signs.append(1 if engine.BAND_TIERS.index(ct) > engine.BAND_TIERS.index(pt) else -1)
+
+    if not signs:
+        return "same"
+    if all(s > 0 for s in signs):
+        return "up"
+    if all(s < 0 for s in signs):
+        return "down"
+    return "mixed"
 
 
 def _held_caption(held: dict) -> str:
