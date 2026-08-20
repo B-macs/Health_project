@@ -1764,16 +1764,25 @@ PLAN[21] = {
 #  supported, no lumbar-extension moment) as this block's pressing pattern
 #  instead, with heavy scapular-control prerequisite work alongside it.
 #
-#  Progression: fast-track lifts (documented strengths in the 2025 log — Hip
+#  Progression: fast-track lifts (highest logged loads in 2025 — Hip
 #  Thrust, Lat Pulldown, DB Row, Face Pull) get +2.5kg every weekly exposure.
-#  Slow-track lifts (documented breakdown patterns — Goblet Squat, RDL,
-#  Incline Press, Bulgarian Split Squat) get +2.5kg only every OTHER exposure;
+#  Slow-track lifts (⚠ Goblet Squat, RDL,
+#  Incline Press, Bulgarian Split Squat) get +2.5kg only every OTHER exposure.
+#  ⚠ THE REASON FOR THE SPLIT IS NOT ESTABLISHED (2026-08-20). It came from the
+#  2025 movement-pattern analysis, which the athlete confirmed was COMPILED from
+#  his logs rather than observed — the bracing, hip-shift and firing-order claims
+#  behind it have been removed from that document. The split is left in place as
+#  a conservative default, NOT as a supported finding. P4 (day 22 top sets) is
+#  the scheduled test; re-decide it there, in either direction.
+#  Meanwhile:
 #  off-weeks hold load and add a tempo/pause constraint instead. Core work is
 #  sequenced LAST in every loaded session, deliberately post-fatigue — trains
-#  TA/multifidus endurance under fatigue, since "deep core switches off under
-#  fatigue" and "lumbar dominates at moderate load" are the documented weak
-#  links in the 2025 movement-pattern analysis, and training them fresh
-#  doesn't address that.
+#  TA/multifidus endurance under fatigue. ⚠ The two claims this rested on —
+#  "deep core switches off under fatigue" and "lumbar dominates at moderate
+#  load" — were REMOVED from the 2025 analysis on 2026-08-20 as unobserved
+#  inferences. Post-fatigue core sequencing is kept because it is a defensible
+#  way to train endurance on its own merits, not because the log established a
+#  deficit.
 # ─────────────────────────────────────────────────────────────────────────────
 
 PLAN_STAGE2: dict[int, dict] = {}
@@ -1897,7 +1906,8 @@ def _s2_recovery_day(objective: str, template: str) -> dict:
 
 def _s2_session_a(week: int) -> dict:
     """Squat + Press + Core. Goblet Squat and Incline Press are slow-track
-    (2025 log's documented breakdown patterns); Face Pull is fast-track."""
+    (conservative default — see the block header; the 2025 reason was retired
+    2026-08-20); Face Pull is fast-track."""
     squat_kg  = {1: 10.0, 2: 10.0, 3: 12.5, 4: 12.5}[week]
     squat_tempo = "3-1-1" if week in (1, 3) else "3-2-1"
     press_kg  = {1: 8.0, 2: 8.0, 3: 10.0, 4: 10.0}[week]
@@ -1924,10 +1934,11 @@ def _s2_session_a(week: int) -> dict:
                     "with a brief pause at the bottom. At depth your right hip passes >60° "
                     "flexion — actively keep the right thigh neutral or slightly internally "
                     "rotated, do not let it drift into external rotation (Coxa Saltans cue). "
-                    "Brace before you descend, not after — the 2025 log shows bracing collapsing "
-                    "from rep 6 onward under load; this pause tempo trains bracing before load increases."
+                    "Brace before you descend, not after. The pause tempo trains holding the brace "
+                    "under load. If it goes, note WHICH rep it went on — that is a reading, and no "
+                    "reliable one exists yet."
                 ),
-                biomechanical_focus="Squat pattern retraining — excellent depth/mobility already documented, but bracing collapse under load and a right-side hip shift are the identified weak links this directly targets.",
+                biomechanical_focus="Squat pattern retraining. ⚠ The bracing-collapse and right-hip-shift claims were removed from the 2025 analysis 2026-08-20 as unobserved; watch for both and record what actually happens, rather than treating either as the identified weak links this directly targets.",
                 progression="8 clean reps, brace held through the pause, no right-hip drift → next exposure adds load or tempo per the block's slow-track schedule.",
                 regression="Bracing fails before rep 6, or right hip drifts into external rotation → reduce depth slightly and/or hold current load an extra week.",
             ),
@@ -1981,7 +1992,7 @@ def _s2_session_a(week: int) -> dict:
                 ex_type="hold_reps",
                 sets=3, reps_in_set=8, hold_seconds=10, rest_seconds=45,
                 mechanics="One knee bent, hands under the low back, brace and lift only the head/shoulders slightly — a bracing hold, not a crunch. Deliberately placed last, after the squat/press work, to train bracing under real fatigue rather than fresh.",
-                biomechanical_focus="Deep core (TA/multifidus) endurance specifically under fatigue — the documented weak link ('switches off under fatigue') that undertrained core work done fresh doesn't address.",
+                biomechanical_focus="Deep core (TA/multifidus) endurance specifically under fatigue. ⚠ The 'switches off under fatigue') that undertrained core work done fresh doesn't address.",
                 progression="10-second holds feel controlled, no lumbar movement → hold for 12 seconds.",
                 regression="Low back moves during the hold → reduce hold time, prioritise a still spine.",
             ),
@@ -2576,7 +2587,9 @@ PREP_GLUTE_ACTIVATION = _ex(
     ),
     biomechanical_focus=(
         "Glute max activation, and the single most load-bearing item in phase 2. The 2025 log "
-        "names 'glutes not warmed up before squats' as a direct cause of the squat breakdown, "
+        "listed 'glutes not warmed up before squats' as one cause of the squat breakdown — "
+        "⚠ an inference, not an observation, and the surrounding claims were removed "
+        "2026-08-20; the warm-up stands on the evidence review, not on this line — "
         "and glute max is the primary underactive muscle in the profile. This is the muscle "
         "the release block just made room for."
     ),
@@ -3109,7 +3122,9 @@ def _s2b_gym_a(week: int) -> dict:
                 ),
                 biomechanical_focus=(
                     "The primary lower-body strength lift of the block. Brace quality is the "
-                    "thing being watched: the 2025 log records the brace collapsing from rep 6 "
+                    "thing being watched. ⚠ No reliable prior number exists — the 2025 rep-6 figure "
+                    "was an inference and was removed 2026-08-20, which is what makes this "
+                    "the FIRST real reading rather than a re-test of one. "
                     "onward, and phase 2 exists partly to move that number."
                 ),
                 progression="All three sets at 12 clean reps → add 2.5 kg and drop back to 8.",
