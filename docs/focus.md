@@ -299,7 +299,10 @@ same clock as phase 2, so sequence phase 2 first.
 - Final working loads logged on all six primary lifts, as the new baseline
 - Functional screen (McGill Big 3, Single-Leg Balance, Hip Hinge Full Range,
   Walk+Stair) matching or beating the Day 21 Stage 1 screen
-- Physiotherapist sign-off — manual, external, not automated
+- Sign-off is the athlete's own, against the recorded measurements. Physiotherapist
+  confirmation was retired as a gate on 2026-08-17, now and in the future — see
+  `patient_profile.PROFILE["stage_transitions"]`. What replaces it is `docs/hypothesis.md`:
+  pre-registered predictions scored at every block boundary.
 
 Guardrails for the stage itself live in `services/rules.py`
 `STAGE_CONSTRAINTS[2]` (ACWR ceiling 1.3), which `services/engine.py` derives

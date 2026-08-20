@@ -118,7 +118,7 @@ docs/        — INVENTORY.md, resume.md, training/*.md, playbook.md, focus.md,
 | Issue | Status |
 |-------|--------|
 | `Training plan/` folder at root | Stale duplicate of `docs/training/` — delete manually (`Remove-Item -Recurse "Training plan"`) |
-| Stage 2 training plan | Not yet built — begins after Day 14 physiotherapist sign-off |
+| Stage 2 training plan | Built and superseded — Stage 2A ran 2026-07-20 to 2026-08-16; Stage 2B started 2026-08-17. Physiotherapist sign-off retired as a gate 2026-08-17. |
 | Apple Health direct sync | Pending — would replace Google Sheets intermediary |
 | Biomechanical review due | 2026-07-19 — update `patient_profile.py` before Stage 2 |
 | `patient_profile.py` not imported | Informational reference only — not wired into active code |

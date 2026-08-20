@@ -459,8 +459,9 @@ MOVEMENT_RULES: list[MovementRule] = [
         movement="nerve glide",
         reason="Neurodynamic technique. Legitimate, but this athlete has moderate right "
                "L5/S1 foraminal stenosis and every symptom log to date records no neural "
-               "signs — electric or burning sensations are an escalation to the "
-               "physiotherapist, never a training variable. Physio-directed only.",
+               "signs — electric or burning sensations are a STOP-and-record event, "
+               "never a training variable. Do not add nerve glides speculatively: "
+               "they treat a symptom this athlete does not have.",
         stage_cap=1, severity="caution", laterality="right",
     ),
     MovementRule(

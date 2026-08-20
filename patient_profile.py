@@ -734,7 +734,7 @@ PROFILE = {
     # block, so the pressure releases sit between it and the first loaded rep.
     #
     # ⚠ TWO REMOVALS, both consequences of the 5-minute budget rather than
-    # clinical judgements, both owed to the physiotherapist at the next contact:
+    # clinical judgements, both settled here at the next block build:
     #
     #   Ischial Tuberosity Hamstring Release (2 x 90 s each side = ~6 min).
     #   Present in Stage 2A, absent in 2B. The physio CONFIRMED this site as
@@ -824,7 +824,7 @@ PROFILE = {
             ],
 
             "escalation_criteria": [
-                "Still sore after ~1 week with no improvement → see physio",
+                "Still sore after ~1 week with no improvement → reduce the aggravating exposure and re-measure weekly",
                 "Pain becomes sharp or radiates down a leg",
                 "Any numbness or tingling",
             ],
@@ -907,8 +907,7 @@ PROFILE = {
             ],
 
             "escalation_criteria": [
-                "No improvement after another week → see physio (physio already involved "
-                "per injury_profile.md #13, ongoing)",
+                "No improvement after another week → treat the current management as failed and change it",
                 "Pain becomes sharp or radiates down a leg",
                 "Any numbness or tingling",
             ],
@@ -995,8 +994,8 @@ PROFILE = {
             },
 
             "plan": [
-                "No self-directed exercise changes — raise with physiotherapist at next check-in, "
-                "referencing finding #6's existing scapular-control note.",
+                "Self-directed changes are allowed and expected — decide against finding #6's "
+                "existing scapular-control note, and record what changed and why.",
                 "Track whether frequency/duration of desk work correlates with symptom severity "
                 "day-to-day via Morning Check-in (Body Areas / Sensations tags).",
                 "Note whether short walking breaks during desk work reduce onset/severity — "
@@ -1006,7 +1005,7 @@ PROFILE = {
             ],
 
             "escalation_criteria": [
-                "No improvement after continued monitoring → raise explicitly with physio",
+                "No improvement after continued monitoring → change the intervention rather than monitoring on",
                 "Any radiating pain into the arm, numbness, or tingling",
                 "Sharp pain or any acute onset (as opposed to the current dull, gradual ache)",
                 "Headache, dizziness, or any symptom suggesting cervical (not just muscular) involvement",
@@ -1090,9 +1089,9 @@ PROFILE = {
             },
 
             "plan": [
-                "No self-directed exercise changes — raise with physiotherapist at next check-in, "
-                "presenting this ROM breakdown together with the 2026-07-21 entry as one "
-                "evolving cervical/upper-back pattern, not two unrelated findings.",
+                "Self-directed changes are allowed — read this ROM breakdown together with the "
+                "2026-07-21 entry as ONE evolving cervical/upper-back pattern, not two "
+                "unrelated findings, and record what changed.",
                 "Continue monitoring whether desk-work load correlates with the left flexion "
                 "tightness specifically, as already being tracked for the interscapular/neck-base "
                 "pattern.",
@@ -1105,7 +1104,7 @@ PROFILE = {
                 "painless mechanical crackling)",
                 "Any numbness, tingling, or radiating pain into the arm",
                 "Headache, dizziness, or vertigo associated with neck movement",
-                "No improvement after continued monitoring → raise explicitly with physio",
+                "No improvement after continued monitoring → change the intervention rather than monitoring on",
             ],
 
             "notes": [
@@ -1252,10 +1251,10 @@ PROFILE = {
                 "activation work, not instead of it — the same inhibit-then-activate sequencing "
                 "the pre-session release protocol already uses for glute medius/piriformis, "
                 "applied upstream.",
-                "No self-directed exercise changes — endurance-biased scapular loading (long "
-                "isometric holds rather than more reps) is an exercise-prescription change and "
-                "goes to the physiotherapist at the Day 28 reassessment (2026-08-16). See "
-                "docs/training/physio_brief_2026-08-16.md.",
+                "Endurance-biased scapular loading (long isometric holds rather than more reps) "
+                "is a self-directed change, decided at the block boundary against the recorded "
+                "readings. Dose it off rest_interval_evidence_review_2026-08-13 §2.4: four "
+                "short efforts beat one long hold at matched loading time.",
                 "Recheck ferritin — 29 ng/mL (Aug 2023) with CRP 0.9, i.e. a true low-normal "
                 "reading rather than an inflammation-masked one, and now three years stale. "
                 "Low-optimal iron worsens exactly this kind of muscular fatigue-tightness. "
@@ -1267,7 +1266,7 @@ PROFILE = {
                 "Sharp pain or any acute onset (as opposed to the current dull, gradual ache)",
                 "Headache, dizziness, or any symptom suggesting cervical (not just muscular) involvement",
                 "Severity trending up from the current flat 1-3/10 tightness, or no improvement "
-                "after the desk/movement changes above → raise explicitly with physio",
+                "after the desk/movement changes above → change the intervention and record it",
             ],
 
             "notes": [
@@ -1519,8 +1518,8 @@ PROFILE = {
                 "stretching: physio brief §11 already records that post-Latarjet a capsular "
                 "restriction changes the prescription from 'stretch it' to 'do not', and the "
                 "tissue here is not yet identified.",
-                "Raise with the physiotherapist at the 2026-08-16 Day 28 reassessment "
-                "(physio brief §13) — the position is easy to demonstrate in the room.",
+                "No outside identification is coming (standing decision, 2026-08-17) — treat the "
+                "position as a repeatable self-test and track whether it changes.",
                 "Do not deliberately re-provoke between now and then; note any appearance in "
                 "OTHER positions, or during the block's pressing work, if it happens on its own.",
             ],
@@ -1544,9 +1543,9 @@ PROFILE = {
                 "the same day): the scar is the right-shoulder surgery scar, and the "
                 "sensation sits on surgically altered anatomy — which is exactly why the "
                 "plan is identification-first rather than self-treatment.",
-                "Painless + position-specific + reliably reproducible makes this a candidate "
-                "CLINICAL RE-CHECK, not just a symptom: if the physio names the tissue, the "
-                "position itself becomes a cheap repeatable test.",
+                "Painless + position-specific + reliably reproducible makes the position itself a "
+                "cheap repeatable self-test — run it, track it, and let the trend stand in "
+                "for a name.",
             ],
         },
         {
@@ -1630,8 +1629,8 @@ PROFILE = {
                     "Horse stance and Cossack squat can BOTH come off deferral — 'patient "
                     "can comfortably do both.' Gap to note honestly: the brief also asked "
                     "WITH WHAT ROTATION CUE, and the response does not name one — the "
-                    "external-rotation cue recorded in the cluster documents stands until "
-                    "the physio says otherwise. Lifting the deferral in "
+                    "external-rotation cue recorded in the cluster documents stands unless a "
+                    "measurement moves it. Lifting the deferral in "
                     "cluster_a_mechanics is a code change that lands with the block "
                     "build, not with this record."
                 ),
@@ -1673,9 +1672,9 @@ PROFILE = {
                     "The athlete resolved the five §15 follow-ups himself the same day. "
                     "What remains for 2026-08-16 is NOT an appointment — it is "
                     "PLAN_STAGE2[28], the plan's own self-administered test session, "
-                    "whose data then goes to the physio for the format-free sign-off "
-                    "stage_2_exit_criteria requires (remote is fine; the brief was "
-                    "answered remotely). The decisions: (1) the "
+                    "scored here against the recorded measurements. (This entry originally "
+                    "sent that data out for a format-free sign-off; SUPERSEDED "
+                    "2026-08-17, when confirmation was retired as a gate.) The decisions: (1) the "
                     "pec techniques are built IN-HOUSE from the Cluster D source "
                     "documents and the Baar annex rather than waiting for a demo — "
                     "docs/training/release_protocols_2026-08-10.md, a pre-registered "
@@ -2063,7 +2062,9 @@ PROFILE = {
         "hip_click": "Coxa Saltans snap controllable with neutral rotation cue",
         "upper_glute": "Measurable reduction in resting grip/tightness of upper glute",
         "hinge": "Pain-free hip hinge to full range (arms past knees)",
-        "physio_sign_off": "Required before advancing to Stage 2",
+        "physio_sign_off": "HISTORICAL — this is what actually gated the Stage 1 → 2 "
+                            "transition on 2026-07-19. Retired as a gate 2026-08-17; not a "
+                            "forward requirement. See stage_transitions.",
     },
 
     # Evaluated at the Stage 2A Day 28 reassessment. Physiotherapist sign-off
@@ -2074,7 +2075,9 @@ PROFILE = {
         "shoulder": "No instability sensation or left-tilt compensation under the incline-press loading introduced this block",
         "working_loads": "Final working loads logged on all six primary lifts (Goblet Squat, Incline DB Press, RDL, Hip Thrust, Lat Pulldown, Single-Arm DB Row) as the new baseline",
         "functional_screen": "McGill Big 3, Single-Leg Balance, Hip Hinge Full Range, Walk+Stair — matching or beating the Day 21 Stage 1 screen",
-        "physio_sign_off": "Required before deciding Stage 2B vs. extending Stage 2A, and before introducing running",
+        "physio_sign_off": "HISTORICAL — retired as a gate 2026-08-17, before this was "
+                            "evaluated. Both decisions were made against the recorded "
+                            "measurements. Not a forward requirement.",
     },
 
     # Draft — evaluated at the Stage 2B Day 28 reassessment (2026-09-13), which
@@ -2209,6 +2212,29 @@ PROFILE = {
                      "ceiling, so nothing was cut to pay for it.",
             "signed_off_by": "athlete (2026-08-14), on the physiotherapist's 2026-08-10 "
                               "recommendation",
+        },
+        {
+            "date": "2026-08-20",
+            "event": "FORWARD PHYSIO DEPENDENCIES SWEPT FROM THE CODE. The 2026-08-17 "
+                     "decision retired physiotherapist confirmation as a gate, but it was "
+                     "only applied to stage_2b_exit_criteria; ~35 places still instructed the "
+                     "athlete to see, ask, flag or wait for a physio, including two he reads "
+                     "live: the Autoregulation advancement message (engine.py, 'Confirm with "
+                     "physio before progressing') and the block-complete screen "
+                     "(views/training.py, 'Discuss both with your physiotherapist'). Every "
+                     "one is now a self-obtainable criterion instead: hold rather than advance, "
+                     "record the reading, change the intervention. Escalation criteria keep their "
+                     "STOP but end in an action he can take. THREE JUDGEMENT CALLS, stated so "
+                     "they can be overruled: (1) historical records of what the physio actually "
+                     "said are UNTOUCHED, per the 2026-08-17 entry's own scope; (2) the two "
+                     "spent physio_sign_off keys are relabelled HISTORICAL rather than deleted, "
+                     "because they are what genuinely gated those transitions; (3) the ONE "
+                     "genuine red flag - shooting/radiating/electric/tingling on the nerve glide "
+                     "- now points at the GP rather than at nothing, the GP channel being "
+                     "already open in this record. accessory.HANG_MAX_STEP 3 needed a new "
+                     "condition since its old one was 'ask the physiotherapist': FOUR clean "
+                     "weeks at step 2, double the two that raise HANG_STEP. Gate 3543 passed.",
+            "signed_off_by": "athlete (2026-08-20)",
         },
     ],
 }

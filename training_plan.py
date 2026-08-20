@@ -799,7 +799,7 @@ PLAN[7] = {
                 "(4) Lying flat on back. (5) Walking 5 steps. "
                 "Write your scores in the Session Notes. Compare these scores with your Day 1 baseline. "
                 "Any score that is lower than Day 1 = progress. "
-                "Any score that has increased = flag for physiotherapist review. "
+                "Any score that has increased = record it and re-check next session. "
                 "Also assess the 5 biomechanical patterns from your profile: "
                 "(6) Upper glute release — has the grip reduced after 7 days? "
                 "(7) Standing hinge — does the sit-bone area feel less restricted?"
@@ -1063,7 +1063,7 @@ PLAN[11] = {
             biomechanical_focus="Sciatic nerve mechanosensitivity reduction — neural tissue that has been sensitised by L5/S1 disc pressure requires specific mobilisation to restore normal neural tension and reduce the neural component of pain.",
             progression="10 reps easy, no pain → add ankle dorsiflexion (pull toes back) when straightening knee.",
             regression="Any shooting or electric sensation → STOP immediately. Return to this exercise next session only.",
-            warning="STOP IMMEDIATELY if any shooting, radiating, electric, or tingling sensation occurs. This indicates neural irritation that needs physiotherapist review.",
+            warning="STOP IMMEDIATELY if any shooting, radiating, electric, or tingling sensation occurs. This is neural irritation: drop this exercise for the rest of the week and log it. If it persists beyond a week, spreads, or brings weakness or numbness, that is a GP question, not a training one.",
         ),
         _ex(
             name="Standing Calf Raise (Eccentric Focus)",
@@ -1312,7 +1312,7 @@ PLAN[14] = {
             ),
             biomechanical_focus="Proprioceptive progression under vision deprivation — tests the full integration of hip, ankle, and core proprioception that has been progressively trained over 14 days.",
             progression="60 seconds eyes closed clean → Stage 2 proprioception criterion met.",
-            regression="Eyes-closed too unstable → perform eyes-open. Document for physiotherapist.",
+            regression="Eyes-closed too unstable → perform eyes-open. Record the reading.",
         ),
         _ex(
             name="Hip Hinge Full Range Assessment",
@@ -1325,7 +1325,7 @@ PLAN[14] = {
                 "Note: what is your maximum pain-free range? How does it compare to Day 4? "
                 "Log this in session notes. "
                 "BIOMECHANICAL CHECK: compare right vs left hip hinge range. Note if right side "
-                "produces the ischial tuberosity release. This data goes to your physiotherapist."
+                "produces the ischial tuberosity release. Record it — this is finding #2's own reading."
             ),
             biomechanical_focus="Hip hinge range of motion and posterior chain capacity — this is the functional test for whether the L5/S1 pathway is desensitised enough to tolerate progressive loading in Stage 2.",
             progression="Full range, pain ≤2/10 → criteria met for Stage 2 Transition programming.",
@@ -1345,7 +1345,7 @@ PLAN[14] = {
             ),
             biomechanical_focus="Integrated functional outcome assessment — walking distance, stair capacity, and pain behaviour during functional tasks are the primary clinical benchmarks for rehabilitation progression.",
             progression="Pain ≤2/10 throughout AND improved from Day 7 scores → Stage 1 COMPLETE. Ready for Stage 2 assessment.",
-            regression="Pain >3/10 on stairs or pain worse than Day 7 → discuss with physiotherapist before progressing.",
+            regression="Pain >3/10 on stairs or pain worse than Day 7 → hold this stage; do not progress on this data.",
         ),
     ],
 }
@@ -1685,7 +1685,7 @@ PLAN[21] = {
             ),
             biomechanical_focus="Functional assessment of the foundational spinal stability system — now with two prior data points (Day 3, Day 14) to compare against, giving a genuine trend rather than a single snapshot.",
             progression="Equal or better than Day 14 → supports Stage 2 readiness on this measure.",
-            regression="Worse than Day 14 → note the specific exercise/side; flag for physio discussion before advancing.",
+            regression="Worse than Day 14 → note the specific exercise/side; hold rather than advancing.",
         ),
         _ex(
             name="Single-Leg Balance (Eyes Closed)",
@@ -1698,7 +1698,7 @@ PLAN[21] = {
             ),
             biomechanical_focus="Proprioceptive re-check — confirms the Day 14 result held (or improved) through the flare and this recovery week.",
             progression="60 seconds eyes closed, clean, matching or beating Day 14 → criterion re-confirmed.",
-            regression="Notably worse than Day 14 → perform eyes-open, document for physiotherapist.",
+            regression="Notably worse than Day 14 → perform eyes-open and record the reading.",
         ),
         _ex(
             name="Hip Hinge Full Range Assessment",
@@ -1712,7 +1712,7 @@ PLAN[21] = {
             ),
             biomechanical_focus="Hip hinge range and posterior chain capacity — the same functional test used at Day 14, now re-checked after the flare to confirm it's genuinely safe to progress.",
             progression="Full range, pain <=2/10, matching or beating Day 14 → criterion re-confirmed for Stage 2.",
-            regression="Pain >3/10 at any range, or worse than Day 14 → document the range where pain begins, discuss with physiotherapist before advancing.",
+            regression="Pain >3/10 at any range, or worse than Day 14 → document the range where pain begins; hold rather than advancing.",
         ),
         _ex(
             name="5-Minute Walk + Stair Assessment",
@@ -1726,7 +1726,7 @@ PLAN[21] = {
             ),
             biomechanical_focus="Integrated functional outcome assessment — the primary clinical benchmark, now showing the trend across Day 7, Day 14, and this recovery check.",
             progression="Pain <=2/10 throughout, matching or beating Day 14 → Stage 1 genuinely complete, ready for the Stage 2 reassessment conversation.",
-            regression="Pain >3/10 on stairs, or worse than Day 14 → discuss with physiotherapist before progressing; do not start Stage 2 on this data.",
+            regression="Pain >3/10 on stairs, or worse than Day 14 → do not start Stage 2 on this data; repeat the screen once it settles.",
         ),
     ],
 }
@@ -2224,7 +2224,7 @@ PLAN_STAGE2[14] = {
             mechanics="Full hip hinge to maximum comfortable range, light effort only. Compare pain-free range and any right-side sensation to before this block started.",
             biomechanical_focus="Confirms the hinge pattern is holding up under two weeks of real external load before progressing further.",
             progression="Pain-free, matching or better than block start → continue into Weeks 3-4 as planned.",
-            regression="Worse than block start → hold current loads for Week 3 rather than progressing, and flag to physiotherapist if it doesn't recover by Week 3.",
+            regression="Worse than block start → hold current loads for Week 3 rather than progressing, and log it as a failed checkpoint if it doesn't recover by Week 3.",
         ),
         _ex(
             name="Single-Leg Balance (Eyes Closed)",
@@ -2273,7 +2273,7 @@ PLAN_STAGE2[28] = {
             ),
             biomechanical_focus="Functional re-check of the foundational spinal stability system after a full block of external load.",
             progression="Equal or better than the Stage 1 Day 21 screen → supports continued progression.",
-            regression="Worse than Day 21 → flag for physiotherapist discussion before any further loading increase.",
+            regression="Worse than Day 21 → hold loads rather than increasing them, and record it.",
         ),
         _ex(
             name="Single-Leg Balance (Eyes Closed)",
@@ -2283,7 +2283,7 @@ PLAN_STAGE2[28] = {
             mechanics="Stand on one leg, eyes closed once stable. Compare to Day 14 of this block and to the Stage 1 baseline.",
             biomechanical_focus="Proprioceptive re-check across the whole loaded block.",
             progression="Matching or beating both prior checkpoints → criterion re-confirmed.",
-            regression="Notably worse → document for the physiotherapist conversation before deciding Stage 2B.",
+            regression="Notably worse → record it; it counts against the Stage 2B decision.",
         ),
         _ex(
             name="Hip Hinge Full Range Assessment",
@@ -2292,7 +2292,7 @@ PLAN_STAGE2[28] = {
             mechanics="Full hip hinge, no wall, maximum comfortable range, 1-second pause at the bottom. Compare pain-free range and right-side sensation to the Day 14 checkpoint and the Stage 1 baseline.",
             biomechanical_focus="The same functional hinge test used throughout, now with a full block of loaded RDL work behind it.",
             progression="Full range, pain <=2/10, matching or beating prior checkpoints → supports Stage 2B / further loading.",
-            regression="Worse than prior checkpoints → discuss with physiotherapist before increasing load further.",
+            regression="Worse than prior checkpoints → hold load rather than increasing it further.",
         ),
         _ex(
             name="5-Minute Walk + Stair Assessment",
@@ -2308,7 +2308,7 @@ PLAN_STAGE2[28] = {
             ),
             biomechanical_focus="Integrated functional outcome measure, now with a full loaded block's worth of trend data.",
             progression="Pain <=2/10 throughout, matching or beating prior checkpoints → Stage 2A genuinely complete.",
-            regression="Pain >3/10 on stairs, or worse than prior checkpoints → discuss with physiotherapist before deciding next steps; do not decide Stage 2B or running introduction on this data.",
+            regression="Pain >3/10 on stairs, or worse than prior checkpoints → do not decide Stage 2B or running introduction on this data.",
         ),
     ],
 }
@@ -3972,8 +3972,7 @@ PLAN_STAGE2B[28] = {
                 "hold is judged on its condition, never expired by a date."
             ),
             progression="No increase in click frequency → the deferred movements can be reconsidered.",
-            regression="More frequent or newly painful → the deferrals stand and the physio hears "
-                       "about it.",
+            regression="More frequent or newly painful → the deferrals stand; record the count.",
         ),
         _ex(
             name="Bunkie — Posterior Power Line (Timed)",
@@ -4282,8 +4281,8 @@ PEC_SCAR_RELEASE = _ex(
     ),
     progression="Spots that talked back going quiet -> drop to twice a week; that is the endpoint.",
     regression=("A week of finding nothing tender -> the local job is done. Unchanged after two "
-                "weeks means self-release is not enough and it goes to the physio for hands-on "
-                "work, which is the shoulder cluster's own answer."),
+                "weeks means self-release is not enough for this spot — stop spending the slot on "
+                "it and record the null."),
     warning=(
         "Pain never above 2/10. Move off immediately on any point-specific ice-pick feeling, on "
         "any tingling, numbness or ache running into the arm — that is nerve — and on any pulse "

@@ -234,11 +234,11 @@ recorded in `patient_profile.PROFILE["stage_transitions"]`.
 | Average 14-day tightness | ≤ 3.0 / 10 |
 | McGill Big 3 | Performed pain-free with good form (Day 14 screen) |
 | Hip hinge full range | Pain ≤ 2/10 at arms-past-knees range |
-| Physiotherapist sign-off | Required |
+| Sign-off | The athlete's own, against the recorded measurements. Physiotherapist confirmation retired as a gate 2026-08-17, now and in the future. |
 
 Note on `pain_free_streak`: agreed with the user 2026-07-13 to treat it as
 **informative, not a hard blocker**, provided tightness (≤3.0) and pain (≤2/10)
-are met and the physio signs off. A single reversed day inside an otherwise
+are met. A single reversed day inside an otherwise
 improving trend should not restart the clock the way a fresh injury does.
 
 **Stage 2 → next-block criteria** live in

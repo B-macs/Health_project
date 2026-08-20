@@ -1293,7 +1293,7 @@ def stage_status(
         "days_progress_pct":   round(days_pct, 3),
         "tight_progress_pct":  round(tight_pct, 3),
         "message": (
-            "Advancement criteria met. Confirm with physio before progressing."
+            "Advancement criteria met. Decide against the recorded measurements."
             if (days_ok and tight_ok)
             else "Keep logging. Criteria not yet met."
         ),

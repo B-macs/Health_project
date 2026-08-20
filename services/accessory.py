@@ -125,13 +125,14 @@ LOW_VOLUME_MULTIPLIER: float = 0.75
 # passive end-range loading on a shoulder with three anterior dislocations, a
 # failed capsular wrap and a Latarjet on a shallow glenoid, whose stability is
 # now muscular rather than ligamentous. The shoulder cluster prescribes it; the
-# clinical record argues against it; nobody has asked the physiotherapist. So
-# it is authored and held, in the `cluster_a_mechanics.DEFERRED` idiom — a hold
+# clinical record argues against it. So it is authored and held, in the
+# `cluster_a_mechanics.DEFERRED` idiom — a hold
 # on evidence, with the condition that lifts it written down beside it.
 #
-# RAISE HANG_MAX_STEP TO 3 ONLY AFTER: two clean weeks at step 2, AND the
-# question has been put to the physiotherapist. Raise HANG_STEP on two clean
-# weeks alone. Drop HANG_STEP by one on any of the four signals above; twice
+# RAISE HANG_MAX_STEP TO 3 ONLY AFTER FOUR clean weeks at step 2 - double the
+# two that raise HANG_STEP, because step 3 is the one step that is hard to
+# undo if it is wrong and no outside opinion is coming to adjudicate it
+# (standing decision, 2026-08-17). Raise HANG_STEP on two clean weeks alone. Drop HANG_STEP by one on any of the four signals above; twice
 # means back to 1 and an entry in patient_profile's symptom_log.
 
 HANG_MAX_STEP: int = 2

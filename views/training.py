@@ -3252,8 +3252,8 @@ def render():
                 "Final working loads and the Day 28 functional screen are logged. "
                 "This data feeds two decisions that are deliberately not made here: "
                 "whether to introduce running, and whether to move to Stage 2B or "
-                "extend Stage 2A. Discuss both with your physiotherapist before the "
-                "next block is authored."
+                "extend Stage 2A. Both are settled here, against the recorded "
+                "measurements and the pre-registered predictions in docs/hypothesis.md."
             )
         else:
             st.success(f"**{_plan_days}-Day {active.name} Complete.**")

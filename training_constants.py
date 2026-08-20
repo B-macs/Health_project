@@ -356,7 +356,7 @@ REGION_DISPLAY: dict[str, dict] = {
 #  are flagged REGION_SHARES_BASIS = "provisional" in the
 #  services/battery.py BASIS_PROVISIONAL sense, the flag reaches the screen,
 #  and the REVERT CONDITION is written in the HRV_GARMIN_HOLD idiom:
-#  revise on the athlete's or the physiotherapist's review of this table, or on
+#  revise on the athlete's review of this table, or on
 #  measured per-region evidence — never on a date.
 #
 #  Three authoring rules, all enforced by test:
