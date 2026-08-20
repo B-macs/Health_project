@@ -2502,7 +2502,15 @@ ANTERIOR_HIP_RELEASE = _ex(
         "recommendation (2026-08-10): sustained pressure at the front of the hip, to release "
         "the pressure from sitting. Six to eight hours a day holds this tissue short; that is "
         "wear, not training, and part of the seated tilt deficit is held TONE rather than "
-        "tissue length."
+        "tissue length. "
+        "WHICH FINDING IT SERVES, established on the first reading (2026-08-20): "
+        "FINDING #4, not the overactive-list line above. The athlete reports the release "
+        "site as exactly where the Dead Bug snap occurs, and finding #4 names the "
+        "iliopsoas as its structure, is RIGHT-ONLY, and tested positive on 2026-08-17. "
+        "Its 2026-08-05 evidence had already read the trigger as CONTRACTILE - active hip "
+        "flexion under iliopsoas contraction - which is the same structure from the other "
+        "direction. Do NOT read finding #2's 'iliopsoas is unlikely' against this: that "
+        "refutation is scoped to the SIT-BONE snap and says nothing about the front."
     ),
     progression=("Tender points quieting and standing up straight after sitting getting easier "
                  "→ it is working; the daily protocol keeps doing the volume."),
