@@ -2375,6 +2375,33 @@ def _region_rows(days: int = 31) -> list[dict]:
     return repo.get_repository().get_daily_region_au(days=days)["rows"]
 
 
+def _warning_strains(today: date) -> tuple[dict | None, dict | None]:
+    """(today's, yesterday's) per-region strain, for the safety-warning gate.
+
+    Returns (None, None) — the fail-open signal — when the read itself fails,
+    and NOT when there simply was no session. `strain_regions.region_strain`
+    already distinguishes those: it returns all-None for a day with no
+    session, which the gate reads as "the area is unloaded", which is exactly
+    when the warning should stay off.
+
+    Both days come out of ONE fetch. The gate runs on every exercise render,
+    so a per-exercise read would be one round trip per set.
+    """
+    try:
+        rows = _region_rows()
+        stage = int(repo.get_repository().get_current_stage())
+    except Exception:
+        return None, None
+    out = []
+    for d in (today, today - timedelta(days=1)):
+        try:
+            out.append(strain_regions.region_strain(
+                strain_regions.region_au_for_date(rows, d), stage))
+        except Exception:
+            out.append(None)
+    return out[0], out[1]
+
+
 def _accessory_choice(active, day_num: int | None, policy_directive: dict):
     """Everything services/accessory.choose needs, gathered defensively.
 
@@ -3728,8 +3755,26 @@ def _render_guided_flow(day_num, exercises, n_ex,
         unsafe_allow_html=True,
     )
 
+    # ── Safety warning — GATED ON REGIONAL STRAIN since 2026-08-20 ────────────
+    #
+    # It used to render on every exercise that carried a `warning`, every set,
+    # every session. The athlete's objection, and it is the right one: a
+    # warning shown unconditionally is a warning that gets ignored, at which
+    # point it is no longer doing the job it exists for.
+    #
+    # It now appears only when the body area this exercise actually loads is
+    # already above `strain_regions.WARNING_STRAIN_THRESHOLD` (16 on the 0-21
+    # scale — his number). The rule itself lives in services/ so it is
+    # testable; this is display only.
+    #
+    # ⚠ THE `warning` FIELD IS UNTOUCHED IN training_plan.py. Nothing was
+    # deleted and no exercise became less safe — 13 exercises carry one and all
+    # 13 still do. What changed is when it is put in front of him.
     if ex.get("warning"):
-        st.error(f"⚠️ {ex['warning']}")
+        _t_str, _y_str = _warning_strains(date.today())
+        _warn = strain_regions.warning_is_due(ex["name"], _t_str, _y_str)
+        if _warn["due"]:
+            st.error(f"⚠️ {ex['warning']}")
 
     # Per-exercise note — one per exercise (keyed on _eidx, not on set/rep),
     # so it persists across every set of this exercise. The WIDGET is only the
@@ -3873,17 +3918,19 @@ def _render_guided_flow(day_num, exercises, n_ex,
             elif _equip and _equip != "band" and _actual[_wk] is not None:
                 _incr = ex.get("increment_size", 2.5)
                 _incr_unit = ex.get("increment_unit", "kg")
-                _wt_label = "WEIGHT (KG)" if _incr_unit == "kg" else "WEIGHT (MACHINE UNITS)"
+                # THE MACHINE-UNIT DISCLOSURE WAS REMOVED 2026-08-20 (athlete):
+                # the unit a stack is calibrated in is a BACKGROUND fact, not
+                # something to put in front of him mid-set. `increment_unit`
+                # still drives the step size, and the stored value is still in
+                # machine units — nothing about the data changed, only what is
+                # said about it. The label reads plain "WEIGHT" when the stack
+                # is not in kg, because "WEIGHT (KG)" there would be false.
+                _wt_label = "WEIGHT (KG)" if _incr_unit == "kg" else "WEIGHT"
                 st.markdown(
                     f"<div style='text-align:center;font-size:11px;color:#8A99A3;"
                     f"font-family:monospace;letter-spacing:2px;margin-top:8px;'>{_wt_label}</div>",
                     unsafe_allow_html=True,
                 )
-                if _incr_unit != "kg":
-                    st.caption(
-                        "⚠ Unit-based — this machine's scale isn't calibrated to kg yet. "
-                        f"Each tap moves {_incr:g} unit on the machine's own dial."
-                    )
                 wc1, wc2, wc3 = st.columns([1, 2, 1])
                 with wc1:
                     if st.button("−", key=f"tp_wt_dec_{_eidx}", use_container_width=True):
@@ -4193,31 +4240,25 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 _save_checkpoint(day_num)
                 _rerun_flow()
 
-    # ── Clinical guidance section ─────────────────────────────────────────────
-    st.divider()
-    col_bio, col_prog_reg = st.columns(2, gap="large")
-
-    with col_bio:
-        st.markdown(
-            f"<div style='background:#1A2026;border-radius:16px;padding:14px;'>"
-            f"<div style='font-size:10px;color:#E8ECEF;font-family:monospace;"
-            f"letter-spacing:2px;margin-bottom:6px;'>BIOMECHANICAL FOCUS</div>"
-            f"<div style='font-size:13px;color:#C8CAD0;line-height:1.55;'>{ex['biomechanical_focus']}</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-
-    with col_prog_reg:
-        st.markdown(
-            f"<div style='background:#1A2026;border-radius:16px;padding:14px;'>"
-            f"<div style='font-size:10px;color:#E8ECEF;font-family:monospace;"
-            f"letter-spacing:2px;margin-bottom:6px;'>PROGRESSION / REGRESSION</div>"
-            f"<div style='font-size:12px;color:#C8CAD0;line-height:1.5;'>"
-            f"<span style='color:#E8ECEF;'>▲ Progress if:</span> {ex['progression']}<br><br>"
-            f"<span style='color:#FF4B4B;'>▼ Regress if:</span> {ex['regression']}"
-            f"</div></div>",
-            unsafe_allow_html=True,
-        )
+    # ── THE CLINICAL GUIDANCE SECTION IS GONE ─────────────────────────────────
+    #
+    # Removed 2026-08-20 on the athlete's instruction: the WHY is not wanted on
+    # the training screen. Both panels went — BIOMECHANICAL FOCUS and
+    # PROGRESSION / REGRESSION.
+    #
+    # Measured before removing them, on Stage 2B day 2 (14 exercises):
+    #   biomechanical_focus  4,161 chars  (~832 words)
+    #   progression + regression  2,040 chars  (~407 words)
+    # i.e. ~1,240 words per gym session of text that was not telling him what to
+    # do in the set in front of him.
+    #
+    # ⚠ THE FIELDS ARE UNCHANGED IN training_plan.py AND MUST STAY THERE. Every
+    # exercise still carries all three. They are the reasoning record — what an
+    # exercise is for, and the authored conditions for moving its load up or
+    # down — and the block build reads them. Removing the PANEL stops showing
+    # them mid-set; removing the FIELDS would delete the programme's own logic.
+    # tests/test_exercise_notes.py and the Stage 2B plan tests still assert they
+    # are populated.
 
     # ── Skip exercise option ──────────────────────────────────────────────────
     with st.expander("Skip this exercise", expanded=False):

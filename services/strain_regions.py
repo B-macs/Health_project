@@ -439,6 +439,100 @@ def additivity_gap(region_strains: dict[str, float | None],
     return round(sum(values) - overall_strain, 1)
 
 
+#: A per-exercise safety warning is shown ONLY when the body area that
+#: exercise actually loads is already carrying high strain. Athlete's
+#: instruction, 2026-08-20, and the reasoning is his: a warning that appears
+#: on every set of every session is a warning that gets ignored, so it stops
+#: being a safety message and becomes furniture.
+#:
+#: 16 on the 0-21 strain scale is HIS NUMBER, stated as such. It is not
+#: derived from anything and should not be presented as though it were.
+WARNING_STRAIN_THRESHOLD: float = 16.0
+
+#: How much of an exercise must belong to a region before that region's strain
+#: can trigger its warning. INVENTED, and flagged as invented in the same
+#: idiom as the battery's provisional targets: without it, a lift with a 5%
+#: incidental core share would fire on core strain, which is not what "that
+#: body part area" means. Revisit against real firing rates.
+WARNING_MIN_REGION_SHARE: float = 0.25
+
+
+def warning_is_due(
+    name: str,
+    today_strains: dict[str, float | None] | None,
+    yesterday_strains: dict[str, float | None] | None,
+    threshold: float = WARNING_STRAIN_THRESHOLD,
+) -> dict:
+    """Should this exercise's safety warning be shown right now?
+
+    Returns {"due", "regions", "peak", "basis", "reason"} and NEVER raises.
+
+    The rule: take the regions this exercise genuinely loads (share >=
+    WARNING_MIN_REGION_SHARE), read each one's strain as the HIGHER of today
+    so far and yesterday, and show the warning if any of them is above the
+    threshold. Today-or-yesterday is the athlete's choice and matches what
+    services/accessory.py already reads.
+
+    THREE WAYS IT FAILS, and they do not fail the same direction on purpose:
+
+      unmapped name  -> DUE. We cannot tell which area the exercise loads, so
+                        we cannot justify suppressing a safety message. This
+                        also surfaces a missing EXERCISE_REGION_SHARES entry
+                        as an over-warning rather than as silence.
+      strains are None -> NOT DUE. `region_strain` returns None for every
+                        region when there was no session at all. That is a
+                        real reading meaning the area is unloaded, which is
+                        precisely when the warning is not wanted.
+      caller passed nothing (read failed) -> DUE. Pass None for BOTH dicts
+                        only when the read itself failed; an unknown state is
+                        not evidence of safety, the same rule the battery
+                        applies with `indeterminate`.
+
+    ⚠ IN PRACTICE THIS READS YESTERDAY. Sets are not logged until the session
+    is saved, so "today so far" is empty for the whole of the session being
+    performed. That is a property of when writes happen, not of this rule, and
+    it is stated here so the behaviour is not mistaken for a bug.
+    """
+    shares, basis = region_shares_for(name)
+    if shares is None:
+        return {"due": True, "regions": [], "peak": None, "basis": basis,
+                "reason": "unmapped exercise — cannot locate the load"}
+
+    regions = sorted(r for r, s in shares.items()
+                     if s >= WARNING_MIN_REGION_SHARE)
+    if not regions:
+        return {"due": True, "regions": [], "peak": None, "basis": basis,
+                "reason": "no region reaches the minimum share"}
+
+    if today_strains is None and yesterday_strains is None:
+        return {"due": True, "regions": regions, "peak": None, "basis": basis,
+                "reason": "regional strain could not be read"}
+
+    peak, hot = None, []
+    for r in regions:
+        vals = [d.get(r) for d in (today_strains, yesterday_strains)
+                if isinstance(d, dict)]
+        vals = [float(v) for v in vals if v is not None]
+        if not vals:
+            continue
+        v = max(vals)
+        peak = v if peak is None else max(peak, v)
+        if v > threshold:
+            hot.append(r)
+
+    if peak is None:
+        return {"due": False, "regions": regions, "peak": None, "basis": basis,
+                "reason": "no session on either day — the area is unloaded"}
+    return {
+        "due": bool(hot),
+        "regions": hot or regions,
+        "peak": round(peak, 1),
+        "basis": basis,
+        "reason": (f"{', '.join(hot)} above {threshold:g}" if hot
+                   else f"peak {peak:.1f} at or below {threshold:g}"),
+    }
+
+
 def rolling_prior_region_row(
     rows: list[dict], today: date | None = None,
 ) -> dict | None:

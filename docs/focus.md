@@ -343,7 +343,20 @@ non-diagnostic until a stage has that many days behind it.
    `training_constants.EXERCISE_MOVEMENT_WEIGHT` (or they fall back to
    `UNMAPPED_EXERCISE_WEIGHT` 1.0 and inflate Strain/ACWR — this already
    happened once, across 34 of 63 Stage 1 exercise names).
-5. Run `python -m pytest tests/` — 2437/2437 or higher.
+4b. **Author to the screen rules below, not around them** (athlete, 2026-08-20).
+   Every exercise still gets `biomechanical_focus`, `progression` and
+   `regression` written properly — they are the programme's reasoning and the
+   authored conditions for moving load, and tests require them — but **none of
+   the three is rendered**, so do not write them as if he will read them
+   mid-set, and do not smuggle their content into `mechanics` to get it on
+   screen. `mechanics` says what to do and nothing else. A `warning` is shown
+   only when that exercise's own body area is over
+   `strain_regions.WARNING_STRAIN_THRESHOLD`, so **every new exercise carrying
+   a warning needs an `EXERCISE_REGION_SHARES` entry** or it warns
+   unconditionally (`tests/test_warning_strain_gate.py` fails on this). Machine
+   units are a background fact and are never named on screen. See CLAUDE.md
+   Key Rule 20.
+5. Run `python -m pytest tests/` — 3555/3555 or higher.
 6. Update this file: block, day, gate, next action.
 
 ---
