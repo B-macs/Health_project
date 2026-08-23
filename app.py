@@ -23,6 +23,8 @@ import streamlit as st
 
 import nav
 import repo
+import today
+from services import verdict as vd
 import styles
 import training_constants as _tc
 from services import dashboard as dash
@@ -726,6 +728,34 @@ def _trend_chart(chart: str, dates: list, values: list, *, colour: str,
 
 # ─── Card builder ────────────────────────────────────────────────────────────
 
+def _verdict_line(v) -> str:
+    """WHAT TRAINING IS ABOUT TO SAY, said here first.
+
+    ⚠ 2026-08-23, the athlete: "I saw 66 but then saw reduce load in training
+    ... I dont want to be suprised when I see the deload statement in
+    training." Home showed the smoothed trend and Training decided on the raw
+    score, and Training displays no readiness figure at all — so the two
+    screens shared no number to disagree about. This is that fix: the SAME
+    string services/sessions.py hands the training banner, printed here.
+
+    The HRV note sits on its own line in neutral ink, never a warning tone, so
+    a run cannot be mistaken for the load decision it did not cause.
+    """
+    if not v.has_something_to_say:
+        return ""
+    rows = ""
+    if v.banner_text:
+        rows += (f'<div style="font-size:13px;color:#B9C2D6;line-height:1.55;">'
+                 f'{v.banner_text}</div>')
+    if v.hrv_note:
+        rows += (f'<div style="font-size:12.5px;color:#8A99A3;line-height:1.5;'
+                 f'margin-top:{"7px" if v.banner_text else "0"};">{v.hrv_note}</div>')
+    return (
+        f'<div style="background:#131929;border-left:3px solid {v.tone};'
+        f'border-radius:6px;padding:12px 14px;margin:-2px 0 14px;">{rows}</div>'
+    )
+
+
 def _card_html(
     label_text: str,
     bg_data_url: str,
@@ -737,12 +767,19 @@ def _card_html(
     description: str,
     tertiary: str = "",
     gauge_size: int = 220,
+    badge: str = "",
+    badge_tone: str = "",
 ) -> str:
     scrim  = "linear-gradient(180deg,rgba(0,0,0,0.18) 0%,rgba(0,0,0,0.60) 50%,rgba(0,0,0,0.80) 100%)"
     bg_css = (
         f'background-image:url(\'{bg_data_url}\');background-size:cover;background-position:center;'
         if bg_data_url else "background:#1A2238;"
     )
+    badge_block = (
+        f'<div><span style="display:inline-block;font:600 9.5px/1.7 ui-monospace,monospace;'
+        f'letter-spacing:.12em;text-transform:uppercase;padding:2px 9px;border-radius:20px;'
+        f'margin-top:9px;background:{badge_tone}2E;color:{badge_tone};">{badge}</span></div>'
+    ) if badge and badge_tone else ""
     gauge_block = (
         f'<div style="position:relative;width:{gauge_size}px;height:{gauge_size}px;margin:0 auto;">'
         f'{gauge_svg}'
@@ -752,6 +789,7 @@ def _card_html(
         f'{score_display}</div>'
         f'<div style="font-size:13px;font-weight:500;color:{status_color};margin-top:6px;">'
         f'{status_label}</div>'
+        f'{badge_block}'
         f'</div>'
         f'</div>'
     )
@@ -921,7 +959,15 @@ def _readiness_contributors_block() -> str:
             f'{dash.readiness_unscored_reason(_bio_rows_failed)}</div>',
         )
     rows = "".join(_contributor_row(r) for r in dash.readiness_breakdown_rows(breakdown))
+    # ⚠ THE MASTHEAD ABOVE AND THESE ROWS GRADE DIFFERENT NUMBERS, and until
+    # 2026-08-23 nothing on screen said so. The card shows
+    # compute_readiness_trend (an EMA over ~14 days); these contributors
+    # decompose the RAW compute_readiness for the night. On 2026-08-23 that was
+    # 66 against 56.2 — the gap that produced "I saw 66 but then saw reduce load
+    # in training". _sleep_contributors_block already solved this exact shape
+    # with a one-line caption; this is its readiness twin.
     caption = " ".join(c for c in (
+        vd.readiness_scale_caption(_readiness_score, breakdown.get("score")),
         dash.readiness_coverage_caption(breakdown),
         dash.readiness_alcohol_caption(breakdown),
     ) if c)
@@ -2090,10 +2136,20 @@ _home_css = """<style>
 # ─── Build cards ─────────────────────────────────────────────────────────────
 
 r_col, r_disp, r_lbl, r_hdr, r_desc, r_tert = dash.readiness_meta(_readiness_score)
+# The SAME verdict object views/training.py renders from — one load_policy call
+# per process, so the two screens cannot describe different days.
+try:
+    _verdict = today.today_verdict(readiness_display=_readiness_score,
+                                   readiness_band=r_lbl)
+except Exception:
+    _verdict = None
+_verdict_html = _verdict_line(_verdict) if _verdict else ""
 _card_readiness = _card_html(
     "READINESS", _bg["readiness"],
     _arc_svg(_readiness_score, 100, r_col),
     r_disp, r_lbl, r_col, r_hdr, r_desc, r_tert,
+    badge=(_verdict.badge if _verdict else ""),
+    badge_tone=(_verdict.tone if _verdict else ""),
 )
 
 s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
@@ -2167,6 +2223,14 @@ else:
         st.button(f"Open {_cview} detail", key=_ckey, on_click=_go,
                   kwargs={"d": selected_date, "view": _cview},
                   use_container_width=True)
+        # ⚠ AFTER the button, never between it and the card. _NAV_BUTTON_CSS
+        # pulls the invisible hit target up 464px over the IMMEDIATELY
+        # PRECEDING element; anything inserted between them drags the button
+        # onto the wrong element and the card silently stops being tappable.
+        # The button is 464px tall and pulled up 464px, so emitting here costs
+        # zero net flow offset and lands directly under the card.
+        if _cview == "readiness" and _verdict_html:
+            st.markdown(_verdict_html, unsafe_allow_html=True)
 # A DEAD CREDENTIAL AND A FLAKY NETWORK ARE NOT THE SAME NOTICE, and
 # collapsing them into one grey caption is what let the Oura token die on
 # 2026-08-12 and go unnoticed for five days. "will retry next visit" was

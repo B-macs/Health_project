@@ -19,6 +19,7 @@ import json
 import time
 import nav
 import repo
+import today
 import training_plan as tp
 from services import accessory as acc
 from services import background_sync
@@ -1246,40 +1247,13 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
 #  Engine Directive (cached at module level so it persists across reruns)
 # ─────────────────────────────────────────────────────────────────────────────
 
-@st.cache_data(ttl=1800, show_spinner=False)
-def _engine_directive() -> dict:
-    try:
-        r        = repo.get_repository()
-        bio      = [asdict(b) for b in r.get_biometric_rolling(days=28)]
-        # Separate, deliberately wide fetch feeding ONLY the baseline-drift
-        # guard — see engine.traffic_light's drift_rows docstring for why this
-        # can't just be a longer `bio`. Same underlying Sheets reads either
-        # way (get_biometric_rolling reads whole tabs and filters in Python).
-        drift    = [asdict(b) for b in
-                    r.get_biometric_rolling(days=engine.DRIFT_RECOMMENDED_FETCH_DAYS)]
-        au       = r.get_daily_session_au_weighted(28)
-        diag     = r.get_diagnostic_profile()
-        stage    = r.get_current_stage()
-        streak   = r.get_pain_free_streak()
-        tight    = r.get_avg_tightness(14)
-        lam      = float(diag.get("injury_weight_decay_lambda") or 0.05)
-        tl       = engine.traffic_light(bio, drift_rows=drift)
-        # Scope ACWR's chronic baseline to the current stage — see
-        # engine.ACWR_MIN_IN_STAGE_DAYS for why a calendar window spanning a
-        # stage transition reads as overreach even on zero-AU rest days.
-        acwr_r   = engine.acwr(au, stage,
-                               stage_start=ph.current_stage_start(r.get_phases(),
-                                                                  date.today()))
-        inj_w    = engine.injury_weight(lam, streak)
-        obs_rem  = engine.observation_days_remaining(tl["data_days"])
-        return engine.volume_recommendation(tl, acwr_r, stage, obs_rem, inj_w)
-    except Exception:
-        return {"signal_color": "grey", "label": "", "action": "", "multiplier": 1.0}
-
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _bio_for_readiness() -> list[dict]:
-    return [asdict(b) for b in repo.get_repository().get_biometric_rolling(days=14)]
+# ── Today's decision now lives in today.py ──────────────────────────────────
+# _engine_directive and _bio_for_readiness moved there on 2026-08-23 so HOME
+# reads the same object. Two identically-coded @st.cache_data functions are two
+# independent cache entries: Home would fill at 09:00, Training at 09:31 after
+# a sync landed, and the screens would disagree with identical source. The
+# cached reader has to be one function OBJECT, which is why this is a move and
+# not a copy. See today.py's docstring.
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1367,7 +1341,7 @@ def _plan_logged_dates(start_iso: str, today_iso: str) -> set[str]:
 @st.cache_data(ttl=1800, show_spinner=False)
 def _sync_weekly_rollup_cached() -> tuple[bool, str | None]:
     """Persists ended weeks to the Weekly Rollup Sheet tab, throttled by the
-    TTL like _engine_directive above. Non-blocking: the caller never stops
+    TTL like today.today_directive. Non-blocking: the caller never stops
     rendering on failure, since the banner itself is computed in-memory,
     independent of this write succeeding."""
     try:
@@ -2473,7 +2447,7 @@ def _start_accessory_session() -> None:
     except Exception:
         active = None
     day_num = ph.day_number_in_phase(active, date.today()) if active else None
-    choice = _accessory_choice(active, day_num, _engine_directive())
+    choice = _accessory_choice(active, day_num, today.today_directive())
 
     _reset_session()
     st.session_state.tp_accessory_plan = acc.build_day(choice)
@@ -2912,18 +2886,15 @@ def render():
     _in_session = bool(st.session_state.get("tp_started")) and not st.session_state.get("tp_done_today")
 
     # ── Readiness modifier — computed once per render, applied to prescriptions ─
-    try:
-        _rm_bio = _bio_for_readiness()
-    except Exception:
-        _rm_bio = []
-    _readiness_modifier = engine.readiness_training_modifier(_rm_bio)
+    _readiness_modifier = today.today_readiness_modifier()
     # ONE load decision for the whole page — the banner, the SESSION ADAPTED
     # badge, the volume factor applied to reps/holds/durations, and the clamp
     # on every seeded weight all read this single object. Two independently
     # computed flags are exactly what produced the 2026-08-06 contradiction
     # (header said reduced load, Lat Pulldown seeded 45x10 -> 47.5x11); see
     # services/sessions.py's LOAD RESOLUTION section.
-    _policy = sess.load_policy(_engine_directive(), _readiness_modifier)
+    _verdict = today.today_verdict()
+    _policy = _verdict.policy
     _volume_factor = _policy["volume_factor"]
 
     # ── The accessory session owns the page while one is running ────────────
@@ -3208,7 +3179,7 @@ def render():
     _plan_days = len(active_plan)
     if (1 <= day_num <= _plan_days and not st.session_state.tp_done_today
             and not st.session_state.tp_started):
-        _directive = _engine_directive()
+        _directive = today.today_directive()
         today_plan = active_plan[day_num]
         exercises  = today_plan["exercises"]
         _render_overview(day_num, active, today_plan, exercises, _directive, _policy)
@@ -3295,18 +3266,18 @@ def render():
     # number below — never from a separately re-derived signal_color. That is
     # the structural guarantee: the banner cannot describe a day the numbers
     # disagree with, because there is only one day-decision to describe.
-    _directive = _engine_directive()
-    if _policy["banner_kind"] == "error":
-        st.error(_policy["banner_text"])
-    elif _policy["banner_kind"] == "warning":
-        st.warning(_policy["banner_text"])
-    elif _policy["banner_kind"] == "info":
+    _directive = today.today_directive()
+    if _verdict.banner_kind == "error":
+        st.error(_verdict.banner_text)
+    elif _verdict.banner_kind == "warning":
+        st.warning(_verdict.banner_text)
+    elif _verdict.banner_kind == "info":
         # A STANDING CAP, NOT A BAD MORNING. Blue rather than amber, because
         # the amber was the contradiction the athlete reported: green metrics
         # and low strain under a warning that reads as "you are under-
         # recovered". The numbers below are clamped exactly as they would be
         # under the warning — only the claim about WHY has changed.
-        st.info(_policy["banner_text"])
+        st.info(_verdict.banner_text)
     # green / grey: no banner — train normally, nothing to flag
     # ACWR is advisory while engine.ACWR_ADVISORY_MODE is set: it annotates the
     # day, it does not decide it.
@@ -3586,11 +3557,11 @@ def render():
                                "compares like for like with your self-reported AU.")
                 m3.metric("Active time", f"{_hr['hr_active_minutes']:.0f} min")
                 if _d_rpe is not None:
-                    _verdict = ("You called it almost exactly." if abs(_d_rpe) < 0.5 else
-                                "You under-rated it." if _d_rpe > 0 else
-                                "You over-rated it.")
+                    _rpe_verdict = ("You called it almost exactly." if abs(_d_rpe) < 0.5 else
+                                    "You under-rated it." if _d_rpe > 0 else
+                                    "You over-rated it.")
                     st.caption(
-                        f"**{_verdict}** You rated this {_rep_rpe}; heart rate says "
+                        f"**{_rpe_verdict}** You rated this {_rep_rpe}; heart rate says "
                         f"{_hr['hr_rpe']}. Neither replaces the other — yours measures how "
                         "close to failure it felt, heart rate measures metabolic cost."
                     )
@@ -3676,7 +3647,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
 
     The six parameters are render()'s locals, frozen for the fragment's
     life. Freezing _policy is a small improvement rather than a
-    regression: _engine_directive() is cached for 1800s, so previously a
+    regression: today.today_directive() is cached for 1800s, so previously a
     mid-session cache expiry could change the load policy between two taps
     while tp_actuals had been seeded against the old one.
 

@@ -390,6 +390,20 @@ def _referenced_names(path: str) -> set[str]:
     return names
 
 
+
+def _referenced_names_in_function(path: str, func: str) -> set[str]:
+    """_referenced_names, narrowed to one function body."""
+    tree = ast.parse(Path(path).read_text(encoding="utf-8"))
+    node = next(n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == func)
+    names: set[str] = set()
+    for sub in ast.walk(node):
+        if isinstance(sub, ast.Attribute):
+            names.add(sub.attr)
+        elif isinstance(sub, ast.Name):
+            names.add(sub.id)
+    return names
+
 def test_the_trend_cannot_reach_any_guardrail():
     used = _referenced_names("services/hrv_trend.py")
     for forbidden in ("traffic_light", "volume_recommendation", "acwr",
@@ -441,9 +455,17 @@ def test_every_patient_facing_sentence_is_plain_english(real):
 
 
 def test_the_sentence_says_the_flag_changes_no_training_number(real):
+    """⚠ "ON ITS OWN" is load-bearing, not a stylistic choice. This sentence now
+    renders on the training screen, where on a reduced-load day it sits directly
+    under a banner saying every weight and rep IS held. The earlier wording
+    ("Nothing in your training numbers changes because of this") was true and
+    would not be read that way — two statements about today's numbers,
+    apparently contradicting each other. Same contradiction class the athlete
+    reported on 2026-08-17."""
     oura, garmin = real
     p = ht.panel(oura, garmin, TODAY)
-    assert "training numbers" in p.oura_flag.sentence
+    assert "on its own does not change any of today's numbers" in p.oura_flag.sentence
+    assert "Nothing in your training numbers changes" not in p.oura_flag.sentence
 
 
 def test_a_shape_only_fire_says_the_depth_was_ordinary(real):
@@ -557,3 +579,81 @@ def test_an_older_point_moves_when_the_anchor_moves():
     was = next(n.oura_from_normal for n in before.nights if n.day == day)
     now = next(n.oura_from_normal for n in after.nights if n.day == day)
     assert was != now
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  ring_run_advisory — the one thing allowed out of a display-only module
+# ─────────────────────────────────────────────────────────────────────────────
+#  Added 2026-08-23. The athlete asked for the run to APPEAR in the training
+#  statement while changing no prescribed number. That means one sentence
+#  crosses onto a screen that also carries a load decision — so the sentence
+#  itself has to be structurally incapable of being about the watch or about
+#  the 60/40 combined figure, both of which depend on which device was worn.
+
+import inspect  # noqa: E402
+
+
+def test_the_advisory_takes_no_device_and_no_second_series():
+    """The signature IS the guarantee. downward_flag takes a device NAME, which
+    selects the word on screen but not the data — downward_flag(garmin, today,
+    "oura") runs happily and lies. This entry point cannot."""
+    assert list(inspect.signature(ht.ring_run_advisory).parameters) == ["oura", "today"]
+
+
+def test_the_advisory_cannot_reach_the_combined_figure():
+    """Source-level. The ring's series is what engine.traffic_light already
+    scores HRV against, so a sentence about it adds no new device dependence.
+    The combined figure would, and must not be reachable from here."""
+    used = _referenced_names_in_function("services/hrv_trend.py", "ring_run_advisory")
+    for forbidden in ("combine", "OURA_SHARE", "GARMIN_SHARE", "panel",
+                      "combined_from_normal", "divergence", "_GARMIN"):
+        assert forbidden not in used, forbidden
+    assert "_OURA" in used, "the device must be a literal, not an argument"
+
+
+def test_the_advisory_is_the_ring_even_when_the_watch_is_also_firing(real):
+    oura, garmin = real
+    note = ht.ring_run_advisory(oura, TODAY)
+    assert "ring" in note and "watch" not in note
+    # The watch IS firing on this date — so this is a real discrimination.
+    assert ht.downward_flag(garmin, TODAY, "garmin").firing is True
+    assert note == ht.downward_flag(oura, TODAY, "oura").sentence
+
+
+def test_the_advisory_is_none_on_a_quiet_day():
+    """None, not "". A quiet day says nothing rather than reassuring."""
+    series = {TODAY - timedelta(days=i): 20.0 for i in range(30)}
+    assert ht.ring_run_advisory(series, TODAY) is None
+
+
+def test_the_training_sentence_and_the_panel_sentence_are_the_same_sentence():
+    """⚠ downward_flag defaults provisional=False while panel computes it, and
+    the sentence gains a "still settling" clause on a thin series. Without
+    passing it explicitly the two screens would print DIFFERENT sentences for
+    the same night — invisible on a 28-reading fixture, and live on his real
+    record, which holds a 274-night ring-off stretch."""
+    thin = {TODAY - timedelta(days=i): v
+            for i, v in enumerate([13.0, 15.0, 17.0, 20.0] + [21.0] * 20)}
+    note = ht.ring_run_advisory(thin, TODAY)
+    assert note == ht.panel(thin, {}, TODAY).oura_flag.sentence
+    assert "still settling" in note
+
+
+def test_the_gate_only_silences_and_carries_a_revert_condition():
+    """There is no setting of HRV_RUN_ON_TRAINING_SCREEN that makes the run act
+    — nothing in engine.py or sessions.py ever receives this text. False means
+    he stops being told."""
+    src = Path("services/hrv_trend.py").read_text(encoding="utf-8")
+    i = src.index("HRV_RUN_ON_TRAINING_SCREEN = True")
+    preamble = src[max(0, i - 2200):i]
+    assert "REVERT CONDITION" in preamble
+    assert "15%" in preamble, "the revert condition needs a measurable bar"
+
+
+def test_the_gate_off_returns_none_and_changes_nothing_else(real, monkeypatch):
+    oura, _ = real
+    assert ht.ring_run_advisory(oura, TODAY) is not None
+    monkeypatch.setattr(ht, "HRV_RUN_ON_TRAINING_SCREEN", False)
+    assert ht.ring_run_advisory(oura, TODAY) is None
+    # The panel is untouched by the gate — the chart is not what it governs.
+    assert ht.panel(oura, {}, TODAY).oura_flag.firing is True

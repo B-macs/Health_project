@@ -196,19 +196,39 @@ def test_a_clear_day_shows_no_banner_at_all():
 
 # ─── the view renders the third kind ──────────────────────────────────────
 
-def test_the_training_view_renders_every_banner_kind():
-    """A banner_kind the view does not branch on renders as SILENCE — the
-    athlete would get a clamped session with no explanation at all, which is
-    worse than the contradiction being fixed."""
-    import pathlib
-
-    src = (pathlib.Path(__file__).resolve().parent.parent
-           / "views" / "training.py").read_text(encoding="utf-8")
+def _reachable_banner_kinds() -> set:
     kinds = set()
     for traffic, injury in [(RED, 0.1), (YELLOW, 0.1), (GREEN, 0.95), (GREEN, 0.1)]:
         kinds.add(sess.load_policy(_directive(traffic, injury),
                                    {"volume_factor": 1.0})["banner_kind"])
-    for kind in kinds - {""}:
-        assert f'_policy["banner_kind"] == "{kind}"' in src, (
+    return kinds - {""}
+
+
+def test_the_training_view_renders_every_banner_kind():
+    """A banner_kind the view does not branch on renders as SILENCE — the
+    athlete would get a clamped session with no explanation at all, which is
+    worse than the contradiction being fixed.
+
+    Reads `_verdict.banner_kind` as of 2026-08-23: the view now renders from the
+    shared verdict rather than from its own policy dict, so that Home cannot
+    print a different sentence. The property this test protects is unchanged."""
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parent.parent
+           / "views" / "training.py").read_text(encoding="utf-8")
+    for kind in _reachable_banner_kinds():
+        assert f'_verdict.banner_kind == "{kind}"' in src, (
             f"load_policy can return banner_kind {kind!r} and the view never "
             f"renders it — the session would be clamped with no message")
+
+
+def test_home_carries_a_badge_for_every_banner_kind():
+    """⚠ THE REPORTED BUG, GENERALISED. 2026-08-23: "I saw 66 but then saw
+    reduce load in training." A kind Home has no badge word for renders as a
+    reassuring number with nothing beside it, which is exactly how that
+    happened. Home is now held to the same bar the training view is."""
+    from services import verdict as vd
+
+    for kind in _reachable_banner_kinds():
+        assert vd.BADGE_WORDS.get(kind), f"Home has no badge for {kind!r}"
+        assert vd.HOME_TONES.get(kind), f"Home has no tone for {kind!r}"

@@ -104,6 +104,33 @@ SHAPE_MIN_RUN = 4
 #: floors, and says so. Justified by sd_garmin/sd_oura = 0.978.
 DEVICE_OWN_FLOOR_MIN_WINDOWS = 60
 
+#: ⚠ THIS SWITCHES A SENTENCE ON AND OFF. THERE IS NO SETTING OF IT THAT MAKES
+#: THE RUN ACT.
+#:
+#: Deliberately NOT named *_ADVISORY_MODE, the way engine.ACWR_ADVISORY_MODE and
+#: strain_regions' advisory_only are. Both of those describe a wire that EXISTS
+#: and is currently held open, and both are expected to be flipped one day.
+#: There is no such wire here: nothing in engine.py or services/sessions.py ever
+#: receives this text, so False means the athlete stops being told — it can
+#: never mean the run starts deciding.
+#:
+#: Added 2026-08-23 on the athlete's ask that the run APPEAR in the training
+#: statement while changing no prescribed weight, rep, volume factor or ceiling.
+#: Allowed out of a display-only module because ring_run_advisory reads the RING
+#: ALONE — the same source engine.traffic_light already scores HRV against, since
+#: biometrics.HRV_GARMIN_HOLD keeps hrv_ms Oura's or nothing — so it adds no new
+#: dependence on which device was worn (key rule 2b). The 60/40 combined figure
+#: does, and does not leave this file.
+#:
+#: REVERT CONDITION (HRV_GARMIN_HOLD idiom — evidence, not a date): re-measure
+#: the fire rate over the first 90 days it is on screen and set this False if it
+#: exceeds ~15% of days. The athlete's own bar is at SHAPE_MIN_RUN above — "one
+#: night in six is not a flag" — and the calibrated rate is 4.15% of nights
+#: against 2.35% by chance, so anything approaching 15% means DEPTH_FLOOR_MS has
+#: drifted rather than that he is declining. Key rule 20's own lesson: a warning
+#: on every session is ignored, at which point it is not a safety message.
+HRV_RUN_ON_TRAINING_SCREEN = True
+
 # ── Divergence ───────────────────────────────────────────────────────────────
 #: Both devices report WHOLE milliseconds, so the gap series is quantised and a
 #: rank-based spread collapses to exactly 0.00 on it (measured: MAD and Sn both
@@ -539,8 +566,53 @@ def _flag_sentence(flag: DownwardFlag) -> str:
             f"The {word} has only been recording HRV for a short time, so its "
             f"usual level is still settling."
         )
-    parts.append("Nothing in your training numbers changes because of this.")
+    # ⚠ "ON ITS OWN". This sentence now renders on the training screen, where
+    # on a reduced-load day it sits directly under a banner saying every weight
+    # and rep IS held. The earlier wording — "Nothing in your training numbers
+    # changes because of this" — was true (the run is not what held them) and
+    # would not be read that way: two statements about today's numbers,
+    # apparently contradicting. That is the contradiction class the athlete has
+    # already reported once, on 2026-08-17.
+    parts.append("This on its own does not change any of today's numbers.")
     return " ".join(parts)
+
+
+def ring_run_advisory(oura: Series, today: date) -> str | None:
+    """The RING'S downward run, as one sentence, or None.
+
+    ⚠ THE ONLY THING IN THIS MODULE ANYTHING OUTSIDE A VIEW MAY CALL, and the
+    only thing that may be quoted on a screen that also carries a load decision.
+
+    NO DEVICE PARAMETER AND NO SECOND SERIES. `_OURA` is a literal inside this
+    function, so the sentence cannot be about the watch and cannot be about the
+    60/40 combined figure, whatever a caller passes. That is why it exists as
+    its own name rather than callers reaching for `downward_flag`, which takes a
+    device NAME — and a name selects the word on screen, not the data:
+    `downward_flag(garmin, today, "oura")` runs happily and lies.
+
+    KEY RULE 2b, and why this is allowed out of a display-only module: the
+    ring's series is the SAME source engine.traffic_light already scores HRV
+    against, because biometrics.HRV_GARMIN_HOLD keeps hrv_ms Oura's or nothing.
+    So a sentence about the ring adds NO new dependence on which device was
+    worn. The combined figure does, and stays in here — `combine`, `OURA_SHARE`
+    and `NightPoint.combined_from_normal` are not reachable from this function.
+
+    ⚠ Callers must pass Repository.hrv_trend_series()["oura"] — the RAW ring
+    series — never `hrv_ms` off get_biometric_rolling. Those are the same
+    numbers today only because the hold is on; the day it lifts, `hrv_ms`
+    becomes a 70/30 mixture and this function would start describing a blend
+    while claiming to describe the ring.
+
+    Passes `provisional` explicitly so this sentence and the one on the trend
+    panel are the SAME sentence for the same night — `downward_flag` defaults it
+    False while `panel` computes it, and the two would otherwise differ by the
+    "still settling" clause on any stretch where the ring is thin.
+    """
+    if not HRV_RUN_ON_TRAINING_SCREEN:
+        return None
+    norm = normal_for(oura, _OURA, today)
+    flag = downward_flag(oura, today, _OURA, provisional=norm.provisional)
+    return flag.sentence or None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
