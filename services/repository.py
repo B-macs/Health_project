@@ -3153,6 +3153,39 @@ class Repository:
         status["window_days"] = days
         return status
 
+    def hrv_trend_series(self, days: int = 90, today: date | None = None
+                         ) -> dict[str, dict[str, float]]:
+        """The two RAW nightly HRV series, for services.hrv_trend.
+
+        Returns {"oura": {iso_date: ms}, "garmin": {iso_date: ms}} — a night
+        with no reading is ABSENT from its map, never present as 0.
+
+        ⚠ Deliberately NOT blend_hrv. The hold makes that Oura-verbatim today
+        and a real 70/30 mixture the day it is lifted, at which point "the
+        ring's line" on the trend chart would silently stop being the ring's.
+        The trend view exists to show the two devices SEPARATELY, so it has to
+        read them separately.
+
+        Oura comes through _oura_sleep_metrics_by_date, which already applies
+        biometrics.split_sleep_periods — so the duplicate-sleep-period bug
+        (Oura re-analyses a night by writing a SECOND row) cannot recur here.
+        """
+        today = today or date.today()
+        start = (today - timedelta(days=days)).isoformat()
+        end = today.isoformat()
+        return {
+            "oura": {
+                d: m["hrv_ms"]
+                for d, m in self._oura_sleep_metrics_by_date(start, end).items()
+                if m.get("hrv_ms") is not None
+            },
+            "garmin": {
+                d: m["hrv_ms"]
+                for d, m in self._garmin_metrics_by_date(start, end).items()
+                if m.get("hrv_ms") is not None
+            },
+        }
+
     def _alcohol_units_by_date(self, days: int, today: date) -> dict[str, float]:
         """Alcohol units logged via the morning check-in (Notion Readiness
         DB — not a wearable source), keyed by date. Feeds
