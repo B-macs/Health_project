@@ -505,6 +505,67 @@ def _temperature_signal(deviation) -> str:
     return "green"
 
 
+#: Plain-English names for the one-sentence reason the banner carries.
+#: Separate from each metric's `label` on purpose: `label` is rendered in the
+#: Insights traffic-light table, a narrow column where "RHR" is right, while a
+#: banner is a sentence read once and has to say the thing (key rule 19).
+_METRIC_SENTENCE_NAMES = {
+    "hrv_ms":                     "HRV",
+    "resting_heart_rate":         "resting heart rate",
+    "sleep_duration_hours":       "sleep",
+    "oura_temperature_deviation": "body temperature",
+}
+
+
+def _fmt_reading(value: float) -> str:
+    """One decimal place, with a trailing '.0' dropped — 38.0 -> '38',
+    4.93 -> '4.9'. A reading printed as '52.0 bpm' reads as spurious
+    precision on a number that is already a daily average."""
+    return f"{round(float(value), 1):g}"
+
+
+def metric_reason(key: str, metric: dict) -> str:
+    """WHICH READING COUNTED AGAINST TODAY, in one clause.
+
+    traffic_light takes the WORST of four metrics (_worst_signal) rather than
+    averaging them, so a red light is always attributable to a specific
+    reading — but until 2026-08-23 nothing carried that attribution out of the
+    function, and volume_recommendation printed one fixed sentence
+    ("systemic fatigue or distress") for all four causes. The athlete's
+    question was the obvious consequence: readiness read 66 and the training
+    screen said no loaded training, and there was no way to tell from the
+    screen which of HRV, resting HR, sleep or temperature had fired, or by how
+    much. Worse, the temperature case already HAD a specific sentence
+    (see traffic_light's `message`) and volume_recommendation discarded it.
+
+    Returns "" for a green or grey metric — nothing to say — and "" for a
+    metric with no reading at all, which is what makes a missing value stay
+    silent rather than being narrated as a cause.
+
+    Temperature is formatted differently because it carries no baseline: the
+    reading IS a deviation from Oura's own personal norm, so there is no ratio
+    to quote and no direction to infer (the metric is one-sided — only warmth
+    counts). See the TEMP_DEVIATION_* block.
+    """
+    if metric.get("signal") not in ("yellow", "red"):
+        return ""
+    value = metric.get("value")
+    if value is None:
+        return ""
+    name = _METRIC_SENTENCE_NAMES.get(key) or metric.get("label") or key
+    unit = metric.get("unit") or ""
+    baseline = metric.get("baseline_28d")
+    delta    = metric.get("delta_pct")
+    if baseline is None or delta is None:
+        # Always "above": this branch is only reached for temperature, whose
+        # signal is one-sided — a cooler-than-normal reading stays green and
+        # never becomes a driver. See _temperature_signal.
+        return f"{name} {abs(float(value)):.2f} {unit} above your normal".strip()
+    direction = "below" if delta < 0 else "above"
+    return (f"{name} {_fmt_reading(value)} {unit}, {abs(delta):.0f}% {direction} "
+            f"your 28-day average of {_fmt_reading(baseline)} {unit}").replace("  ", " ")
+
+
 def _worst_signal(*signals) -> str:
     return min(signals, key=lambda s: _SIGNAL_PRIORITY.get(s, 2))
 
@@ -650,6 +711,13 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
         metrics         : dict per metric with value/baseline/signal/delta_pct
         drift           : baseline_drift() result (see that function)
         drift_applied   : bool — True when drift actually downgraded `overall`
+        drivers         : list[str] — metric keys sitting AT `overall`, i.e.
+                          the reading(s) that decided the light. Empty on a
+                          green or grey day, and on a drift-downgraded one
+                          (drift is a statement about the baseline, not about
+                          any single reading).
+        driver_summary  : str — those readings as one plain-English clause,
+                          for the banner. "" when there is nothing to name.
         data_days       : int
         message         : str
     """
@@ -752,6 +820,30 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
                "Elevated. Hold volume and re-check tomorrow.")
         )
 
+    # WHICH METRIC DROVE THE LIGHT. The overall signal is the WORST of the
+    # four, never an average, so on a yellow or red day there is always a
+    # specific reading to name — and naming it is the difference between a
+    # banner the athlete can act on and one he can only be puzzled by.
+    #
+    # Every metric SITTING AT the overall signal is listed, not just the first:
+    # two metrics can be red at once, and reporting one of them would make the
+    # other disappear from the only place it is ever mentioned. Order follows
+    # `metrics`' own insertion order (HRV, resting HR, sleep, temperature), so
+    # the summary is deterministic.
+    #
+    # Green and grey get an empty list on purpose. Grey means a reading is
+    # MISSING, which is not a cause and must never be narrated as one.
+    drivers = ([k for k, m in metrics.items() if m["signal"] == overall]
+               if overall in ("yellow", "red") else [])
+    driver_summary = "; ".join(
+        r for r in (metric_reason(k, metrics[k]) for k in drivers) if r
+    )
+    # A drift downgrade has no metric behind it by construction — it fires only
+    # when every reading is green and the BASELINE itself has moved — so the
+    # drift message is the honest attribution for that day.
+    if not driver_summary and drift_applied:
+        driver_summary = drift["message"]
+
     return {
         "overall":  overall,
         "status":   "ok",
@@ -759,6 +851,8 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
         "metrics":  metrics,
         "drift":    drift,
         "drift_applied": drift_applied,
+        "drivers":  drivers,
+        "driver_summary": driver_summary,
         "data_days": len(biometric_rows),
         "message":  message,
     }
@@ -1082,14 +1176,26 @@ def _volume_recommendation_core(
             "injury_weight_active": False,
         }
 
-    # Red traffic light → systemic fatigue → rest only (injury weight cannot override rest)
+    # Red traffic light → rest only (injury weight cannot override rest).
+    #
+    # NAME THE READING. The light is the worst of four metrics, so "biometrics
+    # indicate systemic fatigue or distress" was a summary of a fact the
+    # function already had in full — and it was the only sentence the athlete
+    # ever saw, since sessions.coach_message renders `action` as the day's
+    # headline. It also silently overwrote the specific temperature sentence
+    # traffic_light builds for a possible-illness reading. driver_summary is
+    # that attribution; the generic wording survives only as the fallback for
+    # a red with nothing nameable behind it, which should not happen.
     if overall == "red":
+        summary = traffic.get("driver_summary") or ""
+        cause = (f"{summary[0].upper()}{summary[1:]}." if summary
+                 else "Biometrics indicate systemic fatigue or distress.")
         return {
             "label":              "REST / DELOAD",
             "driver":             DRIVER_BIOMETRICS,
             "multiplier":         0.0,
-            "action":             "Biometrics indicate systemic fatigue or distress. "
-                                  "No loaded training. Mobility and light walking only.",
+            "action":             f"{cause} No loaded training. "
+                                  f"Mobility and light walking only.",
             "signal_color":       "red",
             "injury_weight_active": False,
         }
@@ -1115,14 +1221,18 @@ def _volume_recommendation_core(
             "injury_weight_active": False,
         }
 
-    # Yellow biometrics — reduce volume, hold intensity
+    # Yellow biometrics — reduce volume, hold intensity. Named for the same
+    # reason as the red branch above.
     if overall == "yellow":
+        summary = traffic.get("driver_summary") or ""
+        cause = (f"{summary[0].upper()}{summary[1:]}." if summary
+                 else "Biometrics are below baseline.")
         return {
             "label":              "REDUCED VOLUME  (−25%)",
             "driver":             DRIVER_BIOMETRICS,
             "multiplier":         0.75,
-            "action":             "Biometrics are below baseline. Scale total volume down 20–30%. "
-                                  "Hold intensity targets unchanged — do not increase load today.",
+            "action":             f"{cause} Scale total volume down 20–30%. "
+                                  f"Hold intensity targets unchanged — do not increase load today.",
             "signal_color":       "orange",
             "injury_weight_active": False,
         }
