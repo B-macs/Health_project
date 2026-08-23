@@ -667,7 +667,13 @@ def test_load_policy_red_signal_gets_the_rest_banner():
     p = sessions.load_policy(_RED, _HIGH_STREAK)
     assert p["reduced"] is True
     assert p["banner_kind"] == "error"
-    assert "Rest day" in p["banner_text"]
+    # Identity against the constant, not a phrase: the wording was softened on
+    # 2026-08-23 ("No loaded exercises" was never true of a red day — the
+    # session below is fully loaded, merely held at the last one). The property
+    # this test exists for is WHICH banner a red day gets, and that the advice
+    # to rest survives the rewording.
+    assert p["banner_text"] == sessions._REST_BANNER
+    assert p["banner_text"].startswith("Rest is the better call")
 
 
 def test_load_policy_degrades_to_no_opinion_on_missing_inputs():

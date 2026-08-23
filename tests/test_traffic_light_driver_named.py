@@ -59,8 +59,8 @@ def test_each_red_metric_is_named_in_the_action(today, key, must_contain):
     assert must_contain.lower() in rec["action"].lower()
     # The generic sentence is gone, not merely appended to.
     assert "systemic fatigue" not in rec["action"]
-    # The instruction itself survives — this changes the WHY, never the what.
-    assert "No loaded training" in rec["action"]
+    # The recommendation survives — this changes the WHY, never the what.
+    assert "Rest is the better call" in rec["action"]
 
 
 def test_the_reading_and_its_baseline_are_both_quoted():
@@ -167,3 +167,62 @@ def test_naming_the_driver_changes_no_number():
     assert rec["signal_color"] == "red"
     assert rec["label"] == "REST / DELOAD"
     assert rec["driver"] == engine.DRIVER_BIOMETRICS
+
+
+# ── The message must not claim more than the app actually does ───────────────
+#  Athlete, 2026-08-23: "soften the message, don't change the loaded work."
+#
+#  A red day clamps every weight, rep and band tier to the last completed
+#  session and caps volume at 100%. It does NOT remove an exercise, gate the
+#  Start button or zero anything -- load_policy reads the engine's 0.0
+#  multiplier as a reason string, never as a factor. The old wording ("No
+#  loaded training" / "No loaded exercises") described a behaviour that has
+#  never existed, on the one screen where the athlete would act on it.
+
+from services import sessions  # noqa: E402
+
+
+def test_the_red_directive_does_not_assert_what_the_screen_will_do():
+    _, rec = _directive(_rows(hrv_ms=38.0))
+    assert "No loaded training" not in rec["action"]
+    assert "Rest is the better call" in rec["action"]
+
+
+def test_the_rest_banner_does_not_promise_an_unloaded_session():
+    """The session below is fully loaded, merely held. Saying otherwise is the
+    contradiction this replaced."""
+    assert "No loaded exercises" not in sessions._REST_BANNER
+    assert "held at your last session" in sessions._REST_BANNER
+
+
+def test_the_rest_banner_still_recommends_rest():
+    """Softening the CLAIM must not soften the ADVICE -- the metrics said rest
+    and the banner still has to say so first."""
+    assert sessions._REST_BANNER.startswith("Rest is the better call today")
+    assert "mobility and walking" in sessions._REST_BANNER
+
+
+def test_a_red_day_still_clamps_and_still_reads_as_an_error():
+    """The whole point: the wording moved, the behaviour did not."""
+    _, rec = _directive(_rows(hrv_ms=38.0))
+    policy = sessions.load_policy(rec, {"volume_factor": 1.12, "description": "streak"})
+    assert policy["reduced"] is True
+    assert policy["volume_factor"] == 1.0      # the +12% proposal is refused
+    assert policy["banner_kind"] == "error"
+    assert policy["banner_text"] == sessions._REST_BANNER
+
+
+def test_clamping_is_unchanged_by_the_new_wording():
+    """clamp_to_ceiling is what actually holds the numbers, and it runs off
+    policy["reduced"] — which a red day still sets. Exercised directly rather
+    than through resolve_prescription so this pins the clamp itself, not the
+    seeding fixture around it."""
+    _, rec = _directive(_rows(hrv_ms=38.0))
+    policy = sessions.load_policy(rec, {"volume_factor": 1.0})
+    assert policy["reduced"] is True
+
+    proposed = {"weight_kg": 15.0, "reps": 11}
+    ceiling  = {"weight_kg": 12.5, "reps": 10}
+    held = sessions.clamp_to_ceiling(proposed, ceiling)
+    assert held["weight_kg"] == 12.5 and held["reps"] == 10
+    assert set(held["clamped"]) == {"weight_kg", "reps"}

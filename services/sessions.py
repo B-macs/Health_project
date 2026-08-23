@@ -654,9 +654,23 @@ _REDUCED_BANNER = (
     "failure. Every weight and rep below is held at or under your last "
     "session; the app will not ask you to add load."
 )
+# ⚠ "No loaded exercises" WAS NOT TRUE, and this banner is the one place the
+# athlete read it. A red day does two real things -- clamp_to_ceiling holds
+# every weight, rep and band tier to the last completed session, and
+# volume_factor is capped at 1.0 -- but it does not remove an exercise, gate
+# the Start button or zero anything. The 0.0 multiplier on the engine's red
+# branch is read by load_policy as a REASON (see the `reasons` list above),
+# never as a factor. So the screen said "no loaded exercises" and then handed
+# over the full loaded session.
+#
+# Athlete, 2026-08-23: soften the message, do not change the loaded work. The
+# recommendation is unchanged and still leads -- what changed is that the
+# second sentence now describes what actually happens below it, in the same
+# shape as the other two banners.
 _REST_BANNER = (
-    "Rest day recommended today — mobility and walking only. No loaded "
-    "exercises."
+    "Rest is the better call today — mobility and walking. If you train "
+    "anyway, every weight and rep below is held at your last session and "
+    "nothing will ask you to add load."
 )
 # THE SAME CLAMP, TOLD TRUTHFULLY. Athlete, 2026-08-17: "if my strain is at 2.3
 # then it shouldn't say reduced load in training, that is a contradiction."

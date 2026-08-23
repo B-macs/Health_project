@@ -106,7 +106,11 @@ def test_a_yellow_day_still_gets_the_fatigue_warning():
 def test_a_red_day_still_gets_the_rest_banner():
     policy = sess.load_policy(_directive(RED, injury=0.1), {"volume_factor": 1.0})
     assert policy["banner_kind"] == "error"
-    assert "Rest day" in policy["banner_text"]
+    # See tests/test_sessions.py's copy of this assertion: the banner was
+    # reworded 2026-08-23, so this pins the banner's IDENTITY and its advice
+    # rather than a phrase that is no longer in it.
+    assert policy["banner_text"] == sess._REST_BANNER
+    assert policy["banner_text"].startswith("Rest is the better call")
 
 
 def test_an_acwr_lock_is_a_recovery_driver_and_keeps_the_warning():

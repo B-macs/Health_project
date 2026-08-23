@@ -1194,8 +1194,19 @@ def _volume_recommendation_core(
             "label":              "REST / DELOAD",
             "driver":             DRIVER_BIOMETRICS,
             "multiplier":         0.0,
-            "action":             f"{cause} No loaded training. "
-                                  f"Mobility and light walking only.",
+            # A RECOMMENDATION, SAID AS ONE. This used to read "No loaded
+            # training. Mobility and light walking only." -- an instruction,
+            # which sessions.coach_message renders as the day's headline, and
+            # which the app then contradicts by presenting the full loaded
+            # session underneath it (load_policy never applies this 0.0
+            # multiplier; it reads it as a reason string and clamps to the last
+            # session instead). Athlete, 2026-08-23: soften the message, do not
+            # change the loaded work. So the engine says what it advises and
+            # stops asserting what the screen will do -- engine.py has no
+            # knowledge of the screen and should not sound like it does.
+            "action":             f"{cause} Rest is the better call today — "
+                                  f"mobility and light walking rather than "
+                                  f"loaded training.",
             "signal_color":       "red",
             "injury_weight_active": False,
         }
