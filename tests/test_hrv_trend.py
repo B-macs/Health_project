@@ -485,15 +485,75 @@ def test_the_watch_borrows_the_rings_floors_and_says_so(real):
     assert "still settling" in p.garmin_flag.sentence
 
 
-def test_an_older_point_does_not_move_when_a_newer_reading_arrives(real):
-    """Each night is centred on the normal AS OF THAT NIGHT. Otherwise the
-    whole chart would redraw every morning."""
+def test_the_chart_is_anchored_and_back_dated(real):
+    """Athlete, 2026-08-23: "we now know the average is 33, so we can back date
+    that data to the first day the watch is used."
+
+    One normal per device, applied to every night that device recorded. The
+    watch's first reading is 2026-08-06, so it gets 18 points on the chart --
+    not the 5 a trailing per-night normal allowed, which withheld 13 nights of
+    real readings purely because nights AFTER them had not happened yet."""
     oura, garmin = real
-    before = {n.day: n.oura_from_normal
-              for n in ht.panel(oura, garmin, TODAY - timedelta(days=1)).nights}
-    after = {n.day: n.oura_from_normal
-             for n in ht.panel(oura, garmin, TODAY).nights}
-    shared = set(before) & set(after)
-    assert len(shared) > 20
-    for d in shared:
-        assert before[d] == after[d], d
+    p = ht.panel(oura, garmin, TODAY)
+    watch = [n for n in p.nights if n.garmin_from_normal is not None]
+    assert len(watch) == 18
+    assert watch[0].day == date(2026, 8, 6)
+    # ...and each is simply the reading minus the one anchor.
+    assert watch[0].garmin_from_normal == 34.0 - 33.0
+    assert watch[-1].garmin_from_normal == 21.0 - 33.0
+
+
+def test_the_anchor_is_a_median_so_the_current_slide_cannot_define_it():
+    """The one thing that could make back-dating dishonest is a decline
+    dragging down the level it is measured against. Measured on the real watch
+    series the anchor is 33.0 computed three ways: all 18 nights, the first 14,
+    and with the four declining nights removed."""
+    vals = [float(g) for _, _, g in _REAL]
+    assert statistics.median(vals) == 33.0
+    assert statistics.median(vals[:14]) == 33.0
+    assert statistics.median(vals[:-4]) == 33.0
+
+
+def test_the_flag_is_NOT_anchored(real):
+    """⚠ The chart and the flag answer different questions and must keep
+    different references. The flag's reference deliberately ends where the run
+    BEGINS, so a slide cannot drag down the number deciding whether it is a
+    slide. Anchoring the flag would break exactly that."""
+    src = Path("services/hrv_trend.py").read_text(encoding="utf-8")
+    body = src[src.index("def depth_drop("):src.index("def declining_run(")]
+    assert "today - timedelta(days=k)" in body
+
+    oura, garmin = real
+    p = ht.panel(oura, garmin, TODAY)
+    # The ring's chart anchor and its flag reference are both 20.5 here only
+    # because the window happens to agree; what matters is that the flag
+    # computes its own rather than reading the chart's.
+    assert p.oura_flag.depth[5]["drop_ms"] == pytest.approx(4.2)
+    assert p.oura_flag.normal_ms == 20.5
+
+
+def test_an_older_point_moves_when_the_anchor_moves():
+    """THE PRICE OF BACK-DATING, pinned so it is a known trade and not a
+    surprise. Under the previous trailing design an old point was fixed
+    forever; under anchoring the whole line redraws when the anchor shifts.
+    That is the right way round for a chart whose job is reading a trend --
+    a trailing reference follows a decline down and flattens it out of its own
+    chart -- but it is a genuine change and this test says so.
+
+    Built deliberately so the anchor DOES move, and that took some doing: the
+    real series holds a median of 20.5 on four consecutive days, and a single
+    freak night cannot shift a median at all (one 60 ms night among 28 at
+    20 ms moves it exactly 0.00 — which is the robustness the centre was
+    chosen for). A steady ramp is what actually walks a median forward."""
+    series = {TODAY - timedelta(days=i): 100.0 - i for i in range(1, 29)}
+    before = ht.panel(series, {}, TODAY - timedelta(days=1))
+    anchor_before = before.oura_normal.normal_ms
+
+    series[TODAY] = 100.0
+    after = ht.panel(series, {}, TODAY)
+    assert after.oura_normal.normal_ms != anchor_before
+
+    day = TODAY - timedelta(days=5)
+    was = next(n.oura_from_normal for n in before.nights if n.day == day)
+    now = next(n.oura_from_normal for n in after.nights if n.day == day)
+    assert was != now

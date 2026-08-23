@@ -554,14 +554,43 @@ def panel(oura: Series, garmin: Series, today: date,
     g_norm = normal_for(garmin, _GARMIN, today)
     div = divergence(oura, garmin, today)
 
+    # ── THE CHART IS ANCHORED, AND BACK-DATED ───────────────────────────────
+    # One normal per device — today's — applied to EVERY night that device
+    # recorded, however little history sat behind that night at the time.
+    #
+    # Athlete, 2026-08-23: "we now know the average is 33, so we can back date
+    # that data to the first day the watch is used." He is right, though not
+    # for the reason he gave: the watch was never calibrating. Every nightly
+    # reading was a direct measurement from its first night. The 14-reading
+    # minimum is OUR rule for when we will call something a usual level, not
+    # the watch's — so refusing to plot 2026-08-06 because nights AFTER it had
+    # not happened yet withholds a subtraction we can already do today.
+    #
+    # It was a trailing per-night normal before this. Two consequences of the
+    # change, both real:
+    #   + A sustained decline now SHOWS. Under a trailing normal the reference
+    #     follows you down, so a slow slide flattens itself out of its own
+    #     chart — the module's own known blind spot.
+    #   − Every point redraws when the anchor moves. An older point is no
+    #     longer fixed. That is the price, and it is the right way round for a
+    #     chart whose job is reading a trend rather than replaying what was
+    #     knowable on the night.
+    #
+    # Safe here because the anchor is a MEDIAN: measured on the real watch
+    # series it is 33.0 computed from all 18 nights, from the first 14, or with
+    # the four declining nights removed. The current slide cannot define the
+    # line it is judged against.
+    #
+    # ⚠ THE FLAG IS NOT ANCHORED AND MUST NOT BE. Its reference deliberately
+    # ends where the run BEGINS (see depth_drop) so a slide cannot drag down
+    # the number deciding whether it is a slide. Chart and flag answer
+    # different questions and keep different references on purpose.
     nights: list[NightPoint] = []
     for i in range(chart_nights - 1, -1, -1):
         d = today - timedelta(days=i)
         o, g = oura.get(d), garmin.get(d)
-        # Each night is centred on the normal AS OF THAT NIGHT, so an older
-        # point does not move when a newer reading arrives.
-        od = from_normal(o, normal_for(oura, _OURA, d))
-        gd = from_normal(g, normal_for(garmin, _GARMIN, d))
+        od = from_normal(o, o_norm)
+        gd = from_normal(g, g_norm)
         gap = (float(g) - float(o)) if (o is not None and g is not None) else None
         diverged = None
         if gap is not None and div.centre_ms is not None and div.band_ms is not None:
