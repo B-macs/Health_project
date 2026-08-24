@@ -292,3 +292,108 @@ def test_the_2026_08_23_report():
     # A green-metrics day must not tell him he is under-recovered.
     assert "under-recovered" not in v.banner_text.lower()
     assert v.hrv_note                        # ...and the run is still said
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Two numbers, both shown, and the one with consequences leads
+# ─────────────────────────────────────────────────────────────────────────────
+#  Athlete, 2026-08-23: "I dont like the way I have two different numbers for
+#  readiness, I either want them put together or show them both."
+
+def test_the_card_shows_both_numbers_side_by_side_with_titles():
+    """Athlete, 2026-08-23: "show them both ... with daily and trend as the
+    titles of each". DAILY leads because it is the number with consequences —
+    engine.readiness_training_modifier buckets the raw score and the trend
+    drives nothing."""
+    import app as home
+
+    r = home._card_html("READINESS", "", "<svg/>", "57", "Pay Attention",
+                        "#BFA06A", "h", "d",
+                        score_pair=(("DAILY", "57"), ("TREND", "66")))
+    assert "DAILY" in r and "TREND" in r
+    assert r.index(">57<") < r.index(">66<"), "daily must come first"
+    assert "font-size:58px" not in r, "the single-number block must not also render"
+
+    src = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "_arc_svg(_r_card, 100, r_col)" in src, "the gauge must track the card's number"
+    assert "score_pair=_r_pair" in src
+
+
+def test_the_other_two_cards_are_untouched_by_the_pair():
+    """score_pair defaults to None, so strain and sleep render byte-identical
+    markup to what they rendered before readiness gained a second figure."""
+    import app as home
+
+    a = home._card_html("STRAIN", "", "<svg/>", "12", "Hard", "#BFA06A", "h", "d")
+    b = home._card_html("STRAIN", "", "<svg/>", "12", "Hard", "#BFA06A", "h", "d",
+                        score_pair=None)
+    assert a == b
+    assert "font-size:58px" in a, "the single-number card keeps its 58px figure"
+    assert "DAILY" not in a
+
+
+def test_no_pair_is_shown_on_a_day_the_two_numbers_agree():
+    """Two identical figures side by side would invent a distinction. The app
+    only pairs them when they genuinely differ."""
+    src = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "round(_readiness_today) != round(_readiness_score)" in src
+
+
+def test_the_trend_is_still_what_gets_persisted():
+    """⚠ compute_daily_metrics_snapshot's readiness_score is written into
+    Metrics History and plotted by the 30-day sparkline. Changing WHICH number
+    the card leads with must not change WHICH number is stored, or ~57 rows
+    become incomparable with every row after them."""
+    import inspect
+
+    from services import dashboard as dash
+
+    body = inspect.getsource(dash.compute_daily_metrics_snapshot)
+    assert "compute_readiness_trend" in body
+    assert "readiness_score = _readiness.compute_readiness_trend" in body
+
+
+def test_the_two_numbers_are_never_averaged_into_a_third():
+    """Averaging them would produce a figure that is neither today's score nor
+    the fortnight's, and would break the r=0.992 agreement with Oura that
+    MODEL_VERSION 2 was validated against."""
+    v = vd.today_verdict(_directive(GREEN), {"volume_factor": 1.0},
+                         readiness_display=66.0, readiness_raw=56.2)
+    assert v.readiness_display == 66.0
+    assert v.readiness_raw == 56.2
+    assert not hasattr(v, "readiness_combined")
+    src = (ROOT / "app.py").read_text(encoding="utf-8")
+    for forbidden in ("_readiness_score + _readiness_today",
+                      "(_readiness_score + _readiness_today)"):
+        assert forbidden not in src
+
+
+def test_the_daily_number_is_computed_for_the_selected_date():
+    """⚠ Home renders a PAST day whenever the `d` query param is set.
+    today.today_readiness_raw() always answers for date.today(), so using it
+    for the card would pair a past day's trend with today's daily score under
+    one pair of titles — two different dates, no way to tell."""
+    src = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "for_date=selected_date, bio_rows=_bio_rows" in src
+
+
+def test_todays_displayed_daily_is_the_number_the_engine_bucketed():
+    """⚠ compute_readiness reads a WINDOW, and the score moves with how wide
+    it is: measured 2026-08-23, 56.7 over the engine's 14 days against 56.2
+    over the card's 60. Invisible today (both "56", both "below"); near a
+    bucket edge the card would show one number while the session was decided
+    on another."""
+    src = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert "_readiness_today = today.today_readiness_raw()" in src, (
+        "today's daily must come from the engine's own reader")
+    assert "if is_today:" in src
+
+
+def test_the_verdict_only_renders_on_today():
+    """The verdict describes TODAY's session. Under a card the athlete has
+    navigated back to, it would attach a live training decision to a day that
+    is already over."""
+    src = (ROOT / "app.py").read_text(encoding="utf-8")
+    i = src.index("_verdict = None\nif is_today:")
+    assert i > 0, "the verdict must be gated on is_today"
+    assert src.index("today.today_verdict(") > i

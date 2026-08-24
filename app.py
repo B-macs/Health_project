@@ -769,12 +769,36 @@ def _card_html(
     gauge_size: int = 220,
     badge: str = "",
     badge_tone: str = "",
+    score_pair: tuple | None = None,
 ) -> str:
     scrim  = "linear-gradient(180deg,rgba(0,0,0,0.18) 0%,rgba(0,0,0,0.60) 50%,rgba(0,0,0,0.80) 100%)"
     bg_css = (
         f'background-image:url(\'{bg_data_url}\');background-size:cover;background-position:center;'
         if bg_data_url else "background:#1A2238;"
     )
+    # TWO NUMBERS SIDE BY SIDE, EACH WITH ITS OWN TITLE, when score_pair is
+    # given — the athlete's ask on 2026-08-23 ("show them both ... with daily
+    # and trend as the titles of each"). Absent, this renders the single 58px
+    # figure exactly as before, so the strain and sleep cards are unchanged.
+    if score_pair:
+        (_lab_a, _val_a), (_lab_b, _val_b) = score_pair
+        _col = ("font-size:9px;letter-spacing:.16em;font-family:ui-monospace,monospace;"
+                "color:rgba(255,255,255,0.58);margin-bottom:1px;")
+        number_block = (
+            f'<div style="display:flex;gap:22px;align-items:flex-start;justify-content:center;">'
+            f'<div><div style="{_col}">{_lab_a}</div>'
+            f'<div style="font-size:42px;font-weight:800;color:#fff;line-height:1;'
+            f'letter-spacing:-1.5px;">{_val_a}</div></div>'
+            f'<div><div style="{_col}">{_lab_b}</div>'
+            f'<div style="font-size:42px;font-weight:800;color:rgba(255,255,255,0.72);'
+            f'line-height:1;letter-spacing:-1.5px;">{_val_b}</div></div>'
+            f'</div>'
+        )
+    else:
+        number_block = (
+            f'<div style="font-size:58px;font-weight:800;color:#fff;line-height:1;'
+            f'letter-spacing:-2px;">{score_display}</div>'
+        )
     badge_block = (
         f'<div><span style="display:inline-block;font:600 9.5px/1.7 ui-monospace,monospace;'
         f'letter-spacing:.12em;text-transform:uppercase;padding:2px 9px;border-radius:20px;'
@@ -785,8 +809,7 @@ def _card_html(
         f'{gauge_svg}'
         f'<div style="position:absolute;top:42%;left:50%;transform:translate(-50%,-50%);'
         f'text-align:center;pointer-events:none;">'
-        f'<div style="font-size:58px;font-weight:800;color:#fff;line-height:1;letter-spacing:-2px;">'
-        f'{score_display}</div>'
+        f'{number_block}'
         f'<div style="font-size:13px;font-weight:500;color:{status_color};margin-top:6px;">'
         f'{status_label}</div>'
         f'{badge_block}'
@@ -1880,7 +1903,8 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
     # clamps to it), so the rounded axis must never claim a value outside them.
     hist_decimals = 0
     if view == "readiness":
-        col, disp, lbl, _, _, _ = dash.readiness_meta(_readiness_score)
+        col, disp, lbl, _, _, _ = dash.readiness_meta(
+            _readiness_today if _readiness_today is not None else _readiness_score)
         detail_label = f"READINESS · {date_label}"
         hist_key, hist_unit, hist_title, hist_color = "readiness_score", "", "Readiness Trend", "#6BAF8B"
         hist_metric = "Readiness"
@@ -2135,21 +2159,83 @@ _home_css = """<style>
 
 # ─── Build cards ─────────────────────────────────────────────────────────────
 
-r_col, r_disp, r_lbl, r_hdr, r_desc, r_tert = dash.readiness_meta(_readiness_score)
+# TWO NUMBERS, BOTH SHOWN, AND THE ONE WITH CONSEQUENCES LEADS.
+# Athlete, 2026-08-23: "I dont like the way I have two different numbers for
+# readiness, I either want them put together or show them both."
+#
+# Averaging them was refused: it would manufacture a third figure that is
+# neither today's score nor the fortnight's, break the r=0.992 agreement with
+# Oura's own readiness that MODEL_VERSION 2 was validated against, and make
+# every stored row incomparable with every new one.
+#
+# So both are on the card, and TODAY'S leads — because today's is the number
+# with consequences. engine.readiness_training_modifier buckets the raw score;
+# the trend drives nothing at all. Showing the trend large while the raw score
+# decided the session is the lie of emphasis that produced the original report:
+# 66 on screen, "reduce load" on the next one, and on that day the raw score
+# was 56.7 -> "below" -> -10% volume, while the trend would have bucketed
+# "normal" and contributed nothing.
+#
+# ⚠ _readiness_score (the TREND) stays exactly as it is everywhere else: it is
+# what compute_daily_metrics_snapshot persists into Metrics History, and what
+# the 30-day sparkline plots. Only the card's headline moves.
+# ⚠ FOR selected_date, NOT date.today(). Home renders a past day whenever the
+# `d` query param is set, and today.today_readiness_raw() always answers for
+# TODAY — pairing it with a past day's trend would put two different dates
+# side by side under one pair of titles.
+# ⚠ ON TODAY, THE DISPLAYED DAILY MUST BE THE NUMBER THE ENGINE BUCKETED.
+# compute_readiness reads a window, and the score moves with how wide that
+# window is — measured on 2026-08-23: 56.7 over the engine's 14 days against
+# 56.2 over the card's 60. Both round to "56" and both bucket "below", so it
+# is invisible today; near a bucket edge the card would show one number while
+# the session was decided on another. That is the mismatch this whole change
+# exists to remove, so today's figure comes from the engine's own reader.
+# A past date has no live decision to agree with, so it uses the rows Home
+# already holds.
+try:
+    if is_today:
+        _readiness_today = today.today_readiness_raw()
+    else:
+        _readiness_today = readiness_model.compute_readiness(
+            for_date=selected_date, bio_rows=_bio_rows)
+    if isinstance(_readiness_today, str):       # NOT_COMPUTED
+        _readiness_today = None
+except Exception:
+    _readiness_today = None
+# A day with no reading of its own still shows the trend rather than nothing,
+# which is the pre-existing behaviour of this card.
+_r_card = _readiness_today if _readiness_today is not None else _readiness_score
+r_col, r_disp, r_lbl, r_hdr, r_desc, r_tert = dash.readiness_meta(_r_card)
+# BOTH FIGURES, EACH TITLED. Only paired when the two genuinely exist and
+# differ — on a day they agree, one number with no titles is the honest render
+# and two identical figures side by side would invent a distinction.
+_fmt_r = lambda v: "--" if v is None else f"{float(v):.0f}"
+_r_pair = (
+    (("DAILY", _fmt_r(_readiness_today)), ("TREND", _fmt_r(_readiness_score)))
+    if (_readiness_today is not None and _readiness_score is not None
+        and round(_readiness_today) != round(_readiness_score))
+    else None
+)
 # The SAME verdict object views/training.py renders from — one load_policy call
 # per process, so the two screens cannot describe different days.
-try:
-    _verdict = today.today_verdict(readiness_display=_readiness_score,
-                                   readiness_band=r_lbl)
-except Exception:
-    _verdict = None
+# ⚠ ONLY ON TODAY. The verdict describes today's session; rendering it under
+# a card the athlete has navigated back to would attach a live training
+# decision to a day that is already over.
+_verdict = None
+if is_today:
+    try:
+        _verdict = today.today_verdict(readiness_display=_readiness_score,
+                                       readiness_band=r_lbl)
+    except Exception:
+        _verdict = None
 _verdict_html = _verdict_line(_verdict) if _verdict else ""
 _card_readiness = _card_html(
     "READINESS", _bg["readiness"],
-    _arc_svg(_readiness_score, 100, r_col),
+    _arc_svg(_r_card, 100, r_col),
     r_disp, r_lbl, r_col, r_hdr, r_desc, r_tert,
     badge=(_verdict.badge if _verdict else ""),
     badge_tone=(_verdict.tone if _verdict else ""),
+    score_pair=_r_pair,
 )
 
 s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
