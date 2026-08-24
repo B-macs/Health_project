@@ -5,8 +5,8 @@ dont want to be suprised when I see the deload statement in training."
 
 Neither screen was wrong. THEY SHARED NO NUMBER AT ALL. Home's card shows
 readiness.compute_readiness_trend (an EMA over ~14 days); the training decision
-buckets the RAW compute_readiness, which that day read 56.2 against the trend's
-66; and views/training.py displays no readiness figure of any kind. So the fix
+buckets the RAW compute_readiness, which on the reported day read LOWER than
+the trend; and views/training.py displays no readiness figure of any kind. So the fix
 was not reconciling two numbers -- it was putting the DECISION on Home.
 
 These tests hold that shut.
@@ -148,8 +148,8 @@ def test_the_line_renders_after_the_button_not_between_it_and_the_card():
 # ─────────────────────────────────────────────────────────────────────────────
 
 _NOISE = ("", "Your HRV has come down 4 nights running on the ring.", "x" * 5000)
-_DISPLAYS = (None, 0.0, 66.0, 100.0)
-_RAWS = (None, 0.0, 56.2, 99.0)
+_DISPLAYS = (None, 0.0, 62.0, 100.0)
+_RAWS = (None, 0.0, 58.0, 99.0)
 
 _DECISION_FIELDS = ("reduced", "banner_kind", "banner_text", "driver",
                     "standing_cap", "volume_factor", "reasons", "badge", "tone")
@@ -235,17 +235,17 @@ def test_the_two_scales_grade_different_numbers_and_that_is_deliberate():
 
 def test_the_verdict_keeps_the_two_scores_apart():
     v = vd.today_verdict(_directive(GREEN), {"volume_factor": 1.0},
-                         readiness_display=66.0, readiness_raw=56.2,
+                         readiness_display=62.0, readiness_raw=58.0,
                          readiness_band="Pay Attention")
-    assert v.readiness_display == 66.0     # the card's number
-    assert v.readiness_raw == 56.2         # what the engine bucketed
+    assert v.readiness_display == 62.0     # the card's number
+    assert v.readiness_raw == 58.0         # what the engine bucketed
     assert v.readiness_band == "Pay Attention"
 
 
 def test_the_drill_down_caption_explains_the_gap_only_when_there_is_one():
-    assert "last night alone" in vd.readiness_scale_caption(66.1, 56.2)
-    assert vd.readiness_scale_caption(56.2, 56.2) == ""
-    assert vd.readiness_scale_caption(None, 56.2) == ""
+    assert "last night alone" in vd.readiness_scale_caption(62.0, 58.0)
+    assert vd.readiness_scale_caption(58.0, 58.0) == ""
+    assert vd.readiness_scale_caption(None, 58.0) == ""
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -273,15 +273,15 @@ def test_none_inputs_do_not_raise():
 def test_the_2026_08_23_report():
     """The athlete: "I saw 66 but then saw reduce load in training."
 
-    A trend of 66 reads "Pay Attention" on the card. Under the old code that
-    was the whole story Home told. Now the same render carries the badge and
+    A trend in the "Pay Attention" band was the whole story Home told under the
+    old code. Now the same render carries the badge and
     the sentence Training is about to show."""
     from services import dashboard as dash
 
-    assert dash.readiness_meta(66.0)[2] == "Pay Attention"
+    assert dash.readiness_meta(62.0)[2] == "Pay Attention"
     directive = _directive(GREEN, injury=0.95)          # standing injury cap
     v = vd.today_verdict(directive, {"volume_factor": 1.0},
-                         readiness_display=66.0, readiness_raw=56.2,
+                         readiness_display=62.0, readiness_raw=58.0,
                          readiness_band="Pay Attention",
                          hrv_note="Your HRV has come down 4 nights running on the ring.")
     assert v.reduced is True
@@ -358,9 +358,9 @@ def test_the_two_numbers_are_never_averaged_into_a_third():
     the fortnight's, and would break the r=0.992 agreement with Oura that
     MODEL_VERSION 2 was validated against."""
     v = vd.today_verdict(_directive(GREEN), {"volume_factor": 1.0},
-                         readiness_display=66.0, readiness_raw=56.2)
-    assert v.readiness_display == 66.0
-    assert v.readiness_raw == 56.2
+                         readiness_display=62.0, readiness_raw=58.0)
+    assert v.readiness_display == 62.0
+    assert v.readiness_raw == 58.0
     assert not hasattr(v, "readiness_combined")
     src = (ROOT / "app.py").read_text(encoding="utf-8")
     for forbidden in ("_readiness_score + _readiness_today",
@@ -379,10 +379,10 @@ def test_the_daily_number_is_computed_for_the_selected_date():
 
 def test_todays_displayed_daily_is_the_number_the_engine_bucketed():
     """⚠ compute_readiness reads a WINDOW, and the score moves with how wide
-    it is: measured 2026-08-23, 56.7 over the engine's 14 days against 56.2
-    over the card's 60. Invisible today (both "56", both "below"); near a
-    bucket edge the card would show one number while the session was decided
-    on another."""
+    it is: measured once over the engine's 14 days against the card's 60, the
+    two differed by half a point. Both rounded the same and both bucketed the
+    same, so it was invisible; near a bucket edge the card would show one
+    number while the session was decided on another."""
     src = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "_readiness_today = today.today_readiness_raw()" in src, (
         "today's daily must come from the engine's own reader")

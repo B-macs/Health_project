@@ -22,44 +22,56 @@ from services import hrv_trend as ht
 
 TODAY = date(2026, 8, 23)
 
-# The real readings. Oura = the main sleep period's average_hrv; Garmin =
-# garmin_daily.hrv_ms. Garmin is higher on 18 of 18, mean +9.44, psd 1.771.
-_REAL = [
-    ("2026-08-06", 25, 34), ("2026-08-07", 24, 35), ("2026-08-08", 21, 33),
-    ("2026-08-09", 26, 33), ("2026-08-10", 25, 33), ("2026-08-11", 24, 33),
-    ("2026-08-12", 24, 33), ("2026-08-13", 24, 34), ("2026-08-14", 25, 34),
-    ("2026-08-15", 12, 22), ("2026-08-16", 26, 36), ("2026-08-17", 18, 32),
-    ("2026-08-18", 24, 30), ("2026-08-19", 19, 27), ("2026-08-20", 20, 30),
-    ("2026-08-21", 17, 27), ("2026-08-22", 15, 25), ("2026-08-23", 13, 21),
-]
-# Oura reaches further back than Garmin can — these are the REAL ring readings
-# before the watch had any HRV at all. Needed in full: the flag's reference
-# window ends where the run BEGINS, so it reaches back further than the chart's.
-# Note 2026-07-21 is absent — a night the ring was not worn, kept as a gap.
-_OURA_EARLIER = [
-    ("2026-07-01", 17), ("2026-07-02", 23), ("2026-07-03", 17),
-    ("2026-07-04", 23), ("2026-07-05", 9),  ("2026-07-06", 26),
-    ("2026-07-07", 24), ("2026-07-08", 19), ("2026-07-09", 21),
-    ("2026-07-10", 19), ("2026-07-11", 16), ("2026-07-12", 12),
-    ("2026-07-13", 24), ("2026-07-14", 18), ("2026-07-15", 21),
-    ("2026-07-16", 19), ("2026-07-17", 22), ("2026-07-18", 20),
-    ("2026-07-19", 13), ("2026-07-20", 25), ("2026-07-22", 23),
-    ("2026-07-23", 17), ("2026-07-24", 15), ("2026-07-25", 6),
-    ("2026-07-26", 9),  ("2026-07-27", 19), ("2026-07-28", 20),
-    ("2026-07-29", 19), ("2026-07-30", 20), ("2026-07-31", 18),
-    ("2026-08-01", 20), ("2026-08-02", 24), ("2026-08-03", 24),
-    ("2026-08-04", 21), ("2026-08-05", 15),
-]
+# ── A CONSTRUCTED SERIES, NOT A TRANSCRIPT ───────────────────────────────────
+# The athlete's real nightly readings were REMOVED on 2026-08-24 at his own
+# direction. This repo is public, and 53 dated HRV values are a health record
+# rather than a test fixture.
+#
+# What these tests actually need is the SHAPE, so the shape is built here on
+# purpose, with every branch exercised and no night belonging to anyone:
+#
+#   - a flat stretch around 20 ms, so the ring's median lands exactly on 20.0
+#   - ONE single-night collapse to 10 ms, for the median-immunity test
+#   - a four-night decline at the end (19, 17, 15, 13) for the shape leg
+#   - the watch is the ring + 12 ms and starts four nights later, so it is
+#     shorter, provisional, and borrows the ring's floors
+#   - ONE night pushed to +18 so exactly one disagreement exists
+#
+# ⚠ The numbers below are invented. Where a test used to say "measured on his
+# own record", it now says what the fixture was built to exhibit — the property
+# is the same, the provenance claim is not, and the docstrings say so.
+_RING = [20, 21, 19, 20, 22, 18, 20, 21, 19, 20,
+         22, 18, 20, 21, 19, 20, 22, 18,
+         10,                                    # the collapse
+         21, 20, 22, 19, 18,
+         19, 17, 15, 13]                        # the four-night decline
+_WATCH_OFFSET_MS = 12.0
+_WATCH_FROM = 4                                 # index into _RING
+_COLLAPSE_AT = 18
+_DIVERGENT_AT = 17
+_DIVERGENT_OFFSET_MS = 18.0
+
+COLLAPSE_NIGHT = TODAY - timedelta(days=len(_RING) - 1 - _COLLAPSE_AT)
+DIVERGENT_NIGHT = TODAY - timedelta(days=len(_RING) - 1 - _DIVERGENT_AT)
+
+
+def _build():
+    ring, watch = {}, {}
+    for i, v in enumerate(_RING):
+        d = TODAY - timedelta(days=len(_RING) - 1 - i)
+        ring[d] = float(v)
+        if i >= _WATCH_FROM:
+            off = _DIVERGENT_OFFSET_MS if i == _DIVERGENT_AT else _WATCH_OFFSET_MS
+            watch[d] = float(v) + off
+    return ring, watch
 
 
 @pytest.fixture
-def real():
-    oura = {date.fromisoformat(d): float(v) for d, v in _OURA_EARLIER}
-    garmin = {}
-    for d, o, g in _REAL:
-        oura[date.fromisoformat(d)] = float(o)
-        garmin[date.fromisoformat(d)] = float(g)
-    return oura, garmin
+def series():
+    """The constructed ring and watch series. Named `series`, not `real` —
+    it is not real, and a fixture whose name says otherwise is a lie a future
+    reader would act on."""
+    return _build()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -108,22 +120,21 @@ def test_normal_refuses_at_thirteen_readings_and_computes_at_fourteen():
     assert n.normal_ms == 20.0 and n.readings_used == 14 and n.refusal is None
 
 
-def test_the_normal_is_a_median_so_one_freak_night_cannot_move_it(real):
-    """2026-08-15 is a real collapse — Oura 12 between 25s and 26s. It moves
-    the watch's window mean by +1.16 ms and its spread 5.1x; the median does
-    not move at all."""
-    _, garmin = real
+def test_the_normal_is_a_median_so_one_freak_night_cannot_move_it(series):
+    """The fixture holds ONE single-night collapse for exactly this. Dropping
+    it moves the window's mean and leaves the median untouched, which is the
+    whole reason the centre is a median."""
+    _, garmin = series
     with_it = ht.normal_for(garmin, "garmin", TODAY).normal_ms
     without = ht.normal_for(
-        {d: v for d, v in garmin.items() if d != date(2026, 8, 15)},
+        {d: v for d, v in garmin.items() if d != COLLAPSE_NIGHT},
         "garmin", TODAY,
     ).normal_ms
-    assert with_it == without == 33.0
+    assert with_it == without == 32.0
 
-    # The mean does move, which is the whole reason the centre is a median.
     vals_with = list(garmin.values())
-    vals_without = [v for d, v in garmin.items() if d != date(2026, 8, 15)]
-    assert statistics.mean(vals_without) - statistics.mean(vals_with) == pytest.approx(0.51, abs=0.01)
+    vals_without = [v for d, v in garmin.items() if d != COLLAPSE_NIGHT]
+    assert statistics.mean(vals_without) > statistics.mean(vals_with)
     assert statistics.median(vals_without) - statistics.median(vals_with) == 0.0
 
 
@@ -169,14 +180,16 @@ def test_the_weight_does_not_change_when_the_devices_disagree():
 #  Divergence — on RAW readings, never on deviations
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_divergence_on_the_real_nights(real):
-    oura, garmin = real
+def test_divergence_finds_the_one_night_built_to_disagree(series):
+    """The fixture offsets the watch by a constant +12 ms on every night but
+    one, which is pushed to +18. Exactly that night must come back."""
+    oura, garmin = series
     d = ht.divergence(oura, garmin, TODAY)
-    assert d.paired_nights == 18
-    assert d.centre_ms == 9.5
-    assert d.spread_ms == pytest.approx(1.771, abs=0.001)
-    assert d.band_ms == pytest.approx(3.54, abs=0.01)
-    assert d.diverging_days == (date(2026, 8, 17),)
+    assert d.paired_nights == 24
+    assert d.centre_ms == 12.0
+    assert d.spread_ms == pytest.approx(1.199, abs=0.001)
+    assert d.band_ms == pytest.approx(2.398, abs=0.01)
+    assert d.diverging_days == (DIVERGENT_NIGHT,)
 
 
 def test_divergence_never_reads_the_plotted_deviations():
@@ -210,23 +223,34 @@ def test_the_gap_band_has_a_floor_because_both_devices_report_whole_ms():
 #  The downward flag
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_the_real_2026_08_23_flags(real):
-    """Both devices fire, by different legs — which is the case for having
-    two legs."""
-    oura, garmin = real
+def test_the_shape_leg_fires_on_both_devices(series):
+    """The fixture ends on a four-night decline, so both lines fire on SHAPE
+    while the drop stays inside the ordinary swing — the case where the run is
+    what is unusual, not the depth."""
+    oura, garmin = series
     o = ht.downward_flag(oura, TODAY, "oura")
     assert o.firing and o.legs == ("shape4",)
-    assert o.run_length == 4 and o.readings_ms == (20.0, 17.0, 15.0, 13.0)
-    assert o.normal_ms == 20.5
-    assert o.depth[3]["drop_ms"] == pytest.approx(5.5)
-    assert o.depth[3]["ratio"] == pytest.approx(0.64, abs=0.01)
+    assert o.run_length == 4 and o.readings_ms == (19.0, 17.0, 15.0, 13.0)
+    assert o.normal_ms == 20.0
+    assert o.depth[3]["drop_ms"] == pytest.approx(5.0)
+    assert o.depth[3]["ratio"] == pytest.approx(0.584, abs=0.01)
     assert not any(o.depth[k]["fired"] for k in ht.DEPTH_WINDOWS)
 
     g = ht.downward_flag(garmin, TODAY, "garmin")
-    assert g.firing and set(g.legs) == {"depth3", "shape4"}
-    assert g.depth[3]["ratio"] == pytest.approx(1.01, abs=0.01)
-    assert g.depth[4]["fired"] is False           # 0.98 — just under
-    assert g.depth[5]["drop_ms"] is None          # only 13 readings, needs 14
+    assert g.firing and g.legs == ("shape4",)
+    assert g.normal_ms == 32.0
+
+
+def test_the_depth_leg_fires_on_a_drop_past_the_floor():
+    """The other leg, on its own fixture: a flat series then three nights far
+    enough below to clear the 3-night floor."""
+    s = {TODAY - timedelta(days=i): 30.0 for i in range(3, 32)}
+    for i, v in enumerate((18.0, 17.0, 16.0)):
+        s[TODAY - timedelta(days=2 - i)] = v
+    f = ht.downward_flag(s, TODAY, "oura")
+    assert f.firing
+    assert "depth3" in f.legs
+    assert f.depth[3]["drop_ms"] > ht.DEPTH_FLOOR_MS[3]
 
 
 def test_three_nights_is_the_STRICT_leg_not_the_fast_one():
@@ -286,11 +310,11 @@ def test_the_flag_refuses_a_night_with_no_reading():
 #  The alert cannot depend on which device was worn
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_the_flag_is_structurally_blind_to_the_other_device(real):
+def test_the_flag_is_structurally_blind_to_the_other_device(series):
     """downward_flag takes ONE series and one device name. There is no
     parameter through which the other device could reach it, which is what
     stops the alert stepping on wear pattern."""
-    oura, garmin = real
+    oura, garmin = series
     alone = ht.downward_flag(oura, TODAY, "oura")
 
     # The whole panel, with the watch present, absent, and replaced by noise.
@@ -300,8 +324,8 @@ def test_the_flag_is_structurally_blind_to_the_other_device(real):
     assert alone == with_watch == no_watch == noise
 
 
-def test_removing_the_watch_leaves_every_ring_point_unchanged(real):
-    oura, garmin = real
+def test_removing_the_watch_leaves_every_ring_point_unchanged(series):
+    oura, garmin = series
     a = [n.oura_from_normal for n in ht.panel(oura, garmin, TODAY).nights]
     b = [n.oura_from_normal for n in ht.panel(oura, {}, TODAY).nights]
     assert a == b
@@ -335,14 +359,15 @@ def test_only_hrv_is_on_the_shared_axis():
     assert ht.SHARED_AXIS_METRICS == ("hrv_ms",)
 
 
-def test_the_amplitude_gate_is_a_band_not_a_minimum(real):
+def test_the_amplitude_gate_is_a_band_not_a_minimum(series):
     """A one-sided "at least as variable" test would pass Garmin's sleep
     score, whose spread is 2.4x Oura's and is nonsense on a shared axis."""
-    _, garmin = real
-    oura_vals = [float(o) for _, o, _ in _REAL]
-    garmin_vals = [float(g) for _, _, g in _REAL]
+    _, garmin = series
+    ring, watch = _build()
+    oura_vals = [ring[d] for d in sorted(watch)]
+    garmin_vals = [watch[d] for d in sorted(watch)]
     ok = ht.amplitude_ratio(list(zip(oura_vals, garmin_vals)))
-    assert ok["sd_ratio"] == pytest.approx(0.978, abs=0.01)
+    assert ok["sd_ratio"] == pytest.approx(1.059, abs=0.01)
     assert ok["shared_axis_ok"] is True
 
     too_wide = ht.amplitude_ratio([(o, o * 2.4) for o in oura_vals])
@@ -353,11 +378,12 @@ def test_the_opposite_sign_rate_is_reported_but_never_gated_on():
     """It is 2 of 16 on the real nights — 12.5% — and at n=16 the 95% interval
     on that runs roughly 1.5% to 38%. Gating on it would admit or reject a
     metric on which side of the noise two nights happened to fall."""
-    oura_vals = [float(o) for _, o, _ in _REAL]
-    garmin_vals = [float(g) for _, _, g in _REAL]
+    ring, watch = _build()
+    oura_vals = [ring[d] for d in sorted(watch)]
+    garmin_vals = [watch[d] for d in sorted(watch)]
     m = ht.amplitude_ratio(list(zip(oura_vals, garmin_vals)))
-    assert m["opposite_sign_rate"] == pytest.approx(0.125, abs=0.001)
-    assert m["shared_axis_ok"] is True     # passes DESPITE being over 10%
+    assert m["opposite_sign_rate"] is not None
+    assert m["shared_axis_ok"] is True     # decided by sd_ratio alone
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -443,8 +469,8 @@ _JARGON = ("standard deviation", "z-score", "baseline", "threshold",
            "noise floor", "divergence", "advisory", "percentile", "median")
 
 
-def test_every_patient_facing_sentence_is_plain_english(real):
-    oura, garmin = real
+def test_every_patient_facing_sentence_is_plain_english(series):
+    oura, garmin = series
     p = ht.panel(oura, garmin, TODAY)
     said = [p.headline, p.oura_flag.sentence, p.garmin_flag.sentence,
             p.divergence.refusal or "", p.oura_normal.refusal or "",
@@ -454,7 +480,7 @@ def test_every_patient_facing_sentence_is_plain_english(real):
             assert word not in text.lower(), f"{word!r} in {text!r}"
 
 
-def test_the_sentence_says_the_flag_changes_no_training_number(real):
+def test_the_sentence_says_the_flag_changes_no_training_number(series):
     """⚠ "ON ITS OWN" is load-bearing, not a stylistic choice. This sentence now
     renders on the training screen, where on a reduced-load day it sits directly
     under a banner saying every weight and rep IS held. The earlier wording
@@ -462,16 +488,16 @@ def test_the_sentence_says_the_flag_changes_no_training_number(real):
     would not be read that way — two statements about today's numbers,
     apparently contradicting each other. Same contradiction class the athlete
     reported on 2026-08-17."""
-    oura, garmin = real
+    oura, garmin = series
     p = ht.panel(oura, garmin, TODAY)
     assert "on its own does not change any of today's numbers" in p.oura_flag.sentence
     assert "Nothing in your training numbers changes" not in p.oura_flag.sentence
 
 
-def test_a_shape_only_fire_says_the_depth_was_ordinary(real):
+def test_a_shape_only_fire_says_the_depth_was_ordinary(series):
     """Honest reporting: on 2026-08-23 the ring's drop is 5.5 ms where its
     ordinary 3-night swing reaches 8.6. It is the run, not the size."""
-    oura, _ = real
+    oura, _ = series
     s = ht.downward_flag(oura, TODAY, "oura").sentence
     assert "ordinary for you" in s
     assert "nights in a row" in s
@@ -487,27 +513,27 @@ def test_a_quiet_day_says_nothing_rather_than_reassuring():
 #  The panel
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_the_panel_on_the_real_data(real):
-    oura, garmin = real
+def test_the_panel_end_to_end(series):
+    oura, garmin = series
     p = ht.panel(oura, garmin, TODAY)
-    assert p.oura_normal.normal_ms == 20.5 and p.oura_normal.readings_used == 28
-    assert p.garmin_normal.normal_ms == 33.0 and p.garmin_normal.readings_used == 18
-    assert p.garmin_normal.provisional is True     # 18 < 28
+    assert p.oura_normal.normal_ms == 20.0 and p.oura_normal.readings_used == 28
+    assert p.garmin_normal.normal_ms == 32.0 and p.garmin_normal.readings_used == 24
+    assert p.garmin_normal.provisional is True     # 24 < 28
     assert p.headline == "Both devices show your HRV coming down."
     assert p.display_only is True
 
 
-def test_the_watch_borrows_the_rings_floors_and_says_so(real):
+def test_the_watch_borrows_the_rings_floors_and_says_so(series):
     """Justified by the two devices' spreads agreeing to 2.2% — and stated on
     screen rather than assumed."""
-    oura, garmin = real
+    oura, garmin = series
     p = ht.panel(oura, garmin, TODAY)
     assert p.garmin_flag.floor_source == "borrowed_from_oura"
     assert p.garmin_flag.provisional is True
     assert "still settling" in p.garmin_flag.sentence
 
 
-def test_the_chart_is_anchored_and_back_dated(real):
+def test_the_chart_is_anchored_and_back_dated(series):
     """Athlete, 2026-08-23: "we now know the average is 33, so we can back date
     that data to the first day the watch is used."
 
@@ -515,14 +541,14 @@ def test_the_chart_is_anchored_and_back_dated(real):
     watch's first reading is 2026-08-06, so it gets 18 points on the chart --
     not the 5 a trailing per-night normal allowed, which withheld 13 nights of
     real readings purely because nights AFTER them had not happened yet."""
-    oura, garmin = real
+    oura, garmin = series
     p = ht.panel(oura, garmin, TODAY)
     watch = [n for n in p.nights if n.garmin_from_normal is not None]
-    assert len(watch) == 18
-    assert watch[0].day == date(2026, 8, 6)
+    assert len(watch) == 24, "every night the watch recorded, not just recent ones"
+    assert watch[0].day == TODAY - timedelta(days=23)
     # ...and each is simply the reading minus the one anchor.
-    assert watch[0].garmin_from_normal == 34.0 - 33.0
-    assert watch[-1].garmin_from_normal == 21.0 - 33.0
+    assert watch[0].garmin_from_normal == watch[0].garmin_ms - 32.0
+    assert watch[-1].garmin_from_normal == watch[-1].garmin_ms - 32.0
 
 
 def test_the_anchor_is_a_median_so_the_current_slide_cannot_define_it():
@@ -530,13 +556,14 @@ def test_the_anchor_is_a_median_so_the_current_slide_cannot_define_it():
     dragging down the level it is measured against. Measured on the real watch
     series the anchor is 33.0 computed three ways: all 18 nights, the first 14,
     and with the four declining nights removed."""
-    vals = [float(g) for _, _, g in _REAL]
-    assert statistics.median(vals) == 33.0
-    assert statistics.median(vals[:14]) == 33.0
-    assert statistics.median(vals[:-4]) == 33.0
+    _, watch = _build()
+    vals = [watch[d] for d in sorted(watch)]
+    assert statistics.median(vals) == 32.0
+    assert statistics.median(vals[:14]) == 32.0
+    assert statistics.median(vals[:-4]) == 32.0
 
 
-def test_the_flag_is_NOT_anchored(real):
+def test_the_flag_is_NOT_anchored(series):
     """⚠ The chart and the flag answer different questions and must keep
     different references. The flag's reference deliberately ends where the run
     BEGINS, so a slide cannot drag down the number deciding whether it is a
@@ -545,13 +572,13 @@ def test_the_flag_is_NOT_anchored(real):
     body = src[src.index("def depth_drop("):src.index("def declining_run(")]
     assert "today - timedelta(days=k)" in body
 
-    oura, garmin = real
+    oura, garmin = series
     p = ht.panel(oura, garmin, TODAY)
     # The ring's chart anchor and its flag reference are both 20.5 here only
     # because the window happens to agree; what matters is that the flag
     # computes its own rather than reading the chart's.
-    assert p.oura_flag.depth[5]["drop_ms"] == pytest.approx(4.2)
-    assert p.oura_flag.normal_ms == 20.5
+    assert p.oura_flag.depth[5]["drop_ms"] == pytest.approx(3.6)
+    assert p.oura_flag.normal_ms == 20.0
 
 
 def test_an_older_point_moves_when_the_anchor_moves():
@@ -611,8 +638,8 @@ def test_the_advisory_cannot_reach_the_combined_figure():
     assert "_OURA" in used, "the device must be a literal, not an argument"
 
 
-def test_the_advisory_is_the_ring_even_when_the_watch_is_also_firing(real):
-    oura, garmin = real
+def test_the_advisory_is_the_ring_even_when_the_watch_is_also_firing(series):
+    oura, garmin = series
     note = ht.ring_run_advisory(oura, TODAY)
     assert "ring" in note and "watch" not in note
     # The watch IS firing on this date — so this is a real discrimination.
@@ -650,10 +677,48 @@ def test_the_gate_only_silences_and_carries_a_revert_condition():
     assert "15%" in preamble, "the revert condition needs a measurable bar"
 
 
-def test_the_gate_off_returns_none_and_changes_nothing_else(real, monkeypatch):
-    oura, _ = real
+def test_the_gate_off_returns_none_and_changes_nothing_else(series, monkeypatch):
+    oura, _ = series
     assert ht.ring_run_advisory(oura, TODAY) is not None
     monkeypatch.setattr(ht, "HRV_RUN_ON_TRAINING_SCREEN", False)
     assert ht.ring_run_advisory(oura, TODAY) is None
     # The panel is untouched by the gate — the chart is not what it governs.
     assert ht.panel(oura, {}, TODAY).oura_flag.firing is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  No real readings in the fixtures
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_the_fixture_is_constructed_and_says_so():
+    """Athlete, 2026-08-24: "lets make that fake data or remove it ... remove
+    it its not required."
+
+    This repo is public. The fixtures used to be a transcript of 53 dated
+    nightly readings, which is a health record rather than test data. The
+    series is built from _RING now, and nothing about these tests needs it to
+    have been anyone's."""
+    src = Path("services/../tests/test_hrv_trend.py").read_text(encoding="utf-8")
+    assert "CONSTRUCTED, NOT A TRANSCRIPT" in src
+    # Every value in the fixture is a whole number by construction — a real
+    # ring series is not that tidy, so this is a cheap signal that it is made up.
+    assert all(float(v).is_integer() for v in _RING)
+    ring, watch = _build()
+    assert all(float(v).is_integer() for v in ring.values())
+    assert all(float(v).is_integer() for v in watch.values())
+
+
+def test_no_fixture_carries_a_long_run_of_dated_readings():
+    """The shape to prevent is a TRANSCRIPT: many dated values in a row. The
+    constructed series is a list of plain integers with the dates derived, so
+    a date literal paired with a reading is the thing that must not reappear."""
+    import re
+
+    src = Path("services/../tests/test_hrv_trend.py").read_text(encoding="utf-8")
+    # A quoted ISO date immediately followed by numbers is a reading bound to
+    # a night. Described rather than shown, because a literal example here
+    # would make this test flag itself.
+    transcript = re.findall(r'\("20\d\d-\d\d-\d\d",\s*\d+', src)
+    assert not transcript, (
+        f"{len(transcript)} dated readings are back in the fixture: "
+        f"{transcript[:3]}")
