@@ -859,26 +859,43 @@ PROFILE = {
     #   retrain. REVERT: a measured right-left internal-rotation gap beyond
     #   ~10 degrees, or the click reappearing in neutral.
     #
-    # ── THE DAILY PROTOCOL, and what was actually wrong with the old note ────
-    # docs/training/release_protocols_2026-08-10.md Protocol 2 prescribes
-    # sustained front-of-hip pressure, two zones, DAILY ON DESK DAYS. The
-    # 2026-08-14 note recorded it as running "alongside" this block and as
-    # being "the larger dose", and the block halved its own dose on that basis
-    # — one zone here, "the second zone stays in the daily protocol".
+    # ── THE SECOND ZONE IS AN OPTION, NOT AN OWED DOSE ──────────────────
+    # Settled by the athlete 2026-08-24, correcting a first pass that had this
+    # exactly backwards and wrote the error into three files.
     #
-    # IT NEVER RAN. It existed in that document and nowhere else: never
-    # scheduled, never on a screen, never logged, and the eight days a block
-    # with no session on them carried no front-of-hip work of any kind. Found
-    # 2026-08-24 when the athlete asked whether the block addressed his psoas
-    # at all. It is now IN THE APP on those eight days, at one zone rather than
-    # two — his own reasoning is that release buys the next few hours, so on a
-    # day with no training after it this is the lowest-value item in the block,
-    # and the time went to the isometrics instead.
+    # ONE ZONE PER SIDE IS THE BLOCK'S DOSE and always was. It is not a
+    # fraction of a larger prescription and the block was never trimmed to
+    # leave room for anything. The dependence runs ONE WAY: the second zone is
+    # contingent on the first, never the reverse — "the first zone / block was
+    # never to be altered for the second block, only the second for the first.
+    # The second zone may never been run it is only to be run on a day when I
+    # want to double train. But this may never arrive."
     #
-    # THE REUSABLE PART: a prescription recorded as "continues alongside" is a
-    # prescription nothing owns. If it is not in training_plan.py it is not
-    # happening, and the note saying it is happening is what stops anyone
-    # checking.
+    # Consequences, because this is the kind of thing that gets re-derived
+    # wrongly by the next person reading the source document:
+    #   • The second zone is an OPTIONAL EXTRA for a day he chooses to work the
+    #     hip twice. Nothing schedules it. Its absence is not a shortfall, not
+    #     a finding, and not something to chase at a block build.
+    #   • docs/training/release_protocols_2026-08-10.md Protocol 2 does
+    #     prescribe two zones daily on desk days. That is the DOCUMENT'S
+    #     prescription; the above is the standing decision on how it is run.
+    #     Recorded rather than silently diverged from.
+    #   • The 2026-08-14 note's line that the daily protocol "continues
+    #     alongside and is the larger dose" is REMOVED, not amended. It
+    #     described something that was not running, and it made the in-block
+    #     zone read as a fraction of a whole when it is the whole.
+    #
+    # WHAT WAS ACTUALLY WRONG, and it stands: twelve of the block's days
+    # carried NO front-of-hip work at all — the eight rest, travel and mobility
+    # days, and the four upper-body days — while the desk day is the exposure
+    # the protocol treats. That is the gap the 2026-08-24 change closed, at one
+    # zone, which is the dose.
+    #
+    # THE REUSABLE PART: the failure was reading a source document's dose as
+    # the standard the block owed, then treating the difference as a deficit.
+    # A block's dose is a decision, not a shortfall against the paper it came
+    # from — and when the two differ, the decision is what needs recording.
+
 
     "add_when_right_hip_loaded": [
             "Right Hip Tendon Path Drill (Coxa Saltans) — 2 × 10 reps right only",

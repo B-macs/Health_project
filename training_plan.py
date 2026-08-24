@@ -2509,9 +2509,10 @@ ANTERIOR_HIP_RELEASE = _ex(
         "weight onto it slowly and wait 60 seconds, breathing, until the tissue lets go under "
         "you. Then a few slow knee-bends of that leg with the pressure still on. "
         "GO STRAIGHT TO THE OTHER SIDE — no pause between right and left. "
-        "One zone per side here; the second zone stays in the daily protocol, which has the "
-        "time for it. If two weeks go by and no tender spot ever quietens down under the "
-        "ball, stop doing it — that answer is worth having."
+        "That is the session dose. There is a second spot — slightly inward and higher, "
+        "just inside the point of the hip bone — for a day you want to work this twice; "
+        "it is an extra, not part of today. If two weeks go by and no tender spot ever "
+        "quietens down under the ball, stop doing it — that answer is worth having."
     ),
     biomechanical_focus=(
         "The one overactive structure in the profile with no release anywhere in the block "
@@ -2533,7 +2534,9 @@ ANTERIOR_HIP_RELEASE = _ex(
         "refutation is scoped to the SIT-BONE snap and says nothing about the front."
     ),
     progression=("Tender points quieting and standing up straight after sitting getting easier "
-                 "→ it is working; the daily protocol keeps doing the volume."),
+                 "→ it is working. The dose does not grow on that: one zone a side is the "
+                 "prescription, and the second zone is an option for a day of doubling up "
+                 "rather than a step to climb to."),
     regression=("Nothing tender to find, or no change after four weeks → retire it and record "
                 "the null. It would mean the sitting-tone hypothesis is wrong for this body."),
     warning=(
@@ -3093,21 +3096,30 @@ def _s2b_release(hip_loaded: bool, anterior: bool = False,
     # found it, which is why it is in flexibility.RELEASE_EXERCISES and why the
     # accessory session already offers it on exactly these days.
     #
-    # WHY IT IS HERE AT ALL: patient_profile's pre_session_release note says the
-    # daily front-of-hip protocol "continues alongside and is the larger dose —
-    # it runs on desk days, which is the exposure being treated, rather than
-    # only on the five days a week that carry a session". It never ran. It
-    # existed in docs/training/release_protocols_2026-08-10.md and nowhere
-    # else: never scheduled, never on a screen, never logged. The block halved
-    # its own dose on the strength of a protocol that was not happening.
+    # WHY IT IS HERE AT ALL: these days carried NO front-of-hip work of any
+    # kind — no release, no anything — while the desk day is the exposure the
+    # whole protocol is aimed at. Found 2026-08-24 when the athlete asked
+    # whether the block addressed his psoas.
     #
-    # ⚠ ONE ZONE, 60 s a side — two minutes, not the source protocol's six. The
-    # athlete's own reasoning, 2026-08-24: release buys the next two or three
-    # hours of training, so on a day with no training after it this is the
-    # lowest-value item in the block. It is here because it is cheap and
-    # because the desk day is the exposure; the time went into the hip-flexor
-    # isometrics instead. REVERT: if the front of the hip stops producing a
-    # tender point that quiets, this goes out with the rest of the protocol.
+    # ⚠ ONE ZONE IS THE DOSE, AND IT IS NOT HALF OF ANYTHING. Corrected the
+    # same day, on the athlete's own reading of his protocol, because the
+    # first version of this comment had it backwards. The block was never
+    # trimmed to make room for a second zone elsewhere: zone 1 is complete in
+    # itself, and the ORDER OF DEPENDENCE RUNS ONE WAY — the second zone is
+    # contingent on the first, never the reverse. In his words: "the first
+    # zone / block was never to be altered for the second block, only the
+    # second for the first. The second zone may never been run it is only to
+    # be run on a day when I want to double train. But this may never arrive."
+    #
+    # So the second zone is an OPTIONAL EXTRA for a day he chooses to work this
+    # twice, not an owed dose and not a gap. Nothing schedules it, nothing
+    # should chase it, and its absence from the log is not a finding. Note the
+    # source document (docs/training/release_protocols_2026-08-10.md) does
+    # prescribe two zones daily on desk days — that is the document's
+    # prescription, and this is the standing decision about how it is run,
+    # recorded here so the difference is deliberate rather than a drift.
+    # REVERT: if the front of the hip stops producing a tender point that
+    # quiets, this goes out with the rest of the protocol.
     if not training:
         return [ANTERIOR_HIP_RELEASE]
     head = [ISCHIAL_RELEASE] if hip_loaded else []
