@@ -242,7 +242,7 @@ RIGHT_HIP_CAPSULE_REVISED = _ex(
     mechanics=(
         "Revised version — the standard cross-body cue (Days 1-14) reportedly produced tightness "
         "at the FRONT/middle of BOTH hips rather than the intended RIGHT posterior capsule, with "
-        "no sensation at the back of the hip/glute (session note, 2026-07-08). Try this instead: "
+        "no sensation at the back of the hip/glute. Try this instead: "
         "Lie on your back, RIGHT knee bent. Posteriorly tilt your pelvis slightly and keep your "
         "LOWER BACK FLAT on the floor throughout — this is the priority, not stretch distance. "
         "From there, draw the right knee across toward the left shoulder ONLY as far as the lower "
@@ -252,7 +252,7 @@ RIGHT_HIP_CAPSULE_REVISED = _ex(
         "the flat-back cue over cross-body distance. Note whether this version lands differently."
     ),
     biomechanical_focus=(
-        "Same target as the original (right posterior hip capsule, finding #2) — this variant "
+        "Same target as the original (right posterior hip capsule) — this variant "
         "prioritises pelvic control (flat lower back) over stretch distance, since the prior cueing "
         "may have let the pelvis rotate/tilt, shifting the stretch anteriorly instead of posteriorly. "
         "A diagnostic adjustment based on direct session feedback, not a confirmed fix yet."
@@ -1325,7 +1325,7 @@ PLAN[14] = {
                 "Note: what is your maximum pain-free range? How does it compare to Day 4? "
                 "Log this in session notes. "
                 "BIOMECHANICAL CHECK: compare right vs left hip hinge range. Note if right side "
-                "produces the ischial tuberosity release. Record it — this is finding #2's own reading."
+                "produces the ischial tuberosity release. Record it."
             ),
             biomechanical_focus="Hip hinge range of motion and posterior chain capacity — this is the functional test for whether the L5/S1 pathway is desensitised enough to tolerate progressive loading in Stage 2.",
             progression="Full range, pain ≤2/10 → criteria met for Stage 2 Transition programming.",
@@ -1471,7 +1471,7 @@ PLAN[16] = {
                 "lower back pressed flat into the floor throughout — this is the non-negotiable part. "
                 "RIGHT LEG: keep a neutral/slight-internal-rotation bias as the leg extends, "
                 "especially around 45 degrees of knee flexion — a clicking sensation has been "
-                "noted right around there (finding #4). Move slowly and deliberately through that "
+                "noted right around there. Move slowly and deliberately through that "
                 "point rather than rushing past it. Return and repeat the other side. "
                 "8 reps each side, even count."
             ),
@@ -1479,7 +1479,7 @@ PLAN[16] = {
                 "Deep core (transversus abdominis) activation with contralateral limb movement — "
                 "directly targets the underactive deep-core half of the compensation pattern. The "
                 "right-side rotation cue now explicitly extends to this supine pattern, not just "
-                "standing hip flexion, per the 2026-07-08 finding."
+                "standing hip flexion."
             ),
             progression="8 clean reps each side, no clicking, flat back maintained → add a 2-second hold at full extension.",
             regression="Low back lifts off the floor, or clicking is uncomfortable → reduce leg-extension range on the right.",
@@ -1628,7 +1628,7 @@ PLAN[20] = {
             mechanics=(
                 "Same setup as the bilateral bridge, but extend one leg straight and bridge on "
                 "the other. The RIGHT side has been noticeably harder than the left in prior "
-                "sessions (2026-07-06) — expect that difference, don't force the right side to "
+                "sessions — expect that difference, don't force the right side to "
                 "match the left's range, just keep the pelvis level. 8 reps each side, even count."
             ),
             biomechanical_focus="Unilateral glute max strength — directly tests and trains the right-left asymmetry already documented, at a low volume appropriate for this stage.",
@@ -1655,8 +1655,8 @@ PLAN[20] = {
             sets=2, hold_seconds=60, rest_seconds=60,
             mechanics=(
                 "Back against a wall, knees at roughly 90 degrees, thighs parallel to the floor. "
-                "Hold 60 seconds — confirmed as sufficient volume for this exercise (2026-07-08 "
-                "feedback), not pushed further without a specific reason to."
+                "Hold 60 seconds — confirmed as sufficient volume for this exercise, "
+                "not pushed further without a specific reason to."
             ),
             biomechanical_focus="Isometric quad/glute endurance without spinal loading — a stable, well-tolerated hold at an already-confirmed appropriate dose.",
             progression="Consistently easy at 60s across 2+ sessions → consider single-leg-assisted variation, not just longer duration.",
@@ -1806,7 +1806,7 @@ def _s2_recovery_day(objective: str, template: str) -> dict:
                 sets=2, reps_in_set=8, hold_seconds=3, rest_seconds=45,
                 mechanics=(
                     "Lower back flat throughout. Neutral/slight-internal-rotation bias on the "
-                    "right leg through the ~45-degree knee-extension range (finding #4 — the same "
+                    "right leg through the ~45-degree knee-extension range (the same "
                     "click mechanism shows up here, not just standing). 8 reps each side, even count."
                 ),
                 biomechanical_focus="Maintenance dose of the neutral-rotation motor pattern through the supine leg-extension range, on days without loaded hip work.",
@@ -2036,7 +2036,7 @@ def _s2_session_b(week: int) -> dict:
                     "One dumbbell in each hand, hinge from the hips keeping the DBs close to your "
                     "shins. Stop the descent the instant your lower back wants to round — depth is "
                     "whatever range you can keep neutral. A right posterior-hip/sit-bone sensation "
-                    "here is an expected structural release (finding #2), not a stop signal; a sharp "
+                    "here is an expected structural release, not a stop signal; a sharp "
                     "lumbar symptom is the actual stop signal. Kept well below the 70-90kg range "
                     "where the 2025 log shows the lumbar taking over and the glutes not finishing lockout."
                 ),
@@ -2485,24 +2485,33 @@ RIGHT_HIP_CAPSULE_5MIN = _ex(
     ),
 )
 
+# UNGATED 2026-08-17 (athlete). This waited on the flexibility battery baseline
+# being captured — four cold mornings, of which the app retained only the last;
+# the surviving reading is the record. Running the release IS how it is found
+# out whether there is anything here to respond to, so a null result is a
+# result: two weeks with no tender point that quiets down retires it.
+#
+# ⚠ THAT PARAGRAPH USED TO BE THE FIRST THREE SENTENCES OF `mechanics`, i.e. on
+# screen, mid-session, while he is face down with a ball under his hip. Key rule
+# 20: mechanics says what to do and nothing else. It also broke key rule 19 —
+# a changelog stamp, an app-defect note, third person about him, and "the null
+# is the finding", which is filing vocabulary. The stop rule survives in the
+# instruction below because it is genuinely actionable; the provenance lives
+# here. tests/test_plan_text_is_instructions_only.py stops it coming back.
 ANTERIOR_HIP_RELEASE = _ex(
     name="Anterior Hip Pressure Release",
     ex_type="hold",
     laterality="unilateral",
     sets=1, hold_seconds=60, rest_seconds=0,
     mechanics=(
-        "UNGATED 2026-08-17 (athlete): this waited on the flexibility battery baseline, and "
-        "he has captured it — four cold mornings, of which the app lost all but the last. "
-        "The surviving reading is the record. Running the release IS how you find out "
-        "whether there is anything here to respond; if two weeks find no tender point that "
-        "quiets down, skip it from then on and record that, because the null is the finding. "
         "Lie face down with a massage ball between the floor and the front of the hip, on the "
         "meaty pocket-corner just below and outside the point of the hip bone. Settle your "
         "weight onto it slowly and wait 60 seconds, breathing, until the tissue lets go under "
         "you. Then a few slow knee-bends of that leg with the pressure still on. "
         "GO STRAIGHT TO THE OTHER SIDE — no pause between right and left. "
         "One zone per side here; the second zone stays in the daily protocol, which has the "
-        "time for it."
+        "time for it. If two weeks go by and no tender spot ever quietens down under the "
+        "ball, stop doing it — that answer is worth having."
     ),
     biomechanical_focus=(
         "The one overactive structure in the profile with no release anywhere in the block "
