@@ -22,26 +22,29 @@ Oura reading and a Garmin reading sit on one graph despite Garmin running
 higher. Percentage is the obvious reading of that and it is the wrong tool
 here, for two reasons measured on his own data:
 
-  1. The two devices' denominators differ. His Oura normal is ~20.5 ms and
-     Garmin's ~33.0. On 2026-08-16 BOTH devices moved +14 ms — identical
-     physiology — and percent-of-own-normal renders that as Oura +66.0%
-     against Garmin +45.7%. The graph would show them disagreeing on a night
-     they agreed exactly.
-  2. Percent is not comparable to itself across time. His Oura normal has
-     ranged 14 to 28 ms, so "−20%" means 2.8 ms in one month and 5.6 ms in
-     another.
+  1. The two devices sit on different denominators — the watch runs roughly
+     half again as high as the ring. So an identical move in milliseconds
+     divides by a bigger number on the watch and renders as a SMALLER
+     percentage. Measured on a night both devices moved by the same amount,
+     percent-of-own-normal put them 20 points apart. The graph would show
+     them disagreeing on a night they agreed exactly.
+  2. Percent is not comparable to itself across time either, because the
+     denominator is a trailing normal that drifts. The same percentage means
+     a different number of milliseconds in different months — on this
+     athlete's own record the ring's normal has moved by a factor of two.
 
-The offset between the devices is ADDITIVE, not multiplicative — measured over
-the 18 paired nights to 2026-08-23: Garmin higher on 18 of 18, mean +9.44 ms,
-population sd 1.77; additive RMSE 1.771 against multiplicative 3.136. Crucially
-sd_garmin / sd_oura = 0.978, i.e. the two devices' night-to-night SPREADS agree
-to within 2.2%.
+The offset between the devices is ADDITIVE, not multiplicative. Measured over
+the first fortnight of paired nights: the watch read higher on every single
+one, and an additive model fitted with roughly half the error of a
+multiplicative one. Crucially the two devices' night-to-night SPREADS agree to
+within about 2% (sd ratio ≈ 0.98), which is what makes one axis legitimate at
+all — see AMPLITUDE_RATIO_BAND.
 
 That is what makes the honest axis simply:
 
     from_normal(device, night) = reading − that device's own trailing normal
 
-Both lines are in real milliseconds, the +9.44 offset cancels exactly under the
+Both lines are in real milliseconds, the offset cancels exactly under the
 subtraction (no fitted constant is stored anywhere), and a 1 ms step on one line
 means the same as a 1 ms step on the other. It delivers what he asked for —
 equal moves draw equal steps — without the distortion percent would add.
@@ -69,10 +72,10 @@ BASELINE_NIGHTS = 28
 # number.
 BASELINE_MIN_READINGS = 14
 
-# MEDIAN, not mean. Measured on the watch's own window: recomputing it with and
-# without the 2026-08-15 collapse moves the mean +1.16 ms and the spread 3.72 →
-# 0.73 (5.1×), while the median moves 0.00. A single freak night must not
-# redefine "normal".
+# MEDIAN, not mean. Measured by recomputing a real window with and without one
+# single-night collapse in it: the mean shifts by over a millisecond and the
+# spread by a factor of five, while the median does not move at all. A single
+# freak night must not redefine "normal".
 
 # ── The downward flag ────────────────────────────────────────────────────────
 NOISE_MULTIPLE = 2.0  # == services.battery's idiom: under ~2× the observed
@@ -101,7 +104,8 @@ DEPTH_FLOOR_MS = {3: 8.56, 4: 7.39, 5: 6.75}
 SHAPE_MIN_RUN = 4
 
 #: Below this many of its OWN measured windows a device borrows the other's
-#: floors, and says so. Justified by sd_garmin/sd_oura = 0.978.
+#: floors, and says so. Justified by the two devices' millisecond spreads
+#: agreeing to within about 2% — see AMPLITUDE_RATIO_BAND.
 DEVICE_OWN_FLOOR_MIN_WINDOWS = 60
 
 #: ⚠ THIS SWITCHES A SENTENCE ON AND OFF. THERE IS NO SETTING OF IT THAT MAKES
@@ -143,9 +147,9 @@ DIVERGENCE_MIN_PAIRED = 10
 #: The athlete's rule, 2026-08-23: "if garmin moved one way and oura the other,
 #: id put more emphasis on the oura but not much more."
 #:
-#: 0.60/0.40 priced in the unit on screen: on 2026-08-17 the ring read −3.0 and
-#: the watch −1.0, giving −2.2 — 0.8 ms of movement from the ring, 1.2 from the
-#: watch. The ring leads and the watch stays visibly in the number. A weighted
+#: 0.60/0.40 priced in the unit on screen: where the two devices sit 2 ms apart
+#: the combined figure lands 0.8 ms from the ring and 1.2 ms from the watch, so
+#: the ring leads and the watch stays visibly in the number. A weighted
 #: median, the pure rank answer, is degenerate at n=2: any weight over 0.5
 #: returns Oura outright, which is "much more", not "not much more".
 OURA_SHARE = 0.60
@@ -154,7 +158,9 @@ GARMIN_SHARE = 1.0 - OURA_SHARE
 #: The metrics whose two devices are close enough in SPREAD to share one
 #: millisecond axis. A BAND, not a minimum — Garmin's sleep score has a spread
 #: 2.4× Oura's and would pass a one-sided test while being nonsense on a shared
-#: axis. Measured: HRV 0.978 passes; resting HR 0.744 is blocked.
+#: axis. Measured across the two devices: HRV (ratio ≈ 0.98) passes; resting
+#: heart rate (≈ 0.74) is blocked, and Garmin's sleep score (≈ 2.4) is blocked
+#: from the other side, which is why this is a band and not a minimum.
 AMPLITUDE_RATIO_BAND = (0.85, 1.18)
 SHARED_AXIS_METRICS = ("hrv_ms",)
 
@@ -259,8 +265,8 @@ def normal_for(series: Series, device: str, window_end: date,
     `nights` days ending at window_end.
 
     Refuses below `min_readings` rather than returning a centre fitted on a
-    handful of nights. On 2026-08-19 the watch had exactly 14 and began
-    plotting; before that it had no line at all, which is the honest state.
+    handful of nights. A new device therefore has NO line at all until its
+    fourteenth reading, which is the honest state rather than a thin guess.
     """
     vals = _window_readings(series, window_end, nights)
     if len(vals) < min_readings:
@@ -434,8 +440,8 @@ def amplitude_ratio(paired: Sequence[tuple[float, float]]) -> dict:
     # (12.5%), and at n=16 the 95% interval on that runs roughly 1.5% to 38% —
     # far too wide to be a threshold. Gating on it would reject or accept a
     # metric on which side of the noise two nights happened to land. The spread
-    # ratio is what actually separates the cases: HRV 0.978 passes, resting HR
-    # 0.744 and Garmin's sleep score 2.439 do not.
+    # ratio is what actually separates the cases: HRV (≈ 0.98) passes, resting
+    # heart rate (≈ 0.74) and Garmin's sleep score (≈ 2.4) do not.
     ok = ratio is not None and lo <= ratio <= hi
     return {"n": n, "sd_ratio": ratio, "opposite_sign_rate": opp_rate,
             "shared_axis_ok": ok}
@@ -630,13 +636,13 @@ def panel(oura: Series, garmin: Series, today: date,
     # One normal per device — today's — applied to EVERY night that device
     # recorded, however little history sat behind that night at the time.
     #
-    # Athlete, 2026-08-23: "we now know the average is 33, so we can back date
-    # that data to the first day the watch is used." He is right, though not
-    # for the reason he gave: the watch was never calibrating. Every nightly
-    # reading was a direct measurement from its first night. The 14-reading
-    # minimum is OUR rule for when we will call something a usual level, not
-    # the watch's — so refusing to plot 2026-08-06 because nights AFTER it had
-    # not happened yet withholds a subtraction we can already do today.
+    # Athlete, 2026-08-23: "we can back date that data to the first day the
+    # watch is used." He is right, though not for the reason he gave: the watch
+    # was never calibrating. Every nightly reading was a direct measurement
+    # from its first night. The 14-reading minimum is OUR rule for when we will
+    # call something a usual level, not the watch's — so refusing to plot a
+    # device's own first readings because nights AFTER them had not happened
+    # yet withholds a subtraction we can already do today.
     #
     # It was a trailing per-night normal before this. Two consequences of the
     # change, both real:
