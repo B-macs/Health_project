@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import pytest
 
+import cluster_a_mechanics as cm
 import training_constants as tc
 import training_plan as tp
 from services import flexibility as fx, rules, scheduling as sch, sessions as sess
@@ -125,6 +126,17 @@ def test_running_actually_reaches_the_movement_rules():
         assert rules.check_movement(name, 2)["severity"] == "caution", name
 
 
+#: The two items the 2026-08-17 withdrawal trial actually withdrew. The trial
+#: measures ONE thing — whether the upper glute's resting grip holds without
+#: daily release — and its instrument is the weekly Upper Glute Grip Grade,
+#: which reads the upper glute. These are the names that must stay off a rest
+#: day; an item the grip grade does not measure cannot corrupt the reading.
+_WITHDRAWN_PAIR = {
+    "Upper Glute / TFL Self-Release",
+    "Piriformis Contract-Relax (PNF)",
+}
+
+
 def test_the_release_block_precedes_every_training_session_and_is_absent_from_rest_days():
     """This test used to assert the release opened all 28 days, rest days
     included. Since 2026-08-17 it pins the WITHDRAWAL TRIAL instead, in both
@@ -132,13 +144,27 @@ def test_the_release_block_precedes_every_training_session_and_is_absent_from_re
 
     * every TRAINING day (main, stretch, and the day-28 test screen) still
       opens with a release exercise — Key Rule 6, physio-confirmed;
-    * every REST day carries NO release-pair work at all. Finding #1's exit
+    * every REST day carries none of the WITHDRAWN PAIR. Finding #1's exit
       criterion was met on 2026-07-19 and the pair ran 28/28 anyway; whether
       the reduction holds without daily release is unanswerable while it runs
       daily. The weekly Upper Glute Grip Grade on the mobility days is the
       trial's instrument, and it must not be quietly re-treated between
-      readings — release creeping back onto a rest day would corrupt the
+      readings — the pair creeping back onto a rest day would corrupt the
       trial while looking like diligence.
+
+    ⚠ NARROWED 2026-08-24, deliberately, and it is a narrowing rather than a
+    weakening. The assertion used to be "no RELEASE_EXERCISE_NAMES item at all
+    on a rest day", which is wider than the trial it protects. The front-of-hip
+    release is neither withdrawn structure, is not what the grip grade reads,
+    and is not adaptation-seeking — a pressure release leaves the tissue
+    quieter than it found it, which is why it sits in
+    flexibility.RELEASE_EXERCISES and why the accessory session already offered
+    it on exactly these days. What put it there: patient_profile's own
+    pre_session_release note says the daily front-of-hip protocol "continues
+    alongside and is the larger dose — it runs on desk days, which is the
+    exposure being treated", and it had never run anywhere. Both directions are
+    pinned below, so the pair cannot come back and the front of the hip cannot
+    quietly go away.
 
     MEASUREMENTS AND TRIALS MAY LEAD, on any day — day 1's finding tests and
     P2's fold exposure carry a "(Test)"/"(Timed Test)"/"(Trial)" suffix, and
@@ -163,10 +189,14 @@ def test_the_release_block_precedes_every_training_session_and_is_absent_from_re
                 f"day {d}'s first non-measurement item is "
                 f"{body[0] if body else 'nothing'}")
         else:
-            leaked = [n for n in body if n in sess.RELEASE_EXERCISE_NAMES]
+            leaked = sorted(set(body) & _WITHDRAWN_PAIR)
             assert not leaked, (
                 f"day {d} is a rest day inside the withdrawal trial and "
-                f"carries release work: {leaked}")
+                f"carries the withdrawn pair: {leaked}")
+            assert ANTERIOR in body, (
+                f"day {d} carries no front-of-hip release. The desk day is the "
+                f"exposure the protocol treats, and these are the days with "
+                f"nothing else on them")
 
 
 def test_the_long_stretch_runs_first_on_hip_loaded_days():
@@ -475,3 +505,198 @@ def test_it_counts_as_a_release_not_as_leg_loading():
     what the retest-spacing rule guards against."""
     assert ANTERIOR in fx.RELEASE_EXERCISES
     assert ANTERIOR in sess.RELEASE_EXERCISE_NAMES
+
+
+# ── front-of-hip STRENGTH (2026-08-24) ──────────────────────────────────────
+# The athlete's correction to the first draft of this work: "release is only
+# going to help the next 2-3 hours of training, without isometric holds or
+# strengthing the muscle will just return to its original position. We need to
+# only a few minutes of release to allow for successful training but more time
+# on holds and strengthing to get the real benefits."
+#
+# Before this the block had ONE front-of-hip item, a release, on 15 of 28 days,
+# and no hip-flexor strength work anywhere — Stage 1's two hip-flexor items
+# vanished at the Stage 2A transition with no reason recorded. These tests pin
+# the shape of the answer, because the shape is the argument: three times a
+# week, appended to the session rather than to the preparation block, dosed as
+# efforts with an end rather than as positions to hold.
+
+HOVER = "Half-Kneeling Knee-Hover Isometric"
+PSOAS = "End-Range Psoas Isometric"
+LIFT_OFFS = "Straddle lift-offs from a flat back"
+_STRENGTH = (HOVER, PSOAS, LIFT_OFFS)
+_STRENGTH_DAYS = [d for d in DAYS
+                  if any(e["name"] in _STRENGTH for e in PLAN[d]["exercises"])]
+
+
+def test_the_front_of_the_hip_is_actually_trained_and_not_only_released():
+    """The whole claim of the 2026-08-24 change in one assertion. A release
+    quiets tone for a few hours; nothing in the block loaded the tissue."""
+    assert _STRENGTH_DAYS, "the block trains the front of the hip nowhere"
+
+
+def test_hip_flexor_strength_runs_three_times_in_every_week():
+    """Frequency is the claim, so frequency is what a later edit would break
+    first — dropping one day looks like tidying and halves a strength stimulus
+    that is already only four weeks long."""
+    for start in range(1, 29, 7):
+        window = [d for d in _STRENGTH_DAYS if start <= d < start + 7]
+        assert len(window) >= 3, (
+            f"days {start}-{start + 6} carry hip-flexor strength on {window}")
+
+
+def test_the_strength_work_is_not_preparation():
+    """It is appended AFTER the workout, which is what makes it affordable: the
+    10-15 min preparation ceiling walks the day's list and stops at the first
+    item that is not a release or the raise. Putting these in the preparation
+    run would blow that ceiling on every hip-loaded day."""
+    prep = sess.RELEASE_EXERCISE_NAMES | {
+        "Walking Raise (Incline)", "Single-Leg Glute Bridge", "Dead Bug",
+        "Scapular Wall Slide", "Prone Y-Raise (Scapular)",
+    }
+    for name in _STRENGTH:
+        assert name not in prep, name
+    for d in _STRENGTH_DAYS:
+        names = [e["name"] for e in PLAN[d]["exercises"]]
+        first_strength = min(names.index(n) for n in _STRENGTH if n in names)
+        assert any(n not in prep and "(Trial)" not in n and "(Test)" not in n
+                   for n in names[:first_strength]), (
+            f"day {d} opens its strength work before any real session content")
+
+
+def test_the_psoas_isometric_is_short_efforts_not_a_long_hold():
+    """Same rule and same reason as the scapular isometric beside it: at
+    matched loading time four 3-s contractions beat one 12-s hold, +57% against
+    +25%, and intensity rather than duration is the variable
+    (docs/training/rest_interval_evidence_review_2026-08-13.md 2.4)."""
+    ex = tp.END_RANGE_PSOAS_ISOMETRIC
+    assert ex["type"] == "hold_reps"
+    assert ex["hold_seconds"] <= 5, ex["hold_seconds"]
+    assert ex["reps_in_set"] >= 4, ex["reps_in_set"]
+    assert ex["laterality"] == "unilateral"
+
+
+def test_the_knee_hover_dose_steps_up_across_the_block_and_never_down():
+    """The progression lives in the PLAN, the way the block's loaded lifts do,
+    rather than in a `progression` field no view renders. A hover's intensity
+    is fixed by bodyweight and leverage, so duration is the only thing there is
+    to step — which is also why this one is a timed hold and the psoas
+    isometric beside it is not."""
+    by_week: dict[int, set[int]] = {}
+    for d in DAYS:
+        for e in PLAN[d]["exercises"]:
+            if e["name"] != HOVER:
+                continue
+            assert e["type"] == "hold" and e["laterality"] == "unilateral"
+            work = e["sets"] * e["hold_seconds"]
+            by_week.setdefault((d - 1) // 7 + 1, set()).add(work)
+    assert by_week, "the knee-hover is not in the block"
+    for week, doses in by_week.items():
+        assert len(doses) == 1, f"week {week} runs two different doses: {doses}"
+    weeks = sorted(by_week)
+    seconds = [next(iter(by_week[w])) for w in weeks]
+    assert seconds == sorted(seconds), f"the dose steps DOWN across {weeks}: {seconds}"
+    assert seconds[-1] > seconds[0], "the dose never actually progresses"
+
+
+def test_the_knee_hover_says_the_knee_hovers_and_the_ribs_stay_down():
+    """The athlete's own specification, and the two cues that make it the
+    exercise rather than a stretch he holds: knee over the ankle, back knee off
+    the ground. The lumbar arch is the named failure — the 2026-07-06 entry is
+    a genuine strain produced by holding a corrected posture — so the set ends
+    on the ribs flaring, not on the clock."""
+    ex = next(e for d in DAYS for e in PLAN[d]["exercises"] if e["name"] == HOVER)
+    mech = ex["mechanics"].lower()
+    assert "over the ankle" in mech
+    assert "off the floor" in mech and "never touches down" in mech
+    assert "ribs" in mech and "arch" in mech
+
+
+def test_the_right_hip_keeps_its_rotation_cue_in_the_new_work():
+    """Key rule 7: right hip flexion past 60 degrees is cued neutral or
+    slightly internal, because external rotation is what snaps the iliopsoas
+    tendon. Both end-range items take the right hip there."""
+    for name in (PSOAS, LIFT_OFFS):
+        ex = next(e for d in DAYS for e in PLAN[d]["exercises"] if e["name"] == name)
+        text = ex["mechanics"].lower()
+        assert "right" in text, name
+        assert "inward" in text or "internal" in text, name
+
+
+def test_the_new_work_reaches_the_safety_rules():
+    """`unknown` is not a block and reads exactly like `cleared` on the
+    training screen. There was NO psoas rule in services/rules.py at all before
+    this change — on the one muscle the imaging, the imbalance list and the
+    symptom log all name."""
+    for name in _STRENGTH:
+        severity = rules.check_movement(name, 2)["severity"]
+        assert severity in ("caution", "cleared"), f"{name} -> {severity}"
+
+
+def test_the_lift_offs_are_the_clusters_own_exercise_by_name():
+    """One name per movement across the layers. cluster_a_mechanics owns this
+    exercise and its how-to text; a second name for it would let the two drift
+    the way the plan and the prescription were about to before
+    tests/test_cluster_session_is_real_exercises.py bound them."""
+    assert LIFT_OFFS in {e.name for e in cm.LIBRARY}
+
+
+def test_the_lift_offs_run_at_the_end_of_the_flexibility_session():
+    """Pattern G's own sequencing: 'You can reach it, you cannot produce it.
+    Tilt work moves to the END of the session and becomes strength work.' The
+    2026-08-12 reading is tilt_range 89 deg clearing the 90 deg line while
+    tilt_production 93 deg does not, which is that pattern exactly."""
+    cluster_days = [d for d in DAYS if "Cluster A" in (PLAN[d].get("objective") or "")]
+    lift_days = [d for d in DAYS
+                 if any(e["name"] == LIFT_OFFS for e in PLAN[d]["exercises"])]
+    assert lift_days == cluster_days, (lift_days, cluster_days)
+    for d in lift_days:
+        names = [e["name"] for e in PLAN[d]["exercises"]]
+        assert names[-1] == LIFT_OFFS, f"day {d} ends on {names[-1]}"
+
+
+def test_the_front_of_the_hip_is_released_every_day_but_the_assessment():
+    """15 of 28 before 2026-08-24. The eight days carrying nothing at all were
+    the rest, travel and mobility days — i.e. the DESK days, which are the
+    exposure the protocol treats and the reason patient_profile says the daily
+    front-of-hip protocol 'continues alongside and is the larger dose'. It had
+    never run anywhere. Day 28 stays off: that screen's whole value is
+    comparability with the Stage 1 and Stage 2A versions of itself."""
+    assert _ANTERIOR_DAYS == [d for d in DAYS if d != 28], _ANTERIOR_DAYS
+
+
+def test_the_release_dose_did_not_grow_to_pay_for_the_strength_work():
+    """The athlete's reasoning, 2026-08-24: release buys the next two or three
+    hours, so more of it is not the answer and a longer hold would be the trade
+    he rejected. One zone, 60 s a side, everywhere it runs."""
+    assert tp.ANTERIOR_HIP_RELEASE["hold_seconds"] == 60
+    assert tp.ANTERIOR_HIP_RELEASE["sets"] == 1
+
+
+def test_preparation_still_clears_the_ten_minute_floor_on_training_days():
+    """The ceiling test's other half. The band is 10-15 min, and the upper-body
+    days cross 10 for the first time here — they were at 9.55 with no
+    front-of-hip work on them at all. Rest days and the day-28 screen are
+    exempt for the same reason they are exempt from the raise: nothing is being
+    prepared for, and day 28's value is comparability."""
+    prep = sess.RELEASE_EXERCISE_NAMES | {
+        "Walking Raise (Incline)", "Single-Leg Glute Bridge", "Dead Bug",
+        "Scapular Wall Slide", "Prone Y-Raise (Scapular)",
+    }
+    for d in DAYS:
+        if PLAN[d]["day_type"] in ("rest", "test"):
+            continue
+        exercises = [ex for ex in PLAN[d]["exercises"]
+                     if "(Test)" not in ex["name"]
+                     and "(Timed Test)" not in ex["name"]
+                     and "(Trial)" not in ex["name"]]
+        seconds = 0
+        for ex in exercises:
+            if ex["name"] not in prep:
+                break
+            sides = 2 if (ex.get("laterality") == "unilateral"
+                          and ex["name"] not in _RIGHT_ONLY) else 1
+            seconds += sess.exercise_duration_seconds(ex) * sides
+        assert seconds >= 10 * 60, (
+            f"day {d} spends only {seconds / 60:.1f} min preparing, under the "
+            f"10-minute floor")

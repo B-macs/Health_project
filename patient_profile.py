@@ -496,19 +496,19 @@ PROFILE = {
                 "do not treat passive, floor-supported external rotation as a risk position. "
                 "Does not downgrade the finding — it narrows where it applies."
             ),
-            "additional_evidence_2026_08_20": (
+            "additional_evidence_2026_08_18": (
                 "FIRST READING OF THE ANTERIOR HIP PRESSURE RELEASE, and it lands on "
                 "this finding rather than on the overactive-list line the drill was "
                 "authored from. Athlete's report, right side: a tender point that is "
-                "PAINFUL FOR A FEW SECONDS, then releases, then is COMPLETELY GONE by "
-                "90 s of sustained pressure; NOTHING equivalent on the left; and tension "
+                "PAINFUL FOR A FEW SECONDS, then releases, then goes COMPLETELY QUIET; "
+                "NOTHING equivalent on the left; and tension "
                 "felt simultaneously where the muscle attaches to the back, pulling and "
                 "releasing at both ends at once. His own reading, which the record "
                 "supports: a TIGHT RIGHT HIP FLEXOR. "
                 "THE DECISIVE OBSERVATION IS THE TIME COURSE. Sustained pressure "
                 "escalates a nerve; it settles a muscle. Brief pain resolving to nothing "
-                "over 90 s is contractile tissue behaving as it should, and it is why "
-                "this needs no further differentiation. "
+                "under sustained pressure is contractile tissue behaving as it should, "
+                "and it is why this needs no further differentiation. "
                 "WHY IT ATTACHES HERE: the athlete reports the release site as EXACTLY "
                 "where the Dead Bug snap occurs (additional_evidence_2026_07_08). Same "
                 "spot, same side, same structure - and the 2026-08-05 entry had already "
@@ -519,9 +519,48 @@ PROFILE = {
                 "no change after four weeks -> retire it and record the null.' There IS "
                 "a tender point and it DOES quiet down, so it is tracking toward its "
                 "progression condition, not its null. "
-                "WHAT WOULD CHANGE THE READING: the point failing to settle within the "
-                "90 s, or the same tenderness appearing on the left - the right-only "
+                "WHAT WOULD CHANGE THE READING: the point failing to settle at all, or "
+                "the same tenderness appearing on the left - the right-only "
                 "asymmetry is what makes it consistent with a RIGHT-ONLY finding."
+            ),
+            # ── THREE CORRECTIONS TO THE ENTRY ABOVE, made 2026-08-24 by
+            # reading the raw session note instead of the summary of it. All
+            # three matter, because this release is running as a pre-registered
+            # trial whose verdict rule is "tender points quieting over ~2 weeks"
+            # and the starting reading is what that gets compared against.
+            "corrections_2026_08_24": (
+                "(1) THE DATE. This was filed as 2026-08-20 evidence. The session is "
+                "2026-08-18; the key has been corrected and the old one is gone. "
+                "(2) THE TIME COURSE WAS WRONG BY A FACTOR OF THREE, and it was the "
+                "load-bearing number. The entry said the point was 'COMPLETELY GONE by "
+                "90 s' and built its whole differentiation on that. The athlete's own "
+                "note says: 'held the right for longer time - took about 5 mins to "
+                "release.' The 90 s appears to be the PRESCRIBED DOSE read back as if it "
+                "were the observation - the protocol's range is 60-90 s and the coded "
+                "hold is 60. The conclusion survives: brief pain resolving to nothing "
+                "under sustained pressure is still a muscle rather than a nerve, and "
+                "still right-only. What does not survive is any comparison that treats "
+                "90 s as the baseline. All duration claims above are now stated without "
+                "a number, because the one number on record is five minutes. "
+                "(3) TWO OBSERVATIONS WERE IN THE SESSION NOTE AND NOWHERE ELSE. First: "
+                "'I can feel it in my middle back when doing it.' Referred sensation to "
+                "the mid-back while pressing the front of the hip is the strongest single "
+                "piece of evidence in this file that the structure is PSOAS rather than "
+                "TFL or rectus femoris, because psoas is the only one of the three that "
+                "attaches there - along L1-L4, which is the same attachment the MRI "
+                "section names as amplifying the L5/S1 compression. Neither TFL nor "
+                "rectus femoris crosses the spine at all. Second: 'Instead of doing the "
+                "hip I've done the right hip flexor, so inside of my right left pressure "
+                "point' - i.e. he worked MEDIAL to the zone the exercise names, which "
+                "sends him toward the inner-front crease the protocol excludes. The "
+                "tender point may genuinely be medial to where the instruction points; "
+                "that is worth establishing once, since it decides both where he presses "
+                "and which structure the trial is actually testing. "
+                "METHOD NOTE, and it is the reusable part: the summary was written from "
+                "the conversation and the raw note was never read back. A per-exercise "
+                "note is the primary record and the profile is a derived one - when the "
+                "two disagree the note wins, and the disagreement here was invisible for "
+                "six days."
             ),
         },
         {
@@ -752,46 +791,94 @@ PROFILE = {
             "Right Posterior Hip Capsule Cross-Body Stretch — 3 × 60s right only",
             "Ischial Tuberosity Hamstring Release — 2 × 90s each side",
         ],
-        # ── AS BUILT IN STAGE 2B (2026-08-14) ────────────────────────────────
-    # The block runs this list at ~5 min, which is the dose this file has
-    # specified all along. Recording it here because two prescribed items are
-    # NOT in it, and an unexplained absence is indistinguishable from an
-    # oversight.
+        # ── AS BUILT IN STAGE 2B (rewritten 2026-08-24) ──────────────────────
+    # The 2026-08-14 version of this note is gone rather than amended: it was
+    # wrong in three ways at once and each one would have misled somebody
+    # reading it to find out what the block does. It said the anterior release
+    # starts in week 3 (it starts day 1, ungated 2026-08-17); it said the
+    # capsule stretch and the Coxa Saltans drill lead on hip-loaded days (both
+    # retired 2026-08-17, each on a measurement); and it said the daily
+    # front-of-hip protocol "continues alongside and is the larger dose", which
+    # was never true — see the last paragraph.
     #
-    # WHAT RUNS, in order. Hip-loaded days: Right Posterior Hip Capsule Stretch
-    # (Revised Cue) 2 x 45 s right -> Coxa Saltans path drill 2 x 10 right ->
-    # Upper Glute / TFL Self-Release 1 x 90 s EACH SIDE -> Piriformis PNF 1 x 5
-    # cycles each side. From week 3, Anterior Hip Pressure Release 1 x 60 s each
-    # side with no pause between them. Other days: the last two only.
+    # WHAT RUNS, in order.
+    #   Hip-loaded days (2, 4, 5, 8, 9, 11, 13, 15, 16, 18, 20, 22, 23, 25):
+    #     Ischial Tuberosity Hamstring Release 2 x 90 s + 1 x 45 s bilateral ->
+    #     Upper Glute / TFL Self-Release 1 x 90 s EACH SIDE ->
+    #     Piriformis PNF 1 x 5 cycles each side ->
+    #     Anterior Hip Pressure Release 1 x 60 s each side, no pause between.
+    #   Upper-body days (6, 12, 19, 26): the last three, no ischial release.
+    #   Rest, travel and mobility days (3, 7, 10, 14, 17, 21, 24, 27): the
+    #     anterior release ONLY — two minutes. See _s2b_release's own note for
+    #     why that does not hole the withdrawal trial running on those days.
+    #   Day 1: as a hip-loaded day. Day 28: no anterior release, because that
+    #     screen's value is comparability with its Stage 1 and 2A selves.
     #
-    # The capsule stretch leads because it is the only >= 60 s stretch in the
-    # block, so the pressure releases sit between it and the first loaded rep.
+    # Preparation, first movement to first working rep, measured with both
+    # sides counted: 13.28 min on hip-loaded days, 12.95 on runs, 12.42 on
+    # flexibility days, 10.55 on upper days, 2.00 on the rest days. Inside the
+    # athlete's 10-15 min band everywhere it applies.
     #
-    # ⚠ TWO REMOVALS, both consequences of the 5-minute budget rather than
-    # clinical judgements, both settled here at the next block build:
+    # ── 2026-08-24: THE FRONT OF THE HIP IS NOW TRAINED, NOT ONLY RELEASED ───
+    # The athlete's correction, and it reframes this whole section: "release is
+    # only going to help the next 2-3 hours of training, without isometric
+    # holds or strengthing the muscle will just return to its original
+    # position. We need to only a few minutes of release to allow for
+    # successful training but more time on holds and strengthing to get the
+    # real benefits."
     #
-    #   Ischial Tuberosity Hamstring Release (2 x 90 s each side = ~6 min).
-    #   Present in Stage 2A, absent in 2B. The physio CONFIRMED this site as
-    #   right for the proximal hamstring on 2026-08-10, so this is a real
-    #   trade-off and not a correction. REVERT: restore it the moment the
-    #   preparation budget grows, or if proximal hamstring symptoms return —
-    #   it costs 6 min at the prescribed dose, which is the whole budget, so
-    #   restoring it means something else leaves.
+    # He is right and this file already said so — imbalances' own caveat is
+    # that overactive_tight is a list of muscles with high resting TONE, not
+    # short muscles, and hypermobility.training_implications prescribes
+    # controlled-range strength and stability work over passive end-range
+    # stretching. Nothing had joined those two lines up. So the block gained
+    # three items OUTSIDE this release block, appended to the session where no
+    # preparation ceiling applies:
     #
-    #   Hip-flexor work (Standing Hip Flexor Release, 90/90 Hip Flexor Hold).
-    #   Present in Stage 1, absent from Stage 2A onward, and nobody recorded
-    #   why. PARTLY REVERTED 2026-08-14: Anterior Hip Pressure Release now
-    #   covers the front of the hip from week 3, on the physio's own
-    #   2026-08-10 recommendation ("sustained-pressure testing for the FRONT
-    #   of the hip as well, to release the pressure from sitting — a candidate
-    #   for the pre-session release block at the next block build"). It is
-    #   sustained pressure rather than a stretch, and it is one zone per side
-    #   rather than the daily protocol's two.
+    #   Half-Kneeling Knee-Hover Isometric  — hip-flexor strength at LENGTH.
+    #     Days 2, 4, 6, 8, 11, 12, 15, 18, 19, 22, 25, 26. Dose steps by week:
+    #     2 x 10 s -> 3 x 15 s -> 3 x 20 s per side.
+    #   End-Range Psoas Isometric — the psoas is the only hip flexor still
+    #     working above 90 degrees of flexion. Same days, 3 x (4 x 5 s) a side.
+    #   Straddle lift-offs from a flat back — 3 x 8, flexibility days only
+    #     (11, 18, 25), at the END of the session per the battery's pattern G.
     #
-    # The daily front-of-hip protocol (docs/training/release_protocols_
-    # 2026-08-10.md, Protocol 2) continues alongside and is the larger dose:
-    # it runs on desk days, which is the exposure being treated, rather than
-    # only on the five days a week that carry a session.
+    # Front-of-hip minutes per week: release 13.5, holds and strength 19 in
+    # week 1 rising to 30 in week 4. Before this change: release 7.5, strength
+    # ZERO — Stage 1's Standing Hip Flexor Release and 90/90 Hip Flexor Hold
+    # vanished at the Stage 2A transition with no recorded reason and nothing
+    # ever replaced them.
+    #
+    # ⚠ ONE REMOVAL STILL STANDS, and it is a trade rather than a correction:
+    #
+    #   Right Posterior Hip Capsule Stretch and the Coxa Saltans path drill,
+    #   out 2026-08-17. Each on its own measurement, not on the budget — prone
+    #   internal rotation came back past 45 degrees BOTH sides with no
+    #   asymmetry, so there is no capsular restriction to treat; and the click
+    #   is gone in neutral rotation, which is what the drill existed to
+    #   retrain. REVERT: a measured right-left internal-rotation gap beyond
+    #   ~10 degrees, or the click reappearing in neutral.
+    #
+    # ── THE DAILY PROTOCOL, and what was actually wrong with the old note ────
+    # docs/training/release_protocols_2026-08-10.md Protocol 2 prescribes
+    # sustained front-of-hip pressure, two zones, DAILY ON DESK DAYS. The
+    # 2026-08-14 note recorded it as running "alongside" this block and as
+    # being "the larger dose", and the block halved its own dose on that basis
+    # — one zone here, "the second zone stays in the daily protocol".
+    #
+    # IT NEVER RAN. It existed in that document and nowhere else: never
+    # scheduled, never on a screen, never logged, and the eight days a block
+    # with no session on them carried no front-of-hip work of any kind. Found
+    # 2026-08-24 when the athlete asked whether the block addressed his psoas
+    # at all. It is now IN THE APP on those eight days, at one zone rather than
+    # two — his own reasoning is that release buys the next few hours, so on a
+    # day with no training after it this is the lowest-value item in the block,
+    # and the time went to the isometrics instead.
+    #
+    # THE REUSABLE PART: a prescription recorded as "continues alongside" is a
+    # prescription nothing owns. If it is not in training_plan.py it is not
+    # happening, and the note saying it is happening is what stops anyone
+    # checking.
 
     "add_when_right_hip_loaded": [
             "Right Hip Tendon Path Drill (Coxa Saltans) — 2 × 10 reps right only",

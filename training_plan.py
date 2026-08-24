@@ -2567,17 +2567,23 @@ ANTERIOR_HIP_RELEASE = _ex(
 PREP_RAISE = _ex(
     name="Walking Raise (Incline)",
     ex_type="duration",
-    sets=1, duration_minutes=4, rest_seconds=0,
+    sets=1, duration_minutes=3, rest_seconds=0,
     mechanics=(
-        "Four minutes of brisk walking on an incline — treadmill at a real gradient, or any "
-        "uphill outdoors. Warm enough to notice, nowhere near breathless. You are raising "
-        "muscle temperature and getting the hips moving through range under your own power, "
-        "not training."
+        "Three minutes of brisk walking on an incline — treadmill at a real gradient, a hill "
+        "outdoors, or a flight of stairs walked up and down if there is no treadmill. Warm "
+        "enough to notice, nowhere near breathless. You are raising muscle temperature and "
+        "getting the hips moving through range under your own power, not training."
     ),
     biomechanical_focus=(
         "General raise, biased toward the pattern about to be trained. Deliberately NOT "
         "cycling: the 2025 log names cycling as what tightens the hip flexors and inhibits "
-        "the glutes, which is the one muscle this phase exists to switch on."
+        "the glutes, which is the one muscle this phase exists to switch on. "
+        "FOUR MINUTES -> THREE, 2026-08-24 (athlete). Job A is about the phase existing, "
+        "not its duration: Warneke 2024's counteraction finding specifies none, and the "
+        "15-minute figure belongs to Job B, the near-1RM performance bump this block does "
+        "not buy. The minute goes to the hip-flexor isometrics, which is the direction he "
+        "asked the session's time to move. Stairs and a hill are named in the instructions "
+        "because the travel fortnight has no treadmill and a session note already said so."
     ),
     progression="Feels like nothing → raise the gradient, never the speed. This is not conditioning.",
     regression="Breathing hard → slow down. If it costs anything, it is too hard.",
@@ -3064,23 +3070,257 @@ def _s2b_release(hip_loaded: bool, anterior: bool = False,
     hip-flexor release immediately before a hinge assessment would move the
     number for a reason that has nothing to do with the athlete."""
     # ── 2026-08-17, WITHDRAWAL TRIAL (athlete's decision, from three options)
-    # training=False — rest, travel and mobility days — now returns NOTHING.
-    # The daily pair ran 28 days out of 28, finding #1's exit criterion was
+    # training=False — rest, travel and mobility days — dropped the daily PAIR.
+    # The pair ran 28 days out of 28, finding #1's exit criterion was
     # already MET on 2026-07-19, and the release stayed anyway with no reason
     # recorded; whether the reduction HOLDS without daily release is
     # unanswerable while it runs every day. Training days keep the block
     # (Key Rule 6, physio-confirmed 2026-08-12); the withdrawal is judged by
-    # the weekly Upper Glute Grip Grade test on the mobility days, and its
-    # slot is deliberately NOT refilled — replacement work on a rest day would
-    # be adaptation-seeking load on the one day defined by its absence, the
-    # same rule that keeps cluster sessions and the accessory's full tier off
-    # rest days. REVERT: grip grade reaching 2, or hip-crest symptoms
+    # the weekly Upper Glute Grip Grade test on the mobility days, and the
+    # pair's slot is deliberately NOT refilled — replacement work on a rest day
+    # would be adaptation-seeking load on the one day defined by its absence,
+    # the same rule that keeps cluster sessions and the accessory's full tier
+    # off rest days. REVERT: grip grade reaching 2, or hip-crest symptoms
     # returning, puts the pair back on every day.
+    #
+    # ── 2026-08-24: THE FRONT-OF-HIP RELEASE JOINS THESE DAYS, and it is not a
+    # hole in the trial above. That trial measures ONE THING — whether the
+    # upper glute's resting grip holds without daily release — and its
+    # instrument is the Upper Glute Grip Grade, which reads the upper glute.
+    # The anterior item is neither of the two withdrawn structures and is not
+    # what the grip grade measures, so it cannot corrupt the reading. Nor is it
+    # adaptation-seeking: a pressure release leaves the tissue quieter than it
+    # found it, which is why it is in flexibility.RELEASE_EXERCISES and why the
+    # accessory session already offers it on exactly these days.
+    #
+    # WHY IT IS HERE AT ALL: patient_profile's pre_session_release note says the
+    # daily front-of-hip protocol "continues alongside and is the larger dose —
+    # it runs on desk days, which is the exposure being treated, rather than
+    # only on the five days a week that carry a session". It never ran. It
+    # existed in docs/training/release_protocols_2026-08-10.md and nowhere
+    # else: never scheduled, never on a screen, never logged. The block halved
+    # its own dose on the strength of a protocol that was not happening.
+    #
+    # ⚠ ONE ZONE, 60 s a side — two minutes, not the source protocol's six. The
+    # athlete's own reasoning, 2026-08-24: release buys the next two or three
+    # hours of training, so on a day with no training after it this is the
+    # lowest-value item in the block. It is here because it is cheap and
+    # because the desk day is the exposure; the time went into the hip-flexor
+    # isometrics instead. REVERT: if the front of the hip stops producing a
+    # tender point that quiets, this goes out with the rest of the protocol.
     if not training:
-        return []
+        return [ANTERIOR_HIP_RELEASE]
     head = [ISCHIAL_RELEASE] if hip_loaded else []
     tail = [ANTERIOR_HIP_RELEASE] if anterior else []
     return head + [UPPER_GLUTE_RELEASE_5MIN, PIRIFORMIS_PNF_5MIN] + tail
+
+
+# ── FRONT-OF-HIP STRENGTH ───────────────────────────────────────────────────
+# Added 2026-08-24 on the athlete's direction: "release is only going to help
+# the next 2-3 hours of training, without isometric holds or strengthing the
+# muscle will just return to its original position. We need to only a few
+# minutes of release to allow for successful training but more time on holds
+# and strengthing to get the real benefits."
+#
+# He is right, and the record already said so in four places nobody had joined
+# up. patient_profile's own standing rule is controlled-range strength and
+# stability work over passive end-range stretching, held at FULL WEIGHT every
+# block because a Beighton 6/9 does not resolve. flexibility_baselines'
+# GAP_EXPLAINED: a big passive-minus-active gap means the range is already
+# there and cannot be held, so "stretching more will not help, and strength
+# work in the position will". The 2026-08-12 tilt reading is 89 deg with help
+# against 93 deg under his own power — the position is REACHABLE and he cannot
+# PRODUCE it, which is the battery's pattern G and a strength reading rather
+# than a length one. And cluster_a_mechanics.TILT_COMPONENTS names end-range
+# hip flexor strength as the fix while flagging its evidence "Untested".
+#
+# WHAT THE BLOCK HAD: one release, 60 s a side, on 15 of 28 days, and NO
+# hip-flexor strength work anywhere. Stage 1's two hip-flexor items vanished at
+# the Stage 2A transition with no reason recorded, and nothing replaced them.
+# The block's only front-of-hip item was the thing he is saying wears off.
+#
+# ⚠ THESE ARE NOT PREPARATION, and that is what makes them affordable. The
+# 10-15 min preparation ceiling walks the day's list and STOPS at the first
+# item that is not a release or the raise, so work appended to the session
+# costs nothing against it. The ceiling was never the constraint here.
+#
+# FREQUENCY is three times a week, every week: days 2, 4, 6, 8, 11, 12, 15, 18,
+# 19, 22, 25, 26. The two isometrics start day 2; the lift-offs start day 11,
+# so week 1 introduces two low-load items and week 2 introduces one.
+
+
+def _s2b_knee_hover(week: int) -> dict:
+    """Half-kneeling with the back knee HOVERING. Strength at LENGTH.
+
+    The athlete's own specification, 2026-08-24: knee over the ankle, back knee
+    off the ground, held. That change is what turns it from a stretch he holds
+    into lengthened-position strength work — the back hip sits in extension
+    while the whole mass of that leg is carried by the hip flexors on that
+    side, which is the loading pattern that moves where a muscle sits rather
+    than borrowing range for a couple of hours.
+
+    A TIMED HOLD rather than the short repeated efforts used by the psoas
+    isometric beside it, and the difference is deliberate: in a hover the
+    intensity is fixed by bodyweight and leverage, so duration and leverage are
+    the only things there are to progress. Where intensity CAN be modulated —
+    the psoas isometric, SCAPULAR_ISOMETRIC — the rest-interval review's 2.4
+    finding applies and the dose is four short hard efforts instead.
+
+    The dose steps by WEEK, in the plan, the way the block's loaded lifts
+    already do, so the progression is a prescription rather than a note in a
+    field nobody renders.
+    """
+    sets, hold = {1: (2, 10), 2: (3, 15), 3: (3, 15), 4: (3, 20)}[week]
+    return _ex(
+        name="Half-Kneeling Knee-Hover Isometric",
+        ex_type="hold",
+        laterality="unilateral",
+        sets=sets, hold_seconds=hold, rest_seconds=45,
+        mechanics=(
+            "Kneel on one knee on a mat. Front foot planted with the knee stacked directly "
+            "over the ankle and the shin vertical. Tuck the pelvis under — tailbone down, "
+            "lower back long — and set the ribs down. Now lift the back knee two or three "
+            "centimetres off the floor and HOLD IT THERE; it never touches down inside a "
+            "set. The whole of that back leg is being carried by the front of that hip, "
+            "which is the exercise. Keep breathing. Then the other side. "
+            "The lower back arching ends the set, not the clock: the moment the ribs flare "
+            "or the tailbone tips back, put the knee down."
+        ),
+        biomechanical_focus=(
+            "Hip-flexor strength in the LENGTHENED position — the mechanism that changes "
+            "where a muscle sits, as against release, which quiets tone and wears off. The "
+            "back hip is in extension with that leg's whole mass held by psoas, iliacus and "
+            "rectus femoris, so they work at the end of their range under load instead of "
+            "being stretched passively at rest. "
+            "AUTHORED TO THE ATHLETE'S OWN SPECIFICATION (2026-08-24): knee over the ankle, "
+            "back knee off the ground. The earlier draft was a half-kneeling stretch with "
+            "the knee down, and he replaced it — correctly, since a held stretch is the "
+            "thing his objection was about. "
+            "Weighted toward strength on the profile's own rule (controlled-range strength "
+            "and stability over passive end-range stretching, full weight every block, "
+            "Beighton 6/9) and on flexibility_baselines.GAP_EXPLAINED. "
+            "The failure mode is the lumbar arch and it is not hypothetical: the "
+            "2026-07-06 symptom_log entry is a genuine left iliocostalis/QL strain produced "
+            "by holding a corrected posture for a whole walk, which is why this is an "
+            "effort with a defined end rather than a position to live in."
+        ),
+        progression=(
+            "All sets a side at the week's hold with no arching → the far arm goes overhead, "
+            "which lengthens the lever and raises the anti-arch demand at the same hold. "
+            "Advance on two clean weeks, both sides, never on one good day."
+        ),
+        regression=(
+            "The lower back arches before the hold is done → drop back a week's dose, or rest "
+            "the back toes on the floor to carry some of the leg. The front knee travelling "
+            "past the ankle means the load has left the back hip — reset the foot."
+        ),
+    )
+
+
+END_RANGE_PSOAS_ISOMETRIC = _ex(
+    name="End-Range Psoas Isometric",
+    ex_type="hold_reps",
+    laterality="unilateral",
+    sets=3, reps_in_set=4, hold_seconds=5, rest_seconds=45,
+    mechanics=(
+        "Stand tall with your back flat against a wall, heels a few centimetres out from it. "
+        "Drive one knee up as high as it will go — above hip height is the part that counts — "
+        "and hold it there against your own hands pressing down on the thigh. Push hard for "
+        "five seconds, ease off, go again: four efforts, then rest. On the RIGHT, keep the "
+        "kneecap pointing straight ahead or turned very slightly inward. Your back stays on "
+        "the wall throughout — if you have to lean back to get the knee up, the knee is too "
+        "high. Then the other side."
+    ),
+    biomechanical_focus=(
+        "The psoas is the only hip flexor still working above 90 degrees of hip flexion, so "
+        "end-range work is what trains IT rather than the group. "
+        "cluster_a_mechanics.TILT_COMPONENTS names 'hip flexor production' as one of the two "
+        "components of the seated-tilt deficit and its own evidence field reads 'Untested' — "
+        "the source's line is that end-range hip flexor strength is what pulls you into the "
+        "anterior tilt, and no block has ever loaded it. The measurement agrees: the "
+        "2026-08-12 reading is tilt_range 89 deg clearing the 90 deg line while "
+        "tilt_production 93 deg does not, i.e. the battery's pattern G — reachable, not "
+        "producible. "
+        "FOUR SHORT HARD EFFORTS rather than one long hold, on "
+        "docs/training/rest_interval_evidence_review_2026-08-13.md 2.4: at matched loading "
+        "time four 3-s contractions beat one 12-s hold (+57% against +25%) and intensity "
+        "rather than duration is the variable. Same dose shape as SCAPULAR_ISOMETRIC, which "
+        "is already in this block. "
+        "Key rule 7 supplies the right-side cue: right hip flexion past 60 degrees is cued "
+        "neutral or slightly internal, because external rotation is what snaps the iliopsoas "
+        "tendon over the bony ridge (finding #4)."
+    ),
+    progression=(
+        "Four clean efforts a side with the back staying on the wall → add a light band around "
+        "the thigh, then an ankle weight. Advance on two clean weeks, both sides, never on one "
+        "good day."
+    ),
+    regression=(
+        "The back comes off the wall, or the knee will not clear hip height → lower the knee to "
+        "where the back stays flat and work there. A click in the right groin → reset to a "
+        "kneecap-forward position and start again from lower."
+    ),
+)
+
+# Cluster A's own resisted answer to the tilt, named EXACTLY as
+# cluster_a_mechanics names it so the two layers share one vocabulary. It is
+# NOT part of pattern D's prescribed stack — which is what the cluster days
+# run, bound by tests/test_cluster_session_is_real_exercises.py — it is
+# appended AFTER it. Pattern G's own sequencing is what puts it there: "You can
+# reach it, you cannot produce it. Tilt work moves to the END of the session
+# and becomes strength work."
+STRADDLE_LIFT_OFFS = _ex(
+    name="Straddle lift-offs from a flat back",
+    ex_type="reps",
+    laterality="bilateral",
+    sets=3, reps=8, rest_seconds=45,
+    mechanics=(
+        "Sit with your legs straight and open to your recorded straddle width — on the block "
+        "while the tilt is new, on the floor once it is not. Arms crossed on your chest; hands "
+        "never touch the floor. Pull yourself forward from the hips to your flat-back limit. "
+        "Gravity is not the resistance here — your own leg tissue is, and the muscles at the "
+        "front of the hips must out-pull it. At the limit, lift the chest five to ten "
+        "centimetres, then pull back down. That cycle is one rep. "
+        "FEEL: Distinct working effort deep at the front of the hips — this is strength work, "
+        "and it can cramp there at first. On the right, keep the kneecap pointing up or "
+        "slightly inward. "
+        "STOP: When you can no longer reach the same depth with a flat back, the set is over. "
+        "A hand coming down voids the rep."
+    ),
+    biomechanical_focus=(
+        "Hip flexor strength to PRODUCE the tilt rather than be placed into it — active hip "
+        "flexion under iliopsoas load. The how-to text is transcribed from "
+        "cluster_a_mechanics' own position/movement/feel/stop fields for this exercise, and "
+        "the name matches so the layers cannot drift into two names for one movement. "
+        "Placed at the END of the flexibility session because that is pattern G's own "
+        "instruction, and the 2026-08-12 reading points at G once slot 2 is reached. "
+        "Added 2026-08-24 with the two hip-flexor isometrics, on the athlete's direction that "
+        "the time belongs in holds and strengthening rather than in more release."
+    ),
+    progression=(
+        "More degrees of tip produced on your own — the number the assessment's own-power test "
+        "measures. Progress is the SAME depth from a lower block, never more reach at the same "
+        "height."
+    ),
+    regression=(
+        "The back rounds to reach depth → raise the block. A hand coming down voids the rep; if "
+        "that keeps happening the width is too wide for today."
+    ),
+)
+
+
+def _s2b_hip_flexor(week: int, lift_offs: bool = False) -> list:
+    """The block's front-of-hip STRENGTH work, appended to the session.
+
+    Not preparation and not release: it goes after the workout, where no
+    ceiling applies. `lift_offs` is the flexibility days only — see
+    STRADDLE_LIFT_OFFS for why it belongs at the end of that session
+    specifically.
+    """
+    items = [_s2b_knee_hover(week), END_RANGE_PSOAS_ISOMETRIC]
+    if lift_offs:
+        items.append(STRADDLE_LIFT_OFFS)
+    return items
 
 
 def _s2b_gym_a(week: int) -> dict:
@@ -3220,7 +3460,7 @@ def _s2b_gym_a(week: int) -> dict:
                 progression="45 s solid both sides → add 10 s, never load it.",
                 regression="Hips sag → drop to the bent-knee version for the same time.",
             ),
-        ],
+        ] + _s2b_hip_flexor(week),
     }
 
 
@@ -3287,7 +3527,7 @@ def _s2b_gym_b(week: int) -> dict:
         "session_rpe_target": 7 if week == 4 else 6,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _p2_fold(week >= 3) + _s2b_release(hip_loaded=False) + _s2b_prep(lower=False) + [
+        "exercises": _p2_fold(week >= 3) + _s2b_release(hip_loaded=False, anterior=True) + _s2b_prep(lower=False) + [
             _ex(
                 name="Incline DB Press",
                 ex_type="reps",
@@ -3378,7 +3618,7 @@ def _s2b_gym_b(week: int) -> dict:
                 progression="45 s solid both sides → add 10 s, never load it.",
                 regression="Hips sag → drop to the bent-knee version for the same time.",
             ),
-        ] + returning,
+        ] + returning + _s2b_hip_flexor(week),
     }
 
 
@@ -3419,7 +3659,7 @@ def _s2b_band_a(week: int) -> dict:
                 progression="45 s solid → add 10 s.",
                 regression="Hips sag → bent-knee version, same time.",
             ),
-        ],
+        ] + _s2b_hip_flexor(week),
     }
 
 
@@ -3431,7 +3671,7 @@ def _s2b_band_b(week: int) -> dict:
         "session_rpe_target": 5,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _p2_fold(False) + _s2b_release(hip_loaded=False) + _s2b_prep(lower=False) + [
+        "exercises": _p2_fold(False) + _s2b_release(hip_loaded=False, anterior=True) + _s2b_prep(lower=False) + [
             BAND_CHEST_PRESS,
             BAND_LAT_PULLDOWN,
             BAND_ROW,
@@ -3448,7 +3688,7 @@ def _s2b_band_b(week: int) -> dict:
                 progression="45 s solid → add 10 s.",
                 regression="Hips sag → bent-knee version, same time.",
             ),
-        ],
+        ] + _s2b_hip_flexor(week),
     }
 
 
@@ -3757,7 +3997,7 @@ def _s2b_cluster(week: int) -> dict:
             progression='Stack progresses on its own terms — Lower hips at the same stance, without the pinch.',
             regression="Any sharp pinch at the front of a hip ends that set; record it. A sharp pinch at the front of a hip with a hard, sudden stop ends today's depth work — record it.",
         ),
-        ],
+        ] + _s2b_hip_flexor(week, lift_offs=True),
     }
 
 

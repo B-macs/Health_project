@@ -642,6 +642,36 @@ MOVEMENT_RULES: list[MovementRule] = [
                "from the lower back is the arch this exercise exists to undo.",
         stage_cap=1, severity="cleared", laterality="bilateral",
     ),
+    # ── Front-of-hip STRENGTH, added 2026-08-24 ─────────────────────────────
+    # The block gained hip-flexor isometrics on the athlete's direction that
+    # release wears off and holds and strengthening are what change anything.
+    # Both rules exist so those names actually LAND somewhere: `unknown` is not
+    # a block and reads exactly like `cleared` on the training screen, which is
+    # the vocabulary failure this file has been burned by twice.
+    MovementRule(
+        movement="half kneeling",
+        reason="Split stance with the back hip in EXTENSION and the back knee "
+               "unsupported, so the back leg's weight is carried by the hip flexors on "
+               "that side. That is the point of it — hip-flexor strength at length. The "
+               "range must not be bought with a lumbar arch: the ribs flaring ends the "
+               "hold, over the L5/S1 retrolisthesis and the two covered annular tears. "
+               "Front knee stacked over the ankle; travelling past it moves the load off "
+               "the back hip. Cued neutral or slightly internal on the right per key "
+               "rule 7 when that side is forward.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="psoas",
+        reason="Active hip flexion under iliopsoas load. THERE WAS NO PSOAS RULE IN THIS "
+               "FILE AT ALL until 2026-08-24, so every name containing the word returned "
+               "`unknown` — on the one muscle the imaging, the imbalance list and the "
+               "symptom log all name. End-range work above 90 degrees is what trains the "
+               "psoas specifically rather than the group, and it attaches along L1-L4, so "
+               "the range comes from the hip and never from a lumbar arch. Cue neutral or "
+               "slight internal rotation on the RIGHT: external rotation is what snaps "
+               "the tendon over the bony ridge (finding #4).",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
     MovementRule(
         movement="thoracic extension",
         reason="Extension over a support, THORACIC ONLY. The mid-back is the target; the "

@@ -199,6 +199,13 @@ _CORE_EXERCISES: tuple[str, ...] = (
 _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Upper Glute / TFL Self-Release",
     "Upper Glute Grip Grade (Test)",
+    # Front-of-hip STRENGTH, added 2026-08-24. Lower body rather than core
+    # even though all three carry a real anti-arch demand: the tissue being
+    # trained is the hip flexor group, and the argmax test binds this to the
+    # shares triple below.
+    "Half-Kneeling Knee-Hover Isometric",
+    "End-Range Psoas Isometric",
+    "Straddle lift-offs from a flat back",
     # Cluster A pattern-D stack, broken out of the single session 2026-08-18
     "Tailor's pose, unloaded",
     'Frog rocks',
@@ -419,6 +426,12 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Seated Forward Fold Exposure — Loaded (Trial)": {"upper_body": 0.00, "core": 0.90, "lower_body": 0.10},
     "Reassessment Wrap-Up (Notes)":           {"upper_body": 0.00, "core": 0.80, "lower_body": 0.20},
     "Upper Glute Grip Grade (Test)":          {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    # Front-of-hip strength, 2026-08-24. The knee-hover carries the most core
+    # of the three because holding the back knee off the floor without letting
+    # the lower back arch is a trunk job, and the arch is its named failure.
+    "Half-Kneeling Knee-Hover Isometric":     {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    "End-Range Psoas Isometric":              {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    "Straddle lift-offs from a flat back":    {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
     "Tailor's pose, unloaded":                     {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     'Frog rocks':                                  {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     'Butterfly PIR':                               {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
@@ -660,6 +673,14 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Seated Forward Fold Exposure — Loaded (Trial)": ("mobility_core", 0.25),
     "Wide-Stance Rotation Count (Test)": ("mobility_core", 0.25),
     "Upper Glute Grip Grade (Test)":     ("mobility_core", 0.25),
+    # Front-of-hip strength, 2026-08-24. NOT mobility_core: these are training
+    # and Strain, AU and ACWR have to see them as training, which is the whole
+    # point of adding them. The knee-hover is bodyweight_compound, the tier
+    # created for unloaded multi-joint work (step-ups, lunges, wall sits); the
+    # other two are single-joint hip flexion under load.
+    "Half-Kneeling Knee-Hover Isometric":   ("bodyweight_compound", 0.5),
+    "End-Range Psoas Isometric":            ("isolation", 0.3),
+    "Straddle lift-offs from a flat back":  ("isolation", 0.3),
     "Tailor's pose, unloaded":                     ("mobility_core", 0.25),
     'Frog rocks':                                  ("mobility_core", 0.25),
     'Butterfly PIR':                               ("mobility_core", 0.25),
