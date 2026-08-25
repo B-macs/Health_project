@@ -236,6 +236,27 @@ _NAV_BUTTON_CSS = """<style>
 }
 .st-key-hdr_prev, .st-key-hdr_back { left: max(14px, calc((100vw - 480px)/2 + 14px)) !important; }
 .st-key-hdr_next { right: max(14px, calc((100vw - 480px)/2 + 14px)) !important; }
+/* Drill-down day arrows: BOTH on the right, because the back button owns the
+   left. Same 44px cells, so dnext sits at the edge and dprev one cell in. */
+.st-key-hdr_dprev, .st-key-hdr_dnext {
+    position: fixed !important; top: 0 !important; z-index: 901 !important;
+    width: 44px !important; margin: 0 !important;
+}
+.st-key-hdr_dnext { right: max(14px, calc((100vw - 480px)/2 + 14px)) !important; }
+.st-key-hdr_dprev { right: max(58px, calc((100vw - 480px)/2 + 58px)) !important; }
+.st-key-hdr_dprev button, .st-key-hdr_dnext button {
+    width: 44px !important; height: 56px !important; min-height: 0 !important;
+    background: transparent !important; border: none !important;
+    box-shadow: none !important; padding: 0 !important;
+}
+.st-key-hdr_dprev button p, .st-key-hdr_dnext button p {
+    font-size: 26px !important; color: #D4DCEE !important; line-height: 1 !important;
+    margin: 0 !important;
+}
+.st-key-hdr_dnext button:disabled p { color: #2A2A3A !important; }
+.st-key-hdr_dprev button:focus, .st-key-hdr_dnext button:focus {
+    outline: none !important; box-shadow: none !important;
+}
 .st-key-hdr_prev button, .st-key-hdr_next button, .st-key-hdr_back button {
     width: 44px !important; height: 56px !important; min-height: 0 !important;
     background: transparent !important; border: none !important;
@@ -967,23 +988,50 @@ def _contributor_row(row: dict) -> str:
     )
 
 
+def _sleep_breakdown() -> dict:
+    """The night's Sleep Score breakdown, computed once per render.
+
+    Computed inline rather than cached: it is pure math over _bio_rows, which
+    is already loaded and cached. Hashing 60 rows to memoise a microsecond of
+    arithmetic would cost more than it saves. Held in a module global because
+    TWO things now read it — the contributors panel, and the gate that decides
+    whether any of the night panels render at all — and re-deriving it in the
+    second would let the two disagree about whether the night was scored."""
+    global _sleep_breakdown_cache
+    if _sleep_breakdown_cache is None:
+        _sleep_breakdown_cache = sleep_score_model.sleep_score_breakdown(
+            selected_date, _bio_rows, wake_time_adjustments=_wake_adjustments,
+        )
+    return _sleep_breakdown_cache
+
+
+_sleep_breakdown_cache: dict | None = None
+
+
+def _sleep_is_scored() -> bool:
+    """Whether this night has a Sleep Score at all — the ONE gate every night
+    panel on this screen answers to. See _sleep_night_blocks."""
+    return _sleep_breakdown()["score"] != _NOT_COMPUTED
+
+
 def _sleep_contributors_block() -> str:
     """The seven contributors behind the Sleep Score.
 
     dashboard.sleep_meta's copy has told users to "check the breakdown for
     what's holding it back" since it was written, while no breakdown existed
     anywhere in the app. This is it."""
-    # Computed inline rather than cached: it is pure math over _bio_rows,
-    # which is already loaded and cached. Hashing 60 rows to memoise a
-    # microsecond of arithmetic would cost more than it saves.
-    breakdown = sleep_score_model.sleep_score_breakdown(
-        selected_date, _bio_rows, wake_time_adjustments=_wake_adjustments,
-    )
+    breakdown = _sleep_breakdown()
     if breakdown["score"] == _NOT_COMPUTED:
-        return _panel(
-            "Contributors",
-            '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
-            f'{dash.sleep_unscored_reason(_bio_rows_failed, _bio_rows_stale)}</div>',
+        # A plain line, NOT a panel with a CONTRIBUTORS heading over it: there
+        # are no contributors to head. Everything else on the screen is gone
+        # too (see _sleep_night_blocks), so this line and the day arrows in the
+        # header are the whole screen.
+        return (
+            '<div style="font-size:12px;color:#8A99A3;line-height:1.6;'
+            'padding:2px 2px 8px;">'
+            f'{dash.sleep_unscored_reason(_bio_rows_failed, _bio_rows_stale)}'
+            '<br><span style="color:#6B7A9B;">Tap ‹ at the top to see an '
+            'earlier night.</span></div>'
         )
     rows = "".join(_contributor_row(r) for r in dash.sleep_breakdown_rows(breakdown))
     caption = dash.sleep_coverage_caption(breakdown)
@@ -1366,7 +1414,38 @@ def _float_or_zero(v) -> float:
 def _sleep_night_blocks() -> str:
     """Key metrics, sleep debt, architecture and vitals for the selected
     night. Everything here reads the Oura values the score itself used, so
-    the numbers under the score always explain that score."""
+    the numbers under the score always explain that score.
+
+    ⚠ ALL OR NOTHING, and the gate is the SCORE — athlete, 2026-08-25:
+    "I want the sleep to be fully blank until the data is there, I should be
+    able to review yesterdays sleep by toggling to yesterday if I want that."
+
+    A night detail can exist while the score does not (the two are separate
+    reads of the same tab, taken at different moments), and this screen used
+    the detail alone: it drew a full night — total sleep, time in bed,
+    efficiency, the whole architecture — underneath a header reading "No
+    Readings". Half a screen is worse than none of it, because the reader has
+    no way to tell which half to believe. So the score decides for everything:
+    no score, no night panels, and the day arrows in the header are how you go
+    and look at a night that has one."""
+    if not _sleep_is_scored():
+        fused_only = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
+        if (str(fused_only.get("source")) == "garmin_only"
+                and fused_only.get("master_hypnogram")):
+            # The ONE exception, and it earns it by saying so in its own text:
+            # the ring was not worn, the watch has the night, and the panel
+            # states in terms that there is no Sleep Score and that only the
+            # timeline below it is real. Nothing here is presented as scoring.
+            return _panel(
+                "Time asleep",
+                '<div style="font-size:11px;color:#6B7A9B;line-height:1.5;">'
+                'No Oura ring reading for this night, so there is no Sleep Score — '
+                'every contributor it is built from is an Oura measurement. '
+                'Garmin recorded the night, so the stage timeline below is real.</div>'
+                + _hypnogram_strip(None)
+                + f'<div style="margin-top:12px;">{_garmin_only_stage_rows(fused_only)}</div>')
+        return ""
+
     detail = _sleep_details.get(selected_date.isoformat())
     context = _sleep_context.get(selected_date.isoformat(), {})
     fused = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
@@ -1379,20 +1458,9 @@ def _sleep_night_blocks() -> str:
                 "Night detail",
                 '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
                 'Could not load this night&rsquo;s detail — try again shortly.</div>')
-        if str(fused.get("source")) == "garmin_only" and fused.get("master_hypnogram"):
-            # The ring was not worn but the watch has this night. Everything
-            # below is built from Oura fields and genuinely does not exist, so
-            # show the architecture the watch DOES have rather than nothing —
-            # and say why the score above is blank, which is otherwise the
-            # most confusing part of the screen.
-            return _panel(
-                "Time asleep",
-                '<div style="font-size:11px;color:#6B7A9B;line-height:1.5;">'
-                'No Oura ring reading for this night, so there is no Sleep Score — '
-                'every contributor it is built from is an Oura measurement. '
-                'Garmin recorded the night, so the stage timeline below is real.</div>'
-                + _hypnogram_strip(None)
-                + f'<div style="margin-top:12px;">{_garmin_only_stage_rows(fused)}</div>')
+        # A scored night whose detail read failed is the only case left here:
+        # the garmin-only night is handled by the gate above, and an unscored
+        # night never reaches this line at all.
         return ""
 
     out = _key_metric_grid(dash.sleep_key_metrics(detail))
@@ -2125,9 +2193,15 @@ def _render_wake_time_control(d: date) -> None:
 # _render_header_buttons() below, after the header markup so they layer above it.
 _DETAIL_VIEW_TITLES = {"strain": "Strain History", "readiness": "Readiness History", "sleep": "Sleep History"}
 if view in _DETAIL_VIEW_TITLES:
+    # The date rides in the fixed header, not only in the panel's own overline:
+    # the arrows beside it are how the athlete moves between nights, and once
+    # he has scrolled the overline is gone while this is not. margin-right
+    # clears the two arrow buttons _NAV_BUTTON_CSS pins over this bar.
     _header_inner = (
         f'<span style="color:#D4DCEE;font-weight:600;font-size:15px;'
         f'margin-left:44px;">{_DETAIL_VIEW_TITLES[view]}</span>'
+        f'<span style="color:#6B7A9B;font-size:12px;letter-spacing:1px;'
+        f'margin-left:auto;margin-right:92px;">{date_label}</span>'
     )
     _header_justify = "flex-start"
 else:
@@ -2146,6 +2220,22 @@ def _render_header_buttons() -> None:
         # re-open the rest-day week panel the athlete had closed.
         st.button("←", key="hdr_back", on_click=_go,
                   kwargs={"view": None, "pt": None, "rw": None}, help="Back")
+        # ⚠ THE DRILL-DOWN USED TO REPLACE THE DAY ARROWS WITH THE BACK BUTTON,
+        # so the only way to reach another night was to go back to Home, step
+        # the day there and re-open the card. That is why a morning with no
+        # reading yet had nowhere to go — athlete, 2026-08-25: "I should be
+        # able to review yesterdays sleep by toggling to yesterday if I want
+        # that." Separate keys from the Home pair so each has its own position
+        # in _NAV_BUTTON_CSS rather than one rule trying to serve both layouts.
+        #
+        # pt is dropped on a day change: a selected chart point is an index
+        # into THIS night's series, and carrying it to another night would
+        # silently select an unrelated sample.
+        st.button("‹", key="hdr_dprev", on_click=_go,
+                  kwargs={"d": prev_date, "pt": None}, help="Previous day")
+        st.button("›", key="hdr_dnext", on_click=_go,
+                  kwargs={"d": next_date, "pt": None},
+                  disabled=not can_go_next, help="Next day")
         return
     st.button("‹", key="hdr_prev", on_click=_go, kwargs={"d": prev_date},
               help="Previous day")
@@ -2338,7 +2428,10 @@ if view in ("strain", "readiness", "sleep"):
     # Only the drill-downs carry chart links, so the iframe this installs is
     # never paid for on the three-card Home stream.
     styles.enable_chart_links()
-    if view == "sleep":
+    if view == "sleep" and _sleep_is_scored():
+        # Nothing to correct on a night with no reading — and offering a
+        # wake-time stepper under "No Readings" is the same half-a-screen the
+        # night panels were just gated for.
         _render_wake_time_control(selected_date)
 else:
     # Rendered card-by-card rather than as one concatenated blob: each needs
