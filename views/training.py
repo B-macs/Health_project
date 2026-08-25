@@ -2146,7 +2146,14 @@ def _render_verdict_banner(verdict, directive: dict) -> None:
         # recovered". The numbers below are clamped exactly as they would be
         # under the warning — only the claim about WHY has changed.
         st.info(verdict.banner_text)
-    # green / grey: no banner — train normally, nothing to flag
+    elif verdict.banner_kind == "neutral":
+        # NOTHING TO JUDGE, SAID OUT LOUD. The half of the fix that is visible
+        # here: Home's card renders its own "Awaiting Data" state, this screen
+        # had no equivalent, and the athlete got a normal-looking session on a
+        # morning the engine had nothing to go on. st.info rather than
+        # st.warning — it is a fact about the data, not a warning about him.
+        st.info(verdict.banner_text)
+    # green: no banner — train normally, nothing to flag
     # ACWR is advisory while engine.ACWR_ADVISORY_MODE is set: it annotates the
     # day, it does not decide it.
     if directive.get("acwr_advisory"):

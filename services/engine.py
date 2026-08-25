@@ -813,7 +813,19 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
     # of this function scores -- rather than searching the list, so the gate and
     # the reading can never describe different rows.
     if for_date is not None and not _row_can_be_judged(today, for_date):
-        latest = str(today.get("date") or "") or None
+        # THE MOST RECENT ROW THAT ACTUALLY CARRIES A READING, not simply the
+        # most recent row. A row can exist for today and hold nothing (a
+        # morning check-in makes one), and naming that date as "the most recent
+        # reading" in the same sentence that says there is no reading is a
+        # contradiction of its own.
+        latest = next(
+            (str(r.get("date")) for r in reversed(biometric_rows)
+             if any(r.get(k) is not None for k in _LIGHT_READING_FIELDS)
+             and r.get("date")),
+            None,
+        )
+        if latest == str(for_date):
+            latest = None
         return {
             "overall": "grey",
             "status": STATUS_AWAITING_DATA,

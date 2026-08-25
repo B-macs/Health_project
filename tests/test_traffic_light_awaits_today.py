@@ -16,13 +16,17 @@ The fix is engine.traffic_light's `for_date`. These tests pin four things:
     services/dashboard.py's fusion shadow report compares two row SETS and is
     not judging a calendar day at all;
   * a stale newest row, or one carrying no scored reading, yields grey;
-  * grey travels all the way to an empty badge and an empty banner;
+  * grey never becomes a load decision — no badge, no clamp;
   * the two callers that carry a load decision actually pass for_date.
 
-⚠ THE CHOSEN OUTCOME IS SILENCE, NOT A CLAMP (athlete, same day). A day with
-no reading gets no badge, no banner and no ceiling — the same as every day
-below MIN_DAYS. Grey is the absence of an opinion, not a green light, and
-test_no_reading_does_not_assert_all_clear pins that it never becomes one.
+⚠ NO CLAMP, BUT NOT SILENCE EITHER — and that second half was settled a few
+hours after the first. The athlete's call on the NUMBERS stands: a day with no
+reading gets no badge and no ceiling, the same as every day below MIN_DAYS, and
+test_no_reading_does_not_assert_all_clear pins that grey never becomes a green
+light. What changed is that the absence is now SAID, in one sentence both
+screens print — see section 5. Silence turned out to be the wrong shape,
+because Home's card renders its own "Awaiting Data" state and the training
+screen had no equivalent, so the same absence read as a normal session there.
 """
 
 from datetime import date, timedelta
@@ -160,10 +164,16 @@ def _verdict_for(rows, for_date):
     return rec, verdict.today_verdict(rec, {"volume_factor": 1.0})
 
 
-def test_no_reading_produces_no_badge_and_no_banner():
+def test_no_reading_produces_no_load_decision():
     """The screenshot, made impossible. Home printed REDUCED LOAD under a card
-    reading "Awaiting Data"; the badge is derived from banner_kind alone, so
-    an empty kind is the whole fix at the display layer."""
+    reading "Awaiting Data"; the badge is derived from banner_kind alone, and
+    no kind that carries a badge is reachable without a reading.
+
+    ⚠ This asserted `banner_kind == ""` until later the same day, when the
+    athlete asked for the absence to be stated rather than merely not
+    contradicted. The kind is "neutral" now and section 5 pins what it says.
+    The property THIS test protects — a day with nothing to judge produces no
+    load decision — is unchanged, and is the one that matters here."""
     stale = _rows(last_day=TODAY - timedelta(days=2), hrv_ms=20.0)
     rec, v = _verdict_for(stale, TODAY)
 
@@ -173,12 +183,9 @@ def test_no_reading_produces_no_badge_and_no_banner():
     assert rec["label"] == "AWAITING TODAY'S READING"
 
     assert v.reduced is False
-    assert v.banner_kind == ""
     assert v.badge == ""
-    assert v.banner_text == ""
     assert v.reasons == ()
-    # No hrv note in this construction either, so Home renders no line at all.
-    assert v.has_something_to_say is False
+    assert v.volume_factor == 1.0
 
 
 def test_the_same_reading_arriving_today_does_produce_the_badge():
@@ -202,17 +209,19 @@ def test_no_reading_does_not_assert_all_clear():
     assert "nominal" not in rec["action"].lower()
 
 
-def test_load_policy_says_nothing_on_an_awaiting_day():
+def test_load_policy_holds_nothing_back_on_an_awaiting_day():
     """Pinned at the policy rather than through the verdict, because
-    load_policy is what clamp_to_ceiling reads."""
+    load_policy is what clamp_to_ceiling reads. The banner it now carries is a
+    statement about the DATA; nothing here may become a statement about the
+    numbers."""
     tl = engine.traffic_light(_rows(last_day=TODAY - timedelta(days=2),
                                     hrv_ms=20.0), for_date=TODAY)
     rec = engine.volume_recommendation(tl, engine.acwr([], stage=2), stage=2)
     policy = sessions.load_policy(rec, {"volume_factor": 1.0})
     assert policy["reduced"] is False
-    assert policy["banner_kind"] == ""
-    assert policy["banner_text"] == ""
     assert policy["volume_factor"] == 1.0
+    assert policy["reasons"] == []
+    assert policy["banner_kind"] == "neutral"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -257,3 +266,97 @@ def test_every_decision_carrying_caller_passes_for_date():
         "find as if it were today. Pass for_date, or add the file to "
         "_UNGATED_ALLOWED with the reason: " + "; ".join(offenders)
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  5. "Nothing to judge" is said on BOTH screens, in one sentence.
+# ─────────────────────────────────────────────────────────────────────────────
+#  Athlete, 2026-08-25: "when there is no data in the home page, then no data
+#  is message is presented in the training page."
+#
+#  Silence was the wrong shape. Home's readiness card renders its own "Awaiting
+#  Data" state, so Home looked handled; the training screen had no equivalent
+#  and fell through to whatever the directive's action string happened to be,
+#  which on a grey day is not a load statement at all and read as a normal
+#  session. Two screens inferring the same absence separately is how they came
+#  to disagree about it.
+
+def test_a_no_reading_day_produces_one_banner_for_both_screens():
+    stale = _rows(last_day=TODAY - timedelta(days=2))
+    rec, v = _verdict_for(stale, TODAY)
+
+    assert v.banner_kind == "neutral"
+    assert v.banner_text                      # ...and it is not empty
+    # Home renders the line, which is the half the training banner mirrors.
+    assert v.has_something_to_say is True
+    # THE SAME STRING OBJECT, not a copy and not a re-authoring.
+    assert v.banner_text is v.policy["banner_text"]
+
+
+def test_the_no_reading_banner_names_both_dates():
+    """The day with nothing, and the day of the last real reading. Those are
+    the two facts that make it actionable rather than merely apologetic."""
+    stale = _rows(last_day=TODAY - timedelta(days=2))
+    _, v = _verdict_for(stale, TODAY)
+    assert TODAY.isoformat() in v.banner_text
+    assert (TODAY - timedelta(days=2)).isoformat() in v.banner_text
+
+
+def test_an_empty_row_for_today_is_not_named_as_the_most_recent_reading():
+    """A row can exist for today carrying nothing — a morning check-in makes
+    one. Naming that date as "the most recent reading" in the same sentence
+    that says there is no reading is a contradiction of its own."""
+    blanks = {k: None for k in engine._LIGHT_READING_FIELDS}
+    rows = _rows(last_day=TODAY, **blanks)
+    tl = engine.traffic_light(rows, for_date=TODAY)
+    assert tl["latest_reading_date"] == (TODAY - timedelta(days=1)).isoformat()
+    assert tl["message"].count(TODAY.isoformat()) == 1, \
+        "today must appear only as the day with nothing"
+
+
+def test_the_no_reading_day_carries_no_badge_and_no_clamp():
+    """⚠ IT IS NOT A LOAD DECISION. The athlete's choice was silence on the
+    numbers; what changed is that the SILENCE is now explained rather than
+    inferred. No badge — the card's own status label already reads "No
+    Readings" directly above where the pill would sit."""
+    stale = _rows(last_day=TODAY - timedelta(days=2))
+    _, v = _verdict_for(stale, TODAY)
+    assert v.reduced is False
+    assert v.badge == ""
+    assert v.volume_factor == 1.0
+
+
+def test_a_real_reduction_still_wins_over_the_no_reading_notice():
+    """The branch is reached only when nothing else had an opinion, so it can
+    never mask one. If readiness computed and asked for less, that is a
+    reduction off real data even where the light has none."""
+    stale = _rows(last_day=TODAY - timedelta(days=2))
+    tl = engine.traffic_light(stale, for_date=TODAY)
+    rec = engine.volume_recommendation(tl, engine.acwr([], stage=2), stage=2)
+    v = verdict.today_verdict(rec, {"volume_factor": 0.85,
+                                    "description": "two low readiness days"})
+    assert v.banner_kind == "warning"
+    assert v.badge == verdict.BADGE_WORDS["warning"]
+
+
+def test_the_training_view_renders_the_no_reading_kind():
+    """A kind the view does not branch on renders as silence — which is the
+    state this whole change exists to end."""
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "views" / "training.py").read_text(encoding="utf-8")
+    assert 'verdict.banner_kind == "neutral"' in src
+
+
+def test_the_headline_does_not_repeat_the_no_reading_banner():
+    """The banner text IS the directive's action on this branch, so letting the
+    headline print it too would say the same thing twice, once at 26px."""
+    from services import sessions as sess
+
+    stale = _rows(last_day=TODAY - timedelta(days=2))
+    rec, v = _verdict_for(stale, TODAY)
+    plan = {"objective": "Posterior Chain Strength", "phase": "Stage 2B"}
+    headline, _ = sess.coach_message(rec, plan, v.policy)
+    assert headline == plan["objective"]
+    assert headline != v.banner_text

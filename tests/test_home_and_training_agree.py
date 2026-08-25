@@ -126,9 +126,14 @@ def test_a_clear_day_says_nothing_rather_than_reassuring():
 
 def test_home_never_borrows_the_bright_signal_palette():
     """#FF4B4B on a 460px hero card is an alarm. The requirement was "not
-    surprised", not "alarmed"."""
+    surprised", not "alarmed".
+
+    #8A99A3 joined the palette on 2026-08-25 for the "nothing to judge" line —
+    the same grey ink the card's own "No Readings" label uses, and deliberately
+    NOT one of the three status colours: an absent reading is not a status."""
     assert set(vd.HOME_TONES.values()).isdisjoint(set(engine.SIGNAL_COLORS.values()))
-    assert set(vd.HOME_TONES.values()) <= {"#6BAF8B", "#BFA06A", "#C47878"}
+    assert set(vd.HOME_TONES.values()) <= {"#6BAF8B", "#BFA06A", "#C47878",
+                                           "#8A99A3"}
     assert "SIGNAL_COLORS" not in (ROOT / "app.py").read_text(encoding="utf-8")
 
 

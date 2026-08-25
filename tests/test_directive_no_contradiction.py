@@ -323,6 +323,27 @@ def test_omitting_the_policy_keeps_the_old_headline():
             == (directive["action"], plan["phase"]))
 
 
+def test_home_renders_every_banner_kind_load_policy_can_emit():
+    """⚠ A kind neither screen knows about renders as SILENCE, which is how
+    both of this week's reports happened. Held wider than the reachable-kinds
+    helper above, because that helper only walks traffic-light fixtures and
+    "neutral" is reached through the DRIVER instead.
+
+    Not every kind needs a badge — "neutral" deliberately has none, since the
+    card's own status label already says it — but every kind needs a TONE, or
+    _verdict_line renders the sentence with no left border and no colour.
+    """
+    from services import verdict as vd
+
+    for kind in ("", "info", "warning", "error", "neutral"):
+        assert kind in vd.HOME_TONES, f"Home has no tone for {kind!r}"
+        assert kind in vd.BADGE_WORDS, f"Home has no badge entry for {kind!r}"
+
+    # Every kind that CLAMPS must announce itself on the card.
+    for kind in ("info", "warning", "error"):
+        assert vd.BADGE_WORDS[kind], f"a clamping kind needs a badge: {kind!r}"
+
+
 def test_home_carries_a_badge_for_every_banner_kind():
     """⚠ THE REPORTED BUG, GENERALISED. 2026-08-23: "I saw 66 but then saw
     reduce load in training." A kind Home has no badge word for renders as a

@@ -222,24 +222,36 @@ def coach_message(directive: dict, today_plan: dict,
     is correct for any caller that has no load decision in hand.
     """
     action = directive.get("action") or ""
-    if action and _headline_would_contradict(directive, policy):
+    if action and _headline_is_superseded(directive, policy):
         action = ""
     headline = action or today_plan["objective"]
     subtitle = today_plan["phase"]
     return headline, subtitle
 
 
-def _headline_would_contradict(directive: dict, policy: dict | None) -> bool:
-    """True when the directive is asking for more load on a day load_policy has
-    already decided is reduced.
+def _headline_is_superseded(directive: dict, policy: dict | None) -> bool:
+    """True when the banner has already dealt with the directive's sentence —
+    either by PRINTING it or by CONTRADICTING it.
 
-    Deliberately keyed on the MULTIPLIER rather than on the driver: a directive
-    that reduced the day itself (yellow biometrics, an ACWR lock) has an action
-    string that already says the right thing, and replacing it would throw away
-    the one place the reason is named. Only the "add load" sentence is the
-    contradiction.
+    Two cases, and they are different:
+
+    * DUPLICATION. On a no-reading day the banner text IS the directive's
+      action, so letting the headline print it too would say the same thing
+      twice, once at 26px.
+    * CONTRADICTION. The directive is asking for more load on a day the policy
+      has already decided is reduced — the 2026-08-25 report.
+
+    The contradiction test is deliberately keyed on the MULTIPLIER rather than
+    on the driver: a directive that reduced the day itself (yellow biometrics,
+    an ACWR lock) has an action string that already says the right thing and
+    NAMES THE READING, and replacing it would throw away the one place the
+    reason appears. Only the "add load" sentence is the contradiction.
     """
-    if not policy or not policy.get("reduced"):
+    if not policy:
+        return False
+    if policy.get("banner_text") and policy["banner_text"] == directive.get("action"):
+        return True
+    if not policy.get("reduced"):
         return False
     try:
         return float(directive.get("multiplier", 1.0) or 1.0) > 1.0
@@ -735,6 +747,15 @@ _CAPPED_BANNER = (
 )
 
 
+# Fallback only. engine.volume_recommendation authors the real sentence with
+# the dates in it; this is what a directive that lost its action string would
+# say, and it must never read as an all-clear.
+_NO_READING_BANNER = (
+    "No reading for today yet, so nothing below has been judged against how "
+    "you are. Train to feel, and the guidance returns once a reading arrives."
+)
+
+
 class PrescriptionContradiction(RuntimeError):
     """The resolved prescription exceeds the previous session on a day the
     engine flagged as reduced load.
@@ -825,6 +846,31 @@ def load_policy(directive: dict | None, readiness_modifier: dict | None) -> dict
         kind, text = "info", _CAPPED_BANNER
     elif reduced:
         kind, text = "warning", _REDUCED_BANNER
+    elif driver == engine.DRIVER_NO_DATA:
+        # ⚠ NOTHING TO JUDGE IS ITSELF SOMETHING TO SAY, AND BOTH SCREENS MUST
+        # SAY IT. Athlete, 2026-08-25: "when there is no data in the home page,
+        # then no data is message is presented in the training page."
+        #
+        # Silence was the wrong shape for this. Home's card says "Awaiting
+        # Data" because readiness has its own no-score render; the training
+        # screen had no equivalent, so a day with nothing to judge fell through
+        # to whatever the directive's action string happened to be — which on
+        # a grey day is not a load statement at all, and read as normal
+        # training. Two screens inferring the same absence separately is how
+        # they came to disagree about it.
+        #
+        # ⚠ IT IS NOT A LOAD DECISION. `reduced` stays False and volume_factor
+        # is untouched — this branch is only reached when nothing else had an
+        # opinion, so it can never mask one. A day where readiness computed and
+        # asked for less is still `warning`, because that is a reduction off
+        # real data even when the traffic light has none.
+        #
+        # The text is the ENGINE'S OWN sentence rather than a constant authored
+        # here: it names the date and the date of the most recent reading, and
+        # those are the two facts that make the message actionable rather than
+        # merely apologetic.
+        kind = "neutral"
+        text = directive.get("action") or _NO_READING_BANNER
     else:
         kind, text = "", ""
 

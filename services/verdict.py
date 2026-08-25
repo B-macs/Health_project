@@ -51,6 +51,10 @@ HOME_TONES = {
     "info":    "#BFA06A",
     "warning": "#BFA06A",
     "error":   "#C47878",
+    # Grey ink, deliberately: "nothing to judge" is not a warning about him and
+    # must not borrow a warning's colour. It is the same grey the card's own
+    # "No Readings" label already uses.
+    "neutral": "#8A99A3",
 }
 
 #: banner_kind -> the pill under the readiness figure. Derived from banner_kind
@@ -61,6 +65,13 @@ BADGE_WORDS = {
     "info":    "VOLUME HELD",
     "warning": "REDUCED LOAD",
     "error":   "REST ADVISED",
+    # NO BADGE, ON PURPOSE. The pill sits directly under the card's status
+    # label, which on a no-reading day already reads "No Readings" over an
+    # "Awaiting Data" heading — a third way of saying it in the same 60px. The
+    # LINE beneath the card is where this kind speaks, and that is the half
+    # the training screen mirrors. A badge is for a decision about load; this
+    # is the absence of one.
+    "neutral": "",
 }
 
 
@@ -96,7 +107,11 @@ class Verdict:
         matching Training, which shows no banner on green or grey, and matching
         hrv_trend's own rule that a quiet day says nothing rather than
         reassuring."""
-        return bool(self.reduced or self.hrv_note)
+        # banner_text rather than `reduced`: a no-reading day has something to
+        # say and nothing to clamp, and those are no longer the same question
+        # (2026-08-25). Identical to the old expression for every other kind —
+        # banner_text is non-empty exactly when reduced is True.
+        return bool(self.banner_text or self.hrv_note)
 
 
 def today_verdict(directive: dict | None,
