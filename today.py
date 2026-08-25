@@ -54,7 +54,9 @@ def today_directive() -> dict:
         stage = r.get_current_stage()
         streak = r.get_pain_free_streak()
         lam = float(diag.get("injury_weight_decay_lambda") or 0.05)
-        tl = engine.traffic_light(bio, drift_rows=drift)
+        # for_date is what stops a stale row being graded as this morning
+        # -- see engine.traffic_light's _row_can_be_judged note.
+        tl = engine.traffic_light(bio, drift_rows=drift, for_date=date.today())
         # Scope ACWR's chronic baseline to the current stage — see
         # engine.ACWR_MIN_IN_STAGE_DAYS.
         acwr_r = engine.acwr(au, stage,

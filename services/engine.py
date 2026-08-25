@@ -672,7 +672,68 @@ def baseline_drift(biometric_rows: list[dict]) -> dict:
     }
 
 
-def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = None) -> dict:
+# -- IS THERE A READING FOR THE DAY BEING JUDGED? ----------------------------
+#
+# Athlete, 2026-08-25, on Home showing "Awaiting Data" and REDUCED LOAD at the
+# same time: "reduced load must only come up after the decision is made from
+# the data. not before."
+#
+# traffic_light used to judge `biometric_rows[-1]` -- the newest row it was
+# handed, WHATEVER MORNING THAT ROW BELONGS TO. There was no date anywhere in
+# the function. So between midnight and the ring uploading it graded a night
+# that was already over, volume_recommendation turned that into today's
+# directive, and Home printed the badge beside a readiness card correctly
+# showing nothing -- because readiness.compute_readiness requires the day to
+# carry a measurement of its own (see _was_measured there). Two rules about
+# what "today" means, on one screen.
+#
+# This is the SAME defect readiness already fixed in the other direction: an
+# unmeasured day scoring 100/100 off a trailing aggregate. The lesson never
+# reached the light.
+#
+# WHAT IT DOES NOT DO: clamp anything. Athlete's call, same day -- a day with
+# no reading goes SILENT rather than held, matching what the app already does
+# below MIN_DAYS. Grey means no opinion, and no opinion is not a green light;
+# it is the absence of one.
+#
+# for_date IS OPTIONAL AND DEFAULTS TO OFF. Passing None keeps the old
+# "newest row is today" reading exactly, which is what services/dashboard.py's
+# fusion shadow report wants -- it compares two row SETS against each other and
+# is not judging a calendar day at all. Only the callers carrying a load
+# decision opt in.
+STATUS_OK = "ok"
+STATUS_INSUFFICIENT_DATA = "insufficient_data"
+STATUS_AWAITING_DATA = "awaiting_data"
+
+#: Statuses meaning the light has NOTHING TO JUDGE ON. Both degrade to grey /
+#: multiplier 1.0 in volume_recommendation.
+NO_READING_STATUSES = (STATUS_INSUFFICIENT_DATA, STATUS_AWAITING_DATA)
+
+#: The readings the light actually scores. A row can exist for a date and carry
+#: none of them -- a morning check-in creates one, so does a Garmin-first sync
+#: -- and every metric then greys, which _worst_signal resolves in green's
+#: favour and volume_recommendation turns into "All systems nominal. Apply
+#: standard progressive overload." A directive off an empty row is the same
+#: error as a directive off a stale one, so the gate is EVIDENCE, not merely a
+#: matching date.
+_LIGHT_READING_FIELDS = (
+    "hrv_ms", "resting_heart_rate", "sleep_duration_hours",
+    "oura_temperature_deviation",
+)
+
+
+def _row_can_be_judged(row: dict | None, for_date) -> bool:
+    """True when `row` is for_date's own row AND carries at least one reading
+    the light scores."""
+    if not row:
+        return False
+    if str(row.get("date") or "") != str(for_date):
+        return False
+    return any(row.get(k) is not None for k in _LIGHT_READING_FIELDS)
+
+
+def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = None,
+                  for_date=None) -> dict:
     """
     Evaluate daily biometrics against rolling baselines.
 
@@ -704,9 +765,17 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
                         "insufficient_data" and the guard is a no-op. Existing
                         callers therefore see no behaviour change.
 
+        for_date:       the day being judged. When given, the newest row must
+                        BE that day's row and must carry at least one scored
+                        reading, or the light returns grey with status
+                        "awaiting_data" rather than grading an older night as
+                        if it were this one. None (the default) keeps the
+                        historical behaviour of treating the last row as today.
+                        See _row_can_be_judged.
+
     Returns dict with keys:
         overall         : "green" | "yellow" | "red" | "grey"
-        status          : "ok" | "insufficient_data"
+        status          : "ok" | "insufficient_data" | "awaiting_data"
         volume_multiplier_from_traffic : float
         metrics         : dict per metric with value/baseline/signal/delta_pct
         drift           : baseline_drift() result (see that function)
@@ -732,11 +801,39 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
             "drift": baseline_drift(drift_rows if drift_rows is not None else biometric_rows),
             "drift_applied": False,
             "data_days": len(biometric_rows),
+            "latest_reading_date": (str(biometric_rows[-1].get("date") or "") or None
+                                    if biometric_rows else None),
             "message": f"Need {MIN_DAYS} days of biometric data to activate. "
                        f"Currently have {len(biometric_rows)}.",
         }
 
     today = biometric_rows[-1]
+
+    # NOTHING TO JUDGE YET. Deliberately checks `today` -- the very row the rest
+    # of this function scores -- rather than searching the list, so the gate and
+    # the reading can never describe different rows.
+    if for_date is not None and not _row_can_be_judged(today, for_date):
+        latest = str(today.get("date") or "") or None
+        return {
+            "overall": "grey",
+            "status": STATUS_AWAITING_DATA,
+            "volume_multiplier_from_traffic": 1.0,
+            "metrics": {},
+            "drift": baseline_drift(drift_rows if drift_rows is not None else biometric_rows),
+            "drift_applied": False,
+            # Grey names no driver, the same as every other grey day: a missing
+            # reading is not a cause and must never be narrated as one.
+            "drivers": [],
+            "driver_summary": "",
+            "data_days": len(biometric_rows),
+            "latest_reading_date": latest,
+            "message": (
+                f"No biometric reading for {for_date} yet"
+                + (f" - the most recent is {latest}." if latest else ".")
+                + " Nothing is being judged until one arrives."
+            ),
+        }
+
     baseline_rows = biometric_rows[-28:]  # up to 28 days, whatever is available
 
     metric_specs = [
@@ -854,6 +951,7 @@ def traffic_light(biometric_rows: list[dict], drift_rows: list[dict] | None = No
         "drivers":  drivers,
         "driver_summary": driver_summary,
         "data_days": len(biometric_rows),
+        "latest_reading_date": str(today.get("date") or "") or None,
         "message":  message,
     }
 
@@ -1165,10 +1263,16 @@ def _volume_recommendation_core(
     acwr_val    = acwr_result.get("acwr")
     ceiling     = acwr_result.get("ceiling", 1.3)
 
-    # Insufficient biometric data
-    if tl_status == "insufficient_data":
+    # NOTHING TO JUDGE ON -- either not enough history to activate the engine,
+    # or no reading for today yet. Both mean the same thing to the athlete: the
+    # app has no opinion, so it states none. Grey carries multiplier 1.0 and
+    # load_policy reads that as not-reduced, which is why no badge and no
+    # banner appear until a reading lands.
+    if tl_status in NO_READING_STATUSES:
         return {
-            "label":              "OBSERVATION MODE",
+            "label":              ("AWAITING TODAY'S READING"
+                                   if tl_status == STATUS_AWAITING_DATA
+                                   else "OBSERVATION MODE"),
             "driver":             DRIVER_NO_DATA,
             "multiplier":         1.0,
             "action":             traffic.get("message", "Log biometrics daily to activate the engine."),

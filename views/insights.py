@@ -2349,7 +2349,8 @@ def render() -> None:
             current_stage = _stage()
             lambda_val    = float(diagnostic.get("injury_weight_decay_lambda") or 0.05)
 
-            tl          = engine.traffic_light(bio_rows, drift_rows=_bio_drift())
+            tl          = engine.traffic_light(bio_rows, drift_rows=_bio_drift(),
+                                              for_date=date.today())
             acwr_result = engine.acwr(au_rows, current_stage,
                                       stage_start=_stage_start())
             inj_weight  = engine.injury_weight(lambda_val, pain_streak)
@@ -2396,7 +2397,7 @@ def render() -> None:
 
         # ── Biometric traffic light ───────────────────────────────────────────
         st.subheader("Biometric Traffic Light")
-        if tl["status"] == "insufficient_data":
+        if tl["status"] in engine.NO_READING_STATUSES:
             st.info(tl["message"])
         else:
             overall_color = engine.SIGNAL_COLORS.get(tl["overall"], engine.SIGNAL_COLORS["grey"])
