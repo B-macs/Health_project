@@ -476,6 +476,39 @@ if view == "readiness":
     except Exception:
         pass
 
+# ⚠ THE NIGHT DETAIL AND THE BIOMETRIC ROWS READ THE SAME OURA SLEEP-PERIODS
+# TAB, AND ARE CACHED SEPARATELY. _bio_rolling runs on every Home render, so
+# it is usually taken BEFORE the day's device sync lands last night;
+# _sleep_night_details runs only when a drill-down is opened, which is usually
+# AFTER. The first morning open therefore rendered a complete night — total
+# sleep, time in bed, efficiency, the whole architecture — underneath a header
+# reading "No Readings" and a Contributors panel asserting "Oura recorded no
+# sleep period for this night". Both statements were false, and the panel
+# immediately below them was drawing the night that disproved them.
+#
+# When the detail read holds a night the biometric rows do not, the biometric
+# rows are provably the older of the two, so re-read them. This is NOT the
+# blanket st.cache_data.clear() Key Rule 14 forbids: ONE cached function,
+# cleared only on positive evidence that it is stale, at most once per date
+# per session, and only on a screen the user deliberately opened. A failed
+# re-read keeps the rows we already have rather than emptying the screen.
+_bio_rows_stale = dash.has_night_without_biometric_row(
+    _bio_rows, _sleep_details, selected_date)
+if _bio_rows_stale and not _bio_rows_failed:
+    _refresh_key = f"_bio_refreshed_{selected_date.isoformat()}"
+    if not st.session_state.get(_refresh_key):
+        st.session_state[_refresh_key] = True
+        try:
+            _bio_rolling.clear()
+            _bio_rows = _bio_rolling(days=60)
+        except Exception:
+            pass
+    # Re-checked, not assumed: if the row is still absent after the re-read,
+    # the contributors panel must still not blame the ring for a night it can
+    # see on screen.
+    _bio_rows_stale = dash.has_night_without_biometric_row(
+        _bio_rows, _sleep_details, selected_date)
+
 _au_rows = []
 try:
     _au_rows = _au_history()
@@ -780,6 +813,11 @@ def _card_html(
     # given — the athlete's ask on 2026-08-23 ("show them both ... with daily
     # and trend as the titles of each"). Absent, this renders the single 58px
     # figure exactly as before, so the strain and sleep cards are unchanged.
+    #
+    # Readiness now passes a pair on EVERY day, blanks included (2026-08-25),
+    # so `score_display` is unused there. It is still what strain and sleep
+    # render, and still what readiness would fall back to if the pair were ever
+    # dropped — so it stays a required argument rather than becoming dead.
     if score_pair:
         (_lab_a, _val_a), (_lab_b, _val_b) = score_pair
         _col = ("font-size:9px;letter-spacing:.16em;font-family:ui-monospace,monospace;"
@@ -945,7 +983,7 @@ def _sleep_contributors_block() -> str:
         return _panel(
             "Contributors",
             '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
-            f'{dash.sleep_unscored_reason(_bio_rows_failed)}</div>',
+            f'{dash.sleep_unscored_reason(_bio_rows_failed, _bio_rows_stale)}</div>',
         )
     rows = "".join(_contributor_row(r) for r in dash.sleep_breakdown_rows(breakdown))
     caption = dash.sleep_coverage_caption(breakdown)
@@ -979,7 +1017,7 @@ def _readiness_contributors_block() -> str:
         return _panel(
             "Contributors",
             '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
-            f'{dash.readiness_unscored_reason(_bio_rows_failed)}</div>',
+            f'{dash.readiness_unscored_reason(_bio_rows_failed, _bio_rows_stale)}</div>',
         )
     rows = "".join(_contributor_row(r) for r in dash.readiness_breakdown_rows(breakdown))
     # ⚠ THE MASTHEAD ABOVE AND THESE ROWS GRADE DIFFERENT NUMBERS, and until
@@ -2206,16 +2244,25 @@ except Exception:
 # which is the pre-existing behaviour of this card.
 _r_card = _readiness_today if _readiness_today is not None else _readiness_score
 r_col, r_disp, r_lbl, r_hdr, r_desc, r_tert = dash.readiness_meta(_r_card)
-# BOTH FIGURES, EACH TITLED. Only paired when the two genuinely exist and
-# differ — on a day they agree, one number with no titles is the honest render
-# and two identical figures side by side would invent a distinction.
+# BOTH FIGURES, EACH TITLED, ALWAYS — including when one or both are blank.
+# Athlete, 2026-08-25: "Rather always see both labeled even when blank."
+#
+# This used to pair them only when both existed AND rounded differently, on the
+# reasoning that two identical figures side by side invent a distinction. What
+# that actually bought was a card that changed SHAPE from day to day: one big
+# untitled number when they agreed, two small titled ones when they did not,
+# and a bare "--" on a morning before the ring uploaded. Three renders of one
+# card — and on the days it showed a single figure, nothing on screen said
+# which of the two you were looking at.
+#
+# A "--" under TREND is information, not an empty slot: it says that number
+# does not exist yet, which is precisely what a morning with no reading needs
+# to say. Both go blank together by construction — compute_readiness_trend
+# returns NOT_COMPUTED whenever the date carries no score of its own — so this
+# never shows one figure beside a hole.
 _fmt_r = lambda v: "--" if v is None else f"{float(v):.0f}"
-_r_pair = (
-    (("DAILY", _fmt_r(_readiness_today)), ("TREND", _fmt_r(_readiness_score)))
-    if (_readiness_today is not None and _readiness_score is not None
-        and round(_readiness_today) != round(_readiness_score))
-    else None
-)
+_r_pair = (("DAILY", _fmt_r(_readiness_today)),
+           ("TREND", _fmt_r(_readiness_score)))
 # The SAME verdict object views/training.py renders from — one load_policy call
 # per process, so the two screens cannot describe different days.
 # ⚠ ONLY ON TODAY. The verdict describes today's session; rendering it under

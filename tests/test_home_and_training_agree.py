@@ -332,11 +332,43 @@ def test_the_other_two_cards_are_untouched_by_the_pair():
     assert "DAILY" not in a
 
 
-def test_no_pair_is_shown_on_a_day_the_two_numbers_agree():
-    """Two identical figures side by side would invent a distinction. The app
-    only pairs them when they genuinely differ."""
+def test_the_pair_is_shown_on_every_day_including_a_blank_one():
+    """Athlete, 2026-08-25: "Rather always see both labeled even when blank."
+
+    ⚠ THIS REVERSES A RULE, it does not relax one. Until this date the card
+    paired the two numbers only when both existed and rounded differently — on
+    the reasoning that two identical figures invent a distinction. The cost was
+    a card that rendered three different ways (one untitled figure, two titled
+    ones, a bare "--"), and on the single-figure days nothing said which of the
+    two numbers you were looking at. A titled "--" says the number does not
+    exist yet, which is what a morning with no reading needs to say.
+    """
     src = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "round(_readiness_today) != round(_readiness_score)" in src
+    assert "round(_readiness_today) != round(_readiness_score)" not in src, \
+        "the pair is unconditional now — see the docstring above"
+    assert '_r_pair = (("DAILY", _fmt_r(_readiness_today)),' in src
+
+    import app as home
+
+    # The blank morning itself: both figures absent, both still titled.
+    r = home._card_html("READINESS", "", "<svg/>", "--", "No Readings",
+                        "#555555", "Awaiting Data", "d",
+                        score_pair=(("DAILY", "--"), ("TREND", "--")))
+    assert "DAILY" in r and "TREND" in r
+    assert "font-size:58px" not in r, "the single-number block must not also render"
+
+    # And a day the two agree — still both, still titled.
+    same = home._card_html("READINESS", "", "<svg/>", "66", "Good", "#6BAF8B",
+                           "h", "d", score_pair=(("DAILY", "66"), ("TREND", "66")))
+    assert same.count(">66<") == 2
+
+
+def test_blank_formats_as_two_dashes_not_none_or_zero():
+    """"None" or "0" under DAILY would both read as a measurement. The card's
+    own formatter is the one place that decides, so pin it here rather than
+    trusting the caller."""
+    src = (ROOT / "app.py").read_text(encoding="utf-8")
+    assert '_fmt_r = lambda v: "--" if v is None else f"{float(v):.0f}"' in src
 
 
 def test_the_trend_is_still_what_gets_persisted():
