@@ -869,10 +869,141 @@ def sleep_debt_display(debt_hours: float | None,
     }
 
 
-def sleep_key_metrics(detail: dict | None) -> list[dict]:
-    """The 2x2 grid — a fixed set, so a missing reading shows a dash rather
-    than collapsing the grid and moving everything else around."""
+def _num(v):
+    try:
+        return None if v is None or v == "" else float(v)
+    except (TypeError, ValueError):
+        return None
+
+
+_STAGE_BY_CODE = {"1": "deep", "2": "light", "3": "rem", "4": "awake"}
+
+
+def sleep_stage_deltas(fused: dict | None) -> dict | None:
+    """The minutes fusion MOVED between stages, read off the two per-minute
+    hypnograms the row stores side by side. None when it stores neither.
+
+    ⚠ WHY A DELTA AND NOT THE ROW'S OWN master_*_minutes, which is the
+    obvious thing to reach for and is WRONG for display. sleep_fusion resamples
+    Oura's 30-second hypnogram to one stage per minute, and dominant_stage
+    breaks a tied minute toward AWAKE on purpose ("never manufacture sleep").
+    A minute that was 30 s awake and 30 s light therefore counts as a whole
+    minute awake, so the row's own oura_sleep_hours sits BELOW Oura's stored
+    total — measured over 2026-08-21/22/23: 5.95 vs 6.22, 6.50 vs 6.80, 6.50
+    vs 6.96, i.e. 16-28 minutes a night. master_sleep_hours inherits every one
+    of those minutes, so presenting it would show LESS sleep than Oura reported
+    on a screen whose score says more.
+
+    Both hypnograms are resampled the SAME way, so the difference between them
+    is pure fusion decision with none of that bias in it. Applied to Oura's own
+    30-second-precise scalars it reconstructs the fused night exactly: verified
+    on those three nights, the stage rows sum to Oura's total plus the phantom
+    minutes (which is the figure the Sleep Score uses), and sleep plus awake
+    comes back to time in bed to the second.
+    """
+    f = fused or {}
+    oura_h, master_h = str(f.get("oura_hypnogram") or ""), str(f.get("master_hypnogram") or "")
+    if not oura_h or not master_h:
+        return None
+    delta = {"awake": 0, "rem": 0, "light": 0, "deep": 0}
+    for was, now in zip(oura_h, master_h):
+        if was != now and was in _STAGE_BY_CODE and now in _STAGE_BY_CODE:
+            delta[_STAGE_BY_CODE[was]] -= 1
+            delta[_STAGE_BY_CODE[now]] += 1
+    return delta
+
+
+def sleep_stage_minutes(detail: dict | None, fused: dict | None) -> dict | None:
+    """Oura's own stage scalars with fusion's moves applied — the stage rows
+    that belong under a fused headline. None when either side is missing, in
+    which case sleep_stage_legend falls back to Oura alone."""
     d = detail or {}
+    delta = sleep_stage_deltas(fused)
+    if not delta:
+        return None
+    base = {"awake": _num(d.get("awake_seconds")), "rem": _num(d.get("rem_seconds")),
+            "light": _num(d.get("light_seconds")), "deep": _num(d.get("deep_seconds"))}
+    if any(v is None for v in base.values()):
+        return None
+    return {k: max(0.0, base[k] / 60.0 + delta[k]) for k in base}
+
+
+def sleep_night_figures(detail: dict | None, fused: dict | None = None) -> dict:
+    """The night AS PRESENTED — fused where fusion has an opinion, Oura's own
+    reading where it has none.
+
+    Athlete, 2026-08-25: "I would like all of the data to be presented in the
+    sleep part to be fused data."
+
+    THE SCORE WAS ALREADY FUSED AND THE PANELS UNDER IT WERE NOT. A fusion
+    row's `phantom_wake_minutes` reaches services/sleep_score.py as a wake-time
+    adjustment (repository.get_effective_wake_adjustments →
+    sleep_fusion.effective_wake_adjustments), so the Sleep Score's Total Sleep
+    and Efficiency have been computed on the fused night all along, while the
+    key metrics and the stage rows drew Oura's raw scalars — two different
+    totals a few centimetres apart, with a caption explaining the gap instead
+    of closing it. This closes it.
+
+    WHAT FUSION DOES AND DOES NOT TOUCH. It merges STAGES: Oura supplies the
+    stage, Garmin supplies permission to call a minute Awake, so the only
+    quantity it moves is where the awake/asleep line falls. Time in bed is the
+    bed window and is unchanged. Heart rate, HRV, breathing, temperature and
+    blood oxygen are Oura MEASUREMENTS with no fused counterpart — fusion has
+    no opinion about them, so they pass through untouched rather than being
+    relabelled as something they are not.
+
+    Efficiency is scaled by the same effective-total-seconds ratio
+    services/sleep_score.py uses, not recomputed as sleep/time-in-bed, so the
+    figure on screen is arithmetically the one the score used.
+    """
+    d, f = detail or {}, fused or {}
+    total = _num(d.get("total_seconds"))
+    awake = _num(d.get("awake_seconds"))
+    efficiency = _num(d.get("efficiency"))
+    phantom = _num(f.get("phantom_wake_minutes")) or 0.0
+    is_fused = str(f.get("source") or "") == "fused" and bool(f.get("master_hypnogram"))
+
+    if is_fused and phantom and total:
+        gained = phantom * 60.0
+        ratio = (total + gained) / total
+        if efficiency is not None:
+            efficiency = max(0.0, min(100.0, efficiency * ratio))
+        total = total + gained
+        if awake is not None:
+            awake = max(0.0, awake - gained)
+
+    return {
+        "total_seconds": total,
+        "time_in_bed_seconds": _num(d.get("time_in_bed_seconds")),
+        "efficiency": efficiency,
+        "lowest_heart_rate": _num(d.get("lowest_heart_rate")),
+        "awake_seconds": awake,
+        "is_fused": is_fused,
+        "phantom_wake_minutes": phantom if is_fused else 0.0,
+    }
+
+
+def sleep_fusion_caption(figures: dict | None) -> str:
+    """One line naming what fusion moved, or "" when it moved nothing.
+
+    Said once, under the figures it applies to. A night where Garmin agreed
+    with Oura minute for minute gets no line — there is nothing to explain."""
+    fig = figures or {}
+    minutes = fig.get("phantom_wake_minutes") or 0
+    if not fig.get("is_fused") or not minutes:
+        return ""
+    return (f"Fused with Garmin: {minutes:.0f} min Oura called awake are counted "
+            f"as sleep, because the watch saw no movement. Total sleep and "
+            f"Efficiency here are the figures the score used.")
+
+
+def sleep_key_metrics(detail: dict | None, fused: dict | None = None) -> list[dict]:
+    """The 2x2 grid — a fixed set, so a missing reading shows a dash rather
+    than collapsing the grid and moving everything else around.
+
+    `fused` applies the night's stage fusion; omitted, this is Oura's raw
+    reading exactly as before. See sleep_night_figures."""
+    d = sleep_night_figures(detail, fused) if fused else (detail or {})
     return [
         {"label": "Total sleep", "value": format_duration(d.get("total_seconds")) or "—"},
         {"label": "Time in bed", "value": format_duration(d.get("time_in_bed_seconds")) or "—"},

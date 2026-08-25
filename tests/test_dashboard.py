@@ -4,6 +4,8 @@ from app.py's previously undocumented, unparameterized dashboard-math cluster.""
 import ast
 from datetime import date, timedelta
 
+import pytest
+
 from services import dashboard
 from services import hr_load
 
@@ -848,3 +850,111 @@ def test_snapshot_complete_accepts_a_genuine_zero():
     assert dashboard.snapshot_is_complete(
         {"date": "2026-08-01", "readiness_score": 0, "sleep_score": 0},
     ) is True
+
+
+# ─── The Sleep screen presents the FUSED night ───────────────────────────────
+#  Athlete, 2026-08-25: "I would like all of the data to be presented in the
+#  sleep part to be fused data."
+#
+#  The score already was -- a fusion row's phantom_wake_minutes reaches
+#  services/sleep_score.py as a wake-time adjustment -- while the panels under
+#  it drew Oura's raw scalars, with a caption explaining the gap rather than
+#  closing it.
+
+def _fused_row(oura_hyp: str, master_hyp: str, phantom: float) -> dict:
+    return {"source": "fused", "oura_hypnogram": oura_hyp,
+            "master_hypnogram": master_hyp, "phantom_wake_minutes": phantom}
+
+
+def _oura_night() -> dict:
+    """Ten minutes: 4 awake, 6 light. Small enough to check by hand."""
+    return {"total_seconds": 360.0, "time_in_bed_seconds": 600.0,
+            "efficiency": 60.0, "lowest_heart_rate": 55.0,
+            "awake_seconds": 240.0, "deep_seconds": 0.0,
+            "light_seconds": 360.0, "rem_seconds": 0.0}
+
+
+def test_fusion_moves_the_awake_line_and_nothing_else():
+    fig = dashboard.sleep_night_figures(
+        _oura_night(), _fused_row("4444222222", "4422222222", 2))
+    assert fig["total_seconds"] == 360.0 + 120.0
+    assert fig["awake_seconds"] == 240.0 - 120.0
+    assert fig["time_in_bed_seconds"] == 600.0, "fusion has no opinion about the bed window"
+    assert fig["lowest_heart_rate"] == 55.0, "nor about heart rate"
+    assert fig["is_fused"] is True
+
+
+def test_efficiency_is_scaled_the_way_the_score_scales_it():
+    """Not recomputed as sleep/time-in-bed: services/sleep_score.py scales
+    Oura's own efficiency by the effective-total-seconds ratio, and the figure
+    on screen has to be arithmetically the one the score used."""
+    fig = dashboard.sleep_night_figures(
+        _oura_night(), _fused_row("4444222222", "4422222222", 2))
+    assert fig["efficiency"] == pytest.approx(60.0 * (480.0 / 360.0))
+
+
+def test_a_night_fusion_did_not_change_reads_exactly_as_oura():
+    fig = dashboard.sleep_night_figures(
+        _oura_night(), _fused_row("4444222222", "4444222222", 0))
+    assert fig["total_seconds"] == 360.0
+    assert fig["efficiency"] == 60.0
+    assert dashboard.sleep_fusion_caption(fig) == "", \
+        "nothing moved, so there is nothing to explain"
+
+
+def test_the_stage_rows_add_up_to_the_headline():
+    """The whole point of reconstructing them: a fused strip over Oura's
+    numbers is two descriptions of one night that disagree."""
+    detail = _oura_night()
+    fused = _fused_row("4444222222", "4422222222", 2)
+    mins = dashboard.sleep_stage_minutes(detail, fused)
+    asleep = sum(v for k, v in mins.items() if k != "awake")
+    assert asleep * 60 == dashboard.sleep_night_figures(detail, fused)["total_seconds"]
+    assert (asleep + mins["awake"]) * 60 == detail["time_in_bed_seconds"]
+
+
+def test_the_stage_rows_come_from_a_delta_not_from_master_minutes():
+    """⚠ THE TRAP. sleep_fusion resamples Oura's 30-second hypnogram to one
+    stage per minute and breaks a tied minute toward AWAKE on purpose, so a
+    minute that was 30 s awake + 30 s light counts as a whole minute awake. The
+    row's own master_*_minutes carries every one of those minutes -- measured
+    16-28 min a night -- so presenting them would show LESS sleep than Oura
+    reported under a score that says more. Both hypnograms are resampled the
+    same way, so their DIFFERENCE is clean.
+    """
+    detail = _oura_night()
+    fused = _fused_row("4444222222", "4422222222", 2)
+    # A row whose master_* counts are wildly wrong must not affect the rows.
+    fused.update({"master_awake_minutes": 999, "master_light_minutes": 1,
+                  "master_rem_minutes": 0, "master_deep_minutes": 0})
+    mins = dashboard.sleep_stage_minutes(detail, fused)
+    assert mins["awake"] == 2.0 and mins["light"] == 8.0
+
+
+def test_stage_deltas_are_none_without_both_hypnograms():
+    assert dashboard.sleep_stage_deltas({"master_hypnogram": "222"}) is None
+    assert dashboard.sleep_stage_deltas({"oura_hypnogram": "222"}) is None
+    assert dashboard.sleep_stage_deltas(None) is None
+    assert dashboard.sleep_stage_minutes(_oura_night(), None) is None, \
+        "no fusion row means the legend falls back to Oura, unchanged"
+
+
+def test_key_metrics_without_a_fusion_row_are_byte_identical_to_before():
+    """Every caller that does not pass `fused` must be unaffected."""
+    detail = _oura_night()
+    assert dashboard.sleep_key_metrics(detail) == [
+        {"label": "Total sleep", "value": "0h 06m"},
+        {"label": "Time in bed", "value": "0h 10m"},
+        {"label": "Efficiency", "value": "60 %"},
+        {"label": "Resting HR", "value": "55 bpm"},
+    ]
+
+
+def test_a_watch_only_night_is_not_treated_as_fused():
+    """source garmin_only has no Oura period to correct; the screen renders it
+    through its own labelled path instead."""
+    fig = dashboard.sleep_night_figures(
+        _oura_night(), {"source": "garmin_only", "master_hypnogram": "2222",
+                        "phantom_wake_minutes": 30})
+    assert fig["is_fused"] is False
+    assert fig["total_seconds"] == 360.0

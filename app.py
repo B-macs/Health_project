@@ -1040,10 +1040,14 @@ def _sleep_contributors_block() -> str:
     # computed from; Key metrics below shows Oura's raw readings. Without
     # this line the screen carries two different "total sleep" numbers a few
     # centimetres apart with nothing explaining the gap.
+    # ⚠ This note used to end "Key metrics below shows Oura's raw readings",
+    # which was the screen explaining a gap instead of closing it. Since
+    # 2026-08-25 the figures below are the SAME corrected ones, so the note
+    # names the correction and stops there.
     adj = breakdown.get("wake_adjustment_minutes") or 0
     if adj:
         note = (f"Total sleep and Efficiency include a {adj:.0f} min wake-time "
-                f"correction; Key metrics below shows Oura's raw readings.")
+                f"correction, and so do the figures below.")
         caption = f"{caption} {note}".strip()
     return _panel("Contributors", rows, caption)
 
@@ -1227,10 +1231,16 @@ def _hypnogram_strip(detail: dict | None) -> str:
 
     phantom = fused.get("phantom_wake_minutes")
     if source == "fused" and phantom:
+        # ⚠ This used to end "Display only; the score above uses Oura." That
+        # was false and had been for as long as fusion fed
+        # get_effective_wake_adjustments: phantom_wake_minutes reaches
+        # services/sleep_score.py as a wake-time adjustment, so the score above
+        # is computed on exactly these minutes. As of 2026-08-25 every figure
+        # on the screen is, which is what makes one sentence enough.
         note = (f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;line-height:1.5;">'
                 f'<b style="color:#8FCDF0;">{title}</b> · {phantom} min of Oura wake '
-                f'reclassified as sleep — Garmin saw no movement. Display only; the score '
-                f'above uses Oura.</div>')
+                f'counted as sleep — Garmin saw no movement. Everything on this '
+                f'screen, the score included, is this fused night.</div>')
     elif source == "garmin_only":
         # Say plainly that this is the weaker sensor. Garmin mislabels REM as
         # Light, so presenting its hypnogram as equivalent to a ring night
@@ -1463,13 +1473,29 @@ def _sleep_night_blocks() -> str:
         # night never reaches this line at all.
         return ""
 
-    out = _key_metric_grid(dash.sleep_key_metrics(detail))
+    # EVERY FIGURE ON THIS SCREEN IS THE FUSED NIGHT — athlete, 2026-08-25.
+    # The score above already was (a fusion row's phantom_wake_minutes reaches
+    # sleep_score.py as a wake-time adjustment), so this closes a gap rather
+    # than opening one: the panels used to draw Oura's raw scalars under a
+    # score computed on the fused night, with a caption explaining the
+    # difference instead of removing it. Time in bed, heart rate, HRV,
+    # breathing and temperature pass through — fusion merges STAGES and has no
+    # opinion about any of them. See dashboard.sleep_night_figures.
+    figures = dash.sleep_night_figures(detail, fused)
+    out = _key_metric_grid(dash.sleep_key_metrics(detail, fused))
+    fusion_caption = dash.sleep_fusion_caption(figures)
+    if fusion_caption:
+        out += (f'<div style="font-size:10px;color:#6B7A9B;line-height:1.5;'
+                f'margin:-4px 2px 12px;">{fusion_caption}</div>')
 
     debt = dash.sleep_debt_display(
         readiness_model.sleep_debt_hours(_bio_rows, selected_date))
     out += _sleep_debt_block(debt)
 
-    legend = dash.sleep_stage_legend(detail)
+    # stage_minutes off the fusion row, so these durations describe the SAME
+    # sequence the strip above them draws. Without it a fused night showed a
+    # fused strip over Oura's numbers.
+    legend = dash.sleep_stage_legend(detail, dash.sleep_stage_minutes(detail, fused))
     stage_rows = "".join(
         f'<div style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;">'
         f'<span style="width:26px;height:6px;border-radius:3px;flex:none;'
@@ -1479,8 +1505,8 @@ def _sleep_night_blocks() -> str:
         f'<span style="color:#6B7A9B;margin-left:auto;">{r["pct"]}</span></div>'
         for r, k in zip(legend, ("4", "3", "2", "1"))
     )
-    asleep = dash.format_duration(detail.get("total_seconds")) or "—"
-    in_bed = dash.format_duration(detail.get("time_in_bed_seconds")) or "—"
+    asleep = dash.format_duration(figures.get("total_seconds")) or "—"
+    in_bed = dash.format_duration(figures.get("time_in_bed_seconds")) or "—"
     out += _panel(
         "Time asleep",
         f'<div style="font-size:28px;font-weight:700;color:#D4DCEE;">{asleep}</div>'
