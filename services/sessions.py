@@ -193,13 +193,58 @@ def set_timestamp(now: datetime, tz_name: str = "") -> str:
     return now.isoformat(timespec="seconds")
 
 
-def coach_message(directive: dict, today_plan: dict) -> tuple[str, str]:
+def coach_message(directive: dict, today_plan: dict,
+                  policy: dict | None = None) -> tuple[str, str]:
     """Dynamic headline sourced from the real engine directive (readiness/
     ACWR-driven), falling back to the day's clinical objective — never
-    fabricated copy."""
-    headline = directive.get("action") or today_plan["objective"]
+    fabricated copy.
+
+    ⚠ THE HEADLINE MAY NOT ASK FOR LOAD THE CLAMP WILL NOT GIVE. Athlete,
+    2026-08-25, holding the two screens side by side: Home read REDUCED LOAD
+    while the training screen's headline read "All systems nominal. Apply
+    standard progressive overload: +2.5 kg."
+
+    Both were correct about their own input, which is the whole problem. The
+    directive is only ONE of load_policy's three arguments — the readiness
+    modifier and the volume multiplier can each pull a day down on their own —
+    so on a day the traffic light is clear but something else is holding load,
+    `directive["action"]` is still the green sentence. That is the 2026-08-06
+    contradiction (header said reduced, Lat Pulldown seeded 45x10 -> 47.5x11)
+    arriving through the headline instead of through the numbers.
+
+    So when the day is reduced and the directive is nonetheless proposing MORE
+    (multiplier > 1.0), the headline drops to the day's clinical objective and
+    the banner carries the load decision. Nothing is invented and nothing is
+    duplicated: the objective is the same fallback this function already used
+    for a directive with no action text.
+
+    `policy` is load_policy's dict. Omitting it keeps the old behaviour, which
+    is correct for any caller that has no load decision in hand.
+    """
+    action = directive.get("action") or ""
+    if action and _headline_would_contradict(directive, policy):
+        action = ""
+    headline = action or today_plan["objective"]
     subtitle = today_plan["phase"]
     return headline, subtitle
+
+
+def _headline_would_contradict(directive: dict, policy: dict | None) -> bool:
+    """True when the directive is asking for more load on a day load_policy has
+    already decided is reduced.
+
+    Deliberately keyed on the MULTIPLIER rather than on the driver: a directive
+    that reduced the day itself (yellow biometrics, an ACWR lock) has an action
+    string that already says the right thing, and replacing it would throw away
+    the one place the reason is named. Only the "add load" sentence is the
+    contradiction.
+    """
+    if not policy or not policy.get("reduced"):
+        return False
+    try:
+        return float(directive.get("multiplier", 1.0) or 1.0) > 1.0
+    except (TypeError, ValueError):
+        return False
 
 
 def is_run_or_walk(ex: dict) -> bool:

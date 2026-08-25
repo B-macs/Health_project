@@ -209,17 +209,118 @@ def test_the_training_view_renders_every_banner_kind():
     athlete would get a clamped session with no explanation at all, which is
     worse than the contradiction being fixed.
 
-    Reads `_verdict.banner_kind` as of 2026-08-23: the view now renders from the
-    shared verdict rather than from its own policy dict, so that Home cannot
-    print a different sentence. The property this test protects is unchanged."""
+    Reads `verdict.banner_kind` — the view renders from the shared verdict
+    rather than from its own policy dict, so that Home cannot print a different
+    sentence. Matched without the leading underscore since 2026-08-25, when the
+    block moved out of render()'s local `_verdict` and into
+    _render_verdict_banner's parameter. The property this test protects is
+    unchanged."""
     import pathlib
 
     src = (pathlib.Path(__file__).resolve().parent.parent
            / "views" / "training.py").read_text(encoding="utf-8")
     for kind in _reachable_banner_kinds():
-        assert f'_verdict.banner_kind == "{kind}"' in src, (
+        assert f'verdict.banner_kind == "{kind}"' in src, (
             f"load_policy can return banner_kind {kind!r} and the view never "
             f"renders it — the session would be clamped with no message")
+
+
+# ─── and it renders it on the screen he is actually looking at ────────────
+
+def test_the_day_overview_screen_renders_the_verdict_banner():
+    """⚠ THE REPORTED BUG. Athlete, 2026-08-25, holding both screens at 08:03:
+    Home read REDUCED LOAD, the training screen read "All systems nominal.
+    Apply standard progressive overload: +2.5 kg."
+
+    The banner block sat inline in render(), 77 lines BELOW the `st.stop()`
+    that ends the day-overview screen — so the pre-session screen, the one
+    actually read before training, never showed it. Rendering it only once you
+    are already inside the session is rendering it after the decision it
+    describes has been acted on.
+
+    services/verdict.py exists so the two screens cannot describe different
+    days. It cannot do that on a screen that does not render it.
+    """
+    import ast
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parent.parent
+           / "views" / "training.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+
+    def _calls(node, name):
+        return [n for n in ast.walk(node)
+                if isinstance(n, ast.Call)
+                and getattr(n.func, "id", None) == name]
+
+    defs = [n for n in ast.walk(tree)
+            if isinstance(n, ast.FunctionDef) and n.name == "_render_verdict_banner"]
+    assert len(defs) == 1, "one banner renderer, or the two screens can drift again"
+
+    overview = [n for n in ast.walk(tree)
+                if isinstance(n, ast.FunctionDef) and n.name == "_render_overview"]
+    assert overview, "_render_overview vanished — re-point this test"
+    assert _calls(overview[0], "_render_verdict_banner"), (
+        "the day-overview screen must render the verdict banner; it st.stop()s "
+        "before the in-session one is ever reached")
+
+    # Two call sites total: the overview screen and the in-session flow.
+    assert len(_calls(tree, "_render_verdict_banner")) >= 2, (
+        "the in-session flow needs it too — it is a different screen")
+
+
+def test_the_overview_headline_is_resolved_against_the_policy():
+    """The banner alone is not enough. The headline is the DIRECTIVE's own
+    sentence, and the directive is only one of load_policy's three inputs — so
+    without the policy in hand it can still print "apply progressive overload"
+    directly above a reduced-load banner."""
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parent.parent
+           / "views" / "training.py").read_text(encoding="utf-8")
+    assert "sess.coach_message(directive, today_plan, policy)" in src
+
+
+def test_the_headline_never_asks_for_more_load_on_a_reduced_day():
+    """The contradiction itself, at the function that produces the words.
+
+    A green traffic light with a readiness modifier below 1.0 is a REDUCED day
+    whose directive is still the overload sentence — the exact combination on
+    screen on 2026-08-25."""
+    plan = {"objective": "Posterior Chain Strength", "phase": "Stage 2B — Week 2"}
+    directive = _directive(GREEN, injury=0.10)
+    assert directive["multiplier"] > 1.0, "fixture must be the overload branch"
+
+    policy = sess.load_policy(directive, {"volume_factor": 0.85})
+    assert policy["reduced"] is True, "fixture must produce a reduced day"
+
+    headline, _ = sess.coach_message(directive, plan, policy)
+    assert headline == plan["objective"]
+    for banned in ("progressive overload", "+2.5 kg", "nominal"):
+        assert banned not in headline.lower()
+
+
+def test_a_directive_that_reduced_the_day_itself_keeps_its_own_words():
+    """Only the "add load" sentence is the contradiction. A yellow-biometrics
+    or ACWR directive already says the right thing and NAMES THE READING —
+    replacing it with the generic objective would throw away the one place the
+    reason appears."""
+    plan = {"objective": "Posterior Chain Strength", "phase": "Stage 2B — Week 2"}
+    directive = _directive(YELLOW, injury=0.10)
+    policy = sess.load_policy(directive, {"volume_factor": 1.0})
+    assert policy["reduced"] is True
+
+    headline, _ = sess.coach_message(directive, plan, policy)
+    assert headline == directive["action"]
+
+
+def test_omitting_the_policy_keeps_the_old_headline():
+    """Any caller with no load decision in hand must be unaffected."""
+    plan = {"objective": "Posterior Chain Strength", "phase": "Stage 2B — Week 2"}
+    directive = _directive(GREEN, injury=0.10)
+    assert (sess.coach_message(directive, plan)
+            == sess.coach_message(directive, plan, None)
+            == (directive["action"], plan["phase"]))
 
 
 def test_home_carries_a_badge_for_every_banner_kind():

@@ -2118,14 +2118,56 @@ _FAB_CSS = f"""<style>
 </style>"""
 
 
+def _render_verdict_banner(verdict, directive: dict) -> None:
+    """TODAY'S ONE LOAD DECISION, on whichever training screen is rendering.
+
+    ⚠ WHY THIS IS A FUNCTION. Until 2026-08-25 this block sat inline in
+    render(), 77 lines BELOW the `st.stop()` that ends the day-overview screen
+    — so the pre-session screen, the one actually read before training, never
+    showed it. Home put the decision on the readiness card and the training
+    screen answered with the raw engine directive, which is how the athlete
+    came to be holding REDUCED LOAD and "All systems nominal. Apply standard
+    progressive overload" at the same moment.
+
+    services/verdict.py exists so the two screens cannot describe different
+    days. It cannot do that on a screen that does not render it.
+
+    Rendered from the verdict — the SAME object that clamps every prescribed
+    number below — never from a separately re-derived signal_color.
+    """
+    if verdict.banner_kind == "error":
+        st.error(verdict.banner_text)
+    elif verdict.banner_kind == "warning":
+        st.warning(verdict.banner_text)
+    elif verdict.banner_kind == "info":
+        # A STANDING CAP, NOT A BAD MORNING. Blue rather than amber, because
+        # the amber was the contradiction the athlete reported: green metrics
+        # and low strain under a warning that reads as "you are under-
+        # recovered". The numbers below are clamped exactly as they would be
+        # under the warning — only the claim about WHY has changed.
+        st.info(verdict.banner_text)
+    # green / grey: no banner — train normally, nothing to flag
+    # ACWR is advisory while engine.ACWR_ADVISORY_MODE is set: it annotates the
+    # day, it does not decide it.
+    if directive.get("acwr_advisory"):
+        st.caption(directive["acwr_advisory"])
+
+
 def _render_overview(day_num: int, active, today_plan: dict,
-                      exercises: list, directive: dict, policy: dict) -> None:
+                      exercises: list, directive: dict, policy: dict,
+                      verdict) -> None:
     """Today's session — coach header, workout card, accordions, floating actions.
     The day strip, phase resolution, and past/future/rest routing all happen once
     in render() before this is ever called; this only ever renders today."""
     today = date.today()
     duration_min       = sess.estimate_duration(exercises)
-    headline, subtitle  = sess.coach_message(directive, today_plan)
+    # ABOVE THE HEADLINE, because it can overrule it. The headline is the
+    # engine directive's own sentence; the banner is the resolved decision the
+    # numbers below are actually clamped to.
+    _render_verdict_banner(verdict, directive)
+    # policy is passed so the headline cannot ask for load the clamp will not
+    # give — see sessions.coach_message.
+    headline, subtitle  = sess.coach_message(directive, today_plan, policy)
 
     st.markdown(
         f"""
@@ -3182,7 +3224,8 @@ def render():
         _directive = today.today_directive()
         today_plan = active_plan[day_num]
         exercises  = today_plan["exercises"]
-        _render_overview(day_num, active, today_plan, exercises, _directive, _policy)
+        _render_overview(day_num, active, today_plan, exercises,
+                         _directive, _policy, _verdict)
         nav.inject("training")
         st.stop()
 
@@ -3262,27 +3305,10 @@ def render():
         st.stop()
 
     # ── Engine directive banner ───────────────────────────────────────────────
-    # Rendered from _policy — the SAME object that clamps every prescribed
-    # number below — never from a separately re-derived signal_color. That is
-    # the structural guarantee: the banner cannot describe a day the numbers
-    # disagree with, because there is only one day-decision to describe.
+    # The SAME call the day-overview screen makes — see _render_verdict_banner
+    # for why it stopped being inline here.
     _directive = today.today_directive()
-    if _verdict.banner_kind == "error":
-        st.error(_verdict.banner_text)
-    elif _verdict.banner_kind == "warning":
-        st.warning(_verdict.banner_text)
-    elif _verdict.banner_kind == "info":
-        # A STANDING CAP, NOT A BAD MORNING. Blue rather than amber, because
-        # the amber was the contradiction the athlete reported: green metrics
-        # and low strain under a warning that reads as "you are under-
-        # recovered". The numbers below are clamped exactly as they would be
-        # under the warning — only the claim about WHY has changed.
-        st.info(_verdict.banner_text)
-    # green / grey: no banner — train normally, nothing to flag
-    # ACWR is advisory while engine.ACWR_ADVISORY_MODE is set: it annotates the
-    # day, it does not decide it.
-    if _directive.get("acwr_advisory"):
-        st.caption(_directive["acwr_advisory"])
+    _render_verdict_banner(_verdict, _directive)
 
     # ── Active plan day ───────────────────────────────────────────────────────
     today_plan = active_plan[day_num]
