@@ -2504,14 +2504,13 @@ ANTERIOR_HIP_RELEASE = _ex(
     laterality="unilateral",
     sets=1, hold_seconds=60, rest_seconds=0,
     mechanics=(
-        "Lie face down with a massage ball between the floor and the front of the hip, on the "
-        "meaty pocket-corner just below and outside the point of the hip bone. Settle your "
-        "weight onto it slowly and wait 60 seconds, breathing, until the tissue lets go under "
-        "you. Then a few slow knee-bends of that leg with the pressure still on. "
+        "Lie face down with a massage ball between the floor and the front of the hip, "
+        "slightly INWARD and higher than the point of the hip bone — just inside it, in the "
+        "soft hollow, not out on the bony corner. Settle your weight onto it slowly and wait "
+        "60 seconds, breathing, until the tissue lets go under you. Then a few slow "
+        "knee-bends of that leg with the pressure still on. "
         "GO STRAIGHT TO THE OTHER SIDE — no pause between right and left. "
-        "That is the session dose. There is a second spot — slightly inward and higher, "
-        "just inside the point of the hip bone — for a day you want to work this twice; "
-        "it is an extra, not part of today. If two weeks go by and no tender spot ever "
+        "One spot per side is the dose. If two weeks go by and no tender spot ever "
         "quietens down under the ball, stop doing it — that answer is worth having."
     ),
     biomechanical_focus=(
@@ -2532,19 +2531,32 @@ ANTERIOR_HIP_RELEASE = _ex(
         "flexion under iliopsoas contraction - which is the same structure from the other "
         "direction. Do NOT read finding #2's 'iliopsoas is unlikely' against this: that "
         "refutation is scoped to the SIT-BONE snap and says nothing about the front."
+        " "
+        "⚠ THE SITE WAS WRONG IN THE INSTRUCTIONS UNTIL 2026-08-24, and the block had been "
+        "running that way since day 1. The exercise named the source protocol's ZONE 1 — the "
+        "pocket-corner just below and OUTSIDE the point of the hip bone. The athlete gets "
+        "nothing there and does not work it: 'there is no release in the outside point of the "
+        "hip bone that I do for that exercise.' What releases is the protocol's ZONE 2, "
+        "slightly inward and higher, just inside the point of the hip bone — iliacus and "
+        "psoas in the iliac fossa rather than TFL on the crest. Both zones are named in "
+        "docs/training/release_protocols_2026-08-10.md; the block simply took the first one. "
+        "HIS 2026-08-18 SESSION NOTE SAID SO ON THE FIRST RUN and nobody read it back: "
+        "'Instead of doing the hip I\'ve done the right hip flexor, so inside of my right "
+        "left pressure point.' That was logged as a deviation. It was the correction. "
+        "It also strengthens the tissue call: the referred sensation he reports into the "
+        "middle back fits a structure attaching along L1-L4, which iliacus/psoas does and "
+        "TFL does not — and zone 2 is where that structure actually is."
     ),
     progression=("Tender points quieting and standing up straight after sitting getting easier "
-                 "→ it is working. The dose does not grow on that: one zone a side is the "
-                 "prescription, and the second zone is an option for a day of doubling up "
-                 "rather than a step to climb to."),
+                 "→ it is working. The dose does not grow on that: one spot a side is the "
+                 "prescription, and nothing here is a ladder to climb."),
     regression=("Nothing tender to find, or no change after four weeks → retire it and record "
                 "the null. It would mean the sitting-tone hypothesis is wrong for this body."),
     warning=(
-        "THE SHARP EDGE OF THIS ONE. The inner front of the hip carries the leg's main artery "
-        "and nerve. NEVER press anywhere you can feel a pulse. Stop immediately on any "
-        "tingling, numbness or electric feeling down the leg. Stay on the OUTER half of the "
-        "front of the hip, on tissue that pushes back like muscle — the crease at the very "
-        "front, middle third, is off-limits entirely. Pain never above 2/10."
+        "One place is off-limits and it is not where you are working: the CREASE itself, "
+        "front and centre where the thigh folds into the body, carries the leg's main artery "
+        "and nerve. Stay up by the hip bone and out of the fold, and never press anywhere you "
+        "can feel a pulse. Pain never above 2/10."
     ),
 )
 

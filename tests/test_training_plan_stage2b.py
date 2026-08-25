@@ -700,3 +700,38 @@ def test_preparation_still_clears_the_ten_minute_floor_on_training_days():
         assert seconds >= 10 * 60, (
             f"day {d} spends only {seconds / 60:.1f} min preparing, under the "
             f"10-minute floor")
+
+
+def test_the_release_names_the_spot_that_actually_releases():
+    """The block named the WRONG SPOT from day 1 and ran that way for a week.
+
+    docs/training/release_protocols_2026-08-10.md gives the ball two target
+    zones. The exercise took zone 1 -- the pocket-corner just below and OUTSIDE
+    the point of the hip bone. Athlete, 2026-08-24: "the second zone is where I
+    get the pressure release during anterior hip flexor release, there is no
+    release in the outside point of the hip bone that I do for that exercise."
+
+    His FIRST session note said so, on 2026-08-18 -- "inside of my right" --
+    and it was filed as a protocol deviation instead of read as the finding.
+    The instruction now names zone 2, and the warning no longer sends him back
+    out to the crest: it used to say "stay on the OUTER half of the front of
+    the hip", which pointed away from the only spot that responds.
+
+    Anatomy backs the correction rather than merely accommodating it: iliacus
+    and psoas sit in that hollow and attach along L1-L4, which is where he
+    reports the referred sensation into the mid-back. TFL sits on the crest,
+    where he gets nothing.
+    """
+    ex = tp.ANTERIOR_HIP_RELEASE
+    mech = ex["mechanics"].lower()
+    warning = (ex["warning"] or "").lower()
+
+    assert "inward" in mech and "just inside" in mech, (
+        "the instruction no longer names the inward, higher spot -- the only "
+        "one that releases for him")
+    assert "outside the point of the hip bone" not in mech, (
+        "the instruction is pointing at the bony corner again, where he gets "
+        "nothing")
+    assert "outer half" not in warning, (
+        "the warning is sending him back out to the crest and away from the "
+        "spot the exercise exists to press")

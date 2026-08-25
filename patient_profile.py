@@ -551,11 +551,17 @@ PROFILE = {
                 "section names as amplifying the L5/S1 compression. Neither TFL nor "
                 "rectus femoris crosses the spine at all. Second: 'Instead of doing the "
                 "hip I've done the right hip flexor, so inside of my right left pressure "
-                "point' - i.e. he worked MEDIAL to the zone the exercise names, which "
-                "sends him toward the inner-front crease the protocol excludes. The "
-                "tender point may genuinely be medial to where the instruction points; "
-                "that is worth establishing once, since it decides both where he presses "
-                "and which structure the trial is actually testing. "
+                "point' - i.e. he worked MEDIAL to the spot the exercise named. "
+                "FILED HERE AS A DEVIATION; IT WAS THE CORRECTION, and it was settled "
+                "2026-08-24 in his own words: 'the second zone is where I get the "
+                "pressure release during anterior hip flexor release, there is no release "
+                "in the outside point of the hip bone that I do for that exercise.' The "
+                "source protocol names TWO zones and the block had taken the first; the "
+                "one that releases for him is the SECOND, slightly inward and higher, just "
+                "inside the point of the hip bone. training_plan.py now names that spot. "
+                "It also tightens the tissue call: iliacus and psoas sit in that hollow and "
+                "attach along L1-L4, which is exactly where he reports the referred "
+                "sensation, while TFL sits out on the crest where he gets nothing. "
                 "METHOD NOTE, and it is the reusable part: the summary was written from "
                 "the conversation and the raw note was never read back. A per-exercise "
                 "note is the primary record and the profile is a derived one - when the "
@@ -859,42 +865,73 @@ PROFILE = {
     #   retrain. REVERT: a measured right-left internal-rotation gap beyond
     #   ~10 degrees, or the click reappearing in neutral.
     #
-    # ── THE SECOND ZONE IS AN OPTION, NOT AN OWED DOSE ──────────────────
-    # Settled by the athlete 2026-08-24, correcting a first pass that had this
-    # exactly backwards and wrote the error into three files.
+    # ── ⚠ "THE SECOND ZONE" MEANT TWO DIFFERENT THINGS, AND THAT COST THREE
+    #    WRONG WRITE-UPS IN ONE DAY (2026-08-24). READ THIS BEFORE USING THE
+    #    PHRASE AGAIN. ────────────────────────────────────────────────────────
     #
-    # ONE ZONE PER SIDE IS THE BLOCK'S DOSE and always was. It is not a
-    # fraction of a larger prescription and the block was never trimmed to
-    # leave room for anything. The dependence runs ONE WAY: the second zone is
-    # contingent on the first, never the reverse — "the first zone / block was
-    # never to be altered for the second block, only the second for the first.
-    # The second zone may never been run it is only to be run on a day when I
-    # want to double train. But this may never arrive."
+    # There are two unrelated "second things" in this system and they were
+    # conflated in conversation, then written into the files three times in a
+    # row, each time confidently and each time wrong. Name which one you mean,
+    # every time.
     #
-    # Consequences, because this is the kind of thing that gets re-derived
-    # wrongly by the next person reading the source document:
-    #   • The second zone is an OPTIONAL EXTRA for a day he chooses to work the
-    #     hip twice. Nothing schedules it. Its absence is not a shortfall, not
-    #     a finding, and not something to chase at a block build.
-    #   • docs/training/release_protocols_2026-08-10.md Protocol 2 does
-    #     prescribe two zones daily on desk days. That is the DOCUMENT'S
-    #     prescription; the above is the standing decision on how it is run.
-    #     Recorded rather than silently diverged from.
-    #   • The 2026-08-14 note's line that the daily protocol "continues
-    #     alongside and is the larger dose" is REMOVED, not amended. It
-    #     described something that was not running, and it made the in-block
-    #     zone read as a fraction of a whole when it is the whole.
+    # (A) THE SECOND BALL SPOT — inside ONE exercise, Anterior Hip Pressure
+    #     Release. docs/training/release_protocols_2026-08-10.md names two
+    #     target zones for the ball: zone 1, the meaty pocket-corner just below
+    #     and OUTSIDE the point of the hip bone; zone 2, slightly INWARD and
+    #     higher, just inside it.
     #
-    # WHAT WAS ACTUALLY WRONG, and it stands: twelve of the block's days
+    #     WHAT IS TRUE: zone 2 is the one that works for him and zone 1 does
+    #     nothing. His words, 2026-08-24: "the second zone is where I get the
+    #     pressure release during anterior hip flexor release, there is no
+    #     release in the outside point of the hip bone that I do for that
+    #     exercise." The block had named ZONE 1 from day 1 and he had been
+    #     quietly ignoring it and working zone 2 — which his first session note
+    #     recorded on 2026-08-18 and which was filed as a protocol deviation
+    #     rather than read as the finding it was. training_plan.py now names
+    #     zone 2. ONE SPOT PER SIDE IS THE DOSE; nothing here is half of
+    #     anything, and no second spot is scheduled or owed.
+    #
+    # (B) THE ACCESSORY SESSION — the "+" button on the training page,
+    #     services/accessory.py. A whole separate 10-20 min mini-session, not a
+    #     ball position. It is opt-in, has never once been run, and its tier
+    #     logic already shrinks it to release-only whenever the main session is
+    #     heavy (RPE >= 6), or the day is rest or assessment, or the engine has
+    #     cut volume — i.e. the second flexes for the first, never the reverse.
+    #
+    #     ⚠ UNCONFIRMED: his 2026-08-24 line "the second zone ... is only to be
+    #     run on a day when I want to double train, but this may never arrive"
+    #     fits (B) better than (A) — "double train" is a second SESSION, and
+    #     the accessory session has genuinely never been run. That reading has
+    #     NOT been confirmed with him, so it is recorded as a reading and not
+    #     as his instruction. Ask before acting on it.
+    #
+    # HOW THE ERROR RAN. He objected to a claim that "the block halved its own
+    # dose"; the objection was read as being about (A) when the words fit (B)
+    # better ("a day when I want to double train", "may never arrive"); the
+    # correction was then written into training_plan.py, this file and
+    # CLAUDE.md, describing the ball's zone 2 as an optional extra for a
+    # double-training day. It is not an extra — it is the only zone he uses.
+    #
+    # THE TWO REUSABLE RULES:
+    #   1. A source document's dose is not a standard the block owes. Where the
+    #      block and the document differ, that is a DECISION to record, not a
+    #      deficit to close. Reading it as a deficit is what produced the
+    #      original "halved its own dose" story.
+    #   2. WHEN A CORRECTION ARRIVES, PIN THE REFERENT BEFORE WRITING IT DOWN.
+    #      "The second zone" was ambiguous across two systems; the cost of
+    #      asking was one sentence, the cost of guessing was three files.
+    #
+    # WHAT WAS ACTUALLY WRONG WITH THE BLOCK, and it stands: twelve of its days
     # carried NO front-of-hip work at all — the eight rest, travel and mobility
     # days, and the four upper-body days — while the desk day is the exposure
     # the protocol treats. That is the gap the 2026-08-24 change closed, at one
-    # zone, which is the dose.
+    # spot per side, which is the dose.
     #
-    # THE REUSABLE PART: the failure was reading a source document's dose as
-    # the standard the block owed, then treating the difference as a deficit.
-    # A block's dose is a decision, not a shortfall against the paper it came
-    # from — and when the two differ, the decision is what needs recording.
+    # The 2026-08-14 note's line that the daily protocol "continues alongside
+    # and is the larger dose" is REMOVED, not amended: it described something
+    # that was not running, and it made the in-block dose read as a fraction of
+    # a whole when it is the whole.
+
 
 
     "add_when_right_hip_loaded": [
