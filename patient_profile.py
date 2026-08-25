@@ -865,61 +865,52 @@ PROFILE = {
     #   retrain. REVERT: a measured right-left internal-rotation gap beyond
     #   ~10 degrees, or the click reappearing in neutral.
     #
-    # ── ⚠ "THE SECOND ZONE" MEANT TWO DIFFERENT THINGS, AND THAT COST THREE
-    #    WRONG WRITE-UPS IN ONE DAY (2026-08-24). READ THIS BEFORE USING THE
-    #    PHRASE AGAIN. ────────────────────────────────────────────────────────
+    # ── ⚠ "THE SECOND ZONE" ALWAYS MEANS ZONE 2. Settled by the athlete
+    #    2026-08-24 after three wrong write-ups in one day: "update it to mean
+    #    zone 2 each time." ─────────────────────────────────────────────────
     #
-    # There are two unrelated "second things" in this system and they were
-    # conflated in conversation, then written into the files three times in a
-    # row, each time confidently and each time wrong. Name which one you mean,
-    # every time.
+    # ZONE 2 IS THE SPOT AND THERE IS NOTHING ELSE TO IT.
+    # docs/training/release_protocols_2026-08-10.md numbers two ball targets
+    # for Anterior Hip Pressure Release. Zone 1 is the meaty pocket-corner just
+    # below and OUTSIDE the point of the hip bone. Zone 2 is slightly INWARD
+    # and higher, just inside it. His words: "the second zone is where I get
+    # the pressure release during anterior hip flexor release, there is no
+    # release in the outside point of the hip bone that I do for that
+    # exercise."
     #
-    # (A) THE SECOND BALL SPOT — inside ONE exercise, Anterior Hip Pressure
-    #     Release. docs/training/release_protocols_2026-08-10.md names two
-    #     target zones for the ball: zone 1, the meaty pocket-corner just below
-    #     and OUTSIDE the point of the hip bone; zone 2, slightly INWARD and
-    #     higher, just inside it.
+    #   • Zone 2 is what the block presses, and ONE SPOT PER SIDE IS THE DOSE.
+    #   • Zone 1 does nothing for him. It is not a warm-up to it, not a first
+    #     half of it, and not something owed at a later block.
+    #   • Nothing here is half of anything, and no further spot is scheduled.
     #
-    #     WHAT IS TRUE: zone 2 is the one that works for him and zone 1 does
-    #     nothing. His words, 2026-08-24: "the second zone is where I get the
-    #     pressure release during anterior hip flexor release, there is no
-    #     release in the outside point of the hip bone that I do for that
-    #     exercise." The block had named ZONE 1 from day 1 and he had been
-    #     quietly ignoring it and working zone 2 — which his first session note
-    #     recorded on 2026-08-18 and which was filed as a protocol deviation
-    #     rather than read as the finding it was. training_plan.py now names
-    #     zone 2. ONE SPOT PER SIDE IS THE DOSE; nothing here is half of
-    #     anything, and no second spot is scheduled or owed.
+    # HOW IT WENT WRONG, because the shape of the error is the useful part.
+    # The block named ZONE 1 from day 1 and ran that way for a week. He was
+    # ignoring the instruction and pressing zone 2 — which his very first
+    # session note recorded on 2026-08-18 ("inside of my right") and which was
+    # filed HERE as a protocol deviation instead of read as the finding. Then a
+    # correction of his was written into training_plan.py, this file and
+    # CLAUDE.md twice in opposite directions: first as "the block halved its
+    # own dose", then as "zone 2 is an optional extra for a double-training
+    # day". Both confident, both detailed, both wrong.
     #
-    # (B) THE ACCESSORY SESSION — the "+" button on the training page,
-    #     services/accessory.py. A whole separate 10-20 min mini-session, not a
-    #     ball position. It is opt-in, has never once been run, and its tier
-    #     logic already shrinks it to release-only whenever the main session is
-    #     heavy (RPE >= 6), or the day is rest or assessment, or the engine has
-    #     cut volume — i.e. the second flexes for the first, never the reverse.
-    #
-    #     ⚠ UNCONFIRMED: his 2026-08-24 line "the second zone ... is only to be
-    #     run on a day when I want to double train, but this may never arrive"
-    #     fits (B) better than (A) — "double train" is a second SESSION, and
-    #     the accessory session has genuinely never been run. That reading has
-    #     NOT been confirmed with him, so it is recorded as a reading and not
-    #     as his instruction. Ask before acting on it.
-    #
-    # HOW THE ERROR RAN. He objected to a claim that "the block halved its own
-    # dose"; the objection was read as being about (A) when the words fit (B)
-    # better ("a day when I want to double train", "may never arrive"); the
-    # correction was then written into training_plan.py, this file and
-    # CLAUDE.md, describing the ball's zone 2 as an optional extra for a
-    # double-training day. It is not an extra — it is the only zone he uses.
+    # ⚠ DO NOT CONFUSE THIS WITH THE ACCESSORY SESSION. Separate thing, and it
+    # is what the phrase got mixed up with: the "+" button on the training
+    # page, services/accessory.py, a whole 10-20 min mini-session rather than a
+    # ball position. Opt-in, never once run, and its tier logic already shrinks
+    # it to release-only whenever the main session is heavy (RPE >= 6), the day
+    # is rest or assessment, or the engine has cut volume. When either is meant
+    # in future, NAME IT: "zone 2" for the ball, "the accessory session" for
+    # the button. Never "the second one".
     #
     # THE TWO REUSABLE RULES:
     #   1. A source document's dose is not a standard the block owes. Where the
     #      block and the document differ, that is a DECISION to record, not a
-    #      deficit to close. Reading it as a deficit is what produced the
-    #      original "halved its own dose" story.
-    #   2. WHEN A CORRECTION ARRIVES, PIN THE REFERENT BEFORE WRITING IT DOWN.
-    #      "The second zone" was ambiguous across two systems; the cost of
-    #      asking was one sentence, the cost of guessing was three files.
+    #      deficit to close. Reading it as a deficit produced the original
+    #      "halved its own dose" story.
+    #   2. PIN THE REFERENT BEFORE WRITING A CORRECTION DOWN. Asking cost one
+    #      sentence; guessing cost three files and two commits. Ordinals are
+    #      the trap — "the second zone", "the other block" — especially when
+    #      the word was introduced by whoever is doing the writing.
     #
     # WHAT WAS ACTUALLY WRONG WITH THE BLOCK, and it stands: twelve of its days
     # carried NO front-of-hip work at all — the eight rest, travel and mobility

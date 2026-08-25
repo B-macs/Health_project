@@ -122,14 +122,33 @@ such interaction and starts immediately.
 
 ### Technique — front-of-hip sustained pressure (~4 min, daily on desk days)
 
+> **⚠ ADAPTED IN PLACE FOR THIS BODY — 2026-08-24. ZONE 2 IS THE ZONE.**
+> The document below numbers two ball targets. **Only zone 2 responds for this
+> athlete, and zone 1 does nothing.** His words: *"the second zone is where I
+> get the pressure release during anterior hip flexor release, there is no
+> release in the outside point of the hip bone that I do for that exercise."*
+> Corroborated by anatomy — he reports referred sensation into the mid-back,
+> and iliacus/psoas sit in that hollow and attach along L1–L4, where TFL on the
+> crest does not.
+>
+> **`training_plan.ANTERIOR_HIP_RELEASE` presses ZONE 2 ONLY, one spot per side,
+> and that is the dose.** It is not half a prescription: zone 1 is not owed, not
+> a warm-up to zone 2, and not something to restore at a later block build. The
+> block ran zone 1 for its first week because this list was read in order, and
+> the athlete quietly worked zone 2 instead — which his first session note said
+> on 2026-08-18 and which was filed as a deviation rather than as the finding.
+>
+> **REVERT:** a later reading in which zone 1 produces a tender point that
+> responds. Nothing else. Do not re-add it because the document lists it first.
+
 - **Position:** lying face down, a massage ball between the floor and the
   front of the hip. Two target zones, worked one at a time: (1) the meaty
   pocket-corner region just below the pelvic crest at the FRONT-OUTSIDE of the
-  hip; (2) slightly inward and higher, just inside the point of the hip bone.
+  hip — **NOT USED, see the note above**; (2) slightly inward and higher, just
+  inside the point of the hip bone — **THIS IS THE ONE.**
 - **Movement:** settle body weight onto the ball slowly and wait — 60–90
   seconds of stillness per spot, breathing, until the tissue visibly lets go
-  under you. Then a few slow knee-bends of that leg with the pressure held,
-  and move to the next spot.
+  under you. Then a few slow knee-bends of that leg with the pressure held.
 - **Feel:** the cramping good-hurt of a held knot, easing as you breathe.
   Pain never above 2/10.
 - **Stop — and this is the sharp edge of this protocol:** the inner-front of
