@@ -39,7 +39,7 @@ shoulder) are the kind that matters.
 | Seated Side Stretch (Right) | 01:00 | 30s | caution | Lateral flexion — right foraminal stenosis at L5/S1 (`rules.py`: "right lateral"). Keep it light, self-supported. |
 | Seated Side Stretch (Left) | 01:40 | 30s | caution | Lateral flexion — left dorsolateral protrusions at L3/4, L4/5 (`rules.py`: "left lateral"). Keep it light. |
 | 90/90 Hip Rotation | 02:20 | 30s | caution | Passes the right hip through flexion + external rotation — the exact position that triggers the documented right-hip snap (finding #4, Coxa Saltans). Cue neutral/internal rotation on the right. |
-| Butterfly Forward Fold | 03:00 | 30s | **contraindicated** | Seated forward fold — end-range lumbar flexion loads the covered annulus tears at L3/4, L4/5 (`rules.py`: "forward fold"). Sit tall instead, or hinge from the hips with a flat back. |
+| Butterfly Forward Fold | 03:00 | 30s | caution | Seated forward fold. Downgraded from contraindicated 2026-08-17 with the five flexion rules in `rules.py` — the Nov-2025 MRI is no longer determining, and the same-day reading was five unloaded folds, zero releases, zero pain. Fold from the hips with a flat back; revert on any lumbar-base release or pain under flexion load. |
 | Walk the Dog (Down Dog pedaling) | 03:40 | 30s | caution | Mild spinal flexion under bodyweight load. Keep knees soft, back flat — don't force a hamstring-driven round. |
 | Deep Lunge (Right) | 04:20 | 30s | cleared | Hip flexor/psoas stretch — directly addresses the psoas hypertonicity called out in the MRI downstream findings. Keep the pelvis neutral. |
 | Deep Lunge Hip Opener (Right) | 05:00 | 30s | caution | Reach/backbend combination risks end-range lumbar extension + rotation. Keep the reach modest. |
@@ -50,7 +50,7 @@ shoulder) are the kind that matters.
 | Deep Lunge Hip Opener (Left) | 08:20 | 30s | caution | Same reach/backbend reasoning as the right side — general extension/rotation caution, not Coxa-Saltans-specific (that finding is right-only). |
 | Half Pigeon Pose (Left) | 09:00 | 30s | cleared | No right-hip mechanism on this side. Still avoid forcing external rotation to end range. |
 | Seated Twist (Right) | 09:40 | 30s | cleared | Gentle unloaded rotation. |
-| Straddle Forward Fold | 10:20 | 30s | **contraindicated** | Seated wide-leg forward fold — same mechanism as Butterfly Forward Fold. |
+| Straddle Forward Fold | 10:20 | 30s | caution | Seated wide-leg forward fold — same mechanism, same 2026-08-17 downgrade, as Butterfly Forward Fold. |
 | Knee to Chest (Right) | 11:00 | 30s | cleared | Supine, unloaded flexion — decompressive for the L5/S1 facet base (finding #3). |
 | Lying Twist (Right) | 11:40 | 30s | cleared | Supine, unloaded rotation — decompressive, same family as thread-the-needle. |
 | Knee to Chest (Left) | 12:20 | 30s | cleared | Supine, unloaded flexion — decompressive. |
@@ -58,7 +58,7 @@ shoulder) are the kind that matters.
 | Happy Baby | 13:40 | 30s | cleared | Supine hip flexion, fully supported — decompressive for the low back. |
 | Deep Relaxation (Savasana) | 14:20 | 30s+ | cleared | Passive rest. No mechanism of concern. |
 
-**Net:** 11 poses cleared, 9 caution, 2 contraindicated (both forward folds).
+**Net:** 11 poses cleared, 11 caution, 0 contraindicated. The two forward folds were downgraded contraindicated → caution on 2026-08-17; the catalogue is tagged separately from `rules.py` and `effective_safety` takes the stricter of the two, so a rules downgrade does not reach a pose without editing the catalogue as well.
 Nothing here is unique to this routine — the forward-fold contraindication and
 the lateral-flexion cautions reuse the exact keywords already in
 `services/rules.py`'s `MOVEMENT_RULES` (`effective_safety()` cross-checks both

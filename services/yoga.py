@@ -165,11 +165,19 @@ YOGA_LIBRARY: list[YogaSession] = [
                 "floor-supported position does not reproduce it. The mechanism is "
                 "unchanged, this position just does not load it.",
             ),
+            # Downgraded contraindicated -> caution 2026-08-17, with the five
+            # flexion rules in services/rules.py: the Nov-2025 MRI is ~1 year
+            # old and no longer determining, and the same-day reading was five
+            # unloaded seated folds, zero releases, zero pain. The catalogue is
+            # tagged separately from rules.py and effective_safety takes the
+            # stricter of the two, so a rules downgrade cannot reach a pose
+            # without this edit. REVERT on any lumbar-base release or pain
+            # under flexion load.
             YogaPose(
-                "Butterfly Forward Fold", _t("03:00"), 30, "contraindicated",
-                "Seated forward fold — end-range lumbar flexion loads the covered "
-                "annulus tears at L3/4 and L4/5. Sit tall instead, or hinge only from "
-                "the hips with a flat back.",
+                "Butterfly Forward Fold", _t("03:00"), 30, "caution",
+                "Seated forward fold. Fold from the hips with a flat back rather "
+                "than rounding down, and stop short of where the low back has to "
+                "round to go further.",
             ),
             YogaPose(
                 "Walk the Dog (Down Dog pedaling)", _t("03:40"), 30, "caution",
@@ -258,9 +266,10 @@ YOGA_LIBRARY: list[YogaSession] = [
             YogaPose("Seated Twist (Right)", _t("09:40"), 30, "cleared",
                       "Gentle unloaded rotation. Keep it gentle."),
             YogaPose(
-                "Straddle Forward Fold", _t("10:20"), 30, "contraindicated",
-                "Seated wide-leg forward fold — end-range lumbar flexion loads the covered "
-                "annulus tears. Sit tall, or hinge only from the hips with a flat back.",
+                "Straddle Forward Fold", _t("10:20"), 30, "caution",
+                "Seated wide-leg forward fold. Fold from the hips with a flat "
+                "back, and stop where the low back starts to round — that point "
+                "coming down is the progress, not the distance reached.",
             ),
             YogaPose(
                 "Knee to Chest (Right)", _t("11:00"), 30, "cleared",
