@@ -30,7 +30,7 @@ before testing for overlap.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 # Padding applied to each end of the logged session window before testing
 # overlap. Covers watch-vs-phone clock skew and the lag between the final set
@@ -71,6 +71,55 @@ def _to_dt(value) -> datetime | None:
         except ValueError:
             continue
     return None
+
+
+def device_start_iso(start_local, start_gmt) -> str:
+    """An activity's start as an OFFSET-AWARE ISO string, derived from the two
+    naive strings Garmin returns for it.
+
+    Garmin reports every activity's start twice: `startTimeLocal`, the watch's
+    own clock where the activity actually happened, and `startTimeGMT`, the
+    same instant in UTC. Both arrive as naive strings, so neither one alone
+    says which zone the watch was in.
+
+    Their DIFFERENCE is the watch's UTC offset, which is exactly the missing
+    fact. Stamping it onto the local time makes the activity side of every
+    match an INSTANT rather than a clock face, so `_comparable` takes its
+    all-aware branch and both sides are compared as instants.
+
+    Why this is worth doing. Our per-set `ts` already carries an offset
+    (services.sessions.set_timestamp), but the app does not run where the
+    athlete trains: on a UTC host with HEALTH_TIMEZONE unset the sets are
+    stamped +00:00 while the watch stamps local time. Reduced to wall clock
+    those two differ by the athlete's whole UTC offset -- one hour in Ireland,
+    two at a CEST base -- and the padding in MATCH_TOLERANCE_SECONDS is wide
+    enough that a shifted window can still score past MIN_MATCH_QUALITY, so
+    the failure is a CONFIDENT WRONG MATCH rather than no match at all.
+    Comparing instants removes the dependence on host configuration and on
+    where the athlete happens to be, so travel and DST both cost nothing.
+
+    Falls back to the local string UNCHANGED whenever the offset cannot be
+    established -- GMT missing, either side unparseable, or a difference too
+    large to be a real zone. The mixed branch of `_comparable` then behaves
+    exactly as it did before, which is what every already-stored row needs.
+    """
+    local_dt = _to_dt(start_local)
+    if local_dt is None:
+        return str(start_local or "")
+    if local_dt.tzinfo is not None:
+        return local_dt.isoformat(timespec="seconds")
+
+    gmt_dt = _to_dt(start_gmt)
+    if gmt_dt is None:
+        return str(start_local)
+    if gmt_dt.tzinfo is not None:
+        gmt_dt = gmt_dt.astimezone(timezone.utc).replace(tzinfo=None)
+
+    minutes = round((local_dt - gmt_dt).total_seconds() / 60.0)
+    if abs(minutes) > 14 * 60:
+        return str(start_local)
+    offset = timezone(timedelta(minutes=minutes))
+    return local_dt.replace(tzinfo=offset).isoformat(timespec="seconds")
 
 
 def _comparable(*dts: datetime) -> tuple[datetime, ...]:

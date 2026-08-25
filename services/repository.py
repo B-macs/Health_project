@@ -5149,12 +5149,19 @@ class Repository:
         start_local = act.get("startTimeLocal", "")
         duration_s = act.get("duration") or 0
         distance_m = act.get("distance") or 0
+        # start_time_local carries the WATCH's own UTC offset when Garmin
+        # supplies both clocks, so hr_matching compares instants rather than
+        # clock faces -- see hr_matching.device_start_iso. "date" stays the
+        # LOCAL calendar date: that is the day he trained, whatever the host's
+        # zone is. Degrades to the bare local string when GMT is absent.
+        start_iso = hr_matching.device_start_iso(
+            start_local, act.get("startTimeGMT", ""))
         return {
             "activity_id": str(act.get("activityId", "")),
             "date": start_local[:10] if start_local else "",
             "name": act.get("activityName", ""),
             "type": activity_type,
-            "start_time_local": start_local,
+            "start_time_local": start_iso,
             "duration_minutes": round(duration_s / 60, 1),
             "distance_km": round(distance_m / 1000, 2),
             "avg_hr": act.get("averageHR", ""),
