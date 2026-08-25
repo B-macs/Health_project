@@ -641,6 +641,67 @@ def test_the_two_unscored_reasons_are_never_the_same_text():
             != dashboard.sleep_unscored_reason(False))
 
 
+# ─── The night is on screen while the score says there is none ───────────────
+#  Reported from the live app: at 08:03 the Sleep screen read "No Readings"
+#  and "Oura recorded no sleep period for this night" with a full night —
+#  7h 06m asleep, 8h 56m in bed, 80 % efficiency, 56 bpm — drawn directly
+#  underneath. Both reads come off the same Oura sleep-periods tab; they were
+#  simply taken minutes apart, either side of the day's device sync.
+
+def test_a_recorded_night_missing_from_the_biometric_rows_is_detected():
+    details = {"2026-08-25": {"total_seconds": 25560.0}}
+    rows = [{"date": "2026-08-24", "sleep_duration_hours": 7.0}]
+    assert dashboard.has_night_without_biometric_row(
+        rows, details, date(2026, 8, 25)) is True
+
+
+def test_a_night_present_in_both_reads_is_not_stale():
+    details = {"2026-08-25": {"total_seconds": 25560.0}}
+    rows = [{"date": "2026-08-25", "sleep_duration_hours": 7.1}]
+    assert dashboard.has_night_without_biometric_row(
+        rows, details, date(2026, 8, 25)) is False
+
+
+def test_no_recorded_night_is_not_stale_however_empty_the_rows_are():
+    """A night the detail read does not have either is a genuine absence —
+    the ordinary case for a date with no sleep, and it must not trigger a
+    re-read or change the message."""
+    assert dashboard.has_night_without_biometric_row(
+        [], {}, date(2026, 8, 25)) is False
+    assert dashboard.has_night_without_biometric_row(
+        [], None, date(2026, 8, 25)) is False
+    assert dashboard.has_night_without_biometric_row(
+        None, {"2026-08-24": {}}, date(2026, 8, 25)) is False
+
+
+def test_the_detector_accepts_a_plain_date_string():
+    assert dashboard.has_night_without_biometric_row(
+        [], {"2026-08-25": {}}, "2026-08-25") is True
+
+
+def test_sleep_unscored_reason_never_blames_the_ring_for_a_night_on_screen():
+    msg = dashboard.sleep_unscored_reason(read_failed=False, night_recorded=True)
+    assert "no sleep period" not in msg
+    assert msg != dashboard.sleep_unscored_reason(read_failed=False)
+    assert msg != dashboard.sleep_unscored_reason(read_failed=True)
+
+
+def test_readiness_unscored_reason_never_blames_the_ring_for_a_night_on_screen():
+    msg = dashboard.readiness_unscored_reason(read_failed=False, night_recorded=True)
+    assert "No biometric readings" not in msg
+    assert msg != dashboard.readiness_unscored_reason(read_failed=False)
+    assert msg != dashboard.readiness_unscored_reason(read_failed=True)
+
+
+def test_a_failed_read_still_wins_over_the_stale_message():
+    """A failed read is the one the reader can act on — reload — and it is
+    reported whatever the detail read managed to return."""
+    assert (dashboard.sleep_unscored_reason(True, night_recorded=True)
+            == dashboard.sleep_unscored_reason(True))
+    assert (dashboard.readiness_unscored_reason(True, night_recorded=True)
+            == dashboard.readiness_unscored_reason(True))
+
+
 # ─── Readiness drill-down helpers ────────────────────────────────────────────
 
 def _rb(components=None, missing=None, available=1.0, units=None):

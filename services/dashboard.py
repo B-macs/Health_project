@@ -673,16 +673,50 @@ def sleep_coverage_caption(breakdown: dict) -> str:
             f"remaining weights renormalised to 100%.")
 
 
-def sleep_unscored_reason(read_failed: bool) -> str:
+def has_night_without_biometric_row(
+    bio_rows: list[dict] | None,
+    sleep_details: dict | None,
+    for_date,
+) -> bool:
+    """True when the night-detail read holds a night for `for_date` that the
+    biometric rows carry no row for at all.
+
+    The two reads come from the SAME Oura sleep-periods tab through the same
+    main-period gate, so they cannot genuinely disagree about whether a night
+    exists — only about WHEN each was taken. The biometric rows are read on
+    every Home render and then held; the night detail is read only the first
+    time a drill-down is opened. On the first morning open after the day's
+    device sync lands last night, the detail is therefore the fresher of the
+    two, and the Sleep screen rendered a complete night — total sleep, time
+    in bed, efficiency, the whole architecture — underneath a header reading
+    "No Readings" and a Contributors panel asserting "Oura recorded no sleep
+    period for this night". Both claims were false, and the panel immediately
+    below them said so.
+
+    This is only the detection; the caller's repair is to re-read the
+    biometric rows. It lives here so it is testable without Streamlit.
+    """
+    key = getattr(for_date, "isoformat", lambda: str(for_date))()
+    if not sleep_details or key not in sleep_details:
+        return False
+    return not any((r or {}).get("date") == key for r in (bio_rows or []))
+
+
+def sleep_unscored_reason(read_failed: bool, night_recorded: bool = False) -> str:
     """What to say when the Sleep Score could not be computed at all.
 
-    Two causes produce an identical empty result and must not produce an
+    THREE causes produce an identical empty result and must not produce an
     identical message. "Oura recorded no sleep period for this night" is a
     claim about the ring; asserting it after a failed Google Sheets read is
     simply false, and it sends the reader to check their ring instead of
     reloading. Observed in the wild on a night whose data was complete —
     every contributor present, score 76.8 — which is the whole reason this
     distinction is now a function rather than a hardcoded string.
+
+    `night_recorded` is the third: the night IS in the sleep-periods tab (the
+    panels below this one are drawing it) but the readings the score is built
+    from have not been re-read yet. Blaming the ring there contradicts the
+    very next panel on screen. See has_night_without_biometric_row.
 
     The same asymmetry the fusion work kept running into: a read that fails
     looks exactly like data that is absent, and only the caller knows which
@@ -691,6 +725,9 @@ def sleep_unscored_reason(read_failed: bool) -> str:
     if read_failed:
         return ("Could not load your biometric readings — this is a "
                 "loading problem, not missing sleep data. Try again shortly.")
+    if night_recorded:
+        return ("Oura recorded this night — the readings the score is built "
+                "from have not come through yet. Reopen this screen shortly.")
     return "Oura recorded no sleep period for this night."
 
 
@@ -786,18 +823,24 @@ def readiness_alcohol_caption(breakdown: dict) -> str:
             f"it out keeps this number comparable with Oura's.")
 
 
-def readiness_unscored_reason(read_failed: bool) -> str:
+def readiness_unscored_reason(read_failed: bool, night_recorded: bool = False) -> str:
     """What to say when readiness could not be computed at all — the readiness
     twin of sleep_unscored_reason, and here from the first commit rather than
     added after the fact.
 
-    Two causes produce an identical empty result and must not produce an
-    identical message: a genuine absence of biometric readings, versus a
-    failed Google Sheets read. Asserting the first when the second happened
-    sends the reader to check their ring instead of reloading."""
+    Three causes produce an identical empty result and must not produce an
+    identical message: a genuine absence of biometric readings, a failed
+    Google Sheets read, and readings that exist but have not been re-read yet
+    (`night_recorded` — the Readiness screen draws the same night detail the
+    Sleep screen does, so it hits this the same way). Asserting the first
+    when either of the others happened sends the reader to check their ring
+    instead of reloading."""
     if read_failed:
         return ("Could not load your biometric readings — this is a loading "
                 "problem, not missing data. Try again shortly.")
+    if night_recorded:
+        return ("This night was recorded — the readings readiness is built "
+                "from have not come through yet. Reopen this screen shortly.")
     return "No biometric readings for this day, so readiness could not be scored."
 
 
