@@ -142,7 +142,7 @@ write the *discriminating question* rather than the conclusion.
 
 ## Block-by-block protocol
 
-At each block boundary (next: **day 28, 2026-09-13**):
+At each block boundary (next: **the day after the race, 2026-10-12**; Block A was scored 2026-09-11, below, with its day-28 screen still to run on 09-13):
 
 1. Score every open prediction — CONFIRMED / BROKEN / UNTESTED, with the
    reading and its date. No prediction is quietly dropped; UNTESTED must say
@@ -165,7 +165,53 @@ symptom-era caution.
 
 ---
 
+## Block A scored — 2026-09-11 (v1.2)
+
+Scored from the log, two days before Block A's day-28 screen. What Block A actually
+delivered: FIVE sessions in 28 days — squat days on 08-18 and 09-10, band lower days on
+08-20 and 08-24, ONE run on 08-21 (16 min run/walk) — the Ireland fortnight ran to 09-03,
+Berlin followed, and a flare landed on 08-25.
+
+| # | Verdict | Reading |
+|---|---|---|
+| P1 | **UNTESTED** | No mobility day was logged, so no grip grade was recorded on days 10, 17 or 24. The withdrawal itself ran (no release on rest days); its instrument never fired. Carried. |
+| P2 | **CONFIRMED** | Five exposures (08-18, 08-20, 08-21, 08-24 bodyweight; 09-10 loaded at 2.5 kg): *No clicks* on every one, and the athlete's own statement that the fold has never clicked. The trial is closed and the item leaves Block B. The disc is not the governor of a seated fold. |
+| P3 | **UNTESTED** | One run of six (08-21, 16 min, *body felt good after not running in months*). No Sartorius signal in it, but one run is not a build. Block B's central trial (P8). |
+| P4 | **CONFIRMED** | 09-10: Goblet 25 × 5 and RDL 52.5 × 5, both at prescription, session RPE 5. Capacity was where the plan said or above — H2 holds on the one day it was tested. |
+| P5 | **UNTESTED** | The Bunkie lines are day 28, Sunday 2026-09-13. |
+| P6 | **UNTESTED** | No battery retest inside Block A. |
+| P7 | **AMBIGUOUS → ledger** | 08-25: tightness 8, pain 5, central lower back + mid back, *what it feels like is my psoas muscle is really tight and painful* — the morning after a light band session (08-24, RPE 5) in Ireland. Load-following or held-exposure? The check-in does not say what was HELD in the 48 h before (flights, a car, a bar stool), and that is the question H1 turns on. Not scorable from the record; the ledger question below is what would have scored it. |
+
+**Standing strengthener logged:** 08-18, the athlete on the front-of-hip release — *an absolute
+game changer* — a tight reading normalising within a session of pressure, which is guarding
+behaving like guarding.
+
+**Ledger addition:** *A flare appears* → the check-in must say what was held in the previous
+48 h, or P7 cannot be scored. The 08-25 entry names the tissue and not the exposure.
+
+### Block B predictions, registered 2026-09-11 — before day 1
+
+| # | Trial (instrument) | Prediction if the hypothesis is TRUE | What BREAKS it |
+|---|---|---|---|
+| P8 | **The running build** — seven runs and the race; per-run notes, the day-after check-in; the decision run on day 20 | All seven clean, the day-20 run/walk holds 5:1 for 55 min, the race is run. No left front-of-hip signal anywhere: the two historic strains were dose errors, not a fragile tissue | Any left anterior-hip signal → a true local vulnerability (H3 grows); the pre-registered rule downgrades the race and the build stops |
+| P9 | **The session shape** — set timestamps on every gym day | With three main lifts and nested ramps the squat day measures ≤ 70 min and the press day ≤ 60, and the athlete's description stops being *three exercises in 84 minutes*. (A claim about the system, scored by the same instrument that found the problem.) | A gym day over 75 min with the prescribed rests taken → the changeover model is wrong and gets re-measured, not the block |
+| P10 | **Three Epley-valid top sets per lift** (days 1, 8, 15) | They come in AT prescription at RPE ≤ 8, and the e1RMs they produce sit above the working-set estimates the system has been carrying — capacity was underrated by caution (H2) | A grind or a fail at the prescribed number → capacity genuinely low; H2 takes the hit and Block C starts lower |
+| P11 | **Symptom topology under a real loading week** — week 3 (days 15-21) is the block's heaviest and holds the decision run | If a symptom appears in Block B it follows a HELD exposure (a desk day, travel, a car) and not the heaviest week: check-ins on days 16-22 stay ≤ 3 tightness / 0 pain, or name an exposure | A symptom tracking the heavy week with no held exposure named → H1's core is wrong for loaded training, not only for stillness |
+
+**What Version 1 committed to for Block B, and what happened:** preparation did shift from
+release toward activation (the fold trial and the dead bug left; the glute bridge and the
+raise stayed; the front-of-hip work is strength on three days a week); passive stretching
+stays narrowed to the cluster's pattern-D stack; stillness management is unchanged; loads
+progress from the top sets that were actually lifted (22.5/42.5/30) rather than from the
+plan's week-4 line. The session-shape rule was not predicted by v1 — it came from the
+athlete, and it is the reason the block is shorter, not the hypothesis.
+
 ## Version history
+
+- **v1.2, 2026-09-11** — Block A scored from the log (P2, P4 confirmed; P1, P3, P5, P6
+  untested; P7 ambiguous and moved to the ledger). Block B's P8-P11 registered before its
+  day 1. The Bunkie baseline (P5) lands on 09-13 and is scored into v1.3 at the next
+  boundary.
 
 - **v1.1, 2026-08-17 (same evening)** — P2 authored into Block A days 2–27
   on the athlete's requirement that the training itself runs the trials:

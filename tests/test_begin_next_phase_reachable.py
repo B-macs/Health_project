@@ -174,12 +174,12 @@ def test_next_phase_offer_survives_as_the_seeding_helper():
         _phase(2, "2026-07-20", 28, "completed"),
         _phase(3, "2026-08-17", 28, "active"),
     ]
-    # None TODAY, and for the right reason: Block B (phase 4) is not authored
-    # yet, and next_phase_offer refuses to name a block whose content does not
-    # exist. Seeding Block B therefore starts with authoring it, which is the
-    # correct order and is what the day-28 review produces.
-    assert sess.next_phase_offer(phases) is None
-    assert 4 not in sess.PHASE_META, "when Block B is authored, update this test"
+    # Block B (phase 4) was authored 2026-09-11 (training_plan.PLAN_BLOCK_B),
+    # so with phases 1-3 stored the helper names it — and it is what
+    # scripts/seed_next_block.py seeds for 2026-09-14. With 4 stored as well
+    # there is nothing further authored, and the helper says so.
+    assert sess.next_phase_offer(phases) == 4
+    assert sess.next_phase_offer(phases + [_phase(4, "2026-09-14", 28, "upcoming")]) is None
     # It still refuses to skip: with phase 3 absent it will not offer 3's slot
     # to a phase-4 block either.
     assert sess.next_phase_offer(phases[:1]) == 2

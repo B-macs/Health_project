@@ -4,16 +4,16 @@
 
 ---
 
-## Current State (2026-08-14)
+## Current State (2026-09-11)
 
 | Item | Value |
 |------|-------|
 | Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
-| Block | **Stage 2B — 28-Day Block**, starts **2026-08-17** (`training_plan.PLAN_STAGE2B`, Phase 3) |
-| Day | Block A day 0 — starts Monday |
-| Gate | **3020/3020** — `python -m pytest tests/` |
-| Last code commit | The accessory session — a strain-chosen second training on the "+" button |
-| Next action | **Sun 16 Aug: Stage 2A's last day (day 26). Run the day-28 screen YOURSELF — the app will not offer it** |
+| Block | **Stage 2B (Block A)** ends Sun 2026-09-13; **Block B — Race Build** starts Mon **2026-09-14** (`training_plan.PLAN_BLOCK_B`, Phase 4 — **seed it before Monday**: `python scripts/seed_next_block.py --start 2026-09-14`) |
+| Day | Block A day 26 (Fri 2026-09-11); Block B day 1 on Monday |
+| Gate | **4010/4010** — `python -m pytest tests/` |
+| Last code commit | Block B, the session-shape rule (Key Rule 21), the measured time model, the resumable save |
+| Next action | **Run the two scripts (seed Block B; archive the 09-10 duplicates). Sun 13 Sep: Block A day 28 — the Bunkie lines + hip-click verdict. Mon 14 Sep: Block B day 1 (squat day, 15 entries, ~67 min)** |
 
 ### The two blocks, and why the dates are what they are
 
@@ -27,6 +27,26 @@ Starting on the Monday is what makes this work. Both blocks land Mon–Sun, whic
 Ireland trip falls on days **3–14**, so gym work resumes exactly at the top of
 week 3 with nothing stranded mid-week; and the 10 km lands as day 28 of Block B
 rather than somewhere inside it.
+
+### Block B — what changed and why (2026-09-11)
+
+Built from Block A's **log**, not its plan: five sessions in 28 days (two squat days, two band
+days, one 16-minute run), a psoas-attributed flare on 08-25, top sets at prescription on 09-10.
+The week is the same every week — **Mon squat, Tue run, Wed mobility, Thu cluster, Fri press,
+Sat run, Sun rest** — and race week swaps Saturday for rest and Sunday for the race.
+
+- **Every gym day is three main lifts, one core item, one hip item** (Key Rule 21). Squat day
+  15 entries / ~67 min modelled with full rests; press day 11 / ~56. The 2026-09-10 session
+  was 20 / 81.
+- **Ramp → heavy top set → working sets, at one rack, then the next lift.** Top sets weeks 1-3
+  only; race week is two working sets at week-1 loads.
+- **Runs restart at Block A's Run 2** and the **decision run is Sat 3 Oct (day 20, 55 min
+  run/walk 5:1, ~7 km)**: clean → the 10 km is run/walk 5:1 from the gun; not clean → walked
+  at the last clean ratio, or not run. Written before the data, scored on it.
+- **Out:** Dead Bug, the fold trial. **Moved:** McGill + scapular isometric → Wednesday;
+  Hip 90/90 + Lateral Lunge → after the Tuesday runs; Prone Y-Raise out of the press day.
+  Each removal's revert condition is at the block header in `training_plan.py`.
+- **The cluster day is still 13 entries / ~61 min** — not governed, noted for the next block.
 
 ### Next actions, in order — the athlete's, not the code's
 

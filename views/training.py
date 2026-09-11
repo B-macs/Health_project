@@ -807,6 +807,9 @@ def _init_state(day_num: int | None = None):
         "tp_notes":            {},       # {exercise_idx: note text} — the DURABLE copy of the per-exercise notes; see _record_note
         "tp_rest_started_at":  0,        # Unix timestamp, stamped when a rest phase BEGINS — see _record_rest_taken
         "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
+        "tp_pending_session":  None,     # the session dict minted by the FIRST press of Save; reused by every retry — see _auto_log_session
+        "tp_saved_exercise_idx": [],     # exercise indices already written under tp_pending_session
+        "tp_last_saved_exercise_id": None,
         "tp_accessory_plan":   None,     # the accessory session's day dict while one is running; None on a plan session. MUST have a default — it is in sess.CHECKPOINT_FIELDS, and building that payload indexes session_state directly
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
@@ -911,13 +914,31 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     garmin_detail = st.session_state.get("tp_garmin_activity_detail", {})
     actuals = st.session_state.get("tp_actuals", {})
     set_log = st.session_state.get("tp_set_log", {})
-    session_info = r.create_training_session(
-        session_date=date.today(),
-        duration_minutes=duration_minutes,
-        session_rpe=session_rpe,
-    )
-    last_id = None
+    # ONE session id per save, however many presses it takes. A save that
+    # stops partway — a Notion 429 twenty rows in, a dropped connection — used
+    # to be retried by pressing Save again, and every press minted a fresh id
+    # and rewrote every exercise from the top. 2026-09-10 was logged three
+    # times that way: 8, 20 and 2 exercises under three ids, 1,306 AU for one
+    # session, strain 17.1 for the day. The pending session and the indices
+    # already written live in session_state AND in the checkpoint
+    # (sess.CHECKPOINT_FIELDS), so a retry — even after a reload — continues
+    # under the same id from the exercise that failed, with the duration and
+    # RPE the first press recorded.
+    session_info = st.session_state.get("tp_pending_session") or None
+    if not session_info:
+        session_info = r.create_training_session(
+            session_date=date.today(),
+            duration_minutes=duration_minutes,
+            session_rpe=session_rpe,
+        )
+        st.session_state.tp_pending_session = session_info
+        st.session_state.tp_saved_exercise_idx = []
+        st.session_state.tp_last_saved_exercise_id = None
+    saved = set(st.session_state.get("tp_saved_exercise_idx") or [])
+    last_id = st.session_state.get("tp_last_saved_exercise_id")
     for idx, ex in enumerate(exercises):
+        if idx in saved:
+            continue
         actual_min = garmin_minutes.get(idx)
         # Garmin-verified duration and the live reps/weight/band-tier
         # steppers both override the planned prescription for logging — a
@@ -989,8 +1010,17 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
             garmin_distance_km=detail.get("distance_km"),
             garmin_calories=detail.get("calories"),
         )
+        saved.add(idx)
+        st.session_state.tp_saved_exercise_idx = sorted(saved)
+        st.session_state.tp_last_saved_exercise_id = last_id
     if notes.strip() and last_id:
         r.save_session_notes(last_id, notes)
+    # Everything is written: the pending markers are spent, and they are
+    # checkpointed, so they must be cleared here or the NEXT session would
+    # resume into this one's id.
+    st.session_state.tp_pending_session = None
+    st.session_state.tp_saved_exercise_idx = []
+    st.session_state.tp_last_saved_exercise_id = None
 
     # A logged session is the one thing that legitimately changes today's
     # numbers after the morning sync has already run: it moves Session AU,
@@ -2616,7 +2646,9 @@ def _render_accessory_session(policy: dict, readiness_modifier: float,
                                       elapsed, notes,
                                       movement_type_override=acc.ACCESSORY_TYPE)
                 except Exception as exc:
-                    st.error(f"Couldn't save the session: {exc}")
+                    _save_checkpoint(acc.ACCESSORY_DAY_KEY)
+                    st.error(f"Couldn't save the session: {exc} — press Save again; it "
+                             f"continues under the same session from the exercise that failed.")
                 else:
                     st.session_state.tp_session_logged = True
                     _save_checkpoint(acc.ACCESSORY_DAY_KEY)
@@ -3506,8 +3538,23 @@ def render():
                 save_btn = st.form_submit_button("Save Session to Log",
                                                  type="primary", use_container_width=True)
             if save_btn:
-                with st.spinner("Saving session to Notion…"):
-                    _auto_log_session(day_num, exercises, session_rpe, elapsed_minutes, session_notes)
+                try:
+                    with st.spinner("Saving session to Notion…"):
+                        _auto_log_session(day_num, exercises, session_rpe, elapsed_minutes, session_notes)
+                except Exception as exc:
+                    # Keep what was written. The pending session id and the
+                    # exercises already saved go into the checkpoint here, so
+                    # the next press — or a reload — continues under the SAME
+                    # session instead of starting a second one, which is how
+                    # 2026-09-10 was logged three times.
+                    _save_checkpoint(day_num)
+                    n_saved = len(st.session_state.get("tp_saved_exercise_idx") or [])
+                    st.error(
+                        f"Saving stopped after {n_saved} of {n_ex} exercises: {exc}. "
+                        f"Nothing is lost — press Save again and it continues from the "
+                        f"exercise that failed, under the same session."
+                    )
+                    st.stop()
                 # Keep the self-reported figures so the comparison below has
                 # both sides. The rating is ALWAYS collected, Garmin or not:
                 # its value is precisely that it is independent of the

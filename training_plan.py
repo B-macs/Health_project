@@ -4728,3 +4728,535 @@ ACC_BREATHING = _ex(
                 "the knees bent instead."),
     warning="Stop immediately on any tingling or numbness in a leg in this position.",
 )
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  BLOCK B — RACE BUILD. Phase 4, clinical stage 2. 2026-09-14 -> 2026-10-11.
+#  Race day is day 28.
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Authored 2026-09-11 against Block A's real log, not its plan. Block A
+# (PLAN_STAGE2B) delivered FIVE sessions in 28 days: gym A on 2026-08-18 and
+# 2026-09-10, the band lower session on 08-20 and 08-24, and ONE run (08-21,
+# 16 min run/walk, "body felt good after not running in months"). The Ireland
+# fortnight ran long (to 09-03), Berlin followed (09-04 -> 09-06), and a flare
+# landed on 2026-08-25 — tightness 8, pain 5, central lower back and mid back,
+# his words "what it feels like is my psoas muscle is really tight and painful"
+# — the morning after a band session in Ireland. Runs 2-6 never happened, the
+# press/pull day never ran loaded, and the two heavy top sets on 09-10 came in
+# at prescription (Goblet 25 x 5, RDL 52.5 x 5). So this block starts the
+# running build from Block A's Run 2, keeps the gym loads where the log left
+# them, and stays at clinical stage 2 — a block change needs no exit criteria;
+# a STAGE change does, and Block A's are mostly UNTESTED (docs/hypothesis.md).
+#
+# THE SESSION SHAPE IS THE POINT OF THIS BLOCK, and it is CLAUDE.md Key Rule
+# 21 now. The 2026-09-10 session ran 20 entries and 81 minutes; costed from its
+# set timestamps the three main lifts took 28 min, the five add-on exercises 33
+# and preparation 19. The athlete's direction (2026-09-11): limit the exercise
+# count against what a normal hour holds, limit the one-set items, nest ramp
+# sets under their own lift, and price every exercise change at what it
+# actually costs — measured at 74 s for a floor item and 117 s for a station,
+# not the 30 s the estimate charged (services/sessions.py, CHANGEOVER_SECONDS).
+# sessions.session_shape_violations holds the rules and refuses this block if
+# it drifts; tests/test_session_shape_rules.py runs it on every block from
+# this one on.
+#
+# What each gym day is now: THREE MAIN LIFTS, ONE CORE ITEM, ONE HIP-FLEXOR
+# ITEM, inside six to seven preparation entries. Squat day: Goblet Squat, RDL,
+# Hip Thrust, Pallof Press, End-Range Psoas Isometric. Press day: Incline DB
+# Press, Lat Pulldown, Single-Arm DB Row, Face Pull (the clinical pairing with
+# the press, finding #6), Full Side Bridge, Half-Kneeling Knee-Hover Isometric.
+# The ramp set and the heavy top set of each heavy compound sit IMMEDIATELY
+# before that lift — one station, one weight change each — instead of the
+# 2026-09-10 order (both ramps, both tops, both lifts: six weight changes
+# across two stations, and he logged the four singles in an eleven-second
+# burst because he had not followed it anyway).
+#
+# REMOVALS AND MOVES, each with the condition that reverts it
+# (docs/clinical_profile_weighting.md §4, rule 2 — an unexplained absence is
+# indistinguishable from an oversight):
+#
+#   Dead Bug (preparation)          OUT. One set of six is potentiation, not
+#     training, and he said so twice (2026-08-18 "6 reps is nothing?",
+#     2026-09-11). Nothing in the record names deep core as failing to fire
+#     before a squat; the glute bridge stays because his own 2025 log names
+#     glutes not warmed up before squats as a cause of the breakdown.
+#     REVERT: the brace failing before rep 8 on the squat with the glute
+#     bridge alone in preparation.
+#   Seated Forward Fold Exposure (Trial)   OUT. P2's readings: no clicks on
+#     every one of its five exposures, bodyweight and loaded, and his own
+#     statement that the fold has never clicked. The trial has its answer.
+#     REVERT: any lumbar-base release or pain in a seated fold.
+#   McGill Curl-Up (Progressed)     MOVED to the Wednesday mobility day. A mat
+#     item that cost 8 minutes in a gym session and costs 3 on a floor day.
+#   Scapular Retraction Isometric   MOVED to the Wednesday mobility day, the
+#     desk-intervention day, which is where the interscapular exposure lives;
+#     its own exit criterion says the intervention under test is the desk.
+#     Face Pull stays on the press day as the loaded scapular item.
+#   Prone Y-Raise (Scapular)        OUT of the press day's preparation. Two
+#     sets of lower-trap strength work sitting in a slot meant for one
+#     activation item; the face pull and the retraction isometric cover the
+#     tissue and the single-arm timed hold is the finding-#6 instrument.
+#     REVERT: a right-left Y-hold gap over 15%, or instability under the
+#     press.
+#   Hip 90/90 Flow + Lateral Lunge  MOVED from the press day to the Tuesday
+#     run days as post-run movement. Finding #5 read zero cracks; they are
+#     movement content, not treatment, and they cost nothing after a run.
+#   Half-Kneeling Knee-Hover        press day and cluster day only.
+#   End-Range Psoas Isometric       squat day and cluster day only.
+#     (One hip-flexor item per gym day; the cluster day keeps both plus the
+#     lift-offs, so each still lands twice a week — the minimum that "advance
+#     on two clean weeks" can be judged against.)
+#   Ischial Tuberosity Hamstring Release   RE-CODED, same name: one side then
+#     the other with NO pause. It was two bilateral sets with 45 s between,
+#     and his 2026-09-10 note asked why a stretch had a pause in it.
+#
+# RUNNING. Seven runs and the race, starting where Block A actually got to:
+# run/walk 2:2 and 3:1 in week 1, a first continuous 20 min and a 40-min long
+# run/walk in week 2, a continuous 30 and the 55-minute DECISION RUN in week
+# 3, a 25-minute taper run in race week. Run 6 on day 20 is pre-registered as
+# the race's go / no-go: clean (no left front-of-hip signal that day or the
+# next morning, and the run/walk pattern held) -> the race is run/walk at
+# 5 min running to 1 walking from the gun; not clean -> the race is walked at
+# the ratio that was clean, or not run. A missed race costs nothing that a
+# third Sartorius strain would not cost more. Every run keeps the stop rule.
+# The build is compressed — long runs 30 -> 40 -> 55 -> 75 — because the race
+# date is fixed and the athlete's baseline is high (16k steps a day, a 10 km
+# hike with no symptoms); the run/walk format and the day-20 decision are what
+# make that acceptable rather than the progression rate.
+#
+# LOADS, from the log rather than the plan. Goblet Squat 22.5 (last 3 x 8 at
+# 22.5, top set 25 x 5); RDL 42.5 (last 3 x 10 at 40 on the re-entry step,
+# 45 before travel, top set 52.5 x 5); Hip Thrust 30 (last 25, 42.5 before
+# travel — the 09-10 session was cut to 20-25 with no note, so the step is
+# from what he did, not what was written); Incline Press 15 (held three
+# sessions, add reps first); Lat Pulldown 45; Single-Arm Row 22.5; Pallof 5
+# units; Face Pull 6 units. Race week runs two working sets at week-1 loads
+# and no top sets.
+#
+# The Cluster A stack, the mobility day's thoracic work, the grip-grade test
+# and the release block are Block A's, unchanged in content. Everything is at
+# the same clinical stage, so the ACWR, RPE and volume ceilings in
+# services/rules.py do not move. ACWR stays advisory (held 2026-08-14,
+# evaluate against Block B's loading — the first normal loading since the
+# chronic window reset).
+
+
+_BB_PHASE = "Block B — Race Build"
+
+
+def _take(exercises: list, name: str, **overrides) -> dict:
+    """A shallow copy of the named exercise from an authored list, with fields
+    overridden. Block B reuses Block A's vetted instructions and changes the
+    dose; a copy keeps the two blocks' dicts distinct so a stepper on one can
+    never mutate the other."""
+    src = next(e for e in exercises if e["name"] == name)
+    return dict(src, **overrides)
+
+
+ISCHIAL_RELEASE_NO_PAUSE = _ex(
+    name="Ischial Tuberosity Hamstring Release",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=1, hold_seconds=90, rest_seconds=0,
+    mechanics=(
+        "Sit on a hard surface — a wooden chair, the floor or a firm step — with a small "
+        "rolled sock or folded cloth under your RIGHT sit bone. Lean slightly forward at "
+        "the hip so your weight loads into the sit bone, and hold 90 seconds. A dull ache "
+        "or warmth is normal; sharp pain means stop. Then move the sock under the LEFT sit "
+        "bone and go straight into the left side — no pause between the two."
+    ),
+    biomechanical_focus=(
+        "Proximal hamstring tendon desensitisation at the ischial tuberosity — the "
+        "structure finding #2 now points at, with the posterior capsule refuted "
+        "2026-08-17. Same dose as Block A (90 s a side); re-coded 2026-09-11 as one side "
+        "then the other with no rest, because it was two bilateral sets with 45 s between "
+        "and the athlete's 2026-09-10 session note asked why a stretch had a pause in it. "
+        "The pause was a coding artefact, not a prescription."
+    ),
+    progression="Comfortable → lean further forward to load the attachment more.",
+    regression="Too intense → a softer surface, no raised object, or a shorter hold.",
+)
+
+
+def _bb_release(hip_loaded: bool, training: bool = True) -> list:
+    """Phase 1, quiet things down. The withdrawal trial's rule stands: rest
+    and mobility days carry the front-of-hip release only."""
+    if not training:
+        return [ANTERIOR_HIP_RELEASE]
+    head = [ISCHIAL_RELEASE_NO_PAUSE] if hip_loaded else []
+    return head + [UPPER_GLUTE_RELEASE_5MIN, PIRIFORMIS_PNF_5MIN, ANTERIOR_HIP_RELEASE]
+
+
+def _bb_prep(lower: bool) -> list:
+    """Phase 2, wake things back up: the raise and ONE activation item."""
+    return [PREP_RAISE, PREP_GLUTE_ACTIVATION if lower else PREP_SCAPULAR]
+
+
+def _bb_ramp(template: dict, kg: float) -> dict:
+    """A ramp set at ~62% of the day's working load, 60 s rest — the rest a
+    light rehearsal set needs, not the 90 s Block A charged."""
+    return dict(template, weight_kg=kg, rest_seconds=60)
+
+
+def _bb_top(template: dict, kg: float, lift: str) -> dict:
+    return dict(
+        template, weight_kg=kg,
+        mechanics=(
+            f"ONE set of five, heavier than today's working weight, straight after the "
+            f"ramp and before the working sets — you are already at the {lift}. Same "
+            f"movement, same depth, same flat back. It should feel like RPE 7-8: two or "
+            f"three good reps left, never a grind. If the number shown is not that, change "
+            f"the weight and log what you actually used; the honest number is the entire "
+            f"point of this set."
+        ),
+    )
+
+
+_BB_A = {
+    # week: (squat, rdl, thrust, goblet top, rdl top, working sets, heavy rest)
+    1: (22.5, 42.5, 30.0, 25.0, 52.5, 3, 120),
+    2: (22.5, 45.0, 32.5, 27.5, 55.0, 3, 120),
+    3: (25.0, 45.0, 35.0, 27.5, 55.0, 3, 120),
+    4: (20.0, 40.0, 30.0, None, None, 2, 90),
+}
+_BB_A_OBJECTIVE = {
+    1: "Block B Week 1 — Squat + Hinge (ramped, top sets nested)",
+    2: "Block B Week 2 — Squat + Hinge (top sets up one step)",
+    3: "Block B Week 3 — Squat + Hinge (the block's heaviest)",
+    4: "Block B Week 4 — Squat + Hinge (race week: two sets, no top set)",
+}
+_S2B_A4 = _s2b_gym_a(4)["exercises"]
+_S2B_B4 = _s2b_gym_b(4)["exercises"]
+
+
+def _bb_gym_a(week: int) -> dict:
+    """Squat + Hinge. Three main lifts, one core item, one hip-flexor item.
+
+    Each heavy compound is ONE station: ramp, heavy top set, working sets,
+    then the next lift. Week 4 is race week — two working sets at week-1
+    loads, 90 s rest, no top set; the legs should arrive at Sunday fresh."""
+    squat, rdl, thrust, top_g, top_r, n_sets, heavy_rest = _BB_A[week]
+    goblet = [_bb_ramp(GOBLET_RAMP, 12.5 if squat <= 22.5 else 15.0)]
+    if top_g:
+        goblet.append(_bb_top(GOBLET_TOP_SET, top_g, "rack"))
+    goblet.append(_take(_S2B_A4, "Goblet Squat", weight_kg=squat, sets=n_sets,
+                        rest_seconds=heavy_rest))
+    hinge = [_bb_ramp(RDL_RAMP, 25.0 if rdl <= 42.5 else 27.5)]
+    if top_r:
+        hinge.append(_bb_top(RDL_TOP_SET, top_r, "dumbbells"))
+    hinge.append(_take(_S2B_A4, "Romanian Deadlift (DB)", weight_kg=rdl, sets=n_sets,
+                       rest_seconds=heavy_rest))
+    return {
+        "objective": _BB_A_OBJECTIVE[week],
+        "phase": _BB_PHASE,
+        "session_rpe_target": 6 if week == 4 else 7,
+        "is_gym_session": True,
+        "day_type": "main",
+        "exercises": _bb_release(hip_loaded=True) + _bb_prep(lower=True) + goblet + hinge + [
+            _take(_S2B_A4, "Hip Thrust (Loaded)", weight_kg=thrust, sets=n_sets),
+            _take(_S2B_A4, "Pallof Press (Cable)", sets=n_sets),
+            END_RANGE_PSOAS_ISOMETRIC,
+        ],
+    }
+
+
+_BB_B = {
+    # week: (press, pulldown, row, face pull units, working sets)
+    1: (15.0, 45.0, 22.5, 6.0, 3),
+    2: (15.0, 47.5, 22.5, 6.0, 3),
+    3: (15.0, 47.5, 25.0, 7.0, 3),
+    4: (12.5, 40.0, 20.0, 6.0, 2),
+}
+
+
+def _bb_knee_hover(week: int) -> dict:
+    """Continues Block A's ladder (it ended at 3 x 20 s). Held at 3 x 25 from
+    week 2: advance on two clean weeks, never on one good day, and the race
+    week is not the week to find out."""
+    sets, hold = {1: (3, 20), 2: (3, 25), 3: (3, 25), 4: (3, 25)}[week]
+    return dict(_s2b_knee_hover(4), sets=sets, hold_seconds=hold)
+
+
+def _bb_gym_b(week: int) -> dict:
+    """Press + Pull. Three main lifts, the face-pull pairing, one core item,
+    one hip-flexor item. The scapular retraction isometric and the prone
+    Y-raise are not here — see the block header for where they went and why."""
+    press, pulldown, row, face, n_sets = _BB_B[week]
+    return {
+        "objective": (f"Block B Week {week} — Press + Pull"
+                      + (" (race week: two sets)" if week == 4 else "")),
+        "phase": _BB_PHASE,
+        "session_rpe_target": 6 if week == 4 else 7,
+        "is_gym_session": True,
+        "day_type": "main",
+        "exercises": _bb_release(hip_loaded=False) + _bb_prep(lower=False) + [
+            _take(_S2B_B4, "Incline DB Press", weight_kg=press, sets=n_sets),
+            _take(_S2B_B4, "Lat Pulldown", weight_kg=pulldown, sets=n_sets),
+            _take(_S2B_B4, "Single-Arm DB Row", weight_kg=row, sets=n_sets),
+            _take(_S2B_B4, "Face Pull (Cable)", weight_kg=face, sets=n_sets),
+            _take(_S2B_B4, "Full Side Bridge", sets=n_sets),
+            _bb_knee_hover(week),
+        ],
+    }
+
+
+_S2B_MOB = _s2b_mobility(4)["exercises"]
+
+
+def _bb_mobility(week: int) -> dict:
+    """Wednesday. The desk-intervention day: the front-of-hip release, the
+    weekly grip grade, thoracic work, the two mat items that left the gym
+    sessions, and the walk. No loading, no raise — nothing is being prepared
+    for. day_type stays "rest" so the cluster day after it has a clean
+    morning."""
+    return {
+        "objective": f"Block B Week {week} — Mobility + Release" + (" (race week)" if week == 4 else ""),
+        "phase": _BB_PHASE,
+        "session_rpe_target": 3,
+        "is_gym_session": False,
+        "day_type": "rest",
+        "exercises": _bb_release(hip_loaded=False, training=False) + [
+            _take(_S2B_MOB, "Upper Glute Grip Grade (Test)"),
+            _take(_S2B_MOB, "Thoracic Extension (Rolled Towel)"),
+            _take(_S2B_MOB, "Thread-the-Needle (Thoracic Rotation)"),
+            _take(_S2B_A4, "McGill Curl-Up (Progressed)"),
+            SCAPULAR_ISOMETRIC,
+            _take(_S2B_MOB, "Controlled Walking"),
+        ],
+    }
+
+
+_CLUSTER_STACK_NAMES = (
+    "Tailor's pose, unloaded", "Frog rocks", "Butterfly PIR",
+    "90/90 hip rotations with lift-offs", "Triangle side split, external-rotation cue",
+)
+_S2B_CLUSTER = _s2b_cluster(4)["exercises"]
+
+
+def _bb_cluster(week: int) -> dict:
+    """Thursday. Cluster A's pattern-D stack, unchanged from Block A, with
+    both hip-flexor items and the lift-offs at the end. The flexibility retest
+    is run cold on one of these mornings, before the session — the mobility
+    day before it loads no legs, which is what makes the morning readable."""
+    return {
+        "objective": f"Block B Week {week} — Cluster A Flexibility Session",
+        "phase": _BB_PHASE,
+        "session_rpe_target": 4,
+        "is_gym_session": False,
+        "day_type": "stretch",
+        "exercises": _bb_release(hip_loaded=True) + [PREP_RAISE]
+                     + [_take(_S2B_CLUSTER, n) for n in _CLUSTER_STACK_NAMES]
+                     + [_bb_knee_hover(week), END_RANGE_PSOAS_ISOMETRIC, STRADDLE_LIFT_OFFS],
+    }
+
+
+_RUN_STOP = ("Stop and walk home at any front-of-hip or groin pain on the LEFT — that is "
+             "the Sartorius, it has gone twice before, and both times it was running "
+             "volume. A missed run costs nothing; a third strain costs the race.")
+
+_BB_RUN_DAYS = {
+    2: ("Run 1 — run/walk", "Running Intervals (Run/Walk)", 25, 4,
+        "Twenty-five minutes: two minutes of easy running, two minutes of walking, six times "
+        "through. Conversational the whole way — if you cannot talk in full sentences, slow "
+        "down. This picks up where the last block's one run left off.",
+        "Block A's Run 2, which never ran. One run of sixteen minutes is the whole running "
+        "history since 2025, so the build restarts at run/walk rather than at the plan's "
+        "week-4 line.",
+        "Comfortable, no next-day left hip flexor soreness → the walk shortens on Saturday.",
+        "Any left front-hip soreness the next day → repeat this session on Saturday instead."),
+    6: ("Run 2 — run/walk", "Running Intervals (Run/Walk)", 30, 4,
+        "Thirty minutes: three minutes of easy running, one minute of walking, seven or eight "
+        "times through. The walk is a break now, not half the session. Still conversational.",
+        "The last run/walk before the first continuous run. One variable moves per session "
+        "and this one moves the ratio.",
+        "Comfortable → first continuous run on Tuesday.",
+        "Not comfortable → Tuesday repeats this session; the calendar gives way, the hip does not."),
+    9: ("Run 3 — first continuous run", "Easy Running", 20, 4,
+        "Twenty minutes of continuous easy running, no walk breaks, slower than feels "
+        "necessary. If you cannot talk, you are running too fast for this block.",
+        "The step from run/walk to continuous is the one most likely to produce soreness; "
+        "it is short on purpose and it lands the day after a squat day so the long run "
+        "has a clear run-in.",
+        "Comfortable → Saturday's long run/walk as written.",
+        "Sore → Saturday drops to three-minute intervals."),
+    13: ("Run 4 — long run/walk", "Long Running (Run/Walk)", 40, 4,
+         "Forty minutes: four minutes of easy running, one minute of walking, eight times "
+         "through — about five kilometres at this pace. Easy throughout; the distance is the "
+         "work, the pace is not.",
+         "The first long run. Run/walk keeps the impact dose below what continuous running "
+         "at the same distance would cost, which is the lever this block pulls instead of "
+         "slowing the build.",
+         "Comfortable, clean the next morning → the decision run next Saturday.",
+         "Any left front-of-hip signal → next Saturday repeats this distance rather than extending it."),
+    16: ("Run 5 — easy", "Easy Running", 30, 4,
+         "Thirty minutes continuous, easy, conversational. Nothing to prove today — this is "
+         "time on feet between the two long runs.",
+         "Continuous running at a dose already cleared, on the Tuesday, so the week's "
+         "long run gets three clear days before it.",
+         "Comfortable → the decision run on Saturday as written.",
+         "Fatigue accumulating → shorten this one, never the long run."),
+    20: ("Run 6 — THE DECISION RUN", "Long Running (Run/Walk)", 55, 5,
+         "Fifty-five minutes: five minutes of easy running, one minute of walking, nine "
+         "times through — about seven kilometres. This is the run that decides the race. "
+         "Run it exactly as the race will be run: same pattern, same easy pace, same "
+         "route type if you can. Write in the note how the left hip felt during, straight "
+         "after, and tomorrow morning.",
+         "The go / no-go for the 10 km, pre-registered: clean today and clean tomorrow "
+         "morning, with the 5:1 pattern held throughout → the race is run/walk at 5:1 "
+         "from the gun. A left front-of-hip signal at any point → the race is walked at "
+         "whatever ratio was clean, or not run. A missed race costs nothing that a third "
+         "Sartorius strain would not cost more. The decision is made on this run, not on "
+         "race morning.",
+         "Clean → race day is a run/walk at 5:1. Book it.",
+         "Not clean → the race is a walk/run at the last clean ratio, or a spectator day. "
+         "Write which, and why, in the note."),
+    23: ("Run 7 — taper", "Easy Running", 25, 4,
+         "Twenty-five minutes continuous, easy. The work is done; this keeps the legs "
+         "used to the movement without spending anything. Stop early if it feels like "
+         "more than that.",
+         "Race-week taper. Volume drops, the pattern stays.",
+         "Feels easy → good; that is the point of this week.",
+         "Anything at all in the left hip → walk, and race morning becomes a walk/run decision."),
+}
+
+_S2B_B3 = _s2b_gym_b(3)["exercises"]
+_POST_RUN_MOVEMENT = [_take(_S2B_B3, "Hip 90/90 Flow"), _take(_S2B_B3, "Lateral Lunge")]
+
+
+def _bb_run_day(day: int) -> dict:
+    """A run day: the hip-loaded release, the raise and the glute bridge,
+    the run, and on Tuesdays the two finding-#5 movements as a cooldown."""
+    label, name, minutes, rpe, mech, focus, prog, regr = _BB_RUN_DAYS[day]
+    tuesday = day in (2, 9, 16, 23)
+    return {
+        "objective": f"Block B — {label}",
+        "phase": _BB_PHASE,
+        "session_rpe_target": rpe,
+        "is_gym_session": False,
+        "day_type": "stretch",
+        "exercises": _bb_release(hip_loaded=True) + [PREP_RAISE, PREP_GLUTE_ACTIVATION] + [
+            _ex(
+                name=name,
+                ex_type="duration",
+                sets=1, duration_minutes=minutes, rest_seconds=0,
+                mechanics=mech,
+                biomechanical_focus=focus,
+                progression=prog,
+                regression=regr,
+                warning=_RUN_STOP,
+            ),
+        ] + (_POST_RUN_MOVEMENT if tuesday else []),
+    }
+
+
+def _bb_rest(week: int, note: str) -> dict:
+    return {
+        "objective": f"Block B Week {week} — Rest",
+        "phase": _BB_PHASE,
+        "session_rpe_target": 2,
+        "is_gym_session": False,
+        "day_type": "rest",
+        "exercises": _bb_release(hip_loaded=False, training=False) + [
+            _ex(
+                name="Controlled Walking",
+                ex_type="duration",
+                sets=1, duration_minutes=20, rest_seconds=0,
+                mechanics="Twenty minutes, easy, outdoors. Nothing else is prescribed today.",
+                biomechanical_focus=note,
+                progression="Feeling good → a longer walk is fine. Running is not.",
+                regression="Tired → the release alone is a complete day.",
+            ),
+        ],
+    }
+
+
+PLAN_BLOCK_B: dict[int, dict] = {}
+
+# ── Week 1: the build restarts ───────────────────────────────────────────────
+PLAN_BLOCK_B[1] = _bb_gym_a(1)
+PLAN_BLOCK_B[2] = _bb_run_day(2)
+PLAN_BLOCK_B[3] = _bb_mobility(1)
+PLAN_BLOCK_B[4] = _bb_cluster(1)
+PLAN_BLOCK_B[5] = _bb_gym_b(1)
+PLAN_BLOCK_B[6] = _bb_run_day(6)
+PLAN_BLOCK_B[7] = _bb_rest(1, "A genuine rest day. The walk is the trapezius perfusion "
+                              "mechanism, not filler; the front-of-hip release is the desk "
+                              "day's dose.")
+# ── Week 2: first continuous run, first long run ─────────────────────────────
+PLAN_BLOCK_B[8] = _bb_gym_a(2)
+PLAN_BLOCK_B[9] = _bb_run_day(9)
+PLAN_BLOCK_B[10] = _bb_mobility(2)
+PLAN_BLOCK_B[11] = _bb_cluster(2)
+PLAN_BLOCK_B[12] = _bb_gym_b(2)
+PLAN_BLOCK_B[13] = _bb_run_day(13)
+PLAN_BLOCK_B[14] = _bb_rest(2, "Rest after the first long run. How the left hip feels "
+                               "this morning is data for the decision run — note it.")
+# ── Week 3: the heaviest week, and the decision run ──────────────────────────
+PLAN_BLOCK_B[15] = _bb_gym_a(3)
+PLAN_BLOCK_B[16] = _bb_run_day(16)
+PLAN_BLOCK_B[17] = _bb_mobility(3)
+PLAN_BLOCK_B[18] = _bb_cluster(3)
+PLAN_BLOCK_B[19] = _bb_gym_b(3)
+PLAN_BLOCK_B[20] = _bb_run_day(20)
+PLAN_BLOCK_B[21] = _bb_rest(3, "The morning after the decision run. The left hip this "
+                               "morning is the second half of that decision — write it "
+                               "in the note before anything else.")
+# ── Week 4: race week ────────────────────────────────────────────────────────
+PLAN_BLOCK_B[22] = _bb_gym_a(4)
+PLAN_BLOCK_B[23] = _bb_run_day(23)
+PLAN_BLOCK_B[24] = _bb_mobility(4)
+PLAN_BLOCK_B[25] = _bb_cluster(4)
+PLAN_BLOCK_B[26] = _bb_gym_b(4)
+PLAN_BLOCK_B[27] = _bb_rest(4, "The day before the race. Nothing but the walk and the "
+                               "release; a race run on fatigue measures the fatigue.")
+PLAN_BLOCK_B[28] = {
+    "objective": "Block B Day 28 — RACE DAY, 10 km",
+    "phase": _BB_PHASE,
+    "session_rpe_target": 7,
+    "is_gym_session": False,
+    "day_type": "test",
+    "exercises": _bb_release(hip_loaded=True) + [PREP_RAISE, PREP_GLUTE_ACTIVATION] + [
+        _ex(
+            name="Race Day — 10 km Running (Run/Walk)",
+            ex_type="duration",
+            sets=1, duration_minutes=75, rest_seconds=0,
+            mechanics=(
+                "Ten kilometres, run/walk from the gun: five minutes of easy running, one "
+                "minute of walking, and again, all the way to the line — the pattern the "
+                "decision run proved. Start slower than the people around you; the first "
+                "kilometre at conversational pace is the whole race plan. Walk every break "
+                "even when you feel good at 3 km, especially then. If the decision run was "
+                "not clean, today is a walk/run at the last clean ratio, and that is still "
+                "the race."
+            ),
+            biomechanical_focus=(
+                "The block's endpoint, 2026-10-11. The format is set by Run 6 on day 20, "
+                "pre-registered there; nothing is decided on race morning. Seventy-five "
+                "minutes is the run/walk estimate at ~7.5 min/km and the number the "
+                "duration reads if the watch is not running."
+            ),
+            progression="Finished with the hip quiet → the next block starts from a runner, not a rehab patient.",
+            regression="Any left front-of-hip signal → walk the rest; the finish line is not the point.",
+            warning=_RUN_STOP,
+        ),
+        _ex(
+            name="Race Debrief (Notes)",
+            ex_type="duration",
+            sets=1, duration_minutes=3, rest_seconds=0,
+            mechanics=(
+                "Three minutes with the note field while it is fresh. Write: the finish "
+                "time and the run/walk ratio you actually held; how the left front of the "
+                "hip felt at 3 km, at the finish and an hour after; whether the right hip "
+                "clicked at any point; and how the lower back feels standing still now."
+            ),
+            biomechanical_focus=(
+                "This note is the data the next block is authored from — the running "
+                "tolerance criterion, finding #4 under the longest run on record, and the "
+                "stillness question that H1 turns on."
+            ),
+            progression="Done → the next block has its inputs.",
+            regression="Short on time → the hip and the ratio are the two that cannot be skipped.",
+        ),
+    ],
+}

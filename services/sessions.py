@@ -105,6 +105,16 @@ CHECKPOINT_FIELDS = (
     # session_state with every name here, and a missing one silently stops
     # the whole checkpoint saving.
     "tp_accessory_plan",
+    # The save-in-progress markers. A session's id is minted ONCE, on the first
+    # press of Save, and every exercise written under it is remembered here, so
+    # a save that stops partway (a Notion 429 twenty rows in, a dropped
+    # connection) resumes under the SAME session from the exercise that failed.
+    # Before 2026-09-11 every press minted a fresh id and rewrote everything,
+    # which is how 2026-09-10 was logged three times: 8, 20 and 2 exercises
+    # under three ids, 1,306 AU for one session, strain 17.1 for the day.
+    "tp_pending_session",
+    "tp_saved_exercise_idx",
+    "tp_last_saved_exercise_id",
 )
 
 #: Read-time HOLD, the biometrics.HRV_GARMIN_HOLD idiom. `rest_taken_seconds`
@@ -1364,9 +1374,296 @@ def exercise_seconds_from_sets(sets: list[dict]) -> int:
     return active + rest
 
 
+# ── SESSION TIME MODEL, RE-BASED ON MEASUREMENT (2026-09-11) ─────────────────
+#
+# The old estimate charged 30 s per exercise change and read no laterality.
+# Measured from the per-set timestamps of every logged session that carries
+# them (13 sessions, 109 exercise changes, 2026-07-31 -> 2026-09-10): the time
+# from the last set of one exercise to the START of the first set of the next,
+# with that set's own work subtracted, was
+#
+#     next station is a mat or floor item          median  74 s  (p25 52,  p75 114)
+#     next station is a rack, plates or a cable    median 117 s  (p25 60,  p75 161)
+#     next station is a band set-up                median 158 s  (p25 96,  p75 212)
+#
+# So a 20-entry session carried 20-30 minutes of changeover the estimate never
+# saw. Stage 2B day 22 (2026-09-10) was estimated at 54 min and took 81; costed
+# from its timestamps the three main lifts took 28 min, the five add-on
+# exercises 33, and preparation 19. The athlete's own description of the same
+# session: "nearly 40 mins in when I finished just the first two real training
+# exercises" — which the timestamps put at 39.
+#
+# Consecutive entries of the SAME LIFT — a ramp set, a heavy top set and the
+# working sets of one exercise — share a station and cost one weight change,
+# not a changeover. That is also why a ramp belongs immediately before the lift
+# it prepares and nowhere else: the 2026-09-10 session ran squat ramp, RDL
+# ramp, squat top, RDL top, squat, RDL, i.e. six weight changes across two
+# stations, and the athlete logged all four singles in an eleven-second burst
+# because he had not followed that order anyway. See session_shape_violations.
+#
+# These are MEDIANS of his own changeovers. They will drift as the sessions
+# get shorter (fewer stations, less walking) — re-measure them from the
+# timestamps rather than tuning them by hand: scripts/measure_changeovers.py
+# is the measurement and prints these three numbers.
+CHANGEOVER_SECONDS: dict[str, int] = {"floor": 74, "gym": 117, "band": 158}
+#: One weight change at a station the previous entry already occupied.
+CHANGEOVER_SAME_STATION_SECONDS = 20
+#: Getting to the first item — the old estimate's 120 s, kept.
+SESSION_SETUP_SECONDS = 120
+#: Per rep when an exercise carries no tempo. Measured 2026-09-10: Hip Thrust
+#: ten reps in ~46 s, Pallof Press ten reps in ~26 s a side, RDL ten at 3-1-1
+#: in ~44 s. The old formula charged a flat 20 s per SET regardless of reps.
+REPS_SECONDS_DEFAULT = 4
+#: Seconds between the reps of a hold_reps set — reset, breathe, go again.
+HOLD_REPS_GAP_SECONDS = 2
+#: Coded laterality="unilateral" but having only ONE side. Counting them twice
+#: is what inflated an earlier estimate of the right/left split's cost.
+SINGLE_SIDED_NAMES = frozenset({
+    "Right Posterior Hip Capsule Stretch (Revised Cue)",
+    "Right Posterior Hip Capsule Stretch (Quadruped)",
+    "Right Hip Tendon Path Drill (Coxa Saltans)",
+})
+_GYM_EQUIPMENT = frozenset({"dumbbell", "plate", "cable", "barbell", "machine"})
+#: No equipment_type, but a station you walk to and set up all the same.
+_GYM_STATION_NAMES = frozenset({"Walking Raise (Incline)"})
+
+
+def base_name(name: str) -> str:
+    """'Goblet Squat (Ramp Set)' -> 'Goblet Squat'. The bracketed suffix names
+    a set's ROLE (ramp, top set, test); the base names the lift, which is the
+    station the athlete is standing at."""
+    return re.sub(r"\s*\([^)]*\)\s*$", "", name or "").strip()
+
+
+def station_kind(ex: dict) -> str:
+    """'gym' for a rack, plates, a cable or a treadmill; 'band' for a band
+    set-up; 'floor' for a mat item. Keys CHANGEOVER_SECONDS."""
+    eq = ex.get("equipment_type")
+    if eq == "band":
+        return "band"
+    if eq in _GYM_EQUIPMENT or ex.get("name") in _GYM_STATION_NAMES:
+        return "gym"
+    return "floor"
+
+
+def sides(ex: dict) -> int:
+    """2 for a two-sided unilateral item, otherwise 1. 'alternating' is 1:
+    its reps already alternate inside the set."""
+    if ex.get("laterality") == "unilateral" and ex.get("name") not in SINGLE_SIDED_NAMES:
+        return 2
+    return 1
+
+
+def tempo_seconds(tempo: str | None) -> int:
+    """'3-1-1' -> 5 seconds per rep. No tempo -> REPS_SECONDS_DEFAULT."""
+    if not tempo:
+        return REPS_SECONDS_DEFAULT
+    try:
+        return max(1, sum(int(part) for part in str(tempo).split("-")))
+    except ValueError:
+        return REPS_SECONDS_DEFAULT
+
+
+def set_work_seconds(ex: dict) -> int:
+    """Working time of ONE set on ONE side."""
+    t = ex.get("type")
+    if t == "duration":
+        return (ex.get("duration_minutes") or 0) * 60
+    if t == "hold":
+        return ex.get("hold_seconds") or 0
+    if t == "hold_reps":
+        return (ex.get("reps_in_set") or 1) * ((ex.get("hold_seconds") or 0) + HOLD_REPS_GAP_SECONDS)
+    if t == "reps":
+        return (ex.get("reps") or 0) * tempo_seconds(ex.get("tempo"))
+    return 0
+
+
+def exercise_work_seconds(ex: dict) -> int:
+    """Work plus the rest BETWEEN its sets, both sides counted. The rest is
+    not doubled: the guided flow runs no timer on the right-to-left switch,
+    so the other side's working time is the first side's rest."""
+    n = ex.get("sets", 1) or 1
+    rest = ex.get("rest_seconds", 60) or 0
+    if ex.get("type") == "duration":
+        return set_work_seconds(ex)
+    return n * set_work_seconds(ex) * sides(ex) + (n - 1) * rest
+
+
+def changeover_seconds(prev: dict | None, cur: dict) -> int:
+    """Getting from the last set of `prev` to the first set of `cur`."""
+    if prev is None:
+        return 0
+    if base_name(prev.get("name", "")) == base_name(cur.get("name", "")):
+        return CHANGEOVER_SAME_STATION_SECONDS
+    return CHANGEOVER_SECONDS[station_kind(cur)]
+
+
+def gap_seconds(prev: dict | None, cur: dict) -> int:
+    """From the last set of `prev` to the first set of `cur`: the LONGER of
+    prev's prescribed rest and the changeover. After a heavy top set the
+    athlete rests 150 s whether the next entry is the same lift or a walk to
+    another station — the walk happens inside the rest, it does not add to
+    it. A release item with 15 s of rest is bounded by the 74 s it takes to
+    get onto the next mat; a ramp with 60 s of rest at the same rack is
+    bounded by the rest."""
+    if prev is None:
+        return 0
+    return max(prev.get("rest_seconds", 0) or 0, changeover_seconds(prev, cur))
+
+
+def session_seconds(exercises: list[dict]) -> int:
+    """The whole session: set-up, every entry's work and between-set rest,
+    and the gap between every consecutive pair."""
+    total, prev = SESSION_SETUP_SECONDS, None
+    for ex in exercises:
+        total += gap_seconds(prev, ex) + exercise_work_seconds(ex)
+        prev = ex
+    return total
+
+
 def estimate_duration(exercises: list[dict]) -> int:
-    total = 120 + sum(exercise_duration_seconds(ex) + 30 for ex in exercises)
-    return max(10, round(total / 60))
+    """Minutes, floored at 10. Built on session_seconds — the measured model
+    above — since 2026-09-11; before that it was exercise_duration_seconds
+    plus 30 s per entry, which read Stage 2B day 22 as 54 min against a
+    measured 81."""
+    return max(10, round(session_seconds(exercises) / 60))
+
+
+# ── SESSION SHAPE — what a gym session is authored to (CLAUDE.md Key Rule 21)
+#
+# Athlete, 2026-09-11, after the 81-minute session: "Limit the number of
+# exercises — it seems to be just increasing and increasing"; "limit the number
+# of 1 set exercises"; "ramp sets must only arrive before the real exercises";
+# "84 is too long for what feels like three main exercises". Each addition to
+# Stage 2B had been individually justified and nobody was counting the total:
+# Stage 2A gym days ran 10 exercises and 58-67 min, Stage 2B week 1 ran 14
+# entries at 75-77 min, and by week 4 two appended isometrics took it to 20
+# entries and 81 min.
+#
+# Published anchors for an hour: ACSM's whole-body prescription is 8-10
+# exercises at 2-4 sets, with one set of it taking ~20 min and three ~50, and
+# dropout rising once sessions pass 60 min; NSCA's program design puts the
+# core lifts first with 2-3 min rest and assistance after, which fits 4-6
+# exercises and 15-22 working sets in an hour. Day 22 had 8 exercises at three
+# sets, 24 working sets, before four singles and eight preparation items.
+#
+# These rules apply to every plan registered from SESSION_SHAPE_RULES_FROM_PHASE
+# on. Stage 2B (phase 3) is the block that produced them and is exempt because
+# it ends 2026-09-13 and its content is history. session_shape_violations is
+# the check; tests/test_session_shape_rules.py runs it over every registered
+# block, so a future block cannot be authored past these numbers without
+# either fixing the block or changing this constant deliberately.
+SESSION_SHAPE_RULES_FROM_PHASE = 4
+SESSION_SHAPE: dict[str, int] = {
+    # Distinct lifts outside preparation. 3 main + core + hip work; 6 leaves
+    # room for the press day's clinical face-pull pairing.
+    "max_working_families": 6,
+    # A one-set exercise outside the release block, a ramp/top set of a lift
+    # that follows, or a measurement, trains nothing and costs a changeover.
+    "max_single_set_training_entries": 0,
+    # session_seconds / 60, with the measured changeovers. The athlete's line:
+    # over 60 is fine, 84 is not. Block B's squat day — three heavy lifts with
+    # a ramp and a top set nested under two of them — models at 68 with every
+    # prescribed rest taken in full (150 s after a top set, 120 s between
+    # working sets), which he cut short on 2026-09-10; the press day at 56.
+    "max_gym_minutes": 70,
+    # Release items, the raise and ONE activation item.
+    "max_preparation_entries": 7,
+}
+RAMP_SUFFIX = "(Ramp Set)"
+TOP_SET_SUFFIX = "(Heavy Top Set)"
+#: The preparation vocabulary: the release block, the raise and the activation
+#: items. Everything after the last of these in a session is load.
+PREPARATION_NAMES = RELEASE_EXERCISE_NAMES | frozenset({
+    "Walking Raise (Incline)", "Single-Leg Glute Bridge", "Dead Bug",
+    "Scapular Wall Slide", "Prone Y-Raise (Scapular)",
+})
+
+
+def is_measurement(name: str) -> bool:
+    """Finding tests and trials carry a suffix and may lead a session."""
+    return any(tag in (name or "") for tag in ("(Test)", "(Timed Test)", "(Trial)"))
+
+
+def is_ramp_or_top(name: str) -> bool:
+    return (name or "").endswith(RAMP_SUFFIX) or (name or "").endswith(TOP_SET_SUFFIX)
+
+
+def preparation_entries(exercises: list[dict]) -> list[dict]:
+    """The leading run of measurement and preparation items."""
+    out = []
+    for ex in exercises:
+        if is_measurement(ex.get("name", "")) or ex.get("name") in PREPARATION_NAMES:
+            out.append(ex)
+        else:
+            break
+    return out
+
+
+def working_families(exercises: list[dict]) -> list[str]:
+    """Distinct base names of everything that is not preparation or a
+    measurement, in first-seen order. A ramp, its top set and the working
+    sets of one lift are one family."""
+    seen: list[str] = []
+    for ex in exercises:
+        name = ex.get("name", "")
+        if is_measurement(name) or name in PREPARATION_NAMES:
+            continue
+        b = base_name(name)
+        if b not in seen:
+            seen.append(b)
+    return seen
+
+
+def session_shape_violations(day: dict, rules: dict[str, int] | None = None) -> list[str]:
+    """Every way a plan day breaks the session-shape rules, as readable
+    reasons. Empty for a day that fits. Only `day_type == "main"` (a gym
+    session) is held to the counts and the clock; every day is held to the
+    ramp-nesting rule, because a ramp anywhere else is a changeover for
+    nothing."""
+    rules = dict(SESSION_SHAPE, **(rules or {}))
+    exercises = day.get("exercises") or []
+    names = [ex.get("name", "") for ex in exercises]
+    out: list[str] = []
+
+    for i, name in enumerate(names):
+        if not is_ramp_or_top(name):
+            continue
+        lift = base_name(name)
+        nxt = names[i + 1] if i + 1 < len(names) else None
+        if nxt is None or base_name(nxt) != lift:
+            out.append(f"{name!r} is not immediately followed by its own lift "
+                       f"({lift!r}); ramp and top sets sit right before the lift they prepare")
+        if name.endswith(RAMP_SUFFIX) and not exercises[i].get("warmup"):
+            out.append(f"{name!r} is a ramp set but is not flagged warmup=True, so its "
+                       f"reps and weight would count as work")
+
+    if day.get("day_type") != "main":
+        return out
+
+    fams = working_families(exercises)
+    if len(fams) > rules["max_working_families"]:
+        out.append(f"{len(fams)} working exercises ({', '.join(fams)}); the ceiling is "
+                   f"{rules['max_working_families']}")
+
+    singles = [n for ex, n in zip(exercises, names)
+               if (ex.get("sets", 1) or 1) == 1
+               and not is_measurement(n) and n not in PREPARATION_NAMES
+               and not is_ramp_or_top(n)]
+    if len(singles) > rules["max_single_set_training_entries"]:
+        out.append(f"one-set training entries {singles}; the ceiling is "
+                   f"{rules['max_single_set_training_entries']}")
+
+    prep = preparation_entries(exercises)
+    if len(prep) > rules["max_preparation_entries"]:
+        out.append(f"{len(prep)} preparation entries; the ceiling is "
+                   f"{rules['max_preparation_entries']}")
+
+    minutes = session_seconds(exercises) / 60
+    if minutes > rules["max_gym_minutes"]:
+        out.append(f"{minutes:.0f} min with measured changeovers; the ceiling is "
+                   f"{rules['max_gym_minutes']}")
+    return out
 
 
 def checkpoint_payload(day_num: int, state: dict) -> dict:
@@ -1396,7 +1693,7 @@ def seed_default_phase(phases: list[Phase], plan_start: date | None) -> list[Pha
 
 
 _PLAN_BY_PHASE_NUMBER: dict[int, dict[int, dict]] = {
-    1: tp.PLAN, 2: tp.PLAN_STAGE2, 3: tp.PLAN_STAGE2B,
+    1: tp.PLAN, 2: tp.PLAN_STAGE2, 3: tp.PLAN_STAGE2B, 4: tp.PLAN_BLOCK_B,
 }
 
 #: Everything needed to CREATE a phase, per phase number. Only consulted when a
@@ -1415,6 +1712,13 @@ PHASE_META: dict[int, dict] = {
         "button": "Begin Stage 2 — 4-Week Transition Block"},
     3: {"name": "Stage 2B — Strength + Running Build", "stage": 2,
         "button": "Begin Stage 2B — 4-Week Block"},
+    # Block B is a new BLOCK at the same clinical stage, for the same reason
+    # 2B was: the content changes (race build, the session shape of Key Rule
+    # 21), the ceilings do not. Block A's exit criteria gate a STAGE change
+    # and are mostly untested (docs/hypothesis.md, 2026-09-11); no criterion
+    # is needed to start the next block of the same stage.
+    4: {"name": "Block B — Race Build", "stage": 2,
+        "button": "Begin Block B — 4-Week Race Build"},
 }
 
 

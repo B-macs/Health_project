@@ -167,6 +167,7 @@ _CORE_EXERCISES: tuple[str, ...] = (
     "Seated Forward Fold Exposure — Loaded (Trial)",
     "Wide-Stance Rotation Count (Test)",
     "Reassessment Wrap-Up (Notes)",
+    "Race Debrief (Notes)",
     "Bunkie — Anterior Power Line (Timed)",
     # Stage 2B addition
     "Band Pallof Press",
@@ -285,6 +286,8 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Running Intervals (Run/Walk)",
     "Easy Running",
     "Long Easy Running",
+    "Long Running (Run/Walk)",
+    "Race Day — 10 km Running (Run/Walk)",
     "Band Front Squat",
     "Band Romanian Deadlift",
     "Band Hip Thrust",
@@ -425,6 +428,7 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Seated Forward Fold Exposure (Trial)":   {"upper_body": 0.00, "core": 0.90, "lower_body": 0.10},
     "Seated Forward Fold Exposure — Loaded (Trial)": {"upper_body": 0.00, "core": 0.90, "lower_body": 0.10},
     "Reassessment Wrap-Up (Notes)":           {"upper_body": 0.00, "core": 0.80, "lower_body": 0.20},
+    "Race Debrief (Notes)":                   {"upper_body": 0.00, "core": 0.80, "lower_body": 0.20},
     "Upper Glute Grip Grade (Test)":          {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     # Front-of-hip strength, 2026-08-24. The knee-hover carries the most core
     # of the three because holding the back knee off the floor without letting
@@ -569,6 +573,8 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Running Intervals (Run/Walk)":           {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
     "Easy Running":                           {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
     "Long Easy Running":                      {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
+    "Long Running (Run/Walk)":                {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
+    "Race Day — 10 km Running (Run/Walk)":    {"upper_body": 0.05, "core": 0.15, "lower_body": 0.80},
     # Band versions carry the same distribution as the loaded lifts they
     # stand in for -- the movement is the same, only the resistance differs.
     "Band Front Squat":                       {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
@@ -687,6 +693,7 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     '90/90 hip rotations with lift-offs':          ("mobility_core", 0.25),
     'Triangle side split, external-rotation cue':  ("mobility_core", 0.25),
     "Reassessment Wrap-Up (Notes)":      ("mobility_core", 0.25),
+    "Race Debrief (Notes)":              ("mobility_core", 0.25),
     "Bunkie — Posterior Power Line (Timed)":       ("bodyweight_compound", 0.5),
     "Bunkie — Anterior Power Line (Timed)":        ("bodyweight_compound", 0.5),
     "Bunkie — Posterior Stabilizing Line (Timed)": ("bodyweight_compound", 0.5),
@@ -799,6 +806,8 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Running Intervals (Run/Walk)":             ("bodyweight_compound", 0.5),
     "Easy Running":                             ("bodyweight_compound", 0.5),
     "Long Easy Running":                        ("bodyweight_compound", 0.5),
+    "Long Running (Run/Walk)":                  ("bodyweight_compound", 0.5),
+    "Race Day — 10 km Running (Run/Walk)":      ("bodyweight_compound", 0.5),
     # BAND WORK SITS AT bodyweight_compound, NOT AT ITS LOADED TIER. A band
     # front squat is not a 1.3 squat -- scoring it there would repeat the
     # Stage 1 over-count in the other direction, inflating a maintenance

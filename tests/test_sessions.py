@@ -1210,17 +1210,20 @@ def test_exercise_duration_seconds_unknown_type_returns_zero():
     assert sessions.exercise_duration_seconds({"type": "unknown"}) == 0
 
 
-def test_exercise_duration_seconds_sums_to_estimate_duration():
-    # estimate_duration is now built from this function — lock the
-    # relationship in so a future edit to one doesn't silently drift from
-    # the other: 120s base + (per-exercise time + 30s transition) each.
+def test_estimate_duration_is_built_on_the_measured_session_model():
+    # Until 2026-09-11 this pinned "120 s base + per-exercise time + 30 s per
+    # entry". That model read Stage 2B day 22 as 54 min against a measured
+    # 81, because 30 s is not what an exercise change costs (74 s to a floor
+    # item, 117 s to a station, measured over 109 changes). estimate_duration
+    # is now session_seconds / 60 — tests/test_session_time_model.py holds
+    # the model itself; this pins only that the two cannot drift apart.
     exercises = [
-        {"type": "duration", "duration_minutes": 5},
-        {"type": "hold", "sets": 3, "hold_seconds": 30, "rest_seconds": 15},
-        {"type": "reps", "sets": 3, "reps": 10, "rest_seconds": 45},
+        {"name": "A", "type": "duration", "duration_minutes": 5},
+        {"name": "B", "type": "hold", "sets": 3, "hold_seconds": 30, "rest_seconds": 15},
+        {"name": "C", "type": "reps", "sets": 3, "reps": 10, "rest_seconds": 45},
     ]
-    raw_total = 120 + sum(sessions.exercise_duration_seconds(ex) + 30 for ex in exercises)
-    assert sessions.estimate_duration(exercises) == max(10, round(raw_total / 60))
+    assert sessions.estimate_duration(exercises) == max(
+        10, round(sessions.session_seconds(exercises) / 60))
 
 
 # ─── exercise_seconds_from_sets ─────────────────────────────────────────────
@@ -1283,6 +1286,8 @@ _STATE = {
     # is running. Present-but-None rather than absent is the point — see
     # CHECKPOINT_FIELDS' own note on why a missing key kills the checkpoint.
     "tp_accessory_plan": None,
+    "tp_pending_session": None, "tp_saved_exercise_idx": [],
+    "tp_last_saved_exercise_id": None,
 }
 
 
@@ -1477,7 +1482,10 @@ def test_next_phase_offer_returns_the_next_authored_block():
 
 
 def test_next_phase_offer_never_re_offers_an_existing_block():
-    assert sessions.next_phase_offer([_ph(1), _ph(2), _ph(3)]) is None
+    # Phase 4 (Block B) is authored since 2026-09-11, so 1-3 stored offers it;
+    # with all four stored there is nothing left to offer.
+    assert sessions.next_phase_offer([_ph(1), _ph(2), _ph(3)]) == 4
+    assert sessions.next_phase_offer([_ph(1), _ph(2), _ph(3), _ph(4)]) is None
 
 
 def test_next_phase_offer_will_not_skip_a_block():

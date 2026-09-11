@@ -5,6 +5,20 @@ Single source of truth for MRI findings and biomechanical assessment.
 Referenced by training_plan.py when designing sessions.
 Update this file before generating each new training block.
 
+2026-09-11: BLOCK B IS AUTHORED AND STARTS 2026-09-14 (training_plan.PLAN_BLOCK_B,
+  Phase 4 at clinical stage 2, race day 2026-10-11 as its day 28). Built from Block
+  A's LOG: five sessions in 28 days, one run, a psoas-attributed flare on 08-25,
+  top sets at prescription on 09-10. THE SESSION SHAPE IS NOW A RULE (CLAUDE.md
+  Key Rule 21, athlete 2026-09-11): three main lifts, one core item, one hip-flexor
+  item, no one-set training entries, ramp and top set nested under their own lift,
+  and every exercise change priced at its MEASURED cost (74 s floor / 117 s station)
+  rather than the 30 s the estimate had charged. The 2026-09-10 session ran 20
+  entries and 81 minutes; Block B's squat day is 15 entries and ~67. Removals and
+  moves with their revert conditions are at the block header and in
+  pre_session_release below. Clinical stage unchanged — a block change needs no
+  exit criteria; the Stage 2B criteria gate a STAGE change and are mostly
+  untested (docs/hypothesis.md v1.2 scores them).
+
 2026-08-14: STAGE 2B IS AUTHORED AND THE BLOCK STARTS 2026-08-17. It replaces
   Stage 2A rather than extending it (athlete + physio, 2026-08-12) and runs as
   Phase 3 at CLINICAL STAGE 2 — the block changes, the ACWR/RPE/volume ceilings
@@ -172,29 +186,26 @@ PROFILE = {
 
     "patient": "Patient",
     "current_stage": 2,
-    "current_block": "Stage 2B — 28-Day Block (Days 1-28, starts 2026-08-17), training_plan."
-                      "PLAN_STAGE2B, Phase 3 at clinical stage 2. THREE things make it unlike "
-                      "2A. (1) Days 3-14 are Ireland with BANDS AND BODYWEIGHT ONLY — those two "
-                      "weeks hold ground and do not progress; the progression in them is the "
-                      "running. (2) RUNNING IS INTRODUCED from day 5, toward the 10 km on "
-                      "2026-10-11, which is day 28 of the NEXT block. Six runs, three of them "
-                      "run/walk, reaching 35 min continuous — deliberately short of the "
-                      "distance, because the left Sartorius has strained twice from running "
-                      "overuse and clinical_profile_weighting #1 makes that full-weight again "
-                      "the moment a plan re-stresses it. (3) EVERY SESSION IS NOW THREE PHASES: "
-                      "quiet things down (~5 min, the release block restored to the dose this "
-                      "file always specified) -> wake things back up (~5 min, NEW) -> load. "
-                      "Total preparation 10-15 min, 15 a ceiling. Still no overhead pressing "
-                      "(finding #6).",
-    "next_reassessment": "Day 28 (2026-09-13) — reassess against stage_2b_exit_criteria and "
-                          "author Block B, which runs 2026-09-14 -> 2026-10-11 with RACE DAY as "
-                          "its own day 28. The decisions that land: how the band fortnight "
-                          "actually went, whether the running introduction produced any left hip "
-                          "flexor signal, the Coxa Saltans verdict that gates the horse-stance "
-                          "and Cossack deferrals, and whether ACWR enforcement comes off advisory "
-                          "mode (deferred to Block B on 2026-08-14 — the chronic window over "
-                          "Block A is 12/14 travel days, so a breach there would be an artefact "
-                          "of the trip rather than of training).",
+    "current_block": "Block B — Race Build (Days 1-28, 2026-09-14 -> 2026-10-11), training_plan."
+                      "PLAN_BLOCK_B, Phase 4 at clinical stage 2; Stage 2B (Block A) runs to "
+                      "2026-09-13. The week is fixed: Mon squat, Tue run, Wed mobility, Thu "
+                      "cluster, Fri press, Sat run, Sun rest; race week swaps Saturday for rest "
+                      "and Sunday for the 10 km. Every gym day is THREE main lifts, ONE core item, "
+                      "ONE hip-flexor item (Key Rule 21): Goblet Squat, RDL, Hip Thrust, Pallof, "
+                      "End-Range Psoas Isometric on the squat day; Incline Press, Pulldown, Row, "
+                      "Face Pull, Side Bridge, Knee-Hover on the press day. Ramp -> heavy top set "
+                      "-> working sets at one rack, top sets weeks 1-3, race week two working "
+                      "sets. Running restarts at Block A's Run 2 and the DECISION RUN is day 20 "
+                      "(Sat 2026-10-03, 55 min run/walk 5:1): clean -> the race is run/walk 5:1; "
+                      "not clean -> walked at the last clean ratio, or not run. Still no overhead "
+                      "pressing (finding #6).",
+    "next_reassessment": "Block A day 28 is Sunday 2026-09-13 (the Bunkie lines and the hip-click "
+                          "verdict, the athlete's own screen). Block B's measurement is Run 6 on "
+                          "day 20 (the race go/no-go, pre-registered) and the race itself on "
+                          "2026-10-11; the post-race reassessment lands at the next block's day 1, "
+                          "and docs/hypothesis.md v1.2 holds the predictions (P8-P11) it scores. "
+                          "ACWR advisory mode is evaluated against Block B's loading, the first "
+                          "normal loading since the chronic window reset.",
 
     # ─────────────────────────────────────────────────────────────────────────
     #  MRI Findings
@@ -924,6 +935,32 @@ PROFILE = {
     # a whole when it is the whole.
 
 
+
+    # ── 2026-09-11: AS BUILT IN BLOCK B ──────────────────────────────────
+    # The release block is unchanged in CONTENT and re-coded in SHAPE:
+    #   Hip-loaded days (squat days, run days, cluster days, race day):
+    #     Ischial Tuberosity Hamstring Release 90 s RIGHT then 90 s LEFT, no
+    #     pause (it was two bilateral sets with 45 s between; his 2026-09-10
+    #     note: "Why is there a pause between a stretch?") ->
+    #     Upper Glute / TFL 90 s each side -> Piriformis PNF 5 cycles each
+    #     side -> Anterior Hip Pressure Release 60 s each side.
+    #   Press days: the last three.
+    #   Mobility and rest days: the anterior release only (withdrawal trial).
+    # Phase 2 is the raise and ONE activation item: Single-Leg Glute Bridge on
+    # lower days, Scapular Wall Slide on upper days. DEAD BUG IS OUT — one set
+    # of six is potentiation, he said so twice, and nothing in the record
+    # names deep core as failing to fire before a squat. REVERT: the brace
+    # failing before rep 8 on the squat with the glute bridge alone in
+    # preparation. PRONE Y-RAISE IS OUT of the press day's preparation (two
+    # sets of strength work in a one-activation-item slot; face pull and the
+    # retraction isometric cover the tissue; the timed single-arm hold is
+    # finding #6's instrument). REVERT: a right-left Y-hold gap over 15% or
+    # instability under the press.
+    #
+    # Preparation costs ~21 min on a squat day and ~17 on a press day ONCE
+    # THE CHANGEOVERS ARE PRICED AT THEIR MEASURED COST (74 s per floor item);
+    # the 10-15 min figure above was computed at 30 s a change. The items are
+    # the same; the clock was wrong. Not re-opened, recorded.
 
     "add_when_right_hip_loaded": [
             "Right Hip Tendon Path Drill (Coxa Saltans) — 2 × 10 reps right only",
@@ -2401,6 +2438,35 @@ PROFILE = {
                      "condition since its old one was 'ask the physiotherapist': FOUR clean "
                      "weeks at step 2, double the two that raise HANG_STEP. Gate 3543 passed.",
             "signed_off_by": "athlete (2026-08-20)",
+        },
+        {
+            "date": "2026-09-11",
+            "event": "BLOCK B AUTHORED as training_plan.PLAN_BLOCK_B, Phase 4 at clinical "
+                     "stage 2, 2026-09-14 -> 2026-10-11 with race day as day 28 (to be seeded "
+                     "with scripts/seed_next_block.py before Monday; the live write is the "
+                     "athlete's). Built from Block A's log rather than its plan: five sessions "
+                     "in 28 days, one run of six, a psoas-attributed flare on 08-25 (tightness "
+                     "8, pain 5), top sets at prescription on 09-10. THE SESSION SHAPE IS A "
+                     "RULE FROM THIS BLOCK ON (CLAUDE.md Key Rule 21), the athlete's direction "
+                     "after a 20-entry, 81-minute session: three main lifts, one core item, one "
+                     "hip-flexor item; no one-set training entries; ramp and top set nested "
+                     "under their own lift; at most 70 minutes on a model that prices every "
+                     "exercise change at its MEASURED cost (74 s floor, 117 s station, 158 s "
+                     "band — medians of his own set timestamps; the estimate had charged 30). "
+                     "Removals with reverts at the block header: Dead Bug out; the seated-fold "
+                     "trial out (P2 confirmed on five clean exposures); McGill and the scapular "
+                     "isometric to the mobility day; Prone Y-Raise out of the press day; Hip "
+                     "90/90 and Lateral Lunge to the Tuesday runs; the ischial release re-coded "
+                     "one side then the other with no pause. Running is a compressed build "
+                     "(long runs 30 -> 40 -> 55 -> 75 min) with the race format decided by the "
+                     "day-20 run, pre-registered. Same day: the 2026-09-10 session, saved three "
+                     "times by a retried Save, got its repair script (archive the two partial "
+                     "copies; dry-run verified, live run the athlete's) and the save path was "
+                     "made resumable. Clinical stage unchanged — a block change "
+                     "needs no exit criteria; the Stage 2B criteria gate a stage change and "
+                     "are scored UNTESTED/CONFIRMED in docs/hypothesis.md v1.2.",
+            "signed_off_by": "athlete (2026-09-11) — the shape, the core and hip placement, "
+                              "and 'make the changes'",
         },
     ],
 }
