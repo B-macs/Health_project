@@ -264,23 +264,43 @@ def test_the_mat_items_moved_to_the_mobility_day():
         assert "Scapular Retraction Isometric" not in _names(d), d
 
 
-def test_the_finding_five_movements_run_after_the_tuesday_runs():
-    for d in (2, 9, 16, 23):
-        names = _names(d)
-        assert names[-2:] == ["Hip 90/90 Flow", "Lateral Lunge"], (d, names[-2:])
-    for d in GYM_DAYS:
-        assert "Lateral Lunge" not in _names(d), d
+def test_the_finding_five_movements_are_measured_not_maintained():
+    """Zero cracks on 2026-08-17. A quiet finding gets its count re-run once a
+    block (week-4 mobility day) rather than two maintenance exercises every
+    week. REVERT: any crack on that count puts both back on the Saturday runs."""
+    assert "Hip 90/90 Flow" not in NAMES and "Lateral Lunge" not in NAMES
+    assert _names(24)[0] == "Wide-Stance Rotation Count (Test)"
+    for d in (3, 10, 17):
+        assert "Wide-Stance Rotation Count (Test)" not in _names(d), d
 
 
-def test_one_hip_flexor_item_per_gym_day_and_both_on_the_cluster_day():
+def test_one_hip_flexor_item_per_gym_day_and_both_after_the_tuesday_run():
     for d in SQUAT_DAYS:
         assert "End-Range Psoas Isometric" in _names(d) and "Half-Kneeling Knee-Hover Isometric" not in _names(d), d
     for d in PRESS_DAYS:
         assert "Half-Kneeling Knee-Hover Isometric" in _names(d) and "End-Range Psoas Isometric" not in _names(d), d
+    for d in (2, 9, 16, 23):
+        assert _names(d)[-2:] == ["Half-Kneeling Knee-Hover Isometric", "End-Range Psoas Isometric"], d
+    # Never after the long Saturday run: it would muddy the run's own signal.
+    for d in (6, 13, 20):
+        assert not {"Half-Kneeling Knee-Hover Isometric", "End-Range Psoas Isometric"} & set(_names(d)), d
+
+
+def test_the_cluster_day_is_the_release_the_stack_and_the_lift_offs():
+    """Ten entries, under 50 modelled minutes — found at 13 / 61 on 2026-09-11.
+    No raise: the phase-2 lock's two conditions (stretching before load, loads
+    near max) are both false on a flexibility session, and the blueprint asks
+    only that the MEASUREMENT be cold."""
     for d in (4, 11, 18, 25):
         names = _names(d)
-        assert names[-3:] == ["Half-Kneeling Knee-Hover Isometric", "End-Range Psoas Isometric",
-                              "Straddle lift-offs from a flat back"], (d, names[-3:])
+        assert PLAN[d].get("session_kind") == "flexibility", d
+        assert len(names) == 10, (d, len(names))
+        assert names[:4] == ["Ischial Tuberosity Hamstring Release", "Upper Glute / TFL Self-Release",
+                             "Piriformis Contract-Relax (PNF)", "Anterior Hip Pressure Release"], d
+        assert names[4:9] == list(tp._CLUSTER_STACK_NAMES), d
+        assert names[-1] == "Straddle lift-offs from a flat back", d
+        assert "Walking Raise (Incline)" not in names, d
+        assert sess.estimate_duration(PLAN[d]["exercises"]) <= sess.SESSION_SHAPE["max_flexibility_minutes"], d
 
 
 def test_each_hip_flexor_item_lands_twice_a_week():
@@ -293,6 +313,9 @@ def test_each_hip_flexor_item_lands_twice_a_week():
 def test_the_knee_hover_never_steps_down_and_holds_from_week_two():
     doses = [(_ex(d, "Half-Kneeling Knee-Hover Isometric")["sets"],
               _ex(d, "Half-Kneeling Knee-Hover Isometric")["hold_seconds"]) for d in PRESS_DAYS]
+    tuesday = [(_ex(d, "Half-Kneeling Knee-Hover Isometric")["sets"],
+                _ex(d, "Half-Kneeling Knee-Hover Isometric")["hold_seconds"]) for d in (2, 9, 16, 23)]
+    assert tuesday == doses, "the Tuesday exposure runs the same week's dose as the Friday one"
     work = [s * h for s, h in doses]
     assert work == sorted(work) and work[1] > work[0] and work[1] == work[2] == work[3]
 
@@ -316,7 +339,7 @@ def test_the_ischial_release_is_one_side_then_the_other_with_no_pause():
 def test_every_training_day_opens_with_the_release_and_rest_days_carry_only_the_front_of_hip():
     withdrawn = {"Upper Glute / TFL Self-Release", "Piriformis Contract-Relax (PNF)"}
     for d in DAYS:
-        names = _names(d)
+        names = [n for n in _names(d) if not sess.is_measurement(n)]
         if PLAN[d]["day_type"] != "rest":
             assert names[0] in sess.RELEASE_EXERCISE_NAMES, (d, names[0])
         else:
@@ -329,10 +352,12 @@ def test_the_front_of_the_hip_is_released_every_day_of_the_block():
         assert "Anterior Hip Pressure Release" in _names(d), d
 
 
-def test_every_loaded_session_and_every_run_has_a_raise():
-    for d in GYM_DAYS + RUN_DAYS + [4, 11, 18, 25, 28]:
+def test_every_loaded_session_and_every_run_has_a_raise_and_the_cluster_day_does_not():
+    """Phase 2 is mandatory where stretching runs immediately before LOAD —
+    the lock's own condition. A flexibility session loads nothing after."""
+    for d in GYM_DAYS + RUN_DAYS + [28]:
         assert "Walking Raise (Incline)" in _names(d), d
-    for d in (3, 7, 10, 14, 17, 21, 24, 27):
+    for d in (3, 4, 7, 10, 11, 14, 17, 18, 21, 24, 25, 27):
         assert "Walking Raise (Incline)" not in _names(d), d
 
 

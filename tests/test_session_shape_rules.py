@@ -81,11 +81,23 @@ def test_a_one_set_training_entry_is_a_violation_but_activation_and_release_are_
     assert any("one-set" in r for r in s.session_shape_violations(day))
 
 
-def test_non_gym_days_are_only_held_to_the_nesting_rule():
-    """A cluster day carries fourteen floor items and is not an hour in a gym;
-    the counts and the clock are a gym session's rules."""
-    day = {"day_type": "stretch", "exercises": tp.PLAN_STAGE2B[25]["exercises"]}
+def test_run_and_rest_days_are_only_held_to_the_nesting_rule():
+    """A run day's content is the run; the counts and the clock are a gym
+    session's rules and a flexibility day's."""
+    day = {"day_type": "stretch", "exercises": tp.PLAN_STAGE2B[23]["exercises"]}
     assert s.session_shape_violations(day) == []
+
+
+def test_a_flexibility_day_has_its_own_entry_and_minute_ceilings():
+    """Block B's cluster day was 13 entries / 61 min before 2026-09-11; Stage
+    2B's is pinned as failing so the rule cannot go vacuous."""
+    assert s.SESSION_SHAPE["max_flexibility_entries"] == 10
+    assert 40 <= s.SESSION_SHAPE["max_flexibility_minutes"] <= 55
+    old = {"day_type": "stretch", "session_kind": "flexibility",
+           "exercises": tp.PLAN_STAGE2B[25]["exercises"]}
+    text = " ".join(s.session_shape_violations(old))
+    assert "entries on a flexibility day" in text and "min on a flexibility day" in text
+    assert s.session_shape_violations(tp.PLAN_BLOCK_B[4]) == []
 
 
 def test_working_families_treat_ramp_top_and_lift_as_one():

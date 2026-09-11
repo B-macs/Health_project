@@ -4799,14 +4799,26 @@ ACC_BREATHING = _ex(
 #     tissue and the single-arm timed hold is the finding-#6 instrument.
 #     REVERT: a right-left Y-hold gap over 15%, or instability under the
 #     press.
-#   Hip 90/90 Flow + Lateral Lunge  MOVED from the press day to the Tuesday
-#     run days as post-run movement. Finding #5 read zero cracks; they are
-#     movement content, not treatment, and they cost nothing after a run.
-#   Half-Kneeling Knee-Hover        press day and cluster day only.
-#   End-Range Psoas Isometric       squat day and cluster day only.
-#     (One hip-flexor item per gym day; the cluster day keeps both plus the
-#     lift-offs, so each still lands twice a week — the minimum that "advance
-#     on two clean weeks" can be judged against.)
+#   Hip 90/90 Flow + Lateral Lunge  OUT for this block. Finding #5 read zero
+#     cracks on 2026-08-17 and they returned as movement content, not
+#     treatment; a quiet finding is MEASURED, not maintained — the
+#     wide-stance rotation count runs on the week-4 mobility day (day 24).
+#     REVERT: any crack on that count puts both back on the Saturday runs.
+#   Half-Kneeling Knee-Hover        press day and the Tuesday runs.
+#   End-Range Psoas Isometric       squat day and the Tuesday runs.
+#     (One hip-flexor item per gym day; the second weekly exposure of each
+#     sits after the SHORT Tuesday run, never the long Saturday one — a
+#     hip-flexor load after the long run would muddy the very signal P8
+#     reads. Each still lands twice a week, the minimum that "advance on two
+#     clean weeks" can be judged against.)
+#   THE CLUSTER DAY IS THE STACK. Release, the five items pattern D
+#     prescribes, the straddle lift-offs at the end — ten entries, ~45 min.
+#     The raise is OFF it: the phase-2 lock's own two conditions (stretching
+#     runs immediately before load; the loads are near-maximal) are both
+#     false on a flexibility session, and the blueprint asks for nothing
+#     warm — it asks that the MEASUREMENT be cold. The two isometrics that
+#     were appended to it left with the raise (2026-09-11, the athlete's
+#     "fix that as well" after the day was found at 13 entries / 61 min).
 #   Ischial Tuberosity Hamstring Release   RE-CODED, same name: one side then
 #     the other with NO pause. It was two bilateral sets with 45 s between,
 #     and his 2026-09-10 note asked why a stretch had a pause in it.
@@ -5009,14 +5021,17 @@ def _bb_mobility(week: int) -> dict:
     weekly grip grade, thoracic work, the two mat items that left the gym
     sessions, and the walk. No loading, no raise — nothing is being prepared
     for. day_type stays "rest" so the cluster day after it has a clean
-    morning."""
+    morning. Week 4 opens with finding #5's wide-stance rotation count — a
+    quiet finding is re-measured once a block rather than maintained."""
+    measurement = ([_take(PLAN_STAGE2B[1]["exercises"], "Wide-Stance Rotation Count (Test)")]
+                   if week == 4 else [])
     return {
         "objective": f"Block B Week {week} — Mobility + Release" + (" (race week)" if week == 4 else ""),
         "phase": _BB_PHASE,
         "session_rpe_target": 3,
         "is_gym_session": False,
         "day_type": "rest",
-        "exercises": _bb_release(hip_loaded=False, training=False) + [
+        "exercises": measurement + _bb_release(hip_loaded=False, training=False) + [
             _take(_S2B_MOB, "Upper Glute Grip Grade (Test)"),
             _take(_S2B_MOB, "Thoracic Extension (Rolled Towel)"),
             _take(_S2B_MOB, "Thread-the-Needle (Thoracic Rotation)"),
@@ -5035,19 +5050,25 @@ _S2B_CLUSTER = _s2b_cluster(4)["exercises"]
 
 
 def _bb_cluster(week: int) -> dict:
-    """Thursday. Cluster A's pattern-D stack, unchanged from Block A, with
-    both hip-flexor items and the lift-offs at the end. The flexibility retest
+    """Thursday. The release block, Cluster A's pattern-D stack unchanged from
+    Block A, and the straddle lift-offs at the end — ten entries. No raise
+    (see the block header) and no appended isometrics. The flexibility retest
     is run cold on one of these mornings, before the session — the mobility
-    day before it loads no legs, which is what makes the morning readable."""
+    day before it loads no legs, which is what makes the morning readable.
+
+    `session_kind` marks it for sessions.session_shape_violations, which holds
+    a flexibility day to its own ceilings (entries and minutes) the way it
+    holds a gym day to the lift count."""
     return {
         "objective": f"Block B Week {week} — Cluster A Flexibility Session",
         "phase": _BB_PHASE,
         "session_rpe_target": 4,
         "is_gym_session": False,
         "day_type": "stretch",
-        "exercises": _bb_release(hip_loaded=True) + [PREP_RAISE]
+        "session_kind": "flexibility",
+        "exercises": _bb_release(hip_loaded=True)
                      + [_take(_S2B_CLUSTER, n) for n in _CLUSTER_STACK_NAMES]
-                     + [_bb_knee_hover(week), END_RANGE_PSOAS_ISOMETRIC, STRADDLE_LIFT_OFFS],
+                     + [STRADDLE_LIFT_OFFS],
     }
 
 
@@ -5120,15 +5141,15 @@ _BB_RUN_DAYS = {
          "Anything at all in the left hip → walk, and race morning becomes a walk/run decision."),
 }
 
-_S2B_B3 = _s2b_gym_b(3)["exercises"]
-_POST_RUN_MOVEMENT = [_take(_S2B_B3, "Hip 90/90 Flow"), _take(_S2B_B3, "Lateral Lunge")]
-
-
 def _bb_run_day(day: int) -> dict:
-    """A run day: the hip-loaded release, the raise and the glute bridge,
-    the run, and on Tuesdays the two finding-#5 movements as a cooldown."""
+    """A run day: the hip-loaded release, the raise and the glute bridge, the
+    run — and after the SHORT Tuesday run, the two hip-flexor isometrics
+    (their second weekly exposure; the squat and press days carry the first).
+    Never after the long Saturday run: a hip-flexor load there would muddy
+    the signal the run itself is measuring."""
     label, name, minutes, rpe, mech, focus, prog, regr = _BB_RUN_DAYS[day]
     tuesday = day in (2, 9, 16, 23)
+    week = (day - 1) // 7 + 1
     return {
         "objective": f"Block B — {label}",
         "phase": _BB_PHASE,
@@ -5146,7 +5167,7 @@ def _bb_run_day(day: int) -> dict:
                 regression=regr,
                 warning=_RUN_STOP,
             ),
-        ] + (_POST_RUN_MOVEMENT if tuesday else []),
+        ] + ([_bb_knee_hover(week), END_RANGE_PSOAS_ISOMETRIC] if tuesday else []),
     }
 
 

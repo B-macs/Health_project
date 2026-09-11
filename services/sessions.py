@@ -1569,6 +1569,14 @@ SESSION_SHAPE: dict[str, int] = {
     "max_gym_minutes": 70,
     # Release items, the raise and ONE activation item.
     "max_preparation_entries": 7,
+    # A flexibility day (session_kind == "flexibility"): the release block,
+    # the prescribed stack (cluster_a_prescription.LENGTH caps it at five)
+    # and at most one appended item. Block B's cluster day was found at 13
+    # entries / 61 modelled minutes on 2026-09-11 — a raise the phase-2 lock
+    # does not ask of a stretching session, plus two isometrics appended for
+    # frequency — and the athlete's answer was "fix that as well".
+    "max_flexibility_entries": 10,
+    "max_flexibility_minutes": 50,
 }
 RAMP_SUFFIX = "(Ramp Set)"
 TOP_SET_SUFFIX = "(Heavy Top Set)"
@@ -1638,6 +1646,15 @@ def session_shape_violations(day: dict, rules: dict[str, int] | None = None) -> 
             out.append(f"{name!r} is a ramp set but is not flagged warmup=True, so its "
                        f"reps and weight would count as work")
 
+    if day.get("session_kind") == "flexibility":
+        if len(exercises) > rules["max_flexibility_entries"]:
+            out.append(f"{len(exercises)} entries on a flexibility day; the ceiling is "
+                       f"{rules['max_flexibility_entries']}")
+        minutes = session_seconds(exercises) / 60
+        if minutes > rules["max_flexibility_minutes"]:
+            out.append(f"{minutes:.0f} min on a flexibility day with measured changeovers; "
+                       f"the ceiling is {rules['max_flexibility_minutes']}")
+        return out
     if day.get("day_type") != "main":
         return out
 

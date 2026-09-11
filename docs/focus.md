@@ -11,7 +11,7 @@
 | Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
 | Block | **Stage 2B (Block A)** ends Sun 2026-09-13; **Block B — Race Build** starts Mon **2026-09-14** (`training_plan.PLAN_BLOCK_B`, Phase 4 — **seed it before Monday**: `python scripts/seed_next_block.py --start 2026-09-14`) |
 | Day | Block A day 26 (Fri 2026-09-11); Block B day 1 on Monday |
-| Gate | **4010/4010** — `python -m pytest tests/` |
+| Gate | **4011/4011** — `python -m pytest tests/` |
 | Last code commit | Block B, the session-shape rule (Key Rule 21), the measured time model, the resumable save |
 | Next action | **Run the two scripts (seed Block B; archive the 09-10 duplicates). Sun 13 Sep: Block A day 28 — the Bunkie lines + hip-click verdict. Mon 14 Sep: Block B day 1 (squat day, 15 entries, ~67 min)** |
 
@@ -46,7 +46,9 @@ Sat run, Sun rest** — and race week swaps Saturday for rest and Sunday for the
 - **Out:** Dead Bug, the fold trial. **Moved:** McGill + scapular isometric → Wednesday;
   Hip 90/90 + Lateral Lunge → after the Tuesday runs; Prone Y-Raise out of the press day.
   Each removal's revert condition is at the block header in `training_plan.py`.
-- **The cluster day is still 13 entries / ~61 min** — not governed, noted for the next block.
+- **The cluster day is 10 entries / ~45 min**: release, pattern D's five items, the lift-offs.
+  No raise (nothing is loaded after it); the two isometrics moved to the short Tuesday runs.
+  Hip 90/90 + Lateral Lunge are out for the block and finding #5 is re-measured on day 24.
 
 ### Next actions, in order — the athlete's, not the code's
 
