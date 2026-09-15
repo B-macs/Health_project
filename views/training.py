@@ -30,6 +30,7 @@ from services import plan as ph  # aliased: render()'s guided flow has a local v
 from services import scheduling
 from services import sessions as sess
 from services import strain_regions
+from services import week_repeat
 from services import flexibility as fx
 from services import yoga as yg
 from services.repository import PhasesCorruptError
@@ -1552,6 +1553,11 @@ def _current_week_tier(scheduled: int, completed: int) -> tuple[str, str]:
         return "ULTIMATE WEEK", _MARKER_GREEN
     if completed * 5 >= scheduled * 4:
         return f"PERFECT WEEK — {scheduled - completed} to go for ultimate", _MARKER_GREEN
+    if completed <= ml.FAILED_WEEK_MAX_DAYS:
+        # Below the failed-week line the next thing that matters is not a
+        # perfect week but whether this week runs again (services/week_repeat.py).
+        short = ml.FAILED_WEEK_MAX_DAYS + 1 - completed
+        return f"{short} more to pass this week", _MARKER_MISSED
     needed = -(-(scheduled * 4) // 5)  # ceil(scheduled*4/5)
     remaining = max(1, needed - completed)
     return f"{remaining} more for a perfect week", _OV_TEXT_SEC
@@ -1599,6 +1605,68 @@ def _render_weekly_rollup_banner(history: list, streak) -> None:
             f"Last week: <span style='color:{color};font-weight:600;'>{text}</span></div>",
             unsafe_allow_html=True,
         )
+
+
+def _render_week_repeat(phases: list, in_session: bool) -> None:
+    """The failed-week rule on screen: why this week runs again (when it does),
+    and the athlete's own "redo this week" (athlete, 2026-09-15: "if I
+    performed 3 days it's not a failed week but also give me the option to
+    redo the week").
+
+    The redo is two presses — the button, then a confirm that says what moves
+    — because it moves the next block and cannot be taken back from here. It
+    is hidden during a session: it changes next week, never today, but the
+    session screen is not the place to decide that.
+    """
+    _today = date.today()
+    try:
+        _notice = week_repeat.repeat_notice(phases, _today)
+    except Exception:
+        _notice = None
+    if _notice:
+        st.info(_notice, icon="🔁")
+    if in_session or not phases:
+        return
+    try:
+        _first = min(date.fromisoformat(p.start_date) for p in phases)
+        _logged = _all_logged_dates(_first.isoformat(), _today.isoformat())
+        _after, _refusal = week_repeat.redo_this_week(phases, _logged, _today)
+    except Exception:
+        return
+    if _after is None:
+        return  # already set to repeat, no block this week, or it cannot move
+    if not st.session_state.get("tp_redo_confirm"):
+        if st.button("Redo this week", key="tp_redo_week"):
+            st.session_state.tp_redo_confirm = True
+            st.rerun()
+        return
+    _lines = ["Next week runs this week's sessions again."]
+    _lines += week_repeat.consequences(phases, _after)
+    st.warning("\n\n".join(_lines))
+    _yes_col, _no_col = st.columns(2)
+    if _yes_col.button("Yes, redo this week", key="tp_redo_yes"):
+        _redo_ok = False
+        try:
+            # A permanent write with no undo on screen: rebuild it from a
+            # fresh read of the stored phases and the log, never from the
+            # copies this render started with.
+            _r = repo.get_repository()
+            _stored = _r.get_phases_live()
+            _fresh, _why = week_repeat.redo_this_week(
+                _stored, _r.get_logged_session_dates(_first, _today), _today)
+            if _fresh is None:
+                st.warning(f"This week was not set to repeat: {_why}.")
+            else:
+                _r.set_phases(_fresh)
+                _redo_ok = True
+        except Exception:
+            st.error("Couldn't save the redo — nothing was changed. Try again.")
+        st.session_state.tp_redo_confirm = False
+        if _redo_ok:
+            st.rerun()
+    if _no_col.button("Cancel", key="tp_redo_no"):
+        st.session_state.tp_redo_confirm = False
+        st.rerun()
 
 
 def _render_week_status_badge(history: list, viewed_week_start) -> None:
@@ -1885,7 +1953,7 @@ def _render_past_missed(d: date, active, phases: list) -> None:
         f"margin-bottom:16px;'>NOT COMPLETED</div>",
         unsafe_allow_html=True,
     )
-    plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
+    plan_dict = sess.calendar_plan(active)
     today_plan = plan_dict.get(day_num)
     if not today_plan:
         st.info(f"Day {day_num} of {active.name} has no authored content on record.")
@@ -1928,7 +1996,7 @@ def _render_swap_with_today(d: date, active, phases: list, *,
         for _b in _blockers:
             st.info(f"Swap with today isn't available: {_b}")
         return
-    plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
+    plan_dict = sess.calendar_plan(active)
     _today_num = ph.day_number_in_phase(active, _today)
     _today_content = plan_dict.get(_today_num)
     _today_obj = _today_content["objective"] if _today_content else f"Day {_today_num}"
@@ -1978,7 +2046,7 @@ def _render_future_day(d: date, active, phases: list) -> None:
     explicit overwrite."""
     day_num = ph.day_number_in_phase(active, d)
     _day_overline(d)
-    today_plan = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
+    today_plan = sess.calendar_plan(active).get(day_num)
     if not today_plan:
         st.markdown(
             f"<div style='color:{_OV_TEXT_SEC};font-size:13px;margin-bottom:12px;'>"
@@ -2077,7 +2145,7 @@ def _render_no_active_phase(phases: list) -> None:
         stranded = ph.stranded_override_days(lapsed)
         if not stranded:
             continue
-        plan_days = sess.plan_dict_for_phase(lapsed.phase_number) or {}
+        plan_days = sess.calendar_plan(lapsed)
         lines = ", ".join(
             f"day {n} ({(plan_days.get(n) or {}).get('day_type', 'unknown')}) on {iso}"
             for iso, n in stranded
@@ -2499,7 +2567,7 @@ def _accessory_choice(active, day_num: int | None, policy_directive: dict):
 
     plan_day = None
     if active is not None and day_num is not None:
-        plan_day = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
+        plan_day = sess.calendar_plan(active).get(day_num)
 
     try:
         rows = _region_rows()
@@ -3019,6 +3087,42 @@ def render():
         nav.inject("training")
         st.stop()
 
+    # ── The failed-week rule — a week with 0-2 logged days runs again ─────────
+    # The athlete's rule (2026-09-15): "make it automatic for 0-2 days". NOT
+    # ask-first, unlike the two scheduling writers below — this is a
+    # consequence he set for himself, and one that waits for permission is a
+    # suggestion. It runs before them because it decides which block and which
+    # week today belongs to. services/week_repeat.py holds the whole rule.
+    #
+    # The cached read only decides whether a write is DUE. The write itself is
+    # recomputed from a FRESH read of both the log and the stored phases —
+    # phases from Notion itself, past the local copy — because this path
+    # replaces the whole phase list with no button press, and a list built from
+    # a stale local copy would put an older schedule over a newer one. When the
+    # fresh list already holds the verdict but the local copy does not, the
+    # fresh list is written back as it is, which repairs the copy the rest of
+    # this page reads.
+    if phases and not _in_session:
+        _fw_written = False
+        try:
+            _fw_today = date.today()
+            _fw_first = min(date.fromisoformat(p.start_date) for p in phases)
+            _fw_due, _ = week_repeat.apply_failed_week_rule(
+                phases, _all_logged_dates(_fw_first.isoformat(), _fw_today.isoformat()),
+                _fw_today)
+            if _fw_due is not phases:
+                _fw_repo = repo.get_repository()
+                _fw_stored = _fw_repo.get_phases_live()
+                _fw_logged = _fw_repo.get_logged_session_dates(_fw_first, _fw_today)
+                _fw_new, _ = week_repeat.apply_failed_week_rule(_fw_stored, _fw_logged, _fw_today)
+                if _fw_new is not _fw_stored or _fw_stored != phases:
+                    _fw_repo.set_phases(_fw_new)
+                    _fw_written = True
+        except Exception:
+            pass  # never let the rule's check crash the page; it runs again next render
+        if _fw_written:
+            st.rerun()
+
     # ── Missed-session rescheduling — priority-based carry within the week ──────
     # ASK-FIRST (the athlete's rule, 2026-08-07): a proposal that would MOVE a
     # session is never written without an explicit button press — it renders
@@ -3036,7 +3140,7 @@ def render():
     if active is not None and not _in_session:
         _mr_write_succeeded = False
         try:
-            _mr_plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
+            _mr_plan_dict = sess.calendar_plan(active)
             _mr_today = date.today()
             _mr_monday = _mr_today - timedelta(days=_mr_today.weekday())
             _mr_overrides, _mr_reasons = scheduling.missed_reschedules(
@@ -3117,7 +3221,7 @@ def render():
     # important check in this feature (see its own docstring).
     if active is not None and day_num is not None and not _in_session:
         _today_iso = date.today().isoformat()
-        _today_content = (sess.plan_dict_for_phase(active.phase_number) or {}).get(day_num)
+        _today_content = sess.calendar_plan(active).get(day_num)
         _is_gym_day = bool(_today_content and _today_content.get("is_gym_session"))
         if scheduling.should_evaluate_shift(_is_gym_day, _today_iso, active.shift_reasons):
             # ASK-FIRST (the athlete's rule, 2026-08-07): a shift that would
@@ -3135,7 +3239,7 @@ def render():
             try:
                 _shift, _reason = scheduling.should_shift_session(_rm_bio, _rm_bio, date.today())
                 if _shift:
-                    _plan_dict = sess.plan_dict_for_phase(active.phase_number) or {}
+                    _plan_dict = sess.calendar_plan(active)
                     _new_overrides = scheduling.swap_pairs_for_shift(active, date.today(), _plan_dict)
                     _new_reasons = scheduling.shift_reason_entries(
                         _new_overrides, _reason, phase=active)
@@ -3257,6 +3361,7 @@ def render():
         st.caption("Weekly rollup sync unavailable — showing live data only.")
     if not _garmin_sync_ok and _garmin_sync_err:
         st.caption("Garmin daily sync unavailable — will retry next visit.")
+    _render_week_repeat(phases, _in_session)
 
     _render_day_strip(active)
     _render_week_status_badge(history, st.session_state.get("tp_week_start"))
@@ -3282,10 +3387,10 @@ def render():
     # ── selected == today: existing day_num-driven flow, unchanged below ────────
 
     # ── Day-overview screen — shown until "Start" is tapped for today's session ─
-    # Upper bound is however many days are actually authored for the active
-    # phase's plan dict (Phase 1 → tp.PLAN, Phase 2 → tp.PLAN_STAGE2, via
-    # sess.plan_dict_for_phase) rather than a magic number.
-    active_plan = sess.plan_dict_for_phase(active.phase_number) or {}
+    # Upper bound is however many days the active phase's CALENDAR holds
+    # (sess.calendar_plan — the authored plan read through any repeated or
+    # dropped weeks) rather than a magic number.
+    active_plan = sess.calendar_plan(active)
     _plan_days = len(active_plan)
     if (1 <= day_num <= _plan_days and not st.session_state.tp_done_today
             and not st.session_state.tp_started):

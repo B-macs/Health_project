@@ -4731,9 +4731,17 @@ ACC_BREATHING = _ex(
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  BLOCK B — RACE BUILD. Phase 4, clinical stage 2. 2026-09-14 -> 2026-10-11.
-#  Race day is day 28.
+#  BLOCK B — RACE BUILD. Phase 4, clinical stage 2. Authored 2026-09-14 ->
+#  2026-10-11, race day is authored day 28.
 # ═════════════════════════════════════════════════════════════════════════════
+#
+# ⚠ IT RUNS 2026-09-21 -> 2026-10-11, WEEKS 2-4. Stage 2B week 4 failed (one
+# logged day) and repeated 2026-09-14..20 under the failed-week rule
+# (services/week_repeat.py), and the race date does not move, so Block B lost
+# a week rather than ending after the race. The week it lost is week 1 — its
+# sessions are what ran as that repeat (PLAN_STAGE2B_WEEK4_REPEAT, end of this
+# file). The authored numbering below is unchanged; sessions.calendar_plan
+# reads it through the stored phase's week_plan.
 #
 # Authored 2026-09-11 against Block A's real log, not its plan. Block A
 # (PLAN_STAGE2B) delivered FIVE sessions in 28 days: gym A on 2026-08-18 and
@@ -5280,4 +5288,52 @@ PLAN_BLOCK_B[28] = {
             regression="Short on time → the hip and the ratio are the two that cannot be skipped.",
         ),
     ],
+}
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  STAGE 2B WEEK 4, REPEATED — 2026-09-14 -> 2026-09-20
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# The failed-week rule (athlete, 2026-09-15): a week with 0-2 logged days
+# fails and runs again. Stage 2B week 4 (2026-09-07) logged ONE day, so it
+# repeats. What repeats is the week's SHAPE, not its authored sessions — the
+# athlete's choice, 2026-09-15 ("Shorter sessions"), for two reasons found in
+# the log rather than the plan:
+#
+#   * Day 23 as authored is a 35-minute CONTINUOUS run, the block's longest.
+#     The only run logged since July is a 20-minute run/walk on 2026-08-21.
+#     Block B restarts the build at a 25-minute run/walk for exactly that
+#     reason, and the left sartorius has strained twice from running overuse.
+#   * Days 22, 25 and 26 are the 20-, 14- and 17-entry sessions he rejected on
+#     2026-09-11 ("84 is too long"); Block B week 1 holds their Key Rule 21
+#     versions.
+#
+# So Monday to Saturday run Block B week 1's sessions in last week's slots —
+# squat day, run, mobility, flexibility, press day, rest — and Sunday keeps
+# Stage 2B's own day-28 reassessment, with the rest day before it that keeps
+# the reading clean. Block B's second run (its day 6) does not appear: last
+# week had one run, and Saturday is the rest day in front of the test.
+#
+# The exercise dicts are Block B's own objects, so every rule and scan that
+# covers Block B covers these; only the title and the phase label change, so
+# the screen does not announce a block that has not started.
+#
+# REVERT: none needed — this content runs only when Stage 2B's week 4 repeats
+# (sessions._REPEAT_CONTENT), and a later repeat of the same week reuses it.
+_S2B_WEEK4_AGAIN = "Stage 2B Week 4, again"
+PLAN_STAGE2B_WEEK4_REPEAT: dict[int, dict] = {
+    22: {**PLAN_BLOCK_B[1], "phase": PLAN_STAGE2B[22]["phase"],
+         "objective": f"{_S2B_WEEK4_AGAIN} — Squat + Hinge (ramped, top sets nested)"},
+    23: {**PLAN_BLOCK_B[2], "phase": PLAN_STAGE2B[23]["phase"],
+         "objective": f"{_S2B_WEEK4_AGAIN} — Run/walk"},
+    24: {**PLAN_BLOCK_B[3], "phase": PLAN_STAGE2B[24]["phase"],
+         "objective": f"{_S2B_WEEK4_AGAIN} — Mobility + Release"},
+    25: {**PLAN_BLOCK_B[4], "phase": PLAN_STAGE2B[25]["phase"],
+         "objective": f"{_S2B_WEEK4_AGAIN} — Cluster A Flexibility Session"},
+    26: {**PLAN_BLOCK_B[5], "phase": PLAN_STAGE2B[26]["phase"],
+         "objective": f"{_S2B_WEEK4_AGAIN} — Press + Pull"},
+    27: {**PLAN_BLOCK_B[7], "phase": PLAN_STAGE2B[27]["phase"],
+         "objective": f"{_S2B_WEEK4_AGAIN} — Rest"},
+    # 28 is not replaced: the reassessment runs as authored.
 }

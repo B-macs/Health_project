@@ -2664,6 +2664,13 @@ class Repository:
                     f"{p.start_date!r}"
                 ) from exc
             errors = plan.week_alignment_errors(start, p.length_days)
+            if p.week_plan is not None and (
+                    len(p.week_plan) * 7 != p.length_days
+                    or any(not isinstance(w, int) or w < 1 for w in p.week_plan)):
+                errors.append(
+                    f"week_plan {p.week_plan} does not describe a "
+                    f"{p.length_days}-day block, one authored week per calendar week"
+                )
             if errors:
                 raise plan.WeekAlignmentError(
                     f"phase {p.phase_number} ({p.name}): " + "; ".join(errors)
@@ -2692,13 +2699,50 @@ class Repository:
                     f"list order. Mark the earlier one 'completed' or move the "
                     f"later one."
                 )
-        payload = [
-            {"phase_number": p.phase_number, "name": p.name, "start_date": p.start_date,
-             "length_days": p.length_days, "status": p.status,
-             "date_overrides": p.date_overrides, "shift_reasons": p.shift_reasons}
-            for p in phases
-        ]
+        payload = []
+        for p in phases:
+            row = {"phase_number": p.phase_number, "name": p.name, "start_date": p.start_date,
+                   "length_days": p.length_days, "status": p.status,
+                   "date_overrides": p.date_overrides, "shift_reasons": p.shift_reasons}
+            # The failed-week rule's two fields are written only by a block
+            # that uses them, so every other phase stores exactly the JSON it
+            # stored before the rule existed.
+            if p.week_plan is not None:
+                row["week_plan"] = list(p.week_plan)
+            if p.week_results:
+                row["week_results"] = p.week_results
+            payload.append(row)
         self.set_config("phases", json.dumps(payload), today=today)
+
+    def get_phases_live(self) -> list[models.Phase]:
+        """The stored phase list read from Notion ITSELF — past the config
+        memo and past the local datastore.
+
+        For a writer that runs WITHOUT a button press and replaces the whole
+        list: the failed-week rule. In cache mode the hosted app reads phases
+        from its local copy, which a write made anywhere else (the block seed
+        script, the Notion UI) does not reach until the next redeploy. A list
+        computed from that copy and written back would silently put an OLDER
+        schedule over the newer one in Notion — the 2026-08-18 reversion by
+        another door. Reading the system of record first is what stops it.
+
+        Offline (a read-only snapshot) there is no live side to read, and
+        every write raises anyway, so this is the ordinary read there.
+        """
+        if self.offline:
+            return self.get_phases()
+        pages = notion.query_database(
+            self._nc, self.config.notion_db_config,
+            filter_={"property": "Key", "title": {"equals": "phases"}})
+        raw = notion.get_property(pages[0], "Value", "rich_text") if pages else None
+        if not raw:
+            return []
+        try:
+            return [models.Phase(**p) for p in json.loads(raw)]
+        except Exception as exc:
+            raise PhasesCorruptError(
+                f"stored 'phases' config exists but failed to parse: {exc!r}"
+            ) from exc
 
     def get_diagnostic_profile(self) -> dict:
         page = self._config_page("diagnostic_profile")

@@ -181,6 +181,58 @@ def day_number_in_phase(phase: Phase, d: date) -> int:
     return (d - _start(phase)).days + 1
 
 
+def plan_weeks(phase: Phase) -> list[int]:
+    """The AUTHORED plan week each calendar week of the block runs, in order.
+
+    The identity for every phase that has never used the failed-week rule
+    (week_plan None): calendar week N runs plan week N. See
+    services/week_repeat.py for how a week comes to appear twice or not at all.
+    """
+    if phase.week_plan:
+        return list(phase.week_plan)
+    return list(range(1, phase.length_days // 7 + 1))
+
+
+def plan_day_for_position(phase: Phase, position: int) -> int | None:
+    """The AUTHORED plan day a calendar position (a day number) shows, or None
+    outside the block.
+
+    Day numbers are calendar positions everywhere — date_overrides, key rule
+    18b's week check, the day strip, the missed-session carry — and none of
+    that changes when a week repeats. Only the content lookup goes through
+    here.
+    """
+    weeks = plan_weeks(phase)
+    if not 1 <= position <= len(weeks) * 7:
+        return None
+    index, offset = divmod(position - 1, 7)
+    return (weeks[index] - 1) * 7 + offset + 1
+
+
+def is_repeat_week(phase: Phase, d: date) -> bool:
+    """True when the calendar week holding `d` runs a plan week that an EARLIER
+    calendar week of the same block already ran."""
+    weeks = plan_weeks(phase)
+    index = (d - _start(phase)).days // 7
+    return 0 <= index < len(weeks) and weeks[index] in weeks[:index]
+
+
+def drop_week(weeks: list[int], drop_order, after: int = -1) -> list[int] | None:
+    """`weeks` with ONE droppable week removed, or None when none can go.
+
+    A block with a fixed last date (Block B ends on race day) cannot grow and
+    cannot start late without losing a week. `drop_order` is the authored order
+    in which its weeks may go; a week never listed there is never dropped. Only
+    positions after `after` are eligible, so a week just inserted as a repeat
+    is never the week removed to make room for it.
+    """
+    for week in drop_order:
+        for index in range(after + 1, len(weeks)):
+            if weeks[index] == week:
+                return weeks[:index] + weeks[index + 1:]
+    return None
+
+
 def stranded_override_days(phase: Phase) -> list[tuple[str, int]]:
     """Overrides that schedule a plan day PAST the phase's own last date.
 

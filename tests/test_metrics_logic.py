@@ -36,21 +36,22 @@ def test_4_of_5_is_perfect():
     assert ml.score_week(_WK, _LATER_TODAY, scheduled=5, completed=4).status == "perfect"
 
 
-def test_2_of_5_is_normal():
-    assert ml.score_week(_WK, _LATER_TODAY, scheduled=5, completed=2).status == "normal"
+def test_3_of_5_is_normal():
+    assert ml.score_week(_WK, _LATER_TODAY, scheduled=5, completed=3).status == "normal"
 
 
 def test_0_of_5_is_failed():
     assert ml.score_week(_WK, _LATER_TODAY, scheduled=5, completed=0).status == "failed"
 
 
-def test_1_of_5_lands_on_normal_not_failed():
-    # The 20% boundary: 1*5 >= 5*1 is True, so this is "normal", not
-    # "failed" — despite the shorthand "1/5 failed" in the original task
-    # description, the spec's own integer-math formulas put exactly 20% in
-    # the "normal" bucket (>= 20%). This test locks in that the boundary
-    # lands where the formulas say it does.
-    assert ml.score_week(_WK, _LATER_TODAY, scheduled=5, completed=1).status == "normal"
+def test_2_of_5_is_failed_the_line_is_a_count_of_days():
+    # The athlete moved the line on 2026-09-15: "change the failed week to
+    # 0-2 days", because a failed week now REPEATS (services/week_repeat.py).
+    # Until then the line was 20% (completed*5 >= scheduled), which scored
+    # 1 of 5 and 2 of 5 as normal; both are failed now. The whole boundary is
+    # pinned in tests/test_failed_week_rule.py.
+    assert ml.score_week(_WK, _LATER_TODAY, scheduled=5, completed=2).status == "failed"
+    assert ml.score_week(_WK, _LATER_TODAY, scheduled=5, completed=1).status == "failed"
 
 
 def test_current_week_is_in_progress_regardless_of_ratio():

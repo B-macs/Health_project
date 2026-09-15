@@ -20,6 +20,13 @@ from services.models import Phase, StreakInfo, WeekScore
 
 _GOOD_STATUSES = ("perfect", "ultimate")
 
+#: A week with this many logged days or fewer is a FAILED week, and a failed
+#: week repeats (services/week_repeat.py). The athlete's number, 2026-09-15:
+#: "change the failed week to 0-2 days" — "if I performed 3 days it's not a
+#: failed week". A COUNT of days, not a share: it replaced the old <20% line,
+#: which let one logged day in seven read as a normal week.
+FAILED_WEEK_MAX_DAYS = 2
+
 
 def score_week(week_start: date, today: date, scheduled: int, completed: int,
                 phase_number: int | None = None) -> WeekScore:
@@ -30,7 +37,7 @@ def score_week(week_start: date, today: date, scheduled: int, completed: int,
       - else scheduled == 0: "no_plan" (reassessment gap / pre-plan)
       - else completed == scheduled: "ultimate"
       - else completed*5 >= scheduled*4 (>=80%): "perfect"
-      - else completed*5 >= scheduled*1 (>=20%): "normal"
+      - else completed > FAILED_WEEK_MAX_DAYS (3 or more days): "normal"
       - else: "failed"
     """
     week_end = week_start + timedelta(days=6)
@@ -42,7 +49,7 @@ def score_week(week_start: date, today: date, scheduled: int, completed: int,
         status = "ultimate"
     elif completed * 5 >= scheduled * 4:
         status = "perfect"
-    elif completed * 5 >= scheduled * 1:
+    elif completed > FAILED_WEEK_MAX_DAYS:
         status = "normal"
     else:
         status = "failed"

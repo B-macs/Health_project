@@ -1735,7 +1735,27 @@ PHASE_META: dict[int, dict] = {
     # and are mostly untested (docs/hypothesis.md, 2026-09-11); no criterion
     # is needed to start the next block of the same stage.
     4: {"name": "Block B — Race Build", "stage": 2,
-        "button": "Begin Block B — 4-Week Race Build"},
+        "button": "Begin Block B — 4-Week Race Build",
+        # THE RACE DOES NOT MOVE. Block B ends on race day whatever happens
+        # before it, so a block that starts late — the failed-week rule
+        # pushing it, services/week_repeat.py — LOSES A WEEK instead of ending
+        # after the race. `drop_weeks` is the order its weeks may go: week 1
+        # first (on 2026-09-15 its sessions ran as the repeat of Stage 2B week
+        # 4), then week 2. Week 3 holds the day-20 decision run that
+        # pre-registers the race format and week 4 is the taper and the race;
+        # neither is ever dropped, so a push that would need one is refused.
+        "ends_on": date(2026, 10, 11),
+        "drop_weeks": (1, 2)},
+}
+
+#: Content that runs INSTEAD of an authored week when that week REPEATS, keyed
+#: (phase_number, plan week) -> {authored plan day: day content}. The first run
+#: of a week always shows its authored content; every later run shows this.
+#: Only for a week whose authored sessions are no longer the right thing to run
+#: again — a block authored to Key Rule 21 repeats as written and needs no
+#: entry. See training_plan.PLAN_STAGE2B_WEEK4_REPEAT for the one that exists.
+_REPEAT_CONTENT: dict[tuple[int, int], dict[int, dict]] = {
+    (3, 4): tp.PLAN_STAGE2B_WEEK4_REPEAT,
 }
 
 
@@ -1744,6 +1764,70 @@ def plan_dict_for_phase(phase_number: int) -> dict[int, dict] | None:
     nothing's been authored for it yet (legitimate — not every phase has
     content written)."""
     return _PLAN_BY_PHASE_NUMBER.get(phase_number)
+
+
+def calendar_plan(phase: Phase) -> dict[int, dict]:
+    """The phase's day content keyed by CALENDAR position — the day number the
+    screens, the day strip and every scheduling rule already use.
+
+    For a phase whose weeks run in authored order (week_plan None) this IS the
+    authored dict, the same object, so every block stored before the
+    failed-week rule reads exactly as it did. For a phase that repeated a week
+    or lost one, the authored plan is read through plan.plan_weeks, and a
+    repeated week shows its _REPEAT_CONTENT where one is authored.
+
+    ⚠ A screen that looks today's content up with plan_dict_for_phase(number)
+    instead shows the WRONG session in any repeated week, silently — the
+    position and the authored day agree everywhere except there.
+    tests/test_failed_week_rule.py pins that views/training.py never does.
+    """
+    authored = plan_dict_for_phase(phase.phase_number) or {}
+    if phase.week_plan is None:
+        return authored
+    out: dict[int, dict] = {}
+    runs: dict[int, int] = {}
+    for index, week in enumerate(_plan.plan_weeks(phase)):
+        earlier = runs.get(week, 0)
+        runs[week] = earlier + 1
+        replacement = _REPEAT_CONTENT.get((phase.phase_number, week), {}) if earlier else {}
+        for offset in range(7):
+            plan_day = (week - 1) * 7 + offset + 1
+            content = replacement.get(plan_day) or authored.get(plan_day)
+            if content is not None:
+                out[index * 7 + offset + 1] = content
+    return out
+
+
+def build_phase(phase_number: int, start: date, status: str = "active") -> Phase:
+    """The Phase a new block is stored as when it starts on `start`.
+
+    A block with a fixed last date (PHASE_META "ends_on" — Block B's race day)
+    that starts late loses weeks in its authored `drop_weeks` order until it
+    fits, and stores which weeks remain as week_plan. Raises when it cannot
+    fit: a block that would have to drop a week it is never allowed to lose is
+    a decision for the athlete, not something to squeeze silently.
+    """
+    meta = PHASE_META[phase_number]
+    authored = plan_dict_for_phase(phase_number)
+    if not authored:
+        raise ValueError(f"phase {phase_number} has no authored content")
+    weeks = list(range(1, len(authored) // 7 + 1))
+    ends_on = meta.get("ends_on")
+    if ends_on is not None:
+        room = (ends_on - start).days + 1
+        while len(weeks) * 7 > room:
+            fewer = _plan.drop_week(weeks, meta.get("drop_weeks", ()))
+            if fewer is None:
+                raise ValueError(
+                    f"{meta['name']} must end on {ends_on.isoformat()}; starting "
+                    f"{start.isoformat()} leaves {room} days, and none of the "
+                    f"weeks it still holds ({weeks}) may be dropped"
+                )
+            weeks = fewer
+    new = _plan.default_phase(start, length_days=len(weeks) * 7,
+                              phase_number=phase_number, name=meta["name"])
+    identity = weeks == list(range(1, len(weeks) + 1)) and len(weeks) * 7 == len(authored)
+    return replace(new, status=status, week_plan=None if identity else weeks)
 
 
 def next_phase_offer(phases: list[Phase]) -> int | None:

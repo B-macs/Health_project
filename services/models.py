@@ -32,6 +32,18 @@ class Phase:
     # why a session moved. Absent (not just empty-string) for manual
     # reschedules and for every date that has never been auto-shifted.
     shift_reasons: dict[str, str] = field(default_factory=dict)
+    # Which AUTHORED plan week each calendar week of the block runs, in order —
+    # the failed-week rule (athlete, 2026-09-15, services/week_repeat.py). None
+    # is the identity (calendar week N runs plan week N), which is every phase
+    # stored before the rule. A repeated week appears twice; a block with a
+    # fixed last date that had to start late has a week absent. Day numbers
+    # everywhere stay CALENDAR positions (1..length_days): this only decides
+    # which content a position shows, via sessions.calendar_plan.
+    week_plan: list[int] | None = None
+    # {"YYYY-MM-DD" Monday: outcome} — every week the rule has judged, passed
+    # or failed, and every week redone by choice. A week is judged ONCE, so a
+    # session deleted weeks later can never repeat a week after the fact.
+    week_results: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
