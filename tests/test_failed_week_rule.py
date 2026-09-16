@@ -10,6 +10,9 @@ and pushes out the block by one week."
     loses a droppable week instead, and refuses when none is left.
   * The repeat changes which CONTENT a calendar day shows and nothing else
     (sessions.calendar_plan); day numbers stay calendar positions.
+  * A week that runs again because it FAILED holds the load (athlete,
+    2026-09-16): weight, band and reps start at the last session and nothing
+    progresses; the + button still adds. A week redone by choice progresses.
 
 The first real use is pinned here too: Stage 2B week 4 (2026-09-07) logged
 one day and runs again 2026-09-14..20 with the shorter sessions the athlete
@@ -194,6 +197,8 @@ def test_the_stored_list_passes_the_stores_own_refusals():
 def test_the_notice_says_why_and_when_block_b_starts():
     assert wr.repeat_notice(_after_first_failure(), TUE_0915) == (
         "Last week had 1 of 7 days logged, so it failed. This week runs it again. "
+        "Every weight, band and rep starts at your last session, and nothing goes "
+        "up by itself this week. "
         "Block B — Race Build starts Monday 21 September.")
 
 
@@ -407,6 +412,125 @@ def test_block_b_is_refused_rather_than_losing_the_decision_run():
 
 
 # ═════════════════════════════════════════════════════════════════════════════
+#  A failed week holds the load
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# Athlete, 2026-09-16, the morning after the repeated week's squat day went up
+# on every lift and his back tired by the next afternoon: "if there is a failed
+# week then no increases in the weights during that week." Settled the same
+# day: failed weeks only, not a redo by choice; weight, band AND reps; and a
+# starting point rather than a limit on the + button.
+
+_GOBLET = next(e for e in tp.PLAN_BLOCK_B[1]["exercises"] if e["name"] == "Goblet Squat")
+_BAND_PALLOF = {"name": "Band Pallof Press", "type": "reps", "reps": 10, "sets": 3,
+                "equipment_type": "band", "band_tier": "Blue"}
+_GREEN = sess.load_policy({"signal_color": "green"}, {"volume_factor": 1.0})
+_HELD = sess.hold_for_failed_week(_GREEN)
+
+
+def _last(reps, weight):
+    sets = [{"reps": r, "weight": weight} for r in reps]
+    return {"reps": reps[-1], "weight_kg": weight, "session_date": "2026-09-10"}, sets
+
+
+def test_the_repeat_of_a_failed_week_holds_the_load():
+    assert wr.failed_week_holds_load(_after_first_failure(), TUE_0915)
+
+
+def test_an_ordinary_week_does_not_hold():
+    assert not wr.failed_week_holds_load(_live(), date(2026, 9, 1))
+
+
+def test_the_week_after_a_passed_repeat_progresses_again():
+    passed = LOGGED | {"2026-09-14", "2026-09-15", "2026-09-16"}
+    phases, _ = wr.apply_failed_week_rule(_after_first_failure(), passed, date(2026, 9, 21))
+    assert not wr.failed_week_holds_load(phases, date(2026, 9, 21))
+
+
+def test_failing_the_repeat_holds_its_repeat_too():
+    phases, _ = wr.apply_failed_week_rule(
+        _after_first_failure(), LOGGED | {"2026-09-15", "2026-09-16"}, date(2026, 9, 21))
+    assert wr.failed_week_holds_load(phases, date(2026, 9, 21))
+
+
+def test_a_week_redone_by_choice_keeps_normal_progression():
+    after, _ = wr.redo_this_week(_after_first_failure(), LOGGED, date(2026, 9, 16))
+    assert not wr.failed_week_holds_load(after, date(2026, 9, 22))
+    assert wr.HOLD_SENTENCE not in wr.repeat_notice(after, date(2026, 9, 22))
+
+
+def test_the_squat_day_that_went_up_would_have_started_at_last_session():
+    # 2026-09-15: 22.5 kg x 8, 8, 8 on 2026-09-10 and a high readiness streak,
+    # so the app started the goblet squat at 25 kg.
+    last, sets = _last([8, 8, 8], 22.5)
+    free = sess.resolve_prescription(_GOBLET, last, "high", _GREEN, last_session_sets=sets)
+    assert free["weight_kg"] == 25.0
+    held = sess.resolve_prescription(_GOBLET, last, "high", _HELD, last_session_sets=sets)
+    assert (held["weight_kg"], held["reps"]) == (22.5, 8)
+    assert held["clamped"] == {"weight_kg": {"from": 25.0, "to": 22.5}}
+    caption = sess.actual_caption(held)
+    assert "25 → 22.5 kg" in caption and "last week failed" in caption
+    assert "reduced-load" not in caption
+
+
+def test_a_hold_repeats_the_reps_rather_than_resetting_them():
+    # Every set at the top of the range fires double progression, which raises
+    # the weight AND drops the reps to the bottom of the range. Putting only the
+    # weight back would prescribe 22.5 x 8 in a week meant to repeat 22.5 x 12.
+    last, sets = _last([12, 12, 12], 22.5)
+    free = sess.resolve_prescription(_GOBLET, last, "normal", _GREEN, last_session_sets=sets)
+    assert (free["weight_kg"], free["reps"]) == (25.0, 8)
+    held = sess.resolve_prescription(_GOBLET, last, "normal", _HELD, last_session_sets=sets)
+    assert (held["weight_kg"], held["reps"]) == (22.5, 12)
+    assert held["clamped"] == {"weight_kg": {"from": 25.0, "to": 22.5}}
+
+
+def test_a_hold_keeps_the_band():
+    last = {"reps": 10, "band_tier": "Blue", "session_date": "2026-09-10"}
+    sets = [{"reps": 10, "band_tier": "Blue"}] * 3
+    free = sess.resolve_prescription(_BAND_PALLOF, last, "high", _GREEN, last_session_sets=sets)
+    held = sess.resolve_prescription(_BAND_PALLOF, last, "high", _HELD, last_session_sets=sets)
+    assert (free["band_tier"], held["band_tier"]) == ("Yellow", "Blue")
+
+
+def test_a_good_readiness_streak_cannot_add_reps_in_a_held_week():
+    policy = sess.hold_for_failed_week(
+        sess.load_policy({"signal_color": "green"}, {"volume_factor": 1.12}))
+    assert policy["volume_factor"] == 1.0
+    assert policy["volume_note"] == \
+        "Readiness suggested +12% volume; held at 100% — last week failed"
+
+
+def test_a_low_streak_still_lowers_the_weight_in_a_held_week():
+    last, sets = _last([8, 8, 8], 22.5)
+    held = sess.resolve_prescription(_GOBLET, last, "low", _HELD, last_session_sets=sets)
+    assert held["weight_kg"] == 20.0
+
+
+def test_the_hold_is_not_a_reduced_load_day():
+    # A green morning in a repeated week is still green: no fatigue banner.
+    assert _HELD["reduced"] is False
+    assert (_HELD["banner_kind"], _HELD["banner_text"]) == (_GREEN["banner_kind"],
+                                                           _GREEN["banner_text"])
+
+
+def test_a_reduced_day_inside_a_held_week_stays_at_or_under_the_last_session():
+    reduced = sess.load_policy({"signal_color": "orange", "label": "REDUCED VOLUME"},
+                               {"volume_factor": 1.0})
+    last, sets = _last([12, 12, 12], 22.5)
+    held = sess.resolve_prescription(_GOBLET, last, "high",
+                                     sess.hold_for_failed_week(reduced), last_session_sets=sets)
+    assert held["weight_kg"] <= 22.5 and held["reps"] <= 12
+    assert "reduced-load day" in sess.actual_caption(held)
+
+
+def test_the_invariant_check_covers_a_held_week():
+    with pytest.raises(sess.PrescriptionContradiction, match="failed-week repeat"):
+        sess.assert_within_ceiling({"reps": 8, "weight_kg": 25.0},
+                                   {"weight_kg": 22.5, "reps": 8}, _HELD, "Goblet Squat")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 #  Storage
 # ═════════════════════════════════════════════════════════════════════════════
 
@@ -539,3 +663,12 @@ def test_the_redo_rereads_notion_before_it_writes():
 def test_the_rule_runs_before_the_scheduling_writers_that_depend_on_it():
     render = _function_source("render")
     assert render.index("apply_failed_week_rule(") < render.index("missed_reschedules(")
+
+
+def test_the_screen_holds_the_load_before_anything_reads_the_policy():
+    render = _function_source("render")
+    hold_at = render.index("sess.hold_for_failed_week(_policy)")
+    assert "week_repeat.failed_week_holds_load(phases" in render
+    assert render.index("_policy = _verdict.policy") < hold_at
+    assert hold_at < render.index('_volume_factor = _policy["volume_factor"]')
+    assert hold_at < render.index("_render_accessory_session(")

@@ -30,6 +30,15 @@ out the block by one week."
     week of 2026-09-07; the two weeks before it would also have failed, and
     the athlete asked to repeat only last week.
 
+  * A week that runs again BECAUSE IT FAILED holds the load (athlete,
+    2026-09-16: "if there is a failed week then no increases in the weights
+    during that week"). Every weight, band and rep starts at the last session
+    and nothing goes up by itself; the + button still works, because he chose
+    a starting point over a hard limit. failed_week_holds_load() decides it and
+    sessions.hold_for_failed_week() applies it. A week redone BY CHOICE keeps
+    normal progression, and a failed week whose repeat was refused has no
+    repeat week to hold.
+
 WHAT A REPEAT DOES NOT TOUCH: day numbers stay calendar positions, so
 date_overrides, key rule 18b's week check, the day strip and the missed-session
 carry all work unchanged inside a repeated week. Only the content a position
@@ -347,23 +356,51 @@ def consequences(before: list[Phase], after: list[Phase]) -> list[str]:
     return lines
 
 
+#: What the repeat notice adds in a week that holds the load. It says what the
+#: numbers do and nothing about why the rule exists.
+HOLD_SENTENCE = ("Every weight, band and rep starts at your last session, "
+                 "and nothing goes up by itself this week.")
+
+
+def _last_weeks_outcome(block: Phase, today: date) -> str:
+    last_week = (_monday(today) - timedelta(days=7)).isoformat()
+    return block.week_results.get(last_week, "")
+
+
+def failed_week_holds_load(phases: list[Phase], today: date) -> bool:
+    """True when today's week runs again because the week before it FAILED.
+
+    A repeat always runs in the week straight after the week it repeats, and
+    repeat_week records the verdict on the block that gains the repeat, so the
+    verdict to read is last week's, on today's own block. A week redone by
+    choice is recorded as REDONE_PREFIX and does not hold; a refused repeat
+    leaves no repeat week, so is_repeat_week is False and nothing holds.
+    """
+    block = covering_phase(phases, today)
+    if block is None or not _plan.is_repeat_week(block, today):
+        return False
+    return _last_weeks_outcome(block, today).startswith(FAILED_PREFIX)
+
+
 def repeat_notice(phases: list[Phase], today: date) -> str | None:
     """The line that explains a repeated week on the week it runs — why it
-    repeats, and when the next block now starts. None in an ordinary week."""
+    repeats, what that does to the numbers, and when the next block now
+    starts. None in an ordinary week."""
     block = covering_phase(phases, today)
     if block is None or not _plan.is_repeat_week(block, today):
         return None
-    last_week = (_monday(today) - timedelta(days=7)).isoformat()
-    outcome = block.week_results.get(last_week, "")
+    outcome = _last_weeks_outcome(block, today)
     found = _DAYS_RE.search(outcome)
     if outcome.startswith(FAILED_PREFIX) and found:
         days = int(found.group(1))
         text = (f"Last week had {days} of 7 days logged, so it failed. "
-                f"This week runs it again.")
+                f"This week runs it again. {HOLD_SENTENCE}")
     elif outcome.startswith(REDONE_PREFIX):
         text = "This week runs last week again, as you chose."
     else:
         text = "This week runs an earlier week again."
+        if outcome.startswith(FAILED_PREFIX):
+            text += f" {HOLD_SENTENCE}"
     end = _plan.phase_end_date(block)
     following = sorted((p for p in phases if p.status != "completed"
                         and _start(p) > end), key=_start)

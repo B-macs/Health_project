@@ -3073,6 +3073,16 @@ def render():
     # services/sessions.py's LOAD RESOLUTION section.
     _verdict = today.today_verdict()
     _policy = _verdict.policy
+    # A week that runs again because it FAILED holds the load (Key Rule 22,
+    # athlete 2026-09-16). Folded into the same object, before anything reads
+    # it, so the volume factor, the seeded numbers and the accessory session
+    # all see one decision. The banner is the verdict's and stays about today;
+    # the repeat notice says the week is held.
+    try:
+        if phases and week_repeat.failed_week_holds_load(phases, date.today()):
+            _policy = sess.hold_for_failed_week(_policy)
+    except Exception:
+        pass  # a failed check leaves progression as it was; + adds load either way
     _volume_factor = _policy["volume_factor"]
 
     # ── The accessory session owns the page while one is running ────────────

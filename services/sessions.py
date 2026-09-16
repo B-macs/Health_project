@@ -905,6 +905,49 @@ def load_policy(directive: dict | None, readiness_modifier: dict | None) -> dict
     }
 
 
+#: What a failed-week hold adds to the reasons a number was held. See
+#: hold_for_failed_week.
+FAILED_WEEK_HOLD_REASON = "last week failed"
+
+
+def hold_for_failed_week(policy: dict) -> dict:
+    """`policy` with the failed-week hold added — Key Rule 22, athlete
+    2026-09-16: "if there is a failed week then no increases in the weights
+    during that week."
+
+    week_repeat.failed_week_holds_load decides WHETHER a week holds; this
+    decides WHAT the hold does, and it changes three keys only:
+
+      failed_week_hold  True. resolve_prescription then starts every weight,
+                        band and rep at the last session and lets nothing
+                        progress, on a good morning as on a bad one.
+      volume_factor     capped at 1.0, because the athlete chose to hold reps
+                        as well as weight and band — a good readiness streak
+                        must not add reps to the week by the other route.
+      volume_note       says so when the cap moved it, in load_policy's words.
+
+    ⚠ `reduced`, the reasons and the banner are NOT touched. They describe how
+    he is today, and a green morning in a repeated week is still green — the
+    injury-cap banner was split out on 2026-08-17 for exactly this reason. The
+    repeat notice on the training screen carries the sentence instead
+    (week_repeat.HOLD_SENTENCE).
+
+    ⚠ NOTHING HERE LIMITS THE STEPPER. Asked on 2026-09-16 whether the +
+    button should stop at last session's weight, he chose a starting point
+    over a hard limit. A later change that caps the stepper reverses his
+    decision rather than completing this rule.
+    """
+    out = dict(policy)
+    out["failed_week_hold"] = True
+    raw = out.get("volume_factor")
+    factor = 1.0 if raw is None else float(raw)
+    if factor > 1.0:
+        out["volume_factor"] = 1.0
+        out["volume_note"] = (f"Readiness suggested +{(factor - 1) * 100:.0f}% volume; "
+                              f"held at 100% — {FAILED_WEEK_HOLD_REASON}")
+    return out
+
+
 def last_completed_ceiling(last_performance: dict | None,
                             last_session_sets: list[dict] | None) -> dict:
     """The most a reduced-load day is allowed to prescribe: the TOP completed
@@ -1004,28 +1047,35 @@ def assert_within_ceiling(entry: dict, ceiling: dict, policy: dict,
     Deliberately re-derived from the final entry rather than trusting
     clamp_to_ceiling's own output: an assertion that reads the value the
     clamp just wrote would pass by construction and check nothing.
+
+    A failed-week hold (hold_for_failed_week) is checked the same way.
     """
-    if not policy.get("reduced"):
+    if not (policy.get("reduced") or policy.get("failed_week_hold")):
         return
     name = exercise_name or "this exercise"
+    day = "reduced-load day" if policy.get("reduced") else "failed-week repeat"
+    reasons = list(policy.get("reasons") or [])
+    if policy.get("failed_week_hold"):
+        reasons.append(FAILED_WEEK_HOLD_REASON)
+    why = "; ".join(reasons)
     cw, cr = ceiling.get("weight_kg"), ceiling.get("reps")
     w, r   = entry.get("weight_kg"), entry.get("reps")
     if cw is not None and w is not None and w > cw:
         raise PrescriptionContradiction(
-            f"{name}: reduced-load day prescribes {w} kg, above the last "
-            f"completed working weight of {cw} kg ({'; '.join(policy.get('reasons') or [])})"
+            f"{name}: {day} prescribes {w} kg, above the last "
+            f"completed working weight of {cw} kg ({why})"
         )
     if cr is not None and r is not None and r > cr:
         raise PrescriptionContradiction(
-            f"{name}: reduced-load day prescribes {r} reps, above the last "
-            f"completed {cr} reps ({'; '.join(policy.get('reasons') or [])})"
+            f"{name}: {day} prescribes {r} reps, above the last "
+            f"completed {cr} reps ({why})"
         )
     ct, t = ceiling.get("band_tier"), entry.get("band_tier")
     if (ct in engine.BAND_TIERS and t in engine.BAND_TIERS
             and engine.BAND_TIERS.index(t) > engine.BAND_TIERS.index(ct)):
         raise PrescriptionContradiction(
-            f"{name}: reduced-load day prescribes the {t} band, above the last "
-            f"completed {ct} band ({'; '.join(policy.get('reasons') or [])})"
+            f"{name}: {day} prescribes the {t} band, above the last "
+            f"completed {ct} band ({why})"
         )
 
 
@@ -1055,6 +1105,17 @@ def resolve_prescription(
     nothing is clamped -- but the view has already capped policy["volume_factor"]
     at 1.0 before building `ex`, so the plan's authored reps are what gets
     proposed, not an inflated version of them.
+
+    A FAILED-WEEK HOLD (hold_for_failed_week) seeds a second time with
+    progression OFF, then applies the same ceiling. Clamping the free proposal
+    alone is not enough there: when double progression fires it raises the
+    weight AND resets the reps to the bottom of the range, so the clamp would
+    put the weight back and leave 12 reps reading as 8 -- a week meant to
+    repeat the last session would quietly prescribe less of it. The ledger is
+    still measured against the free proposal, so the caption says what the
+    hold stopped. This path also runs when the day is reduced as well; its
+    result is at or under the last session on every axis either way, which is
+    all a reduced-load day promises.
     """
     proposed = seed_actual_entry(
         ex, last_performance, streak_label,
@@ -1063,10 +1124,39 @@ def resolve_prescription(
         last_session_sets=last_session_sets,
     )
     ceiling = last_completed_ceiling(last_performance, last_session_sets)
-    final = clamp_to_ceiling(proposed, ceiling) if policy.get("reduced") else dict(proposed)
+    if policy.get("failed_week_hold"):
+        held = seed_actual_entry(
+            ex, last_performance, streak_label,
+            allow_increase=False,
+            weight_increment=weight_increment,
+            last_session_sets=last_session_sets,
+        )
+        final = clamp_to_ceiling(held, ceiling)
+        final["clamped"] = _held_below(proposed, final)
+        if not policy.get("reduced"):
+            final["held_because"] = "failed_week"
+    elif policy.get("reduced"):
+        final = clamp_to_ceiling(proposed, ceiling)
+    else:
+        final = dict(proposed)
     final.setdefault("clamped", {})
     assert_within_ceiling(final, ceiling, policy, ex.get("name", ""))
     return final
+
+
+def _held_below(proposed: dict, final: dict) -> dict:
+    """clamp_to_ceiling's ledger shape, measured between progression's free
+    proposal and the held result: every axis the hold kept lower."""
+    moved: dict[str, dict] = {}
+    for axis in ("weight_kg", "reps"):
+        was, now = proposed.get(axis), final.get(axis)
+        if was is not None and now is not None and was > now:
+            moved[axis] = {"from": was, "to": now}
+    was, now = proposed.get("band_tier"), final.get("band_tier")
+    if (was in engine.BAND_TIERS and now in engine.BAND_TIERS
+            and engine.BAND_TIERS.index(was) > engine.BAND_TIERS.index(now)):
+        moved["band_tier"] = {"from": was, "to": now}
+    return moved
 
 
 def displayed_prescription(ex: dict, actual: dict | None) -> dict:
@@ -1124,7 +1214,7 @@ def actual_caption(entry: dict) -> str:
         base = f"Starting from your last logged session{date_part}."
     else:
         base = "No prior record — using plan default."
-    return f"{base} {_held_caption(held)}" if held else base
+    return f"{base} {_held_caption(held, entry.get('held_because'))}" if held else base
 
 
 # ─── The previous session, shown beside today's prescription ─────────────
@@ -1297,10 +1387,13 @@ def delta_direction(entry: dict | None, previous: dict | None) -> str:
     return "mixed"
 
 
-def _held_caption(held: dict) -> str:
+def _held_caption(held: dict, because: str | None = None) -> str:
     """Renders clamp_to_ceiling's ledger into the caption. The athlete is told
     the number was held DOWN and by how much -- a prescription that silently
-    fails to move looks identical to one the app forgot to progress."""
+    fails to move looks identical to one the app forgot to progress.
+
+    `because` is resolve_prescription's "held_because": "failed_week" names the
+    failed week, anything else is the reduced-load day it always said."""
     bits = []
     if "weight_kg" in held:
         bits.append(f"{held['weight_kg']['from']:g} → {held['weight_kg']['to']:g} kg")
@@ -1308,7 +1401,9 @@ def _held_caption(held: dict) -> str:
         bits.append(f"{held['reps']['from']} → {held['reps']['to']} reps")
     if "band_tier" in held:
         bits.append(f"{held['band_tier']['from']} → {held['band_tier']['to']} band")
-    return f"· Held down ({', '.join(bits)}) — reduced-load day." if bits else ""
+    reason = ("last week failed, so nothing goes up this week"
+              if because == "failed_week" else "reduced-load day")
+    return f"· Held down ({', '.join(bits)}) — {reason}." if bits else ""
 
 
 def exercise_duration_seconds(ex: dict) -> int:
