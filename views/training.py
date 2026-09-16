@@ -1276,12 +1276,35 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
     st.session_state.tp_previous[idx] = sess.previous_performance(last, last_session_sets)
     if not need_actuals:
         return
+    # The session before last: a weight goes up only after TWO sessions in a
+    # row at the rep target (engine.PROGRESSION_SESSIONS). Fetched only for a
+    # lift that progresses, and a failed read means no step, never a guessed one.
+    previous_session_sets = None
+    if ex.get("rep_min") is not None and ex.get("rep_max") is not None:
+        try:
+            previous_session_sets = repo.get_repository().get_previous_session_all_sets(ex["name"])
+        except Exception:
+            pass  # never block the live flow on a lookup failure
+    # The pain gate (athlete, 2026-09-16): a weight step waits on today's
+    # check-in. Read only when two sessions exist, i.e. when a step is possible,
+    # and re-read per exercise so a check-in made mid-session counts. A read
+    # that fails BLOCKS, like a missing check-in: an unread score is not a
+    # clean one.
+    step_block = None
+    if previous_session_sets is not None:
+        try:
+            step_block = sess.step_block_reason(sess.todays_check_in(
+                repo.get_repository().get_recent_readiness(days=1), date.today()))
+        except Exception:
+            step_block = "today's check-in could not be read"
     try:
         entry = sess.resolve_prescription(
             ex, last, readiness_modifier.get("streak_label", "unknown"),
             policy,
             weight_increment=ex.get("increment_size", 2.5),
             last_session_sets=last_session_sets,
+            previous_session_sets=previous_session_sets,
+            step_block=step_block,
         )
     except sess.PrescriptionContradiction as exc:
         # Hard error, surfaced not swallowed. The clamp should already have

@@ -2107,6 +2107,38 @@ class Repository:
             return None
         return sets
 
+    def get_previous_session_all_sets(self, movement_name: str) -> list[dict] | None:
+        """The per-set array of the session BEFORE the most recent one for this
+        exact movement — get_last_session_all_sets' twin, one session further
+        back. Double progression needs both: since 2026-09-16 a weight goes up
+        only after two sessions in a row at the rep target
+        (engine.PROGRESSION_SESSIONS).
+
+        Sessions are counted by distinct Session Date, so two pages on one
+        date — the duplicate-save failure of 2026-09-10 — read as ONE session
+        and can never pass for two. Within a date the page is picked the way
+        get_last_session_all_sets picks, first in query order.
+
+        Returns None when there is no earlier date, or its Sets JSON is empty
+        or unparseable."""
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Movement", "title": {"equals": movement_name}},
+            sorts=[{"property": "Session Date", "direction": "descending"}],
+        )
+        by_date: dict[str, dict] = {}
+        for page in pages or []:
+            by_date.setdefault(notion.get_property(page, "Session Date", "date") or "", page)
+        dates = sorted(by_date, reverse=True)
+        if len(dates) < 2:
+            return None
+        sets_raw = notion.get_property(by_date[dates[1]], "Sets", "rich_text") or "[]"
+        try:
+            sets = json.loads(sets_raw)
+        except Exception:
+            sets = []
+        return sets or None
+
     def get_all_training_exercises_raw(self) -> list[dict]:
         """Every exercise row ever logged in the Training DB, unwindowed (no
         Session Date filter) — the full historical per-set detail that

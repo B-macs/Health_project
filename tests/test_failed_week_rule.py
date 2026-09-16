@@ -459,41 +459,54 @@ def test_a_week_redone_by_choice_keeps_normal_progression():
     assert wr.HOLD_SENTENCE not in wr.repeat_notice(after, date(2026, 9, 22))
 
 
-def test_the_squat_day_that_went_up_would_have_started_at_last_session():
+def test_the_squat_day_that_went_up_now_starts_at_last_session():
     # 2026-09-15: 22.5 kg x 8, 8, 8 on 2026-09-10 and a high readiness streak,
-    # so the app started the goblet squat at 25 kg.
+    # so the app started the goblet squat at 25 kg. Since 2026-09-16 readiness
+    # never raises a weight, so it starts at 22.5 in any week.
     last, sets = _last([8, 8, 8], 22.5)
-    free = sess.resolve_prescription(_GOBLET, last, "high", _GREEN, last_session_sets=sets)
-    assert free["weight_kg"] == 25.0
-    held = sess.resolve_prescription(_GOBLET, last, "high", _HELD, last_session_sets=sets)
-    assert (held["weight_kg"], held["reps"]) == (22.5, 8)
+    for policy in (_GREEN, _HELD):
+        entry = sess.resolve_prescription(_GOBLET, last, "high", policy,
+                                          last_session_sets=sets, previous_session_sets=sets)
+        assert (entry["weight_kg"], entry["reps"]) == (22.5, 8)
+
+
+def test_a_hold_stops_an_earned_step_and_says_so():
+    # Two sessions at 13 reps earn 22.5 -> 25 kg at 9 reps; the held week
+    # repeats 22.5 x 13 instead, and the caption names the failed week.
+    last, sets = _last([13, 13, 13], 22.5)
+    free = sess.resolve_prescription(_GOBLET, last, "normal", _GREEN,
+                                     last_session_sets=sets, previous_session_sets=sets)
+    assert (free["weight_kg"], free["reps"]) == (25.0, 9)
+    held = sess.resolve_prescription(_GOBLET, last, "normal", _HELD,
+                                     last_session_sets=sets, previous_session_sets=sets)
+    assert (held["weight_kg"], held["reps"]) == (22.5, 13)
     assert held["clamped"] == {"weight_kg": {"from": 25.0, "to": 22.5}}
     caption = sess.actual_caption(held)
     assert "25 → 22.5 kg" in caption and "last week failed" in caption
     assert "reduced-load" not in caption
+    assert "next_step" not in held   # nothing goes up this week, so no "goes up after" line
 
 
-def test_a_hold_repeats_the_reps_rather_than_resetting_them():
-    # Every set at the top of the range fires double progression, which raises
-    # the weight AND drops the reps to the bottom of the range. Putting only the
-    # weight back would prescribe 22.5 x 8 in a week meant to repeat 22.5 x 12.
-    last, sets = _last([12, 12, 12], 22.5)
-    free = sess.resolve_prescription(_GOBLET, last, "normal", _GREEN, last_session_sets=sets)
-    assert (free["weight_kg"], free["reps"]) == (25.0, 8)
-    held = sess.resolve_prescription(_GOBLET, last, "normal", _HELD, last_session_sets=sets)
-    assert (held["weight_kg"], held["reps"]) == (22.5, 12)
-    assert held["clamped"] == {"weight_kg": {"from": 25.0, "to": 22.5}}
+def test_a_hold_repeats_the_reps_rather_than_lowering_them():
+    # A step lowers the reps by what it costs. Putting only the weight back
+    # would prescribe 22.5 x 9 in a week meant to repeat 22.5 x 13.
+    last, sets = _last([13, 13, 13], 22.5)
+    held = sess.resolve_prescription(_GOBLET, last, "normal", _HELD,
+                                     last_session_sets=sets, previous_session_sets=sets)
+    assert held["reps"] == 13
 
 
-def test_a_hold_keeps_the_band():
+def test_a_hold_keeps_the_band_and_still_lowers_it_on_a_low_streak():
     last = {"reps": 10, "band_tier": "Blue", "session_date": "2026-09-10"}
     sets = [{"reps": 10, "band_tier": "Blue"}] * 3
-    free = sess.resolve_prescription(_BAND_PALLOF, last, "high", _GREEN, last_session_sets=sets)
-    held = sess.resolve_prescription(_BAND_PALLOF, last, "high", _HELD, last_session_sets=sets)
-    assert (free["band_tier"], held["band_tier"]) == ("Yellow", "Blue")
+    high = sess.resolve_prescription(_BAND_PALLOF, last, "high", _HELD, last_session_sets=sets)
+    low = sess.resolve_prescription(_BAND_PALLOF, last, "low", _HELD, last_session_sets=sets)
+    assert (high["band_tier"], low["band_tier"]) == ("Blue", "Green")
 
 
 def test_a_good_readiness_streak_cannot_add_reps_in_a_held_week():
+    # The engine no longer emits a factor over 1.0 (2026-09-16); the cap stays
+    # so a held week holds whatever the factor's source becomes.
     policy = sess.hold_for_failed_week(
         sess.load_policy({"signal_color": "green"}, {"volume_factor": 1.12}))
     assert policy["volume_factor"] == 1.0
@@ -517,10 +530,11 @@ def test_the_hold_is_not_a_reduced_load_day():
 def test_a_reduced_day_inside_a_held_week_stays_at_or_under_the_last_session():
     reduced = sess.load_policy({"signal_color": "orange", "label": "REDUCED VOLUME"},
                                {"volume_factor": 1.0})
-    last, sets = _last([12, 12, 12], 22.5)
+    last, sets = _last([13, 13, 13], 22.5)
     held = sess.resolve_prescription(_GOBLET, last, "high",
-                                     sess.hold_for_failed_week(reduced), last_session_sets=sets)
-    assert held["weight_kg"] <= 22.5 and held["reps"] <= 12
+                                     sess.hold_for_failed_week(reduced),
+                                     last_session_sets=sets, previous_session_sets=sets)
+    assert held["weight_kg"] <= 22.5 and held["reps"] <= 13
     assert "reduced-load day" in sess.actual_caption(held)
 
 
@@ -672,3 +686,17 @@ def test_the_screen_holds_the_load_before_anything_reads_the_policy():
     assert render.index("_policy = _verdict.policy") < hold_at
     assert hold_at < render.index('_volume_factor = _policy["volume_factor"]')
     assert hold_at < render.index("_render_accessory_session(")
+
+
+def test_the_screen_seeds_with_both_sessions_and_the_pain_gate():
+    """The engine's two-session rule and the pain gate only exist if the screen
+    hands them their inputs; a missing argument would silently mean 'never
+    step' (no previous session) or 'always allowed' (no block)."""
+    seed = _function_source("_seed_actuals_if_needed")
+    call_at = seed.index("sess.resolve_prescription(")
+    assert "get_previous_session_all_sets(" in seed[:call_at]
+    assert "get_recent_readiness(" in seed[:call_at]
+    assert "previous_session_sets=previous_session_sets" in seed[call_at:]
+    assert "step_block=step_block" in seed[call_at:]
+    # A failed read blocks rather than allowing the step.
+    assert 'step_block = "today\'s check-in could not be read"' in seed

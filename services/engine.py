@@ -162,14 +162,25 @@ def injury_weight_signal(weight: float) -> str:
 # ─────────────────────────────────────────────────────────────────────────────
 #  READINESS-TO-TRAINING MODIFIER
 #  Adjusts session volume based on the last 3 days of readiness scores.
-#  Positive adjustments require multi-day confirmation; negatives compound immediately.
+#  READINESS MAY HOLD OR CUT VOLUME AND NEVER ADDS IT (2026-09-16).
 # ─────────────────────────────────────────────────────────────────────────────
 
 # (bucket, streak_days) → (volume_factor, rpe_delta, description)
+#
+# ⚠ THE HIGH ROWS WERE +4/+8/+12% UNTIL 2026-09-16, and they are 1.0 on
+# evidence, not caution — docs/training/load_progression_evidence_review_
+# 2026-09-16.md. No resistance-training trial has raised load or volume because
+# HRV or a readiness score was high; every HRV-guided trial only held, cut or
+# skipped (de Oliveira 2019, DeBlauw 2021, Bittencourt 2024), and morning HRV
+# recovers before the muscle does and does not predict same-day strength
+# (Flatt 2019, Dobbs 2020, Thamm 2019). The +12% also lengthened runs and holds,
+# not only reps. Load goes up from what the lifts did — double_progression —
+# never from how the night went. The rows stay in the table so a high streak
+# still reads as "high" rather than falling through as "unknown".
 _READINESS_MODIFIER_TABLE: dict[tuple, tuple] = {
-    ("high",  3): (1.12, +0.5, "Strong 3-day readiness -- +12% volume"),
-    ("high",  2): (1.08, +0.5, "Strong 2-day readiness -- +8% volume"),
-    ("high",  1): (1.04,  0.0, "Good readiness -- +4% volume"),
+    ("high",  3): (1.0, 0.0, ""),
+    ("high",  2): (1.0, 0.0, ""),
+    ("high",  1): (1.0, 0.0, ""),
     ("below", 1): (0.90, -0.5, "Below baseline -- -10% volume"),
     ("below", 2): (0.82, -1.0, "2-day low readiness -- -18% volume"),
     ("below", 3): (0.75, -1.0, "3-day low readiness -- -25% volume"),
@@ -233,7 +244,8 @@ def readiness_training_modifier(bio_rows: list[dict], today: date | None = None)
     Compute a training volume modifier from the last 3 days of readiness scores.
 
     Returns volume_factor, rpe_delta, streak_days, streak_label, description.
-    volume_factor is in [0.50, 1.12]; rpe_delta is advisory only.
+    volume_factor is in [0.50, 1.0] — readiness never adds volume, see
+    _READINESS_MODIFIER_TABLE; rpe_delta is advisory only.
     """
     today  = today or date.today()
     scores = []
@@ -276,22 +288,21 @@ def suggested_weight_kg(
     current_weight_kg: float | None,
     streak_label: str,
     increment: float = 2.5,
-    allow_increase: bool = True,
 ) -> float | None:
     """
     Deterministic next-session weight suggestion for a loaded (dumbbell/
-    cable/plate) exercise, nudging by one `increment` based on the
-    readiness engine's own streak_label (readiness_training_modifier's
-    output) -- reusing that existing signal rather than a new ad-hoc system.
+    cable/plate) exercise, nudging DOWN by one `increment` on the readiness
+    engine's own streak_label (readiness_training_modifier's output).
 
     streak_label -> delta:
-      "high"             -> +increment  (only if allow_increase)
       "low" | "below"    -> -increment
-      anything else       -> unchanged
+      anything else       -> unchanged, "high" included
 
-    allow_increase lets the caller suppress the upward nudge (e.g. on a
-    red-signal engine-directive day, or when there's no existing load to
-    build on). It never suppresses the downward nudge.
+    ⚠ "high" ADDED AN INCREMENT UNTIL 2026-09-16, and that is the step that
+    started a goblet squat at 25 kg after 22.5 kg x 8 — the bottom of its rep
+    range, so the lifts themselves said hold. No trial raises resistance load
+    because readiness is high; see _READINESS_MODIFIER_TABLE. The allow_increase
+    parameter went with it: there is no upward move left to suppress.
 
     Returns None if current_weight_kg is None. "Unchanged" returns
     current_weight_kg exactly (floored at 0, rounded for float cleanliness)
@@ -303,15 +314,126 @@ def suggested_weight_kg(
     """
     if current_weight_kg is None:
         return None
-    if streak_label == "high" and allow_increase:
-        delta = increment
-    elif streak_label in ("low", "below"):
+    if streak_label in ("low", "below"):
         delta = -increment
     else:
         return round(max(0.0, current_weight_kg), 2)
     raw = current_weight_kg + delta
     stepped = round(raw / increment) * increment if increment else raw
     return round(max(0.0, stepped), 2)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  LOAD PROGRESSION — when the weight goes up, and what the reps do after it
+#
+#  docs/training/load_progression_evidence_review_2026-09-16.md is the source
+#  for every number here. The athlete, 2026-09-16: "review how it is done in
+#  best scientific journals and follow the best method" — after a goblet squat
+#  went up on a readiness streak with the reps at the bottom of their range.
+#
+#  1. TWO SESSIONS IN A ROW, NOT ONE. The only published trigger is two
+#     consecutive sessions over the rep target: ACSM 2009's position stand (in
+#     its body text — the abstract drops the condition) and the NSCA "2-for-2"
+#     rule. No trial compares one session with two, so this is the published
+#     convention rather than a tested result; it is also the less noisy choice
+#     with about one rep of day-to-day spread, and with each lift trained once a
+#     week it means a lift gets heavier at most every second week — the
+#     athlete's own "don't change every week".
+#  2. THE REPS DROP BY WHAT THE STEP COSTS. Reps to failure fall about 0.37 per
+#     1% of load in the 8-15 rep zone, read off Nuzzo et al. 2024's
+#     meta-regression tables (Sports Med, 269 studies; general, squat and bench
+#     agree to about half a rep). The slope is DERIVED from those tables here,
+#     not a figure the paper states. A reset to the bottom of the range is right
+#     only for a ~10-11% step and a fixed -2 only for ~6%; this is right for
+#     both, because it keeps effort where it was.
+#  3. REPS FIRST WHEN THE STEP IS BIG. A fixed 2.5 kg is +11% on a 22.5 kg
+#     dumbbell and +17% on 15 kg, past the 2-10% ACSM and NSCA give. So the reps
+#     climb past the top of the range until the drop after the step still lands
+#     inside it. That is the same 0.37 slope read backwards, which is why there
+#     is no separate percentage ceiling to disagree with it.
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: Reps to failure lost per 1% of added load, in the 8-15 rep zone. Derived from
+#: Nuzzo, Pinto, Nosaka & Steele 2024 (Sports Med 54:303) — see the section
+#: header. People differ by 2.5-3.3 reps at a given %1RM, so this sets a
+#: starting target and the logged reps correct it.
+REPS_LOST_PER_LOAD_PERCENT = 0.37
+
+#: Consecutive logged sessions of a lift, at the same weight, that must each
+#: have every prescribed set at the rep target before the weight goes up.
+PROGRESSION_SESSIONS = 2
+
+
+def _round_half_up(x: float) -> int:
+    return int(math.floor(x + 0.5))
+
+
+def _step_percent(weight: float | None, increment: float) -> float | None:
+    if not weight or weight <= 0 or not increment:
+        return None
+    return 100.0 * increment / float(weight)
+
+
+def progression_rep_target(rep_min: int, rep_max: int, weight: float | None,
+                           increment: float = 2.5) -> int:
+    """The reps every set must reach, in PROGRESSION_SESSIONS sessions in a
+    row, before `weight` goes up by `increment`.
+
+    The top of the range, unless the step is so large at this weight that the
+    reps after it (reps_after_load_step) would land below the bottom of the
+    range — then more, until they would not. 8-12 at 22.5 kg with 2.5 kg steps
+    is 13; at 45 kg it is 12. A weight of zero or none has no percentage step,
+    so the top of the range stands.
+    """
+    step = _step_percent(weight, increment)
+    if step is None:
+        return rep_max
+    return max(rep_max, math.ceil(rep_min + REPS_LOST_PER_LOAD_PERCENT * step - 1e-9))
+
+
+def reps_after_load_step(reps: int, weight: float | None, increment: float = 2.5,
+                         rep_min: int | None = None) -> int:
+    """The reps to prescribe at `weight + increment` for about the same effort
+    as `reps` at `weight`: the reps the step costs, rounded to the nearest rep,
+    never more than before. A weight of zero or none has no percentage step and
+    falls back to `rep_min` (or `reps`) — there is nothing to scale."""
+    step = _step_percent(weight, increment)
+    if step is None:
+        return rep_min if rep_min is not None else reps
+    return max(1, min(reps, _round_half_up(reps - REPS_LOST_PER_LOAD_PERCENT * step)))
+
+
+def _working_weight(sets: list[dict] | None) -> float | None:
+    w = sets[-1].get("weight") if sets else None
+    return None if w is None else float(w)
+
+
+def _session_at_target(sets: list[dict] | None, prescribed_sets: int, target: int) -> bool:
+    """Every prescribed set logged, and every logged set at `target` or more.
+    The length check matters: all() over a session cut short after one set is
+    vacuously true."""
+    return (bool(sets) and len(sets) >= prescribed_sets
+            and all((s.get("reps") or 0) >= target for s in sets))
+
+
+def progression_sessions_done(rep_min: int, rep_max: int, weight: float | None,
+                              recent_sessions: list[list[dict] | None],
+                              prescribed_sets: int = 1, increment: float = 2.5) -> int:
+    """How many of the most recent sessions IN A ROW, newest first, were at
+    `weight` with every prescribed set at the rep target. Stops at the first
+    that was not — a lighter or heavier session, a short one, or one set under
+    target all break the run. A session whose sets carry no weight is taken to
+    be at `weight`."""
+    target = progression_rep_target(rep_min, rep_max, weight, increment)
+    done = 0
+    for sets in recent_sessions:
+        if not _session_at_target(sets, prescribed_sets, target):
+            break
+        lifted = _working_weight(sets)
+        if weight is not None and lifted is not None and abs(lifted - float(weight)) > 1e-6:
+            break
+        done += 1
+    return done
 
 
 def double_progression(
@@ -323,78 +445,59 @@ def double_progression(
     prescribed_sets: int = 1,
     increment: float = 2.5,
     allow_increase: bool = True,
+    previous_session_sets: list[dict] | None = None,
 ) -> tuple[float, int]:
     """
-    Standard double-progression check for one loaded, countable-reps
-    exercise (training_plan._ex's rep_min/rep_max fields).
+    Double progression for one loaded, countable-reps exercise
+    (training_plan._ex's rep_min/rep_max fields). See the LOAD PROGRESSION
+    section above for why each rule is what it is.
 
-    If the last logged session hit the TOP of the rep range (>= rep_max) on
-    EVERY prescribed set, the next session progresses: weight goes up by
-    one `increment` and the target reps reset to the bottom of the range
-    (rep_min). Otherwise the inputs are returned completely unchanged --
-    the caller (services.sessions.seed_actual_entry) falls through to the
-    existing last_performance/readiness-nudge seeding path when this
-    doesn't fire.
+    The weight goes up by one `increment` when the last PROGRESSION_SESSIONS
+    logged sessions — `last_session_sets` and `previous_session_sets`, each
+    Repository's full per-set array — were both at the same weight with every
+    prescribed set at progression_rep_target. The reps then drop to
+    reps_after_load_step of the lowest set in the last session. Otherwise the
+    inputs come back unchanged, and services.sessions.seed_actual_entry falls
+    through to last performance.
 
-    last_session_sets: the full per-set array for the movement's most
-    recent logged session (Repository.get_last_session_all_sets's shape --
-    a list of {"reps": .., "weight": .., ...} dicts), not just the last
-    set, since "every prescribed set" must all clear rep_max.
+    The step is based on the weight ACTUALLY LIFTED (the last set's "weight"),
+    not the caller's current_weight — that may be a static plan-authored value
+    gone stale once real history exists, and stepping from it would silently
+    discard weight already earned. current_weight is the fallback only when the
+    logged set carries no weight.
 
-    prescribed_sets: how many sets this exercise is actually prescribed for
-    (ex["sets"]). A session logged with FEWER sets than prescribed (cut
-    short) never progresses even if every logged set hit rep_max --
-    `all()` over a short list is vacuously true, so without this check a
-    partial session would read identically to a full clean one.
-
-    The weight progression increments FROM is the actual last-lifted
-    weight (last_session_sets' own "weight" on its last set) when
-    available, not the caller-supplied current_weight -- current_weight
-    may be a static, plan-authored value (training_plan.py's per-week
-    dicts) that's gone stale once real logged history exists; basing the
-    increment on it instead of what was actually lifted would silently
-    discard weight the user already earned. Falls back to current_weight
-    only if the logged set is missing a weight value.
-
-    allow_increase gates the upward move exactly like suggested_weight_kg's
-    own allow_increase param (e.g. suppressed on a red-signal engine-
-    directive day) -- it never suppresses anything else, since this
-    function has no downward direction: it either progresses or leaves the
-    inputs untouched.
-
-    Returns (current_weight, current_target_reps) unchanged when
-    last_session_sets is None/empty, has fewer sets than prescribed_sets,
-    when any logged set fell short of rep_max, or when allow_increase is
-    False.
+    Unchanged when either session is missing or empty, either has fewer sets
+    than prescribed (a session cut short never reads as a clean one), the two
+    were at different weights, any set fell short of the target, or
+    allow_increase is False (e.g. a failed week's repeat).
     """
-    if (not last_session_sets or not allow_increase
-            or len(last_session_sets) < prescribed_sets):
+    if not allow_increase or not last_session_sets or not previous_session_sets:
         return current_weight, current_target_reps
-    if all((s.get("reps") or 0) >= rep_max for s in last_session_sets):
-        last_weight = last_session_sets[-1].get("weight")
-        base_weight = last_weight if last_weight is not None else current_weight
-        return base_weight + increment, rep_min
-    return current_weight, current_target_reps
+    lifted = _working_weight(last_session_sets)
+    base = lifted if lifted is not None else current_weight
+    sessions = [last_session_sets, previous_session_sets]
+    if progression_sessions_done(rep_min, rep_max, base, sessions,
+                                 prescribed_sets, increment) < PROGRESSION_SESSIONS:
+        return current_weight, current_target_reps
+    lowest = min(int(s.get("reps") or 0) for s in last_session_sets)
+    return base + increment, reps_after_load_step(lowest, base, increment, rep_min)
 
 
 def suggested_band_tier(
     current_tier: str | None,
     streak_label: str,
-    allow_increase: bool = True,
 ) -> str | None:
     """
     Band-resistance counterpart to suggested_weight_kg -- steps one
-    position through the fixed Green/Blue/Yellow/Red/Black tier scale
-    instead of a kg increment, same streak_label -> direction mapping,
-    clamped at both ends. Returns None if current_tier is None or not a
-    recognised tier.
+    position DOWN the fixed Green/Blue/Yellow/Red/Black tier scale on a
+    "low"/"below" streak, clamped at Green. "high" leaves the tier unchanged
+    for the same reason it leaves a weight unchanged. Returns None if
+    current_tier is None or not a recognised tier.
     """
     if current_tier not in BAND_TIERS:
         return None
     idx = BAND_TIERS.index(current_tier)
-    if streak_label == "high" and allow_increase:
-        idx += 1
-    elif streak_label in ("low", "below"):
+    if streak_label in ("low", "below"):
         idx -= 1
     idx = max(0, min(len(BAND_TIERS) - 1, idx))
     return BAND_TIERS[idx]

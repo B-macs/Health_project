@@ -585,22 +585,25 @@ def seed_actual_entry(
     allow_increase: bool,
     weight_increment: float = 2.5,
     last_session_sets: list[dict] | None = None,
+    previous_session_sets: list[dict] | None = None,
 ) -> dict:
     """Decide the starting {"reps", "weight_kg", "band_tier", "source",
     "last_seen_date"} entry for one exercise's live-session steppers.
 
     Priority order:
       1. Double progression (engine.double_progression) -- fires only when
-         ex has both "rep_min" and "rep_max" set AND last_session_sets is
-         given AND every set in it hit the top of the range. When it
-         fires, its (weight, reps) become the seed and everything below is
-         skipped for weight/reps -- double progression takes priority over
-         last_performance/readiness seeding, not merely a nudge on top of it.
+         ex has both "rep_min" and "rep_max" set AND the last two sessions
+         (last_session_sets, previous_session_sets) were at one weight with
+         every set at the rep target. When it fires, its (weight, reps)
+         become the seed and everything below is skipped for weight/reps --
+         double progression takes priority over last_performance/readiness
+         seeding, not merely a nudge on top of it.
       2. last_performance (Repository.get_last_performance's shape) if
          present, else the exercise's own (already volume-adjusted --
          caller passes the post apply_exercise_volume_modifier `ex`) plan
-         prescription. The readiness engine's streak_label then nudges the
-         weight/band-tier by one step on top -- reps are already readiness-
+         prescription. The readiness engine's streak_label may then lower
+         the weight/band-tier by one step; it never raises it (engine.
+         suggested_weight_kg, 2026-09-16) -- reps are already readiness-
          adjusted upstream by apply_exercise_volume_modifier, so they are
          NOT nudged again here.
 
@@ -609,12 +612,9 @@ def seed_actual_entry(
     by the existing live per-rep hold-timer counter; only their weight is
     steppable, to avoid a stepper silently disagreeing with that counter.
 
-    allow_increase is forced off by the caller when there's no existing
-    load to build on (seed weight/tier absent), or on a red-signal engine-
-    directive day -- a good readiness day must never auto-introduce load
-    on an exercise the plan or history has deliberately kept bodyweight
-    (e.g. Bulgarian Split Squat, weeks 1-2). Reducing load is never
-    suppressed. Also gates double progression's own upward move.
+    allow_increase gates double progression's upward move -- the only
+    upward move left, since readiness no longer raises anything. Reducing
+    load is never suppressed.
     """
     entry = {"reps": None, "weight_kg": None, "band_tier": None,
               "source": "plan_default", "last_seen_date": None}
@@ -637,14 +637,15 @@ def seed_actual_entry(
             entry["weight_kg"], entry["reps"], rep_min, rep_max,
             last_session_sets, prescribed_sets=ex.get("sets", 1),
             increment=weight_increment, allow_increase=allow_increase,
+            previous_session_sets=previous_session_sets,
         )
         if (progressed_weight, progressed_reps) != (entry["weight_kg"], entry["reps"]):
             entry["weight_kg"] = progressed_weight
             entry["reps"] = progressed_reps
             entry["source"] = "double_progression"
             # The date is recorded on THIS branch too. Double progression only
-            # fires BECAUSE there is a logged session behind it -- every
-            # prescribed set hit the top of the rep range -- so leaving
+            # fires BECAUSE there are logged sessions behind it -- every
+            # prescribed set at the rep target, twice -- so leaving
             # last_seen_date None made actual_caption fall through to its
             # "No prior record" wording on the one branch where the history is
             # most load-bearing, and it is the branch that raises the weight.
@@ -662,13 +663,10 @@ def seed_actual_entry(
             entry["weight_kg"] = last_performance["weight_kg"]
 
     if equip == "band" and entry["band_tier"]:
-        entry["band_tier"] = engine.suggested_band_tier(
-            entry["band_tier"], streak_label, allow_increase=allow_increase,
-        )
+        entry["band_tier"] = engine.suggested_band_tier(entry["band_tier"], streak_label)
     elif equip != "band" and entry["weight_kg"] is not None:
         entry["weight_kg"] = engine.suggested_weight_kg(
             entry["weight_kg"], streak_label, increment=weight_increment,
-            allow_increase=(allow_increase and entry["weight_kg"] > 0),
         )
     return entry
 
@@ -905,6 +903,44 @@ def load_policy(directive: dict | None, readiness_modifier: dict | None) -> dict
     }
 
 
+#: A weight step waits when today's check-in pain score is ABOVE this, out of
+#: 10 (athlete, 2026-09-16). The pain-monitoring model's acceptable zone:
+#: Silbernagel 2007 allowed pain up to 5/10 during loading provided it settled
+#: by the next morning, and the HEAVY trial in hypermobile shoulders (Liaghat
+#: 2022) progressed load with symptoms under 5/10. The 2026-08-10 progression
+#: design chose the same number on his own record — 3-4/10 has repeatedly been
+#: fine to train on — and docs/training/load_progression_evidence_review_
+#: 2026-09-16.md carries the sources. Both are borrowed from tendon and shoulder
+#: work; nothing tests a threshold for a lumbar disc.
+STEP_PAIN_CEILING = 5
+
+
+def todays_check_in(rows: list[dict] | None, today: date) -> dict | None:
+    """The check-in row dated `today` among Repository.get_recent_readiness'
+    rows, or None."""
+    iso = today.isoformat()
+    return next((r for r in rows or [] if r.get("date") == iso), None)
+
+
+def step_block_reason(check_in: dict | None) -> str | None:
+    """Why a weight step must wait today, in words for the screen, or None
+    when it may go ahead.
+
+    ⚠ NO CHECK-IN BLOCKS, by the athlete's choice (2026-09-16), and a check-in
+    without a pain score blocks the same way: a measurement not taken is not
+    evidence of health. A step is one session's worth of progress and waiting
+    costs a week, while a step onto an unreported flare costs more.
+    """
+    if not check_in:
+        return "there is no check-in for today"
+    pain = check_in.get("pain_score")
+    if pain is None or pain == "":
+        return "today's check-in has no pain score"
+    if float(pain) > STEP_PAIN_CEILING:
+        return f"today's pain score is {float(pain):g}/10"
+    return None
+
+
 #: What a failed-week hold adds to the reasons a number was held. See
 #: hold_for_failed_week.
 FAILED_WEEK_HOLD_REASON = "last week failed"
@@ -1086,6 +1122,8 @@ def resolve_prescription(
     policy: dict,
     weight_increment: float = 2.5,
     last_session_sets: list[dict] | None = None,
+    previous_session_sets: list[dict] | None = None,
+    step_block: str | None = None,
 ) -> dict:
     """THE single ordered resolution. Every prescribed number the live training
     screen shows comes out of here, and the banner above them comes out of the
@@ -1109,19 +1147,29 @@ def resolve_prescription(
     A FAILED-WEEK HOLD (hold_for_failed_week) seeds a second time with
     progression OFF, then applies the same ceiling. Clamping the free proposal
     alone is not enough there: when double progression fires it raises the
-    weight AND resets the reps to the bottom of the range, so the clamp would
-    put the weight back and leave 12 reps reading as 8 -- a week meant to
+    weight AND lowers the reps by what the step costs, so the clamp would put
+    the weight back and leave 12 reps reading as 10 or 8 -- a week meant to
     repeat the last session would quietly prescribe less of it. The ledger is
     still measured against the free proposal, so the caption says what the
     hold stopped. This path also runs when the day is reduced as well; its
     result is at or under the last session on every axis either way, which is
     all a reduced-load day promises.
+
+    `next_step` carries next_step_caption: when this lift's weight goes up
+    next. It is left out in a failed-week hold, where nothing goes up.
+
+    `step_block` is step_block_reason's answer for today: when it is set and
+    double progression wanted to step, the entry is seeded again with
+    progression OFF — the last session's weight and reps — and says why in
+    `step_blocked` and `next_step`. Nothing else is gated: a block only ever
+    stops the one upward move there is.
     """
     proposed = seed_actual_entry(
         ex, last_performance, streak_label,
         allow_increase=True,
         weight_increment=weight_increment,
         last_session_sets=last_session_sets,
+        previous_session_sets=previous_session_sets,
     )
     ceiling = last_completed_ceiling(last_performance, last_session_sets)
     if policy.get("failed_week_hold"):
@@ -1130,18 +1178,67 @@ def resolve_prescription(
             allow_increase=False,
             weight_increment=weight_increment,
             last_session_sets=last_session_sets,
+            previous_session_sets=previous_session_sets,
         )
         final = clamp_to_ceiling(held, ceiling)
         final["clamped"] = _held_below(proposed, final)
         if not policy.get("reduced"):
             final["held_because"] = "failed_week"
-    elif policy.get("reduced"):
-        final = clamp_to_ceiling(proposed, ceiling)
     else:
-        final = dict(proposed)
+        blocked = bool(step_block) and proposed.get("source") == "double_progression"
+        base = proposed
+        if blocked:
+            base = seed_actual_entry(
+                ex, last_performance, streak_label,
+                allow_increase=False,
+                weight_increment=weight_increment,
+                last_session_sets=last_session_sets,
+                previous_session_sets=previous_session_sets,
+            )
+        final = clamp_to_ceiling(base, ceiling) if policy.get("reduced") else dict(base)
+        if blocked:
+            final["step_blocked"] = step_block
     final.setdefault("clamped", {})
     assert_within_ceiling(final, ceiling, policy, ex.get("name", ""))
+    if final.get("step_blocked"):
+        final["next_step"] = ("The weight is ready to go up, but it stays the same "
+                              f"today: {final['step_blocked']}.")
+    elif not policy.get("failed_week_hold"):
+        step = next_step_caption(ex, final, last_session_sets, previous_session_sets,
+                                 weight_increment)
+        if step:
+            final["next_step"] = step
     return final
+
+
+def next_step_caption(ex: dict, entry: dict,
+                      last_session_sets: list[dict] | None,
+                      previous_session_sets: list[dict] | None,
+                      weight_increment: float = 2.5) -> str:
+    """When this lift's weight goes up next, in one sentence.
+
+    The screen prints "3 sets × 8 reps" and never the rep range, so without
+    this the trigger for a heavier weight is invisible — and since 2026-09-16
+    it spans two sessions and can sit above the top of the range on a light
+    dumbbell (engine.progression_rep_target), neither of which he could guess.
+
+    "" for anything double progression does not run on, and on the session
+    that IS the step (actual_caption already names it).
+    """
+    rep_min, rep_max = ex.get("rep_min"), ex.get("rep_max")
+    weight = entry.get("weight_kg")
+    if (rep_min is None or rep_max is None or ex.get("type") != "reps"
+            or ex.get("equipment_type") in (None, "band") or weight is None
+            or entry.get("source") == "double_progression"):
+        return ""
+    target = engine.progression_rep_target(rep_min, rep_max, weight, weight_increment)
+    need = engine.PROGRESSION_SESSIONS
+    done = min(need, engine.progression_sessions_done(
+        rep_min, rep_max, weight, [last_session_sets, previous_session_sets],
+        ex.get("sets", 1), weight_increment))
+    sessions = "two" if need == 2 else str(need)
+    return (f"The weight goes up after every set reaches {target} reps in "
+            f"{sessions} sessions in a row ({done} of {need} so far).")
 
 
 def _held_below(proposed: dict, final: dict) -> dict:
@@ -1208,13 +1305,18 @@ def actual_caption(entry: dict) -> str:
     source = entry.get("source")
     date_part = f" ({entry['last_seen_date']})" if entry.get("last_seen_date") else ""
     if source == "double_progression":
-        base = ("Double progression — every prescribed set hit the top of the "
-                f"rep range last session{date_part}.")
+        base = ("Double progression — every set reached its rep target in your "
+                f"last two sessions{date_part}.")
     elif source == "last_time":
         base = f"Starting from your last logged session{date_part}."
     else:
         base = "No prior record — using plan default."
-    return f"{base} {_held_caption(held, entry.get('held_because'))}" if held else base
+    parts = [base]
+    if held:
+        parts.append(_held_caption(held, entry.get("held_because")))
+    if entry.get("next_step"):
+        parts.append(entry["next_step"])
+    return " ".join(parts)
 
 
 # ─── The previous session, shown beside today's prescription ─────────────

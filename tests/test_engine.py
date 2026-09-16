@@ -11,6 +11,8 @@ import math
 from datetime import date, timedelta
 from unittest import mock
 
+import pytest
+
 from services import engine
 from tests._legacy_check import check
 
@@ -364,9 +366,14 @@ def test_engine_readiness_training_modifier_buckets():
     # Modifier table — via _readiness_modifier_from_buckets
     _mfb = engine._readiness_modifier_from_buckets
 
-    check("3-day high -> 1.12", _mfb(["high", "high", "high"])["volume_factor"],  1.12)
-    check("2-day high -> 1.08", _mfb(["high", "high", "normal"])["volume_factor"], 1.08)
-    check("1-day high -> 1.04", _mfb(["high", "normal", "normal"])["volume_factor"], 1.04)
+    # High readiness adds NOTHING since 2026-09-16 (it was +12/+8/+4%): no trial
+    # raises resistance load or volume because readiness is high —
+    # docs/training/load_progression_evidence_review_2026-09-16.md.
+    check("3-day high -> 1.00", _mfb(["high", "high", "high"])["volume_factor"],  1.00)
+    check("2-day high -> 1.00", _mfb(["high", "high", "normal"])["volume_factor"], 1.00)
+    check("1-day high -> 1.00", _mfb(["high", "normal", "normal"])["volume_factor"], 1.00)
+    check("high still reads as high", _mfb(["high", "high", "high"])["streak_label"], "high")
+    check("high carries no description", _mfb(["high", "high", "high"])["description"], "")
     check("normal -> 1.00",     _mfb(["normal", "normal", "normal"])["volume_factor"], 1.00)
     check("1-day below -> 0.90",_mfb(["below", "normal", "normal"])["volume_factor"], 0.90)
     check("2-day below -> 0.82",_mfb(["below", "below", "normal"])["volume_factor"],  0.82)
@@ -376,7 +383,7 @@ def test_engine_readiness_training_modifier_buckets():
     check("3-day low -> 0.50",  _mfb(["low", "low", "low"])["volume_factor"],         0.50)
 
     # Mixed: high today, low prior -- counts as 1-day high streak (no prior confirmation)
-    check("high today, low prior -> 1.04", _mfb(["high", "low", "low"])["volume_factor"], 1.04)
+    check("high today, low prior -> 1.00", _mfb(["high", "low", "low"])["volume_factor"], 1.00)
     check("high today, low prior streak=1", _mfb(["high", "low", "low"])["streak_days"],   1)
 
     # Mixed: low today, high prior -- counts as 1-day low streak
@@ -447,9 +454,15 @@ def test_engine_apply_exercise_volume_modifier():
 
 
 # ─── suggested_weight_kg ─────────────────────────────────────────────────────
+#
+# Readiness may LOWER a weight and never raises one (2026-09-16). "high" added
+# an increment until then, and that is the step that started a goblet squat at
+# 25 kg after 22.5 kg x 8, the bottom of its range —
+# docs/training/load_progression_evidence_review_2026-09-16.md.
 
-def test_suggested_weight_kg_high_streak_nudges_up():
-    assert engine.suggested_weight_kg(10.0, "high") == 12.5
+def test_suggested_weight_kg_high_streak_never_raises():
+    assert engine.suggested_weight_kg(10.0, "high") == 10.0
+    assert engine.suggested_weight_kg(22.5, "high") == 22.5
 
 
 def test_suggested_weight_kg_low_streak_nudges_down():
@@ -463,14 +476,21 @@ def test_suggested_weight_kg_normal_or_unknown_leaves_value_exactly_unchanged():
     # Off-grid weights (e.g. a 1kg accessory dumbbell) must NOT be snapped
     # to the 2.5kg increment grid on a "no change" suggestion.
     assert engine.suggested_weight_kg(1.0, "normal") == 1.0
+    assert engine.suggested_weight_kg(1.0, "high") == 1.0
 
 
-def test_suggested_weight_kg_allow_increase_false_suppresses_upward_nudge():
-    assert engine.suggested_weight_kg(10.0, "high", allow_increase=False) == 10.0
+def test_suggested_weight_kg_has_no_upward_switch_left():
+    # allow_increase went with the upward move. A parameter that switches off
+    # something that cannot happen would read as though it could.
+    import inspect
+    assert "allow_increase" not in inspect.signature(engine.suggested_weight_kg).parameters
 
 
-def test_suggested_weight_kg_allow_increase_false_still_allows_downward_nudge():
-    assert engine.suggested_weight_kg(10.0, "low", allow_increase=False) == 7.5
+def test_a_run_of_high_readiness_days_never_climbs():
+    weight = 20.0
+    for _ in range(10):
+        weight = engine.suggested_weight_kg(weight, "high")
+    assert weight == 20.0
 
 
 def test_suggested_weight_kg_floors_at_zero():
@@ -485,14 +505,14 @@ def test_suggested_weight_kg_none_input_returns_none():
 def test_suggested_weight_kg_snaps_to_increment_multiple_on_an_actual_move():
     # Simulates float drift from a non-aligned seed -- only when actually
     # moving (delta != 0) does the result snap to the 2.5kg grid.
-    assert engine.suggested_weight_kg(11.3, "high") == 15.0
+    assert engine.suggested_weight_kg(11.3, "low") == 10.0
 
 
 # ─── suggested_band_tier ─────────────────────────────────────────────────────
 
-def test_suggested_band_tier_high_streak_moves_up_one_tier():
-    assert engine.suggested_band_tier("Green", "high") == "Blue"
-    assert engine.suggested_band_tier("Yellow", "high") == "Red"
+def test_suggested_band_tier_high_streak_never_moves_up():
+    assert engine.suggested_band_tier("Green", "high") == "Green"
+    assert engine.suggested_band_tier("Yellow", "high") == "Yellow"
 
 
 def test_suggested_band_tier_low_streak_moves_down_one_tier():
@@ -512,8 +532,9 @@ def test_suggested_band_tier_clamped_at_green():
     assert engine.suggested_band_tier("Green", "low") == "Green"
 
 
-def test_suggested_band_tier_allow_increase_false_suppresses_upward_move():
-    assert engine.suggested_band_tier("Green", "high", allow_increase=False) == "Green"
+def test_suggested_band_tier_has_no_upward_switch_left():
+    import inspect
+    assert "allow_increase" not in inspect.signature(engine.suggested_band_tier).parameters
 
 
 def test_suggested_band_tier_unrecognised_tier_returns_none():
@@ -522,45 +543,73 @@ def test_suggested_band_tier_unrecognised_tier_returns_none():
 
 
 # ─── double_progression ──────────────────────────────────────────────────────
+#
+# 2026-09-16, docs/training/load_progression_evidence_review_2026-09-16.md:
+# two sessions in a row at the rep target (ACSM 2009, NSCA 2-for-2), reps after
+# the step lowered by what the step costs (Nuzzo 2024's load-reps tables), and
+# reps first when 2.5 kg is a big step at a light weight.
 
-def test_double_progression_fires_when_all_sets_hit_rep_max():
-    sets = [{"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}, {"reps": 11, "weight": 10.0}]
-    weight, reps = engine.double_progression(10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets)
-    assert weight == 12.5
-    assert reps == 8
+_12S_AT_40 = [{"reps": 12, "weight": 40.0}] * 3
+
+
+def test_double_progression_fires_after_two_sessions_at_the_top_of_the_range():
+    weight, reps = engine.double_progression(
+        40.0, 12, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40,
+        prescribed_sets=3, previous_session_sets=_12S_AT_40)
+    assert (weight, reps) == (42.5, 10)
+
+
+def test_one_session_at_the_top_is_not_enough():
+    # Each lift is trained once a week, so one session would let a weight rise
+    # every week — the athlete's "don't change every week".
+    weight, reps = engine.double_progression(
+        40.0, 12, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40, prescribed_sets=3)
+    assert (weight, reps) == (40.0, 12)
+
+
+def test_the_two_sessions_must_be_at_the_same_weight():
+    at_37_5 = [{"reps": 12, "weight": 37.5}] * 3
+    weight, reps = engine.double_progression(
+        40.0, 12, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40,
+        prescribed_sets=3, previous_session_sets=at_37_5)
+    assert (weight, reps) == (40.0, 12)
 
 
 def test_double_progression_does_not_fire_when_one_set_falls_short():
-    sets = [{"reps": 10, "weight": 10.0}, {"reps": 9, "weight": 10.0}, {"reps": 10, "weight": 10.0}]
-    weight, reps = engine.double_progression(10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets)
-    assert (weight, reps) == (10.0, 8)
+    short = [{"reps": 12, "weight": 40.0}, {"reps": 11, "weight": 40.0}, {"reps": 12, "weight": 40.0}]
+    for last, previous in ((short, _12S_AT_40), (_12S_AT_40, short)):
+        weight, reps = engine.double_progression(
+            40.0, 12, rep_min=8, rep_max=12, last_session_sets=last,
+            prescribed_sets=3, previous_session_sets=previous)
+        assert (weight, reps) == (40.0, 12)
 
 
 def test_double_progression_does_not_fire_when_allow_increase_is_false():
-    sets = [{"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}]
     weight, reps = engine.double_progression(
-        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets, allow_increase=False,
-    )
-    assert (weight, reps) == (10.0, 8)
+        40.0, 12, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40,
+        prescribed_sets=3, allow_increase=False, previous_session_sets=_12S_AT_40)
+    assert (weight, reps) == (40.0, 12)
 
 
 def test_double_progression_returns_inputs_unchanged_when_last_session_sets_is_none():
-    weight, reps = engine.double_progression(10.0, 8, rep_min=8, rep_max=10, last_session_sets=None)
-    assert (weight, reps) == (10.0, 8)
+    weight, reps = engine.double_progression(
+        40.0, 12, rep_min=8, rep_max=12, last_session_sets=None, previous_session_sets=_12S_AT_40)
+    assert (weight, reps) == (40.0, 12)
 
 
 def test_double_progression_returns_inputs_unchanged_when_last_session_sets_is_empty():
-    weight, reps = engine.double_progression(10.0, 8, rep_min=8, rep_max=10, last_session_sets=[])
-    assert (weight, reps) == (10.0, 8)
+    weight, reps = engine.double_progression(
+        40.0, 12, rep_min=8, rep_max=12, last_session_sets=[], previous_session_sets=_12S_AT_40)
+    assert (weight, reps) == (40.0, 12)
 
 
 def test_double_progression_respects_custom_increment():
-    sets = [{"reps": 12, "weight": 5.0}, {"reps": 12, "weight": 5.0}, {"reps": 12, "weight": 5.0}]
+    # A cable stack in its own units: 20 -> 21 is +5%, which costs about 2 reps.
+    at_20 = [{"reps": 12, "weight": 20.0}] * 3
     weight, reps = engine.double_progression(
-        5.0, 12, rep_min=12, rep_max=12, last_session_sets=sets, increment=1,
-    )
-    assert weight == 6.0
-    assert reps == 12
+        20.0, 12, rep_min=10, rep_max=12, last_session_sets=at_20,
+        prescribed_sets=3, increment=1, previous_session_sets=at_20)
+    assert (weight, reps) == (21.0, 10)
 
 
 def test_double_progression_bases_increment_on_actual_last_weight_not_stale_current_weight():
@@ -570,38 +619,98 @@ def test_double_progression_bases_increment_on_actual_last_weight_not_stale_curr
     # pushed the real weight above it). Progressing from the stale value
     # would silently discard weight already earned -- the increment must be
     # based on the actually-logged weight instead.
-    sets = [{"reps": 10, "weight": 15.0}, {"reps": 10, "weight": 15.0}, {"reps": 10, "weight": 15.0}]
     weight, reps = engine.double_progression(
-        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets,  # current_weight=10.0 is stale
-    )
-    assert weight == 17.5  # 15.0 (actually lifted) + 2.5, not 10.0 (stale plan value) + 2.5
-    assert reps == 8
+        10.0, 8, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40,  # 10.0 is stale
+        prescribed_sets=3, previous_session_sets=_12S_AT_40)
+    assert weight == 42.5  # 40.0 (actually lifted) + 2.5, not 10.0 (stale plan value) + 2.5
+    assert reps == 10
 
 
 def test_double_progression_falls_back_to_current_weight_when_logged_weight_missing():
-    sets = [{"reps": 10}, {"reps": 10}, {"reps": 10}]  # defensive: no "weight" key at all
+    sets = [{"reps": 12}, {"reps": 12}, {"reps": 12}]  # defensive: no "weight" key at all
     weight, reps = engine.double_progression(
-        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets,
-    )
-    assert weight == 12.5  # falls back to current_weight + increment
-    assert reps == 8
+        40.0, 12, rep_min=8, rep_max=12, last_session_sets=sets,
+        prescribed_sets=3, previous_session_sets=sets)
+    assert (weight, reps) == (42.5, 10)  # falls back to current_weight + increment
 
 
 def test_double_progression_does_not_fire_when_fewer_sets_logged_than_prescribed():
     # Regression guard: all() over a short list is vacuously true -- a
     # session cut short after 1 of 3 prescribed sets, with that one set
-    # hitting rep_max, must not read as a clean full session.
-    sets = [{"reps": 10, "weight": 10.0}]  # only 1 set logged
-    weight, reps = engine.double_progression(
-        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets, prescribed_sets=3,
-    )
-    assert (weight, reps) == (10.0, 8)
+    # hitting the target, must not read as a clean full session.
+    one_set = [{"reps": 12, "weight": 40.0}]
+    for last, previous in ((one_set, _12S_AT_40), (_12S_AT_40, one_set)):
+        weight, reps = engine.double_progression(
+            40.0, 12, rep_min=8, rep_max=12, last_session_sets=last,
+            prescribed_sets=3, previous_session_sets=previous)
+        assert (weight, reps) == (40.0, 12)
 
 
 def test_double_progression_fires_when_logged_sets_meet_or_exceed_prescribed():
-    sets = [{"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0}]
+    over = [{"reps": 13, "weight": 40.0}, {"reps": 12, "weight": 40.0},
+            {"reps": 12, "weight": 40.0}, {"reps": 12, "weight": 40.0}]
     weight, reps = engine.double_progression(
-        10.0, 8, rep_min=8, rep_max=10, last_session_sets=sets, prescribed_sets=3,
-    )
-    assert weight == 12.5
-    assert reps == 8
+        40.0, 12, rep_min=8, rep_max=12, last_session_sets=over,
+        prescribed_sets=3, previous_session_sets=_12S_AT_40)
+    assert (weight, reps) == (42.5, 10)  # from the LOWEST set, 12, not the 13
+
+
+# ─── the reps after a step, and the reps before one ──────────────────────────
+
+def test_the_reps_drop_by_what_the_step_costs():
+    # From the review's worked cases, starting at 12 reps:
+    assert engine.reps_after_load_step(12, 40.0) == 10   # +6.3%, DB RDL
+    assert engine.reps_after_load_step(12, 25.0) == 8    # +10%, goblet squat / hip thrust
+    assert engine.reps_after_load_step(12, 45.0) == 10   # +5.6%
+
+
+def test_the_reps_never_rise_after_a_step():
+    assert engine.reps_after_load_step(8, 1000.0) == 8
+
+
+def test_the_reps_fall_back_to_the_bottom_of_the_range_with_no_weight_to_scale():
+    assert engine.reps_after_load_step(12, 0.0, rep_min=8) == 8
+    assert engine.reps_after_load_step(12, None, rep_min=8) == 8
+
+
+def test_a_heavy_lift_steps_at_the_top_of_its_range():
+    assert engine.progression_rep_target(8, 12, 40.0) == 12
+    assert engine.progression_rep_target(8, 12, 25.0) == 12
+
+
+def test_a_light_dumbbell_climbs_past_the_range_before_it_steps():
+    # 2.5 kg on 22.5 kg is +11%, past ACSM's 2-10%: 12 reps would drop to 8 at
+    # the edge, so the target is 13 and the drop lands at 9.
+    assert engine.progression_rep_target(8, 12, 22.5) == 13
+    assert engine.reps_after_load_step(13, 22.5) == 9
+    # 2.5 kg on 15 kg is +17%.
+    assert engine.progression_rep_target(8, 12, 15.0) == 15
+    assert engine.reps_after_load_step(15, 15.0) == 9
+
+
+@pytest.mark.parametrize("weight", [10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0, 30.0, 40.0, 60.0])
+@pytest.mark.parametrize("rep_min,rep_max", [(8, 12), (10, 12), (6, 10), (12, 15)])
+def test_after_a_step_the_reps_land_inside_the_range(weight, rep_min, rep_max):
+    """The target is built so the drop can never leave the range — the one
+    property that makes reps-first and effort-matching a single rule."""
+    target = engine.progression_rep_target(rep_min, rep_max, weight)
+    assert target >= rep_max
+    assert rep_min <= engine.reps_after_load_step(target, weight) <= target
+
+
+def test_twelve_reps_at_22_5_kg_does_not_step():
+    at_22_5 = [{"reps": 12, "weight": 22.5}] * 3
+    weight, reps = engine.double_progression(
+        22.5, 12, rep_min=8, rep_max=12, last_session_sets=at_22_5,
+        prescribed_sets=3, previous_session_sets=at_22_5)
+    assert (weight, reps) == (22.5, 12)
+
+
+def test_progression_sessions_done_counts_the_unbroken_run_from_the_newest():
+    at_40 = _12S_AT_40
+    short = [{"reps": 10, "weight": 40.0}] * 3
+    assert engine.progression_sessions_done(8, 12, 40.0, [at_40, at_40], 3) == 2
+    assert engine.progression_sessions_done(8, 12, 40.0, [at_40, short], 3) == 1
+    assert engine.progression_sessions_done(8, 12, 40.0, [short, at_40], 3) == 0
+    assert engine.progression_sessions_done(8, 12, 40.0, [None, at_40], 3) == 0
+    assert engine.progression_sessions_done(8, 12, 42.5, [at_40, at_40], 3) == 0

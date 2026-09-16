@@ -1,5 +1,16 @@
 # Automatic Progression Rule — Design (P5)
 
+> **⚠ PARTLY SUPERSEDED 2026-09-16 — read
+> `load_progression_evidence_review_2026-09-16.md` §7 first.** The live rule is
+> not this rung machine. On the athlete's choices after a new literature review:
+> a weight steps after **two sessions in a row** at the rep target (not a +1 rep
+> ladder), and the reps after a step **drop by what the step costs** (not a reset
+> to `rep_min` — §4.1's heuristic, which this document already called weak).
+> Kept from this design: the readiness nudge retired, reps first on too-coarse
+> steps, and the 5/10 pain gate with a missing check-in holding. Still unbuilt
+> from it: rollback, the 21-day stale gap, step spacing, the RPE gate, the
+> decline lockout and the stored prescription snapshot.
+
 *Status: **DESIGN ONLY** — approved shape for the post-2026-08-16 block build. No code
 implements this yet. Written 2026-08-10. The athlete's brief: after 3 consecutive
 sessions of an exercise at the same working weight, progress the load automatically

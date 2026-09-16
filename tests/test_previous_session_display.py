@@ -175,9 +175,10 @@ st.session_state.setdefault("tp_previous", {})
 EX = {"name": "Goblet Squat", "type": "reps", "reps": 10, "sets": 3,
       "equipment_type": "dumbbell", "weight_kg": 20.0}
 
-# A readiness-HIGH day, i.e. the day the engine adds an increment. This is the
-# case the old caption got wrong.
-V._seed_actuals_if_needed(0, EX, {"streak_label": "high"}, {"reduced": False}, 1)
+# A readiness-LOW day, i.e. a day the engine moves the prescription off the
+# last session. (The old caption got this wrong on a HIGH day, when high still
+# added an increment; since 2026-09-16 only a low day moves it.)
+V._seed_actuals_if_needed(0, EX, {"streak_label": "low"}, {"reduced": False}, 1)
 
 _entry = st.session_state.tp_actuals[0]
 _prev  = st.session_state.tp_previous[0]
@@ -199,11 +200,11 @@ def test_seeding_runs_under_the_real_runtime_and_keeps_the_two_apart():
     repository reads, and the previous reading must survive the readiness nudge
     that moves the prescription."""
     out = _run_seed_script()
-    assert "PRESCRIBED 45.0" in out, out
+    assert "PRESCRIBED 40.0" in out, out
     assert "PREVIOUS Last: 45kg × 10, 45kg × 10, 42.5kg × 8 (2026-08-10)" in out, out
-    # 42.5 + one 2.5 increment = 45.0, clamped by nothing; the previous top set
-    # was also 45.0, so the honest delta is the rep change alone.
-    assert "DELTA -2 reps" in out, out
+    # 42.5 - one 2.5 increment = 40.0; the previous TOP set was 45.0 x 10, so
+    # the delta is measured from there, not from the proposal's own start.
+    assert "DELTA -5kg, -2 reps" in out, out
 
 
 def test_a_restored_checkpoint_refetches_the_previous_reading():

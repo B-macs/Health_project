@@ -500,6 +500,46 @@ def test_get_last_session_all_sets_empty_sets_json_returns_none():
     assert repo.get_last_session_all_sets("Goblet Squat") is None
 
 
+# ─── get_previous_session_all_sets ──────────────────────────────────────────
+# The session BEFORE the last: a weight step needs two sessions in a row
+# (engine.PROGRESSION_SESSIONS, 2026-09-16).
+
+def _goblet_page(day, sets):
+    return {"properties": {
+        "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop(day),
+        "Sets": _rich_text_prop(json.dumps(sets)),
+    }}
+
+
+def test_get_previous_session_all_sets_is_the_second_newest_date():
+    repo = _repo({"db-training": [
+        _goblet_page("2026-09-01", [{"reps": 8, "weight": 20.0}]),
+        _goblet_page("2026-09-15", [{"reps": 10, "weight": 22.5}]),
+        _goblet_page("2026-09-10", [{"reps": 9, "weight": 22.5}]),
+    ]})
+    assert repo.get_previous_session_all_sets("Goblet Squat") == [{"reps": 9, "weight": 22.5}]
+
+
+def test_two_pages_on_one_date_are_one_session_not_two():
+    # The 2026-09-10 triple save: duplicates of one session must never pass
+    # for the second session a step needs.
+    repo = _repo({"db-training": [
+        _goblet_page("2026-09-10", [{"reps": 12, "weight": 40.0}]),
+        _goblet_page("2026-09-10", [{"reps": 12, "weight": 40.0}]),
+    ]})
+    assert repo.get_previous_session_all_sets("Goblet Squat") is None
+
+
+def test_get_previous_session_all_sets_none_when_logged_once_or_empty():
+    once = _repo({"db-training": [_goblet_page("2026-09-15", [{"reps": 10, "weight": 22.5}])]})
+    assert once.get_previous_session_all_sets("Goblet Squat") is None
+    empty = _repo({"db-training": [
+        _goblet_page("2026-09-10", []),
+        _goblet_page("2026-09-15", [{"reps": 10, "weight": 22.5}]),
+    ]})
+    assert empty.get_previous_session_all_sets("Goblet Squat") is None
+
+
 def test_get_last_session_all_sets_corrupt_json_returns_none():
     page = {"properties": {
         "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-14"),

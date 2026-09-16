@@ -458,11 +458,13 @@ def test_seed_actual_entry_prefers_last_performance_over_plan():
     assert entry["last_seen_date"] == "2026-07-14"
 
 
-def test_seed_actual_entry_applies_readiness_nudge_on_top_of_last_performance():
+def test_seed_actual_entry_readiness_nudge_only_ever_lowers_last_performance():
+    # 2026-09-16: a high streak raised this to 12.5 until then. Readiness may
+    # lower a weight and never raises one.
     ex = {"type": "reps", "reps": 8, "weight_kg": 10.0, "equipment_type": "dumbbell"}
     last = {"reps": 6, "weight_kg": 10.0, "session_date": "2026-07-14"}
-    entry = sessions.seed_actual_entry(ex, last, "high", True)
-    assert entry["weight_kg"] == 12.5
+    assert sessions.seed_actual_entry(ex, last, "high", True)["weight_kg"] == 10.0
+    assert sessions.seed_actual_entry(ex, last, "low", True)["weight_kg"] == 7.5
 
 
 def test_seed_actual_entry_readiness_nudge_respects_custom_weight_increment():
@@ -471,8 +473,8 @@ def test_seed_actual_entry_readiness_nudge_respects_custom_weight_increment():
     # default 2.5kg.
     ex = {"type": "reps", "reps": 10, "weight_kg": 5.0, "equipment_type": "cable"}
     last = {"reps": 8, "weight_kg": 5.0, "session_date": "2026-07-14"}
-    entry = sessions.seed_actual_entry(ex, last, "high", True, weight_increment=1)
-    assert entry["weight_kg"] == 6.0
+    entry = sessions.seed_actual_entry(ex, last, "low", True, weight_increment=1)
+    assert entry["weight_kg"] == 4.0
 
 
 def test_seed_actual_entry_suppresses_increase_from_zero_baseline():
@@ -507,29 +509,39 @@ def test_seed_actual_entry_band_prefers_last_performance_tier():
     assert entry["reps"] == 12
 
 
-def test_seed_actual_entry_band_applies_readiness_nudge():
-    ex = {"type": "reps", "reps": 10, "equipment_type": "band", "band_tier": "Green"}
-    entry = sessions.seed_actual_entry(ex, None, "high", True)
-    assert entry["band_tier"] == "Blue"
+def test_seed_actual_entry_band_readiness_nudge_only_ever_lowers():
+    ex = {"type": "reps", "reps": 10, "equipment_type": "band", "band_tier": "Blue"}
+    assert sessions.seed_actual_entry(ex, None, "high", True)["band_tier"] == "Blue"
+    assert sessions.seed_actual_entry(ex, None, "low", True)["band_tier"] == "Green"
 
 
 # ─── seed_actual_entry: double progression ─────────────────────────────────
 
 def test_seed_actual_entry_double_progression_fires_and_takes_priority():
-    # Goblet Squat shape: rep_min=8, rep_max=10, all last-session sets hit 10.
-    ex = {"type": "reps", "reps": 8, "rep_min": 8, "rep_max": 10,
-          "weight_kg": 10.0, "equipment_type": "dumbbell"}
-    last_session_sets = [{"reps": 10, "weight": 10.0}, {"reps": 10, "weight": 10.0},
-                          {"reps": 10, "weight": 10.0}]
-    # last_performance would otherwise seed reps=10/weight=10.0 -- double
+    # DB RDL shape: 8-12, every set at 12 in the last TWO sessions.
+    ex = {"type": "reps", "reps": 10, "rep_min": 8, "rep_max": 12, "sets": 3,
+          "weight_kg": 40.0, "equipment_type": "dumbbell"}
+    maxed = [{"reps": 12, "weight": 40.0}] * 3
+    # last_performance would otherwise seed reps=12/weight=40.0 -- double
     # progression must win instead of being overridden by it.
-    last_performance = {"reps": 10, "weight_kg": 10.0, "session_date": "2026-07-14"}
+    last_performance = {"reps": 12, "weight_kg": 40.0, "session_date": "2026-07-14"}
     entry = sessions.seed_actual_entry(
-        ex, last_performance, "normal", True, last_session_sets=last_session_sets,
+        ex, last_performance, "normal", True,
+        last_session_sets=maxed, previous_session_sets=maxed,
     )
-    assert entry["weight_kg"] == 12.5
-    assert entry["reps"] == 8
+    assert entry["weight_kg"] == 42.5
+    assert entry["reps"] == 10   # +6% costs about two reps
     assert entry["source"] == "double_progression"
+
+
+def test_seed_actual_entry_one_maxed_session_falls_through():
+    ex = {"type": "reps", "reps": 10, "rep_min": 8, "rep_max": 12, "sets": 3,
+          "weight_kg": 40.0, "equipment_type": "dumbbell"}
+    maxed = [{"reps": 12, "weight": 40.0}] * 3
+    last_performance = {"reps": 12, "weight_kg": 40.0, "session_date": "2026-07-14"}
+    entry = sessions.seed_actual_entry(
+        ex, last_performance, "normal", True, last_session_sets=maxed)
+    assert (entry["source"], entry["weight_kg"], entry["reps"]) == ("last_time", 40.0, 12)
 
 
 def test_seed_actual_entry_double_progression_does_not_fire_falls_through():
@@ -581,15 +593,16 @@ def test_seed_actual_entry_double_progression_uses_actual_lifted_weight_not_stal
     # plan-authored weight_kg (10.0) is behind what was actually lifted
     # last session (12.5, e.g. from an earlier progression) -- the seeded
     # weight must progress from the real 12.5, not the stale plan value.
-    ex = {"type": "reps", "reps": 8, "rep_min": 8, "rep_max": 10, "sets": 3,
+    ex = {"type": "reps", "reps": 8, "rep_min": 8, "rep_max": 12, "sets": 3,
           "weight_kg": 10.0, "equipment_type": "dumbbell"}
-    last_session_sets = [{"reps": 10, "weight": 12.5}] * 3
-    last_performance = {"reps": 10, "weight_kg": 12.5, "session_date": "2026-07-14"}
+    last_session_sets = [{"reps": 12, "weight": 42.5}] * 3
+    last_performance = {"reps": 12, "weight_kg": 42.5, "session_date": "2026-07-14"}
     entry = sessions.seed_actual_entry(
-        ex, last_performance, "normal", True, last_session_sets=last_session_sets,
+        ex, last_performance, "normal", True,
+        last_session_sets=last_session_sets, previous_session_sets=last_session_sets,
     )
     assert entry["source"] == "double_progression"
-    assert entry["weight_kg"] == 15.0  # 12.5 (actually lifted) + 2.5, not 10.0 (stale) + 2.5
+    assert entry["weight_kg"] == 45.0  # 42.5 (actually lifted) + 2.5, not 10.0 (stale) + 2.5
 
 
 # ─── LOAD RESOLUTION: progression proposes, autoregulation clamps ──────────
@@ -797,14 +810,27 @@ def test_assertion_raises_on_an_over_ceiling_band_tier():
 # ── resolve_prescription: the end-to-end regressions ───────────────────────
 
 def test_green_day_still_progresses():
-    # The fix must not turn every day into a hold.
+    # The fix must not turn every day into a hold. Since 2026-09-16 the step
+    # is earned by the lifts (two sessions at the top of the range), not by a
+    # readiness streak — so the pulldown here carries a rep range.
+    ex = dict(_PULLDOWN, rep_min=8, rep_max=12)
+    maxed = [{"reps": 12, "weight": 45.0}] * 3
+    p = sessions.load_policy(_GREEN, _HIGH_STREAK)
+    entry = sessions.resolve_prescription(
+        ex, dict(_PULLDOWN_LAST_PERF, reps=12), "high", p,
+        last_session_sets=maxed, previous_session_sets=maxed,
+    )
+    assert (entry["weight_kg"], entry["reps"]) == (47.5, 10)
+    assert entry["clamped"] == {}
+
+
+def test_a_green_high_readiness_day_alone_does_not_raise_the_weight():
     p = sessions.load_policy(_GREEN, _HIGH_STREAK)
     entry = sessions.resolve_prescription(
         _PULLDOWN, _PULLDOWN_LAST_PERF, "high", p,
         last_session_sets=_PULLDOWN_LAST_SETS,
     )
-    assert entry["weight_kg"] == 47.5   # 45 + 2.5, the readiness nudge
-    assert entry["clamped"] == {}
+    assert entry["weight_kg"] == 45.0
 
 
 def test_the_2026_08_06_bug_reduced_load_day_never_exceeds_the_prior_session():
@@ -843,15 +869,16 @@ def test_reduced_load_day_holds_every_signal_colour_that_shows_a_banner():
 def test_reduced_load_day_blocks_double_progression_too():
     # The other upward path: every set hit rep_max, so double progression
     # wants +2.5kg. It proposes; the clamp still holds it.
-    ex = {"name": "RDL", "type": "reps", "reps": 10, "rep_min": 10, "rep_max": 12,
-          "sets": 3, "weight_kg": 12.5, "equipment_type": "dumbbell"}
-    last_sets = [{"reps": 12, "weight": 12.5}] * 3
-    last_perf = {"reps": 12, "weight_kg": 12.5, "session_date": "2026-07-30"}
+    ex = {"name": "RDL", "type": "reps", "reps": 10, "rep_min": 8, "rep_max": 12,
+          "sets": 3, "weight_kg": 40.0, "equipment_type": "dumbbell"}
+    last_sets = [{"reps": 12, "weight": 40.0}] * 3
+    last_perf = {"reps": 12, "weight_kg": 40.0, "session_date": "2026-07-30"}
     p = sessions.load_policy(_ORANGE, _NEUTRAL)
     entry = sessions.resolve_prescription(ex, last_perf, "normal", p,
-                                           last_session_sets=last_sets)
-    assert entry["weight_kg"] == 12.5
-    assert entry["clamped"]["weight_kg"] == {"from": 15.0, "to": 12.5}
+                                           last_session_sets=last_sets,
+                                           previous_session_sets=last_sets)
+    assert entry["weight_kg"] == 40.0
+    assert entry["clamped"]["weight_kg"] == {"from": 42.5, "to": 40.0}
 
 
 def test_reduced_load_day_holds_a_band_tier_increase():
@@ -883,7 +910,7 @@ def test_reduced_load_day_with_no_history_does_not_invent_a_ceiling():
     ex = engine.apply_exercise_volume_modifier(_PULLDOWN, p["volume_factor"])
     entry = sessions.resolve_prescription(ex, None, "high", p)
     assert entry["reps"] == 10                     # not 11
-    assert entry["weight_kg"] == 47.5              # unclamped: no record exists
+    assert entry["weight_kg"] == 45.0              # the plan's own; nothing raises it
     assert entry["clamped"] == {}
 
 
@@ -1146,15 +1173,16 @@ def test_delta_direction_colours_only():
 
 def test_previous_is_not_moved_by_the_readiness_nudge_end_to_end():
     """THE REGRESSION THIS FEATURE EXISTS FOR. Resolve a real prescription on a
-    readiness-high day and check the previous reading beside it still reports
-    what was actually lifted, not what is being proposed."""
+    day the readiness nudge moves it and check the previous reading beside it
+    still reports what was actually lifted, not what is being proposed. (A LOW
+    day since 2026-09-16 — a high one no longer moves anything.)"""
     ex = {"name": "Goblet Squat", "type": "reps", "reps": 10, "sets": 3,
           "equipment_type": "dumbbell", "weight_kg": 20.0}
     entry = sessions.resolve_prescription(
-        ex, _LP, "high", {"reduced": False}, weight_increment=2.5,
+        ex, _LP, "low", {"reduced": False}, weight_increment=2.5,
         last_session_sets=_SETS)
     prev = sessions.previous_performance(_LP, _SETS)
-    assert entry["weight_kg"] == 45.0            # 42.5 + one increment
+    assert entry["weight_kg"] == 40.0            # 42.5 - one increment
     assert prev["top"]["weight_kg"] == 45.0      # unchanged by the nudge
     assert "45kg × 10, 45kg × 10, 42.5kg × 8" in sessions.previous_caption(prev)
 
@@ -1164,17 +1192,61 @@ def test_double_progression_still_reports_its_previous_session():
     was no history at all."""
     ex = {"name": "Goblet Squat", "type": "reps", "reps": 10, "sets": 3,
           "equipment_type": "dumbbell", "weight_kg": 20.0, "rep_min": 8, "rep_max": 12}
-    maxed = [{"reps": 12, "weight": 22.5}] * 3
-    lp = {"session_date": "2026-08-10", "reps": 12, "weight_kg": 22.5}
+    # 22.5 kg needs 13 reps before its +11% step (engine.progression_rep_target).
+    maxed = [{"reps": 13, "weight": 22.5}] * 3
+    lp = {"session_date": "2026-08-10", "reps": 13, "weight_kg": 22.5}
     entry = sessions.resolve_prescription(
         ex, lp, "normal", {"reduced": False}, weight_increment=2.5,
-        last_session_sets=maxed)
+        last_session_sets=maxed, previous_session_sets=maxed)
     prev = sessions.previous_performance(lp, maxed)
     assert entry["source"] == "double_progression"
     assert entry["last_seen_date"] == "2026-08-10"
     assert sessions.previous_caption(prev) == \
-        "Last: 22.5kg × 12, 22.5kg × 12, 22.5kg × 12 (2026-08-10)"
+        "Last: 22.5kg × 13, 22.5kg × 13, 22.5kg × 13 (2026-08-10)"
     assert sessions.prescription_delta(entry, prev) == "+2.5kg, -4 reps"
+
+
+# ─── next_step_caption: when the weight goes up next ────────────────────────
+
+_RDL = {"name": "Romanian Deadlift (DB)", "type": "reps", "reps": 10, "sets": 3,
+        "equipment_type": "dumbbell", "weight_kg": 40.0, "rep_min": 8, "rep_max": 12}
+
+
+def test_the_next_step_line_counts_the_sessions_done():
+    maxed = [{"reps": 12, "weight": 40.0}] * 3
+    short = [{"reps": 10, "weight": 40.0}] * 3
+    lp = {"session_date": "2026-09-15", "reps": 12, "weight_kg": 40.0}
+    entry = sessions.resolve_prescription(
+        _RDL, lp, "normal", {"reduced": False},
+        last_session_sets=maxed, previous_session_sets=short)
+    assert entry["next_step"] == (
+        "The weight goes up after every set reaches 12 reps in two sessions in a row "
+        "(1 of 2 so far).")
+    assert entry["next_step"] in sessions.actual_caption(entry)
+
+
+def test_the_next_step_line_names_the_higher_target_on_a_light_dumbbell():
+    goblet = dict(_RDL, name="Goblet Squat", weight_kg=22.5)
+    sets = [{"reps": 8, "weight": 22.5}] * 3
+    lp = {"session_date": "2026-09-15", "reps": 8, "weight_kg": 22.5}
+    entry = sessions.resolve_prescription(
+        goblet, lp, "high", {"reduced": False},
+        last_session_sets=sets, previous_session_sets=sets)
+    assert entry["weight_kg"] == 22.5
+    assert "13 reps" in entry["next_step"] and "(0 of 2 so far)" in entry["next_step"]
+
+
+def test_no_next_step_line_on_the_step_itself_or_without_a_range():
+    maxed = [{"reps": 12, "weight": 40.0}] * 3
+    lp = {"session_date": "2026-09-15", "reps": 12, "weight_kg": 40.0}
+    stepped = sessions.resolve_prescription(
+        _RDL, lp, "normal", {"reduced": False},
+        last_session_sets=maxed, previous_session_sets=maxed)
+    assert stepped["source"] == "double_progression" and "next_step" not in stepped
+    no_range = {k: v for k, v in _RDL.items() if k not in ("rep_min", "rep_max")}
+    plain = sessions.resolve_prescription(no_range, lp, "normal", {"reduced": False},
+                                          last_session_sets=maxed)
+    assert "next_step" not in plain
 
 
 def test_estimate_duration_floor_is_10_minutes():
@@ -1511,3 +1583,69 @@ def test_stage_2b_is_a_new_block_at_the_same_clinical_stage():
     over Performance-and-Growth ceilings (ACWR 1.5, RPE 10) on a block name."""
     assert sessions.PHASE_META[3]["stage"] == 2
     assert sessions.plan_dict_for_phase(3) is not None
+
+
+# ─── the pain gate on a weight step (athlete, 2026-09-16) ──────────────────
+
+_MAXED_AT_40 = [{"reps": 12, "weight": 40.0}] * 3
+_LP_40 = {"session_date": "2026-09-15", "reps": 12, "weight_kg": 40.0}
+
+
+@pytest.mark.parametrize("check_in,reason", [
+    (None, "there is no check-in for today"),
+    ({"date": "2026-09-18", "pain_score": None}, "today's check-in has no pain score"),
+    ({"date": "2026-09-18", "pain_score": 6}, "today's pain score is 6/10"),
+    ({"date": "2026-09-18", "pain_score": 5.5}, "today's pain score is 5.5/10"),
+    ({"date": "2026-09-18", "pain_score": 5}, None),
+    ({"date": "2026-09-18", "pain_score": 0}, None),
+])
+def test_step_block_reason(check_in, reason):
+    assert sessions.step_block_reason(check_in) == reason
+
+
+def test_todays_check_in_is_the_row_dated_today():
+    rows = [{"date": "2026-09-17", "pain_score": 0}, {"date": "2026-09-18", "pain_score": 2}]
+    assert sessions.todays_check_in(rows, date(2026, 9, 18))["pain_score"] == 2
+    assert sessions.todays_check_in(rows, date(2026, 9, 19)) is None
+    assert sessions.todays_check_in(None, date(2026, 9, 19)) is None
+
+
+def test_a_blocked_step_keeps_the_last_session_and_says_why():
+    entry = sessions.resolve_prescription(
+        _RDL, _LP_40, "normal", {"reduced": False},
+        last_session_sets=_MAXED_AT_40, previous_session_sets=_MAXED_AT_40,
+        step_block="there is no check-in for today")
+    assert (entry["weight_kg"], entry["reps"]) == (40.0, 12)
+    assert entry["step_blocked"] == "there is no check-in for today"
+    assert entry["next_step"] == ("The weight is ready to go up, but it stays the same "
+                                  "today: there is no check-in for today.")
+    assert entry["next_step"] in sessions.actual_caption(entry)
+
+
+def test_a_clear_check_in_lets_the_step_through():
+    entry = sessions.resolve_prescription(
+        _RDL, _LP_40, "normal", {"reduced": False},
+        last_session_sets=_MAXED_AT_40, previous_session_sets=_MAXED_AT_40,
+        step_block=sessions.step_block_reason({"date": "2026-09-18", "pain_score": 3}))
+    assert (entry["weight_kg"], entry["reps"]) == (42.5, 10)
+    assert "step_blocked" not in entry
+
+
+def test_a_block_changes_nothing_when_no_step_was_due():
+    short = [{"reps": 10, "weight": 40.0}] * 3
+    entry = sessions.resolve_prescription(
+        _RDL, _LP_40, "normal", {"reduced": False},
+        last_session_sets=short, previous_session_sets=short,
+        step_block="there is no check-in for today")
+    assert "step_blocked" not in entry
+    assert "(0 of 2 so far)" in entry["next_step"]
+
+
+def test_a_block_on_a_reduced_day_stays_at_or_under_the_last_session():
+    p = sessions.load_policy(_ORANGE, _NEUTRAL)
+    entry = sessions.resolve_prescription(
+        _RDL, _LP_40, "normal", p,
+        last_session_sets=_MAXED_AT_40, previous_session_sets=_MAXED_AT_40,
+        step_block="today's pain score is 7/10")
+    assert entry["weight_kg"] <= 40.0 and entry["reps"] <= 12
+    assert entry["step_blocked"] == "today's pain score is 7/10"
