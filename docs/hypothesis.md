@@ -193,10 +193,10 @@ behaving like guarding.
 
 | # | Trial (instrument) | Prediction if the hypothesis is TRUE | What BREAKS it |
 |---|---|---|---|
-| P8 | **The running build** — seven runs and the race; per-run notes, the day-after check-in; the decision run on day 20 | All seven clean, the day-20 run/walk holds 5:1 for 55 min, the race is run. No left front-of-hip signal anywhere: the two historic strains were dose errors, not a fragile tissue | Any left anterior-hip signal → a true local vulnerability (H3 grows); the pre-registered rule downgrades the race and the build stops |
+| P8 | **The running build** — seven run/walks over four weeks; per-run notes, the day-after check-in. ⚠ **RE-REGISTERED 2026-09-18**: the race was cancelled, so the instrument is no longer a race build. The prediction is unchanged in substance and the doses are smaller — the long run reaches 30 minutes, not 55 | All seven clean. No left front-of-hip signal anywhere: the two historic strains were dose errors, not a fragile tissue | Any left anterior-hip signal → a true local vulnerability (H3 grows); the build stops rather than slows |
 | P9 | **The session shape** — set timestamps on every gym day | With three main lifts and nested ramps the squat day measures ≤ 70 min and the press day ≤ 60, and the athlete's description stops being *three exercises in 84 minutes*. (A claim about the system, scored by the same instrument that found the problem.) | A gym day over 75 min with the prescribed rests taken → the changeover model is wrong and gets re-measured, not the block |
 | P10 | **Three Epley-valid top sets per lift** (days 1, 8, 15) | They come in AT prescription at RPE ≤ 8, and the e1RMs they produce sit above the working-set estimates the system has been carrying — capacity was underrated by caution (H2) | A grind or a fail at the prescribed number → capacity genuinely low; H2 takes the hit and Block C starts lower |
-| P11 | **Symptom topology under a real loading week** — week 3 (days 15-21) is the block's heaviest and holds the decision run | If a symptom appears in Block B it follows a HELD exposure (a desk day, travel, a car) and not the heaviest week: check-ins on days 16-22 stay ≤ 3 tightness / 0 pain, or name an exposure | A symptom tracking the heavy week with no held exposure named → H1's core is wrong for loaded training, not only for stillness |
+| P11 | **Symptom topology under a real loading week** — week 3 (days 15-21) is the block's heaviest and holds its longest run | If a symptom appears in Block B it follows a HELD exposure (a desk day, travel, a car) and not the heaviest week: check-ins on days 16-22 stay ≤ 3 tightness / 0 pain, or name an exposure | A symptom tracking the heavy week with no held exposure named → H1's core is wrong for loaded training, not only for stillness |
 
 **What Version 1 committed to for Block B, and what happened:** preparation did shift from
 release toward activation (the fold trial and the dead bug left; the glute bridge and the
@@ -207,6 +207,13 @@ plan's week-4 line. The session-shape rule was not predicted by v1 — it came f
 athlete, and it is the reason the block is shorter, not the hypothesis.
 
 ## Version history
+
+- **v1.3, 2026-09-18** — the 10 km race was cancelled by the athlete ("the next block has
+  no end date"; the goal is 21 km, no date). P8's instrument was a race build and is
+  re-registered here as a four-week run/walk build: same claim about the left hip, smaller
+  doses, no decision run. Nothing else in P8-P11 changes — none of them was about the race.
+  The Bunkie baseline (P5) moved with the failed week to 2026-09-20 and is scored at the
+  next boundary, where Block B's own day 28 re-times it.
 
 - **v1.2, 2026-09-11** — Block A scored from the log (P2, P4 confirmed; P1, P3, P5, P6
   untested; P7 ambiguous and moved to the ledger). Block B's P8-P11 registered before its

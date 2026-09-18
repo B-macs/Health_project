@@ -160,7 +160,7 @@ def test_the_repeat_week_run_is_the_restart_run_not_the_35_minute_run():
     runs = [ex for p in range(29, 36) for ex in calendar[p]["exercises"]
             if "Running" in ex["name"]]
     assert [(ex["name"], ex["duration_minutes"]) for ex in runs] == \
-        [("Running Intervals (Run/Walk)", 25)]
+        [("Running Intervals (Run/Walk)", 20)]
 
 
 def test_the_repeat_week_does_not_announce_a_block_that_has_not_started():
@@ -176,15 +176,20 @@ def test_the_first_run_of_week_4_still_shows_what_it_authored():
         assert calendar[position] is tp.PLAN_STAGE2B[position]
 
 
-def test_block_b_starts_next_monday_without_its_week_1_and_keeps_race_day():
+def test_block_b_starts_next_monday_with_all_four_weeks():
+    """It ran weeks 2-4 while the race fixed its last date: the repeat above
+    pushed it, and a block that cannot end later loses a week instead. The race
+    was cancelled 2026-09-18, so nothing is given up — it starts late and runs
+    its full four weeks."""
     block_b = _by_number(_after_first_failure(), 4)
-    assert (block_b.start_date, block_b.length_days, block_b.week_plan, block_b.status) == \
-        ("2026-09-21", 21, [2, 3, 4], "upcoming")
+    assert (block_b.start_date, block_b.length_days, block_b.status) ==         ("2026-09-21", 28, "upcoming")
+    # None means "as authored" — no week was dropped and none is repeated.
+    assert block_b.week_plan is None
+    assert ph.plan_weeks(block_b) == [1, 2, 3, 4]
     calendar = sess.calendar_plan(block_b)
-    assert calendar[1] is tp.PLAN_BLOCK_B[8]
-    race_position = (date(2026, 10, 11) - date(2026, 9, 21)).days + 1
-    assert calendar[race_position] is tp.PLAN_BLOCK_B[28]
-    assert ph.phase_end_date(block_b) == date(2026, 10, 11)
+    assert calendar[1] is tp.PLAN_BLOCK_B[1]
+    assert calendar[28] is tp.PLAN_BLOCK_B[28]
+    assert ph.phase_end_date(block_b) == date(2026, 10, 18)
 
 
 def test_the_stored_list_passes_the_stores_own_refusals():
@@ -199,7 +204,7 @@ def test_the_notice_says_why_and_when_block_b_starts():
         "Last week had 1 of 7 days logged, so it failed. This week runs it again. "
         "Every weight, band and rep starts at your last session, and nothing goes "
         "up by itself this week. "
-        "Block B — Race Build starts Monday 21 September.")
+        "Block B — Strength + Running Build starts Monday 21 September.")
 
 
 def test_no_notice_in_an_ordinary_week():
@@ -210,15 +215,17 @@ def test_no_notice_in_an_ordinary_week():
 #  "unless I fail this week again"
 # ═════════════════════════════════════════════════════════════════════════════
 
-def test_failing_this_week_too_repeats_it_and_block_b_loses_week_2():
+def test_failing_this_week_too_repeats_it_and_block_b_simply_starts_later():
     phases, events = wr.apply_failed_week_rule(
         _after_first_failure(), LOGGED | {"2026-09-15", "2026-09-16"}, date(2026, 9, 21))
     block_a, block_b = _by_number(phases, 3), _by_number(phases, 4)
     assert [e[0] for e in events] == ["2026-09-14"]
     assert block_a.week_plan == [1, 2, 3, 4, 4, 4]
-    assert (block_b.start_date, block_b.week_plan) == ("2026-09-28", [3, 4])
-    assert ph.phase_end_date(block_b) == date(2026, 10, 11)
-    assert sess.calendar_plan(block_b)[14] is tp.PLAN_BLOCK_B[28]
+    # It used to lose week 2 here, to keep race day. Nothing is lost now.
+    assert (block_b.start_date, block_b.week_plan) == ("2026-09-28", None)
+    assert ph.plan_weeks(block_b) == [1, 2, 3, 4]
+    assert ph.phase_end_date(block_b) == date(2026, 10, 25)
+    assert sess.calendar_plan(block_b)[28] is tp.PLAN_BLOCK_B[28]
 
 
 def test_passing_this_week_leaves_block_b_on_the_21st():
@@ -230,26 +237,33 @@ def test_passing_this_week_leaves_block_b_on_the_21st():
     assert _by_number(phases, 3).week_plan == [1, 2, 3, 4, 4]
 
 
-def test_the_decision_run_and_the_race_week_are_never_given_up():
-    """A third failure would need Block B to lose week 3 (the day-20 decision
-    run) or week 4 (the race). The repeat is refused and the refusal kept."""
+def test_a_third_failure_is_no_longer_refused():
+    """With race day fixed, a third failure would have needed Block B to give up
+    the decision run or the race week, so the repeat was refused. No block has a
+    fixed last date now, so a repeat always fits — it moves things later."""
     twice, _ = wr.apply_failed_week_rule(
         _after_first_failure(), LOGGED, date(2026, 9, 21))
     thrice, events = wr.apply_failed_week_rule(twice, LOGGED, date(2026, 9, 28))
     assert [e[0] for e in events] == ["2026-09-21"]
-    assert "not repeated" in events[0][1]
-    assert _by_number(thrice, 4) == _by_number(twice, 4)
-    assert _by_number(thrice, 3).week_plan == _by_number(twice, 3).week_plan
-    assert _by_number(thrice, 3).week_results["2026-09-21"] == events[0][1]
+    assert "not repeated" not in events[0][1]
+    assert _by_number(thrice, 3).week_plan == [1, 2, 3, 4, 4, 4, 4]
+    assert _by_number(thrice, 4).start_date == "2026-10-05"
+    assert ph.plan_weeks(_by_number(thrice, 4)) == [1, 2, 3, 4]
 
 
-def test_a_failed_week_inside_block_b_cannot_push_the_race():
+def test_a_failed_week_inside_block_b_lengthens_block_b():
+    """Week 1 of Block B itself fails. It used to be refused — the block could
+    not grow without ending after the race. Now the block runs its week 1 twice
+    and ends a week later."""
     phases = _after_first_failure()
     phases, events = wr.apply_failed_week_rule(
         phases, LOGGED | {"2026-09-15", "2026-09-16", "2026-09-17"}, date(2026, 9, 28))
     assert [e[0] for e in events] == ["2026-09-14", "2026-09-21"]
-    assert "not repeated" in events[1][1]
-    assert _by_number(phases, 4).week_plan == [2, 3, 4]
+    assert "not repeated" not in events[1][1]
+    block_b = _by_number(phases, 4)
+    assert block_b.week_plan == [1, 1, 2, 3, 4]
+    assert (block_b.start_date, block_b.length_days) == ("2026-09-21", 35)
+    assert ph.phase_end_date(block_b) == date(2026, 10, 25)
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -346,10 +360,11 @@ def test_redo_by_choice_runs_this_week_again_next_week():
     assert _by_number(after, 3).week_plan == [1, 2, 3, 4, 4, 4]
     assert _by_number(after, 3).week_results["2026-09-14"] == \
         "Redone by choice — 3 of 7 days logged when chosen"
+    # The third line was "Block B still ends on 11 October, so it has 2 weeks
+    # instead of 3" — the cost of a fixed race date. There is no such cost now.
     assert wr.consequences(before, after) == [
         "Stage 2B — Strength + Running Build runs to 27 September instead of 20 September.",
-        "Block B — Race Build starts 28 September instead of 21 September.",
-        "Block B — Race Build still ends on 11 October, so it has 2 weeks instead of 3.",
+        "Block B — Strength + Running Build starts 28 September instead of 21 September.",
     ]
 
 
@@ -397,18 +412,22 @@ def test_drop_week_follows_the_authored_order_and_spares_the_repeat():
     assert ph.drop_week([2, 2, 3, 4], (1, 2), after=1) is None
 
 
-@pytest.mark.parametrize("start, weeks", [
-    (date(2026, 9, 14), None), (date(2026, 9, 21), [2, 3, 4]), (date(2026, 9, 28), [3, 4]),
+@pytest.mark.parametrize("start", [
+    date(2026, 9, 21), date(2026, 9, 28), date(2026, 10, 5), date(2026, 11, 30),
 ])
-def test_block_b_always_ends_on_race_day(start, weeks):
+def test_block_b_is_four_whole_weeks_whenever_it_starts(start):
+    """No fixed last date since 2026-09-18, so no start date costs it a week and
+    none is refused. It used to end on 2026-10-11 whatever happened."""
     block_b = sess.build_phase(4, start)
-    assert block_b.week_plan == weeks
-    assert ph.phase_end_date(block_b) == date(2026, 10, 11)
+    assert block_b.length_days == 28
+    assert ph.plan_weeks(block_b) == [1, 2, 3, 4]
+    assert ph.phase_end_date(block_b) == start + timedelta(days=27)
 
 
-def test_block_b_is_refused_rather_than_losing_the_decision_run():
-    with pytest.raises(ValueError, match="none of the weeks"):
-        sess.build_phase(4, date(2026, 10, 5))
+def test_no_block_carries_a_fixed_last_date():
+    for number, meta in sess.PHASE_META.items():
+        assert "ends_on" not in meta, number
+        assert "drop_weeks" not in meta, number
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -602,7 +621,7 @@ def test_the_new_fields_are_stored_only_by_a_block_that_uses_them():
     assert stored[2]["week_plan"] == [1, 2, 3, 4, 4]
     assert stored[2]["week_results"] == {
         "2026-09-07": "Failed — 1 of 7 days logged, repeated the week after"}
-    assert stored[3]["week_plan"] == [2, 3, 4] and "week_results" not in stored[3]
+    assert "week_plan" not in stored[3] and "week_results" not in stored[3]
 
     reread = Repository(_config())
     reread._notion_client = _FakeNotion([_phases_page(json.dumps(stored))])

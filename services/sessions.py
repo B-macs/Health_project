@@ -1931,18 +1931,14 @@ PHASE_META: dict[int, dict] = {
     # 21), the ceilings do not. Block A's exit criteria gate a STAGE change
     # and are mostly untested (docs/hypothesis.md, 2026-09-11); no criterion
     # is needed to start the next block of the same stage.
-    4: {"name": "Block B — Race Build", "stage": 2,
-        "button": "Begin Block B — 4-Week Race Build",
-        # THE RACE DOES NOT MOVE. Block B ends on race day whatever happens
-        # before it, so a block that starts late — the failed-week rule
-        # pushing it, services/week_repeat.py — LOSES A WEEK instead of ending
-        # after the race. `drop_weeks` is the order its weeks may go: week 1
-        # first (on 2026-09-15 its sessions ran as the repeat of Stage 2B week
-        # 4), then week 2. Week 3 holds the day-20 decision run that
-        # pre-registers the race format and week 4 is the taper and the race;
-        # neither is ever dropped, so a push that would need one is refused.
-        "ends_on": date(2026, 10, 11),
-        "drop_weeks": (1, 2)},
+    # ⚠ NO `ends_on`, AND THAT IS A DECISION. Until 2026-09-18 this block ended
+    # on race day (2026-10-11) and LOST A WEEK rather than finish after it —
+    # which is why the seeded phase ran weeks 2-4. The athlete cancelled the
+    # race that day: "the next block has no end date". A block with no fixed
+    # last date simply moves when a week is repeated, and no week is lost.
+    # Nothing here should regain `ends_on`/`drop_weeks` unless he names a date.
+    4: {"name": "Block B — Strength + Running Build", "stage": 2,
+        "button": "Begin Block B — 4-Week Block"},
 }
 
 #: Content that runs INSTEAD of an authored week when that week REPEATS, keyed

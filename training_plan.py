@@ -4731,17 +4731,31 @@ ACC_BREATHING = _ex(
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-#  BLOCK B — RACE BUILD. Phase 4, clinical stage 2. Authored 2026-09-14 ->
-#  2026-10-11, race day is authored day 28.
+#  BLOCK B — STRENGTH + RUNNING BUILD. Phase 4, clinical stage 2.
+#  2026-09-21 -> 2026-10-18, all four weeks. NO END DATE.
 # ═════════════════════════════════════════════════════════════════════════════
 #
-# ⚠ IT RUNS 2026-09-21 -> 2026-10-11, WEEKS 2-4. Stage 2B week 4 failed (one
-# logged day) and repeated 2026-09-14..20 under the failed-week rule
-# (services/week_repeat.py), and the race date does not move, so Block B lost
-# a week rather than ending after the race. The week it lost is week 1 — its
-# sessions are what ran as that repeat (PLAN_STAGE2B_WEEK4_REPEAT, end of this
-# file). The authored numbering below is unchanged; sessions.calendar_plan
-# reads it through the stored phase's week_plan.
+# ⚠ THE RACE IS OFF, AND THAT IS WHY THIS BLOCK CHANGED (athlete, 2026-09-18:
+# "The race is off I'm not doing it anymore, so the next block has no end
+# date", and "Yes kept as general fitness, the goal is to do a 21 km run,
+# however long it takes"). What the race had put in the block and what replaced
+# it:
+#
+#   * The fixed last date and the week it cost. Block B had ends_on 2026-10-11
+#     and dropped a week rather than end after the race, so the seeded phase
+#     ran weeks 2-4. PHASE_META[4] no longer carries ends_on or drop_weeks, a
+#     failed week now simply pushes the block later, and all four weeks run.
+#   * The run build. It reached 10 km on a date: 20 continuous, 40 long, the
+#     55-minute decision run on day 20, a taper and race day. It is now seven
+#     run/walk sessions, the long run growing about a tenth a week (25, 28, 30)
+#     with an easy fourth week — his four choices on 2026-09-18, and the shape
+#     the two Sartorius strains argue for at any distance goal.
+#   * Day 28. Race day becomes the reassessment: the same five Bunkie lines
+#     timed on 2026-09-20, re-timed four weeks on, which is what makes that
+#     baseline a baseline.
+#
+# The gym days are UNCHANGED. He approved their shape on 2026-09-11 (Key Rule
+# 21) and nothing about them was built for a race.
 #
 # Authored 2026-09-11 against Block A's real log, not its plan. Block A
 # (PLAN_STAGE2B) delivered FIVE sessions in 28 days: gym A on 2026-08-18 and
@@ -4862,7 +4876,7 @@ ACC_BREATHING = _ex(
 # chronic window reset).
 
 
-_BB_PHASE = "Block B — Race Build"
+_BB_PHASE = "Block B — Strength + Running Build"
 
 
 def _take(exercises: list, name: str, **overrides) -> dict:
@@ -4944,7 +4958,7 @@ _BB_A_OBJECTIVE = {
     1: "Block B Week 1 — Squat + Hinge (ramped, top sets nested)",
     2: "Block B Week 2 — Squat + Hinge (top sets up one step)",
     3: "Block B Week 3 — Squat + Hinge (the block's heaviest)",
-    4: "Block B Week 4 — Squat + Hinge (race week: two sets, no top set)",
+    4: "Block B Week 4 — Squat + Hinge (easy week: two sets, no top set)",
 }
 _S2B_A4 = _s2b_gym_a(4)["exercises"]
 _S2B_B4 = _s2b_gym_b(4)["exercises"]
@@ -4954,8 +4968,10 @@ def _bb_gym_a(week: int) -> dict:
     """Squat + Hinge. Three main lifts, one core item, one hip-flexor item.
 
     Each heavy compound is ONE station: ramp, heavy top set, working sets,
-    then the next lift. Week 4 is race week — two working sets at week-1
-    loads, 90 s rest, no top set; the legs should arrive at Sunday fresh."""
+    then the next lift. Week 4 is the EASY week — two working sets at week-1
+    loads, 90 s rest, no top set; tissue adapts in the week the load comes
+    down, and Sunday's reassessment reads a rested body rather than a tired
+    one."""
     squat, rdl, thrust, top_g, top_r, n_sets, heavy_rest = _BB_A[week]
     goblet = [_bb_ramp(GOBLET_RAMP, 12.5 if squat <= 22.5 else 15.0)]
     if top_g:
@@ -4992,7 +5008,7 @@ _BB_B = {
 
 def _bb_knee_hover(week: int) -> dict:
     """Continues Block A's ladder (it ended at 3 x 20 s). Held at 3 x 25 from
-    week 2: advance on two clean weeks, never on one good day, and the race
+    week 2: advance on two clean weeks, never on one good day, and the easy
     week is not the week to find out."""
     sets, hold = {1: (3, 20), 2: (3, 25), 3: (3, 25), 4: (3, 25)}[week]
     return dict(_s2b_knee_hover(4), sets=sets, hold_seconds=hold)
@@ -5005,7 +5021,7 @@ def _bb_gym_b(week: int) -> dict:
     press, pulldown, row, face, n_sets = _BB_B[week]
     return {
         "objective": (f"Block B Week {week} — Press + Pull"
-                      + (" (race week: two sets)" if week == 4 else "")),
+                      + (" (easy week: two sets)" if week == 4 else "")),
         "phase": _BB_PHASE,
         "session_rpe_target": 6 if week == 4 else 7,
         "is_gym_session": True,
@@ -5034,7 +5050,7 @@ def _bb_mobility(week: int) -> dict:
     measurement = ([_take(PLAN_STAGE2B[1]["exercises"], "Wide-Stance Rotation Count (Test)")]
                    if week == 4 else [])
     return {
-        "objective": f"Block B Week {week} — Mobility + Release" + (" (race week)" if week == 4 else ""),
+        "objective": f"Block B Week {week} — Mobility + Release" + (" (easy week)" if week == 4 else ""),
         "phase": _BB_PHASE,
         "session_rpe_target": 3,
         "is_gym_session": False,
@@ -5082,71 +5098,70 @@ def _bb_cluster(week: int) -> dict:
 
 _RUN_STOP = ("Stop and walk home at any front-of-hip or groin pain on the LEFT — that is "
              "the Sartorius, it has gone twice before, and both times it was running "
-             "volume. A missed run costs nothing; a third strain costs the race.")
+             "volume. A missed run costs nothing; a third strain costs months of "
+             "running.")
 
 _BB_RUN_DAYS = {
-    2: ("Run 1 — run/walk", "Running Intervals (Run/Walk)", 25, 4,
-        "Twenty-five minutes: two minutes of easy running, two minutes of walking, six times "
+    2: ("Run 1 — run/walk", "Running Intervals (Run/Walk)", 20, 4,
+        "Twenty minutes: two minutes of easy running, two minutes of walking, five times "
         "through. Conversational the whole way — if you cannot talk in full sentences, slow "
-        "down. This picks up where the last block's one run left off.",
-        "Block A's Run 2, which never ran. One run of sixteen minutes is the whole running "
-        "history since 2025, so the build restarts at run/walk rather than at the plan's "
-        "week-4 line.",
-        "Comfortable, no next-day left hip flexor soreness → the walk shortens on Saturday.",
-        "Any left front-hip soreness the next day → repeat this session on Saturday instead."),
-    6: ("Run 2 — run/walk", "Running Intervals (Run/Walk)", 30, 4,
-        "Thirty minutes: three minutes of easy running, one minute of walking, seven or eight "
-        "times through. The walk is a break now, not half the session. Still conversational.",
-        "The last run/walk before the first continuous run. One variable moves per session "
-        "and this one moves the ratio.",
-        "Comfortable → first continuous run on Tuesday.",
-        "Not comfortable → Tuesday repeats this session; the calendar gives way, the hip does not."),
-    9: ("Run 3 — first continuous run", "Easy Running", 20, 4,
-        "Twenty minutes of continuous easy running, no walk breaks, slower than feels "
-        "necessary. If you cannot talk, you are running too fast for this block.",
-        "The step from run/walk to continuous is the one most likely to produce soreness; "
-        "it is short on purpose and it lands the day after a squat day so the long run "
-        "has a clear run-in.",
-        "Comfortable → Saturday's long run/walk as written.",
-        "Sore → Saturday drops to three-minute intervals."),
-    13: ("Run 4 — long run/walk", "Long Running (Run/Walk)", 40, 4,
-         "Forty minutes: four minutes of easy running, one minute of walking, eight times "
-         "through — about five kilometres at this pace. Easy throughout; the distance is the "
-         "work, the pace is not.",
-         "The first long run. Run/walk keeps the impact dose below what continuous running "
-         "at the same distance would cost, which is the lever this block pulls instead of "
-         "slowing the build.",
-         "Comfortable, clean the next morning → the decision run next Saturday.",
-         "Any left front-of-hip signal → next Saturday repeats this distance rather than extending it."),
-    16: ("Run 5 — easy", "Easy Running", 30, 4,
-         "Thirty minutes continuous, easy, conversational. Nothing to prove today — this is "
-         "time on feet between the two long runs.",
-         "Continuous running at a dose already cleared, on the Tuesday, so the week's "
-         "long run gets three clear days before it.",
-         "Comfortable → the decision run on Saturday as written.",
-         "Fatigue accumulating → shorten this one, never the long run."),
-    20: ("Run 6 — THE DECISION RUN", "Long Running (Run/Walk)", 55, 5,
-         "Fifty-five minutes: five minutes of easy running, one minute of walking, nine "
-         "times through — about seven kilometres. This is the run that decides the race. "
-         "Run it exactly as the race will be run: same pattern, same easy pace, same "
-         "route type if you can. Write in the note how the left hip felt during, straight "
-         "after, and tomorrow morning.",
-         "The go / no-go for the 10 km, pre-registered: clean today and clean tomorrow "
-         "morning, with the 5:1 pattern held throughout → the race is run/walk at 5:1 "
-         "from the gun. A left front-of-hip signal at any point → the race is walked at "
-         "whatever ratio was clean, or not run. A missed race costs nothing that a third "
-         "Sartorius strain would not cost more. The decision is made on this run, not on "
-         "race morning.",
-         "Clean → race day is a run/walk at 5:1. Book it.",
-         "Not clean → the race is a walk/run at the last clean ratio, or a spectator day. "
-         "Write which, and why, in the note."),
-    23: ("Run 7 — taper", "Easy Running", 25, 4,
-         "Twenty-five minutes continuous, easy. The work is done; this keeps the legs "
-         "used to the movement without spending anything. Stop early if it feels like "
-         "more than that.",
-         "Race-week taper. Volume drops, the pattern stays.",
-         "Feels easy → good; that is the point of this week.",
-         "Anything at all in the left hip → walk, and race morning becomes a walk/run decision."),
+        "down.",
+        "The restart. One run of sixteen minutes and one twenty-minute run/walk are the "
+        "whole running history since 2025, so week 1 repeats a dose already tolerated "
+        "rather than continuing the build that was written for a fixed date.",
+        "Comfortable, no next-day left hip flexor soreness → Saturday runs the same pattern "
+        "for five minutes longer.",
+        "Any left front-hip soreness the next day → Saturday repeats this session."),
+    6: ("Run 2 — long run/walk", "Running Intervals (Run/Walk)", 25, 4,
+        "Twenty-five minutes: two minutes of easy running, two minutes of walking, six "
+        "times through, with a walking minute at the end. Same pace as Tuesday.",
+        "The week's longer run, five minutes on Tuesday's. The long run is the only "
+        "session that grows each week, and it grows by about a tenth.",
+        "Clean the next morning → the running minutes go up next week.",
+        "Sore → next week repeats this week rather than extending it."),
+    9: ("Run 3 — run/walk", "Running Intervals (Run/Walk)", 20, 4,
+        "Twenty minutes: three minutes of easy running, two minutes of walking, four times "
+        "through. Same twenty minutes as last week, more of it running.",
+        "One variable moves per week. This week it is the ratio, not the minutes — the "
+        "left Sartorius has strained twice, both times from running volume rising faster "
+        "than the tissue.",
+        "Comfortable → the same ratio on Saturday, three minutes longer.",
+        "Tight afterwards → back to two minutes running, two walking, and hold there."),
+    13: ("Run 4 — long run/walk", "Running Intervals (Run/Walk)", 28, 4,
+         "Twenty-eight minutes: three minutes of easy running, two minutes of walking, five "
+         "times through, then three minutes of walking. Easy throughout.",
+         "Twenty-eight minutes against twenty-five: the tenth-per-week step. Distance is "
+         "the work here and pace is not.",
+         "Clean → thirty minutes next Saturday, with a shorter walk.",
+         "Any left front-of-hip signal → next Saturday repeats twenty-eight minutes."),
+    16: ("Run 5 — run/walk", "Running Intervals (Run/Walk)", 22, 4,
+         "Twenty-two minutes: three minutes of easy running, one minute of walking, five "
+         "times through, then two minutes of walking. The walk is a break now, not half "
+         "the session.",
+         "The ratio moves again while the minutes barely do. Running is axial impact at "
+         "roughly two and a half times bodyweight per stride, and the lumbar findings are "
+         "the reason the walk breaks stay in at all.",
+         "Comfortable → Saturday is thirty minutes at this ratio.",
+         "Anything in the left hip or the lower back → back to two minutes walking."),
+    20: ("Run 6 — long run/walk", "Running Intervals (Run/Walk)", 30, 4,
+         "Thirty minutes: three minutes of easy running, one minute of walking, seven "
+         "times through, then two minutes of walking. Take a drink with you, and salt in "
+         "it if the weather is warm.",
+         "The block's longest run, and the third weekly step of about a tenth. The drink "
+         "is not incidental: the fluid-handling pattern in the profile is a standing "
+         "issue, and a long run is where it shows.",
+         "Clean the next morning → the next block starts its long run here, not lower.",
+         "Sore, or the back tires standing still afterwards → the next block holds at "
+         "thirty minutes instead of extending."),
+    23: ("Run 7 — easy week", "Running Intervals (Run/Walk)", 20, 3,
+         "Twenty minutes: three minutes of easy running, one minute of walking, five "
+         "times through. Easier than last week on purpose. Stop at twenty minutes even if "
+         "it feels good.",
+         "The easy week. Tissue adapts in the week the load comes down, and the next "
+         "block is planned from what this week reads rather than from a tired one. The "
+         "long run is deliberately absent.",
+         "Easy → the reassessment on Sunday is a clean reading.",
+         "Still tired → walk it, and say so in the note."),
 }
 
 def _bb_run_day(day: int) -> dict:
@@ -5219,75 +5234,42 @@ PLAN_BLOCK_B[10] = _bb_mobility(2)
 PLAN_BLOCK_B[11] = _bb_cluster(2)
 PLAN_BLOCK_B[12] = _bb_gym_b(2)
 PLAN_BLOCK_B[13] = _bb_run_day(13)
-PLAN_BLOCK_B[14] = _bb_rest(2, "Rest after the first long run. How the left hip feels "
-                               "this morning is data for the decision run — note it.")
-# ── Week 3: the heaviest week, and the decision run ──────────────────────────
+PLAN_BLOCK_B[14] = _bb_rest(2, "Rest after the longest run so far. How the left hip "
+                               "feels this morning decides whether the minutes rise next "
+                               "week — note it.")
+# ── Week 3: the heaviest week ────────────────────────────────────────────────
 PLAN_BLOCK_B[15] = _bb_gym_a(3)
 PLAN_BLOCK_B[16] = _bb_run_day(16)
 PLAN_BLOCK_B[17] = _bb_mobility(3)
 PLAN_BLOCK_B[18] = _bb_cluster(3)
 PLAN_BLOCK_B[19] = _bb_gym_b(3)
 PLAN_BLOCK_B[20] = _bb_run_day(20)
-PLAN_BLOCK_B[21] = _bb_rest(3, "The morning after the decision run. The left hip this "
-                               "morning is the second half of that decision — write it "
-                               "in the note before anything else.")
-# ── Week 4: race week ────────────────────────────────────────────────────────
+PLAN_BLOCK_B[21] = _bb_rest(3, "The morning after the block's longest run. What the "
+                               "left hip says now sets where the next block's long run "
+                               "starts — write it in the note before anything else.")
+# ── Week 4: the easy week, then the reassessment ─────────────────────────────
 PLAN_BLOCK_B[22] = _bb_gym_a(4)
 PLAN_BLOCK_B[23] = _bb_run_day(23)
 PLAN_BLOCK_B[24] = _bb_mobility(4)
 PLAN_BLOCK_B[25] = _bb_cluster(4)
 PLAN_BLOCK_B[26] = _bb_gym_b(4)
-PLAN_BLOCK_B[27] = _bb_rest(4, "The day before the race. Nothing but the walk and the "
-                               "release; a race run on fatigue measures the fatigue.")
+PLAN_BLOCK_B[27] = _bb_rest(4, "The day before the reassessment. Nothing but the walk "
+                               "and the release: five timed holds read fatigue as "
+                               "weakness, and this is a measurement.")
 PLAN_BLOCK_B[28] = {
-    "objective": "Block B Day 28 — RACE DAY, 10 km",
+    "objective": "Block B Day 28 — Reassessment: Bunkie Lines + Hip-Click Verdict",
     "phase": _BB_PHASE,
-    "session_rpe_target": 7,
+    "session_rpe_target": 4,
     "is_gym_session": False,
     "day_type": "test",
-    "exercises": _bb_release(hip_loaded=True) + [PREP_RAISE, PREP_GLUTE_ACTIVATION] + [
-        _ex(
-            name="Race Day — 10 km Running (Run/Walk)",
-            ex_type="duration",
-            sets=1, duration_minutes=75, rest_seconds=0,
-            mechanics=(
-                "Ten kilometres, run/walk from the gun: five minutes of easy running, one "
-                "minute of walking, and again, all the way to the line — the pattern the "
-                "decision run proved. Start slower than the people around you; the first "
-                "kilometre at conversational pace is the whole race plan. Walk every break "
-                "even when you feel good at 3 km, especially then. If the decision run was "
-                "not clean, today is a walk/run at the last clean ratio, and that is still "
-                "the race."
-            ),
-            biomechanical_focus=(
-                "The block's endpoint, 2026-10-11. The format is set by Run 6 on day 20, "
-                "pre-registered there; nothing is decided on race morning. Seventy-five "
-                "minutes is the run/walk estimate at ~7.5 min/km and the number the "
-                "duration reads if the watch is not running."
-            ),
-            progression="Finished with the hip quiet → the next block starts from a runner, not a rehab patient.",
-            regression="Any left front-of-hip signal → walk the rest; the finish line is not the point.",
-            warning=_RUN_STOP,
-        ),
-        _ex(
-            name="Race Debrief (Notes)",
-            ex_type="duration",
-            sets=1, duration_minutes=3, rest_seconds=0,
-            mechanics=(
-                "Three minutes with the note field while it is fresh. Write: the finish "
-                "time and the run/walk ratio you actually held; how the left front of the "
-                "hip felt at 3 km, at the finish and an hour after; whether the right hip "
-                "clicked at any point; and how the lower back feels standing still now."
-            ),
-            biomechanical_focus=(
-                "This note is the data the next block is authored from — the running "
-                "tolerance criterion, finding #4 under the longest run on record, and the "
-                "stillness question that H1 turns on."
-            ),
-            progression="Done → the next block has its inputs.",
-            regression="Short on time → the hip and the ratio are the two that cannot be skipped.",
-        ),
-    ],
+    # THE SAME FIVE LINES, FOUR WEEKS ON. Day 28 was the 10 km race until the
+    # athlete cancelled it (2026-09-18: "The race is off I'm not doing it
+    # anymore, so the next block has no end date"). What replaces it is the
+    # measurement the block deserves: the Bunkie baseline timed on 2026-09-20
+    # is only a baseline if something re-times it. The exercise objects are
+    # Stage 2B's own, so the protocol, the cues and the order are identical —
+    # a re-test that re-words its own instructions measures the wording.
+    "exercises": list(PLAN_STAGE2B[28]["exercises"]),
 }
 
 

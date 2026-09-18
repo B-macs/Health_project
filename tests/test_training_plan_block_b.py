@@ -36,11 +36,27 @@ def _ex(d, name):
 
 # ── shape ───────────────────────────────────────────────────────────────────
 
-def test_the_block_is_twenty_eight_days_and_race_day_is_the_last():
+def test_the_block_is_twenty_eight_days_and_ends_with_the_reassessment():
+    """Day 28 was the 10 km race until the athlete cancelled it (2026-09-18:
+    "The race is off I'm not doing it anymore"). What replaces it is the
+    re-test of the Bunkie baseline timed on 2026-09-20 — a baseline is only a
+    baseline if something re-times it."""
     assert DAYS == list(range(1, 29))
     assert PLAN[28]["day_type"] == "test"
-    assert "RACE DAY" in PLAN[28]["objective"]
-    assert any("10 km Running" in n for n in _names(28))
+    assert "Reassessment" in PLAN[28]["objective"]
+    assert len([n for n in _names(28) if n.startswith("Bunkie")]) == 5
+
+
+def test_nothing_in_the_block_mentions_the_race():
+    fields = ("objective",)
+    for d in DAYS:
+        for f in fields:
+            assert "race" not in PLAN[d][f].lower(), (d, f)
+        for ex in PLAN[d]["exercises"]:
+            for f in ("name", "mechanics", "biomechanical_focus", "progression",
+                      "regression", "warning"):
+                text = (ex.get(f) or "").lower()
+                assert "race" not in text.replace("brace", ""), (d, ex["name"], f)
 
 
 def test_every_day_has_exercises_an_rpe_target_and_the_phase_name():
@@ -329,7 +345,9 @@ def test_the_ischial_release_is_one_side_then_the_other_with_no_pause():
     assert ex["laterality"] == "unilateral" and ex["sets"] == 1
     assert ex["hold_seconds"] == 90 and ex["rest_seconds"] == 0
     assert "no pause" in ex["mechanics"].lower()
-    for d in SQUAT_DAYS + RUN_DAYS + [4, 11, 18, 25, 28]:
+    # 28 is exempt: it runs the baseline protocol it re-tests, ischial release
+    # included, rather than this block's re-coded version.
+    for d in SQUAT_DAYS + RUN_DAYS + [4, 11, 18, 25]:
         assert _ex(d, ex["name"]) is not tp.ISCHIAL_RELEASE, d
         assert _ex(d, ex["name"])["rest_seconds"] == 0, d
 
@@ -347,17 +365,24 @@ def test_every_training_day_opens_with_the_release_and_rest_days_carry_only_the_
             assert "Anterior Hip Pressure Release" in names, d
 
 
-def test_the_front_of_the_hip_is_released_every_day_of_the_block():
+def test_the_front_of_the_hip_is_released_every_day_but_the_reassessment():
+    """Day 28 runs the 2026-09-20 baseline's own protocol, which leaves the
+    anterior-hip release off to keep the reading comparable."""
     for d in DAYS:
+        if d == 28:
+            assert "Anterior Hip Pressure Release" not in _names(d)
+            continue
         assert "Anterior Hip Pressure Release" in _names(d), d
 
 
 def test_every_loaded_session_and_every_run_has_a_raise_and_the_cluster_day_does_not():
     """Phase 2 is mandatory where stretching runs immediately before LOAD —
     the lock's own condition. A flexibility session loads nothing after."""
-    for d in GYM_DAYS + RUN_DAYS + [28]:
+    for d in GYM_DAYS + RUN_DAYS:
         assert "Walking Raise (Incline)" in _names(d), d
-    for d in (3, 4, 7, 10, 11, 14, 17, 18, 21, 24, 25, 27):
+    # 28 joins the list that loads nothing after the release: a measurement is
+    # taken cold, and the race it replaced was the one test day that loaded.
+    for d in (3, 4, 7, 10, 11, 14, 17, 18, 21, 24, 25, 27, 28):
         assert "Walking Raise (Incline)" not in _names(d), d
 
 
@@ -368,28 +393,41 @@ def test_the_raise_is_never_cycling():
 
 # ── running ─────────────────────────────────────────────────────────────────
 
-def test_seven_runs_then_the_race_and_the_long_runs_only_grow():
+def test_seven_run_walks_and_the_long_run_grows_about_a_tenth_a_week():
+    """The athlete's four choices, 2026-09-18: two runs a week, the long run
+    growing about 10% a week, run/walk throughout, and an easier fourth week.
+    The race build this replaces went 20 continuous, 40, then a 55-minute
+    decision run."""
     minutes = []
     for d in RUN_DAYS:
         run = next(e for e in PLAN[d]["exercises"] if "Running" in e["name"])
         minutes.append(run["duration_minutes"])
-    assert minutes == [25, 30, 20, 40, 30, 55, 25]
-    long_runs = [minutes[i] for i, d in enumerate(RUN_DAYS) if d in (6, 13, 20)]
-    assert long_runs == sorted(long_runs)
-    race = next(e for e in PLAN[28]["exercises"] if "10 km Running" in e["name"])
-    assert race["duration_minutes"] > max(minutes)
+    assert minutes == [20, 25, 20, 28, 22, 30, 20]
+
+    long_runs = [minutes[RUN_DAYS.index(d)] for d in (6, 13, 20)]
+    for before, after in zip(long_runs, long_runs[1:]):
+        assert 1.0 < after / before <= 1.15, (before, after)
+
+    # Week 4 is the easy week: its one run is no longer than any other, and it
+    # has no long run at all.
+    assert minutes[-1] <= min(minutes)
+    assert 27 not in RUN_DAYS and PLAN[27]["day_type"] == "rest"
+    assert not any("Running" in n for n in _names(28))
 
 
-def test_the_decision_run_is_day_20_and_says_so():
-    run = next(e for e in PLAN[20]["exercises"] if "Running" in e["name"])
-    assert "DECISION" in PLAN[20]["objective"]
-    assert "decides the race" in run["mechanics"]
-    assert "not clean" in run["regression"].lower()
-    assert "left front-of-hip signal" in run["biomechanical_focus"].lower()
+def test_no_run_is_a_test_and_every_run_is_a_run_walk():
+    """The 55-minute decision run pre-registered a race format. With no race
+    there is nothing to decide on a run, and every session keeps walk breaks —
+    the lever this build pulls instead of raising the minutes faster."""
+    for d in RUN_DAYS:
+        assert "decision" not in PLAN[d]["objective"].lower(), d
+        run = next(e for e in PLAN[d]["exercises"] if "Running" in e["name"])
+        assert run["name"] == "Running Intervals (Run/Walk)", d
+        assert "walking" in run["mechanics"].lower(), d
 
 
-def test_every_run_and_the_race_carry_the_sartorius_stop_rule():
-    for d in RUN_DAYS + [28]:
+def test_every_run_carries_the_sartorius_stop_rule():
+    for d in RUN_DAYS:
         run = next(e for e in PLAN[d]["exercises"] if "Running" in e["name"])
         w = (run["warning"] or "").lower()
         assert "left" in w and "sartorius" in w and "stop" in w, d
@@ -397,18 +435,21 @@ def test_every_run_and_the_race_carry_the_sartorius_stop_rule():
 
 def test_running_reaches_the_movement_rules_and_counts_as_leg_loading():
     runs = [n for n in NAMES if "running" in n.lower()]
-    assert len(runs) == 4, runs
+    assert runs == ["Running Intervals (Run/Walk)"], runs
     for name in runs:
         assert rules.check_movement(name, 2)["severity"] == "caution", name
         assert tc.EXERCISE_BODY_REGION[name] == "lower_body", name
         assert name not in fx.RELEASE_EXERCISES, name
 
 
-def test_the_race_is_run_walk_and_the_format_is_decided_on_day_20():
-    race = next(e for e in PLAN[28]["exercises"] if "10 km Running" in e["name"])
-    assert "run/walk" in race["mechanics"].lower()
-    assert "decision run" in race["mechanics"].lower()
-    assert _names(28)[-1] == "Race Debrief (Notes)"
+def test_day_28_re_times_the_baseline_protocol_UNCHANGED():
+    """The same objects, not a re-wording of them: a re-test that re-writes its
+    own instructions measures the wording. This is why day 28 is exempt from
+    three of the block's own rules below — it runs the baseline's protocol."""
+    baseline = tp.PLAN_STAGE2B[28]["exercises"]
+    assert PLAN[28]["exercises"] == list(baseline)
+    for mine, theirs in zip(PLAN[28]["exercises"], baseline):
+        assert mine is theirs
 
 
 # ── safety and the maps ─────────────────────────────────────────────────────

@@ -4,80 +4,66 @@
 
 ---
 
-## Current State (2026-09-11)
+## Current State (2026-09-18)
 
 | Item | Value |
 |------|-------|
-| Stage | **Stage 2** — Transition (external load). Unchanged: Stage 2B is a new BLOCK at the same clinical stage |
-| Block | **Stage 2B (Block A)** ends Sun 2026-09-13; **Block B — Race Build** starts Mon **2026-09-14** (`training_plan.PLAN_BLOCK_B`, Phase 4 — **seed it before Monday**: `python scripts/seed_next_block.py --start 2026-09-14`) |
-| Day | Block A day 26 (Fri 2026-09-11); Block B day 1 on Monday |
-| Gate | **4011/4011** — `python -m pytest tests/` |
-| Last code commit | Block B, the session-shape rule (Key Rule 21), the measured time model, the resumable save |
-| Next action | **Run the two scripts (seed Block B; archive the 09-10 duplicates). Sun 13 Sep: Block A day 28 — the Bunkie lines + hip-click verdict. Mon 14 Sep: Block B day 1 (squat day, 15 entries, ~67 min)** |
+| Stage | **Stage 2** — Transition (external load). A new BLOCK is not a new stage |
+| Block | **Stage 2B (Block A)** ends Sun 2026-09-20 (it runs its week 4 again, under the failed-week rule); **Block B — Strength + Running Build** starts Mon **2026-09-21**, seeded and rebuilt |
+| Day | Block A day 33 (Fri 2026-09-18, press day); Block B day 1 on Monday |
+| Gate | **4171/4171** — `python -m pytest tests/` |
+| Goal | **Run 21 km, no date.** The 10 km race on 2026-10-11 was cancelled 2026-09-18 |
+| Last code commit | The load-progression rule (Key Rule 23), the Monday-only redo offer, Stage 1 off the screen, the profile/programme split |
+| Next action | **Sun 20 Sep: Block A day 28 — the Bunkie lines + hip-click verdict** (it is the baseline Block B's own day 28 re-times). **Mon 21 Sep: Block B day 1.** And redeploy the hosted app — it is several changes behind |
 
 ### The two blocks, and why the dates are what they are
 
 | | Runs | Ends |
 |---|---|---|
-| **Block A** | 2026-08-17 (Mon) → 2026-09-13 (Sun) | reassess, and author Block B from its real data |
-| **Block B** | 2026-09-14 (Mon) → 2026-10-11 (Sun) | **race day is Block B's own day 28** |
+| **Block A** | 2026-08-17 (Mon) → 2026-09-20 (Sun) | five weeks: week 4 logged one day, failed, and ran again |
+| **Block B** | 2026-09-21 (Mon) → 2026-10-18 (Sun) | four weeks, **no fixed last date** |
 
-Starting on the Monday is what makes this work. Both blocks land Mon–Sun, which
-`services/plan.py`'s multiple-of-7 invariant and every spacing rule assume; the
-Ireland trip falls on days **3–14**, so gym work resumes exactly at the top of
-week 3 with nothing stranded mid-week; and the 10 km lands as day 28 of Block B
-rather than somewhere inside it.
+Both blocks land Mon–Sun, which `services/plan.py`'s multiple-of-7 invariant and
+every spacing rule assume. Nothing is pinned to a date any more: if a week fails,
+the block simply runs seven days longer and everything after it moves.
 
-### Block B — what changed and why (2026-09-11)
+### Block B — what it is now (rebuilt 2026-09-18)
 
-Built from Block A's **log**, not its plan: five sessions in 28 days (two squat days, two band
-days, one 16-minute run), a psoas-attributed flare on 08-25, top sets at prescription on 09-10.
-The week is the same every week — **Mon squat, Tue run, Wed mobility, Thu cluster, Fri press,
-Sat run, Sun rest** — and race week swaps Saturday for rest and Sunday for the race.
+The race was cancelled and the block was rebuilt the same day. **The gym days are
+unchanged** — their shape is Key Rule 21, approved 2026-09-11, and none of it was
+built for a race. The week is **Mon squat, Tue run, Wed mobility, Thu cluster,
+Fri press, Sat run, Sun rest**, with week 4 easier and Sunday's reassessment last.
 
-- **Every gym day is three main lifts, one core item, one hip item** (Key Rule 21). Squat day
-  15 entries / ~67 min modelled with full rests; press day 11 / ~56. The 2026-09-10 session
-  was 20 / 81.
-- **Ramp → heavy top set → working sets, at one rack, then the next lift.** Top sets weeks 1-3
-  only; race week is two working sets at week-1 loads.
-- **Runs restart at Block A's Run 2** and the **decision run is Sat 3 Oct (day 20, 55 min
-  run/walk 5:1, ~7 km)**: clean → the 10 km is run/walk 5:1 from the gun; not clean → walked
-  at the last clean ratio, or not run. Written before the data, scored on it.
-- **Out:** Dead Bug, the fold trial. **Moved:** McGill + scapular isometric → Wednesday;
-  Hip 90/90 + Lateral Lunge → after the Tuesday runs; Prone Y-Raise out of the press day.
-  Each removal's revert condition is at the block header in `training_plan.py`.
-- **The cluster day is 10 entries / ~45 min**: release, pattern D's five items, the lift-offs.
-  No raise (nothing is loaded after it); the two isometrics moved to the short Tuesday runs.
-  Hip 90/90 + Lateral Lunge are out for the block and finding #5 is re-measured on day 24.
+- **Every gym day is three main lifts, one core item, one hip item** (Key Rule 21).
+  Squat day 15 entries / ~67 min modelled with full rests; press day 11 / ~56.
+- **Ramp → heavy top set → working sets, at one rack, then the next lift.** Top sets
+  weeks 1-3 only; week 4 is two working sets at week-1 loads.
+- **Running is seven run/walk sessions**, two a week in weeks 1-3 and one in week 4:
+  20, 25, 20, 28, 22, 30, 20 minutes. The long run grows about a tenth a week
+  (25 → 28 → 30) and the walk breaks stay in — the lever this build pulls instead
+  of adding minutes faster. The left Sartorius has strained twice, both times from
+  running volume. **No test run and no decision run**; there is nothing to decide.
+- **Day 28 is the reassessment**: the same five Bunkie lines timed on 2026-09-20,
+  re-timed four weeks on, run under that baseline's own protocol.
+- **The cluster day is 10 entries / ~45 min**: release, pattern D's five items, the
+  lift-offs. No raise (nothing is loaded after it).
+- **Loads follow Key Rule 23**: a weight goes up only after two sessions in a row
+  with every set at the rep target, the reps then drop by what the step costs, and
+  a step waits on the day's check-in.
 
 ### Next actions, in order — the athlete's, not the code's
 
-1. **Sun 16 Aug — Stage 2A's final day.** The app shows **day 26** (Unilateral/Glute
-   + Scapular + Core), which is the last authored day it can reach.
-   **⚠ The day-28 reassessment is not in the app's reach and never was.** Stage 2A
-   absorbed two days of reschedules, so its own overrides put day 28 on 2026-08-18
-   while the block's calendar ended 2026-08-16. The two stranded entries were
-   removed on 2026-08-14 so the block finishes cleanly on the Sunday; the athlete
-   runs the screen by hand. It is short — McGill Big 3, single-leg balance eyes
-   closed, hip hinge full range, 5-minute walk + stairs — and two of the six exit
-   criteria (final working loads, functional screen) come from it.
-2. **Battery baseline mornings: 16, 19 and 20 Aug.** Cold, first thing, before
-   anything else that day. The cluster stack cannot be authored without a
-   pattern — `prescribe(None)` raises by design — and the battery has still
-   never been run. **Verify each morning with `flexibility.leg_loading_days`
-   against the real log rather than by eye**: Saturday's walk may classify as a
-   leg day and block the 16th. Capture the straddle width and heel distance at
-   the same sitting — the number is the record.
-3. **Fri 21 Aug** — the anterior-hip pressure protocol starts, the day AFTER the
-   battery baseline and not before. Contaminating the tilt measurement is the
-   pre-declared failure mode.
-4. **~24 Aug** — two-week verdict on the pec/scar protocol, in the standardised
-   prayer position.
-5. **This week** — raise the desk to standing elbow height measured ON the
-   treadmill deck, and raise the monitor by the same amount. Dominant driver of
-   the trapezius symptom; costs nothing.
-6. **Before ~Sept** — the InBody bridge scan. Unrecoverable once the gym swaps
-   machines.
+1. **Sun 20 Sep — Block A day 28.** The Bunkie lines (five timed holds) and the
+   hip-click verdict. This is the baseline Block B's day 28 re-times, so run it
+   rested and run it as written.
+2. **Mon 21 Sep — Block B day 1**, squat day. The weights start where the log left
+   them; the app no longer raises anything for a good readiness day.
+3. **Redeploy the hosted app.** It is behind by: the failed-week load hold, the
+   load-progression rule, the Monday-only redo, the Stage 1 copy removal, and the
+   rebuilt Block B. It also still holds the 2026-09-10 duplicate sessions in its
+   local copy.
+4. **Check in on training days.** A weight step waits on that day's check-in, and
+   there has been one check-in since 2026-09-09.
 
 ### The accessory session — new 2026-08-16, on the "+" button
 
