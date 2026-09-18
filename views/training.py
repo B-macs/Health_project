@@ -1,5 +1,5 @@
 """
-Training Plan — Interactive 14-Day Rehab Session Guide.
+Training Plan — the guided session screen for whichever block is live.
 Progress persists across navigation and across dropped sessions — return exactly
 where you left off. In-session state lives in st.session_state for the active
 browser connection, and is checkpointed to Notion (Config DB, key
@@ -1640,6 +1640,12 @@ def _render_week_repeat(phases: list, in_session: bool) -> None:
     — because it moves the next block and cannot be taken back from here. It
     is hidden during a session: it changes next week, never today, but the
     session screen is not the place to decide that.
+
+    It is also hidden on every day the rule does not ask — Monday only, after a
+    week of 0-2 logged days (week_repeat.redo_is_offered, athlete 2026-09-18).
+    It used to render whenever a redo was POSSIBLE, which is most days of most
+    weeks, so it stood at the top of the page asking him to repeat a week he
+    had already repeated.
     """
     _today = date.today()
     try:
@@ -1653,6 +1659,8 @@ def _render_week_repeat(phases: list, in_session: bool) -> None:
     try:
         _first = min(date.fromisoformat(p.start_date) for p in phases)
         _logged = _all_logged_dates(_first.isoformat(), _today.isoformat())
+        if not week_repeat.redo_is_offered(phases, _logged, _today):
+            return
         _after, _refusal = week_repeat.redo_this_week(phases, _logged, _today)
     except Exception:
         return
@@ -3346,10 +3354,8 @@ def render():
         st.title("Training Plan")
         st.subheader("Set Your Plan Start Date")
         st.info(
-            "This 14-day progressive rehab plan is tailored to your MRI profile "
-            "(L5/S1 disc pathology, Stage 1 Rehab). "
-            "Bodyweight only — no equipment required. "
-            "Set your start date and the app will show the correct day's exercises automatically."
+            "Your plan is built around your own MRI findings and your training log. "
+            "Set a start date and the app shows the right session for each day."
         )
         start_input = st.date_input("Plan start date", value=date.today(),
                                     help="You can backdate if you've already started.")
@@ -3486,24 +3492,13 @@ def render():
     # ── Plan complete ─────────────────────────────────────────────────────────
     if day_num > _plan_days:
         st.balloons()
-        if active.phase_number == 1:
-            st.success(
-                f"**{_plan_days}-Day Stage 1 Rehab Complete.**\n\n"
-                "Your objectives: tissue tolerance established, neural desensitisation, "
-                "gluteal activation, hip hinge pattern, and spinal stability foundation.\n\n"
-                "Open **Autoregulation** to check Stage 1 → 2 progression criteria."
-            )
-        elif active.phase_number == 2:
-            st.success(
-                f"**{_plan_days}-Day Stage 2A Gym Strength Block Complete.**\n\n"
-                "Final working loads and the Day 28 functional screen are logged. "
-                "This data feeds two decisions that are deliberately not made here: "
-                "whether to introduce running, and whether to move to Stage 2B or "
-                "extend Stage 2A. Both are settled here, against the recorded "
-                "measurements and the pre-registered predictions in docs/hypothesis.md."
-            )
-        else:
-            st.success(f"**{_plan_days}-Day {active.name} Complete.**")
+        # ONE MESSAGE, NAMED FROM THE PHASE ITSELF. The two branches this
+        # replaced were written for blocks that have ended: a Stage 1 summary
+        # ("Stage 1 information should never be displayed to the user, we have
+        # moved on from it" — athlete, 2026-09-18) and a Stage 2A one that
+        # listed decisions already taken and cited a repo document on screen,
+        # which Key Rule 20 keeps off it.
+        st.success(f"**{_plan_days}-Day {active.name} Complete.**")
         if st.button("Back to Home", type="primary", use_container_width=True):
             st.session_state["_nav_page"] = "home"
             st.rerun()

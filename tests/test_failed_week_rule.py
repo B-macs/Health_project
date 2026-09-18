@@ -700,3 +700,57 @@ def test_the_screen_seeds_with_both_sessions_and_the_pain_gate():
     assert "step_block=step_block" in seed[call_at:]
     # A failed read blocks rather than allowing the step.
     assert 'step_block = "today\'s check-in could not be read"' in seed
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+#  When the redo is OFFERED (athlete, 2026-09-18)
+# ═════════════════════════════════════════════════════════════════════════════
+#
+# "It only shows if the previous week was a failed week and only shows on the
+# Monday, if accepted it doesn't show until the next Monday if that repeated
+# week also fails." The button had stood at the top of the training page every
+# day of a week he had already repeated.
+
+MON_0921 = date(2026, 9, 21)
+
+
+def test_the_redo_is_offered_on_a_monday_after_a_failed_week():
+    # The week of 09-14 logged two days.
+    logged = LOGGED | {"2026-09-15", "2026-09-16"}
+    assert wr.redo_is_offered(_after_first_failure(), logged, MON_0921)
+
+
+def test_the_redo_is_not_offered_on_any_other_day():
+    logged = LOGGED | {"2026-09-15", "2026-09-16"}
+    for offset in range(1, 7):
+        day = MON_0921 + timedelta(days=offset)
+        assert not wr.redo_is_offered(_after_first_failure(), logged, day), day
+
+
+def test_the_redo_is_not_offered_when_last_week_was_not_failed():
+    three_days = LOGGED | {"2026-09-15", "2026-09-16", "2026-09-17"}
+    assert not wr.redo_is_offered(_after_first_failure(), three_days, MON_0921)
+
+
+def test_the_redo_is_not_offered_in_the_week_he_already_repeated():
+    """The report that produced the rule: mid-week, inside the repeat."""
+    for day in (TUE_0915, date(2026, 9, 18)):
+        assert not wr.redo_is_offered(_after_first_failure(), LOGGED, day)
+
+
+def test_a_redone_week_that_also_fails_is_offered_again():
+    """The count decides, not the stored verdict: a week redone BY CHOICE is
+    recorded as redone when chosen and never judged, so reading the verdict
+    would hide the offer after exactly the redo he asked for."""
+    after, _ = wr.redo_this_week(_after_first_failure(), LOGGED, date(2026, 9, 16))
+    assert _by_number(after, 3).week_results["2026-09-14"].startswith(wr.REDONE_PREFIX)
+    assert wr.redo_is_offered(after, LOGGED | {"2026-09-15"}, MON_0921)
+
+
+def test_the_redo_is_not_offered_outside_a_block():
+    assert not wr.redo_is_offered([], LOGGED, MON_0921)
+
+
+def test_the_screen_asks_the_rule_before_it_draws_the_button():
+    redo = _function_source("_render_week_repeat")
+    assert redo.index("redo_is_offered(") < redo.index('st.button("Redo this week"')

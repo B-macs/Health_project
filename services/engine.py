@@ -1483,13 +1483,23 @@ def _volume_recommendation_core(
             "injury_weight_active": True,
         }
 
-    # All clear — standard progressive overload
+    # All clear — train the session as prescribed.
+    #
+    # ⚠ THIS SENTENCE IS READ BY THE ATHLETE. services.insights.directive_copy
+    # prints a green day's `action` verbatim on the Autoregulation screen, so it
+    # is a prescription, not a log line. Until 2026-09-18 it read "Apply standard
+    # progressive overload: +2.5 kg (Stage 2+) or +1 rep per set (Stage 1)", and
+    # both halves were wrong by then: the app has not added weight for a good
+    # day since Key Rule 23 (a step is earned by two sessions at the rep
+    # target), and Stage 1 ended in July — "Stage 1 information should never be
+    # displayed to the user, we have moved on from it" (athlete, 2026-09-18).
     return {
         "label":              "PROGRESSIVE OVERLOAD",
         "driver":             DRIVER_NONE,
         "multiplier":         1.05,
-        "action":             "All systems nominal. Apply standard progressive overload: "
-                              "+2.5 kg (Stage 2+) or +1 rep per set (Stage 1).",
+        "action":             "All systems nominal. Train the session as prescribed. "
+                              "A weight goes up when the lifts earn it — every set at "
+                              "the rep target, two sessions in a row.",
         "signal_color":       "green",
         "injury_weight_active": False,
     }
@@ -1504,6 +1514,12 @@ def apply_volume_recommendation(
 ) -> dict:
     """
     Translate today's volume recommendation into specific training targets.
+
+    ⚠ NOT THE LIVE PATH, and its overload branch predates Key Rule 23 — the
+    live prescription is services.sessions.resolve_prescription, where a weight
+    goes up only after two sessions at the rep target and never because a day
+    was green. Nothing but this function's own test calls it (recorded
+    2026-08-06). Do not revive the branch below as a progression rule.
 
     Multiplier semantics:
       0.0  → REST — no loaded training

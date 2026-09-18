@@ -382,6 +382,36 @@ def failed_week_holds_load(phases: list[Phase], today: date) -> bool:
     return _last_weeks_outcome(block, today).startswith(FAILED_PREFIX)
 
 
+def redo_is_offered(phases: list[Phase], logged_dates, today: date) -> bool:
+    """Whether the screen may offer "Redo this week" at all today.
+
+    The athlete's rule, 2026-09-18, after the button sat at the top of the
+    training page every day of a week he had already repeated: *"It only shows
+    if the previous week was a failed week and only shows on the Monday, if
+    accepted it doesn't show until the next Monday if that repeated week also
+    fails."*
+
+    So: MONDAY, and last week logged 0-2 days. Two consequences worth stating
+    because they are the point of the rule rather than side effects:
+
+      * It is offered at most once a week, on the one day a decision about the
+        week ahead can still shape the whole week.
+      * The test is last week's COUNT, not its stored verdict. A week redone by
+        choice is recorded as redone when it is chosen, so it is never judged
+        by the automatic rule — reading the verdict would hide the offer after
+        exactly the redo he asked to be able to repeat ("if that repeated week
+        also fails").
+
+    Whether the redo can actually be applied is still redo_this_week's answer;
+    this only decides whether to ask.
+    """
+    if today.weekday() != 0:
+        return False
+    if covering_phase(phases, today) is None:
+        return False
+    return days_logged(logged_dates, _monday(today) - timedelta(days=7)) <= _ml.FAILED_WEEK_MAX_DAYS
+
+
 def repeat_notice(phases: list[Phase], today: date) -> str | None:
     """The line that explains a repeated week on the week it runs — why it
     repeats, what that does to the numbers, and when the next block now

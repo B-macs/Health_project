@@ -74,10 +74,15 @@ def render() -> None:
         key="checkin_date_select",
     )
 
+    # The date, and nothing about a stage. This read "— Stage 1: Rehab" on every
+    # check-in, hard-coded, for two blocks after Stage 1 ended (athlete,
+    # 2026-09-18: "Stage 1 information should never be displayed to the user").
+    # A stage label printed from a constant is wrong the day the stage changes,
+    # which is why the fix is to drop it rather than to update it.
     if selected_date != today:
-        st.caption(f"⚠ Backfilling {selected_date.strftime('%A, %d %B %Y')} — Stage 1: Rehab")
+        st.caption(f"⚠ Backfilling {selected_date.strftime('%A, %d %B %Y')}")
     else:
-        st.caption(f"{selected_date.strftime('%A, %d %B %Y')} — Stage 1: Rehab")
+        st.caption(selected_date.strftime('%A, %d %B %Y'))
     st.divider()
 
     with st.form("morning_checkin", clear_on_submit=True):
@@ -87,8 +92,7 @@ def render() -> None:
             st.subheader("Tissue State")
             tightness_score = st.slider(
                 "Tightness Score", min_value=0, max_value=10, value=0, step=1,
-                help="Clinical scale. 0 = no restriction, 10 = severe. "
-                     "Primary metric for Stage 1 → 2 progression.",
+                help="Clinical scale. 0 = no restriction, 10 = severe.",
             )
             pain_score = st.slider(
                 "Pain Score", min_value=0, max_value=10, value=0, step=1,
