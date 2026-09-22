@@ -659,6 +659,35 @@ def test_the_live_read_goes_past_a_stale_local_copy(tmp_path):
     assert repo.get_phases_live()[0].week_plan == [1, 2, 3, 4, 4]
 
 
+def _session_page(day: str) -> dict:
+    return {"id": f"page-{day}", "properties": {
+        "Session Date": {"date": {"start": day}}}}
+
+
+def test_the_live_count_goes_past_a_cache_missing_logged_days(tmp_path):
+    """2026-09-22, live: the hosted cache was rebuilt from Supabase, which had
+    lost the sessions of the 17th and 18th. The cache counted two days in a
+    week Notion held four of, and the rule repeated a week that had passed."""
+    path = tmp_path / "cache.db"
+    conn = sqlite3.connect(path)
+    conn.executescript((ROOT / "services" / "datastore_schema.sql").read_text(encoding="utf-8"))
+    for day in ("2026-09-15", "2026-09-16"):
+        conn.execute("INSERT INTO training_sessions (session_id, session_date) VALUES (?, ?)",
+                     (f"{day}-x", day))
+        conn.execute("INSERT INTO training_exercises (exercise_id, session_id, session_date, "
+                     "movement_name) VALUES (?, ?, ?, ?)", (f"ex-{day}", f"{day}-x", day, "Walk"))
+    conn.commit()
+    conn.close()
+    repo = Repository(_config(str(path), mode="cache"))
+    repo._notion_client = _FakeNotion([_session_page(d) for d in
+                                       ("2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18")])
+    start, end = date(2026, 9, 14), date(2026, 9, 20)
+    cached = repo.get_logged_session_dates(start, end)
+    live = repo.get_logged_session_dates_live(start, end)
+    assert wr.days_logged(cached, date(2026, 9, 14)) == 2
+    assert wr.days_logged(live, date(2026, 9, 14)) == 4
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  The training screen
 # ═════════════════════════════════════════════════════════════════════════════
@@ -686,6 +715,17 @@ def test_the_automatic_repeat_rereads_notion_before_it_writes():
     rule_at = render.index("week_repeat.apply_failed_week_rule(")
     write_at = render.index("set_phases(_fw_new)")
     assert rule_at < render.index("get_phases_live()", rule_at) < write_at
+
+
+def test_the_automatic_repeat_counts_logged_days_from_notion_before_it_writes():
+    """The schedule AND the count come from Notion before a verdict is written.
+    Only the schedule did until 2026-09-22, when a cache missing two logged days
+    failed a four-day week."""
+    render = _function_source("render")
+    rule_at = render.index("week_repeat.apply_failed_week_rule(")
+    write_at = render.index("set_phases(_fw_new)")
+    assert rule_at < render.index("get_logged_session_dates_live(", rule_at) < write_at
+    assert "get_logged_session_dates(" not in render[rule_at:write_at]
 
 
 def test_the_redo_rereads_notion_before_it_writes():

@@ -3137,7 +3137,8 @@ def render():
     #
     # The cached read only decides whether a write is DUE. The write itself is
     # recomputed from a FRESH read of both the log and the stored phases —
-    # phases from Notion itself, past the local copy — because this path
+    # BOTH from Notion itself, past the local copy (the log read was the local
+    # copy until 2026-09-22, when it failed a four-day week) — because this path
     # replaces the whole phase list with no button press, and a list built from
     # a stale local copy would put an older schedule over a newer one. When the
     # fresh list already holds the verdict but the local copy does not, the
@@ -3154,7 +3155,10 @@ def render():
             if _fw_due is not phases:
                 _fw_repo = repo.get_repository()
                 _fw_stored = _fw_repo.get_phases_live()
-                _fw_logged = _fw_repo.get_logged_session_dates(_fw_first, _fw_today)
+                # The COUNT from Notion too, not only the schedule: the cache is
+                # rebuilt from Supabase on a restart and can be missing logged
+                # days, which failed a four-day week on 2026-09-22.
+                _fw_logged = _fw_repo.get_logged_session_dates_live(_fw_first, _fw_today)
                 _fw_new, _ = week_repeat.apply_failed_week_rule(_fw_stored, _fw_logged, _fw_today)
                 if _fw_new is not _fw_stored or _fw_stored != phases:
                     _fw_repo.set_phases(_fw_new)

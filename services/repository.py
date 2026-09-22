@@ -2272,6 +2272,35 @@ class Repository:
                      not in self.SUPPLEMENTARY_SESSION_TYPES]
         return {d for p in pages if (d := notion.get_property(p, "Session Date", "date"))}
 
+    def get_logged_session_dates_live(self, start: date, end: date) -> set[str]:
+        """get_logged_session_dates read from Notion ITSELF, past the local
+        datastore — the count-side twin of get_phases_live.
+
+        For the failed-week rule, which writes a verdict once and repeats a
+        week with no button press. FOUND 2026-09-22: the hosted app rebuilds
+        its cache from Supabase whenever it restarts, Supabase had lost two
+        logged days of the week of 2026-09-14 (a mirror flush that fails
+        drops its rows), and the rule counted that cache: a week with four
+        logged days read as two, was judged failed, and a repeat week pushed
+        Block B back a week. get_phases_live already kept the SCHEDULE it
+        writes from being stale; this keeps the COUNT it judges on from being
+        stale. Every logged session counts, supplementary ones included, the
+        way the rule's count always has.
+
+        Offline (a read-only snapshot) there is no live side to read, and
+        every write raises anyway, so this is the ordinary read there.
+        """
+        if self.offline:
+            return self.get_logged_session_dates(start, end)
+        pages = notion.query_database(
+            self._nc, self.config.notion_db_training,
+            filter_={"and": [
+                {"property": "Session Date", "date": {"on_or_after": str(start)}},
+                {"property": "Session Date", "date": {"on_or_before": str(end)}},
+            ]},
+        )
+        return {d for p in pages if (d := notion.get_property(p, "Session Date", "date"))}
+
     def get_daily_session_au(self, days: int = 28, today: date | None = None) -> list[dict]:
         today = today or date.today()
         cutoff = (today - timedelta(days=days)).isoformat()
