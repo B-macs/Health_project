@@ -197,6 +197,7 @@ behaving like guarding.
 | P9 | **The session shape** — set timestamps on every gym day | With three main lifts and nested ramps the squat day measures ≤ 70 min and the press day ≤ 60, and the athlete's description stops being *three exercises in 84 minutes*. (A claim about the system, scored by the same instrument that found the problem.) | A gym day over 75 min with the prescribed rests taken → the changeover model is wrong and gets re-measured, not the block |
 | P10 | **Three Epley-valid top sets per lift** (days 1, 8, 15) | They come in AT prescription at RPE ≤ 8, and the e1RMs they produce sit above the working-set estimates the system has been carrying — capacity was underrated by caution (H2) | A grind or a fail at the prescribed number → capacity genuinely low; H2 takes the hit and Block C starts lower |
 | P11 | **Symptom topology under a real loading week** — week 3 (days 15-21) is the block's heaviest and holds its longest run | If a symptom appears in Block B it follows a HELD exposure (a desk day, travel, a car) and not the heaviest week: check-ins on days 16-22 stay ≤ 3 tightness / 0 pain, or name an exposure | A symptom tracking the heavy week with no held exposure named → H1's core is wrong for loaded training, not only for stillness |
+| P12 | **Full release withdrawal** (P1, carried and widened) — all four releases out of every day but 28 from 2026-09-22, the athlete's call; instrument: the Upper Glute Grip Grade, read FIRST and cold on days 3, 10, 17 and 24, and the daily check-ins. ⚠ Registered on day 2, after day 1's session, and before the first grip read | Right grip stays ≤ grade 1 all block and no hip-crest or front-of-hip symptom returns: the grip was tone the moving warm-up and the strength work now hold, not a structure the release was propping up (H1) | Right grip 2+ or the symptoms back → the release was doing structural work; it returns, and H1's claim that tone is compensable takes the hit |
 
 **What Version 1 committed to for Block B, and what happened:** preparation did shift from
 release toward activation (the fold trial and the dead bug left; the glute bridge and the
@@ -207,6 +208,8 @@ plan's week-4 line. The session-shape rule was not predicted by v1 — it came f
 athlete, and it is the reason the block is shorter, not the hypothesis.
 
 ## Version history
+
+- **v1.4, 2026-09-22** — the athlete took the release block out of Block B on day 2 ("the release is now outdated, there isn't that much gripping anymore") and put a moving warm-up and daily planks in its place. P1 never fired in Block A — no mobility day was logged — so it is carried as P12 on the wider withdrawal, with the grip grade moved to the front of the Wednesday session so it reads the hip before anything is done to it.
 
 - **v1.3, 2026-09-18** — the 10 km race was cancelled by the athlete ("the next block has
   no end date"; the goal is 21 km, no date). P8's instrument was a race build and is

@@ -409,6 +409,9 @@ MOBILITY_TIER_LOADS_LEGS: frozenset[str] = frozenset({
     # Hip flexors, which are what the tilt-production slot measures
     "90/90 Hip Flexor Hold",
     "Supine Hip Flexion (Marching)",
+    # Block B's warm-up march (2026-09-22) — the same muscle standing up, which
+    # is why it is kept off the Wednesday before the flexibility morning.
+    "Standing Psoas March",
     # Loaded posterior chain and abductors — the "pullers" of pattern I
     "Single-Leg Glute Bridge",
     "Lateral Band Walk",

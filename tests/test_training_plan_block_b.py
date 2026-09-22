@@ -1,10 +1,11 @@
-"""Tests for training_plan.PLAN_BLOCK_B — Block B, the race build, Phase 4.
+"""Tests for training_plan.PLAN_BLOCK_B — Block B, Phase 4.
 
 Carries Stage 2B's scheduling, safety and map invariants forward, and pins the
 things this block is the first to do: the session shape (Key Rule 21) on every
 gym day, ramp and top sets nested under their own lift, one hip-flexor item per
-gym day, the running build that restarts from Block A's actual run history and
-ends on race day, and the removals the block header records with their revert
+gym day, the running build that restarts from Block A's actual run history,
+the moving warm-up and daily planks that replaced the release block on
+2026-09-22, and the removals the block header records with their revert
 conditions.
 """
 
@@ -160,7 +161,10 @@ def test_no_day_breaks_the_session_shape_rules():
     assert not bad, "\n".join(f"day {d}: {'; '.join(v)}" for d, v in bad.items())
 
 
-def test_every_gym_day_is_three_main_lifts_one_core_item_one_hip_item():
+def test_the_working_part_of_every_gym_day():
+    """Three main lifts and one hip-flexor item on both days; the squat day
+    keeps the Pallof press as its core lift. The press day's core item is the
+    side bridge, which moved to the start with the planks on 2026-09-22."""
     for d in SQUAT_DAYS:
         assert sess.working_families(PLAN[d]["exercises"]) == [
             "Goblet Squat", "Romanian Deadlift", "Hip Thrust", "Pallof Press",
@@ -168,7 +172,7 @@ def test_every_gym_day_is_three_main_lifts_one_core_item_one_hip_item():
     for d in PRESS_DAYS:
         assert sess.working_families(PLAN[d]["exercises"]) == [
             "Incline DB Press", "Lat Pulldown", "Single-Arm DB Row", "Face Pull",
-            "Full Side Bridge", "Half-Kneeling Knee-Hover Isometric"], d
+            "Half-Kneeling Knee-Hover Isometric"], d
 
 
 def test_every_gym_day_fits_the_hour_with_measured_changeovers():
@@ -177,7 +181,21 @@ def test_every_gym_day_fits_the_hour_with_measured_changeovers():
     for d in GYM_DAYS:
         minutes = sess.estimate_duration(PLAN[d]["exercises"])
         assert minutes <= sess.SESSION_SHAPE["max_gym_minutes"], f"day {d}: {minutes} min"
+    for d in (1, 5, 8, 12, 15, 19):
+        minutes = sess.estimate_duration(PLAN[d]["exercises"])
         assert minutes >= 40, f"day {d}: {minutes} min — a gym session, not a warm-up"
+
+
+def test_the_lifts_not_the_warm_up_are_most_of_every_gym_day():
+    """A gym session, not a warm-up. With the release block gone (2026-09-22)
+    the easy week's press day models at 39 minutes, under the 40-minute floor
+    the weeks above keep; what that floor was guarding is this — the working
+    part must be the larger part of the session, easy week included."""
+    for d in GYM_DAYS:
+        exercises = PLAN[d]["exercises"]
+        n_prep = len(sess.preparation_entries(exercises))
+        prep = sess.session_seconds(exercises[:n_prep])
+        assert sess.session_seconds(exercises) - prep > prep, d
 
 
 def test_ramp_and_top_set_sit_immediately_before_their_own_lift():
@@ -245,17 +263,19 @@ def test_no_one_set_training_entry_anywhere_on_a_gym_day():
         assert not singles, (d, singles)
 
 
-def test_preparation_is_release_raise_and_one_activation_item():
+def test_preparation_is_the_march_the_planks_and_one_activation_item():
+    """No release block since 2026-09-22 (athlete: "I think the release is now
+    outdated, there isn't that much gripping anymore, a dynamic stretching
+    would be better"). The planks come BEFORE the lifts: "every training day
+    but at the start not the end". No incline walk: he walks fifteen minutes to
+    the gym."""
+    head = ["Standing Psoas March", "Forearm Plank", "Full Side Bridge"]
     for d in SQUAT_DAYS:
         prep = [e["name"] for e in sess.preparation_entries(PLAN[d]["exercises"])]
-        assert prep == ["Ischial Tuberosity Hamstring Release", "Upper Glute / TFL Self-Release",
-                        "Piriformis Contract-Relax (PNF)", "Anterior Hip Pressure Release",
-                        "Walking Raise (Incline)", "Single-Leg Glute Bridge"], d
+        assert prep == head + ["Single-Leg Glute Bridge"], d
     for d in PRESS_DAYS:
         prep = [e["name"] for e in sess.preparation_entries(PLAN[d]["exercises"])]
-        assert prep == ["Upper Glute / TFL Self-Release", "Piriformis Contract-Relax (PNF)",
-                        "Anterior Hip Pressure Release", "Walking Raise (Incline)",
-                        "Scapular Wall Slide"], d
+        assert prep == head + ["Scapular Wall Slide"], d
 
 
 # ── the removals, each with its revert written at the block header ──────────
@@ -302,18 +322,18 @@ def test_one_hip_flexor_item_per_gym_day_and_both_after_the_tuesday_run():
         assert not {"Half-Kneeling Knee-Hover Isometric", "End-Range Psoas Isometric"} & set(_names(d)), d
 
 
-def test_the_cluster_day_is_the_release_the_stack_and_the_lift_offs():
-    """Ten entries, under 50 modelled minutes — found at 13 / 61 on 2026-09-11.
-    No raise: the phase-2 lock's two conditions (stretching before load, loads
+def test_the_cluster_day_is_the_march_the_planks_the_stack_and_the_lift_offs():
+    """Nine entries, under 50 modelled minutes — found at 13 / 61 on
+    2026-09-11, and ten until the release block came out on 2026-09-22. No
+    raise: the phase-2 lock's two conditions (stretching before load, loads
     near max) are both false on a flexibility session, and the blueprint asks
     only that the MEASUREMENT be cold."""
     for d in (4, 11, 18, 25):
         names = _names(d)
         assert PLAN[d].get("session_kind") == "flexibility", d
-        assert len(names) == 10, (d, len(names))
-        assert names[:4] == ["Ischial Tuberosity Hamstring Release", "Upper Glute / TFL Self-Release",
-                             "Piriformis Contract-Relax (PNF)", "Anterior Hip Pressure Release"], d
-        assert names[4:9] == list(tp._CLUSTER_STACK_NAMES), d
+        assert len(names) == 9, (d, len(names))
+        assert names[:3] == ["Standing Psoas March", "Forearm Plank", "Full Side Bridge"], d
+        assert names[3:8] == list(tp._CLUSTER_STACK_NAMES), d
         assert names[-1] == "Straddle lift-offs from a flat back", d
         assert "Walking Raise (Incline)" not in names, d
         assert sess.estimate_duration(PLAN[d]["exercises"]) <= sess.SESSION_SHAPE["max_flexibility_minutes"], d
@@ -339,47 +359,119 @@ def test_the_knee_hover_never_steps_down_and_holds_from_week_two():
 def test_the_ischial_release_is_one_side_then_the_other_with_no_pause():
     """Athlete's 2026-09-10 note: 'Is one set one side and then the other? Why
     is there a pause between a stretch?' It was two bilateral sets with 45 s
-    between. Same 90 s a side, no pause."""
+    between. Same 90 s a side, no pause. OUT of the block with the rest of the
+    release block since 2026-09-22 and kept for the revert, so it is pinned as
+    it would come back."""
     ex = tp.ISCHIAL_RELEASE_NO_PAUSE
     assert ex["name"] == "Ischial Tuberosity Hamstring Release"
     assert ex["laterality"] == "unilateral" and ex["sets"] == 1
     assert ex["hold_seconds"] == 90 and ex["rest_seconds"] == 0
     assert "no pause" in ex["mechanics"].lower()
-    # 28 is exempt: it runs the baseline protocol it re-tests, ischial release
-    # included, rather than this block's re-coded version.
-    for d in SQUAT_DAYS + RUN_DAYS + [4, 11, 18, 25]:
-        assert _ex(d, ex["name"]) is not tp.ISCHIAL_RELEASE, d
-        assert _ex(d, ex["name"])["rest_seconds"] == 0, d
-
-
-# ── the release block, the withdrawal trial, phase 2 ────────────────────────
-
-def test_every_training_day_opens_with_the_release_and_rest_days_carry_only_the_front_of_hip():
-    withdrawn = {"Upper Glute / TFL Self-Release", "Piriformis Contract-Relax (PNF)"}
     for d in DAYS:
-        names = [n for n in _names(d) if not sess.is_measurement(n)]
-        if PLAN[d]["day_type"] != "rest":
-            assert names[0] in sess.RELEASE_EXERCISE_NAMES, (d, names[0])
-        else:
-            assert not withdrawn & set(names), d
-            assert "Anterior Hip Pressure Release" in names, d
+        assert tp.ISCHIAL_RELEASE_NO_PAUSE not in PLAN[d]["exercises"], d
 
 
-def test_the_front_of_the_hip_is_released_every_day_but_the_reassessment():
-    """Day 28 runs the 2026-09-20 baseline's own protocol, which leaves the
-    anterior-hip release off to keep the reading comparable."""
+# ── the warm-up, the planks, phase 2 (the release block left 2026-09-22) ───
+
+def test_no_release_item_on_any_day_but_the_reassessment():
+    """All four releases out (athlete, 2026-09-22), rest days included — a rest
+    day is the walk. Day 28 keeps its own: it re-runs the 2026-09-20 baseline's
+    protocol, and a re-test with a different lead-in measures the lead-in.
+    REVERT (block header): right grip grade 2+ on a Wednesday, or the hip
+    symptoms back."""
     for d in DAYS:
         if d == 28:
-            assert "Anterior Hip Pressure Release" not in _names(d)
             continue
-        assert "Anterior Hip Pressure Release" in _names(d), d
+        assert not set(_names(d)) & sess.RELEASE_EXERCISE_NAMES, (d, _names(d))
+    for d in (7, 14, 21, 27):
+        assert _names(d) == ["Controlled Walking"], d
 
 
-def test_every_loaded_session_and_every_run_has_a_raise_and_the_cluster_day_does_not():
-    """Phase 2 is mandatory where stretching runs immediately before LOAD —
-    the lock's own condition. A flexibility session loads nothing after."""
-    for d in GYM_DAYS + RUN_DAYS:
-        assert "Walking Raise (Incline)" in _names(d), d
+def test_the_grip_grade_is_read_first_and_cold_every_wednesday():
+    """It is the check on the release block's removal, so it reads the hip
+    before anything is done to it."""
+    for d in (3, 10, 17, 24):
+        names = [n for n in _names(d) if n != "Wide-Stance Rotation Count (Test)"]
+        assert names[0] == "Upper Glute Grip Grade (Test)", d
+
+
+def test_the_psoas_march_warms_up_every_session_that_loads_or_stretches():
+    """His pick for the moving warm-up: "I feel more of stretch from that than
+    any other stretch." Not on Wednesday — it is leg work, and Thursday's
+    flexibility morning must not follow leg work — and not on rest days or
+    day 28."""
+    for d in GYM_DAYS + RUN_DAYS + [4, 11, 18, 25]:
+        assert "Standing Psoas March" in _names(d), d
+    for d in (3, 7, 10, 14, 17, 21, 24, 27, 28):
+        assert "Standing Psoas March" not in _names(d), d
+    march = tp.STANDING_PSOAS_MARCH
+    assert march["laterality"] == "alternating" and march["sets"] == 2 and march["reps"] == 10
+    text = march["mechanics"].lower()
+    assert "do not swing" in text and "right" in text, "active range, and key rule 7's cue"
+    assert rules.check_movement(march["name"], 2)["severity"] == "caution"
+
+
+TRAINING_DAYS = [d for d in DAYS if d not in (7, 14, 21, 27, 28)]
+
+
+def test_planks_open_every_training_day_but_the_reassessment():
+    """Athlete, 2026-09-22: "Every training day but at the start not the end."
+    Both planks sit before the first thing that is not warm-up or a
+    measurement. Not on rest days, and not on day 28: its five Bunkie lines are
+    timed plank holds, and a trunk tired first reads as a weaker one."""
+    for d in TRAINING_DAYS:
+        names = _names(d)
+        assert "Forearm Plank" in names and "Full Side Bridge" in names, d
+        first_work = next(i for i, n in enumerate(names)
+                          if n not in sess.PREPARATION_NAMES and not sess.is_measurement(n))
+        assert names.index("Forearm Plank") < first_work, d
+        assert names.index("Full Side Bridge") < first_work, d
+        assert names.count("Full Side Bridge") == 1, d
+    for d in (7, 14, 21, 27, 28):
+        assert not {"Forearm Plank", "Full Side Bridge"} & set(_names(d)), d
+
+
+def test_the_plank_dose_is_short_and_steps_by_week():
+    """Switched on, not tired, before a loaded hinge: 20 s rising 5 s a week,
+    and the easy week back at 20 with one set fewer on the front plank."""
+    for d in TRAINING_DAYS:
+        week = (d - 1) // 7 + 1
+        front, side = _ex(d, "Forearm Plank"), _ex(d, "Full Side Bridge")
+        hold = {1: 20, 2: 25, 3: 30, 4: 20}[week]
+        assert front["hold_seconds"] == side["hold_seconds"] == hold, d
+        assert front["sets"] == (2 if week == 4 else 3), d
+        assert side["sets"] == 2 and side["laterality"] == "unilateral", d
+
+
+def test_no_reverse_plank():
+    """The physio's third plank, left out on the shoulder: it loads the arm in
+    extension under body weight, which drives the top of the arm bone forward
+    in the socket — the direction of three dislocations and the Latarjet."""
+    assert not any("reverse plank" in n.lower() for n in NAMES)
+    assert rules.check_movement("Reverse Plank", 2)["severity"] != "cleared"
+
+
+def test_the_glute_bridge_is_three_sets_on_the_same_eleven_days():
+    """Athlete, 2026-09-22: more sets, not more days. Stage 2B's one-set
+    activation item is untouched."""
+    days = [d for d in DAYS if "Single-Leg Glute Bridge" in _names(d)]
+    assert days == sorted(SQUAT_DAYS + RUN_DAYS)
+    for d in days:
+        assert _ex(d, "Single-Leg Glute Bridge")["sets"] == 3, d
+    assert tp.PREP_GLUTE_ACTIVATION["sets"] == 1
+
+
+def test_the_incline_walk_leads_the_runs_and_the_walk_to_the_gym_is_the_gym_days_raise():
+    """Athlete, 2026-09-22: "I always walk 15 mins to get to the gym, so a 3 min
+    incline walk is not needed to start." Fifteen minutes of easy walking is
+    five times the raise's dose, so the gym days start at the psoas march. The
+    runs start from home and keep it. A flexibility session loads nothing
+    after, so it never had one."""
+    for d in RUN_DAYS:
+        assert _names(d)[0] == "Walking Raise (Incline)", d
+    for d in GYM_DAYS:
+        assert "Walking Raise (Incline)" not in _names(d), d
+        assert _names(d)[0] == "Standing Psoas March", d
     # 28 joins the list that loads nothing after the release: a measurement is
     # taken cold, and the race it replaced was the one test day that loaded.
     for d in (3, 4, 7, 10, 11, 14, 17, 18, 21, 24, 25, 27, 28):

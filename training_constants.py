@@ -206,6 +206,7 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     # shares triple below.
     "Half-Kneeling Knee-Hover Isometric",
     "End-Range Psoas Isometric",
+    "Standing Psoas March",
     "Straddle lift-offs from a flat back",
     # Cluster A pattern-D stack, broken out of the single session 2026-08-18
     "Tailor's pose, unloaded",
@@ -435,6 +436,9 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # the lower back arch is a trunk job, and the arch is its named failure.
     "Half-Kneeling Knee-Hover Isometric":     {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
     "End-Range Psoas Isometric":              {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    # The Block B warm-up march (2026-09-22): the same hip as the isometric,
+    # moving, and the Supine Hip Flexion (Marching) split for the same reason.
+    "Standing Psoas March":                   {"upper_body": 0.00, "core": 0.30, "lower_body": 0.70},
     "Straddle lift-offs from a flat back":    {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
     "Tailor's pose, unloaded":                     {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     'Frog rocks':                                  {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
@@ -686,6 +690,8 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     # other two are single-joint hip flexion under load.
     "Half-Kneeling Knee-Hover Isometric":   ("bodyweight_compound", 0.5),
     "End-Range Psoas Isometric":            ("isolation", 0.3),
+    # Bodyweight, unloaded, a warm-up: the Supine Hip Flexion (Marching) tier.
+    "Standing Psoas March":                 ("mobility_core", 0.25),
     "Straddle lift-offs from a flat back":  ("isolation", 0.3),
     "Tailor's pose, unloaded":                     ("mobility_core", 0.25),
     'Frog rocks':                                  ("mobility_core", 0.25),

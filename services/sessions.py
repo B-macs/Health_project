@@ -1764,7 +1764,9 @@ SESSION_SHAPE: dict[str, int] = {
     # prescribed rest taken in full (150 s after a top set, 120 s between
     # working sets), which he cut short on 2026-09-10; the press day at 56.
     "max_gym_minutes": 70,
-    # Release items, the raise and ONE activation item.
+    # The raise, the psoas march, the two planks and ONE activation item since
+    # 2026-09-22, when the release block came out of Block B; release items
+    # still count here in a block that has them.
     "max_preparation_entries": 7,
     # A flexibility day (session_kind == "flexibility"): the release block,
     # the prescribed stack (cluster_a_prescription.LENGTH caps it at five)
@@ -1779,9 +1781,17 @@ RAMP_SUFFIX = "(Ramp Set)"
 TOP_SET_SUFFIX = "(Heavy Top Set)"
 #: The preparation vocabulary: the release block, the raise and the activation
 #: items. Everything after the last of these in a session is load.
+#:
+#: The march and the two planks joined on 2026-09-22 (athlete: planks "every
+#: training day but at the start not the end"). At the start of a session at a
+#: 20-30 s dose they switch the trunk on for the lifts, which is what an
+#: activation item is; the Pallof press on the squat day is still that day's
+#: core LIFT. The side bridge counts as preparation wherever it sits, which only
+#: matters from Block B on — the shape rules read no earlier block.
 PREPARATION_NAMES = RELEASE_EXERCISE_NAMES | frozenset({
     "Walking Raise (Incline)", "Single-Leg Glute Bridge", "Dead Bug",
     "Scapular Wall Slide", "Prone Y-Raise (Scapular)",
+    "Standing Psoas March", "Forearm Plank", "Full Side Bridge",
 })
 
 

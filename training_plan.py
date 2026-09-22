@@ -4757,6 +4757,55 @@ ACC_BREATHING = _ex(
 # The gym days are UNCHANGED. He approved their shape on 2026-09-11 (Key Rule
 # 21) and nothing about them was built for a race.
 #
+# ⚠ 2026-09-22, DAY 2 OF THE BLOCK — THE RELEASE BLOCK IS OUT, A MOVING
+# WARM-UP AND DAILY PLANKS ARE IN. The athlete, reviewing the block: "I think
+# the release is now outdated, there isn't that much gripping anymore, a dynamic
+# stretching would be better"; of the standing psoas march (named in his
+# answer), "should be added, I feel more of stretch from that than any other
+# stretch"; and, on the
+# physio's plank, side plank and reverse plank every gym day last year, "we do
+# barely any ab work". His four choices, each between options:
+#
+#   * ALL FOUR RELEASES OUT of every day but 28 (ischial, upper glute, the
+#     piriformis PNF, the front-of-hip ball). The standing psoas march takes
+#     their place at the start of the session. It is active range — he lifts the
+#     leg with his own muscles and lowers it under control, no swing — which
+#     is the kind of stretch patient_profile's hypermobility rule allows:
+#     controlled range over passive end range, at Beighton 6/9. The ramp sets
+#     stay the specific warm-up for each lift. The warm-up evidence review
+#     backs the direction: holds of 60 s and more cost force for a while
+#     after, and a moving warm-up does not.
+#     REVERT: the weekly Upper Glute Grip Grade (Wednesday, now read FIRST,
+#     cold, before anything is done to the hip) at 2+ on the right, or the
+#     hip-crest / front-of-hip symptoms coming back -> the release returns.
+#     Grip was never actually graded in Stage 2B (no mobility day was logged),
+#     so his own report is the only reading behind this, and the grade is what
+#     turns it into a measurement. docs/hypothesis.md P1.
+#   * PLANKS ON EVERY TRAINING DAY, AT THE START (his words: "every training
+#     day but at the start not the end"): the forearm plank and the side
+#     bridge after the psoas march and before the activation item. A short
+#     dose — 20 s holds rising 5 s a week, two sets in the easy week — so the
+#     trunk is switched on and not tired before the squat: the discs are the
+#     reason for the trunk work and would be the casualty of a trunk fatigued
+#     before a loaded hinge. The press day's side bridge moved from the end to
+#     here. The Pallof press stays on the squat day and the curl-up on
+#     Wednesday. NOT on rest days, and NOT on day 28, whose five Bunkie lines
+#     are themselves timed plank holds and would read a pre-tired trunk.
+#   * NO REVERSE PLANK, on the shoulder: it loads the arm in extension with
+#     the body's weight on it, which drives the top of the arm bone forward in
+#     the socket — the direction of three dislocations and the Latarjet.
+#     The glute bridge covers the back-of-body muscles it trains.
+#   * THE SINGLE-LEG GLUTE BRIDGE IS THREE SETS, not one ("more sets"), on the
+#     same eleven days.
+#   * THE INCLINE WALK IS OFF THE GYM DAYS, same day: "I always walk 15 mins to
+#     get to the gym, so a 3 min incline walk is not needed to start." The walk
+#     there is the raise — five times its dose, and the fifteen minutes of easy
+#     work the warm-up review found worth having before near-maximal loads. It
+#     stays on the run days, which start from home.
+#
+# Day 28 keeps its release items: it re-runs the 2026-09-20 baseline's own
+# protocol, and a re-test with a different lead-in measures the lead-in.
+#
 # Authored 2026-09-11 against Block A's real log, not its plan. Block A
 # (PLAN_STAGE2B) delivered FIVE sessions in 28 days: gym A on 2026-08-18 and
 # 2026-09-10, the band lower session on 08-20 and 08-24, and ONE run (08-21,
@@ -4845,19 +4894,11 @@ ACC_BREATHING = _ex(
 #     the other with NO pause. It was two bilateral sets with 45 s between,
 #     and his 2026-09-10 note asked why a stretch had a pause in it.
 #
-# RUNNING. Seven runs and the race, starting where Block A actually got to:
-# run/walk 2:2 and 3:1 in week 1, a first continuous 20 min and a 40-min long
-# run/walk in week 2, a continuous 30 and the 55-minute DECISION RUN in week
-# 3, a 25-minute taper run in race week. Run 6 on day 20 is pre-registered as
-# the race's go / no-go: clean (no left front-of-hip signal that day or the
-# next morning, and the run/walk pattern held) -> the race is run/walk at
-# 5 min running to 1 walking from the gun; not clean -> the race is walked at
-# the ratio that was clean, or not run. A missed race costs nothing that a
-# third Sartorius strain would not cost more. Every run keeps the stop rule.
-# The build is compressed — long runs 30 -> 40 -> 55 -> 75 — because the race
-# date is fixed and the athlete's baseline is high (16k steps a day, a 10 km
-# hike with no symptoms); the run/walk format and the day-20 decision are what
-# make that acceptable rather than the progression rate.
+# RUNNING. Seven run/walk sessions, rebuilt 2026-09-18 with no date to reach:
+# Tuesday and Saturday in weeks 1-3, one in the easy week 4; the long run 25 ->
+# 28 -> 30 min, about a tenth a week; walk breaks in every session; no test
+# run. Every run keeps the stop rule. The two Sartorius strains are why the
+# build is slow — both came from running volume rising faster than the tissue.
 #
 # LOADS, from the log rather than the plan. Goblet Squat 22.5 (last 3 x 8 at
 # 22.5, top set 25 x 5); RDL 42.5 (last 3 x 10 at 40 on the re-entry step,
@@ -4865,11 +4906,11 @@ ACC_BREATHING = _ex(
 # travel — the 09-10 session was cut to 20-25 with no note, so the step is
 # from what he did, not what was written); Incline Press 15 (held three
 # sessions, add reps first); Lat Pulldown 45; Single-Arm Row 22.5; Pallof 5
-# units; Face Pull 6 units. Race week runs two working sets at week-1 loads
-# and no top sets.
+# units; Face Pull 6 units. The easy week 4 runs two working sets at week-1
+# loads and no top sets.
 #
-# The Cluster A stack, the mobility day's thoracic work, the grip-grade test
-# and the release block are Block A's, unchanged in content. Everything is at
+# The Cluster A stack, the mobility day's thoracic work and the grip-grade test
+# are Block A's, unchanged in content. Everything is at
 # the same clinical stage, so the ACWR, RPE and volume ceilings in
 # services/rules.py do not move. ACWR stays advisory (held 2026-08-14,
 # evaluate against Block B's loading — the first normal loading since the
@@ -4888,6 +4929,8 @@ def _take(exercises: list, name: str, **overrides) -> dict:
     return dict(src, **overrides)
 
 
+# OUT of the block since 2026-09-22 with the rest of the release block (see the
+# header). Kept, because the revert condition puts it straight back.
 ISCHIAL_RELEASE_NO_PAUSE = _ex(
     name="Ischial Tuberosity Hamstring Release",
     ex_type="hold",
@@ -4913,18 +4956,100 @@ ISCHIAL_RELEASE_NO_PAUSE = _ex(
 )
 
 
-def _bb_release(hip_loaded: bool, training: bool = True) -> list:
-    """Phase 1, quiet things down. The withdrawal trial's rule stands: rest
-    and mobility days carry the front-of-hip release only."""
-    if not training:
-        return [ANTERIOR_HIP_RELEASE]
-    head = [ISCHIAL_RELEASE_NO_PAUSE] if hip_loaded else []
-    return head + [UPPER_GLUTE_RELEASE_5MIN, PIRIFORMIS_PNF_5MIN, ANTERIOR_HIP_RELEASE]
+STANDING_PSOAS_MARCH = _ex(
+    name="Standing Psoas March",
+    ex_type="reps",
+    laterality="alternating",
+    sets=2, reps=10, rest_seconds=20,
+    mechanics=(
+        "Stand tall, one fingertip on a wall for balance if you need it. Drive one knee up "
+        "above hip height, then lower it slowly, and then the other knee. Ten each side, "
+        "alternating. Lift the knee with the front of the hip: your chest stays tall and "
+        "your lower back stays still, with no lean back. On the RIGHT, keep the kneecap "
+        "pointing straight ahead or turned very slightly inward. Do not swing the leg — it "
+        "goes only as high as you can lift it and lower it under control."
+    ),
+    biomechanical_focus=(
+        "The moving warm-up that replaced the release block on 2026-09-22 (athlete: \"a "
+        "dynamic stretching would be better\"), and his own pick for it: \"I feel more of "
+        "stretch from that than any other stretch.\" Hip flexion above 90 degrees is the "
+        "range where the psoas is the only flexor still working, so the lift works the "
+        "tissue the ball release used to press on, and lifting one knee high tips the "
+        "pelvis back, which lengthens the standing side's hip flexors. Active range and no "
+        "swing, because at Beighton 6/9 a swing carries the joint past the range the "
+        "muscles control — the profile's rule of controlled range over passive end range."
+    ),
+    progression="Ten each side clean with a still back → pause one second at the top.",
+    regression="Lower back arches or leans back → lower the knee to hip height.",
+)
 
 
-def _bb_prep(lower: bool) -> list:
-    """Phase 2, wake things back up: the raise and ONE activation item."""
-    return [PREP_RAISE, PREP_GLUTE_ACTIVATION if lower else PREP_SCAPULAR]
+def _bb_planks(week: int) -> list:
+    """The forearm plank and the side bridge, at the START of every training
+    day (athlete, 2026-09-22: "every training day but at the start not the
+    end"). A switching-on dose, not a trunk workout: 20 s holds rising 5 s a
+    week, two sets in the easy week."""
+    sets, hold = {1: (3, 20), 2: (3, 25), 3: (3, 30), 4: (2, 20)}[week]
+    return [
+        _ex(
+            name="Forearm Plank",
+            ex_type="hold",
+            sets=sets, hold_seconds=hold, rest_seconds=20,
+            mechanics=(
+                f"Forearms on the floor, elbows under your shoulders, toes on the floor. Lift "
+                f"into one straight line from your heels to your head, squeeze your glutes and "
+                f"breathe. Hold {hold} seconds. Do not let your hips sag or pike up. Stop each "
+                f"hold with good form left — this starts the session, it is not the workout."
+            ),
+            biomechanical_focus=(
+                "Front trunk endurance in a neutral spine — the physio's daily plank from "
+                "2025, back on the athlete's direction (\"we do barely any ab work\"). Short "
+                "holds early in the session: a trunk switched on, not tired, before the "
+                "loaded hinge. A sagging hip is lumbar extension over the L5/S1 findings, so "
+                "the line is the rep."
+            ),
+            progression=f"{hold} s solid on every set → next week's dose.",
+            regression="Lower back aches or the hips sag → knees down, same time.",
+        ),
+        _ex(
+            name="Full Side Bridge",
+            ex_type="hold",
+            laterality="unilateral",
+            sets=2, hold_seconds=hold, rest_seconds=20,
+            mechanics=(
+                f"On your side, forearm down with the elbow under the shoulder, feet stacked. "
+                f"Lift your hips until your body is one straight line from ankle to head. "
+                f"Hold {hold} seconds, then the other side. Hips high — do not let them sag "
+                f"or roll forward."
+            ),
+            biomechanical_focus=(
+                "Lateral trunk endurance, one of McGill's three, the physio's daily side "
+                "plank, and the press day's core item moved from the end of the session to "
+                "the start (2026-09-22)."
+            ),
+            progression=f"{hold} s solid both sides → next week's dose.",
+            regression="Hips sag → bottom knee down, same time.",
+        ),
+    ]
+
+
+#: More sets, not more days (athlete, 2026-09-22). Block B's own copy, so
+#: Stage 2B's one-set activation item is untouched.
+BB_GLUTE_BRIDGE = dict(PREP_GLUTE_ACTIVATION, sets=3, rest_seconds=30)
+
+
+def _bb_warmup(week: int, activation: dict | None, incline_walk: bool) -> list:
+    """The start of every training session since 2026-09-22: the psoas march,
+    the two planks, then the day's activation item. There is no release block
+    in front of it any more — see the block header.
+
+    The incline walk leads the RUN days only. On a gym day he has already
+    walked fifteen minutes to the gym (athlete, 2026-09-22: "I always walk 15
+    mins to get to the gym, so a 3 min incline walk is not needed to start"),
+    which is five times the raise's own dose and the fifteen minutes of easy
+    work the warm-up review found worth having before a near-maximal lift."""
+    head = ([PREP_RAISE] if incline_walk else []) + [STANDING_PSOAS_MARCH] + _bb_planks(week)
+    return head + ([activation] if activation else [])
 
 
 def _bb_ramp(template: dict, kg: float) -> dict:
@@ -4989,7 +5114,7 @@ def _bb_gym_a(week: int) -> dict:
         "session_rpe_target": 6 if week == 4 else 7,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _bb_release(hip_loaded=True) + _bb_prep(lower=True) + goblet + hinge + [
+        "exercises": _bb_warmup(week, BB_GLUTE_BRIDGE, incline_walk=False) + goblet + hinge + [
             _take(_S2B_A4, "Hip Thrust (Loaded)", weight_kg=thrust, sets=n_sets),
             _take(_S2B_A4, "Pallof Press (Cable)", sets=n_sets),
             END_RANGE_PSOAS_ISOMETRIC,
@@ -5015,8 +5140,9 @@ def _bb_knee_hover(week: int) -> dict:
 
 
 def _bb_gym_b(week: int) -> dict:
-    """Press + Pull. Three main lifts, the face-pull pairing, one core item,
-    one hip-flexor item. The scapular retraction isometric and the prone
+    """Press + Pull. Three main lifts, the face-pull pairing, one hip-flexor
+    item. Its core item is the side bridge, which moved to the start with the
+    planks on 2026-09-22. The scapular retraction isometric and the prone
     Y-raise are not here — see the block header for where they went and why."""
     press, pulldown, row, face, n_sets = _BB_B[week]
     return {
@@ -5026,12 +5152,11 @@ def _bb_gym_b(week: int) -> dict:
         "session_rpe_target": 6 if week == 4 else 7,
         "is_gym_session": True,
         "day_type": "main",
-        "exercises": _bb_release(hip_loaded=False) + _bb_prep(lower=False) + [
+        "exercises": _bb_warmup(week, PREP_SCAPULAR, incline_walk=False) + [
             _take(_S2B_B4, "Incline DB Press", weight_kg=press, sets=n_sets),
             _take(_S2B_B4, "Lat Pulldown", weight_kg=pulldown, sets=n_sets),
             _take(_S2B_B4, "Single-Arm DB Row", weight_kg=row, sets=n_sets),
             _take(_S2B_B4, "Face Pull (Cable)", weight_kg=face, sets=n_sets),
-            _take(_S2B_B4, "Full Side Bridge", sets=n_sets),
             _bb_knee_hover(week),
         ],
     }
@@ -5041,22 +5166,25 @@ _S2B_MOB = _s2b_mobility(4)["exercises"]
 
 
 def _bb_mobility(week: int) -> dict:
-    """Wednesday. The desk-intervention day: the front-of-hip release, the
-    weekly grip grade, thoracic work, the two mat items that left the gym
-    sessions, and the walk. No loading, no raise — nothing is being prepared
-    for. day_type stays "rest" so the cluster day after it has a clean
-    morning. Week 4 opens with finding #5's wide-stance rotation count — a
-    quiet finding is re-measured once a block rather than maintained."""
+    """Wednesday. The desk-intervention day: the weekly grip grade FIRST and
+    cold — since 2026-09-22 it is the check on the release block's removal —
+    then the planks, thoracic work, the two mat items that left the gym
+    sessions, and the walk. No loading, no raise and no psoas march — nothing
+    is being prepared for, and the march is leg work the Thursday flexibility
+    morning must not follow. day_type stays "rest" so the cluster day after it
+    has a clean morning. Week 4 opens with finding #5's wide-stance rotation
+    count — a quiet finding is re-measured once a block rather than
+    maintained."""
     measurement = ([_take(PLAN_STAGE2B[1]["exercises"], "Wide-Stance Rotation Count (Test)")]
                    if week == 4 else [])
     return {
-        "objective": f"Block B Week {week} — Mobility + Release" + (" (easy week)" if week == 4 else ""),
+        "objective": f"Block B Week {week} — Mobility + Core" + (" (easy week)" if week == 4 else ""),
         "phase": _BB_PHASE,
         "session_rpe_target": 3,
         "is_gym_session": False,
         "day_type": "rest",
-        "exercises": measurement + _bb_release(hip_loaded=False, training=False) + [
-            _take(_S2B_MOB, "Upper Glute Grip Grade (Test)"),
+        "exercises": measurement + [_take(_S2B_MOB, "Upper Glute Grip Grade (Test)")]
+                     + _bb_planks(week) + [
             _take(_S2B_MOB, "Thoracic Extension (Rolled Towel)"),
             _take(_S2B_MOB, "Thread-the-Needle (Thoracic Rotation)"),
             _take(_S2B_A4, "McGill Curl-Up (Progressed)"),
@@ -5074,11 +5202,12 @@ _S2B_CLUSTER = _s2b_cluster(4)["exercises"]
 
 
 def _bb_cluster(week: int) -> dict:
-    """Thursday. The release block, Cluster A's pattern-D stack unchanged from
-    Block A, and the straddle lift-offs at the end — ten entries. No raise
-    (see the block header) and no appended isometrics. The flexibility retest
-    is run cold on one of these mornings, before the session — the mobility
-    day before it loads no legs, which is what makes the morning readable.
+    """Thursday. The psoas march and the planks (the release block until
+    2026-09-22), Cluster A's pattern-D stack unchanged from Block A, and the
+    straddle lift-offs at the end — nine entries. No raise (see the block
+    header) and no appended isometrics. The flexibility retest is run cold on
+    one of these mornings, before the session — the mobility day before it
+    loads no legs, which is what makes the morning readable.
 
     `session_kind` marks it for sessions.session_shape_violations, which holds
     a flexibility day to its own ceilings (entries and minutes) the way it
@@ -5090,7 +5219,7 @@ def _bb_cluster(week: int) -> dict:
         "is_gym_session": False,
         "day_type": "stretch",
         "session_kind": "flexibility",
-        "exercises": _bb_release(hip_loaded=True)
+        "exercises": [STANDING_PSOAS_MARCH] + _bb_planks(week)
                      + [_take(_S2B_CLUSTER, n) for n in _CLUSTER_STACK_NAMES]
                      + [STRADDLE_LIFT_OFFS],
     }
@@ -5165,8 +5294,8 @@ _BB_RUN_DAYS = {
 }
 
 def _bb_run_day(day: int) -> dict:
-    """A run day: the hip-loaded release, the raise and the glute bridge, the
-    run — and after the SHORT Tuesday run, the two hip-flexor isometrics
+    """A run day: the warm-up and the planks, the glute bridge, the run — and
+    after the SHORT Tuesday run, the two hip-flexor isometrics
     (their second weekly exposure; the squat and press days carry the first).
     Never after the long Saturday run: a hip-flexor load there would muddy
     the signal the run itself is measuring."""
@@ -5179,7 +5308,7 @@ def _bb_run_day(day: int) -> dict:
         "session_rpe_target": rpe,
         "is_gym_session": False,
         "day_type": "stretch",
-        "exercises": _bb_release(hip_loaded=True) + [PREP_RAISE, PREP_GLUTE_ACTIVATION] + [
+        "exercises": _bb_warmup(week, BB_GLUTE_BRIDGE, incline_walk=True) + [
             _ex(
                 name=name,
                 ex_type="duration",
@@ -5201,7 +5330,7 @@ def _bb_rest(week: int, note: str) -> dict:
         "session_rpe_target": 2,
         "is_gym_session": False,
         "day_type": "rest",
-        "exercises": _bb_release(hip_loaded=False, training=False) + [
+        "exercises": [
             _ex(
                 name="Controlled Walking",
                 ex_type="duration",
@@ -5209,7 +5338,7 @@ def _bb_rest(week: int, note: str) -> dict:
                 mechanics="Twenty minutes, easy, outdoors. Nothing else is prescribed today.",
                 biomechanical_focus=note,
                 progression="Feeling good → a longer walk is fine. Running is not.",
-                regression="Tired → the release alone is a complete day.",
+                regression="Tired → ten minutes is a complete day.",
             ),
         ],
     }
@@ -5225,8 +5354,7 @@ PLAN_BLOCK_B[4] = _bb_cluster(1)
 PLAN_BLOCK_B[5] = _bb_gym_b(1)
 PLAN_BLOCK_B[6] = _bb_run_day(6)
 PLAN_BLOCK_B[7] = _bb_rest(1, "A genuine rest day. The walk is the trapezius perfusion "
-                              "mechanism, not filler; the front-of-hip release is the desk "
-                              "day's dose.")
+                              "mechanism, not filler.")
 # ── Week 2: first continuous run, first long run ─────────────────────────────
 PLAN_BLOCK_B[8] = _bb_gym_a(2)
 PLAN_BLOCK_B[9] = _bb_run_day(9)
@@ -5253,9 +5381,9 @@ PLAN_BLOCK_B[23] = _bb_run_day(23)
 PLAN_BLOCK_B[24] = _bb_mobility(4)
 PLAN_BLOCK_B[25] = _bb_cluster(4)
 PLAN_BLOCK_B[26] = _bb_gym_b(4)
-PLAN_BLOCK_B[27] = _bb_rest(4, "The day before the reassessment. Nothing but the walk "
-                               "and the release: five timed holds read fatigue as "
-                               "weakness, and this is a measurement.")
+PLAN_BLOCK_B[27] = _bb_rest(4, "The day before the reassessment. Nothing but the walk: "
+                               "five timed holds read fatigue as weakness, and this is a "
+                               "measurement.")
 PLAN_BLOCK_B[28] = {
     "objective": "Block B Day 28 — Reassessment: Bunkie Lines + Hip-Click Verdict",
     "phase": _BB_PHASE,

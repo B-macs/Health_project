@@ -717,6 +717,18 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="cleared", laterality="bilateral",
     ),
     MovementRule(
+        movement="forearm plank",
+        reason="Forearm plank. Front trunk endurance in a neutral spine, weight on the "
+               "forearms with the elbows under the shoulders — closed-chain, so the "
+               "shoulder is compressed rather than levered. The line is the rep: a "
+               "sagging hip is lumbar extension over the L5/S1 findings. Ruled "
+               "2026-09-22, when it came back daily at the start of every Block B "
+               "session; it had returned `unknown` since Stage 1. Heads the name on "
+               "purpose, so it clears nothing called a reverse plank — that one loads the "
+               "shoulder in extension, the direction of the three dislocations.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
         movement="side bridge",
         reason="Side bridge, any variant. Lateral trunk endurance in a neutral spine — "
                "the flexion-free alternative to the contraindicated sit-up and crunch.",
