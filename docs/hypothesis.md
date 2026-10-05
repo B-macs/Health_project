@@ -137,6 +137,14 @@ write the *discriminating question* rather than the conclusion.
 - **A symptom appears** → first question is always the exposure ledger, not
   the training log: what was HELD in the last 48 h? (Every symptom so far has
   answered to that question first.)
+- **The pelvis sits turned, right side forward, and the left ribs flare**
+  (finding #7, 2026-10-05) → before reading it as a fixed structure: does the
+  lying grade change across Block B with the posture work (the 90/90 hip lift,
+  the hip airplane, the dead bug, the bird dog), and does the psoas-attachment
+  tightness come and go WITH the grade? Moving together supports H1's claim
+  that the hip flexors' grip holds the pelvis; the grade stuck while the back
+  quiets says the two are separate. The first graded run is the baseline —
+  the 2026-10-05 reading is his description, not a grade.
 
 ---
 
@@ -208,6 +216,8 @@ plan's week-4 line. The session-shape rule was not predicted by v1 — it came f
 athlete, and it is the reason the block is shorter, not the hypothesis.
 
 ## Version history
+
+- **v1.5, 2026-10-05** — the psoas-attachment tightness came back on both sides (pain 0/10) after twelve days untrained and a week sick. It is NOT scored against P12: P12 tests whether the moving warm-up and the strength work hold the hip without the release, and a fortnight of no training tested neither; by location it is also not the hip-crest or front-of-hip symptom P12 names. Offered the release under P12's revert rule, the athlete declined it ("I dont want release execises instead, lets look at postural fix exercises and abs workouts") — so from here P12 reads on the Wednesday grip grade alone. The release had been logged the day before both earlier episodes (2026-08-24, 2026-09-15) and did not prevent either. Finding #7 enters the ledger above.
 
 - **v1.4, 2026-09-22** — the athlete took the release block out of Block B on day 2 ("the release is now outdated, there isn't that much gripping anymore") and put a moving warm-up and daily planks in its place. P1 never fired in Block A — no mobility day was logged — so it is carried as P12 on the wider withdrawal, with the grip grade moved to the front of the Wednesday session so it reads the hip before anything is done to it.
 

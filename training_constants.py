@@ -191,6 +191,9 @@ _CORE_EXERCISES: tuple[str, ...] = (
     "Pallof Press Hold (Doorframe)",
     "Side Bridge with Hip Dip",
     "Forearm Plank",
+    # Block B posture item, 2026-10-05: the heel press is a hamstring effort,
+    # but the job is the ribs coming down on the breath out — core.
+    "90/90 Hip Lift",
     "McGill Big 3 — Quality Screen",
     "Child's Pose",
     # Stage 2A additions
@@ -208,6 +211,9 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "End-Range Psoas Isometric",
     "Standing Psoas March",
     "Straddle lift-offs from a flat back",
+    # Block B posture item, 2026-10-05: single-leg stance, the standing hip's
+    # rotators turning the pelvis.
+    "Hip Airplane",
     # Cluster A pattern-D stack, broken out of the single session 2026-08-18
     "Tailor's pose, unloaded",
     'Frog rocks',
@@ -439,6 +445,11 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # The Block B warm-up march (2026-09-22): the same hip as the isometric,
     # moving, and the Supine Hip Flexion (Marching) split for the same reason.
     "Standing Psoas March":                   {"upper_body": 0.00, "core": 0.30, "lower_body": 0.70},
+    # Block B posture items (2026-10-05). The airplane is a standing hip doing
+    # the work with the trunk held; the hip lift is a breath-out effort with
+    # the hamstrings holding the pelvis.
+    "Hip Airplane":                           {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    "90/90 Hip Lift":                         {"upper_body": 0.00, "core": 0.60, "lower_body": 0.40},
     "Straddle lift-offs from a flat back":    {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
     "Tailor's pose, unloaded":                     {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     'Frog rocks':                                  {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
@@ -692,6 +703,9 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "End-Range Psoas Isometric":            ("isolation", 0.3),
     # Bodyweight, unloaded, a warm-up: the Supine Hip Flexion (Marching) tier.
     "Standing Psoas March":                 ("mobility_core", 0.25),
+    # Block B posture items (2026-10-05): unloaded, slow, bodyweight.
+    "Hip Airplane":                         ("mobility_core", 0.25),
+    "90/90 Hip Lift":                       ("mobility_core", 0.25),
     "Straddle lift-offs from a flat back":  ("isolation", 0.3),
     "Tailor's pose, unloaded":                     ("mobility_core", 0.25),
     'Frog rocks':                                  ("mobility_core", 0.25),

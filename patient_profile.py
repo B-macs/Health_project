@@ -5,6 +5,17 @@ Single source of truth for MRI findings and biomechanical assessment.
 Referenced by training_plan.py when designing sessions.
 Update this file before generating each new training block.
 
+2026-10-05: FINDING #7, THE ATHLETE'S OWN — a pelvis-ribcage counter-rotation he
+  noticed during a week off sick: lying on his back the right side of the pelvis
+  sits higher and forward, the ribcage turns back to the right, the left ribs
+  flare, the right hip flexors stretch on a heel drive where the left do not, and
+  both sit bones carry a pressure discomfort. Recorded with a one-person test
+  (graded for the first time at its next run) and read as ONE pattern. Same day,
+  a symptom log entry: the psoas-attachment tightness came back on both sides
+  (0/10 pain) after twelve days untrained, its third episode. He declined the
+  release P12 offered and chose posture and trunk work instead (training_plan.py).
+  `current_block` and `next_reassessment` no longer describe the cancelled race.
+
 2026-09-11: BLOCK B IS AUTHORED AND STARTS 2026-09-14 (training_plan.PLAN_BLOCK_B,
   Phase 4 at clinical stage 2, race day 2026-10-11 as its day 28). Built from Block
   A's LOG: five sessions in 28 days, one run, a psoas-attributed flare on 08-25,
@@ -186,26 +197,22 @@ PROFILE = {
 
     "patient": "Patient",
     "current_stage": 2,
-    "current_block": "Block B — Race Build (Days 1-28, 2026-09-14 -> 2026-10-11), training_plan."
-                      "PLAN_BLOCK_B, Phase 4 at clinical stage 2; Stage 2B (Block A) runs to "
-                      "2026-09-13. The week is fixed: Mon squat, Tue run, Wed mobility, Thu "
-                      "cluster, Fri press, Sat run, Sun rest; race week swaps Saturday for rest "
-                      "and Sunday for the 10 km. Every gym day is THREE main lifts, ONE core item, "
-                      "ONE hip-flexor item (Key Rule 21): Goblet Squat, RDL, Hip Thrust, Pallof, "
-                      "End-Range Psoas Isometric on the squat day; Incline Press, Pulldown, Row, "
-                      "Face Pull, Side Bridge, Knee-Hover on the press day. Ramp -> heavy top set "
-                      "-> working sets at one rack, top sets weeks 1-3, race week two working "
-                      "sets. Running restarts at Block A's Run 2 and the DECISION RUN is day 20 "
-                      "(Sat 2026-10-03, 55 min run/walk 5:1): clean -> the race is run/walk 5:1; "
-                      "not clean -> walked at the last clean ratio, or not run. Still no overhead "
-                      "pressing (finding #6).",
-    "next_reassessment": "Block A day 28 is Sunday 2026-09-13 (the Bunkie lines and the hip-click "
-                          "verdict, the athlete's own screen). Block B's measurement is Run 6 on "
-                          "day 20 (the race go/no-go, pre-registered) and the race itself on "
-                          "2026-10-11; the post-race reassessment lands at the next block's day 1, "
-                          "and docs/hypothesis.md v1.2 holds the predictions (P8-P11) it scores. "
-                          "ACWR advisory mode is evaluated against Block B's loading, the first "
-                          "normal loading since the chronic window reset.",
+    # Corrected 2026-10-05: this still described the race build three weeks
+    # after the race was cancelled (2026-09-18).
+    "current_block": "Block B — Strength + Running Build, training_plan.PLAN_BLOCK_B, Phase 4 "
+                      "at clinical stage 2, from 2026-09-21. No race and no fixed end: the 10 km "
+                      "was cancelled 2026-09-18, running continues toward 21 km with no date, "
+                      "and a failed week pushes the block a week later. The weeks of 2026-09-21 "
+                      "(2 of 7 days) and 2026-09-28 (0 of 7, sick) failed, so week 1 runs again "
+                      "from 2026-10-05. The week: Mon squat, Tue run, Wed mobility + trunk, Thu "
+                      "cluster, Fri press, Sat run, Sun rest. Gym days are three main lifts, one "
+                      "core item, one hip-flexor item (Key Rule 21). Still no overhead pressing "
+                      "(finding #6).",
+    "next_reassessment": "Block B day 28 - the five Bunkie lines re-timed under the 2026-09-20 "
+                          "protocol - falls on 2026-11-01 after the two repeated weeks, and "
+                          "moves a week later with each further failed week. docs/hypothesis.md "
+                          "holds the predictions it scores (P8-P12). Finding #7's test is graded "
+                          "for the first time before then.",
 
     # ─────────────────────────────────────────────────────────────────────────
     #  MRI Findings
@@ -737,6 +744,122 @@ PROFILE = {
                 "overcompensating, and BOTH sides get strengthened rather than isolating "
                 "one side. The training implication above stands, now with sign-off "
                 "attached."
+            ),
+        },
+        {
+            "id": 7,
+            # ── HOW THIS FINDING IS RE-MEASURED ──────────────────────────
+            "test": {
+                "name": "Lying pelvis level, heel drive, and rib position",
+                "protocol": (
+                    "THREE PARTS, both sides, cold, before any training. (a) PELVIS - lie "
+                    "on your back on a firm floor, legs straight, arms by your sides, and "
+                    "take five slow breaths to settle. Put your fingertips on the bony "
+                    "point at the front of each hip and judge which one sits higher off "
+                    "the floor. Grade the difference 0-2 (0 level, 1 slight, 2 clear) and "
+                    "name the higher side. (b) HEEL DRIVE - same position. Press one heel "
+                    "down into the floor for five seconds and rate the stretch at the "
+                    "front of that hip 0-10. Then the other heel. (c) RIBS - stand in front "
+                    "of a mirror, shirt off, arms relaxed, and breathe out normally. Look "
+                    "at the bottom edge of the ribs at the front. Grade which side sticks "
+                    "forward more, 0-2, and name the side."
+                ),
+                "unit": "0-2 grade with side, pelvis and ribs; 0-10 stretch each side, heel drive",
+                "positive_if": (
+                    "a pelvis or rib grade of 1 or more, or a right-left heel-drive stretch "
+                    "gap over 2 points"
+                ),
+                "single_person": True,
+                "last_run": "2026-10-05",
+                "last_result": (
+                    "FIRST READING, his own observation, UNGRADED - observed during the "
+                    "week of 2026-09-28 (sick, untrained) and reported 2026-10-05. "
+                    "PELVIS: right side higher and forward, left lower and flatter on the "
+                    "floor. HEEL DRIVE: a notable stretch at the front of the RIGHT hip "
+                    "(he named the hip flexors and the QL), little or none on the left. "
+                    "RIBS: left lower ribs forward and more prominent looking down, right "
+                    "flatter; upper body turned slightly to the right relative to the "
+                    "pelvis. No grades or 0-10 scores were taken, so the next run grades "
+                    "all three - that run is the baseline a change is read against."
+                ),
+            },
+            "title": "Pelvis-Ribcage Counter-Rotation — Right Pelvis Forward, Ribcage Turned Right",
+            "location": (
+                "Pelvis (right side high and forward lying on the back) and lower ribcage "
+                "(left side forward); discomfort at the base of BOTH sit bones"
+            ),
+            "source": (
+                "Self-observed, reported 2026-10-05 as a written summary. His words below are "
+                "the primary record; `reading` is derived from them and loses to them where "
+                "the two disagree."
+            ),
+            "observation": {
+                "sit_bones": (
+                    "Localized tension and pressure at the base of the sit bone (ischial "
+                    "tuberosity) - BOTH sides (pinned 2026-10-05; the summary said "
+                    "'left/right'). His summary called it consistent with proximal "
+                    "hamstring tendon tension or ischial bursa compression."
+                ),
+                "pelvis_lying_on_back": (
+                    "Left hip/pelvis rests lower and flatter against the floor. Right hip "
+                    "sits higher, forward and elevated. Driving the right heel down forces "
+                    "the elevated right hip into extension and produces a notable stretch "
+                    "on the hip flexors/QL; driving the left heel down produces little to "
+                    "no stretch."
+                ),
+                "ribcage": (
+                    "Upper body rotated slightly to the right relative to the pelvis. Left "
+                    "side of the chest/ribcage flares forward and looks more prominent when "
+                    "looking down; the right side sits flatter."
+                ),
+            },
+            "reading": (
+                "ONE PATTERN, NOT THREE. Lying on the back, the right half of the pelvis "
+                "forward means the pelvis faces slightly LEFT; the ribcage turned back to the "
+                "right brings the trunk round to face forward again, and the left ribs "
+                "standing forward is the visible end of that turn. The three observations "
+                "agree with each other, which is the main reason to take them as one "
+                "position rather than three faults. "
+                "THE HEEL DRIVE AGREES WITH THE RECORD: the right hip flexors resist hip "
+                "extension where the left do not, matching 'Deep right hip flexors / TFL' "
+                "in `imbalances` and the right-only response of the front-of-hip ball "
+                "release (finding #4's evidence). A right half of the pelvis held forward is "
+                "the position tight right hip flexors would hold it in. ⚠ The same caveat "
+                "as `imbalances`: one heel test cannot separate high resting tone from a "
+                "short muscle, and this file has already been wrong once by reading tone as "
+                "length. "
+                "THE SIT BONES are finding #2's area, which is a RIGHT-side snap on external "
+                "rotation; this is a pressure discomfort, on BOTH sides. Two things changed "
+                "just before it was noticed: the ischial release left Block B on 2026-09-22, "
+                "and a week sick meant more lying and sitting. Either could explain it, so "
+                "it is recorded, not attributed. His summary adds the ischial bursa as a "
+                "candidate, which finding #2's list does not hold. "
+                "THE PSOAS LINK IS PLAUSIBLE, NOT TESTED: the psoas attaches along both "
+                "sides of L1-L4, and the same day he reported tightness at exactly those "
+                "attachments, both sides evenly (symptom log 2026-10-05). A pelvis held "
+                "turned changes the length each side works at. Nothing measured connects "
+                "the two yet. "
+                "EXPECT LEVEL TO FEEL WRONG AT FIRST: the 2026-07-06 entry found his sense "
+                "of neutral calibrated to his habitual position, so a corrected position "
+                "feels turned before it is."
+            ),
+            "structures": [
+                "Right hip flexors (iliopsoas, TFL) - holding the right half of the pelvis forward",
+                "Abdominal wall / obliques - rib position",
+                "Proximal hamstrings at both ischial tuberosities (sit-bone discomfort)",
+            ],
+            "training_implication": (
+                "CONTROL, TRAINED IN SHORT EFFORTS - NEVER A CORRECTED POSTURE HELD. The "
+                "2026-07-06 left back strain came from holding a posture correction for a "
+                "whole walk. No trial shows an exercise moves a resting pelvic or rib "
+                "position; what can be trained is control in the position, and the test "
+                "above is how any change gets seen. What Block B runs for it is authored in "
+                "training_plan.py (the 90/90 hip lift and the hip airplane after the planks, "
+                "the dead bug and the bird dog on Wednesday, all from 2026-10-05)."
+            ),
+            "laterality": (
+                "asymmetric - right pelvis high and forward, left ribs forward; sit-bone "
+                "discomfort on BOTH sides"
             ),
         },
     ],
@@ -2081,6 +2204,62 @@ PROFILE = {
                 "compensation pattern the whole rehab rests on is a capacity claim (glute max "
                 "underactive, upper glute over-gripping to compensate)."
             ),
+        },
+        {
+            "date":   "2026-10-05",
+            "status": "Active — monitoring (third episode of the same symptom)",
+            "region": "Lumbar — both sides of the spine, at the psoas attachments",
+            "title":  "Psoas-Attachment Tightness, Both Sides, After Twelve Days Off and a Week Sick",
+
+            "reported": (
+                "'My back is back at me, 100% my psoas muscles where they connect at my back.' "
+                "Both sides evenly, exactly where the psoas connects to the spine. Pain 0/10 - "
+                "tight and tired, no pain. No leg symptoms reported."
+            ),
+
+            "context": (
+                "No training from 2026-09-24 to 2026-10-04 (last session 2026-09-23); sick "
+                "the whole week of 2026-09-28. That week logged 0 of 7 days, so Block B's "
+                "week 1 runs again from 2026-10-05 with every load held. He trained again "
+                "on 2026-10-05 by his own choice at greatly reduced weights. The same day "
+                "he reported the pelvis-ribcage pattern recorded as finding #7."
+            ),
+
+            "the_same_symptom_before": [
+                "2026-08-25 - the Block A flare: tightness 8, pain 5, 'my psoas muscle is "
+                "really tight'.",
+                "2026-09-16 check-in - tightness 3, pain 0, dull ache: 'Tired back just at "
+                "where the psoas connects to the back'. The afternoon after a session that "
+                "raised the goblet squat and the RDL a step each (2026-09-15).",
+            ],
+
+            "what_it_shows_and_what_it_does_not": [
+                "THE RELEASE DID NOT PREVENT IT. The full release block, front-of-hip ball "
+                "release included, was logged the day before both earlier episodes "
+                "(2026-08-24 and 2026-09-15) and on 2026-09-16 itself.",
+                "IT DOES NOT SCORE docs/hypothesis.md P12. P12 asks whether the moving "
+                "warm-up and the strength work hold the hip quiet without the release; "
+                "twelve days with no training tested neither. By location it is also not "
+                "the hip-crest or front-of-hip symptom P12 names.",
+                "THREE TRIGGERS, NO SINGLE ONE: a flare inside a training block, a load "
+                "step, and twelve days of inactivity and illness. Recorded, not resolved.",
+            ],
+
+            "decision": (
+                "The athlete, 2026-10-05, offered the release back under P12's revert rule: "
+                "'I dont want release execises instead, lets look at postural fix exercises "
+                "and abs workouts, include Single Leg hip Rotations.' The release stays out; "
+                "the posture and trunk work is authored in training_plan.py (see finding "
+                "#7's training_implication)."
+            ),
+
+            "escalation_criteria": [
+                "Pain above 3/10, or the tightness still there after two weeks of normal "
+                "training -> re-read it against P12 and finding #7's test.",
+                "Pain into a leg, numbness or tingling.",
+                "Back pain with fever, pain at the side below the ribs, or pain passing "
+                "urine -> a doctor, not the training plan (it followed an illness).",
+            ],
         },
     ],
 

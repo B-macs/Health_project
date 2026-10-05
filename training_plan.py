@@ -4757,6 +4757,34 @@ ACC_BREATHING = _ex(
 # The gym days are UNCHANGED. He approved their shape on 2026-09-11 (Key Rule
 # 21) and nothing about them was built for a race.
 #
+# ⚠ 2026-10-05, BACK AFTER A WEEK SICK — POSTURE AND TRUNK WORK, STILL NO
+# RELEASE. The psoas-attachment tightness came back on both sides (0/10 pain)
+# after twelve untrained days, and the release was his to bring back under
+# P12's rule. His answer: "I dont want release execises instead, lets look at
+# postural fix exercises and abs workouts, include Single Leg hip Rotations."
+# The same day he reported a pelvis-ribcage counter-rotation, now profile
+# finding #7. His choices:
+#
+#   * THE 90/90 HIP LIFT AND THE HIP AIRPLANE AFTER THE PLANKS on every gym and
+#     run day (his pick for the rotation: the standing hip airplane). The hip
+#     lift also opens Wednesday and Thursday after the planks; the airplane is
+#     standing leg work, so it stays off Wednesday for the march's reason, and
+#     off Thursday, where it would be the flexibility day's eleventh entry.
+#     Both count as preparation. Cost: about 7 modelled minutes a gym day —
+#     the squat day 60 -> 67 of its 70, the press day 43 -> 50.
+#   * THE BIRD DOG AND THE DEAD BUG ON WEDNESDAY, after the curl-up, chosen for
+#     the pattern when he asked which ab work fits it: the dead bug holds the
+#     ribs down against an arm going overhead (the left flare), the bird dog
+#     extends the right hip with the pelvis held level (the right side
+#     forward). With the side bridge at the start, McGill's three run in one
+#     session. Not on the gym days: Key Rule 21's one core item stands.
+#   * NO HOLLOW HOLD, NO LEG RAISES: legs held up on the hip flexors pull on
+#     the psoas attachment, where the back was tight that day.
+# All four are short efforts with a defined end — a held corrected posture is
+# what strained the left back on 2026-07-06. REVIEW it when finding #7's test
+# reads level on both grades; take an item out on any lower-back pain that
+# item itself brings on.
+#
 # ⚠ 2026-09-22, DAY 2 OF THE BLOCK — THE RELEASE BLOCK IS OUT, A MOVING
 # WARM-UP AND DAILY PLANKS ARE IN. The athlete, reviewing the block: "I think
 # the release is now outdated, there isn't that much gripping anymore, a dynamic
@@ -5033,6 +5061,129 @@ def _bb_planks(week: int) -> list:
     ]
 
 
+# ── POSTURE AND TRUNK WORK, 2026-10-05 (see the block header) ─────────────
+# Two posture items after the planks on every training day, and the dead bug
+# and the bird dog on Wednesday. All four are short efforts with a defined end:
+# a corrected posture HELD is what strained the left back on 2026-07-06.
+
+NINETY_NINETY_HIP_LIFT = _ex(
+    name="90/90 Hip Lift",
+    ex_type="reps",
+    sets=2, reps=5, tempo="4-0-6", rest_seconds=20,
+    mechanics=(
+        "Lie on your back with your feet flat on a wall, hips and knees bent to 90 degrees, "
+        "arms by your sides. Press both heels down into the wall, a little harder through "
+        "the RIGHT heel, until your tailbone just lifts off the floor: the backs of your "
+        "thighs switch on and your lower back stays on the floor. Keep that and breathe: in "
+        "through your nose for four seconds, then out through your mouth for six, all the "
+        "way out, until your lower ribs sink toward your hips. Rest your left hand on your "
+        "lower left ribs and feel them drop on every breath out. Five breaths is one set. "
+        "Lower your tailbone and relax between sets."
+    ),
+    biomechanical_focus=(
+        "The athlete's 2026-10-05 observation (patient_profile finding #7): lying on his back "
+        "the right side of the pelvis sits higher and forward, the ribcage turns back to the "
+        "right, and the left ribs flare. Driving the RIGHT heel down was his own test and "
+        "stretched the right hip flexors where the left gave nothing — this is that "
+        "movement, made an exercise. The heel press is the hamstrings pulling the pelvis "
+        "back, harder on the right; the long breath out is the abdominals pulling the lower "
+        "ribs down, felt on the left. Five breaths and stop: a defined effort, never a "
+        "posture held for its own sake. No trial shows an exercise moves a resting pelvic "
+        "position; what this trains is control in the position, which is the claim."
+    ),
+    progression="Five calm breaths with the ribs down every time → a two-second pause at the end of each breath out.",
+    regression="Backs of the thighs cramp → move your hips closer to the wall.",
+)
+
+HIP_AIRPLANE = _ex(
+    name="Hip Airplane",
+    ex_type="reps",
+    laterality="unilateral",
+    sets=2, reps=5, tempo="3-0-3", rest_seconds=30,
+    mechanics=(
+        "Stand on your RIGHT leg, side-on to a wall, your right hand on the wall for balance "
+        "and your standing knee slightly bent. Bow forward a little from the hip — your chest "
+        "stays well up — and keep the standing kneecap pointing straight ahead. Slowly turn "
+        "your pelvis open, so your left hip rotates up and away from the wall, as far as you "
+        "can turn under control. Then turn it back, past the start, so your left hip turns "
+        "forward and in toward the wall. Open and back is one rep. Do five slow reps, then "
+        "turn round and stand on your LEFT leg with your left hand on the wall. Your "
+        "standing knee and foot stay still: the turn happens at the standing hip, and you "
+        "feel it deep in the side and back of that hip. On the RIGHT leg, start with a small "
+        "turn, and if you feel a click or a snap in the groin or at the sit bone, make the "
+        "turn smaller."
+    ),
+    biomechanical_focus=(
+        "The athlete's pick for the posture work (2026-10-05, 'Single Leg hip Rotations', "
+        "confirmed as the standing hip airplane). His pelvis sits turned with the right side "
+        "forward (finding #7); this turns the pelvis over each standing hip in both "
+        "directions under the hip's own muscles, which is rotation CONTROL rather than "
+        "rotation range — the controlled-range rule at Beighton 6/9. A slight bow keeps the "
+        "right hip well under 60 degrees of flexion (key rule 7), and the kneecap cue holds "
+        "the femur neutral. The opening turn is the standing hip's external rotation, which "
+        "is what provokes the sit-bone snap (finding #2) and the groin click (finding #4) on "
+        "the right; hence the small range there and the stop rule in the instruction."
+    ),
+    progression="Five slow reps each leg with no wobble → take the hand off the wall.",
+    regression="Wobbly, or a click → hand firm on the wall and a smaller turn.",
+)
+
+BB_BIRD_DOG = _ex(
+    name="Bird-Dog",
+    ex_type="hold_reps",
+    laterality="alternating",
+    sets=2, reps_in_set=6, hold_seconds=5, rest_seconds=30,
+    mechanics=(
+        "On your hands and knees, hands under your shoulders and knees under your hips. "
+        "Breathe out and keep your back flat. Reach one arm forward and the OPPOSITE leg "
+        "straight back, hold five seconds, then return with control. Six each side, "
+        "alternating. When the RIGHT leg goes back, keep the right side of your pelvis level: "
+        "it does not lift or turn out. Reach long rather than high — the leg stops at hip "
+        "height and the arm at shoulder height. You feel it in the back of the hip and along "
+        "the trunk, never in the lower back."
+    ),
+    biomechanical_focus=(
+        "Added on Wednesday 2026-10-05 for the posture pattern (finding #7). The right hip "
+        "extends while the pelvis must not turn, which is the pattern's right-side-forward "
+        "pelvis trained the other way under control. With Wednesday's curl-up and the side "
+        "bridge that opens every session, McGill's three now all run in one session."
+    ),
+    progression="Six steady holds each side, pelvis level → hold eight seconds.",
+    regression="Pelvis turns or the back sags → slide the leg back along the floor instead of lifting it.",
+)
+
+BB_DEAD_BUG = _ex(
+    name="Dead Bug",
+    ex_type="reps",
+    laterality="alternating",
+    sets=2, reps=8, tempo="3-0-3", rest_seconds=30,
+    mechanics=(
+        "Lie on your back, arms straight up toward the ceiling, hips and knees bent to 90 "
+        "degrees with your shins level. Breathe all the way out until your lower ribs sink "
+        "and your lower back rests flat on the floor, and keep it there. Slowly lower one arm "
+        "overhead and straighten the OPPOSITE leg out toward the floor over three seconds, "
+        "breathing out as they go, then bring both back over three seconds. Eight each side, "
+        "alternating. The leg goes only as low as your lower back stays flat, and your left "
+        "ribs stay down as the arm goes over. Keep your RIGHT knee and toes pointing straight "
+        "up, not turned out."
+    ),
+    biomechanical_focus=(
+        "Back in Block B on Wednesday only, 2026-10-05: it left the gym days on 2026-09-11 "
+        "for the session shape, and the athlete asked for trunk work aimed at the posture "
+        "pattern (finding #7). An arm going overhead lifts the ribs, so holding them down "
+        "against it is the left rib flare trained directly. The right-knee cue is key rule 7 "
+        "at 90 degrees of hip flexion. Chosen over the hollow hold and leg raises, which "
+        "hold the legs up on the hip flexors and pull on the psoas attachment at the spine "
+        "— where the back was tight the day it was added."
+    ),
+    progression="Back flat on every rep → a two-second pause with the arm and leg out.",
+    regression="Lower back lifts → move only the leg, and keep it higher.",
+)
+
+#: The two posture items, after the planks and before the activation item.
+BB_POSTURE = [NINETY_NINETY_HIP_LIFT, HIP_AIRPLANE]
+
+
 #: More sets, not more days (athlete, 2026-09-22). Block B's own copy, so
 #: Stage 2B's one-set activation item is untouched.
 BB_GLUTE_BRIDGE = dict(PREP_GLUTE_ACTIVATION, sets=3, rest_seconds=30)
@@ -5047,9 +5198,12 @@ def _bb_warmup(week: int, activation: dict | None, incline_walk: bool) -> list:
     walked fifteen minutes to the gym (athlete, 2026-09-22: "I always walk 15
     mins to get to the gym, so a 3 min incline walk is not needed to start"),
     which is five times the raise's own dose and the fifteen minutes of easy
-    work the warm-up review found worth having before a near-maximal lift."""
+    work the warm-up review found worth having before a near-maximal lift.
+
+    Since 2026-10-05 the two posture items follow the planks (athlete: posture
+    work "and abs workouts", the hip rotation his own pick)."""
     head = ([PREP_RAISE] if incline_walk else []) + [STANDING_PSOAS_MARCH] + _bb_planks(week)
-    return head + ([activation] if activation else [])
+    return head + BB_POSTURE + ([activation] if activation else [])
 
 
 def _bb_ramp(template: dict, kg: float) -> dict:
@@ -5174,7 +5328,11 @@ def _bb_mobility(week: int) -> dict:
     morning must not follow. day_type stays "rest" so the cluster day after it
     has a clean morning. Week 4 opens with finding #5's wide-stance rotation
     count — a quiet finding is re-measured once a block rather than
-    maintained."""
+    maintained.
+
+    Since 2026-10-05 it is also the trunk day: the 90/90 hip lift after the
+    planks (the hip airplane is standing leg work, so it stays off here for
+    the march's reason), and the bird dog and the dead bug after the curl-up."""
     measurement = ([_take(PLAN_STAGE2B[1]["exercises"], "Wide-Stance Rotation Count (Test)")]
                    if week == 4 else [])
     return {
@@ -5185,9 +5343,12 @@ def _bb_mobility(week: int) -> dict:
         "day_type": "rest",
         "exercises": measurement + [_take(_S2B_MOB, "Upper Glute Grip Grade (Test)")]
                      + _bb_planks(week) + [
+            NINETY_NINETY_HIP_LIFT,
             _take(_S2B_MOB, "Thoracic Extension (Rolled Towel)"),
             _take(_S2B_MOB, "Thread-the-Needle (Thoracic Rotation)"),
             _take(_S2B_A4, "McGill Curl-Up (Progressed)"),
+            BB_BIRD_DOG,
+            BB_DEAD_BUG,
             SCAPULAR_ISOMETRIC,
             _take(_S2B_MOB, "Controlled Walking"),
         ],
@@ -5211,7 +5372,11 @@ def _bb_cluster(week: int) -> dict:
 
     `session_kind` marks it for sessions.session_shape_violations, which holds
     a flexibility day to its own ceilings (entries and minutes) the way it
-    holds a gym day to the lift count."""
+    holds a gym day to the lift count.
+
+    Since 2026-10-05 the 90/90 hip lift follows the planks — ten entries, the
+    flexibility day's ceiling. The hip airplane is not here: it would be the
+    eleventh, and the stack already turns the hips (the 90/90 rotations)."""
     return {
         "objective": f"Block B Week {week} — Cluster A Flexibility Session",
         "phase": _BB_PHASE,
@@ -5219,7 +5384,7 @@ def _bb_cluster(week: int) -> dict:
         "is_gym_session": False,
         "day_type": "stretch",
         "session_kind": "flexibility",
-        "exercises": [STANDING_PSOAS_MARCH] + _bb_planks(week)
+        "exercises": [STANDING_PSOAS_MARCH] + _bb_planks(week) + [NINETY_NINETY_HIP_LIFT]
                      + [_take(_S2B_CLUSTER, n) for n in _CLUSTER_STACK_NAMES]
                      + [STRADDLE_LIFT_OFFS],
     }

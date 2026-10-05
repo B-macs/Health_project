@@ -263,13 +263,15 @@ def test_no_one_set_training_entry_anywhere_on_a_gym_day():
         assert not singles, (d, singles)
 
 
-def test_preparation_is_the_march_the_planks_and_one_activation_item():
+def test_preparation_is_the_march_the_planks_the_posture_pair_and_one_activation_item():
     """No release block since 2026-09-22 (athlete: "I think the release is now
     outdated, there isn't that much gripping anymore, a dynamic stretching
     would be better"). The planks come BEFORE the lifts: "every training day
     but at the start not the end". No incline walk: he walks fifteen minutes to
-    the gym."""
-    head = ["Standing Psoas March", "Forearm Plank", "Full Side Bridge"]
+    the gym. Since 2026-10-05 the 90/90 hip lift and the hip airplane follow
+    the planks (finding #7, his choice of posture work over the release)."""
+    head = ["Standing Psoas March", "Forearm Plank", "Full Side Bridge",
+            "90/90 Hip Lift", "Hip Airplane"]
     for d in SQUAT_DAYS:
         prep = [e["name"] for e in sess.preparation_entries(PLAN[d]["exercises"])]
         assert prep == head + ["Single-Leg Glute Bridge"], d
@@ -280,9 +282,14 @@ def test_preparation_is_the_march_the_planks_and_one_activation_item():
 
 # ── the removals, each with its revert written at the block header ──────────
 
-def test_dead_bug_and_the_fold_trial_are_out_of_the_whole_block():
-    assert "Dead Bug" not in NAMES
+def test_the_fold_trial_is_out_and_the_dead_bug_is_on_wednesday_only():
+    """The dead bug left the gym days on 2026-09-11 for the session shape and
+    stays off them. It came back on 2026-10-05 on the Wednesday trunk day only,
+    aimed at the left rib flare (finding #7). Both directions, so it can neither
+    creep back onto a gym day nor quietly leave Wednesday."""
     assert not any("Forward Fold" in n for n in NAMES)
+    days = [d for d in DAYS if "Dead Bug" in _names(d)]
+    assert days == [3, 10, 17, 24], days
 
 
 def test_the_prone_y_raise_is_out_of_the_press_day():
@@ -323,17 +330,21 @@ def test_one_hip_flexor_item_per_gym_day_and_both_after_the_tuesday_run():
 
 
 def test_the_cluster_day_is_the_march_the_planks_the_stack_and_the_lift_offs():
-    """Nine entries, under 50 modelled minutes — found at 13 / 61 on
-    2026-09-11, and ten until the release block came out on 2026-09-22. No
-    raise: the phase-2 lock's two conditions (stretching before load, loads
-    near max) are both false on a flexibility session, and the blueprint asks
-    only that the MEASUREMENT be cold."""
+    """Ten entries, under 50 modelled minutes — found at 13 / 61 on
+    2026-09-11, ten until the release block came out on 2026-09-22, nine until
+    the 90/90 hip lift joined on 2026-10-05. Ten is the flexibility ceiling,
+    which is why the hip airplane is not here. No raise: the phase-2 lock's two
+    conditions (stretching before load, loads near max) are both false on a
+    flexibility session, and the blueprint asks only that the MEASUREMENT be
+    cold."""
     for d in (4, 11, 18, 25):
         names = _names(d)
         assert PLAN[d].get("session_kind") == "flexibility", d
-        assert len(names) == 9, (d, len(names))
-        assert names[:3] == ["Standing Psoas March", "Forearm Plank", "Full Side Bridge"], d
-        assert names[3:8] == list(tp._CLUSTER_STACK_NAMES), d
+        assert len(names) == 10, (d, len(names))
+        assert names[:4] == ["Standing Psoas March", "Forearm Plank", "Full Side Bridge",
+                             "90/90 Hip Lift"], d
+        assert "Hip Airplane" not in names, d
+        assert names[4:9] == list(tp._CLUSTER_STACK_NAMES), d
         assert names[-1] == "Straddle lift-offs from a flat back", d
         assert "Walking Raise (Incline)" not in names, d
         assert sess.estimate_duration(PLAN[d]["exercises"]) <= sess.SESSION_SHAPE["max_flexibility_minutes"], d
@@ -441,6 +452,73 @@ def test_the_plank_dose_is_short_and_steps_by_week():
         assert front["hold_seconds"] == side["hold_seconds"] == hold, d
         assert front["sets"] == (2 if week == 4 else 3), d
         assert side["sets"] == 2 and side["laterality"] == "unilateral", d
+
+
+# ── posture and trunk work, 2026-10-05 (finding #7) ──────────────────────────
+
+def test_the_hip_lift_follows_the_planks_on_every_training_day():
+    """Athlete, 2026-10-05: posture work and ab work instead of the release.
+    Straight after the planks, every training day; never on a rest day or on
+    day 28, which re-runs its baseline's own lead-in."""
+    for d in TRAINING_DAYS:
+        names = _names(d)
+        assert names.index("90/90 Hip Lift") == names.index("Full Side Bridge") + 1, d
+    for d in (7, 14, 21, 27, 28):
+        assert "90/90 Hip Lift" not in _names(d), d
+
+
+def test_the_hip_airplane_runs_on_the_gym_and_run_days_only():
+    """His pick ("Single Leg hip Rotations", confirmed as the standing hip
+    airplane). Straight after the hip lift. Not on Wednesday — it is standing
+    leg work and Thursday's flexibility morning must not follow leg work, the
+    march's rule — and not on Thursday, where it would be the eleventh entry."""
+    for d in GYM_DAYS + RUN_DAYS:
+        names = _names(d)
+        assert names.index("Hip Airplane") == names.index("90/90 Hip Lift") + 1, d
+    for d in (3, 4, 7, 10, 11, 14, 17, 18, 21, 24, 25, 27, 28):
+        assert "Hip Airplane" not in _names(d), d
+    assert "Hip Airplane" in fx.MOBILITY_TIER_LOADS_LEGS
+
+
+def test_wednesday_is_the_trunk_day():
+    """The bird dog and the dead bug after the curl-up: with the side bridge
+    that opens the session, McGill's three run together. Neither is on a gym
+    day — Key Rule 21's one core item stands."""
+    for d in (3, 10, 17, 24):
+        names = _names(d)
+        i = names.index("McGill Curl-Up (Progressed)")
+        assert names[i + 1:i + 3] == ["Bird-Dog", "Dead Bug"], d
+    for d in GYM_DAYS:
+        assert not {"Bird-Dog", "Dead Bug"} & set(_names(d)), d
+
+
+def test_the_posture_items_say_how_and_carry_their_safety_cues():
+    """Short efforts with a defined end, never a held posture (the 2026-07-06
+    strain). Key rule 7 on the right where the hip bends, and the airplane's
+    stop rule in the text he reads — the warning field only shows on a high
+    strain day."""
+    lift = tp.NINETY_NINETY_HIP_LIFT["mechanics"].lower()
+    assert "breath" in lift and "right heel" in lift and "lie on your back" in lift
+    plane = tp.HIP_AIRPLANE["mechanics"].lower()
+    assert "stand on your right leg" in plane and "click" in plane and "smaller" in plane
+    assert "kneecap" in plane, "key rule 7: the femur held neutral"
+    bug = tp.BB_DEAD_BUG["mechanics"].lower()
+    assert "right knee" in bug and "not turned out" in bug, "key rule 7 at 90 degrees"
+    assert "pelvis level" in tp.BB_BIRD_DOG["mechanics"].lower()
+    for ex in (tp.NINETY_NINETY_HIP_LIFT, tp.HIP_AIRPLANE, tp.BB_BIRD_DOG, tp.BB_DEAD_BUG):
+        assert ex["sets"] >= 2, ex["name"]
+    assert rules.check_movement("90/90 Hip Lift", 2)["severity"] == "cleared"
+    plane_rule = rules.check_movement("Hip Airplane", 2)
+    assert plane_rule["severity"] == "caution" and plane_rule["laterality"] == "right"
+
+
+def test_no_hip_flexor_dominant_ab_work():
+    """Chosen 2026-10-05 against the hollow hold and leg raises: holding the
+    legs up is hip-flexor work that pulls on the psoas attachment at the
+    spine, where the back was tight the day the trunk work was added. Sit-ups
+    and crunches are loaded lumbar flexion over the annulus findings."""
+    banned = ("hollow", "leg raise", "knee raise", "sit-up", "crunch", "v-up")
+    assert not [n for n in NAMES if any(b in n.lower() for b in banned)]
 
 
 def test_no_reverse_plank():

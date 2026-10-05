@@ -412,6 +412,9 @@ MOBILITY_TIER_LOADS_LEGS: frozenset[str] = frozenset({
     # Block B's warm-up march (2026-09-22) — the same muscle standing up, which
     # is why it is kept off the Wednesday before the flexibility morning.
     "Standing Psoas March",
+    # Block B's hip airplane (2026-10-05): single-leg stance and hip rotation
+    # under the hip's own muscles, kept off Wednesday for the march's reason.
+    "Hip Airplane",
     # Loaded posterior chain and abductors — the "pullers" of pattern I
     "Single-Leg Glute Bridge",
     "Lateral Band Walk",

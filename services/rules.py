@@ -729,6 +729,28 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="cleared", laterality="bilateral",
     ),
     MovementRule(
+        movement="90/90 hip lift",
+        reason="90/90 hip lift. Lying on the back, feet on a wall, hips and knees at 90 "
+               "degrees: the heels press down until the tailbone just lifts, and a full "
+               "breath out brings the lower ribs down. Unloaded, the lower back stays on "
+               "the floor, no lumbar flexion or extension. Ruled 2026-10-05, when it joined "
+               "Block B for the pelvis/ribcage counter-rotation pattern (profile finding "
+               "#7). A set is five breaths — a defined effort, not a held posture.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="hip airplane",
+        reason="Hip airplane. Single-leg stance, a slight bow from the hip, the pelvis "
+               "turned open and closed over the standing hip. Caution on the RIGHT: the "
+               "opening turn is the standing hip's EXTERNAL rotation, which provokes the "
+               "sit-bone snap (finding #2) and the groin click (finding #4), so the range "
+               "starts small there and gets smaller at any click. The bow stays slight, "
+               "keeping the right hip under 60 degrees of flexion, with the kneecap "
+               "pointing ahead (key rule 7). Controlled range only at Beighton 6/9. Ruled "
+               "2026-10-05.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
         movement="side bridge",
         reason="Side bridge, any variant. Lateral trunk endurance in a neutral spine — "
                "the flexion-free alternative to the contraindicated sit-up and crunch.",

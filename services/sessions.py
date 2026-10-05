@@ -1792,6 +1792,9 @@ PREPARATION_NAMES = RELEASE_EXERCISE_NAMES | frozenset({
     "Walking Raise (Incline)", "Single-Leg Glute Bridge", "Dead Bug",
     "Scapular Wall Slide", "Prone Y-Raise (Scapular)",
     "Standing Psoas March", "Forearm Plank", "Full Side Bridge",
+    # The two posture items after the planks, 2026-10-05: short efforts that
+    # switch on control before the lifts, the planks' reasoning.
+    "90/90 Hip Lift", "Hip Airplane",
 })
 
 
