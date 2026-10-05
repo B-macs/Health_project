@@ -2301,6 +2301,43 @@ class Repository:
         )
         return {d for p in pages if (d := notion.get_property(p, "Session Date", "date"))}
 
+    def get_supplementary_sessions_live(self, day: date, session_type: str) -> dict[str, dict]:
+        """One day's sessions of one supplementary Type, read from Notion
+        ITSELF: {session_id: {"movements": [...], "notes": [...]}}.
+
+        For the yoga and outdoor savers, which must not write a session that
+        is already there. FOUND 2026-10-05: one Complete press on a 22-pose
+        yoga flow wrote 51 sessions and 407 rows in one minute, while the
+        hosted app was updating after a push — every run of the saver minted
+        a fresh session id, and runs that stopped partway left partial copies.
+        A saver asks this first, so a session written by an earlier run (or
+        another browser session) is found and finished rather than written
+        again. Live rather than the local copy, because the copy that matters
+        may have been written by a different process.
+
+        Offline there is no live side, and every write raises anyway.
+        """
+        if self.offline:
+            pages = self._query(self.config.notion_db_training,
+                                filter_={"property": "Session Date",
+                                         "date": {"equals": str(day)}})
+        else:
+            pages = notion.query_database(
+                self._nc, self.config.notion_db_training,
+                filter_={"property": "Session Date", "date": {"equals": str(day)}},
+            )
+        out: dict[str, dict] = {}
+        for p in pages:
+            if notion.get_property(p, "Type", "select") != session_type:
+                continue
+            sid = notion.get_property(p, "Session ID", "rich_text") or ""
+            if not sid:
+                continue
+            entry = out.setdefault(sid, {"movements": [], "notes": []})
+            entry["movements"].append(notion.get_property(p, "Movement", "title") or "")
+            entry["notes"].append(notion.get_property(p, "Notes", "rich_text") or "")
+        return out
+
     def get_daily_session_au(self, days: int = 28, today: date | None = None) -> list[dict]:
         today = today or date.today()
         cutoff = (today - timedelta(days=days)).isoformat()

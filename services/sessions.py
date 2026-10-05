@@ -64,6 +64,43 @@ def outdoor_exercise_name(type_key: str | None) -> str:
     type — the fallback name for anything outside the outdoor family."""
     return OUTDOOR_EXERCISE_BY_TYPE.get((type_key or "").lower(), OUTDOOR_FALLBACK_EXERCISE)
 
+
+def yoga_save_plan(existing: dict[str, dict], pose_names) -> tuple[str | None, set[str]]:
+    """DETERMINISTIC. Which session a yoga save writes into, and which poses
+    are already written there.
+
+    `existing` is Repository.get_supplementary_sessions_live(day, "Yoga"). A
+    session whose poses are all poses of THIS flow is this flow's earlier
+    write — finished, or stopped partway — so the save continues it under its
+    id rather than minting another (2026-10-05: one press wrote 51 sessions).
+    The most complete one wins. (None, set()) means nothing is there yet:
+    mint a new id. A returned set equal to the flow's poses means it is
+    already logged, and the save writes nothing.
+
+    The cost, accepted: the same flow done twice in one day logs once.
+    """
+    wanted = set(pose_names)
+    best: tuple[str | None, set[str]] = (None, set())
+    for sid, entry in sorted(existing.items()):
+        done = {m for m in entry.get("movements", []) if m}
+        if done and done <= wanted and len(done) > len(best[1]):
+            best = (sid, done)
+    return best
+
+
+def outdoor_activity_logged(existing: dict[str, dict], activity_id) -> bool:
+    """DETERMINISTIC. True when a Garmin activity is already in the log.
+
+    The outdoor saver writes the activity id into the session note
+    ("activity <id>"), so the note is the key. A missing id is never treated
+    as logged — there is nothing to match it on."""
+    if activity_id in (None, ""):
+        return False
+    # Bounded, so activity 123 is not found inside activity 1234.
+    tag = re.compile(rf"\bactivity {re.escape(str(activity_id))}\b")
+    return any(tag.search(n or "") for entry in existing.values()
+               for n in entry.get("notes", []))
+
 # The pre-session release protocol (always the same shared exercises inserted
 # first in every plan day) — detected by name so this stays in sync with
 # whatever training_plan.py's shared release-exercise constants are named.

@@ -204,13 +204,14 @@ PROFILE = {
                       "was cancelled 2026-09-18, running continues toward 21 km with no date, "
                       "and a failed week pushes the block a week later. The weeks of 2026-09-21 "
                       "(2 of 7 days) and 2026-09-28 (0 of 7, sick) failed, so week 1 runs again "
-                      "from 2026-10-05. The week: Mon squat, Tue run, Wed mobility + trunk, Thu "
+                      "from 2026-10-05, and he chose to redo it once more from 2026-10-12. The week: Mon squat, Tue run, Wed mobility + trunk, Thu "
                       "cluster, Fri press, Sat run, Sun rest. Gym days are three main lifts, one "
                       "core item, one hip-flexor item (Key Rule 21). Still no overhead pressing "
                       "(finding #6).",
     "next_reassessment": "Block B day 28 - the five Bunkie lines re-timed under the 2026-09-20 "
-                          "protocol - falls on 2026-11-01 after the two repeated weeks, and "
-                          "moves a week later with each further failed week. docs/hypothesis.md "
+                          "protocol - falls on 2026-11-08 after three repeats of week 1 (two failed "
+                          "weeks and one redo by choice), and moves a week later with each further "
+                          "failed or redone week. docs/hypothesis.md "
                           "holds the predictions it scores (P8-P12). Finding #7's test is graded "
                           "for the first time before then.",
 
@@ -586,6 +587,15 @@ PROFILE = {
                 "two disagree the note wins, and the disagreement here was invisible for "
                 "six days."
             ),
+            "additional_evidence_2026_10_05": (
+                "THOMAS TEST, both sides (athlete, self-check, 2026-10-05): 'click in the hip "
+                "when I get to 45 degrees on the right side. none on the left.' The same "
+                "angle as the 2026-07-08 Dead Bug click (~45 degrees, supine, the right leg "
+                "moving toward straight), so the supine leg-lowering range is a second "
+                "reliable trigger beside standing flexion + external rotation. Painless, "
+                "right only, as always. The Thomas reading itself (hip flexor length, equal "
+                "and normal on both sides) is recorded under finding #7's test."
+            ),
         },
         {
             "id": 5,
@@ -750,9 +760,9 @@ PROFILE = {
             "id": 7,
             # ── HOW THIS FINDING IS RE-MEASURED ──────────────────────────
             "test": {
-                "name": "Lying pelvis level, heel drive, and rib position",
+                "name": "Lying pelvis level, heel drive, rib position, and Thomas test",
                 "protocol": (
-                    "THREE PARTS, both sides, cold, before any training. (a) PELVIS - lie "
+                    "FOUR PARTS, both sides, cold, before any training. (a) PELVIS - lie "
                     "on your back on a firm floor, legs straight, arms by your sides, and "
                     "take five slow breaths to settle. Put your fingertips on the bony "
                     "point at the front of each hip and judge which one sits higher off "
@@ -762,12 +772,17 @@ PROFILE = {
                     "front of that hip 0-10. Then the other heel. (c) RIBS - stand in front "
                     "of a mirror, shirt off, arms relaxed, and breathe out normally. Look "
                     "at the bottom edge of the ribs at the front. Grade which side sticks "
-                    "forward more, 0-2, and name the side."
+                    "forward more, 0-2, and name the side. (d) THOMAS TEST - lie on your "
+                    "back with your hips at the end of a firm bed. Hug your left knee to your "
+                    "chest and let your right leg hang; note where the right thigh settles "
+                    "against the level of the bed, and any click. Then swap sides. When you "
+                    "hug the right knee, keep it pointing straight up."
                 ),
-                "unit": "0-2 grade with side, pelvis and ribs; 0-10 stretch each side, heel drive",
+                "unit": ("0-2 grade with side, pelvis and ribs; 0-10 stretch each side, heel "
+                         "drive; hanging-thigh angle each side against the bed, Thomas"),
                 "positive_if": (
-                    "a pelvis or rib grade of 1 or more, or a right-left heel-drive stretch "
-                    "gap over 2 points"
+                    "a pelvis or rib grade of 1 or more, a right-left heel-drive stretch gap "
+                    "over 2 points, or a hanging thigh that stays above the level of the bed"
                 ),
                 "single_person": True,
                 "last_run": "2026-10-05",
@@ -780,7 +795,13 @@ PROFILE = {
                     "RIBS: left lower ribs forward and more prominent looking down, right "
                     "flatter; upper body turned slightly to the right relative to the "
                     "pelvis. No grades or 0-10 scores were taken, so the next run grades "
-                    "all three - that run is the baseline a change is read against."
+                    "all three - that run is the baseline a change is read against. "
+                    "THOMAS TEST, same day, after the question was asked: both thighs settle "
+                    "at about the level of the bed, and both sides read the same - "
+                    "NEGATIVE, normal hip flexor length on both sides. A painless click in "
+                    "the RIGHT hip at about 45 degrees, none on the left (finding #4). Taken "
+                    "after the morning's yoga, so warm: it can read looser than cold, and it "
+                    "is re-read cold at the next run."
                 ),
             },
             "title": "Pelvis-Ribcage Counter-Rotation — Right Pelvis Forward, Ribcage Turned Right",
@@ -820,6 +841,14 @@ PROFILE = {
                 "standing forward is the visible end of that turn. The three observations "
                 "agree with each other, which is the main reason to take them as one "
                 "position rather than three faults. "
+                "⚠ THE RIGHT HIP FLEXORS ARE NOT SHORT (Thomas test, 2026-10-05): both thighs "
+                "hang level with the bed, the same on both sides. So a short right psoas does "
+                "NOT explain the right half of the pelvis sitting forward. What is left is "
+                "TONE or HABIT, not length: the hip flexors holding the position without "
+                "being short, which is what docs/hypothesis.md H1 (grip, not shortness) "
+                "predicts and what `imbalances` already warns about. Lengthening the right "
+                "hip flexors is therefore not the fix; control in the position is. One "
+                "caveat: the test was taken warm, after yoga. "
                 "THE HEEL DRIVE AGREES WITH THE RECORD: the right hip flexors resist hip "
                 "extension where the left do not, matching 'Deep right hip flexors / TFL' "
                 "in `imbalances` and the right-only response of the front-of-hip ball "

@@ -16,6 +16,7 @@ import contextlib
 from dataclasses import asdict, replace
 from datetime import date, datetime, timedelta, timezone
 import json
+import threading
 import time
 import nav
 import repo
@@ -2782,7 +2783,15 @@ def _render_accessory_session(policy: dict, readiness_modifier: float,
                         policy, readiness_modifier, volume_factor)
 
 
-def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> None:
+#: One yoga or outdoor save at a time in this process (2026-10-05). A save runs
+#: Notion writes with no Streamlit call between them, and two browser sessions
+#: (or two runs during an app update) saving at once is how one Complete press
+#: became 51 sessions. Holding the lock, a second save waits, then reads the
+#: first one's work back from Notion and writes nothing twice.
+_SUPPLEMENTARY_SAVE_LOCK = threading.Lock()
+
+
+def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> bool:
     """Persist a completed yoga session to Notion — mirrors _auto_log_session's
     shape (one shared session_id/AU/RPE across a row per pose) so it feeds the
     same get_daily_session_au_weighted() aggregate the Home strain card and
@@ -2792,7 +2801,14 @@ def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> None:
     Tagged Type="Yoga" so repo.has_logged_session() (which gates the rehab-plan
     flow) skips it — see that method's docstring. `note` is the whole-session
     note from the completion screen, attached to the last logged pose the same
-    way _auto_log_session attaches the rehab flow's session-wide notes."""
+    way _auto_log_session attaches the rehab flow's session-wide notes.
+
+    WRITES EACH POSE ONCE, under ONE session id (2026-10-05: one press wrote
+    51 sessions and 407 rows in a minute, every run minting its own id). It
+    reads today's yoga back from Notion first: an earlier write of this flow
+    is continued under its own id with its written poses skipped, and a flow
+    already fully logged writes nothing. Returns False in that last case, so
+    the screen can say so instead of claiming a new log."""
     r = repo.get_repository()
     try:
         current_stage = r.get_current_stage()
@@ -2803,26 +2819,44 @@ def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> None:
         duration_minutes=session.total_duration_minutes,
         session_rpe=session.estimated_rpe,
     )
-    last_id = None
-    for pose in session.poses:
-        severity, pose_note = yg.effective_safety(pose, current_stage)
-        last_id = r.save_training_exercise(
-            session_id=session_info["session_id"],
-            movement_name=pose.name,
-            movement_type="Yoga",
-            planned_sets=1,
-            planned_reps=1,
-            rpe=session.estimated_rpe,
-            sets=[{"set_num": 1, "reps": 1, "weight": 0.0,
-                   "rest": 10, "tut": pose.hold_seconds, "velocity": "isometric"}],
-            note=pose_note if severity != "cleared" else "",
-            session_date=session_info["session_date"],
-            session_duration_minutes=session_info["duration_minutes"],
-            session_rpe=session_info["session_rpe"],
-            session_au=session_info["session_au"],
-        )
-    if note.strip() and last_id:
-        r.save_session_notes(last_id, note)
+    with _SUPPLEMENTARY_SAVE_LOCK:
+        existing_id, written = sess.yoga_save_plan(
+            r.get_supplementary_sessions_live(date.today(), "Yoga"),
+            [p.name for p in session.poses])
+        if existing_id:
+            session_info["session_id"] = existing_id
+        if written >= {p.name for p in session.poses}:
+            return False
+        last_id = None
+        for pose in session.poses:
+            if pose.name in written:
+                continue
+            last_id = _save_yoga_pose(r, session, session_info, pose, current_stage)
+            written.add(pose.name)
+        if note.strip() and last_id:
+            r.save_session_notes(last_id, note)
+    return True
+
+
+def _save_yoga_pose(r, session: yg.YogaSession, session_info: dict, pose,
+                    current_stage: int) -> str:
+    """One pose's row, under the session the caller chose."""
+    severity, pose_note = yg.effective_safety(pose, current_stage)
+    return r.save_training_exercise(
+        session_id=session_info["session_id"],
+        movement_name=pose.name,
+        movement_type="Yoga",
+        planned_sets=1,
+        planned_reps=1,
+        rpe=session.estimated_rpe,
+        sets=[{"set_num": 1, "reps": 1, "weight": 0.0,
+               "rest": 10, "tut": pose.hold_seconds, "velocity": "isometric"}],
+        note=pose_note if severity != "cleared" else "",
+        session_date=session_info["session_date"],
+        session_duration_minutes=session_info["duration_minutes"],
+        session_rpe=session_info["session_rpe"],
+        session_au=session_info["session_au"],
+    )
 
 
 def _render_yoga_detail(session: yg.YogaSession) -> None:
@@ -2877,10 +2911,11 @@ def _render_yoga_detail(session: yg.YogaSession) -> None:
     )
 
     if st.button("Complete", type="primary", key="tp_yoga_complete", use_container_width=True):
-        _log_yoga_completion(session, yoga_note)
+        logged = _log_yoga_completion(session, yoga_note)
         st.session_state.tp_yoga_detail = None
         st.session_state.tp_yoga_select = False
-        st.toast(f"Logged {session.name} — nice work.")
+        st.toast(f"Logged {session.name} — nice work." if logged
+                 else f"{session.name} is already logged for today.")
         st.rerun()
 
 
@@ -2914,7 +2949,7 @@ def _render_yoga_select() -> None:
             st.rerun()
 
 
-def _log_outdoor_activity(d: date, act: dict, session_rpe: int) -> None:
+def _log_outdoor_activity(d: date, act: dict, session_rpe: int) -> bool:
     """Persist a Garmin-imported outdoor activity as a training session —
     mirrors _log_yoga_completion's shape. Type="Outdoor" keeps it
     SUPPLEMENTARY (real AU toward strain/ACWR, never a substitute for the
@@ -2922,8 +2957,22 @@ def _log_outdoor_activity(d: date, act: dict, session_rpe: int) -> None:
     carries the movement weight and the leg-day classification, and the
     Garmin identity lives in the note. AU = RPE x duration, weighted 0.5 by
     the content multiplier — rule 2b untouched: the activity's HR numbers
-    are persisted as context, never fed into AU."""
+    are persisted as context, never fed into AU.
+
+    Writes an activity ONCE (2026-10-05, the yoga saver's 51 copies): under
+    the save lock it reads the day's outdoor sessions back from Notion, and an
+    activity whose id is already in a note writes nothing and returns False."""
     r = repo.get_repository()
+    with _SUPPLEMENTARY_SAVE_LOCK:
+        if sess.outdoor_activity_logged(r.get_supplementary_sessions_live(d, "Outdoor"),
+                                        act.get("activity_id")):
+            return False
+        _write_outdoor_activity(r, d, act, session_rpe)
+    st.cache_data.clear()  # the day strip and AU caches must see it now
+    return True
+
+
+def _write_outdoor_activity(r, d: date, act: dict, session_rpe: int) -> None:
     minutes = max(1, int(round(float(act.get("duration_minutes") or 0))))
     session = r.create_training_session(
         session_date=d, duration_minutes=minutes, session_rpe=session_rpe)
@@ -2955,7 +3004,6 @@ def _log_outdoor_activity(d: date, act: dict, session_rpe: int) -> None:
         garmin_distance_km=_num(act.get("distance_km")),
         garmin_calories=_num(act.get("calories")),
     )
-    st.cache_data.clear()  # the day strip and AU caches must see it now
 
 
 def _render_hike_import() -> None:
@@ -3031,13 +3079,14 @@ def _render_hike_import() -> None:
     if st.button(f"Log to training — {name}", key=f"tp_hike_log_{iso}",
                  type="primary", use_container_width=True):
         try:
-            _log_outdoor_activity(picked, act, rpe)
+            logged = _log_outdoor_activity(picked, act, rpe)
         except Exception as exc:
             st.error(f"Couldn't log it — nothing was saved: {exc}")
         else:
             st.session_state.tp_hike_select = False
             st.session_state.pop("tp_hike_results", None)
-            st.toast(f"{name} on {iso} logged — {rpe * minutes:.0f} AU.")
+            st.toast(f"{name} on {iso} logged — {rpe * minutes:.0f} AU." if logged
+                     else f"{name} on {iso} is already logged.")
             st.rerun()
 
 
