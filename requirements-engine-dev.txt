@@ -1,0 +1,5 @@
+# Test tools for the engine venv (.venv-engine, Python 3.12). Not in the image.
+-r requirements-engine.txt
+pytest==9.1.1
+# FastAPI's TestClient runs on httpx.
+httpx==0.28.1

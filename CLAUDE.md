@@ -632,6 +632,54 @@ calls a read method on the Supabase client.
 
 ---
 
+## Phone app rebuild (from 2026-10-07)
+
+The health app leaves Streamlit and becomes a Home-Screen phone app on Cloudflare, built the way ../lauscher is built. The phase prompts live in Notion (Health Project > "Health App — Cloudflare phone app (prompt set)"). The state lives in docs/rebuild/.
+
+### Shape
+- Phone (app/): a Home-Screen PWA for the owner's iPhone (iOS 26). React + TypeScript, offline-first: every screen renders the last saved data first, a training session lives on the phone until it is saved, and every write waits in an outbox until the engine confirms it. The phone holds NO training, readiness or safety rule; it shows what the engine returns.
+- Cloudflare Worker (worker/, free plan): serves the app and /api from one address, checks the owner's access key, passes /api/* to the engine with a shared secret, and runs the scheduled syncs (Cron Triggers).
+- Engine (api/, Google Cloud Run free tier): FastAPI over the unchanged services/. At most one instance; scales to zero. Its SQLite read cache is rebuilt from Supabase at each start.
+- Data: unchanged. Notion and Sheets are the system of record; Supabase is the mirror; Postgres is read only to rebuild the cache.
+- Voice Training: its own Streamlit app from its own repo. Not part of this app.
+
+### Rebuild rules (non-negotiable)
+1. services/ is the specification. The gate in "Deterministic Gate" stays green after every commit. A rule that lives in a view moves into services/ with its test. No rule is copied into TypeScript.
+2. One background writer at a time. Until the switch-over (Phase 9) the Streamlit app runs the Oura and Garmin syncs and the automatic writes (the failed-week rule, the readiness shift); after it, only the engine does. Oura uses up its refresh token at each refresh, so two syncers break the login.
+3. The server never decides "today". The phone sends its local date with every request that depends on it. The container's TZ is HEALTH_TIMEZONE as a safety net only.
+4. Every save is idempotent. The phone mints the ids; a save sent three times stores one session.
+5. Every request that writes sends the Supabase mirror before it answers. A failed send is reported to the caller and logged, never dropped silently (2026-09-22).
+6. A Repository is never shared between threads (Key Rule 12).
+7. The repo is public. No personal reading, no screenshot with real data, no secret and no clinical text goes into git, into a committed report, into a log, or into the Cloud Build upload. .gcloudignore excludes Input_files/, .streamlit/, *.db and .env*, and the upload list is checked before the first deploy of each phase.
+8. Free tiers only (Workers free plan, Cloud Run, Cloud Build, Artifact Registry, Secret Manager). Stop and ask before any change that would cost money.
+9. The screen rules carry over: Key Rules 17, 19 and 20, the patient-facing text rules, no Stage 1 text, and the Sleep screen's all-or-nothing rule. All screen text lives in one strings file, and the existing text scanners run over it.
+10. Verify before trusting: versions, limits and prices change. Check the live docs, then record the version and the source URL in docs/rebuild/stack.md.
+11. Commit after every working milestone. Push only when the owner says so: a push to main redeploys the hosted Streamlit app.
+12. When blocked by something only the owner can do (billing, a login, a secret, a test on the phone), stop and give exact steps. Never read, print or paste a secret; the owner pastes it.
+
+### Control files
+- docs/rebuild/state.md: the rolling state (phase, done, next, open). Update it during the session.
+- docs/rebuild/feature_list.json: the current phase's tasks {id, phase, description, depends_on, gate, passes}; passes flips to true only when its counter reads 0.
+- docs/rebuild/stack.md: pinned versions, limits, prices and their sources.
+- docs/rebuild/screen_inventory.md (from Phase 2): every Streamlit feature and where it goes.
+- docs/rebuild/handoff/pN_to_pM.json + pN_to_pM_summary.md: written at each phase gate.
+- docs/rebuild/archive.md: the full history.
+
+### Session start (rebuild sessions)
+Read CLAUDE.md, docs/rebuild/state.md, the latest handoff summary, docs/rebuild/feature_list.json and `git log --oneline -15`. Other sessions change the training plan in this repo at the same time: never undo their work. Confirm in at most 8 lines what you read and what you will do next, then start.
+
+### Gate protocol (every PROMPT 2)
+1. Run `python -m pytest tests/` (at or above the floor) and `python scripts/rebuild_gate.py pN` (plus the pnpm tests the phase owns). The rebuild gate prints each counter and the total; 🟢 only at 0. You may self-rate 🟠, never 🟢.
+2. Write reports/rebuild/pN_gate.html (gitignored): 🔴 items first, every counter with its evidence, and what the owner must check on the phone.
+3. Update state.md, archive.md and stack.md; flip passes only where the counter is 0.
+4. Write handoff/pN_to_pM.json + _summary.md: what now exists, pinned versions, the owner's decisions, open items, what the next phase may rely on.
+5. Commit `chore(rebuild-pN): gate` and HARD STOP until the owner signs off.
+
+### Roadmap
+P0 Foundation & engine proof · P1 Separate Voice Training · P2 Engine API · P3 Design bake-off · P4 App shell · P5 Today & check-in · P6 Training session · P7 Training week & extras · P8 Insights · P9 Side by side & switch-over · P10 Retire Streamlit. Each phase = PROMPT 1 (build) + PROMPT 2 (gate). Hard stop at the end of every phase.
+
+---
+
 ## Garmin 645 → 265 upgrade — what to re-test
 
 *Recorded 2026-07-31, before the upgrade. Every "645" figure below is measured

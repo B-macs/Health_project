@@ -1,0 +1,25 @@
+{
+  "_note": "Phase 0 proof numbers only, never a personal reading. null = not measured yet, and scripts/rebuild_gate.py counts an unmeasured target as missed.",
+  "engine_venv": {
+    "python": "3.12.9",
+    "passed": 3895,
+    "skipped": 1,
+    "failed": 0,
+    "streamlit_tests_excluded": 11,
+    "measured_on": "2026-10-07"
+  },
+  "region": null,
+  "image_size_mb": null,
+  "image_monthly_cost_eur": null,
+  "upload_personal_files": null,
+  "cold_start_median_s": null,
+  "cold_start_worst_s": null,
+  "cold_start_runs_s": [],
+  "warm_request_ms": null,
+  "worker_to_engine_ms": null,
+  "oura_probe": null,
+  "garmin_ok": null,
+  "garmin_probe": null,
+  "free_tier_max_share": null,
+  "free_tier_projection": null
+}

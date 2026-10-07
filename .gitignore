@@ -42,3 +42,11 @@ Thumbs.db
 
 # Local scratch: debug HTML dumps, streamlit logs, screenshots.
 tmp/
+
+# Phone app rebuild (docs/rebuild/): Node packages, builds, Wrangler state,
+# gate reports (they can hold personal readings) and the Python 3.12 engine venv.
+node_modules/
+app/dist/
+.wrangler/
+reports/rebuild/
+.venv-*/

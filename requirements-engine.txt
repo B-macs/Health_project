@@ -1,0 +1,18 @@
+# The engine's runtime on Google Cloud Run (see docs/rebuild/). Exact pins,
+# checked on PyPI on 2026-10-07 and recorded with their sources in
+# docs/rebuild/stack.md. Streamlit and the voice libraries are NOT here: the
+# engine never draws a screen, and Voice Training leaves in rebuild Phase 1.
+# Needs Python 3.12 or newer: garminconnect 0.3.17 and numpy 2.5.3 require it.
+# requirements.txt stays the Streamlit app's file until rebuild Phase 10.
+fastapi==0.142.2
+uvicorn==0.54.0
+gspread==6.2.1
+# The repo's own pin in requirements.txt; notion-client 3.x is not evaluated.
+notion-client==2.2.1
+requests==2.34.2
+garminconnect==0.3.17
+# services/stats.py imports both.
+numpy==2.5.3
+pandas==3.0.6
+# zoneinfo data for HEALTH_TIMEZONE; the slim image has no Python tz database.
+tzdata==2026.5

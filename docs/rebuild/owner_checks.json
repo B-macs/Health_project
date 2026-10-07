@@ -1,0 +1,7 @@
+{
+  "_note": "The owner's own checks, recorded as the owner reports them. true = confirmed, false = reported broken, null = not checked yet. scripts/rebuild_gate.py reads this.",
+  "p0": {
+    "streamlit_app_opens": null,
+    "placeholder_opens_on_iphone": null
+  }
+}
