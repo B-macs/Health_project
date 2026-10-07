@@ -8,3 +8,10 @@
 ## 2026-10-07 — Phase 0 started
 - Plan approved by the owner, with one change from the Notion prompt: the Google Cloud CLI was missing, so the owner installs it while the local work runs, and one STOP 1 collects every owner task.
 - M1 measured: the engine suite on Python 3.12.9 without Streamlit, 3895 passed, 1 skipped, 0 failed (11 Streamlit test files excluded).
+
+## 2026-10-07 — Phase 0 local work done, STOP 1
+- M2 and M3 built and tested locally (commit 06f1cdb). The image's file set (only the allow-listed files, copied to a scratch folder) imports healthapi and every services/ module.
+- The first `pnpm install` added minimum-release-age exceptions for three packages released days earlier. They were removed, and the Worker pins Lauscher's proven wrangler 4.147.0 and test plugin 1.3.6.
+- Hono's bearerAuth answers a header in another scheme ("Basic ...") with 400, not 401; the Worker test records that.
+- The placeholder page was checked at phone width in the browser pane: title, line, version line with the commit; no console errors.
+- Main gate: 4276 passed, 1 skipped.
