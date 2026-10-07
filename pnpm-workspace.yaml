@@ -1,0 +1,8 @@
+packages:
+  - app
+  - worker
+allowBuilds:
+  '@swc/core': false
+  esbuild: false
+  # Cloudflare's runtime for wrangler and the Worker tests: its script links the Windows binary
+  workerd: true

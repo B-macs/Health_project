@@ -1,0 +1,19 @@
+# The Docker build context (rebuild Phase 0). Same allow-list as .gcloudignore,
+# so a local `docker build` can never pick up a personal file either.
+*
+!Dockerfile
+!requirements-engine.txt
+!api/
+!services/
+!training_plan.py
+!training_constants.py
+!cluster_a_battery.py
+!cluster_a_mechanics.py
+!cluster_a_prescription.py
+!flexibility_baselines.py
+**/__pycache__
+**/*.pyc
+**/*.db
+**/*.sqlite*
+**/.env*
+**/.sync_state.json

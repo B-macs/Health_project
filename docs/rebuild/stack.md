@@ -30,15 +30,15 @@ source again before relying on one (rebuild rule 10).
 | pandas | 3.0.6 | >=3.11 | https://pypi.org/project/pandas/ (services/stats.py) |
 | tzdata | 2026.5 | | https://pypi.org/project/tzdata/ (zoneinfo data in a slim image) |
 | pytest (dev) | 9.1.1 | >=3.10 | https://pypi.org/project/pytest/ |
-| httpx (dev) | 0.28.1 | >=3.8 | https://pypi.org/project/httpx/ (FastAPI's TestClient) |
+| httpx (dev) | 0.28.1 | >=3.8 | https://pypi.org/project/httpx/ (FastAPI's TestClient). Starlette 1.7 warns that TestClient on httpx is deprecated in favour of httpx2 (2.13.1); a warning only, revisit in Phase 2 |
 
 ## npm packages (checked with `npm view` 2026-10-07)
 
 | Package | Version | Used in | Notes |
 |---|---|---|---|
 | hono | 4.13.13 | worker | `bearerAuth` compares with SHA-256 + constant-time equality (checked in Lauscher's node_modules) |
-| wrangler | 4.148.0 | worker | Lauscher pins 4.147.0 |
-| @cloudflare/vitest-plugin | 1.3.7 | worker | peer: vitest ^4.1.0, so the Worker stays on vitest 4.1 (Lauscher's finding) |
+| wrangler | 4.147.0 | worker | 4.148.0 is the newest, but pnpm's minimum-release-age check held it (released days ago); 4.147.0 is the version Lauscher runs |
+| @cloudflare/vitest-plugin | 1.3.6 | worker | peer: vitest ^4.1.0, so the Worker stays on vitest 4.1 (Lauscher's finding); 1.3.7 was held by the same release-age check |
 | vitest | 4.1.11 (worker), 5.0.3 (app) | | |
 | typescript | 7.0.2 (app, worker), 5.9.3 (root) | | openapi-typescript needs typescript ^5 (peer), so the ROOT package pins 5.9.3 for it alone |
 | vite | 8.3.3 | app | |
@@ -63,3 +63,6 @@ source again before relying on one (rebuild rule 10).
 - **The Worker's ENGINE_URL is a secret, not a `vars` entry,** so the engine's address is not in this public repo.
 - **The account's workers.dev subdomain is `lauscher-worker`.** The Worker named `health` is `health.lauscher-worker.workers.dev`. Changing the subdomain would also change Lauscher's address.
 - **Region:** europe-west1 (Belgium) is planned as a Tier 1 European region. Checked again at the deploy (M4) and recorded in p0_proof.json.
+
+- **pnpm's minimum release age is kept on.** On the first install pnpm added `minimumReleaseAgeExclude` entries for three packages released days earlier (wrangler 4.148.0, @cloudflare/vitest-plugin 1.3.7, a miniflare alpha). They were removed and the Worker pinned to Lauscher's proven versions instead: a bad release is usually caught in its first days. `pnpm install` now reports that the lockfile passes the supply-chain policies with no exception.
+- **The engine runs with PYTHONPATH=<root>:<root>/api** (Dockerfile). `uvicorn --app-dir api` alone would put only api/ on the path, and `services` would not import.

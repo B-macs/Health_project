@@ -1,0 +1,26 @@
+// The health app's Worker (rebuild Phase 0; CLAUDE.md "Phone app rebuild"): the app's
+// static files from app/dist with the single-page-app fallback, and /api passed on to
+// the engine on Google Cloud Run. Free plan only.
+//
+// Three secrets, set with `wrangler secret put` and NEVER written in this public file:
+//   ACCESS_KEY  the owner's key; the phone sends it as `Authorization: Bearer ...`
+//   ENGINE_KEY  sent to the engine as X-Engine-Key (the same value as Secret Manager's
+//               health-engine-key)
+//   ENGINE_URL  the Cloud Run address, kept out of the repo so it is not published
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "health",
+  // The address is health.<account subdomain>.workers.dev. The subdomain
+  // (lauscher-worker) is shared with Lauscher: changing it moves both apps.
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "preview_urls": true,
+  "assets": {
+    "directory": "../app/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    // Only /api reaches the Worker; every other path is a static file or index.html.
+    "run_worker_first": ["/api/*"]
+  }
+}

@@ -1,0 +1,30 @@
+# What `gcloud run deploy --source .` may upload to Cloud Build (rebuild Phase 0).
+# This is an ALLOW-LIST: everything is ignored, then only the engine's files are
+# admitted. The repo is public and this folder also holds clinical documents
+# (Input_files/), live credentials (.streamlit/), the datastore (*.db) and the
+# owner's .env; none of them may leave the PC (CLAUDE.md, rebuild rule 7).
+# Check the result with `gcloud meta list-files-for-upload .` before a deploy;
+# scripts/rebuild_gate.py counts any personal file in that list as open.
+# Add a file here only when the image needs it, and say why.
+
+/*
+!/.gcloudignore
+!/Dockerfile
+!/.dockerignore
+!/requirements-engine.txt
+!/api/
+!/services/
+!/training_plan.py
+!/training_constants.py
+!/cluster_a_battery.py
+!/cluster_a_mechanics.py
+!/cluster_a_prescription.py
+!/flexibility_baselines.py
+
+# Never, even inside an admitted folder.
+**/__pycache__/
+**/*.pyc
+**/*.db
+**/*.sqlite*
+**/.env*
+**/.sync_state.json

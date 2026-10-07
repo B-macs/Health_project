@@ -307,7 +307,8 @@ def p0_engine_venv_fail() -> CounterResult:
         ["p0/pytest-engine.log"])
 
 
-@counter("p0", "pnpm_tests_failing", "failures in `pnpm -r test` (the app and the Worker)")
+@counter("p0", "pnpm_tests_failing",
+         "failures in `pnpm test` (builds the app, then the app and Worker tests)")
 def p0_pnpm_tests_failing() -> CounterResult:
     pnpm = shutil.which("pnpm")
     if not pnpm:
@@ -316,7 +317,7 @@ def p0_pnpm_tests_failing() -> CounterResult:
         return CounterResult(1, "node_modules is missing (pnpm install)")
     out = REPORTS_DIR / "p0"
     out.mkdir(parents=True, exist_ok=True)
-    proc = subprocess.run([pnpm, "-r", "test"], cwd=REPO_ROOT, env=_child_env(),
+    proc = subprocess.run([pnpm, "test"], cwd=REPO_ROOT, env=_child_env(),
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
     log = proc.stdout + proc.stderr
     (out / "pnpm-test.log").write_text(log, encoding="utf-8", newline="\n")

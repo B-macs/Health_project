@@ -1,0 +1,14 @@
+{
+  "name": "health",
+  "private": true,
+  "packageManager": "pnpm@12.9.1",
+  "scripts": {
+    "test": "pnpm --filter @health/app build && pnpm -r test",
+    "build:app": "pnpm --filter @health/app build",
+    "gen:types": "openapi-typescript shared/openapi.json -o app/src/generated/api.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0",
+    "typescript": "5.9.3"
+  }
+}
