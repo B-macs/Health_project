@@ -1755,7 +1755,7 @@ def _render_week_status_badge(history: list, viewed_week_start) -> None:
     )
 
 
-def _render_shift_banner(active, d: date) -> None:
+def _render_shift_banner(active, d: date, logged: bool = False) -> None:
     """"Session moved" notice for whatever date is currently displayed —
     today's overview screen, or a day-strip detail view for a different
     date. Runs regardless of whether an auto-shift just happened THIS
@@ -1765,7 +1765,8 @@ def _render_shift_banner(active, d: date) -> None:
     signal-color banner further down in render())."""
     if active is None:
         return
-    reason = active.shift_reasons.get(d.isoformat())
+    # `logged`: a "missed" note is wrong on a day that has a session.
+    reason = scheduling.shift_note(active.shift_reasons, d.isoformat(), logged)
     if reason:
         if reason.startswith((scheduling.DROPPED_REASON_PREFIX,
                               scheduling.HELD_REASON_PREFIX,
@@ -3327,7 +3328,7 @@ def render():
                                      if date.fromisoformat(_iso) < _mr_today]
                     if _k_miss_dates:
                         _mr_write(*scheduling.declined_entries(
-                            active, _k_miss_dates, "left as missed by choice"))
+                            active, _k_miss_dates, scheduling.LEFT_AS_MISSED))
                         _mr_write_succeeded = True
         except Exception:
             pass  # never let a scheduling-check failure crash the page
@@ -3474,6 +3475,7 @@ def render():
     _sync_ok, _sync_err = _sync_weekly_rollup_cached()
     _garmin_sync_ok, _garmin_sync_err = _sync_garmin_daily_cached()
     history: list = []
+    _logged: set = set()
     if phases:
         _earliest = min(date.fromisoformat(p.start_date) for p in phases)
         try:
@@ -3499,7 +3501,7 @@ def render():
 
     _today = date.today()
     _selected = st.session_state.tp_selected_date
-    _render_shift_banner(active, _selected)
+    _render_shift_banner(active, _selected, logged=_selected.isoformat() in _logged)
     if _selected != _today:
         _render_day_detail(_selected, active, phases)
         nav.inject("training")

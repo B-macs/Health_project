@@ -101,6 +101,29 @@ HELD_REASON_PREFIX = "Session kept in place: "
 #: again — nothing about the schedule itself changes.
 DECLINED_REASON_PREFIX = "Declined: "
 
+#: What the missed-session prompt's "Leave as missed" records, after the
+#: DECLINED prefix. One constant, because shift_note reads it back.
+LEFT_AS_MISSED = "left as missed by choice"
+
+
+def shift_note(shift_reasons: dict[str, str], day_iso: str, logged: bool) -> str | None:
+    """DETERMINISTIC. The schedule note to show for a day, or None.
+
+    A note that the day's session was MISSED — not rescheduled, or left as
+    missed by choice — is not shown on a day that HAS a logged session: it can
+    only have been written while the app could not see that session. Found
+    2026-10-09: a restart rebuilt the hosted app's data without three
+    sessions, the app offered to move two of them, the athlete pressed "Leave
+    as missed", and the note then stood on two days he had trained. Other
+    notes (a move, a kept-in-place shift, a declined readiness shift) stay
+    true on a logged day and are shown."""
+    reason = shift_reasons.get(day_iso)
+    if not reason:
+        return None
+    missed = (reason.startswith(DROPPED_REASON_PREFIX)
+              or reason == DECLINED_REASON_PREFIX + LEFT_AS_MISSED)
+    return None if (logged and missed) else reason
+
 
 def should_evaluate_shift(is_gym_session: bool, today_iso: str, shift_reasons: dict[str, str]) -> bool:
     """The idempotency guard: whether the caller should even bother calling
