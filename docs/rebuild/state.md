@@ -19,6 +19,8 @@
 - Then: the upload list, M4 deploy (europe-west1), M7 Worker deploy and its three secrets, M5 cold starts, M6 Oura probe and (with the owner's OK) the Garmin probe, M8 cost, the go or no-go.
 
 ## Open items
+- **2026-10-09, owner decision: leave Notion and rely on Supabase only — Notion first, then Google Sheets.** This replaces "Data: unchanged" in CLAUDE.md's rebuild section once the work starts. Proposed stages: (1) reconcile Supabase to Notion over all history for training, check-ins and config (training already matches: 450 exercises; check-ins 2026-08-20 and 08-31 are missing); (2) Supabase-first writes behind one switch, Notion as a shadow, the `*_live` reads moved to Supabase, the Oura token moved with one writer; (3) Notion off; (4) Sheets. Before (3): a nightly backup (the Free plan has none) and a guard against the 7-day inactivity pause. Not started.
+- Same day: saves on the Training and Check-in pages had only QUEUED their Supabase rows, and the send ran only from the Home page's sync chain; a restart lost them (sessions of 10-06 to 10-08). `Repository.send_mirror_now` now sends at save time. The engine's rebuild rule 5 already requires this; keep it when the save endpoints are built.
 - The Home card's choice between the 14-day and the 60-day window lives in app.py (and today.py). The Phase 0 /api/readiness endpoint repeats that choice; Phase 2 moves it into services/ and makes app.py call it.
 - `services/clients/local_cache.py` writes `.sync_state.json` next to the repo root with no setting to move it; the container makes /app writable for its user. Phase 2 can add a setting if needed.
 - Starlette 1.7 warns that its TestClient on httpx is deprecated (httpx2). A warning only; revisit in Phase 2.
