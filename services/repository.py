@@ -1300,6 +1300,30 @@ class Repository:
                 self.mirror_last_error = (table, str(exc)[:300])
         return sent
 
+    def send_mirror_now(self) -> str | None:
+        """Send the queued Supabase rows NOW, and say whether that worked.
+
+        For a save made on a page that starts no sync chain. The routine send
+        is the last step of run_home_syncs, and only the Home page starts that
+        chain, so a session saved on the Training page waited in the queue
+        until the next Home visit. A Community Cloud restart before then lost
+        the queue, and the same restart rebuilt the hosted read cache FROM
+        Supabase, so the session vanished from the app as well: the sessions
+        of 2026-10-06, 10-07 and 10-08 (found 2026-10-09), and most likely
+        2026-09-17, 09-18 and 09-23 before them.
+
+        None when everything queued was sent, or nothing was queued; the error
+        text when a send failed. Rows from a failed send are dropped, as in
+        every flush, and scripts/backfill_mirror_sessions.py copies them from
+        Notion. Never raises: the Notion write it follows has succeeded.
+        """
+        self.mirror_last_error = None
+        self.flush_supabase_mirror()
+        if self.mirror_last_error is None:
+            return None
+        table, detail = self.mirror_last_error
+        return f"{table}: {detail}"
+
     def _db_kind(self, db_id: str) -> str:
         """Which of the four Notion databases an id refers to.
 

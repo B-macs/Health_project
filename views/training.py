@@ -1023,6 +1023,7 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     st.session_state.tp_pending_session = None
     st.session_state.tp_saved_exercise_idx = []
     st.session_state.tp_last_saved_exercise_id = None
+    _send_backup_copy(r)
 
     # A logged session is the one thing that legitimately changes today's
     # numbers after the morning sync has already run: it moves Session AU,
@@ -1031,6 +1032,36 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     # session you just finished would not appear for up to half an hour.
     # Mirrors views/checkin.py's clear after a check-in save.
     st.cache_data.clear()
+
+
+#: Not under "tp_": two reset paths clear every tp_ key, and this must stay
+#: on the page until a later send works.
+_BACKUP_SEND_ERROR = "_backup_send_error"
+
+
+def _send_backup_copy(r) -> None:
+    """Send this save's Supabase copy before the page moves on.
+
+    The hosted app rebuilds its data from Supabase after a restart, so a save
+    that reached only Notion vanished from the app at the next restart: the
+    sessions of 2026-10-06, 10-07 and 10-08 (Repository.send_mirror_now). A
+    failed send is kept in session state and shown at the top of the page
+    until a later send works."""
+    err = r.send_mirror_now()
+    if err:
+        st.session_state[_BACKUP_SEND_ERROR] = err
+    else:
+        st.session_state.pop(_BACKUP_SEND_ERROR, None)
+
+
+def _render_backup_warning() -> None:
+    err = st.session_state.get(_BACKUP_SEND_ERROR)
+    if err:
+        st.warning(
+            "Your last save is in Notion, but its copy in Supabase did not send "
+            f"({err}). The app rebuilds from that copy when it restarts, so until "
+            "the copy is made, a restart hides this save from the app."
+        )
 
 
 def _record_note(idx: int, day_num: int | None) -> None:
@@ -2835,6 +2866,7 @@ def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> bool:
             written.add(pose.name)
         if note.strip() and last_id:
             r.save_session_notes(last_id, note)
+    _send_backup_copy(r)
     return True
 
 
@@ -2968,6 +3000,7 @@ def _log_outdoor_activity(d: date, act: dict, session_rpe: int) -> bool:
                                         act.get("activity_id")):
             return False
         _write_outdoor_activity(r, d, act, session_rpe)
+    _send_backup_copy(r)
     st.cache_data.clear()  # the day strip and AU caches must see it now
     return True
 
@@ -3097,6 +3130,7 @@ def _render_hike_import() -> None:
 def render():
     st.markdown(_PAGE_CSS, unsafe_allow_html=True)
     _audio_unlock_component()
+    _render_backup_warning()
 
     # ── "Add Training" — floating + menu on every state below; the yoga-picker
     #     sub-screen short-circuits everything else (same page, no navigation).
