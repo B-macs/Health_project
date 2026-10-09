@@ -29,6 +29,8 @@ carries a synthesized page id that Notion will refuse to archive.
 from __future__ import annotations
 
 import argparse
+import json
+from datetime import datetime
 import os
 import sys
 import tomllib
@@ -53,6 +55,11 @@ def _repo() -> Repository:
     return Repository(load_config(overrides))
 
 
+def _get(store, path: str) -> list[dict]:
+    """Every column of the rows a PostgREST filter matches."""
+    return store._request("GET", f"{path}&select=*")[1] or []
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", required=True, help="ISO date of the duplicated session")
@@ -61,7 +68,8 @@ def main() -> int:
     args = ap.parse_args()
 
     if os.environ.get("HEALTH_DATASTORE_PATH"):
-        print("REFUSED: unset HEALTH_DATASTORE_PATH — this needs live Notion page ids.")
+        print("REFUSED: unset HEALTH_DATASTORE_PATH — this needs the live store, "
+              "not the offline snapshot.")
         return 1
 
     repo = _repo()
@@ -85,12 +93,38 @@ def main() -> int:
     if not doomed:
         print("nothing to archive")
         return 0
-    for _sid, p in doomed:
-        if notion_reader.is_synthesized_page_id(p["id"]):
-            print("REFUSED: a synthesized page id — the read was not live.")
-            return 1
+    if not repo.supabase_record:
+        for _sid, p in doomed:
+            if notion_reader.is_synthesized_page_id(p["id"]):
+                print("REFUSED: a synthesized page id — the read was not live.")
+                return 1
     if not args.apply:
-        print(f"dry run — would archive {len(doomed)} pages and delete their mirror rows")
+        print(f"dry run — would remove {len(doomed)} exercises and their sets")
+        return 0
+
+    if repo.supabase_record:
+        # Supabase is the record: there is no archive to move them to, so the
+        # rows are saved to a file first and then deleted.
+        exercise_ids = [p["id"] for _sid, p in doomed]
+        session_ids = sorted({sid for sid, _p in doomed})
+        store = repo._sb
+        backup = {
+            "date": args.date, "keep": args.keep,
+            "training_sessions": [r for sid in session_ids
+                                  for r in _get(store, f"training_sessions?session_id=eq.{sid}")],
+            "training_exercises": [r for eid in exercise_ids
+                                   for r in _get(store, f"training_exercises?exercise_id=eq.{eid}")],
+            "training_sets": [r for eid in exercise_ids
+                              for r in _get(store, f"training_sets?exercise_id=eq.{eid}")],
+        }
+        out = _ROOT / "Input_files" / "mirror_backups"
+        out.mkdir(parents=True, exist_ok=True)
+        path = out / f"archive_{args.date}_{datetime.now():%Y%m%d-%H%M%S}.json"
+        path.write_text(json.dumps(backup, indent=1, default=str), encoding="utf-8")
+        print(f"backup: {path}")
+        repo.delete_training_rows(exercise_ids, session_ids)
+        print(f"removed {len(exercise_ids)} exercises and {len(session_ids)} sessions "
+              f"from Supabase and the local copy")
         return 0
 
     for _sid, p in doomed:

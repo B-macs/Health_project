@@ -47,6 +47,10 @@ class _FakeRepo:
     the shipping code rather than a copy of it."""
 
     _FLUSH_IMMEDIATELY = Repository._FLUSH_IMMEDIATELY
+    #: Notion as the record — the mode these tests are about. With Supabase as
+    #: the record the write itself waits for Supabase, so there is no queue to
+    #: flush (tests/test_supabase_record_mode.py).
+    supabase_record = False
 
     def __init__(self):
         self.flushes = 0

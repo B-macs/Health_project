@@ -40,14 +40,29 @@ def test_overrides_win_over_env(monkeypatch):
     assert cfg.notion_api_key == "from_overrides"
 
 
-def test_missing_key_raises():
+#: Every setting load_config reads from the environment. Streamlit copies the
+#: top-level keys of .streamlit/secrets.toml into os.environ the first time
+#: any test touches st.secrets, so a test about MISSING settings has to clear
+#: them first or it measures the checkout's secrets file instead.
+_ENV_KEYS = ("NOTION_API_KEY", "NOTION_DB_READINESS", "NOTION_DB_TRAINING",
+             "NOTION_DB_CONFIG", "GOOGLE_SHEETS_ID", "GOOGLE_SERVICE_ACCOUNT_JSON",
+             "SUPABASE_URL", "SUPABASE_SECRET_KEY", "HEALTH_SYSTEM_OF_RECORD",
+             "HEALTH_DATASTORE_PATH", "HEALTH_DATASTORE_MODE")
+
+
+@pytest.fixture
+def clean_env(monkeypatch):
+    for key in _ENV_KEYS:
+        monkeypatch.delenv(key, raising=False)
+
+
+def test_missing_key_raises(clean_env):
     with pytest.raises(EnvironmentError):
         load_config({})
 
 
-def test_missing_service_account_raises(monkeypatch):
+def test_missing_service_account_raises(clean_env):
     incomplete = {k: v for k, v in _OVERRIDES.items() if k != "google_service_account"}
-    monkeypatch.delenv("GOOGLE_SERVICE_ACCOUNT_JSON", raising=False)
     with pytest.raises(EnvironmentError):
         load_config(incomplete)
 

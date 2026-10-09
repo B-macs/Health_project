@@ -11,6 +11,11 @@ PostgreSQL, back out again.
 DESTRUCTIVE: replaces the Supabase contents wholesale, the same contract
 services/datastore.py already has for the SQLite copy, where the data is a
 regenerable projection rather than the system of record.
+
+2026-10-09: SUPABASE IS NOW THE SYSTEM OF RECORD. This replaces its tables
+with a local file, so it would put an old copy over real data. It refuses
+unless --overwrite-record is given; take a backup first
+(scripts/backup_supabase.py).
 """
 from __future__ import annotations
 
@@ -92,9 +97,17 @@ def main() -> int:
     ap.add_argument("--db", default=str(ROOT / "datastore.db"))
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--verify", action="store_true", help="verify only, no push")
+    ap.add_argument("--overwrite-record", action="store_true",
+                    help="push even though Supabase is the system of record")
     args = ap.parse_args()
 
     cfg = load_config(_secrets())
+    if (cfg.system_of_record == "supabase" and not args.verify and not args.dry_run
+            and not args.overwrite_record):
+        print("REFUSED: Supabase is the system of record, and this replaces its "
+              "tables with a local file. Back it up first, then pass "
+              "--overwrite-record if that is really what you want.")
+        return 2
     if not cfg.supabase_url or not cfg.supabase_secret_key:
         print("SUPABASE_URL / SUPABASE_SECRET_KEY not configured.")
         return 2

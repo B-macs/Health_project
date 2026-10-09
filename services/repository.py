@@ -26,11 +26,13 @@ import atexit
 
 import dataclasses
 import json
+import sqlite3
 import threading
 import time
 import uuid
 from datetime import date, datetime, timedelta
 
+from services import backup
 from services import biometrics
 from services import content_weighting
 from services import dashboard
@@ -42,6 +44,7 @@ from services import models
 from services import oura_auth
 from services import plan
 from services import readiness
+from services import record_cache
 from services import sessions as training_sessions
 from services import sleep_fusion
 from services import sleep_movement
@@ -63,6 +66,12 @@ class PhasesCorruptError(Exception):
     value exists but fails to parse — deliberately distinct from returning
     [], which means "nothing has ever been configured" and is safe for a
     caller to auto-seed from. See get_phases's docstring."""
+
+
+class LegacyStoreDisconnectedError(RuntimeError):
+    """Notion or Google Sheets was called while Supabase is the system of
+    record (2026-10-09). Raised, never caught here: a write that reached a
+    store nothing reads any more would look saved and be lost."""
 
 
 # ─── Check-In merge-upsert — CheckInRecord field -> (Notion property name,
@@ -554,6 +563,20 @@ class Repository:
         #: Sync page — a mirror that quietly stopped working looks exactly
         #: like one that is up to date.
         self.mirror_last_error: tuple[str, str] | None = None
+        # Supabase as the system of record: the local copy is rebuilt from it
+        # once per process, before anything can read through it.
+        if self.supabase_record:
+            record_cache.hydrate_once(config)
+
+    @property
+    def supabase_record(self) -> bool:
+        """True when Supabase is the ONLY store (Config.system_of_record,
+        2026-10-09). Reads come from the local copy, every write goes to
+        Supabase first and then through to that copy, and Notion and Google
+        Sheets are never called — _nc and _sc refuse, so a write path that
+        still reached them would fail loudly rather than write to a store
+        nothing reads any more."""
+        return record_cache.is_supabase_record(self.config)
 
     @property
     def _nc(self):
@@ -574,12 +597,22 @@ class Repository:
                 "read-only: unset datastore_path / HEALTH_DATASTORE_PATH to "
                 "run against live Notion."
             )
+        if self.supabase_record:
+            raise LegacyStoreDisconnectedError(
+                "Notion was called while Supabase is the system of record. "
+                "Every read and write goes to Supabase now; this call path "
+                "was missed when Notion was disconnected (2026-10-09).")
         if self._notion_client is None:
             self._notion_client = notion.make_client(self.config)
         return self._notion_client
 
     @property
     def _sc(self):
+        if self.supabase_record:
+            raise LegacyStoreDisconnectedError(
+                "Google Sheets was called while Supabase is the system of "
+                "record. Every read and write goes to Supabase now; this call "
+                "path was missed when Sheets was disconnected (2026-10-09).")
         if self._sheets_client is None:
             self._sheets_client = sheets.make_client(self.config)
         return self._sheets_client
@@ -999,9 +1032,14 @@ class Repository:
         Note what this does NOT cover: rebuild_tab/rewrite_worksheet and the
         append_rows batch path, which rewrite a tab wholesale. Those are rare
         maintenance operations, and a wholesale rewrite is what the full push
-        is for."""
-        sheets.upsert_row_by_key(self._write_target(ws), key_col=1,
-                                 key_value=key_value, row_values=values)
+        is for.
+
+        With Supabase as the system of record the tab is not written at all:
+        the same row goes to Supabase, synchronously, and then to the local
+        copy (queue_mirror)."""
+        if not self.supabase_record:
+            sheets.upsert_row_by_key(self._write_target(ws), key_col=1,
+                                     key_value=key_value, row_values=values)
         self._queue_mirror_row(getattr(ws, "title", ""), key_value, values)
 
     def _rewrite_sheet(self, ws, header: list[str], rows: list[list]) -> None:
@@ -1014,11 +1052,13 @@ class Repository:
         there is nothing to delete. A rewrite that could SHRINK a tab would
         need delete-then-insert, the way training_sets does.
         """
-        sheets.rewrite_worksheet(self._write_target(ws), header, rows)
+        if not self.supabase_record:
+            sheets.rewrite_worksheet(self._write_target(ws), header, rows)
         self._queue_mirror_rows(ws, header, rows)
 
     def _append_sheet_rows(self, ws, header: list[str], values: list[list]) -> None:
-        sheets.append_rows(self._write_target(ws), values)
+        if not self.supabase_record:
+            sheets.append_rows(self._write_target(ws), values)
         self._queue_mirror_rows(ws, header, values)
 
     def _queue_mirror_rows(self, ws, header: list[str], rows: list[list]) -> None:
@@ -1027,17 +1067,35 @@ class Repository:
         The header is passed rather than read from _ws_headers because these
         paths deliberately use the tab's own header, which can differ from the
         current constant — that is the whole point of rebuild_tab. Every one
-        of these tabs is keyed on its first column."""
+        of these tabs is keyed on its first column.
+
+        With Supabase as the system of record the batch goes in ONE write
+        (500 rows a request) rather than a request per row: a whole-tab
+        rewrite of the sleep periods is ~600 rows."""
         title = getattr(ws, "title", "")
         if not self._mirror_sinks_active() or not _DATASTORE_TABLE_BY_TAB.get(title):
+            return
+        if self.supabase_record:
+            batch: dict = {}
+            table = None
+            for values in rows:
+                if not values:
+                    continue
+                mapped = self._mirror_row_for(title, values, header)
+                if mapped is not None:
+                    table, row = mapped
+                    batch[str(values[0])] = supabase_store.blank_to_null(row)
+            if table and batch:
+                self._write_record(table, batch, supabase_store.UPSERT)
             return
         for values in rows:
             if values:
                 self._queue_mirror_row(title, values[0], values, header=header)
 
-    def _queue_mirror_row(self, title: str, key_value, values: list,
-                          header: list[str] | None = None) -> None:
-        """Buffer one written row against its datastore table.
+    def _mirror_row_for(self, title: str, values: list,
+                        header: list[str] | None = None) -> tuple[str, dict] | None:
+        """(table, row) for one positional sheet row, or None when the tab has
+        no table or no known header.
 
         The sheet's HEADER NAMES ARE the datastore's column names — already
         load-bearing (services/datastore.py inserts _read_records output
@@ -1045,18 +1103,26 @@ class Repository:
         tests/test_repository_offline_datastore.py — so the row is the header
         zipped onto the values it was just written from.
         """
-        if not self._mirror_sinks_active():
-            return
         table = _DATASTORE_TABLE_BY_TAB.get(title)
         header = header or self._ws_headers.get(title)
         if not table or not header:
-            return
+            return None
         # Filtered to the table's real columns, which is _insert_rows' own
         # behaviour rather than caution — a sheet that has gained a column the
         # datastore has not would otherwise send an unknown key, and PostgREST
         # rejects the whole batch on one.
         known = supabase_store.table_columns(table)
-        row = {c: v for c, v in zip(header, values) if c in known}
+        return table, {c: v for c, v in zip(header, values) if c in known}
+
+    def _queue_mirror_row(self, title: str, key_value, values: list,
+                          header: list[str] | None = None) -> None:
+        """Buffer one written row against its datastore table."""
+        if not self._mirror_sinks_active():
+            return
+        mapped = self._mirror_row_for(title, values, header)
+        if mapped is None:
+            return
+        table, row = mapped
         self.queue_mirror(table, key_value, row)
 
     def queue_mirror(self, table: str, key_value, row: dict,
@@ -1079,6 +1145,10 @@ class Repository:
             return
         else:
             payload = supabase_store.blank_to_null(row)
+        if self.supabase_record:
+            # Supabase IS the record: write it now and wait, then the copy.
+            self._write_record(table, {str(key_value): payload}, mode)
+            return
         # TWO SINKS, and the split is deliberate. The local cache is written
         # SYNCHRONOUSLY because the very next read must see it — that is the
         # whole reason cache mode is safe where offline mode was not. Supabase
@@ -1263,42 +1333,54 @@ class Repository:
 
         for (table, mode), rows in sorted(drained.items(), key=_rank):
             try:
-                numeric = supabase_store.numeric_columns(table)
-                if mode == supabase_store.REPLACE:
-                    parent = supabase_store.REPLACE_PARENT_COLUMN[table]
-                    n = 0
-                    for parent_key, children in rows.items():
-                        # Delete first, ALWAYS — including when the new list
-                        # is empty, which is how "this exercise now has no
-                        # sets" reaches Postgres.
-                        self._sb.delete_where(table, parent, parent_key)
-                        payload = [supabase_store.coerce_row(c, numeric)
-                                   for c in children]
-                        if payload:
-                            n += self._sb.insert(table, payload)
-                    sent[table] = sent.get(table, 0) + n
-                    continue
-                if mode == supabase_store.PATCH:
-                    pk = supabase_store.primary_key(table)
-                    n = 0
-                    for key, row in rows.items():
-                        n += self._sb.patch(
-                            table, pk, key,
-                            supabase_store.coerce_row(row, numeric))
-                    sent[table] = sent.get(table, 0) + n
-                    continue
-                payload = [supabase_store.coerce_row(r, numeric)
-                           for r in rows.values()]
-                # One request per DISTINCT COLUMN SET: PostgREST requires
-                # uniform keys across a bulk body, and Notion writes to one
-                # table do not all carry the same columns.
-                n = 0
-                for batch in supabase_store.group_by_columns(payload):
-                    n += self._sb.upsert(table, batch)
-                sent[table] = sent.get(table, 0) + n
+                sent[table] = sent.get(table, 0) + self._send_group(table, mode, rows)
             except Exception as exc:
                 self.mirror_last_error = (table, str(exc)[:300])
         return sent
+
+    def _send_group(self, table: str, mode: str, rows: dict) -> int:
+        """Send one table's rows in one mode to Supabase; rows sent. Raises.
+
+        Shared by the queued flush above and by _write_record, so the two
+        write paths cannot drift apart."""
+        numeric = supabase_store.numeric_columns(table)
+        if mode == supabase_store.REPLACE:
+            parent = supabase_store.REPLACE_PARENT_COLUMN[table]
+            n = 0
+            for parent_key, children in rows.items():
+                # Delete first, ALWAYS — including when the new list is
+                # empty, which is how "this exercise now has no sets" reaches
+                # Postgres.
+                self._sb.delete_where(table, parent, parent_key)
+                payload = [supabase_store.coerce_row(c, numeric) for c in children]
+                if payload:
+                    n += self._sb.insert(table, payload)
+            return n
+        if mode == supabase_store.PATCH:
+            pk = supabase_store.primary_key(table)
+            return sum(self._sb.patch(table, pk, key,
+                                      supabase_store.coerce_row(row, numeric))
+                       for key, row in rows.items())
+        payload = [supabase_store.coerce_row(r, numeric) for r in rows.values()]
+        # One request per DISTINCT COLUMN SET: PostgREST requires uniform keys
+        # across a bulk body, and Notion writes to one table do not all carry
+        # the same columns.
+        return sum(self._sb.upsert(table, batch)
+                   for batch in supabase_store.group_by_columns(payload))
+
+    def _write_record(self, table: str, rows: dict, mode: str) -> None:
+        """Supabase as the system of record: write `rows` to Supabase and WAIT,
+        then apply them to the local copy.
+
+        In that order, and raising. The copy must never hold a row Supabase
+        does not — that is exactly how sessions vanished from the hosted app
+        (2026-09-22, 2026-10-09): the app showed what its copy held, the copy
+        was rebuilt from Supabase at the next restart, and Supabase had never
+        been sent the rows. A failed write raises to the caller, who already
+        has to handle a failed save, and nothing is queued to retry later."""
+        self._send_group(table, mode, rows)
+        for key, payload in rows.items():
+            self._write_through(table, key, payload, mode)
 
     def send_mirror_now(self) -> str | None:
         """Send the queued Supabase rows NOW, and say whether that worked.
@@ -1332,11 +1414,20 @@ class Repository:
         wrong guess here would serve one database's rows in answer to
         another's query, and every property lookup would return None — which
         renders as an empty screen, not as an error."""
-        for kind, configured in (
+        configured_ids = (
             (notion_reader.READINESS, self.config.notion_db_readiness),
             (notion_reader.TRAINING, self.config.notion_db_training),
             (notion_reader.CONFIG, self.config.notion_db_config),
-        ):
+        )
+        # Two databases sharing one id (both blank, say) would make this
+        # answer the FIRST for every lookup — the training log read as
+        # check-ins, with no error anywhere.
+        ids = [configured for _kind, configured in configured_ids]
+        if len(set(ids)) != len(ids):
+            raise KeyError(
+                "two of the three database ids are the same, so a read cannot "
+                "be routed to its table; give each its own id")
+        for kind, configured in configured_ids:
             if db_id == configured:
                 return kind
         raise KeyError(
@@ -1356,6 +1447,45 @@ class Repository:
             return notion_reader.query(
                 self._ds, self._db_kind(db_id), filter_=filter_, sorts=sorts)
         return notion.query_database(self._nc, db_id, filter_=filter_, sorts=sorts)
+
+    def _live_query(self, db_id: str, filter_: dict | None = None,
+                    sorts: list | None = None) -> list[dict]:
+        """A read from the SYSTEM OF RECORD ITSELF, past the local copy — for
+        the few readers that write a whole document or a verdict back and
+        must not start from a stale copy (get_phases_live,
+        get_logged_session_dates_live, get_supplementary_sessions_live).
+
+        Notion while Notion is the record; Supabase once it is, through the
+        same page-shaped reader the local copy uses, so a filter means the
+        same thing on both sides. Offline, the snapshot is all there is."""
+        if self.supabase_record:
+            return self._record_pages(self._db_kind(db_id), filter_, sorts)
+        if self.offline:
+            return self._query(db_id, filter_=filter_, sorts=sorts)
+        return notion.query_database(self._nc, db_id, filter_=filter_, sorts=sorts)
+
+    #: The Supabase tables behind each page-shaped kind.
+    _RECORD_TABLES = {
+        notion_reader.READINESS: ["readiness_checkins"],
+        notion_reader.CONFIG: ["config"],
+        notion_reader.TRAINING: ["training_sessions", "training_exercises",
+                                 "training_sets"],
+    }
+
+    def _record_pages(self, kind: str, filter_: dict | None = None,
+                      sorts: list | None = None) -> list[dict]:
+        """notion_reader.query over rows read from Supabase just now, loaded
+        into an in-memory SQLite with the datastore's own schema. Whole
+        tables (a few hundred rows; one to four requests each), because these
+        reads are rare and the copy has to be exactly what the local one
+        would hold."""
+        conn = sqlite3.connect(":memory:")
+        conn.row_factory = sqlite3.Row
+        try:
+            supabase_store.pull(self._sb, conn, tables=self._RECORD_TABLES[kind])
+            return notion_reader.query(conn, kind, filter_=filter_, sorts=sorts)
+        finally:
+            conn.close()
 
     #: How to find a page LIVE from the key its synthesized id carries. One
     #: entry per database whose page ids are invented — TRAINING is absent
@@ -1425,7 +1555,10 @@ class Repository:
         services.clients.notion.ensure_properties. Craving Type and Sodium
         (mg) were removed from the check-in (2026-07-14) — no longer
         created here, though the columns may still exist in Notion from
-        before if they were never manually deleted."""
+        before if they were never manually deleted. With Supabase as the
+        system of record there is no Notion schema to extend."""
+        if self.supabase_record:
+            return []
         return notion.ensure_properties(self._nc, self.config.notion_db_readiness, {
             "Instability Events":   {"number": {}},
             "Bristol Type":         {"number": {}},
@@ -1502,6 +1635,26 @@ class Repository:
 
     def save_check_in(self, record: models.CheckInRecord) -> None:
         existing_page = self._find_check_in_page(record.date)
+        if self.supabase_record:
+            # The local copy is current for this date (rebuilt from Supabase
+            # at process start, written through since), so it decides
+            # create-vs-merge exactly as the Notion page did.
+            if existing_page is None:
+                self.mirror_notion_write(
+                    notion_reader.READINESS, record.date,
+                    {**self._check_in_properties(record),
+                     "Parsed": notion.checkbox(False)})
+                return
+            # UPSERT of the 19 check-in columns, not PATCH: it changes only the
+            # columns it names (the AI-parser ones are left alone), and if the
+            # row were somehow missing from Supabase it is written instead of
+            # the update vanishing.
+            merged, note_changed = self._merge_check_in(record, existing_page)
+            properties = self._check_in_properties(merged)
+            if note_changed:
+                properties["Parsed"] = notion.checkbox(False)
+            self.mirror_notion_write(notion_reader.READINESS, record.date, properties)
+            return
         # Resolved BEFORE the branch, because in cache mode a local row proves
         # only that the datastore has this date — the Notion page behind it is
         # what decides create-vs-update, and its id is the only one writable.
@@ -1561,7 +1714,14 @@ class Repository:
         collapsed last-one-wins on the way in and are structurally
         unrepresentable there — an empty result would read as "checked, all
         clean" when the question was never asked. This is a live-Notion repair
-        tool; unset HEALTH_DATASTORE_PATH to run it."""
+        tool; unset HEALTH_DATASTORE_PATH to run it.
+
+        With Supabase as the system of record the question HAS been answered:
+        the record itself is keyed by date, so a second check-in for a day is
+        an update of the first and a duplicate cannot be stored. {} is then
+        the true answer, not an unasked question."""
+        if self.supabase_record:
+            return {}
         if self.local_datastore:
             raise datastore_reader.DatastoreReadOnlyError(
                 "duplicate check-in pages cannot be found through the local "
@@ -1666,6 +1826,10 @@ class Repository:
         for that date, so the archive list cannot even be named. Its only
         caller already refuses to get this far (find_duplicate_check_in_dates
         raises), and this is the second line of that defence."""
+        if self.supabase_record:
+            raise LegacyStoreDisconnectedError(
+                "merging duplicate Notion check-in pages is a Notion repair; "
+                "Supabase is the system of record and cannot hold duplicates.")
         for pid in [primary_page_id, *archive_ids]:
             if notion_reader.is_synthesized_page_id(pid):
                 raise ValueError(
@@ -1802,6 +1966,16 @@ class Repository:
             "Warning":           notion.select(warning_level),
             "Parsed":            notion.checkbox(True),
         }
+        if self.supabase_record:
+            # The row's key is its date: passed in, or carried by the
+            # synthesized id ("offline:readiness:<date>") the local copy gave
+            # it. PATCH, so a date with no check-in gets no AI-only row.
+            if not entry_date and notion_reader.is_synthesized_page_id(row_id):
+                entry_date = notion_reader.synthesized_page_key(row_id)[1]
+            if entry_date:
+                self.mirror_notion_write(notion_reader.READINESS, entry_date,
+                                         properties, mode=supabase_store.PATCH)
+            return
         # get_unparsed_readiness hands back whatever _query produced, so in
         # cache mode row_id is synthesized. A page that no longer exists live
         # is skipped rather than created: this method only ever ANNOTATES a
@@ -1970,6 +2144,9 @@ class Repository:
         if garmin_calories is not None:
             properties["Activity Calories"] = notion.number(garmin_calories)
 
+        if self.supabase_record:
+            return self._save_training_exercise_record(properties, sets or [])
+
         page = notion.create_page(self._nc, self.config.notion_db_training, properties=properties)
         # AFTER the create, because the page id IS training_exercises' primary
         # key and because a create that raised must not leave a row queued for
@@ -1983,7 +2160,10 @@ class Repository:
         """One-time schema migration: adds the 4 Garmin-activity Number
         properties to the Training Log database if they don't already exist.
         Safe to call repeatedly (a no-op once they're present). Returns the
-        property names actually created."""
+        property names actually created. Nothing to do with Supabase as the
+        system of record: its columns are fixed by the schema."""
+        if self.supabase_record:
+            return []
         return notion.ensure_number_properties(
             self._nc, self.config.notion_db_training,
             ["Activity Avg HR", "Activity Max HR", "Activity Distance (km)", "Activity Calories"],
@@ -1995,17 +2175,84 @@ class Repository:
     # build_set_record) and written in one shot by save_training_exercise
     # above, so a per-set round-trip to Notion mid-session is redundant.
 
+    def _save_training_exercise_record(self, properties: dict, sets: list) -> str:
+        """save_training_exercise with Supabase as the record.
+
+        The id Notion used to issue is minted here. Three writes (the session,
+        the exercise, its sets), each one waited for; if a later one fails, the
+        earlier exercise row is removed again, so the Save button's retry —
+        which writes this exercise afresh under a new id — cannot leave a
+        set-less duplicate behind."""
+        exercise_id = str(uuid.uuid4())
+        try:
+            self.mirror_notion_write(notion_reader.TRAINING, exercise_id,
+                                     properties, sets=sets)
+        except Exception:
+            self._discard_record_exercise(exercise_id)
+            raise
+        return exercise_id
+
+    def _discard_record_exercise(self, exercise_id: str) -> None:
+        """Best-effort removal of one exercise and its sets from Supabase and
+        the local copy, after a save that failed partway. Never raises: it
+        runs while the original failure is being reported."""
+        for table in ("training_sets", "training_exercises"):
+            try:
+                self._sb.delete_where(table, "exercise_id", exercise_id)
+            except Exception:
+                pass
+            try:
+                with self._ds:
+                    self._ds.execute(f"DELETE FROM {table} WHERE exercise_id = ?",
+                                     (exercise_id,))
+                sheets.bump_write_generation()
+            except Exception:
+                pass
+
+    def delete_training_rows(self, exercise_ids: list[str],
+                             session_ids: list[str] = ()) -> None:
+        """Delete exercises (with their sets) and sessions from Supabase, then
+        from the local copy — children first, because the foreign keys are
+        enforced in Postgres. Supabase-record mode only: this is the repair
+        that Notion's archive used to be (scripts/archive_duplicate_sessions.py),
+        and its caller takes the backup. Raises on a failed delete."""
+        if not self.supabase_record:
+            raise LegacyStoreDisconnectedError(
+                "delete_training_rows deletes from Supabase as the system of "
+                "record; with Notion as the record, archive the Notion pages.")
+        for exercise_id in exercise_ids:
+            self._sb.delete_where("training_sets", "exercise_id", exercise_id)
+            self._sb.delete_where("training_exercises", "exercise_id", exercise_id)
+        for session_id in session_ids:
+            self._sb.delete_where("training_sessions", "session_id", session_id)
+        with self._ds:
+            for exercise_id in exercise_ids:
+                self._ds.execute("DELETE FROM training_sets WHERE exercise_id = ?", (exercise_id,))
+                self._ds.execute("DELETE FROM training_exercises WHERE exercise_id = ?", (exercise_id,))
+            for session_id in session_ids:
+                self._ds.execute("DELETE FROM training_sessions WHERE session_id = ?", (session_id,))
+        sheets.bump_write_generation()
+
     def save_session_notes(self, training_log_id: str, raw_text: str) -> None:
         if not training_log_id or not (raw_text or "").strip():
             return
-        page = self._nc.pages.retrieve(training_log_id)
-        existing = notion.get_property(page, "Notes", "rich_text") or ""
+        if self.supabase_record:
+            # The local copy holds this exercise: this process just wrote it
+            # (through Supabase first), and the copy was rebuilt at start.
+            row = self._ds.execute(
+                "SELECT notes FROM training_exercises WHERE exercise_id = ?",
+                (training_log_id,)).fetchone()
+            existing = (row[0] if row else None) or ""
+        else:
+            page = self._nc.pages.retrieve(training_log_id)
+            existing = notion.get_property(page, "Notes", "rich_text") or ""
         combined = (
             (existing.strip() + "\n\n" + raw_text.strip()).strip()
             if existing.strip() else raw_text.strip()
         )
         properties = {"Notes": notion.rich_text(combined[:2000])}
-        notion.update_page(self._nc, training_log_id, properties=properties)
+        if not self.supabase_record:
+            notion.update_page(self._nc, training_log_id, properties=properties)
         # ONE property, so PATCH — an upsert would insert a training_exercises
         # row holding nothing but a note for any page logged before the mirror
         # existed. training_log_id IS exercise_id (the Notion page id).
@@ -2316,8 +2563,8 @@ class Repository:
         """
         if self.offline:
             return self.get_logged_session_dates(start, end)
-        pages = notion.query_database(
-            self._nc, self.config.notion_db_training,
+        pages = self._live_query(
+            self.config.notion_db_training,
             filter_={"and": [
                 {"property": "Session Date", "date": {"on_or_after": str(start)}},
                 {"property": "Session Date", "date": {"on_or_before": str(end)}},
@@ -2341,15 +2588,10 @@ class Repository:
 
         Offline there is no live side, and every write raises anyway.
         """
-        if self.offline:
-            pages = self._query(self.config.notion_db_training,
-                                filter_={"property": "Session Date",
-                                         "date": {"equals": str(day)}})
-        else:
-            pages = notion.query_database(
-                self._nc, self.config.notion_db_training,
-                filter_={"property": "Session Date", "date": {"equals": str(day)}},
-            )
+        pages = self._live_query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"equals": str(day)}},
+        )
         out: dict[str, dict] = {}
         for p in pages:
             if notion.get_property(p, "Type", "select") != session_type:
@@ -2542,7 +2784,8 @@ class Repository:
             "Flagged Areas": notion.rich_text(json.dumps(flagged_body_parts or [])),
             "Warning":       notion.select(warning_level),
         }
-        notion.update_page(self._nc, note_id, properties=properties)
+        if not self.supabase_record:
+            notion.update_page(self._nc, note_id, properties=properties)
         self.mirror_notion_write(notion_reader.TRAINING, note_id, properties,
                                  mode=supabase_store.PATCH)
 
@@ -2699,6 +2942,9 @@ class Repository:
             "Key": notion.title(key), "Value": notion.rich_text(str(value)),
             "Updated": notion.date_prop(str(today)),
         }
+        if self.supabase_record:
+            self._set_config_record(key, props)
+            return
         try:
             # The page came from _query, so in cache mode its id is
             # synthesized and cannot be written to. Resolving it live is what
@@ -2731,9 +2977,36 @@ class Repository:
             # wrong side of), and serving it again would repeat the failure.
             self._invalidate_config_cache()
 
+    def _set_config_record(self, key: str, props: dict) -> None:
+        """set_config with Supabase as the record: one upsert keyed on the
+        Key, waited for — no page to resolve and no queue to flush."""
+        try:
+            self.mirror_notion_write(notion_reader.CONFIG, key, props)
+        finally:
+            self._invalidate_config_cache()
+
     def get_config_value(self, key: str) -> str | None:
         page = self._config_page(key)
         return notion.get_property(page, "Value", "rich_text") if page else None
+
+    def mark_record_since(self, now: datetime | None = None) -> str | None:
+        """Record, once, when Supabase became the system of record; returns
+        the value written, or None when there was nothing to do.
+
+        Called by the hosted app at start (repo.get_repository), and only
+        there — see record_cache.RECORD_SINCE_KEY for what the row guards.
+        Never raises: a failed write is retried at the next process start, and
+        an app that cannot write its marker can still serve the athlete."""
+        if not self.supabase_record:
+            return None
+        try:
+            if self.get_config_value(record_cache.RECORD_SINCE_KEY):
+                return None
+            stamp = (now or datetime.now()).isoformat(timespec="seconds")
+            self.set_config(record_cache.RECORD_SINCE_KEY, stamp)
+            return stamp
+        except Exception:
+            return None
 
     def get_phases(self) -> list[models.Phase]:
         """[] means "nothing has ever been configured" — genuinely safe for
@@ -2853,8 +3126,8 @@ class Repository:
         """
         if self.offline:
             return self.get_phases()
-        pages = notion.query_database(
-            self._nc, self.config.notion_db_config,
+        pages = self._live_query(
+            self.config.notion_db_config,
             filter_={"property": "Key", "title": {"equals": "phases"}})
         raw = notion.get_property(pages[0], "Value", "rich_text") if pages else None
         if not raw:
@@ -3016,6 +3289,10 @@ class Repository:
         raw. Returning the mapped columns under this method's name would be
         a lie about what "raw passthrough" means, and returning [] would
         read as "the legacy export is empty"."""
+        if self.supabase_record:
+            raise LegacyStoreDisconnectedError(
+                "Google Sheets is disconnected; Sheet1's history is kept, "
+                "mapped, as sheet1_legacy_biometrics.")
         if self.local_datastore:
             raise datastore_reader.DatastoreReadOnlyError(
                 "get_raw_sheet_rows() has no offline equivalent — the "
@@ -3843,7 +4120,11 @@ class Repository:
                 score.status,
                 score.computed_at or "",
             ]
-            sheets.upsert_weekly_rollup_row(ws, key_col=1, key_value=score.week_start, row_values=row_values)
+            if self.supabase_record:
+                self._upsert_sheet_row(ws, score.week_start, row_values)
+            else:
+                sheets.upsert_weekly_rollup_row(ws, key_col=1, key_value=score.week_start,
+                                                row_values=row_values)
             written.append(score.week_start)
         return written
 
@@ -4230,7 +4511,8 @@ class Repository:
             if rpe is None:
                 continue
             properties = {"Exercise RPE": notion.number(round(float(rpe), 1))}
-            notion.update_page(self._nc, page["id"], properties=properties)
+            if not self.supabase_record:
+                notion.update_page(self._nc, page["id"], properties=properties)
             # PATCH, never UPSERT. This touches one property of an existing
             # page; a partial upsert would insert an orphan training_exercises
             # row carrying an RPE and nothing else — no session_id, no movement,
@@ -5952,6 +6234,7 @@ class Repository:
         results["session_hr"] = self.sync_session_hr_recent_if_due(days=2, **kw)
         results["metrics_history"] = self.sync_metrics_history_if_due(days=7, **kw)
         results["sleep_fusion"] = self.sync_sleep_fusion_if_due(days=14, **kw)
+        results["backup"] = self.backup_supabase_if_due(today=today, now=now)
         # LAST, and unthrottled: it sends only what the steps above actually
         # wrote, so an empty buffer costs nothing and a throttle would just
         # delay rows that are already in hand. Never raises — see
@@ -5963,6 +6246,18 @@ class Repository:
             else f"{self.mirror_last_error[0]}: {self.mirror_last_error[1]}",
         ) if sent or self.mirror_last_error else (True, None)
         return results
+
+    def backup_supabase_if_due(self, today: date | None = None, now: datetime | None = None,
+                               hours: float = 24) -> tuple[bool, str | None]:
+        """Once a day, with Supabase as the system of record: a copy of every
+        table in a private Supabase Storage bucket, 30 days kept
+        (services/backup.py). The Free plan takes no backups of its own. Not a
+        step at all while Notion and Sheets are the record."""
+        if not self.supabase_record:
+            return True, None
+        today = today or date.today()
+        return self.run_sync_if_due(
+            "supabase_backup", lambda: backup.run(self._sb, today), hours=hours, now=now)
 
     def _garmin_daily_if_due_safe(self, days: int = 2, today: date | None = None,
                                   now: datetime | None = None, hours: float = 2

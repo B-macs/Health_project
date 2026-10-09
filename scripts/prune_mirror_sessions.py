@@ -119,7 +119,9 @@ def _repo():
     if secrets.exists():
         with open(secrets, "rb") as fh:
             overrides = tomllib.load(fh)
-    return Repository(load_config(overrides))
+    # Notion is the side being read, so it is named explicitly: the default
+    # is Supabase whenever Supabase is configured.
+    return Repository(load_config({**overrides, "HEALTH_SYSTEM_OF_RECORD": "notion"}))
 
 
 def main() -> int:
@@ -159,6 +161,13 @@ def main() -> int:
     if not ex_ids and not session_ids:
         print("nothing to remove")
         return 0
+    if args.apply:
+        from services import record_cache
+        since = record_cache.record_since(store)
+        if since:
+            print(f"REFUSED: Supabase has been the system of record since {since}; "
+                  f"Notion is a frozen archive and must not be copied over it.")
+            return 1
     if not args.apply:
         print("dry run — nothing deleted")
         return 0

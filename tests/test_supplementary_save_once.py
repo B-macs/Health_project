@@ -148,7 +148,14 @@ def test_no_yoga_or_outdoor_write_bypasses_the_savers():
         assert holders and set(holders) <= {"_save_yoga_pose", "_write_outdoor_activity"}, holders
 
 
-def test_the_day_is_read_from_notion_itself_not_the_local_copy():
+def test_the_day_is_read_from_the_record_itself_not_the_local_copy():
+    """From the SYSTEM OF RECORD, past the local copy: Notion while it was the
+    record, Supabase since 2026-10-09 — both through _live_query, which only
+    falls back to the copy offline, where there is no live side."""
     body = _function_source(_REPO, "get_supplementary_sessions_live")
-    assert "notion.query_database(" in body
-    assert body.index("if self.offline:") < body.index("notion.query_database(")
+    assert "self._live_query(" in body
+    live = _function_source(_REPO, "_live_query")
+    assert "notion.query_database(" in live
+    assert "self._record_pages(" in live
+    assert live.index("if self.supabase_record:") < live.index("if self.offline:") \
+        < live.index("notion.query_database(")

@@ -3759,7 +3759,7 @@ def render():
                                                  type="primary", use_container_width=True)
             if save_btn:
                 try:
-                    with st.spinner("Saving session to Notion…"):
+                    with st.spinner("Saving session…"):
                         _auto_log_session(day_num, exercises, session_rpe, elapsed_minutes, session_notes)
                 except Exception as exc:
                     # Keep what was written. The pending session id and the

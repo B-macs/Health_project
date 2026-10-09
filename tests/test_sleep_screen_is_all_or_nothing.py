@@ -26,6 +26,8 @@ import ast
 from datetime import date
 from pathlib import Path
 
+from tests._app_loader import load_app
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # The actual night behind the screenshot, as Oura stored it.
@@ -43,10 +45,15 @@ NIGHT_DATE = date(2026, 8, 25)
 LEFT_ARROW = "‹"
 
 
+#: app.py's definitions without its page — NEVER `import app`, which runs the
+#: Home page with this checkout's real secrets (see tests/_app_loader.py).
+_HOME = load_app()
+
+
 def _sleep_screen(monkeypatch, *, score, details=None, fusion=None,
                   read_failed=False, stale=False):
     """The sleep drill-down's two blocks, rendered against one night."""
-    import app as home
+    home = _HOME
     monkeypatch.setattr(home, "selected_date", NIGHT_DATE)
     monkeypatch.setattr(home, "_sleep_details",
                         {NIGHT_DATE.isoformat(): NIGHT} if details is None else details)
@@ -64,7 +71,7 @@ def _sleep_screen(monkeypatch, *, score, details=None, fusion=None,
 def test_a_full_night_is_not_drawn_under_a_header_saying_there_is_none(monkeypatch):
     """THE REPORTED SCREEN. The detail read has the whole night; the score
     does not. Nothing about the night may render."""
-    import app as home
+    home = _HOME
     _h, _contrib, night = _sleep_screen(monkeypatch, score=home._NOT_COMPUTED)
     assert night == ""
     for figure in ("7h 06m", "8h 56m", "80 %", "56 bpm",
@@ -84,7 +91,7 @@ def test_the_same_night_renders_in_full_once_it_is_scored(monkeypatch):
 def test_an_unscored_night_says_why_without_a_contributors_heading(monkeypatch):
     """There are no contributors to head. One plain line, and it points at the
     arrow that reaches a night which does have data."""
-    import app as home
+    home = _HOME
     _h, contrib, _night = _sleep_screen(monkeypatch, score=home._NOT_COMPUTED)
     assert "Oura recorded no sleep period for this night." in contrib
     assert ">Contributors<" not in contrib
@@ -94,7 +101,7 @@ def test_an_unscored_night_says_why_without_a_contributors_heading(monkeypatch):
 def test_a_failed_read_still_says_so_rather_than_blaming_the_ring(monkeypatch):
     """Blanking the screen must not swallow the one message the reader can
     act on."""
-    import app as home
+    home = _HOME
     _h, contrib, night = _sleep_screen(
         monkeypatch, score=home._NOT_COMPUTED, read_failed=True)
     assert "loading problem" in contrib
@@ -106,7 +113,7 @@ def test_the_watch_only_night_is_the_one_thing_that_still_draws(monkeypatch):
     """It earns the exception by saying in its own text that there is no Sleep
     Score and that only the timeline is real -- nothing there is presented as
     having been scored."""
-    import app as home
+    home = _HOME
     fusion = {NIGHT_DATE.isoformat(): {
         "source": "garmin_only", "master_hypnogram": "2223",
         "master_deep_minutes": 60, "master_light_minutes": 240,
@@ -119,7 +126,7 @@ def test_the_watch_only_night_is_the_one_thing_that_still_draws(monkeypatch):
 
 
 def test_a_night_with_nothing_at_all_draws_nothing_at_all(monkeypatch):
-    import app as home
+    home = _HOME
     _h, _contrib, night = _sleep_screen(
         monkeypatch, score=home._NOT_COMPUTED, details={}, fusion={})
     assert night == ""

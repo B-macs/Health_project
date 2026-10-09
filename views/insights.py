@@ -3078,262 +3078,276 @@ def render() -> None:
         # INVISIBLE by construction — it looks exactly like one that is up to
         # date. This is the only place that difference is shown.
         _mirror_repo = repo.get_repository()
-        if _mirror_repo.supabase_configured():
-            _mirror_err = _mirror_repo.mirror_last_error
-            if _mirror_err:
-                st.warning(
-                    f"**Supabase mirror failing on `{_mirror_err[0]}`** — "
-                    f"Notion and Sheets are unaffected and still hold "
-                    f"everything; the Postgres copy is behind. Repair with "
-                    f"`python scripts/push_datastore_to_supabase.py`.\n\n"
-                    f"```\n{_mirror_err[1]}\n```"
-                )
-            else:
-                st.caption("Supabase mirror: no errors recorded this session.")
+        if _mirror_repo.supabase_record:
+            # Supabase is the only store (2026-10-09): a save is written there
+            # and waited for before the screen confirms it, so there is no
+            # queued copy that can fall behind.
+            st.caption(
+                "Supabase holds all data. Each save is written there before "
+                "the screen confirms it. Notion and Google Sheets are no longer used."
+            )
+            sheet_id = ""
+        else:
+            if _mirror_repo.supabase_configured():
+                _mirror_err = _mirror_repo.mirror_last_error
+                if _mirror_err:
+                    st.warning(
+                        f"**Supabase mirror failing on `{_mirror_err[0]}`** — "
+                        f"Notion and Sheets are unaffected and still hold "
+                        f"everything; the Postgres copy is behind. Repair with "
+                        f"`python scripts/push_datastore_to_supabase.py`.\n\n"
+                        f"```\n{_mirror_err[1]}\n```"
+                    )
+                else:
+                    st.caption("Supabase mirror: no errors recorded this session.")
 
+            st.caption(
+                "Legacy Apple Health export (Sheet1) — no longer read by the engine. "
+                "Kept for historical reference and the one-time Garmin backfill "
+                "(scripts/backfill_garmin_from_sheet1.py) only."
+            )
+
+            try:
+                sheet_id = st.secrets["GOOGLE_SHEETS_ID"]
+            except Exception:
+                sheet_id = None
+                st.error("GOOGLE_SHEETS_ID missing from .streamlit/secrets.toml")
+
+            # Only the raw Sheet1 table depends on Sheet1 being readable. The
+            # sections below it used to be nested inside this block, so a
+            # failed Sheet1 read (always, on the hosted app's local copy) hid
+            # the history tables and every sync button with it.
+            if sheet_id:
+                if st.button("Refresh", use_container_width=False, key="sync_refresh"):
+                    st.cache_data.clear()
+                    st.rerun()
+
+                with st.spinner("Reading Sheet1 from Google Sheets…"):
+                    try:
+                        sync_rows = _sync_raw(sheet_id)
+                    except Exception as exc:
+                        sync_rows = None
+                        st.error(f"Could not read Sheet1: {exc}")
+
+                if sync_rows is not None:
+                    if not sync_rows:
+                        st.info("Sheet1 is empty — no data yet.")
+                    else:
+                        df_sync = pd.DataFrame(sync_rows)
+
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Total rows", len(df_sync))
+                        col2.metric("Earliest",   str(df_sync["Date/Time"].iloc[0])[:10])
+                        col3.metric("Latest",     str(df_sync["Date/Time"].iloc[-1])[:10])
+
+                        st.divider()
+
+                        st.subheader("Raw Sheet Data")
+                        st.dataframe(df_sync, use_container_width=True, height=400)
+
+        st.divider()
+        st.subheader("Engine View — Last 28 Days (live)")
         st.caption(
-            "Legacy Apple Health export (Sheet1) — no longer read by the engine. "
-            "Kept for historical reference and the one-time Garmin backfill "
-            "(scripts/backfill_garmin_from_sheet1.py) only."
+            "Oura (70%) + Garmin (30%) blend for HRV/RHR/sleep, Garmin (80%) + "
+            "Oura (20%) for steps — services/biometrics.py — as passed to the "
+            "traffic-light engine right now. Recomputed on every load; not "
+            "persisted. No longer sourced from Sheet1 above."
+        )
+
+        engine_rows = _sync_engine_view(sheet_id)
+        if engine_rows:
+            st.dataframe(pd.DataFrame(engine_rows), use_container_width=True)
+        else:
+            st.info("No rows within the last 28 days.")
+
+        st.divider()
+        st.subheader("Biometric Blend History (persisted)")
+        st.caption(
+            "A fixed daily record of the blend above, written once a day "
+            "(Repository.sync_biometric_blend) to its own sheet tab. Unlike the "
+            "live view above, a past day here doesn't change even if Oura/Garmin "
+            "later revise that day's raw reading — this is what you actually saw "
+            "at the time."
+        )
+        if st.button(
+            "Backfill full history now",
+            use_container_width=False,
+            key="backfill_biometric_blend",
+        ):
+            try:
+                with _manual_sync("Computing and persisting the full blend history…"):
+                    n = repo.get_repository().sync_biometric_blend(days=400)
+                st.success(f"Persisted {n} day(s) to the Biometric Blend tab.")
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as exc:
+                st.warning(f"Backfill failed: {exc}")
+
+        try:
+            blend_history = _blend_history()
+        except Exception as exc:
+            blend_history = None
+            st.warning(f"Could not load blend history: {exc}")
+
+        if blend_history:
+            earliest = date.fromisoformat(blend_history[0]["date"])
+            latest = date.fromisoformat(blend_history[-1]["date"])
+            col_from, col_to = st.columns(2)
+            start_pick = col_from.date_input("From", value=earliest, key="blend_hist_from")
+            end_pick = col_to.date_input("To", value=latest, key="blend_hist_to")
+            filtered = [
+                r for r in blend_history
+                if str(start_pick) <= r["date"] <= str(end_pick)
+            ]
+            st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
+        elif blend_history is not None:
+            st.info(
+                "No persisted history yet — click \"Backfill full history now\" "
+                "above, or wait for the automatic once-a-day sync."
+            )
+
+        st.divider()
+        st.subheader("Metrics History (persisted)")
+        st.caption(
+            "A fixed daily record of Readiness, Sleep Score, and Strain — written "
+            "once a day (Repository.sync_metrics_history) to its own sheet tab, "
+            "same rationale as Biometric Blend above. This is also what feeds the "
+            "trend sparklines behind the Readiness/Sleep/Strain cards on Home "
+            "(tap a card to see it)."
         )
 
         try:
-            sheet_id = st.secrets["GOOGLE_SHEETS_ID"]
-        except Exception:
-            sheet_id = None
-            st.error("GOOGLE_SHEETS_ID missing from .streamlit/secrets.toml")
+            metrics_history = _metrics_history()
+        except Exception as exc:
+            metrics_history = None
+            st.warning(f"Could not load metrics history: {exc}")
 
-        if sheet_id:
-            if st.button("Refresh", use_container_width=False, key="sync_refresh"):
+        if metrics_history:
+            earliest = date.fromisoformat(metrics_history[0]["date"])
+            latest = date.fromisoformat(metrics_history[-1]["date"])
+            col_from, col_to = st.columns(2)
+            start_pick = col_from.date_input("From", value=earliest, key="metrics_hist_from")
+            end_pick = col_to.date_input("To", value=latest, key="metrics_hist_to")
+            filtered = [
+                r for r in metrics_history
+                if str(start_pick) <= r["date"] <= str(end_pick)
+            ]
+            st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
+        elif metrics_history is not None:
+            st.info("No persisted history yet — wait for the automatic once-a-day sync.")
+
+        st.divider()
+        st.caption(
+            "Weekly Rollup syncs automatically once a week; Garmin Daily Metrics "
+            "syncs automatically once a day (both checked whenever the Home or "
+            "Training page loads — no button needed)."
+        )
+
+        st.divider()
+        st.subheader("Garmin")
+        sync_repo = repo.get_repository()
+        if not sync_repo.garmin_configured():
+            st.info(
+                "Add GARMIN_EMAIL and GARMIN_PASSWORD to .streamlit/secrets.toml to "
+                "enable Garmin sync. Feeds the readiness/ACWR engine (30% weight for "
+                "HRV/RHR/sleep, 80% for steps, blended with Oura) once configured."
+            )
+        else:
+            st.caption(
+                "Daily wellness metrics feed the readiness/ACWR engine (blended with "
+                "Oura) and archive to their own Sheet tabs (Garmin Daily, Garmin "
+                "Activities). Daily Metrics also syncs automatically once a day on "
+                "Home/Training page open; use the button below to run it on demand."
+            )
+
+            col_daily, col_activities = st.columns(2, gap="small")
+            with col_daily:
+                if st.button(
+                    "Sync Garmin Daily Metrics",
+                    use_container_width=True,
+                    key="sync_garmin_daily",
+                ):
+                    try:
+                        with _manual_sync("Pulling daily metrics from Garmin…"):
+                            n = sync_repo.sync_garmin_daily(days=7)
+                        st.success(f"Synced {n} days to the Garmin Daily tab.")
+                    except Exception as exc:
+                        st.warning(f"Garmin daily sync failed: {exc}")
+            with col_activities:
+                if st.button(
+                    "Sync Garmin Activities",
+                    use_container_width=True,
+                    key="sync_garmin_activities",
+                ):
+                    try:
+                        with _manual_sync("Pulling activities from Garmin…"):
+                            n = sync_repo.sync_garmin_activities(limit=20)
+                        st.success(
+                            f"Synced {n} activities to the Garmin Activities tab."
+                        )
+                    except Exception as exc:
+                        st.warning(f"Garmin activity sync failed: {exc}")
+
+        st.divider()
+        st.subheader("Sleep Fusion")
+        st.caption(
+            "Merges Oura's stage sequence with Garmin's into one master "
+            "hypnogram — Oura reads stage well but over-reports Awake; "
+            "Garmin's wrist sensor needs real rotational movement, so its "
+            "Awake acts as a strict filter. Reads only the already-synced "
+            "Sheet tabs, so it never calls a device API and is safe to "
+            "re-run while Garmin is rate-limited. Display-only: the engine "
+            "still reads the Oura/Garmin biometric blend."
+        )
+        if st.button(
+            "Rebuild Sleep Fusion (full history)",
+            use_container_width=True,
+            key="sync_sleep_fusion",
+        ):
+            try:
+                with _manual_sync("Recomputing fused hypnograms…"):
+                    counts = sync_repo.sync_sleep_fusion(days=1200)
                 st.cache_data.clear()
-                st.rerun()
+                st.success(
+                    f"Fused {counts.get('fused', 0)} night(s); "
+                    f"{counts.get('oura_only', 0)} had no Garmin match "
+                    "and pass Oura through unchanged."
+                )
+            except Exception as exc:
+                st.warning(f"Sleep fusion rebuild failed: {exc}")
 
-            with st.spinner("Reading Sheet1 from Google Sheets…"):
+        st.divider()
+        st.subheader("Oura")
+        if not sync_repo.oura_configured():
+            st.info(
+                "Add OURA_TOKEN to .streamlit/secrets.toml to enable Oura sync. "
+                "Feeds the readiness/ACWR engine (70% weight for HRV/RHR/sleep, 20% "
+                "for steps, blended with Garmin) once configured."
+            )
+        else:
+            st.caption(
+                "Daily steps and sleep-period HRV/RHR/sleep-duration feed the "
+                "readiness/ACWR engine (blended with Garmin). Daily summary scores "
+                "(sleep, readiness, activity, stress, resilience, SpO2, "
+                "cardiovascular age) archive to the Oura Daily tab; workouts, "
+                "sessions, and rest-mode periods each get their own archival tab. "
+                "Also syncs automatically 2 hours after the Home page is opened; use "
+                "the button below to pull a full week on demand."
+            )
+            if st.button(
+                "Sync Weekly Oura Details",
+                use_container_width=False,
+                key="sync_oura_weekly",
+            ):
                 try:
-                    sync_rows = _sync_raw(sheet_id)
+                    with _manual_sync("Pulling the last 7 days from Oura…"):
+                        counts = sync_repo.sync_oura_all(days=7)
+                    st.success(
+                        f"Synced {counts['daily']} days, "
+                        f"{counts['workouts']} workouts, "
+                        f"{counts['sleep_periods']} sleep periods, "
+                        f"{counts['sessions']} sessions, "
+                        f"{counts['rest_mode_periods']} rest-mode periods."
+                    )
                 except Exception as exc:
-                    sync_rows = None
-                    st.error(f"Could not read Sheet1: {exc}")
-
-            if sync_rows is not None:
-                if not sync_rows:
-                    st.info("Sheet1 is empty — no data yet.")
-                else:
-                    df_sync = pd.DataFrame(sync_rows)
-
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("Total rows", len(df_sync))
-                    col2.metric("Earliest",   str(df_sync["Date/Time"].iloc[0])[:10])
-                    col3.metric("Latest",     str(df_sync["Date/Time"].iloc[-1])[:10])
-
-                    st.divider()
-
-                    st.subheader("Raw Sheet Data")
-                    st.dataframe(df_sync, use_container_width=True, height=400)
-
-                    st.divider()
-                    st.subheader("Engine View — Last 28 Days (live)")
-                    st.caption(
-                        "Oura (70%) + Garmin (30%) blend for HRV/RHR/sleep, Garmin (80%) + "
-                        "Oura (20%) for steps — services/biometrics.py — as passed to the "
-                        "traffic-light engine right now. Recomputed on every load; not "
-                        "persisted. No longer sourced from Sheet1 above."
-                    )
-
-                    engine_rows = _sync_engine_view(sheet_id)
-                    if engine_rows:
-                        st.dataframe(pd.DataFrame(engine_rows), use_container_width=True)
-                    else:
-                        st.info("No rows within the last 28 days.")
-
-                    st.divider()
-                    st.subheader("Biometric Blend History (persisted)")
-                    st.caption(
-                        "A fixed daily record of the blend above, written once a day "
-                        "(Repository.sync_biometric_blend) to its own sheet tab. Unlike the "
-                        "live view above, a past day here doesn't change even if Oura/Garmin "
-                        "later revise that day's raw reading — this is what you actually saw "
-                        "at the time."
-                    )
-                    if st.button(
-                        "Backfill full history now",
-                        use_container_width=False,
-                        key="backfill_biometric_blend",
-                    ):
-                        try:
-                            with _manual_sync("Computing and persisting the full blend history…"):
-                                n = repo.get_repository().sync_biometric_blend(days=400)
-                            st.success(f"Persisted {n} day(s) to the Biometric Blend tab.")
-                            st.cache_data.clear()
-                            st.rerun()
-                        except Exception as exc:
-                            st.warning(f"Backfill failed: {exc}")
-
-                    try:
-                        blend_history = _blend_history()
-                    except Exception as exc:
-                        blend_history = None
-                        st.warning(f"Could not load blend history: {exc}")
-
-                    if blend_history:
-                        earliest = date.fromisoformat(blend_history[0]["date"])
-                        latest = date.fromisoformat(blend_history[-1]["date"])
-                        col_from, col_to = st.columns(2)
-                        start_pick = col_from.date_input("From", value=earliest, key="blend_hist_from")
-                        end_pick = col_to.date_input("To", value=latest, key="blend_hist_to")
-                        filtered = [
-                            r for r in blend_history
-                            if str(start_pick) <= r["date"] <= str(end_pick)
-                        ]
-                        st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
-                    elif blend_history is not None:
-                        st.info(
-                            "No persisted history yet — click \"Backfill full history now\" "
-                            "above, or wait for the automatic once-a-day sync."
-                        )
-
-                    st.divider()
-                    st.subheader("Metrics History (persisted)")
-                    st.caption(
-                        "A fixed daily record of Readiness, Sleep Score, and Strain — written "
-                        "once a day (Repository.sync_metrics_history) to its own sheet tab, "
-                        "same rationale as Biometric Blend above. This is also what feeds the "
-                        "trend sparklines behind the Readiness/Sleep/Strain cards on Home "
-                        "(tap a card to see it)."
-                    )
-
-                    try:
-                        metrics_history = _metrics_history()
-                    except Exception as exc:
-                        metrics_history = None
-                        st.warning(f"Could not load metrics history: {exc}")
-
-                    if metrics_history:
-                        earliest = date.fromisoformat(metrics_history[0]["date"])
-                        latest = date.fromisoformat(metrics_history[-1]["date"])
-                        col_from, col_to = st.columns(2)
-                        start_pick = col_from.date_input("From", value=earliest, key="metrics_hist_from")
-                        end_pick = col_to.date_input("To", value=latest, key="metrics_hist_to")
-                        filtered = [
-                            r for r in metrics_history
-                            if str(start_pick) <= r["date"] <= str(end_pick)
-                        ]
-                        st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
-                    elif metrics_history is not None:
-                        st.info("No persisted history yet — wait for the automatic once-a-day sync.")
-
-                    st.divider()
-                    st.caption(
-                        "Weekly Rollup syncs automatically once a week; Garmin Daily Metrics "
-                        "syncs automatically once a day (both checked whenever the Home or "
-                        "Training page loads — no button needed)."
-                    )
-
-                    st.divider()
-                    st.subheader("Garmin")
-                    sync_repo = repo.get_repository()
-                    if not sync_repo.garmin_configured():
-                        st.info(
-                            "Add GARMIN_EMAIL and GARMIN_PASSWORD to .streamlit/secrets.toml to "
-                            "enable Garmin sync. Feeds the readiness/ACWR engine (30% weight for "
-                            "HRV/RHR/sleep, 80% for steps, blended with Oura) once configured."
-                        )
-                    else:
-                        st.caption(
-                            "Daily wellness metrics feed the readiness/ACWR engine (blended with "
-                            "Oura) and archive to their own Sheet tabs (Garmin Daily, Garmin "
-                            "Activities). Daily Metrics also syncs automatically once a day on "
-                            "Home/Training page open; use the button below to run it on demand."
-                        )
-
-                        col_daily, col_activities = st.columns(2, gap="small")
-                        with col_daily:
-                            if st.button(
-                                "Sync Garmin Daily Metrics",
-                                use_container_width=True,
-                                key="sync_garmin_daily",
-                            ):
-                                try:
-                                    with _manual_sync("Pulling daily metrics from Garmin…"):
-                                        n = sync_repo.sync_garmin_daily(days=7)
-                                    st.success(f"Synced {n} days to the Garmin Daily tab.")
-                                except Exception as exc:
-                                    st.warning(f"Garmin daily sync failed: {exc}")
-                        with col_activities:
-                            if st.button(
-                                "Sync Garmin Activities",
-                                use_container_width=True,
-                                key="sync_garmin_activities",
-                            ):
-                                try:
-                                    with _manual_sync("Pulling activities from Garmin…"):
-                                        n = sync_repo.sync_garmin_activities(limit=20)
-                                    st.success(
-                                        f"Synced {n} activities to the Garmin Activities tab."
-                                    )
-                                except Exception as exc:
-                                    st.warning(f"Garmin activity sync failed: {exc}")
-
-                    st.divider()
-                    st.subheader("Sleep Fusion")
-                    st.caption(
-                        "Merges Oura's stage sequence with Garmin's into one master "
-                        "hypnogram — Oura reads stage well but over-reports Awake; "
-                        "Garmin's wrist sensor needs real rotational movement, so its "
-                        "Awake acts as a strict filter. Reads only the already-synced "
-                        "Sheet tabs, so it never calls a device API and is safe to "
-                        "re-run while Garmin is rate-limited. Display-only: the engine "
-                        "still reads the Oura/Garmin biometric blend."
-                    )
-                    if st.button(
-                        "Rebuild Sleep Fusion (full history)",
-                        use_container_width=True,
-                        key="sync_sleep_fusion",
-                    ):
-                        try:
-                            with _manual_sync("Recomputing fused hypnograms…"):
-                                counts = sync_repo.sync_sleep_fusion(days=1200)
-                            st.cache_data.clear()
-                            st.success(
-                                f"Fused {counts.get('fused', 0)} night(s); "
-                                f"{counts.get('oura_only', 0)} had no Garmin match "
-                                "and pass Oura through unchanged."
-                            )
-                        except Exception as exc:
-                            st.warning(f"Sleep fusion rebuild failed: {exc}")
-
-                    st.divider()
-                    st.subheader("Oura")
-                    if not sync_repo.oura_configured():
-                        st.info(
-                            "Add OURA_TOKEN to .streamlit/secrets.toml to enable Oura sync. "
-                            "Feeds the readiness/ACWR engine (70% weight for HRV/RHR/sleep, 20% "
-                            "for steps, blended with Garmin) once configured."
-                        )
-                    else:
-                        st.caption(
-                            "Daily steps and sleep-period HRV/RHR/sleep-duration feed the "
-                            "readiness/ACWR engine (blended with Garmin). Daily summary scores "
-                            "(sleep, readiness, activity, stress, resilience, SpO2, "
-                            "cardiovascular age) archive to the Oura Daily tab; workouts, "
-                            "sessions, and rest-mode periods each get their own archival tab. "
-                            "Also syncs automatically 2 hours after the Home page is opened; use "
-                            "the button below to pull a full week on demand."
-                        )
-                        if st.button(
-                            "Sync Weekly Oura Details",
-                            use_container_width=False,
-                            key="sync_oura_weekly",
-                        ):
-                            try:
-                                with _manual_sync("Pulling the last 7 days from Oura…"):
-                                    counts = sync_repo.sync_oura_all(days=7)
-                                st.success(
-                                    f"Synced {counts['daily']} days, "
-                                    f"{counts['workouts']} workouts, "
-                                    f"{counts['sleep_periods']} sleep periods, "
-                                    f"{counts['sessions']} sessions, "
-                                    f"{counts['rest_mode_periods']} rest-mode periods."
-                                )
-                            except Exception as exc:
-                                st.warning(f"Oura sync failed: {exc}")
+                    st.warning(f"Oura sync failed: {exc}")

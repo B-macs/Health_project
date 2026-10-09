@@ -116,7 +116,15 @@ def main() -> int:
     ap.add_argument("--out", default=str(ROOT / "datastore.db"))
     ap.add_argument("--round-trip", action="store_true",
                     help="push the current datastore, pull it back, diff both")
+    ap.add_argument("--overwrite-record", action="store_true",
+                    help="allow --round-trip although Supabase is the system of record")
     args = ap.parse_args()
+    record = load_config(_secrets()).system_of_record
+    if args.round_trip and not args.overwrite_record and record == "supabase":
+        print("REFUSED: --round-trip first PUSHES datastore.db over Supabase, which "
+              "is now the system of record. Back it up first, then pass "
+              "--overwrite-record if that is really what you want.")
+        return 2
     store = _store()
     tables = datastore_postgres.table_names(datastore_postgres.to_postgres())
 

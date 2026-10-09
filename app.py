@@ -2633,4 +2633,8 @@ def _run_startup_sync() -> None:
     # beats briefly absent.
 
 
-_run_startup_sync()
+# Only under a Streamlit server. Imported any other way — a test did, until
+# 2026-10-09 — this file runs the Home page with the checkout's real secrets,
+# and this line then synced Oura and Garmin from that machine.
+if st.runtime.exists():
+    _run_startup_sync()

@@ -25,6 +25,10 @@ that Notion will refuse to update.
 
     python scripts/fix_session_duration.py --date 2026-09-16 --minutes 45
     python scripts/fix_session_duration.py --date 2026-09-16 --minutes 45 --apply
+
+With SUPABASE AS THE SYSTEM OF RECORD (2026-10-09) steps 3 and 4 are one
+write: the training_sessions row in Supabase, which is where the duration
+and AU live, then the local copy.
 """
 from __future__ import annotations
 
@@ -39,7 +43,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from services import engine  # noqa: E402
+from services import engine, supabase_store  # noqa: E402
 from services.clients import notion, notion_reader  # noqa: E402
 from services.config import load_config  # noqa: E402
 from services.repository import Repository  # noqa: E402
@@ -62,7 +66,8 @@ def main() -> int:
     args = ap.parse_args()
 
     if os.environ.get("HEALTH_DATASTORE_PATH"):
-        print("REFUSED: unset HEALTH_DATASTORE_PATH — this needs live Notion page ids.")
+        print("REFUSED: unset HEALTH_DATASTORE_PATH — this needs the live store, "
+              "not the offline snapshot.")
         return 1
 
     repo = _repo()
@@ -81,10 +86,11 @@ def main() -> int:
               f"archive the duplicates first.")
         return 1
     session_id, session_pages = next(iter(by_session.items()))
-    for p in session_pages:
-        if notion_reader.is_synthesized_page_id(p["id"]):
-            print("REFUSED: a synthesized page id — the read was not live.")
-            return 1
+    if not repo.supabase_record:
+        for p in session_pages:
+            if notion_reader.is_synthesized_page_id(p["id"]):
+                print("REFUSED: a synthesized page id — the read was not live.")
+                return 1
 
     first = session_pages[0]
     old_minutes = notion.get_property(first, "Session Duration", "number")
@@ -97,6 +103,16 @@ def main() -> int:
     print(f"  AU        {old_au} -> {new_au:g}")
     if not args.apply:
         print("dry run — nothing written")
+        return 0
+
+    if repo.supabase_record:
+        repo.queue_mirror("training_sessions", session_id,
+                          {"session_duration_minutes": args.minutes,
+                           "session_au": new_au}, mode=supabase_store.PATCH)
+        print("updated the training_sessions row in Supabase")
+        changed = repo.sync_metrics_history(days=30, today=_date.today(),
+                                            only_dates={args.date})
+        print(f"re-derived Metrics History for {args.date} ({changed} row(s) written)")
         return 0
 
     props = {"Session Duration": notion.number(args.minutes),

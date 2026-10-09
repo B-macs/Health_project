@@ -12,9 +12,13 @@ other cached resource, and strictly cheaper than db.py's/sync_sheets.py's
 prior per-call Client() construction, not a user-visible behavior change.
 """
 
+import threading
+
 import streamlit as st
 
 from services import datastore
+from services import record_cache
+from services import switchover
 from services.background_sync import BackgroundSyncRunner
 from services.config import load_config
 from services.repository import Repository
@@ -67,11 +71,23 @@ def get_repository() -> Repository:
     global _cache_hydration_notice
     config = get_config()
     filled = datastore.ensure_local_cache(config)
-    if filled:
+    if filled and not record_cache.is_supabase_record(config):
+        # With Supabase as the record the copy is rebuilt at EVERY process
+        # start, so saying so on every start would be noise.
         _cache_hydration_notice = (
             f"Rebuilt the local read cache from Supabase ({filled})."
         )
-    return Repository(config)
+    repository = Repository(config)
+    # The switch to Supabase as the only store — the marker, then the one-time
+    # add-only catch-up from Notion and Sheets (services/switchover.py). Only
+    # under a Streamlit server: a test that imported app.py wrote the marker
+    # on 2026-10-09. On its own thread with its own Repository (key rule 12),
+    # so the first open never waits for a read of Notion and Sheets; after the
+    # first successful run it costs one config read per process.
+    if st.runtime.exists() and repository.supabase_record:
+        threading.Thread(target=switchover.finish, args=(config,),
+                         name="switchover", daemon=True).start()
+    return repository
 
 
 def pop_cache_hydration_notice() -> str | None:

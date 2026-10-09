@@ -342,7 +342,7 @@ def test_the_bootstrap_hydrates_before_handing_back_a_repository():
     src = (ROOT / "repo.py").read_text(encoding="utf-8")
     body = src.split("def get_repository")[1].split("\ndef ")[0]
     assert "ensure_local_cache" in body
-    assert body.index("ensure_local_cache") < body.index("return Repository")
+    assert body.index("ensure_local_cache") < body.index("Repository(config)")
 
 
 def test_hydration_names_an_unwritable_path_as_a_setting_not_a_crash(tmp_path, monkeypatch):

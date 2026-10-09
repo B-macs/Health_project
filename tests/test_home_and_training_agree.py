@@ -19,6 +19,7 @@ from pathlib import Path
 import pytest
 
 from services import engine, sessions, verdict as vd
+from tests._app_loader import load_app
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -310,7 +311,7 @@ def test_the_card_shows_both_numbers_side_by_side_with_titles():
     titles of each". DAILY leads because it is the number with consequences —
     engine.readiness_training_modifier buckets the raw score and the trend
     drives nothing."""
-    import app as home
+    home = load_app()   # app.py's definitions, never its page
 
     r = home._card_html("READINESS", "", "<svg/>", "57", "Pay Attention",
                         "#BFA06A", "h", "d",
@@ -327,7 +328,7 @@ def test_the_card_shows_both_numbers_side_by_side_with_titles():
 def test_the_other_two_cards_are_untouched_by_the_pair():
     """score_pair defaults to None, so strain and sleep render byte-identical
     markup to what they rendered before readiness gained a second figure."""
-    import app as home
+    home = load_app()   # app.py's definitions, never its page
 
     a = home._card_html("STRAIN", "", "<svg/>", "12", "Hard", "#BFA06A", "h", "d")
     b = home._card_html("STRAIN", "", "<svg/>", "12", "Hard", "#BFA06A", "h", "d",
@@ -353,7 +354,7 @@ def test_the_pair_is_shown_on_every_day_including_a_blank_one():
         "the pair is unconditional now — see the docstring above"
     assert '_r_pair = (("DAILY", _fmt_r(_readiness_today)),' in src
 
-    import app as home
+    home = load_app()   # app.py's definitions, never its page
 
     # The blank morning itself: both figures absent, both still titled.
     r = home._card_html("READINESS", "", "<svg/>", "--", "No Readings",

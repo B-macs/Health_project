@@ -12,11 +12,14 @@ from __future__ import annotations
 import ast
 from datetime import date
 from pathlib import Path
-
 import pytest
 
-import app as app_module
 from services import dashboard, strain_regions as sr
+from tests._app_loader import load_app
+
+# app.py's definitions without its page — NEVER `import app`, which runs the
+# Home page with this checkout's real secrets (see tests/_app_loader.py).
+app_module = load_app()
 
 REGIONS = sr.REGIONS
 D = date(2026, 7, 30)

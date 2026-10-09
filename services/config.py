@@ -1,8 +1,13 @@
 """
 services/config.py — Credentials/settings loader.
 
-Backend access needs 5 values: the Notion API key + 3 database IDs (Readiness,
-Training, Config), and the Google Sheets ID + service-account JSON.
+Since 2026-10-09 Supabase is the system of record (Config.system_of_record):
+backend access needs SUPABASE_URL and SUPABASE_SECRET_KEY, and the Notion and
+Google Sheets settings are optional — read only by the migration tools and the
+hosted app's one-time catch-up (services/switchover.py). With Notion as the
+record (HEALTH_SYSTEM_OF_RECORD=notion) the old five are required again: the
+Notion API key + 3 database IDs (Readiness, Training, Config), and the Google
+Sheets ID + service-account JSON.
 
 The Notion BIOMETRICS database was retired on 2026-08-12 -- it held ten pages
 with every column NULL and had no live writer. NOTION_DB_BIOMETRICS is no
@@ -99,6 +104,46 @@ class Config:
     # An IANA name rather than a fixed offset so DST is handled — a
     # +02:00 constant would be an hour wrong for half the year.
     timezone: str = ""
+    # WHERE THE DATA LIVES (2026-10-09, the athlete: "disconnecting Notion
+    # completely and relying only on Supabase").
+    #
+    #   "notion"    the legacy arrangement. Notion (check-ins, training,
+    #               config) and Google Sheets (device data, history) hold the
+    #               record, and Supabase is a mirror of them.
+    #   "supabase"  Supabase is the ONLY store. Every write goes to Supabase
+    #               first and waits for it; reads come from a local SQLite
+    #               copy that each process rebuilds from Supabase when it
+    #               starts; Notion and Google Sheets are never called.
+    #
+    # The dataclass default stays "notion" so every test that builds a Config
+    # by hand keeps testing what it always tested. load_config() resolves the
+    # production default instead: "supabase" whenever Supabase is configured.
+    system_of_record: str = "notion"
+
+
+SYSTEMS_OF_RECORD = ("notion", "supabase")
+
+
+def default_record_cache_path() -> str:
+    """Where a Supabase-record process keeps its local copy when no
+    HEALTH_DATASTORE_PATH is given: a file of its own in the temp directory.
+
+    One file PER PROCESS, because the copy is rebuilt from Supabase at every
+    process start by replacing the file, and on Windows a file another
+    process has open cannot be replaced. Removed again at exit."""
+    import atexit
+    import tempfile
+    path = os.path.join(tempfile.gettempdir(), f"health_record_cache_{os.getpid()}.db")
+
+    def _remove():
+        for suffix in ("", "-wal", "-shm", "-journal"):
+            try:
+                os.remove(path + suffix)
+            except OSError:
+                pass
+
+    atexit.register(_remove)
+    return path
 
 
 _STR_KEYS = (
@@ -158,18 +203,71 @@ def _resolve_service_account(overrides: dict) -> dict:
     )
 
 
+def _resolve_system_of_record(overrides: dict, supabase_ready: bool) -> str:
+    """HEALTH_SYSTEM_OF_RECORD, or the production default: "supabase" whenever
+    Supabase is configured, "notion" otherwise. Set it to "notion" only for a
+    tool that must read the legacy stores (the reconcile scripts)."""
+    record = _resolve_optional_str("HEALTH_SYSTEM_OF_RECORD", overrides).strip().lower()
+    record = record or ("supabase" if supabase_ready else "notion")
+    if record not in SYSTEMS_OF_RECORD:
+        raise EnvironmentError(
+            f"HEALTH_SYSTEM_OF_RECORD={record!r}; expected one of {SYSTEMS_OF_RECORD}.")
+    if record == "supabase" and not supabase_ready:
+        raise EnvironmentError(
+            "HEALTH_SYSTEM_OF_RECORD='supabase' needs SUPABASE_URL and "
+            "SUPABASE_SECRET_KEY: Supabase is then the only store.")
+    return record
+
+
 def load_config(overrides: dict | None = None) -> Config:
     """Build a Config. `overrides` is typically st.secrets (as a plain dict) in
     the Streamlit layer, or omitted entirely to read purely from environment
-    variables — the path a non-Streamlit deployment would use."""
+    variables — the path a non-Streamlit deployment would use.
+
+    With Supabase as the system of record the Notion and Google Sheets
+    settings are optional (nothing calls them), and the local copy runs in
+    "cache" mode — at HEALTH_DATASTORE_PATH, or at a per-process temp file.
+    One exception: a datastore path with mode "readonly", or with no mode at
+    all, is still the offline snapshot it always was (reads local, writes
+    raise), so `HEALTH_DATASTORE_PATH=datastore.db python -m pytest` keeps
+    meaning what it meant."""
     overrides = overrides or {}
+    supabase_url = _resolve_optional_str("SUPABASE_URL", overrides)
+    supabase_secret_key = _resolve_optional_str("SUPABASE_SECRET_KEY", overrides)
+    record = _resolve_system_of_record(
+        overrides, bool(supabase_url and supabase_secret_key))
+    legacy = record == "notion"
+    required = _resolve_str if legacy else _resolve_optional_str
+
+    datastore_path = _resolve_optional_str("HEALTH_DATASTORE_PATH", overrides)
+    datastore_mode = _resolve_optional_str("HEALTH_DATASTORE_MODE", overrides)
+    offline_snapshot = datastore_mode == "readonly" or (datastore_path and not datastore_mode)
+    if not legacy and not offline_snapshot:
+        datastore_mode = "cache"
+        datastore_path = datastore_path or default_record_cache_path()
+    datastore_mode = datastore_mode or "readonly"
+
+    if legacy:
+        service_account = _resolve_service_account(overrides)
+    else:
+        try:
+            service_account = _resolve_service_account(overrides)
+        except EnvironmentError:
+            service_account = {}
+    def database_handle(key: str, name: str) -> str:
+        # Repository routes every read by these ids (the three Notion
+        # databases map onto three Supabase tables), so with Notion gone each
+        # still needs a DISTINCT value — three blanks would route every read
+        # to the first table.
+        return required(key, overrides) or f"record:{name}"
+
     return Config(
-        notion_api_key=_resolve_str("NOTION_API_KEY", overrides),
-        notion_db_readiness=_resolve_str("NOTION_DB_READINESS", overrides),
-        notion_db_training=_resolve_str("NOTION_DB_TRAINING", overrides),
-        notion_db_config=_resolve_str("NOTION_DB_CONFIG", overrides),
-        google_sheets_id=_resolve_str("GOOGLE_SHEETS_ID", overrides),
-        google_service_account=_resolve_service_account(overrides),
+        notion_api_key=required("NOTION_API_KEY", overrides),
+        notion_db_readiness=database_handle("NOTION_DB_READINESS", "readiness"),
+        notion_db_training=database_handle("NOTION_DB_TRAINING", "training"),
+        notion_db_config=database_handle("NOTION_DB_CONFIG", "config"),
+        google_sheets_id=required("GOOGLE_SHEETS_ID", overrides),
+        google_service_account=service_account,
         garmin_email=_resolve_optional_str("GARMIN_EMAIL", overrides),
         garmin_password=_resolve_optional_str("GARMIN_PASSWORD", overrides),
         oura_token=_resolve_optional_str("OURA_TOKEN", overrides),
@@ -177,9 +275,10 @@ def load_config(overrides: dict | None = None) -> Config:
             ("OURA_CLIENT_ID", "CLIENT_ID"), overrides),
         oura_client_secret=_resolve_first_optional_str(
             ("OURA_CLIENT_SECRET", "CLIENT_SECRET"), overrides),
-        datastore_path=_resolve_optional_str("HEALTH_DATASTORE_PATH", overrides),
-        datastore_mode=_resolve_optional_str("HEALTH_DATASTORE_MODE", overrides) or "readonly",
-        supabase_url=_resolve_optional_str("SUPABASE_URL", overrides),
-        supabase_secret_key=_resolve_optional_str("SUPABASE_SECRET_KEY", overrides),
+        datastore_path=datastore_path,
+        datastore_mode=datastore_mode,
+        supabase_url=supabase_url,
+        supabase_secret_key=supabase_secret_key,
         timezone=_resolve_optional_str("HEALTH_TIMEZONE", overrides),
+        system_of_record=record,
     )

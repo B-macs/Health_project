@@ -364,6 +364,26 @@ def test_the_mirror_is_write_only_and_nothing_reads_from_postgres():
     assert not found, f"repository.py reads from Supabase at {found}"
 
 
+def test_the_one_read_from_postgres_is_the_live_check_with_supabase_as_the_record():
+    """2026-10-09: with Supabase as the system of record, the few readers
+    that must not start from a stale local copy (get_phases_live,
+    get_logged_session_dates_live, get_supplementary_sessions_live) read it
+    through Repository._record_pages — and that is the ONLY place
+    repository.py pulls from Postgres. Every other read stays on the local
+    copy, for the same 132x reason as above."""
+    src = (ROOT / "services" / "repository.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    owners = []
+    for fn in ast.walk(tree):
+        if isinstance(fn, ast.FunctionDef):
+            for n in ast.walk(fn):
+                if (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                        and n.func.attr == "pull"
+                        and getattr(n.func.value, "id", "") == "supabase_store"):
+                    owners.append(fn.name)
+    assert owners == ["_record_pages"], owners
+
+
 # ─── blank -> NULL, the way a rebuild writes it ──────────────────────────
 
 def test_a_blank_text_value_is_queued_as_NULL_not_empty_string():

@@ -73,7 +73,14 @@ def ensure_local_cache(config, store_factory=None) -> str | None:
     present cache is never silently replaced, because it may hold
     written-through rows this process just made. Refresh an existing one
     deliberately with scripts/pull_datastore_from_supabase.py.
+
+    With SUPABASE AS THE SYSTEM OF RECORD (2026-10-09) the rule is stricter:
+    the copy is rebuilt once per process whether or not a file is there —
+    see services/record_cache.py for why.
     """
+    from services import record_cache
+    if record_cache.is_supabase_record(config):
+        return record_cache.hydrate_once(config, store_factory)
     if not (config.datastore_path and config.datastore_mode == "cache"):
         return None
     if not (config.supabase_url and config.supabase_secret_key):
