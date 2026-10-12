@@ -12,7 +12,9 @@ Update this file before generating each new training block.
   Thomas test contradicts). Finding #1 gains its daily pattern: the side
   tightness at his desk is BELOW the rim of the pelvis (his answer, so finding
   #1's upper glute and not the QL), worst sitting, delayed standing, relieved
-  only by walking, and kept away for hours by a morning leg session. Finding #4
+  only by walking, and kept away for hours by a morning leg session. Both sides,
+  the right maybe more, and older than the release withdrawal of 2026-09-22, so
+  it does not score that trial. Finding #4
   gains the psoas-march click: every time on turning out, SOMETIMES with the knee
   straight, stopped by bracing the abs, never on turning in. Finding #7 gains
   three sit-bone observations (both ends of the standing tilt; a seated lean
@@ -357,20 +359,21 @@ PROFILE = {
                 "morning then it's usually fine a lot longer.' Asked where, he placed it "
                 "BELOW the rim of the pelvic bone - this finding's band, not the quadratus "
                 "lumborum above the rim, which is where the other assistant put it. Which "
-                "side gets too sore was not stated; this finding reads right worse than "
-                "left. "
+                "side gets too sore (asked the same day): 'its both sides maybe the right "
+                "more but can be both' - the same right-worse-than-left reading this "
+                "finding already holds. "
                 "WHAT IT SHOWS: the tightness builds under stillness (sitting fastest, "
                 "standing slower) and is relieved by movement (walking) and by hard work of "
                 "the hip extensors earlier in the day (a morning leg session). That is the "
                 "pattern docs/hypothesis.md H1 predicts for grip - the cost shows under "
                 "stillness, not under load - and it is the first time this finding has a "
                 "time course. "
-                "WHAT IT DOES NOT SETTLE: when it started. The hypothesis named the "
-                "hip-crest symptom coming back as one of the two things that would bring "
-                "the release back (P12, all releases out from 2026-09-22). If this is new "
-                "since 2026-09-22 it bears on that trial; if it is older it does not. The "
-                "onset was not stated, so it is recorded, not scored. From 2026-10-05 P12 "
-                "reads on the Wednesday grip grade. "
+                "IT DOES NOT SCORE THE RELEASE TRIAL. The hypothesis named the hip-crest "
+                "symptom coming back as one of the two things that would bring the release "
+                "back (P12, all releases out from 2026-09-22). Asked when this started: "
+                "'It is older' - it was there before the releases came out, so it is not a "
+                "return and P12 is unchanged. From 2026-10-05 P12 reads on the Wednesday "
+                "grip grade. How long before 2026-09-22 it started was not asked. "
                 "EXPOSURE CHANGE: on 2026-10-12 he was given a timed work-day routine that "
                 "breaks up sitting and standing with walking and short activation efforts. "
                 "If he follows it, read any later change in this finding with that in mind."
