@@ -2405,6 +2405,29 @@ PROFILE = {
                 "any symptom; his sleeping position is not recorded. Status unchanged."
             ),
 
+            "update_2026_10_12_walking": (
+                "IT FOLLOWS WALKING ON A GYM DAY. His words, 2026-10-12: 'if I walk too much "
+                "after a gym day ive noticed that my psoas just where it connects to the back "
+                "gets sore, so today I can feel it.' Which gym day and how much walking were "
+                "not stated. His own test the same day: an hour sitting with heat, to see if "
+                "it settles - result to be recorded here. "
+                "READING: the psoas lifts the swinging leg on every step, so hours of walking "
+                "are thousands of small psoas contractions, and after a gym day they land on a "
+                "muscle already worked. That is a DOSE response at the attachment - the "
+                "opposite of the upper-glute desk tightness (finding #1), which walking "
+                "relieves. Two symptoms with opposite responses to walking: rate and treat "
+                "them separately. With the 2026-09-16 episode (the afternoon after a load "
+                "step) and 2026-08-25 (the morning after a band session), three of the four "
+                "accounts follow training load; 2026-10-05 followed twelve days of illness and "
+                "no training. A symptom that follows load is the pattern docs/hypothesis.md "
+                "P7 says would break H1 for that symptom. One account with no minutes is not "
+                "a reading, so it is recorded, not scored; the ledger question in "
+                "docs/hypothesis.md says what would score it. "
+                "THE SAME DAY'S WORK ROUTINE had put about three hours a day on the walking "
+                "pad, gym days included. Corrected the same day: walking is capped on gym "
+                "days, and this soreness at 3/10 stops the walking for the day."
+            ),
+
             "decision": (
                 "The athlete, 2026-10-05, offered the release back under P12's revert rule: "
                 "'I dont want release execises instead, lets look at postural fix exercises "

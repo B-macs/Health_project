@@ -151,6 +151,15 @@ write the *discriminating question* rather than the conclusion.
   and the peak matters as well as the hours; if the mornings read the same,
   the hours are the whole story. Instrument: the morning check-in, compared
   across the two kinds of day. Nothing in the record answers it yet.
+- **The psoas attachment gets sore after a lot of walking on a gym day**
+  (2026-10-12, the athlete's own observation) → is it a dose? On gym days,
+  record the walking minutes after the session (the walk home, the pad) and
+  the attachment's rating that evening and the next morning. Soreness rising
+  with walking minutes on gym days, and absent after the same walking on rest
+  days, says the attachment has a local endurance limit (H3 grows) and this
+  symptom follows load — P7's break condition, for this symptom only. Soreness
+  that follows the still hours instead says grip (H1). The upper-glute desk
+  tightness answers walking the opposite way, so the two are never pooled.
 
 ---
 
@@ -230,7 +239,9 @@ walking only walking relieves it, and heat relieves it a lot while sitting; kept
 hours by a morning leg session; older than the release withdrawal). The same day he was given a work-day routine: sitting and standing each capped
 at 60 minutes in a row, at least 15 minutes on the walking pad and one 5-minute activation
 break in every hour, small movements in seated meetings and a 10-minute walk after one of
-60 minutes or more. It is the first time this record has tested **stillness management as
+60 minutes or more. Corrected the same day, on his report that a lot of walking after a gym
+day makes the psoas attachment sore: on gym days the pad is capped at 10 minutes an hour,
+and that soreness at 3/10 stops the walking for the day. It is the first time this record has tested **stillness management as
 the lever** — the hypothesis has claimed it since v1 ("treated as the primary symptom
 lever, not training modification") without a trial behind the claim.
 
@@ -245,7 +256,7 @@ milder, faster-settling tightness, not its absence.
 
 ## Version history
 
-- **v1.6, 2026-10-12** — P13 registered, before the desk routine's first full day: the first trial of stillness management as the lever, scored on its own dates (2026-11-22 for the prediction, 2026-12-06 for the break condition) rather than at a block boundary. Three standing strengtheners logged the same day, all from the athlete's account of the desk-day side tightness (patient_profile finding #1): walking is the only thing that relieves it; heat relieves it a lot while sitting — heat restores blood flow and lowers resting tension and changes no muscle's length, so a large effect points to holding rather than shortness; and a morning leg session keeps it away for hours — a symptom held off by hard work of the muscles it sits in. The tightness is older than the release withdrawal of 2026-09-22, so it does not score P12. A ledger question was added (does a 6+ day leave more stiffness the next morning?), and the next block boundary is corrected from the cancelled race date to the end of Block B, 2026-11-08.
+- **v1.6, 2026-10-12** — P13 registered, before the desk routine's first full day: the first trial of stillness management as the lever, scored on its own dates (2026-11-22 for the prediction, 2026-12-06 for the break condition) rather than at a block boundary. Three standing strengtheners logged the same day, all from the athlete's account of the desk-day side tightness (patient_profile finding #1): walking is the only thing that relieves it; heat relieves it a lot while sitting — heat restores blood flow and lowers resting tension and changes no muscle's length, so a large effect points to holding rather than shortness; and a morning leg session keeps it away for hours — a symptom held off by hard work of the muscles it sits in. The tightness is older than the release withdrawal of 2026-09-22, so it does not score P12. Two ledger questions were added (does a 6+ day leave more stiffness the next morning? is the psoas-attachment soreness after a lot of walking on a gym day a dose? — the first account in which that symptom answers walking the opposite way from the desk tightness), and the next block boundary is corrected from the cancelled race date to the end of Block B, 2026-11-08.
 
 - **v1.5, 2026-10-05** — the psoas-attachment tightness came back on both sides (pain 0/10) after twelve days untrained and a week sick. It is NOT scored against P12: P12 tests whether the moving warm-up and the strength work hold the hip without the release, and a fortnight of no training tested neither; by location it is also not the hip-crest or front-of-hip symptom P12 names. Offered the release under P12's revert rule, the athlete declined it ("I dont want release execises instead, lets look at postural fix exercises and abs workouts") — so from here P12 reads on the Wednesday grip grade alone. The release had been logged the day before both earlier episodes (2026-08-24, 2026-09-15) and did not prevent either. Finding #7 enters the ledger above. The same day the Thomas test read NEGATIVE and equal on both sides (taken warm, after yoga): the right hip flexors are not short, so the right half of the pelvis sitting forward is held by tone or habit rather than length — H1's claim, met on its first direct length reading.
 
