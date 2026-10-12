@@ -5,6 +5,20 @@ Single source of truth for MRI findings and biomechanical assessment.
 Referenced by training_plan.py when designing sessions.
 Update this file before generating each new training block.
 
+2026-10-12: SIX OBSERVATIONS OF HIS OWN, first described in a conversation with
+  another AI assistant and reviewed here the same day. Only his descriptions are
+  recorded; that assistant's readings are not, because it worked without the
+  measurements in this file (it read the psoas as SHORT, which the 2026-10-05
+  Thomas test contradicts). Finding #1 gains its daily pattern: the side
+  tightness at his desk is BELOW the rim of the pelvis (his answer, so finding
+  #1's upper glute and not the QL), worst sitting, delayed standing, relieved
+  only by walking, and kept away for hours by a morning leg session. Finding #4
+  gains the psoas-march click: every time on turning out, SOMETIMES with the knee
+  straight, stopped by bracing the abs, never on turning in. Finding #7 gains
+  three sit-bone observations (both ends of the standing tilt; a seated lean
+  and tuck; a thin line near the anus at the bottom of a deep goblet squat). The
+  2026-10-05 symptom entry gains its morning timing and the erector muscles.
+
 2026-10-05: FINDING #7, THE ATHLETE'S OWN — a pelvis-ribcage counter-rotation he
   noticed during a week off sick: lying on his back the right side of the pelvis
   sits higher and forward, the ribcage turns back to the right, the left ribs
@@ -335,6 +349,32 @@ PROFILE = {
                 "Self-release and PNF stretching must precede any glute activation work."
             ),
             "laterality": "bilateral — RIGHT significantly tighter",
+            "additional_evidence_2026_10_12": (
+                "THE DAILY PATTERN, his own account (2026-10-12): 'Over the course of a day "
+                "my sides would get super tight to the point one side will get too sore, "
+                "standing is better than sitting but over time standing is also the same, "
+                "walking is the only one that helps, or if I do some leg work gym in the "
+                "morning then it's usually fine a lot longer.' Asked where, he placed it "
+                "BELOW the rim of the pelvic bone - this finding's band, not the quadratus "
+                "lumborum above the rim, which is where the other assistant put it. Which "
+                "side gets too sore was not stated; this finding reads right worse than "
+                "left. "
+                "WHAT IT SHOWS: the tightness builds under stillness (sitting fastest, "
+                "standing slower) and is relieved by movement (walking) and by hard work of "
+                "the hip extensors earlier in the day (a morning leg session). That is the "
+                "pattern docs/hypothesis.md H1 predicts for grip - the cost shows under "
+                "stillness, not under load - and it is the first time this finding has a "
+                "time course. "
+                "WHAT IT DOES NOT SETTLE: when it started. The hypothesis named the "
+                "hip-crest symptom coming back as one of the two things that would bring "
+                "the release back (P12, all releases out from 2026-09-22). If this is new "
+                "since 2026-09-22 it bears on that trial; if it is older it does not. The "
+                "onset was not stated, so it is recorded, not scored. From 2026-10-05 P12 "
+                "reads on the Wednesday grip grade. "
+                "EXPOSURE CHANGE: on 2026-10-12 he was given a timed work-day routine that "
+                "breaks up sitting and standing with walking and short activation efforts. "
+                "If he follows it, read any later change in this finding with that in mind."
+            ),
         },
         {
             "id": 2,
@@ -596,6 +636,24 @@ PROFILE = {
                 "right only, as always. The Thomas reading itself (hip flexor length, equal "
                 "and normal on both sides) is recorded under finding #7's test."
             ),
+            "additional_evidence_2026_10_12": (
+                "THE STANDING PSOAS MARCH, his own account (2026-10-12): 'when I do the psoas "
+                "march, my right side hip clicks, on all external rotation, sometimes straight "
+                "as well - however if I tense my abs it helps to prevent it at straight, never "
+                "clicks at internal rotation.' Right only, as always. "
+                "TWO THINGS ARE NEW. (1) A click with the knee STRAIGHT is the neutral "
+                "condition, which is this finding's positive threshold - and the last "
+                "two-condition test (2026-08-17) read none in neutral. It was seen in the "
+                "march, not in the test: the march lifts the knee ABOVE hip height and lowers "
+                "it under control, where the test stops at 90 degrees. So it is recorded "
+                "here and the test's last_result is unchanged; the next run of the "
+                "two-condition test grades it. (2) BRACING THE ABS STOPS THE STRAIGHT-KNEE "
+                "CLICK. A trunk brace changes how the pelvis sits under the tendon, so the "
+                "snap depends on control as well as on rotation - which fits the 2026-08-05 "
+                "reading (the trigger is contractile, not positional) and the neutral click's "
+                "earlier resolution by motor-path practice. The march's own cue (kneecap "
+                "straight ahead or slightly in) is unchanged by this."
+            ),
         },
         {
             "id": 5,
@@ -828,6 +886,40 @@ PROFILE = {
                     "Three variations, same session, warm after yoga, side not stated: feet "
                     "hip-width - 'yes tighter'; knees slightly bent - 'slightly tighter'; "
                     "feet turned out - 'no difference'."
+                ),
+                "sit_bones_both_ends_of_tilt_2026_10_12": (
+                    "His words: 'If I roll my hips from anterior to posterior at the ends I can "
+                    "feel a tightness just at my sitbone.' So the sit bone tightens at BOTH "
+                    "ends of the standing tilt, not only at the tuck end recorded 2026-10-05. "
+                    "At the tuck end the hamstrings are at their shortest and working (the "
+                    "2026-10-05 reading); at the forward end they are at their longest, which "
+                    "fits the 2026-08-05 reading of normal hamstring length with no reserve. "
+                    "Side not stated."
+                ),
+                "sit_bones_seated_tuck_2026_10_12": (
+                    "His words: 'when I sit down, knees at 90 degrees and I bend forward and "
+                    "then try and posterior tilt my hips, there's a super tight feeling in my "
+                    "sitbone and upper glutes.' Reading: tucking the pelvis OPENS the hip "
+                    "angle, so the hamstrings and the glutes get SHORTER in this movement, not "
+                    "longer (the other assistant read it as a stretch, which is the wrong way "
+                    "round). The sit-bone part is then the same contraction at short length as "
+                    "the standing tuck. The upper-glute part sits where finding #1 grips; the "
+                    "other candidate is the low-back tissue that attaches to the back of the "
+                    "pelvis, pulled because a tuck with the trunk held forward rounds the low "
+                    "back. Not separated."
+                ),
+                "deep_squat_line_2026_10_12": (
+                    "At the bottom of a deep goblet squat, chest up and no forward lean: a "
+                    "stretch through the buttock that feels like a THIN muscle, running near "
+                    "the anus. Not the psoas, which is slack at the bottom of a squat. "
+                    "Candidates, none tested: the hip rotators that pass the sit bone "
+                    "(obturator internus - already on finding #2's list); the pelvic floor; "
+                    "and the adductor magnus, whose rear head starts on the sit bone. The last "
+                    "is not on finding #2's list, and the adductors are the one group the "
+                    "flexibility battery read as genuinely short (docs/hypothesis.md H3). A "
+                    "one-person check, not yet run: the same squat at two stance widths. A "
+                    "stronger line in the WIDER stance points to the adductor magnus, which is "
+                    "longest with the legs wide. Side not stated; no pain, no tingling."
                 ),
                 "pelvis_lying_on_back": (
                     "Left hip/pelvis rests lower and flatter against the floor. Right hip "
@@ -2294,6 +2386,17 @@ PROFILE = {
                 "THREE TRIGGERS, NO SINGLE ONE: a flare inside a training block, a load "
                 "step, and twelve days of inactivity and illness. Recorded, not resolved.",
             ],
+
+            "update_2026_10_12": (
+                "IT IS ALSO A MORNING STIFFNESS. He reports tightness in the middle of the "
+                "back on waking, and placed it (asked whether it was between the shoulder "
+                "blades or lower): 'Lower, and more the erector muscles along with the psoas "
+                "muscle connection in the middle lower back.' So it is this entry's region, "
+                "with the erector muscles beside the spine added - NOT the left trapezius "
+                "symptom between the shoulder blades (2026-08-13). A night lying still is "
+                "itself a held exposure, which is the first question the hypothesis asks of "
+                "any symptom; his sleeping position is not recorded. Status unchanged."
+            ),
 
             "decision": (
                 "The athlete, 2026-10-05, offered the release back under P12's revert rule: "
