@@ -145,12 +145,18 @@ write the *discriminating question* rather than the conclusion.
   that the hip flexors' grip holds the pelvis; the grade stuck while the back
   quiets says the two are separate. The first graded run is the baseline —
   the 2026-10-05 reading is his description, not a grade.
+- **A desk day reaches 6/10 or more ("too sore")** (2026-10-12) → does the
+  next morning carry more back stiffness than the morning after a day that
+  stayed at 3 or below? If it does, a bad day leaves protective tension behind
+  and the peak matters as well as the hours; if the mornings read the same,
+  the hours are the whole story. Instrument: the morning check-in, compared
+  across the two kinds of day. Nothing in the record answers it yet.
 
 ---
 
 ## Block-by-block protocol
 
-At each block boundary (next: **the day after the race, 2026-10-12**; Block A was scored 2026-09-11, below, with its day-28 screen still to run on 09-13):
+At each block boundary (next: **the end of Block B, 2026-11-08** — the race was cancelled and the failed week ran again; Block A was scored 2026-09-11, below, with its day-28 screen still to run on 09-13). P13 is the exception: it is scored on its own dates, below.
 
 1. Score every open prediction — CONFIRMED / BROKEN / UNTESTED, with the
    reading and its date. No prediction is quietly dropped; UNTESTED must say
@@ -215,7 +221,31 @@ progress from the top sets that were actually lifted (22.5/42.5/30) rather than 
 plan's week-4 line. The session-shape rule was not predicted by v1 — it came from the
 athlete, and it is the reason the block is shorter, not the hypothesis.
 
+### Desk-day prediction, registered 2026-10-12 — before the routine's first full day
+
+The athlete, 2026-10-12, asked how long the desk-day side tightness takes to settle
+(patient_profile finding #1, `additional_evidence_2026_10_12`: below the rim of the pelvis,
+both sides, the right maybe more; worst sitting, delayed standing; of sitting, standing and
+walking only walking relieves it, and heat relieves it a lot while sitting; kept away for
+hours by a morning leg session; older than the release withdrawal). The same day he was given a work-day routine: sitting and standing each capped
+at 60 minutes in a row, at least 15 minutes on the walking pad and one 5-minute activation
+break in every hour, small movements in seated meetings and a 10-minute walk after one of
+60 minutes or more. It is the first time this record has tested **stillness management as
+the lever** — the hypothesis has claimed it since v1 ("treated as the primary symptom
+lever, not training modification") without a trial behind the claim.
+
+| # | Trial (instrument) | Prediction if the hypothesis is TRUE | What BREAKS it |
+|---|---|---|---|
+| P13 | **The desk-day routine** — the evening check-in note on each work day: minutes sitting before the tighter side reaches 3/10, the day's peak (0-10, tighter side), and whether heat, the roller or a leg session before work was used. Week 1 (2026-10-12 → 10-16) is the baseline and must include at least two days without heat. **Only work days with no heat and no leg session before work are scored** — heat delays the 3/10 point and a morning leg session holds it off for hours, so either would read as progress. "Followed" means the routine on at least 4 of 5 work days in a week | In weeks 4-6 (2026-11-02 → 11-22), the week's median minutes-to-3/10 sits **above the longest reading of week 1**, and fewer days a week reach 6 or more than in week 1. Walking still brings it down within the day | The routine followed and, by the end of week 8 (2026-12-06), minutes-to-3/10 still inside week 1's range and the 6+ days no fewer → stillness management is not the lever for this symptom; the next candidates are the seat set-up, a local tissue, and the release. A tightness that follows the heavy training days rather than the desk hours breaks H1's core as well (P7, P11) |
+
+Not scored as a failure of the hypothesis if the routine was **not** followed — that reads
+UNTESTED, with the reason. Zero tight days is not the target and not the prediction: in a
+body at Beighton 6/9 the muscles keep doing more of the holding, so the claim is a later,
+milder, faster-settling tightness, not its absence.
+
 ## Version history
+
+- **v1.6, 2026-10-12** — P13 registered, before the desk routine's first full day: the first trial of stillness management as the lever, scored on its own dates (2026-11-22 for the prediction, 2026-12-06 for the break condition) rather than at a block boundary. Three standing strengtheners logged the same day, all from the athlete's account of the desk-day side tightness (patient_profile finding #1): walking is the only thing that relieves it; heat relieves it a lot while sitting — heat restores blood flow and lowers resting tension and changes no muscle's length, so a large effect points to holding rather than shortness; and a morning leg session keeps it away for hours — a symptom held off by hard work of the muscles it sits in. The tightness is older than the release withdrawal of 2026-09-22, so it does not score P12. A ledger question was added (does a 6+ day leave more stiffness the next morning?), and the next block boundary is corrected from the cancelled race date to the end of Block B, 2026-11-08.
 
 - **v1.5, 2026-10-05** — the psoas-attachment tightness came back on both sides (pain 0/10) after twelve days untrained and a week sick. It is NOT scored against P12: P12 tests whether the moving warm-up and the strength work hold the hip without the release, and a fortnight of no training tested neither; by location it is also not the hip-crest or front-of-hip symptom P12 names. Offered the release under P12's revert rule, the athlete declined it ("I dont want release execises instead, lets look at postural fix exercises and abs workouts") — so from here P12 reads on the Wednesday grip grade alone. The release had been logged the day before both earlier episodes (2026-08-24, 2026-09-15) and did not prevent either. Finding #7 enters the ledger above. The same day the Thomas test read NEGATIVE and equal on both sides (taken warm, after yoga): the right hip flexors are not short, so the right half of the pelvis sitting forward is held by tone or habit rather than length — H1's claim, met on its first direct length reading.
 
