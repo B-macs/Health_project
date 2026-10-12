@@ -292,6 +292,10 @@ PROFILE = {
             "end range. Applies broadly, not just to the joints already symptomatic."
         ),
         "autonomic_cluster_note": (
+            "⚠ RARE, NOT A DESIGN DRIVER (athlete, 2026-08-10), and HEAT HAS NEVER CAUSED "
+            "IT (athlete, 2026-10-12: 'This is not true, never has been', on a "
+            "stand-up-slowly-after-heat caution) - do not attach a lightheadedness caution "
+            "to advice. "
             "Suspected mild autonomic/low-blood-volume features (low HRV, orthostatic "
             "lightheadedness on standing transitions, fluid-handling irregularities) "
             "commonly associated with hypermobility — self-observed, not diagnosed. "
@@ -2408,9 +2412,14 @@ PROFILE = {
             "update_2026_10_12_walking": (
                 "IT FOLLOWS WALKING ON A GYM DAY. His words, 2026-10-12: 'if I walk too much "
                 "after a gym day ive noticed that my psoas just where it connects to the back "
-                "gets sore, so today I can feel it.' Which gym day and how much walking were "
-                "not stated. His own test the same day: an hour sitting with heat, to see if "
-                "it settles - result to be recorded here. "
+                "gets sore, so today I can feel it.' THE EPISODE: gym on Saturday "
+                "2026-10-10, then 2-4 hours walking in town; sore for the last 30 minutes of "
+                "it, in boots with a heel ('which might have contributed'); still 3-4/10 on "
+                "Monday 2026-10-12, two days later. The heel cannot be separated from the "
+                "walking time on this account; the next long walk in flat shoes separates it. "
+                "HIS OWN TEST, 2026-10-12: an hour sitting with heat. Before: psoas "
+                "attachment 3-4/10; upper glutes 0 sitting upright, 2/10 when leaning forward "
+                "to about 60 degrees. After: to be recorded here. "
                 "READING: the psoas lifts the swinging leg on every step, so hours of walking "
                 "are thousands of small psoas contractions, and after a gym day they land on a "
                 "muscle already worked. That is a DOSE response at the attachment - the "
