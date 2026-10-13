@@ -1488,7 +1488,7 @@ def _fx_render_empty(accent: str) -> None:
         f'<div class="fx-huge" style="color:{accent};">Not measured</div>'
         f'<div class="fx-sm">{spec["label"]} &middot; up to {n} tests &middot; measured '
         f'<b style="color:{_INK2};">cold</b>, no warm-up.<br>'
-        f'Every four weeks. It usually stops early &mdash; the first failing slot is '
+        f'Every twelve weeks. It usually stops early &mdash; the first failing slot is '
         f'your answer, and nothing below it is worth measuring.</div></div>',
         unsafe_allow_html=True,
     )

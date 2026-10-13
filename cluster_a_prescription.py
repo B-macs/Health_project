@@ -172,7 +172,7 @@ STACKS: dict[str, Stack] = {
               "measured the way the battery measures it. How far forward you fold may not "
               "change for weeks and that is not failure: if the angle grows, or the block "
               "under your hips comes down, while the fold stays put, the stack is working "
-              "exactly as intended. Retest the tilt after four weeks, cold, before adding "
+              "exactly as intended. Retest the tilt after twelve weeks, cold, before adding "
               "anything.",
     ),
 
@@ -265,10 +265,12 @@ LENGTH: str = (
 )
 
 #: The retest cadence as a number, for anything that needs to compute the date.
-RETEST_INTERVAL_DAYS: int = 28
+#: Twelve weeks from 2026-10-13 (athlete: "Flexibility should be retested every 12
+#: weeks not 4 weeks"); it was 28 days.
+RETEST_INTERVAL_DAYS: int = 84
 
 RETEST: str = (
-    "Every four weeks, cold, in order. Only re-run the slots below the one you have "
+    "Every twelve weeks, cold, in order. Only re-run the slots below the one you have "
     "been fixing. **Never the morning after leg training** — a leg day reads as extra "
     "tightness in exactly the areas being tested, so the reading would measure the "
     "leg day rather than the baseline. Take the first morning after a legs-free day."
@@ -276,7 +278,7 @@ RETEST: str = (
 
 CHANGE_NOTHING: str = (
     "A number moving less than about double your baseline noise is not a result and is not "
-    "a reason to change the programme. Give it another four weeks. **Until three baseline "
+    "a reason to change the programme. Give it another twelve weeks. **Until three baseline "
     "mornings exist there is no noise figure at all**, so until then, change nothing on the "
     "strength of a single reading in either direction."
 )

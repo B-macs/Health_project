@@ -480,7 +480,7 @@ def retest_due_on(last_assessed_on: date,
     """When the next retest falls. The interval is the Prescription's — dosage
     and cadence are its business, not this module's."""
     interval = getattr(CLUSTERS[cluster_key]["prescription"],
-                       "RETEST_INTERVAL_DAYS", 28)
+                       "RETEST_INTERVAL_DAYS", 84)
     return last_assessed_on + timedelta(days=interval)
 
 

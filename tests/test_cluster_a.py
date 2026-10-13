@@ -776,12 +776,15 @@ def test_the_retest_is_never_the_morning_after_leg_training():
     the leg day, not the baseline — the same contamination class as a warm-up,
     one day earlier."""
     last = date(2026, 8, 16)
-    assert fx.retest_due_on(last) == date(2026, 9, 13)
-    blocked, reason = fx.retest_readiness(last, date(2026, 9, 13),
-                                          {date(2026, 9, 12)})
+    # Twelve weeks on since 2026-10-13 (athlete: "Flexibility should be
+    # retested every 12 weeks not 4 weeks"); it was 2026-09-13, four weeks on.
+    due = date(2026, 11, 8)
+    assert fx.retest_due_on(last) == due
+    assert (due - last).days == 84
+    blocked, reason = fx.retest_readiness(last, due, {date(2026, 11, 7)})
     assert blocked == fx.RETEST_BLOCKED
     assert "yesterday loaded the legs" in reason
-    ready, _ = fx.retest_readiness(last, date(2026, 9, 13), set())
+    ready, _ = fx.retest_readiness(last, due, set())
     assert ready == fx.RETEST_READY
 
 
@@ -789,15 +792,16 @@ def test_the_day_before_warns_to_stay_off_the_legs():
     """TOMORROW exists so the training screen can protect the reading while
     today's session can still be moved — by the morning of, it is too late."""
     last = date(2026, 8, 16)
-    status, reason = fx.retest_readiness(last, date(2026, 9, 12), set())
+    eve = date(2026, 11, 7)      # the day before the twelve-week retest
+    status, reason = fx.retest_readiness(last, eve, set())
     assert status == fx.RETEST_TOMORROW
     assert "off the legs" in reason
-    status, reason = fx.retest_readiness(last, date(2026, 9, 12),
-                                         {date(2026, 9, 12)})
+    status, reason = fx.retest_readiness(last, eve, {eve})
     assert status == fx.RETEST_TOMORROW
     assert "loaded the legs" in reason.lower()
     assert "swap" in reason.lower()
-    status, _ = fx.retest_readiness(last, date(2026, 9, 1), set())
+    # Four weeks on is no longer a retest morning.
+    status, _ = fx.retest_readiness(last, date(2026, 9, 12), set())
     assert status == fx.RETEST_NOT_DUE
 
 
