@@ -3907,11 +3907,10 @@ def render():
                         "probably paused or stopped early. The figures above describe the "
                         "recorded part only; the gap is excluded rather than estimated."
                     )
-                st.caption(
-                    "This is metabolic demand, measured. Your own session RPE is still what "
-                    "drives ACWR — the two are kept on separate units deliberately, so load "
-                    "never depends on whether the watch was running."
-                )
+                # The caption that explained these figures as measured metabolic
+                # cost is off the screen since 2026-10-13 (athlete: "remove this
+                # message"). What it said still holds: session RPE drives ACWR,
+                # Key Rule 2b.
             elif st.session_state.get("tp_garmin_declared"):
                 st.caption(
                     "No heart-rate match for this session"

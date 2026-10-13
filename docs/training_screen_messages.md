@@ -111,7 +111,7 @@ different places:
 | [3565](../views/training.py#L3565) | "**{verdict}** You rated this {x}; heart rate says {y}. Neither replaces the other — yours measures how close to failure…" | |
 | [3570](../views/training.py#L3570) | "Matched to *{activity}* · {n}/{m} exercises had heart-rate cover ({pct} of block time)." | |
 | [3579](../views/training.py#L3579) | "Heart rate covers only {pct} of this session — the watch was probably paused or stopped early." | |
-| [3584](../views/training.py#L3584) | "This is metabolic demand, measured. Your own session RPE is still what drives ACWR." | |
+| ~~3584~~ | "This is metabolic demand, measured. Your own session RPE is still what drives ACWR." | **CUT 2026-10-13** (athlete: "remove this message") |
 | [3596](../views/training.py#L3596) | "Logged at your rating of RPE {n}. Start a Garmin workout next session to get a measured figure alongside it." | |
 | [3982](../views/training.py#L3982) | "🏃 Start **{name}** on your Garmin watch now. Tap Complete below when you're done." | |
 | [4009](../views/training.py#L4009) / [4011](../views/training.py#L4011) | toast "Pulled {n} min from Garmin" / "No Garmin activity today lasting {a}-{b} min — logged with the planned duration." | |
