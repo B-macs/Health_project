@@ -127,6 +127,18 @@ MIN_CALIBRATION_NIGHTS = 14
 #  meaning. On a device change: refit, compare, then re-derive history with
 #  Repository.sync_sleep_fusion(days=1500). CLAUDE.md's "Garmin 645 -> 265
 #  upgrade" section holds the full checklist.
+#
+#  ⚠ THE RULE ABOVE WAS NOT ENFORCED UNTIL 2026-10-13. The 265 arrived in
+#  early August and the fit kept running over ALL paired history: 26 nights
+#  from the 645 pooled with the 265's, its top boundary moving between 4.73
+#  and 5.69 across refits. CALIBRATION_WATCH_FIRST_NIGHT now limits the fit
+#  to the current watch.
+
+#: The first night of the Forerunner 265 on record: the first night Garmin
+#: reported HRV, which the 645 never did (garmin_daily.hrv_ms, from
+#: 2026-08-06). 3-5 August may also be the 265, and are left out rather than
+#: risk a 645 night in the fit. On the next watch: move this to its first night.
+CALIBRATION_WATCH_FIRST_NIGHT = "2026-08-06"
 
 # Oura reports movement every 30s; Garmin every 60s. Fusion runs on the FINER
 # grid — downsampling Oura to match Garmin would destroy real resolution to

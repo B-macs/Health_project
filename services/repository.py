@@ -5211,11 +5211,17 @@ class Repository:
         Returns None when there is too little paired history
         (sleep_movement.MIN_CALIBRATION_NIGHTS), so callers fall back to
         Oura-only movement rather than to an invented scale.
+
+        ONE WATCH ONLY (2026-10-13): nights before
+        sleep_movement.CALIBRATION_WATCH_FIRST_NIGHT were the Forerunner 645,
+        whose scale need not match the 265's, and are not paired.
         """
         garmin_values: list[float] = []
         oura_classes: list[int] = []
         nights = 0
         for day, main in oura_by_date.items():
+            if str(day) < sleep_movement.CALIBRATION_WATCH_FIRST_NIGHT:
+                continue
             classes = sleep_movement.oura_movement(main.get("movement_30_sec"))
             if not classes:
                 continue
