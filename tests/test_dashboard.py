@@ -185,6 +185,23 @@ def test_strain_meta_rolling_vs_non_rolling_have_different_copy():
     assert hdr_r != hdr_nr
 
 
+@pytest.mark.parametrize("score, label", [
+    (7.9, "Light"), (8.0, "Moderate"), (11.9, "Moderate"), (12.0, "Hard"),
+    (15.9, "Hard"), (16.0, "Strenuous"), (21.0, "Strenuous"),
+])
+def test_strain_bands_are_eight_twelve_sixteen(score, label):
+    """The athlete's choice, 2026-10-13 (WP-18): at 6 / 10 / 14 one logged day
+    in three read "Strenuous — Max exertion"."""
+    assert dashboard.strain_meta(score)[2] == label
+    assert dashboard.strain_meta(score, is_rolling=True)[2] == label
+
+
+def test_a_strenuous_day_no_longer_claims_max_exertion():
+    _, _, _, head, desc = dashboard.strain_meta(16.5)
+    assert "Max exertion" not in desc and "Full recovery required" not in desc
+    assert head == "Very high output"
+
+
 def test_sleep_meta_none_score():
     _, val, lbl, _, _ = dashboard.sleep_meta(None, 8.0, None)
     assert lbl == "No Readings"

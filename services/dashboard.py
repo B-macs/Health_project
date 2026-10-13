@@ -260,15 +260,24 @@ def readiness_meta(score) -> tuple:
     return c, str(int(s)), lbl, hdr, descs[lbl], ""
 
 
+#: Where Light ends, Moderate ends and Hard ends, on the 0-21 strain scale.
+#: 8 / 12 / 16 since 2026-10-13 (the athlete's choice, WP-18): at 6 / 10 / 14,
+#: 6 of the 17 logged days from 2026-08-17 to 10-09 read "Strenuous — Max
+#: exertion", i.e. an ordinary gym day. Those days ran 7.6-17.1, median 12.1;
+#: the new bands read them 1 Light, 7 Moderate, 7 Hard, 2 Strenuous.
+STRAIN_BANDS: tuple[float, float, float] = (8.0, 12.0, 16.0)
+
+
 def strain_meta(score, is_rolling: bool = False) -> tuple:
     if score is None:
         return "#555555", "--", "No Readings", "No workload logged", \
                "No training data recorded for this day."
     s = float(score)
-    if s < 6:    c, lbl = "#6BAF8B", "Light"
-    elif s < 10: c, lbl = "#BFA06A", "Moderate"
-    elif s < 14: c, lbl = "#C47878", "Hard"
-    else:        c, lbl = "#C47878", "Strenuous"
+    light_below, moderate_below, hard_below = STRAIN_BANDS
+    if s < light_below:      c, lbl = "#6BAF8B", "Light"
+    elif s < moderate_below: c, lbl = "#BFA06A", "Moderate"
+    elif s < hard_below:     c, lbl = "#C47878", "Hard"
+    else:                    c, lbl = "#C47878", "Strenuous"
     if is_rolling:
         heads = {
             "Light": "Low body load", "Moderate": "Moderate body load",
@@ -281,13 +290,17 @@ def strain_meta(score, is_rolling: bool = False) -> tuple:
             "Strenuous": "High load from recent sessions. Assess recovery before adding more volume.",
         }
     else:
+        # The Strenuous words changed with the bands (2026-10-13): "Max
+        # exertion. Full recovery required before your next training block"
+        # was false for a normal gym day and asked for a rest the plan does
+        # not give.
         heads = {"Light": "Light day", "Moderate": "Building momentum",
-                 "Hard": "High output", "Strenuous": "Peak effort"}
+                 "Hard": "High output", "Strenuous": "Very high output"}
         descs = {
             "Light":     "Minimal cardiovascular stress. Ideal for active recovery.",
             "Moderate":  "Solid aerobic work accumulating. Body is adapting.",
             "Hard":      "Significant load logged. Adequate recovery needed before next session.",
-            "Strenuous": "Max exertion. Full recovery required before your next training block.",
+            "Strenuous": "One of your hardest days. Give recovery extra attention tonight.",
         }
     return c, f"{s:.1f}", lbl, heads[lbl], descs[lbl]
 
