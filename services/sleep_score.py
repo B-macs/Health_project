@@ -183,6 +183,18 @@ def _composite(available: list[tuple[float, float]]) -> float | str:
     return round(weighted_sum, 1)
 
 
+#: The ring's own sleep-period readings. A row with none of them is a night the
+#: ring did not record, whatever the watch saw.
+_RING_SLEEP_FIELDS = (
+    "oura_sleep_total_seconds", "oura_sleep_efficiency", "oura_sleep_rem_seconds",
+    "oura_sleep_deep_seconds", "oura_sleep_restless_periods", "oura_sleep_latency_seconds",
+)
+
+
+def _has_ring_reading(row: dict | None) -> bool:
+    return bool(row) and any(row.get(k) is not None for k in _RING_SLEEP_FIELDS)
+
+
 def _contributor_scores(
     for_date: date | None,
     bio_rows: list[dict] | None,
@@ -205,6 +217,16 @@ def _contributor_scores(
         return None
 
     today_row = next((r for r in rows_to_date if r["date"] == date_str), None)
+
+    # NO RING, NO SCORE (2026-10-13, the athlete's approval of WP-11). On a
+    # night only the watch recorded, Total Sleep was the one input left — from
+    # Garmin's duration, which reads about an hour longer than Oura's — and the
+    # six missing inputs' weights moved onto it, so a long watch-only night
+    # scored 100 (2026-08-16, during the Oura outage). The module docstring
+    # always said a night with no Oura sleep period is NOT_COMPUTED; this makes
+    # it true. The watch-only night still shows its timeline on the Sleep screen.
+    if not _has_ring_reading(today_row):
+        return None
 
     def _get(key):
         if today_row is None or today_row.get(key) is None:

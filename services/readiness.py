@@ -327,8 +327,10 @@ def compute_readiness(
 # Fields whose presence means "this date was actually measured". Deliberately
 # broader than the scored components: it includes the raw blend readings, so a
 # night the ring wasn't worn and only Garmin recorded still counts as measured
-# (services/sleep_fusion.py notes the watch is worn about twice as often), and
-# so pre-enrichment rows that predate the Oura contributor columns still score.
+# (services/sleep_fusion.py notes the watch is worn about twice as often).
+# MEASURED IS NOT SCORED: since 2026-10-13 (WP-11) a day needs at least one of
+# the ring's contributors to have a readiness at all — see _component_scores —
+# because Sleep Debt alone was otherwise the whole score.
 # What it excludes is a row that exists for some OTHER reason — a morning
 # check-in's alcohol units, or a step count — carrying nothing about the night.
 _SAME_DAY_EVIDENCE = (
@@ -443,6 +445,17 @@ def _component_scores(
     # (score, raw, reference). Oura's pre-scored contributors have no reference
     # of ours to show — their baseline lives inside Oura — so raw IS the score
     # for those, and reference is None.
+    # NOT FROM SLEEP DEBT ALONE (2026-10-13, the athlete's approval of WP-11).
+    # On a day the ring did not record, every Oura contributor is None and
+    # Sleep Debt — a trailing aggregate that needs no reading for today — was
+    # the whole score, renormalised to 100% of it. That is a readiness number
+    # with no measurement of the night behind it. At least one of the ring's
+    # contributors must exist, or there is no readiness for the day.
+    ring = (hrv_balance_s, recovery_s, prev_night_s, rhr_s, body_temp_s,
+            prev_activity_s, sleep_reg_s, activity_bal_s)
+    if all(v is None for v in ring):
+        return None
+
     built = {
         "hrv_balance":   (hrv_balance_s,   hrv_balance_s,   None),
         "recovery":      (recovery_s,      recovery_s,      None),

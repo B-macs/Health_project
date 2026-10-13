@@ -98,7 +98,10 @@ def test_compute_sleep_score_is_unchanged_for_a_night_with_a_wake_time_adjustmen
 def test_compute_sleep_score_is_unchanged_when_renormalising_a_single_contributor():
     """The path where `total_w` renormalisation actually bites — one
     contributor carrying the whole score."""
-    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2)]
+    # The ring recorded the night (no ring, no score since 2026-10-13); its total
+    # seconds alone score nothing, so Total Sleep is still the only input.
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2,
+                                                oura_sleep_total_seconds=22320.0)]
     assert sleep_score.compute_sleep_score(date(2026, 7, 1), rows) == 83.2
 
 
@@ -119,13 +122,34 @@ def test_row_present_but_no_sleep_fields_is_not_computed():
 def test_total_sleep_alone_is_capped_at_100_when_sleeping_more_than_baseline():
     # Regression case for the bug this module replaced: sleeping longer than
     # your recent average must never push the score over 100.
-    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=12.0)]
+    # The ring recorded the night (no ring, no score since 2026-10-13); its total
+    # seconds alone score nothing, so Total Sleep is still the only input.
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=12.0,
+                                              oura_sleep_total_seconds=43200.0)]
     score = sleep_score.compute_sleep_score(date(2026, 7, 20), rows)
     assert score == 100.0  # only contributor available (Total Sleep), capped
 
 
+def test_a_watch_only_night_has_no_sleep_score():
+    """2026-08-16, the Oura outage: Total Sleep — from Garmin's duration, about
+    an hour longer than Oura's — was the one input left, took the six missing
+    inputs' weights, and a long watch-only night read 100. No ring reading, no
+    Sleep Score (WP-11, approved 2026-10-13); the screen keeps the night's
+    timeline and says there is no score, which is now true."""
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=9.5)]
+    assert sleep_score.compute_sleep_score(date(2026, 7, 20), rows) == sleep_score.NOT_COMPUTED
+    breakdown = sleep_score.sleep_score_breakdown(date(2026, 7, 20), rows)
+    assert breakdown["score"] == sleep_score.NOT_COMPUTED
+    assert breakdown["available_weight"] == 0.0
+    ring = rows[:-1] + [_row("2026-07-20", sleep_duration_hours=9.5,
+                             oura_sleep_total_seconds=34200.0)]
+    assert sleep_score.compute_sleep_score(date(2026, 7, 20), ring) == 100.0, (
+        "with the ring, a long night still caps at 100")
+
+
 def test_total_sleep_scales_linearly_below_baseline():
-    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0)]
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0,
+                                              oura_sleep_total_seconds=21600.0)]  # ring recorded it
     score = sleep_score.compute_sleep_score(date(2026, 7, 20), rows)
     # Today's own 6h reading also feeds its own baseline average (last 7 of
     # [8.0]*10 + [6.0] = six 8.0s + one 6.0 -> baseline 7.714...), same
@@ -207,14 +231,16 @@ def test_latency_too_fast_is_penalised_same_as_too_slow():
 # must be a no-op whenever it's None or has no entry for the scored date.
 
 def test_wake_time_adjustments_none_is_identical_to_omitting_the_argument():
-    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0)]
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0,
+                                              oura_sleep_total_seconds=21600.0)]  # ring recorded it
     without_arg = sleep_score.compute_sleep_score(date(2026, 7, 20), rows)
     with_none = sleep_score.compute_sleep_score(date(2026, 7, 20), rows, wake_time_adjustments=None)
     assert without_arg == with_none == 77.8
 
 
 def test_wake_time_adjustments_empty_dict_is_a_no_op():
-    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0)]
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0,
+                                              oura_sleep_total_seconds=21600.0)]  # ring recorded it
     score = sleep_score.compute_sleep_score(date(2026, 7, 20), rows, wake_time_adjustments={})
     assert score == 77.8
 
@@ -222,7 +248,8 @@ def test_wake_time_adjustments_empty_dict_is_a_no_op():
 def test_wake_time_adjustments_entry_for_a_different_date_has_no_effect():
     # Regression guard: the adjustment must only ever touch for_date's own
     # row, never a historical row that happens to have an entry too.
-    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0)]
+    rows = _baseline_rows(hours=8.0) + [_row("2026-07-20", sleep_duration_hours=6.0,
+                                              oura_sleep_total_seconds=21600.0)]  # ring recorded it
     score = sleep_score.compute_sleep_score(
         date(2026, 7, 20), rows, wake_time_adjustments={"2026-07-19": 30},
     )
@@ -355,7 +382,8 @@ def test_breakdown_lists_all_seven_contributors_in_ouras_reading_order():
 def test_all_seven_rows_are_present_even_when_only_one_contributor_has_data():
     """Absence is the most informative thing on this panel, so the UI needs a
     row for every contributor, not just the ones that scored."""
-    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2)]
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2,
+                                                oura_sleep_total_seconds=22320.0)]  # ring recorded it
     b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
     assert len(b["contributors"]) == 7
     assert sum(1 for c in b["contributors"] if c["score"] is not None) == 1
@@ -365,7 +393,8 @@ def test_all_seven_rows_are_present_even_when_only_one_contributor_has_data():
 def test_a_missing_contributor_has_no_score_and_zero_effective_weight():
     """Zero effective weight is what makes it impossible for a missing
     contributor to contribute silently."""
-    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2)]
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2,
+                                                oura_sleep_total_seconds=22320.0)]  # ring recorded it
     b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
     missing = [c for c in b["contributors"] if c["key"] == "efficiency"][0]
     assert missing["score"] is None
@@ -390,7 +419,8 @@ def test_contributions_sum_to_the_composite_within_rounding_tolerance():
 
 
 def test_available_weight_reports_how_much_of_the_score_was_actually_measured():
-    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2)]
+    rows = _full_night_rows()[:28] + [_row("2026-07-01", sleep_duration_hours=6.2,
+                                                oura_sleep_total_seconds=22320.0)]  # ring recorded it
     b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
     assert b["available_weight"] == 0.25          # total_sleep alone
 

@@ -164,13 +164,15 @@ def test_compute_readiness_high_sleep_debt_drags_score_down():
     # 7 nights at baseline (8.0h), then today itself also logs a poor-but-
     # not-catastrophic night -- isolate sleep_debt_s's effect by comparing
     # against the same setup with a full night's sleep instead.
-    good_rows = [_day(n, 30.0, 55.0, 8.0) for n in range(1, 8)]
-    good_rows.append(_day(8, 30.0, 55.0, 8.0))
+    # Every night carries a ring reading (_contrib): since 2026-10-13 a day
+    # with none is NOT_COMPUTED rather than scored from Sleep Debt alone.
+    good_rows = [{**_day(n, 30.0, 55.0, 8.0), **_contrib(80.0)} for n in range(1, 8)]
+    good_rows.append({**_day(8, 30.0, 55.0, 8.0), **_contrib(80.0)})
     today = date(2026, 6, 8)
     good_score = readiness.compute_readiness(today, good_rows)
 
-    debt_rows = [_day(n, 30.0, 55.0, 8.0) for n in range(1, 8)]
-    debt_rows.append(_day(8, 30.0, 55.0, 4.5))  # today: short night
+    debt_rows = [{**_day(n, 30.0, 55.0, 8.0), **_contrib(80.0)} for n in range(1, 8)]
+    debt_rows.append({**_day(8, 30.0, 55.0, 4.5), **_contrib(80.0)})  # today: short night
     debt_score = readiness.compute_readiness(today, debt_rows)
 
     assert debt_score < good_score
@@ -313,12 +315,14 @@ def test_compute_readiness_trend_seeds_from_first_available_day():
 def test_compute_readiness_trend_matches_manual_ema_recurrence():
     # Establish a stable baseline, then a bad/bad/good/bad pattern —
     # verify the EMA recurrence exactly, day by day.
-    rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 11)]        # days 1-10: baseline
+    # A ring reading on every row (_contrib, constant, so the days still differ
+    # by their sleep alone): since 2026-10-13 a day with none is NOT_COMPUTED.
+    rows = [{**_day(n, 30.0, 55.0, 7.5), **_contrib(80.0)} for n in range(1, 11)]  # baseline
     rows += [
-        _day(11, 15.0, 65.0, 5.0),   # Sat — bad
-        _day(12, 14.0, 66.0, 4.8),   # Sun — bad
-        _day(13, 32.0, 54.0, 8.5),   # Mon — recovery day, good raw score
-        _day(14, 16.0, 64.0, 5.2),   # Tue (today) — out again, bad
+        {**_day(11, 15.0, 65.0, 5.0), **_contrib(80.0)},   # Sat — bad
+        {**_day(12, 14.0, 66.0, 4.8), **_contrib(80.0)},   # Sun — bad
+        {**_day(13, 32.0, 54.0, 8.5), **_contrib(80.0)},   # Mon — recovery day
+        {**_day(14, 16.0, 64.0, 5.2), **_contrib(80.0)},   # Tue (today) — out again
     ]
     alpha = 0.5
     expected_trend = None
@@ -459,14 +463,16 @@ def test_compute_readiness_computable_from_oura_contributors_alone():
         "recovery": 70.0, "body_temp": 90.0, "prev_activity": 85.0})
 
 
-def test_compute_readiness_backward_compatible_without_oura_fields():
-    # Rows with no oura_* keys at all (pre-enrichment shape) must still
-    # compute — the new fields are absent, not present-and-zero.
+def test_rows_without_any_ring_contributor_no_longer_score():
+    """Until 2026-10-13 rows with no oura_* keys still computed — and under
+    MODEL_VERSION 2 the only component they could score was Sleep Debt, a
+    trailing aggregate that needs no reading of the night at all. The athlete
+    approved the change (WP-11): no ring contributor, no readiness."""
     rows = [_day(n, 30.0, 55.0, 7.5) for n in range(1, 11)]
     today = date(2026, 6, 10)
-    score = readiness.compute_readiness(today, rows)
-    assert score != readiness.NOT_COMPUTED
-    assert score > 90.0  # perfect baseline-matching day, no degraded contributors
+    assert readiness.compute_readiness(today, rows) == readiness.NOT_COMPUTED
+    rows[-1] = {**rows[-1], **_contrib(80.0)}
+    assert readiness.compute_readiness(today, rows) != readiness.NOT_COMPUTED
 
 
 # --- Alcohol is NOT scored (MODEL_VERSION 2) ---------------------------------
@@ -692,13 +698,18 @@ def test_a_row_that_exists_for_another_reason_is_not_a_measurement():
         assert readiness.compute_readiness(date(2026, 6, 8), probe) == readiness.NOT_COMPUTED, extra
 
 
-def test_a_garmin_only_night_still_scores():
-    """The ring is worn far less often than the watch (see
-    services/sleep_fusion.py), so 'measured' must not mean 'Oura present' —
-    that would blank readiness on every night the ring was off."""
+def test_a_garmin_only_night_no_longer_scores():
+    """It used to, on purpose: the ring was worn far less often than the watch
+    (services/sleep_fusion.py). But all the ring's contributors are then
+    missing and Sleep Debt alone became the whole score — on 2026-08-16, the
+    Oura outage, that is how readiness and sleep read high on a watch-only
+    night. The athlete approved the change on 2026-10-13 (WP-11): no ring
+    contributor, no readiness. The night still counts as measured for the
+    Sleep screen's watch-only timeline."""
     rows = [_measured_night(n) for n in range(1, 8)]
     rows.append(_day(8, 31.0, 54.0, 7.2))     # blend readings, no oura_* keys
-    assert readiness.compute_readiness(date(2026, 6, 8), rows) != readiness.NOT_COMPUTED
+    assert readiness._was_measured(rows[-1])
+    assert readiness.compute_readiness(date(2026, 6, 8), rows) == readiness.NOT_COMPUTED
 
 
 def test_readiness_appears_once_the_night_lands():
