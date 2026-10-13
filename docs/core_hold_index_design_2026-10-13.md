@@ -1,8 +1,16 @@
 # Core score from timed holds — design for the athlete's OK (WP-15 step 6)
 
 The athlete's direction (2026-10-13): score core from the Bunkie holds against
-the 2025 log. This is the design. **Nothing is built yet**; four choices below
-need the athlete's answer first.
+the 2025 log. This is the design. **Nothing is built yet.**
+
+> **Decided 2026-10-13, all four choices:** (1) core shows its hold-time index
+> on its own card from the first test, provisional, and stays out of the
+> headline; (2) the lateral and medial lines, which match the 2025 log;
+> (3) a `tut_left` field — the build gives the athlete the one SQL line to
+> paste BEFORE its push, because a write naming a column Supabase lacks is
+> rejected whole; (4) the Bunkie lines were never timed, so the first core
+> point is Block B day 28, 2026-11-08. The build is its own session, as WP-15
+> said, and must land before that date.
 
 ## The answer
 

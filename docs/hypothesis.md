@@ -267,7 +267,9 @@ milder, faster-settling tightness, not its absence.
   re-registered here as a four-week run/walk build: same claim about the left hip, smaller
   doses, no decision run. Nothing else in P8-P11 changes — none of them was about the race.
   The Bunkie baseline (P5) moved with the failed week to 2026-09-20 and is scored at the
-  next boundary, where Block B's own day 28 re-times it.
+  next boundary, where Block B's own day 28 re-times it. (⚠ 2026-10-13: it was never
+  logged — the log holds no Bunkie test — so Block B day 28, 2026-11-08, is P5's FIRST
+  timing, and the athlete confirmed the lines were not timed outside the app.)
 
 - **v1.2, 2026-09-11** — Block A scored from the log (P2, P4 confirmed; P1, P3, P5, P6
   untested; P7 ambiguous and moved to the ledger). Block B's P8-P11 registered before its
