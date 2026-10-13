@@ -204,8 +204,8 @@ def parts_against_oura(rows: list[dict], conn: sqlite3.Connection, since: str) -
 def options(rows: list[dict], oura: dict, since: str) -> dict:
     """What each way of fixing Restfulness does to the total, night by night,
     through the score's own composite. A: Oura's own Restfulness contributor.
-    B: the same raw count on a band re-based on his own nights (100 at his 10th
-    percentile, 0 at his 90th). C: no change. D: the part removed and its
+    B: the same raw count on a band re-based on the athlete's own nights (100 at
+    the 10th percentile, 0 at the 90th). C: no change. D: the part removed and its
     weight shared among the other six."""
     rph_all = sorted(
         _num(r["oura_sleep_restless_periods"]) / (_num(r["oura_sleep_total_seconds"]) / 3600)

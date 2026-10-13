@@ -85,8 +85,8 @@ Oura uses more than this one count.
 | Timing | 5 % | −6.2 | −0.3 |
 | **Total score** | | **+3.9 (sd 6.4)** | |
 
-Our Total Sleep is scored against his own usual length and stops at 100, so
-a night of his usual length reads 100. Oura's own Total Sleep part reads 22.7
+Our Total Sleep is scored against the athlete's own usual length and stops at
+100, so a night of that usual length reads 100. Oura's own Total Sleep part reads 22.7
 points lower on the same nights. That is the largest single difference, and
 it is a design choice of this project (`sleep_score.py`, Total Sleep), not a
 fault. It is recorded here because a Restfulness fix alone moves the total
@@ -100,7 +100,7 @@ composite. "Gap" is our total minus Oura's total.
 | Option | Mean change of the score | Gap (sd) |
 |---|---|---|
 | **A. Use Oura's own Restfulness part (0–100)** — recommended | +5.4 | +9.3 (6.3) |
-| B. Keep the count, re-base the band on his own nights (100 at 36.2 per hour, 0 at 56.0) | +5.7 | +9.5 (7.2) |
+| B. Keep the count, re-base the band on the athlete's own nights (100 at 36.2 per hour, 0 at 56.0) | +5.7 | +9.5 (7.2) |
 | C. No change | 0 | +3.9 (6.4) |
 | D. Remove the part, share its weight among the other six | +8.0 | +11.9 (6.8) |
 
