@@ -208,6 +208,51 @@ def test_sync_metrics_history_persists_real_snapshot_values(monkeypatch):
     assert row[4] is not None and row[4] > 0  # strain computed from the AU logged that day
 
 
+def test_the_stored_strain_blends_heart_rate_the_way_the_card_does(monkeypatch):
+    """2026-10-13: the Home card passed the heart-rate rows to the shared
+    snapshot and this sync did not, so the stored history and the trend line
+    were RPE-only — 2026-08-21 showed about 7.9 and stored 14.2. The same
+    snapshot call now gets the same rows."""
+    from services import dashboard
+
+    ws = _FakeMetricsHistoryWorksheet()
+    repo = _repo_with_ws(ws)
+    au_rows = [{"date": "2026-07-20", "total_au": 300.0}]
+    hr_rows = [{"date": "2026-07-20", "hr_strain": 5.9, "edwards_load": 80.0}]
+    monkeypatch.setattr(repo, "get_biometric_rolling", lambda days=None, today=None: [])
+    monkeypatch.setattr(repo, "get_daily_session_au_weighted", lambda days=None, today=None: au_rows)
+    monkeypatch.setattr(repo, "get_current_stage", lambda: 2)
+    monkeypatch.setattr(repo, "get_session_hr_history", lambda start=None: hr_rows)
+    seen = []
+    real = dashboard.compute_daily_metrics_snapshot
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs.get("hr_rows"))
+        return real(*args, **kwargs)
+    monkeypatch.setattr(dashboard, "compute_daily_metrics_snapshot", spy)
+
+    repo.sync_metrics_history(days=1, today=datetime.date(2026, 7, 20))
+    assert seen == [hr_rows]
+    stored = next(r for r in ws.appended if r[0] == "2026-07-20")[4]
+    card = real(datetime.date(2026, 7, 20), [], au_rows, 2, hr_rows=hr_rows)["strain"]
+    rpe_only = real(datetime.date(2026, 7, 20), [], au_rows, 2)["strain"]
+    assert stored == card and card != rpe_only
+
+
+def test_a_failed_heart_rate_read_stores_the_rpe_figure(monkeypatch):
+    ws = _FakeMetricsHistoryWorksheet()
+    repo = _repo_with_ws(ws)
+    monkeypatch.setattr(repo, "get_biometric_rolling", lambda days=None, today=None: [])
+    monkeypatch.setattr(repo, "get_daily_session_au_weighted",
+                        lambda days=None, today=None: [{"date": "2026-07-20", "total_au": 300.0}])
+    monkeypatch.setattr(repo, "get_current_stage", lambda: 2)
+
+    def boom(start=None):
+        raise RuntimeError("store unreachable")
+    monkeypatch.setattr(repo, "get_session_hr_history", boom)
+    assert repo.sync_metrics_history(days=1, today=datetime.date(2026, 7, 20)) == 1
+
+
 def test_sync_metrics_history_uses_today_when_not_given(monkeypatch):
     ws = _FakeMetricsHistoryWorksheet()
     repo = _repo_with_ws(ws)

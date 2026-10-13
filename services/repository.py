@@ -3934,6 +3934,16 @@ class Repository:
         wake_adjustments, _sources = self.get_effective_wake_adjustments(
             start=(today - timedelta(days=days - 1)).isoformat(), end=today.isoformat(),
         )
+        # THE HEART-RATE ROWS, which the Home card passes and this did not
+        # (2026-10-13): the card blends heart-rate strain in when a watch
+        # activity matched, so the stored history and the trend line were the
+        # RPE figure alone — 2026-08-21 showed about 7.9 and stored 14.2. A
+        # failed read stores the RPE figure, as before.
+        try:
+            hr_rows = self.get_session_hr_history(
+                start=(today - timedelta(days=days + 28)).isoformat())
+        except Exception:
+            hr_rows = []
 
         # One read of the tab up front, not one per row — see _rows_by_key.
         existing = self._rows_by_key(self._metrics_history_ws(), "date")
@@ -3945,6 +3955,7 @@ class Repository:
                 continue
             snapshot = dashboard.compute_daily_metrics_snapshot(
                 d, bio_rows, au_rows, stage, wake_time_adjustments=wake_adjustments,
+                hr_rows=hr_rows,
             )
             snapshot["date"] = iso
             self.upsert_metrics_history_row(
