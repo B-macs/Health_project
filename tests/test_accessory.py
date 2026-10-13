@@ -26,6 +26,7 @@ import training_plan as tp
 from services import accessory as acc
 from services import flexibility as fx
 from services import rules
+from services import sessions as sess
 from services import strain_regions as sr
 from services.content_weighting import UNMAPPED_EXERCISE_WEIGHT
 from services.repository import Repository
@@ -180,12 +181,12 @@ def test_withheld_regional_acwr_is_simply_not_consulted():
 #  Tier
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_a_rest_day_gets_the_release_only_version():
+def test_a_rest_day_gets_the_warm_up_only_version():
     choice = acc.choose(plan_day=_plan_day(day_type="rest", rpe=2), today=TODAY)
     assert choice.tier == acc.TIER_SHRUNK
 
 
-def test_an_assessment_day_gets_the_release_only_version():
+def test_an_assessment_day_gets_the_warm_up_only_version():
     """Day 28 is where the block's exit criteria are judged — final working
     loads and the functional screen. Extra work beside them is a confound."""
     choice = acc.choose(plan_day=_plan_day(day_type="test", rpe=4), today=TODAY)
@@ -194,12 +195,12 @@ def test_an_assessment_day_gets_the_release_only_version():
     assert acc.choose(plan_day=tp.PLAN_STAGE2B[28], today=TODAY).tier == acc.TIER_SHRUNK
 
 
-def test_a_heavy_day_gets_the_release_only_version():
+def test_a_heavy_day_gets_the_warm_up_only_version():
     choice = acc.choose(plan_day=_plan_day(rpe=acc.HEAVY_DAY_RPE_TARGET), today=TODAY)
     assert choice.tier == acc.TIER_SHRUNK
 
 
-def test_a_reduced_volume_day_gets_the_release_only_version():
+def test_a_reduced_volume_day_gets_the_warm_up_only_version():
     choice = acc.choose(plan_day=_plan_day(),
                         volume_rec={"multiplier": acc.LOW_VOLUME_MULTIPLIER},
                         today=TODAY)
@@ -214,22 +215,19 @@ def test_a_moderate_day_gets_the_full_version():
 
 
 def test_the_shrunk_version_has_no_adaptation_seeking_work():
-    """Release and decompress. Nothing that asks for an adaptation, which is
+    """Decompress, mobilise, switch on. Nothing at a training dose, which is
     what lets it sit beside a heavy gym day without becoming a sixth session.
 
-    REFINED 2026-08-18, when the shrunk tier gained a 10-minute floor and
-    started filling from the release lists. A plain intersection with
-    _ACTIVATE gives a FALSE POSITIVE: Thoracic Extension (Rolled Towel) is in
-    both — it is mobility, and lying back over a towel breathing into the
-    position asks for no adaptation. What must never appear is something only
-    an activation list offers, so that is what this asserts. Narrower on
-    purpose, and the exercise it now allows is one the release lists already
-    contained."""
+    The fill is warm-up class (since 2026-10-13; release until then), and some
+    of it — the scapular items, the dead bug — also sits in an activation list
+    at the same switching-on dose. What must never appear is something ONLY an
+    activation list offers, so that is what this asserts."""
     shrunk = acc.choose(plan_day=_plan_day(day_type="rest", rpe=2), today=TODAY)
     activation = {ex["name"] for group in acc._ACTIVATE.values() for ex in group}
-    release = ({ex["name"] for ex in acc._SHRUNK_FILL}
+    warm_up = ({ex["name"] for ex in acc._SHRUNK_FILL}
                | {ex["name"] for ex in tp.ACCESSORY_HANG_LADDER})
-    activation_only = activation - release
+    activation_only = activation - warm_up
+    assert activation_only, "the check must have something to catch"
     assert not (set(shrunk.names) & activation_only), sorted(
         set(shrunk.names) & activation_only)
 
@@ -251,68 +249,82 @@ def test_both_tiers_rate_low_enough_to_still_be_an_accessory_session():
 # ─────────────────────────────────────────────────────────────────────────────
 
 def test_an_exercise_already_in_todays_session_is_not_repeated():
-    day = _plan_day(exercises=[tp.ANTERIOR_HIP_RELEASE])
-    choice = acc.choose(plan_day=day, battery_baseline_captured=True, today=TODAY)
-    assert tp.ANTERIOR_HIP_RELEASE["name"] not in choice.names
+    day = _plan_day(exercises=[tp.STANDING_PSOAS_MARCH])
+    choice = acc.choose(plan_day=day, today=TODAY)
+    assert tp.STANDING_PSOAS_MARCH["name"] not in choice.names
 
 
 def test_a_collision_substitutes_rather_than_leaving_the_slot_empty():
-    """The block's own release block runs two of these in 28 of 28 days. A rule
-    that merely DROPPED a collision would empty the release slot every single
-    day — deleting the half of this session that justifies it."""
-    for day_num, plan_day in tp.PLAN_STAGE2B.items():
-        choice = acc.choose(plan_day=plan_day, battery_baseline_captured=True,
-                            today=TODAY)
-        release_names = {ex["name"] for ex in
-                         (*acc._RELEASE_A, *acc._RELEASE_A_PRE_BASELINE)}
-        assert set(choice.names) & release_names, (
-            f"day {day_num} produced an accessory session with no release item"
-        )
+    """Block B's warm-up runs the march on most days. The front-of-hip slot
+    moves on to the 90/90 hip lift rather than going empty — and when today
+    already did both, it stays empty: the answer then is to add less."""
+    marched = acc.choose(plan_day=_plan_day(exercises=[tp.STANDING_PSOAS_MARCH]),
+                         today=TODAY)
+    assert marched.tier == acc.TIER_FULL
+    assert tp.NINETY_NINETY_HIP_LIFT["name"] in marched.names
+    both = acc.choose(plan_day=_plan_day(exercises=[tp.STANDING_PSOAS_MARCH,
+                                                    tp.NINETY_NINETY_HIP_LIFT]),
+                      today=TODAY)
+    assert not {ex["name"] for ex in acc._FRONT_OF_HIP} & set(both.names)
 
 
 def test_no_exercise_appears_twice_in_one_accessory_session():
-    for plan_day in tp.PLAN_STAGE2B.values():
-        for baseline in (False, True):
-            names = acc.choose(plan_day=plan_day,
-                               battery_baseline_captured=baseline,
-                               today=TODAY).names
+    for plan in (tp.PLAN_STAGE2B, tp.PLAN_BLOCK_B):
+        for plan_day in plan.values():
+            names = acc.choose(plan_day=plan_day, today=TODAY).names
             assert len(names) == len(set(names))
 
 
 def test_every_authored_day_of_the_block_produces_a_usable_session():
-    for day_num, plan_day in tp.PLAN_STAGE2B.items():
-        choice = acc.choose(plan_day=plan_day, today=TODAY)
-        assert len(choice.exercises) >= 3, f"day {day_num}: {choice.names}"
-        assert choice.estimated_minutes <= 20, f"day {day_num}: {choice.names}"
+    """The live block and the one before it, every day, with tomorrow's day
+    passed the way the screen passes it."""
+    for plan in (tp.PLAN_STAGE2B, tp.PLAN_BLOCK_B):
+        for day_num, plan_day in plan.items():
+            choice = acc.choose(plan_day=plan_day, tomorrow_plan_day=plan.get(day_num + 1),
+                                today=TODAY)
+            assert len(choice.exercises) >= 3, f"day {day_num}: {choice.names}"
+            assert 10 <= choice.estimated_minutes <= 20, f"day {day_num}: {choice.names}"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  The battery gate
+#  No release, since 2026-10-13
 # ─────────────────────────────────────────────────────────────────────────────
 
-def test_the_front_of_hip_protocol_is_held_until_the_battery_has_a_baseline():
-    """Not a preference. The seated tilt is the battery's central measurement
-    and starting this intervention before the three cold baseline mornings is
-    the pre-declared failure mode."""
-    choice = acc.choose(plan_day=_plan_day(), battery_baseline_captured=False,
-                        today=TODAY)
-    assert tp.ANTERIOR_HIP_RELEASE["name"] not in choice.names
-    assert any("cold baseline" in r for r in choice.reasons)
+def test_no_release_item_in_any_recipe():
+    """Athlete, 2026-10-13: "Drop the release" — the second session follows
+    Block B, which dropped its release block on 2026-09-22. Nothing the module
+    can emit is a release, by the plan's own list or by its name."""
+    for name in acc.accessory_names():
+        assert name not in sess.RELEASE_EXERCISE_NAMES, name
+        assert "release" not in name.lower(), name
+    retired = {ex["name"] for ex in acc._RETIRED_RELEASE}
+    assert not retired & set(acc.accessory_names())
+    for plan in (tp.PLAN_STAGE2B, tp.PLAN_BLOCK_B):
+        for plan_day in plan.values():
+            names = acc.choose(plan_day=plan_day, today=TODAY).names
+            assert not retired & set(names), names
 
 
-def test_a_hip_flexor_release_is_still_offered_before_the_baseline_exists():
-    """The athlete asked for a hip-flexor/psoas release by name. The gate covers
-    the sustained-pressure protocol, not the standing stretch, so the ask is
-    still answered meanwhile."""
-    choice = acc.choose(plan_day=_plan_day(), battery_baseline_captured=False,
-                        today=TODAY)
-    assert tp.ACC_STANDING_HIP_FLEXOR["name"] in choice.names
+def test_the_retired_release_stays_named_for_its_revert():
+    """The revert is one line, so the six items stay authored and listed: the
+    front-of-hip ball, the standing hip-flexor stretch, the upper-glute
+    release, the piriformis PNF, and the two halves of the right pec and scar
+    protocol."""
+    retired = {ex["name"] for ex in acc._RETIRED_RELEASE}
+    assert retired == {
+        tp.ANTERIOR_HIP_RELEASE["name"], tp.ACC_STANDING_HIP_FLEXOR["name"],
+        tp.UPPER_GLUTE_RELEASE_5MIN["name"], tp.PIRIFORMIS_PNF_5MIN["name"],
+        tp.PEC_SCAR_RELEASE["name"], tp.ANTERIOR_SHOULDER_RECIPROCATION["name"],
+    }
 
 
-def test_the_front_of_hip_protocol_leads_once_the_baseline_exists():
-    choice = acc.choose(plan_day=_plan_day(), battery_baseline_captured=True,
-                        today=TODAY)
-    assert tp.ANTERIOR_HIP_RELEASE["name"] in choice.names
+def test_the_front_of_hip_is_moved_not_released():
+    """His pick for the moving warm-up leads the slot that used to press on
+    the front of the hip."""
+    choice = acc.choose(plan_day=_plan_day(), today=TODAY)
+    assert choice.tier == acc.TIER_FULL
+    assert acc._FRONT_OF_HIP[0]["name"] == "Standing Psoas March"
+    assert "Standing Psoas March" in choice.names
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -329,6 +341,22 @@ def test_lower_body_activation_is_suppressed_the_day_before_a_retest():
                          legs_must_stay_clean=True, today=TODAY)
     assert guarded.region != "lower_body"
     assert any("retest" in r for r in guarded.reasons)
+    assert not [n for n in guarded.names if tc.EXERCISE_BODY_REGION.get(n) == "lower_body"]
+
+
+def test_no_leg_work_the_day_before_the_flexibility_session():
+    """Block B's Wednesday carries no leg work so Thursday's flexibility
+    morning reads clean; the accessory session must not undo that. Its shrunk
+    tier held only release until 2026-10-13, so the rule only became needed
+    when the march joined its fill."""
+    for wednesday in (3, 10, 17, 24):
+        choice = acc.choose(plan_day=tp.PLAN_BLOCK_B[wednesday],
+                            tomorrow_plan_day=tp.PLAN_BLOCK_B[wednesday + 1], today=TODAY)
+        legs = [n for n in choice.names if tc.EXERCISE_BODY_REGION.get(n) == "lower_body"]
+        assert not legs, (wednesday, legs)
+    free = acc.choose(plan_day=tp.PLAN_BLOCK_B[7], tomorrow_plan_day=tp.PLAN_BLOCK_B[8],
+                      today=TODAY)
+    assert "Standing Psoas March" in free.names, "a rest day before a gym day is not held back"
 
 
 def test_nothing_the_session_can_emit_dirties_a_retest_unclassified():
@@ -361,11 +389,9 @@ def test_the_passive_hang_is_held_out_of_every_session():
     assert acc.HANG_MAX_STEP < len(tp.ACCESSORY_HANG_LADDER)
     held = tp.ACCESSORY_HANG_LADDER[-1]["name"]
     assert held == "Passive Dead Hang"
-    for plan_day in tp.PLAN_STAGE2B.values():
-        for baseline in (False, True):
-            assert held not in acc.choose(plan_day=plan_day,
-                                          battery_baseline_captured=baseline,
-                                          today=TODAY).names
+    for plan in (tp.PLAN_STAGE2B, tp.PLAN_BLOCK_B):
+        for plan_day in plan.values():
+            assert held not in acc.choose(plan_day=plan_day, today=TODAY).names
 
 
 def test_the_shrunk_tier_always_uses_the_easiest_hang():
@@ -498,13 +524,15 @@ def test_the_day_dict_is_the_shape_the_renderer_reads():
 
 
 def test_the_shrunk_heading_does_not_promise_work_the_session_lacks():
-    """A shrunk session is a hang, a release and two minutes of breathing. A
+    """A shrunk session is a hang and warm-up work from one fixed list. A
     heading of "Shoulders & Posture" over it would name work that is not there.
-    Caught on screen, not by reasoning about it."""
+    Caught on screen, not by reasoning about it. ("Release Only" until
+    2026-10-13, when the release left.)"""
     shrunk = acc.choose(plan_day=_plan_day(day_type="rest", rpe=2),
                         region_rows=_rows(core=200.0, lower_body=200.0), today=TODAY)
     assert shrunk.tier == acc.TIER_SHRUNK and shrunk.region == "upper_body"
-    assert acc.build_day(shrunk)["objective"] == "Accessory — Release Only"
+    assert acc.build_day(shrunk)["objective"] == "Accessory — Mobility & Warm-Up"
+    assert "release" not in acc.ACCESSORY_PHASE.lower()
 
     full = acc.choose(plan_day=_plan_day(rpe=4),
                       region_rows=_rows(core=200.0, lower_body=200.0), today=TODAY)

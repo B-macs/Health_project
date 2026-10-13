@@ -689,6 +689,16 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="caution", laterality="axial",
     ),
     MovementRule(
+        movement="thread the needle",
+        reason="Thoracic rotation on hands and knees, unloaded. The ribs turn and the "
+               "lower back stays square: rotation is the shear direction the L3-L5 disc "
+               "findings name, so the range ends where the hips start to turn. CAUTION for "
+               "that reason, as thoracic extension is. Ruled 2026-10-13, when the accessory "
+               "session began offering it; it had run on Block B's Wednesday returning "
+               "`unknown`.",
+        stage_cap=1, severity="caution", laterality="axial",
+    ),
+    MovementRule(
         movement="prone decompression",
         reason="Prone decompression breathing. Unloaded, position-only, and the "
                "down-regulating close to a session rather than a stressor in it.",

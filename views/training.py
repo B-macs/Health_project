@@ -2621,17 +2621,19 @@ def _accessory_choice(active, day_num: int | None, policy_directive: dict):
 
     Every read here is wrapped, and each failure degrades to the conservative
     side rather than to an error: no regional history means the tie-break
-    decides, no battery record means the front-of-hip protocol stays held, and
-    an unreadable phase means today is treated as unplanned. A health page that
+    decides, and an unreadable phase means today is treated as unplanned. A
+    health page that
     crashes because a Sheets read timed out is worse than one that offers a
     slightly blunter session.
     """
     r = repo.get_repository()
     today = date.today()
 
-    plan_day = None
+    plan_day = tomorrow_day = None
     if active is not None and day_num is not None:
-        plan_day = sess.calendar_plan(active).get(day_num)
+        _calendar = sess.calendar_plan(active)
+        plan_day = _calendar.get(day_num)
+        tomorrow_day = _calendar.get(day_num + 1)
 
     try:
         rows = _region_rows()
@@ -2651,10 +2653,9 @@ def _accessory_choice(active, day_num: int | None, policy_directive: dict):
     except Exception:
         region_acwr = None
 
-    baseline_captured, legs_clean = False, False
+    legs_clean = False
     try:
         stored = r.get_flexibility_assessments()
-        baseline_captured = bool(stored)
         if stored:
             status, _ = fx.retest_readiness(
                 stored[-1].taken_on, today,
@@ -2665,8 +2666,8 @@ def _accessory_choice(active, day_num: int | None, policy_directive: dict):
 
     return acc.choose(plan_day=plan_day, region_rows=rows, region_acwr=region_acwr,
                       volume_rec=policy_directive,
-                      battery_baseline_captured=baseline_captured,
-                      legs_must_stay_clean=legs_clean, today=today)
+                      legs_must_stay_clean=legs_clean, tomorrow_plan_day=tomorrow_day,
+                      today=today)
 
 
 def _start_accessory_session() -> None:
@@ -2791,10 +2792,7 @@ def _render_accessory_session(policy: dict, readiness_modifier: float,
 
     # ── Overview, until Start is tapped ─────────────────────────────────────
     if not st.session_state.get("tp_started"):
-        st.caption(
-            f"{n_ex} items · about {sess.estimate_duration(exercises)} min "
-            f"(reads low — per-side work is counted once)"
-        )
+        st.caption(f"{n_ex} items · about {sess.estimate_duration(exercises)} min")
         _render_exercise_timeline(exercises)
         with st.expander("Why this session", expanded=False):
             for reason in day.get("accessory_reasons") or ():

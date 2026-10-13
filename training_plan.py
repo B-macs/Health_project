@@ -5469,6 +5469,10 @@ def _bb_gym_b(week: int) -> dict:
 
 _S2B_MOB = _s2b_mobility(4)["exercises"]
 
+#: A module-level copy the accessory session can name (services/accessory.py
+#: defines no exercise). Wednesday keeps its own copy below.
+BB_THREAD_THE_NEEDLE = _take(_S2B_MOB, "Thread-the-Needle (Thoracic Rotation)")
+
 
 def _bb_mobility(week: int) -> dict:
     """Wednesday. The desk-intervention day: the weekly grip grade FIRST and

@@ -20,12 +20,14 @@ flexibility cluster runs between its mechanics and its prescription.
 WHY IT IS NOT A SIXTH SESSION, which is the first objection to answer.
 `rules.STAGE_CONSTRAINTS[2]["session_freq_max"]` is 5 and weeks 3-4 of the
 current block already sit at exactly 5. This session does not spend one of
-those, because it is authored in the family the physiotherapist already
-cleared and the athlete already runs daily: release work at ~50% effort inside
-a ~10 minute dose, which docs/training/release_protocols_2026-08-10.md states
-in terms is "not a training stressor". What the regional strain decides is
-whether anything gets ACTIVATED beside the release — and on a heavy day the
-answer is nothing, which is what TIER_SHRUNK is — release only, never adaptation-seeking, and since 2026-08-18 held to a 10-minute working floor.
+those, because it is authored in the family the athlete already runs before
+every session: Block B's moving warm-up, posture items and mobility at their
+switching-on dose. Until 2026-10-13 that family was release work at ~50%
+effort; the release is out (see the recipe note below). What the regional
+strain decides is whether anything gets ACTIVATED beside the warm-up work — and
+on a heavy day the answer is nothing, which is what TIER_SHRUNK is: warm-up
+class only, never a training dose, and since 2026-08-18 held to a 10-minute
+working floor where today's own session leaves enough to fill it.
 
 ⚠ IT STILL COUNTS. The session logs like any other, feeds Foster AU and
 therefore Strain and ACWR, and appears in the day's regional split. Volume
@@ -45,8 +47,8 @@ REGIONAL ACWR MAY SWAP A REGION AND MAY NEVER REFUSE A SESSION.
 `strain_regions.region_acwr` returns `advisory_only=True, hard_locked=False`
 unconditionally and by design; building a refusal on it would be a per-region
 volume cap by another door. Athlete's decision, 2026-08-16: silently swap,
-never refuse — there is always a session, because the release half of it is
-most useful precisely on the days the numbers look worst.
+never refuse — there is always a session, because its easy half is most useful
+precisely on the days the numbers look worst.
 """
 
 from __future__ import annotations
@@ -54,6 +56,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
+import training_constants as tc
 import training_plan as tp
 from services import sessions as sess
 from services import strain_regions as sr
@@ -80,7 +83,7 @@ ACCESSORY_DAY_KEY: int = -1
 #: marking a plan day done; a test pins that it does.
 ACCESSORY_TYPE: str = "Accessory"
 
-ACCESSORY_PHASE: str = "Accessory — Release & Activation"
+ACCESSORY_PHASE: str = "Accessory — Mobility & Activation"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -88,9 +91,10 @@ ACCESSORY_PHASE: str = "Accessory — Release & Activation"
 # ─────────────────────────────────────────────────────────────────────────────
 #
 # The athlete's rule, 2026-08-16: available EVERY day, but the recipe shrinks
-# rather than the button refusing. TIER_SHRUNK is release only — decompress,
-# release, breathe — with no adaptation-seeking work at all, so it can sit
-# beside a heavy gym day or a rest day without being either.
+# rather than the button refusing. TIER_SHRUNK is warm-up class only —
+# decompress, mobilise, switch on — with nothing at a training dose, so it can
+# sit beside a heavy gym day or a rest day without being either. (Release only
+# until 2026-10-13.)
 
 TIER_FULL: str = "full"
 TIER_SHRUNK: str = "shrunk"
@@ -148,48 +152,49 @@ _SHRUNK_HANG_STEP: int = 1
 #  The recipes
 # ─────────────────────────────────────────────────────────────────────────────
 #
-# Five slots, always in this order, because INHIBIT THEN ACTIVATE is the
-# profile's own sequencing rule and running it the other way round trains the
-# compensation:
+# ⚠ NO RELEASE SINCE 2026-10-13 (athlete: "Drop the release", answering whether
+# this session should follow Block B, which dropped its release block on
+# 2026-09-22 — "I like the program as is without release in it, continue like
+# this"). The two release slots became a MOVED front of the hip and a mobility
+# slot, both drawn from what Block B already runs before every session. Out of
+# the recipe, all still authored in training_plan: the front-of-hip ball, the
+# upper-glute release, the piriformis PNF, the standing hip-flexor stretch, and
+# the right pec and scar protocol (its two techniques went together — the
+# reciprocation is the second half of that one release).
+# REVERT with Block B's own signal (docs/hypothesis.md P12): the Wednesday grip
+# grade at 2+ on the right, or the hip-crest or front-of-hip symptoms coming
+# back, brings the release back here as well; the right upper-chest burning
+# coming back brings the pec protocol back.
+#
+# Four slots, always in this order:
 #
 #   1  decompress    the hang
-#   2  release A     the front of the hip — the athlete's explicit ask, and a
-#                    release, so it never adds load
-#   3  release B     region-dependent
+#   2  front of hip  moved, not released: the psoas march, his own pick
+#   3  mobility      region-dependent, moving or positional
 #   4  activate      two items in the freshest region  (FULL only)
-#   5  down-regulate breathing
 #
-# Six items, except upper, which runs to seven: Techniques A and B of the pec
-# protocol are ONE physiotherapist prescription in two parts, and splitting
-# them across days would be running half a protocol.
-#
-# ⚠ EVERY SLOT IS AN ORDERED CANDIDATE LIST, AND THAT IS NOT TIDINESS.
-# The block's own release block runs Upper Glute / TFL Self-Release and the
-# Piriformis PNF in 28 of 28 days, and Single-Leg Glute Bridge in 11 — so a
-# rule that merely DROPS a collision would leave the release slot empty on
-# every single day, i.e. would delete the half of this session that justifies
-# it. A slot therefore SUBSTITUTES down its list to the first item today's own
-# session is not already doing. Standing Hip Flexor Release and Prone
-# Decompression Breathing appear in 0 of 28 days, which is why each list ends
-# somewhere that can always be reached.
+# ⚠ EVERY SLOT IS AN ORDERED CANDIDATE LIST, AND THAT IS NOT TIDINESS. Block
+# B's warm-up runs the march and the 90/90 hip lift on most days, so a rule
+# that merely DROPPED a collision would leave a slot empty most days. A slot
+# therefore SUBSTITUTES down its list to the first item today's own session is
+# not already doing — and when the whole list is already done, the slot stays
+# empty: the right answer then is to add less.
 
-_RELEASE_B: dict[str, tuple[dict, ...]] = {
-    # Both, always — Techniques A and B are one prescription.
-    "upper_body": (tp.PEC_SCAR_RELEASE, tp.ANTERIOR_SHOULDER_RECIPROCATION),
-    # First free one.
-    "lower_body": (tp.ACC_STANDING_HIP_FLEXOR, tp.UPPER_GLUTE_RELEASE_5MIN,
-                   tp.PIRIFORMIS_PNF_5MIN),
-    "core":       (tp.ACC_THORACIC_EXTENSION, tp.PIRIFORMIS_PNF_5MIN),
+#: Slot 2: the front of the hip, MOVED. The march first; the hip lift when
+#: today's session already marched.
+_FRONT_OF_HIP: tuple[dict, ...] = (tp.STANDING_PSOAS_MARCH, tp.NINETY_NINETY_HIP_LIFT)
+
+#: Slot 3: mobility for the chosen region, first free one.
+_MOBILITY: dict[str, tuple[dict, ...]] = {
+    "upper_body": (tp.ACC_THORACIC_EXTENSION, tp.BB_THREAD_THE_NEEDLE),
+    "core":       (tp.BB_THREAD_THE_NEEDLE, tp.ACC_THORACIC_EXTENSION),
+    "lower_body": (tp.HIP_AIRPLANE, tp.NINETY_NINETY_HIP_LIFT, tp.ACC_THORACIC_EXTENSION),
 }
 
-#: Slot 3 takes every candidate for upper (one protocol) and only the first
-#: free candidate for the others.
-_RELEASE_B_TAKE_ALL: frozenset[str] = frozenset({"upper_body"})
-
 _ACTIVATE: dict[str, tuple[dict, ...]] = {
-    # Rounded shoulders, and the order is the argument: the front wall is
-    # released first, the segment is mobilised second, and only then are the
-    # retractors asked to work. Prone Y-Raise is the one scapular item the log
+    # Rounded shoulders, and the order is the argument: the segment is
+    # mobilised first (slot 3), and only then are the retractors asked to
+    # work. Prone Y-Raise is the one scapular item the log
     # shows genuinely lapsing (last run 2026-07-24); the isometric is four
     # 3-second efforts rather than a hold, because the tissue is
     # perfusion-limited left trapezius where a sustained low-level contraction
@@ -209,32 +214,14 @@ _ACTIVATE: dict[str, tuple[dict, ...]] = {
 #: to reach further down the list for something to do.
 _ACTIVATE_COUNT: int = 2
 
-#: Slot 2, in order. The anterior-hip item is the physiotherapist's own
-#: 2026-08-10 recommendation and the one overactive structure that had no
-#: release anywhere in the block until week 3 — so it leads whenever it is
-#: allowed. Standing Hip Flexor Release is the fallback and appears in 0 of the
-#: block's 28 days, which is what makes this slot always fillable.
-_RELEASE_A: tuple[dict, ...] = (tp.ANTERIOR_HIP_RELEASE, tp.ACC_STANDING_HIP_FLEXOR,
-                                tp.UPPER_GLUTE_RELEASE_5MIN)
-
-#: What slot 2 falls back to before the flexibility battery has a cold baseline.
-#: NOT a preference — release_protocols_2026-08-10.md is explicit that the
-#: SUSTAINED-PRESSURE protocol must not start until the three baseline mornings
-#: are captured, because the seated tilt is the battery's central measurement
-#: and starting an intervention first contaminates the one number this project
-#: has been protecting for weeks. That is the pre-declared failure mode, so the
-#: code refuses to walk into it.
-#:
-#: The standing stretch is NOT held by that gate, and the distinction is the
-#: document's own: what it sequences is Protocol 2, a daily sustained-pressure
-#: course whose claimed mechanism is an adjunct multiplier on the tilt. A hip
-#: flexor stretch is a different technique on a different timescale, it was a
-#: Stage 1 staple, and short hip flexors do not limit the seated forward tilt —
-#: if anything they assist it. So the athlete's explicit ask for a hip-flexor
-#: release is still answered before the baseline exists, by the item the gate
-#: does not cover.
-_RELEASE_A_PRE_BASELINE: tuple[dict, ...] = (tp.ACC_STANDING_HIP_FLEXOR,
-                                             tp.UPPER_GLUTE_RELEASE_5MIN)
+#: RETIRED FROM THE RECIPE 2026-10-13, with the rest of the release (see the
+#: recipe note above). Kept named so the revert is one line: the battery gate
+#: that held the front-of-hip ball protocol until the flexibility battery had
+#: a cold baseline went with it, and would come back with it.
+_RETIRED_RELEASE: tuple[dict, ...] = (
+    tp.ANTERIOR_HIP_RELEASE, tp.ACC_STANDING_HIP_FLEXOR, tp.UPPER_GLUTE_RELEASE_5MIN,
+    tp.PIRIFORMIS_PNF_5MIN, tp.PEC_SCAR_RELEASE, tp.ANTERIOR_SHOULDER_RECIPROCATION,
+)
 
 #: RETIRED FROM THE RECIPE 2026-08-18 — athlete: "decompression breathing is
 #: not training". It closed every accessory session as a down-regulating slot,
@@ -249,50 +236,52 @@ _RETIRED_DOWN_REGULATE = tp.ACC_BREATHING
 #: THE SHRUNK TIER'S FLOOR, in seconds of WORK — athlete, 2026-08-18: "the
 #: extra training set is too short it should be at least 10 mins".
 #:
-#: It was hang + one release + two minutes of breathing, which on a gym day
-#: (where the block's own release block has already taken the glute, piriformis
-#: and hip items) collapsed to two real exercises. The screen said "about 10
+#: It was hang + one release + two minutes of breathing, which on a Stage 2B
+#: gym day (where the block's own release block had already taken the glute,
+#: piriformis and hip items) collapsed to two real exercises. The screen said "about 10
 #: min" because estimate_duration counts a per-side item ONCE; the truth was
 #: nearer six, and two of those were breathing.
 #:
-#: Measured in laterality-aware working time, which is what the athlete
-#: experiences and what estimate_duration under-reports. The tier fills from
-#: release-only candidates until it clears this, so a thin day extends the
-#: session rather than shortening it.
-SHRUNK_MIN_WORK_SECONDS: int = 600
+#: Until 2026-10-13 the floor was 600 s of WORK, both sides counted, because
+#: the session estimate then counted a per-side item once and charged 30 s a
+#: changeover — a floor cannot sit on a number known to read low. Since
+#: 2026-09-11 the time model (sessions.session_seconds) counts both sides and
+#: the measured changeovers, so the floor now sits on the time the session
+#: TAKES, which is what "10 mins" meant. Twelve, for a margin over the ten he
+#: named. The work floor had been met by long release holds with few
+#: changeovers; with the release gone it pushed a rest day to 22 minutes, past
+#: the 10-20 minute ask.
+SHRUNK_MIN_MINUTES: int = 12
 
-def work_seconds(exercises) -> int:
-    """Working time with BOTH SIDES counted.
-
-    services.sessions.estimate_duration deliberately does not do this (a
-    recorded open issue), and the accessory screen even says so out loud —
-    "reads low — per-side work is counted once". A duration FLOOR cannot be
-    built on a number known to read low, so this counts what the athlete
-    actually performs. Every unilateral item in the accessory pools genuinely
-    runs both sides; the block's right-only items are not in them.
-    """
-    total = 0
-    for ex in exercises:
-        secs = sess.exercise_duration_seconds(ex)
-        if ex.get("laterality") == "unilateral":
-            secs *= 2
-        total += secs
-    return total
+#: The top of the athlete's ask: "this would be a 10-20 min training". The fill
+#: never adds an item that would take the session past it.
+SESSION_MAX_MINUTES: int = 20
 
 
-#: What the shrunk tier reaches for, in order, once its two fixed slots are
-#: placed. RELEASE ONLY — the tier's contract is "no adaptation-seeking work",
-#: so filling it must never reach into _ACTIVATE. Ordered: the chosen region's
-#: own release work first, then the other regions', then whatever is left of
-#: slot 2. Each list ends somewhere the block does not use, which is what keeps
-#: it fillable on a gym day when the release block has already taken the hip
-#: items.
+def modelled_minutes(exercises) -> float:
+    """The session's modelled length in minutes — the same measured model the
+    plan sessions are timed on, both sides and every changeover counted."""
+    return sess.session_seconds(list(exercises)) / 60
+
+
+#: What the shrunk tier reaches for, in order, after the hang. WARM-UP CLASS
+#: ONLY — the tier's contract is "nothing at a training dose": positional and
+#: moving mobility first, then Block B's own moving warm-up and posture items,
+#: then the switching-on activation items `sessions.PREPARATION_NAMES` already
+#: counts as preparation, and last the scapular isometric, the left trapezius's
+#: own decongestant (four light 3-second efforts). On a heavy gym day most of
+#: the warm-up is already done, so the session comes in short of the floor —
+#: and says so — rather than repeating work or reaching for a training dose.
 _SHRUNK_FILL: tuple[dict, ...] = (
-    *_RELEASE_B["upper_body"],
-    *_RELEASE_B["core"],
-    *_RELEASE_B["lower_body"],
-    *_RELEASE_A,
     tp.ACC_THORACIC_EXTENSION,
+    tp.BB_THREAD_THE_NEEDLE,
+    tp.STANDING_PSOAS_MARCH,
+    tp.NINETY_NINETY_HIP_LIFT,
+    tp.HIP_AIRPLANE,
+    tp.PRONE_Y_RAISE,
+    tp.PREP_SCAPULAR,
+    tp.PREP_DEAD_BUG,
+    tp.SCAPULAR_ISOMETRIC,
 )
 
 
@@ -333,9 +322,10 @@ class AccessoryChoice:
 
     @property
     def estimated_minutes(self) -> int:
-        """⚠ Reads LOW on this session. `sessions.estimate_duration` does not
-        read `laterality`, so every per-side item counts once — a known gap
-        recorded in the rest-interval review, not introduced here."""
+        """The minutes the screen states. Since 2026-09-11 the time model
+        counts both sides of a per-side item and the measured changeovers; it
+        read low before that, which is what the old work floor was built
+        around."""
         return sess.estimate_duration(list(self.exercises))
 
 
@@ -403,22 +393,24 @@ def _yesterday_region_au(region_rows: list[dict], today: date) -> tuple[dict[str
 def _tier(plan_day: dict | None, volume_rec: dict | None) -> tuple[str, str]:
     day_type = (plan_day or {}).get("day_type")
     if day_type == "rest":
-        return TIER_SHRUNK, "today is a rest day — release only, no adaptation-seeking work"
+        return TIER_SHRUNK, "today is a rest day — mobility and warm-up work only, nothing at a training dose"
     if day_type == "test":
         # The day the block's exit criteria are judged on — final working loads
         # and the functional screen. Extra work beside them is a confound, and
         # the same contamination class the retest rule guards against.
         return TIER_SHRUNK, (
-            "today is an assessment day — release only, so nothing here shows up in the "
-            "numbers the block is judged on"
+            "today is an assessment day — mobility and warm-up work only, so nothing here "
+            "shows up in the numbers the block is judged on"
         )
     rpe_target = int((plan_day or {}).get("session_rpe_target") or 0)
     if rpe_target >= HEAVY_DAY_RPE_TARGET:
-        return TIER_SHRUNK, f"today's session targets RPE {rpe_target} — release only"
+        return TIER_SHRUNK, (f"today's session targets RPE {rpe_target} — mobility and "
+                             f"warm-up work only")
     mult = (volume_rec or {}).get("multiplier")
     if mult is not None and float(mult) <= LOW_VOLUME_MULTIPLIER:
         return TIER_SHRUNK, (
-            f"the engine has today at {float(mult):.2f} of normal volume — release only"
+            f"the engine has today at {float(mult):.2f} of normal volume — mobility and "
+            f"warm-up work only"
         )
     return TIER_FULL, "a moderate day — there is room for activation work"
 
@@ -453,8 +445,8 @@ def choose(*,
            region_rows: list[dict] | None = None,
            region_acwr: dict[str, dict] | None = None,
            volume_rec: dict | None = None,
-           battery_baseline_captured: bool = False,
            legs_must_stay_clean: bool = False,
+           tomorrow_plan_day: dict | None = None,
            today: date | None = None) -> AccessoryChoice:
     """Decide today's accessory session. Pure, deterministic, and total — it
     always returns a session.
@@ -466,16 +458,27 @@ def choose(*,
                    and is therefore simply not consulted, which is right — the
                    first week of a block has nothing to say yet.
     `volume_rec`   `engine.volume_recommendation(...)`.
-    `battery_baseline_captured`  whether the flexibility battery has a cold
-                   baseline. False withholds the anterior-hip release, because
-                   starting it first contaminates the tilt measurement.
-    `legs_must_stay_clean`  the next morning is a flexibility retest, so
-                   lower-body activation is suppressed — a leg day the day
-                   before reads as extra tightness in exactly the tissue under
-                   test.
+    `legs_must_stay_clean`  the next morning is a flexibility retest, so no
+                   lower-body item runs at all — the region moves to the trunk
+                   and the march and the hip airplane are skipped. A leg day
+                   the day before reads as extra tightness in exactly the
+                   tissue under test.
+    `tomorrow_plan_day`  tomorrow's PLAN day. When it is a flexibility session
+                   the legs stay clean too — the plan's own rule, which is why
+                   Block B's Wednesday carries no leg work. Before the release
+                   left this session its shrunk tier held no leg work at all,
+                   so the rule only became needed on 2026-10-13.
+
+    (`battery_baseline_captured` left with the front-of-hip ball protocol it
+    gated, 2026-10-13.)
     """
     today = today or date.today()
     rows = list(region_rows or ())
+    if (tomorrow_plan_day or {}).get("session_kind") == "flexibility" and not legs_must_stay_clean:
+        legs_must_stay_clean = True
+        tomorrow_flexibility = True
+    else:
+        tomorrow_flexibility = False
 
     tier, tier_reason = _tier(plan_day, volume_rec)
     reasons: list[str] = [tier_reason]
@@ -493,24 +496,27 @@ def choose(*,
     region, region_reasons = _region(load, region_acwr)
     reasons.extend(region_reasons)
 
+    tomorrow_why = ("tomorrow is the flexibility session" if tomorrow_flexibility
+                    else "a flexibility retest falls tomorrow morning")
     if region == "lower_body" and legs_must_stay_clean:
         region = "core"
         reasons.append(
-            "a flexibility retest falls tomorrow morning — lower-body work would read as "
-            "tightness in exactly the tissue being measured, so the trunk takes it instead"
+            f"{tomorrow_why} — lower-body work would read as tightness in exactly the "
+            f"tissue being stretched or measured, so the trunk takes it instead"
         )
 
     hang_step = _SHRUNK_HANG_STEP if tier == TIER_SHRUNK else min(HANG_STEP, HANG_MAX_STEP)
     hang_step = max(1, min(hang_step, HANG_MAX_STEP, len(tp.ACCESSORY_HANG_LADDER)))
     hang = tp.ACCESSORY_HANG_LADDER[hang_step - 1]
 
-    # Never dose the same exercise twice in one day: the block's own release
-    # block already runs two of these in 28 of 28 days, and the anterior-hip
-    # item from day 15. Every slot below therefore SUBSTITUTES past a collision
-    # rather than dropping it — see the note on the recipe tables.
+    # Never dose the same exercise twice in one day: Block B's warm-up already
+    # runs the march and the 90/90 hip lift on most days. Every slot below
+    # therefore SUBSTITUTES past a collision rather than dropping it — see the
+    # note on the recipe tables.
     taken: set[str] = set()
     planned_today = {ex.get("name") for ex in ((plan_day or {}).get("exercises") or ())}
     substituted: list[str] = []
+    kept_off_legs: list[str] = []
 
     def _free(candidates, limit: int | None = 1) -> list[dict]:
         """First `limit` candidates today's own session is not already doing."""
@@ -524,25 +530,18 @@ def choose(*,
             if name in planned_today:
                 substituted.append(name)
                 continue
+            if legs_must_stay_clean and tc.EXERCISE_BODY_REGION.get(name) == "lower_body":
+                kept_off_legs.append(name)
+                continue
             taken.add(name)
             out.append(ex)
         return out
 
     items: list[dict] = [*_free((hang,))]
 
-    if battery_baseline_captured:
-        items.extend(_free(_RELEASE_A))
-    else:
-        items.extend(_free(_RELEASE_A_PRE_BASELINE))
-        reasons.append(
-            "the flexibility battery has no cold baseline yet, so the sustained front-of-hip "
-            "protocol is held — starting it first would contaminate the seated tilt it is "
-            "judged on. The standing hip-flexor release covers the same tissue meanwhile"
-        )
-
     if tier == TIER_FULL:
-        b_limit = None if region in _RELEASE_B_TAKE_ALL else 1
-        items.extend(_free(_RELEASE_B[region], limit=b_limit))
+        items.extend(_free(_FRONT_OF_HIP))
+        items.extend(_free(_MOBILITY[region]))
         activation = _free(_ACTIVATE[region], limit=_ACTIVATE_COUNT)
         items.extend(activation)
         if len(activation) < _ACTIVATE_COUNT:
@@ -551,26 +550,29 @@ def choose(*,
                 f"the right answer there is to add less, not to reach further down the list"
             )
     else:
-        # FILL TO THE FLOOR. The shrunk tier used to be hang + one release +
-        # breathing, and on a gym day — where the block's release block has
-        # already taken the hip items — that left two real exercises. Reaching
-        # for MORE RELEASE keeps the tier's contract intact: nothing here is
-        # adaptation-seeking, so a longer session is still not a training
-        # stressor. Region-ordered rather than arbitrary, and it stops the
-        # moment the floor is cleared rather than emptying the pool.
+        # FILL TO THE FLOOR, from warm-up-class work only, in a fixed order, and
+        # stop the moment the floor is cleared rather than emptying the pool.
         for candidate in _SHRUNK_FILL:
-            if work_seconds(items) >= SHRUNK_MIN_WORK_SECONDS:
+            if modelled_minutes(items) >= SHRUNK_MIN_MINUTES:
                 break
+            if modelled_minutes([*items, candidate]) > SESSION_MAX_MINUTES:
+                continue
             items.extend(_free((candidate,)))
-        short_by = SHRUNK_MIN_WORK_SECONDS - work_seconds(items)
+        short_by = SHRUNK_MIN_MINUTES - modelled_minutes(items)
         if short_by > 0:
             reasons.append(
-                f"today's own session already uses most of the release list, so this "
-                f"comes in {short_by // 60} min under the {SHRUNK_MIN_WORK_SECONDS // 60}-minute "
+                f"today's own session already does most of the warm-up work, so this "
+                f"comes in {short_by:.0f} min under the {SHRUNK_MIN_MINUTES}-minute "
                 f"floor — the honest outcome, since the alternative is repeating work "
-                f"already done today or reaching into adaptation-seeking work this tier "
-                f"exists to exclude"
+                f"already done today or reaching for a training dose this tier exists to "
+                f"exclude"
             )
+
+    if kept_off_legs:
+        reasons.append(
+            f"{tomorrow_why}, so no leg work runs here: "
+            + ", ".join(dict.fromkeys(kept_off_legs))
+        )
 
     if substituted:
         reasons.append(
@@ -601,14 +603,13 @@ def build_day(choice: AccessoryChoice) -> dict:
     adoption that silently kills the readiness auto-shift.
     """
     # ⚠ THE SHRUNK TIER DOES NOT NAME THE REGION, and that is not cosmetic.
-    # A shrunk session is a hang and release work drawn from every region's
+    # A shrunk session is a hang and warm-up-class work drawn from one fixed
     # list until it clears its floor — so it contains no region-specific
     # PROGRAMME, and a heading of "Shoulders & Posture" would promise work the
-    # session does not centre on. The region is still CHOSEN and still recorded
-    # (it decides what the fill reaches for first), it is simply not claimed on
-    # screen.
+    # session does not centre on. The region is still CHOSEN and still
+    # recorded, it is simply not claimed on screen.
     if choice.tier == TIER_SHRUNK:
-        objective = "Accessory — Release Only"
+        objective = "Accessory — Mobility & Warm-Up"
     else:
         objective = "Accessory — " + {"upper_body": "Shoulders & Posture",
                                       "core": "Trunk",
@@ -656,10 +657,10 @@ def session_note(choice: AccessoryChoice) -> str:
 #: which is the Stage 1 over-count arriving by a new door.
 ACCESSORY_LIBRARY: tuple[dict, ...] = (
     *tp.ACCESSORY_HANG_LADDER,
-    *_RELEASE_A,
-    *_RELEASE_A_PRE_BASELINE,
-    *(ex for group in _RELEASE_B.values() for ex in group),
+    *_FRONT_OF_HIP,
+    *(ex for group in _MOBILITY.values() for ex in group),
     *(ex for group in _ACTIVATE.values() for ex in group),
+    *_SHRUNK_FILL,
 )
 
 
