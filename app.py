@@ -183,10 +183,23 @@ _NOT_COMPUTED     = readiness_model.NOT_COMPUTED
 _today = date.today()
 _params = st.query_params
 
-try:
-    selected_date = date.fromisoformat(_params.get("d", str(_today)))
-except ValueError:
-    selected_date = _today
+if "_home_date_opened" not in st.session_state:
+    # The first run of a browser session: a past day survives only when it was
+    # picked today, i.e. this is a reconnect (dash.home_date_on_open). Anything
+    # else — the Home Screen app reopening an address from 17 September — opens
+    # on today, and the stale keys leave the address.
+    st.session_state["_home_date_opened"] = True
+    selected_date = dash.home_date_on_open(
+        _params.get("d"), _params.get(dash.HOME_DATE_SET_ON_PARAM), _today)
+    if selected_date == _today:
+        for _stale in ("d", dash.HOME_DATE_SET_ON_PARAM):
+            if _stale in st.query_params:
+                del st.query_params[_stale]
+else:
+    try:
+        selected_date = min(date.fromisoformat(_params.get("d", str(_today))), _today)
+    except ValueError:
+        selected_date = _today
 
 view        = _params.get("view", "home")
 
@@ -223,7 +236,14 @@ def _go(**params) -> None:
 
     Callbacks run BEFORE the script reruns, so the values written here are
     what the `_params` reads at the top of this file see on the next pass.
+
+    A day passes through dash.home_date_params: today writes no ?d= at all,
+    and a past day writes the day it was picked on beside it, which is what
+    lets the next session tell a reconnect from a reopened old address.
     """
+    if "d" in params:
+        chosen = params.pop("d")
+        params.update(dash.home_date_params(chosen, date.today()))
     for key, value in params.items():
         if value is None:
             if key in st.query_params:
@@ -327,6 +347,17 @@ _NAV_BUTTON_CSS = """<style>
 }
 .st-key-fab_checkin button:hover { background: #EDEFF5 !important; }
 .st-key-fab_checkin button:focus { outline: none !important; box-shadow: 0 4px 20px rgba(0,0,0,0.45) !important; }
+
+/* ── Back to today (only while a past day shows) ────────────────────────── */
+.st-key-go_today { display: flex !important; justify-content: center !important;
+    margin: 0 0 8px 0 !important; }
+.st-key-go_today button {
+    min-height: 0 !important; padding: 5px 14px !important; border-radius: 14px !important;
+    background: transparent !important; border: 1px solid #1E2840 !important;
+}
+.st-key-go_today button p { font-size: 12px !important; color: #8FCDF0 !important;
+    margin: 0 !important; letter-spacing: 0.3px !important; }
+.st-key-go_today button:focus { outline: none !important; box-shadow: none !important; }
 
 /* No .st-key-detail_back rules: the in-panel back control was REMOVED rather
    than converted (see _detail_header), because the fixed header carries a real
@@ -715,6 +746,10 @@ def _url_state(**overrides) -> str:
     if _strain_window_week:
         state["rw"] = 1
     state.update(overrides)
+    # The day goes through the same rule as _go: a full navigation starts a
+    # new session, which keeps a past day only if the address says it was
+    # picked today (dash.home_date_on_open).
+    state.update(dash.home_date_params(state.pop("d", None), _today))
     return "?" + "&".join(f"{k}={v}" for k, v in state.items() if v is not None)
 
 
@@ -2464,6 +2499,11 @@ st.markdown(_NAV_BUTTON_CSS, unsafe_allow_html=True)  # positions the buttons be
 _render_header_buttons()                           # ‹ / › / ← , into the header bar
 st.button("+", key="fab_checkin", on_click=_open_checkin,
           help="Morning check-in")                 # FAB → Check-In
+if not is_today:
+    # One tap back to today (2026-10-13). The arrows step a day at a time, and
+    # a past day is something picked during this visit, never where Home opens.
+    st.button("Back to today", key="go_today", on_click=_go,
+              kwargs={"d": None, "pt": None}, help="Show today")
 
 # A failed biometric read blanks every card on this page — the arcs go grey
 # and read "No Readings", which is indistinguishable from a night you simply

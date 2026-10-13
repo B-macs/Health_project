@@ -1401,6 +1401,48 @@ def point_selection_key(chart: str, index: int) -> str:
     return f"{chart}:{int(index)}"
 
 
+# ─── The day Home shows ─────────────────────────────────────────────────────
+#
+# The athlete, 2026-10: "When opening readiness - 17th Sept was opened it
+# should be today's date." Home keeps its day in the address (?d=) so a
+# reconnect in the middle of a visit lands where it was — and the Home Screen
+# app reopens the LAST address, so a day picked on 17 September came back
+# weeks later. A picked past day now also carries the day it was picked on
+# (?ds=). A new browser session keeps the past day only when it was picked
+# TODAY, which is what a reconnect is; any other start opens on today.
+
+#: The query parameter holding the day a past Home day was picked on.
+HOME_DATE_SET_ON_PARAM = "ds"
+
+
+def home_date_on_open(d_param, set_on_param, today: date) -> date:
+    """The day Home opens on at the START of a browser session.
+
+    Today, unless `d_param` is a past day picked today (`set_on_param` equal to
+    today): an absent, malformed or future `d`, or a past day picked on an
+    earlier day or with no record of when, all open on today."""
+    try:
+        chosen = date.fromisoformat(str(d_param)) if d_param else today
+    except ValueError:
+        return today
+    if chosen >= today:
+        return today
+    return chosen if set_on_param == today.isoformat() else today
+
+
+def home_date_params(chosen, today: date) -> dict:
+    """The address state for a picked Home day. Today writes NOTHING — an
+    absent ?d= means today, so a card tapped today can no longer pin the
+    address to a date that is yesterday by tomorrow. A past day writes the day
+    and the day it was picked on. Values of None remove the keys."""
+    if chosen is None:
+        return {"d": None, HOME_DATE_SET_ON_PARAM: None}
+    chosen = chosen if isinstance(chosen, date) else date.fromisoformat(str(chosen))
+    if chosen >= today:
+        return {"d": None, HOME_DATE_SET_ON_PARAM: None}
+    return {"d": chosen.isoformat(), HOME_DATE_SET_ON_PARAM: today.isoformat()}
+
+
 def _as_iso_date(d) -> str:
     return d.isoformat() if isinstance(d, date) else str(d or "")
 
