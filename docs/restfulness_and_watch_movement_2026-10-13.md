@@ -2,11 +2,17 @@
 
 The athlete's question: *"Restfulness — can we take into account Garmin
 movements through the night?"* This document answers it, and records a
-larger fault the measurement found. **Nothing in the score is changed yet.**
-The decision is the athlete's (WP-19 step 3).
+larger fault the measurement found. **The score was changed after the athlete's decision (option A).**
+The decision was the athlete's (WP-19 step 3): option A, see below.
 
 Every number below comes from `scripts/compare_restfulness_sources.py`, run
 read-only on the 2026-10-09 backup. Re-run it before you change anything.
+
+> **Decided 2026-10-13: option A.** The athlete chose Oura's own Restfulness
+> part. It is built as Sleep Score `MODEL_VERSION` 2: on the same 95 nights the
+> new score reads exactly option A's figures below (+5.4 on average, 9.3 above
+> Oura's total). The stored history is re-computed once, after the Supabase
+> switch, in the same run as the other stored-row corrections.
 
 ## The answer
 

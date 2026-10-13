@@ -3515,6 +3515,11 @@ class Repository:
                 "sleep_regularity":       r.get("readiness_sleep_regularity") or None,
                 "activity_balance":       r.get("readiness_activity_balance") or None,
                 "resting_heart_rate":     r.get("readiness_resting_heart_rate") or None,
+                # The one SLEEP contributor read from the same row: Sleep
+                # Score MODEL_VERSION 2 scores Restfulness from Oura's own
+                # 0-100 reading (2026-10-13). _float_or_none, not `or None`:
+                # a genuine 0 is a reading.
+                "sleep_restfulness":      _float_or_none(r.get("sleep_restfulness")),
             }
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
         }
@@ -3723,6 +3728,7 @@ class Repository:
                     oura_sleep_regularity=contributors.get("sleep_regularity"),
                     oura_activity_balance=contributors.get("activity_balance"),
                     oura_resting_heart_rate_score=contributors.get("resting_heart_rate"),
+                    oura_sleep_restfulness=contributors.get("sleep_restfulness"),
                 )
             sleep_raw = oura_sleep.get(d)
             if sleep_raw:

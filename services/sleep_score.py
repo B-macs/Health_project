@@ -9,6 +9,15 @@ philosophy as services/readiness.py::compute_readiness: build our own
 0-100 composite from raw values rather than relaying a third party's
 finished number.
 
+ONE EXCEPTION SINCE MODEL_VERSION 2 (2026-10-13): Restfulness is Oura's own
+0-100 Restfulness contributor. The raw restless-period count it replaces runs
+at a median of 46.7 per hour, and this project's band for it (2-12 per hour)
+scored 0 on 426 of 427 ring nights — a fixed 10% handicap carrying nothing.
+The athlete chose Oura's own reading (option A of
+docs/restfulness_and_watch_movement_2026-10-13.md) over a re-guessed band:
+Oura made both the count and the score, so its scale is the only one known
+to fit. readiness.py already scores from Oura's contributors the same way.
+
 All 7 contributors are Oura-exclusive (no Garmin equivalent — same
 situation as readiness.py's oura_recovery_index trio), sourced from the
 *main* sleep period Oura reports (services.biometrics.pick_main_sleep_period
@@ -27,24 +36,20 @@ Total Sleep   25%   blended sleep_duration_hours vs personal baseline (capped at
 Efficiency    20%   Oura's own raw efficiency reading (already 0-100), used directly
 REM Sleep     15%   rem seconds as % of total sleep, ramped over an ideal band
 Deep Sleep    15%   deep seconds as % of total sleep, ramped over an ideal band
-Restfulness   10%   restless periods per hour of sleep, inverted — UNVERIFIED unit,
-                    see caveat below
+Restfulness   10%   Oura's own Restfulness contributor, 0-100 (MODEL_VERSION 2;
+                    version 1 inverted restless periods per hour — see below)
 Latency       10%   seconds to fall asleep, banded (too fast or too slow both penalised)
 Timing         5%   bedtime deviation from your own rolling-average bedtime
 
-Restfulness caveat: Oura's `restless_periods` field's exact unit/scale
-isn't verified against a live payload (same caveat class as the Garmin HRV
-field mapping) — the per-hour rate and band below are a starting guess,
-worth confirming against a real logged night before trusting at the
-margins.
-
-⚠ MEASURED 2026-10-13, AND THE GUESS IS WRONG: the input runs at a median of
-46.7 restless periods per hour (427 ring nights since 2023, range 3.6-120),
-so _RESTLESS_BAND (2-12) scores Restfulness 0 on 426 of 427 nights — a fixed
-10% handicap that carries no information. The fix is the athlete's decision
-and is NOT made here: docs/restfulness_and_watch_movement_2026-10-13.md holds
-the options, measured by scripts/compare_restfulness_sources.py. Any fix moves
-every stored score, so it ships with a version stamp and a re-derive.
+Restfulness, version 1 (until 2026-10-13): restless periods per hour of
+sleep, inverted over a band of 2-12 per hour, whose unit the docstring always
+flagged as an unverified guess. MEASURED 2026-10-13, THE GUESS WAS WRONG: the
+input runs at a median of 46.7 per hour (427 ring nights since 2023, range
+3.6-120), so the band scored 0 on 426 of 427 nights. The athlete chose
+option A (Oura's own contributor) from the four measured in
+docs/restfulness_and_watch_movement_2026-10-13.md; the band is gone, and
+scripts/compare_restfulness_sources.py keeps a copy of it to re-measure.
+The change ships with a re-derive of every stored row (MODEL_VERSION).
 """
 
 from __future__ import annotations
@@ -61,8 +66,15 @@ _BEDTIME_WINDOWS = (7, 14, 28, 56)   # same progressive schedule as sleep_baseli
 _REM_PCT_BAND  = ((10.0, 0.0), (22.0, 100.0))               # % of total sleep
 _DEEP_PCT_BAND = ((5.0, 0.0), (15.0, 100.0))                # % of total sleep
 _LATENCY_BAND  = ((0.0, 0.0), (10.0, 100.0), (20.0, 100.0), (45.0, 0.0))  # minutes
-_RESTLESS_BAND = ((2.0, 100.0), (12.0, 0.0))                # restless periods / hour
 _TIMING_BAND   = ((30.0, 100.0), (180.0, 0.0))              # minutes deviation from your average bedtime
+
+#: Which Sleep Score model produced a number. 2 (2026-10-13): Restfulness is
+#: Oura's own contributor instead of a band over restless periods per hour.
+#: Not stored per row — the Supabase metrics_history table has no version
+#: column (readiness's stamp reaches only the frozen Sheets copy) — so a
+#: change of model ships with a re-derive of EVERY stored row, which keeps the
+#: stored series one version throughout.
+MODEL_VERSION = 2
 
 _WEIGHTS = {
     "total_sleep": 0.25,
@@ -285,12 +297,14 @@ def _contributor_scores(
     rem_s  = _interp(rem_raw / total_s * 100.0, _REM_PCT_BAND) if rem_raw is not None and total_s else None
     deep_s = _interp(deep_raw / total_s * 100.0, _DEEP_PCT_BAND) if deep_raw is not None and total_s else None
 
-    # ── Restfulness — restless periods per hour of sleep, inverted ───────────
+    # ── Restfulness — Oura's own Restfulness contributor (MODEL_VERSION 2) ───
+    #  The restless-period count stays as the row's raw value, for the record;
+    #  it no longer scores (see the module docstring). No contributor, no
+    #  score: the part is missing and its weight renormalises away.
     restless_raw = _get("oura_sleep_restless_periods")
-    restfulness_s = (
-        _interp(restless_raw / (total_s / 3600.0), _RESTLESS_BAND)
-        if restless_raw is not None and total_s else None
-    )
+    restfulness_s = _get("oura_sleep_restfulness")
+    if restfulness_s is not None:
+        restfulness_s = max(0.0, min(100.0, restfulness_s))
 
     # ── Latency — minutes to fall asleep, banded both sides ──────────────────
     latency_raw = _get("oura_sleep_latency_seconds")

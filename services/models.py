@@ -170,6 +170,13 @@ class BiometricRecord:
     oura_sleep_rem_seconds: float | None = None
     oura_sleep_latency_seconds: float | None = None
     oura_sleep_restless_periods: float | None = None
+    # Oura's own Restfulness CONTRIBUTOR (0-100) from the daily sleep summary —
+    # pre-scored, unlike the raw fields around it. Sleep Score MODEL_VERSION 2
+    # (2026-10-13, the athlete's choice) scores Restfulness from it: the raw
+    # restless-period count runs at a median of 46.7 per hour, so the band
+    # this project guessed (2-12 per hour) scored 0 on 426 of 427 nights.
+    # docs/restfulness_and_watch_movement_2026-10-13.md has the measurement.
+    oura_sleep_restfulness: float | None = None
     oura_sleep_bedtime_start: str | None = None  # ISO datetime string
     # Raw awake-time seconds from the same main sleep period — feeds the
     # per-night wake-time adjustment (services.repository.get_wake_time_

@@ -7,6 +7,8 @@ missing-data re-normalization.
 
 from datetime import date
 
+import pytest
+
 from services import sleep_score
 
 
@@ -80,6 +82,10 @@ def _full_night_rows() -> list[dict]:
         sleep_duration_hours=5.98, oura_sleep_efficiency=74.0,
         oura_sleep_total_seconds=21540, oura_sleep_rem_seconds=5040,
         oura_sleep_deep_seconds=2940, oura_sleep_restless_periods=18,
+        # Oura's own Restfulness, which scores the part since MODEL_VERSION 2
+        # (2026-10-13). 90 is about what the version-1 band gave this night's
+        # 18 periods in 5.98 h (89.9).
+        oura_sleep_restfulness=90.0,
         oura_sleep_latency_seconds=720, oura_sleep_awake_seconds=7440,
         oura_sleep_bedtime_start="2026-06-30T22:42:00+00:00",
     ))
@@ -91,8 +97,11 @@ def test_compute_sleep_score_is_unchanged_for_a_fixed_fully_scored_night():
 
 
 def test_compute_sleep_score_is_unchanged_for_a_night_with_a_wake_time_adjustment():
+    # 89.7 until 2026-10-13. Re-pinned for MODEL_VERSION 2: Restfulness is the
+    # fixture's Oura reading (90.0) instead of the band's 89.92, +0.008 on the
+    # total, which crosses the rounding step. The arithmetic is unchanged.
     assert sleep_score.compute_sleep_score(
-        date(2026, 7, 1), _full_night_rows(), {"2026-07-01": 30.0}) == 89.7
+        date(2026, 7, 1), _full_night_rows(), {"2026-07-01": 30.0}) == 89.8
 
 
 def test_compute_sleep_score_is_unchanged_when_renormalising_a_single_contributor():
@@ -165,7 +174,8 @@ def test_full_good_night_scores_near_100():
         oura_sleep_total_seconds=28800.0,   # 8h
         oura_sleep_rem_seconds=6336.0,      # 22% of total -> top of REM band
         oura_sleep_deep_seconds=4320.0,     # 15% of total -> top of Deep band
-        oura_sleep_restless_periods=1.0,    # 0.125/hr -> well under the 2/hr floor
+        oura_sleep_restless_periods=1.0,
+        oura_sleep_restfulness=100.0,       # Oura's own Restfulness (MODEL_VERSION 2)
         oura_sleep_latency_seconds=900.0,   # 15 min -> dead centre of ideal band
         oura_sleep_bedtime_start="2026-07-20T23:00:00+00:00",
     )]
@@ -181,7 +191,8 @@ def test_full_bad_night_scores_low():
         oura_sleep_total_seconds=14400.0,   # 4h
         oura_sleep_rem_seconds=0.0,         # 0% -> below REM floor
         oura_sleep_deep_seconds=0.0,        # 0% -> below Deep floor
-        oura_sleep_restless_periods=48.0,   # 12/hr -> at/over the restless ceiling
+        oura_sleep_restless_periods=48.0,
+        oura_sleep_restfulness=0.0,         # Oura's own Restfulness (MODEL_VERSION 2)
         oura_sleep_latency_seconds=0.0,     # fell asleep instantly -> latency floor
         oura_sleep_bedtime_start="2026-07-21T03:00:00+00:00",  # far off an 11 PM baseline
     )]
@@ -487,3 +498,51 @@ def test_breakdown_is_deterministic_for_the_same_inputs():
     rows = _full_night_rows()
     assert (sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows)
             == sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows))
+
+
+# ─── Restfulness is Oura's own contributor (MODEL_VERSION 2, 2026-10-13) ────
+#  The version-1 band (100 at 2, 0 at 12 restless periods per hour) scored 0 on
+#  426 of 427 real nights: the input runs at a median of 46.7 per hour. The
+#  athlete chose option A of docs/restfulness_and_watch_movement_2026-10-13.md.
+
+def _one_night(**fields):
+    return _baseline_rows(hours=8.0) + [_row(
+        "2026-07-20", sleep_duration_hours=8.0, oura_sleep_total_seconds=28800.0,
+        oura_sleep_efficiency=90.0, **fields)]
+
+
+def _restfulness(rows):
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 20), rows)
+    return next(c for c in b["contributors"] if c["key"] == "restfulness")
+
+
+def test_restfulness_scores_oura_s_own_reading():
+    part = _restfulness(_one_night(oura_sleep_restfulness=64.0,
+                                   oura_sleep_restless_periods=360.0))
+    assert part["score"] == 64.0
+    assert part["raw"] == pytest.approx(45.0), "the count stays as the row's raw value"
+
+
+def test_a_typical_restless_count_no_longer_scores_zero():
+    """45 restless periods per hour is a median night. Version 1 scored it 0."""
+    part = _restfulness(_one_night(oura_sleep_restfulness=71.0,
+                                   oura_sleep_restless_periods=360.0))
+    assert part["score"] == 71.0
+
+
+def test_without_oura_s_reading_the_part_is_missing_not_zero():
+    """The count alone no longer scores, so a night without Oura's daily
+    reading leaves the part out and its weight renormalises away."""
+    rows = _one_night(oura_sleep_restless_periods=360.0)
+    assert _restfulness(rows)["score"] is None
+    assert "restfulness" in sleep_score.sleep_score_breakdown(date(2026, 7, 20), rows)["missing"]
+
+
+def test_oura_s_reading_is_kept_inside_zero_to_one_hundred():
+    assert _restfulness(_one_night(oura_sleep_restfulness=104.0))["score"] == 100.0
+    assert _restfulness(_one_night(oura_sleep_restfulness=-3.0))["score"] == 0.0
+
+
+def test_the_model_version_says_two():
+    assert sleep_score.MODEL_VERSION == 2
+    assert not hasattr(sleep_score, "_RESTLESS_BAND"), "the version-1 band is retired"

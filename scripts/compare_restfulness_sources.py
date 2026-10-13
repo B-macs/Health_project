@@ -12,7 +12,8 @@ and nothing on the network.
 
 Three parts:
 
-  1. THE SCALE. sleep_score._RESTLESS_BAND scores Oura's restless_periods per
+  1. THE SCALE. VERSION_1_BAND (sleep_score's band until 2026-10-13) scored
+     Oura's restless_periods per
      hour of sleep: 100 at 2, 0 at 12. How many real nights land inside it.
   2. OUR PARTS AGAINST OURA'S. Each of our seven sub-scores minus Oura's own
      contributor of the same name, and what the difference is worth on the
@@ -25,7 +26,8 @@ Three parts:
      ring's own series that count tracks Oura's restless_periods, which is
      what makes it a fair yardstick for the watch's series.
 
-Measured 2026-10-13 on the 2026-10-09 backup (427 ring nights since 2023):
+Measured 2026-10-13 on the 2026-10-09 backup, under Sleep Score version 1
+(427 ring nights since 2023; since version 2 the restfulness row reads ~0):
     restless periods per hour   median 46.7, range 3.6-120; 1 of 427 under 12
     Oura's own Restfulness      median 54, range 17-98; rank correlation with
                                 the count alone -0.54 (422 nights)
@@ -60,6 +62,11 @@ from services.config import Config  # noqa: E402
 from services.repository import Repository  # noqa: E402
 
 _SLEEP_STAGES = {sleep_fusion.DEEP, sleep_fusion.LIGHT, sleep_fusion.REM}
+# The band Sleep Score version 1 scored Restfulness with: 100 at 2 restless
+# periods per hour, 0 at 12. Kept here, not in sleep_score.py, so the
+# measurement that retired it can still be re-run (MODEL_VERSION 2 scores
+# Oura's own contributor instead).
+VERSION_1_BAND = ((2.0, 100.0), (12.0, 0.0))
 _OURA_PARTS = {"total_sleep": "sleep_total_sleep", "efficiency": "sleep_efficiency",
                "restfulness": "sleep_restfulness", "rem": "sleep_rem_sleep",
                "deep": "sleep_deep_sleep", "latency": "sleep_latency", "timing": "sleep_timing"}
@@ -157,7 +164,7 @@ def scale(rows: list[dict], conn: sqlite3.Connection) -> dict:
         "range_per_hour": (round(min(rph), 1), round(max(rph), 1)),
         "nights_under_12": sum(1 for v in rph if v < 12),
         "nights_scored_above_0": sum(
-            1 for v in rph if sleep_score._interp(v, sleep_score._RESTLESS_BAND) > 0),
+            1 for v in rph if sleep_score._interp(v, VERSION_1_BAND) > 0),
     }
     if len(pairs) >= 3:
         theirs = [p[1] for p in pairs]
@@ -205,8 +212,10 @@ def options(rows: list[dict], oura: dict, since: str) -> dict:
     """What each way of fixing Restfulness does to the total, night by night,
     through the score's own composite. A: Oura's own Restfulness contributor.
     B: the same raw count on a band re-based on the athlete's own nights (100 at
-    the 10th percentile, 0 at the 90th). C: no change. D: the part removed and its
-    weight shared among the other six."""
+    the 10th percentile, 0 at the 90th). C: version 1, the count on
+    VERSION_1_BAND. D: the part removed and its weight shared among the other
+    six. Each is built from the six other parts as scored today, so the result
+    does not depend on which version sleep_score.py currently runs."""
     rph_all = sorted(
         _num(r["oura_sleep_restless_periods"]) / (_num(r["oura_sleep_total_seconds"]) / 3600)
         for r in rows
@@ -230,15 +239,17 @@ def options(rows: list[dict], oura: dict, since: str) -> dict:
             continue
         others = [(c["score"], c["weight"]) for c in b["contributors"]
                   if c["key"] != "restfulness" and c["score"] is not None]
+        old = sleep_score._composite(
+            others + [(sleep_score._interp(rest["raw"], VERSION_1_BAND), rest["weight"])])
         new = {
             "A": sleep_score._composite(others + [(theirs_rest, rest["weight"])]),
             "B": sleep_score._composite(others + [(sleep_score._interp(rest["raw"], band),
                                                    rest["weight"])]),
             "D": sleep_score._composite(others),
         }
-        gaps["C"].append(b["score"] - theirs_total)
+        gaps["C"].append(old - theirs_total)
         for k, v in new.items():
-            shifts[k].append(v - b["score"])
+            shifts[k].append(v - old)
             gaps[k].append(v - theirs_total)
     if not gaps["C"]:
         return {}
