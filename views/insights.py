@@ -231,7 +231,17 @@ def _bioage_card_css(key: str) -> str:
 # desktop card rather than staying a fixed height; min/max-height clamp the two
 # ends. The derived illustrations keep their own native aspect ratio and render
 # via background-size:contain, so the full image is always visible.
-_CARD_DIMENSIONS_CSS = "aspect-ratio:1194/356;min-height:220px;max-height:420px;"
+#
+# ⚠ THE WIDTH COMES FIRST, and it is what keeps these cards on a phone screen
+# (athlete, 2026-10: "Strength page is not aligned to the page it goes off the
+# page to the right"). With no width of its own, a box with an aspect ratio and
+# a minimum height is widened to keep the ratio: 220 px tall at 1194/356 is
+# 738 px wide, so on a 390 px phone the hero and the muscle-balance card ran
+# 740 px and the page scrolled sideways to 756. Width 100% makes the width
+# fixed and the min-height wins on the height instead — 358 x 220 measured,
+# page 390. The Metabolism hero shares this string and had the same fault.
+_CARD_DIMENSIONS_CSS = ("width:100%;box-sizing:border-box;"
+                        "aspect-ratio:1194/356;min-height:220px;max-height:420px;")
 
 _STRENGTH_FACEPLATE_DIR = _BIOAGE_BG_DIR / "body_faceplates_v2"
 
