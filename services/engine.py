@@ -1422,6 +1422,9 @@ def _volume_recommendation_core(
         return {
             "label":              "REST / DELOAD",
             "driver":             DRIVER_BIOMETRICS,
+            # The named reading on its own, for Home's line under the card —
+            # Training already prints it as the headline (2026-10-13).
+            "cause":              cause,
             "multiplier":         0.0,
             # A RECOMMENDATION, SAID AS ONE. This used to read "No loaded
             # training. Mobility and light walking only." -- an instruction,
@@ -1470,6 +1473,9 @@ def _volume_recommendation_core(
         return {
             "label":              "REDUCED VOLUME  (−25%)",
             "driver":             DRIVER_BIOMETRICS,
+            # The named reading — including the baseline-drift message, which
+            # on an all-green day is the only reason there is (2026-10-13).
+            "cause":              cause,
             "multiplier":         0.75,
             "action":             f"{cause} Scale total volume down 20–30%. "
                                   f"Hold intensity targets unchanged — do not increase load today.",
@@ -1495,8 +1501,8 @@ def _volume_recommendation_core(
 
     # All clear — train the session as prescribed.
     #
-    # ⚠ THIS SENTENCE IS READ BY THE ATHLETE. services.insights.directive_copy
-    # prints a green day's `action` verbatim on the Autoregulation screen, so it
+    # ⚠ THIS SENTENCE IS READ BY THE ATHLETE. The Insights Engine Data panel
+    # prints a green day's `action` verbatim (views/insights.py), so it
     # is a prescription, not a log line. Until 2026-09-18 it read "Apply standard
     # progressive overload: +2.5 kg (Stage 2+) or +1 rep per set (Stage 1)", and
     # both halves were wrong by then: the app has not added weight for a good

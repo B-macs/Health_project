@@ -15,33 +15,8 @@ def test_no_streamlit_import():
             assert node.module is None or node.module.split(".")[0] != "streamlit"
 
 
-# ─── directive_copy ─────────────────────────────────────────────────────────
-
-def test_directive_copy_green_uses_the_real_action_text():
-    label, detail = insights.directive_copy(
-        {"signal_color": "green", "action": "Train hard today.", "label": "GO"})
-    assert label == "Train normally today."
-    assert detail == "Train hard today."
-
-
-def test_directive_copy_red_uses_fixed_clinical_copy():
-    label, detail = insights.directive_copy(
-        {"signal_color": "red", "action": "anything", "label": "REST"})
-    assert "Rest day" in label
-    assert "systemic fatigue" in detail
-
-
-def test_directive_copy_yellow_and_orange_share_the_same_detail():
-    _, yellow_detail = insights.directive_copy({"signal_color": "yellow", "action": "x", "label": "y"})
-    _, orange_detail = insights.directive_copy({"signal_color": "orange", "action": "x", "label": "y"})
-    assert yellow_detail == orange_detail
-
-
-def test_directive_copy_unknown_signal_falls_back_to_rec_fields():
-    label, detail = insights.directive_copy(
-        {"signal_color": "purple", "action": "fallback action", "label": "fallback label"})
-    assert label == "fallback label"
-    assert detail == "fallback action"
+# directive_copy was removed on 2026-10-13: no view called it. The Engine
+# Data panel speaks in Home's words (tests/test_home_and_training_last_gaps.py).
 
 
 # ─── metric_delta_str ───────────────────────────────────────────────────────

@@ -133,8 +133,10 @@ def test_home_never_borrows_the_bright_signal_palette():
     the same grey ink the card's own "No Readings" label uses, and deliberately
     NOT one of the three status colours: an absent reading is not a status."""
     assert set(vd.HOME_TONES.values()).isdisjoint(set(engine.SIGNAL_COLORS.values()))
+    # #7FA3C4 joined on 2026-10-13: the muted blue of the "info" kind (VOLUME
+    # HELD), which Training shows in blue and Home showed in the warning's amber.
     assert set(vd.HOME_TONES.values()) <= {"#6BAF8B", "#BFA06A", "#C47878",
-                                           "#8A99A3"}
+                                           "#8A99A3", "#7FA3C4"}
     assert "SIGNAL_COLORS" not in (ROOT / "app.py").read_text(encoding="utf-8")
 
 

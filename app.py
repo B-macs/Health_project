@@ -871,6 +871,12 @@ def _verdict_line(v) -> str:
     if not v.has_something_to_say:
         return ""
     rows = ""
+    # The reading the engine named (2026-10-13): Training prints it as the
+    # headline, and a baseline-drift day — every tile green, load reduced — had
+    # no reason on Home at all.
+    if v.cause:
+        rows += (f'<div style="font-size:13px;color:#D4DCEE;line-height:1.55;'
+                 f'margin-bottom:5px;">{v.cause}</div>')
     if v.banner_text:
         rows += (f'<div style="font-size:13px;color:#B9C2D6;line-height:1.55;">'
                  f'{v.banner_text}</div>')

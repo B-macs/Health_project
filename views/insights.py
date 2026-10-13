@@ -44,6 +44,7 @@ from services import stats as stats_mod
 from services import insights as insights_svc
 from services import plan as plan_svc
 from services import sessions as sessions_svc
+from services import verdict as verdict_svc
 from services import strength as strength_svc
 from services import tonnage as tonnage_svc
 from services import volume as volume_svc
@@ -2373,15 +2374,23 @@ def render() -> None:
             stage_info  = engine.stage_status(current_stage, pain_streak, avg_tight)
 
         # ── Directive banner ──────────────────────────────────────────────────
-        sig = rec["signal_color"]
-        sig_color = engine.SIGNAL_COLORS.get(sig, engine.SIGNAL_COLORS["grey"])
+        # In Home's words and tone, from the same load_policy (2026-10-13): this
+        # panel printed the raw engine label — "CONSERVATIVE LOAD (injury weight
+        # 95%)" — in the bright signal yellow on a day Home called VOLUME HELD
+        # in blue. The raw label stays, as a caption.
+        _kind = sessions_svc.load_policy(rec, {})["banner_kind"]
+        sig_color = verdict_svc.HOME_TONES.get(_kind, verdict_svc.HOME_TONES[""])
+        _words = (verdict_svc.BADGE_WORDS.get(_kind)
+                  or {"neutral": "NO READING YET"}.get(_kind, "NO CHANGE TO LOAD"))
         st.markdown(
             f"<div style='background:{sig_color}20;border-left:4px solid {sig_color};"
             f"border-radius:6px;padding:12px 16px;margin-bottom:16px;'>"
             f"<div style='font-size:10px;color:{sig_color};font-family:monospace;"
             f"letter-spacing:2px;margin-bottom:2px;'>DIRECTIVE</div>"
-            f"<div style='font-size:17px;font-weight:700;color:#E8EAF0;'>{rec['label']}</div>"
+            f"<div style='font-size:17px;font-weight:700;color:#E8EAF0;'>{_words}</div>"
             f"<div style='font-size:12px;color:#9AA3B2;margin-top:4px;'>{rec['action']}</div>"
+            f"<div style='font-size:10px;color:#6B7A9B;margin-top:6px;font-family:monospace;'>"
+            f"engine label: {rec['label']}</div>"
             f"</div>",
             unsafe_allow_html=True,
         )

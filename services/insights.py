@@ -17,38 +17,6 @@ from __future__ import annotations
 import json
 from datetime import date, timedelta
 
-_DIRECTIVE_LABELS = {
-    "green":  "Train normally today.",
-    "yellow": "Reduced load today — keep the session controlled, don't push to failure.",
-    "orange": "Reduced load today — keep the session controlled, don't push to failure.",
-    "red":    "Rest day — mobility and walking only. No loaded training.",
-    "grey":   "Building baseline — train at comfortable effort.",
-}
-
-_DIRECTIVE_DETAIL_FIXED = {
-    "yellow": (
-        "Biometrics are slightly below your rolling average. "
-        "Scale back total volume by around 20–25%. "
-        "Hold intensity — just do fewer sets."
-    ),
-    "orange": (
-        "Biometrics are slightly below your rolling average. "
-        "Scale back total volume by around 20–25%. "
-        "Hold intensity — just do fewer sets."
-    ),
-    "red": "Biometrics show significant systemic fatigue. Rest is the training stimulus today.",
-}
-
-
-def directive_copy(rec: dict) -> tuple[str, str]:
-    """(label, detail) plain-language copy for today's engine directive.
-    green/grey detail comes from the real directive's own action text —
-    never fabricated; yellow/orange/red use fixed clinical copy."""
-    sig = rec["signal_color"]
-    label = _DIRECTIVE_LABELS.get(sig, rec["label"])
-    detail = _DIRECTIVE_DETAIL_FIXED.get(sig, rec["action"])
-    return label, detail
-
 
 def metric_delta_str(delta_pct: float | None) -> str:
     if not delta_pct:

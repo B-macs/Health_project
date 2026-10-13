@@ -2272,9 +2272,13 @@ def _adapt_session_dialog(policy: dict) -> None:
             st.markdown(f"**Volume {direction} to {factor:.0%}** of the standard prescription.")
         st.caption(policy.get("volume_note", ""))
     if policy.get("reduced"):
-        st.warning(
-            "Reduced-load day: no weight, rep or band tier will be seeded above "
-            "your last completed session, whatever your readiness streak says."
+        # Blue, and "volume held", on an injury-cap day — the banner's own kind
+        # and Home's own pill (2026-10-13).
+        _held = policy.get("banner_kind") == "info"
+        (st.info if _held else st.warning)(
+            f"{'Volume held' if _held else 'Reduced-load day'}: no weight, rep or band "
+            "tier will be seeded above your last completed session, whatever your "
+            "readiness streak says."
         )
     st.divider()
     st.caption(
@@ -3975,10 +3979,12 @@ def render():
     # which is precisely the one worth showing and the one a bare
     # `factor != 1.0` test would hide.
     if _volume_factor != 1.0 or _policy["volume_note"]:
-        _badge_color = (
+        # Coloured by the verdict's KIND, the banner's own colour (2026-10-13):
+        # an injury-cap day showed a calm blue banner over this badge in amber.
+        _badge_color = {"info": "#4FC3F7", "error": "#FF4B4B"}.get(
+            _policy["banner_kind"],
             "#E8ECEF" if _volume_factor > 1.0
-            else ("#FFD700" if _policy["reduced"] or _volume_factor >= 0.75 else "#FF4B4B")
-        )
+            else ("#FFD700" if _policy["reduced"] or _volume_factor >= 0.75 else "#FF4B4B"))
         st.markdown(
             f"<div style='background:#0E1117;border-left:3px solid {_badge_color};"
             f"border-radius:6px;padding:8px 12px;margin-bottom:8px;'>"

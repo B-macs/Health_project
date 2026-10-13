@@ -48,7 +48,10 @@ from services import sessions
 #: "alarmed".
 HOME_TONES = {
     "":        "#6BAF8B",
-    "info":    "#BFA06A",
+    # Muted blue since 2026-10-13: Training shows this kind (the injury cap,
+    # "VOLUME HELD") as a calm blue box, and Home showed it in the warning's
+    # amber — the same decision in two colours.
+    "info":    "#7FA3C4",
     "warning": "#BFA06A",
     "error":   "#C47878",
     # Grey ink, deliberately: "nothing to judge" is not a warning about him and
@@ -100,6 +103,10 @@ class Verdict:
     readiness_raw:     float | None = None   # what the engine actually bucketed
     readiness_band:    str = ""              # readiness_meta's word
     hrv_note:          str = ""              # opaque; composed in today.py
+    #: The reading the engine named for a reduced or rest day (the directive's
+    #: own `cause`), printed on Home's line the way Training prints it as the
+    #: headline. On a baseline-drift day it is the only reason there is.
+    cause:             str = ""
 
     @property
     def has_something_to_say(self) -> bool:
@@ -146,6 +153,7 @@ def today_verdict(directive: dict | None,
         readiness_raw=readiness_raw,
         readiness_band=readiness_band,
         hrv_note=hrv_note or "",
+        cause=((directive or {}).get("cause") or "") if policy["reduced"] else "",
     )
 
 

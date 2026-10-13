@@ -82,10 +82,13 @@ def test_the_green_day_sentence_says_what_the_app_actually_does():
 
 
 def test_the_green_day_sentence_is_what_the_autoregulation_screen_prints():
-    """services.insights.directive_copy passes a green day's action through
-    verbatim — which is how the stale sentence reached him."""
-    from services import insights
+    """The Engine Data panel prints a green day's action verbatim — which is
+    how the stale sentence reached him. (It named services.insights.
+    directive_copy until 2026-10-13; nothing called that function, and the
+    panel prints rec['action'] itself.)"""
+    from pathlib import Path
 
-    rec = _green_directive()
-    _label, detail = insights.directive_copy(rec)
-    assert detail == rec["action"]
+    src = (Path(__file__).resolve().parent.parent / "views" / "insights.py").read_text(
+        encoding="utf-8")
+    assert "{rec['action']}" in src
+    assert "Stage 1" not in _green_directive()["action"]
