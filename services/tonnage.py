@@ -170,7 +170,11 @@ def weekly_tonnage(
             elif tut:
                 # A hold or a timed piece: sessions.py writes reps=1 and puts
                 # the actual work in tut. Counting its "1 rep" would hide it.
-                seconds_only += tut
+                # A set of held reps (a bird dog's six 5-second holds) writes
+                # reps=6 and tut=5, so the time is tut per rep — the same rule
+                # sessions.py's duration model uses. Counted once per set, a
+                # 30-second set read as 5 (fixed 2026-10-13, WP-15).
+                seconds_only += tut * max(reps, 1)
             elif reps:
                 reps_only += reps
         if loaded_kg:

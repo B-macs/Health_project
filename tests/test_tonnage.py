@@ -220,6 +220,32 @@ def test_a_hold_is_counted_in_seconds_not_as_one_rep():
     assert core.kg == 0.0
 
 
+def test_a_set_of_held_reps_counts_every_hold():
+    """A hold_reps set (bird dog: 6 reps, 5 s each) is written reps=6, tut=5
+    by both sessions.build_set_record and sessions.make_sets_data. The work is
+    30 s; counted once per set it read as 5 (WP-15, 2026-10-13)."""
+    rows = [_row("Dead Bug", "2026-07-27",
+                 [{"reps": 6, "weight": None, "tut": 5, "velocity": "isometric"}] * 2)]
+    series, _ = tonnage.weekly_tonnage(rows, REGION_MAP, today=TODAY, weeks=4)
+    core = _week(series, "2026-07-27").value("core")
+    assert core.unloaded_seconds == 60.0
+    assert core.unloaded_reps == 0.0, "held reps are time, never also reps"
+
+
+def test_held_time_follows_the_set_builders_shape():
+    """The rule rests on what the builders write: per-rep hold time in tut and
+    the rep count in reps. If either builder changes shape, this fails first."""
+    from services import sessions
+    ex = {"type": "hold_reps", "sets": 2, "reps_in_set": 6, "hold_seconds": 5,
+          "rest_seconds": 30}
+    built = sessions.build_set_record(ex, 1, None, "2026-07-27T10:00:00")
+    assert (built["reps"], built["tut"]) == (6, 5)
+    assert [(s["reps"], s["tut"]) for s in sessions.make_sets_data(ex)] == [(6, 5), (6, 5)]
+    plank = sessions.build_set_record(
+        {"type": "hold", "sets": 1, "hold_seconds": 45}, 1, None, "2026-07-27T10:00:00")
+    assert (plank["reps"], plank["tut"]) == (1, 45)
+
+
 def test_reps_and_seconds_are_never_added_together():
     """No exchange rate between a rep and a second is defined here, so the two
     counters stay apart — the same reason a bodyweight hold never becomes kg."""
