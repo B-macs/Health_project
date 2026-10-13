@@ -4127,11 +4127,13 @@ class Repository:
                 score.status,
                 score.computed_at or "",
             ]
-            if self.supabase_record:
-                self._upsert_sheet_row(ws, score.week_start, row_values)
-            else:
-                sheets.upsert_weekly_rollup_row(ws, key_col=1, key_value=score.week_start,
-                                                row_values=row_values)
+            # Through the one write seam in both modes (2026-10-13). The legacy
+            # branch called sheets.upsert_weekly_rollup_row on `ws` itself — in
+            # cache mode the READ-ONLY local handle, so on the hosted app every
+            # save failed and the screen said "Weekly rollup sync unavailable"
+            # from about 2026-08-12; it also skipped the Supabase mirror. The
+            # seam writes the live tab (_write_target) and mirrors the row.
+            self._upsert_sheet_row(ws, score.week_start, row_values)
             written.append(score.week_start)
         return written
 

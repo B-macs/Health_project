@@ -62,6 +62,38 @@ def test_writes_ended_weeks_stamped_with_computed_at():
     assert all(s.computed_at is not None for s in repo.upserted)
 
 
+def test_only_weeks_whose_verdict_changed_are_written():
+    """Every ended week used to be re-stamped and rewritten on each refresh; in
+    record mode each row is a waited Supabase write inside the Training page's
+    render. A stored row that says the same thing is left alone — only the
+    computed time would have differed."""
+    from services.models import WeekScore
+
+    class _Stored(_FakeRepository):
+        def get_weekly_rollup_history(self):
+            return [WeekScore(week_start="2026-06-29", week_end="2026-07-05", phase_number=1,
+                              scheduled=self._first.scheduled, completed=self._first.completed,
+                              status=self._first.status, computed_at="2026-07-06T08:00:00")]
+
+    plain = _FakeRepository(phases=[_PHASE], logged_dates=set())
+    metrics.sync_weekly_rollup(plain, today=date(2026, 7, 13))
+    repo = _Stored(phases=[_PHASE], logged_dates=set())
+    repo._first = plain.upserted[0]
+    result = metrics.sync_weekly_rollup(repo, today=date(2026, 7, 13))
+    assert result.ok is True
+    assert result.synced_week_starts == ["2026-07-06"], "the unchanged week is not rewritten"
+
+
+def test_an_unreadable_table_writes_every_ended_week():
+    class _Unreadable(_FakeRepository):
+        def get_weekly_rollup_history(self):
+            raise RuntimeError("store unreachable")
+
+    repo = _Unreadable(phases=[_PHASE], logged_dates=set())
+    result = metrics.sync_weekly_rollup(repo, today=date(2026, 7, 13))
+    assert result.synced_week_starts == ["2026-06-29", "2026-07-06"]
+
+
 def test_upsert_failure_returns_failed_sync_result_not_raise():
     repo = _FakeRepository(phases=[_PHASE], upsert_error=RuntimeError("Sheets is down"))
     result = metrics.sync_weekly_rollup(repo, today=date(2026, 7, 20))

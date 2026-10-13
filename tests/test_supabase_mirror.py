@@ -328,6 +328,40 @@ def test_every_sheet_row_write_goes_through_the_one_seam():
     assert fn.lineno < direct[0] <= (fn.end_lineno or direct[0])
 
 
+#: Every write function of services/clients/sheets.py, and the three seams that
+#: alone may call them.
+_SHEETS_WRITES = {"upsert_row_by_key", "upsert_weekly_rollup_row", "append_rows",
+                  "rewrite_worksheet"}
+_WRITE_SEAMS = {"_upsert_sheet_row", "_rewrite_sheet", "_append_sheet_rows"}
+
+
+def test_no_sheets_write_skips_the_seams_or_the_live_handle():
+    """The check above names ONE write function, and the weekly summary went
+    past it with another: sheets.upsert_weekly_rollup_row on the tab handle
+    itself — in cache mode the read-only local copy — so the hosted app failed
+    every save from about 2026-08-12 and showed "Weekly rollup sync
+    unavailable", and the row never reached the mirror. Every Sheets write
+    now sits inside a seam and writes to self._write_target(...)."""
+    src = (ROOT / "services" / "repository.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    seams = [n for n in ast.walk(tree)
+             if isinstance(n, ast.FunctionDef) and n.name in _WRITE_SEAMS]
+    assert {fn.name for fn in seams} == _WRITE_SEAMS
+    bad = []
+    for n in ast.walk(tree):
+        if not (isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and isinstance(n.func.value, ast.Name) and n.func.value.id == "sheets"
+                and n.func.attr in _SHEETS_WRITES):
+            continue
+        inside = any(fn.lineno <= n.lineno <= (fn.end_lineno or fn.lineno) for fn in seams)
+        first = n.args[0] if n.args else None
+        live = (isinstance(first, ast.Call) and isinstance(first.func, ast.Attribute)
+                and first.func.attr == "_write_target")
+        if not (inside and live):
+            bad.append((n.lineno, n.func.attr))
+    assert not bad, f"Sheets writes outside a seam or not on _write_target(...): {bad}"
+
+
 def test_the_flush_runs_at_the_end_of_the_sync_chain_and_is_UNTHROTTLED():
     """Last, so it sends everything the chain wrote in one pass per table —
     and OUTSIDE the six *_if_due steps, which is what keeps the window short.
