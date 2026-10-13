@@ -451,6 +451,13 @@ _WAKE_TIME_ADJUSTMENTS_HEADER = ["date", "adjustment_minutes"]
 # every single page load.
 _SYNC_FAILURE_COOLDOWN_MINUTES = 15
 
+# The session-HR catch-up (Repository.sync_session_hr_recent_if_due,
+# 2026-10-13): how far back a logged plan session with no heart-rate row is
+# still looked for, and how long a date that found no match waits before it is
+# asked again. Each date costs several calls to Garmin's rate-limited API.
+SESSION_HR_CATCH_UP_DAYS = 35
+SESSION_HR_RECHECK_DAYS = 7
+
 # Distinguishes "the caller supplied None because there is no such row"
 # from "the caller supplied nothing, look it up yourself". A plain None
 # default would conflate the two and silently re-read the tab per row.
@@ -4671,16 +4678,49 @@ class Repository:
         failure. Only the last couple of days: a session's Garmin activity
         doesn't change retroactively, and each date costs several calls to
         Garmin's unofficial, rate-limit-sensitive API — the one most worth
-        not repeating after a failure."""
+        not repeating after a failure.
+
+        THEN THE CATCH-UP (2026-10-13): any logged plan session of the last
+        SESSION_HR_CATCH_UP_DAYS days with no heart-rate row, each date asked
+        at most once every SESSION_HR_RECHECK_DAYS days (its own durable
+        marker), so a session with no watch costs one look a week rather than
+        one every two hours. Seven sessions between 2026-09-16 and 10-08 had
+        no row: six reached the store late (the save-send bug fixed in
+        efebd3c) and the two-day window had passed by the time they arrived."""
         if not self.garmin_configured():
             return True, None
         today = today or date.today()
+        now = now or datetime.now()
 
         def _work():
             for offset in range(days):
                 self.sync_session_hr_for_date(today - timedelta(days=offset))
+            try:
+                catch_up = self.session_hr_catch_up_dates(today, recent_days=days)
+            except Exception:
+                catch_up = []   # never fail the routine window over the catch-up's read
+            for d in catch_up:
+                key = f"session_hr_catch_up_{d.isoformat()}"
+                if not self.sync_due(key, hours=24 * SESSION_HR_RECHECK_DAYS, now=now):
+                    continue
+                self.mark_sync_attempted(key, when=now)
+                self.sync_session_hr_for_date(d)
+                self.mark_synced(key, when=now)
 
         return self.run_sync_if_due("session_hr", _work, hours=hours, now=now)
+
+    def session_hr_catch_up_dates(self, today: date, recent_days: int = 2) -> list[date]:
+        """Logged PLAN sessions of the last SESSION_HR_CATCH_UP_DAYS days, older
+        than the routine `recent_days` window, that have no heart-rate row —
+        oldest first. Yoga, outdoor and accessory sessions are not candidates:
+        a match needs per-set timestamps, which only a plan session carries."""
+        start = today - timedelta(days=SESSION_HR_CATCH_UP_DAYS)
+        end = today - timedelta(days=recent_days)
+        if end < start:
+            return []
+        logged = self.get_logged_session_dates(start, end, include_supplementary=False)
+        have = {row["date"] for row in self.get_session_hr_history(start=start.isoformat())}
+        return sorted(date.fromisoformat(d) for d in logged if d not in have)
 
     def _garmin_raw_day(self, client, d: date) -> dict:
         """The four Garmin fetches for one day, done ONCE. Split out from

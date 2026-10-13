@@ -276,8 +276,15 @@ def test_session_hr_sync_skipped_when_garmin_not_configured():
     assert calls == []
 
 
+def _no_catch_up(repo):
+    """The catch-up reads the store; on a fake config that read would go out
+    to the network. These two tests are about the routine window alone."""
+    repo.session_hr_catch_up_dates = lambda *_a, **_k: []
+    return repo
+
+
 def test_session_hr_sync_covers_the_requested_window():
-    repo = Repository(_config(garmin_email="a@b.c", garmin_password="pw"))
+    repo = _no_catch_up(Repository(_config(garmin_email="a@b.c", garmin_password="pw")))
     calls = []
     repo.sync_session_hr_for_date = lambda d, hr_rest=None: calls.append(d)
     ok, err = repo.sync_session_hr_recent_if_due(
@@ -288,7 +295,7 @@ def test_session_hr_sync_covers_the_requested_window():
 
 
 def test_session_hr_sync_is_throttled():
-    repo = Repository(_config(garmin_email="a@b.c", garmin_password="pw"))
+    repo = _no_catch_up(Repository(_config(garmin_email="a@b.c", garmin_password="pw")))
     calls = []
     repo.sync_session_hr_for_date = lambda d, hr_rest=None: calls.append(d)
     repo.sync_session_hr_recent_if_due(days=2, today=date(2026, 8, 1), now=NOW)
@@ -296,3 +303,63 @@ def test_session_hr_sync_is_throttled():
         days=2, today=date(2026, 8, 1), now=NOW + timedelta(minutes=30),
     )
     assert len(calls) == 2   # one window only, not two
+
+
+# ─── the session-HR catch-up (2026-10-13) ────────────────────────────────────
+# Seven sessions between 2026-09-16 and 10-08 had no heart-rate row: six reached
+# the store after the two-day window had passed. The catch-up looks back 35 days
+# for a logged plan session with no row, and asks Garmin about each date at most
+# once a week.
+
+TODAY_1013 = date(2026, 10, 13)
+NOW_1013 = datetime(2026, 10, 13, 8, 0, 0)
+
+
+def _catch_up_repo(logged: set[str], have: set[str], calls: list):
+    repo = Repository(_config(garmin_email="a@b.c", garmin_password="pw"))
+    repo.sync_session_hr_for_date = lambda d, hr_rest=None: calls.append(d)
+    repo.get_logged_session_dates = (
+        lambda start, end, include_supplementary=True:
+        {d for d in logged if start.isoformat() <= d <= end.isoformat()})
+    repo.get_session_hr_history = lambda start=None: [{"date": d} for d in sorted(have)]
+    return repo
+
+
+def test_the_catch_up_finds_logged_sessions_with_no_heart_rate_row():
+    logged = {"2026-09-10", "2026-09-17", "2026-09-18", "2026-10-06", "2026-10-12"}
+    have = {"2026-09-10"}
+    repo = _catch_up_repo(logged, have, [])
+    assert repo.session_hr_catch_up_dates(TODAY_1013, recent_days=2) == [
+        date(2026, 9, 17), date(2026, 9, 18), date(2026, 10, 6)], (
+        "oldest first; a row already there and the routine two days are skipped")
+    old = repo.session_hr_catch_up_dates(date(2026, 11, 30), recent_days=2)
+    assert old == [], "past 35 days a session is no longer looked for"
+
+
+def test_the_sync_runs_the_window_then_the_catch_up_and_asks_each_date_once_a_week():
+    calls: list = []
+    repo = _catch_up_repo({"2026-09-17", "2026-10-06"}, set(), calls)
+    assert repo.sync_session_hr_recent_if_due(days=2, today=TODAY_1013, now=NOW_1013) == (True, None)
+    assert calls == [date(2026, 10, 13), date(2026, 10, 12),
+                     date(2026, 9, 17), date(2026, 10, 6)]
+    calls.clear()
+    later = NOW_1013 + timedelta(hours=3)
+    repo.sync_session_hr_recent_if_due(days=2, today=TODAY_1013, now=later)
+    assert calls == [date(2026, 10, 13), date(2026, 10, 12)], (
+        "a date that found nothing is not asked again inside the week")
+    calls.clear()
+    week_on = NOW_1013 + timedelta(days=7, hours=1)
+    repo.sync_session_hr_recent_if_due(days=2, today=TODAY_1013, now=week_on)
+    assert date(2026, 9, 17) in calls and date(2026, 10, 6) in calls
+
+
+def test_a_failed_catch_up_read_never_fails_the_routine_window():
+    repo = Repository(_config(garmin_email="a@b.c", garmin_password="pw"))
+    calls = []
+    repo.sync_session_hr_for_date = lambda d, hr_rest=None: calls.append(d)
+
+    def _boom(*_a, **_k):
+        raise RuntimeError("store unreachable")
+    repo.session_hr_catch_up_dates = _boom
+    assert repo.sync_session_hr_recent_if_due(days=2, today=TODAY_1013, now=NOW_1013) == (True, None)
+    assert calls == [date(2026, 10, 13), date(2026, 10, 12)]
