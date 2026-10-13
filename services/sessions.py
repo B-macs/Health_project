@@ -879,6 +879,10 @@ def load_policy(directive: dict | None, readiness_modifier: dict | None) -> dict
         note = "; ".join(reasons)
     else:
         note = readiness_modifier.get("description", "") or ""
+    if factor < 1.0:
+        # readiness_scales: the factor shortens the working sets only.
+        note = f"{note} — the warm-up and the tests stay at full dose" if note else (
+            "The warm-up and the tests stay at full dose")
 
     # WHICH SENTENCE, AND WHICH COLOUR. `reduced` and the clamp below it are
     # unchanged — a capped day is still capped, whatever drove it. What the
@@ -1838,6 +1842,39 @@ PREPARATION_NAMES = RELEASE_EXERCISE_NAMES | frozenset({
 def is_measurement(name: str) -> bool:
     """Finding tests and trials carry a suffix and may lead a session."""
     return any(tag in (name or "") for tag in ("(Test)", "(Timed Test)", "(Trial)"))
+
+
+def readiness_scales(ex: dict, day_type: str | None = None) -> bool:
+    """Whether a low-readiness day may shorten this exercise's dose.
+
+    The athlete, August 2026: "The warm up and the release doesn't need to be
+    increased in time and reps when I have a better readiness ... Otherwise
+    keep it as the min when readiness is low"; and 2026-10: "Some timers
+    shouldn't go down when I'm under performing like hip lifts." Readiness has
+    raised nothing since 2026-09-16 (Key Rule 23); this stops it LOWERING the
+    warm-up. No study sets a warm-up's length from a readiness score — the
+    warm-up review (docs/training/warmup_evidence_review_2026-08-10.md) ties
+    its value to the load lifted next — so it runs at its prescribed dose on
+    every day.
+
+    Never shortened: preparation (PREPARATION_NAMES — the release block, the
+    raise, the march, the planks, the posture and activation items), a ramp set
+    (`warmup=True`, the lift's own warm-up), a finding test or trial, and
+    everything on a test day: a measurement shortened on a low morning measures
+    the morning. The working sets still shorten.
+    """
+    if day_type == "test":
+        return False
+    name = ex.get("name") or ""
+    return not (name in PREPARATION_NAMES or ex.get("warmup") or is_measurement(name))
+
+
+def readiness_dose(ex: dict, volume_factor: float, day_type: str | None = None) -> dict:
+    """The exercise as it runs today: scaled by the readiness volume factor
+    where readiness_scales allows it, the prescription untouched otherwise."""
+    if not readiness_scales(ex, day_type):
+        return ex
+    return engine.apply_exercise_volume_modifier(ex, volume_factor)
 
 
 def is_ramp_or_top(name: str) -> bool:

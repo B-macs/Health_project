@@ -262,18 +262,28 @@ def apply_exercise_volume_modifier(ex: dict, volume_factor: float) -> dict:
     Return a shallow copy of ex with reps/hold_seconds/reps_in_set/duration_minutes
     scaled by volume_factor. Sets and rest_seconds are unchanged.
     Returns the same object when volume_factor == 1.0 (fast path).
+
+    A floor never RAISES a value above its prescription (fixed 2026-10-13).
+    The 5-second and 5-minute floors used to lift anything shorter up to them on
+    a reduced day: a 2-second glute-bridge hold ran 5 s and the 3-minute
+    incline walk ran 5 — readiness adding volume, which Key Rule 23 forbids.
+    Which exercises may be scaled at all is sessions.readiness_scales.
     """
     if volume_factor == 1.0:
         return ex
+
+    def _scaled(value, floor: int) -> int:
+        return max(min(floor, value), round(value * volume_factor))
+
     m = dict(ex)
     if m.get("reps") is not None:
-        m["reps"] = max(1, round(m["reps"] * volume_factor))
+        m["reps"] = _scaled(m["reps"], 1)
     if m.get("hold_seconds") is not None:
-        m["hold_seconds"] = max(5, round(m["hold_seconds"] * volume_factor))
+        m["hold_seconds"] = _scaled(m["hold_seconds"], 5)
     if m.get("reps_in_set") is not None:
-        m["reps_in_set"] = max(1, round(m["reps_in_set"] * volume_factor))
+        m["reps_in_set"] = _scaled(m["reps_in_set"], 1)
     if m.get("duration_minutes") is not None:
-        m["duration_minutes"] = max(5, round(m["duration_minutes"] * volume_factor))
+        m["duration_minutes"] = _scaled(m["duration_minutes"], 5)
     return m
 
 

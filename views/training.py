@@ -24,7 +24,6 @@ import today
 import training_plan as tp
 from services import accessory as acc
 from services import background_sync
-from services import engine
 from services import metrics
 from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
@@ -3957,12 +3956,14 @@ def render():
 
 
     _render_guided_flow(day_num, exercises, n_ex,
-                        _policy, _readiness_modifier, _volume_factor)
+                        _policy, _readiness_modifier, _volume_factor,
+                        today_plan.get("day_type"))
 
 
 @st.fragment
 def _render_guided_flow(day_num, exercises, n_ex,
-                        _policy, _readiness_modifier, _volume_factor):
+                        _policy, _readiness_modifier, _volume_factor,
+                        day_type=None):
     """The in-session guided flow: exercise list, steppers, timers, set
     completion. Everything that changes when the athlete taps.
 
@@ -4011,8 +4012,10 @@ def _render_guided_flow(day_num, exercises, n_ex,
         _save_checkpoint(day_num)
         st.rerun()
 
-    ex   = engine.apply_exercise_volume_modifier(
-               exercises[st.session_state.tp_ex_idx], _volume_factor)
+    # The warm-up, a ramp set, a test and every item on a test day keep their
+    # prescription; only the working sets take the readiness factor.
+    ex   = sess.readiness_dose(exercises[st.session_state.tp_ex_idx], _volume_factor,
+                               day_type)
     ex_n = st.session_state.tp_ex_idx + 1
 
     # Unique timer keys scoped to this exercise / set / rep / side
