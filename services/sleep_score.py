@@ -37,6 +37,14 @@ isn't verified against a live payload (same caveat class as the Garmin HRV
 field mapping) — the per-hour rate and band below are a starting guess,
 worth confirming against a real logged night before trusting at the
 margins.
+
+⚠ MEASURED 2026-10-13, AND THE GUESS IS WRONG: the input runs at a median of
+46.7 restless periods per hour (427 ring nights since 2023, range 3.6-120),
+so _RESTLESS_BAND (2-12) scores Restfulness 0 on 426 of 427 nights — a fixed
+10% handicap that carries no information. The fix is the athlete's decision
+and is NOT made here: docs/restfulness_and_watch_movement_2026-10-13.md holds
+the options, measured by scripts/compare_restfulness_sources.py. Any fix moves
+every stored score, so it ships with a version stamp and a re-derive.
 """
 
 from __future__ import annotations
