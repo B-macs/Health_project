@@ -211,6 +211,29 @@ def test_no_notice_in_an_ordinary_week():
     assert wr.repeat_notice(_live(), date(2026, 9, 1)) is None
 
 
+def test_the_failed_week_message_is_mondays_only_and_the_hold_is_not():
+    """Athlete, 2026-10-13: "The last week message failed doesn't need to be
+    show every single day of the failed week." The message is Monday's — the
+    day the redo is offered — and the load hold still runs every day."""
+    monday = date(2026, 9, 14)
+    week = [monday + timedelta(days=i) for i in range(7)]
+    assert [wr.repeat_notice_is_due(d) for d in week] == [True] + [False] * 6
+    phases = _after_first_failure()
+    assert all(wr.failed_week_holds_load(phases, d) for d in week), (
+        "the hold is the rule; only the message is Monday's")
+    assert wr.last_week_line_is_due("failed", monday)
+    assert not wr.last_week_line_is_due("failed", TUE_0915)
+    for status in ("normal", "perfect", "ultimate"):
+        assert wr.last_week_line_is_due(status, TUE_0915), status
+
+
+def test_the_screen_asks_the_day_rule_before_either_failed_week_line():
+    src = (Path(__file__).resolve().parent.parent / "views" / "training.py").read_text(
+        encoding="utf-8")
+    assert "week_repeat.repeat_notice_is_due(_today)" in src
+    assert "week_repeat.last_week_line_is_due(last_week.status" in src
+
+
 # ═════════════════════════════════════════════════════════════════════════════
 #  "unless I fail this week again"
 # ═════════════════════════════════════════════════════════════════════════════

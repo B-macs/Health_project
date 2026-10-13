@@ -412,6 +412,26 @@ def redo_is_offered(phases: list[Phase], logged_dates, today: date) -> bool:
     return days_logged(logged_dates, _monday(today) - timedelta(days=7)) <= _ml.FAILED_WEEK_MAX_DAYS
 
 
+def repeat_notice_is_due(today: date) -> bool:
+    """Whether the screen shows the repeat-week message today: on the Monday
+    the repeat week starts, and no other day.
+
+    The athlete, 2026-10-13: "The last week message failed doesn't need to be
+    show every single day of the failed week." Monday is the day redo_is_offered
+    already uses, for the same reason — the one day a message about the week
+    ahead can still shape it. The load hold itself (failed_week_holds_load)
+    runs on every day of the week; only the message is Monday's.
+    """
+    return today.weekday() == 0
+
+
+def last_week_line_is_due(status: str, today: date) -> bool:
+    """The "Last week: ..." verdict under the weekly banner. A FAILED week's
+    line follows repeat_notice_is_due; a normal, perfect or ultimate week
+    shows every day, as it always has."""
+    return status != "failed" or repeat_notice_is_due(today)
+
+
 def repeat_notice(phases: list[Phase], today: date) -> str | None:
     """The line that explains a repeated week on the week it runs — why it
     repeats, what that does to the numbers, and when the next block now

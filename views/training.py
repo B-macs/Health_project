@@ -1652,6 +1652,9 @@ def _render_weekly_rollup_banner(history: list, streak) -> None:
     ended = [w for w in history if w.status not in ("in_progress", "no_plan")]
     if ended:
         last_week = max(ended, key=lambda w: w.week_start)
+        # A failed week's line is Monday's only (week_repeat.last_week_line_is_due).
+        if not week_repeat.last_week_line_is_due(last_week.status, date.today()):
+            return
         text = _VERDICT_TEXT[last_week.status]
         color = _VERDICT_COLOR[last_week.status]
         st.markdown(
@@ -1680,7 +1683,9 @@ def _render_week_repeat(phases: list, in_session: bool) -> None:
     """
     _today = date.today()
     try:
-        _notice = week_repeat.repeat_notice(phases, _today)
+        # Monday only (week_repeat.repeat_notice_is_due); the hold runs all week.
+        _notice = (week_repeat.repeat_notice(phases, _today)
+                   if week_repeat.repeat_notice_is_due(_today) else None)
     except Exception:
         _notice = None
     if _notice:
