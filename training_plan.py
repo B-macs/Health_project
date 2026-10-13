@@ -4757,6 +4757,27 @@ ACC_BREATHING = _ex(
 # The gym days are UNCHANGED. He approved their shape on 2026-09-11 (Key Rule
 # 21) and nothing about them was built for a race.
 #
+# ⚠ 2026-10-13 — THE PSOAS MARCH IS TWENTY EACH SIDE, AND AN ADDUCTOR LADDER
+# RUNS ONCE A WEEK. The athlete's notes, answered the same day:
+#
+#   * "increase the psoas march to 20" — "it means I did 20 lifts each side".
+#     2 x 20 each side, the dose he was already doing. The squat day now models
+#     at exactly its 70-minute ceiling, so nothing more fits on it.
+#   * "I have no abductor or adductor exercises, should there be some? Added
+#     once per week" — "yes add let's start with the most basic and work up to a
+#     real Copenhagen plank". ADDUCTOR_LADDER: ball squeeze -> side-lying lift ->
+#     short-lever Copenhagen 2 x 15 s -> 3 x 20 s -> the full plank. Two weeks a
+#     step (weeks 1-2 the squeeze, weeks 3-4 the lift); the next block continues
+#     at step 3. It runs on TUESDAY after the short run, before the two hip
+#     isometrics — never on Wednesday, which stays free of leg work so the
+#     Thursday flexibility morning, which stretches the same muscles, reads
+#     clean. No isolated abductor exercise: glute medius is recorded as
+#     high-tone, and the side bridge, the hip airplane and the single-leg bridge
+#     load it as a stabiliser on most days. REVIEW the abductor answer if the
+#     Wednesday grip grade reads 0-1 for four weeks running.
+#     HOLD A STEP on groin or inner-knee pain during it or the next day; step
+#     back on a second one.
+#
 # ⚠ 2026-10-05, BACK AFTER A WEEK SICK — POSTURE AND TRUNK WORK, STILL NO
 # RELEASE. The psoas-attachment tightness came back on both sides (0/10 pain)
 # after twelve untrained days, and the release was his to bring back under
@@ -4988,10 +5009,10 @@ STANDING_PSOAS_MARCH = _ex(
     name="Standing Psoas March",
     ex_type="reps",
     laterality="alternating",
-    sets=2, reps=10, rest_seconds=20,
+    sets=2, reps=20, rest_seconds=20,
     mechanics=(
         "Stand tall, one fingertip on a wall for balance if you need it. Drive one knee up "
-        "above hip height, then lower it slowly, and then the other knee. Ten each side, "
+        "above hip height, then lower it slowly, and then the other knee. Twenty each side, "
         "alternating. Lift the knee with the front of the hip: your chest stays tall and "
         "your lower back stays still, with no lean back. On the RIGHT, keep the kneecap "
         "pointing straight ahead or turned very slightly inward. Do not swing the leg — it "
@@ -5005,9 +5026,12 @@ STANDING_PSOAS_MARCH = _ex(
         "tissue the ball release used to press on, and lifting one knee high tips the "
         "pelvis back, which lengthens the standing side's hip flexors. Active range and no "
         "swing, because at Beighton 6/9 a swing carries the joint past the range the "
-        "muscles control — the profile's rule of controlled range over passive end range."
+        "muscles control — the profile's rule of controlled range over passive end range. "
+        "Twenty each side from 2026-10-13 (athlete: \"increase the psoas march to 20\" — \"it "
+        "means I did 20 lifts each side\"): the dose he was already doing, now the one "
+        "written. The squat day then models at exactly its 70-minute ceiling."
     ),
-    progression="Ten each side clean with a still back → pause one second at the top.",
+    progression="Twenty each side clean with a still back → pause one second at the top.",
     regression="Lower back arches or leans back → lower the knee to hip height.",
 )
 
@@ -5187,6 +5211,133 @@ BB_POSTURE = [NINETY_NINETY_HIP_LIFT, HIP_AIRPLANE]
 #: More sets, not more days (athlete, 2026-09-22). Block B's own copy, so
 #: Stage 2B's one-set activation item is untouched.
 BB_GLUTE_BRIDGE = dict(PREP_GLUTE_ACTIVATION, sets=3, rest_seconds=30)
+
+
+# ── THE ADDUCTOR LADDER, 2026-10-13 (see the block header) ────────────────
+# Adductor strength once a week, easiest first, up to the full Copenhagen
+# plank. Five steps; each runs two weeks before the next, the ladder rule of the
+# knee hover and the hang: advance on two clean weeks, never on one good day.
+# Block B reaches step 2 and the next block continues at step 3. On Tuesday
+# after the short run, with the two hip isometrics, and never on Wednesday: the
+# Wednesday mobility day loads no legs, so Thursday's flexibility morning — which
+# stretches these same muscles — reads clean.
+
+_ADDUCTOR_FOCUS = (
+    "The adductor ladder (athlete, 2026-10-13: \"yes add let's start with the most basic "
+    "and work up to a real Copenhagen plank\"). The adductors read genuinely short in the "
+    "battery (pattern D) and are stretched every Thursday; strength in the position is the "
+    "profile's answer to a wide passive-minus-active gap (flexibility_baselines."
+    "GAP_EXPLAINED), and the Copenhagen adduction exercise is the best-tested "
+    "groin-protection exercise in sport. No isolated abductor work beside it: glute medius "
+    "is recorded as high-tone, and the side bridge, the hip airplane and the single-leg "
+    "bridge already load it as a stabiliser. "
+)
+
+ADDUCTOR_SQUEEZE = _ex(
+    name="Adductor Squeeze (Ball)",
+    ex_type="hold_reps",
+    sets=3, reps_in_set=5, hold_seconds=5, rest_seconds=30,
+    mechanics=(
+        "Lie on your back with your knees bent and your feet flat on the floor, hip-width "
+        "apart. Put a soft ball or a firmly folded pillow between your knees. Breathe out and "
+        "squeeze it with your knees at about half your full effort for five seconds, then let "
+        "go. Five squeezes is one set. Your lower back rests on the floor and your feet stay "
+        "flat. You feel it on the inside of both thighs. Stop at any sharp pain in the groin."
+    ),
+    biomechanical_focus=_ADDUCTOR_FOCUS + (
+        "Step 1: isometric adduction at a controlled width, with no spinal load and no end "
+        "range — the cleared rule's own description."),
+    progression="Two weeks of clean squeezes → the side-lying lift.",
+    regression="Groin pain during it or the next day → squeeze more gently, and stay on this step.",
+)
+
+ADDUCTOR_SIDE_LYING_LIFT = _ex(
+    name="Adductor Lift (Side-Lying)",
+    ex_type="reps",
+    laterality="unilateral",
+    sets=2, reps=8, tempo="2-1-3", rest_seconds=30,
+    mechanics=(
+        "Lie on your RIGHT side with your head resting on your arm. Bend your top knee and put "
+        "that foot flat on the floor in front of your right knee. Keep the bottom leg straight, "
+        "toes pointing forward. Lift the bottom leg a hand's width off the floor over two "
+        "seconds, hold it for one, and lower it over three. Eight lifts, then turn over and do "
+        "the LEFT leg the same way. Your hips stay stacked one above the other, with no roll "
+        "backwards. You feel it on the inside of the bottom thigh. Stop at any sharp pain in "
+        "the groin."
+    ),
+    biomechanical_focus=_ADDUCTOR_FOCUS + (
+        "Step 2: adduction against the leg's own weight through a short range — the step "
+        "between a squeeze and body weight held on a bench."),
+    progression="Two weeks of clean lifts on both legs → the short-lever Copenhagen plank.",
+    regression="Groin pain during it or the next day → a smaller lift, and stay on this step.",
+)
+
+
+def _copenhagen_short_lever(sets: int, hold: int) -> dict:
+    """Steps 3 and 4: the knee on the bench, which halves the lever against
+    the full plank. The RIGHT side is the right knee on the bench."""
+    return _ex(
+        name="Copenhagen Plank (Short Lever)",
+        ex_type="hold",
+        laterality="unilateral",
+        sets=sets, hold_seconds=hold, rest_seconds=30,
+        mechanics=(
+            f"Lie on your LEFT side next to a bench. Put the inside of your RIGHT knee on the "
+            f"bench, with the lower leg resting along it, and your left leg underneath. Your "
+            f"left forearm is on the floor with the elbow under your shoulder. Lift your hips "
+            f"until your body is one straight line from your right knee to your head, and lift "
+            f"the bottom leg up toward the bench. Hold {hold} seconds, then turn round and do it "
+            f"with your LEFT knee on the bench. Hips high and stacked: no roll forward or back. "
+            f"You feel it on the inside of the top thigh. Stop at any sharp pain in the groin "
+            f"or the inner knee."
+        ),
+        biomechanical_focus=_ADDUCTOR_FOCUS + (
+            "Steps 3 and 4: the Copenhagen plank with the knee on the bench. He did the full "
+            "plank in 2025 at 30 s × 3 — the rule's caution is that dose, with a back injury "
+            "and a rehab block since — and the day-28 medial Bunkie line is a Copenhagen-type "
+            "hold, so the position is not new; the lever is what steps."),
+        progression=f"{hold} s clean on both sides for two weeks → the next step.",
+        regression="Groin or inner-knee pain → back to the side-lying lift.",
+    )
+
+
+COPENHAGEN_LONG_LEVER = _ex(
+    name="Copenhagen Plank (Long Lever)",
+    ex_type="hold",
+    laterality="unilateral",
+    sets=2, hold_seconds=15, rest_seconds=30,
+    mechanics=(
+        "Lie on your LEFT side next to a bench. Put the inside of your RIGHT ankle and foot on "
+        "the bench, with that leg straight, and your left leg underneath. Your left forearm is "
+        "on the floor with the elbow under your shoulder. Lift your hips until your body is one "
+        "straight line from your right foot to your head, and lift the bottom leg up toward the "
+        "bench. Hold 15 seconds, then turn round and do it with your LEFT ankle on the bench. "
+        "Hips high and stacked: no roll forward or back. You feel it on the inside of the top "
+        "thigh. Stop at any sharp pain in the groin or the inner knee."
+    ),
+    biomechanical_focus=_ADDUCTOR_FOCUS + (
+        "Step 5, the full Copenhagen plank: the top leg straight with the bench at the ankle. "
+        "It starts at 2 × 15 s and builds toward the 2025 dose of 3 × 30 s."),
+    progression="15 s clean on both sides for two weeks → add 5 s, up to 3 × 30 s.",
+    regression="Groin or inner-knee pain → back to the short lever.",
+)
+
+#: Easiest first. Steps 3 and 4 are one exercise at two doses.
+ADDUCTOR_LADDER: tuple[dict, ...] = (
+    ADDUCTOR_SQUEEZE,
+    ADDUCTOR_SIDE_LYING_LIFT,
+    _copenhagen_short_lever(sets=2, hold=15),
+    _copenhagen_short_lever(sets=3, hold=20),
+    COPENHAGEN_LONG_LEVER,
+)
+
+#: Block B's ladder step per authored week (0-based): two weeks a step, so the
+#: easy week 4 never brings a new step. The next block starts at step 3.
+_BB_ADDUCTOR_STEP = {1: 0, 2: 0, 3: 1, 4: 1}
+
+
+def _bb_adductor(week: int) -> dict:
+    return ADDUCTOR_LADDER[_BB_ADDUCTOR_STEP[week]]
 
 
 def _bb_warmup(week: int, activation: dict | None, incline_walk: bool) -> list:
@@ -5460,10 +5611,10 @@ _BB_RUN_DAYS = {
 
 def _bb_run_day(day: int) -> dict:
     """A run day: the warm-up and the planks, the glute bridge, the run — and
-    after the SHORT Tuesday run, the two hip-flexor isometrics
-    (their second weekly exposure; the squat and press days carry the first).
-    Never after the long Saturday run: a hip-flexor load there would muddy
-    the signal the run itself is measuring."""
+    after the SHORT Tuesday run, the week's adductor-ladder step and then the
+    two hip-flexor isometrics (their second weekly exposure; the squat and
+    press days carry the first). Never after the long Saturday run: a hip load
+    there would muddy the signal the run itself is measuring."""
     label, name, minutes, rpe, mech, focus, prog, regr = _BB_RUN_DAYS[day]
     tuesday = day in (2, 9, 16, 23)
     week = (day - 1) // 7 + 1
@@ -5484,7 +5635,8 @@ def _bb_run_day(day: int) -> dict:
                 regression=regr,
                 warning=_RUN_STOP,
             ),
-        ] + ([_bb_knee_hover(week), END_RANGE_PSOAS_ISOMETRIC] if tuesday else []),
+        ] + ([_bb_adductor(week), _bb_knee_hover(week), END_RANGE_PSOAS_ISOMETRIC]
+             if tuesday else []),
     }
 
 

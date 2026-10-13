@@ -415,6 +415,13 @@ MOBILITY_TIER_LOADS_LEGS: frozenset[str] = frozenset({
     # Block B's hip airplane (2026-10-05): single-leg stance and hip rotation
     # under the hip's own muscles, kept off Wednesday for the march's reason.
     "Hip Airplane",
+    # The adductor ladder's two floor steps (2026-10-13). Strength work on the
+    # adductors, which pattern D's stack stretches and the battery measures —
+    # the reason the ladder runs on Tuesday and never the day before a
+    # flexibility morning. (The two Copenhagen steps are bodyweight_compound,
+    # not the mobility tier, so the region map alone already counts them.)
+    "Adductor Squeeze (Ball)",
+    "Adductor Lift (Side-Lying)",
     # Loaded posterior chain and abductors — the "pullers" of pattern I
     "Single-Leg Glute Bridge",
     "Lateral Band Walk",

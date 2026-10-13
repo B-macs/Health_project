@@ -480,6 +480,14 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="cleared", laterality="bilateral",
     ),
     MovementRule(
+        movement="adductor lift",
+        reason="Side-lying hip adduction: the bottom leg lifts a hand's width against its "
+               "own weight, straight and toes forward. No spinal load and no end range — "
+               "step 2 of Block B's adductor ladder (2026-10-13), between the squeeze and "
+               "the Copenhagen plank.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
         movement="side leg raise",
         reason="Active hip abduction, spine neutral. Loads glute medius, which the "
                "biomechanical assessment lists as overactive and right-dominant — release "

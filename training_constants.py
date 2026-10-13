@@ -224,6 +224,13 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Bunkie — Posterior Stabilizing Line (Timed)",
     "Bunkie — Lateral Stabilizing Line (Timed)",
     "Bunkie — Medial Stabilizing Line (Timed)",
+    # Block B's adductor ladder, 2026-10-13 (training_plan.ADDUCTOR_LADDER).
+    # Lower body: the tissue trained is the adductor group, which also makes
+    # the day it runs a leg-loading day — the reason it is a Tuesday item.
+    "Adductor Squeeze (Ball)",
+    "Adductor Lift (Side-Lying)",
+    "Copenhagen Plank (Short Lever)",
+    "Copenhagen Plank (Long Lever)",
     "Right Posterior Hip Capsule Stretch",
     "Piriformis Contract-Relax (PNF)",
     "Ischial Tuberosity Hamstring Release",
@@ -461,6 +468,12 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Bunkie — Posterior Stabilizing Line (Timed)": {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
     "Bunkie — Lateral Stabilizing Line (Timed)":   {"upper_body": 0.10, "core": 0.40, "lower_body": 0.50},
     "Bunkie — Medial Stabilizing Line (Timed)":    {"upper_body": 0.10, "core": 0.30, "lower_body": 0.60},
+    # The adductor ladder: the two floor steps are the thigh alone; the two
+    # Copenhagen planks share the medial Bunkie line's split (same position).
+    "Adductor Squeeze (Ball)":                {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Adductor Lift (Side-Lying)":             {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Copenhagen Plank (Short Lever)":         {"upper_body": 0.10, "core": 0.30, "lower_body": 0.60},
+    "Copenhagen Plank (Long Lever)":          {"upper_body": 0.10, "core": 0.30, "lower_body": 0.60},
     "Wide-Stance Rotation Count (Test)":      {"upper_body": 0.10, "core": 0.80, "lower_body": 0.10},
     "Diaphragmatic Breathing":                {"upper_body": 0.00, "core": 1.00, "lower_body": 0.00},
     "Prone Decompression Breathing":          {"upper_body": 0.05, "core": 0.95, "lower_body": 0.00},
@@ -719,6 +732,12 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Bunkie — Posterior Stabilizing Line (Timed)": ("bodyweight_compound", 0.5),
     "Bunkie — Lateral Stabilizing Line (Timed)":   ("bodyweight_compound", 0.5),
     "Bunkie — Medial Stabilizing Line (Timed)":    ("bodyweight_compound", 0.5),
+    # The adductor ladder (2026-10-13): the floor steps weigh what the lateral
+    # band walk weighs; the planks what the medial Bunkie line weighs.
+    "Adductor Squeeze (Ball)":                     ("mobility_core", 0.25),
+    "Adductor Lift (Side-Lying)":                  ("mobility_core", 0.25),
+    "Copenhagen Plank (Short Lever)":              ("bodyweight_compound", 0.5),
+    "Copenhagen Plank (Long Lever)":               ("bodyweight_compound", 0.5),
     "Lateral Band Walk":                 ("mobility_core", 0.25),
     "Bird-Dog":                          ("mobility_core", 0.25),
     "Side Bridge with Hip Dip":          ("mobility_core", 0.25),

@@ -416,10 +416,87 @@ def test_the_psoas_march_warms_up_every_session_that_loads_or_stretches():
     for d in (3, 7, 10, 14, 17, 21, 24, 27, 28):
         assert "Standing Psoas March" not in _names(d), d
     march = tp.STANDING_PSOAS_MARCH
-    assert march["laterality"] == "alternating" and march["sets"] == 2 and march["reps"] == 10
+    # Twenty each side from 2026-10-13 (athlete: "increase the psoas march to
+    # 20" — "it means I did 20 lifts each side"). It was ten.
+    assert march["laterality"] == "alternating" and march["sets"] == 2 and march["reps"] == 20
     text = march["mechanics"].lower()
+    assert "twenty each side" in text, "the screen states the dose the plan holds"
     assert "do not swing" in text and "right" in text, "active range, and key rule 7's cue"
     assert rules.check_movement(march["name"], 2)["severity"] == "caution"
+
+
+# ── the adductor ladder, 2026-10-13 ─────────────────────────────────────────
+
+LADDER_NAMES = ("Adductor Squeeze (Ball)", "Adductor Lift (Side-Lying)",
+                "Copenhagen Plank (Short Lever)", "Copenhagen Plank (Long Lever)")
+
+
+def test_the_adductor_ladder_runs_once_a_week_on_tuesday_after_the_run():
+    """Athlete, 2026-10-13: "I have no abductor or adductor exercises, should
+    there be some? Added once per week" — "yes add let's start with the most
+    basic and work up to a real Copenhagen plank". After the short Tuesday run
+    and before the two hip isometrics, which stay last."""
+    for d in (2, 9, 16, 23):
+        names = _names(d)
+        step = [n for n in names if n in LADDER_NAMES]
+        assert len(step) == 1, (d, step)
+        assert names.index(step[0]) == names.index("Running Intervals (Run/Walk)") + 1, d
+        assert names[-2:] == ["Half-Kneeling Knee-Hover Isometric", "End-Range Psoas Isometric"], d
+    for d in DAYS:
+        if d not in (2, 9, 16, 23):
+            assert not set(_names(d)) & set(LADDER_NAMES), d
+
+
+def test_wednesday_stays_free_of_adductor_work():
+    """Thursday's flexibility session stretches the adductors, and a cluster
+    morning must not follow leg work — the reason the ladder is a Tuesday item.
+    test_the_cluster_session_never_lands_on_a_rest_day_or_after_leg_work holds
+    the general rule; this names the case that tempted the wrong placement."""
+    for d in (3, 10, 17, 24):
+        assert not set(_names(d)) & set(LADDER_NAMES), d
+    for name in LADDER_NAMES:
+        assert tc.EXERCISE_BODY_REGION[name] == "lower_body", name
+
+
+def test_the_ladder_starts_at_the_squeeze_and_steps_every_two_weeks():
+    """Most basic first, two weeks a step, never a new step in the easy week,
+    never a step down. Block B reaches the side-lying lift; the next block
+    continues at the short-lever plank."""
+    steps = [next(e for e in PLAN[d]["exercises"] if e["name"] in LADDER_NAMES)
+             for d in (2, 9, 16, 23)]
+    index = [tp.ADDUCTOR_LADDER.index(s) for s in steps]
+    assert index == [0, 0, 1, 1], index
+    assert tp.ADDUCTOR_LADDER[0]["name"] == "Adductor Squeeze (Ball)"
+    assert tp.ADDUCTOR_LADDER[-1]["name"] == "Copenhagen Plank (Long Lever)"
+    assert [e["name"] for e in tp.ADDUCTOR_LADDER[2:4]] == ["Copenhagen Plank (Short Lever)"] * 2
+    short, longer = tp.ADDUCTOR_LADDER[2], tp.ADDUCTOR_LADDER[3]
+    assert short["sets"] * short["hold_seconds"] < longer["sets"] * longer["hold_seconds"]
+
+
+def test_every_ladder_step_says_how_and_lands_on_a_rule():
+    """Each step names the body position and a stop sign, and none is unknown
+    to the movement rules: the squeeze and the lift are cleared, the planks are
+    caution on dose."""
+    expected = {"Adductor Squeeze (Ball)": "cleared", "Adductor Lift (Side-Lying)": "cleared",
+                "Copenhagen Plank (Short Lever)": "caution",
+                "Copenhagen Plank (Long Lever)": "caution"}
+    for ex in tp.ADDUCTOR_LADDER:
+        assert rules.check_movement(ex["name"], 2)["severity"] == expected[ex["name"]], ex["name"]
+        text = ex["mechanics"].lower()
+        assert text.startswith("lie on your"), ex["name"]
+        assert "stop at any sharp pain in the groin" in text, ex["name"]
+        for field in ("biomechanical_focus", "progression", "regression"):
+            assert ex.get(field), (ex["name"], field)
+
+
+def test_no_isolated_abductor_exercise():
+    """The other half of the athlete's question, answered no on 2026-10-13:
+    glute medius is recorded as high-tone, and the side bridge, the hip airplane
+    and the single-leg bridge load it as a stabiliser. REVIEW if the Wednesday
+    grip grade reads 0-1 for four weeks running."""
+    for name in NAMES:
+        low = name.lower()
+        assert "abduct" not in low and "clamshell" not in low and "band walk" not in low, name
 
 
 TRAINING_DAYS = [d for d in DAYS if d not in (7, 14, 21, 27, 28)]
