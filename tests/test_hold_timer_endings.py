@@ -211,6 +211,15 @@ def test_an_alternating_exercise_never_signals_a_side_swap():
 
 # ─── the real plan content routes correctly ───────────────────────────────
 
+def _plan_names(tp) -> list[str]:
+    """Every PLAN* table in training_plan, so a new block is walked without an
+    edit here. The list was hard-coded to Stage 1, 2A and 2B until 2026-10-13,
+    which left Block B — the live block — unchecked."""
+    names = [n for n in dir(tp) if n.startswith("PLAN") and isinstance(getattr(tp, n), dict)]
+    assert "PLAN_BLOCK_B" in names
+    return names
+
+
 def test_every_timed_exercise_in_the_live_plans_gets_a_reachable_ending():
     """Walks the authored blocks rather than a fixture, so a future exercise
     with a new shape cannot quietly land on the wrong bell."""
@@ -219,7 +228,7 @@ def test_every_timed_exercise_in_the_live_plans_gets_a_reachable_ending():
     from views import training as V
 
     seen = set()
-    for plan_name in ("PLAN", "PLAN_STAGE2", "PLAN_STAGE2B"):
+    for plan_name in _plan_names(tp):
         for content in (getattr(tp, plan_name, None) or {}).values():
             for ex in (content.get("exercises") or []):
                 if ex.get("type") not in ("hold", "hold_reps"):
@@ -260,7 +269,7 @@ def test_every_authored_exercise_with_a_hold_is_a_routed_type():
     from views import training as V
 
     unrouted = []
-    for plan_name in ("PLAN", "PLAN_STAGE2", "PLAN_STAGE2B"):
+    for plan_name in _plan_names(tp):
         for day, content in (getattr(tp, plan_name, None) or {}).items():
             for ex in (content.get("exercises") or []):
                 if ex.get("hold_seconds") and ex.get("type") not in V.HOLD_TIMER_TYPES:
