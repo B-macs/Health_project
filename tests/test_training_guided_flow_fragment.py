@@ -137,12 +137,15 @@ def test_the_guided_flow_is_decorated_as_a_fragment():
 
 
 def test_the_guided_flow_takes_render_locals_as_frozen_arguments():
-    """Six, and no more — anything else it needs would be read live from
-    session_state and could disagree with what render() decided."""
+    """Seven, and no more — anything else it needs would be read live from
+    session_state and could disagree with what render() decided. The seventh,
+    `day_type`, joined 2026-10-13 so a test day's items keep their prescription
+    (sessions.readiness_scales); it is render()'s own today_plan value, frozen
+    like the other six."""
     fn = _fn("_render_guided_flow")
     assert [a.arg for a in fn.args.args] == [
         "day_num", "exercises", "n_ex",
-        "_policy", "_readiness_modifier", "_volume_factor",
+        "_policy", "_readiness_modifier", "_volume_factor", "day_type",
     ]
 
 
