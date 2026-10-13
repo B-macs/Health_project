@@ -442,6 +442,33 @@ def planned_reps(ex: dict) -> int:
     return 1
 
 
+#: The `source` an unloaded exercise's stepper entry carries (2026-10-13).
+BODYWEIGHT_SOURCE = "bodyweight_plan"
+
+
+def reps_are_editable(ex: dict) -> bool:
+    """Whether the training screen offers a reps stepper for this exercise.
+
+    A loaded "reps" exercise always had one. Since 2026-10-13 an UNLOADED one
+    does too — the athlete: "I should be able to adjust the reps on the body
+    weight exercises" — so the march, the 90/90 hip lift, the hip airplane,
+    the dead bug and the rest log what he did, not what was written. Holds and
+    hold_reps stay fixed: their count is driven by the per-rep timer, and a
+    stepper beside it could disagree with it.
+    """
+    return ex.get("type") == "reps" and (bool(ex.get("equipment_type"))
+                                         or bool(ex.get("reps")))
+
+
+def bodyweight_entry(ex: dict) -> dict:
+    """The stepper entry for an unloaded "reps" exercise: today's prescribed
+    reps as the start value, and no weight or band. Nothing about an unloaded
+    item is seeded from history or progressed by itself — the prescription is
+    the proposal, and the previous session shows beside it as a reading."""
+    return {"reps": planned_reps(ex), "weight_kg": None, "band_tier": None,
+            "source": BODYWEIGHT_SOURCE, "last_seen_date": None, "clamped": {}}
+
+
 def build_set_record(ex: dict, set_num: int, actual: dict | None,
                       completed_at: str, rest_taken_seconds: int | None = None) -> dict:
     """One ACTUALLY-COMPLETED set, captured at the moment the user taps the
@@ -1350,6 +1377,8 @@ def actual_caption(entry: dict) -> str:
                 f"last two sessions{date_part}.")
     elif source == "last_time":
         base = f"Starting from your last logged session{date_part}."
+    elif source == BODYWEIGHT_SOURCE:
+        base = "Today's planned reps. Change them if you do a different number."
     else:
         base = "No prior record — using plan default."
     parts = [base]

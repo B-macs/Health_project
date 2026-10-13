@@ -947,7 +947,7 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         # mutated in place.
         log_ex = dict(ex, duration_minutes=actual_min) if actual_min else dict(ex)
         actual = actuals.get(idx)
-        if actual and ex.get("equipment_type"):
+        if actual and (ex.get("equipment_type") or sess.reps_are_editable(ex)):
             if ex["type"] == "hold_reps":
                 if actual.get("reps") is not None:
                     log_ex["reps_in_set"] = actual["reps"]
@@ -1287,8 +1287,15 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
     The two guards are independent. A restored checkpoint carries tp_actuals but
     not tp_previous (the latter is a reading of the log, not session state, so it
     is re-fetched rather than persisted), and an exercise whose entry is already
-    seeded must still be able to fill in its previous reading."""
-    if not ex.get("equipment_type"):
+    seeded must still be able to fill in its previous reading.
+
+    An UNLOADED "reps" exercise gets an entry too since 2026-10-13
+    (sess.reps_are_editable — the athlete: "I should be able to adjust the reps
+    on the body weight exercises"): its previous session, and a reps-only entry
+    whose start value is today's prescription (sess.bodyweight_entry). None of
+    the loaded path below applies to it."""
+    loaded = bool(ex.get("equipment_type"))
+    if not loaded and not sess.reps_are_editable(ex):
         return
     need_actuals  = idx not in st.session_state.tp_actuals
     need_previous = idx not in st.session_state.tp_previous
@@ -1306,6 +1313,10 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
         pass  # never block the live flow on a lookup failure
     st.session_state.tp_previous[idx] = sess.previous_performance(last, last_session_sets)
     if not need_actuals:
+        return
+    if not loaded:
+        st.session_state.tp_actuals[idx] = sess.bodyweight_entry(ex)
+        _save_checkpoint(day_num)
         return
     # The session before last: a weight goes up only after TWO sessions in a
     # row at the rep target (engine.PROGRESSION_SESSIONS). Fetched only for a
@@ -4063,11 +4074,12 @@ def _render_guided_flow(day_num, exercises, n_ex,
     #   engine's opening proposal, so it keeps telling the truth after the
     #   athlete has overridden the number by hand.
     #
-    #   Only steppered exercises get the block. An exercise with no
-    #   equipment_type has no resolved entry and no proposed increase to check
-    #   — ten of the fourteen items on a Stage 2B gym day are fixed-protocol
-    #   release and activation work, and "No previous data" against each of them
-    #   would bury the four lines that actually carry a decision.
+    #   Only steppered exercises get the block. A hold has no resolved entry and
+    #   no proposed increase to check — ten of the fourteen items on a Stage 2B
+    #   gym day were fixed-protocol release and activation work, and "No
+    #   previous data" against each of them would bury the four lines that
+    #   actually carry a decision. Since 2026-10-13 an unloaded "reps" exercise
+    #   is steppered (its reps are his to set), so it shows last time's reps.
     _prev = st.session_state.tp_previous.get(_eidx)
     if _prev is not None:
         _entry     = st.session_state.tp_actuals.get(_eidx)
@@ -4144,8 +4156,9 @@ def _render_guided_flow(day_num, exercises, n_ex,
     # can move tp_ex_idx and take the widget with it.
     _record_note(_eidx, day_num)
 
-    # ── Reps / weight / band-tier steppers — gym/free-weight/band exercises
-    #     only (ex.get("equipment_type") truthy). Seeded once per exercise
+    # ── Reps / weight / band-tier steppers — gym/free-weight/band exercises,
+    #     and since 2026-10-13 a reps-only stepper for an unloaded "reps"
+    #     exercise (sess.reps_are_editable). Seeded once per exercise
     #     per session by _seed_actuals_if_needed above; every tap here just
     #     mutates the seeded entry in place and checkpoints it LOCALLY
     #     (durable=False — mirror only, no Notion). This is the hot path: the
@@ -4337,11 +4350,10 @@ def _render_guided_flow(day_num, exercises, n_ex,
                     unsafe_allow_html=True,
                 )
             if ex_type == "reps":
-                # Static reps number only for exercises the new live-session
-                # stepper doesn't already cover (ex.get("equipment_type") is
-                # None) — for gym/band exercises the stepper block above is
-                # the adjustable, authoritative reps display instead.
-                if not ex.get("equipment_type"):
+                # Static reps number only for an exercise the stepper above does
+                # not cover — since 2026-10-13 every "reps" exercise has one, so
+                # this shows only if its entry could not be seeded.
+                if st.session_state.tp_actuals.get(_eidx) is None:
                     st.markdown(
                         f"<div style='text-align:center;margin-top:8px;'>"
                         f"<div style='font-size:11px;color:#8A99A3;font-family:monospace;letter-spacing:2px;'>REPS</div>"
