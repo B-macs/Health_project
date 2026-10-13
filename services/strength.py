@@ -31,6 +31,13 @@ With every regional index starting at CALIBRATION_INDEX (50), the overall is 50
 *whatever the shares turn out to be*. That is why calibration can run for months
 without the headline moving, and why nothing jumps the day it completes.
 
+⚠ SINCE 2026-10-13 (WP-15) THE HEADLINE IS THE MODELLED LEVEL, not the anchor.
+The page had shown a fixed 50 beside a chart whose level moved, and every
+region read 50 because the view forced calibration on all three for ever. Now
+the headline is current_level() of the weekly model (replayed from the anchor),
+the regions divide it by their shares, and each region leaves calibration on
+its own confidence — see snapshot() and screen().
+
 THE ASYMMETRY THAT MAKES IT SAFE
 --------------------------------
 Measured performance can only push the level UP. The only downward force is
@@ -56,7 +63,7 @@ raises tonnage and leaves estimated 1RM untouched, which is the whole point.
 from __future__ import annotations
 
 import statistics
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 
 REGIONS: tuple[str, ...] = ("upper_body", "core", "lower_body")
@@ -104,7 +111,9 @@ class Observation:
 class RegionState:
     region: str
     index: float | None          # measured index, None when nothing is comparable
-    displayed_index: float       # what the card shows (held at 50 while calibrating)
+    # What the card shows: the measured index once confidence reaches
+    # CALIBRATION_EXIT, CALIBRATION_INDEX below it, None with nothing measured.
+    displayed_index: float | None
     confidence: float
     share: float
     contribution_points: float
@@ -180,10 +189,19 @@ def qualifying_rows(rows: list[dict], today: date):
         ]
         if not loaded:
             continue
-        rpe = row.get("exercise_rpe")
-        if rpe is None:
-            rpe = row.get("session_rpe")
-        yield name, day, loaded, rpe
+        yield name, day, loaded, estimate_rpe(row)
+
+
+def estimate_rpe(row: dict) -> float | None:
+    """The RPE a strength estimate reads: the athlete's own SESSION rating.
+
+    Never `exercise_rpe` (2026-10-13, WP-15). Since 2026-08-14 that field is
+    filled from heart rate (Repository.reassign_exercise_rpe_from_hr), and heart
+    rate is not reps in reserve — Key Rule 23 says so — while estimated_1rm
+    converts RPE straight into reps in reserve. Before 2026-08-14 every exercise
+    carried the session rating, so those rows read exactly as before. None
+    reads as RPE 10 in estimated_1rm, the conservative reading."""
+    return row.get("session_rpe")
 
 
 def observation_days(rows: list[dict], today: date | None = None) -> dict[str, set[date]]:
@@ -449,9 +467,7 @@ def weekly_measured_index(
                   and not s.get("is_warmup")]
         if not loaded:
             continue
-        rpe = row.get("exercise_rpe")
-        if rpe is None:
-            rpe = row.get("session_rpe")
+        rpe = estimate_rpe(row)
         peak_kg, peak_reps, _comparability, _why = peaks[name]
         base = baseline_e1rm(peak_kg, peak_reps, pr_rir)
         top = max(estimated_1rm(float(s["weight"]), float(s["reps"]), rpe)[0] for s in loaded)
@@ -478,24 +494,47 @@ def score_series(
     weeks: int = 8,
     calibrating: bool = True,
 ) -> list[dict]:
-    """The Overall Strength Score, week by week, ready to plot.
+    """The Overall Strength Score, week by week, ready to plot: the last
+    `weeks` weeks.
 
     Weeks before the anchor carry a measured value but no modelled level —
     there was no level yet. The model is seeded at the anchor and replayed
-    forward from there, with decay suspended while calibrating."""
+    forward from there, with decay suspended while calibrating.
+
+    REPLAYED FROM THE ANCHOR, WHATEVER `weeks` IS (2026-10-13, WP-15). It used
+    to replay only the weeks it returned, so the level restarted at the anchor
+    value at the left edge of the display window: on 2026-10-13 the 6-week
+    chart read 54.5 where the model run from 2026-07-30 reads 59.0, and the
+    figure dropped every Monday a gained week slid out of the window. A level
+    is the model's memory; it cannot depend on how much of it is drawn."""
     today = today or date.today()
-    measured = weekly_measured_index(rows, peaks, movement_weights, pr_rir,
-                                     today=today, weeks=weeks)
     anchor_week = week_start(anchor_date)
+    since_anchor = (week_start(today) - anchor_week).days // 7 + 1
+    measured = weekly_measured_index(rows, peaks, movement_weights, pr_rir,
+                                     today=today, weeks=max(weeks, since_anchor))
     pre = [(w, m) for w, m in measured if w < anchor_week]
     post = [(w, m) for w, m in measured if w >= anchor_week]
     modelled = run_model(post, seed=anchor_value, decay_suspended=calibrating)
     levels = {w: level for w, _m, level, _why in modelled}
     reasons = {w: why for w, _m, _level, why in modelled}
-    return (
+    points = (
         [{"week": w, "measured": m, "level": None, "why": "before the anchor"} for w, m in pre]
         + [{"week": w, "measured": m, "level": levels[w], "why": reasons[w]} for w, m in post]
     )
+    return points[-weeks:]
+
+
+def current_level(points: list[dict], fallback: float) -> float:
+    """The headline: the series' latest modelled level — the number the chart
+    ends on. `fallback` (the anchor value) only before any week is modelled.
+
+    The headline used to be the anchor itself, a fixed 50, while the chart
+    beside it drew a level that moved, so the page showed two different
+    "overall" numbers (WP-15)."""
+    for point in reversed(points):
+        if point.get("level") is not None:
+            return point["level"]
+    return fallback
 
 
 # ── the whole picture, in one call ──────────────────────────────────────────
@@ -509,15 +548,26 @@ def snapshot(
     pr_rir: float,
     overall: float,
     today: date | None = None,
-    calibrating: bool = True,
 ) -> dict:
-    """Everything the Strength screen needs, from the raw exercise rows.
+    """The regional half of the Strength screen, from the raw exercise rows.
+    `overall` is the headline the three regions divide; screen() passes the
+    modelled level.
 
-    While `calibrating` is True the overall is held at `overall` and every
-    regional index is displayed as CALIBRATION_INDEX — the measured index is
-    still computed and returned as `index`, it is simply not what the card
-    shows. Contributions are computed from the DISPLAYED index so that the
-    three always total the overall on screen."""
+    CALIBRATION IS PER REGION (2026-10-13, WP-15). A region shows its measured
+    index once its confidence reaches CALIBRATION_EXIT; below that it shows
+    CALIBRATION_INDEX, a stated placeholder; with nothing measured it shows
+    None, which the screen prints as "—" — never 0, which would claim a
+    measurement of nothing, and never 50, which would claim a calibration
+    that cannot happen. It used to be one flag the view always set, so every
+    region showed 50 whatever was logged.
+
+    The snapshot's own `calibrating` is True while any MEASURED region is
+    still below the exit, or while nothing is measured at all. A region that
+    cannot be measured (core: no 2025 kilogram baseline) does not hold the
+    others in calibration for ever.
+
+    Contributions divide `overall` by the shares, so the three always total
+    the headline on screen."""
     today = today or date.today()
     observed = best_observations(rows, today=today)
 
@@ -569,30 +619,71 @@ def snapshot(
     }
     shares = region_shares(confidence, evidence, prior)
 
-    displayed_index = CALIBRATION_INDEX if calibrating else None
     points = split_parts(shares, overall)
     percents = split_parts(shares, 100.0)
 
     states = []
     for region in REGIONS:
-        shown = displayed_index if displayed_index is not None else (measured_index[region] or 0.0)
+        exited = confidence[region] >= CALIBRATION_EXIT
         states.append(RegionState(
             region=region,
             index=measured_index[region],
-            displayed_index=shown,
+            displayed_index=displayed_index(measured_index[region], confidence[region]),
             confidence=confidence[region],
             share=shares[region],
             contribution_points=points[region],
             contribution_pct=percents[region],
             observations=observation_counts[region],
-            calibrating=confidence[region] < CALIBRATION_EXIT,
+            calibrating=not exited,
             components=components[region],
         ))
+    measured_states = [s for s in states if s.index is not None]
 
     return {
         "overall": overall,
-        "calibrating": calibrating,
+        "calibrating": not measured_states or any(s.calibrating for s in measured_states),
         "regions": states,
         "exercises": per_exercise,
         "observation_dates": sorted({o.session_date for o in observed.values()}),
+    }
+
+
+def displayed_index(measured: float | None, confidence: float) -> float | None:
+    """What one region's card shows: the measured index once trusted, the
+    placeholder while calibrating, nothing without a measurement."""
+    if measured is None:
+        return None
+    return measured if confidence >= CALIBRATION_EXIT else CALIBRATION_INDEX
+
+
+def screen(
+    rows: list[dict],
+    peaks: dict[str, tuple[float, int, float, str]],
+    region_map: dict[str, str],
+    movement_weights: dict[str, float],
+    prior: dict[str, float],
+    pr_rir: float,
+    anchor_date: date,
+    anchor_value: float,
+    today: date | None = None,
+    weeks: int = 8,
+) -> dict:
+    """The whole Strength screen in one call, in the order its parts depend
+    on each other: calibration (per region) decides whether the model may
+    decay, the model decides the level, and the level is the headline the
+    regions divide. snapshot()'s keys plus `score_series`; `overall` is the
+    chart's current level (current_level)."""
+    today = today or date.today()
+    regional = snapshot(rows, peaks, region_map, movement_weights, prior, pr_rir,
+                        anchor_value, today=today)
+    points = score_series(rows, peaks, movement_weights, pr_rir, anchor_date, anchor_value,
+                          today=today, weeks=weeks, calibrating=regional["calibrating"])
+    level = current_level(points, anchor_value)
+    divided = split_parts({s.region: s.share for s in regional["regions"]}, level)
+    return {
+        **regional,
+        "overall": level,
+        "regions": [replace(s, contribution_points=divided[s.region])
+                    for s in regional["regions"]],
+        "score_series": points,
     }

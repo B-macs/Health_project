@@ -338,10 +338,10 @@ def test_a_second_week_back_still_cannot_gain_from_a_lower_result():
 
 # ── the whole snapshot ──────────────────────────────────────────────────────
 
-def _snapshot(rows, today=date(2026, 8, 4), calibrating=True):
+def _snapshot(rows, today=date(2026, 8, 4), overall=sb.ANCHOR_VALUE):
     return strength.snapshot(
         rows, sb.PEAKS_2025, tc.EXERCISE_BODY_REGION, MW, sb.REGION_PRIOR,
-        sb.PR_RIR, sb.ANCHOR_VALUE, today=today, calibrating=calibrating,
+        sb.PR_RIR, overall, today=today,
     )
 
 
@@ -360,19 +360,36 @@ def test_contributions_total_the_overall_with_no_training_at_all():
     assert sum(r.contribution_points for r in snap["regions"]) == pytest.approx(sb.ANCHOR_VALUE)
 
 
-def test_every_regional_index_displays_at_fifty_while_calibrating():
+def test_a_measured_region_below_the_exit_shows_the_placeholder():
+    """Changed on purpose 2026-10-13 (WP-15). It was "every regional index
+    displays at fifty while calibrating" — one flag, which the view always set,
+    so all three regions read 50 for ever. Calibration is now per region: a
+    MEASURED region below the exit still shows the placeholder, and a region
+    with no measurement shows nothing (next test)."""
     rows = [_row("Lat Pulldown", "2026-07-27", [{"reps": 10, "weight": 45}])]
-    snap = _snapshot(rows)
-    assert all(r.displayed_index == strength.CALIBRATION_INDEX for r in snap["regions"])
+    upper = next(r for r in _snapshot(rows)["regions"] if r.region == "upper_body")
+    assert upper.index is not None and upper.confidence < strength.CALIBRATION_EXIT
+    assert upper.displayed_index == strength.CALIBRATION_INDEX
 
 
-def test_the_overall_holds_at_fifty_for_any_share_split():
-    """The identity the whole calibration period rests on: with every index at
-    50, the overall is 50 whatever the shares turn out to be."""
+def test_a_region_with_no_measurement_shows_nothing_never_zero_or_fifty():
+    """Zero would claim a measurement of nothing; fifty would claim a
+    calibration that cannot happen. Core has no 2025 kilogram baseline, so it
+    reads None whatever is logged, and the screen prints "—"."""
+    rows = [_row("Lat Pulldown", "2026-07-27", [{"reps": 10, "weight": 45}]),
+            _row("Pallof Press (Cable)", "2026-07-27", [{"reps": 10, "weight": 12.5}])]
+    by_region = {r.region: r for r in _snapshot(rows)["regions"]}
+    assert by_region["core"].displayed_index is None
+    assert by_region["lower_body"].displayed_index is None
+
+
+def test_the_regions_divide_whatever_headline_they_are_given():
+    """Replaces "the overall holds at fifty for any share split" (2026-10-13):
+    the headline is now the modelled level, not the anchor, and the identity
+    the screen keeps is that the three contributions total it exactly."""
     rows = [_row("Lat Pulldown", "2026-07-27", [{"reps": 10, "weight": 45}])]
-    snap = _snapshot(rows)
-    computed = sum(r.share * r.displayed_index for r in snap["regions"])
-    assert computed == pytest.approx(sb.ANCHOR_VALUE)
+    snap = _snapshot(rows, overall=57.3)
+    assert sum(r.contribution_points for r in snap["regions"]) == pytest.approx(57.3)
 
 
 def test_core_stays_uncalibrated_because_its_2025_peak_is_a_band():
@@ -449,3 +466,110 @@ def test_the_calibration_index_is_not_duplicated_in_the_baselines_module():
     strength_baselines.py read like the source of truth and was read by
     nothing."""
     assert not hasattr(sb, "CALIBRATION_INDEX")
+
+
+# ── WP-15 (2026-10-13): per-region calibration, the headline, the RPE read ──
+
+_DAYS = ["2026-09-08", "2026-09-15", "2026-09-22", "2026-09-29"]
+
+
+def _confident_upper_rows():
+    """Three comparable upper-body lifts, each at 70% of its own 2025 e1RM on
+    four days: quantity 12/12, comparability 1.0, consistency 1.0, so upper's
+    confidence is 1.0. Weight = 0.5 x base: 10 reps at RPE 8 is 12 effective
+    reps, a factor of 1.4, and 0.5 x 1.4 = 0.7."""
+    rows = []
+    for name in ("Lat Pulldown", "Single-Arm DB Row", "Incline DB Press"):
+        peak_kg, peak_reps, _c, _w = sb.PEAKS_2025[name]
+        base = strength.baseline_e1rm(peak_kg, peak_reps, sb.PR_RIR)
+        rows += [_row(name, d, [{"reps": 10, "weight": round(0.5 * base, 4)}], rpe=8)
+                 for d in _DAYS]
+    return rows
+
+
+def test_a_confident_region_shows_its_measured_index():
+    upper = next(r for r in _snapshot(_confident_upper_rows(), today=date(2026, 10, 1))["regions"]
+                 if r.region == "upper_body")
+    assert upper.confidence >= strength.CALIBRATION_EXIT
+    assert upper.calibrating is False
+    assert upper.displayed_index == pytest.approx(70.0, abs=0.01)
+
+
+def test_an_unmeasurable_region_does_not_hold_the_others_in_calibration():
+    """Core can never leave calibration (no 2025 kilogram baseline), so a
+    flag that waited for every region would never clear."""
+    snap = _snapshot(_confident_upper_rows(), today=date(2026, 10, 1))
+    assert snap["calibrating"] is False
+
+
+def test_the_snapshot_calibrates_while_a_measured_region_is_below_the_exit():
+    rows = _confident_upper_rows() + [
+        _row("Hip Thrust (Loaded)", "2026-09-29", [{"reps": 10, "weight": 40}])]
+    assert _snapshot(rows, today=date(2026, 10, 1))["calibrating"] is True
+
+
+def test_nothing_measured_is_still_calibrating():
+    assert _snapshot([])["calibrating"] is True
+
+
+def _series(rows, weeks, today=date(2026, 10, 13)):
+    return strength.score_series(rows, sb.PEAKS_2025, MW, sb.PR_RIR, sb.ANCHOR_DATE,
+                                 sb.ANCHOR_VALUE, today=today, weeks=weeks)
+
+
+def _weekly_rows():
+    """One heavy upper session a week from the anchor on, enough to earn the
+    capped gain most weeks."""
+    out, day = [], date(2026, 7, 28)
+    while day <= date(2026, 10, 13):
+        out.append(_row("Lat Pulldown", day.isoformat(), [{"reps": 10, "weight": 60}], rpe=8))
+        day += timedelta(days=7)
+    return out
+
+
+def test_the_level_is_replayed_from_the_anchor_whatever_the_window():
+    """The bug: the model was replayed over the displayed weeks only, so it
+    restarted at the anchor value at the window's left edge — 54.5 on a
+    6-week chart where the model from 2026-07-30 read 59.0 (2026-10-13)."""
+    narrow, wide = _series(_weekly_rows(), 3), _series(_weekly_rows(), 12)
+    assert len(narrow) == 3 and len(wide) == 12
+    assert narrow[-1]["level"] == wide[-1]["level"]
+    assert narrow[0]["level"] == wide[-3]["level"]
+    assert narrow[0]["level"] > sb.ANCHOR_VALUE, "gains before the window are kept"
+
+
+def test_current_level_is_the_last_modelled_week():
+    points = [{"level": None}, {"level": 51.5}, {"level": 53.0}]
+    assert strength.current_level(points, 50.0) == 53.0
+    assert strength.current_level([{"level": None}], 50.0) == 50.0
+    assert strength.current_level([], 50.0) == 50.0
+
+
+def test_the_screen_headline_is_the_charts_level_and_the_regions_total_it():
+    rows = _weekly_rows()
+    out = strength.screen(rows, sb.PEAKS_2025, tc.EXERCISE_BODY_REGION, MW, sb.REGION_PRIOR,
+                          sb.PR_RIR, sb.ANCHOR_DATE, sb.ANCHOR_VALUE,
+                          today=date(2026, 10, 13), weeks=6)
+    assert out["overall"] == out["score_series"][-1]["level"]
+    assert out["overall"] > sb.ANCHOR_VALUE
+    assert sum(r.contribution_points for r in out["regions"]) == pytest.approx(out["overall"])
+
+
+def test_the_estimate_reads_the_session_rpe_not_the_heart_rate_one():
+    """exercise_rpe has been filled from heart rate since 2026-08-14, and heart
+    rate is not reps in reserve (Key Rule 23). 10 reps at the session's RPE 8
+    is 12 effective reps; at the heart rate's 3 it would be 17."""
+    row = {"movement_name": "Lat Pulldown", "session_date": "2026-09-08",
+           "sets": [{"reps": 10, "weight": 50}], "exercise_rpe": 3.0, "session_rpe": 8.0}
+    obs = strength.best_observations([row], today=date(2026, 9, 9))["Lat Pulldown"]
+    assert obs.rpe == 8.0 and obs.effective_reps == 12.0
+    week = strength.weekly_measured_index([row], sb.PEAKS_2025, MW, sb.PR_RIR,
+                                          today=date(2026, 9, 9), weeks=1)
+    base = strength.baseline_e1rm(*sb.PEAKS_2025["Lat Pulldown"][:2], sb.PR_RIR)
+    assert week[-1][1] == pytest.approx(50 * (1 + 12 / 30) / base * 100)
+
+
+def test_a_missing_session_rpe_reads_as_all_out_never_as_the_heart_rate():
+    row = {"movement_name": "Lat Pulldown", "session_date": "2026-09-08",
+           "sets": [{"reps": 10, "weight": 50}], "exercise_rpe": 3.0, "session_rpe": None}
+    assert strength.best_observations([row], today=date(2026, 9, 9))["Lat Pulldown"].rpe == 10.0

@@ -280,3 +280,22 @@ def test_every_gridline_is_a_whole_number_of_kilograms(peak):
     for i in range(5):
         line = top * i / 4
         assert line == pytest.approx(round(line)), f"gridline {line} is not whole"
+
+
+# ── work without load, on the page (WP-15, 2026-10-13) ──────────────────────
+
+@pytest.mark.parametrize("seconds, text", [
+    (45, "45 s"), (60, "1 min"), (245, "4 min 5 s"), (59.6, "1 min"), (0.4, "0 s"),
+])
+def test_held_time_reads_as_a_person_says_it(seconds, text):
+    assert tonnage.held_text(seconds) == text
+
+
+def test_the_unloaded_line_names_held_time_and_reps_apart():
+    cell = tonnage.SectorWeek(unloaded_seconds=245.0, unloaded_reps=36.0)
+    assert tonnage.unloaded_text(cell) == "4 min 5 s held, 36 reps"
+    assert tonnage.unloaded_text(tonnage.SectorWeek(unloaded_reps=1.0)) == "1 rep"
+
+
+def test_a_week_with_only_loaded_work_has_no_unloaded_line():
+    assert tonnage.unloaded_text(tonnage.SectorWeek(kg=400.0, sets=4)) is None

@@ -6,7 +6,9 @@ carried RPE 8 because the session did — a 90-second pressure release and a set
 of Romanian deadlifts rated identically. It was not merely cosmetic.
 services/strength.py takes `exercise_rpe` first and falls back to `session_rpe`
 only when it is None, so the fallback was never reached and every 1RM estimate
-was computed at the session figure.
+was computed at the session figure. (Since 2026-10-13 the strength estimate
+reads ONLY the session figure: the heart-rate one is not reps in reserve, Key
+Rule 23 — see strength.estimate_rpe.)
 
 The session slider is untouched. It is the athlete's own answer, it feeds
 session_au and through it Strain and ACWR, and key rule 2b keeps anything
@@ -45,11 +47,17 @@ def test_a_null_exercise_rpe_falls_back_to_the_session_figure():
     assert out[0][3] == 8
 
 
-def test_an_assigned_exercise_rpe_wins_over_the_session_figure():
+def test_the_strength_estimate_reads_the_session_figure_not_the_heart_rate_one():
+    """Reversed on purpose 2026-10-13 (WP-15). This test was "an assigned
+    exercise RPE wins over the session figure". Key Rule 23 (2026-09-16) then
+    settled that the heart-rate figure is not reps in reserve, and the strength
+    estimate turns RPE straight into reps in reserve — so it reads the
+    athlete's own session rating. The heart-rate figure still lands on the
+    exercise (the tests below); nothing that estimates strength reads it."""
     rows = [{"movement_name": "Goblet Squat", "session_date": "2026-08-14",
              "exercise_rpe": 5.2, "session_rpe": 8,
              "sets": [{"reps": 10, "weight": 20.0}]}]
-    assert list(strength.qualifying_rows(rows, date(2026, 8, 15)))[0][3] == 5.2
+    assert list(strength.qualifying_rows(rows, date(2026, 8, 15)))[0][3] == 8
 
 
 def test_heart_rate_separates_a_release_from_a_working_set():

@@ -241,3 +241,29 @@ def nice_axis_max(peak: float, divisions: int = 4) -> float:
         if step >= target - 1e-9:
             return math.ceil(step) * divisions
     return math.ceil(exponent * 10) * divisions
+
+
+def held_text(seconds: float) -> str:
+    """Held time as a person reads it: "45 s", "4 min", "4 min 5 s"."""
+    total = int(round(seconds))
+    if total < 60:
+        return f"{total} s"
+    minutes, rest = divmod(total, 60)
+    return f"{minutes} min" + (f" {rest} s" if rest else "")
+
+
+def unloaded_text(cell: SectorWeek) -> str | None:
+    """The work a week did WITHOUT load, as one line: held time and reps side
+    by side, never added together. None when there was none.
+
+    Printed on the page, not only in the chart's tooltip (WP-15, 2026-10-13):
+    a tooltip needs a mouse, so on the phone it never shows, and Block B's
+    core work is almost all holds and unloaded reps — the Core chart read 0 kg
+    with nothing on screen to say what was done."""
+    parts = []
+    if cell.unloaded_seconds:
+        parts.append(f"{held_text(cell.unloaded_seconds)} held")
+    if cell.unloaded_reps:
+        reps = cell.unloaded_reps
+        parts.append(f"{reps:g} rep{'' if reps == 1 else 's'}")
+    return ", ".join(parts) if parts else None

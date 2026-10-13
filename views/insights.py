@@ -423,9 +423,10 @@ def _tonnage_chart_svg(series: list, key: str, colour: str, label: str) -> str:
             f"{wk.training_days} training day{'' if wk.training_days == 1 else 's'}"
             # Reps and seconds are reported separately and never summed — a
             # hold is logged as 1 rep with the work in `tut`, so adding them
-            # would hide exactly the work these counters exist to show.
-            + (f" · {_kg(cell.unloaded_reps)} unloaded reps" if cell.unloaded_reps else "")
-            + (f" · {_kg(cell.unloaded_seconds)}s held" if cell.unloaded_seconds else "")
+            # would hide exactly the work these counters exist to show. Same
+            # words as the line under the chart, which a phone can see.
+            + (f" · without load: {tonnage_svc.unloaded_text(cell)}"
+               if tonnage_svc.unloaded_text(cell) else "")
         )
         if cell.kg <= 0:
             out += (
@@ -452,6 +453,26 @@ def _tonnage_chart_svg(series: list, key: str, colour: str, label: str) -> str:
         f'preserveAspectRatio="xMidYMid meet" role="img" '
         f'aria-label="{label}, kilograms per week">{out}</svg>'
     )
+
+
+def _unloaded_note_html(series: list, key: str) -> str:
+    """This week's and last week's work without load, under a tonnage chart.
+
+    The chart counts kilograms only, so a week of planks and bodyweight reps
+    draws a zero bar. The tooltip said what was done, and a tooltip never
+    shows on a touch screen (WP-15, 2026-10-13). Empty when neither week did
+    any, so a loaded-only sector carries no extra line."""
+    lines = []
+    for label, week in (("This week", series[-1] if series else None),
+                        ("Last week", series[-2] if len(series) > 1 else None)):
+        text = tonnage_svc.unloaded_text(week.value(key)) if week is not None else None
+        if text:
+            lines.append(f'<div style="font-size:13px;color:{_INK2};">{label}: {text}</div>')
+    if not lines:
+        return ""
+    return (f'<div class="sb-unloaded" style="margin:-4px 0 16px;">'
+            f'<div style="font-size:12px;color:{_INK3};letter-spacing:.04em;'
+            f'margin-bottom:2px;">Work without load</div>{"".join(lines)}</div>')
 
 
 def _score_chart_svg(points: list[dict], colour: str) -> str:
@@ -610,16 +631,21 @@ def _strength_region_strip_html(regions: list) -> str:
         conf_col = _GOOD if conf >= strength_svc.CALIBRATION_EXIT else (_WARN if conf > 0 else _BAD)
         band = "established" if conf >= strength_svc.CALIBRATION_EXIT else "provisional"
         off = " off" if conf <= 0 else ""
+        # No measurement prints "—", never 0 (WP-15): core has no 2025
+        # kilogram baseline, so nothing it does can be measured on this scale.
+        index_text = ("—" if state.displayed_index is None
+                      else f"{state.displayed_index:.1f}")
         aria = (f'{meta["name"]}, {state.contribution_points:.1f} points, '
                 f'{state.contribution_pct:.1f} percent of overall, '
-                f'index {state.displayed_index:.1f}, confidence {conf:.2f}')
+                f'index {"not measured" if state.displayed_index is None else index_text}, '
+                f'confidence {conf:.2f}')
         rows += (
             f'<div class="sb-region" role="group" aria-label="{aria}">'
             f'<div class="txt">'
             f'<div class="nm" style="color:{meta["colour"]}">{meta["name"]}</div>'
             f'<div class="sc">{state.contribution_points:.1f}'
             f'<u>pts&thinsp;<s>{state.contribution_pct:.1f}%</s></u></div>'
-            f'<div class="idx">Index <em>{state.displayed_index:.1f}</em></div>'
+            f'<div class="idx">Index <em>{index_text}</em></div>'
             f'<div class="sb-cbar"><i style="width:{max(round(conf * 100), 2)}%;'
             f'background:{conf_col}"></i></div>'
             f'<div class="sb-cnote" style="color:{conf_col}">{band} · confidence {conf:.2f}</div>'
@@ -762,6 +788,10 @@ def _render_strength_detail() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(f'<div class="sb-chartbox">{chart}</div>', unsafe_allow_html=True)
+    if not is_score:
+        note = _unloaded_note_html(data["tonnage"], metric["key"])
+        if note:
+            st.markdown(note, unsafe_allow_html=True)
 
     # ── Body parts ────────────────────────────────────────────────────────
     st.markdown(
@@ -2236,31 +2266,24 @@ def _strength_screen_data() -> dict:
         for name, (_category, weight) in training_constants.EXERCISE_MOVEMENT_WEIGHT.items()
     }
 
-    snapshot = strength_svc.snapshot(
+    # One call, so the headline IS the chart's current level and each region
+    # leaves calibration on its own confidence (WP-15, 2026-10-13).
+    snapshot = strength_svc.screen(
         rows,
         strength_baselines.PEAKS_2025,
         training_constants.EXERCISE_BODY_REGION,
         movement_weights,
         strength_baselines.REGION_PRIOR,
         strength_baselines.PR_RIR,
-        strength_baselines.ANCHOR_VALUE,
-        today=today,
-        calibrating=True,
-    )
-    series, unmapped = tonnage_svc.weekly_tonnage(
-        rows, training_constants.EXERCISE_BODY_REGION, today=today, weeks=_STRENGTH_WEEKS,
-    )
-    score_points = strength_svc.score_series(
-        rows,
-        strength_baselines.PEAKS_2025,
-        movement_weights,
-        strength_baselines.PR_RIR,
         strength_baselines.ANCHOR_DATE,
         strength_baselines.ANCHOR_VALUE,
         today=today,
         weeks=_STRENGTH_WEEKS,
-        calibrating=True,
     )
+    series, unmapped = tonnage_svc.weekly_tonnage(
+        rows, training_constants.EXERCISE_BODY_REGION, today=today, weeks=_STRENGTH_WEEKS,
+    )
+    score_points = snapshot["score_series"]
     labels = [
         w.week_start.strftime("%-d %b") if os.name != "nt"
         else w.week_start.strftime("%d %b").lstrip("0")

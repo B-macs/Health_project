@@ -202,3 +202,46 @@ def test_the_screen_survives_a_repository_failure():
     html = _html(app)
     assert "Muscle imbalances" in html
     assert html.count('class="sb-region"') == 3
+
+
+# ── WP-15 (2026-10-13) ──────────────────────────────────────────────────────
+
+def test_a_region_with_no_measurement_prints_a_dash_never_a_number(app):
+    """Core has no 2025 kilogram baseline, so its index is None — the strip
+    prints "—", never 0 and never the 50 placeholder."""
+    html = _html(app)
+    core = html[html.index('aria-label="Core'):]
+    core = core[:core.index('class="sb-plate')]
+    assert "Index <em>—</em>" in core
+    assert "index not measured" in html
+
+
+def test_the_hero_and_the_chart_show_the_same_level(app):
+    """The headline is the chart's current level, not a separate fixed 50."""
+    html = _html(app)
+    hero = html[html.index(">Overall Strength<"):]
+    level = hero[hero.index("tabular-nums;"):].split(">", 1)[1].split("<", 1)[0]
+    assert f"{level}<u>points</u>" in html
+
+
+def test_work_without_load_is_printed_under_a_tonnage_chart():
+    """A tooltip never shows on a touch screen, so the held time and the
+    unloaded reps are printed as text (WP-15)."""
+    from datetime import date
+    from services import tonnage
+    from views import insights as V
+
+    def week(day, **core):
+        return tonnage.TonnageWeek(
+            week_start=date.fromisoformat(day), training_days=2,
+            sectors={r: tonnage.SectorWeek(**(core if r == "core" else {}))
+                     for r in tonnage.REGIONS})
+    series = [week("2026-09-28", unloaded_seconds=120.0),
+              week("2026-10-05", unloaded_seconds=245.0, unloaded_reps=36.0)]
+    note = V._unloaded_note_html(series, "core")
+    assert "Work without load" in note
+    assert "This week: 4 min 5 s held, 36 reps" in note
+    assert "Last week: 2 min held" in note
+    assert V._unloaded_note_html(series, "upper_body") == ""
+    src = __import__("inspect").getsource(V._render_strength_detail)
+    assert "_unloaded_note_html(data[\"tonnage\"], metric[\"key\"])" in src
