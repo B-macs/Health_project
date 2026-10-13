@@ -43,6 +43,7 @@ from services import flexibility as fx
 from services import stats as stats_mod
 from services import insights as insights_svc
 from services import plan as plan_svc
+from services import sessions as sessions_svc
 from services import strength as strength_svc
 from services import tonnage as tonnage_svc
 from services import volume as volume_svc
@@ -3248,6 +3249,23 @@ def render() -> None:
             st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
         elif metrics_history is not None:
             st.info("No persisted history yet — wait for the automatic once-a-day sync.")
+
+        # ── Session checks (2026-10-13): the two inputs that have inflated
+        #    strain before — a repeat save and a session left open.
+        st.divider()
+        st.subheader("Session checks")
+        try:
+            _log_warnings = sessions_svc.session_log_warnings(
+                repo.get_repository().get_session_summaries(days=35))
+        except Exception as exc:
+            _log_warnings = None
+            st.warning(f"Could not check the session log: {exc}")
+        if _log_warnings:
+            for _w in _log_warnings:
+                st.warning(_w)
+        elif _log_warnings is not None:
+            st.caption("The last 35 days of the session log look clean: no repeat saves, "
+                       "and no day far above the rest.")
 
         st.divider()
         st.caption(

@@ -2611,6 +2611,34 @@ class Repository:
             entry["notes"].append(notion.get_property(p, "Notes", "rich_text") or "")
         return out
 
+    def get_session_summaries(self, days: int = 35, today: date | None = None) -> list[dict]:
+        """One dict per logged SESSION (not per date) over the last `days`:
+        session_id, date, au, duration_minutes and whether it is a plan
+        session. get_recent_sessions groups by date and keeps the first row's
+        AU, so a second copy of a session is invisible there; this is what
+        sessions.session_log_warnings reads to find one (2026-10-13)."""
+        today = today or date.today()
+        cutoff = (today - timedelta(days=days)).isoformat()
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"on_or_after": cutoff}},
+        )
+        out: dict[str, dict] = {}
+        for p in pages:
+            sid = notion.get_property(p, "Session ID", "rich_text") or ""
+            if not sid:
+                continue
+            row = out.setdefault(sid, {
+                "session_id": sid,
+                "date": notion.get_property(p, "Session Date", "date") or "",
+                "au": notion.get_property(p, "Session AU", "number") or 0.0,
+                "duration_minutes": notion.get_property(p, "Session Duration", "number"),
+                "plan": True,
+            })
+            if notion.get_property(p, "Type", "select") in self.SUPPLEMENTARY_SESSION_TYPES:
+                row["plan"] = False
+        return sorted(out.values(), key=lambda r: (r["date"], r["session_id"]))
+
     def get_daily_session_au(self, days: int = 28, today: date | None = None) -> list[dict]:
         today = today or date.today()
         cutoff = (today - timedelta(days=days)).isoformat()

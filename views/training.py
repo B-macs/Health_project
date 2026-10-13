@@ -3757,13 +3757,31 @@ def render():
                     "the only intensity record — it's what the session load is built from."
                 )
 
+            # A clock that ran far past the plan asks before it saves
+            # (sess.duration_needs_a_check, 2026-10-13): the session load is
+            # RPE x minutes, so a session left open multiplies it.
+            _modelled_minutes = sess.estimate_duration(exercises)
+            _check_length = sess.duration_needs_a_check(elapsed_minutes, _modelled_minutes)
             with st.form("log_session_form"):
                 session_rpe = st.slider("Session RPE — how hard did it feel?",
                                         min_value=1, max_value=10, value=5,
                                         help="1 = very easy  ·  10 = maximal effort")
+                if _check_length:
+                    _save_minutes = st.radio(
+                        f"The clock says {elapsed_minutes} min, and this session plans about "
+                        f"{_modelled_minutes} min. Which length do you save?",
+                        options=[_modelled_minutes, elapsed_minutes], index=0,
+                        format_func=lambda m: (f"{m} min — the planned length"
+                                               if m == _modelled_minutes else
+                                               f"{m} min — the clock"),
+                        key="tp_length_choice",
+                    )
+                else:
+                    _save_minutes = elapsed_minutes
                 st.caption(
-                    f"Session duration: **{elapsed_minutes} min** (auto-timed)  ·  "
-                    f"Estimated AU: **{5 * elapsed_minutes}** (RPE × duration)"
+                    f"Session duration: **{_save_minutes} min**"
+                    f"{' (your choice)' if _check_length else ' (auto-timed)'}  ·  "
+                    f"Estimated AU: **{5 * _save_minutes}** (RPE × duration)"
                 )
                 session_notes = st.text_area(
                     "Session Notes (optional)",
@@ -3773,6 +3791,7 @@ def render():
                 save_btn = st.form_submit_button("Save Session to Log",
                                                  type="primary", use_container_width=True)
             if save_btn:
+                elapsed_minutes = _save_minutes
                 try:
                     with st.spinner("Saving session…"):
                         _auto_log_session(day_num, exercises, session_rpe, elapsed_minutes, session_notes)

@@ -1873,6 +1873,56 @@ def is_measurement(name: str) -> bool:
     return any(tag in (name or "") for tag in ("(Test)", "(Timed Test)", "(Trial)"))
 
 
+#: A session whose clock time runs past this multiple of its modelled time is
+#: asked about before it saves (2026-10-13). 2026-09-16 was left open after a
+#: walk and logged 189 minutes — 378 AU against a real ~90, four times the load.
+DURATION_CHECK_RATIO = 1.5
+
+
+def duration_needs_a_check(clock_minutes, modelled_minutes) -> bool:
+    """True when the save should ask which length to keep: the clock ran more
+    than DURATION_CHECK_RATIO times the session's modelled length."""
+    return bool(modelled_minutes) and clock_minutes > DURATION_CHECK_RATIO * modelled_minutes
+
+
+#: A day's load more than this multiple of every other day in the window is
+#: flagged (2026-10-13): a double save (2026-09-10, 1,306 AU) or a session left
+#: open reads that way, and a real hard day rarely does.
+DAY_AU_OUTLIER_RATIO = 1.5
+#: Days needed in the window before the outlier rule speaks at all.
+DAY_AU_OUTLIER_MIN_DAYS = 7
+
+
+def session_log_warnings(summaries: list[dict]) -> list[str]:
+    """Plain-English warnings about the session log, from
+    Repository.get_session_summaries. Two checks, both about the two inputs
+    that have inflated strain before: two PLAN sessions logged on one date
+    (a repeat save — 2026-09-10 was saved three times), and a day whose load
+    is more than DAY_AU_OUTLIER_RATIO times every other day's. Empty when the
+    log looks clean."""
+    out: list[str] = []
+    plan_by_date: dict[str, list[str]] = {}
+    au_by_date: dict[str, float] = {}
+    for s in summaries:
+        d = s.get("date") or ""
+        if not d:
+            continue
+        au_by_date[d] = au_by_date.get(d, 0.0) + float(s.get("au") or 0.0)
+        if s.get("plan"):
+            plan_by_date.setdefault(d, []).append(s.get("session_id", ""))
+    for d in sorted(plan_by_date):
+        if len(plan_by_date[d]) > 1:
+            out.append(f"{len(plan_by_date[d])} plan sessions are logged on {d}. If one is "
+                       f"a repeat save, remove it: it counts that day's load twice.")
+    if len(au_by_date) >= DAY_AU_OUTLIER_MIN_DAYS:
+        for d, au in sorted(au_by_date.items()):
+            others = [v for k, v in au_by_date.items() if k != d]
+            if others and au > DAY_AU_OUTLIER_RATIO * max(others):
+                out.append(f"The load on {d} ({au:.0f} AU) is more than half again above any "
+                           f"other day. Check it for a repeat save or a session left open.")
+    return out
+
+
 def readiness_scales(ex: dict, day_type: str | None = None) -> bool:
     """Whether a low-readiness day may shorten this exercise's dose.
 
