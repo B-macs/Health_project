@@ -133,7 +133,7 @@ function _bellStrike(root, atOffset, vol, dur) {
   });
 }
 
-// ── THREE ENDINGS, COUNTED ────────────────────────────────────────────────
+// ── FOUR ENDINGS, COUNTED (three until 2026-10-13) ────────────────────────
 //
 // Athlete's request, 2026-08-17: the last timer of a run must not sound like
 // the ones before it. Mid-set he is holding a position with his eyes shut and
@@ -142,7 +142,9 @@ function _bellStrike(root, atOffset, vol, dur) {
 // the set" makes all three the same instruction.
 //
 // THE SIGNAL IS HOW MANY STRIKES, not which pitches: 1 = another rep,
-// 2 = swap sides, 3 = the set is over. Counting survives gym noise, a single
+// 2 = swap sides, 3 = the set is over, 4 = the exercise is over (its last
+// set; added 2026-10-13 at the athlete's request, so the last set no longer
+// sounds like every other one). Counting survives gym noise, a single
 // earbud and a half-heard first strike, where remembering whether a pair rose
 // or fell does not. Falling pitch reinforces the two endings that stop
 // something, but nothing depends on hearing it.
@@ -181,6 +183,16 @@ function _bellFinish() {
   _bellStrike(1046.5, 0.00, 0.90, 1.0);  // C6
   _bellStrike(784.0,  0.18, 0.95, 1.2);  // G5
   _bellStrike(523.3,  0.36, 1.00, 2.6);  // C5 -- long ring-out
+}
+
+// FOUR falling strikes: the exercise is over -- its last set, or a timed
+// piece (the incline walk) that has run out. The longest ring-out here, and
+// followed by the next exercise, never by another rep.
+function _bellDone() {
+  _bellStrike(1046.5, 0.00, 0.90, 1.0);  // C6
+  _bellStrike(784.0,  0.18, 0.95, 1.1);  // G5
+  _bellStrike(659.3,  0.36, 0.95, 1.2);  // E5
+  _bellStrike(523.3,  0.54, 1.00, 2.8);  // C5 -- longest ring-out
 }
 
 // RISING pair -- the REST timer's "go" signal, not one of the three endings
@@ -271,12 +283,14 @@ def _audio_unlock_component() -> None:
 
 
 #: What happens after a hold timer reaches zero, and therefore which bell it
-#: rings. See _AUDIO_JS's "three endings" block for why the distinction is by
-#: pitch contour.
-HOLD_ENDING_CONTINUE = "continue"   # another rep of the same thing follows
-HOLD_ENDING_SWITCH = "switch"       # that side is done; swap to the other
-HOLD_ENDING_FINISH = "finish"       # the set is done; rest (or next exercise)
-HOLD_ENDINGS = (HOLD_ENDING_CONTINUE, HOLD_ENDING_SWITCH, HOLD_ENDING_FINISH)
+#: rings. The rule and the names live in services.sessions (hold_ending) since
+#: 2026-10-13; re-exported here for the timer and its tests. See _AUDIO_JS's
+#: "four endings" block for why the distinction is a count of strikes.
+HOLD_ENDING_CONTINUE = sess.HOLD_ENDING_CONTINUE   # 1 strike: another rep
+HOLD_ENDING_SWITCH = sess.HOLD_ENDING_SWITCH       # 2 strikes: swap sides
+HOLD_ENDING_FINISH = sess.HOLD_ENDING_FINISH       # 3 strikes: set over, rest
+HOLD_ENDING_DONE = sess.HOLD_ENDING_DONE           # 4 strikes: exercise over
+HOLD_ENDINGS = sess.HOLD_ENDINGS
 
 #: Exercise `type` values whose work is measured by a hold timer, and which
 #: therefore get the three-bell treatment.
@@ -343,6 +357,9 @@ function _doneBeep() {{
   if (_ENDING === 'switch') {{
     _bellSwitch();
     _notify('Side complete', 'Swap sides and go again.');
+  }} else if (_ENDING === 'done') {{
+    _bellDone();
+    _notify('Exercise complete', 'Move on to the next exercise.');
   }} else if (_ENDING === 'finish') {{
     _bellFinish();
     _notify('Set complete', 'Rest now.');
@@ -618,6 +635,7 @@ var _dtotal = {total};
 var _drem   = {total};
 var _div;
 var _TKEY = "{timer_key}";
+{_AUDIO_JS}
 
 function _save(running) {{
   try {{ localStorage.setItem(_TKEY, JSON.stringify({{total:_dtotal,remaining:_drem,savedAt:Date.now(),running:running}})); }} catch(e) {{}}
@@ -651,6 +669,11 @@ function startDur() {{
     if (_drem <= 30) {{ document.getElementById('dur-num').style.color='#E8ECEF'; }}
     if (_drem <= 0) {{
       clearInterval(_div); _clear();
+      // The athlete's request, 2026-10-13: the timer used to end in silence.
+      // Rung only by a live countdown -- a timer found already finished on
+      // reload (the restore block above) ran out while nobody was looking.
+      _bellDone();
+      _notify('Timer complete', 'Move on to the next exercise.');
       document.getElementById('dur-num').textContent='DONE ✓';
       document.getElementById('dur-btn').textContent='▶ Restart';
       document.getElementById('dur-btn').onclick=function(){{_drem=_dtotal;startDur();}};
@@ -4516,11 +4539,12 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 _set_auto_start = is_uni and _side == "right"
                 # One hold IS one set here (Full Side Bridge), so the only
                 # mid-exercise ending is the side swap; everything else ends
-                # the set. Derived from the same condition the completion
-                # handler below branches on, so the bell cannot promise
-                # something different from what the button then does.
-                _ending = (HOLD_ENDING_SWITCH if _set_auto_start
-                           else HOLD_ENDING_FINISH)
+                # the set, and the LAST set ends the exercise. The same
+                # conditions the completion handler below branches on, so the
+                # bell cannot promise something the button then does not do.
+                _ending = sess.hold_ending(
+                    "hold", is_uni=is_uni, side=_side,
+                    cur_set=cur_set, total_sets=total_sets)
                 _hold_timer(ex["hold_seconds"], label=_hold_label, timer_key=_hold_key,
                             set_auto_start=_set_auto_start, ending=_ending)
                 _btn_label = "✓ Right Side Done" if (is_uni and _side == "right") else f"✓ Set {cur_set} Complete"
@@ -4566,17 +4590,14 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 _set_auto_start = (cur_rep < reps_per_set) or (
                     cur_rep >= reps_per_set and is_uni and _side == "right"
                 )
-                # Three endings, matching the completion handler below exactly:
-                # another rep, the right→left swap, or the set is over. This is
-                # the case the request was actually about — rep 8 of 8 on the
-                # McGill Curl-Up and the Dead Bug ends the set, and rep 8 on the
-                # RIGHT of the Single-Leg Glute Bridge means swap, not stop.
-                if cur_rep < reps_per_set:
-                    _ending = HOLD_ENDING_CONTINUE
-                elif is_uni and _side == "right":
-                    _ending = HOLD_ENDING_SWITCH
-                else:
-                    _ending = HOLD_ENDING_FINISH
+                # Four endings, matching the completion handler below exactly:
+                # another rep, the right→left swap, the set is over, or the
+                # exercise is over. Rep 8 of 8 on the McGill Curl-Up ends the
+                # set (the exercise on its last set), and rep 8 on the RIGHT of
+                # the Single-Leg Glute Bridge means swap, not stop.
+                _ending = sess.hold_ending(
+                    "hold_reps", is_uni=is_uni, side=_side, cur_set=cur_set,
+                    total_sets=total_sets, cur_rep=cur_rep, reps_per_set=reps_per_set)
                 _hold_timer(ex["hold_seconds"], label=f"REP {cur_rep} of {reps_per_set}{_side_suffix}",
                             timer_key=_hold_key, set_auto_start=_set_auto_start,
                             ending=_ending)

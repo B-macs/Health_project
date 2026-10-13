@@ -2259,3 +2259,39 @@ def day_view_state(selected: date, today: date, active: Phase | None, is_logged:
     if selected < today:
         return "past_completed" if is_logged else "past_missed"
     return "future"
+
+
+# ─── Hold-timer endings: which bell a hold timer rings ──────────────────────
+#
+# The athlete holds a side bridge with the eyes shut, so the bell is the only
+# channel saying what comes next, and it is COUNTED: 1 strike another rep,
+# 2 swap sides, 3 the set is over, 4 the exercise is over (its last set —
+# the athlete's choice, 2026-10-13, WP-08: the last set used to ring the same
+# 3 strikes as every other set). The rule lived in views/training.py in two
+# copies until 2026-10-13; it is here so the phone app copies one rule
+# (rebuild rule 1) and so the bell and the completion handler read the SAME
+# conditions — a bell that promises something the button then does not do is
+# worse than no bell. tests/test_hold_timer_endings.py pins both.
+
+HOLD_ENDING_CONTINUE = "continue"   # another rep of the same thing follows
+HOLD_ENDING_SWITCH = "switch"       # that side is done; swap to the other
+HOLD_ENDING_FINISH = "finish"       # the set is done; rest, another set follows
+HOLD_ENDING_DONE = "done"           # the LAST set is done; the exercise is over
+HOLD_ENDINGS = (HOLD_ENDING_CONTINUE, HOLD_ENDING_SWITCH,
+                HOLD_ENDING_FINISH, HOLD_ENDING_DONE)
+
+
+def hold_ending(ex_type: str, *, is_uni: bool, side: str, cur_set: int,
+                total_sets: int, cur_rep: int = 1, reps_per_set: int = 1) -> str:
+    """Which ending a hold timer announces when it reaches zero.
+
+    `hold`: one hold IS one set, so the only mid-set ending is the right-to-
+    left swap. `hold_reps`: a rep before the set's last continues. After the
+    last rep (or the hold), the right side of a unilateral exercise swaps;
+    otherwise the set is over — FINISH while sets remain, DONE on the last.
+    """
+    if ex_type == "hold_reps" and cur_rep < reps_per_set:
+        return HOLD_ENDING_CONTINUE
+    if is_uni and side == "right":
+        return HOLD_ENDING_SWITCH
+    return HOLD_ENDING_DONE if cur_set >= total_sets else HOLD_ENDING_FINISH

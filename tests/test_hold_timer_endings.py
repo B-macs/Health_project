@@ -34,14 +34,20 @@ _SRC = _PATH.read_text(encoding="utf-8")
 
 # ─── the three signals exist and are distinguishable ──────────────────────
 
-def test_the_three_endings_are_named_constants():
+def test_the_four_endings_are_named_constants():
+    """Three until 2026-10-13. The athlete asked for a fourth (WP-08): the
+    LAST set of an exercise rang the same 3 strikes as every other set, so the
+    ear could not tell "rest, another set" from "move on". The names and the
+    rule live in services.sessions; the view re-exports them."""
+    from services import sessions
     from views import training as V
 
-    assert V.HOLD_ENDINGS == ("continue", "switch", "finish")
+    assert V.HOLD_ENDINGS == ("continue", "switch", "finish", "done")
+    assert V.HOLD_ENDINGS == sessions.HOLD_ENDINGS
 
 
 def test_each_ending_has_its_own_bell():
-    for fn in ("_bellContinue", "_bellSwitch", "_bellFinish"):
+    for fn in ("_bellContinue", "_bellSwitch", "_bellFinish", "_bellDone"):
         assert f"function {fn}()" in _SRC, f"{fn} missing from the shared audio block"
 
 
@@ -59,11 +65,12 @@ def test_the_endings_are_counted_one_two_three():
     assert len(_bell_pitches("_bellContinue")) == 1, "another rep = one strike"
     assert len(_bell_pitches("_bellSwitch")) == 2, "swap sides = two strikes"
     assert len(_bell_pitches("_bellFinish")) == 3, "set over = three strikes"
+    assert len(_bell_pitches("_bellDone")) == 4, "exercise over = four strikes"
 
 
 def test_both_stopping_signals_fall():
     """Reinforcement, not the signal itself — nothing depends on hearing it."""
-    for fn in ("_bellSwitch", "_bellFinish"):
+    for fn in ("_bellSwitch", "_bellFinish", "_bellDone"):
         p = _bell_pitches(fn)
         assert p == sorted(p, reverse=True), f"{fn} must descend"
 
@@ -87,7 +94,7 @@ def test_the_continue_bell_dies_before_the_next_rep_starts():
 def test_the_stopping_bells_may_ring_on():
     """Both are followed by silence (the other side's timer, or rest), so the
     long ring-out that would smear a rep is exactly what makes them carry."""
-    for fn in ("_bellSwitch", "_bellFinish"):
+    for fn in ("_bellSwitch", "_bellFinish", "_bellDone"):
         body = re.search(rf"function {fn}\(\)\s*\{{(.*?)\n\}}", _SRC, re.S).group(1)
         longest = max(float(d) for d in re.findall(r",\s*([0-9.]+)\)\s*;", body))
         assert longest > 1.0, f"{fn} should ring on"
@@ -101,10 +108,10 @@ def test_the_rest_timers_go_signal_is_not_one_of_the_endings():
     assert tuple(rest) != tuple(_bell_pitches("_bellSwitch"))
 
 
-def test_all_three_are_distinct_sequences():
+def test_all_four_are_distinct_sequences():
     seqs = [tuple(_bell_pitches(f)) for f in
-            ("_bellContinue", "_bellSwitch", "_bellFinish")]
-    assert len(set(seqs)) == 3, f"two endings sound identical: {seqs}"
+            ("_bellContinue", "_bellSwitch", "_bellFinish", "_bellDone")]
+    assert len(set(seqs)) == 4, f"two endings sound identical: {seqs}"
 
 
 # ─── the timer dispatches on the ending ───────────────────────────────────
@@ -130,11 +137,11 @@ def test_the_default_ending_promises_nothing():
     assert default == V.HOLD_ENDING_CONTINUE
 
 
-def test_done_beep_branches_on_all_three():
+def test_done_beep_branches_on_all_four():
     beep = re.search(r"function _doneBeep\(\)\s*\{\{(.*?)\n\}\}", _SRC, re.S)
     assert beep, "could not read _doneBeep"
     body = beep.group(1)
-    for fn in ("_bellSwitch", "_bellFinish", "_bellContinue"):
+    for fn in ("_bellSwitch", "_bellFinish", "_bellContinue", "_bellDone"):
         assert fn in body, f"_doneBeep never plays {fn}"
 
 
@@ -143,30 +150,29 @@ def test_the_notification_text_tracks_the_bell():
     ear was told."""
     beep = re.search(r"function _doneBeep\(\)\s*\{\{(.*?)\n\}\}", _SRC, re.S)
     notes = re.findall(r"_notify\('([^']+)'", beep.group(1))
-    assert len(notes) == 3 and len(set(notes)) == 3, (
+    assert len(notes) == 4 and len(set(notes)) == 4, (
         f"each ending needs its own notification, got {notes}"
     )
 
 
 # ─── the bell agrees with what happens next ───────────────────────────────
 
-def _ending_for_hold(is_uni: bool, side: str) -> str:
-    """Mirror of the `hold` branch: one hold IS one set, so the only
-    mid-exercise ending is the side swap."""
-    from views import training as V
+def _ending_for_hold(is_uni: bool, side: str, cur_set: int = 1, total_sets: int = 2) -> str:
+    """The `hold` rule, from services (it was a mirror of the view's code
+    until 2026-10-13). Defaults to a set that is NOT the last, so the
+    expectations below read "finish"; the last set reads "done"."""
+    from services import sessions
 
-    return (V.HOLD_ENDING_SWITCH if (is_uni and side == "right")
-            else V.HOLD_ENDING_FINISH)
+    return sessions.hold_ending("hold", is_uni=is_uni, side=side,
+                                cur_set=cur_set, total_sets=total_sets)
 
 
-def _ending_for_hold_reps(cur_rep: int, reps: int, is_uni: bool, side: str) -> str:
-    from views import training as V
+def _ending_for_hold_reps(cur_rep: int, reps: int, is_uni: bool, side: str,
+                          cur_set: int = 1, total_sets: int = 2) -> str:
+    from services import sessions
 
-    if cur_rep < reps:
-        return V.HOLD_ENDING_CONTINUE
-    if is_uni and side == "right":
-        return V.HOLD_ENDING_SWITCH
-    return V.HOLD_ENDING_FINISH
+    return sessions.hold_ending("hold_reps", is_uni=is_uni, side=side, cur_set=cur_set,
+                                total_sets=total_sets, cur_rep=cur_rep, reps_per_set=reps)
 
 
 @pytest.mark.parametrize("cur_rep,expected", [
@@ -234,16 +240,21 @@ def test_every_timed_exercise_in_the_live_plans_gets_a_reachable_ending():
                 if ex.get("type") not in ("hold", "hold_reps"):
                     continue
                 is_uni = ex.get("laterality") == "unilateral"
+                sets = int(ex.get("sets") or 1)
                 if ex["type"] == "hold":
-                    endings = {_ending_for_hold(is_uni, s) for s in ("right", "left")}
+                    endings = {_ending_for_hold(is_uni, s, n, sets)
+                               for s in ("right", "left") for n in range(1, sets + 1)}
                 else:
                     reps = ex.get("reps_in_set", 5)
-                    endings = {_ending_for_hold_reps(r, reps, is_uni, s)
-                               for r in range(1, reps + 1) for s in ("right", "left")}
+                    endings = {_ending_for_hold_reps(r, reps, is_uni, s, n, sets)
+                               for r in range(1, reps + 1) for s in ("right", "left")
+                               for n in range(1, sets + 1)}
                 assert endings <= set(V.HOLD_ENDINGS), ex["name"]
-                # Every timed exercise must have exactly one way to END, or the
-                # athlete never learns that the set is over.
-                assert V.HOLD_ENDING_FINISH in endings, ex["name"]
+                # Every timed exercise must announce its END, or the athlete
+                # never learns that it is over: the last set rings "done", and
+                # every earlier set rings "finish".
+                assert V.HOLD_ENDING_DONE in endings, ex["name"]
+                assert (V.HOLD_ENDING_FINISH in endings) == (sets > 1), ex["name"]
                 if is_uni:
                     assert V.HOLD_ENDING_SWITCH in endings, (
                         f"{ex['name']} is unilateral and must signal the swap")
@@ -333,8 +344,48 @@ def test_a_new_unilateral_timed_exercise_would_signal_its_swap():
 
 def test_a_single_rep_timed_exercise_finishes_rather_than_continuing():
     """The degenerate shape a new block is most likely to introduce: one rep,
-    one set. It must announce the end, not promise another rep."""
+    one set. It must announce the end, not promise another rep — and as its
+    only set is its last, the end is the exercise's."""
     assert _ending_for_hold_reps(1, 1, is_uni=False, side="right") == "finish"
+    assert _ending_for_hold_reps(1, 1, is_uni=False, side="right",
+                                 cur_set=1, total_sets=1) == "done"
+
+
+# ─── the fourth bell: the exercise is over (2026-10-13, WP-08) ──────────────
+
+@pytest.mark.parametrize("cur_set,expected", [(1, "finish"), (2, "finish"), (3, "done")])
+def test_the_last_set_ends_the_exercise(cur_set, expected):
+    """McGill Curl-Up, 3 sets of 8: rep 8 ends the set, and on set 3 it
+    ends the exercise."""
+    assert _ending_for_hold_reps(8, 8, is_uni=False, side="right",
+                                 cur_set=cur_set, total_sets=3) == expected
+
+
+def test_a_unilateral_last_set_still_swaps_before_it_ends():
+    """On the last set the RIGHT side still means swap; only the left side
+    ends the exercise."""
+    assert _ending_for_hold(True, "right", cur_set=2, total_sets=2) == "switch"
+    assert _ending_for_hold(True, "left", cur_set=2, total_sets=2) == "done"
+
+
+def test_the_view_takes_the_ending_from_services():
+    """Both call sites read sessions.hold_ending, so the bell and the
+    completion handler cannot drift apart again."""
+    assert _SRC.count("_ending = sess.hold_ending(") == 2
+    assert "_ending = HOLD_ENDING_" not in _SRC
+
+
+def test_the_activity_timer_rings_when_it_runs_out():
+    """The incline walk ended in silence (WP-08). The bell rings on a live
+    countdown only: a timer found already finished on reload ran out while
+    nobody was looking."""
+    start = _SRC.index("def _duration_timer(")
+    body = _SRC[start:_SRC.index("\ndef ", start + 10)]
+    assert "_AUDIO_JS" in body
+    live = body[body.index("function startDur()"):]
+    assert "_bellDone();" in live
+    restore = body[body.index("// Auto-restore on load"):body.index("function startDur()")]
+    assert "_bell" not in restore
 
 
 def test_both_hold_timer_call_sites_pass_an_ending():
