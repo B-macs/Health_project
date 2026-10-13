@@ -1045,25 +1045,48 @@ PROFILE = {
     #  Muscle Imbalance Summary
     # ─────────────────────────────────────────────────────────────────────────
 
+    # RE-READ 2026-10-13 against findings #1-#7, the Thomas test and the
+    # symptom log — the first change since 2026-06-29, after the athlete flagged
+    # the card ("ReQ"). overactive_tight is a TONE list (the notes' second
+    # instrument caveat): muscles that hold tension at rest, not short ones.
+    # Every change carries its reason in `changes_2026_10_13` below.
     "imbalances": {
         "overactive_tight": [
             "Gluteus medius — upper fibres (bilateral, right > left)",
             "Piriformis (bilateral)",
-            "Deep right hip flexors / TFL",
-            "Right posterior hip capsule",
-            "Proximal hamstrings at ischial tuberosity",
-            "Lumbar facet joint capsules — horizontal L5/S1 base",
+            "Deep right hip flexors / TFL — tone, not length (Thomas test normal, 2026-10-05)",
+            "Proximal hamstrings at both ischial tuberosities",
         ],
         "underactive_weak": [
             "Gluteus maximus — primary hip extensor",
             "Deep core stabilisers (transversus abdominis, multifidus)",
+            "Left abdominal wall — the left lower ribs sit forward",
         ],
         "compensation_pattern": (
             "Under-firing glute max + deep core → upper glutes and hip flexors over-grip "
-            "to create artificial stability → compressed joints and snapping tendons. "
-            "The rehab sequence must FIRST inhibit/release the overactive structures, "
-            "THEN activate the underactive ones."
+            "to create artificial stability → compressed joints and snapping tendons."
         ),
+        "changes_2026_10_13": [
+            "REMOVED 'Right posterior hip capsule': refuted 2026-08-17 — prone internal "
+            "rotation past 45 degrees on both sides with no clear asymmetry, so there is no "
+            "capsular restriction (finding #2). And a capsule is a joint, not a muscle.",
+            "REMOVED 'Lumbar facet joint capsules — horizontal L5/S1 base': a joint, not a "
+            "muscle; it stays where it belongs, as finding #3, which read zero releases in "
+            "five folds on 2026-08-17.",
+            "REWORDED 'Deep right hip flexors / TFL': the Thomas test (2026-10-05) read both "
+            "hip flexors at normal length, so the right side holds TONE or habit, not "
+            "shortness (finding #7's reading). Taken warm; re-read cold at the next run.",
+            "REWORDED 'Proximal hamstrings at ischial tuberosity' to BOTH sides: the "
+            "sit-bone tightness of finding #7 is on both, and reads as the hamstring "
+            "origin working at short length.",
+            "ADDED 'Left abdominal wall': finding #7 — the left lower ribs sit forward, and "
+            "the trunk work aimed at it (the long breath out of the 90/90 hip lift, the "
+            "dead bug) trains the abdominals to pull them down.",
+            "MOVED the sentence 'The rehab sequence must FIRST inhibit/release the "
+            "overactive structures, THEN activate the underactive ones' to "
+            "training_history.py: it is a prescription, and the programme has run without "
+            "release since 2026-09-22 (Key Rule 6).",
+        ],
     },
 
     # ─────────────────────────────────────────────────────────────────────────

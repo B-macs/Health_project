@@ -680,13 +680,16 @@ def _imbalance_list_html(imbalances: dict) -> str:
     under = imbalances.get("underactive_weak", [])
     if not over and not under:
         return ""
+    # The headings describe a STATE, not a programme step (2026-10-13): they said
+    # "release first" / "activate second" while the programme had run without
+    # release since 2026-09-22. The order of work lives in training_plan.py.
     out = '<div class="sb-imblist">'
     if over:
-        out += '<div class="grp">Overactive · release first</div>'
+        out += '<div class="grp">Hold tension at rest</div>'
         out += "".join(f'<div class="i"><b style="background:{_BAD}"></b>'
                        f"<span>{name}</span></div>" for name in over)
     if under:
-        out += '<div class="grp">Underactive · activate second</div>'
+        out += '<div class="grp">Work too little</div>'
         out += "".join(f'<div class="i"><b style="background:{_GOOD}"></b>'
                        f"<span>{name}</span></div>" for name in under)
     return out + "</div>"

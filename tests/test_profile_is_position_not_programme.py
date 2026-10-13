@@ -78,3 +78,32 @@ def test_the_history_is_read_by_nothing():
             if isinstance(node, ast.ImportFrom) and node.module == "training_history":
                 importers.append(path.name)
     assert not importers, importers
+
+
+def test_the_imbalance_sequencing_rule_moved_to_the_history():
+    """2026-10-13: 'The rehab sequence must FIRST inhibit/release the overactive
+    structures, THEN activate the underactive ones' sat inside the imbalance
+    list — a prescription in the position, and the Strength screen said
+    "release first" under it while the programme had run without release
+    since 2026-09-22. It moved here, and the card's headings name a state."""
+    sentence = "must FIRST inhibit/release the overactive structures"
+    assert sentence in training_history.HISTORY["imbalance_sequencing_rule"]
+    assert sentence not in str(patient_profile.PROFILE["imbalances"]["compensation_pattern"])
+    assert patient_profile.PROFILE["imbalances"]["changes_2026_10_13"], (
+        "each change to the list keeps its reason")
+
+
+def test_no_screen_says_release_first():
+    """String literals only — what can reach the screen. A comment that records
+    what the heading used to say is history, not copy."""
+    import ast
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parent.parent
+    for path in [root / "app.py", *(root / "views").glob("*.py")]:
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Constant) and isinstance(node.value, str):
+                text = node.value.lower()
+                assert "release first" not in text, (path.name, node.lineno)
+                assert "activate second" not in text, (path.name, node.lineno)

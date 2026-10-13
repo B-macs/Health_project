@@ -269,4 +269,19 @@ HISTORY: dict = {
                     "appointment that does not exist.",
     },
 
+    # ─────────────────────────────────────────────────────────────────────────
+    #  The imbalance list's sequencing rule (moved 2026-10-13)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Moved verbatim out of patient_profile.PROFILE["imbalances"]
+    # ["compensation_pattern"] when the list was re-read, for the reason this
+    # file exists: it is a prescription, not his position. The programme has
+    # run without release since 2026-09-22 (Key Rule 6, the athlete's decision,
+    # kept on 2026-10-05 and 2026-10-13), and the Strength screen said "release
+    # first" under it until the same day.
+
+    "imbalance_sequencing_rule": (
+        "The rehab sequence must FIRST inhibit/release the overactive structures, "
+        "THEN activate the underactive ones."
+    ),
+
 }

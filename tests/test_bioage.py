@@ -30,7 +30,10 @@ def test_muscle_imbalance_count_against_real_patient_profile():
     # Regression check: if patient_profile.PROFILE's imbalances change
     # (CLAUDE.md rule 8 — updated before each new training block), this
     # documents that the count changed intentionally rather than silently.
-    assert bioage.muscle_imbalance_count(patient_profile.PROFILE["imbalances"]) == 8
+    # 8 -> 7 on 2026-10-13: the list was re-read (the athlete's "ReQ"); two
+    # joint capsules came out and the left abdominal wall went in — each change
+    # and its reason is in PROFILE["imbalances"]["changes_2026_10_13"].
+    assert bioage.muscle_imbalance_count(patient_profile.PROFILE["imbalances"]) == 7
 
 
 def test_the_retired_scoring_functions_are_gone():

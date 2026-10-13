@@ -150,7 +150,8 @@ def test_the_muscle_imbalance_findings_render(app):
     present even though this run has a stubbed repository."""
     html = _html(app)
     assert "Muscle imbalances" in html
-    assert html.count('class="i"') == 8
+    assert html.count('class="i"') == 7   # re-read 2026-10-13, see test_bioage
+    assert "release first" not in html.lower()
 
 
 def test_each_plate_keeps_its_own_aspect_ratio(app):
