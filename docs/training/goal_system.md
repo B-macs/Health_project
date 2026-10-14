@@ -13,8 +13,10 @@ Status of each part is marked: APPROVED, DRAFT or OPEN.*
 - Every goal has a **proof**. The proof is the goal: a result that can be measured.
 - To reach the proof, list the **blockers** and order them, **biggest first**.
   Work on the biggest blocker first, then go down the list.
-- PROPOSED (2026-10-14, not yet confirmed): each blocker has its own proof, so
-  that it is known when to move to the next one.
+- Each blocker has its own proof, so that it is known when to move to the next
+  one — APPROVED 2026-10-14.
+- **When two goals compete for time, goal A wins** — APPROVED 2026-10-14
+  (*"goal A is more important, it is the current issue and the long term"*).
 
 ## The gym rule — APPROVED (athlete, 2026-10-14)
 
@@ -63,10 +65,11 @@ safety limit (`services/rules.py`, `session_freq_max` 5):
 3. **Strength:** each main lift's working weight 10% above its weight on
    stage 1 day 1. The lift weights, not the strength score: they are read
    directly, and the score is a model still settling.
-4. **Test day before the first run** — RECOMMENDED, NOT YET CONFIRMED: a
-   30-minute brisk walk, then single-leg calf raises and hops, all without pain.
-   It replaces *"or we're in a position where we believe that we can start"*,
-   which cannot be a gate.
+4. **Test day before the first run** — APPROVED 2026-10-14: a 30-minute brisk
+   walk, then single-leg calf raises and hops, all without pain. It replaces
+   *"or we're in a position where we believe that we can start"*, which cannot
+   be a gate, and checks the left groin muscle (Sartorius, strained twice by
+   running volume) against impact before the first run.
 
 **Gate 2 (stage 2 → 3)** — APPROVED: the same rules over 6 weeks of stage 2,
 with the run counted as a session.
@@ -77,23 +80,40 @@ with the run counted as a session.
 
 ## Goal B — 20 kg overhead press — DRAFT (athlete, 2026-10-14)
 
-**Proof:** a 20 kg overhead press. OPEN: dumbbells (20 kg in each hand) or a
-barbell; seated or standing; how many reps. His 2025 best was 15 kg × 9 in each
-hand with dumbbells, on 2025-06-28 (source: `Input_files/2025-training-year.md`).
+**Proof:** a SEATED DUMBBELL press with 20 kg in each hand (athlete,
+2026-10-14). OPEN: how many reps — 5 recommended. His 2025 best was 15 kg × 9 in
+each hand, on 2025-06-28 (source: `Input_files/2025-training-year.md`), about
+19.5 kg for one rep by the Epley estimate, so 20 kg × 1 is about that best and
+20 kg × 5 about 20% past it.
 
-**Blockers, biggest first** (athlete, 2026-10-14):
+**Blockers, biggest first:**
 
 | # | Blocker | Proof that it is done |
 |---|---|---|
-| 1 | The right shoulder sits tilted inward | OPEN — no test exists |
-| 2 | Strength of the press muscles and the small muscles around the shoulder, over a long period | OPEN |
+| 1 | The right shoulder sits tilted inward — the front of the right shoulder, the shoulder-blade muscles on both sides, and the left side's extra work (APPROVED 2026-10-14) | **Lying on the back, BOTH shoulders touch the floor** (athlete: *"I want to be able to do a shoulder press straight, this means when I put my shoulders on the ground. Both shoulders touch the ground. Currently only the left touches the ground"*). The exact protocol is OPEN |
+| 2 | Strength of the press muscles and the small muscles around the shoulder, over a long period | The goal's proof |
 
-OPEN: how blocker 1 is measured; whether the small shoulder-blade muscles start
-in blocker 1; where the left side goes (it overcompensates, and it strained
-under the overhead press in 2025); and the priority of goal B against goal A
-when they compete for time.
+**His reading of blocker 1** (2026-10-14): *"a middle back problem I think with
+over tight pecs."* The record supports the tight front of the right shoulder: a
+cramp in shortened tissue next to the surgical scar, which the physiotherapist
+read on 2026-08-10 as scar adhesion around pec minor, and prescribed release
+plus active work for the front of the shoulder. The Latarjet moved the bone that
+pec minor attaches to, and the record already holds one range the surgery
+limits on the right (a face-down arm raise, 20 cm right against 40 cm left,
+2026-08-13) — so part of the gap may not close, and the protocol needs a rule
+for when it stops closing. OPEN: whether press weights hold until blocker 1
+passes.
 
-## Goal C — flexibility that lasts — OPEN
+## Goal C — flexibility that lasts — DRAFT
 
 A separate goal: to be more flexible, and to keep it. One session a week in
-every stage. Proof and blockers are not yet defined.
+every stage. The skills are the side split and the pancake (Cluster A).
+
+The flexibility test already works by the blocker rule: it runs in a fixed order
+and STOPS AT THE FIRST FAILURE, and that failure is the biggest blocker. Its one
+stored assessment (2026-08-12, one morning, so not yet trusted — three mornings
+set the noise floor) reads **pattern D**: the adductor group with the knees
+bent, 21.5 cm against a 10 cm target. PROPOSED, not yet confirmed: the goal's
+proof is the side split and the pancake at their targets, still there at the
+next 12-week retest ("lasts"); the blockers are the test's ladder, first
+failure first; each blocker's proof is its rung's target, confirmed at a retest.
