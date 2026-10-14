@@ -12,7 +12,7 @@
 | Block | **Stage 2B (Block A)** ends Sun 2026-09-20 (it runs its week 4 again, under the failed-week rule); **Block B — Strength + Running Build** starts Mon **2026-09-21**, seeded and rebuilt |
 | Day | Block A day 33 (Fri 2026-09-18, press day); Block B day 1 on Monday |
 | Gate | **4171/4171** — `python -m pytest tests/` |
-| Goal | **Run 21 km, no date.** The 10 km race on 2026-10-11 was cancelled 2026-09-18 |
+| Goal | **Since 2026-10-14: see `docs/training/goal_system.md`.** One staged main goal — fix the hips and back; the 21 km run only proves it. Stage 1 is 4 strength + 1 flexibility a week, **no running**, until gate 1 passes. Before that: run 21 km, no date (the 10 km race was cancelled 2026-09-18) |
 | Last code commit | The load-progression rule (Key Rule 23), the Monday-only redo offer, Stage 1 off the screen, the profile/programme split |
 | Next action | **Sun 20 Sep: Block A day 28 — the Bunkie lines + hip-click verdict** (it is the baseline Block B's own day 28 re-times). **Mon 21 Sep: Block B day 1.** And redeploy the hosted app — it is several changes behind |
 
