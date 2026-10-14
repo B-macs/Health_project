@@ -78,7 +78,7 @@ with the run counted as a session.
 
 ---
 
-## Goal B — 20 kg overhead press — APPROVED 2026-10-14, except the floor test's pass and stall rules
+## Goal B — 20 kg overhead press — APPROVED 2026-10-14
 
 **Proof:** a SEATED DUMBBELL press, **20 kg in each hand × 5 reps** — APPROVED
 2026-10-14. His 2025 best was 15 kg × 9 in each hand, on 2025-06-28 (source:
@@ -103,18 +103,14 @@ limits on the right (a face-down arm raise, 20 cm right against 40 cm left,
 2026-08-13) — so part of the gap may not close, and the protocol needs a rule
 for when it stops closing.
 
-**The floor test runs WITH THE 12-WEEK FLEXIBILITY TEST** (athlete,
-2026-10-14: *"we can add it to the flexibility test that's every 12 weeks"*),
-on each of its three mornings, together with the pelvis test (finding #7, the
-same lying position). Protocol: lie on the back on a hard floor, knees bent,
-feet flat, arms by the sides, palms down; breathe out fully and relax for three
-breaths; check by feel whether the back of each shoulder touches the floor; for
-a number, a timed phone photo from the side, the phone on the floor about 1 m
-away, with a ruler leaned upright against a book beside the right shoulder — the
-gap in cm. PROPOSED to fit the 12-week rhythm, not yet confirmed: **pass** when
-both shoulders touch on all three mornings of one retest; **stall** when the
-right gap is not smaller than at the retest before — then the cause is reviewed
-before more of the same work.
+**The floor test is ONE QUESTION in the 12-week flexibility test** — APPROVED
+2026-10-14 (*"floor test to be added to flexibility and can be a questionnaire,
+I don't want to be doing a test often - every 12 weeks is ok"*). No photo, no
+ruler, no extra mornings. The question: *lying on your back on a hard floor,
+knees bent, arms by your sides, after a full breath out — does the back of each
+shoulder touch the floor? Right: yes / almost / no. Left: yes / almost / no.*
+**Pass:** both "yes". **Stall:** the right answer is the same at two tests in a
+row — then the cause is reviewed before more of the same work.
 
 **The press does not wait for blocker 1** (athlete, 2026-10-14: *"keep pressing
 just work on that as well"*): the press weights rise by the normal load rule
@@ -135,3 +131,61 @@ every stage. The skills are the side split and the pancake (Cluster A).
   adductor group with the knees bent, 21.5 cm against a 10 cm target. That was
   one morning, so it is not yet trusted; **the next retest (due about
   2026-11-04, 84 days on) runs three mornings** to set the noise floor.
+
+---
+
+## Step 2 — body areas and jobs — APPROVED 2026-10-14
+
+**Blockers inside one goal run SIDE BY SIDE**; the order decides which one gets
+time first. Only a stage gate holds work back, as gate 1 holds the running
+(athlete, 2026-10-14, confirming his *"keep pressing just work on that as
+well"*).
+
+**The five jobs.** Every area has exactly one; it sets the dose (step 3) and
+the effort (step 4).
+
+1. **Strength and size** — hard sets that make the muscle grow.
+2. **Strength at length** — holds or slow reps with the muscle in its long
+   position, for muscles that are tense but not short.
+3. **Control** — position and timing, in short efforts, never to failure.
+4. **Range** — making the tissue longer, in the flexibility session.
+5. **Endurance** — heart and lungs.
+
+**Goal A — hips and back, blockers 1 and 2:**
+
+| Area | Job | Source |
+|---|---|---|
+| Glute max | Strength and size | Weak list (assessment 2026-06-28) |
+| Abs, front and sides | Strength and size, to failure | Weak list; his decision 2026-10-14 |
+| Deep back muscles | Strength and size | Weak list |
+| Hamstrings | Strength and size, through full length | Tense at the sit bones (2026-10-05); normal length (Jan 2025) |
+| Hip rotators (the pelvis twist) | Strength and size — hip airplane, 3 × max, not every day | Finding #7 (2026-10-05); his decision 2026-10-14 |
+| Hip flexors | Strength at length | Tense, not short (Thomas test 2026-10-05); his rule 2026-08-24 |
+| Left lower ribs | Control | Left ribs flare (2026-10-05) |
+| Upper glutes and piriformis | Control — NO direct work; they settle when the weak muscles take their share | Tense list |
+| Main lifts (legs, back, chest, shoulders) | Strength and size | Gate 1: +10% |
+| Heart and lungs (blocker 3) | Endurance — none in stage 1 beyond the 15-minute walks to the gym (his choice); the running starts at gate 1 | Stage system |
+
+**Goal B — the press, blockers 1 and 2:**
+
+| Area | Job | Source |
+|---|---|---|
+| Front of the right shoulder (pec minor, scar) | Range — release plus active work | Physiotherapist 2026-08-10; `docs/training/release_protocols_2026-08-10.md` |
+| Middle back | Range — to be tested | His reading 2026-10-14 |
+| Shoulder-blade muscles, both sides | Strength and size | Physiotherapist 2026-08-10: the right is weaker, the left works too much |
+| Rotator cuff | Strength and size | Finding #6: the right shoulder is held by muscle, not ligament |
+| Press muscles — shoulders, triceps, upper chest | Strength and size | The 20 kg × 5 proof |
+
+**Rule for the left side (applies at step 5):** single-arm work where possible,
+so that the left cannot do the right's work.
+
+**Goal C — flexibility, the current blocker:**
+
+| Area | Job | Source |
+|---|---|---|
+| Adductors, knees bent | Range, plus strength at length (the adductor ladder) | Flexibility test 2026-08-12: 21.5 cm against a 10 cm target |
+
+**Overlaps:** glute max, the hamstrings and the deep back muscles serve goal
+A's blocker 1 AND the main lifts — one exercise counts for both. The adductors
+serve goal C and the hips in goal A. The shoulder-blade muscles serve goal B
+and protect the right shoulder in every press and pull.
