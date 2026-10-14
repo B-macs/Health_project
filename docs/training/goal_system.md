@@ -189,3 +189,53 @@ so that the left cannot do the right's work.
 A's blocker 1 AND the main lifts — one exercise counts for both. The adductors
 serve goal C and the hips in goal A. The shoulder-blade muscles serve goal B
 and protect the right shoulder in every press and pull.
+
+---
+
+## Step 3 — the weekly dose — APPROVED 2026-10-14, one row open
+
+**Nothing waits on the next flexibility retest** (athlete, 2026-10-14: *"don't
+wait on that flexibility result I don't plan to do it soon"*). Goal C works from
+the 2026-08-12 reading. When the retest happens it runs three mornings once, to
+learn the day-to-day spread, then one morning every 12 weeks; the shoulder floor
+question is answered at that same test.
+
+**Counting rules:**
+
+- A **hard set** ends 0-3 reps before failure. Ramp sets and warm-up sets do not
+  count.
+- A set counts **1** for the area it trains most and **0.5** for one second area
+  (a Romanian deadlift: 1 hamstrings, 0.5 glute max).
+
+**The table:**
+
+| Job | Days a week | Hard sets a week (minimum) | Effort |
+|---|---|---|---|
+| Strength and size, priority 1 — glute max, abs, deep back muscles, hamstrings | 2 or more | 10 per area | 0-3 reps left; failure where step 4 allows |
+| Strength and size, priority 2 — the main lifts (quads, chest, back) and goal B (shoulder-blade muscles, rotator cuff, press muscles) | 2 or more | 6 per area | 0-3 reps left |
+| Hip airplane (his dose) | 2 | 3 × max each day | to failure |
+| Strength at length — hip flexors, adductors | 2 or more | 6 per area | hard; stop before the position slips |
+| Control — left lower ribs | every strength day | 1-2 short sets | easy, never to failure |
+| Range — front of the right shoulder | OPEN (see below) | about 8 minutes | the physiotherapist's protocol |
+| Range — middle back | 2 | 1-2 short items | easy |
+| Range — the flexibility skills | 1 (the flexibility day) | the flexibility plan | — |
+| Endurance | none in stage 1 | — | — |
+
+**Why:** 10 hard sets a week per muscle gave more growth than 5-9, and 5-9 more
+than under 5 (Schoenfeld, Ogborn & Krieger 2017, J Sports Sci, meta-analysis).
+Twice a week gave more growth than once (Schoenfeld, Ogborn & Krieger 2016,
+Sports Med). Sets close to failure give most of the growth and taking every set
+to failure adds little (Refalo et al. 2023, Sports Med). Priority 1 gets 10
+because goal A wins; the rest get 6 because time is limited.
+
+**Fit (estimate, 2026-10-14):** the table needs about 85-90 hard sets a week
+after the 0.5 counting. One 70-minute session holds about 20-22 hard sets with a
+10-15-minute warm-up and the measured changeovers, so four hold about 80-90. It
+fits only just, and NOT with the 18-25-minute warm-up of 2026-10-14 — the
+warm-up limit (step 7) is a hard limit.
+
+**Open — the front of the right shoulder.** The two exercises exist
+(`PEC_SCAR_RELEASE`, `ANTERIOR_SHOULDER_RECIPROCATION`, in the accessory
+session), but neither has ever been logged, and the release half is dosed by
+"tender spots" — points that are sore under a ball — which the record has never
+observed.
