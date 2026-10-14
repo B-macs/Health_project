@@ -331,8 +331,8 @@ def test_band_exercises_never_carry_a_weight():
 
 def test_the_gym_lifts_resume_one_step_down_after_the_travel_weeks():
     """Twelve days without load costs almost no strength — but "weight
-    increased too quickly" is a named cause of the squat breakdown in the
-    athlete's own log."""
+    increased too quickly" is a named cause of the 2025 squat injuries in
+    the athlete's own log (a load cause, not a form one — Key Rule 24)."""
     def load(day, name):
         return next(e["weight_kg"] for e in PLAN[day]["exercises"] if e["name"] == name)
 

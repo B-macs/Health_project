@@ -83,8 +83,7 @@ Each line is dated and checkable; none is an impression.
 
 4. **The 2025 log is a recruitment story, not a capacity story.** "Strong
    enough in isolated work … under-responsive during compound lifts";
-   "very dependent on warm-up to fire properly"; the brace "collapses on
-   rep 6+" while the legs still have reps in them. A weak muscle is weak in
+   "very dependent on warm-up to fire properly". A weak muscle is weak in
    isolation too. A gripped or mis-sequenced one is strong alone and absent
    in the orchestra.
 
@@ -128,9 +127,9 @@ write the *discriminating question* rather than the conclusion.
   released since) restricting the press position? Is the incline setup
   masking a left-tilt compensation? Instruments: single-arm Y-hold trend,
   press notes on tilt, the prayer-position weekly re-check.
-- **Squat stalls while RDL climbs** → brace endurance, not leg strength —
-  check the Bunkie anterior line trend before adding leg volume (the 2025
-  breakdown was "brace collapses rep 6+", never the legs).
+- **Squat stalls while RDL climbs** → check the Bunkie anterior line trend
+  before adding leg volume. (Not form: his form under load has never broken
+  down — CLAUDE.md Key Rule 24.)
 - **A flexibility rung stalls** → is it length or is it fear-of-position?
   Compare active vs passive at the same rung: passive far ahead of active =
   guarding (H2); both capped together = length (H3).

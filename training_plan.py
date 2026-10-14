@@ -2616,12 +2616,11 @@ PREP_GLUTE_ACTIVATION = _ex(
         "level — if the free side drops, you have lost the muscle you came for."
     ),
     biomechanical_focus=(
-        "Glute max activation, and the single most load-bearing item in phase 2. The 2025 log "
-        "listed 'glutes not warmed up before squats' as one cause of the squat breakdown — "
-        "⚠ an inference, not an observation, and the surrounding claims were removed "
-        "2026-08-20; the warm-up stands on the evidence review, not on this line — "
-        "and glute max is the primary underactive muscle in the profile. This is the muscle "
-        "the release block just made room for."
+        "Glute max activation, and the single most load-bearing item in phase 2. The warm-up "
+        "stands on the evidence review, and glute max is the primary underactive muscle in "
+        "the profile. This is the muscle the release block just made room for. (A 2025 "
+        "claim of a squat breakdown was removed, 2026-08-20 and 2026-10-14: his form under "
+        "load has never broken down — CLAUDE.md Key Rule 24.)"
     ),
     progression="Both sides clean with level hips → hold the top for 3 seconds.",
     regression="Hamstring cramps or the hip drops → go to a two-leg bridge for the same 8 reps.",
@@ -3394,11 +3393,9 @@ def _s2b_gym_a(week: int) -> dict:
                     "glutes. Three seconds down, a beat at the bottom, drive up."
                 ),
                 biomechanical_focus=(
-                    "The primary lower-body strength lift of the block. Brace quality is the "
-                    "thing being watched. ⚠ No reliable prior number exists — the 2025 rep-6 figure "
-                    "was an inference and was removed 2026-08-20, which is what makes this "
-                    "the FIRST real reading rather than a re-test of one. "
-                    "onward, and phase 2 exists partly to move that number."
+                    "The primary lower-body strength lift of the block. (A 2025 claim that "
+                    "the brace failed from rep 6 was removed, 2026-08-20 and 2026-10-14: his "
+                    "form under load has never broken down — CLAUDE.md Key Rule 24.)"
                 ),
                 progression="All three sets at 12 clean reps → add 2.5 kg and drop back to 8.",
                 regression="Brace collapses before rep 8 → stop the set there and reduce the load.",
@@ -4302,8 +4299,7 @@ PLAN_STAGE2B[28] = {
                 "moment the line breaks at the low back. Time each side, write both in the note."
             ),
             biomechanical_focus=(
-                "Anterior chain and brace endurance — the brace the 2025 log records collapsing "
-                "from rep 6 in the squat, finally measured on a clock. Run as standard, all "
+                "Anterior chain and brace endurance, measured on a clock. Run as standard, all "
                 "five lines, on the athlete's decision; the line-break stop rule is what "
                 "protects the back, so hold the line, not the burn."
             ),
