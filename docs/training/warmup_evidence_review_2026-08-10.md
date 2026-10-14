@@ -371,12 +371,18 @@ first exercise." Every clause of that is wrong here, for a different reason.
 before any of the above was read:
 
 - *"Very dependent on warm-up to fire properly"* — glutes (line 265)
-- *"**glutes not warmed up before squats**"* — listed as one of four named causes
-  of the squat breakdown pattern (line 332)
 - *"When tired **or cold**, the back is first to complain"* — hinge (line 315)
-- *"Back injuries came from the hole of the squat each time"* (line 330)
-- Root cause: *"Glute max fires during isolated work, but when things get heavy
-  and tired the lumbar takes over"* (line 276)
+
+> **⚠ REMOVED 2026-10-14, the athlete's correction (CLAUDE.md Key Rule 24).**
+> Three more quotes stood here: *"glutes not warmed up before squats"* as a
+> cause of a "squat breakdown", *"Back injuries came from the hole of the squat
+> each time"*, and *"the lumbar takes over"*. All three were compiled from his
+> logs, never observed, and are false: his form under load has never broken
+> down, his back injuries came from **held positions**, and his one back injury
+> from a squat (in his words, about two years ago) happened on the way **up**,
+> from overload and fatigue, not at the bottom and not from form
+> (`Input_files/injury_profile.md` #15). The sentence below was written on the
+> five quotes and is weaker on the two that remain.
 
 This is the highest-weight evidence in the whole document, because it is grade
 **C** in the literature sense but **n-of-1 on the actual athlete**, and it names

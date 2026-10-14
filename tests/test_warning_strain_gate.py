@@ -121,19 +121,54 @@ def test_it_never_raises_on_junk():
 
 # ── nothing was deleted from the plan ────────────────────────────────────────
 
+#: Removed DELIBERATELY, 2026-10-14, on the athlete's instruction: no back
+#: warning in any message ("I will stop automatically if I have back pain"),
+#: and the goblet squat's claimed that his back injuries all came from the
+#: bottom of the squat, which is false (CLAUDE.md Key Rule 24). The floor
+#: below dropped 13 -> 9 by exactly these four, and they may not come back.
+_BACK_WARNINGS_REMOVED_2026_10_14 = frozenset({
+    "Goblet Squat",
+    "Band Romanian Deadlift",
+    "Prone Y-Raise (Scapular)",
+    "Scapular Retraction Isometric",
+})
+
+
 def test_every_authored_warning_still_exists():
     """Gating is a DISPLAY change. If this drops, warnings were deleted from
-    training_plan.py rather than gated, which is a different and worse thing."""
+    training_plan.py rather than gated, which is a different and worse thing.
+    The one deliberate deletion is the athlete's own, and is pinned below."""
     import training_plan as tp
     warned = {e["name"] for plan in (tp.PLAN, tp.PLAN_STAGE2, tp.PLAN_STAGE2B)
               for day in plan.values() for e in day["exercises"]
               if e.get("warning")}
-    assert len(warned) >= 13, warned
+    assert len(warned) >= 9, warned
+
+
+def test_the_back_warnings_the_athlete_removed_stay_removed():
+    import training_plan as tp
+    back = sorted(
+        {e["name"] for plan in (tp.PLAN, tp.PLAN_STAGE2, tp.PLAN_STAGE2B,
+                                tp.PLAN_BLOCK_B)
+         for day in plan.values() for e in day["exercises"]
+         if e.get("warning") and e["name"] in _BACK_WARNINGS_REMOVED_2026_10_14})
+    assert back == [], back
+
+
+def test_no_warning_claims_back_injuries_came_from_the_squat():
+    import training_plan as tp
+    bad = sorted(
+        {e["name"] for plan in (tp.PLAN, tp.PLAN_STAGE2, tp.PLAN_STAGE2B,
+                                tp.PLAN_BLOCK_B)
+         for day in plan.values() for e in day["exercises"]
+         for field in ("warning", "mechanics", "biomechanical_focus")
+         if "bottom of the squat" in (e.get(field) or "").lower()})
+    assert bad == [], bad
 
 
 def test_every_warned_exercise_is_region_mapped():
     """An unmapped warned exercise warns unconditionally — correct as a
-    fallback, useless as a steady state. All 13 map today; keep it that way."""
+    fallback, useless as a steady state. All 9 map today; keep it that way."""
     import training_plan as tp
     unmapped = sorted(
         e["name"] for plan in (tp.PLAN, tp.PLAN_STAGE2, tp.PLAN_STAGE2B)

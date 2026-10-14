@@ -300,7 +300,6 @@ PRONE_Y_RAISE = _ex(
     ),
     progression="Clean 8 reps, no low-back compensation → add a 1-second pause at the very top.",
     regression="Low back arches to compensate → reduce lift height, focus purely on the scapular squeeze.",
-    warning="Stop if this produces lumbar extension discomfort — reduce lift height immediately.",
 )
 
 
@@ -2170,7 +2169,6 @@ def _s2_session_c(week: int) -> dict:
                 biomechanical_focus="Lower trapezius strengthening — the specific weak link in the right shoulder's eccentric control flagged in the 2025 log.",
                 progression="Clean reps, no lumbar compensation → small load addition next exposure.",
                 regression="Low back arches to compensate → reduce lift height and/or load before adding more.",
-                warning="Stop if this produces lumbar extension discomfort — reduce lift height immediately.",
             ),
             _ex(
                 name="Lateral Band Walk",
@@ -2844,8 +2842,9 @@ SCAPULAR_ISOMETRIC = _ex(
     progression="Four clean efforts at full intent → add a fourth set, never a longer hold.",
     regression=("Symptom rises during or after → shorten to 2 seconds and check the head "
                 "position first; the position is usually the problem, not the load."),
-    warning=("Load in NEUTRAL only. If the interscapular area is symptomatic today this is still "
-             "fine — but stop if it climbs during the set rather than after it."),
+    # No warning, 2026-10-14 (athlete): no back warnings in any message — "I will
+    # stop automatically if I have back pain". The neutral-head cue it carried is
+    # already in `mechanics`. CLAUDE.md Key Rule 24.
 )
 
 
@@ -2886,8 +2885,7 @@ BAND_FRONT_SQUAT = _band(
     ),
     focus=(
         "Keeps the squat pattern alive for twelve days without a rack. The band's resistance "
-        "curve is the opposite of a dumbbell's — hardest at lockout, easiest in the hole — "
-        "which suits a back whose injuries all came from the bottom of the squat."
+        "curve is the opposite of a dumbbell's — hardest at lockout, easiest in the hole."
     ),
     progression="12 clean reps with a flat back → step to the next band up.",
     regression="Back rounds or the heels lift → shorten the range, or step to a lighter band.",
@@ -2906,7 +2904,6 @@ BAND_RDL = _band(
     ),
     progression="12 reps with the back flat throughout → next band up.",
     regression="Any lumbar rounding → reduce the range and go back to a lighter band.",
-    warning="Stop at the first sign of the back taking over from the hamstrings.",
 )
 
 BAND_HIP_THRUST = _band(
@@ -3399,8 +3396,11 @@ def _s2b_gym_a(week: int) -> dict:
                 ),
                 progression="All three sets at 12 clean reps → add 2.5 kg and drop back to 8.",
                 regression="Brace collapses before rep 8 → stop the set there and reduce the load.",
-                warning="Back injuries have all come from the bottom of the squat. Stop the set at "
-                        "the first loss of a flat back rather than finishing the reps.",
+                # No warning, 2026-10-14 (athlete): the old one claimed his back
+                # injuries all came from the bottom of the squat, which is false
+                # (they came from held positions; his one squat injury, ~2024,
+                # was on the way up, from overload and fatigue), and "I will
+                # stop automatically if I have back pain". CLAUDE.md Key Rule 24.
             ),
             _ex(
                 name="Romanian Deadlift (DB)",
