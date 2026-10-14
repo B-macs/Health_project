@@ -78,13 +78,13 @@ with the run counted as a session.
 
 ---
 
-## Goal B — 20 kg overhead press — DRAFT (athlete, 2026-10-14)
+## Goal B — 20 kg overhead press — APPROVED 2026-10-14, except the floor test's pass and stall rules
 
-**Proof:** a SEATED DUMBBELL press with 20 kg in each hand (athlete,
-2026-10-14). OPEN: how many reps — 5 recommended. His 2025 best was 15 kg × 9 in
-each hand, on 2025-06-28 (source: `Input_files/2025-training-year.md`), about
-19.5 kg for one rep by the Epley estimate, so 20 kg × 1 is about that best and
-20 kg × 5 about 20% past it.
+**Proof:** a SEATED DUMBBELL press, **20 kg in each hand × 5 reps** — APPROVED
+2026-10-14. His 2025 best was 15 kg × 9 in each hand, on 2025-06-28 (source:
+`Input_files/2025-training-year.md`), about 19.5 kg for one rep by the Epley
+estimate, so 20 kg × 5 is about 20% past it. The plan already runs a heavy set
+of five, so the proof uses a format he knows.
 
 **Blockers, biggest first:**
 
@@ -101,19 +101,37 @@ plus active work for the front of the shoulder. The Latarjet moved the bone that
 pec minor attaches to, and the record already holds one range the surgery
 limits on the right (a face-down arm raise, 20 cm right against 40 cm left,
 2026-08-13) — so part of the gap may not close, and the protocol needs a rule
-for when it stops closing. OPEN: whether press weights hold until blocker 1
-passes.
+for when it stops closing.
 
-## Goal C — flexibility that lasts — DRAFT
+**The floor test runs WITH THE 12-WEEK FLEXIBILITY TEST** (athlete,
+2026-10-14: *"we can add it to the flexibility test that's every 12 weeks"*),
+on each of its three mornings, together with the pelvis test (finding #7, the
+same lying position). Protocol: lie on the back on a hard floor, knees bent,
+feet flat, arms by the sides, palms down; breathe out fully and relax for three
+breaths; check by feel whether the back of each shoulder touches the floor; for
+a number, a timed phone photo from the side, the phone on the floor about 1 m
+away, with a ruler leaned upright against a book beside the right shoulder — the
+gap in cm. PROPOSED to fit the 12-week rhythm, not yet confirmed: **pass** when
+both shoulders touch on all three mornings of one retest; **stall** when the
+right gap is not smaller than at the retest before — then the cause is reviewed
+before more of the same work.
+
+**The press does not wait for blocker 1** (athlete, 2026-10-14: *"keep pressing
+just work on that as well"*): the press weights rise by the normal load rule
+(Key Rule 23) while blocker 1's work runs beside it.
+
+## Goal C — flexibility that lasts — APPROVED 2026-10-14
 
 A separate goal: to be more flexible, and to keep it. One session a week in
 every stage. The skills are the side split and the pancake (Cluster A).
 
-The flexibility test already works by the blocker rule: it runs in a fixed order
-and STOPS AT THE FIRST FAILURE, and that failure is the biggest blocker. Its one
-stored assessment (2026-08-12, one morning, so not yet trusted — three mornings
-set the noise floor) reads **pattern D**: the adductor group with the knees
-bent, 21.5 cm against a 10 cm target. PROPOSED, not yet confirmed: the goal's
-proof is the side split and the pancake at their targets, still there at the
-next 12-week retest ("lasts"); the blockers are the test's ladder, first
-failure first; each blocker's proof is its rung's target, confirmed at a retest.
+- **Proof:** the side split and the pancake at their targets, and still there at
+  the next 12-week retest ("lasts").
+- **Blockers:** the flexibility test's ladder, first failure first — the test
+  already works by the blocker rule: it runs in a fixed order and STOPS AT THE
+  FIRST FAILURE, and that failure is the biggest blocker. Each blocker's proof is
+  its rung's target, confirmed at a retest.
+- **Now:** its one stored assessment (2026-08-12) reads **pattern D**: the
+  adductor group with the knees bent, 21.5 cm against a 10 cm target. That was
+  one morning, so it is not yet trusted; **the next retest (due about
+  2026-11-04, 84 days on) runs three mornings** to set the noise floor.
