@@ -320,11 +320,20 @@ can log and progress it. Ranking among those that pass: (1) safety margin for
 his findings; (2) directness; (3) known tolerance; (4) time. The first that
 passes is picked, and the next is added if the area needs more sets.
 
-**Tier lists — the athlete, 2026-10-15:** train only from the top tiers of a
-recorded list (`docs/training/tier_lists/`; abs first, then chest, back and
-shoulders). Which tiers is being confirmed: his message said "C and A". A tier
-list does not replace the filters; where it sits in the ranking (before or
-after the safety margin) is his decision, open.
+**Tier lists — APPROVED 2026-10-15:** train only from the **S and A** tiers of
+a recorded list (`docs/training/tier_lists/`; abs first, then chest, back and
+shoulders). For a listed group the ranking is **tier first, then safety
+margin** (*"Tier then safety as safety will change with time"*). A list never
+replaces the filters. **Caution in the safety rules means allowed** (*"Yes
+caution but allowed"*). **Abs picks:** upper — the lat-pulldown cable crunch
+facing away (S); lower — the reverse crunch on an ab mat (S); sides — the
+heavier Pallof press and the side bridge to failure, outside the list until a
+list covers them (approved). The weighted dead bug (C tier) is out.
+
+**Corrected 2026-10-15:** the 2026-10-05 "no hollow hold, no leg raises"
+exclusion was the choice of the session that picked his ab work, not a
+decision he stated. His call on it is pending; it does not change the abs
+picks above.
 
 **Open from 2026-10-15:** the neck's job (proposed: range), approval of the
 filters and the ranking, the gym's machines, the goal A picks, and the tier

@@ -20,14 +20,18 @@ A tier list is an INPUT to step 5 of the slot procedure (exercise choice,
 
 1. The safety rules (`services/rules.py`) must know the exercise and not block
    it at the current stage. "Unknown" is not a clearance.
-2. No observed finding or decision of the athlete blocks it (for example, no
-   leg-raise work that pulls on the psoas attachment, decided 2026-10-05).
+2. No observed finding or decision of the athlete blocks it. (The 2026-10-05
+   "no leg raises" exclusion was a session's choice, not his decision —
+   corrected 2026-10-15; his call on it is pending.)
 3. The equipment rule and the gym's equipment allow it.
 4. It can reach the effort step 4 sets for it.
 5. The app can log and progress it.
 
-**The athlete's tier rule (2026-10-15):** train only from the top tiers of a
-list. Which tiers is being confirmed (his message said "C and A").
+**The athlete's tier rule — APPROVED 2026-10-15:** train only from the **S and
+A** tiers of a list. Ranking among those that pass the filters: **tier first,
+then safety margin** (*"Tier then safety as safety will change with time"*),
+then directness, known tolerance and time. Caution in the safety rules means
+allowed. Areas without a list keep the step-5 ranking (safety margin first).
 
 A tier is the SOURCE's judgement, not a trial result. Each file says what the
 source measured and what it did not.

@@ -27,7 +27,7 @@
 | 1 | Sit-up | D | Hip flexors take over the top half; the floor blocks the stretch | Upper abs early in the rep |
 | 2 | Crunch on the floor | C | The abs do the work, but the floor blocks the stretch | Upper |
 | 3 | Crunch on an ab mat or a rolled towel | A | The mat adds the stretch; meets all three criteria; needs a mat | Upper |
-| 4 | Lat-pulldown crunch, unassisted (knees under the pad) | A? | Very stable, deep stretch, very hard. **The transcript reads "E tier"**; the scale has no E and the reasons are positive, so A is likely — confirm against the video | Upper (crunch type) |
+| 4 | Lat-pulldown crunch, unassisted (knees under the pad) | A | Very stable, deep stretch, very hard. The transcript reads "E tier"; the athlete confirmed A (2026-10-15) | Upper (crunch type) |
 | 5 | Lat-pulldown crunch, cable-assisted | **S** | The cable helps on the way up, so a beginner can do full reps | Upper (crunch type) |
 | 6 | Lying leg raise | D | The hip flexors lift the legs; the floor blocks the stretch | More lower than crunches |
 | 7 | Hanging knee raise | D | The hip flexors lift the knees | — |
@@ -58,7 +58,7 @@
 ## By tier
 
 - **S (6):** #5, #17, #19, #27, #28, #30
-- **A (8):** #3, #4 (unconfirmed), #10, #11, #16, #18, #26, #29
+- **A (8):** #3, #4, #10, #11, #16, #18, #26, #29
 - **B (3):** #9, #14, #15
 - **C (4):** #2, #13, #20, #25
 - **D (6):** #1, #6, #7, #8, #21, #22
@@ -75,13 +75,33 @@
 
 - **Safety rules:** every crunch variant (#1-5, #18-19, #21, #26-30) is
   "caution" — loaded bending of the spine, downgraded from contraindicated by
-  the athlete's decision of 2026-08-17. The hanging exercises (#7-10) fall under
+  the athlete's decision of 2026-08-17. Caution means ALLOWED (athlete,
+  2026-10-15: "Yes caution but allowed"). The hanging exercises (#7-10) fall under
   the hang rule (caution, both arms always). Most of the rest are "unknown".
   #23 matches the soles-together hip stretch rule by mistake (a name collision).
-- **His decision of 2026-10-05** — no leg-raise work, because it pulls on the
-  psoas attachment — rules out #6-11, #16-17, #22 and #23.
+- **The 2026-10-05 exclusion** — no hollow hold and no leg raises, because the
+  hip flexors hold or lift the legs and the psoas attaches to the lower spine,
+  where the back was tight that day — rules out #6-11, #16-17, #22 and #23.
+  CORRECTED 2026-10-15: this was the choice of the session that picked his ab
+  work on 2026-10-05, NOT a decision he stated (he did not remember it, and the
+  record's own summary says "his ask, my pick"). His call on it is pending.
 - **Stretch under load:** the S-tier "face away" and "ab mat" versions (#5, #19,
   #27, #28, #30) get their stretch by bending the lower back backward under load
   — the movement the back-extension safety rule limits at L5/S1 (caution). The
   facing-the-machine versions (#26, #29) and the bench reverse crunch (#18) do
   not.
+
+## The athlete's use of this list — APPROVED 2026-10-15
+
+- **Only S and A tier** exercises are picked for the front abs.
+- **Ranking: tier first, then safety margin** (athlete: *"Tier then safety as
+  safety will change with time"*), then directness, known tolerance and time.
+  The hard filters still run first: a "contraindicated" rule or a block from
+  his findings removes an exercise whatever its tier.
+- **Picks:** upper abs — #30, the lat-pulldown cable crunch facing away (S);
+  lower abs — #19, the reverse crunch on an ab mat or towel (S). Within the S
+  tier, #19 ranks above #17 (Garhammer raise) on safety margin: knees bent, a
+  short lever, less load on the hip flexors.
+- **The sides are outside this list** (it has no oblique exercises): the
+  heavier Pallof press and the side bridge to failure stay until a list covers
+  them.
