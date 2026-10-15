@@ -4547,10 +4547,18 @@ ACCESSORY_HANG_LADDER = (HANG_FEET_SUPPORTED, HANG_ACTIVE, HANG_PASSIVE)
 # ─── Slot 3: release B, upper.  Protocol 1, out of the document ──────────────
 #
 # docs/training/release_protocols_2026-08-10.md Techniques A and B, which the
-# physiotherapist prescribed on 2026-08-10 and which have run daily from a
-# document ever since. They are one prescription in two techniques and are kept
-# together for that reason, which is why the upper recipe is the only one that
-# runs to seven items.
+# physiotherapist prescribed on 2026-08-10. They are one prescription in two
+# techniques and are kept together for that reason, which is why the upper
+# recipe is the only one that runs to seven items.
+#
+# CORRECTED 2026-10-15: this note said both "have run daily from a document
+# ever since". The log holds NO session of either (checked 2026-10-15), and NO
+# tender spot on his shoulder has ever been observed — "tender spot" below is
+# the technique's own wording, not a finding (athlete: "where did you get the
+# idea that my shoulder had any tender spots?"). His shoulder decision of the
+# same day: release on the RIGHT only, then back-muscle activation (prone Y,
+# shoulder-blade work); the rotator cuff is not weak — see
+# docs/training/goal_system.md, goal B.
 
 PEC_SCAR_RELEASE = _ex(
     name="Pec & Scar Release (Right)",

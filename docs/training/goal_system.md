@@ -116,6 +116,36 @@ row — then the cause is reviewed before more of the same work.
 just work on that as well"*): the press weights rise by the normal load rule
 (Key Rule 23) while blocker 1's work runs beside it.
 
+**Blocker 1's work, decided 2026-10-15** (athlete: *"Release is good for the
+shoulder only right side, then activation of the back muscles, like Y prone and
+scapular exercises. Rotator cuff is not weak, I've trained them extensively over
+the years. It needs to tackle the angle of my shoulder - it's not perfectly
+straight but pointed inwards. Neck tension is also there."*):
+
+- **The target is the shoulder's ANGLE** — the right shoulder points inward.
+- **Release on the RIGHT side only**, then **activation of the back muscles**
+  straight after it: the prone Y raise and the shoulder-blade exercises. This
+  replaces the physiotherapist's "active work" half (an inward-press and
+  outward-rotation drill, which is rotator-cuff work).
+- **The rotator cuff is NOT a target** — he has trained it for years and it is
+  not weak. Removed from the step-2 areas.
+- **Neck tension is part of the problem** — OPEN: which side, where, and when
+  it is worst.
+- **"Tender spots" were never observed.** The release technique's text says
+  "pin one tender spot"; the record holds no tender spot on his shoulder, and
+  the log holds no session of the release (checked 2026-10-15). A technique's
+  wording is not a finding.
+
+**Equipment, decided 2026-10-15** (athlete: *"barbells in most situations will
+be out for now. RDL are okay but overhead press and squat lets do machine
+only"*): the **squat and the overhead press are MACHINE-ONLY**; the Romanian
+deadlift stays free weight (dumbbells); barbells are out in most cases. OPEN:
+the proof is a seated DUMBBELL press — kept as the goal, with the machine as the
+training tool until blocker 1 passes, is the recommendation, not yet confirmed.
+The safety rules return "unknown" for "machine shoulder press", "seated dumbbell
+shoulder press" and "hip thrust machine" (2026-10-15) — "unknown" is not a
+clearance, so step 5 adds a rule for every name it chooses.
+
 ## Goal C — flexibility that lasts — APPROVED 2026-10-14
 
 A separate goal: to be more flexible, and to keep it. One session a week in
@@ -170,10 +200,11 @@ the effort (step 4).
 
 | Area | Job | Source |
 |---|---|---|
-| Front of the right shoulder (pec minor, scar) | Range — release plus active work | Physiotherapist 2026-08-10; `docs/training/release_protocols_2026-08-10.md` |
+| Front of the right shoulder (pec minor, scar) | Range — release, RIGHT side only, followed straight away by the back-muscle activation (changed 2026-10-15) | Physiotherapist 2026-08-10; his decision 2026-10-15 |
 | Middle back | Range — to be tested | His reading 2026-10-14 |
-| Shoulder-blade muscles, both sides | Strength and size | Physiotherapist 2026-08-10: the right is weaker, the left works too much |
-| Rotator cuff | Strength and size | Finding #6: the right shoulder is held by muscle, not ligament |
+| Neck tension | OPEN — side, place and job to define | His report 2026-10-15 |
+| Shoulder-blade and back muscles, both sides | Strength and size — the prone Y raise and the shoulder-blade exercises come straight after the right-side release (his decision 2026-10-15) | Physiotherapist 2026-08-10: the right is weaker, the left works too much |
+| ~~Rotator cuff~~ | REMOVED 2026-10-15 — not weak; he has trained it for years | His correction |
 | Press muscles — shoulders, triceps, upper chest | Strength and size | The 20 kg × 5 proof |
 
 **Rule for the left side (applies at step 5):** single-arm work where possible,
@@ -212,11 +243,11 @@ question is answered at that same test.
 | Job | Days a week | Hard sets a week (minimum) | Effort |
 |---|---|---|---|
 | Strength and size, priority 1 — glute max, abs, deep back muscles, hamstrings | 2 or more | 10 per area | 0-3 reps left; failure where step 4 allows |
-| Strength and size, priority 2 — the main lifts (quads, chest, back) and goal B (shoulder-blade muscles, rotator cuff, press muscles) | 2 or more | 6 per area | 0-3 reps left |
+| Strength and size, priority 2 — the main lifts (quads, chest, back) and goal B (shoulder-blade and back muscles, press muscles; the rotator cuff removed 2026-10-15) | 2 or more | 6 per area | 0-3 reps left |
 | Hip airplane (his dose) | 2 | 3 × max each day | to failure |
 | Strength at length — hip flexors, adductors | 2 or more | 6 per area | hard; stop before the position slips |
 | Control — left lower ribs | every strength day | 1-2 short sets | easy, never to failure |
-| Range — front of the right shoulder | OPEN (see below) | about 8 minutes | the physiotherapist's protocol |
+| Range — front of the right shoulder: release, right only | OPEN — proposed: the upper-body days, straight before the back-muscle work | about 3 minutes | the release half of the physiotherapist's protocol |
 | Range — middle back | 2 | 1-2 short items | easy |
 | Range — the flexibility skills | 1 (the flexibility day) | the flexibility plan | — |
 | Endurance | none in stage 1 | — | — |
@@ -234,8 +265,10 @@ after the 0.5 counting. One 70-minute session holds about 20-22 hard sets with a
 fits only just, and NOT with the 18-25-minute warm-up of 2026-10-14 — the
 warm-up limit (step 7) is a hard limit.
 
-**Open — the front of the right shoulder.** The two exercises exist
-(`PEC_SCAR_RELEASE`, `ANTERIOR_SHOULDER_RECIPROCATION`, in the accessory
-session), but neither has ever been logged, and the release half is dosed by
-"tender spots" — points that are sore under a ball — which the record has never
-observed.
+**The front of the right shoulder — partly decided 2026-10-15.** The two
+exercises exist (`PEC_SCAR_RELEASE`, `ANTERIOR_SHOULDER_RECIPROCATION`), retired
+from the accessory session on 2026-10-13 and never logged. His decision: the
+release stays, RIGHT side only, and the active half is replaced by back-muscle
+activation (prone Y raise, shoulder-blade exercises) straight after it. The
+release's old dosing rule ("drop to twice a week when a week finds nothing
+tender") is void: no tender spot was ever observed. OPEN: how often.
