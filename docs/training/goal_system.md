@@ -307,3 +307,25 @@ left are less accurate further from failure and above 12 reps (Halperin et al.
 2022, Sports Med 52(2):377-390); with light loads (30% of max) stopping short
 gave about a third of failure's growth, at 80% no difference (Lasevicius et al.
 2022, J Strength Cond Res 36(2):346-351, untrained men).
+
+---
+
+## Step 5 — exercise choice — IN PROGRESS (opened 2026-10-15)
+
+**Proposed, not yet approved** — filters, in order: (1) the safety rules know
+the exercise and do not block it at the stage ("unknown" fails until a rule is
+added); (2) no observed finding or decision blocks it; (3) the equipment rule
+and the gym's equipment allow it; (4) it can reach step 4's effort; (5) the app
+can log and progress it. Ranking among those that pass: (1) safety margin for
+his findings; (2) directness; (3) known tolerance; (4) time. The first that
+passes is picked, and the next is added if the area needs more sets.
+
+**Tier lists — the athlete, 2026-10-15:** train only from the top tiers of a
+recorded list (`docs/training/tier_lists/`; abs first, then chest, back and
+shoulders). Which tiers is being confirmed: his message said "C and A". A tier
+list does not replace the filters; where it sits in the ranking (before or
+after the safety margin) is his decision, open.
+
+**Open from 2026-10-15:** the neck's job (proposed: range), approval of the
+filters and the ranking, the gym's machines, the goal A picks, and the tier
+rule above.
