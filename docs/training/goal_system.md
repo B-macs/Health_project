@@ -129,8 +129,12 @@ straight but pointed inwards. Neck tension is also there."*):
   outward-rotation drill, which is rotator-cuff work).
 - **The rotator cuff is NOT a target** — he has trained it for years and it is
   not weak. Removed from the step-2 areas.
-- **Neck tension is part of the problem** — OPEN: which side, where, and when
-  it is worst.
+- **Neck tension is part of the problem** — RIGHT side, dragging the right
+  shoulder up slightly (athlete, 2026-10-15). New: the record's earlier neck
+  findings (2026-07-31, 2026-08-13) are all on the LEFT. It matches the 2025
+  log's "right scapula elevated" early that year. Job OPEN (proposed: range).
+  The safety rules read "neck side bend" as the LOWER-back side-bend rule
+  (2026-10-15), so step 5 needs a neck rule of its own.
 - **"Tender spots" were never observed.** The release technique's text says
   "pin one tender spot"; the record holds no tender spot on his shoulder, and
   the log holds no session of the release (checked 2026-10-15). A technique's
@@ -141,7 +145,9 @@ be out for now. RDL are okay but overhead press and squat lets do machine
 only"*): the **squat and the overhead press are MACHINE-ONLY**; the Romanian
 deadlift stays free weight (dumbbells); barbells are out in most cases. OPEN:
 the proof is a seated DUMBBELL press — kept as the goal, with the machine as the
-training tool until blocker 1 passes, is the recommendation, not yet confirmed.
+training tool until blocker 1 passes — APPROVED 2026-10-15: the proof stays the
+seated dumbbell press, 20 kg × 5, and the training moves to dumbbells when both
+shoulders touch the floor.
 The safety rules return "unknown" for "machine shoulder press", "seated dumbbell
 shoulder press" and "hip thrust machine" (2026-10-15) — "unknown" is not a
 clearance, so step 5 adds a rule for every name it chooses.
@@ -202,7 +208,7 @@ the effort (step 4).
 |---|---|---|
 | Front of the right shoulder (pec minor, scar) | Range — release, RIGHT side only, followed straight away by the back-muscle activation (changed 2026-10-15) | Physiotherapist 2026-08-10; his decision 2026-10-15 |
 | Middle back | Range — to be tested | His reading 2026-10-14 |
-| Neck tension | OPEN — side, place and job to define | His report 2026-10-15 |
+| Neck tension, RIGHT side, pulling the right shoulder up | OPEN — job to define (proposed: range) | His report 2026-10-15 |
 | Shoulder-blade and back muscles, both sides | Strength and size — the prone Y raise and the shoulder-blade exercises come straight after the right-side release (his decision 2026-10-15) | Physiotherapist 2026-08-10: the right is weaker, the left works too much |
 | ~~Rotator cuff~~ | REMOVED 2026-10-15 — not weak; he has trained it for years | His correction |
 | Press muscles — shoulders, triceps, upper chest | Strength and size | The 20 kg × 5 proof |
@@ -223,7 +229,7 @@ and protect the right shoulder in every press and pull.
 
 ---
 
-## Step 3 — the weekly dose — APPROVED 2026-10-14, one row open
+## Step 3 — the weekly dose — APPROVED 2026-10-14 (the shoulder row 2026-10-15)
 
 **Nothing waits on the next flexibility retest** (athlete, 2026-10-14: *"don't
 wait on that flexibility result I don't plan to do it soon"*). Goal C works from
@@ -247,7 +253,7 @@ question is answered at that same test.
 | Hip airplane (his dose) | 2 | 3 × max each day | to failure |
 | Strength at length — hip flexors, adductors | 2 or more | 6 per area | hard; stop before the position slips |
 | Control — left lower ribs | every strength day | 1-2 short sets | easy, never to failure |
-| Range — front of the right shoulder: release, right only | OPEN — proposed: the upper-body days, straight before the back-muscle work | about 3 minutes | the release half of the physiotherapist's protocol |
+| Range — front of the right shoulder: release, right only | the upper-body days, straight before the back-muscle work (APPROVED 2026-10-15) | about 3 minutes | the release half of the physiotherapist's protocol |
 | Range — middle back | 2 | 1-2 short items | easy |
 | Range — the flexibility skills | 1 (the flexibility day) | the flexibility plan | — |
 | Endurance | none in stage 1 | — | — |
@@ -271,4 +277,33 @@ from the accessory session on 2026-10-13 and never logged. His decision: the
 release stays, RIGHT side only, and the active half is replaced by back-muscle
 activation (prone Y raise, shoulder-blade exercises) straight after it. The
 release's old dosing rule ("drop to twice a week when a week finds nothing
-tender") is void: no tender spot was ever observed. OPEN: how often.
+tender") is void: no tender spot was ever observed. How often: the upper-body
+days (APPROVED 2026-10-15).
+
+---
+
+## Step 4 — effort per exercise type — APPROVED 2026-10-15
+
+Working sets end **1-2 reps before failure** (the counting rule is unchanged: a
+set within 3 reps of failure still counts as a hard set). The session's overall
+rating stays at RPE 8 or below.
+
+| Exercise type | Effort |
+|---|---|
+| Machines and cables — machine squat, machine shoulder press, pulldown, cable row, face pull, Pallof press | Working sets 1-2 reps short; the LAST set to failure |
+| Dumbbell Romanian deadlift | 1-3 reps short; never to failure (his one squat injury came from overload and fatigue; failure causes the most fatigue) |
+| Dumbbell incline press | 1-2 reps short; never to failure (the right shoulder's history) |
+| Single-arm row, prone Y raise, shoulder-blade work | 1-2 reps short; the last set to failure |
+| Abs, hip airplane, body-weight work | Every set to failure (his decision; light loads need it) |
+| Strength at length — hip-flexor holds, adductor ladder | Hard, never to failure |
+| Control and range items | Never to failure |
+
+**Evidence, verified 2026-10-15:** stopping 1-2 reps short grew trained lifters'
+thighs about as much as failure, with less fatigue (Refalo et al. 2024, J Sports
+Sci 42(1):85-101, n = 18); across 15 studies failure was not clearly better
+(Refalo et al. 2023, Sports Med 53(3):649-665); growth rises as sets end closer
+to failure (Robinson et al. 2024, Sports Med 54(9):2209-2231); guesses of reps
+left are less accurate further from failure and above 12 reps (Halperin et al.
+2022, Sports Med 52(2):377-390); with light loads (30% of max) stopping short
+gave about a third of failure's growth, at 80% no difference (Lasevicius et al.
+2022, J Strength Cond Res 36(2):346-351, untrained men).
