@@ -68,3 +68,29 @@ From leg-workout videos that rank nothing (pasted 2026-10-15; kept here so step
   presses do not train fully (Jeff Nippard, leg day).
 - The front squat puts less load on the knees and the lower back than the back
   squat (Built With Science, leg workout) — barbell, so out under his rule.
+- **Built With Science, leg workout** (pasted again as video 4 of 6 — the same
+  video): back and front squats work the quads, hamstrings and glutes about
+  equally, the front squat with about 20% less weight; at least to parallel;
+  6-10 reps. Its 12-week squat-only result (quads +12%, glutes about +9%) is
+  probably from the same 2020 paper that is under data doubt (see
+  [glutes.md](glutes.md)).
+- **Built With Science — "five leg mistakes"** (video 6 of 6, 2026-10-15):
+  - A machine with a back support (hack squat) or a Smith machine takes the
+    balancing work away, so the quads can be taken closer to failure. It cites
+    a 2014 EMG study (less lower-back muscle work in the Smith squat) and a
+    2022 review (machines build muscle about as well as free weights); not
+    checked. This supports his machine-only squat rule. The video's lower-back
+    point is the presenter's account of his own squat, not a claim about the
+    athlete (Key Rule 24).
+  - A shin that travels further forward puts more of the work on the quads:
+    raise the heels (plates or lifting shoes); on the leg press, set the feet
+    low (a 2008 study it cites); in lunges and split squats, let the knee
+    travel forward, with the front heel raised.
+  - Expect less weight with the quad set-up; lower every rep over 2-3 seconds.
+  - The rectus femoris — the quad muscle that also crosses the hip — gets
+    little from squats and leg presses; a knee-only exercise (leg extension or
+    sissy squat) trains it. It cites a 2021 study: 5 weeks, the leg extension
+    grew it at all three measured sites, the squat at none (not checked).
+    **For step 5:** the rectus femoris is also a hip flexor, the area step 2
+    gives the job "strength at length".
+  - Effort: within 3 reps of failure; it says most people stop too early.

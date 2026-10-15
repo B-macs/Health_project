@@ -153,6 +153,29 @@ The safety rules return "unknown" for "machine shoulder press", "seated dumbbell
 shoulder press" and "hip thrust machine" (2026-10-15) — "unknown" is not a
 clearance, so step 5 adds a rule for every name it chooses.
 
+**The right shoulder's written limit — his question, 2026-10-15** (*"Where did
+that safety limit come from ?"*, about "never turn the arm out at 90° to the
+side"). It comes from the Cluster D shoulder documents (`Input_files/`, added
+2026-08-06): a general precaution for a shoulder that dislocates forward, to
+hold "until a physio clears" the position. It was copied into the safety rules
+the same day ("external rotation" and "abduction", both "caution", right side)
+and into the release protocol on 2026-08-10. Nothing in the record shows that
+his surgeon or physiotherapist gave it, and no test of his shoulder produced
+it; the physiotherapist was never asked, and the physio gate was retired on
+2026-08-17. The one MEASURED right-shoulder limit is different: less range with
+the arm behind the body (a face-down arm raise, 20 cm right against 40 cm left,
+2026-08-13).
+Evidence, checked 2026-10-15: the Latarjet is built to hold the shoulder in
+that exact position (the moved tendon slings the front of the joint when the
+arm is out and turned out); rehab protocols protect the position for the first
+months only, and some keep presses and pulldowns behind the head, dips and the
+wide-grip bench out on the return to the gym; about 9 in 10 people return to
+sport, overhead sport included; and instability returns in more people the
+longer they are followed (5-26% in studies of 10 years or more). His own risk
+factors are real: hypermobility, a shallow socket, and a first repair that
+failed. **His decision — keep it, narrow it to the end-range position with the
+arm behind the body, or drop it — is OPEN.**
+
 ## Goal C — flexibility that lasts — APPROVED 2026-10-14
 
 A separate goal: to be more flexible, and to keep it. One session a week in
@@ -213,6 +236,8 @@ the effort (step 4).
 | Shoulder-blade and back muscles, both sides | Strength and size — the prone Y raise and the shoulder-blade exercises come straight after the right-side release (his decision 2026-10-15) | Physiotherapist 2026-08-10: the right is weaker, the left works too much |
 | ~~Rotator cuff~~ | REMOVED 2026-10-15 — not weak; he has trained it for years | His correction |
 | Press muscles — shoulders, triceps, upper chest | Strength and size | The 20 kg × 5 proof |
+| Side delts | Strength and size | His decision 2026-10-15 (*"side and rear delts are nearly more important for me"*) |
+| Rear delts | Strength and size | His decision 2026-10-15 |
 
 **Rule for the left side (applies at step 5):** single-arm work where possible,
 so that the left cannot do the right's work.
@@ -251,10 +276,11 @@ question is answered at that same test.
 |---|---|---|---|
 | Strength and size, priority 1 — glute max, abs, deep back muscles, hamstrings | 2 or more | 10 per area | 0-3 reps left; failure where step 4 allows |
 | Strength and size, priority 2 — the main lifts (quads, chest, back) and goal B (shoulder-blade and back muscles, press muscles; the rotator cuff removed 2026-10-15) | 2 or more | 6 per area | 0-3 reps left |
+| Strength and size — side delts, rear delts (areas from 2026-10-15) | 2 or more | OPEN: 6 (priority 2) or 10 | 0-3 reps left |
 | Hip airplane (his dose) | 2 | 3 × max each day | to failure |
 | Strength at length — hip flexors, adductors | 2 or more | 6 per area | hard; stop before the position slips |
 | Control — left lower ribs | every strength day | 1-2 short sets | easy, never to failure |
-| Range — front of the right shoulder: release, right only | the upper-body days, straight before the back-muscle work (APPROVED 2026-10-15) | about 3 minutes | the release half of the physiotherapist's protocol |
+| Range — front of the right shoulder: release, right only | the upper-body days, straight before the back-muscle work (APPROVED 2026-10-15; every day is full body now — the days are decided at step 6) | about 3 minutes | the release half of the physiotherapist's protocol |
 | Range — middle back | 2 | 1-2 short items | easy |
 | Range — the flexibility skills | 1 (the flexibility day) | the flexibility plan | — |
 | Endurance | none in stage 1 | — | — |
@@ -373,7 +399,9 @@ rule above.
   machine hip thrust (high A) and the Romanian deadlift (high A). The machine
   hip abduction (S) is OUT: no direct work for the upper glutes (step 2).
 - **Hamstrings (no tier list):** the dumbbell Romanian deadlift and the seated
-  leg curl, by the safety-first ranking.
+  leg curl, by the safety-first ranking. *A ranked list arrived later the same
+  day — see the fourth round: the Romanian deadlift is S there, and the curl
+  depends on the open two-list rule.*
 
 **Answers of 2026-10-15 (third round) — APPROVED:**
 
@@ -397,7 +425,56 @@ and a check fails if a pick has no source in its area's file.
 
 **Shoulders (`docs/training/tier_lists/shoulders.md`):** front delts — the
 machine shoulder press (A+, the list's best for the front delts, and his
-machine-only rule). OPEN: whether the side and rear delts become areas; if they
-do, the picks are the cable lateral raise (S+, to shoulder height, thumb not
-turned up) and the reverse cable crossover (S, the right arm stopping at the
-line of the body), both under the right shoulder's limits.
+machine-only rule).
+
+**Answers of 2026-10-15 (fourth round) — APPROVED:**
+
+- **The side and rear delts are areas** (*"Yes side and rear delts are nearly
+  more important for me"*). Picks: side — the cable lateral raise (S+); rear —
+  the reverse cable crossover (S). The dose is OPEN (step 3).
+- **The right shoulder's limits on the picks** (*"Yes agree"*): the lateral
+  raise to shoulder height, thumb not turned up; the crossover's right arm
+  stops at the line of the body; the face pull without the turned-out finish.
+  Agreed before he learned where the 90° limit came from (goal B), so his
+  decision on that limit can change the first and the last.
+- **A cap for step 6** (*"Yes agree to rule"*): about 6-8 hard sets per muscle
+  per session. It is Jeff Nippard's rule of thumb (beyond it, more adds
+  little), not a tested limit.
+
+**New lists, 2026-10-15 (six videos):**
+
+- **Hamstrings now have a ranked list** (`tier_lists/hamstrings.md`, a "hams
+  and glutes" list). It also ranks glute and lower-back exercises: its glute
+  rows are copied into `glutes.md` and its lower-back rows into the new
+  `deep_back.md`.
+- **Duplicates:** video 2 (Jeff Nippard's glute list) and video 4 (Built With
+  Science's leg workout) were already recorded — checked, nothing changed.
+- **Advice** from videos 1, 5 and 6 is in the hamstring, glute, quad and
+  deep-back files.
+- **One cited trial is under data doubt:** the 12-week squat-against-hip-thrust
+  trial (Barbalho et al. 2020), cited by two of the videos; see `glutes.md`.
+
+**OPEN — two ranked lists for one area** (the glutes now). Proposed: an
+exercise qualifies if ANY list puts it in S or A; it ranks by its best tier; a
+tier given without a named version counts for each version his rules allow;
+and when a checked trial compared two exercises directly, the trial's winner
+ranks first. Consequences: the seated leg curl stays ahead of the lying curl
+(Maeo et al. 2021), although the hamstring list rates lying S and seated A; the
+step-up qualifies through Nippard's low A, although the second list rates it D;
+the reverse lunge (S) joins the glute candidates.
+
+**OPEN — the deep back pick:** the 45° back extension, back straight, up to a
+straight line — it counts 1 for the deep back muscles and 0.5 for glute max. It
+was listed as a glute pick (S); the glutes keep the walking lunge, the machine
+hip thrust and the Romanian deadlift.
+
+---
+
+## Step 6 — placement — NOT YET WALKED THROUGH (rules collected so far)
+
+- **Every strength session is full body** (APPROVED 2026-10-15).
+- **The day before the flexibility session is a rest day** — it follows from
+  full body, because every strength day loads the legs.
+- **About 6-8 hard sets per muscle per session** (APPROVED 2026-10-15).
+- **OPEN:** the right-shoulder release was set for "the upper-body days"
+  (step 3); those days no longer exist, so its days are decided here.

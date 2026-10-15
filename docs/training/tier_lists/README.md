@@ -25,8 +25,9 @@ file lacks either part.
 |---|---|---|---|
 | [abs.md](abs.md) | Abs (front wall; the sides are his own picks) | Built With Science, "It's Weird, But Destroyed Every Ab Exercise I Tested" | 2026-10-15 |
 | [quads.md](quads.md) | Quads | YouTube quad tier list (no URL given) | 2026-10-15 |
-| [glutes.md](glutes.md) | Glutes | Jeff Nippard, glute tier list | 2026-10-15 |
-| [hamstrings.md](hamstrings.md) | Hamstrings | No ranked list yet | 2026-10-15 |
+| [glutes.md](glutes.md) | Glutes | Jeff Nippard, glute tier list; and the glute rows of the hams-and-glutes list | 2026-10-15 |
+| [hamstrings.md](hamstrings.md) | Hamstrings (the list also ranks glute and lower-back exercises) | A "hams and glutes" tier-list video (channel not named) | 2026-10-15 |
+| [deep_back.md](deep_back.md) | Deep back muscles | No ranked list yet — the back-extension rows of two other lists | 2026-10-15 |
 | [calves.md](calves.md) | Calves (an area from stage 2) | No ranked list yet | 2026-10-15 |
 | [shoulders.md](shoulders.md) | Deltoids — front, side and rear | Jeff Nippard, shoulder tier list | 2026-10-15 |
 
@@ -49,6 +50,13 @@ of EVERY area every time a plan is built:**
 
 At the build (step 8) the lists become data, and a check fails if a pick has
 no source in its area's file.
+
+**A list that ranks more than one area** is recorded IN FULL in the file of the
+area it ranks most, and its rows for each other area are copied into that
+area's file with the full list's numbers (the hams-and-glutes list, 2026-10-15).
+
+**Two ranked lists for one area** (the glutes, from 2026-10-15): the rule for
+combining them is OPEN — see step 5 of `docs/training/goal_system.md`.
 
 A tier is the SOURCE's judgement, not a trial result. Each file says what the
 source measured and what it did not.
