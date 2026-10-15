@@ -374,3 +374,30 @@ rule above.
   hip abduction (S) is OUT: no direct work for the upper glutes (step 2).
 - **Hamstrings (no tier list):** the dumbbell Romanian deadlift and the seated
   leg curl, by the safety-first ranking.
+
+**Answers of 2026-10-15 (third round) — APPROVED:**
+
+- **Neck dose:** about half effort, 2 sets of 4 efforts (10 seconds on, 5 off),
+  on 3 strength days a week.
+- **The Bulgarian split squat is always allowed** — a dumbbell exercise, not a
+  barbell one (*"Yes bulgarian squat are always allowed"*).
+- **Gym:** the Smith machine, leg extension, glute-ham raise, pendulum squat and
+  calf machines are taken as present until he finds one missing.
+- **Areas with no ranked list** keep the safety-first picks until he sends a
+  tier-list video for them.
+- **Calves** become an area at stage 2.
+
+**The reading rule — his question, *"when is this going to be reviewed"*:**
+every area has ONE file in `docs/training/tier_lists/` with its ranked list and
+the unranked advice from videos that rank nothing; there are no separate notes
+files. Step 5 reads the file of every area each time a plan is built, and every
+pick records its file and part. At the build (step 8) the lists become data,
+and a check fails if a pick has no source in its area's file.
+`tests/test_tier_lists_indexed.py` fails if a file drops out of the index.
+
+**Shoulders (`docs/training/tier_lists/shoulders.md`):** front delts — the
+machine shoulder press (A+, the list's best for the front delts, and his
+machine-only rule). OPEN: whether the side and rear delts become areas; if they
+do, the picks are the cable lateral raise (S+, to shoulder height, thumb not
+turned up) and the reverse cable crossover (S, the right arm stopping at the
+line of the body), both under the right shoulder's limits.

@@ -63,3 +63,15 @@
   (the back-extension safety rule at L5/S1).
 - **Safety-rule gap:** "walking lunge" matches the rule for WALKING and comes
   back "cleared" — a false clearance. A lunge rule is needed before it is used.
+
+## Unranked source advice
+
+From leg-workout videos that rank nothing (pasted 2026-10-15):
+
+- The hip thrust as the complement to the squat; one 12-week study cited there
+  found squats grew the glutes about twice as much as hip thrusts (Built With
+  Science, leg workout).
+- Split squat, progressing to the Bulgarian split squat, then a dumbbell in the
+  opposite hand to bring in the glute medius (Built With Science).
+- The dumbbell walking lunge at full depth, lowering under control, with straps
+  if the grip fails first (Jeff Nippard, leg day 1).

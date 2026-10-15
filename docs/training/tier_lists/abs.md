@@ -110,3 +110,12 @@
   safety rules) and the **side plank with hip raises** (side bending is
   "caution"). The Pallof press is out. Both names are "unknown" to the safety
   rules and need a rule before use.
+
+## Unranked source advice
+
+From leg-workout videos that rank nothing (pasted 2026-10-15):
+
+- Roman chair leg raise (Jeff Nippard, leg day) — the leg-raise family is out
+  for him until gate 1 passes.
+- Decline plate crunch: let the lower back round, add weight or a rep from
+  session to session (Jeff Nippard, leg day 1). Not in the ranked list above.

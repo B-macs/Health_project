@@ -52,6 +52,19 @@
 - **Barbells are out** (his rule, 2026-10-15): #3, #4, #5. The Smith machine is
   NOT a barbell under his rule ("barbell is free moving weight").
 - **Squat machines his gym has:** hack squat and leg press. No belt squat.
-  Pendulum squat and Smith machine: availability not yet confirmed.
+  Pendulum squat, Smith machine and leg extension: taken as present until he
+  finds one missing (athlete, 2026-10-15).
 - **Safety rules:** the squat family and the leg press are "caution" (allowed);
   the leg extension and the reverse Nordic are "unknown" and need a rule first.
+
+## Unranked source advice
+
+From leg-workout videos that rank nothing (pasted 2026-10-15; kept here so step
+5 reads it with the list):
+
+- Leg press for volume, with a slight knee bend at the top for constant tension
+  (Jeff Nippard, leg day).
+- A slow-lowering leg extension for the rectus femoris, which squats and leg
+  presses do not train fully (Jeff Nippard, leg day).
+- The front squat puts less load on the knees and the lower back than the back
+  squat (Built With Science, leg workout) — barbell, so out under his rule.

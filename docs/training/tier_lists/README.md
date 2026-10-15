@@ -4,37 +4,51 @@
 exercises, so with chest, back, shoulders at some stage, but for now I'm just
 going to do with abs."*
 
-One file per muscle group. Each file records a source's FULL ranked list, in
-the source's own order, with the source's tier for every exercise and a short
-paraphrase of its reason. Nothing is dropped, so the list can be re-used when
-the rules or the athlete's findings change.
+## One file per body area — and nothing outside them
 
-| File | Muscle group | Source | Recorded |
+Each area has ONE file with two parts:
+
+1. **The ranked list** — a source's FULL list in its own order, with the
+   source's tier and a short paraphrase of its reason, or the line "No ranked
+   list yet".
+2. **Unranked source advice** — what videos that rank nothing recommend for
+   that area.
+
+There are no separate notes files (athlete, 2026-10-15: *"I dont want to have
+seperate md files that are just ignored when creating the plan"*). The
+leg-workout notes of 2026-10-15 were merged into the area files the same day.
+`tests/test_tier_lists_indexed.py` fails if a file in this folder is missing
+from the index below, if the index names a file that does not exist, or if a
+file lacks either part.
+
+| File | Area | Ranked source | Recorded |
 |---|---|---|---|
-| [abs.md](abs.md) | Abs (front wall) | Built With Science, YouTube, "It's Weird, But Destroyed Every Ab Exercise I Tested" | 2026-10-15 |
-| [quads.md](quads.md) | Quads | YouTube quad tier list (video 2 of the 2026-10-15 set) | 2026-10-15 |
-| [glutes.md](glutes.md) | Glutes | Jeff Nippard, YouTube glute tier list (video 3) | 2026-10-15 |
-| [workout_video_notes.md](workout_video_notes.md) | Hamstrings, quads, glutes, calves, abs — recommendations WITHOUT tiers | Videos 1, 4 and 5 (workouts, not rankings) | 2026-10-15 |
+| [abs.md](abs.md) | Abs (front wall; the sides are his own picks) | Built With Science, "It's Weird, But Destroyed Every Ab Exercise I Tested" | 2026-10-15 |
+| [quads.md](quads.md) | Quads | YouTube quad tier list (no URL given) | 2026-10-15 |
+| [glutes.md](glutes.md) | Glutes | Jeff Nippard, glute tier list | 2026-10-15 |
+| [hamstrings.md](hamstrings.md) | Hamstrings | No ranked list yet | 2026-10-15 |
+| [calves.md](calves.md) | Calves (an area from stage 2) | No ranked list yet | 2026-10-15 |
+| [shoulders.md](shoulders.md) | Deltoids — front, side and rear | Jeff Nippard, shoulder tier list | 2026-10-15 |
 
-## How a tier list is used
+## The reading rule — when these files are used
 
-A tier list is an INPUT to step 5 of the slot procedure (exercise choice,
-`docs/training/goal_system.md`). It never overrides the step-5 filters:
+**Step 5 of the slot procedure (`docs/training/goal_system.md`) reads the file
+of EVERY area every time a plan is built:**
 
-1. The safety rules (`services/rules.py`) must know the exercise and not block
-   it at the current stage. "Unknown" is not a clearance.
-2. No observed finding or decision of the athlete blocks it. (The 2026-10-05
-   "no leg raises" exclusion was a session's choice, not his decision —
-   corrected 2026-10-15; his call on it is pending.)
-3. The equipment rule and the gym's equipment allow it.
-4. It can reach the effort step 4 sets for it.
-5. The app can log and progress it.
+1. The step-5 filters run first: the safety rules know the exercise and do not
+   block it ("caution" is allowed, "unknown" needs a rule first); no finding or
+   decision of the athlete blocks it; the equipment rule and his gym allow it;
+   it can reach step 4's effort; the app can log and progress it.
+2. **An area with a ranked list:** only S and A tiers; ranked tier first, then
+   safety margin, then directness, known tolerance and time (approved
+   2026-10-15: *"Tier then safety as safety will change with time"*).
+3. **An area with no ranked list** (or no S/A exercise that passes): the
+   candidates come from its unranked advice, ranked by safety margin first.
+4. **Every pick records its file and its part** — the tier it came from, or
+   "unranked advice".
 
-**The athlete's tier rule — APPROVED 2026-10-15:** train only from the **S and
-A** tiers of a list. Ranking among those that pass the filters: **tier first,
-then safety margin** (*"Tier then safety as safety will change with time"*),
-then directness, known tolerance and time. Caution in the safety rules means
-allowed. Areas without a list keep the step-5 ranking (safety margin first).
+At the build (step 8) the lists become data, and a check fails if a pick has
+no source in its area's file.
 
 A tier is the SOURCE's judgement, not a trial result. Each file says what the
 source measured and what it did not.
