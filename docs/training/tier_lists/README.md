@@ -12,6 +12,9 @@ the rules or the athlete's findings change.
 | File | Muscle group | Source | Recorded |
 |---|---|---|---|
 | [abs.md](abs.md) | Abs (front wall) | Built With Science, YouTube, "It's Weird, But Destroyed Every Ab Exercise I Tested" | 2026-10-15 |
+| [quads.md](quads.md) | Quads | YouTube quad tier list (video 2 of the 2026-10-15 set) | 2026-10-15 |
+| [glutes.md](glutes.md) | Glutes | Jeff Nippard, YouTube glute tier list (video 3) | 2026-10-15 |
+| [workout_video_notes.md](workout_video_notes.md) | Hamstrings, quads, glutes, calves, abs — recommendations WITHOUT tiers | Videos 1, 4 and 5 (workouts, not rankings) | 2026-10-15 |
 
 ## How a tier list is used
 

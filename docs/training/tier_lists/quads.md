@@ -1,0 +1,57 @@
+# Quads — tier list
+
+- **Source:** a YouTube quad tier-list video, transcript pasted by the athlete on
+  2026-10-15 (video 2 of 5; no URL given). Reasons are short paraphrases.
+- **Scale:** S (best) → A → B → C → D → F (fail). This list uses S, A, B, C and F.
+- **The source's three criteria:**
+  1. High tension on the quads, above all in the stretched position.
+  2. It feels good: no knee pain, a smooth resistance curve.
+  3. Simple progression: add weight or a rep from week to week.
+- **What it measured:** nothing directly; the tiers are the presenter's
+  judgement, with some studies cited (a seat-back leg extension study, and
+  machines and free weights growing muscle about equally).
+- **Best:** hack squat (the pendulum squat feels better, but few gyms have
+  one); if no hack squat, the high-bar back squat. **Worst:** the bosu-ball
+  squat.
+
+## The full list, in the source's order
+
+| # | Exercise | Tier | Source's main reason |
+|---|---|---|---|
+| 1 | Squat or lunge combined with an upper-body move (e.g. squat + press, lunge + curl) | F | The upper body tires long before the quads |
+| 2 | Bosu-ball squat | F | Too unstable; the ankles do the work, little quad tension |
+| 3 | Barbell back squat, high bar | **S** | High tension in the stretch, easy to progress; the rectus femoris needs one other exercise |
+| 4 | Barbell front squat | A | Slightly more quad tension, but many find the bar position awkward |
+| 5 | Barbell back squat, low bar | A | More total load, some tension moves to the glutes |
+| 6 | Hack squat | **S** | All the squat's benefits, faster set-up, more stable |
+| 7 | Pendulum squat | **S** | The arc feels natural; few gyms have one |
+| 8 | Smith machine squat | **S** | Can go close to failure without the fear of falling |
+| 9 | 45° leg press | A | Feels good, easy to load; often less depth than a squat |
+| 10 | Horizontal leg press | C | Even less range; the stack runs out for stronger lifters |
+| 11 | Lunge, as a quad exercise | B | More a glute exercise (A or S for glutes) |
+| 12 | Leg extension, seat set back | A | Trains all four heads including the rectus femoris; less overload than squats |
+| 13 | Reverse Nordic | A | Deep quad stretch, no machine needed; hard to load |
+| 14 | Goblet squat | B | Limited by what you can hold; good for learning and high-rep finishers |
+| 15 | Jump squat | F | Too little tension and overload for growth |
+| 16 | Bulgarian split squat | **S** | Big quad stretch, one leg at a time; very fatiguing |
+| 17 | Deadlift | C | For the quads it is close to a quarter squat |
+| 18 | Step-up | C | Less quad stretch, less stable; a good glute stimulus |
+| 19 | Pistol squat | C | Unstable, hard to load; fine for training at home |
+| 20 | Sissy squat | B | Huge quad stretch, hard to load, a learning curve. (The transcript garbles the name; the description fits the sissy squat) |
+
+## By tier
+
+- **S (5):** #3, #6, #7, #8, #16
+- **A (5):** #4, #5, #9, #12, #13
+- **B (3):** #11, #14, #20
+- **C (4):** #10, #17, #18, #19
+- **F (3):** #1, #2, #15
+
+## Against the athlete's rules (checked 2026-10-15)
+
+- **Barbells are out** (his rule, 2026-10-15): #3, #4, #5. The Smith machine is
+  NOT a barbell under his rule ("barbell is free moving weight").
+- **Squat machines his gym has:** hack squat and leg press. No belt squat.
+  Pendulum squat and Smith machine: availability not yet confirmed.
+- **Safety rules:** the squat family and the leg press are "caution" (allowed);
+  the leg extension and the reverse Nordic are "unknown" and need a rule first.

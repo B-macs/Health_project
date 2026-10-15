@@ -132,7 +132,8 @@ straight but pointed inwards. Neck tension is also there."*):
 - **Neck tension is part of the problem** — RIGHT side, dragging the right
   shoulder up slightly (athlete, 2026-10-15). New: the record's earlier neck
   findings (2026-07-31, 2026-08-13) are all on the LEFT. It matches the 2025
-  log's "right scapula elevated" early that year. Job OPEN (proposed: range).
+  log's "right scapula elevated" early that year. Job: **strength at length**
+  — his "working stretch" (2026-10-15).
   The safety rules read "neck side bend" as the LOWER-back side-bend rule
   (2026-10-15), so step 5 needs a neck rule of its own.
 - **"Tender spots" were never observed.** The release technique's text says
@@ -208,7 +209,7 @@ the effort (step 4).
 |---|---|---|
 | Front of the right shoulder (pec minor, scar) | Range — release, RIGHT side only, followed straight away by the back-muscle activation (changed 2026-10-15) | Physiotherapist 2026-08-10; his decision 2026-10-15 |
 | Middle back | Range — to be tested | His reading 2026-10-14 |
-| Neck tension, RIGHT side, pulling the right shoulder up | OPEN — job to define (proposed: range) | His report 2026-10-15 |
+| Neck tension, RIGHT side, pulling the right shoulder up | Strength at length — head tilted to the LEFT, then 10-second pushes into the hand or pulls away from it, 5 seconds' rest (his choice 2026-10-15) | His report 2026-10-15 |
 | Shoulder-blade and back muscles, both sides | Strength and size — the prone Y raise and the shoulder-blade exercises come straight after the right-side release (his decision 2026-10-15) | Physiotherapist 2026-08-10: the right is weaker, the left works too much |
 | ~~Rotator cuff~~ | REMOVED 2026-10-15 — not weak; he has trained it for years | His correction |
 | Press muscles — shoulders, triceps, upper chest | Strength and size | The 20 kg × 5 proof |
@@ -338,3 +339,38 @@ picks above.
 **Open from 2026-10-15:** the neck's job (proposed: range), approval of the
 filters and the ranking, the gym's machines, the goal A picks, and the tier
 rule above.
+
+**Answers of 2026-10-15 (second round) — APPROVED:**
+
+- **The leg-raise family stays out until gate 1 passes** (*"Yes out until gate
+  1 passes"*); then it can come back.
+- **The five step-5 filters** are approved.
+- **His gym has:** leg press, hack squat, seated leg curl, lying leg curl, 45°
+  back extension bench, hip thrust machine, machine shoulder press, machine
+  chest press. **No belt squat.** **A Smith machine is NOT a barbell** under his
+  rule (*"barbell is free moving weight"*). Not yet confirmed: Smith machine,
+  leg extension, glute-ham raise, pendulum squat, calf machines.
+- **Sides:** the high-to-low cable woodchop and the side plank with hip raises
+  replace the Pallof press and the plain side bridge (see the abs tier file).
+- **Neck:** job "strength at length" (above). Evidence, checked 2026-10-15:
+  over weeks, contract-relax (PNF) and static stretching gain about the same
+  range, and both gain more than dynamic stretching (Konrad et al. 2024, J Sport
+  Health Sci 13(2):186-194, meta-analysis); for the neck itself, trials of this
+  exact method (post-isometric relaxation of the upper trapezius) are small —
+  both it and plain stretching help, one small trial favoured it. Not shown to
+  be better in the long term; shown to be at least as good, with a strength
+  part added. Effort and days: OPEN.
+- **The plan is FULL BODY every strength session** (*"I want the plan to be a
+  full body exercise plan for each day. not spilt into upper, lower etc"*) — a
+  step-6 rule. It means the day before the flexibility session must be a rest
+  day, because every strength day loads the legs.
+
+**Picks from the new tier lists (tier first, then safety margin):**
+
+- **Quads:** hack squat (S; his gym has it). The Bulgarian split squat (S) waits
+  on whether his "squat machine only" rule covers it.
+- **Glutes:** walking lunge (S+) and the 45° back extension (S), then the
+  machine hip thrust (high A) and the Romanian deadlift (high A). The machine
+  hip abduction (S) is OUT: no direct work for the upper glutes (step 2).
+- **Hamstrings (no tier list):** the dumbbell Romanian deadlift and the seated
+  leg curl, by the safety-first ranking.

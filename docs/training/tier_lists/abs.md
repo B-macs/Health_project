@@ -102,6 +102,11 @@
   lower abs — #19, the reverse crunch on an ab mat or towel (S). Within the S
   tier, #19 ranks above #17 (Garhammer raise) on safety margin: knees bent, a
   short lever, less load on the hip flexors.
-- **The sides are outside this list** (it has no oblique exercises): the
-  heavier Pallof press and the side bridge to failure stay until a list covers
-  them.
+- **The sides are outside this list** (it has no oblique exercises). His
+  picks, by this list's own criteria (2026-10-15: *"pallof press does not have
+  stretching, so lets go for something like a high to low woodchop instead"*,
+  and a side plank made harder with a hip raise): the **high-to-low cable
+  woodchop** (a stretch under load; rotation under load is "caution" in the
+  safety rules) and the **side plank with hip raises** (side bending is
+  "caution"). The Pallof press is out. Both names are "unknown" to the safety
+  rules and need a rule before use.
