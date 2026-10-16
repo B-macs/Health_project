@@ -793,6 +793,93 @@ MOVEMENT_RULES: list[MovementRule] = [
                "sustained low-level contraction is the provocative mechanism.",
         stage_cap=1, severity="cleared", laterality="bilateral",
     ),
+
+    # ── The goal-system picks (docs/training/goal_system.md, step 5) ─────────
+    # Approved by the athlete 2026-10-16 ("yes") from a list he asked to see
+    # first. Each of these names read "unknown" — and "unknown" is not a
+    # clearance — except the walking lunge, which the WALKING rule cleared by
+    # mistake. "Caution" means allowed (athlete, 2026-10-15).
+    # The keyword is "lunge (db)" on purpose. "walking lunge" would also match
+    # the plain name "walking" (a caution keyword matches any name it CONTAINS,
+    # and the walking rule's clearance is pinned by tests/test_rules.py), and
+    # "lunge" alone would catch the yoga lunges, whose tags are their own. So
+    # a dumbbell lunge is named "... Lunge (DB)", the plan's convention.
+    MovementRule(
+        movement="lunge (db)",
+        reason="Dumbbell lunge, any version, the walking lunge included. The front hip "
+               "bends past 60 degrees at the bottom of each step, so on the RIGHT leg the "
+               "knee and toes point straight ahead, not turned out (key rule 7). Without "
+               "this rule \"Walking Lunge (DB)\" matched the WALKING rule and came back "
+               "cleared — a false clearance. Ruled 2026-10-16.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="woodchop",
+        reason="Cable woodchop. Turning under load, the rotation-under-load mechanism at "
+               "L3-L5: the turn comes from the hips and the upper back, and the lower back "
+               "stays still. Ruled 2026-10-16.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="side plank with hip raise",
+        reason="Side plank with hip raises. Lowering and lifting the hips is a side bend "
+               "under body weight — the side-bend rule's mechanism at L5/S1. The plain side "
+               "bridge, a held neutral spine, stays cleared under its own rule. Ruled "
+               "2026-10-16.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="hip thrust",
+        reason="Hip thrust, any version. Hip extension under load with the upper back on "
+               "a bench or pad. The top stops at a straight line from knees to shoulders, "
+               "the pelvis tucked: past it the movement becomes lumbar extension, which "
+               "narrows the L5/S1 foramen (the hyperextension rule). Ruled 2026-10-16.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="seated leg curl",
+        reason="Seated leg curl. A knee bend against a pad with the back supported and "
+               "the hips bent, which trains the hamstrings at a long length; no load on the "
+               "spine. Ruled 2026-10-16.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="machine shoulder press",
+        reason="Machine shoulder press. Seated with the back supported; the press goes up "
+               "in front of the head, never behind it (presses and pulldowns behind the "
+               "head stay out, athlete 2026-10-16). Ruled 2026-10-16.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="seated dumbbell shoulder press",
+        reason="Seated dumbbell shoulder press — the goal-B proof. Back supported; the "
+               "dumbbells press up in front of the head, never behind it. Ruled 2026-10-16.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="cable lateral raise",
+        reason="Cable lateral raise. On the RIGHT the cable starts in front of the body, "
+               "not behind it: the right arm reaches less far behind the body (a face-down "
+               "arm raise, 20 cm right against 40 cm left, 2026-08-13). Ruled 2026-10-16.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="reverse cable crossover",
+        reason="Reverse cable crossover, for the rear delts. The RIGHT arm stops at the "
+               "line of the body: the right arm reaches less far behind the body (a "
+               "face-down arm raise, 20 cm right against 40 cm left, 2026-08-13). Ruled "
+               "2026-10-16.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="neck working stretch",
+        reason="Neck working stretch: the head tilted to the left, then 10-second efforts "
+               "pushing into the hand or pulling away from it, 5 seconds' rest, about half "
+               "effort. The hand only resists — it never pulls the head further: at "
+               "Beighton 6/9 the neck is not taken into range by outside pressure. Ruled "
+               "2026-10-16.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
 ]
 
 

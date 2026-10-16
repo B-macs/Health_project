@@ -30,6 +30,8 @@ file lacks either part.
 | [deep_back.md](deep_back.md) | Deep back muscles | No ranked list yet — the back-extension rows of two other lists | 2026-10-15 |
 | [calves.md](calves.md) | Calves (an area from stage 2) | No ranked list yet | 2026-10-15 |
 | [shoulders.md](shoulders.md) | Deltoids — front, side and rear | Jeff Nippard, shoulder tier list | 2026-10-15 |
+| [back.md](back.md) | Back — lats and upper back | No source yet — the tier decider's list | 2026-10-16 |
+| [chest.md](chest.md) | Chest | No source yet — the tier decider's list | 2026-10-16 |
 
 ## The reading rule — when these files are used
 
@@ -63,3 +65,23 @@ first.
 
 A tier is the SOURCE's judgement, not a trial result. Each file says what the
 source measured and what it did not.
+
+## The tier decider — for an area no source has ranked
+
+`services/tier_decider.py` rates an exercise on five things every recorded list
+ranks on (stretch, target, stability, load, comfort — the ratings and the rule
+for each are in `exercise_features.py`) and turns the score into a tier with
+cut points calibrated on the recorded lists. Approved 2026-10-16: *"use the same
+script to create a tier list for back and chest ... go for that for now"*.
+
+- **A decider list is used like a source list until a video for its area
+  arrives**; then the source list replaces it.
+- **How close it gets** (2026-10-16): on a list it was not calibrated on, the
+  exact tier 41% of the time and within one tier 96% (guessing "A" for
+  everything: 32% and 74%). `python scripts/tier_decider.py validate` re-runs it.
+- **When a video arrives:** record its full list as usual, then
+  `python scripts/tier_decider.py compare <file>` gives the decider's agreement
+  with it.
+- `tests/test_tier_decider.py` fails if a source row loses its rating, if the
+  cut points stop being the calibration's answer, if the agreement drops, or if
+  a decider list in this folder stops matching the decider.

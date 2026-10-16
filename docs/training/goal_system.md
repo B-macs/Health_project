@@ -515,7 +515,11 @@ for every picked exercise the safety check calls "unknown", and show him the
 list (exercise, result, one-line reason) before it goes into
 `services/rules.py`.
 
-**The list — PROPOSED 2026-10-16, waiting for his approval.** Already known:
+**The list — APPROVED 2026-10-16** (*"yes"*), now in `services/rules.py` and
+pinned by `tests/test_goal_system_pick_rules.py`. One change in the building: the
+lunge rule's keyword is "lunge (db)", not "walking lunge" — a caution keyword
+also matches any name it contains, so "walking lunge" would have turned plain
+walking into a caution. Already known:
 the crunches, Romanian deadlift, back extension, hack squat, Bulgarian split
 squat, hip airplane and psoas march are "caution" (allowed); the face pull and
 the prone Y raise are "cleared". New rules:
@@ -533,7 +537,24 @@ the prone Y raise are "cleared". New rules:
 | Reverse cable crossover | caution, right | The right arm stops at the line of the body (the measured limit) |
 | Neck working stretch (right) | caution | The hand only resists the push; it never pulls the head further (no pressure into range at Beighton 6/9) |
 
-The chest and back picks get their rules when their lists arrive.
+The chest and back picks get their rules when he approves them.
+
+**The tier decider — BUILT 2026-10-16** (*"I want you to take the deterministic
+decider for tiers and use the same script to create a tier list for back and
+chest, I can copy in later videos to see if you're correct but go for that for
+now"*). `services/tier_decider.py` rates each exercise 0-2 on five things every
+recorded list ranks on (stretch, target, stability, load, comfort; the ratings
+and their rules are in `exercise_features.py`), scores them (stretch counts
+three times), and turns the score into a tier with cut points calibrated on the
+five recorded lists. On a list it was not calibrated on it gives the exact tier
+41% of the time and comes within one tier 96% (guessing "A": 32% and 74%).
+Its back and chest lists are in `tier_lists/back.md` and `tier_lists/chest.md`
+and are used like source lists until his videos arrive.
+
+**Picks from the decider, for his approval:** back — the single-arm dumbbell
+row (S; his single-arm rule and known tolerance break the tie); chest — the
+machine chest press (S; the chest is a gate-1 main lift, so its pick is a press,
+and this is the S press confirmed in his gym).
 
 ---
 
@@ -590,43 +611,70 @@ a rule is broken. Nothing is placed by hand.
 - S3. A ramp set straight before its own lift (Key Rule 21).
 - S4. Trunk work to failure, the hip airplane and the strength-at-length holds
   come last, so a tired trunk never comes before a heavy lift.
+- S5. The right-shoulder release, then the prone Y raise, come straight before
+  a chest or shoulder press (2026-10-16).
+- S6. When an area has more picks than sessions need (the abs: four picks, one
+  exercise a session), the slot rotates through them in rank order.
 
 **Limits:**
 
 - L1. At most 8 hard sets per area in one session.
 - L2. At most 70 modelled minutes per session (Key Rule 21), measured with the
   app's own time model.
-- L3. A session over the limit: (a) cut one set at a time from the area
-  furthest above its weekly minimum, never below it; (b) then pair two
-  isolation exercises at the same station (supersets); (c) if it is still
-  over, stop and ask.
+- L3. A session over the limit loses a WHOLE exercise — the lowest-ranked one
+  whose areas all stay at their weekly minimum without it; sets are never cut
+  below 3 (changed 2026-10-16, his fewer-exercises rule). If it is still over,
+  stop and ask.
+- L4. Every training exercise has 3 working sets (2026-10-16).
 
 **The checks (tests):** the same cards always give the same week; every area
 reaches its minimum; no area goes over 8 sets in a session; no session goes
 over 70 minutes; preparation stays inside its limit; the order rules and the
 day rules hold; every exercise has a known safety rule and a tier source.
 
-**Draft on today's picks** (2026-10-16, from a scratch run of these rules
-through `services/sessions.session_seconds`; the chest and back exercises are
-placeholders until their lists arrive):
+**His answers, 2026-10-16 — APPROVED:**
 
-- **Session A — 89 modelled minutes** (preparation 20): psoas march, rib
-  control, right-shoulder release, prone Y raise, neck; Romanian deadlift
-  (ramp + 3), hack squat (ramp + 3), back extension 2, lat pulldown 3,
-  machine shoulder press 3, cable lateral raise 3; cable crunch 3, reverse
-  crunch 2, adductor ladder 3, hip airplane 3.
-- **Session B — 76 modelled minutes** (preparation 11): psoas march, rib
-  control, neck; walking lunge 3, back extension 2, machine hip thrust 3,
-  seated cable row 3, incline dumbbell press 3, seated leg curl 3, reverse
-  cable crossover 3; woodchop 2, side plank with hip raises 2, psoas
-  isometric 3.
-- **Weekly sets:** every area at or above its minimum except the deep back
-  (8 against 10) — rule W4 adds one back-extension set to B.
+- **Key Rule 21's six-exercise cap is REPLACED for full-body sessions** (*"yes
+  replace it"*) by L1 and L2: at most 8 hard sets per area in one session and
+  at most 70 modelled minutes. The code (`sessions.SESSION_SHAPE`) changes with
+  the first full-body block.
+- **Fewer exercises with 3 sets each, not more exercises with fewer sets**
+  (*"I'd rather less exercises with 3 sets than less sets and more
+  exercises"*). Two rules follow: every training exercise has 3 working sets;
+  and L3 changes — a session over its limit loses a WHOLE exercise (the
+  lowest-ranked one whose areas all stay at their minimum without it), never
+  sets below 3.
+- **The right-shoulder release comes straight before a chest or shoulder
+  press, and only then** (*"The shoulder release is only needed when doing
+  chest presses or shoulder press. It's to release the area before working on
+  it"*). The prone Y raise follows the release, as approved on 2026-10-15.
+- **Training days:** strength Monday, Tuesday, Thursday and Friday; rest
+  Wednesday and Saturday; flexibility Sunday (*"yes agreed"*).
 
-**Two conflicts for his decision:**
+**Draft 2 on today's picks** (2026-10-16, a scratch run through
+`services/sessions.session_seconds`; every exercise 3 sets):
 
-1. **Time:** both sessions are over 70 minutes, and A's preparation is over its
-   10-15 minutes.
-2. **Key Rule 21 caps a session at 6 working exercises** (2026-09-11, after an
-   81-minute session). Full body needs about 9. Its reason — sessions growing
-   longer — is what the time limit (L2) already checks.
+- **Monday and Thursday — session A:** psoas march, rib control (90/90 hip
+  lift), neck; Romanian deadlift (ramp + 3), hack squat (ramp + 3), 45° back
+  extension; the right-shoulder release, prone Y raise, machine shoulder press;
+  cable lateral raise; one abs exercise (Monday the lat-pulldown cable crunch,
+  Thursday the woodchop); hip airplane; adductor ladder. **80 and 82 modelled
+  minutes.**
+- **Tuesday and Friday — session B:** psoas march, rib control, neck (Tuesday
+  only — three days a week); walking lunge, 45° back extension, seated leg curl;
+  the release, prone Y raise, machine chest press; single-arm dumbbell row,
+  reverse cable crossover; one abs exercise (Tuesday the reverse crunch, Friday
+  the side plank with hip raises); psoas isometric. **77 and 75 modelled
+  minutes.**
+- **Weekly hard sets:** every area at or above its minimum — glutes 18, abs 12,
+  deep back 12, hamstrings 12, quads 9, chest 6, back 6, press 9, shoulder
+  blades 15, side delts 9, rear delts 6, hip rotators 6, hip flexors 6,
+  adductors 6.
+- **By his fewer-exercises rule:** the machine hip thrust is out (the glutes
+  stay at 18 without it), and the abs take one exercise a session, rotating
+  through the four picks.
+
+**Still over 70 minutes by 5-12. OPEN, his choice:** (a) move the three holds
+(hip airplane, adductor ladder, psoas isometric — no gym needed) to Wednesday
+and Sunday, which brings the sessions to about 70-72; (b) pair two exercises at
+neighbouring spots (supersets); (c) raise the limit to 85 minutes.

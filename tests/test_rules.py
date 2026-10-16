@@ -145,13 +145,25 @@ def test_incline_db_press_does_not_match_overhead_press_rule():
     assert incline["severity"] == "unknown"
 
 
-def test_hip_thrust_and_pulling_exercises_are_unrestricted_by_omission():
-    # No MOVEMENT_RULES entry matches these — intentional (hip thrust, lat
-    # pulldown, DB row are sagittal-plane/controlled patterns with no
-    # matching contraindication), not an authoring gap.
-    for name in ("Hip Thrust (Loaded)", "Lat Pulldown", "Single-Arm DB Row"):
+def test_pulling_exercises_are_unrestricted_by_omission():
+    # No MOVEMENT_RULES entry matches these — intentional (lat pulldown and DB
+    # row are sagittal-plane/controlled patterns with no matching
+    # contraindication), not an authoring gap. They get rules when the goal
+    # system's back picks are made (docs/training/goal_system.md, step 5).
+    for name in ("Lat Pulldown", "Single-Arm DB Row"):
         result = rules.check_movement(name, current_stage=2)
         assert result["severity"] == "unknown"
+
+
+def test_hip_thrust_has_the_rule_the_athlete_approved():
+    # The hip thrust WAS unrestricted by omission (this test's earlier form).
+    # The goal system's step 5 does not accept "unknown" for a pick, and the
+    # athlete approved a rule on 2026-10-16: caution — the top stops at a
+    # straight line with the pelvis tucked (the L5/S1 extension rule).
+    for name in ("Machine Hip Thrust", "Hip Thrust (Loaded)"):
+        result = rules.check_movement(name, current_stage=2)
+        assert result["severity"] == "caution", name
+        assert "straight line" in result["reason"], name
 
 
 def test_face_pull_cable_is_cleared():
