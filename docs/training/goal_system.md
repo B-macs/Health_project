@@ -935,3 +935,42 @@ monday. lets complete all other steps and then push."*
   when the heaviest is 40 — so one step there is both dumbbells one size up
   (4.5 kg). Logged weights that are not real dumbbells (for example 42.5 or
   25) are read as the nearest real one when the block starts.
+
+---
+
+## Step 8 — the build — rules and answers, 2026-10-16
+
+**No copying — every exercise runs through the workflow** (CLAUDE.md Key Rule
+25): *"Can you ensure that there is never copying, it needs to run through the
+workflow. If I ask for a exercise there needs to be reasons for to and goals
+attached, and even then it can be overwritten with a better exercise to get the
+same goal quicker."* Every exercise has a record in `goal_week.PICKS` (goal,
+area, job, reason, source, the better-exercise check), and
+`tests/test_workflow_picks.py` enforces it. **Eight picks are not yet checked
+against a better exercise for the same goal** (`goal_week.BETTER_CHECK_OPEN`):
+the psoas march, the shoulder release, the prone Y raise, the woodchop, the
+side plank with hip raises, the hip airplane, the psoas isometric and the
+adductor ladder. Step 8 checks each and shows him the result; the block cannot
+be registered before.
+
+**His answers:**
+
+- **Ramp sets — KEPT** (*"Let's keep the ramp set it, I think it will help with
+  injury prevention"*): one before the Romanian deadlift and one before the hack
+  squat. Recorded with the facts given to him: no trial shows a warm-up set
+  prevents injury in weight training, and at 8-12 reps it adds nothing to the
+  working sets; it costs about 2-4 minutes.
+- **No planned easier weeks** (*"follow the recommendation A for the no
+  planned easy weeks. We can do an easy week at the end of 12 weeks if we want.
+  We can decide that at a later point"*): an easier week after week 12 is
+  decided then.
+- **A missed session asks for its reason** (*"if there is a missed session ...
+  let's ask for a question ... And then we can decide at that point what was the
+  reason"*): if a week ends with fewer than 3 core sessions, one tap — hips or
+  back (a flare-up; the 6-week count resets), travel or illness (the count
+  pauses), other (the week does not count; the count resets).
+- **Test mornings — OPEN:** he asked what the rib and pelvis test is, and would
+  "aim for Monday" for the flexibility retest. Monday morning follows Sunday's
+  adductor ladder and flexibility session, and his rule of 2026-08-07 is that a
+  retest is never the morning after leg work; Sunday morning follows Saturday's
+  rest.

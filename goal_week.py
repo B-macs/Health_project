@@ -17,7 +17,7 @@ docs/training/goal_system.md, steps 3-6, as approved on 2026-10-16:
 Changing a pick means changing a card here; the week is then placed again by
 the rules, never by hand. `python scripts/draft_week.py` prints it.
 """
-from dataclasses import replace
+from dataclasses import dataclass, replace
 
 from services.placement import Card, WeekSpec, fill_bonus, place
 
@@ -125,6 +125,193 @@ HOME = {"Neck Working Stretch (Right)": {"sets": 2, "dose": "4 efforts of 10 s, 
                                          "days": CORE_DAYS}}
 EXTRA_SETS = {v["area"]: v["sets"] * len(v["days"]) for v in OFF_GYM.values()}
 EXTRA_DAYS = {v["area"]: len(v["days"]) for v in OFF_GYM.values()}
+
+
+# ─── The workflow record — no exercise enters the block by copying ──────────
+#
+# The athlete, 2026-10-16: "Can you ensure that there is never copying, it needs
+# to run through the workflow. If I ask for a exercise there needs to be reasons
+# for to and goals attached, and even then it can be overwritten with a better
+# exercise to get the same goal quicker." It followed the 90/90 hip lift, which
+# reached this week by being copied from Block B's warm-up. Every exercise in the
+# week, at home and off the gym days has a record here, and
+# tests/test_workflow_picks.py fails on one that does not.
+
+@dataclass(frozen=True)
+class Pick:
+    """Why one exercise is in the block.
+
+    goal       "A" (hips and back, the main goal), "B" (the press), "C"
+               (flexibility) or "warm-up"; several are comma-separated.
+    area, job  the step-2 area it trains, and its job there.
+    reason     why this exercise, in plain words.
+    source     where the pick came from: a tier-list file and the exercise's
+               tier, or his words with their date.
+    listed_as  the exercise's name in its tier-list file ("" without one).
+    better     how it was checked against a better exercise for the same goal;
+               None = not checked yet. The block is not registered while any
+               pick is unchecked (his rule: even his own picks can be replaced).
+    """
+
+    goal: str
+    area: str
+    job: str
+    reason: str
+    source: str
+    listed_as: str = ""
+    better: str | None = None
+
+
+_TIER_FIRST = "step 5: the best tier in its list that passes the five filters"
+
+PICKS: dict[str, Pick] = {
+    "Standing Psoas March": Pick(
+        "warm-up", "hip flexors", "warm-up",
+        "Opens every strength session: it stretches and wakes up the psoas.",
+        "his words, 2026-10-14: 'required to stretch and wake up that muscle'; 2026-09-22: "
+        "'I feel more of stretch from that than any other stretch'"),
+    "Ramp set": Pick(
+        "warm-up", "the lift that follows", "warm-up",
+        "One light set straight before the Romanian deadlift and the hack squat.",
+        "his words, 2026-10-16: 'Let's keep the ramp set it, I think it will help with injury "
+        "prevention'",
+        better="checked 2026-10-16: no trial shows a warm-up set prevents injury in weight "
+               "training, and at 8-12 reps it adds nothing to the working sets (warm-up review "
+               "§1.4); kept by his choice"),
+    "Pec & Scar Release (Right)": Pick(
+        "B", "front of the right shoulder", "range",
+        "Releases the front of the right shoulder straight before a chest or shoulder press.",
+        "physiotherapist, 2026-08-10; his words, 2026-10-16: 'The shoulder release is only needed "
+        "when doing chest presses or shoulder press. It's to release the area before working on it'"),
+    "Prone Y-Raise (Scapular)": Pick(
+        "B", "shoulder-blade muscles", "strength and size",
+        "Back-muscle work straight after the release, before the press; 1-2 reps short of failure.",
+        "his decision, 2026-10-15: release, then back-muscle activation; physiotherapist, "
+        "2026-08-10: the right is weaker and the left works too much"),
+    "Machine Shoulder Press": Pick(
+        "A, B", "press muscles", "strength and size",
+        "Gate-1 main lift and the press goal's training, on a machine (his machine-only rule).",
+        "tier_lists/shoulders.md #8, A+ — the list's best for the front delts",
+        listed_as="Machine shoulder press",
+        better=_TIER_FIRST + "; the S tiers above it train the side and rear delts, which have "
+               "their own picks"),
+    "Machine Chest Press": Pick(
+        "A, B", "chest", "strength and size",
+        "Gate-1 main lift; a press, because the chest is a main lift.",
+        "tier_lists/chest.md #4, S (the decider's list); approved 2026-10-16",
+        listed_as="Machine chest press",
+        better=_TIER_FIRST + "; the S press confirmed in his gym"),
+    "Hack Squat": Pick(
+        "A", "quads", "strength and size",
+        "Gate-1 main lift for the legs, on a machine (his machine-only rule).",
+        "tier_lists/quads.md #6, S — named the list's best",
+        listed_as="Hack squat",
+        better=_TIER_FIRST + "; the pendulum squat is also S, and the list names the hack squat best"),
+    "Walking Lunge (DB)": Pick(
+        "A", "glute max", "strength and size",
+        "The glutes' best exercise, with the quads second.",
+        "tier_lists/glutes.md #16, S+ — best overall",
+        listed_as="Walking lunge",
+        better=_TIER_FIRST + "; the top of its list"),
+    "Romanian Deadlift (DB)": Pick(
+        "A", "hamstrings", "strength and size",
+        "The best hip hinge, for the hamstrings and the lower glutes; dumbbells (his rule).",
+        "tier_lists/glutes.md second list #1, S — the best hip hinge",
+        listed_as="Romanian deadlift",
+        better=_TIER_FIRST + "; the top hinge in both of its lists"),
+    "Seated Leg Curl": Pick(
+        "A", "hamstrings", "strength and size",
+        "Hamstring isolation at length, in the bonus session.",
+        "tier_lists/hamstrings.md #7, A; the two-list rule's trial clause (approved 2026-10-16)",
+        listed_as="Seated leg curl",
+        better="checked 2026-10-15: the list's S lying curl is ranked on feel; a 12-week trial "
+               "found more hamstring growth with the seated curl (Maeo et al. 2021)"),
+    "45° Back Extension": Pick(
+        "A", "deep back", "strength and size",
+        "Trains the deep back muscles, with the glutes second; back kept straight.",
+        "tier_lists/deep_back.md, approved 2026-10-16; ranked S in tier_lists/glutes.md #23",
+        listed_as="45° back extension",
+        better=_TIER_FIRST + "; the only S-ranked deep-back exercise in his gym"),
+    "Single-Arm DB Row": Pick(
+        "A, B", "back", "strength and size",
+        "Gate-1 main lift for the back; one arm at a time, so the left cannot do the right's work.",
+        "tier_lists/back.md #9, S (the decider's list); approved 2026-10-16",
+        listed_as="Single-arm dumbbell row",
+        better=_TIER_FIRST + "; among the S rows his single-arm rule and known tolerance break "
+               "the tie"),
+    "Reverse Cable Crossover": Pick(
+        "B", "rear delts", "strength and size",
+        "Rear delts, through a long range.",
+        "tier_lists/shoulders.md #21, S — best for the rear delts",
+        listed_as="Reverse cable crossover",
+        better=_TIER_FIRST + "; the list's best for the rear delts"),
+    "Cable Lateral Raise": Pick(
+        "B", "side delts", "strength and size",
+        "Side delts, with tension at the stretch.",
+        "tier_lists/shoulders.md #13, S+ — best overall",
+        listed_as="Cable lateral raise",
+        better=_TIER_FIRST + "; the top of its list"),
+    "Lat-Pulldown Cable Crunch (Facing Away)": Pick(
+        "A", "abs", "strength and size",
+        "Upper abs, to failure, at the end of the session.",
+        "tier_lists/abs.md #30, S",
+        listed_as="Lat-pulldown cable crunch, facing away",
+        better=_TIER_FIRST + "; within the S tier, picked by safety margin (approved 2026-10-15)"),
+    "Reverse Crunch (Ab Mat)": Pick(
+        "A", "abs", "strength and size",
+        "Lower abs, to failure, at the end of the session.",
+        "tier_lists/abs.md #19, S",
+        listed_as="Reverse crunch with an ab mat",
+        better=_TIER_FIRST + "; within the S tier, picked by safety margin (approved 2026-10-15)"),
+    "High-to-Low Cable Woodchop": Pick(
+        "A", "abs", "strength and size",
+        "The sides of the abs under load, to failure.",
+        "his words, 2026-10-15 (tier_lists/abs.md): 'lets go for something like a high to low "
+        "woodchop instead'",
+        listed_as="woodchop"),
+    "Side Plank with Hip Raises": Pick(
+        "A", "abs", "strength and size",
+        "The sides of the abs, made harder with a hip raise, to failure.",
+        "his pick, 2026-10-15 (tier_lists/abs.md): a side plank made harder with a hip raise",
+        listed_as="side plank"),
+    "Hip Airplane": Pick(
+        "A", "hip rotators", "strength and size",
+        "Trains the pelvis twist he noticed on 2026-10-05: 3 x max, two days, not every day.",
+        "his decision, 2026-10-14: hip airplane 3 x max, to failure, not every day"),
+    "End-Range Psoas Isometric": Pick(
+        "A", "hip flexors", "strength at length",
+        "Strength at the psoas' long end, which a release cannot give.",
+        "his rule, 2026-08-24: 'more time on holds and strengthing to get the real benefits'"),
+    "Neck Working Stretch (Right)": Pick(
+        "B", "neck, right side", "strength at length",
+        "Head tilted to the left, 10-second pushes into the hand, at home on the core days.",
+        "his choice, 2026-10-15; at home from 2026-10-16",
+        better="checked 2026-10-15: contract-relax and static stretching gain about the same range "
+               "(Konrad et al. 2024), and this one adds a strength part"),
+    "Adductor Ladder (current rung)": Pick(
+        "C", "adductors", "range and strength at length",
+        "The flexibility goal's blocker: the adductors with the knees bent (21.5 cm against "
+        "10 cm, 2026-08-12).",
+        "work package WP-04, 2026-10-13, from his notes; step 2, goal C"),
+}
+
+#: The picks not yet checked against a better exercise for the same goal. Step 8
+#: checks each and shows him the result; tests/test_workflow_picks.py keeps this
+#: list equal to the picks whose `better` is None, and refuses to let the block
+#: be registered while it is not empty.
+BETTER_CHECK_OPEN = (
+    "Standing Psoas March", "Pec & Scar Release (Right)", "Prone Y-Raise (Scapular)",
+    "High-to-Low Cable Woodchop", "Side Plank with Hip Raises", "Hip Airplane",
+    "End-Range Psoas Isometric", "Adductor Ladder (current rung)",
+)
+
+
+def pick_for(name: str) -> Pick | None:
+    """The workflow record for an exercise name in the week; a ramp set reads
+    the shared "Ramp set" record."""
+    if name.endswith("(Ramp Set)"):
+        return PICKS.get("Ramp set")
+    return PICKS.get(name)
 
 
 def week() -> dict:
