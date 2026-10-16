@@ -1306,7 +1306,12 @@ class Repository:
                  "is_warmup": 1 if s.get("is_warmup") else 0,
                  "rest_taken_seconds": s.get("rest_taken_seconds"),
                  "reps_left": s.get("reps_left"),
-                 "weight_left": s.get("weight_left")}
+                 "weight_left": s.get("weight_left"),
+                 # The timed test hold's left side (2026-10-16). ⚠ Supabase
+                 # needs the column FIRST (scripts/migrate_2026-10-16_
+                 # training_sets_tut_left.sql): every row carries the key, and
+                 # PostgREST rejects a whole batch naming a column it lacks.
+                 "tut_left": s.get("tut_left")}
                 for s in sets
             ], mode=supabase_store.REPLACE)
 

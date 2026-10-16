@@ -289,6 +289,7 @@ def _populate_training(repo: Repository, conn: sqlite3.Connection) -> tuple[int,
                 "rest_taken_seconds": s.get("rest_taken_seconds"),
                 "reps_left": s.get("reps_left"),
                 "weight_left": s.get("weight_left"),
+                "tut_left": s.get("tut_left"),
             })
 
     n_sessions = _insert_rows(conn, "training_sessions", list(sessions.values()))

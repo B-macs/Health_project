@@ -523,6 +523,11 @@ def build_set_record(ex: dict, set_num: int, actual: dict | None,
                           an "Edit left side" tap overwrote the whole row, so a
                           lighter left arm read as the athlete declining the
                           prescribed weight outright.
+      tut_left            A timed test hold's left side, in seconds (the core
+                          hold score, decided 2026-10-13): `tut` holds the
+                          right side and `tut_left` the left, written in the
+                          same only-when-different idiom. On a timed test hold
+                          `tut` is the seconds he entered, not the reference.
     """
     t = ex["type"]
     actual = actual or {}
@@ -534,7 +539,10 @@ def build_set_record(ex: dict, set_num: int, actual: dict | None,
         reps = actual.get("reps") if actual.get("reps") is not None else (ex.get("reps_in_set") or 1)
         velocity, tut = "isometric", ex.get("hold_seconds") or 0
     elif t == "hold":
-        reps, velocity, tut = 1, "isometric", ex.get("hold_seconds") or 0
+        # A timed test hold carries the seconds he held (timed_hold_entry);
+        # every other hold logs its prescribed time, as before.
+        reps, velocity = 1, "isometric"
+        tut = actual.get("tut") if actual.get("tut") is not None else (ex.get("hold_seconds") or 0)
     else:  # duration
         reps, velocity, tut = 1, "continuous", (ex.get("duration_minutes") or 0) * 60
 
@@ -567,6 +575,9 @@ def build_set_record(ex: dict, set_num: int, actual: dict | None,
     weight_left = actual.get("weight_kg_left")
     if weight_left is not None and weight_left != weight:
         record["weight_left"] = weight_left
+    tut_left = actual.get("tut_left")
+    if t == "hold" and tut_left is not None and tut_left != tut:
+        record["tut_left"] = tut_left
     return record
 
 
@@ -1959,6 +1970,22 @@ PREPARATION_NAMES = RELEASE_EXERCISE_NAMES | frozenset({
     # release, so readiness never scales it and it is no working exercise.
     "Pec & Scar Release (Right)",
 })
+
+
+def is_timed_test(ex: dict) -> bool:
+    """A hold that is a measurement (the plank test's Bunkie lines): held
+    until the line breaks and timed, so the training page shows a stopwatch
+    that counts up and asks for the seconds, never a countdown that ends the
+    set at the reference time."""
+    return ex.get("type") == "hold" and is_measurement(ex.get("name", ""))
+
+
+def timed_hold_entry(entry: dict | None, side: str, seconds: int) -> dict:
+    """The live entry with one side's held seconds: the right side in `tut`,
+    the left in `tut_left` (build_set_record), whichever side went first."""
+    out = dict(entry or {})
+    out["tut_left" if side == "left" else "tut"] = int(seconds)
+    return out
 
 
 def is_measurement(name: str) -> bool:

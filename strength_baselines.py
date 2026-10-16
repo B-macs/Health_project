@@ -85,3 +85,22 @@ REGION_PRIOR: dict[str, float] = {
     "core":       0.20,
     "lower_body": 0.45,
 }
+
+
+# ─── The core hold score (WP-15 step 6; decided 2026-10-13, built 2026-10-16) ─
+# docs/core_hold_index_design_2026-10-13.md. Core has no 2025 kilogram, so it
+# is scored on hold TIME instead: a Bunkie line held until the line breaks,
+# against the 2025 log's nearest hold. Both 2025 figures are TRAINING doses (3
+# sets), not holds to failure, so they are lower bounds on the 2025 best and
+# today's index reads HIGH against them; the forms differ too (a floor side
+# plank with a march against side support with the feet on a bench). Hence
+# the comparability below, and why the score stays out of the headline.
+#
+#: The timed line → (the 2025 hold in seconds, a side; what the 2025 log holds).
+HOLD_BASELINES_2025: dict[str, tuple[float, str]] = {
+    "Bunkie — Lateral Stabilizing Line (Timed)": (15.0, "side plank with a march, 15 s each side × 3"),
+    "Bunkie — Medial Stabilizing Line (Timed)": (30.0, "Copenhagen plank, 30 s × 3"),
+}
+#: Between a same-pattern different-implement baseline (0.70) and an assumed
+#: figure (0.40): the design's proposal, decided with it.
+HOLD_COMPARABILITY: float = 0.6

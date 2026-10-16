@@ -619,7 +619,11 @@ def _strength_readout_html(current: float | None, previous: float | None,
     )
 
 
-def _strength_region_strip_html(regions: list) -> str:
+def _strength_region_strip_html(regions: list, core_hold: dict | None = None) -> str:
+    """The three body-part cards. Core has no kilogram scale; from the first
+    timed plank test its card shows its hold-time index instead, marked
+    provisional (services/strength.core_hold_index, decided 2026-10-13) — it
+    is never part of the headline."""
     by_id = {r.region: r for r in regions}
     rows = ""
     for meta in _STRENGTH_REGIONS:
@@ -635,9 +639,14 @@ def _strength_region_strip_html(regions: list) -> str:
         # kilogram baseline, so nothing it does can be measured on this scale.
         index_text = ("—" if state.displayed_index is None
                       else f"{state.displayed_index:.1f}")
+        index_label = "Index"
+        if meta["id"] == "core" and state.displayed_index is None and core_hold:
+            index_label, index_text = "Hold time", f"{core_hold['index']:.1f}"
+            band = f"provisional · hold time · {core_hold['date'].strftime('%d %b').lstrip('0')}"
+            conf_col, off = _WARN, ""
         aria = (f'{meta["name"]}, {state.contribution_points:.1f} points, '
                 f'{state.contribution_pct:.1f} percent of overall, '
-                f'index {"not measured" if state.displayed_index is None else index_text}, '
+                f'{index_label.lower()} {"not measured" if index_text == "—" else index_text}, '
                 f'confidence {conf:.2f}')
         rows += (
             f'<div class="sb-region" role="group" aria-label="{aria}">'
@@ -645,10 +654,11 @@ def _strength_region_strip_html(regions: list) -> str:
             f'<div class="nm" style="color:{meta["colour"]}">{meta["name"]}</div>'
             f'<div class="sc">{state.contribution_points:.1f}'
             f'<u>pts&thinsp;<s>{state.contribution_pct:.1f}%</s></u></div>'
-            f'<div class="idx">Index <em>{index_text}</em></div>'
+            f'<div class="idx">{index_label} <em>{index_text}</em></div>'
             f'<div class="sb-cbar"><i style="width:{max(round(conf * 100), 2)}%;'
             f'background:{conf_col}"></i></div>'
-            f'<div class="sb-cnote" style="color:{conf_col}">{band} · confidence {conf:.2f}</div>'
+            f'<div class="sb-cnote" style="color:{conf_col}">{band}'
+            + ("" if index_label != "Index" else f" · confidence {conf:.2f}") + '</div>'
             f'</div>'
             # An absent faceplate keeps its slot at the right aspect ratio
             # rather than collapsing the grid column and shunting the numbers
@@ -799,7 +809,8 @@ def _render_strength_detail() -> None:
         unsafe_allow_html=True,
     )
     st.markdown(_strength_split_html(data["regions"]), unsafe_allow_html=True)
-    st.markdown(_strength_region_strip_html(data["regions"]), unsafe_allow_html=True)
+    st.markdown(_strength_region_strip_html(data["regions"], data.get("core_hold")),
+                unsafe_allow_html=True)
 
     # ── Muscle balance ────────────────────────────────────────────────────
     bal_l, bal_r = st.columns([2, 1])
@@ -2279,6 +2290,7 @@ def _strength_screen_data() -> dict:
         strength_baselines.ANCHOR_VALUE,
         today=today,
         weeks=_STRENGTH_WEEKS,
+        hold_baselines=strength_baselines.HOLD_BASELINES_2025,
     )
     series, unmapped = tonnage_svc.weekly_tonnage(
         rows, training_constants.EXERCISE_BODY_REGION, today=today, weeks=_STRENGTH_WEEKS,
@@ -2296,6 +2308,7 @@ def _strength_screen_data() -> dict:
         "overall":         snapshot["overall"],
         "calibrating":     snapshot["calibrating"],
         "regions":         snapshot["regions"],
+        "core_hold":       snapshot["core_hold"],
         "exercises":       snapshot["exercises"],
         "tonnage":         series,
         "unmapped":        sorted(unmapped),

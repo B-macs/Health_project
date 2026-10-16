@@ -148,7 +148,8 @@ TABLES = {
 #: stores them REAL and hands them back as floats; restoring the int keeps a
 #: seeded stepper reading "10" rather than "10.0". `weight` is absent on
 #: purpose: make_sets_data emits a float there.
-_INTEGRAL_SET_FIELDS = ("set_num", "reps", "rest", "tut", "rest_taken_seconds", "reps_left")
+_INTEGRAL_SET_FIELDS = ("set_num", "reps", "rest", "tut", "rest_taken_seconds", "reps_left",
+                        "tut_left")
 
 #: Written into a synthesized page id. Not a valid Notion UUID, so a write
 #: that somehow reached one fails at the API naming this string, instead of
@@ -457,7 +458,8 @@ def _restore_set(row: sqlite3.Row) -> dict:
         if field in _INTEGRAL_SET_FIELDS and isinstance(v, float) and v.is_integer():
             v = int(v)
         out[field] = v
-    for optional in ("band_tier", "ts", "rest_taken_seconds", "reps_left", "weight_left"):
+    for optional in ("band_tier", "ts", "rest_taken_seconds", "reps_left", "weight_left",
+                     "tut_left"):
         v = _col(optional)
         if v is not None:
             if optional in _INTEGRAL_SET_FIELDS and isinstance(v, float) and v.is_integer():

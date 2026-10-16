@@ -617,6 +617,71 @@ function pauseRest() {{
 </script>""", height=145)
 
 
+def _stopwatch(label: str, timer_key: str) -> None:
+    """A stopwatch that counts UP, for a timed test hold (the plank test):
+    held until the line breaks, so it never ends the set by itself and never
+    rings. The seconds it shows are typed into the box below it — a sandboxed
+    timer cannot hand a value back to the page. Its state survives the rerun
+    the box causes, through localStorage like the other timers."""
+    components.html(f"""
+<div style="text-align:center;padding:12px 0;font-family:monospace;">
+  <div style="font-size:13px;color:#E8ECEF;letter-spacing:3px;margin-bottom:6px;">{label}</div>
+  <div id="sw-num" style="font-size:72px;font-weight:700;color:#E8ECEF;line-height:1;
+       margin-bottom:12px;">0</div>
+  <div style="display:flex;gap:10px;justify-content:center;">
+    <button id="sw-start" onclick="swStart()" style="
+        background:#E8ECEF;color:#0E1117;border:none;border-radius:6px;
+        padding:10px 24px;font-size:14px;font-weight:700;cursor:pointer;">▶ Start</button>
+    <button onclick="swReset()" style="
+        background:#1A2026;color:#E8ECEF;border:1px solid #444;
+        border-radius:6px;padding:10px 20px;font-size:14px;cursor:pointer;">↺ Reset</button>
+  </div>
+</div>
+<script>
+var _TKEY = "{timer_key}";
+var _STALE_MS = 30 * 60 * 1000;
+var _startedAt = null, _held = 0, _iv;
+// A timed test never auto-starts: a flag a previous timer left for the next
+// hold is cleared, not obeyed.
+try {{ localStorage.removeItem('tp_auto_start'); }} catch(e) {{}}
+function _save() {{
+  try {{ localStorage.setItem(_TKEY, JSON.stringify({{startedAt:_startedAt, held:_held, savedAt:Date.now()}})); }} catch(e) {{}}
+}}
+function _show() {{
+  var s = _held + (_startedAt ? (Date.now() - _startedAt) / 1000 : 0);
+  document.getElementById('sw-num').textContent = Math.floor(s);
+}}
+function swStart() {{
+  _startedAt = Date.now(); _save(); _tick();
+  var b = document.getElementById('sw-start'); b.textContent = '■ Stop'; b.onclick = swStop;
+}}
+function swStop() {{
+  clearInterval(_iv);
+  if (_startedAt) {{ _held += (Date.now() - _startedAt) / 1000; _startedAt = null; }}
+  _save(); _show();
+  var b = document.getElementById('sw-start'); b.textContent = '▶ Start'; b.onclick = swStart;
+}}
+function swReset() {{
+  clearInterval(_iv); _startedAt = null; _held = 0;
+  try {{ localStorage.removeItem(_TKEY); }} catch(e) {{}}
+  _show();
+  var b = document.getElementById('sw-start'); b.textContent = '▶ Start'; b.onclick = swStart;
+}}
+function _tick() {{ clearInterval(_iv); _iv = setInterval(_show, 200); _show(); }}
+(function() {{
+  try {{
+    var s = JSON.parse(localStorage.getItem(_TKEY) || 'null');
+    if (!s || Date.now() - s.savedAt > _STALE_MS) {{ localStorage.removeItem(_TKEY); return; }}
+    _held = s.held || 0; _startedAt = s.startedAt;
+    if (_startedAt) {{
+      _tick();
+      var b = document.getElementById('sw-start'); b.textContent = '■ Stop'; b.onclick = swStop;
+    }} else {{ _show(); }}
+  }} catch(e) {{}}
+}})();
+</script>""", height=160)
+
+
 def _duration_timer(minutes: int, timer_key: str = "tp_d") -> None:
     """Continuous activity timer. Saves state to localStorage; auto-resumes on return."""
     total = minutes * 60
@@ -4703,25 +4768,44 @@ def _render_guided_flow(day_num, exercises, n_ex,
                     _save_checkpoint(day_num)
                     _rerun_flow()
             else:
-                _hold_label = f"HOLD — {_side.upper()} SIDE" if is_uni else "HOLD"
-                # The side swap has no rest timer, so the hold timer itself must
-                # flag the second side's timer to auto-start.
-                _set_auto_start = is_uni and _side == _first
-                # One hold IS one set here (Full Side Bridge), so the only
-                # mid-exercise ending is the side swap; everything else ends
-                # the set, and the LAST set ends the exercise. The same
-                # conditions the completion handler below branches on, so the
-                # bell cannot promise something the button then does not do.
-                _ending = sess.hold_ending(
-                    "hold", is_uni=is_uni, side=_side,
-                    cur_set=cur_set, total_sets=total_sets, first=_first)
-                _hold_timer(ex["hold_seconds"], label=_hold_label, timer_key=_hold_key,
-                            set_auto_start=_set_auto_start, ending=_ending)
+                # A timed test hold (the plank test, decided 2026-10-13): held
+                # until the line breaks, on a stopwatch that counts up, and the
+                # seconds typed in for each side. The button waits for them.
+                _timed_test = sess.is_timed_test(ex)
+                _tt_secs = None
+                if _timed_test:
+                    _stopwatch(f"TIME — {_side.upper()} SIDE" if is_uni else "TIME",
+                               timer_key=f"tp_sw_{_eidx}_{cur_set}_{_side}")
+                    _tt_secs = st.number_input(
+                        f"Seconds held — {_side} side" if is_uni else "Seconds held",
+                        min_value=0, max_value=1800, value=None, step=1,
+                        key=f"tp_tt_{_eidx}_{cur_set}_{_side}",
+                        placeholder="The seconds on the stopwatch")
+                else:
+                    _hold_label = f"HOLD — {_side.upper()} SIDE" if is_uni else "HOLD"
+                    # The side swap has no rest timer, so the hold timer itself must
+                    # flag the second side's timer to auto-start.
+                    _set_auto_start = is_uni and _side == _first
+                    # One hold IS one set here (Full Side Bridge), so the only
+                    # mid-exercise ending is the side swap; everything else ends
+                    # the set, and the LAST set ends the exercise. The same
+                    # conditions the completion handler below branches on, so the
+                    # bell cannot promise something the button then does not do.
+                    _ending = sess.hold_ending(
+                        "hold", is_uni=is_uni, side=_side,
+                        cur_set=cur_set, total_sets=total_sets, first=_first)
+                    _hold_timer(ex["hold_seconds"], label=_hold_label, timer_key=_hold_key,
+                                set_auto_start=_set_auto_start, ending=_ending)
                 _btn_label = (f"✓ {_first.capitalize()} Side Done" if (is_uni and _side == _first)
                               else f"✓ Set {cur_set} Complete")
-                if st.button(_btn_label, type="primary", use_container_width=True):
+                if st.button(_btn_label, type="primary", use_container_width=True,
+                             disabled=_timed_test and _tt_secs is None):
                     _mark_start()
                     _push_nav_state()
+                    if _timed_test:
+                        st.session_state.tp_actuals[_eidx] = sess.timed_hold_entry(
+                            st.session_state.tp_actuals.get(_eidx),
+                            _side if is_uni else "right", int(_tt_secs))
                     if is_uni and _side == _first:
                         st.session_state.tp_side = _second
                     else:

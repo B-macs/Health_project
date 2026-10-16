@@ -667,12 +667,15 @@ def screen(
     anchor_value: float,
     today: date | None = None,
     weeks: int = 8,
+    hold_baselines: dict[str, tuple[float, str]] | None = None,
 ) -> dict:
     """The whole Strength screen in one call, in the order its parts depend
     on each other: calibration (per region) decides whether the model may
     decay, the model decides the level, and the level is the headline the
     regions divide. snapshot()'s keys plus `score_series`; `overall` is the
-    chart's current level (current_level)."""
+    chart's current level (current_level). `core_hold` is core's hold-time
+    index (core_hold_index) when `hold_baselines` is given — shown on core's
+    card only, never part of `overall`."""
     today = today or date.today()
     regional = snapshot(rows, peaks, region_map, movement_weights, prior, pr_rir,
                         anchor_value, today=today)
@@ -686,4 +689,60 @@ def screen(
         "regions": [replace(s, contribution_points=divided[s.region])
                     for s in regional["regions"]],
         "score_series": points,
+        "core_hold": core_hold_index(rows, hold_baselines, today) if hold_baselines else None,
     }
+
+
+# ─── Core: hold time (WP-15 step 6, decided 2026-10-13) ─────────────────────
+# Core cannot be scored on the kilogram scale (its 2025 peak is a band), so it
+# gets its own index from the timed plank test: each line's latest test, the
+# WORSE side (the battery's rule: the worse side decides, never an average),
+# as a share of the 2025 hold in seconds, × 100; core's index is the mean of
+# its lines. It is shown on core's own card from the first test, marked
+# provisional, and it stays OUT of the headline: the weekly model reads the
+# lifts only. docs/core_hold_index_design_2026-10-13.md.
+
+def hold_seconds(sets: list[dict]) -> tuple[float, float] | None:
+    """(right, left) seconds of a timed test hold's first set: `tut` is the
+    right side, `tut_left` the left (absent when the sides were equal)."""
+    for s in sets or []:
+        right = s.get("tut")
+        if right is None:
+            continue
+        left = s.get("tut_left")
+        return float(right), float(right if left is None else left)
+    return None
+
+
+def core_hold_index(rows: list[dict], baselines: dict[str, tuple[float, str]],
+                    today: date | None = None) -> dict | None:
+    """Core's hold-time index, or None before any line has been timed.
+
+    Returns {"index", "date", "lines"}: each line's latest test as
+    {"name", "date", "right", "left", "worse", "baseline", "index"}. `rows` is
+    get_all_training_exercises_raw()'s shape."""
+    today = today or date.today()
+    latest: dict[str, tuple[date, tuple[float, float]]] = {}
+    for row in rows:
+        name = row.get("movement_name")
+        if name not in baselines:
+            continue
+        try:
+            day = date.fromisoformat(str(row.get("session_date"))[:10])
+        except (TypeError, ValueError):
+            continue
+        held = hold_seconds(row.get("sets"))
+        if day > today or held is None:
+            continue
+        if name not in latest or day > latest[name][0]:
+            latest[name] = (day, held)
+    if not latest:
+        return None
+    lines = []
+    for name, (day, (right, left)) in sorted(latest.items()):
+        base = baselines[name][0]
+        worse = min(right, left)
+        lines.append({"name": name, "date": day, "right": right, "left": left, "worse": worse,
+                      "baseline": base, "index": round(worse / base * 100, 1)})
+    return {"index": round(sum(l["index"] for l in lines) / len(lines), 1),
+            "date": max(l["date"] for l in lines), "lines": lines}

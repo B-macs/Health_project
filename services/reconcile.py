@@ -42,7 +42,8 @@ from services import supabase_store
 SKIP_TABLES = frozenset({"datastore_meta"})
 
 _SET_FIELDS = ("set_num", "reps", "weight", "rest", "tut", "velocity", "band_tier",
-               "ts", "is_warmup", "rest_taken_seconds", "reps_left", "weight_left")
+               "ts", "is_warmup", "rest_taken_seconds", "reps_left", "weight_left",
+               "tut_left")
 
 _BOOLS = {"TRUE": 1.0, "FALSE": 0.0, "True": 1.0, "False": 0.0,
           "true": 1.0, "false": 0.0}

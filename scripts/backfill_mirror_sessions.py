@@ -78,7 +78,8 @@ def _set_row(exercise_id: str, s: dict) -> dict:
             "band_tier": s.get("band_tier"), "ts": s.get("ts"),
             "is_warmup": 1 if s.get("is_warmup") else 0,
             "rest_taken_seconds": s.get("rest_taken_seconds"),
-            "reps_left": s.get("reps_left"), "weight_left": s.get("weight_left")}
+            "reps_left": s.get("reps_left"), "weight_left": s.get("weight_left"),
+            "tut_left": s.get("tut_left")}
 
 
 def main() -> int:

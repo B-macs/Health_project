@@ -43,7 +43,9 @@ CREATE TABLE training_sets (
                          -- not measured (last set of an exercise, pre-2026-08
                          -- history, or an interrupted rest) — never "no rest"
     reps_left    DOUBLE PRECISION,   -- the weaker side's own numbers, present ONLY when the
-    weight_left  DOUBLE PRECISION    -- athlete edited the left side away from the right
+    weight_left  DOUBLE PRECISION,   -- athlete edited the left side away from the right
+    tut_left     DOUBLE PRECISION    -- a timed test hold's left side in seconds; tut holds the
+                         -- right. Present ONLY when the sides differ (2026-10-16)
 );
 CREATE INDEX idx_training_sets_exercise ON training_sets(exercise_id);
 
