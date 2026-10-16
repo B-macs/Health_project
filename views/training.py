@@ -379,7 +379,7 @@ function _autoComplete() {{
     var btns = window.parent.document.querySelectorAll('button');
     for (var i = 0; i < btns.length; i++) {{
       // Match the guided-flow's own completion buttons ("✓ Set 2 Complete",
-      // "✓ Right Side Done", "✓ Rep 3 Done", "✓ Activity Complete") — not just
+      // "✓ Right Side Done" / "✓ Left Side Done", "✓ Rep 3 Done", "✓ Activity Complete") — not just
       // any "✓"-leading button. The week day-strip's completed-day buttons
       // (e.g. "✓ Mon") also start with "✓" and render earlier in the page,
       // so a bare "starts with ✓" match was clicking those instead and
@@ -805,7 +805,8 @@ def _init_state(day_num: int | None = None):
         "tp_session_logged":   False,
         "tp_exit_confirm":     False,
         "tp_started":          False,    # False = show the day-overview screen; True = guided flow
-        "tp_side":             "right",  # 'right' → 'left' for unilateral exercises
+        "tp_side":             "right",  # the side being worked on a unilateral exercise
+        "tp_first_side":       "right",  # the side each unilateral set starts on; set at Start from sess.first_side
         "tp_session_start_ts": 0,        # Unix timestamp, set on first set completion
         "tp_fab_open":         False,    # "Add Training" + menu expanded/collapsed
         "tp_yoga_select":      False,    # showing the yoga-picker sub-screen
@@ -1341,22 +1342,23 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
         st.session_state.tp_actuals[idx] = sess.bodyweight_entry(ex)
         _save_checkpoint(day_num)
         return
-    # The session before last: a weight goes up only after TWO sessions in a
-    # row at the rep target (engine.PROGRESSION_SESSIONS). Fetched only for a
-    # lift that progresses, and a failed read means no step, never a guessed one.
-    previous_session_sets = None
+    # The lift's recent sessions: the rep range (engine.range_progression,
+    # approved 2026-10-16) steps the weight when the last set reached the top
+    # of the range in every session within 7 days. Fetched only for a lift
+    # with a range, and a failed read means no step, never a guessed one.
+    history = None
     if ex.get("rep_min") is not None and ex.get("rep_max") is not None:
         try:
-            previous_session_sets = repo.get_repository().get_previous_session_all_sets(ex["name"])
+            history = repo.get_repository().get_recent_session_sets(ex["name"])
         except Exception:
-            pass  # never block the live flow on a lookup failure
+            history = []  # never block the live flow on a lookup failure
     # The pain gate (athlete, 2026-09-16): a weight step waits on today's
-    # check-in. Read only when two sessions exist, i.e. when a step is possible,
+    # check-in. Read only when a session exists, i.e. when a step is possible,
     # and re-read per exercise so a check-in made mid-session counts. A read
     # that fails BLOCKS, like a missing check-in: an unread score is not a
     # clean one.
     step_block = None
-    if previous_session_sets is not None:
+    if history:
         try:
             step_block = sess.step_block_reason(sess.todays_check_in(
                 repo.get_repository().get_recent_readiness(days=1), date.today()))
@@ -1368,7 +1370,7 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
             policy,
             weight_increment=ex.get("increment_size", 2.5),
             last_session_sets=last_session_sets,
-            previous_session_sets=previous_session_sets,
+            history=history,
             step_block=step_block,
         )
     except sess.PrescriptionContradiction as exc:
@@ -2463,6 +2465,10 @@ def _render_overview(day_num: int, active, today_plan: dict,
              "yourself at the end, exactly as before.",
     )
 
+    _side_note = sess.first_side_note(exercises, date.today())
+    if _side_note:
+        st.caption(_side_note)
+
     st.markdown(_FAB_CSS, unsafe_allow_html=True)
     st.markdown('<div class="stFabRow" style="display:none"></div>', unsafe_allow_html=True)
     col_adapt, col_start = st.columns(2, gap="small")
@@ -2472,6 +2478,11 @@ def _render_overview(day_num: int, active, today_plan: dict,
     with col_start:
         if st.button("Start", type="primary", use_container_width=True):
             st.session_state.tp_started = True
+            # Which side every unilateral exercise starts on today (athlete,
+            # 2026-10-16: some days the left first, others the right). Fixed
+            # here, so a session that runs past midnight keeps its side.
+            st.session_state.tp_first_side = sess.first_side(date.today())
+            st.session_state.tp_side = st.session_state.tp_first_side
             # Copy the checkbox out of widget state into state we own, for the
             # same reason the per-exercise notes are checkpointed: this widget
             # stops rendering the moment the guided flow begins, and Streamlit
@@ -2842,6 +2853,8 @@ def _render_accessory_session(policy: dict, readiness_modifier: float,
         c_start, c_cancel = st.columns([3, 1])
         if c_start.button("Start", type="primary", use_container_width=True):
             st.session_state.tp_started = True
+            st.session_state.tp_first_side = sess.first_side(date.today())
+            st.session_state.tp_side = st.session_state.tp_first_side
             _save_checkpoint(acc.ACCESSORY_DAY_KEY)
             st.rerun()
         if c_cancel.button("Cancel", use_container_width=True):
@@ -4087,6 +4100,8 @@ def _render_guided_flow(day_num, exercises, n_ex,
     _eset = st.session_state.tp_set
     _erep = st.session_state.tp_rep_in_set
     _side = st.session_state.tp_side
+    _first = st.session_state.tp_first_side
+    _second = sess.other_side(_first)
     _hold_key = f"tp_h_{_eidx}_{_eset}_{_erep}_{_side}"
     _rest_key = f"tp_r_{_eidx}_{_eset}"
     _dur_key  = f"tp_d_{_eidx}"
@@ -4218,32 +4233,30 @@ def _render_guided_flow(day_num, exercises, n_ex,
         st.caption(sess.actual_caption(_actual))
 
         # Unilateral "reps" exercises share ONE tp_actuals entry across both
-        # sides (see module docstring / seed_actual_entry) — the right-side
-        # pass is where the value is actually set, the left-side pass just
-        # replays it. Showing live +/- steppers again on the left reads as
-        # "being asked again" even though nothing new is recorded, so the
-        # left pass renders a read-only mirror line instead, with the exact
-        # same steppers tucked behind an opt-in expander for the rare case
-        # a side genuinely needs a different value.
-        _mirror_left = (
-            ex["type"] == "reps"
-            and ex.get("laterality") == "unilateral"
-            and _side == "left"
-        )
-        # The left side gets its OWN entries rather than overwriting the right's.
-        # Editing used to write straight back into "reps"/"weight_kg", so a
-        # weaker left arm rewrote the whole set record and the session read as
-        # though the prescribed weight had been declined outright — on the very
-        # movement (Single-Arm DB Row) where the two sides differ most.
-        # build_set_record emits them only when they actually differ, so a
-        # symmetric set is byte-identical to what it was before these existed.
-        if _mirror_left:
-            _actual.setdefault("reps_left", _actual.get("reps"))
-            _actual.setdefault("weight_kg_left", _actual.get("weight_kg"))
-        _rk = "reps_left" if _mirror_left else "reps"
-        _wk = "weight_kg_left" if _mirror_left else "weight_kg"
+        # sides (see module docstring / seed_actual_entry) — the FIRST side's
+        # pass is where the value is actually set, the second side's pass
+        # replays it. The first side alternates by the day (sess.first_side,
+        # athlete 2026-10-16). Showing live +/- steppers again on the second
+        # side reads as "being asked again" even though nothing new is
+        # recorded, so that pass renders a read-only mirror line instead, with
+        # the exact same steppers tucked behind an opt-in expander for the
+        # rare case a side genuinely needs a different value.
+        _split_sides = ex["type"] == "reps" and ex.get("laterality") == "unilateral"
+        _mirror = _split_sides and _side == _second
+        # Each side keeps its OWN entries rather than overwriting the other's:
+        # the right side is the entry's reps/weight_kg, the left its
+        # reps_left/weight_kg_left (sess.side_keys). Editing used to write
+        # straight back into "reps"/"weight_kg", so a weaker left arm rewrote
+        # the whole set record and the session read as though the prescribed
+        # weight had been declined outright — on the very movement (Single-Arm
+        # DB Row) where the two sides differ most. build_set_record emits the
+        # left pair only when it actually differs, so a symmetric set is
+        # byte-identical to what it was before these existed.
+        if _split_sides:
+            sess.ready_side(_actual, _side, _first)
+        _rk, _wk = sess.side_keys(_side) if _split_sides else ("reps", "weight_kg")
 
-        if _mirror_left:
+        if _mirror:
             _mirror_bits = []
             if _actual[_rk] is not None:
                 _mirror_bits.append(f"{_actual[_rk]} reps")
@@ -4259,13 +4272,14 @@ def _render_guided_flow(day_num, exercises, n_ex,
             elif _equip and _equip != "band" and _actual[_wk] is not None:
                 _unit_label = "kg" if ex.get("increment_unit", "kg") == "kg" else "units"
                 _mirror_bits.append(f"{_actual[_wk]} {_unit_label}")
-            _mirror_summary = " @ ".join(_mirror_bits) if _mirror_bits else "same as right side"
-            _differs = (_actual.get("reps_left") != _actual.get("reps")
-                        or _actual.get("weight_kg_left") != _actual.get("weight_kg"))
+            _mirror_summary = " @ ".join(_mirror_bits) if _mirror_bits else f"same as {_first} side"
+            _first_rk, _first_wk = sess.side_keys(_first)
+            _differs = (_actual.get(_rk) != _actual.get(_first_rk)
+                        or _actual.get(_wk) != _actual.get(_first_wk))
             st.caption(
-                f"Left side: {'edited' if _differs else 'mirrored'} — {_mirror_summary}"
+                f"{_side.capitalize()} side: {'edited' if _differs else 'mirrored'} — {_mirror_summary}"
             )
-            _stepper_ctx = st.expander("Edit left side")
+            _stepper_ctx = st.expander(f"Edit {_side} side")
         else:
             _stepper_ctx = contextlib.nullcontext()
 
@@ -4467,7 +4481,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 st.session_state.tp_ex_idx += 1
                 st.session_state.tp_set = 1
                 st.session_state.tp_rep_in_set = 1
-                st.session_state.tp_side = "right"
+                st.session_state.tp_side = _first
                 st.session_state.tp_phase = "intro"
                 _save_checkpoint(day_num)
                 _rerun_flow()
@@ -4481,7 +4495,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                     # is snapshotted for "← Back".
                     _record_rest_taken(_eidx)
                     _push_nav_state()
-                    st.session_state.tp_side = "right"
+                    st.session_state.tp_side = _first
                     st.session_state.tp_phase = "intro"
                     _save_checkpoint(day_num)
                     _rerun_flow()
@@ -4499,16 +4513,17 @@ def _render_guided_flow(day_num, exercises, n_ex,
                     + "</div></div>",
                     unsafe_allow_html=True,
                 )
-                _btn_label = "✓ Right Side Done" if (is_uni and _side == "right") else f"✓ Set {cur_set} Complete"
+                _btn_label = (f"✓ {_first.capitalize()} Side Done" if (is_uni and _side == _first)
+                              else f"✓ Set {cur_set} Complete")
                 if st.button(_btn_label, type="primary", use_container_width=True):
                     _mark_start()
                     _push_nav_state()
-                    if is_uni and _side == "right":
-                        st.session_state.tp_side = "left"
+                    if is_uni and _side == _first:
+                        st.session_state.tp_side = _second
                     else:
                         # Both sides done (or bilateral) — the set is complete.
                         _record_completed_set(_eidx, ex, cur_set)
-                        st.session_state.tp_side = "right"
+                        st.session_state.tp_side = _first
                         if cur_set >= total_sets:
                             st.session_state.tp_ex_idx += 1
                             st.session_state.tp_set = 1
@@ -4528,15 +4543,15 @@ def _render_guided_flow(day_num, exercises, n_ex,
                     # is snapshotted for "← Back".
                     _record_rest_taken(_eidx)
                     _push_nav_state()
-                    st.session_state.tp_side = "right"
+                    st.session_state.tp_side = _first
                     st.session_state.tp_phase = "intro"
                     _save_checkpoint(day_num)
                     _rerun_flow()
             else:
                 _hold_label = f"HOLD — {_side.upper()} SIDE" if is_uni else "HOLD"
-                # Right→left side transition has no rest timer, so the hold timer itself
-                # must flag the left side's timer to auto-start.
-                _set_auto_start = is_uni and _side == "right"
+                # The side swap has no rest timer, so the hold timer itself must
+                # flag the second side's timer to auto-start.
+                _set_auto_start = is_uni and _side == _first
                 # One hold IS one set here (Full Side Bridge), so the only
                 # mid-exercise ending is the side swap; everything else ends
                 # the set, and the LAST set ends the exercise. The same
@@ -4544,19 +4559,20 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 # bell cannot promise something the button then does not do.
                 _ending = sess.hold_ending(
                     "hold", is_uni=is_uni, side=_side,
-                    cur_set=cur_set, total_sets=total_sets)
+                    cur_set=cur_set, total_sets=total_sets, first=_first)
                 _hold_timer(ex["hold_seconds"], label=_hold_label, timer_key=_hold_key,
                             set_auto_start=_set_auto_start, ending=_ending)
-                _btn_label = "✓ Right Side Done" if (is_uni and _side == "right") else f"✓ Set {cur_set} Complete"
+                _btn_label = (f"✓ {_first.capitalize()} Side Done" if (is_uni and _side == _first)
+                              else f"✓ Set {cur_set} Complete")
                 if st.button(_btn_label, type="primary", use_container_width=True):
                     _mark_start()
                     _push_nav_state()
-                    if is_uni and _side == "right":
-                        st.session_state.tp_side = "left"
+                    if is_uni and _side == _first:
+                        st.session_state.tp_side = _second
                     else:
                         # Both sides done (or bilateral) — the set is complete.
                         _record_completed_set(_eidx, ex, cur_set)
-                        st.session_state.tp_side = "right"
+                        st.session_state.tp_side = _first
                         if cur_set >= total_sets:
                             st.session_state.tp_ex_idx += 1
                             st.session_state.tp_set = 1
@@ -4578,26 +4594,27 @@ def _render_guided_flow(day_num, exercises, n_ex,
                     _record_rest_taken(_eidx)
                     _push_nav_state()
                     st.session_state.tp_rep_in_set = 1
-                    st.session_state.tp_side = "right"
+                    st.session_state.tp_side = _first
                     st.session_state.tp_phase = "intro"
                     _save_checkpoint(day_num)
                     _rerun_flow()
             else:
                 _side_suffix = f" — {_side.upper()}" if is_uni else ""
                 # More reps in this set → next rep's hold timer needs to auto-start.
-                # Last rep, side-switch (unilateral right→left) → left side rep 1 needs to auto-start.
+                # Last rep, side swap (unilateral, first side) → the second side's rep 1 needs to auto-start.
                 # Last rep, set ends → rest timer will set the flag; don't set it here.
                 _set_auto_start = (cur_rep < reps_per_set) or (
-                    cur_rep >= reps_per_set and is_uni and _side == "right"
+                    cur_rep >= reps_per_set and is_uni and _side == _first
                 )
                 # Four endings, matching the completion handler below exactly:
-                # another rep, the right→left swap, the set is over, or the
+                # another rep, the swap to the second side, the set is over, or the
                 # exercise is over. Rep 8 of 8 on the McGill Curl-Up ends the
                 # set (the exercise on its last set), and rep 8 on the RIGHT of
                 # the Single-Leg Glute Bridge means swap, not stop.
                 _ending = sess.hold_ending(
                     "hold_reps", is_uni=is_uni, side=_side, cur_set=cur_set,
-                    total_sets=total_sets, cur_rep=cur_rep, reps_per_set=reps_per_set)
+                    total_sets=total_sets, cur_rep=cur_rep, reps_per_set=reps_per_set,
+                    first=_first)
                 _hold_timer(ex["hold_seconds"], label=f"REP {cur_rep} of {reps_per_set}{_side_suffix}",
                             timer_key=_hold_key, set_auto_start=_set_auto_start,
                             ending=_ending)
@@ -4605,13 +4622,13 @@ def _render_guided_flow(day_num, exercises, n_ex,
                     _mark_start()
                     _push_nav_state()
                     if cur_rep >= reps_per_set:
-                        if is_uni and _side == "right":
-                            st.session_state.tp_side = "left"
+                        if is_uni and _side == _first:
+                            st.session_state.tp_side = _second
                             st.session_state.tp_rep_in_set = 1
                         else:
                             # Final rep of the set, both sides done — set complete.
                             _record_completed_set(_eidx, ex, cur_set)
-                            st.session_state.tp_side = "right"
+                            st.session_state.tp_side = _first
                             if cur_set >= total_sets:
                                 st.session_state.tp_ex_idx += 1
                                 st.session_state.tp_set = 1
@@ -4670,6 +4687,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
             st.session_state.tp_ex_idx += 1
             st.session_state.tp_set = 1
             st.session_state.tp_rep_in_set = 1
+            st.session_state.tp_side = _first
             st.session_state.tp_phase = "intro"
             _save_checkpoint(day_num)
             _rerun_flow()

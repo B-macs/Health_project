@@ -2354,16 +2354,16 @@ class Repository:
         """Most recent logged session's FULL per-set array for this exact
         movement name — same Notion query as get_last_performance (filter
         Movement==movement_name, most recent by Session Date), but returns
-        every set instead of just the last one. Needed by double progression
-        (services.engine.double_progression), which requires checking that
-        ALL prescribed sets hit the top of the rep range, not just the last
-        set logged.
+        every set instead of just the last one. The reduced-load ceiling
+        (services.sessions.last_completed_ceiling) reads its TOP set, and
+        the previous-session line beside today's prescription prints all
+        of them.
 
         Warm-up sets are deliberately NOT filtered here. A ramp is authored as
         its own exercise (training_plan._ex(warmup=True)) sitting beside the lift
         it prepares, so a movement's sets are either all ramp or none — and
         filtering would empty the ramp's own history, losing the last weight its
-        stepper should seed from. Double progression is unaffected either way:
+        stepper should seed from. The rep range is unaffected either way:
         ramp exercises carry no rep_min/rep_max, so it never runs on them.
 
         Returns None if the movement has never been logged, or its most
@@ -2385,20 +2385,24 @@ class Repository:
             return None
         return sets
 
-    def get_previous_session_all_sets(self, movement_name: str) -> list[dict] | None:
-        """The per-set array of the session BEFORE the most recent one for this
-        exact movement — get_last_session_all_sets' twin, one session further
-        back. Double progression needs both: since 2026-09-16 a weight goes up
-        only after two sessions in a row at the rep target
-        (engine.PROGRESSION_SESSIONS).
+    def get_recent_session_sets(self, movement_name: str,
+                                limit: int = 8) -> list[tuple[str, list[dict]]]:
+        """The per-set arrays of this exact movement's most recent sessions,
+        NEWEST FIRST, as (session_date, sets) — what the rep range reads
+        (engine.range_progression, approved 2026-10-16): the weight goes up
+        when the last set reached the top of the range in every session of
+        the lift within 7 days, and back when it was under the range twice in
+        a row.
 
         Sessions are counted by distinct Session Date, so two pages on one
         date — the duplicate-save failure of 2026-09-10 — read as ONE session
         and can never pass for two. Within a date the page is picked the way
-        get_last_session_all_sets picks, first in query order.
+        get_last_session_all_sets picks, first in query order. A date whose
+        Sets JSON is empty or unparseable is left out; a page without a date
+        too. At most `limit` sessions — seven days of daily training and one
+        more is the most the rule reads.
 
-        Returns None when there is no earlier date, or its Sets JSON is empty
-        or unparseable."""
+        Returns [] when the movement has never been logged."""
         pages = self._query(
             self.config.notion_db_training,
             filter_={"property": "Movement", "title": {"equals": movement_name}},
@@ -2406,16 +2410,21 @@ class Repository:
         )
         by_date: dict[str, dict] = {}
         for page in pages or []:
-            by_date.setdefault(notion.get_property(page, "Session Date", "date") or "", page)
-        dates = sorted(by_date, reverse=True)
-        if len(dates) < 2:
-            return None
-        sets_raw = notion.get_property(by_date[dates[1]], "Sets", "rich_text") or "[]"
-        try:
-            sets = json.loads(sets_raw)
-        except Exception:
-            sets = []
-        return sets or None
+            day = notion.get_property(page, "Session Date", "date")
+            if day:
+                by_date.setdefault(day, page)
+        out: list[tuple[str, list[dict]]] = []
+        for day in sorted(by_date, reverse=True):
+            sets_raw = notion.get_property(by_date[day], "Sets", "rich_text") or "[]"
+            try:
+                sets = json.loads(sets_raw)
+            except Exception:
+                sets = []
+            if sets:
+                out.append((day, sets))
+            if len(out) >= limit:
+                break
+        return out
 
     def get_all_training_exercises_raw(self) -> list[dict]:
         """Every exercise row ever logged in the Training DB, unwindowed (no

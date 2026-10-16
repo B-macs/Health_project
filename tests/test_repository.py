@@ -500,9 +500,9 @@ def test_get_last_session_all_sets_empty_sets_json_returns_none():
     assert repo.get_last_session_all_sets("Goblet Squat") is None
 
 
-# ─── get_previous_session_all_sets ──────────────────────────────────────────
-# The session BEFORE the last: a weight step needs two sessions in a row
-# (engine.PROGRESSION_SESSIONS, 2026-09-16).
+# ─── get_recent_session_sets ────────────────────────────────────────────────
+# The lift's recent sessions, newest first: the rep range steps the weight when
+# the last set reached the top in every session within 7 days (2026-10-16).
 
 def _goblet_page(day, sets):
     return {"properties": {
@@ -511,33 +511,38 @@ def _goblet_page(day, sets):
     }}
 
 
-def test_get_previous_session_all_sets_is_the_second_newest_date():
+def test_get_recent_session_sets_is_newest_first_with_dates():
     repo = _repo({"db-training": [
         _goblet_page("2026-09-01", [{"reps": 8, "weight": 20.0}]),
         _goblet_page("2026-09-15", [{"reps": 10, "weight": 22.5}]),
         _goblet_page("2026-09-10", [{"reps": 9, "weight": 22.5}]),
     ]})
-    assert repo.get_previous_session_all_sets("Goblet Squat") == [{"reps": 9, "weight": 22.5}]
+    assert repo.get_recent_session_sets("Goblet Squat") == [
+        ("2026-09-15", [{"reps": 10, "weight": 22.5}]),
+        ("2026-09-10", [{"reps": 9, "weight": 22.5}]),
+        ("2026-09-01", [{"reps": 8, "weight": 20.0}]),
+    ]
 
 
 def test_two_pages_on_one_date_are_one_session_not_two():
     # The 2026-09-10 triple save: duplicates of one session must never pass
-    # for the second session a step needs.
+    # for two sessions in the week the rule reads.
     repo = _repo({"db-training": [
         _goblet_page("2026-09-10", [{"reps": 12, "weight": 40.0}]),
         _goblet_page("2026-09-10", [{"reps": 12, "weight": 40.0}]),
     ]})
-    assert repo.get_previous_session_all_sets("Goblet Squat") is None
+    assert len(repo.get_recent_session_sets("Goblet Squat")) == 1
 
 
-def test_get_previous_session_all_sets_none_when_logged_once_or_empty():
-    once = _repo({"db-training": [_goblet_page("2026-09-15", [{"reps": 10, "weight": 22.5}])]})
-    assert once.get_previous_session_all_sets("Goblet Squat") is None
-    empty = _repo({"db-training": [
+def test_get_recent_session_sets_skips_empty_sessions_and_stops_at_the_limit():
+    repo = _repo({"db-training": [
         _goblet_page("2026-09-10", []),
         _goblet_page("2026-09-15", [{"reps": 10, "weight": 22.5}]),
+        _goblet_page("2026-09-08", [{"reps": 9, "weight": 22.5}]),
     ]})
-    assert empty.get_previous_session_all_sets("Goblet Squat") is None
+    assert [d for d, _ in repo.get_recent_session_sets("Goblet Squat")] ==         ["2026-09-15", "2026-09-08"]
+    assert [d for d, _ in repo.get_recent_session_sets("Goblet Squat", limit=1)] ==         ["2026-09-15"]
+    assert _repo({"db-training": []}).get_recent_session_sets("Goblet Squat") == []
 
 
 def test_get_last_session_all_sets_corrupt_json_returns_none():

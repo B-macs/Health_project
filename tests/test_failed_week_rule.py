@@ -504,23 +504,24 @@ def test_a_week_redone_by_choice_keeps_normal_progression():
 def test_the_squat_day_that_went_up_now_starts_at_last_session():
     # 2026-09-15: 22.5 kg x 8, 8, 8 on 2026-09-10 and a high readiness streak,
     # so the app started the goblet squat at 25 kg. Since 2026-09-16 readiness
-    # never raises a weight, so it starts at 22.5 in any week.
+    # never raises a weight, so it starts at 22.5 in any week. The rep range
+    # (2026-10-16) aims one rep higher in a normal week; a held week repeats 8.
     last, sets = _last([8, 8, 8], 22.5)
-    for policy in (_GREEN, _HELD):
+    for policy, reps in ((_GREEN, 9), (_HELD, 8)):
         entry = sess.resolve_prescription(_GOBLET, last, "high", policy,
-                                          last_session_sets=sets, previous_session_sets=sets)
-        assert (entry["weight_kg"], entry["reps"]) == (22.5, 8)
+                                          last_session_sets=sets)
+        assert (entry["weight_kg"], entry["reps"]) == (22.5, reps)
 
 
 def test_a_hold_stops_an_earned_step_and_says_so():
-    # Two sessions at 13 reps earn 22.5 -> 25 kg at 9 reps; the held week
+    # A session at 13 reps earns 22.5 -> 25 kg at 9 reps; the held week
     # repeats 22.5 x 13 instead, and the caption names the failed week.
     last, sets = _last([13, 13, 13], 22.5)
     free = sess.resolve_prescription(_GOBLET, last, "normal", _GREEN,
-                                     last_session_sets=sets, previous_session_sets=sets)
+                                     last_session_sets=sets)
     assert (free["weight_kg"], free["reps"]) == (25.0, 9)
     held = sess.resolve_prescription(_GOBLET, last, "normal", _HELD,
-                                     last_session_sets=sets, previous_session_sets=sets)
+                                     last_session_sets=sets)
     assert (held["weight_kg"], held["reps"]) == (22.5, 13)
     assert held["clamped"] == {"weight_kg": {"from": 25.0, "to": 22.5}}
     caption = sess.actual_caption(held)
@@ -534,7 +535,7 @@ def test_a_hold_repeats_the_reps_rather_than_lowering_them():
     # would prescribe 22.5 x 9 in a week meant to repeat 22.5 x 13.
     last, sets = _last([13, 13, 13], 22.5)
     held = sess.resolve_prescription(_GOBLET, last, "normal", _HELD,
-                                     last_session_sets=sets, previous_session_sets=sets)
+                                     last_session_sets=sets)
     assert held["reps"] == 13
 
 
@@ -575,7 +576,7 @@ def test_a_reduced_day_inside_a_held_week_stays_at_or_under_the_last_session():
     last, sets = _last([13, 13, 13], 22.5)
     held = sess.resolve_prescription(_GOBLET, last, "high",
                                      sess.hold_for_failed_week(reduced),
-                                     last_session_sets=sets, previous_session_sets=sets)
+                                     last_session_sets=sets)
     assert held["weight_kg"] <= 22.5 and held["reps"] <= 13
     assert "reduced-load day" in sess.actual_caption(held)
 
@@ -770,15 +771,15 @@ def test_the_screen_holds_the_load_before_anything_reads_the_policy():
     assert hold_at < render.index("_render_accessory_session(")
 
 
-def test_the_screen_seeds_with_both_sessions_and_the_pain_gate():
-    """The engine's two-session rule and the pain gate only exist if the screen
-    hands them their inputs; a missing argument would silently mean 'never
-    step' (no previous session) or 'always allowed' (no block)."""
+def test_the_screen_seeds_with_the_recent_sessions_and_the_pain_gate():
+    """The rep range's one-week rule and the pain gate only exist if the screen
+    hands them their inputs; a missing argument would silently mean 'step on
+    the last session alone' (no history) or 'always allowed' (no block)."""
     seed = _function_source("_seed_actuals_if_needed")
     call_at = seed.index("sess.resolve_prescription(")
-    assert "get_previous_session_all_sets(" in seed[:call_at]
+    assert "get_recent_session_sets(" in seed[:call_at]
     assert "get_recent_readiness(" in seed[:call_at]
-    assert "previous_session_sets=previous_session_sets" in seed[call_at:]
+    assert "history=history" in seed[call_at:]
     assert "step_block=step_block" in seed[call_at:]
     # A failed read blocks rather than allowing the step.
     assert 'step_block = "today\'s check-in could not be read"' in seed

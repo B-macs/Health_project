@@ -126,6 +126,9 @@ RELEASE_EXERCISE_NAMES = frozenset({
 CHECKPOINT_FIELDS = (
     "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_phase", "tp_started",
     "tp_done_today", "tp_session_logged", "tp_side", "tp_session_start_ts",
+    # The side every unilateral exercise starts on (first_side), fixed when
+    # Start is tapped so a session that runs past midnight keeps its side.
+    "tp_first_side",
     "tp_actuals", "tp_set_log", "tp_garmin_declared", "tp_rest_started_at",
     # Per-exercise notes, {exercise_idx: text}. A PLAIN dict rather than the
     # `tp_note_<idx>` WIDGET keys they are typed into, because Streamlit drops
@@ -429,7 +432,12 @@ def prescription_label(ex: dict) -> str:
     if t == "reps":
         sides = " each side" if ex["laterality"] in ("unilateral", "alternating") else ""
         tempo = f"  Tempo {ex['tempo']}" if ex.get("tempo") else ""
-        return f"{ex['sets']} sets × {ex['reps']} reps{sides}{tempo}  |  {ex['rest_seconds']}s rest"
+        # The rep range is on screen beside today's aim (approved 2026-10-16:
+        # the weight, the range and the aim are all shown).
+        rng = (f" (range {ex['rep_min']}-{ex['rep_max']})"
+               if ex.get("rep_min") is not None and ex.get("rep_max") is not None else "")
+        return (f"{ex['sets']} sets × {ex['reps']} reps{sides}{rng}{tempo}"
+                f"  |  {ex['rest_seconds']}s rest")
     if t == "duration":
         return f"{ex['duration_minutes']} minutes continuous"
     return ""
@@ -476,7 +484,7 @@ def build_set_record(ex: dict, set_num: int, actual: dict | None,
 
     Same field shape make_sets_data() emits (so every downstream reader --
     Repository.get_recent_sessions' volume math, get_last_session_all_sets,
-    services.volume, services.engine.double_progression -- works unchanged)
+    services.volume, services.engine.range_progression -- works unchanged)
     plus a "ts" ISO timestamp, which the synthesized rows never had.
 
     `actual` is this exercise's live stepper entry (views/training.py's
@@ -642,6 +650,11 @@ def step_band_tier(current_tier: str, direction: int) -> str:
     return BAND_TIERS[idx]
 
 
+#: The `source` of an entry seeded by the rep range (engine.range_progression):
+#: one weight, the range and today's aim. Its "action" says what the range did.
+RANGE_SOURCE = "range"
+
+
 def seed_actual_entry(
     ex: dict,
     last_performance: dict | None,
@@ -649,36 +662,43 @@ def seed_actual_entry(
     allow_increase: bool,
     weight_increment: float = 2.5,
     last_session_sets: list[dict] | None = None,
-    previous_session_sets: list[dict] | None = None,
+    history: list[tuple[str, list[dict]]] | None = None,
+    hold: bool = False,
 ) -> dict:
     """Decide the starting {"reps", "weight_kg", "band_tier", "source",
     "last_seen_date"} entry for one exercise's live-session steppers.
 
     Priority order:
-      1. Double progression (engine.double_progression) -- fires only when
-         ex has both "rep_min" and "rep_max" set AND the last two sessions
-         (last_session_sets, previous_session_sets) were at one weight with
-         every set at the rep target. When it fires, its (weight, reps)
-         become the seed and everything below is skipped for weight/reps --
-         double progression takes priority over last_performance/readiness
-         seeding, not merely a nudge on top of it.
+      1. The rep range (engine.range_progression, approved 2026-10-16) -- for
+         a loaded "reps" lift with "rep_min" and "rep_max". It reads the lift's
+         recent sessions, `history` (newest first, as (date, sets):
+         Repository.get_recent_session_sets); without it, the last session
+         alone (last_session_sets, dated by last_performance). Its weight and
+         aim REPLACE the last-performance seed below, and the entry also
+         carries "rep_min", "rep_max", "top" (the reps the last set must reach
+         before the weight goes up) and "action" (step_up, step_back, hold,
+         held). With no history the range only adds those keys, and step 2
+         seeds the numbers.
       2. last_performance (Repository.get_last_performance's shape) if
          present, else the exercise's own (already volume-adjusted --
          caller passes the post apply_exercise_volume_modifier `ex`) plan
-         prescription. The readiness engine's streak_label may then lower
-         the weight/band-tier by one step; it never raises it (engine.
-         suggested_weight_kg, 2026-09-16) -- reps are already readiness-
-         adjusted upstream by apply_exercise_volume_modifier, so they are
-         NOT nudged again here.
+         prescription.
+      3. The readiness engine's streak_label may then lower the weight or
+         band tier by one step; it never raises it (engine.suggested_weight_kg,
+         2026-09-16). It does not run on a step up, where a reduced-load day's
+         ceiling does the holding (resolve_prescription). Reps are already
+         readiness-adjusted upstream by apply_exercise_volume_modifier, so
+         they are NOT nudged again here.
 
     "reps" is only populated for ex_type == "reps" -- hold_reps exercises
     (currently only Prone Y-Raise) keep their reps_in_set exactly as shown
     by the existing live per-rep hold-timer counter; only their weight is
     steppable, to avoid a stepper silently disagreeing with that counter.
 
-    allow_increase gates double progression's upward move -- the only
-    upward move left, since readiness no longer raises anything. Reducing
-    load is never suppressed.
+    allow_increase gates the range's step up -- the only upward move left,
+    since readiness no longer raises anything. `hold` is the failed-week hold:
+    last session's weight and reps, not even a rep added. Reducing load is
+    never suppressed.
     """
     entry = {"reps": None, "weight_kg": None, "band_tier": None,
               "source": "plan_default", "last_seen_date": None}
@@ -697,23 +717,21 @@ def seed_actual_entry(
         rep_min is not None and rep_max is not None
         and equip != "band" and entry["weight_kg"] is not None and entry["reps"] is not None
     ):
-        progressed_weight, progressed_reps = engine.double_progression(
-            entry["weight_kg"], entry["reps"], rep_min, rep_max,
-            last_session_sets, prescribed_sets=ex.get("sets", 1),
-            increment=weight_increment, allow_increase=allow_increase,
-            previous_session_sets=previous_session_sets,
+        if history is None and last_session_sets and (last_performance or {}).get("session_date"):
+            history = [(last_performance["session_date"], last_session_sets)]
+        plan = engine.range_progression(
+            rep_min, rep_max, history, entry["weight_kg"], entry["reps"],
+            increment=weight_increment, allow_step=allow_increase, hold=hold,
+            prescribed_sets=ex.get("sets", 1),
         )
-        if (progressed_weight, progressed_reps) != (entry["weight_kg"], entry["reps"]):
-            entry["weight_kg"] = progressed_weight
-            entry["reps"] = progressed_reps
-            entry["source"] = "double_progression"
-            # The date is recorded on THIS branch too. Double progression only
-            # fires BECAUSE there are logged sessions behind it -- every
-            # prescribed set at the rep target, twice -- so leaving
-            # last_seen_date None made actual_caption fall through to its
-            # "No prior record" wording on the one branch where the history is
-            # most load-bearing, and it is the branch that raises the weight.
-            entry["last_seen_date"] = (last_performance or {}).get("session_date")
+        entry.update(rep_min=rep_min, rep_max=rep_max, top=plan["top"])
+        if plan["action"] != "start":
+            entry.update(weight_kg=plan["weight"], reps=plan["aim"], source=RANGE_SOURCE,
+                         action=plan["action"], last_seen_date=plan["date"])
+            if plan["action"] != "step_up":
+                entry["weight_kg"] = engine.suggested_weight_kg(
+                    entry["weight_kg"], streak_label, increment=weight_increment,
+                )
             return entry
 
     if last_performance:
@@ -1190,7 +1208,7 @@ def resolve_prescription(
     policy: dict,
     weight_increment: float = 2.5,
     last_session_sets: list[dict] | None = None,
-    previous_session_sets: list[dict] | None = None,
+    history: list[tuple[str, list[dict]]] | None = None,
     step_block: str | None = None,
 ) -> dict:
     """THE single ordered resolution. Every prescribed number the live training
@@ -1198,46 +1216,51 @@ def resolve_prescription(
     same `policy` argument.
 
     Order, and the order is the whole point:
-      1. seed_actual_entry proposes -- double progression, then last
-         performance, then the readiness nudge. It is handed
-         allow_increase=True so progression is free to want more; suppressing
-         it here would put autoregulation BEFORE progression and reintroduce
-         the two-signals-two-answers shape this replaced.
+      1. seed_actual_entry proposes -- the rep range, then last performance,
+         then the readiness nudge. It is handed allow_increase=True so
+         progression is free to want more; suppressing it here would put
+         autoregulation BEFORE progression and reintroduce the
+         two-signals-two-answers shape this replaced.
       2. clamp_to_ceiling holds it to the last completed session, but only on
          a reduced-load day, and only downward.
       3. assert_within_ceiling verifies the result.
+
+    `history` is the lift's recent sessions, newest first, as (date, sets)
+    (Repository.get_recent_session_sets); `last_session_sets` is the newest of
+    them, which the ceiling reads.
 
     On a reduced-load day with NO logged history the ceiling is empty and
     nothing is clamped -- but the view has already capped policy["volume_factor"]
     at 1.0 before building `ex`, so the plan's authored reps are what gets
     proposed, not an inflated version of them.
 
-    A FAILED-WEEK HOLD (hold_for_failed_week) seeds a second time with
-    progression OFF, then applies the same ceiling. Clamping the free proposal
-    alone is not enough there: when double progression fires it raises the
-    weight AND lowers the reps by what the step costs, so the clamp would put
-    the weight back and leave 12 reps reading as 10 or 8 -- a week meant to
-    repeat the last session would quietly prescribe less of it. The ledger is
-    still measured against the free proposal, so the caption says what the
-    hold stopped. This path also runs when the day is reduced as well; its
-    result is at or under the last session on every axis either way, which is
-    all a reduced-load day promises.
+    A FAILED-WEEK HOLD (hold_for_failed_week) seeds a second time with the
+    range's hold -- last session's weight and reps, nothing climbing -- then
+    applies the same ceiling. Clamping the free proposal alone is not enough
+    there: when the range steps it raises the weight AND lowers the reps by
+    what the step costs, so the clamp would put the weight back and leave 12
+    reps reading as 10 -- a week meant to repeat the last session would
+    quietly prescribe less of it. The ledger is still measured against the
+    free proposal, so the caption says what the hold stopped. This path also
+    runs when the day is reduced as well; its result is at or under the last
+    session on every axis either way, which is all a reduced-load day
+    promises.
 
     `next_step` carries next_step_caption: when this lift's weight goes up
-    next. It is left out in a failed-week hold, where nothing goes up.
+    next. It is left out in a failed-week hold, where nothing goes up, and on
+    the step itself.
 
     `step_block` is step_block_reason's answer for today: when it is set and
-    double progression wanted to step, the entry is seeded again with
-    progression OFF — the last session's weight and reps — and says why in
-    `step_blocked` and `next_step`. Nothing else is gated: a block only ever
-    stops the one upward move there is.
+    the range wanted to step, the entry is seeded again with the step OFF and
+    says why in `step_blocked` and `next_step`. Nothing else is gated: a block
+    only ever stops the one upward move there is.
     """
     proposed = seed_actual_entry(
         ex, last_performance, streak_label,
         allow_increase=True,
         weight_increment=weight_increment,
         last_session_sets=last_session_sets,
-        previous_session_sets=previous_session_sets,
+        history=history,
     )
     ceiling = last_completed_ceiling(last_performance, last_session_sets)
     if policy.get("failed_week_hold"):
@@ -1246,14 +1269,15 @@ def resolve_prescription(
             allow_increase=False,
             weight_increment=weight_increment,
             last_session_sets=last_session_sets,
-            previous_session_sets=previous_session_sets,
+            history=history,
+            hold=True,
         )
         final = clamp_to_ceiling(held, ceiling)
         final["clamped"] = _held_below(proposed, final)
         if not policy.get("reduced"):
             final["held_because"] = "failed_week"
     else:
-        blocked = bool(step_block) and proposed.get("source") == "double_progression"
+        blocked = bool(step_block) and proposed.get("action") == "step_up"
         base = proposed
         if blocked:
             base = seed_actual_entry(
@@ -1261,7 +1285,7 @@ def resolve_prescription(
                 allow_increase=False,
                 weight_increment=weight_increment,
                 last_session_sets=last_session_sets,
-                previous_session_sets=previous_session_sets,
+                history=history,
             )
         final = clamp_to_ceiling(base, ceiling) if policy.get("reduced") else dict(base)
         if blocked:
@@ -1271,42 +1295,33 @@ def resolve_prescription(
     if final.get("step_blocked"):
         final["next_step"] = ("The weight is ready to go up, but it stays the same "
                               f"today: {final['step_blocked']}.")
-    elif not policy.get("failed_week_hold"):
-        step = next_step_caption(ex, final, last_session_sets, previous_session_sets,
-                                 weight_increment)
+    elif not policy.get("failed_week_hold") and final.get("action") != "step_up":
+        step = next_step_caption(ex, final, weight_increment)
         if step:
             final["next_step"] = step
     return final
 
 
-def next_step_caption(ex: dict, entry: dict,
-                      last_session_sets: list[dict] | None,
-                      previous_session_sets: list[dict] | None,
-                      weight_increment: float = 2.5) -> str:
+def next_step_caption(ex: dict, entry: dict, weight_increment: float = 2.5) -> str:
     """When this lift's weight goes up next, in one sentence.
 
-    The screen prints "3 sets × 8 reps" and never the rep range, so without
-    this the trigger for a heavier weight is invisible — and since 2026-09-16
-    it spans two sessions and can sit above the top of the range on a light
-    dumbbell (engine.progression_rep_target), neither of which he could guess.
+    The trigger is the rep range's rule 3 (engine.range_progression): the LAST
+    set at the top of the range in every session of the lift within 7 days.
+    The top can sit above the range on a light dumbbell
+    (engine.progression_rep_target), which he could not guess, so the sentence
+    names the number.
 
-    "" for anything double progression does not run on, and on the session
-    that IS the step (actual_caption already names it).
+    "" for anything the range does not run on.
     """
     rep_min, rep_max = ex.get("rep_min"), ex.get("rep_max")
     weight = entry.get("weight_kg")
     if (rep_min is None or rep_max is None or ex.get("type") != "reps"
-            or ex.get("equipment_type") in (None, "band") or weight is None
-            or entry.get("source") == "double_progression"):
+            or ex.get("equipment_type") in (None, "band") or weight is None):
         return ""
-    target = engine.progression_rep_target(rep_min, rep_max, weight, weight_increment)
-    need = engine.PROGRESSION_SESSIONS
-    done = min(need, engine.progression_sessions_done(
-        rep_min, rep_max, weight, [last_session_sets, previous_session_sets],
-        ex.get("sets", 1), weight_increment))
-    sessions = "two" if need == 2 else str(need)
-    return (f"The weight goes up after every set reaches {target} reps in "
-            f"{sessions} sessions in a row ({done} of {need} so far).")
+    top = engine.progression_rep_target(rep_min, rep_max, weight, weight_increment)
+    days = engine.PROGRESSION_WINDOW_DAYS
+    return (f"The weight goes up when your last set reaches {top} reps in every "
+            f"session of this lift in {days} days.")
 
 
 def _held_below(proposed: dict, final: dict) -> dict:
@@ -1372,10 +1387,17 @@ def actual_caption(entry: dict) -> str:
     held = entry.get("clamped") or {}
     source = entry.get("source")
     date_part = f" ({entry['last_seen_date']})" if entry.get("last_seen_date") else ""
-    if source == "double_progression":
-        base = ("Double progression — every set reached its rep target in your "
-                f"last two sessions{date_part}.")
-    elif source == "last_time":
+    action = entry.get("action")
+    if source == RANGE_SOURCE and action == "step_up":
+        base = (f"Your last set reached the top of the range{date_part}, so the "
+                "weight goes up one step today.")
+    elif source == RANGE_SOURCE and action == "step_back":
+        base = (f"Your last set was under the range in your last two sessions{date_part}, "
+                "so the weight goes down one step today.")
+    elif source == RANGE_SOURCE and action == "hold":
+        base = (f"Same weight as your last logged session{date_part}. The aim is one "
+                "rep more than your last set made, up to the top of the range.")
+    elif source in ("last_time", RANGE_SOURCE):
         base = f"Starting from your last logged session{date_part}."
     elif source == BODYWEIGHT_SOURCE:
         base = "Today's planned reps. Change them if you do a different number."
@@ -2261,6 +2283,82 @@ def day_view_state(selected: date, today: date, active: Phase | None, is_logged:
     return "future"
 
 
+# ─── Which side goes first ───────────────────────────────────────────────────
+#
+# The athlete, 2026-10-16: "We need to switch the right and left so that some
+# days I start with left and others right side to balance out which arm goes
+# first." Until then every unilateral exercise started on the right.
+
+def first_side(day: date) -> str:
+    """The side every unilateral exercise starts on, on `day`: "right" or
+    "left".
+
+    It alternates day by day, so each weekday starts on the other side the
+    next week. Over any two weeks every lift starts on each side equally
+    often, whichever days it is trained on; in his usual week (Monday,
+    Tuesday, Thursday, Friday) two days start on each side.
+
+    It is read from the date and nothing else, so it is the same on every
+    screen and after any restart. The training screen fixes it when Start is
+    tapped (tp_first_side), so a session that runs past midnight keeps its
+    side.
+    """
+    return "left" if day.toordinal() % 2 == 0 else "right"
+
+
+def other_side(side: str) -> str:
+    return "left" if side == "right" else "right"
+
+
+def first_side_note(exercises: list[dict], day: date) -> str:
+    """The day overview's line naming today's first side, or "" when no
+    exercise of the day is done one side at a time."""
+    if not any(e.get("laterality") == "unilateral" for e in exercises or ()):
+        return ""
+    return f"One side at a time: start each of those exercises on the {first_side(day)} side today."
+
+
+def side_keys(side: str) -> tuple[str, str]:
+    """The live stepper entry's (reps, weight) keys for one side.
+
+    The right side owns the entry's own "reps"/"weight_kg", which is what
+    every reader of a set record takes; the left keeps its own pair, written
+    to the record only when it differs (build_set_record). That is true on a
+    left-first day too: which side goes first changes the order, never what a
+    stored field means.
+    """
+    return ("reps", "weight_kg") if side == "right" else ("reps_left", "weight_kg_left")
+
+
+def ready_side(entry: dict, side: str, first: str) -> None:
+    """Fill one side's numbers in a unilateral "reps" entry before that side's
+    pass is drawn. Mutates `entry`.
+
+    The FIRST side starts from the prescription (the right pair, where the
+    seeding puts it) the first time it is drawn, and keeps what the athlete
+    sets after that. The SECOND side shows the first side's numbers
+    ("mirrored") and follows them from set to set until the athlete edits it;
+    an edited second side keeps its own. `entry["mirror_of"]` is the first
+    side's pair as last copied, which is how an edit is told from a copy.
+
+    Before 2026-10-16 the second side was filled once and never again, so a
+    right side cut from 10 to 9 reps in set 2 left the unedited left at 10 —
+    shown as "edited" and logged as 10.
+    """
+    if side == first:
+        reps_key, weight_key = side_keys(side)
+        entry.setdefault(reps_key, entry.get("reps"))
+        entry.setdefault(weight_key, entry.get("weight_kg"))
+        return
+    first_reps, first_weight = side_keys(first)
+    reps_key, weight_key = side_keys(side)
+    copied = entry.get("mirror_of")
+    if copied is None or [entry.get(reps_key), entry.get(weight_key)] == list(copied):
+        entry[reps_key] = entry.get(first_reps)
+        entry[weight_key] = entry.get(first_weight)
+        entry["mirror_of"] = [entry.get(first_reps), entry.get(first_weight)]
+
+
 # ─── Hold-timer endings: which bell a hold timer rings ──────────────────────
 #
 # The athlete holds a side bridge with the eyes shut, so the bell is the only
@@ -2282,16 +2380,18 @@ HOLD_ENDINGS = (HOLD_ENDING_CONTINUE, HOLD_ENDING_SWITCH,
 
 
 def hold_ending(ex_type: str, *, is_uni: bool, side: str, cur_set: int,
-                total_sets: int, cur_rep: int = 1, reps_per_set: int = 1) -> str:
+                total_sets: int, cur_rep: int = 1, reps_per_set: int = 1,
+                first: str = "right") -> str:
     """Which ending a hold timer announces when it reaches zero.
 
-    `hold`: one hold IS one set, so the only mid-set ending is the right-to-
-    left swap. `hold_reps`: a rep before the set's last continues. After the
-    last rep (or the hold), the right side of a unilateral exercise swaps;
-    otherwise the set is over — FINISH while sets remain, DONE on the last.
+    `hold`: one hold IS one set, so the only mid-set ending is the swap to the
+    other side. `hold_reps`: a rep before the set's last continues. After the
+    last rep (or the hold), the FIRST side of a unilateral exercise swaps —
+    the right or the left, by the day (first_side); otherwise the set is over
+    — FINISH while sets remain, DONE on the last.
     """
     if ex_type == "hold_reps" and cur_rep < reps_per_set:
         return HOLD_ENDING_CONTINUE
-    if is_uni and side == "right":
+    if is_uni and side == first:
         return HOLD_ENDING_SWITCH
     return HOLD_ENDING_DONE if cur_set >= total_sets else HOLD_ENDING_FINISH

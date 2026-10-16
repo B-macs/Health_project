@@ -174,7 +174,7 @@ def injury_weight_signal(weight: float) -> str:
 # skipped (de Oliveira 2019, DeBlauw 2021, Bittencourt 2024), and morning HRV
 # recovers before the muscle does and does not predict same-day strength
 # (Flatt 2019, Dobbs 2020, Thamm 2019). The +12% also lengthened runs and holds,
-# not only reps. Load goes up from what the lifts did — double_progression —
+# not only reps. Load goes up from what the lifts did — range_progression —
 # never from how the night went. The rows stay in the table so a high streak
 # still reads as "high" rather than falling through as "unknown".
 _READINESS_MODIFIER_TABLE: dict[tuple, tuple] = {
@@ -334,33 +334,41 @@ def suggested_weight_kg(
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-#  LOAD PROGRESSION — when the weight goes up, and what the reps do after it
+#  LOAD PROGRESSION — a weight, a rep range and today's aim
 #
 #  docs/training/load_progression_evidence_review_2026-09-16.md is the source
-#  for every number here. The athlete, 2026-09-16: "review how it is done in
-#  best scientific journals and follow the best method" — after a goblet squat
-#  went up on a readiness streak with the reps at the bottom of their range.
+#  for every number here; §10 holds the rule that runs now, approved by the
+#  athlete on 2026-10-16 ("Approved all recommendations") from his own proposal:
+#  "it should be a range and a weight if I go up in weight then we try for the
+#  middle to low range until we do that weight at the upper range for one week
+#  then we go up the next week — If the last reps of the last set are outside
+#  the range we increase the first set of the next week automatically."
 #
-#  1. TWO SESSIONS IN A ROW, NOT ONE. The only published trigger is two
-#     consecutive sessions over the rep target: ACSM 2009's position stand (in
-#     its body text — the abstract drops the condition) and the NSCA "2-for-2"
-#     rule. No trial compares one session with two, so this is the published
-#     convention rather than a tested result; it is also the less noisy choice
-#     with about one rep of day-to-day spread, and with each lift trained once a
-#     week it means a lift gets heavier at most every second week — the
-#     athlete's own "don't change every week".
-#  2. THE REPS DROP BY WHAT THE STEP COSTS. Reps to failure fall about 0.37 per
-#     1% of load in the 8-15 rep zone, read off Nuzzo et al. 2024's
-#     meta-regression tables (Sports Med, 269 studies; general, squat and bench
-#     agree to about half a rep). The slope is DERIVED from those tables here,
-#     not a figure the paper states. A reset to the bottom of the range is right
-#     only for a ~10-11% step and a fixed -2 only for ~6%; this is right for
-#     both, because it keeps effort where it was.
-#  3. REPS FIRST WHEN THE STEP IS BIG. A fixed 2.5 kg is +11% on a 22.5 kg
-#     dumbbell and +17% on 15 kg, past the 2-10% ACSM and NSCA give. So the reps
-#     climb past the top of the range until the drop after the step still lands
-#     inside it. That is the same 0.37 slope read backwards, which is why there
-#     is no separate percentage ceiling to disagree with it.
+#  1. ONE WEIGHT, A RANGE, AN AIM. Every working set of a lift uses one weight;
+#     the screen shows the weight, the rep range and today's aim.
+#  2. BETWEEN STEPS THE AIM CLIMBS ONE REP: one more than the last set made
+#     last time, up to the top. Adding reps works as well as adding load
+#     (Plotkin 2022; Chaves 2024).
+#  3. THE WEIGHT GOES UP when the LAST set reached the top of the range in
+#     every session of the lift in the past week (PROGRESSION_WINDOW_DAYS).
+#     No trial compares a one-week trigger with two sessions; this replaced the
+#     two-session rule of 2026-09-16 on his choice. The last set is the hardest
+#     one, so the top there means the weight is light on every set.
+#  4. AFTER A STEP THE AIM IS WHAT THE STEP COSTS. Reps to failure fall about
+#     0.37 per 1% of load in the 8-15 rep zone, read off Nuzzo et al. 2024's
+#     tables (Sports Med, 269 studies). The slope is DERIVED here, not stated by
+#     the paper. A normal step lands in the low-to-middle of the range — his
+#     "middle to low range", by arithmetic.
+#  5. A RANGE IS AT LEAST ONE STEP WIDE. When a step is too coarse for the
+#     range at this weight (a 2.5 kg step on a light dumbbell), the reps climb
+#     past the top first (progression_rep_target), so the reps after the step
+#     still land inside the range.
+#  6. TOO HEAVY GOES BACK: the last set under the bottom of the range in
+#     STEP_BACK_SESSIONS sessions in a row, at one weight, takes the weight
+#     back one step.
+#  7. Readiness never raises the weight (suggested_weight_kg only lowers); a
+#     step waits on the pain gate and the check-in (sessions.step_block_reason);
+#     a failed week holds weight and reps (sessions.hold_for_failed_week).
 # ─────────────────────────────────────────────────────────────────────────────
 
 #: Reps to failure lost per 1% of added load, in the 8-15 rep zone. Derived from
@@ -369,9 +377,13 @@ def suggested_weight_kg(
 #: starting target and the logged reps correct it.
 REPS_LOST_PER_LOAD_PERCENT = 0.37
 
-#: Consecutive logged sessions of a lift, at the same weight, that must each
-#: have every prescribed set at the rep target before the weight goes up.
-PROGRESSION_SESSIONS = 2
+#: The weight steps up when the last set reached the top of the range in every
+#: session of the lift within this many days of the newest one (rule 3).
+PROGRESSION_WINDOW_DAYS = 7
+
+#: The last set under the bottom of the range in this many sessions in a row,
+#: at one weight, takes the weight back one step (rule 6).
+STEP_BACK_SESSIONS = 2
 
 
 def _round_half_up(x: float) -> int:
@@ -386,8 +398,8 @@ def _step_percent(weight: float | None, increment: float) -> float | None:
 
 def progression_rep_target(rep_min: int, rep_max: int, weight: float | None,
                            increment: float = 2.5) -> int:
-    """The reps every set must reach, in PROGRESSION_SESSIONS sessions in a
-    row, before `weight` goes up by `increment`.
+    """The reps the LAST set must reach before `weight` goes up by
+    `increment` (rule 5).
 
     The top of the range, unless the step is so large at this weight that the
     reps after it (reps_after_load_step) would land below the bottom of the
@@ -413,84 +425,112 @@ def reps_after_load_step(reps: int, weight: float | None, increment: float = 2.5
     return max(1, min(reps, _round_half_up(reps - REPS_LOST_PER_LOAD_PERCENT * step)))
 
 
+def _working(sets: list[dict] | None) -> list[dict]:
+    """The working sets: ramp sets (is_warmup) are not the lift."""
+    return [s for s in (sets or []) if not s.get("is_warmup")]
+
+
 def _working_weight(sets: list[dict] | None) -> float | None:
-    w = sets[-1].get("weight") if sets else None
+    work = _working(sets)
+    w = work[-1].get("weight") if work else None
     return None if w is None else float(w)
 
 
-def _session_at_target(sets: list[dict] | None, prescribed_sets: int, target: int) -> bool:
-    """Every prescribed set logged, and every logged set at `target` or more.
-    The length check matters: all() over a session cut short after one set is
-    vacuously true."""
-    return (bool(sets) and len(sets) >= prescribed_sets
-            and all((s.get("reps") or 0) >= target for s in sets))
+def _last_set_reps(sets: list[dict] | None) -> int | None:
+    work = _working(sets)
+    return int(work[-1].get("reps") or 0) if work else None
 
 
-def progression_sessions_done(rep_min: int, rep_max: int, weight: float | None,
-                              recent_sessions: list[list[dict] | None],
-                              prescribed_sets: int = 1, increment: float = 2.5) -> int:
-    """How many of the most recent sessions IN A ROW, newest first, were at
-    `weight` with every prescribed set at the rep target. Stops at the first
-    that was not — a lighter or heavier session, a short one, or one set under
-    target all break the run. A session whose sets carry no weight is taken to
-    be at `weight`."""
-    target = progression_rep_target(rep_min, rep_max, weight, increment)
-    done = 0
-    for sets in recent_sessions:
-        if not _session_at_target(sets, prescribed_sets, target):
-            break
-        lifted = _working_weight(sets)
-        if weight is not None and lifted is not None and abs(lifted - float(weight)) > 1e-6:
-            break
-        done += 1
-    return done
+def _within_window(day: str, newest: str) -> bool:
+    """Whether `day` is inside the PROGRESSION_WINDOW_DAYS that end on `newest`.
+    A date that cannot be read is outside, never inside: an unreadable session
+    must not count toward a step."""
+    try:
+        gap = (date.fromisoformat(str(newest)[:10]) - date.fromisoformat(str(day)[:10])).days
+    except (TypeError, ValueError):
+        return False
+    return 0 <= gap < PROGRESSION_WINDOW_DAYS
 
 
-def double_progression(
-    current_weight: float,
-    current_target_reps: int,
+def range_progression(
     rep_min: int,
     rep_max: int,
-    last_session_sets: list[dict] | None,
-    prescribed_sets: int = 1,
+    sessions: list[tuple[str, list[dict]]] | None,
+    plan_weight: float,
+    plan_reps: int,
     increment: float = 2.5,
-    allow_increase: bool = True,
-    previous_session_sets: list[dict] | None = None,
-) -> tuple[float, int]:
+    allow_step: bool = True,
+    hold: bool = False,
+    prescribed_sets: int = 1,
+) -> dict:
+    """The next session of one loaded lift with a rep range: its weight, its
+    aim and why. See the LOAD PROGRESSION section above for the seven rules.
+
+    `sessions` is the lift's recent history, NEWEST FIRST, as (date, sets):
+    each date "YYYY-MM-DD", each sets the logged per-set list
+    (Repository.get_recent_session_sets). Only working sets count, and a
+    session without one is skipped. The working weight is the last set's
+    weight, so a session that climbed from 45 to 50 kg is a 50 kg session.
+
+    Returns {"weight", "aim", "action", "top", "date"}: action is "start" (no
+    history: the plan), "held" (a failed week: last time's weight and reps),
+    "step_up", "step_back" or "hold"; top is the reps the last set must reach
+    before the weight goes up (rule 5 may lift it past rep_max on a light
+    weight); date is the newest session's, None at the start.
+
+    A session counts toward a step only when it logged `prescribed_sets`
+    working sets: a session stopped after one set never reached its last set.
+    `allow_step` False blocks only the step up (the pain gate, a missing
+    check-in); `hold` True is the failed-week hold, where nothing climbs, not
+    even a rep.
     """
-    Double progression for one loaded, countable-reps exercise
-    (training_plan._ex's rep_min/rep_max fields). See the LOAD PROGRESSION
-    section above for why each rule is what it is.
+    def clamp(reps: int) -> int:
+        return max(rep_min, min(rep_max, reps))
 
-    The weight goes up by one `increment` when the last PROGRESSION_SESSIONS
-    logged sessions — `last_session_sets` and `previous_session_sets`, each
-    Repository's full per-set array — were both at the same weight with every
-    prescribed set at progression_rep_target. The reps then drop to
-    reps_after_load_step of the lowest set in the last session. Otherwise the
-    inputs come back unchanged, and services.sessions.seed_actual_entry falls
-    through to last performance.
+    sessions = [(d, s) for d, s in (sessions or []) if _working(s)]
+    if not sessions:
+        return {"weight": plan_weight, "aim": clamp(plan_reps), "action": "start",
+                "top": progression_rep_target(rep_min, rep_max, plan_weight, increment),
+                "date": None}
+    newest_date, newest_sets = sessions[0]
+    weight = _working_weight(newest_sets)
+    weight = plan_weight if weight is None else weight
+    last = _last_set_reps(newest_sets)
+    top = progression_rep_target(rep_min, rep_max, weight, increment)
+    if hold:
+        return {"weight": weight, "aim": last, "action": "held", "top": top,
+                "date": newest_date}
 
-    The step is based on the weight ACTUALLY LIFTED (the last set's "weight"),
-    not the caller's current_weight — that may be a static plan-authored value
-    gone stale once real history exists, and stepping from it would silently
-    discard weight already earned. current_weight is the fallback only when the
-    logged set carries no weight.
+    def at_weight(sets: list[dict]) -> bool:
+        lifted = _working_weight(sets)
+        return lifted is None or abs(lifted - weight) < 1e-6
 
-    Unchanged when either session is missing or empty, either has fewer sets
-    than prescribed (a session cut short never reads as a clean one), the two
-    were at different weights, any set fell short of the target, or
-    allow_increase is False (e.g. a failed week's repeat).
-    """
-    if not allow_increase or not last_session_sets or not previous_session_sets:
-        return current_weight, current_target_reps
-    lifted = _working_weight(last_session_sets)
-    base = lifted if lifted is not None else current_weight
-    sessions = [last_session_sets, previous_session_sets]
-    if progression_sessions_done(rep_min, rep_max, base, sessions,
-                                 prescribed_sets, increment) < PROGRESSION_SESSIONS:
-        return current_weight, current_target_reps
-    lowest = min(int(s.get("reps") or 0) for s in last_session_sets)
-    return base + increment, reps_after_load_step(lowest, base, increment, rep_min)
+    def at_top(sets: list[dict]) -> bool:
+        return (at_weight(sets) and len(_working(sets)) >= prescribed_sets
+                and _last_set_reps(sets) >= top)
+
+    # The newest session is always in the week, so the check is never vacuous.
+    week = [newest_sets] + [s for d, s in sessions[1:] if _within_window(d, newest_date)]
+    if allow_step and all(at_top(s) for s in week):
+        new_weight = round(weight + increment, 2)
+        return {"weight": new_weight,
+                "aim": clamp(reps_after_load_step(last, weight, increment, rep_min)),
+                "action": "step_up",
+                "top": progression_rep_target(rep_min, rep_max, new_weight, increment),
+                "date": newest_date}
+
+    recent = [s for _, s in sessions[:STEP_BACK_SESSIONS]]
+    if (len(recent) == STEP_BACK_SESSIONS and weight - increment > 0
+            and all(at_weight(s) and _last_set_reps(s) < rep_min for s in recent)):
+        new_weight = round(weight - increment, 2)
+        gained = REPS_LOST_PER_LOAD_PERCENT * (_step_percent(new_weight, increment) or 0)
+        return {"weight": new_weight, "aim": clamp(_round_half_up(last + gained)),
+                "action": "step_back",
+                "top": progression_rep_target(rep_min, rep_max, new_weight, increment),
+                "date": newest_date}
+
+    return {"weight": weight, "aim": min(top, last + 1), "action": "hold", "top": top,
+            "date": newest_date}
 
 
 def suggested_band_tier(
@@ -1506,16 +1546,16 @@ def _volume_recommendation_core(
     # is a prescription, not a log line. Until 2026-09-18 it read "Apply standard
     # progressive overload: +2.5 kg (Stage 2+) or +1 rep per set (Stage 1)", and
     # both halves were wrong by then: the app has not added weight for a good
-    # day since Key Rule 23 (a step is earned by two sessions at the rep
-    # target), and Stage 1 ended in July — "Stage 1 information should never be
+    # day since Key Rule 23 (a step is earned by the lifts, never by
+    # readiness), and Stage 1 ended in July — "Stage 1 information should never be
     # displayed to the user, we have moved on from it" (athlete, 2026-09-18).
     return {
         "label":              "PROGRESSIVE OVERLOAD",
         "driver":             DRIVER_NONE,
         "multiplier":         1.05,
         "action":             "All systems nominal. Train the session as prescribed. "
-                              "A weight goes up when the lifts earn it — every set at "
-                              "the rep target, two sessions in a row.",
+                              "A weight goes up when the lifts earn it — the last set "
+                              "at the top of its rep range in every session of a week.",
         "signal_color":       "green",
         "injury_weight_active": False,
     }

@@ -42,8 +42,8 @@ MINIMUMS = REQUIRED
 
 #: Every area on 2 or more days (step 3), with one exception: the hip flexors'
 #: 3 required sets are one appearance, so the core trains them on one day and
-#: the bonus gives the second (the daily psoas march works them too). OPEN for
-#: his confirmation, 2026-10-16.
+#: the bonus gives the second (the daily psoas march works them too). APPROVED
+#: 2026-10-16 ("Approved all recommendations").
 MIN_DAYS = {"hip flexors": 1}
 
 SPEC = WeekSpec(days=CORE_DAYS, in_a_row=frozenset({("Mon", "Tue")}), minimums=REQUIRED,
@@ -58,8 +58,6 @@ WARMUP = [
          section="warmup", fixed_days=CORE_DAYS),
     Card("90/90 Hip Lift", sets=2, reps=5, rest_seconds=20, section="warmup", fixed_days=CORE_DAYS),
 ]
-NECK = Card("Neck Working Stretch (Right)", sets=2, type="hold_reps", reps=None, hold_seconds=10,
-            reps_in_set=4, rest_seconds=30, section="warmup", fixed_days=CORE_DAYS)
 RELEASE = Card("Pec & Scar Release (Right)", sets=2, type="hold", reps=None, hold_seconds=60,
                rest_seconds=15, section="block", fixed_days=PRESS_DAYS)
 Y_RAISE = Card("Prone Y-Raise (Scapular)", area="shoulder-blade muscles", rest_seconds=45,
@@ -102,7 +100,7 @@ PSOAS_ISO = Card("End-Range Psoas Isometric", area="hip flexors", type="hold_rep
                  section="last", days=1)
 
 #: The core cards: each runs on the days its areas need for the REQUIRED dose.
-CARDS = WARMUP + [NECK, RELEASE, Y_RAISE, SHOULDER_PRESS, CHEST_PRESS, HACK, LUNGE, RDL, BACK_EXT,
+CARDS = WARMUP + [RELEASE, Y_RAISE, SHOULDER_PRESS, CHEST_PRESS, HACK, LUNGE, RDL, BACK_EXT,
                   ROW, CROSSOVER, LATERAL, CRUNCH, REVERSE_CRUNCH, AIRPLANE, PSOAS_ISO]
 
 #: The drop order (approved 2026-10-16), as the bonus session reads it: goal A's
@@ -115,6 +113,12 @@ BONUS_ORDER = [RDL, BACK_EXT, LUNGE, CURL, WOODCHOP, SIDE_PLANK, PSOAS_ISO, HACK
 #: flexibility day (it needs no gym, and the adductors are the flexibility
 #: goal's blocker).
 OFF_GYM = {"Adductor Ladder (current rung)": {"area": "adductors", "sets": 3, "days": ("Wed", "Sun")}}
+
+#: At home, on the core days (approved 2026-10-16): the neck working stretch,
+#: 2 sets of 4 efforts (10 s on, 5 s off). It trains no required area, and
+#: doing it at home brings Tuesday and Thursday back toward the 60-minute target.
+HOME = {"Neck Working Stretch (Right)": {"sets": 2, "dose": "4 efforts of 10 s, 5 s off",
+                                         "days": CORE_DAYS}}
 EXTRA_SETS = {v["area"]: v["sets"] * len(v["days"]) for v in OFF_GYM.values()}
 EXTRA_DAYS = {v["area"]: len(v["days"]) for v in OFF_GYM.values()}
 

@@ -1,5 +1,9 @@
 # Automatic Progression Rule — Design (P5)
 
+> **⚠ SUPERSEDED AGAIN 2026-10-16** — the live rule is the athlete's rep-range
+> rule, `engine.range_progression` (`load_progression_evidence_review_2026-09-16.md`
+> §10). `engine.double_progression`, named throughout below, no longer exists.
+
 > **⚠ PARTLY SUPERSEDED 2026-09-16 — read
 > `load_progression_evidence_review_2026-09-16.md` §7 first.** The live rule is
 > not this rung machine. On the athlete's choices after a new literature review:

@@ -5,7 +5,7 @@ Pure function, no I/O. Complements the Foster-AU-based ACWR/strain engine
 (services.engine) with an actual-load view — total kg moved per week —
 which is only meaningful once loaded, countable-reps exercises exist
 (Stage 2A+ double-progression exercises; see training_plan.py's rep_min/
-rep_max fields and services.engine.double_progression).
+rep_max fields and services.engine.range_progression).
 """
 
 from __future__ import annotations

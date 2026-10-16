@@ -778,12 +778,36 @@ exercises and the psoas isometric. Two fixes on the way: the Y raise follows
 EVERY release (his 2026-10-15 rule), which is what lifted the core from the
 54-59 of the scratch draft; and the placement now spreads each area over days
 (an area met on one day with a half-set credit on the same day had read as two).
-**OPEN:** the hip flexors' 3 required sets fit one day, but step 3 wants two —
-the core uses the bonus as their second day (`goal_week.MIN_DAYS`), for his
-confirmation; and Tuesday and Thursday are over the 60-minute target.
+**Approved 2026-10-16, second round** (*"Approved all recommendations"*):
 
-**Load progression — PROPOSED 2026-10-16:** his double-progression proposal
-(*"it should be a range and a weight ... If the last reps of the last set are
-outside the range we increase the first set of the next week automatically"*)
-checked against the evidence: `docs/training/load_progression_evidence_review_2026-09-16.md`,
-§10. For his approval.
+1. **Load progression** — his double-progression proposal (*"it should be a
+   range and a weight ... If the last reps of the last set are outside the range
+   we increase the first set of the next week automatically"*) as the 7-point
+   rule in `docs/training/load_progression_evidence_review_2026-09-16.md` §10.
+   Built in `services/engine.py::range_progression` and used by the training
+   page for every loaded lift with a rep range: one weight, the range and
+   today's aim on screen; the weight goes up when the last set reached the top
+   in every session of the lift within 7 days; back one step when the last set
+   was under the range twice in a row. A session cut short (fewer sets than
+   prescribed) never counts toward a step.
+2. **Default ranges: 8-12 for a compound lift, 10-15 for an isolation or core
+   item.** Applied to Block B's six lifts that had 10-12 or 12-15 (hip thrust,
+   incline press, lat pulldown, row → 8-12; Pallof press, face pull → 10-15).
+   Where one weight step is still larger than the range allows, the reps climb
+   past the top first (rule 5): at today's plan weights that is the incline
+   press (15 reps at 15 kg), the face pull (17 at 6 units) and the Pallof press
+   (18 at 5 units).
+3. **The hip flexors' second day comes from the bonus** (`goal_week.MIN_DAYS`).
+4. **The neck working stretch is done at home** on the three core days
+   (`goal_week.HOME`). Placed again without it, the core sessions model at
+   Monday 56, Tuesday 61 and Thursday 59 minutes, with no rule broken; Tuesday
+   is 1 minute over the 60-minute target.
+
+**The first side alternates by the day — his request, 2026-10-16** (*"We need
+to switch the right and left so that some days I start with left and others
+right side to balance out which arm goes first"*): `services/sessions.first_side`.
+It changes every day, so each weekday starts on the other side the next week,
+and in his usual week two days start on each side. The training page fixes the
+side when Start is tapped and names it on the day overview. What a set record
+stores does not change: its reps and weight are the right side's, and the left
+side's own numbers are added only when they differ.

@@ -542,117 +542,151 @@ def test_suggested_band_tier_unrecognised_tier_returns_none():
     assert engine.suggested_band_tier(None, "high") is None
 
 
-# ─── double_progression ──────────────────────────────────────────────────────
+# ─── range_progression ───────────────────────────────────────────────────────
 #
-# 2026-09-16, docs/training/load_progression_evidence_review_2026-09-16.md:
-# two sessions in a row at the rep target (ACSM 2009, NSCA 2-for-2), reps after
-# the step lowered by what the step costs (Nuzzo 2024's load-reps tables), and
-# reps first when 2.5 kg is a big step at a light weight.
+# 2026-10-16, docs/training/load_progression_evidence_review_2026-09-16.md §10,
+# approved by the athlete: one weight, a rep range and today's aim. The aim
+# climbs one rep; the weight goes up when the last set reached the top in every
+# session within 7 days, and back when the last set was under the range twice
+# in a row. The reps after a step are what the step costs (Nuzzo 2024's tables).
 
-_12S_AT_40 = [{"reps": 12, "weight": 40.0}] * 3
-
-
-def test_double_progression_fires_after_two_sessions_at_the_top_of_the_range():
-    weight, reps = engine.double_progression(
-        40.0, 12, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40,
-        prescribed_sets=3, previous_session_sets=_12S_AT_40)
-    assert (weight, reps) == (42.5, 10)
+def _session(day, reps, weight=40.0):
+    return (day, [{"reps": r, "weight": weight} for r in reps])
 
 
-def test_one_session_at_the_top_is_not_enough():
-    # Each lift is trained once a week, so one session would let a weight rise
-    # every week — the athlete's "don't change every week".
-    weight, reps = engine.double_progression(
-        40.0, 12, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40, prescribed_sets=3)
-    assert (weight, reps) == (40.0, 12)
+def _rp(sessions, weight=40.0, reps=10, rep_min=8, rep_max=12, **kw):
+    kw.setdefault("prescribed_sets", 3)
+    return engine.range_progression(rep_min, rep_max, sessions, weight, reps, **kw)
 
 
-def test_the_two_sessions_must_be_at_the_same_weight():
-    at_37_5 = [{"reps": 12, "weight": 37.5}] * 3
-    weight, reps = engine.double_progression(
-        40.0, 12, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40,
-        prescribed_sets=3, previous_session_sets=at_37_5)
-    assert (weight, reps) == (40.0, 12)
+def test_his_lat_pulldown_holds_at_50_and_aims_one_rep_higher():
+    """The case he brought (2026-10-10: 45 x 10, 50 x 11, 50 x 8) on the approved
+    8-12 range: the last set made 8, inside the range, so 50 kg with an aim of 9."""
+    s = [("2026-10-10", [{"reps": 10, "weight": 45.0}, {"reps": 11, "weight": 50.0},
+                         {"reps": 8, "weight": 50.0}])]
+    out = _rp(s, weight=45.0, reps=11)
+    assert (out["weight"], out["aim"], out["action"], out["top"]) == (50.0, 9, "hold", 12)
 
 
-def test_double_progression_does_not_fire_when_one_set_falls_short():
-    short = [{"reps": 12, "weight": 40.0}, {"reps": 11, "weight": 40.0}, {"reps": 12, "weight": 40.0}]
-    for last, previous in ((short, _12S_AT_40), (_12S_AT_40, short)):
-        weight, reps = engine.double_progression(
-            40.0, 12, rep_min=8, rep_max=12, last_session_sets=last,
-            prescribed_sets=3, previous_session_sets=previous)
-        assert (weight, reps) == (40.0, 12)
+def test_his_lat_pulldown_steps_when_the_last_set_makes_twelve():
+    out = _rp([_session("2026-10-17", [12, 12, 12], 50.0)], weight=45.0, reps=11)
+    assert (out["weight"], out["aim"], out["action"]) == (52.5, 10, "step_up")
 
 
-def test_double_progression_does_not_fire_when_allow_increase_is_false():
-    weight, reps = engine.double_progression(
-        40.0, 12, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40,
-        prescribed_sets=3, allow_increase=False, previous_session_sets=_12S_AT_40)
-    assert (weight, reps) == (40.0, 12)
+def test_one_session_at_the_top_steps_the_weight():
+    # Replaces the two-sessions-in-a-row rule of 2026-09-16 (his choice).
+    out = _rp([_session("2026-10-10", [12, 12, 12])])
+    assert (out["weight"], out["aim"], out["action"]) == (42.5, 10, "step_up")
 
 
-def test_double_progression_returns_inputs_unchanged_when_last_session_sets_is_none():
-    weight, reps = engine.double_progression(
-        40.0, 12, rep_min=8, rep_max=12, last_session_sets=None, previous_session_sets=_12S_AT_40)
-    assert (weight, reps) == (40.0, 12)
+def test_only_the_last_set_decides():
+    assert _rp([_session("2026-10-10", [12, 11, 12])])["action"] == "step_up"
+    out = _rp([_session("2026-10-10", [12, 12, 11])])
+    assert (out["action"], out["aim"]) == ("hold", 12)
 
 
-def test_double_progression_returns_inputs_unchanged_when_last_session_sets_is_empty():
-    weight, reps = engine.double_progression(
-        40.0, 12, rep_min=8, rep_max=12, last_session_sets=[], previous_session_sets=_12S_AT_40)
-    assert (weight, reps) == (40.0, 12)
+def test_every_session_within_seven_days_must_reach_the_top():
+    # Twice a week: Thursday at the top, Monday not -> hold.
+    s = [_session("2026-10-15", [12, 12, 12]), _session("2026-10-12", [10, 10, 10])]
+    assert _rp(s)["action"] == "hold"
+    # Seven days apart is outside the window: once a week, the newest decides.
+    s = [_session("2026-10-17", [12, 12, 12]), _session("2026-10-10", [10, 10, 10])]
+    assert _rp(s)["action"] == "step_up"
 
 
-def test_double_progression_respects_custom_increment():
+def test_the_sessions_in_the_window_must_be_at_the_same_weight():
+    s = [_session("2026-10-15", [12, 12, 12]), _session("2026-10-12", [12, 12, 12], 37.5)]
+    assert _rp(s)["action"] == "hold"
+
+
+def test_a_session_stopped_short_never_steps():
+    # Stopped after 1 of 3 sets: the last set was never reached.
+    assert _rp([_session("2026-10-10", [12])])["action"] == "hold"
+    assert _rp([_session("2026-10-10", [12, 12, 12, 12])])["action"] == "step_up"
+
+
+def test_the_aim_climbs_one_rep_up_to_the_top():
+    assert _rp([_session("2026-10-10", [10, 10, 9])])["aim"] == 10
+    assert _rp([_session("2026-10-10", [12, 12, 11])])["aim"] == 12
+
+
+def test_a_light_dumbbell_aims_past_the_range_before_it_steps():
+    # 22.5 kg: the top is 13 (rule 5), so 12 is not yet a step.
+    out = _rp([_session("2026-10-10", [12, 12, 12], 22.5)], weight=22.5)
+    assert (out["action"], out["aim"], out["top"]) == ("hold", 13, 13)
+    out = _rp([_session("2026-10-10", [13, 13, 13], 22.5)], weight=22.5)
+    assert (out["weight"], out["aim"], out["action"]) == (25.0, 9, "step_up")
+
+
+def test_the_last_set_under_the_range_twice_steps_back():
+    s = [_session("2026-10-17", [9, 8, 7]), _session("2026-10-10", [9, 8, 6])]
+    out = _rp(s)
+    # 2.5 kg off 40 gives back about 2.5 reps: 7 becomes 9.
+    assert (out["weight"], out["aim"], out["action"]) == (37.5, 9, "step_back")
+
+
+def test_once_under_the_range_is_not_a_step_back():
+    s = [_session("2026-10-17", [9, 8, 7]), _session("2026-10-10", [10, 10, 9])]
+    assert (_rp(s)["weight"], _rp(s)["action"], _rp(s)["aim"]) == (40.0, "hold", 8)
+
+
+def test_a_blocked_step_holds_the_weight():
+    out = _rp([_session("2026-10-10", [12, 12, 12])], allow_step=False)
+    assert (out["weight"], out["aim"], out["action"]) == (40.0, 12, "hold")
+
+
+def test_a_failed_week_holds_the_weight_and_the_reps():
+    out = _rp([_session("2026-10-10", [12, 12, 12])], hold=True)
+    assert (out["weight"], out["aim"], out["action"]) == (40.0, 12, "held")
+
+
+def test_no_history_starts_at_the_plan_inside_the_range():
+    out = _rp([], weight=45.0, reps=11)
+    assert (out["weight"], out["aim"], out["action"], out["date"]) == (45.0, 11, "start", None)
+    assert _rp(None, reps=15)["aim"] == 12
+
+
+def test_the_working_weight_is_the_logged_one_not_the_plan():
+    # The plan's weight can be stale; progress from what was lifted.
+    assert _rp([_session("2026-10-10", [12, 12, 12], 42.5)], weight=10.0)["weight"] == 45.0
+
+
+def test_a_set_without_a_weight_reads_as_the_plan_weight():
+    s = [("2026-10-10", [{"reps": 12}] * 3)]
+    assert (_rp(s)["weight"], _rp(s)["action"]) == (42.5, "step_up")
+
+
+def test_ramp_sets_and_empty_sessions_are_not_the_lift():
+    ramp = [{"reps": 5, "weight": 20.0, "is_warmup": True}]
+    s = [("2026-10-17", []), ("2026-10-10", ramp + [{"reps": 12, "weight": 40.0}] * 3)]
+    out = _rp(s)
+    assert (out["action"], out["date"]) == ("step_up", "2026-10-10")
+
+
+def test_an_unreadable_date_never_counts_toward_a_step():
+    s = [_session("2026-10-15", [12, 12, 12]), _session("bad", [10, 10, 10])]
+    assert _rp(s)["action"] == "step_up"            # outside the window, never inside
+    assert _rp([_session("bad", [12, 12, 12])])["action"] == "step_up"   # the newest counts
+
+
+def test_a_custom_increment_steps_by_its_own_unit():
     # A cable stack in its own units: 20 -> 21 is +5%, which costs about 2 reps.
-    at_20 = [{"reps": 12, "weight": 20.0}] * 3
-    weight, reps = engine.double_progression(
-        20.0, 12, rep_min=10, rep_max=12, last_session_sets=at_20,
-        prescribed_sets=3, increment=1, previous_session_sets=at_20)
-    assert (weight, reps) == (21.0, 10)
+    out = _rp([_session("2026-10-10", [12, 12, 12], 20.0)], weight=20.0, increment=1)
+    assert (out["weight"], out["aim"]) == (21.0, 10)
 
 
-def test_double_progression_bases_increment_on_actual_last_weight_not_stale_current_weight():
-    # Regression guard: current_weight can be a stale, static plan-authored
-    # value (training_plan.py's per-week dicts) that no longer matches what
-    # was actually lifted last session (e.g. a prior progression already
-    # pushed the real weight above it). Progressing from the stale value
-    # would silently discard weight already earned -- the increment must be
-    # based on the actually-logged weight instead.
-    weight, reps = engine.double_progression(
-        10.0, 8, rep_min=8, rep_max=12, last_session_sets=_12S_AT_40,  # 10.0 is stale
-        prescribed_sets=3, previous_session_sets=_12S_AT_40)
-    assert weight == 42.5  # 40.0 (actually lifted) + 2.5, not 10.0 (stale plan value) + 2.5
-    assert reps == 10
-
-
-def test_double_progression_falls_back_to_current_weight_when_logged_weight_missing():
-    sets = [{"reps": 12}, {"reps": 12}, {"reps": 12}]  # defensive: no "weight" key at all
-    weight, reps = engine.double_progression(
-        40.0, 12, rep_min=8, rep_max=12, last_session_sets=sets,
-        prescribed_sets=3, previous_session_sets=sets)
-    assert (weight, reps) == (42.5, 10)  # falls back to current_weight + increment
-
-
-def test_double_progression_does_not_fire_when_fewer_sets_logged_than_prescribed():
-    # Regression guard: all() over a short list is vacuously true -- a
-    # session cut short after 1 of 3 prescribed sets, with that one set
-    # hitting the target, must not read as a clean full session.
-    one_set = [{"reps": 12, "weight": 40.0}]
-    for last, previous in ((one_set, _12S_AT_40), (_12S_AT_40, one_set)):
-        weight, reps = engine.double_progression(
-            40.0, 12, rep_min=8, rep_max=12, last_session_sets=last,
-            prescribed_sets=3, previous_session_sets=previous)
-        assert (weight, reps) == (40.0, 12)
-
-
-def test_double_progression_fires_when_logged_sets_meet_or_exceed_prescribed():
-    over = [{"reps": 13, "weight": 40.0}, {"reps": 12, "weight": 40.0},
-            {"reps": 12, "weight": 40.0}, {"reps": 12, "weight": 40.0}]
-    weight, reps = engine.double_progression(
-        40.0, 12, rep_min=8, rep_max=12, last_session_sets=over,
-        prescribed_sets=3, previous_session_sets=_12S_AT_40)
-    assert (weight, reps) == (42.5, 10)  # from the LOWEST set, 12, not the 13
+@pytest.mark.parametrize("weight", [15.0, 22.5, 40.0, 50.0])
+@pytest.mark.parametrize("rep_min,rep_max", [(8, 12), (10, 15)])
+def test_the_weight_moves_at_most_one_step_and_the_aim_is_never_zero(weight, rep_min, rep_max):
+    for newest in range(4, 18):
+        for older in range(4, 18):
+            s = [_session("2026-10-17", [newest] * 3, weight),
+                 _session("2026-10-10", [older] * 3, weight)]
+            out = _rp(s, weight=weight, rep_min=rep_min, rep_max=rep_max)
+            assert abs(out["weight"] - weight) <= 2.5 + 1e-9
+            assert out["aim"] >= 1
+            if out["action"] in ("step_up", "step_back"):
+                assert rep_min <= out["aim"] <= rep_max
 
 
 # ─── the reps after a step, and the reps before one ──────────────────────────
@@ -696,21 +730,3 @@ def test_after_a_step_the_reps_land_inside_the_range(weight, rep_min, rep_max):
     target = engine.progression_rep_target(rep_min, rep_max, weight)
     assert target >= rep_max
     assert rep_min <= engine.reps_after_load_step(target, weight) <= target
-
-
-def test_twelve_reps_at_22_5_kg_does_not_step():
-    at_22_5 = [{"reps": 12, "weight": 22.5}] * 3
-    weight, reps = engine.double_progression(
-        22.5, 12, rep_min=8, rep_max=12, last_session_sets=at_22_5,
-        prescribed_sets=3, previous_session_sets=at_22_5)
-    assert (weight, reps) == (22.5, 12)
-
-
-def test_progression_sessions_done_counts_the_unbroken_run_from_the_newest():
-    at_40 = _12S_AT_40
-    short = [{"reps": 10, "weight": 40.0}] * 3
-    assert engine.progression_sessions_done(8, 12, 40.0, [at_40, at_40], 3) == 2
-    assert engine.progression_sessions_done(8, 12, 40.0, [at_40, short], 3) == 1
-    assert engine.progression_sessions_done(8, 12, 40.0, [short, at_40], 3) == 0
-    assert engine.progression_sessions_done(8, 12, 40.0, [None, at_40], 3) == 0
-    assert engine.progression_sessions_done(8, 12, 42.5, [at_40, at_40], 3) == 0

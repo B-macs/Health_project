@@ -146,10 +146,19 @@ def test_the_bonus_follows_the_drop_order():
 
 def test_the_minimums_hold_without_the_bonus():
     """The 4th day is a bonus: nothing required depends on it — except the
-    hip flexors' second day, the one named exception (gw.MIN_DAYS)."""
+    hip flexors' second day, the one named exception (gw.MIN_DAYS, approved
+    2026-10-16)."""
     total = pl.weekly_sets(CORE, gw.EXTRA_SETS)
     assert all(total.get(a, 0) >= m for a, m in gw.REQUIRED.items())
     assert set(gw.MIN_DAYS) == {"hip flexors"}
+
+
+def test_the_neck_stretch_is_done_at_home_not_in_the_gym():
+    """Approved 2026-10-16: at home on the core days, so it takes no gym time."""
+    name = "Neck Working Stretch (Right)"
+    assert all(name not in _names(d) for d in gw.DAYS)
+    assert gw.HOME[name]["days"] == gw.CORE_DAYS
+    assert rules.check_movement(name, 2)["severity"] == "caution"
 
 
 # ── safety ───────────────────────────────────────────────────────────────────

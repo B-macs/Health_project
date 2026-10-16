@@ -80,7 +80,8 @@ def _ex(
         "weight_kg": weight_kg,
         "equipment_type": equipment_type,
         "band_tier": band_tier,
-        # Double-progression rep range (services/engine.py::double_progression) —
+        # The rep range (services/engine.py::range_progression, approved
+        # 2026-10-16: one weight, the range and today's aim) —
         # None for exercises that don't auto-progress (holds, mobility, bodyweight).
         "rep_min": rep_min,
         "rep_max": rep_max,
@@ -5419,12 +5420,21 @@ def _bb_gym_a(week: int) -> dict:
         "is_gym_session": True,
         "day_type": "main",
         "exercises": _bb_warmup(week, BB_GLUTE_BRIDGE, incline_walk=False) + goblet + hinge + [
-            _take(_S2B_A4, "Hip Thrust (Loaded)", weight_kg=thrust, sets=n_sets),
-            _take(_S2B_A4, "Pallof Press (Cable)", sets=n_sets),
+            _take(_S2B_A4, "Hip Thrust (Loaded)", weight_kg=thrust, sets=n_sets,
+                  **BB_COMPOUND_RANGE),
+            _take(_S2B_A4, "Pallof Press (Cable)", sets=n_sets, **BB_ISOLATION_RANGE),
             END_RANGE_PSOAS_ISOMETRIC,
         ],
     }
 
+
+#: The rep ranges Block B runs (approved 2026-10-16, the athlete: "Approved all
+#: recommendations"): 8-12 for a compound lift, 10-15 for an isolation or core
+#: item. A range must be at least one weight step wide, or a step lands under
+#: it (engine.range_progression, rule 5); the 10-12 ranges copied from Stage 2B
+#: were not — a 45 -> 50 kg step put the lat pulldown at 8, under its 10.
+BB_COMPOUND_RANGE = {"rep_min": 8, "rep_max": 12}
+BB_ISOLATION_RANGE = {"rep_min": 10, "rep_max": 15}
 
 _BB_B = {
     # week: (press, pulldown, row, face pull units, working sets)
@@ -5457,10 +5467,14 @@ def _bb_gym_b(week: int) -> dict:
         "is_gym_session": True,
         "day_type": "main",
         "exercises": _bb_warmup(week, PREP_SCAPULAR, incline_walk=False) + [
-            _take(_S2B_B4, "Incline DB Press", weight_kg=press, sets=n_sets),
-            _take(_S2B_B4, "Lat Pulldown", weight_kg=pulldown, sets=n_sets),
-            _take(_S2B_B4, "Single-Arm DB Row", weight_kg=row, sets=n_sets),
-            _take(_S2B_B4, "Face Pull (Cable)", weight_kg=face, sets=n_sets),
+            _take(_S2B_B4, "Incline DB Press", weight_kg=press, sets=n_sets,
+                  **BB_COMPOUND_RANGE),
+            _take(_S2B_B4, "Lat Pulldown", weight_kg=pulldown, sets=n_sets,
+                  **BB_COMPOUND_RANGE),
+            _take(_S2B_B4, "Single-Arm DB Row", weight_kg=row, sets=n_sets,
+                  **BB_COMPOUND_RANGE),
+            _take(_S2B_B4, "Face Pull (Cable)", weight_kg=face, sets=n_sets,
+                  **BB_ISOLATION_RANGE),
             _bb_knee_hover(week),
         ],
     }

@@ -39,6 +39,8 @@ def main() -> int:
             print(f"   {card.name}: {dose(card)}{side}")
     for name, v in gw.OFF_GYM.items():
         print(f"\n{' and '.join(v['days'])} (no gym): {name}: {v['sets']} sets")
+    for name, v in gw.HOME.items():
+        print(f"\n{', '.join(v['days'])} (at home): {name}: {v['sets']} sets of {v['dose']}")
     for label, days in (("3 core sessions", core), ("with the bonus", week)):
         total = pl.weekly_sets(days, gw.EXTRA_SETS)
         print(f"\nWeekly hard sets, {label}:",

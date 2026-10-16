@@ -74,11 +74,11 @@ def test_no_stage_one_in_any_string_the_screen_can_print(path):
 
 def test_the_green_day_sentence_says_what_the_app_actually_does():
     """The one the athlete quoted. It promised a +2.5 kg step for a good day,
-    which no longer happens: a step is earned by two sessions at the rep target
-    (Key Rule 23)."""
+    which no longer happens: a step is earned by the lifts (Key Rule 23) — since
+    2026-10-16 the last set at the top of its rep range for a week."""
     action = _green_directive()["action"]
     assert "+2.5 kg" not in action
-    assert "two sessions in a row" in action
+    assert "the last set at the top of its rep range" in action
 
 
 def test_the_green_day_sentence_is_what_the_autoregulation_screen_prints():

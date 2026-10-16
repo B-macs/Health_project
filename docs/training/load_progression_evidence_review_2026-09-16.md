@@ -19,7 +19,7 @@ Grades: **A** meta-analysis or systematic review · **B** RCT · **C** other stu
 > | # | Rule | Where | Grade of the best support |
 > |---|---|---|---|
 > | 1 | **Readiness never raises load.** Weight, band, reps, hold time and run minutes: a high streak changes nothing; a low one may still lower them. | `engine._READINESS_MODIFIER_TABLE`, `suggested_weight_kg`, `suggested_band_tier` | B (no trial raises load on readiness; HRV trials only held or cut) |
-> | 2 | **A weight steps after two sessions in a row** at the same weight with every set at the rep target. | `engine.double_progression`, `PROGRESSION_SESSIONS` | E (ACSM 2009 body text, NSCA) — no trial compares triggers |
+> | 2 | **A weight steps after two sessions in a row** at the same weight with every set at the rep target. **REPLACED 2026-10-16 by his rep-range rule — §10.** | was `engine.double_progression`, `PROGRESSION_SESSIONS`; now `engine.range_progression` | E (ACSM 2009 body text, NSCA) — no trial compares triggers |
 > | 3 | **After a step, the reps drop by what the step costs** — about 0.37 reps per 1% of load. | `engine.reps_after_load_step`, `REPS_LOST_PER_LOAD_PERCENT` | A (Nuzzo 2024 tables; the slope is derived here) |
 > | 4 | **On a light weight, reps climb past the range first**, until the drop after the step still lands inside it. | `engine.progression_rep_target` | E + A (ACSM's 2-10%; the same slope read backwards) |
 > | 5 | **No step when today's pain is above 5/10, or there is no check-in.** | `sessions.step_block_reason`, `STEP_PAIN_CEILING` | B, borrowed (HEAVY trial, shoulders; pain-monitoring model, Achilles) |
@@ -229,7 +229,11 @@ range at all.
   (Schoenfeld, Grgic, Van Every & Plotkin 2021, *Sports* 9:32), so a range can
   be chosen to fit the equipment's step.
 
-**PROPOSED rule, for his approval** (it changes rules 2 and 3 of 2026-09-16):
+**APPROVED 2026-10-16** (*"Approved all recommendations"*; it changes rules 2
+and 3 of 2026-09-16). Built the same day as `services/engine.py::range_progression`,
+with one guard the list below does not state: a session that logged fewer
+working sets than prescribed never counts toward a step, because its last set
+was never reached.
 
 1. Each lift has one working weight for all its working sets, a rep range, and
    today's aim — all three shown on the screen.
