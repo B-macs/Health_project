@@ -545,10 +545,11 @@ def test_suggested_band_tier_unrecognised_tier_returns_none():
 # ─── range_progression ───────────────────────────────────────────────────────
 #
 # 2026-10-16, docs/training/load_progression_evidence_review_2026-09-16.md §10,
-# approved by the athlete: one weight, a rep range and today's aim. The aim
-# climbs one rep; the weight goes up when the last set reached the top in every
-# session within 7 days, and back when the last set was under the range twice
-# in a row. The reps after a step are what the step costs (Nuzzo 2024's tables).
+# the athlete's rule: one weight, a rep range and today's aim. The aim climbs one
+# rep, never past the top; the weight goes up when every set reached the top or
+# one set went past it, in every session within 7 days — the same for every
+# lift; after any weight change the aim resets to the middle-bottom of the
+# range; the last set under the range twice in a row takes the weight back.
 
 def _session(day, reps, weight=40.0):
     return (day, [{"reps": r, "weight": weight} for r in reps])
@@ -560,32 +561,53 @@ def _rp(sessions, weight=40.0, reps=10, rep_min=8, rep_max=12, **kw):
 
 
 def test_his_lat_pulldown_holds_at_50_and_aims_one_rep_higher():
-    """The case he brought (2026-10-10: 45 x 10, 50 x 11, 50 x 8) on the approved
-    8-12 range: the last set made 8, inside the range, so 50 kg with an aim of 9."""
+    """The case he brought (2026-10-10: 45 x 10, 50 x 11, 50 x 8) on the 8-12
+    range: no set went past 12 and not every set reached it."""
     s = [("2026-10-10", [{"reps": 10, "weight": 45.0}, {"reps": 11, "weight": 50.0},
                          {"reps": 8, "weight": 50.0}])]
     out = _rp(s, weight=45.0, reps=11)
-    assert (out["weight"], out["aim"], out["action"], out["top"]) == (50.0, 9, "hold", 12)
+    assert (out["weight"], out["aim"], out["action"]) == (50.0, 9, "hold")
 
 
-def test_his_lat_pulldown_steps_when_the_last_set_makes_twelve():
+def test_every_set_at_the_top_steps_the_weight():
     out = _rp([_session("2026-10-17", [12, 12, 12], 50.0)], weight=45.0, reps=11)
-    assert (out["weight"], out["aim"], out["action"]) == (52.5, 10, "step_up")
+    assert (out["weight"], out["aim"], out["action"]) == (52.5, 9, "step_up")
 
 
-def test_one_session_at_the_top_steps_the_weight():
-    # Replaces the two-sessions-in-a-row rule of 2026-09-16 (his choice).
-    out = _rp([_session("2026-10-10", [12, 12, 12])])
-    assert (out["weight"], out["aim"], out["action"]) == (42.5, 10, "step_up")
+def test_one_set_past_the_top_steps_the_weight():
+    """'if I go over the range ... the weight goes up' (athlete, 2026-10-16)."""
+    out = _rp([_session("2026-10-17", [13, 12, 11])])
+    assert (out["weight"], out["action"]) == (42.5, "step_up")
+    out = _rp([_session("2026-10-17", [10, 11, 13])])
+    assert out["action"] == "step_up"
 
 
-def test_only_the_last_set_decides():
-    assert _rp([_session("2026-10-10", [12, 11, 12])])["action"] == "step_up"
-    out = _rp([_session("2026-10-10", [12, 12, 11])])
-    assert (out["action"], out["aim"]) == ("hold", 12)
+def test_a_set_short_of_the_top_with_none_past_it_holds():
+    out = _rp([_session("2026-10-17", [12, 12, 11])])
+    assert (out["weight"], out["aim"], out["action"]) == (40.0, 12, "hold")
 
 
-def test_every_session_within_seven_days_must_reach_the_top():
+@pytest.mark.parametrize("weight,increment", [(15.0, 2.5), (15.0, 2.25), (6.0, 1), (22.5, 2.5),
+                                              (50.0, 2.5)])
+def test_no_lift_ever_needs_more_than_the_top_of_its_range(weight, increment):
+    """'I dont want anything going over the max as the target to increase
+    weight, the same rule applies to all' — a light dumbbell or a cable stack
+    at 6 units steps at the top like everything else."""
+    for rep_min, rep_max in ((8, 12), (10, 15)):
+        out = _rp([_session("2026-10-17", [rep_max] * 3, weight)], weight=weight,
+                  rep_min=rep_min, rep_max=rep_max, increment=increment)
+        assert out["action"] == "step_up", (weight, rep_min, rep_max)
+
+
+@pytest.mark.parametrize("rep_min,rep_max,aim", [(8, 12, 9), (10, 15, 11), (6, 10, 7),
+                                                 (12, 15, 13)])
+def test_the_aim_after_a_step_is_the_middle_bottom_of_the_range(rep_min, rep_max, aim):
+    assert engine.range_middle_bottom(rep_min, rep_max) == aim
+    out = _rp([_session("2026-10-17", [rep_max + 3] * 3)], rep_min=rep_min, rep_max=rep_max)
+    assert (out["action"], out["aim"]) == ("step_up", aim)
+
+
+def test_every_session_within_seven_days_must_earn_it():
     # Twice a week: Thursday at the top, Monday not -> hold.
     s = [_session("2026-10-15", [12, 12, 12]), _session("2026-10-12", [10, 10, 10])]
     assert _rp(s)["action"] == "hold"
@@ -600,28 +622,20 @@ def test_the_sessions_in_the_window_must_be_at_the_same_weight():
 
 
 def test_a_session_stopped_short_never_steps():
-    # Stopped after 1 of 3 sets: the last set was never reached.
-    assert _rp([_session("2026-10-10", [12])])["action"] == "hold"
+    # Stopped after 1 of 3 sets: the session never reached its last set.
+    assert _rp([_session("2026-10-10", [13])])["action"] == "hold"
     assert _rp([_session("2026-10-10", [12, 12, 12, 12])])["action"] == "step_up"
 
 
-def test_the_aim_climbs_one_rep_up_to_the_top():
+def test_the_aim_climbs_one_rep_and_never_past_the_top():
     assert _rp([_session("2026-10-10", [10, 10, 9])])["aim"] == 10
     assert _rp([_session("2026-10-10", [12, 12, 11])])["aim"] == 12
-
-
-def test_a_light_dumbbell_aims_past_the_range_before_it_steps():
-    # 22.5 kg: the top is 13 (rule 5), so 12 is not yet a step.
-    out = _rp([_session("2026-10-10", [12, 12, 12], 22.5)], weight=22.5)
-    assert (out["action"], out["aim"], out["top"]) == ("hold", 13, 13)
-    out = _rp([_session("2026-10-10", [13, 13, 13], 22.5)], weight=22.5)
-    assert (out["weight"], out["aim"], out["action"]) == (25.0, 9, "step_up")
+    assert _rp([_session("2026-10-10", [13, 12, 12])], allow_step=False)["aim"] == 12
 
 
 def test_the_last_set_under_the_range_twice_steps_back():
     s = [_session("2026-10-17", [9, 8, 7]), _session("2026-10-10", [9, 8, 6])]
     out = _rp(s)
-    # 2.5 kg off 40 gives back about 2.5 reps: 7 becomes 9.
     assert (out["weight"], out["aim"], out["action"]) == (37.5, 9, "step_back")
 
 
@@ -670,63 +684,27 @@ def test_an_unreadable_date_never_counts_toward_a_step():
 
 
 def test_a_custom_increment_steps_by_its_own_unit():
-    # A cable stack in its own units: 20 -> 21 is +5%, which costs about 2 reps.
-    out = _rp([_session("2026-10-10", [12, 12, 12], 20.0)], weight=20.0, increment=1)
-    assert (out["weight"], out["aim"]) == (21.0, 10)
+    out = _rp([_session("2026-10-10", [15, 15, 15], 6.0)], weight=6.0, rep_min=10, rep_max=15,
+              increment=1)
+    assert (out["weight"], out["aim"]) == (7.0, 11)
 
 
 @pytest.mark.parametrize("weight", [15.0, 22.5, 40.0, 50.0])
 @pytest.mark.parametrize("rep_min,rep_max", [(8, 12), (10, 15)])
-def test_the_weight_moves_at_most_one_step_and_the_aim_is_never_zero(weight, rep_min, rep_max):
+def test_the_weight_moves_at_most_one_step_and_the_aim_stays_in_reach(weight, rep_min, rep_max):
     for newest in range(4, 18):
         for older in range(4, 18):
             s = [_session("2026-10-17", [newest] * 3, weight),
                  _session("2026-10-10", [older] * 3, weight)]
             out = _rp(s, weight=weight, rep_min=rep_min, rep_max=rep_max)
             assert abs(out["weight"] - weight) <= 2.5 + 1e-9
-            assert out["aim"] >= 1
+            assert 1 <= out["aim"] <= rep_max
             if out["action"] in ("step_up", "step_back"):
-                assert rep_min <= out["aim"] <= rep_max
+                assert out["aim"] == engine.range_middle_bottom(rep_min, rep_max)
 
 
-# ─── the reps after a step, and the reps before one ──────────────────────────
-
-def test_the_reps_drop_by_what_the_step_costs():
-    # From the review's worked cases, starting at 12 reps:
-    assert engine.reps_after_load_step(12, 40.0) == 10   # +6.3%, DB RDL
-    assert engine.reps_after_load_step(12, 25.0) == 8    # +10%, goblet squat / hip thrust
-    assert engine.reps_after_load_step(12, 45.0) == 10   # +5.6%
-
-
-def test_the_reps_never_rise_after_a_step():
-    assert engine.reps_after_load_step(8, 1000.0) == 8
-
-
-def test_the_reps_fall_back_to_the_bottom_of_the_range_with_no_weight_to_scale():
-    assert engine.reps_after_load_step(12, 0.0, rep_min=8) == 8
-    assert engine.reps_after_load_step(12, None, rep_min=8) == 8
-
-
-def test_a_heavy_lift_steps_at_the_top_of_its_range():
-    assert engine.progression_rep_target(8, 12, 40.0) == 12
-    assert engine.progression_rep_target(8, 12, 25.0) == 12
-
-
-def test_a_light_dumbbell_climbs_past_the_range_before_it_steps():
-    # 2.5 kg on 22.5 kg is +11%, past ACSM's 2-10%: 12 reps would drop to 8 at
-    # the edge, so the target is 13 and the drop lands at 9.
-    assert engine.progression_rep_target(8, 12, 22.5) == 13
-    assert engine.reps_after_load_step(13, 22.5) == 9
-    # 2.5 kg on 15 kg is +17%.
-    assert engine.progression_rep_target(8, 12, 15.0) == 15
-    assert engine.reps_after_load_step(15, 15.0) == 9
-
-
-@pytest.mark.parametrize("weight", [10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0, 30.0, 40.0, 60.0])
-@pytest.mark.parametrize("rep_min,rep_max", [(8, 12), (10, 12), (6, 10), (12, 15)])
-def test_after_a_step_the_reps_land_inside_the_range(weight, rep_min, rep_max):
-    """The target is built so the drop can never leave the range — the one
-    property that makes reps-first and effort-matching a single rule."""
-    target = engine.progression_rep_target(rep_min, rep_max, weight)
-    assert target >= rep_max
-    assert rep_min <= engine.reps_after_load_step(target, weight) <= target
+def test_the_old_step_cost_rule_is_gone():
+    """Replaced 2026-10-16 by the athlete: no target above the top, and the
+    middle-bottom after a step rather than the step's rep cost."""
+    for name in ("progression_rep_target", "reps_after_load_step", "REPS_LOST_PER_LOAD_PERCENT"):
+        assert not hasattr(engine, name), name

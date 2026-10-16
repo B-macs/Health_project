@@ -379,7 +379,12 @@ gave about a third of failure's growth, at 80% no difference (Lasevicius et al.
 
 ---
 
-## Step 5 — exercise choice — IN PROGRESS (opened 2026-10-15)
+## Step 5 — exercise choice — COMPLETE 2026-10-16 (opened 2026-10-15)
+
+**Every pick is approved.** The marks below that still read "proposed" or
+"OPEN" were settled later in this file: the five filters (2026-10-15), the neck
+dose (2026-10-15) and its place at home (2026-10-16), the side and rear delt
+dose (2026-10-16), and the back and chest picks (2026-10-16).
 
 **Proposed, not yet approved** — filters, in order: (1) the safety rules know
 the exercise and do not block it at the stage ("unknown" fails until a rule is
@@ -572,7 +577,12 @@ and this is the S press confirmed in his gym).
 
 ---
 
-## Step 6 — placement — PROPOSED 2026-10-16
+## Step 6 — placement — APPROVED 2026-10-16
+
+**Approved in parts the same day** (the rules, the four sessions A to D, the
+three-core-plus-bonus week, the drop order, the neck at home, Tuesday's 61
+minutes); `goal_week.py` and `services/placement.py` hold it, and
+`tests/test_placement.py` checks it.
 
 His request (2026-10-16): *"Can you bring understand each the exercise and
 create a deterministic test to put them automatically in their correct
@@ -821,3 +831,26 @@ and in his usual week two days start on each side. The training page fixes the
 side when Start is tapped and names it on the day overview. What a set record
 stores does not change: its reps and weight are the right side's, and the left
 side's own numbers are added only when they differ.
+
+---
+
+## The 12-week block — his decisions, 2026-10-16
+
+*"When we push this new session block that will be 12 weeks long, it will
+overwrite all of the current block, so just wait till we have all steps
+finished. Starts once we complete all steps and push and it starts on the next
+monday. lets complete all other steps and then push."*
+
+- **12 weeks long.** A failed week still runs again (Key Rule 22), so the
+  block can grow past 12 weeks; it has no fixed last date.
+- **It replaces all of the current block** (Block B): nothing more is changed
+  in Block B — its runs and its dumbbell step stay as they are until then.
+- **Nothing is pushed until every step is done** (steps 7 and 8 and the
+  checks). The block starts on the Monday after the push.
+- **One progression rule for every lift** (his words: *"I dont want anything
+  going over the max as the target to increase weight, the same rule applies
+  to all, if I go over the range or have all sets at the range, the weight goes
+  up and the range target gets reset to the middle bottom"*): the weight goes
+  up when every set reached the top of the range or one set went past it; then
+  the aim is the middle-bottom of the range (9 on 8-12, 11 on 10-15). Built in
+  `engine.range_progression`; see the load-progression review, §10.

@@ -675,8 +675,7 @@ def seed_actual_entry(
          Repository.get_recent_session_sets); without it, the last session
          alone (last_session_sets, dated by last_performance). Its weight and
          aim REPLACE the last-performance seed below, and the entry also
-         carries "rep_min", "rep_max", "top" (the reps the last set must reach
-         before the weight goes up) and "action" (step_up, step_back, hold,
+         carries "rep_min", "rep_max" and "action" (step_up, step_back, hold,
          held). With no history the range only adds those keys, and step 2
          seeds the numbers.
       2. last_performance (Repository.get_last_performance's shape) if
@@ -724,7 +723,7 @@ def seed_actual_entry(
             increment=weight_increment, allow_step=allow_increase, hold=hold,
             prescribed_sets=ex.get("sets", 1),
         )
-        entry.update(rep_min=rep_min, rep_max=rep_max, top=plan["top"])
+        entry.update(rep_min=rep_min, rep_max=rep_max)
         if plan["action"] != "start":
             entry.update(weight_kg=plan["weight"], reps=plan["aim"], source=RANGE_SOURCE,
                          action=plan["action"], last_seen_date=plan["date"])
@@ -1296,32 +1295,26 @@ def resolve_prescription(
         final["next_step"] = ("The weight is ready to go up, but it stays the same "
                               f"today: {final['step_blocked']}.")
     elif not policy.get("failed_week_hold") and final.get("action") != "step_up":
-        step = next_step_caption(ex, final, weight_increment)
+        step = next_step_caption(ex, final)
         if step:
             final["next_step"] = step
     return final
 
 
-def next_step_caption(ex: dict, entry: dict, weight_increment: float = 2.5) -> str:
-    """When this lift's weight goes up next, in one sentence.
-
-    The trigger is the rep range's rule 3 (engine.range_progression): the LAST
-    set at the top of the range in every session of the lift within 7 days.
-    The top can sit above the range on a light dumbbell
-    (engine.progression_rep_target), which he could not guess, so the sentence
-    names the number.
+def next_step_caption(ex: dict, entry: dict) -> str:
+    """When this lift's weight goes up next, in one sentence: the rep range's
+    rule 3 (engine.range_progression), which is the same for every lift and
+    never above the top of the range (athlete, 2026-10-16).
 
     "" for anything the range does not run on.
     """
     rep_min, rep_max = ex.get("rep_min"), ex.get("rep_max")
-    weight = entry.get("weight_kg")
     if (rep_min is None or rep_max is None or ex.get("type") != "reps"
-            or ex.get("equipment_type") in (None, "band") or weight is None):
+            or ex.get("equipment_type") in (None, "band") or entry.get("weight_kg") is None):
         return ""
-    top = engine.progression_rep_target(rep_min, rep_max, weight, weight_increment)
     days = engine.PROGRESSION_WINDOW_DAYS
-    return (f"The weight goes up when your last set reaches {top} reps in every "
-            f"session of this lift in {days} days.")
+    return (f"The weight goes up when every set reaches {rep_max} reps or one set goes "
+            f"past {rep_max}, in each session of this lift in {days} days.")
 
 
 def _held_below(proposed: dict, final: dict) -> dict:
@@ -1389,8 +1382,8 @@ def actual_caption(entry: dict) -> str:
     date_part = f" ({entry['last_seen_date']})" if entry.get("last_seen_date") else ""
     action = entry.get("action")
     if source == RANGE_SOURCE and action == "step_up":
-        base = (f"Your last set reached the top of the range{date_part}, so the "
-                "weight goes up one step today.")
+        base = (f"Every set reached the top of the range, or one set went past it"
+                f"{date_part}, so the weight goes up one step today.")
     elif source == RANGE_SOURCE and action == "step_back":
         base = (f"Your last set was under the range in your last two sessions{date_part}, "
                 "so the weight goes down one step today.")

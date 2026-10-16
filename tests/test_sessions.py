@@ -518,7 +518,7 @@ def test_seed_actual_entry_band_readiness_nudge_only_ever_lowers():
 # ─── seed_actual_entry: the rep range (approved 2026-10-16) ─────────────────
 
 def test_seed_actual_entry_range_step_fires_and_takes_priority():
-    # DB RDL shape: 8-12, the last set at 12 in the last session.
+    # DB RDL shape: 8-12, every set at 12 in the last session.
     ex = {"type": "reps", "reps": 10, "rep_min": 8, "rep_max": 12, "sets": 3,
           "weight_kg": 40.0, "equipment_type": "dumbbell"}
     maxed = [{"reps": 12, "weight": 40.0}] * 3
@@ -529,9 +529,9 @@ def test_seed_actual_entry_range_step_fires_and_takes_priority():
         ex, last_performance, "normal", True, last_session_sets=maxed,
     )
     assert entry["weight_kg"] == 42.5
-    assert entry["reps"] == 10   # +6% costs about two reps
+    assert entry["reps"] == 9    # the middle-bottom of 8-12 (athlete, 2026-10-16)
     assert (entry["source"], entry["action"]) == ("range", "step_up")
-    assert (entry["rep_min"], entry["rep_max"], entry["top"]) == (8, 12, 12)
+    assert (entry["rep_min"], entry["rep_max"]) == (8, 12)
 
 
 def test_seed_actual_entry_steps_from_the_recent_sessions_it_is_given():
@@ -828,7 +828,7 @@ def test_assertion_raises_on_an_over_ceiling_band_tier():
 
 def test_green_day_still_progresses():
     # The fix must not turn every day into a hold. Since 2026-09-16 the step
-    # is earned by the lifts (since 2026-10-16 the last set at the top of the
+    # is earned by the lifts (since 2026-10-16 every set at the top of the
     # range), not by a readiness streak — so the pulldown carries a range.
     ex = dict(_PULLDOWN, rep_min=8, rep_max=12)
     maxed = [{"reps": 12, "weight": 45.0}] * 3
@@ -837,7 +837,7 @@ def test_green_day_still_progresses():
         ex, dict(_PULLDOWN_LAST_PERF, reps=12), "high", p,
         last_session_sets=maxed,
     )
-    assert (entry["weight_kg"], entry["reps"]) == (47.5, 10)
+    assert (entry["weight_kg"], entry["reps"]) == (47.5, 9)
     assert entry["clamped"] == {}
 
 
@@ -1231,7 +1231,7 @@ def test_a_range_step_still_reports_its_previous_session():
     was no history at all."""
     ex = {"name": "Goblet Squat", "type": "reps", "reps": 10, "sets": 3,
           "equipment_type": "dumbbell", "weight_kg": 20.0, "rep_min": 8, "rep_max": 12}
-    # 22.5 kg needs 13 reps before its +11% step (engine.progression_rep_target).
+    # Every set past the top of 8-12: the weight steps, the aim resets to 9.
     maxed = [{"reps": 13, "weight": 22.5}] * 3
     lp = {"session_date": "2026-08-10", "reps": 13, "weight_kg": 22.5}
     entry = sessions.resolve_prescription(
@@ -1258,19 +1258,21 @@ def test_the_next_step_line_names_the_trigger():
     entry = sessions.resolve_prescription(
         _RDL, lp, "normal", {"reduced": False}, last_session_sets=short)
     assert entry["next_step"] == (
-        "The weight goes up when your last set reaches 12 reps in every session "
-        "of this lift in 7 days.")
+        "The weight goes up when every set reaches 12 reps or one set goes past 12, "
+        "in each session of this lift in 7 days.")
     assert entry["next_step"] in sessions.actual_caption(entry)
 
 
-def test_the_next_step_line_names_the_higher_target_on_a_light_dumbbell():
+def test_the_next_step_line_never_names_more_than_the_top_on_a_light_dumbbell():
+    """'I dont want anything going over the max as the target to increase
+    weight, the same rule applies to all' (athlete, 2026-10-16)."""
     goblet = dict(_RDL, name="Goblet Squat", weight_kg=22.5)
     sets = [{"reps": 8, "weight": 22.5}] * 3
     lp = {"session_date": "2026-09-15", "reps": 8, "weight_kg": 22.5}
     entry = sessions.resolve_prescription(
         goblet, lp, "high", {"reduced": False}, last_session_sets=sets)
     assert entry["weight_kg"] == 22.5
-    assert "13 reps" in entry["next_step"]
+    assert "12 reps" in entry["next_step"] and "13" not in entry["next_step"]
 
 
 def test_no_next_step_line_on_the_step_itself_or_without_a_range():
@@ -1664,7 +1666,7 @@ def test_a_clear_check_in_lets_the_step_through():
         _RDL, _LP_40, "normal", {"reduced": False},
         last_session_sets=_MAXED_AT_40,
         step_block=sessions.step_block_reason({"date": "2026-09-18", "pain_score": 3}))
-    assert (entry["weight_kg"], entry["reps"]) == (42.5, 10)
+    assert (entry["weight_kg"], entry["reps"]) == (42.5, 9)
     assert "step_blocked" not in entry
 
 

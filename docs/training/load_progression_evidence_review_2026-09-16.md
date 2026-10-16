@@ -20,8 +20,8 @@ Grades: **A** meta-analysis or systematic review · **B** RCT · **C** other stu
 > |---|---|---|---|
 > | 1 | **Readiness never raises load.** Weight, band, reps, hold time and run minutes: a high streak changes nothing; a low one may still lower them. | `engine._READINESS_MODIFIER_TABLE`, `suggested_weight_kg`, `suggested_band_tier` | B (no trial raises load on readiness; HRV trials only held or cut) |
 > | 2 | **A weight steps after two sessions in a row** at the same weight with every set at the rep target. **REPLACED 2026-10-16 by his rep-range rule — §10.** | was `engine.double_progression`, `PROGRESSION_SESSIONS`; now `engine.range_progression` | E (ACSM 2009 body text, NSCA) — no trial compares triggers |
-> | 3 | **After a step, the reps drop by what the step costs** — about 0.37 reps per 1% of load. | `engine.reps_after_load_step`, `REPS_LOST_PER_LOAD_PERCENT` | A (Nuzzo 2024 tables; the slope is derived here) |
-> | 4 | **On a light weight, reps climb past the range first**, until the drop after the step still lands inside it. | `engine.progression_rep_target` | E + A (ACSM's 2-10%; the same slope read backwards) |
+> | 3 | **After a step, the reps drop by what the step costs** — about 0.37 reps per 1% of load. **REPLACED 2026-10-16 by his reset to the middle-bottom of the range — §10.** | was `engine.reps_after_load_step`, `REPS_LOST_PER_LOAD_PERCENT`; now `engine.range_middle_bottom` | A (Nuzzo 2024 tables; the slope is derived here) |
+> | 4 | **On a light weight, reps climb past the range first**, until the drop after the step still lands inside it. **REMOVED 2026-10-16 — §10.** | was `engine.progression_rep_target` | E + A (ACSM's 2-10%; the same slope read backwards) |
 > | 5 | **No step when today's pain is above 5/10, or there is no check-in.** | `sessions.step_block_reason`, `STEP_PAIN_CEILING` | B, borrowed (HEAVY trial, shoulders; pain-monitoring model, Achilles) |
 >
 > Rules 2, 3 and 5 were the athlete's choices between options on 2026-09-16.
@@ -260,3 +260,24 @@ the next session is 52.5 kg with an aim of 10.
 [Autoregulated training network meta-analysis, 2025](https://lida.sport-iat.de/ta/Record/4094556) ·
 [Schoenfeld et al. 2021](https://doaj.org/article/6d51b905504d46f0873bb43d5d84bf21) ·
 [increment guidance, a study guide (not a primary source)](https://open-exam-prep.com/study-guides/cscs/program-design/resistance-training-program-design).
+
+**HIS CHANGE, LATER ON 2026-10-16 — one rule for every lift:** *"I dont want
+anything going over the max as the target to increase weight, the same rule
+applies to all, if I go over the range or have all sets at the range, the
+weight goes up and the range target gets reset to the middle bottom."* Built
+the same day in `engine.range_progression`:
+
+- The weight goes up when **every set reached the top of the range, or one set
+  went past it** — in every session of the lift within 7 days. No lift ever
+  needs more reps than the top of its range (rules 3 and 5 above are replaced).
+- After any weight change, up or back, the aim is **the middle-bottom of the
+  range**: halfway between the bottom and the middle (9 on 8-12, 11 on 10-15),
+  in place of the step's rep cost (rule 4 above).
+- Kept: the aim climbs one rep at a time between steps (never past the top), a
+  session cut short never counts toward a step, back one step after two
+  sessions with the last set under the range, and rule 7.
+
+What it costs, said once: the reps-per-1% figure is no longer used to place the
+aim. On a step that is large for its weight (a cable stack at 6 units: +17% for
+one unit) the first session after the step can land under the range; the step
+back then returns the weight after two such sessions.
