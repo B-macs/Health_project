@@ -1594,9 +1594,11 @@ def test_next_phase_offer_returns_the_next_authored_block():
 
 def test_next_phase_offer_never_re_offers_an_existing_block():
     # Phase 4 (Block B) is authored since 2026-09-11, so 1-3 stored offers it;
-    # with all four stored there is nothing left to offer.
+    # phase 5 (the 12-week block) since 2026-10-16, so 1-4 stored offers it;
+    # with all five stored there is nothing left to offer.
     assert sessions.next_phase_offer([_ph(1), _ph(2), _ph(3)]) == 4
-    assert sessions.next_phase_offer([_ph(1), _ph(2), _ph(3), _ph(4)]) is None
+    assert sessions.next_phase_offer([_ph(1), _ph(2), _ph(3), _ph(4)]) == 5
+    assert sessions.next_phase_offer([_ph(n) for n in range(1, 6)]) is None
 
 
 def test_next_phase_offer_will_not_skip_a_block():

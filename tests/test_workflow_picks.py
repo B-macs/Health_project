@@ -15,6 +15,7 @@ import ast
 import re
 from pathlib import Path
 
+import goal_block as gb
 import goal_week as gw
 from services import placement as pl
 from services import sessions
@@ -26,9 +27,12 @@ WEEK = gw.week()
 
 def _every_name() -> set[str]:
     """Every entry the sessions run, in their final order (ramp sets
-    included), plus the home and off-gym items."""
+    included), plus the home and off-gym items, and every entry of the
+    registered block (goal_block.py): its tests and its Sunday session."""
     names = {c.name for d in gw.DAYS for c in pl.order(WEEK[d])}
     names |= {c.name for c in gw.CARDS + gw.BONUS_ORDER}
+    names |= {e["name"] for day in gb.PLAN_GOAL_BLOCK.values()
+              for e in day["exercises"] + day.get("home", [])}
     return names | set(gw.HOME) | set(gw.OFF_GYM)
 
 
@@ -39,13 +43,14 @@ def test_every_exercise_in_the_week_has_a_workflow_record():
 
 def test_the_ramp_sets_are_in_the_sessions_and_read_their_own_record():
     ramps = sorted(n for n in _every_name() if n.endswith("(Ramp Set)"))
-    assert ramps == ["Hack Squat (Ramp Set)", "Romanian Deadlift (DB) (Ramp Set)"]
+    assert ramps == ["Hack Squat (Ramp Set)", "Romanian Deadlift (Ramp Set)"]
     assert all(gw.pick_for(n) is gw.PICKS["Ramp set"] for n in ramps)
 
 
 def test_no_record_is_left_over_from_an_exercise_that_is_gone():
-    used = {("Ramp set" if n.endswith("(Ramp Set)") else n) for n in _every_name()}
-    assert set(gw.PICKS) <= used | {"Ramp set"}, set(gw.PICKS) - used
+    used = {("Ramp set" if n.endswith("(Ramp Set)") else
+             "Timed plank test" if n.startswith("Bunkie — ") else n) for n in _every_name()}
+    assert set(gw.PICKS) <= used, set(gw.PICKS) - used
 
 
 def test_every_record_names_a_goal_an_area_a_job_a_reason_and_a_source():

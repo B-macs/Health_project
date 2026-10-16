@@ -12,6 +12,7 @@ from dataclasses import replace
 import goal_week as gw
 from services import placement as pl
 from services import rules
+from services import sessions
 
 WEEK = gw.week()
 CORE = {d: WEEK[d] for d in gw.CORE_DAYS}
@@ -110,7 +111,12 @@ def test_a_ramp_set_sits_straight_before_its_lift():
         names = _names(d)
         for i, n in enumerate(names):
             if n.endswith("(Ramp Set)"):
-                assert names[i + 1] == n.replace(" (Ramp Set)", ""), (d, n)
+                # The ramp is named for the lift without its equipment tag
+                # ("Romanian Deadlift (Ramp Set)" before "Romanian Deadlift
+                # (DB)"), so the app's base name reads them as one station.
+                lift = names[i + 1]
+                assert not lift.endswith("(Ramp Set)"), (d, n)
+                assert sessions.base_name(lift) == sessions.base_name(n), (d, n, lift)
 
 
 def test_the_release_and_the_y_raise_come_straight_before_the_first_press():

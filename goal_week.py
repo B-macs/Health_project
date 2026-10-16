@@ -104,8 +104,10 @@ SIDE_PLANK = Card("Side Plank with Hip Raises", area="abs", reps=12, rest_second
 #: Kept by his choice over the prone cable hip rotation (step 8's check,
 #: 2026-10-16: "we can add weight to this by holding it around the back but I
 #: like the balance part of this as well as the rotation"): a weight held behind
-#: the back, and the rep range of a compound lift.
-AIRPLANE = Card("Hip Airplane", area="hip rotators", reps=10, rest_seconds=60,
+#: the back, and the rep range of a compound lift. Its own name, so the
+#: weighted lift starts its own history: Block B's "Hip Airplane" was body
+#: weight at 5-6 reps and is a warm-up item there (sessions.PREPARATION_NAMES).
+AIRPLANE = Card("Hip Airplane (Weighted)", area="hip rotators", reps=10, rest_seconds=60,
                 equipment_type="dumbbell", laterality="unilateral", section="last", days=2)
 #: The hip-flexor pick (step 8's check, approved 2026-10-16: "3 yes"): strength
 #: with the hip flexors long, done standing — lying on the back is where the
@@ -303,7 +305,7 @@ PICKS: dict[str, Pick] = {
         listed_as="side plank",
         better="checked 2026-10-16 (tier_lists/abs_sides.md): A, the list's best tier (no S); "
                "within A the safety margin keeps it over the side bends; kept"),
-    "Hip Airplane": Pick(
+    "Hip Airplane (Weighted)": Pick(
         "A", "hip rotators", "strength and size",
         "Trains the pelvis twist he noticed on 2026-10-05: 3 x max, two days, not every day.",
         "his decision, 2026-10-14: hip airplane 3 x max, to failure, not every day",
@@ -333,6 +335,44 @@ PICKS: dict[str, Pick] = {
         listed_as="Adductor machine",
         better="checked 2026-10-16: it replaced the adductor ladder (best rung A); approved "
                "2026-10-16 ('4 yes the gym has the machine')"),
+
+    # ── The block's measurements and its Sunday session (goal_block.py) ─────
+    "Timed plank test": Pick(
+        "A", "trunk and hips", "measurement",
+        "The five Bunkie lines, each held until the line breaks, in week 1 and week 12; the "
+        "lateral and medial lines feed the core hold score.",
+        "his decision, 2026-10-16: the timed plank test in week 1 and week 12, at the end of "
+        "session A in place of that day's abs work",
+        better="a measurement: the protocol stays the same, so week 1 and week 12 compare"),
+    "Rib and Pelvis Test (Test)": Pick(
+        "A", "pelvis and ribs", "measurement",
+        "Finding #7's four-part test, graded for the first time in week 1 and again in week 12.",
+        "his answer, 2026-10-16: week 1 and week 12, on the test Sunday morning",
+        better="a measurement: the protocol stays the same, so week 1 and week 12 compare"),
+    "Flexibility Retest (Test)": Pick(
+        "C", "the flexibility skills", "measurement",
+        "The 12-week flexibility test on three Sunday mornings, so the day-to-day spread is known "
+        "before a number counts.",
+        "his answers, 2026-10-14 ('three mornings once') and 2026-10-16 ('Sunday morning before')",
+        better="a measurement: the battery's own protocol"),
+    "Upper Glute Grip Grade (Test)": Pick(
+        "A", "upper glutes", "measurement",
+        "Key Rule 6's measurement: a right grade of 2 or more brings the hip release back.",
+        "Key Rule 6, 2026-09-22 (Wednesday in Block B); on the Sunday morning from 2026-10-16, "
+        "proposed and his answer asked",
+        better="a measurement: the grade Key Rule 6 names"),
+    **{name: Pick(
+        "C", "adductors and hip rotators", "range",
+        f"Item {i} of the flexibility prescription for the last reading (pattern D: the "
+        "adductors with the knees bent).",
+        "cluster_a_prescription.py, pattern D, from the flexibility battery of 2026-08-12",
+        better="checked 2026-10-16: the prescription chooses the stack from the battery's "
+               "pattern; the retest in weeks 1-3 reads the pattern again, and a new pattern "
+               "brings its own stack")
+       for i, name in enumerate((
+           "Tailor's pose, unloaded", "Frog rocks", "Butterfly PIR",
+           "90/90 hip rotations with lift-offs", "Triangle side split, external-rotation cue"),
+           start=1)},
 }
 
 #: The picks whose check is not closed. Step 8 checked all eight on 2026-10-16
@@ -346,9 +386,12 @@ BETTER_CHECK_OPEN: tuple[str, ...] = ()
 
 def pick_for(name: str) -> Pick | None:
     """The workflow record for an exercise name in the week; a ramp set reads
-    the shared "Ramp set" record."""
+    the shared "Ramp set" record, and a Bunkie line the "Timed plank test"
+    record."""
     if name.endswith("(Ramp Set)"):
         return PICKS.get("Ramp set")
+    if name.startswith("Bunkie — ") and name.endswith("(Timed)"):
+        return PICKS.get("Timed plank test")
     return PICKS.get(name)
 
 

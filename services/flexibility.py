@@ -441,6 +441,10 @@ MOBILITY_TIER_LOADS_LEGS: frozenset[str] = frozenset({
     "Butterfly PIR",
     "90/90 hip rotations with lift-offs",
     "Triangle side split, external-rotation cue",
+    # The 12-week block's retest entry (goal_block.FLEXIBILITY_RETEST): the
+    # battery itself, with its isometric efforts at end range, on the same
+    # tissue the stack works. A morning after it is a morning after leg work.
+    "Flexibility Retest (Test)",
 })
 
 

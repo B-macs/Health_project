@@ -1282,7 +1282,8 @@ def _pop_nav_state() -> bool:
 
 
 def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
-                             policy: dict, day_num: int) -> None:
+                             policy: dict, day_num: int,
+                             lift_entry: dict | None = None) -> None:
     """Seeds st.session_state.tp_actuals[idx] the first time this exercise
     is shown this session, via sess.resolve_prescription — a live +/- stepper,
     not a re-seed, drives every render after that. Guarded so it never
@@ -1337,6 +1338,12 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
         pass  # never block the live flow on a lookup failure
     st.session_state.tp_previous[idx] = sess.previous_performance(last, last_session_sets)
     if not need_actuals:
+        return
+    if lift_entry is not None:
+        # A ramp that follows its lift (sess.ramp_lift_index): about 60% of the
+        # lift's weight for today, whatever the ramp itself logged last time.
+        st.session_state.tp_actuals[idx] = sess.ramp_entry(ex, lift_entry)
+        _save_checkpoint(day_num)
         return
     if not loaded:
         st.session_state.tp_actuals[idx] = sess.bodyweight_entry(ex)
@@ -1989,6 +1996,24 @@ def _render_exercise_timeline(exercises: list) -> None:
     st.markdown(f"<div>{''.join(rows)}</div>", unsafe_allow_html=True)
 
 
+def _render_home_items(day: dict) -> None:
+    """What the day asks for at home (the 12-week block: the neck's working
+    stretch on the core days, approved 2026-10-16). Shown with its how-to; it is
+    not part of the gym session, so it is not timed or logged with it."""
+    home = day.get("home") or []
+    if not home:
+        return
+    with st.expander(f"At home today  ·  {len(home)}", expanded=False):
+        for ex in home:
+            st.markdown(
+                f"<div style='color:{_OV_TEXT_PRI};font-size:15px;font-weight:600;'>{ex['name']}</div>"
+                f"<div style='color:{_OV_TEXT_SEC};font-size:12.5px;margin:2px 0 6px;'>"
+                f"{sess.prescription_label(ex)}</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption(ex.get("mechanics", ""))
+
+
 def _day_overline(d: date) -> None:
     st.markdown(
         f"<div style='color:{_OV_TEXT_SEC};font-size:12px;letter-spacing:2px;font-weight:600;"
@@ -2169,6 +2194,7 @@ def _render_future_day(d: date, active, phases: list) -> None:
         unsafe_allow_html=True,
     )
     _render_exercise_timeline(today_plan["exercises"])
+    _render_home_items(today_plan)
     _render_swap_with_today(
         d, active, phases,
         intro=("Today currently holds: {today_obj}. Swapping does this "
@@ -2271,6 +2297,9 @@ def _render_day_detail(d: date, active, phases: list) -> None:
     except Exception:
         is_logged = False
     state = sess.day_view_state(d, date.today(), active, is_logged)
+    if state != "rest" and not is_logged and sess.is_planned_rest(
+            sess.calendar_plan(active).get(ph.day_number_in_phase(active, d))):
+        state = "rest"
     if state == "rest":
         _render_rest_day(d)
     elif state == "past_completed":
@@ -2432,6 +2461,8 @@ def _render_overview(day_num: int, active, today_plan: dict,
 
     with st.expander(f"Workout  ·  {len(main_exercises)}", expanded=True):
         _render_exercise_timeline(main_exercises)
+
+    _render_home_items(today_plan)
 
     # Spacer — keeps the last accordion row from being hidden behind the fixed
     # floating action bar + bottom nav once scrolled to the end.
@@ -3565,6 +3596,13 @@ def render():
         nav.inject("training")
         st.stop()
 
+    # A planned rest day (the 12-week block's Wednesday and Saturday) has no
+    # exercises: the rest-day screen, never an empty session to Start.
+    if sess.is_planned_rest(sess.calendar_plan(active).get(day_num)):
+        _render_rest_day(_today)
+        nav.inject("training")
+        st.stop()
+
     # ── selected == today: existing day_num-driven flow, unchanged below ────────
 
     # ── Day-overview screen — shown until "Start" is tapped for today's session ─
@@ -4096,7 +4134,16 @@ def _render_guided_flow(day_num, exercises, n_ex,
 
     # Unique timer keys scoped to this exercise / set / rep / side
     _eidx = st.session_state.tp_ex_idx
-    _seed_actuals_if_needed(_eidx, ex, _readiness_modifier, _policy, day_num)
+    # A ramp set with no weight of its own (the 12-week block's) shows about
+    # 60% of its lift's weight today, so the lift is resolved first.
+    _lift_idx = sess.ramp_lift_index(exercises, _eidx)
+    if _lift_idx is not None:
+        _seed_actuals_if_needed(
+            _lift_idx, sess.readiness_dose(exercises[_lift_idx], _volume_factor, day_type),
+            _readiness_modifier, _policy, day_num)
+    _seed_actuals_if_needed(_eidx, ex, _readiness_modifier, _policy, day_num,
+                            lift_entry=(st.session_state.tp_actuals.get(_lift_idx)
+                                        if _lift_idx is not None else None))
     _eset = st.session_state.tp_set
     _erep = st.session_state.tp_rep_in_set
     _side = st.session_state.tp_side

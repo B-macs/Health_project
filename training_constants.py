@@ -158,6 +158,15 @@ _UPPER_BODY_EXERCISES: tuple[str, ...] = (
     "Passive Dead Hang",
     "Pec & Scar Release (Right)",
     "Anterior Shoulder Reciprocation (Right)",
+    # The 12-week block (goal_block.py, phase 5, 2026-10-16): the machine and
+    # cable picks for the upper body, and the neck's working stretch, done at
+    # home on the core days.
+    "Single-Arm Cable Y Raise",
+    "Machine Chest Press",
+    "Machine Shoulder Press",
+    "Reverse Cable Crossover",
+    "Cable Lateral Raise",
+    "Neck Working Stretch (Right)",
 )
 
 _CORE_EXERCISES: tuple[str, ...] = (
@@ -198,6 +207,15 @@ _CORE_EXERCISES: tuple[str, ...] = (
     "Child's Pose",
     # Stage 2A additions
     "Pallof Press (Cable)",
+    # The 12-week block: the four abs picks; the back extension, whose hips
+    # move but whose job is the back muscles that hold the spine; and the rib
+    # and pelvis test.
+    "Lat-Pulldown Cable Crunch (Facing Away)",
+    "Reverse Crunch (Ab Mat)",
+    "High-to-Low Cable Woodchop",
+    "Side Plank with Hip Raises",
+    "45° Back Extension",
+    "Rib and Pelvis Test (Test)",
 )
 
 _LOWER_BODY_EXERCISES: tuple[str, ...] = (
@@ -322,6 +340,17 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     # Sustained pressure at the front of the hip. A release, not loading — it
     # is in services/flexibility.RELEASE_EXERCISES for exactly that reason.
     "Anterior Hip Pressure Release",
+    # The 12-week block (goal_block.py). Its Romanian deadlift ramp is Block
+    # B's name, already above. The flexibility test only reserves its time in
+    # the plan; the readings are taken on the flexibility screen.
+    "Walking Lunge (DB)",
+    "Hack Squat",
+    "Hack Squat (Ramp Set)",
+    "Seated Leg Curl",
+    "Adductor Machine (Seated)",
+    "Standing Cable Hip Flexion",
+    "Hip Airplane (Weighted)",
+    "Flexibility Retest (Test)",
 )
 
 EXERCISE_BODY_REGION: dict[str, str] = {
@@ -634,6 +663,34 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Passive Dead Hang":                      {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
     "Pec & Scar Release (Right)":             {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
     "Anterior Shoulder Reciprocation (Right)": {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
+    # ── The 12-week block (goal_block.py, phase 5) ──────────────────────────
+    # A machine with a back pad gives the trunk little to do; standing cable
+    # work one arm at a time is an anti-rotation task as well. Ramps share
+    # their lift's triple exactly.
+    "Single-Arm Cable Y Raise":               {"upper_body": 0.85, "core": 0.15, "lower_body": 0.00},
+    "Machine Chest Press":                    {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
+    "Machine Shoulder Press":                 {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
+    "Reverse Cable Crossover":                {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Cable Lateral Raise":                    {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    "Neck Working Stretch (Right)":           {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
+    "Lat-Pulldown Cable Crunch (Facing Away)": {"upper_body": 0.05, "core": 0.95, "lower_body": 0.00},
+    # The hips lift on a reverse crunch, so the hip flexors take a share.
+    "Reverse Crunch (Ab Mat)":                {"upper_body": 0.00, "core": 0.85, "lower_body": 0.15},
+    "High-to-Low Cable Woodchop":             {"upper_body": 0.20, "core": 0.70, "lower_body": 0.10},
+    # The same movement as the side bridge with a hip dip: the same triple.
+    "Side Plank with Hip Raises":             {"upper_body": 0.20, "core": 0.75, "lower_body": 0.05},
+    # The back muscles hold the spine while the hips bend: core by a little.
+    "45° Back Extension":                     {"upper_body": 0.05, "core": 0.50, "lower_body": 0.45},
+    "Rib and Pelvis Test (Test)":             {"upper_body": 0.05, "core": 0.65, "lower_body": 0.30},
+    "Walking Lunge (DB)":                     {"upper_body": 0.05, "core": 0.20, "lower_body": 0.75},
+    "Hack Squat":                             {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Hack Squat (Ramp Set)":                  {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "Seated Leg Curl":                        {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
+    "Adductor Machine (Seated)":              {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
+    "Standing Cable Hip Flexion":             {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
+    # The dumbbell held behind the back in both hands gives the arms a little.
+    "Hip Airplane (Weighted)":                {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
+    "Flexibility Retest (Test)":              {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -884,4 +941,33 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Passive Dead Hang":                        ("bodyweight_compound", 0.5),
     "Pec & Scar Release (Right)":               ("mobility_core", 0.25),
     "Anterior Shoulder Reciprocation (Right)":  ("mobility_core", 0.25),
+    # ── The 12-week block (goal_block.py, phase 5) ──────────────────────────
+    # The loaded lifts at their pattern's tier, the ramps at their lift's.
+    "Walking Lunge (DB)":                       ("squat", 1.3),
+    "Hack Squat":                               ("squat", 1.3),
+    "Hack Squat (Ramp Set)":                    ("squat", 1.3),
+    # A hip hinge with a plate held: the hinge tier, as the hip thrust.
+    "45° Back Extension":                       ("hinge", 1.0),
+    "Machine Chest Press":                      ("upper_push", 0.7),
+    "Machine Shoulder Press":                   ("upper_push", 0.7),
+    # Single-joint and loaded: the isolation tier.
+    "Single-Arm Cable Y Raise":                 ("isolation", 0.3),
+    "Reverse Cable Crossover":                  ("isolation", 0.3),
+    "Cable Lateral Raise":                      ("isolation", 0.3),
+    "Seated Leg Curl":                          ("isolation", 0.3),
+    "Adductor Machine (Seated)":                ("isolation", 0.3),
+    "Standing Cable Hip Flexion":               ("isolation", 0.3),
+    "Lat-Pulldown Cable Crunch (Facing Away)":  ("isolation", 0.3),
+    "High-to-Low Cable Woodchop":               ("isolation", 0.3),
+    # Trained to failure without a load: the reverse crunch weighs what the
+    # straddle lift-offs weigh; the side plank what its twin, the side bridge
+    # with a hip dip, weighs.
+    "Reverse Crunch (Ab Mat)":                  ("isolation", 0.3),
+    "Side Plank with Hip Raises":               ("mobility_core", 0.25),
+    # One leg, the body's weight and a dumbbell: the single-leg RDL's tier.
+    "Hip Airplane (Weighted)":                  ("bodyweight_compound", 0.5),
+    # Not training: a stretch at home and two measurements.
+    "Neck Working Stretch (Right)":             ("mobility_core", 0.25),
+    "Rib and Pelvis Test (Test)":               ("mobility_core", 0.25),
+    "Flexibility Retest (Test)":                ("mobility_core", 0.25),
 }

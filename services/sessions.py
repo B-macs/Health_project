@@ -13,11 +13,13 @@ tp_ex_idx etc.) and calls these functions with plain values pulled out of it.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import replace
 from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
+import goal_block as gb
 import training_plan as tp
 from training_constants import EXERCISE_MOVEMENT_WEIGHT as _EXERCISE_MOVEMENT_WEIGHT
 from services import engine
@@ -648,6 +650,61 @@ def step_band_tier(current_tier: str, direction: int) -> str:
     idx = BAND_TIERS.index(current_tier) if current_tier in BAND_TIERS else 0
     idx = max(0, min(len(BAND_TIERS) - 1, idx + direction))
     return BAND_TIERS[idx]
+
+
+def whole_dumbbells(weight_kg: float | None, step: float, *, down: bool = False) -> float | None:
+    """A dumbbell lift's weight as real dumbbells: a whole number of its step.
+
+    His dumbbells, 2026-10-16: "all Dumbells go from 2.25 - 40kg in increments
+    of 2.25kg" — so one dumbbell steps 2.25 kg, and a pair, logged as the total,
+    4.5 kg. A weight logged under the old 2.5 kg steps (42.5, 25) reads as the
+    nearest real one, his rule. On a day that may not go up (`down`: a
+    reduced-load day or a failed-week hold) it reads as the real one at or
+    below, so it never passes the last session. A weight under one step, or
+    no step, is left as it is."""
+    if weight_kg is None or not step or weight_kg < step:
+        return weight_kg
+    n = weight_kg / step
+    n = math.floor(n + 1e-9) if down else math.floor(n + 0.5)
+    return round(n * step, 2)
+
+
+#: A ramp set with no weight of its own (the 12-week block's) shows this share
+#: of its lift's weight for the day, rounded down to the lift's step: about
+#: 60% of the working load (the warm-up review, §2.3; Block B authored ~62%).
+RAMP_SHARE = 0.6
+RAMP_SOURCE = "ramp"
+
+
+def ramp_weight_kg(lift_weight_kg: float | None, step: float) -> float | None:
+    """About 60% of the lift's weight, rounded down to the lift's step."""
+    if lift_weight_kg is None:
+        return None
+    if not step or lift_weight_kg <= 0:
+        return max(0.0, float(lift_weight_kg))
+    return round(float(math.floor(RAMP_SHARE * lift_weight_kg / step + 1e-9)) * float(step), 2)
+
+
+def ramp_lift_index(exercises: list[dict], idx: int) -> int | None:
+    """The index of the lift that the ramp set at `idx` prepares, when the
+    ramp has no weight of its own (it then follows the lift); None for
+    anything else, including a ramp with an authored weight (Block B's)."""
+    ex = exercises[idx]
+    if not (ex.get("warmup") and (ex.get("name") or "").endswith(RAMP_SUFFIX)
+            and ex.get("weight_kg") is None):
+        return None
+    nxt = idx + 1
+    if nxt < len(exercises) and base_name(exercises[nxt].get("name", "")) == base_name(ex["name"]):
+        return nxt
+    return None
+
+
+def ramp_entry(ex: dict, lift_entry: dict | None) -> dict:
+    """A following ramp's live entry: its own reps, and about 60% of the
+    weight its lift shows today (`lift_entry`, the lift's resolved entry)."""
+    weight = ramp_weight_kg((lift_entry or {}).get("weight_kg"), ex.get("increment_size", 2.5))
+    return {"reps": planned_reps(ex), "weight_kg": 0.0 if weight is None else weight,
+            "band_tier": None, "source": RAMP_SOURCE, "last_seen_date": None, "clamped": {}}
 
 
 #: The `source` of an entry seeded by the rep range (engine.range_progression):
@@ -1290,6 +1347,10 @@ def resolve_prescription(
         if blocked:
             final["step_blocked"] = step_block
     final.setdefault("clamped", {})
+    if ex.get("equipment_type") == "dumbbell":
+        final["weight_kg"] = whole_dumbbells(
+            final.get("weight_kg"), weight_increment,
+            down=bool(policy.get("reduced") or policy.get("failed_week_hold")))
     assert_within_ceiling(final, ceiling, policy, ex.get("name", ""))
     if final.get("step_blocked"):
         final["next_step"] = ("The weight is ready to go up, but it stays the same "
@@ -1394,6 +1455,11 @@ def actual_caption(entry: dict) -> str:
         base = f"Starting from your last logged session{date_part}."
     elif source == BODYWEIGHT_SOURCE:
         base = "Today's planned reps. Change them if you do a different number."
+    elif source == RAMP_SOURCE:
+        base = "About 60% of the weight of the lift that follows."
+    elif entry.get("rep_min") is not None:
+        base = ("A light start: set the weight you will lift today. From your next "
+                "session the rep range sets it.")
     else:
         base = "No prior record — using plan default."
     parts = [base]
@@ -1862,6 +1928,15 @@ SESSION_SHAPE: dict[str, int] = {
     "max_flexibility_entries": 10,
     "max_flexibility_minutes": 50,
 }
+#: A full-body day (`"shape": "full_body"`, the goal system's sessions from
+#: phase 5): Key Rule 21's six-exercise cap is REPLACED (athlete, 2026-10-16:
+#: "yes replace it") by at most 8 hard sets per area in one session. The area
+#: count needs each exercise's areas, which the placement's cards carry, so
+#: services/placement.violations checks it on the placed week and
+#: tests/test_goal_block.py pins the block to that week. The other limits —
+#: no one-set training entries, the ramp nesting, seven preparation entries,
+#: 70 modelled minutes — stand.
+FULL_BODY_SHAPE: dict[str, int | None] = {"max_working_families": None}
 RAMP_SUFFIX = "(Ramp Set)"
 TOP_SET_SUFFIX = "(Heavy Top Set)"
 #: The preparation vocabulary: the release block, the raise and the activation
@@ -1880,12 +1955,18 @@ PREPARATION_NAMES = RELEASE_EXERCISE_NAMES | frozenset({
     # The two posture items after the planks, 2026-10-05: short efforts that
     # switch on control before the lifts, the planks' reasoning.
     "90/90 Hip Lift", "Hip Airplane",
+    # The 12-week block's right-shoulder release, straight before a press: a
+    # release, so readiness never scales it and it is no working exercise.
+    "Pec & Scar Release (Right)",
 })
 
 
 def is_measurement(name: str) -> bool:
-    """Finding tests and trials carry a suffix and may lead a session."""
-    return any(tag in (name or "") for tag in ("(Test)", "(Timed Test)", "(Trial)"))
+    """Finding tests and trials carry a suffix and may lead a session. The
+    Bunkie lines end "(Timed)": held to the line breaking and timed, they are
+    measurements too (the 12-week block's timed plank test), so they are never
+    scaled by readiness and never count as one-set training entries."""
+    return any(tag in (name or "") for tag in ("(Test)", "(Timed Test)", "(Timed)", "(Trial)"))
 
 
 #: A session whose clock time runs past this multiple of its modelled time is
@@ -2007,7 +2088,8 @@ def session_shape_violations(day: dict, rules: dict[str, int] | None = None) -> 
     session) is held to the counts and the clock; every day is held to the
     ramp-nesting rule, because a ramp anywhere else is a changeover for
     nothing."""
-    rules = dict(SESSION_SHAPE, **(rules or {}))
+    full_body = FULL_BODY_SHAPE if day.get("shape") == "full_body" else {}
+    rules = dict(SESSION_SHAPE, **full_body, **(rules or {}))
     exercises = day.get("exercises") or []
     names = [ex.get("name", "") for ex in exercises]
     out: list[str] = []
@@ -2025,10 +2107,13 @@ def session_shape_violations(day: dict, rules: dict[str, int] | None = None) -> 
                        f"reps and weight would count as work")
 
     if day.get("session_kind") == "flexibility":
-        if len(exercises) > rules["max_flexibility_entries"]:
-            out.append(f"{len(exercises)} entries on a flexibility day; the ceiling is "
+        # The ceilings are the SESSION's: a test run first on the same morning
+        # (the 12-week block's test Sundays) is not part of it.
+        session = [ex for ex in exercises if not is_measurement(ex.get("name", ""))]
+        if len(session) > rules["max_flexibility_entries"]:
+            out.append(f"{len(session)} entries on a flexibility day; the ceiling is "
                        f"{rules['max_flexibility_entries']}")
-        minutes = session_seconds(exercises) / 60
+        minutes = session_seconds(session) / 60
         if minutes > rules["max_flexibility_minutes"]:
             out.append(f"{minutes:.0f} min on a flexibility day with measured changeovers; "
                        f"the ceiling is {rules['max_flexibility_minutes']}")
@@ -2037,7 +2122,7 @@ def session_shape_violations(day: dict, rules: dict[str, int] | None = None) -> 
         return out
 
     fams = working_families(exercises)
-    if len(fams) > rules["max_working_families"]:
+    if rules["max_working_families"] is not None and len(fams) > rules["max_working_families"]:
         out.append(f"{len(fams)} working exercises ({', '.join(fams)}); the ceiling is "
                    f"{rules['max_working_families']}")
 
@@ -2089,6 +2174,7 @@ def seed_default_phase(phases: list[Phase], plan_start: date | None) -> list[Pha
 
 _PLAN_BY_PHASE_NUMBER: dict[int, dict[int, dict]] = {
     1: tp.PLAN, 2: tp.PLAN_STAGE2, 3: tp.PLAN_STAGE2B, 4: tp.PLAN_BLOCK_B,
+    5: gb.PLAN_GOAL_BLOCK,
 }
 
 #: Everything needed to CREATE a phase, per phase number. Only consulted when a
@@ -2120,6 +2206,13 @@ PHASE_META: dict[int, dict] = {
     # Nothing here should regain `ends_on`/`drop_weeks` unless he names a date.
     4: {"name": "Block B — Strength + Running Build", "stage": 2,
         "button": "Begin Block B — 4-Week Block"},
+    # The goal system's first block (docs/training/goal_system.md), the same
+    # clinical stage for the same reason as Block B: the content changes, the
+    # ceilings do not. Twelve weeks and NO `ends_on` (Key Rule 22): a failed
+    # week runs again and the block grows. It replaces Block B and starts on
+    # the Monday after the push (athlete, 2026-10-16).
+    5: {"name": gb.BLOCK_NAME, "stage": 2,
+        "button": "Begin the 12-Week Block"},
 }
 
 #: Content that runs INSTEAD of an authored week when that week REPEATS, keyed
@@ -2255,6 +2348,13 @@ def begin_new_phase(phases: list[Phase], new_phase: Phase) -> list[Phase]:
     ]
     updated.append(new_phase)
     return updated
+
+
+def is_planned_rest(day: dict | None) -> bool:
+    """A plan day that is a rest day with nothing to do (the 12-week block's
+    Wednesday and Saturday). The training page shows the rest-day screen for
+    it, never an empty session with a Start button or a "not completed" mark."""
+    return bool(day) and day.get("day_type") == "rest" and not day.get("exercises")
 
 
 def day_view_state(selected: date, today: date, active: Phase | None, is_logged: bool) -> str:

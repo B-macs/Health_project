@@ -104,7 +104,7 @@ def exercise_dict(card: Card) -> dict:
 
 
 def _ramp_for(card: Card) -> Card:
-    return replace(card, name=f"{card.name} {sessions.RAMP_SUFFIX}", sets=1, reps=6,
+    return replace(card, name=f"{sessions.base_name(card.name)} {sessions.RAMP_SUFFIX}", sets=1, reps=6,
                    rest_seconds=60, area=None, second=None, ramp=False)
 
 

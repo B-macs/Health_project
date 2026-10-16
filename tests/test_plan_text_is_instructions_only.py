@@ -63,15 +63,20 @@ _THIRD_PERSON = re.compile(
 
 
 def _plans():
+    import goal_block as gb
     return [(n, getattr(tp, n)) for n in dir(tp)
-            if n.startswith("PLAN") and isinstance(getattr(tp, n), dict)]
+            if n.startswith("PLAN") and isinstance(getattr(tp, n), dict)] + [
+        # The 12-week block lives in its own file (Key Rule 25) and is
+        # rendered the same way.
+        ("PLAN_GOAL_BLOCK", gb.PLAN_GOAL_BLOCK)]
 
 
 def _rendered_strings():
-    """(plan, day, exercise, field, text) for everything a view shows."""
+    """(plan, day, exercise, field, text) for everything a view shows. The
+    at-home items of a day are shown too."""
     for plan_name, plan in _plans():
         for day, content in plan.items():
-            for ex in (content.get("exercises") or []):
+            for ex in (content.get("exercises") or []) + (content.get("home") or []):
                 for field in RENDERED_FIELDS:
                     text = ex.get(field)
                     if text:

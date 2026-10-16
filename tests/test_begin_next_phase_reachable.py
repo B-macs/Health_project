@@ -176,10 +176,14 @@ def test_next_phase_offer_survives_as_the_seeding_helper():
     ]
     # Block B (phase 4) was authored 2026-09-11 (training_plan.PLAN_BLOCK_B),
     # so with phases 1-3 stored the helper names it — and it is what
-    # scripts/seed_next_block.py seeds for 2026-09-14. With 4 stored as well
-    # there is nothing further authored, and the helper says so.
+    # scripts/seed_next_block.py seeds for 2026-09-14. The 12-week block
+    # (phase 5, goal_block.PLAN_GOAL_BLOCK) was authored 2026-10-16, so with
+    # 4 stored the helper names 5; with 5 stored as well there is nothing
+    # further authored, and the helper says so.
     assert sess.next_phase_offer(phases) == 4
-    assert sess.next_phase_offer(phases + [_phase(4, "2026-09-14", 28, "upcoming")]) is None
+    with_b = phases + [_phase(4, "2026-09-14", 28, "upcoming")]
+    assert sess.next_phase_offer(with_b) == 5
+    assert sess.next_phase_offer(with_b + [_phase(5, "2026-10-19", 84, "upcoming")]) is None
     # It still refuses to skip: with phase 3 absent it will not offer 3's slot
     # to a phase-4 block either.
     assert sess.next_phase_offer(phases[:1]) == 2
