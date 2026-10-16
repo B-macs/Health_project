@@ -32,6 +32,7 @@ from services import sessions as sess
 from services import strain_regions
 from services import week_repeat
 from services import flexibility as fx
+from services import gate1 as g1
 from services import yoga as yg
 from services.repository import PhasesCorruptError
 
@@ -1705,6 +1706,87 @@ def _render_weekly_rollup_banner(history: list, streak) -> None:
             f"Last week: <span style='color:{color};font-weight:600;'>{text}</span></div>",
             unsafe_allow_html=True,
         )
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def _gate1_lift_weights(since_iso: str) -> dict:
+    """Each gate-1 main lift's (first, latest) working weight in the block."""
+    r = repo.get_repository()
+    since = date.fromisoformat(since_iso)
+    return {lift: g1.lift_weights(r.get_recent_session_sets(lift, limit=60), since)
+            for lift in g1.MAIN_LIFTS}
+
+
+def _fmt_kg(w) -> str:
+    return "—" if w is None else f"{w:g} kg"
+
+
+def _render_gate1(active, in_session: bool) -> None:
+    """Gate 1 — the first run (services/gate1.py; goal A, approved 2026-10-14
+    and 2026-10-16). A week that ended with fewer than 3 core sessions asks
+    its reason, one tap, and the 6-week count waits for the answer. Under it,
+    the count and the four main lifts against 10% above their first weight."""
+    if in_session or not g1.applies(active):
+        return
+    try:
+        r = repo.get_repository()
+        raw = r.get_config_value(g1.CONFIG_KEY)
+        reasons = g1.read_reasons(raw)
+        today_ = date.today()
+        mondays = g1.week_mondays(active, today_)
+        plan_dict = sess.calendar_plan(active)
+        logged = _plan_logged_dates(active.start_date, today_.isoformat()) if mondays else set()
+        weeks = [g1.WeekCount(m, g1.core_sessions_done(active, plan_dict, logged, m),
+                              reasons.get(m.isoformat())) for m in mondays]
+        counted = g1.count(weeks)
+        rows = g1.strength_rows(_gate1_lift_weights(active.start_date))
+    except Exception:
+        return  # never let the gate's read block the training page
+    waiting = counted["waiting"]
+    if waiting is not None:
+        done = next(w.core_done for w in weeks if w.monday == waiting)
+        st.warning(
+            f"The week of {waiting.strftime('%d %b')} ran {done} of 3 core sessions. "
+            "What was the reason? The 6-week count waits for your answer."
+        )
+        for col, (key, label) in zip(st.columns(len(g1.REASONS)), g1.REASONS.items()):
+            if col.button(label, key=f"g1_reason_{key}", use_container_width=True):
+                r.set_config(g1.CONFIG_KEY, g1.with_reason(raw, waiting, key))
+                st.rerun()
+    met = sum(1 for row in rows if row["met"])
+    with st.expander(
+            f"Gate 1 — the first run  ·  {counted['run']} of {counted['required']} weeks  ·  "
+            f"{met} of {len(rows)} lifts", expanded=False):
+        st.caption(
+            "Running starts when all of these are true: 6 weeks in a row with all 3 core "
+            "sessions and no flare-up; each main lift 10% above its first weight in this "
+            "block; then a test day (a 30-minute brisk walk, single-leg calf raises and hops, "
+            "all without pain)."
+        )
+        st.markdown(f"**Weeks in a row:** {counted['run']} of {counted['required']}")
+        for row in rows:
+            mark = "✓" if row["met"] else "·"
+            st.markdown(
+                f"{mark} **{row['lift']}** — first {_fmt_kg(row['first'])}, now "
+                f"{_fmt_kg(row['latest'])}, target {_fmt_kg(row['target'])}"
+            )
+        monday = today_ - timedelta(days=today_.weekday())
+        if reasons.get(monday.isoformat()) == g1.REASON_FLARE:
+            st.caption("A flare-up is recorded for this week.")
+        elif st.session_state.get("g1_flare_confirm"):
+            st.warning("Record a flare-up for this week? It resets the 6-week count.")
+            c_yes, c_no = st.columns(2)
+            if c_yes.button("Yes, record it", key="g1_flare_yes", use_container_width=True):
+                r.set_config(g1.CONFIG_KEY, g1.with_reason(raw, monday, g1.REASON_FLARE))
+                st.session_state.g1_flare_confirm = False
+                st.rerun()
+            if c_no.button("Cancel", key="g1_flare_no", use_container_width=True):
+                st.session_state.g1_flare_confirm = False
+                st.rerun()
+        elif st.button("A session this week was shortened or changed because of the hips "
+                       "or back", key="g1_flare", use_container_width=True):
+            st.session_state.g1_flare_confirm = True
+            st.rerun()
 
 
 def _render_week_repeat(phases: list, in_session: bool) -> None:
@@ -3599,6 +3681,7 @@ def render():
     if not _garmin_sync_ok and _garmin_sync_err:
         st.caption("Garmin daily sync unavailable — will retry next visit.")
     _render_week_repeat(phases, _in_session)
+    _render_gate1(active, _in_session)
 
     _render_day_strip(active)
     _render_week_status_badge(history, st.session_state.get("tp_week_start"))
