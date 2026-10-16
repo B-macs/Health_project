@@ -697,3 +697,46 @@ by L3 the only removable exercise is the walking lunge, which shortens only
 Monday and Thursday. Ramp sets: the warm-up review found a ramp set adds about
 nothing at loads near a 10-rep maximum, and this plan has no heavy top set.
 **OPEN, his choice.**
+
+**Four sessions a week — his decision, 2026-10-16** (*"Ok let's try 4 a week but
+if I start missing and only going to three sessions then we can relook at it
+after 12 weeks. We need to think of this deterministicly"*). Measured the same
+day with the placement rules on the draft cards:
+
+- **Why no exercise can go.** The weekly minimums (step 3) set the work, and
+  each exercise carries part of an area's minimum. Taken out one at a time, every
+  exercise but the walking lunge puts an area under its minimum: the back
+  extension takes the deep back to 0 of 10; the Romanian deadlift or the leg curl
+  the hamstrings to 6 of 10; the hack squat the quads to 3 of 6; the row, the
+  chest press and the reverse crossover their areas to 0 of 6; any abs exercise
+  the abs to 9 of 10; the hip airplane and the psoas isometric their areas to 0
+  of 6. About 100 hard sets a week over four sessions is about 25 sets a session,
+  which is where the 65-70 minutes come from: the time is set by the dose, not by
+  the list of exercises.
+- **One missed session, as the rules stand:** nothing can move — Wednesday would
+  make three strength days in a row, and Saturday stays rest before Sunday's
+  flexibility day — so the session is lost for that week. Five or six areas then
+  end the week one session short (Monday missed: abs, deep back and hamstrings 9
+  of 10; chest 3 and press 4.5 of 6; hip rotators 3 of 6).
+- **A planned 3-day week** (Monday, Wednesday, Friday), every exercise kept: 85,
+  82 and 86 minutes. Fitted to 70 by taking out the lowest-priority exercise of
+  the longest session until each fits (the draft order below): 67, 70, 70 — the
+  lateral raises, the reverse crossovers, one psoas isometric and one Y raise go;
+  side delts 3 and rear delts 0 of 6, hip flexors 3 of 6, abs and deep back 9 of
+  10. Fitted to 60, the chest, back, hack squat and more go too. The exercise
+  choice does not change with the number of days; what changes is how often each
+  exercise runs, and which areas give way is set by the drop order.
+
+**PROPOSED, for his approval:**
+
+- **Drop order** (highest priority first): goal A's priority areas (Romanian
+  deadlift, back extension, walking lunge, seated leg curl, the abs); the hip
+  airplane and the psoas isometric; the gate-1 main lifts (hack squat, shoulder
+  press, chest press, row); goal B (the release with the Y raise, the reverse
+  crossover, the lateral raise). It decides what a 3-day week, or any session
+  over 70 minutes, gives up first.
+- **A missed Monday or Tuesday session moves to Wednesday**, accepting three
+  strength days in a row that week, so the week stays 4 of 4 for gate 1. A
+  missed Thursday or Friday session cannot move (Saturday stays rest).
+- **The 12-week review:** if 4 or more of the 12 weeks had 3 or fewer sessions
+  (travel and illness weeks not counted), the plan is placed again for 3 days.
