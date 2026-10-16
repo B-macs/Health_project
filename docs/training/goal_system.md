@@ -794,14 +794,24 @@ EVERY release (his 2026-10-15 rule), which is what lifted the core from the
    item.** Applied to Block B's six lifts that had 10-12 or 12-15 (hip thrust,
    incline press, lat pulldown, row → 8-12; Pallof press, face pull → 10-15).
    Where one weight step is still larger than the range allows, the reps climb
-   past the top first (rule 5): at today's plan weights that is the incline
-   press (15 reps at 15 kg), the face pull (17 at 6 units) and the Pallof press
-   (18 at 5 units).
+   past the top first (rule 5). At his logged weights (2026-10-10 and 10-12)
+   that is the face pull (17 reps at 6 units, a step of +17%) and the incline
+   press (15 reps at 15 kg with 2.5 kg steps). **Corrected 2026-10-16:** a first
+   count also named the Pallof press (18 reps), read at the plan's starting
+   weight of 5 units; at his logged 9-10 units the step is +10-11% and the
+   weight goes up at 15, the top of its range.
+   **His answers, 2026-10-16:** the dumbbells go up in **2.25 kg** (*"Incline
+   press goes up by the DB available which are in 2.25 increments"*) — the app
+   has logged every dumbbell lift in 2.5 kg steps, so the dumbbell series is
+   asked before the step changes; the cable machines' **units are fine as
+   long as it is the same machine, and 1 unit is about 0.5 kg** (*"this doesnt
+   matter as long as its the same machine"*). The rule reads a step as a share
+   of the weight, so the unit's size in kg does not change it.
 3. **The hip flexors' second day comes from the bonus** (`goal_week.MIN_DAYS`).
 4. **The neck working stretch is done at home** on the three core days
    (`goal_week.HOME`). Placed again without it, the core sessions model at
    Monday 56, Tuesday 61 and Thursday 59 minutes, with no rule broken; Tuesday
-   is 1 minute over the 60-minute target.
+   is 1 minute over the 60-minute target — **ACCEPTED 2026-10-16** (*"Accepted"*).
 
 **The first side alternates by the day — his request, 2026-10-16** (*"We need
 to switch the right and left so that some days I start with left and others
