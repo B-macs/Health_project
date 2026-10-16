@@ -1112,6 +1112,10 @@ im not 5. Yes 5kg"*):
 **The column is in Supabase**: he pasted the `tut_left` line, and a read-only
 query found it (2026-10-16).
 
+**Pushed 2026-10-16** (`618dd07..0fd01a8`; *"Yes push it"*). The first
+Training-page visit stores the changeover; the block starts Monday
+2026-10-19.
+
 **Left open by the documents, recorded:** their physiotherapist sign-off
 clauses (retired 2026-08-17); they expect pattern F, the stored reading is D
 from one morning (the retest reads it again); and five new exercises load the
