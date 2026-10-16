@@ -1017,3 +1017,14 @@ on Tuesday. The core sessions now model at Monday 67, Tuesday 61 and Thursday
 69 minutes: no rule broken, all three over the 60-minute target. Options put to
 him: keep them; trim (the hip airplane's range 6-10 and 45 seconds' rest on the
 adductor machine: 65, 61, 67); or the adductor ladder back at home (60, 61, 62).
+**His answers:** *"Let's keep the session length at A as per it is now. We can
+test it, and if it's too long, we can always change it later point."* — the
+sessions stay at 67, 61 and 69 modelled minutes, and are tested in use. The
+three safety rules for the new picks are approved (*"Yes, recommendation of
+number two is correct"*).
+
+**The build (step 8) starts 2026-10-16.** The design is complete; nothing is in
+the app yet. He asked whether everything was done: it is not — the block, its
+rules in the app, gate 1, the core hold score and the changeover are built
+next, then the push (his OK), then his phone check. The block starts on the
+Monday after the push.
