@@ -153,6 +153,14 @@ def test_the_minimums_hold_without_the_bonus():
     assert set(gw.MIN_DAYS) == {"hip flexors"}
 
 
+def test_the_90_90_hip_lift_is_not_in_the_new_week():
+    """Out on 2026-10-16 (athlete: "It doesnt warm up anything and the evidence
+    it fixes the issue is weak"). It had been carried over from Block B's
+    warm-up without being checked."""
+    assert all("90/90 Hip Lift" not in _names(d) for d in gw.DAYS)
+    assert [c.name for c in gw.WARMUP] == ["Standing Psoas March"]
+
+
 def test_the_neck_stretch_is_done_at_home_not_in_the_gym():
     """Approved 2026-10-16: at home on the core days, so it takes no gym time."""
     name = "Neck Working Stretch (Right)"

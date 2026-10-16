@@ -249,7 +249,7 @@ the effort (step 4).
 | Hamstrings | Strength and size, through full length | Tense at the sit bones (2026-10-05); normal length (Jan 2025) |
 | Hip rotators (the pelvis twist) | Strength and size — hip airplane, 3 × max, not every day | Finding #7 (2026-10-05); his decision 2026-10-14 |
 | Hip flexors | Strength at length | Tense, not short (Thomas test 2026-10-05); his rule 2026-08-24 |
-| Left lower ribs | Control | Left ribs flare (2026-10-05) |
+| Left lower ribs | Covered by the abs work (changed 2026-10-16, when the 90/90 hip lift came out of the new block); it was "Control" | Left ribs flare (2026-10-05) |
 | Upper glutes and piriformis | Control — NO direct work; they settle when the weak muscles take their share | Tense list |
 | Main lifts (legs, back, chest, shoulders) | Strength and size | Gate 1: +10% |
 | Heart and lungs (blocker 3) | Endurance — none in stage 1 beyond the 15-minute walks to the gym (his choice); the running starts at gate 1 | Stage system |
@@ -834,7 +834,7 @@ side's own numbers are added only when they differ.
 
 ---
 
-## Step 7 — the warm-up — 2026-10-16, approved except the hip lift
+## Step 7 — the warm-up — APPROVED 2026-10-16
 
 **Every strength day, before the first lift:**
 
@@ -855,7 +855,7 @@ retired; the abs are trained to failure at the end of each session); the
 incline walk; the hip airplane in the warm-up (3 × max at the end of two
 sessions).
 
-**OPEN — the 90/90 hip lift.** His question: *"What is the objective of the
+**The 90/90 hip lift — REMOVED 2026-10-16.** His question: *"What is the objective of the
 90/90 hip lift and how effective is it and required for the training? or is
 this more of a daily thing to do ... outside of warming up for training? does
 this warm up a certain muscle that without it i could have issues?"* The facts
@@ -877,8 +877,23 @@ given to him:
   for posture find the trials mostly at high risk of bias (2020, 22 trials).
 - **His own record does not answer it:** five logged sessions (2026-10-06 to
   10-12), and finding #7's test has never been graded.
-- **Without it** every session is about 2 minutes shorter: Monday 54, Tuesday
-  59, Thursday 56, Friday 57 modelled minutes.
+- **Without it** every session is about 2 minutes shorter: Monday 53, Tuesday
+  59, Thursday 56, Friday 57 modelled minutes — every session under 60.
+
+**His follow-up, and the answer recorded as given:** *"Why was it in the new
+training block is what Id like to know? It doesnt warm up anything and the
+evidence it fixes the issue is weak?"* There was no good reason. On 2026-10-05
+he asked for posture and abs work after noticing the rib and pelvis pattern,
+and the hip lift was picked then for the ribs — its own text already said no
+trial shows an exercise moves a resting pelvic position. On 2026-10-14 he
+questioned it, and the record agreed it is a breathing drill, not the fix for
+the twist. On 2026-10-16 the new week's warm-up was copied from Block B's
+without checking it against that question, and step 7 then gave it a reason
+from step 2's "left lower ribs — control" instead of asking whether it works.
+**Rule taken from it: a carried-over exercise is checked like a new pick —
+its job, its evidence and its cost — before it enters a new block.** The left
+lower ribs are now covered by the abs work, trained to failure, which trains
+the muscles that pull the lower ribs down.
 
 ---
 
@@ -912,3 +927,11 @@ monday. lets complete all other steps and then push."*
   the rule takes over from the second (option a); **the timed plank test:** in
   week 1 and week 12, at the end of session A in place of that day's abs work,
   with the core hold score built before week 1 (option a).
+- **His dumbbells, 2026-10-16:** *"22.5kg is the number I rowed with this
+  morning and all Dumbells go from 2.25 - 40kg in increments of 2.25kg."* So a
+  dumbbell is a multiple of 2.25 kg, and the + and − buttons move one dumbbell
+  size. A lift with a dumbbell in each hand is logged as the total of both, as
+  his log already is — the Romanian deadlift at 45 kg cannot be one dumbbell
+  when the heaviest is 40 — so one step there is both dumbbells one size up
+  (4.5 kg). Logged weights that are not real dumbbells (for example 42.5 or
+  25) are read as the nearest real one when the block starts.

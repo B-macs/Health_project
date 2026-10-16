@@ -53,10 +53,14 @@ SPEC = WeekSpec(days=CORE_DAYS, in_a_row=frozenset({("Mon", "Tue")}), minimums=R
 #: reps short of failure there, approved 2026-10-16), straight before a press.
 PRESS_DAYS = ("Mon", "Thu")
 
+#: The warm-up (step 7, 2026-10-16): the 15-minute walk to the gym is the raise,
+#: then the psoas march; the ramp sets sit on their lifts. The 90/90 hip lift was
+#: carried over from Block B without being checked and is OUT (athlete,
+#: 2026-10-16: "It doesnt warm up anything and the evidence it fixes the issue
+#: is weak") — the abs work covers the lower ribs.
 WARMUP = [
     Card("Standing Psoas March", sets=2, reps=20, rest_seconds=20, laterality="alternating",
          section="warmup", fixed_days=CORE_DAYS),
-    Card("90/90 Hip Lift", sets=2, reps=5, rest_seconds=20, section="warmup", fixed_days=CORE_DAYS),
 ]
 RELEASE = Card("Pec & Scar Release (Right)", sets=2, type="hold", reps=None, hold_seconds=60,
                rest_seconds=15, section="block", fixed_days=PRESS_DAYS)
