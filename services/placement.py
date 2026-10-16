@@ -18,7 +18,8 @@ THE RULES, in the order they run:
   P2  A rotating group (the abs) takes one card a day, in card order.
   P3  A pattern with as many appearances as there are days (the knee lifts,
       the hip lifts) takes one appearance a day.
-  P4  A card on at most half the days never falls on two days in a row.
+  P4  A card never falls on two days in a row when the week leaves a choice
+      that avoids it.
   P5  The other cards, high demand first and then in card order, each go on
       the allowed days with the least modelled time so far; a tie goes to the
       earlier days.
@@ -126,11 +127,19 @@ def minutes(items: list[Card]) -> float:
     return sessions.session_seconds([exercise_dict(c) for c in order(items)]) / 60
 
 
+def _has_a_row(combo: tuple[str, ...], spec: WeekSpec) -> bool:
+    return any(pair in spec.in_a_row for pair in itertools.combinations(combo, 2))
+
+
+def _row_free_exists(n: int, spec: WeekSpec) -> bool:
+    """Whether n days can be chosen with no two in a row. With Mon, Tue, Thu,
+    Fri, two can and three cannot; with Mon, Tue, Thu, two can."""
+    return any(not _has_a_row(c, spec) for c in itertools.combinations(spec.days, n))
+
+
 def _allowed(card: Card, combo: tuple[str, ...], week: dict, spec: WeekSpec) -> bool:
-    # P4 binds a card on at most half the days: one on more days than that
-    # cannot avoid two in a row (three of Mon, Tue, Thu, Fri always include one).
-    if len(combo) * 2 <= len(spec.days) and any(
-            pair in spec.in_a_row for pair in itertools.combinations(combo, 2)):
+    # P4 binds whenever the week leaves a choice with no two days in a row.
+    if _has_a_row(combo, spec) and _row_free_exists(len(combo), spec):
         return False
     if card.pattern and any(any(c.pattern == card.pattern for c in week[d]) for d in combo):
         return False

@@ -337,6 +337,20 @@ days (APPROVED 2026-10-15).
 
 ---
 
+**PROPOSED 2026-10-16 — a lower REQUIRED dose that three sessions meet, with
+the fourth session a bonus** (*"Then our goal is too high for sets per week,
+Research and find out what is the minimum. I'd like to aim for a 3 day week
+meets the required goal and a 4th day is a bonus"*). The evidence is in
+`docs/training/weekly_volume_minimum_2026-10-16.md`: 10 sets a week is the figure
+for the most growth, about 4 hard sets the practical floor, and strength needs
+less. Proposed: priority-1 areas 6 hard sets a week on 2 days; priority-2 areas
+4, counting half-sets; the hip flexors' strength-at-length work 3; the hip
+airplane and the adductor ladder unchanged. Placed by the rules: three core
+sessions of 54, 57 and 59 minutes meet it; the bonus session (60 minutes) lifts
+the priority-1 areas to 9-16.
+
+---
+
 ## Step 4 — effort per exercise type — APPROVED 2026-10-15
 
 Working sets end **1-2 reps before failure** (the counting rule is unchanged: a

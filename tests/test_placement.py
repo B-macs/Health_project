@@ -146,3 +146,15 @@ def test_the_checker_catches_too_many_sets_for_one_area():
                        for i, c in enumerate(gw.CARDS) if c.area == "abs"]
     found = pl.violations(pl.place(many, gw.SPEC), gw.SPEC, gw.EXTRA_SETS, gw.EXTRA_DAYS)
     assert any("abs gets" in v for v in found), found
+
+
+def test_a_two_day_card_avoids_days_in_a_row_on_a_three_day_week():
+    """Regression, 2026-10-16: the not-in-a-row rule once switched on only for
+    cards on at most half the days, so on Mon, Tue, Thu a two-day card could
+    land on Mon and Tue. It binds whenever a choice without a row exists."""
+    spec = pl.WeekSpec(days=("Mon", "Tue", "Thu"), in_a_row=frozenset({("Mon", "Tue")}))
+    cards = [pl.Card(f"Lift {i}", area="x", days=2) for i in range(4)]
+    week = pl.place(cards, spec)
+    for c in cards:
+        on = tuple(d for d in spec.days if c in week[d])
+        assert on != ("Mon", "Tue"), (c.name, on)
