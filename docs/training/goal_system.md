@@ -515,9 +515,37 @@ for every picked exercise the safety check calls "unknown", and show him the
 list (exercise, result, one-line reason) before it goes into
 `services/rules.py`.
 
+**The list — PROPOSED 2026-10-16, waiting for his approval.** Already known:
+the crunches, Romanian deadlift, back extension, hack squat, Bulgarian split
+squat, hip airplane and psoas march are "caution" (allowed); the face pull and
+the prone Y raise are "cleared". New rules:
+
+| Exercise | Result | Reason (one line) |
+|---|---|---|
+| Walking lunge | caution, right | The "walking" rule cleared it by mistake. Right hip bent past 60° at the bottom: knee and toes point straight ahead (Key Rule 7). Keyword "walking lunge", so the yoga lunges are not caught |
+| High-to-low cable woodchop | caution | Turning under load: the turn comes from the hips and upper back, the lower back stays still |
+| Side plank with hip raises | caution | Lowering and raising the hips is a side bend under body weight (the side-bend rule) |
+| Machine hip thrust | caution | Stop at a straight line at the top, pelvis tucked (the L5/S1 extension rule) |
+| Seated leg curl | cleared | A knee bend with the back supported; no load on the spine |
+| Machine shoulder press | cleared | Back supported; the press goes up in front of the head, never behind it |
+| Seated dumbbell shoulder press (the goal-B proof) | cleared | The same |
+| Cable lateral raise | caution, right | On the right, the cable starts in front of the body (the measured limit) |
+| Reverse cable crossover | caution, right | The right arm stops at the line of the body (the measured limit) |
+| Neck working stretch (right) | caution | The hand only resists the push; it never pulls the head further (no pressure into range at Beighton 6/9) |
+
+The chest and back picks get their rules when their lists arrive.
+
 ---
 
-## Step 6 — placement — NOT YET WALKED THROUGH (rules collected so far)
+## Step 6 — placement — PROPOSED 2026-10-16
+
+His request (2026-10-16): *"Can you bring understand each the exercise and
+create a deterministic test to put them automatically in their correct
+position?"* The answer: every exercise gets a CARD of facts; a fixed list of
+rules places each card on a day and in a place in the session; tests fail when
+a rule is broken. Nothing is placed by hand.
+
+**Already decided:**
 
 - **Every strength session is full body** (APPROVED 2026-10-15).
 - **The day before the flexibility session is a rest day** — it follows from
@@ -525,3 +553,80 @@ list (exercise, result, one-line reason) before it goes into
 - **About 6-8 hard sets per muscle per session** (APPROVED 2026-10-15).
 - **OPEN:** the right-shoulder release was set for "the upper-body days"
   (step 3); those days no longer exist, so its days are decided here.
+
+**The card — what the method knows about each exercise:**
+
+1. Main area (counts 1) and second area (counts 0.5) — step 3.
+2. Job — step 2.
+3. Kind — compound (several joints), isolation (one joint), or preparation.
+4. Pattern — knee bend, hip hinge or extension, push, pull, side delt, rear
+   delt, trunk.
+5. Demand — high (heavy, free weight or balance), medium or low.
+6. Station — the machine, cable, bench or mat. It sets the changeover time
+   (measured: 74 s to a mat, 117 s to a station, 158 s to a band set-up).
+7. Sides — both together, one at a time, or right only.
+8. Effort — step 4.
+9. Dose — sets, reps or seconds, and rest.
+10. Day rule, where one exists — e.g. the hip airplane on two days that are
+    not in a row, the neck on three days.
+11. Safety result and tier source — step 5.
+
+**Week rules:**
+
+- W1. 4 strength days, 1 flexibility day, 2 rest days. The day before the
+  flexibility day is rest. Never 3 strength days in a row.
+- W2. Two full-body sessions, A and B, in the order A, B, A, B.
+- W3. Two exercises with the same pattern go one to A and one to B. An
+  exercise with no partner follows its day rule, or goes into both sessions
+  when its area needs the sets.
+- W4. Every area reaches its weekly minimum (step 3), on 2 or more days.
+
+**Session rules (the order):**
+
+- S1. Preparation first (step 7 sets its content; limit 10-15 minutes).
+- S2. Then the lifts, sorted by: compound before isolation; higher demand
+  first; priority-1 areas before priority 2; the same station together; the
+  name last, so a tie always breaks the same way.
+- S3. A ramp set straight before its own lift (Key Rule 21).
+- S4. Trunk work to failure, the hip airplane and the strength-at-length holds
+  come last, so a tired trunk never comes before a heavy lift.
+
+**Limits:**
+
+- L1. At most 8 hard sets per area in one session.
+- L2. At most 70 modelled minutes per session (Key Rule 21), measured with the
+  app's own time model.
+- L3. A session over the limit: (a) cut one set at a time from the area
+  furthest above its weekly minimum, never below it; (b) then pair two
+  isolation exercises at the same station (supersets); (c) if it is still
+  over, stop and ask.
+
+**The checks (tests):** the same cards always give the same week; every area
+reaches its minimum; no area goes over 8 sets in a session; no session goes
+over 70 minutes; preparation stays inside its limit; the order rules and the
+day rules hold; every exercise has a known safety rule and a tier source.
+
+**Draft on today's picks** (2026-10-16, from a scratch run of these rules
+through `services/sessions.session_seconds`; the chest and back exercises are
+placeholders until their lists arrive):
+
+- **Session A — 89 modelled minutes** (preparation 20): psoas march, rib
+  control, right-shoulder release, prone Y raise, neck; Romanian deadlift
+  (ramp + 3), hack squat (ramp + 3), back extension 2, lat pulldown 3,
+  machine shoulder press 3, cable lateral raise 3; cable crunch 3, reverse
+  crunch 2, adductor ladder 3, hip airplane 3.
+- **Session B — 76 modelled minutes** (preparation 11): psoas march, rib
+  control, neck; walking lunge 3, back extension 2, machine hip thrust 3,
+  seated cable row 3, incline dumbbell press 3, seated leg curl 3, reverse
+  cable crossover 3; woodchop 2, side plank with hip raises 2, psoas
+  isometric 3.
+- **Weekly sets:** every area at or above its minimum except the deep back
+  (8 against 10) — rule W4 adds one back-extension set to B.
+
+**Two conflicts for his decision:**
+
+1. **Time:** both sessions are over 70 minutes, and A's preparation is over its
+   10-15 minutes.
+2. **Key Rule 21 caps a session at 6 working exercises** (2026-09-11, after an
+   81-minute session). Full body needs about 9. Its reason — sessions growing
+   longer — is what the time limit (L2) already checks.
