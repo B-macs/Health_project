@@ -2944,8 +2944,6 @@ BAND_CHEST_PRESS = _band(
     ),
     progression="12 controlled reps → next band up.",
     regression="Shoulder feels unstable → shorten the range and keep the hands lower.",
-    warning="Never press from a position with the arm out at 90 degrees and turned outward — "
-            "that is the position the right shoulder's repair exists to protect.",
 )
 
 BAND_LAT_PULLDOWN = _band(
@@ -4606,18 +4604,15 @@ ANTERIOR_SHOULDER_RECIPROCATION = _ex(
     ),
     biomechanical_focus=(
         "Active work biased toward the long position, which is the opposite of the position "
-        "that cramps. The arm stays low because external rotation at 90 degrees of abduction "
-        "is the apprehension position the Latarjet exists to protect, and that is a geometric "
-        "limit rather than a matter of load."
+        "that cramps."
     ),
     progression="Comfortable at ten seconds -> build the outward hold toward thirty over two weeks.",
     regression=("The lock-out cramp appears -> the position has drifted too short. Open the "
                 "elbow angle rather than pushing through it."),
     warning=(
-        "NEVER external rotation at 90 degrees of abduction on this side. Stop on any "
-        "ice-pick sensation, anything running into the arm, any instability feeling, or any "
-        "hard, abrupt, unspringy end-feel on the outward rotation — on a stabilised shoulder "
-        "that restriction may be load-bearing."
+        "Stop on any ice-pick sensation, anything running into the arm, any instability "
+        "feeling, or any hard, abrupt, unspringy end-feel on the outward rotation — on a "
+        "stabilised shoulder that restriction may be load-bearing."
     ),
 )
 

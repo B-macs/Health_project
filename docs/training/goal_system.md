@@ -185,19 +185,24 @@ of them makes sense as I get older and don't want any issues"*):
   annotated in place (`Input_files/cluster_d_prescription.md`, with a backup in
   `Input_files/backups/`; `docs/training/release_protocols_2026-08-10.md`).
 - **Pulldowns behind the head stay out** — he already avoids them.
-- **My reading of "getting rid of them", TO CONFIRM:** the other end-range lifts
-  with the arm behind the body also stay out, as a precaution with age —
+- **Also out, as a precaution with age — CONFIRMED 2026-10-16** (*"Yes that is
+  correct agree"*): the other end-range lifts with the arm behind the body —
   presses behind the head, dips, and the deep wide-grip bench.
 - **The MEASURED limit stays:** the right arm stops at the line of the body in
   flyes, the reverse cable crossover and the face pull.
-- **Revert condition (proposed, TO CONFIRM):** the 90° limit comes back if the
+- **Revert condition — CONFIRMED 2026-10-16:** the 90° limit comes back if the
   right shoulder ever feels unstable — the feeling that it may slip forward.
-- **Where the old wording still stands as text, not as a rule for this plan:**
-  the notes of the 16-minute shoulder yoga flow (never filmed), the retired
-  anterior-shoulder reciprocation drill (`training_plan.py`, `services/rules.py`),
-  the Stage 2B band chest press warning (a past block), and the reason texts of
-  the "abduction" and "external rotation" safety rules ("caution" — they block
-  nothing). Do not re-derive the limit from them.
+- **The old wording is DELETED, 2026-10-16** (*"Delete the wording from there
+  too"*): from the 16-minute shoulder yoga flow (the wall press is now
+  "cleared"; the prone hold and the chest opener keep their positions, the
+  prone hold's caution now resting on the measured limit), the deep-lunge
+  note of the hip flow, the retired anterior-shoulder reciprocation drill
+  (`training_plan.py` and its rule), the Stage 2B band chest press warning,
+  and the "abduction" and "external rotation" rule texts.
+  `tests/test_shoulder_limit_removed.py` fails if the wording comes back. Dated
+  records keep it, annotated or untouched: the Cluster D prescription and the
+  release protocol (annotated), and an August design mockup
+  (`mockups/flexibility_v2_architecture.html`, a deleted model).
 
 ## Goal C — flexibility that lasts — APPROVED 2026-10-14
 
@@ -481,7 +486,7 @@ machine-only rule).
 - **One cited trial is under data doubt:** the 12-week squat-against-hip-thrust
   trial (Barbalho et al. 2020), cited by two of the videos; see `glutes.md`.
 
-**OPEN — two ranked lists for one area** (the glutes now). Proposed: an
+**APPROVED 2026-10-16 — two ranked lists for one area** (*"2 agree"*): an
 exercise qualifies if ANY list puts it in S or A; it ranks by its best tier; a
 tier given without a named version counts for each version his rules allow;
 and when a checked trial compared two exercises directly, the trial's winner
@@ -501,10 +506,14 @@ is **A** (Jeff Nippard's low A — the list names that version); a step-up onto 
 lower box is **D** (only the second list covers it). Either way it is not
 picked now: six S-tier glute exercises rank above it (walking lunge, Smith
 lunge with the front foot raised, machine hip thrust, reverse lunge, Romanian
-deadlift, 45° back extension). The rule itself is still OPEN; the stricter
-choice is "when lists disagree, the LOWER tier counts" — then the step-up and
-the kickback drop out, and every current pick stays. The trial clause (the
-seated curl ahead of the lying curl) is the same in both.
+deadlift, 45° back extension). He chose the rule above over the stricter
+"when lists disagree, the LOWER tier counts". **The hamstring curl pick is the
+seated leg curl** (the trial clause: Maeo et al. 2021).
+
+**Safety rules for the picks — AGREED 2026-10-16** (*"3 agree"*): write a rule
+for every picked exercise the safety check calls "unknown", and show him the
+list (exercise, result, one-line reason) before it goes into
+`services/rules.py`.
 
 ---
 

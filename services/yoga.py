@@ -243,12 +243,8 @@ YOGA_LIBRARY: list[YogaSession] = [
             YogaPose(
                 "Deep Lunge Hip Opener (Left)", _t("08:20"), 30, "caution",
                 "Reach/backbend combination risks end-range lumbar extension and rotation. "
-                "Keep the reach modest. This is the pose where the RIGHT arm reaches back "
-                "into extension + external rotation — the apprehension-adjacent position "
-                "for the post-Latarjet shoulder (finding #6). It was predicted to be "
-                "range-limited on 2026-08-05 and was not ('right arm can reach the back "
-                "leg with ease'), so the range question is settled; what is NOT settled is "
-                "that finding #6 calls that stability maintenance-dependent.",
+                "Keep the reach modest. The RIGHT arm reaches back for the foot here; on "
+                "2026-08-05 it reached the back leg with ease.",
                 option_note="Option to grab your right foot",
                 retest="Does the right shoulder still reach the back foot with ease, and "
                        "does the front of the joint feel stable there? Baseline 2026-08-05: "
@@ -383,26 +379,24 @@ YOGA_LIBRARY: list[YogaSession] = [
             YogaPose(
                 "Prone Scapular Retraction Hold (Arms Low, Palms Down)",
                 _t("07:15"), 25, "caution",
-                "ARMS LOW, not a prone T — arms at 90 degrees of abduction would put the "
-                "post-Latarjet shoulder toward the apprehension position. 25s as "
-                "authored: this is a positioning drill, not the endurance prescription — "
+                "The right arm lifts less far than the left here: a face-down arm raise "
+                "measured 20 cm on the right against 40 cm on the left (2026-08-13). Lift "
+                "each arm only as far as it goes. 25s as authored: this is a positioning "
+                "drill, not the endurance prescription — "
                 "the physio approved scapular loading 2026-08-10, and lengthening these "
                 "holds is that prescription, made at the block build, not here.",
             ),
             YogaPose(
-                "Wall Forearm Press Hold (Elbows Below Shoulder Height)",
-                _t("08:00"), 25, "caution",
-                "Elbows stay BELOW shoulder height — above it the same drill drifts toward "
-                "abduction plus external rotation. Serratus-biased. 25s as authored, for "
-                "the same reason as the pose above.",
+                "Wall Forearm Press Hold",
+                _t("08:00"), 25, "cleared",
+                "Serratus-biased. 25s as authored, for the same reason as the pose above.",
             ),
             YogaPose(
                 "Supported Chest Opening over a Rolled Towel (Arms at 45 Degrees)",
                 _t("08:45"), 60, "caution",
-                "Arms at 45 degrees, NOT a supine 90/90 T — 90 degrees of abduction with "
-                "external rotation is the apprehension position for anterior instability. "
-                "The towel runs along the spine so the load is gravity on an open chest "
-                "rather than an external frame levering the joint.",
+                "Arms out at about 45 degrees. The towel runs along the spine, so the load "
+                "is gravity on an open chest rather than an external frame levering the "
+                "joint.",
             ),
             YogaPose(
                 "Seated Neck Tilt — Right Ear Toward Right Shoulder",

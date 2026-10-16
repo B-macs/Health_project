@@ -66,8 +66,9 @@
   checked 2026-10-15). Which one wins is the open rule for two sources on one
   question (`docs/training/goal_system.md`, step 5).
 
-**Picks now:** the dumbbell Romanian deadlift (S). The leg curl: seated or
-lying — OPEN until that rule is decided.
+**Picks now:** the dumbbell Romanian deadlift (S) and the **seated leg curl** —
+the two-list rule's trial clause (approved 2026-10-16) puts it ahead of the
+lying curl, although this list rates the lying curl S and the seated curl A.
 
 ## Unranked source advice
 

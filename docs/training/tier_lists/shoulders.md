@@ -105,8 +105,8 @@ From two shoulder videos that rank nothing (pasted 2026-10-15):
     **REMOVED 2026-10-16, his decision** (*"remove it, I don't have any
     problems with this and have been doing shoulder presses for years without
     issue"*) — details in `goal_system.md`, goal B.
-  - **Stays out, his precaution (2026-10-16):** pulldowns behind the head. To
-    confirm: presses behind the head, dips and the deep wide-grip bench.
+  - **Stays out, his precaution (2026-10-16, confirmed):** pulldowns and
+    presses behind the head, dips, and the deep wide-grip bench.
 - **Effects of the MEASURED limit (the arm behind the body):**
   - #15 behind-the-back lateral raise starts with the arm behind the body —
     ranks down on the right.

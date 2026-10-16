@@ -218,16 +218,25 @@ def test_the_down_dog_retest_is_not_duplicated_into_the_new_session():
     assert "50-60" not in down_dog.retest
 
 
-def test_the_new_session_avoids_the_apprehension_position():
-    """Post-Latarjet: 90 degrees of abduction with external rotation is the
-    apprehension position. Two poses are deliberately re-specified away from it
-    and must say so."""
+def test_the_shoulder_flow_keeps_its_positions_without_the_removed_limit():
+    """The athlete removed the right shoulder's 90-degree limit on 2026-10-16
+    ("remove it, I don't have any problems with this and have been doing
+    shoulder presses for years without issue") and asked for its wording to be
+    deleted. Two poses keep the positions they were authored with — arms low on
+    the prone hold, arms at about 45 degrees over the towel — and the prone
+    hold's caution now rests on the MEASURED right-arm limit (a face-down arm
+    raise, 20 cm against 40 cm, 2026-08-13). The wall press, whose only caution
+    was the removed limit, is cleared."""
     s = yoga.get("shoulder_scapula_neck_flow_16min")
     by_name = {p.name: p for p in s.poses}
     prone = next(p for n, p in by_name.items() if "Scapular Retraction" in n)
-    assert "ARMS LOW" in prone.safety_note or "arms low" in prone.safety_note.lower()
+    assert "Arms Low" in prone.name
+    assert "20 cm" in prone.safety_note and "40 cm" in prone.safety_note
     chest = next(p for n, p in by_name.items() if "Chest Opening" in n)
-    assert "45" in chest.safety_note and "apprehension" in chest.safety_note.lower()
+    assert "45" in chest.name and "45" in chest.safety_note
+    wall = next(p for n, p in by_name.items() if "Wall Forearm Press" in n)
+    assert wall.safety == "cleared"
+    assert "Shoulder Height" not in wall.name
 
 
 def test_every_non_cleared_pose_in_the_new_session_states_a_mechanism():

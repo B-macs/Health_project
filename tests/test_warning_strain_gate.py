@@ -133,6 +133,15 @@ _BACK_WARNINGS_REMOVED_2026_10_14 = frozenset({
     "Scapular Retraction Isometric",
 })
 
+#: Removed DELIBERATELY, 2026-10-16, on the athlete's instruction: he removed
+#: the right shoulder's 90-degree limit ("remove it, I don't have any problems
+#: with this and have been doing shoulder presses for years without issue")
+#: and asked for its wording to be deleted. This warning stated nothing else.
+#: The floor below dropped 9 -> 8 by exactly this one, and it may not come back.
+_SHOULDER_WARNINGS_REMOVED_2026_10_16 = frozenset({
+    "Band Chest Press",
+})
+
 
 def test_every_authored_warning_still_exists():
     """Gating is a DISPLAY change. If this drops, warnings were deleted from
@@ -142,7 +151,7 @@ def test_every_authored_warning_still_exists():
     warned = {e["name"] for plan in (tp.PLAN, tp.PLAN_STAGE2, tp.PLAN_STAGE2B)
               for day in plan.values() for e in day["exercises"]
               if e.get("warning")}
-    assert len(warned) >= 9, warned
+    assert len(warned) >= 8, warned
 
 
 def test_the_back_warnings_the_athlete_removed_stay_removed():
@@ -152,6 +161,16 @@ def test_the_back_warnings_the_athlete_removed_stay_removed():
                                 tp.PLAN_BLOCK_B)
          for day in plan.values() for e in day["exercises"]
          if e.get("warning") and e["name"] in _BACK_WARNINGS_REMOVED_2026_10_14})
+    assert back == [], back
+
+
+def test_the_shoulder_warning_the_athlete_removed_stays_removed():
+    import training_plan as tp
+    back = sorted(
+        {e["name"] for plan in (tp.PLAN, tp.PLAN_STAGE2, tp.PLAN_STAGE2B,
+                                tp.PLAN_BLOCK_B)
+         for day in plan.values() for e in day["exercises"]
+         if e.get("warning") and e["name"] in _SHOULDER_WARNINGS_REMOVED_2026_10_16})
     assert back == [], back
 
 
@@ -168,7 +187,7 @@ def test_no_warning_claims_back_injuries_came_from_the_squat():
 
 def test_every_warned_exercise_is_region_mapped():
     """An unmapped warned exercise warns unconditionally — correct as a
-    fallback, useless as a steady state. All 9 map today; keep it that way."""
+    fallback, useless as a steady state. All 8 map today; keep it that way."""
     import training_plan as tp
     unmapped = sorted(
         e["name"] for plan in (tp.PLAN, tp.PLAN_STAGE2, tp.PLAN_STAGE2B)

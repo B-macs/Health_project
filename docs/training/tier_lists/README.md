@@ -55,8 +55,11 @@ no source in its area's file.
 area it ranks most, and its rows for each other area are copied into that
 area's file with the full list's numbers (the hams-and-glutes list, 2026-10-15).
 
-**Two ranked lists for one area** (the glutes, from 2026-10-15): the rule for
-combining them is OPEN — see step 5 of `docs/training/goal_system.md`.
+**Two ranked lists for one area — APPROVED 2026-10-16** (the glutes): an
+exercise qualifies if ANY list puts it in S or A; it ranks by its best tier; a
+tier given without a named version counts for each version his rules allow; and
+when a checked trial compared two exercises directly, the trial's winner ranks
+first.
 
 A tier is the SOURCE's judgement, not a trial result. Each file says what the
 source measured and what it did not.

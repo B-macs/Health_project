@@ -102,9 +102,9 @@ as a recorded decision, not as an edit to a rest-day flow.**
 | 5 | Thread the Needle (Right Arm Under) | 04:30 | 45s | cleared | Unloaded thoracic rotation — the family already used in the pre-session release protocol. |
 | 6 | Thread the Needle (Left Arm Under) | 05:25 | 45s | cleared | As above, other side. |
 | 7 | Extended Puppy Pose | 06:20 | 45s | caution | Passive shoulder flexion with the **lats on stretch** — the one pose here that reaches the lat, otherwise the gap in this athlete's overhead ladder. Let the chest sink rather than pushing into it. |
-| 8 | Prone Scapular Retraction Hold (Arms Low, Palms Down) | 07:15 | **25s** | caution | **Arms low, not a prone T** — 90° of abduction moves a post-Latarjet shoulder toward apprehension. 25 s as authored — lengthening is a block-build decision (see the note above the table). |
-| 9 | Wall Forearm Press Hold (Elbows Below Shoulder Height) | 08:00 | **25s** | caution | **Elbows stay below shoulder height** — above it the drill drifts toward abduction + external rotation. Serratus-biased. 25 s as authored, same reason as pose 8. |
-| 10 | Supported Chest Opening over a Rolled Towel (Arms at 45°) | 08:45 | 60s | caution | **Arms at 45°, not a supine 90/90 T** — 90° abduction with external rotation is the apprehension position for anterior instability. The towel runs *along* the spine, so the load is gravity on an open chest rather than an external frame levering the joint. |
+| 8 | Prone Scapular Retraction Hold (Arms Low, Palms Down) | 07:15 | **25s** | caution | The right arm lifts less far than the left here (a face-down arm raise: 20 cm right, 40 cm left, 2026-08-13) — lift each arm only as far as it goes. 25 s as authored — lengthening is a block-build decision (see the note above the table). |
+| 9 | Wall Forearm Press Hold | 08:00 | **25s** | cleared | Serratus-biased. 25 s as authored, same reason as pose 8. |
+| 10 | Supported Chest Opening over a Rolled Towel (Arms at 45°) | 08:45 | 60s | caution | Arms out at about 45°. The towel runs *along* the spine, so the load is gravity on an open chest rather than an external frame levering the joint. |
 | 11 | Seated Neck Tilt — Right Ear to Right Shoulder | 09:55 | 40s | caution | **Self-generated only, no hand overpressure** — at Beighton 6/9 the cervical spine is the last place to hang on ligament, and `symptom_log` 2026-07-31 records asymmetric flexion tightness with mechanical crepitus. |
 | 12 | Seated Neck Tilt — Left Ear to Left Shoulder | 10:45 | 40s | caution | As above. **Left is the documented dominant side** of the interscapular/cervical pattern, so expect asymmetry and do not chase it into end range. |
 | 13 | Levator Scapulae Stretch (Left) | 11:35 | 40s | caution | Levator scapulae is the anatomical bridge between the cervical spine and the superior medial scapular angle — **the corridor the ache migrates along** in `symptom_log` 2026-08-03. Releasing it *before* the scapular work would be ideal; here it follows, because the holds above are positioning rather than loading. |
@@ -112,10 +112,13 @@ as a recorded decision, not as an edit to a rest-day flow.**
 | 15 | Supine Rest with Arms Overhead on a Cushion | 13:15 | 60s | cleared | Supported overhead position with no reach demand — the shoulder **rests at range** rather than working to get there. |
 | 16 | Deep Relaxation (Savasana) | 14:25 | 60s | cleared | Passive rest. |
 
-**Net:** 6 cleared, 10 caution, **0 contraindicated**. Three distinct mechanisms
-drive every caution: the post-Latarjet apprehension position (poses 2, 8, 9, 10),
-end-range lumbar extension (3, 4), and cervical overpressure at Beighton 6/9
-(11–14). None of them is expressible as a generic `rules.py` keyword without
+**Net:** 7 cleared, 9 caution, **0 contraindicated**. Three distinct mechanisms
+drive every caution: the right shoulder (2: no passive overpressure; 8: the
+measured right-arm limit; 10: a gravity-loaded chest stretch), end-range lumbar
+extension (3, 4), and cervical overpressure at Beighton 6/9 (11–14).
+*2026-10-16: the right shoulder's 90° limit was removed (athlete) and its
+wording deleted here; pose 9 is cleared, and poses 8 and 10 keep their
+positions.* None of them is expressible as a generic `rules.py` keyword without
 losing the position detail that makes each one safe, so all are authored on the
 pose.
 

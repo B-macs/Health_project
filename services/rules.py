@@ -511,17 +511,13 @@ MOVEMENT_RULES: list[MovementRule] = [
         movement="external rotation",
         reason="At the HIP: passive, floor- or seat-supported external rotation is NOT a "
                "snapping-hip risk position — confirmed 2026-08-05 — but it becomes one the "
-               "moment the hip flexes past 60° under its own muscular effort. At the "
-               "SHOULDER: external rotation combined with abduction is the apprehension "
-               "position for the anterior-stabilised right side.",
+               "moment the hip flexes past 60° under its own muscular effort.",
         stage_cap=1, severity="caution", laterality="right",
     ),
     MovementRule(
         movement="abduction",
         reason="Moving a limb away from the midline. At the hip this loads glute medius, "
-               "listed as overactive and right-dominant — release before activating. At the "
-               "shoulder, abduction with external rotation is the apprehension position "
-               "post-Latarjet.",
+               "listed as overactive and right-dominant — release before activating.",
         stage_cap=1, severity="caution", laterality="right",
     ),
     MovementRule(
@@ -635,9 +631,8 @@ MOVEMENT_RULES: list[MovementRule] = [
         movement="anterior shoulder reciprocation",
         reason="Active anterior-wall work on the stabilised right shoulder — press in, "
                "then rotate out under its own power and hold. THE ARM STAYS LOW "
-               "THROUGHOUT: elbow on knee, elbow and shoulder in one vertical line. Never "
-               "external rotation at 90° abduction, which is the apprehension position "
-               "the Latarjet exists to protect. Ramp in and out over 3-5 s at ~50% "
+               "THROUGHOUT: elbow on knee, elbow and shoulder in one vertical line. "
+               "Ramp in and out over 3-5 s at ~50% "
                "effort. Stop on any hard, abrupt end-feel on the outward rotation — on a "
                "stabilised shoulder that restriction may be doing load-bearing work.",
         stage_cap=1, severity="caution", laterality="right",
