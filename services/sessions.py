@@ -2166,7 +2166,12 @@ def session_shape_violations(day: dict, rules: dict[str, int] | None = None) -> 
         out.append(f"{len(prep)} preparation entries; the ceiling is "
                    f"{rules['max_preparation_entries']}")
 
-    minutes = session_seconds(exercises) / 60
+    # The limit reads the TRAINING: a test inside the session is extra time on
+    # the day it runs (the athlete, 2026-10-16, on the 12-week block's
+    # plank-test Mondays at 73 minutes: "Leave it in for those days"), the way
+    # a flexibility day's ceilings count the session and not its tests.
+    minutes = session_seconds(
+        [ex for ex in exercises if not is_measurement(ex.get("name", ""))]) / 60
     if minutes > rules["max_gym_minutes"]:
         out.append(f"{minutes:.0f} min with measured changeovers; the ceiling is "
                    f"{rules['max_gym_minutes']}")

@@ -355,12 +355,6 @@ PICKS: dict[str, Pick] = {
         "before a number counts.",
         "his answers, 2026-10-14 ('three mornings once') and 2026-10-16 ('Sunday morning before')",
         better="a measurement: the battery's own protocol"),
-    "Upper Glute Grip Grade (Test)": Pick(
-        "A", "upper glutes", "measurement",
-        "Key Rule 6's measurement: a right grade of 2 or more brings the hip release back.",
-        "Key Rule 6, 2026-09-22 (Wednesday in Block B); on the Sunday morning from 2026-10-16, "
-        "proposed and his answer asked",
-        better="a measurement: the grade Key Rule 6 names"),
     **{name: Pick(
         "C", "adductors and hip rotators", "range",
         f"Item {i} of the flexibility prescription for the last reading (pattern D: the "

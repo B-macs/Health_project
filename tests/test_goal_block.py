@@ -272,6 +272,8 @@ def test_the_plank_test_runs_in_weeks_1_and_12_in_place_of_session_a_s_abs():
             crunch = usual.index("Lat-Pulldown Cable Crunch (Facing Away)")
             assert names[names.index(bunkie[0]) - 1] == usual[crunch - 1], week
             assert "Lat-Pulldown Cable Crunch (Facing Away)" not in names
+            # Everything else in session A stays, the walking lunge included.
+            assert names == usual[:crunch] + bunkie + usual[crunch + 1:], week
         else:
             assert not bunkie and day["exercises"] == gb.SESSIONS["A"], week
     for d, day in PLAN.items():
@@ -279,37 +281,49 @@ def test_the_plank_test_runs_in_weeks_1_and_12_in_place_of_session_a_s_abs():
             assert not [n for n in _names(day["exercises"]) if n.startswith("Bunkie")], d
 
 
-def test_the_test_monday_stays_inside_70_minutes_and_the_lunge_is_what_gave_way():
-    """With the five lines and the walking lunge, session A models over 70
-    minutes. The lunge is the one Monday exercise whose areas keep their weekly
-    minimum once session D is counted (glute max and the quads); counted on the
-    three core sessions alone, no exercise keeps them, and the athlete's answer
-    on which way to go is asked (2026-10-16)."""
-    a = gb.SESSIONS["A"]
-    crunch = a.index(gb.CABLE_CRUNCH)
-    with_lunge = a[:crunch] + gb.PLANK_TEST + a[crunch + 1:]
-    assert s.session_seconds(with_lunge) / 60 > pl.SESSION_MINUTES_LIMIT
-    assert s.session_seconds(PLAN[1]["exercises"]) / 60 <= pl.SESSION_MINUTES_LIMIT
-    assert "Walking Lunge (DB)" not in _names(PLAN[1]["exercises"])
+def test_the_test_mondays_run_over_70_minutes_by_his_choice():
+    """With the five timed lines in place of the abs, session A models 73
+    minutes. Asked whether the walking lunge should give way, he kept it
+    (2026-10-16: "Leave it in for those days"), so the limit reads the
+    training and not the test inside it: the day passes the shape check while
+    its full time stays visible here."""
+    full = s.session_seconds(PLAN[1]["exercises"]) / 60
+    training = s.session_seconds(
+        [e for e in PLAN[1]["exercises"] if not s.is_measurement(e["name"])]) / 60
+    assert full > pl.SESSION_MINUTES_LIMIT and round(full) == 73
+    assert training <= pl.SESSION_MINUTES_LIMIT
+    assert "Walking Lunge (DB)" in _names(PLAN[1]["exercises"])
+    assert not s.session_shape_violations(PLAN[1])
+    assert not s.session_shape_violations(PLAN[78])
 
-    test_week = dict(WEEK, Mon=[c for c in WEEK["Mon"] if c.name not in (
-        "Lat-Pulldown Cable Crunch (Facing Away)", "Walking Lunge (DB)")])
-    total = pl.weekly_sets(test_week)
-    lunge = _CARDS["Walking Lunge (DB)"]
-    assert total[lunge.area] >= gw.REQUIRED[lunge.area]
-    assert total[lunge.second] >= gw.REQUIRED[lunge.second]
+
+def test_only_a_test_is_left_out_of_the_minutes():
+    """The same Monday with its timed lines read as training breaks the
+    limit: the check leaves out measurements and nothing else."""
+    as_training = [dict(e, name=e["name"].replace(" (Timed)", "")) for e in PLAN[1]["exercises"]]
+    day = dict(PLAN[1], exercises=as_training)
+    assert any("min with measured changeovers" in r for r in s.session_shape_violations(day))
 
 
 def test_the_sunday_tests_run_first_and_in_a_fixed_order():
     for week in range(1, gb.WEEKS + 1):
         names = _names(PLAN[week * 7]["exercises"])
-        want = ["Upper Glute Grip Grade (Test)"]
+        want = []
         if week in gb.FLEX_RETEST_WEEKS:
             want.append("Flexibility Retest (Test)")
         if week in gb.TEST_WEEKS:
             want.append("Rib and Pelvis Test (Test)")
         assert names[:len(want)] == want, week
         assert names[len(want):] == _names(gb.FLEX_STACK), week
+
+
+def test_the_grip_grade_is_not_in_the_block():
+    """Moving Block B's Wednesday grip grade to Sunday was put to him and he
+    declined (2026-10-16: "b drop it"): Key Rule 6's release now comes back
+    only if the hip symptoms return."""
+    for d, _, e in _every_entry():
+        assert "Grip Grade" not in e["name"], d
+    assert "Upper Glute Grip Grade (Test)" not in gw.PICKS
 
 
 def test_no_test_morning_follows_a_leg_day():

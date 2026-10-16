@@ -1042,12 +1042,10 @@ number two is correct"*).
    A's abs. The flexibility retest on the Sunday mornings of weeks 1-3, cold
    and first. The rib and pelvis test in weeks 1 and 12, after the retest
    (the retest's own rule: passive work loosens tissue, and the Thomas test is
-   passive). **ASKED:** with the plank test session A models 73 minutes; the
-   build takes the walking lunge out on those two Mondays (64 minutes), but by
-   rule L3 no Monday exercise keeps its area at the minimum on the core
-   sessions alone (without the lunge the quads read 3 of 4 until Friday).
-4. **The grip grade** (Key Rule 6's measurement) moves from Wednesday, a rest
-   day here, to the Sunday morning, first — **ASKED.**
+   passive). With the plank test session A models 73 minutes; he kept the
+   walking lunge (answer 1 below).
+4. **The grip grade** (Key Rule 6's measurement) is not run: Wednesday is a
+   rest day here, and he declined moving it to Sunday (answer 2 below).
 5. **Load.** Every lift has its range (8-12 compound, 10-15 isolation and
    core; the hip airplane 8-12); a dumbbell weight is always whole dumbbells
    (42.5 kg logged reads as 40.5, a step up lands on 45); a ramp set shows
@@ -1076,18 +1074,43 @@ number two is correct"*).
 | `patient_profile.py` | Finding #4 (the right hip clicks when it bends and turns out): the kneecap-straight cue on the march, lunge, hack squat, cable hip flexion and hip airplane; the airplane's slight bow; the reverse crunch keeps the knees above the hips. Finding #7: the rib and pelvis test in weeks 1 and 12. The imbalance list: no direct work for the upper glutes, which hold tension. |
 | `injury_profile.md` | The left hip flexor strained twice: the cable hip flexion starts light and never goes to failure. Back injuries came from held positions: nothing held is added; the planks are timed tests only. The right shoulder (dislocations, Latarjet): the chest press, crossover, row and Y raise stop the right arm early behind the body. The left rhomboid strain under overhead load (2025): the shoulder-blade work comes straight before the presses, and the press is a machine with the back supported. |
 | `hypermobility-profile.md` | Beighton 6/9: elbows and knees not locked hard on the presses and the hack squat; controlled range with no bounce on the adductor machine; no swing on the march. |
-| `2025-training-year.md` | The two 2025 holds behind the core hold score (side plank with a march 15 s; Copenhagen 30 s). The shoulder came back with a dumbbell lateral raise over 7 kg: the cable lateral raise starts light, and a cap is **ASKED**. Its compiled form claims are not used (Key Rule 24). |
+| `2025-training-year.md` | The two 2025 holds behind the core hold score (side plank with a march 15 s; Copenhagen 30 s). Its undated line that the shoulder came back above a 7 kg dumbbell lateral raise: the cable lateral raise starts light, with no limit (his answer 3). Its compiled form claims are not used (Key Rule 24). |
 | `stage1_recent_data_summary.md` | Even reps on an alternating item: the march is 20 each side. |
 | `docs/clinical_profile_weighting.md` | Recent and unresolved injuries weigh most: the left hip flexor and the right shoulder set the cautions above; the hypermobility rules apply at full weight in every block. |
 | `assessment_battery.md` | The retest is cold, first, on a morning after a rest day, three mornings. Its "every four weeks" is 84 days by his decision (WP-05). |
 | `cluster_a_mechanics.md` | The Sunday items' how-to, and the right-side cue on the lift-offs. |
-| `cluster_a_prescription.md` | The Sunday session is pattern D's stack, item for item, once a week, two days after the last strength day. Its pre-session release is not run: Key Rule 6 (the grip grade decides). |
+| `cluster_a_prescription.md` | The Sunday session is pattern D's stack, item for item, once a week, two days after the last strength day. Its pre-session release is not run: Key Rule 6 (the release comes back if the hip symptoms do). |
 | `cluster_d_mechanics.md`, `cluster_d_prescription.md` | Release, then active work, for the front of the right shoulder; one arm at a time with the weight logged; each side judged against its own history. No Cluster D stack (its tests are not written). The 90° limit is gone (his decision, 2026-10-16); rotator-cuff work, which the file calls the best return, left goal B on 2026-10-15 (his decision). |
 | `flexibility_blueprint.md` | Flexibility is training, not recovery: Sunday follows a rest day. |
-| `baar_tendon_annex.md` | Gate 5, a medicine check before a loading block, is **ASKED**. The release's own text carries the pressure rules (2/10 or less; stop on a sharp pin-point feeling, tingling or a pulse). |
+| `baar_tendon_annex.md` | Gate 5, the medicine check before a loading block: clear (answer 4). The release's own text carries the pressure rules (2/10 or less; stop on a sharp pin-point feeling, tingling or a pulse). |
 | Warm-up review (2026-08-10) | The 15-minute walk to the gym is the raise; ramp sets only on the two heavy lifts (per exercise, never per session); nothing held before the lifts. |
 | Rest-interval review (2026-08-13) | 90 s on the compound lifts, 75 s on the leg curl and the back extension, 45-60 s on isolation work; no timer between the two sides of a one-side exercise. |
 | Load-progression review (2026-09-16) | One rep-range rule for every lift (§10, his change of 2026-10-16). |
+
+**His answers, 2026-10-16, before the push** (*"1. Leave it in for those days
+2. b drop it 3. When did this happen give me the date - No limit."*, then *"4. No
+im not 5. Yes 5kg"*):
+
+1. **The plank-test Mondays keep the walking lunge** — 73 modelled minutes on
+   those two days, over the 70-minute limit by his choice. The limit now reads
+   the training and not a test inside it (`sessions.session_shape_violations`),
+   the way a flexibility day's ceilings already did.
+2. **No grip grade.** The release comes back only if the hip-crest or
+   front-of-hip symptoms return (Key Rule 6; `docs/hypothesis.md` P12).
+3. **No limit on the cable lateral raise.** His question, "when did this
+   happen": the record holds no date. The line "shoulder injury re-aggravates
+   when weight > 7 kg" sits in the 2025 file's movement analysis — the part he
+   confirmed was compiled from his logs, not observed — and no dated entry
+   matches it. The dated lateral-raise entries: a 7 kg × 14 peak in May-June
+   2025, 6 kg in October, 5 kg "(reset session)" in November; the same file's
+   summary links shoulder pain in May to the shoulder blades, not to lateral
+   raises. The injury file and the profile hold no lateral-raise event.
+4. **Not taking either medicine** (a ciprofloxacin-type antibiotic or a
+   "sartan"): the tendon annex's check before a loading block is clear.
+5. **The adductor machine steps 5 kg**, as built.
+
+**The column is in Supabase**: he pasted the `tut_left` line, and a read-only
+query found it (2026-10-16).
 
 **Left open by the documents, recorded:** their physiotherapist sign-off
 clauses (retired 2026-08-17); they expect pattern F, the stored reading is D

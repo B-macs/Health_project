@@ -402,8 +402,9 @@ LATERAL_RAISE = _ex(
     ),
     biomechanical_focus=(
         "The side delts (goal B): tier_lists/shoulders.md, S+, the best overall, with tension "
-        "at the stretch. The 2025 log notes the shoulder injury came back with a dumbbell "
-        "lateral raise over 7 kg; the cable starts light and steps one unit (about 0.5 kg)."
+        "at the stretch. No weight limit (his choice, 2026-10-16: 'No limit'). The 2025 "
+        "file's line that the shoulder injury came back above a 7 kg dumbbell carries no "
+        "date and sits in the compiled movement analysis, not in a dated entry."
     ),
     progression="The rep-range rule adds one unit.",
     regression="Pain at the front of the shoulder → stop at a lower height; log it.",
@@ -740,29 +741,10 @@ RIB_AND_PELVIS_TEST = _ex(
     regression="Any symptom → stop and write what you have.",
 )
 
-#: Key Rule 6's measurement: the hip release came out of the sessions on
-#: 2026-09-22 and comes back when this grade reads 2 or more on the right.
-#: Block B read it on Wednesday, a rest day in this block, so it moves to the
-#: Sunday morning, first and cold — PROPOSED 2026-10-16, his answer asked.
-GRIP_GRADE = _ex(
-    name="Upper Glute Grip Grade (Test)",
-    ex_type="reps",
-    laterality="unilateral",
-    sets=1, reps=1, rest_seconds=0,
-    mechanics=(
-        "First thing, cold. Stand side-on to a wall corner and press the shelf of the upper "
-        "outer hip, just below the crest, into it: one side, then the other. Grade what you "
-        "feel 0-3: 0 nothing, 1 slight grip, 2 clear grip, 3 marked. Write both grades in the "
-        "note, right first."
-    ),
-    biomechanical_focus=(
-        "Key Rule 6: the release block was suspended on 2026-09-22 ('there isn't that much "
-        "gripping anymore'), and a right grade of 2 or more brings it back (docs/hypothesis.md "
-        "P12). The grade is what makes that a measurement rather than a feeling."
-    ),
-    progression="A measurement: nothing to progress.",
-    regression="Grade 2 or more on the right → say so; the release comes back.",
-)
+# NO GRIP GRADE. Block B read the Upper Glute Grip Grade on Wednesday, a rest
+# day here; moving it to Sunday was put to him and he declined (2026-10-16:
+# "b drop it"). Key Rule 6's release now comes back only if the hip-crest or
+# front-of-hip symptoms return. tests/test_goal_block.py keeps it out.
 
 FLEXIBILITY_RETEST = _ex(
     name="Flexibility Retest (Test)",
@@ -827,18 +809,14 @@ FLEX_STACK = [_stack_entry(i) for i in _rx.prescribe(FLEX_PATTERN).live_items]
 
 def _with_plank_test(exercises: list[dict]) -> list[dict]:
     """Session A in a test week: the five timed lines in the place of the day's
-    abs work (his decision, 2026-10-16), and the walking lunge out. The test
-    puts the session over the 70-minute limit, and step 6's L3 then takes out
-    the lowest-ranked exercise whose areas all keep their weekly minimum
-    without it: the lunge (glute max and quads stay far above theirs).
-    tests/test_goal_block.py checks both."""
-    out: list[dict] = []
-    for ex in exercises:
-        if ex is CABLE_CRUNCH:
-            out.extend(PLANK_TEST)
-        elif ex is not WALKING_LUNGE:
-            out.append(ex)
-    return out
+    abs work (his decision, 2026-10-16). Nothing else changes. The test takes
+    the session to 73 modelled minutes, over the 70-minute limit, and he kept
+    it so (2026-10-16, asked whether the walking lunge should give way: "Leave
+    it in for those days"). The limit reads the training, not a test inside it
+    (sessions.session_shape_violations); tests/test_goal_block.py pins both
+    numbers."""
+    return [line for ex in exercises
+            for line in (PLANK_TEST if ex is CABLE_CRUNCH else [ex])]
 
 
 def _strength_day(letter: str, week: int) -> dict:
@@ -876,15 +854,14 @@ def _rest_day(week: int) -> dict:
 
 def _flexibility_day(week: int) -> dict:
     """The tests come first, cold, in a fixed order, so each one sits in the
-    same conditions every time it runs: the grip grade (a few seconds of
-    pressure, every Sunday), then the flexibility retest on its three mornings,
-    then the rib and pelvis test. The retest goes before the rib and pelvis
-    test because its own rule is that passive work loosens tissue for an hour
-    or more, and the Thomas test is passive."""
-    tests = [GRIP_GRADE] + ([FLEXIBILITY_RETEST] if week in FLEX_RETEST_WEEKS else []) \
+    same conditions every time it runs: the flexibility retest on its three
+    mornings, then the rib and pelvis test. The retest goes before the rib
+    and pelvis test because its own rule is that passive work loosens tissue
+    for an hour or more, and the Thomas test is passive."""
+    tests = ([FLEXIBILITY_RETEST] if week in FLEX_RETEST_WEEKS else []) \
         + ([RIB_AND_PELVIS_TEST] if week in TEST_WEEKS else [])
     objective = f"Flexibility — Adductors and Hip Rotators (week {week})"
-    if len(tests) > 1:
+    if tests:
         objective += " — test morning"
     return {
         "objective": objective,
