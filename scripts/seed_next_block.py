@@ -37,6 +37,7 @@ Usage:
     python scripts/seed_next_block.py --start 2026-09-14            # seed
     python scripts/seed_next_block.py --start 2026-09-14 --dry-run  # check only
     python scripts/seed_next_block.py --show                        # list phases
+    python scripts/seed_next_block.py --changeover --dry-run        # the 12-week block, preview
 """
 from __future__ import annotations
 
@@ -49,7 +50,7 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_ROOT))
 
-from services import plan as ph, sessions as sess, week_repeat
+from services import block_changeover, plan as ph, sessions as sess, week_repeat
 from services.config import load_config
 from services.repository import Repository
 
@@ -83,6 +84,9 @@ def main() -> int:
     ap.add_argument("--start", help="ISO date, must be a Monday")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--show", action="store_true")
+    ap.add_argument("--changeover", action="store_true",
+                    help="the 12-week block replacing Block B on goal_block.START "
+                         "(services/block_changeover.py); with --dry-run, a preview")
     args = ap.parse_args()
 
     repo = _repo()
@@ -93,6 +97,23 @@ def main() -> int:
         stored, repo.get_logged_session_dates(first, today), today)
     for monday, outcome in judged:
         print(f"failed-week rule — week of {monday}: {outcome}")
+
+    if args.changeover:
+        # The training page stores this by itself on the first visit after the
+        # push; this is the same computation, to preview it or to run it by hand.
+        out = block_changeover.due(stored)
+        if out is None:
+            print("nothing to do: the 12-week block is stored already, or there is no Block B")
+            return 0
+        print("would store:")
+        _show(out)
+        if args.dry_run:
+            print("dry run — nothing written")
+            return 0
+        repo.set_phases(out)
+        print("written")
+        _show(repo.get_phases())
+        return 0
 
     if args.show or not args.start:
         _show(phases)

@@ -24,6 +24,7 @@ import today
 import training_plan as tp
 from services import accessory as acc
 from services import background_sync
+from services import block_changeover
 from services import metrics
 from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
@@ -3442,6 +3443,35 @@ def render():
         _render_accessory_session(_policy, _readiness_modifier, _volume_factor)
         nav.inject("training")
         st.stop()
+
+    # ── The 12-week block replaces Block B (athlete, 2026-10-16) ──────────────
+    # "When we push this new session block ... it will overwrite all of the
+    # current block ... it starts on the next monday." The first visit after
+    # the push stores it (services/block_changeover.py): Block B ends the day
+    # before goal_block.START, its last week is recorded as not judged so the
+    # failed-week rule below cannot move the new block, and the block is placed
+    # on START. His decision, so not ask-first; once stored it never runs again.
+    # Like the rule below, the write is rebuilt from a LIVE read of the stored
+    # phases, never from the local copy alone.
+    if phases and not _in_session:
+        _co_written = False
+        try:
+            if block_changeover.due(phases) is not None:
+                _co_repo = repo.get_repository()
+                _co_stored = _co_repo.get_phases_live()
+                _co_new = block_changeover.due(_co_stored)
+                if _co_new is not None:
+                    _co_repo.set_phases(_co_new)
+                    _co_written = True
+                elif _co_stored != phases:
+                    # Already stored, but not in the copy this page reads:
+                    # write the stored list back, which repairs the copy.
+                    _co_repo.set_phases(_co_stored)
+                    _co_written = True
+        except Exception:
+            pass  # never let the changeover's check crash the page; it runs again next render
+        if _co_written:
+            st.rerun()
 
     # ── The failed-week rule — a week with 0-2 logged days runs again ─────────
     # The athlete's rule (2026-09-15): "make it automatic for 0-2 days". NOT
