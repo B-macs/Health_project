@@ -1,10 +1,11 @@
 """The placement rules put every exercise in its place, the same way each time.
 
 The athlete, 2026-10-16: "create a deterministic test to put them automatically
-in their correct position", then "Make a session C and D and balance it out".
-services/placement.py holds the rules (step 6 of docs/training/goal_system.md);
-goal_week.py holds the draft cards. These tests run the rules on the cards and
-check the week they produce — and that the checker catches a broken week.
+in their correct position"; then "a 3 day week meets the required goal and a
+4th day is a bonus". services/placement.py holds the rules (step 6 of
+docs/training/goal_system.md); goal_week.py holds the cards. These tests run the
+rules on the cards and check the week they produce — and that the checker
+catches a broken week.
 """
 from dataclasses import replace
 
@@ -12,29 +13,44 @@ import goal_week as gw
 from services import placement as pl
 from services import rules
 
-WEEK = pl.place(gw.CARDS, gw.SPEC)
+WEEK = gw.week()
+CORE = {d: WEEK[d] for d in gw.CORE_DAYS}
 ORDERED = {d: pl.order(WEEK[d]) for d in gw.DAYS}
-
-#: Picks waiting for his approval (2026-10-16); they get rules when approved.
-#: This set may only shrink.
-_PICKS_WITHOUT_A_RULE_YET = {"Single-Arm DB Row", "Machine Chest Press"}
+ALL_CARDS = {c.name: c for c in gw.CARDS + gw.BONUS_ORDER}
 
 
 def _names(day):
     return [c.name for c in ORDERED[day]]
 
 
-def test_the_draft_week_breaks_no_rule():
-    assert pl.violations(WEEK, gw.SPEC, gw.EXTRA_SETS, gw.EXTRA_DAYS) == []
+# ── the core: three sessions meet the required dose ─────────────────────────
+
+def test_the_three_core_sessions_break_no_rule():
+    assert pl.violations(CORE, gw.SPEC, gw.EXTRA_SETS, gw.EXTRA_DAYS) == []
+
+
+def test_the_core_reaches_every_required_number():
+    total = pl.weekly_sets(CORE, gw.EXTRA_SETS)
+    for area, minimum in gw.REQUIRED.items():
+        assert total.get(area, 0) >= minimum, area
+
+
+def test_the_required_dose_is_the_approved_one():
+    """Approved 2026-10-16 (docs/training/weekly_volume_minimum_2026-10-16.md)."""
+    for area in ("glute max", "abs", "deep back", "hamstrings"):
+        assert gw.REQUIRED[area] == 6, area
+    for area in ("quads", "chest", "back", "press muscles", "shoulder-blade muscles",
+                 "side delts", "rear delts"):
+        assert gw.REQUIRED[area] == 4, area
 
 
 def test_the_same_cards_give_the_same_week():
-    again = pl.place(list(gw.CARDS), gw.SPEC)
+    again = gw.week()
     assert {d: [c.name for c in pl.order(again[d])] for d in gw.DAYS} == \
         {d: _names(d) for d in gw.DAYS}
 
 
-def test_every_session_fits_the_time_limit():
+def test_no_session_breaks_the_seventy_minute_limit():
     for d in gw.DAYS:
         assert pl.minutes(WEEK[d]) <= pl.SESSION_MINUTES_LIMIT + 0.5, d
 
@@ -50,25 +66,33 @@ def test_over_target_lists_exactly_the_sessions_over_sixty():
         assert (d in reported) == (pl.minutes(WEEK[d]) > pl.SESSION_MINUTES_TARGET + 0.5), d
 
 
-def test_every_area_reaches_its_minimum():
-    total = pl.weekly_sets(WEEK, gw.EXTRA_SETS)
-    for area, minimum in gw.MINIMUMS.items():
-        assert total.get(area, 0) >= minimum, area
-
-
 def test_every_training_exercise_has_three_sets():
-    for c in gw.CARDS:
+    for c in ALL_CARDS.values():
         if c.area:
             assert c.sets == pl.WORKING_SETS, c.name
 
 
-def test_every_session_is_full_body():
+def test_every_core_session_is_full_body():
     lower = {"quads", "glute max", "hamstrings"}
     upper = {"chest", "back", "press muscles", "side delts", "rear delts", "shoulder-blade muscles"}
-    for d in gw.DAYS:
+    for d in gw.CORE_DAYS:
         areas = set(pl.hard_sets(WEEK[d]))
-        assert areas & lower and areas & upper and "abs" in areas, d
+        assert areas & lower and areas & upper, d
 
+
+def test_a_two_day_exercise_is_never_on_two_core_days_in_a_row():
+    for c in gw.CARDS:
+        on = tuple(d for d in gw.CORE_DAYS if any(x.name == c.name for x in WEEK[d]))
+        if len(on) == 2:
+            assert on not in gw.IN_A_ROW, (c.name, on)
+
+
+def test_the_hack_squat_and_the_lunge_are_on_different_days():
+    for d in gw.CORE_DAYS:
+        assert sum(1 for c in WEEK[d] if c.pattern == "knee") <= 1, d
+
+
+# ── order inside a day ───────────────────────────────────────────────────────
 
 def test_the_warm_up_comes_first_and_the_holds_last():
     for d in gw.DAYS:
@@ -76,8 +100,9 @@ def test_the_warm_up_comes_first_and_the_holds_last():
         first_other = next(i for i, s in enumerate(sections) if s != "warmup")
         assert all(s == "warmup" for s in sections[:first_other])
         assert "warmup" not in sections[first_other:], d
-        first_last = sections.index("last")
-        assert all(s == "last" for s in sections[first_last:]), d
+        if "last" in sections:
+            first_last = sections.index("last")
+            assert all(s == "last" for s in sections[first_last:]), d
 
 
 def test_a_ramp_set_sits_straight_before_its_lift():
@@ -100,30 +125,39 @@ def test_the_release_and_the_y_raise_come_straight_before_the_first_press():
             assert i + 2 == presses[0], d
 
 
-def test_a_two_day_exercise_is_never_on_two_days_in_a_row():
-    for c in gw.CARDS:
-        on = tuple(d for d in gw.DAYS if any(x.name == c.name for x in WEEK[d]))
-        if len(on) == 2:
-            assert on not in gw.IN_A_ROW, (c.name, on)
+# ── the bonus ────────────────────────────────────────────────────────────────
+
+def test_the_bonus_stays_within_the_target():
+    assert pl.minutes(WEEK[gw.BONUS_DAY]) <= pl.SESSION_MINUTES_TARGET + 0.5
 
 
-def test_the_abs_rotate_one_a_day():
-    abs_cards = [c.name for c in gw.CARDS if c.rotation == "abs"]
-    seen = [[c.name for c in WEEK[d] if c.rotation == "abs"] for d in gw.DAYS]
-    assert all(len(s) == 1 for s in seen)
-    assert [s[0] for s in seen] == abs_cards
+def test_the_bonus_never_repeats_a_heavy_lift_from_the_day_before():
+    before = {c.name for c in WEEK["Thu"]}
+    for c in WEEK[gw.BONUS_DAY]:
+        if c.demand >= 3:
+            assert c.name not in before, c.name
 
 
-def test_the_knee_and_hip_lifts_take_one_slot_a_day():
-    for d in gw.DAYS:
-        for pattern in ("knee", "hip"):
-            assert sum(1 for c in WEEK[d] if c.pattern == pattern) == 1, (d, pattern)
+def test_the_bonus_follows_the_drop_order():
+    order = [c.name for c in gw.BONUS_ORDER]
+    picked = [c.name for c in WEEK[gw.BONUS_DAY] if c.name in order and c.section != "block"]
+    assert picked == sorted(picked, key=order.index)
 
 
-def test_every_card_lands_on_a_safety_rule_except_the_pending_picks():
-    unknown = {c.name for c in gw.CARDS if rules.check_movement(c.name, 2)["severity"] == "unknown"}
-    assert unknown <= _PICKS_WITHOUT_A_RULE_YET, unknown - _PICKS_WITHOUT_A_RULE_YET
-    assert all(rules.check_movement(c.name, 2)["severity"] != "contraindicated" for c in gw.CARDS)
+def test_the_minimums_hold_without_the_bonus():
+    """The 4th day is a bonus: nothing required depends on it — except the
+    hip flexors' second day, the one named exception (gw.MIN_DAYS)."""
+    total = pl.weekly_sets(CORE, gw.EXTRA_SETS)
+    assert all(total.get(a, 0) >= m for a, m in gw.REQUIRED.items())
+    assert set(gw.MIN_DAYS) == {"hip flexors"}
+
+
+# ── safety ───────────────────────────────────────────────────────────────────
+
+def test_every_card_lands_on_a_safety_rule():
+    for c in ALL_CARDS.values():
+        severity = rules.check_movement(c.name, 2)["severity"]
+        assert severity in ("cleared", "caution"), (c.name, severity)
 
 
 # ── the checker is not vacuous ───────────────────────────────────────────────
@@ -143,9 +177,15 @@ def test_the_checker_catches_an_over_long_session():
 
 def test_the_checker_catches_too_many_sets_for_one_area():
     many = gw.CARDS + [replace(c, name=c.name + f" #{i}", pattern="", fixed_days=("Mon",))
-                       for i, c in enumerate(gw.CARDS) if c.area == "abs"]
+                       for i, c in enumerate([gw.CRUNCH, gw.REVERSE_CRUNCH, gw.WOODCHOP])]
     found = pl.violations(pl.place(many, gw.SPEC), gw.SPEC, gw.EXTRA_SETS, gw.EXTRA_DAYS)
     assert any("abs gets" in v for v in found), found
+
+
+def test_the_checker_catches_an_area_on_one_day():
+    one = [replace(c, days=1) if c.name == "Romanian Deadlift (DB)" else c for c in gw.CARDS]
+    found = pl.violations(pl.place(one, gw.SPEC), gw.SPEC, gw.EXTRA_SETS, gw.EXTRA_DAYS)
+    assert any(v.startswith("hamstrings") for v in found), found
 
 
 def test_a_two_day_card_avoids_days_in_a_row_on_a_three_day_week():

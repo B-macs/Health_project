@@ -22,6 +22,9 @@ _APPROVED = {
     "Cable Lateral Raise": ("caution", "right"),
     "Reverse Cable Crossover": ("caution", "right"),
     "Neck Working Stretch (Right)": ("caution", "right"),
+    # The back and chest picks, approved 2026-10-16.
+    "Single-Arm DB Row": ("caution", "right"),
+    "Machine Chest Press": ("caution", "right"),
 }
 
 

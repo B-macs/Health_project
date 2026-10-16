@@ -337,8 +337,8 @@ days (APPROVED 2026-10-15).
 
 ---
 
-**PROPOSED 2026-10-16 — a lower REQUIRED dose that three sessions meet, with
-the fourth session a bonus** (*"Then our goal is too high for sets per week,
+**APPROVED 2026-10-16 — a lower REQUIRED dose that three sessions meet, with
+the fourth session a bonus** (*"Approved with all recommendations"*) (*"Then our goal is too high for sets per week,
 Research and find out what is the minimum. I'd like to aim for a 3 day week
 meets the required goal and a 4th day is a bonus"*). The evidence is in
 `docs/training/weekly_volume_minimum_2026-10-16.md`: 10 sets a week is the figure
@@ -754,3 +754,36 @@ day with the placement rules on the draft cards:
   missed Thursday or Friday session cannot move (Saturday stays rest).
 - **The 12-week review:** if 4 or more of the 12 weeks had 3 or fewer sessions
   (travel and illness weeks not counted), the plan is placed again for 3 days.
+
+**Approved 2026-10-16** (*"Approved with all recommendations"*):
+
+1. **The required dose** above (step 3).
+2. **The sessions run in order, A, B, C, then D.** A missed day moves the rest
+   along; three sessions in a week meet the dose. **Gate 1 now counts the 3
+   core sessions** (3 of 3), not 4 of 4.
+3. **The bonus rule and the drop order** (goal A's priority areas; the hip
+   airplane and the psoas isometric; the gate-1 main lifts; goal B).
+4. **No area is dropped**; the areas are reviewed at 12 weeks.
+5. **The back and chest picks:** the single-arm dumbbell row and the machine
+   chest press, both "caution" on the right (the measured limit) in
+   `services/rules.py`.
+6. **The prone Y raise before a press stops 1-2 reps short of failure** (a
+   change to step 4 for that one position).
+
+**Built the same day** (`goal_week.py`, `services/placement.py`): three core
+sessions — Monday 59, Tuesday 64, Thursday 62 modelled minutes — meet every
+required number with no rule broken; the bonus Friday (60 minutes) adds the
+walking lunge, the hack squat, the back extension, the leg curl, the two side-ab
+exercises and the psoas isometric. Two fixes on the way: the Y raise follows
+EVERY release (his 2026-10-15 rule), which is what lifted the core from the
+54-59 of the scratch draft; and the placement now spreads each area over days
+(an area met on one day with a half-set credit on the same day had read as two).
+**OPEN:** the hip flexors' 3 required sets fit one day, but step 3 wants two —
+the core uses the bonus as their second day (`goal_week.MIN_DAYS`), for his
+confirmation; and Tuesday and Thursday are over the 60-minute target.
+
+**Load progression — PROPOSED 2026-10-16:** his double-progression proposal
+(*"it should be a range and a weight ... If the last reps of the last set are
+outside the range we increase the first set of the next week automatically"*)
+checked against the evidence: `docs/training/load_progression_evidence_review_2026-09-16.md`,
+§10. For his approval.

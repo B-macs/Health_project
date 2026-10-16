@@ -21,11 +21,15 @@ THE RULES, in the order they run:
   P4  A card never falls on two days in a row when the week leaves a choice
       that avoids it.
   P5  The other cards, high demand first and then in card order, each go on
-      the allowed days with the least modelled time so far; a tie goes to the
-      earlier days.
+      the allowed days that give their area the most NEW days, then the least
+      modelled time so far; a tie goes to the earlier days.
   P6  Balance: move one card to another allowed set of days while that lowers
-      the longest session; stop when no move helps. Cards are tried in card
+      the longest session without leaving an area on too few days; stop when
+      no move helps. Cards are tried in card
       order and day sets in day order.
+  P8  The bonus session (``fill_bonus``): one more appearance of each exercise
+      in the drop order while it stays within the target, never a heavy lift
+      from the day before.
   P7  Inside a day: warm-up; then the lifts — compound before isolation, high
       demand first, priority 1 first, the same station together, then the
       name; the press block straight before the first press; trunk work and
@@ -88,6 +92,7 @@ class WeekSpec:
     days: tuple[str, ...]                          # the strength days, in order
     in_a_row: frozenset = field(default_factory=frozenset)   # pairs of days in a row
     minimums: dict = field(default_factory=dict)   # area -> weekly hard sets
+    min_days: dict = field(default_factory=dict)   # area -> days it must be trained (default 2)
 
 
 def exercise_dict(card: Card) -> dict:
@@ -146,6 +151,28 @@ def _allowed(card: Card, combo: tuple[str, ...], week: dict, spec: WeekSpec) -> 
     return not any(card in week[d] for d in combo)
 
 
+def _area_days(week: dict) -> dict[str, set]:
+    out: dict[str, set] = {}
+    for d, items in week.items():
+        for area in hard_sets(items):
+            out.setdefault(area, set()).add(d)
+    return out
+
+
+def _short_areas(week: dict, spec: WeekSpec) -> set:
+    """Areas of the minimums trained on fewer days than they need."""
+    days = _area_days(week)
+    return {a for a in spec.minimums if len(days.get(a, ())) < spec.min_days.get(a, 2)}
+
+
+def _new_days(card: Card, combo: tuple[str, ...], week: dict) -> int:
+    """How many of `combo` would be a new day for the card's own area."""
+    if not card.area:
+        return 0
+    have = _area_days(week).get(card.area, set())
+    return sum(1 for d in combo if d not in have)
+
+
 def place(cards: list[Card], spec: WeekSpec) -> dict[str, list[Card]]:
     """P1-P6. Day -> the cards on it (unordered; ``order`` sorts a day)."""
     week: dict[str, list[Card]] = {d: [] for d in spec.days}
@@ -165,7 +192,8 @@ def place(cards: list[Card], spec: WeekSpec) -> dict[str, list[Card]]:
                    if _allowed(c, combo, week, spec)]
         if not options:
             raise ValueError(f"{c.name}: no allowed days left")
-        best = min(options, key=lambda o: (sum(minutes(week[d]) for d in o),
+        best = min(options, key=lambda o: (-_new_days(c, o, week),
+                                           sum(minutes(week[d]) for d in o),
                                            [spec.days.index(d) for d in o]))
         for d in best:
             week[d].append(c)
@@ -182,6 +210,7 @@ def _balance(week: dict, movable: list[Card], spec: WeekSpec) -> dict:
     while improved:
         improved = False
         current = _longest(week)
+        short = _short_areas(week, spec)
         for card in movable:
             if card.days >= len(spec.days):
                 continue
@@ -193,12 +222,34 @@ def _balance(week: dict, movable: list[Card], spec: WeekSpec) -> dict:
                 trial = {d: list(items) for d, items in stripped.items()}
                 for d in combo:
                     trial[d].append(card)
-                if _longest(trial) < current - 1e-9:
+                if _longest(trial) < current - 1e-9 and _short_areas(trial, spec) <= short:
                     week, improved = trial, True
                     break
             if improved:
                 break
     return week
+
+
+def fill_bonus(day_before: list[Card], warmup: list[Card], candidates: list[Card],
+               press_block: list[Card], target: float = SESSION_MINUTES_TARGET) -> list[Card]:
+    """P8, the bonus session (approved 2026-10-16: "a 3 day week meets the
+    required goal and a 4th day is a bonus"). One more appearance of each
+    candidate, in the drop order given, while the session stays at or under the
+    target. Never a high-demand lift that is on the day before. A press brings
+    the press block (the release and the Y raise) in straight before it."""
+    bonus = list(warmup)
+    before = {c.name for c in day_before}
+    for card in candidates:
+        if any(c.name == card.name for c in bonus):
+            continue
+        if card.demand >= 3 and card.name in before:
+            continue
+        trial = bonus + [card]
+        if card.is_press and not any(c.name == b.name for b in press_block for c in bonus):
+            trial += [b for b in press_block]
+        if minutes(trial) <= target + 0.5:
+            bonus = trial
+    return bonus
 
 
 def hard_sets(items: list[Card]) -> dict[str, float]:
@@ -239,8 +290,9 @@ def violations(week: dict, spec: WeekSpec, extra_sets: dict | None = None,
             out.append(f"{area}: {total.get(area, 0):g} hard sets a week, under its {minimum}")
         days = sum(1 for items in week.values() if hard_sets(items).get(area))
         days += (extra_days or {}).get(area, 0)
-        if days < 2:
-            out.append(f"{area}: trained on {days} day(s), under 2")
+        need = spec.min_days.get(area, 2)
+        if days < need:
+            out.append(f"{area}: trained on {days} day(s), under {need}")
     for d, items in week.items():
         for area, n in hard_sets(items).items():
             if n > SESSION_AREA_CAP:

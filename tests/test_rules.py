@@ -148,9 +148,10 @@ def test_incline_db_press_does_not_match_overhead_press_rule():
 def test_pulling_exercises_are_unrestricted_by_omission():
     # No MOVEMENT_RULES entry matches these — intentional (lat pulldown and DB
     # row are sagittal-plane/controlled patterns with no matching
-    # contraindication), not an authoring gap. They get rules when the goal
-    # system's back picks are made (docs/training/goal_system.md, step 5).
-    for name in ("Lat Pulldown", "Single-Arm DB Row"):
+    # contraindication), not an authoring gap. The single-arm dumbbell row
+    # left this list on 2026-10-16, when it became the goal system's back pick
+    # and got its rule (tests/test_goal_system_pick_rules.py).
+    for name in ("Lat Pulldown",):
         result = rules.check_movement(name, current_stage=2)
         assert result["severity"] == "unknown"
 

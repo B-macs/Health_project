@@ -872,6 +872,24 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="caution", laterality="right",
     ),
     MovementRule(
+        movement="single-arm db row",
+        reason="Single-arm dumbbell row, hand and knee on a bench, spine neutral. At the "
+               "top the elbow goes behind the body: on the RIGHT it goes only as far as it "
+               "goes easily — the right arm reaches less far behind the body (a face-down "
+               "arm raise, 20 cm right against 40 cm left, 2026-08-13). Ruled 2026-10-16, "
+               "when it became the back pick.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="machine chest press",
+        reason="Machine chest press, back supported. At the bottom the elbows go behind "
+               "the line of the body: on the RIGHT only as deep as it goes easily, never "
+               "forced deep (the measured limit; the deep wide-grip bench stays out, "
+               "athlete 2026-10-16). The right-shoulder release comes straight before it. "
+               "Ruled 2026-10-16, when it became the chest pick.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
         movement="neck working stretch",
         reason="Neck working stretch: the head tilted to the left, then 10-second efforts "
                "pushing into the hand or pulling away from it, 5 seconds' rest, about half "

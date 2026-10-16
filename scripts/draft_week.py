@@ -27,21 +27,26 @@ def dose(card: pl.Card) -> str:
 
 
 def main() -> int:
-    week = pl.place(gw.CARDS, gw.SPEC)
+    week = gw.week()
+    core = {d: week[d] for d in gw.CORE_DAYS}
     for day in gw.DAYS:
         items = pl.order(week[day])
-        print(f"\n{day} - session {gw.LETTERS[day]}: {pl.minutes(week[day]):.0f} modelled minutes")
+        kind = "bonus" if day == gw.BONUS_DAY else "core"
+        print(f"\n{day} - session {gw.LETTERS[day]} ({kind}): "
+              f"{pl.minutes(week[day]):.0f} modelled minutes")
         for card in items:
             side = " each side" if card.laterality == "unilateral" else ""
             print(f"   {card.name}: {dose(card)}{side}")
     for name, v in gw.OFF_GYM.items():
         print(f"\n{' and '.join(v['days'])} (no gym): {name}: {v['sets']} sets")
-    total = pl.weekly_sets(week, gw.EXTRA_SETS)
-    print("\nWeekly hard sets:", ", ".join(f"{a} {n:g}" for a, n in sorted(total.items())))
+    for label, days in (("3 core sessions", core), ("with the bonus", week)):
+        total = pl.weekly_sets(days, gw.EXTRA_SETS)
+        print(f"\nWeekly hard sets, {label}:",
+              ", ".join(f"{a} {n:g}" for a, n in sorted(total.items())))
     over = pl.over_target(week)
     print(f"Over the {pl.SESSION_MINUTES_TARGET}-minute target:",
           ", ".join(f"{d} {m:.0f}" for d, m in over) if over else "none")
-    broken = pl.violations(week, gw.SPEC, gw.EXTRA_SETS, gw.EXTRA_DAYS)
+    broken = pl.violations(core, gw.SPEC, gw.EXTRA_SETS, gw.EXTRA_DAYS)
     print("Broken rules:", "none" if not broken else "")
     for line in broken:
         print("  ", line)

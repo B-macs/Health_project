@@ -184,3 +184,75 @@ column added by hand.
 - Mann 2010 (APRE) was not randomised — the groups trained in different years —
   so it is not relied on.
 - Doherty 2025 on wearable composite scores (page blocked).
+
+---
+
+## 10. Addendum 2026-10-16 — his double progression
+
+*The athlete: "now we need to look at incremental weight and range adjustments.
+... research this and find out the best increase each week to be done
+automatically — Lat pull down current setup is as follows - Last: 45kg × 10,
+50kg × 11, 50kg × 8 (2026-10-10) · vs prescribed -3 reps ... this week it gave me
+50kg x 8, to start I believe it should be a range and a weight if I go up in
+weight then we try for the middle to low range until we do that weight at the
+upper range for one week then we go up the next week — If the last reps of the
+last set are outside the range we increase the first set of the next week
+automatically."*
+
+**What happened to the lat pulldown.** Its range is 10-12 with 2.5 kg steps.
+He went 45 → 50 kg, which is +11%: at about 0.37 reps per 1% (§3) that costs
+about 4 reps, so 12 becomes about 8 — under a 10-12 range. That is the −3 he
+saw. The next prescription then read last time's set (50 × 8) and showed no
+range at all.
+
+**What the evidence adds, searched 2026-10-16:**
+
+- **Still no trial compares a one-week trigger with a two-session one** (§1).
+  His trigger is as well supported as the current rule, and for a lift trained
+  once a week it lets the weight rise twice as often.
+- **Adding reps works as well as adding load** (§2: Plotkin 2022; Chaves 2024),
+  so climbing reps inside the range costs nothing.
+- **The reps a step costs** (§3, Nuzzo 2024): a 2.5 kg step at 50 kg (+5%)
+  costs about 2 reps, so it lands in the low-to-middle of an 8-12 range — his
+  "middle to low range", by arithmetic.
+- **Step size: no trial settles it.** Training guides give 2-5% for the upper
+  body and small muscles and 5-10% for the lower body and large muscles; very
+  small steps progressed as well as larger ones over 8 weeks (Hostler et al.
+  2001, J Strength Cond Res; read through a secondary source). The usable step
+  is the equipment's smallest one.
+- **Adjusting the next load from the reps done** — his "last set outside the
+  range" rule — is the approach that ranked first for 1RM gains among
+  autoregulation methods in a 2025 network meta-analysis (APRE; *J Exerc Sci
+  Fit* 2025; abstract only; the squat differences were small, so the ranking is
+  tentative).
+- **A wide range of loads builds muscle when sets end near failure**
+  (Schoenfeld, Grgic, Van Every & Plotkin 2021, *Sports* 9:32), so a range can
+  be chosen to fit the equipment's step.
+
+**PROPOSED rule, for his approval** (it changes rules 2 and 3 of 2026-09-16):
+
+1. Each lift has one working weight for all its working sets, a rep range, and
+   today's aim — all three shown on the screen.
+2. Between steps, the aim is one rep more than the last set made last time, up
+   to the top of the range.
+3. The weight goes up one step when the last set reached the top of the range in
+   every session of that lift in the past week.
+4. After a step, the aim is what the step costs from the last set's reps
+   (0.37 per 1%), kept inside the range.
+5. A range is at least one step wide: its width is at least the reps one step
+   costs, plus one. Defaults: 8-12 for compounds, 10-15 for isolation. When a
+   step is too coarse even so, the reps climb past the top first (rule 4 of
+   2026-09-16, kept).
+6. The last set under the bottom of the range in two sessions in a row, at one
+   weight: back one step (the rollback this review listed as missing in §7).
+7. Kept: readiness never raises load; pain above 5/10 or no check-in blocks a
+   step; a failed week holds the load.
+
+**His lat pulldown under it:** range 8-12, 50 kg. The last set made 8, inside
+the range, so next time is 50 kg with an aim of 9; when the last set makes 12,
+the next session is 52.5 kg with an aim of 10.
+
+**Sources (2026-10-16):** [Hostler et al. 2001, via PEDro](https://search.pedro.org.au/search-results/record-detail/10350) ·
+[Autoregulated training network meta-analysis, 2025](https://lida.sport-iat.de/ta/Record/4094556) ·
+[Schoenfeld et al. 2021](https://doaj.org/article/6d51b905504d46f0873bb43d5d84bf21) ·
+[increment guidance, a study guide (not a primary source)](https://open-exam-prep.com/study-guides/cscs/program-design/resistance-training-program-design).
