@@ -16,8 +16,8 @@
   already trains the front delts.
 - **His areas (2026-10-15):** the front delts are part of the press muscles
   (goal B); the side and rear delts became areas of their own (*"Yes side and
-  rear delts are nearly more important for me"*). Their weekly dose is OPEN
-  (`docs/training/goal_system.md`, step 3).
+  rear delts are nearly more important for me"*). Dose: 6 hard sets a week
+  each (his decision 2026-10-16, `docs/training/goal_system.md`, step 3).
 
 ## The full list, in the source's order
 
@@ -101,29 +101,31 @@ From two shoulder videos that rank nothing (pasted 2026-10-15):
     safety rules the same day and into the release protocol on 2026-08-10. No
     surgeon, physiotherapist or test in his record set it; the physiotherapist
     was never asked, and the physio gate was retired on 2026-08-17. His
-    question of 2026-10-15 (*"Where did that safety limit come from ?"*) —
-    keep, narrow or drop it is OPEN (`goal_system.md`, goal B).
+    question of 2026-10-15 (*"Where did that safety limit come from ?"*).
+    **REMOVED 2026-10-16, his decision** (*"remove it, I don't have any
+    problems with this and have been doing shoulder presses for years without
+    issue"*) — details in `goal_system.md`, goal B.
+  - **Stays out, his precaution (2026-10-16):** pulldowns behind the head. To
+    confirm: presses behind the head, dips and the deep wide-grip bench.
 - **Effects of the MEASURED limit (the arm behind the body):**
   - #15 behind-the-back lateral raise starts with the arm behind the body —
     ranks down on the right.
   - #18 and #21 rear-delt flyes: the right arm stops at the line of the body.
-- **Effects of the WRITTEN limit, while it stands:**
-  - #14 cable Y raise goes overhead with the arm turned out — **out on the
-    right**.
-  - #19 face pull: the video's turned-out finish is the limited position — no
-    turned-out finish on the right. The plan's current face pull already has
-    none (elbows high and wide, shoulder blades down and together).
-  - #13 cable lateral raise: up to shoulder height, thumb not turned up.
-  - Read literally, it also reaches the bottom of a shoulder press with the
-    elbows out to the side (the arm at about shoulder height, the forearm
-    up) — #7 and #8, and the goal-B proof. The 2025 log holds his seated
-    dumbbell press up to 15 kg × 9 (elbow position not recorded) and no
-    dislocation; none since the Latarjet (about 2016).
+- **Effects of the WRITTEN limit — all LIFTED 2026-10-16:**
+  - #14 cable Y raise — back in on the right.
+  - #19 face pull — keeps the video's turned-out finish; the right elbow stops
+    at the line of the body (the measured limit).
+  - #13 cable lateral raise — done as the source describes it; no thumb rule.
+  - The bottom of a shoulder press (#7, #8 and the goal-B proof) — no
+    conflict any more. The 2025 log holds his seated dumbbell press up to
+    15 kg × 9 and no dislocation; none since the Latarjet (about 2016).
 - **Agreed 2026-10-15 (*"Yes agree"*):** the limits on the picks — the cable
   lateral raise to shoulder height, thumb not turned up; the reverse cable
   crossover, the right arm stopping at the line of the body; the face pull
   without the turned-out finish. He agreed before he knew where the written
-  limit came from, so his decision on it can change the first and the last.
+  limit came from. **Changed 2026-10-16** when he removed it: the first and
+  the last are lifted, and the crossover's limit stays (it is the measured
+  one).
 - **The overhead press is machine-only** (his rule): #8; the barbell presses (#5,
   #6) are out. The goal-B proof stays a seated dumbbell press (approved).
 - **Safety rules:** every exercise here except the face pull is "unknown". The

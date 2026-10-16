@@ -25,14 +25,13 @@ The 45° back extension is one form of the hyperextension: the bench is set at
   movement stops at a straight line, never past it.
 - **The lower back is not bent under load:** the safety rules contraindicate
   loaded bending of the lower back (the covered annulus tears at L3/4 and L4/5
-  on the MRI). In these
-  exercises the hips move and the back stays straight.
+  on the MRI). In these exercises the hips move and the back stays straight.
 - **Gym:** the 45° back extension bench is confirmed (2026-10-15). A reverse
   hyperextension machine is not confirmed.
 
-**Pick — proposed 2026-10-15, OPEN:** the 45° back extension, back straight, up
-to a straight line. It counts 1 for the deep back muscles and 0.5 for glute
-max.
+**Pick — APPROVED 2026-10-16** (*"yes agreed"*): the 45° back extension, back
+straight, up to a straight line. It counts 1 for the deep back muscles and 0.5
+for glute max.
 
 ## Unranked source advice
 

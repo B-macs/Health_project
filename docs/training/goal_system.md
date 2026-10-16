@@ -173,8 +173,31 @@ wide-grip bench out on the return to the gym; about 9 in 10 people return to
 sport, overhead sport included; and instability returns in more people the
 longer they are followed (5-26% in studies of 10 years or more). His own risk
 factors are real: hypermobility, a shallow socket, and a first repair that
-failed. **His decision — keep it, narrow it to the end-range position with the
-arm behind the body, or drop it — is OPEN.**
+failed.
+
+**REMOVED 2026-10-16 — his decision** (*"remove it, I don't have any problems
+with this and have been doing shoulder presses for years without issue.
+Although I avoid pull downs that go behind the back, other than that the rest I
+have been able to do during this time without issues. But I guess getting rid
+of them makes sense as I get older and don't want any issues"*):
+
+- **The 90° limit is gone** from every plan rule. The source documents are
+  annotated in place (`Input_files/cluster_d_prescription.md`, with a backup in
+  `Input_files/backups/`; `docs/training/release_protocols_2026-08-10.md`).
+- **Pulldowns behind the head stay out** — he already avoids them.
+- **My reading of "getting rid of them", TO CONFIRM:** the other end-range lifts
+  with the arm behind the body also stay out, as a precaution with age —
+  presses behind the head, dips, and the deep wide-grip bench.
+- **The MEASURED limit stays:** the right arm stops at the line of the body in
+  flyes, the reverse cable crossover and the face pull.
+- **Revert condition (proposed, TO CONFIRM):** the 90° limit comes back if the
+  right shoulder ever feels unstable — the feeling that it may slip forward.
+- **Where the old wording still stands as text, not as a rule for this plan:**
+  the notes of the 16-minute shoulder yoga flow (never filmed), the retired
+  anterior-shoulder reciprocation drill (`training_plan.py`, `services/rules.py`),
+  the Stage 2B band chest press warning (a past block), and the reason texts of
+  the "abduction" and "external rotation" safety rules ("caution" — they block
+  nothing). Do not re-derive the limit from them.
 
 ## Goal C — flexibility that lasts — APPROVED 2026-10-14
 
@@ -276,7 +299,7 @@ question is answered at that same test.
 |---|---|---|---|
 | Strength and size, priority 1 — glute max, abs, deep back muscles, hamstrings | 2 or more | 10 per area | 0-3 reps left; failure where step 4 allows |
 | Strength and size, priority 2 — the main lifts (quads, chest, back) and goal B (shoulder-blade and back muscles, press muscles; the rotator cuff removed 2026-10-15) | 2 or more | 6 per area | 0-3 reps left |
-| Strength and size — side delts, rear delts (areas from 2026-10-15) | 2 or more | OPEN: 6 (priority 2) or 10 | 0-3 reps left |
+| Strength and size — side delts, rear delts (areas from 2026-10-15) | 2 or more | 6 per area — priority 2 (his decision 2026-10-16: *"yes 6 sets"*) | 0-3 reps left |
 | Hip airplane (his dose) | 2 | 3 × max each day | to failure |
 | Strength at length — hip flexors, adductors | 2 or more | 6 per area | hard; stop before the position slips |
 | Control — left lower ribs | every strength day | 1-2 short sets | easy, never to failure |
@@ -435,8 +458,12 @@ machine-only rule).
 - **The right shoulder's limits on the picks** (*"Yes agree"*): the lateral
   raise to shoulder height, thumb not turned up; the crossover's right arm
   stops at the line of the body; the face pull without the turned-out finish.
-  Agreed before he learned where the 90° limit came from (goal B), so his
-  decision on that limit can change the first and the last.
+  Agreed before he learned where the 90° limit came from (goal B). **Changed
+  2026-10-16, when he removed that limit:** the lateral raise is done as the
+  source describes it (no thumb rule); the face pull keeps its turned-out
+  finish, with the right elbow stopping at the line of the body; the
+  crossover's right arm still stops at the line of the body (the measured
+  limit). The cable Y raise (S) is a candidate on the right again.
 - **A cap for step 6** (*"Yes agree to rule"*): about 6-8 hard sets per muscle
   per session. It is Jeff Nippard's rule of thumb (beyond it, more adds
   little), not a tested limit.
@@ -463,10 +490,21 @@ ranks first. Consequences: the seated leg curl stays ahead of the lying curl
 step-up qualifies through Nippard's low A, although the second list rates it D;
 the reverse lunge (S) joins the glute candidates.
 
-**OPEN — the deep back pick:** the 45° back extension, back straight, up to a
-straight line — it counts 1 for the deep back muscles and 0.5 for glute max. It
-was listed as a glute pick (S); the glutes keep the walking lunge, the machine
-hip thrust and the Romanian deadlift.
+**The deep back pick — APPROVED 2026-10-16** (*"yes agreed"*): the 45° back
+extension, back straight, up to a straight line — it counts 1 for the deep back
+muscles and 0.5 for glute max. It was listed as a glute pick (S); the glutes
+keep the walking lunge, the machine hip thrust and the Romanian deadlift.
+
+**His question of 2026-10-16 on the two-list rule** (*"is step up a A or D
+so?"*): under the proposed rule, the step-up onto a box at or above knee height
+is **A** (Jeff Nippard's low A — the list names that version); a step-up onto a
+lower box is **D** (only the second list covers it). Either way it is not
+picked now: six S-tier glute exercises rank above it (walking lunge, Smith
+lunge with the front foot raised, machine hip thrust, reverse lunge, Romanian
+deadlift, 45° back extension). The rule itself is still OPEN; the stricter
+choice is "when lists disagree, the LOWER tier counts" — then the step-up and
+the kickback drop out, and every current pick stays. The trial clause (the
+seated curl ahead of the lying curl) is the same in both.
 
 ---
 

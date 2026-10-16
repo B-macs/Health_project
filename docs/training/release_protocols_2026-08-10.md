@@ -65,6 +65,13 @@ Built from Cluster D §E's stabilised-shoulder position and the annex §4 conduc
 rules. The arm stays LOW throughout — never external rotation at 90° abduction,
 which is the apprehension position the Latarjet exists to protect.
 
+> **Annotated 2026-10-16:** the 90° limit in the paragraph above is REMOVED
+> (athlete: *"remove it, I don't have any problems with this and have been doing
+> shoulder presses for years without issue"*). It was the Cluster D documents'
+> general precaution, never observed in his shoulder. Technique B itself was
+> replaced on 2026-10-15 by back-muscle activation. See
+> `docs/training/goal_system.md`, goal B.
+
 - **Position:** seated, right elbow resting on the right knee, forearm hanging,
   elbow and shoulder in one vertical line — the arm low and close to the body.
 - **Movement:** one cycle = (1) press the palm gently inward against the other
