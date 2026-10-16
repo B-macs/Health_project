@@ -651,30 +651,49 @@ day rules hold; every exercise has a known safety rule and a tier source.
 - **Training days:** strength Monday, Tuesday, Thursday and Friday; rest
   Wednesday and Saturday; flexibility Sunday (*"yes agreed"*).
 
-**Draft 2 on today's picks** (2026-10-16, a scratch run through
-`services/sessions.session_seconds`; every exercise 3 sets):
+**Four sessions, A to D — his request, 2026-10-16** (*"Make a session C and D
+and balance it out or make a session C to balance it and we can hold D as a
+every week changing between AB and C"*). Four fixed sessions were chosen over
+a rotating fourth day: with a rotation each week has a different set of
+sessions, so an area can fall under its weekly minimum in some weeks; with four
+fixed sessions the minimums hold every week.
 
-- **Monday and Thursday — session A:** psoas march, rib control (90/90 hip
-  lift), neck; Romanian deadlift (ramp + 3), hack squat (ramp + 3), 45° back
-  extension; the right-shoulder release, prone Y raise, machine shoulder press;
-  cable lateral raise; one abs exercise (Monday the lat-pulldown cable crunch,
-  Thursday the woodchop); hip airplane; adductor ladder. **80 and 82 modelled
-  minutes.**
-- **Tuesday and Friday — session B:** psoas march, rib control, neck (Tuesday
-  only — three days a week); walking lunge, 45° back extension, seated leg curl;
-  the release, prone Y raise, machine chest press; single-arm dumbbell row,
-  reverse cable crossover; one abs exercise (Tuesday the reverse crunch, Friday
-  the side plank with hip raises); psoas isometric. **77 and 75 modelled
-  minutes.**
-- **Weekly hard sets:** every area at or above its minimum — glutes 18, abs 12,
-  deep back 12, hamstrings 12, quads 9, chest 6, back 6, press 9, shoulder
-  blades 15, side delts 9, rear delts 6, hip rotators 6, hip flexors 6,
-  adductors 6.
-- **By his fewer-exercises rule:** the machine hip thrust is out (the glutes
-  stay at 18 without it), and the abs take one exercise a session, rotating
-  through the four picks.
+**60 minutes is the target, 70 the maximum** (*"Also 70min is the Max, 60min is
+the target Not 70 the target"*): a session over 70 breaks the week; a session
+over 60 is reported.
 
-**Still over 70 minutes by 5-12. OPEN, his choice:** (a) move the three holds
-(hip airplane, adductor ladder, psoas isometric — no gym needed) to Wednesday
-and Sunday, which brings the sessions to about 70-72; (b) pair two exercises at
-neighbouring spots (supersets); (c) raise the limit to 85 minutes.
+**The rules are now code** — `services/placement.py` (P1-P7: fixed items, the
+abs rotation, one knee and one hip lift a day, no two-day exercise on two days
+in a row, least-time placement, a balancing pass, the order inside a day), the
+draft cards in `goal_week.py`, `python scripts/draft_week.py` to print the week,
+and `tests/test_placement.py`, which checks the week the rules produce and that
+the checker catches a broken one. The same cards always give the same week.
+
+**Draft 3, placed by the rules** (2026-10-16; the adductor ladder at home on
+Wednesday and Sunday, as proposed — kept in the gym it puts two sessions 2-3
+minutes over 70):
+
+- **A, Monday — 67 min:** psoas march, 90/90 hip lift, neck; walking lunge,
+  45° back extension; the release, prone Y raise, machine chest press, machine
+  shoulder press; seated leg curl; lat-pulldown cable crunch; hip airplane.
+- **B, Tuesday — 70 min:** psoas march, 90/90 hip lift, neck; Romanian deadlift
+  and hack squat (each with a ramp set), 45° back extension, single-arm dumbbell
+  row, cable lateral raise, reverse cable crossover; reverse crunch; psoas
+  isometric.
+- **C, Thursday — 69 min:** as A, with the woodchop for the abs and the psoas
+  isometric for the hold.
+- **D, Friday — 69 min:** as B without the neck, with the side plank with hip
+  raises for the abs and the hip airplane for the hold.
+- **Weekly hard sets:** every area at or above its minimum (glutes 18, abs 12,
+  deep back 12, hamstrings 12, quads 9, press 9, shoulder blades 9, side delts
+  9; chest, back, rear delts, hip rotators, hip flexors and adductors 6).
+
+**Reaching 60 — measured with the same rules** (Monday, Tuesday, Thursday,
+Friday): no ramp sets and the neck at home: 64, 63, 65, 65. Add each hold once
+at home on Wednesday: 64, 63, 60, 59. Everything that needs no gym at home
+(the three holds and the neck, on Wednesday and Sunday, about 20 minutes each
+day) and no ramp sets: 58, 57, 60, 59. Removing exercises does not get there:
+by L3 the only removable exercise is the walking lunge, which shortens only
+Monday and Thursday. Ramp sets: the warm-up review found a ramp set adds about
+nothing at loads near a 10-rep maximum, and this plan has no heavy top set.
+**OPEN, his choice.**
