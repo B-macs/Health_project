@@ -15,3 +15,9 @@
 - Hono's bearerAuth answers a header in another scheme ("Basic ...") with 400, not 401; the Worker test records that.
 - The placeholder page was checked at phone width in the browser pane: title, line, version line with the commit; no console errors.
 - Main gate: 4276 passed, 1 skipped.
+
+## 2026-10-16 — Phase 0 re-checked after the app changed
+- The owner asked whether Phase 0 must be done again after his updates (84 commits since 2026-10-07: Supabase the only store, the twenty work packages, the 12-week block). No: Phase 0 was paused at STOP 1 and nothing was deployed. The local half was re-checked against the new code.
+- Broken: the engine image's allow-list. services/ had started importing `goal_block`, the Dockerfile, .gcloudignore and .dockerignore did not admit it, and a scratch copy of the allowed files failed to import 12 services/ modules. Fixed, and `tests/api/test_image_file_set.py` (5 tests, static) now checks the list against the code both ways.
+- Stale: `tests/test_core_hold_score.py` gained one test that renders a Streamlit screen; the Streamlit list can now name a single test (deselected in the engine run).
+- Holding: the API, the gate, the Worker and the app tests; the startup path under Supabase record mode; the readiness rule of 2026-10-13, which lives in services/.

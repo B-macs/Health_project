@@ -3,7 +3,12 @@
 *The phone-app rebuild: see the "Phone app rebuild (from 2026-10-07)" section of CLAUDE.md. Update this file during every rebuild session.*
 
 ## Now
-**Phase 0 — Foundation & engine proof on Cloud Run.** PROMPT 1, at **STOP 1**: waiting for the owner's Google Cloud and Cloudflare steps (2026-10-07).
+**Phase 0 — Foundation & engine proof on Cloud Run.** PROMPT 1, at **STOP 1**: waiting for the owner's Google Cloud and Cloudflare steps (2026-10-07). Nothing was deployed, so nothing needs redoing.
+
+**Re-checked 2026-10-16 against the app after 84 commits** (Supabase the only store, switched on the hosted app 2026-10-13; the 12-week block, `goal_block.py`):
+- **Broken and fixed:** the image's file list. services/ now imports `goal_block`, which the Dockerfile and both ignore files did not admit, so 12 services/ modules (repository, sessions among them) would not have imported in a container built that day. `goal_block.py` is admitted, and `tests/api/test_image_file_set.py` now fails when services/ or api/ imports a root module the image does not copy (or copies one nothing imports, or would upload the clinical record).
+- **Stale and fixed:** one new test needs Streamlit (`test_core_hold_score.py::test_core_s_card_shows_the_hold_time_marked_provisional`). The list can now name a single test, which the engine run deselects.
+- **Still holds:** the API (its 20 tests, the openapi contract), the gate, the Worker and the app. The engine's startup fits the Supabase record mode: `datastore.ensure_local_cache` leads into `services/record_cache.py`, which rebuilds the local copy from Supabase once per process. The readiness rule of 2026-10-13 (no readiness without a ring reading) lives in `services/readiness.py`, so `/api/readiness` inherits it. No new package in requirements.txt.
 
 ## Done
 - CLAUDE.md rebuild section added (word for word from the Notion Phase 0 page). Commit fa7afc1.

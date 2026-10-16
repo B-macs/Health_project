@@ -2,11 +2,13 @@
   "_note": "Phase 0 proof numbers only, never a personal reading. null = not measured yet, and scripts/rebuild_gate.py counts an unmeasured target as missed.",
   "engine_venv": {
     "python": "3.12.9",
-    "passed": 3895,
+    "passed": 4588,
     "skipped": 1,
+    "deselected": 1,
     "failed": 0,
-    "streamlit_tests_excluded": 11,
-    "measured_on": "2026-10-07"
+    "streamlit_files_excluded": 11,
+    "streamlit_tests_deselected": 1,
+    "measured_on": "2026-10-16"
   },
   "region": null,
   "image_size_mb": null,

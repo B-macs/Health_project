@@ -3,7 +3,7 @@
 These test files import `streamlit` or a screen module (`app`, `views`, `nav`,
 `styles`, `repo`), so they cannot run in the engine's venv, which has no
 Streamlit. `scripts/rebuild_gate.py` reads this list (the lines that start with
-"- `tests/") and passes each file as `--ignore` to the engine-venv run.
+"- `tests/") and passes each file as `--ignore` and each single test (`file::test`) as `--deselect` to the engine-venv run.
 Phase 10 maps every one to a replacement, or to a retirement that the owner
 approves. Found 2026-10-07 by an import scan of `tests/`.
 
@@ -18,6 +18,7 @@ approves. Found 2026-10-07 by an import scan of `tests/`.
 - `tests/test_strain_screen.py` — the strain screen
 - `tests/test_strength_screen.py` — the strength screen
 - `tests/test_training_guided_flow_fragment.py` — the guided training flow
+- `tests/test_core_hold_score.py::test_core_s_card_shows_the_hold_time_marked_provisional` — ONE test (added 2026-10-16): it renders the strength card with views/insights.py; the rest of the file is engine-only and stays in the engine run
 
 ## Tests that only READ the screen files as text
 These run in any venv (they parse source, they do not import it), so the
@@ -36,3 +37,5 @@ test_traffic_light_awaits_today, test_training_checkpoint_mirror.
 2026-10-07, `.venv-engine` (Python 3.12.9, requirements-engine-dev.txt), these
 11 ignored: **3895 passed, 1 skipped, 0 failed** in 72 s. The main gate in
 `venv/` (Python 3.11.9) is 4226 at the floor, so the 11 files hold about 330 tests.
+
+2026-10-16, the same venv on the current code (the 12-week block and Supabase as the only store had landed), the 11 files ignored and the one test deselected: **4588 passed, 1 skipped, 1 deselected, 0 failed** in 99 s. The main gate in `venv/` read 4929 passed, 1 skipped.

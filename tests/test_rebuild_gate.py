@@ -115,10 +115,25 @@ def test_streamlit_bound_list_is_parsed(tmp_path):
     assert gate.streamlit_bound_tests(md) == ["tests/test_a.py", "tests/test_b.py"]
 
 
+def test_one_test_can_be_listed_and_is_deselected_not_ignored(tmp_path):
+    md = tmp_path / "list.md"
+    md.write_text("- `tests/test_a.py` whole file\n- `tests/test_b.py::test_card` one test\n",
+                  encoding="utf-8")
+    listed = gate.streamlit_bound_tests(md)
+    assert listed == ["tests/test_a.py", "tests/test_b.py::test_card"]
+    assert gate.engine_run_exclusions(listed) == [
+        "--ignore=tests/test_a.py", "--deselect=tests/test_b.py::test_card"]
+
+
 def test_the_real_streamlit_bound_list_names_existing_tests():
     listed = gate.streamlit_bound_tests()
     assert listed, "docs/rebuild/streamlit_bound_tests.md lists no tests"
-    assert all((gate.REPO_ROOT / t).exists() for t in listed)
+    for entry in listed:
+        file, _, name = entry.partition("::")
+        assert (gate.REPO_ROOT / file).exists(), entry
+        if name:
+            source = (gate.REPO_ROOT / file).read_text(encoding="utf-8")
+            assert f"def {name}(" in source, entry
 
 
 def test_update_feature_list_flips_only_this_phases_tasks(tmp_path):

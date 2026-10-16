@@ -142,11 +142,18 @@ def read_junit(path: Path) -> JunitSummary:
 
 def streamlit_bound_tests(md_path: Path = STREAMLIT_BOUND_TESTS) -> list[str]:
     """The tests that import Streamlit or the screen modules, as listed in
-    docs/rebuild/streamlit_bound_tests.md (lines like "- `tests/x.py` ...")."""
+    docs/rebuild/streamlit_bound_tests.md: a whole file ("- `tests/x.py` ...")
+    or one test in an otherwise engine-only file ("- `tests/x.py::test_y` ...")."""
     if not md_path.exists():
         return []
-    return re.findall(r"^- `(tests/[^`]+\.py)`", md_path.read_text(encoding="utf-8"),
-                      flags=re.MULTILINE)
+    return re.findall(r"^- `(tests/[^`:]+\.py(?:::[A-Za-z0-9_]+)?)`",
+                      md_path.read_text(encoding="utf-8"), flags=re.MULTILINE)
+
+
+def engine_run_exclusions(entries: list[str]) -> list[str]:
+    """pytest arguments that leave the listed tests out of the engine run: a
+    whole file is ignored, a single test is deselected."""
+    return [f"--deselect={e}" if "::" in e else f"--ignore={e}" for e in entries]
 
 
 def engine_python(root: Path = REPO_ROOT) -> Path:
@@ -296,14 +303,14 @@ def p0_engine_venv_fail() -> CounterResult:
     out = REPORTS_DIR / "p0"
     junit, log = out / "pytest-engine.xml", out / "pytest-engine.log"
     if not (REUSE_TEST_RUNS and junit.exists()):
-        _run_pytest(python, junit, log, [f"--ignore={t}" for t in excluded])
+        _run_pytest(python, junit, log, engine_run_exclusions(excluded))
     if not junit.exists():
         return CounterResult(1, "pytest wrote no junit file", ["p0/pytest-engine.log"])
     summary = read_junit(junit)
     return CounterResult(
         summary.failures + summary.errors,
         f"{summary.passed} passed, {summary.failures} failed, {summary.errors} errors, "
-        f"{summary.skipped} skipped; {len(excluded)} Streamlit tests excluded",
+        f"{summary.skipped} skipped; {len(excluded)} Streamlit entries excluded",
         ["p0/pytest-engine.log"])
 
 

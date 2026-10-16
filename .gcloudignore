@@ -20,6 +20,7 @@
 !/cluster_a_mechanics.py
 !/cluster_a_prescription.py
 !/flexibility_baselines.py
+!/goal_block.py
 
 # Never, even inside an admitted folder.
 **/__pycache__/
