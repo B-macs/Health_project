@@ -834,6 +834,54 @@ side's own numbers are added only when they differ.
 
 ---
 
+## Step 7 — the warm-up — 2026-10-16, approved except the hip lift
+
+**Every strength day, before the first lift:**
+
+1. The 15-minute walk to the gym — the raise; nothing to log.
+2. The standing psoas march, 2 × 20 a side (his decision, 2026-10-14).
+3. One light ramp set (6 reps) straight before the Romanian deadlift and the
+   hack squat only (Key Rule 21).
+
+**Before the first press** (Monday, Thursday): the right-shoulder release
+(about 4 minutes), then the prone Y raise — a training exercise, counted in the
+shoulder-blade sets. In the gym the warm-up takes 7 minutes on Monday and
+Friday and 10 on Tuesday and Thursday, under the 15-minute limit.
+
+**Not carried over from Block B:** the forearm plank and the side bridge at
+the start — **his answer, 2026-10-16: *"Choice of planks was only to
+incorporate abs workout, remove that rule choice"*** (his 2026-09-22 choice is
+retired; the abs are trained to failure at the end of each session); the
+incline walk; the hip airplane in the warm-up (3 × max at the end of two
+sessions).
+
+**OPEN — the 90/90 hip lift.** His question: *"What is the objective of the
+90/90 hip lift and how effective is it and required for the training? or is
+this more of a daily thing to do ... outside of warming up for training? does
+this warm up a certain muscle that without it i could have issues?"* The facts
+given to him:
+
+- **Its job:** control of the left lower ribs (step 2), from his own
+  observation of 2026-10-05 (finding #7). The heel press switches on the backs
+  of the thighs, which tilt the pelvis back; the long breath out switches on
+  the abs, which pull the lower ribs down. It is not the fix for the pelvis
+  twist — the hip airplane trains that.
+- **It warms up no muscle a lift depends on.** The walk warms in general, and
+  the ramp set warms the backs of the thighs before the Romanian deadlift.
+- **The evidence is weak** (searched 2026-10-16): the method comes from the
+  Postural Restoration Institute; the source article describes it without a
+  trial (Boyle et al. 2010); a shoulder trial is registered without a result;
+  small back-pain trials report less pain, at about the level of other
+  exercise (a 2025 thesis review asks for better trials); and no trial shows a
+  breathing drill changes rib or pelvis position for weeks. Reviews of exercise
+  for posture find the trials mostly at high risk of bias (2020, 22 trials).
+- **His own record does not answer it:** five logged sessions (2026-10-06 to
+  10-12), and finding #7's test has never been graded.
+- **Without it** every session is about 2 minutes shorter: Monday 54, Tuesday
+  59, Thursday 56, Friday 57 modelled minutes.
+
+---
+
 ## The 12-week block — his decisions, 2026-10-16
 
 *"When we push this new session block that will be 12 weeks long, it will
@@ -854,3 +902,13 @@ monday. lets complete all other steps and then push."*
   up when every set reached the top of the range or one set went past it; then
   the aim is the middle-bottom of the range (9 on 8-12, 11 on 10-15). Built in
   `engine.range_progression`; see the load-progression review, §10.
+- **His answers of 2026-10-16 to the step-8 inputs:** the rule as built is his
+  (*"Yes built correct"*); the machine steps are confirmed (*"Yes all are
+  correct"*) — hack squat 5 kg (2.5 kg a side), chest press, shoulder press and
+  leg curl 5 kg, cable lateral raise and crossover 1 unit, back extension
+  2.5 kg (a plate held), dumbbells 2.25 kg (one real dumbbell number is still
+  asked, so the + and − buttons land on his dumbbells); **starting weights:**
+  the app shows a light weight, he sets the real one in the first session, and
+  the rule takes over from the second (option a); **the timed plank test:** in
+  week 1 and week 12, at the end of session A in place of that day's abs work,
+  with the core hold score built before week 1 (option a).
