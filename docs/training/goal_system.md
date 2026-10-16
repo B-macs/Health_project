@@ -969,8 +969,28 @@ be registered before.
   reason"*): if a week ends with fewer than 3 core sessions, one tap — hips or
   back (a flare-up; the 6-week count resets), travel or illness (the count
   pauses), other (the week does not count; the count resets).
-- **Test mornings — OPEN:** he asked what the rib and pelvis test is, and would
-  "aim for Monday" for the flexibility retest. Monday morning follows Sunday's
-  adductor ladder and flexibility session, and his rule of 2026-08-07 is that a
-  retest is never the morning after leg work; Sunday morning follows Saturday's
-  rest.
+- **Test mornings — Sunday, before the flexibility session** (*"Sunday morning
+  before"*): Monday morning follows Sunday's adductor ladder and flexibility
+  session, and his rule of 2026-08-07 is that a retest is never the morning
+  after leg work; Sunday morning follows Saturday's rest. The 12-week
+  flexibility retest runs on three Sunday mornings (three mornings before a
+  number counts).
+- **The rib and pelvis test** (finding #7's test from 2026-10-05, never scored):
+  in week 1 and week 12, on the test Sunday morning (*"Yes"* — his answer read
+  "Yes skip", taken as yes and flagged to him).
+
+**The better-exercise checks — done 2026-10-16** with the tier decider for the
+five areas without a ranked list (`docs/training/tier_lists/abs_sides.md`,
+`hip_rotators.md`, `shoulder_blades.md`, `hip_flexors.md`, `adductors.md`), his
+filters applied after the ranking:
+
+| Pick | Result | Why |
+|---|---|---|
+| Standing psoas march | KEEP | No warm-up drill is shown better; a swing or a held stretch is out by his hypermobility rule |
+| Right-shoulder release | KEEP | The chest stretches take the right arm past its measured limit; the release passes, and he uses its short-lived effect |
+| High-to-low woodchop | KEEP | A, the sides' best tier; the best safety margin in it |
+| Side plank with hip raises | KEEP | A, the sides' best tier; the best safety margin in it |
+| Prone Y raise (B) | ASKED: the single-arm cable Y raise (A) | The S rows and pulldowns fail his right-arm limit or load pec minor; the Y raise is hardest where the muscle is shortest, and 2.25 → 4.5 kg is a 100% step |
+| Hip airplane (A) | ASKED: the prone cable hip rotation (S) | Load in small steps, hips straight (no click); gives up the only exercise that turns the pelvis on a standing leg; about 5 more minutes on two days |
+| End-range psoas isometric (B) | ASKED: the cable hip flexion from behind the body (S) | The isometric works the psoas at its shortest — not the area's job of strength at length; the bench-edge version is the Thomas-test position, where the right hip clicks |
+| Adductor ladder | ASKED: the adductor machine (S), if his gym has one | Knees bent, starting wide under load; about 5 minutes on two sessions instead of at home; without one, the ladder stays |

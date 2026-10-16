@@ -169,7 +169,10 @@ PICKS: dict[str, Pick] = {
         "warm-up", "hip flexors", "warm-up",
         "Opens every strength session: it stretches and wakes up the psoas.",
         "his words, 2026-10-14: 'required to stretch and wake up that muscle'; 2026-09-22: "
-        "'I feel more of stretch from that than any other stretch'"),
+        "'I feel more of stretch from that than any other stretch'",
+        better="checked 2026-10-16: no warm-up drill is shown better than another for the hip "
+               "flexors; a leg swing (a swing) and a held hip-flexor stretch (passive end range) "
+               "are out by his hypermobility rule; kept"),
     "Ramp set": Pick(
         "warm-up", "the lift that follows", "warm-up",
         "One light set straight before the Romanian deadlift and the hack squat.",
@@ -182,7 +185,11 @@ PICKS: dict[str, Pick] = {
         "B", "front of the right shoulder", "range",
         "Releases the front of the right shoulder straight before a chest or shoulder press.",
         "physiotherapist, 2026-08-10; his words, 2026-10-16: 'The shoulder release is only needed "
-        "when doing chest presses or shoulder press. It's to release the area before working on it'"),
+        "when doing chest presses or shoulder press. It's to release the area before working on it'",
+        better="checked 2026-10-16: the corner and doorway chest stretches take the right arm "
+               "behind the body, past his measured right-arm limit (20 cm against 40 cm, "
+               "2026-08-13); rolling and pressure gain range for a short time, about as much as "
+               "stretching (Wilke et al. 2020), which is how he uses it; kept"),
     "Prone Y-Raise (Scapular)": Pick(
         "B", "shoulder-blade muscles", "strength and size",
         "Back-muscle work straight after the release, before the press; 1-2 reps short of failure.",
@@ -268,12 +275,16 @@ PICKS: dict[str, Pick] = {
         "The sides of the abs under load, to failure.",
         "his words, 2026-10-15 (tier_lists/abs.md): 'lets go for something like a high to low "
         "woodchop instead'",
-        listed_as="woodchop"),
+        listed_as="woodchop",
+        better="checked 2026-10-16 (tier_lists/abs_sides.md): A, the list's best tier (no S); "
+               "within A the safety margin keeps it over the side bends; kept"),
     "Side Plank with Hip Raises": Pick(
         "A", "abs", "strength and size",
         "The sides of the abs, made harder with a hip raise, to failure.",
         "his pick, 2026-10-15 (tier_lists/abs.md): a side plank made harder with a hip raise",
-        listed_as="side plank"),
+        listed_as="side plank",
+        better="checked 2026-10-16 (tier_lists/abs_sides.md): A, the list's best tier (no S); "
+               "within A the safety margin keeps it over the side bends; kept"),
     "Hip Airplane": Pick(
         "A", "hip rotators", "strength and size",
         "Trains the pelvis twist he noticed on 2026-10-05: 3 x max, two days, not every day.",
@@ -295,14 +306,15 @@ PICKS: dict[str, Pick] = {
         "work package WP-04, 2026-10-13, from his notes; step 2, goal C"),
 }
 
-#: The picks not yet checked against a better exercise for the same goal. Step 8
-#: checks each and shows him the result; tests/test_workflow_picks.py keeps this
-#: list equal to the picks whose `better` is None, and refuses to let the block
-#: be registered while it is not empty.
+#: The picks whose check is not closed. Step 8 checked all eight on 2026-10-16
+#: (the files in docs/training/tier_lists/); for these four a better exercise
+#: ranks higher and his decision is asked, so each stays open until it is
+#: replaced or kept by his choice. tests/test_workflow_picks.py keeps this list
+#: equal to the picks whose `better` is None, and refuses to let the block be
+#: registered while it is not empty.
 BETTER_CHECK_OPEN = (
-    "Standing Psoas March", "Pec & Scar Release (Right)", "Prone Y-Raise (Scapular)",
-    "High-to-Low Cable Woodchop", "Side Plank with Hip Raises", "Hip Airplane",
-    "End-Range Psoas Isometric", "Adductor Ladder (current rung)",
+    "Prone Y-Raise (Scapular)", "Hip Airplane", "End-Range Psoas Isometric",
+    "Adductor Ladder (current rung)",
 )
 
 

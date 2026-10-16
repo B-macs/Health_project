@@ -32,6 +32,11 @@ file lacks either part.
 | [shoulders.md](shoulders.md) | Deltoids — front, side and rear | Jeff Nippard, shoulder tier list | 2026-10-15 |
 | [back.md](back.md) | Back — lats and upper back | No source yet — the tier decider's list | 2026-10-16 |
 | [chest.md](chest.md) | Chest | No source yet — the tier decider's list | 2026-10-16 |
+| [abs_sides.md](abs_sides.md) | Abs, the sides (obliques) | No source yet — the tier decider's list | 2026-10-16 |
+| [hip_rotators.md](hip_rotators.md) | Hip rotators | No source yet — the tier decider's list | 2026-10-16 |
+| [shoulder_blades.md](shoulder_blades.md) | Shoulder-blade muscles (lower and middle trapezius) | No source yet — the tier decider's list | 2026-10-16 |
+| [hip_flexors.md](hip_flexors.md) | Hip flexors, strength at length | No source yet — the tier decider's list | 2026-10-16 |
+| [adductors.md](adductors.md) | Adductors, knees bent | No source yet — the tier decider's list | 2026-10-16 |
 
 ## The reading rule — when these files are used
 
