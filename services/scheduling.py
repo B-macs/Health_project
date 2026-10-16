@@ -624,3 +624,94 @@ def missed_reschedules(
             pending[miss_iso] = target_num
 
     return overrides, reasons
+
+
+# ─── The 12-week block: the sessions run in order ───────────────────────────
+# The athlete, approved 2026-10-16: "The sessions run in order, A, B, C, then
+# D. A missed day moves the rest along; three sessions in a week meet the
+# dose." It replaces the priority carry above for a block whose strength days
+# carry a session letter: every strength day is "main", so the priority carry
+# could only move a missed session onto Wednesday's rest, which he had already
+# turned down (three strength days in a row). ASK-FIRST like every other move.
+
+def runs_in_order(plan_dict: dict | None) -> bool:
+    """DETERMINISTIC. Whether a block's strength days carry session letters
+    (goal_block.py), so a missed day is handled by in_order_reschedules."""
+    return any((content or {}).get("session_letter") for content in (plan_dict or {}).values())
+
+
+def in_order_reschedules(
+    phase: Phase,
+    plan_dict: dict | None,
+    logged_dates: set[str],
+    today: date,
+) -> tuple[dict[str, int], dict[str, str]]:
+    """DETERMINISTIC. The (date_overrides, shift_reasons) deltas that run this
+    week's sessions in order after a missed strength day; both empty when
+    there is nothing to propose.
+
+    The week's strength days are its dates whose resolved plan day carries a
+    session letter. A letter is done when its day was logged (`logged_dates`
+    must be the PLAN-day set: a yoga session is not session A). The letters not
+    done, in order, go to the strength days from today on that are not logged;
+    the ones that do not fit fall onto the missed days, so the dropped session
+    reads as missed there (D first, being last). Nothing leaves the week (Key
+    Rule 18b), and nothing is proposed again once every missed day carries his
+    "left as missed" answer.
+    """
+    if not plan_dict:
+        return {}, {}
+    monday = today - timedelta(days=today.weekday())
+    week = [monday + timedelta(days=i) for i in range(7)]
+    week = [d for d in week if 1 <= plan.day_number_in_phase(phase, d) <= phase.length_days]
+
+    def letter(d: date) -> str | None:
+        return (plan_dict.get(plan.day_number_in_phase(phase, d)) or {}).get("session_letter")
+
+    slots = [d for d in week if letter(d)]
+    if not slots:
+        return {}, {}
+    num_of = {letter(d): plan.day_number_in_phase(phase, d) for d in slots}
+    logged = [d for d in slots if d.isoformat() in logged_dates]
+    missed = [d for d in slots if d < today and d.isoformat() not in logged_dates]
+    ahead = [d for d in slots if d >= today and d.isoformat() not in logged_dates]
+    fresh = [d for d in missed
+             if not phase.shift_reasons.get(d.isoformat(), "").startswith(DECLINED_REASON_PREFIX)]
+    if not fresh:
+        return {}, {}
+    done = {letter(d) for d in logged}
+    todo = [s for s in sorted(num_of) if s not in done]
+    assign = dict(zip(ahead, todo))
+    assign.update(zip(missed, todo[len(ahead):]))
+
+    overrides: dict[str, int] = {}
+    reasons: dict[str, str] = {}
+    for d, s in assign.items():
+        if num_of[s] == plan.day_number_in_phase(phase, d):
+            continue
+        iso = d.isoformat()
+        overrides[iso] = num_of[s]
+        if d < today:
+            reasons[iso] = (DROPPED_REASON_PREFIX
+                            + f"session {s} does not run this week (the sessions run in order)")
+        else:
+            reasons[iso] = f"Session {s} here: the sessions run in order after a missed day"
+    if not any(date.fromisoformat(iso) >= today for iso in overrides):
+        return {}, {}
+    return overrides, reasons
+
+
+def in_order_summary(phase: Phase, plan_dict: dict, overrides: dict[str, int],
+                     today: date) -> list[str]:
+    """DETERMINISTIC. The proposal in plain lines, for the ask-first prompt:
+    which session runs on which day from today, and which does not run."""
+    lines = []
+    for iso in sorted(overrides):
+        d = date.fromisoformat(iso)
+        s = (plan_dict.get(overrides[iso]) or {}).get("session_letter")
+        if d >= today:
+            when = "Today" if d == today else d.strftime("%A %d %b")
+            lines.append(f"{when}: session {s}")
+        else:
+            lines.append(f"Session {s} does not run this week")
+    return lines

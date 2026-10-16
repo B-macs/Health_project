@@ -3356,9 +3356,19 @@ def render():
             _mr_plan_dict = sess.calendar_plan(active)
             _mr_today = date.today()
             _mr_monday = _mr_today - timedelta(days=_mr_today.weekday())
-            _mr_overrides, _mr_reasons = scheduling.missed_reschedules(
-                active, _mr_plan_dict, _week_logged_dates(_mr_monday.isoformat()),
-                _mr_today)
+            # The 12-week block runs its sessions in order (A, B, C, then D;
+            # approved 2026-10-16): a missed day moves the rest along. Its
+            # "done" is a logged PLAN session — a yoga session is not session A.
+            _mr_in_order = scheduling.runs_in_order(_mr_plan_dict)
+            if _mr_in_order:
+                _mr_overrides, _mr_reasons = scheduling.in_order_reschedules(
+                    active, _mr_plan_dict,
+                    _plan_logged_dates(_mr_monday.isoformat(), _mr_today.isoformat()),
+                    _mr_today)
+            else:
+                _mr_overrides, _mr_reasons = scheduling.missed_reschedules(
+                    active, _mr_plan_dict, _week_logged_dates(_mr_monday.isoformat()),
+                    _mr_today)
 
             def _mr_recompute():
                 # The cached logged set can be up to 5 minutes stale and any
@@ -3367,7 +3377,11 @@ def render():
                 # (uncached; one Notion query, only on the rare render that
                 # actually writes) and recompute.
                 _fresh = repo.get_repository().get_logged_session_dates(
-                    _mr_monday, _mr_monday + timedelta(days=6))
+                    _mr_monday, _mr_monday + timedelta(days=6),
+                    include_supplementary=not _mr_in_order)
+                if _mr_in_order:
+                    return scheduling.in_order_reschedules(
+                        active, _mr_plan_dict, _fresh, _mr_today)
                 return scheduling.missed_reschedules(
                     active, _mr_plan_dict, _fresh, _mr_today)
 
@@ -3395,18 +3409,29 @@ def render():
                     _mr_write(_d_ovr, _d_rsn)
                     _mr_write_succeeded = True
             elif _mr_overrides:
-                st.warning(
-                    "Missed session — proposed reschedule (nothing is changed "
-                    "until you choose):\n\n"
-                    + "\n".join(f"- {d}: {r}" for d, r in sorted(_mr_reasons.items()))
-                )
+                if _mr_in_order:
+                    st.warning(
+                        "A session was missed this week. The sessions run in order, "
+                        "so the rest move along (nothing is changed until you "
+                        "choose):\n\n"
+                        + "\n".join(f"- {line}" for line in scheduling.in_order_summary(
+                            active, _mr_plan_dict, _mr_overrides, _mr_today))
+                    )
+                else:
+                    st.warning(
+                        "Missed session — proposed reschedule (nothing is changed "
+                        "until you choose):\n\n"
+                        + "\n".join(f"- {d}: {r}" for d, r in sorted(_mr_reasons.items()))
+                    )
                 _mr_apply_col, _mr_keep_col = st.columns(2)
-                if _mr_apply_col.button("Apply reschedule", key="mr_apply"):
+                if _mr_apply_col.button("Run in order" if _mr_in_order else "Apply reschedule",
+                                        key="mr_apply"):
                     _a_ovr, _a_rsn = _mr_recompute()
                     if _a_ovr:
                         _mr_write(_a_ovr, _a_rsn)
                         _mr_write_succeeded = True
-                if _mr_keep_col.button("Leave as missed", key="mr_dismiss"):
+                if _mr_keep_col.button("Keep as planned" if _mr_in_order else "Leave as missed",
+                                       key="mr_dismiss"):
                     _k_ovr, _k_rsn = _mr_recompute()
                     _k_miss_dates = [date.fromisoformat(_iso) for _iso in _k_ovr
                                      if date.fromisoformat(_iso) < _mr_today]
