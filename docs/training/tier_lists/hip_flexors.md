@@ -64,7 +64,12 @@ for that for now."*
 **Check of the pick (step 8, 2026-10-16): the cable hip flexion from behind the
 body (S) ranks above the end-range psoas isometric (B)**, and it does the job
 the area has — strength with the hip flexors long. The half-kneeling knee-hover
-(A) is the next. **His decision is asked.**
+(A) is the next. **APPROVED 2026-10-16** (*"3 yes"*). **Lying or standing — his
+question:** standing. The decider scores both S: lying is steadier, and the
+standing cable adds load in smaller steps. What decides it for him is the click:
+lying on his back, the right hip clicked at about 45° (the Thomas test,
+2026-10-05; the dead bug, 2026-07-08); standing with the kneecap straight ahead
+it did not (2026-08-17). No trial compares the two.
 
 ## Unranked source advice
 

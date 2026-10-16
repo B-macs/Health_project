@@ -25,6 +25,10 @@ _APPROVED = {
     # The back and chest picks, approved 2026-10-16.
     "Single-Arm DB Row": ("caution", "right"),
     "Machine Chest Press": ("caution", "right"),
+    # Step 8's three replacements, 2026-10-16.
+    "Single-Arm Cable Y Raise": ("caution", "right"),
+    "Standing Cable Hip Flexion": ("caution", "right"),
+    "Adductor Machine (Seated)": ("caution", "bilateral"),
 }
 
 

@@ -70,7 +70,11 @@ the ladder, if his gym has one** — knees bent, starting wide under load, small
 steps on the stack: strength at length in the tested position. It moves the
 adductor work from home into the gym, about 5 minutes on two sessions. Without
 one, the ladder stays: no A exercise has a better safety margin, and its top
-rung has trial evidence. **His decision is asked.**
+rung has trial evidence. **APPROVED 2026-10-16** (*"4 yes the gym has the
+machine"*): the adductor machine replaces the ladder, in two gym sessions. He
+also has a seated abductor machine; it is not used, because step 2 gives the
+upper glutes (the muscles it trains) no direct work — they are on the tense
+list and settle when the weak muscles take their share.
 
 ## Unranked source advice
 

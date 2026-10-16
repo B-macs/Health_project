@@ -121,7 +121,7 @@ def test_the_release_and_the_y_raise_come_straight_before_the_first_press():
         assert has_release == bool(presses), d          # only on a press day
         if presses:
             i = names.index("Pec & Scar Release (Right)")
-            assert names[i + 1] == "Prone Y-Raise (Scapular)", d
+            assert names[i + 1] == "Single-Arm Cable Y Raise", d
             assert i + 2 == presses[0], d
 
 

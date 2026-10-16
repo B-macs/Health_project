@@ -31,7 +31,8 @@ LETTERS = {"Mon": "A", "Tue": "B", "Thu": "C", "Fri": "D"}
 IN_A_ROW = frozenset({("Mon", "Tue"), ("Thu", "Fri")})
 
 #: The required weekly hard sets (approved 2026-10-16). The hip rotators' 6 is
-#: the hip airplane's 3 x max on two days; the adductors' 6 is the ladder at home.
+#: the hip airplane's 3 sets on two days; the adductors' 6 is the adductor
+#: machine's 3 sets on two days (the ladder at home until 2026-10-16).
 REQUIRED = {
     "glute max": 6, "abs": 6, "deep back": 6, "hamstrings": 6,
     "quads": 4, "chest": 4, "back": 4, "press muscles": 4, "shoulder-blade muscles": 4,
@@ -64,8 +65,11 @@ WARMUP = [
 ]
 RELEASE = Card("Pec & Scar Release (Right)", sets=2, type="hold", reps=None, hold_seconds=60,
                rest_seconds=15, section="block", fixed_days=PRESS_DAYS)
-Y_RAISE = Card("Prone Y-Raise (Scapular)", area="shoulder-blade muscles", rest_seconds=45,
-               section="block", fixed_days=PRESS_DAYS)
+#: The shoulder-blade pick after the release (step 8's check, approved 2026-10-16:
+#: "1 yes"): the single-arm cable Y raise in place of the prone Y raise.
+Y_RAISE = Card("Single-Arm Cable Y Raise", area="shoulder-blade muscles", reps=12, rest_seconds=45,
+               equipment_type="cable", laterality="unilateral", section="block",
+               fixed_days=PRESS_DAYS)
 
 SHOULDER_PRESS = Card("Machine Shoulder Press", area="press muscles", second="side delts", reps=8,
                       equipment_type="machine", kind="compound", demand=2, is_press=True,
@@ -97,26 +101,35 @@ WOODCHOP = Card("High-to-Low Cable Woodchop", area="abs", reps=12, rest_seconds=
                 laterality="unilateral", priority=1, section="last", days=1)
 SIDE_PLANK = Card("Side Plank with Hip Raises", area="abs", reps=12, rest_seconds=45,
                   laterality="unilateral", priority=1, section="last", days=1)
-AIRPLANE = Card("Hip Airplane", area="hip rotators", reps=6, rest_seconds=60, laterality="unilateral",
-                section="last", days=2)
-PSOAS_ISO = Card("End-Range Psoas Isometric", area="hip flexors", type="hold_reps", reps=None,
-                 hold_seconds=5, reps_in_set=4, rest_seconds=45, laterality="unilateral",
-                 section="last", days=1)
+#: Kept by his choice over the prone cable hip rotation (step 8's check,
+#: 2026-10-16: "we can add weight to this by holding it around the back but I
+#: like the balance part of this as well as the rotation"): a weight held behind
+#: the back, and the rep range of a compound lift.
+AIRPLANE = Card("Hip Airplane", area="hip rotators", reps=10, rest_seconds=60,
+                equipment_type="dumbbell", laterality="unilateral", section="last", days=2)
+#: The hip-flexor pick (step 8's check, approved 2026-10-16: "3 yes"): strength
+#: with the hip flexors long, done standing — lying on the back is where the
+#: right hip clicked (finding #4).
+HIP_FLEXION = Card("Standing Cable Hip Flexion", area="hip flexors", reps=12, rest_seconds=45,
+                   equipment_type="cable", laterality="unilateral", section="last", days=1)
+#: The adductor pick (step 8's check, approved 2026-10-16: "4 yes the gym has the
+#: machine"): knees bent, starting wide under load, in place of the ladder at home.
+ADDUCTOR = Card("Adductor Machine (Seated)", area="adductors", reps=12, rest_seconds=60,
+                equipment_type="machine", days=2)
 
 #: The core cards: each runs on the days its areas need for the REQUIRED dose.
 CARDS = WARMUP + [RELEASE, Y_RAISE, SHOULDER_PRESS, CHEST_PRESS, HACK, LUNGE, RDL, BACK_EXT,
-                  ROW, CROSSOVER, LATERAL, CRUNCH, REVERSE_CRUNCH, AIRPLANE, PSOAS_ISO]
+                  ROW, CROSSOVER, LATERAL, ADDUCTOR, CRUNCH, REVERSE_CRUNCH, AIRPLANE, HIP_FLEXION]
 
 #: The drop order (approved 2026-10-16), as the bonus session reads it: goal A's
 #: priority areas, then the hip work, then the gate-1 main lifts, then goal B.
 #: The abs take their next picks; the hip airplane's dose stays at two days.
-BONUS_ORDER = [RDL, BACK_EXT, LUNGE, CURL, WOODCHOP, SIDE_PLANK, PSOAS_ISO, HACK, SHOULDER_PRESS,
-               CHEST_PRESS, ROW, Y_RAISE, CROSSOVER, LATERAL]
+BONUS_ORDER = [RDL, BACK_EXT, LUNGE, CURL, WOODCHOP, SIDE_PLANK, HIP_FLEXION, HACK, SHOULDER_PRESS,
+               CHEST_PRESS, ROW, Y_RAISE, CROSSOVER, LATERAL, ADDUCTOR]
 
-#: Off the gym days: the adductor ladder on Wednesday and on the Sunday
-#: flexibility day (it needs no gym, and the adductors are the flexibility
-#: goal's blocker).
-OFF_GYM = {"Adductor Ladder (current rung)": {"area": "adductors", "sets": 3, "days": ("Wed", "Sun")}}
+#: Off the gym days: nothing since 2026-10-16. The adductor ladder (Wednesday and
+#: Sunday at home) was replaced by the adductor machine in the gym sessions.
+OFF_GYM: dict = {}
 
 #: At home, on the core days (approved 2026-10-16): the neck working stretch,
 #: 2 sets of 4 efforts (10 s on, 5 s off). It trains no required area, and
@@ -190,11 +203,16 @@ PICKS: dict[str, Pick] = {
                "behind the body, past his measured right-arm limit (20 cm against 40 cm, "
                "2026-08-13); rolling and pressure gain range for a short time, about as much as "
                "stretching (Wilke et al. 2020), which is how he uses it; kept"),
-    "Prone Y-Raise (Scapular)": Pick(
+    "Single-Arm Cable Y Raise": Pick(
         "B", "shoulder-blade muscles", "strength and size",
-        "Back-muscle work straight after the release, before the press; 1-2 reps short of failure.",
-        "his decision, 2026-10-15: release, then back-muscle activation; physiotherapist, "
-        "2026-08-10: the right is weaker and the left works too much"),
+        "Back-muscle work straight after the release, before the press, one arm at a time; "
+        "1-2 reps short of failure.",
+        "tier_lists/shoulder_blades.md #5, A (the decider's list); his decision, 2026-10-15: "
+        "release, then back-muscle activation",
+        listed_as="Single-arm cable Y raise",
+        better="checked 2026-10-16: the S rows and the face pull end with the arm behind the body, "
+               "where his right arm stops early; the scapular pulldowns load pec minor; it "
+               "replaced the prone Y raise (B) — approved 2026-10-16 ('1 yes')"),
     "Machine Shoulder Press": Pick(
         "A, B", "press muscles", "strength and size",
         "Gate-1 main lift and the press goal's training, on a machine (his machine-only rule).",
@@ -288,22 +306,33 @@ PICKS: dict[str, Pick] = {
     "Hip Airplane": Pick(
         "A", "hip rotators", "strength and size",
         "Trains the pelvis twist he noticed on 2026-10-05: 3 x max, two days, not every day.",
-        "his decision, 2026-10-14: hip airplane 3 x max, to failure, not every day"),
-    "End-Range Psoas Isometric": Pick(
+        "his decision, 2026-10-14: hip airplane 3 x max, to failure, not every day",
+        better="checked 2026-10-16 (tier_lists/hip_rotators.md): the prone cable hip rotation (S) "
+               "ranks higher; kept by his choice — 'we can add weight to this by holding it "
+               "around the back but I like the balance part of this as well as the rotation'"),
+    "Standing Cable Hip Flexion": Pick(
         "A", "hip flexors", "strength at length",
-        "Strength at the psoas' long end, which a release cannot give.",
-        "his rule, 2026-08-24: 'more time on holds and strengthing to get the real benefits'"),
+        "Strength with the hip flexors long: the leg starts behind the body, under load.",
+        "tier_lists/hip_flexors.md #2, S (the decider's list); his rule, 2026-08-24: 'more time "
+        "on holds and strengthing to get the real benefits'",
+        listed_as="Cable hip flexion from behind the body",
+        better="checked 2026-10-16: it replaced the end-range psoas isometric (B), which worked "
+               "the psoas at its shortest; standing, not lying — the bench-edge version is the "
+               "Thomas-test position, where the right hip clicked; approved 2026-10-16 ('3 yes')"),
     "Neck Working Stretch (Right)": Pick(
         "B", "neck, right side", "strength at length",
         "Head tilted to the left, 10-second pushes into the hand, at home on the core days.",
         "his choice, 2026-10-15; at home from 2026-10-16",
         better="checked 2026-10-15: contract-relax and static stretching gain about the same range "
                "(Konrad et al. 2024), and this one adds a strength part"),
-    "Adductor Ladder (current rung)": Pick(
-        "C", "adductors", "range and strength at length",
-        "The flexibility goal's blocker: the adductors with the knees bent (21.5 cm against "
-        "10 cm, 2026-08-12).",
-        "work package WP-04, 2026-10-13, from his notes; step 2, goal C"),
+    "Adductor Machine (Seated)": Pick(
+        "C", "adductors", "strength at length",
+        "The flexibility goal's blocker, the adductors with the knees bent (21.5 cm against "
+        "10 cm, 2026-08-12): strength from a wide start, in the tested position.",
+        "tier_lists/adductors.md #1, S (the decider's list); step 2, goal C",
+        listed_as="Adductor machine",
+        better="checked 2026-10-16: it replaced the adductor ladder (best rung A); approved "
+               "2026-10-16 ('4 yes the gym has the machine')"),
 }
 
 #: The picks whose check is not closed. Step 8 checked all eight on 2026-10-16
@@ -312,10 +341,7 @@ PICKS: dict[str, Pick] = {
 #: replaced or kept by his choice. tests/test_workflow_picks.py keeps this list
 #: equal to the picks whose `better` is None, and refuses to let the block be
 #: registered while it is not empty.
-BETTER_CHECK_OPEN = (
-    "Prone Y-Raise (Scapular)", "Hip Airplane", "End-Range Psoas Isometric",
-    "Adductor Ladder (current rung)",
-)
+BETTER_CHECK_OPEN: tuple[str, ...] = ()
 
 
 def pick_for(name: str) -> Pick | None:
@@ -330,11 +356,8 @@ def week() -> dict:
     """The full week: the three core sessions placed by the rules, then the
     bonus filled after them."""
     core = place(CARDS, SPEC)
-    warm = [Card(c.name, sets=c.sets, reps=c.reps, rest_seconds=c.rest_seconds,
-                 laterality=c.laterality, section="warmup") for c in WARMUP]
-    block = [Card(c.name, area=c.area, sets=c.sets, type=c.type, reps=c.reps,
-                  hold_seconds=c.hold_seconds, rest_seconds=c.rest_seconds, section="block")
-             for c in (RELEASE, Y_RAISE)]
+    warm = [replace(c, fixed_days=()) for c in WARMUP]
+    block = [replace(c, fixed_days=()) for c in (RELEASE, Y_RAISE)]
     candidates = [replace(c, fixed_days=(), pattern="", rotation="")
                   for c in BONUS_ORDER if c.name not in (RELEASE.name, Y_RAISE.name)]
     bonus = fill_bonus(core["Thu"], warm, candidates, block)

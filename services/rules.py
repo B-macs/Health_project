@@ -898,6 +898,33 @@ MOVEMENT_RULES: list[MovementRule] = [
                "2026-10-16.",
         stage_cap=1, severity="caution", laterality="right",
     ),
+    # Step 8's better-exercise checks, 2026-10-16 (CLAUDE.md Key Rule 25): the
+    # three picks that replaced the prone Y raise, the end-range psoas
+    # isometric and the adductor ladder.
+    MovementRule(
+        movement="cable y raise",
+        reason="Single-arm cable Y raise: the cable from a low pulley on the other side, "
+               "the arm rising up and out into a Y. On the RIGHT the arm rises only as far "
+               "as it goes easily — the shoulder had a Latarjet. Before a press it stops 1-2 "
+               "reps short of failure (approved 2026-10-16). Ruled 2026-10-16.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="cable hip flexion",
+        reason="Standing cable hip flexion, the cable at the ankle: the leg starts behind "
+               "the body and lifts forward to about hip height, slowly, with no swing. On "
+               "the RIGHT the kneecap points straight ahead: bending the right hip while "
+               "turning it out sets off the click (finding #4, key rule 7). Not lying on the "
+               "back, where the right hip clicked at about 45 degrees. Ruled 2026-10-16.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="adductor machine",
+        reason="Seated adductor machine, knees bent: the legs start only as wide as they "
+               "go under control and close against the pads, with no bounce at the open "
+               "end — controlled range only at Beighton 6/9. Ruled 2026-10-16.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
 ]
 
 

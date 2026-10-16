@@ -68,7 +68,12 @@ ranks above the hip airplane (A)** — load in small steps on the stack (the
 airplane can only add reps) and tension where the rotators are longest. What
 it gives up: the airplane is the only exercise here that turns the pelvis on a
 standing leg, the movement of the twist. Turning both ways with both legs costs
-about 5 more minutes on each of its two days. **His decision is asked.**
+about 5 more minutes on each of its two days. **KEPT BY HIS CHOICE, 2026-10-16:**
+*"No - we can add weight to this by holding it around the back but I like the
+balance part of this as well as the rotation."* The hip airplane stays, with a
+weight held behind the back in both hands (so no hand on the wall: the balance
+is part of the exercise) and a rep range, so the one progression rule adds
+weight to it like any other lift.
 
 ## Unranked source advice
 

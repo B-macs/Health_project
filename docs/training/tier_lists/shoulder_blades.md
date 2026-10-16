@@ -68,8 +68,10 @@ for that for now."*
 - **Safety rules:** the cable Y raise reads "unknown" and gets a rule before use.
 
 **Check of the pick (step 8, 2026-10-16): the single-arm cable Y raise (A)
-ranks above the prone Y raise (B)** for the same job. **His decision is
-asked.**
+ranks above the prone Y raise (B)** for the same job. **APPROVED 2026-10-16**
+(*"1 yes"*): it replaces the prone Y raise. One arm at a time costs about 3
+minutes more than the prone Y raise on each press day — a cost not stated when
+he was asked, and given to him afterwards.
 
 ## Unranked source advice
 

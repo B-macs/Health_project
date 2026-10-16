@@ -994,3 +994,26 @@ filters applied after the ranking:
 | Hip airplane (A) | ASKED: the prone cable hip rotation (S) | Load in small steps, hips straight (no click); gives up the only exercise that turns the pelvis on a standing leg; about 5 more minutes on two days |
 | End-range psoas isometric (B) | ASKED: the cable hip flexion from behind the body (S) | The isometric works the psoas at its shortest — not the area's job of strength at length; the bench-edge version is the Thomas-test position, where the right hip clicks |
 | Adductor ladder | ASKED: the adductor machine (S), if his gym has one | Knees bent, starting wide under load; about 5 minutes on two sessions instead of at home; without one, the ladder stays |
+
+**His answers, 2026-10-16:** *"1 yes 2 No - we can add weight to this by
+holding it around the back but I like the balance part of this as well as the
+rotation 3 yes - but is lying or standing better ? 4 yes the gym has the
+machine alos a seated abductor machine if needed"*
+
+1. **The single-arm cable Y raise** replaces the prone Y raise.
+2. **The hip airplane is kept by his choice**, for the balance and the rotation,
+   with a weight held behind the back in both hands (no wall) and the
+   compound range, 8-12, so the one progression rule adds weight to it.
+3. **The standing cable hip flexion** replaces the end-range psoas isometric.
+   Standing, not lying: lying on his back is where the right hip clicked.
+4. **The adductor machine** replaces the ladder; the abductor machine is not
+   used (step 2: no direct work for the upper glutes).
+
+**What the four changes cost in time — given to him after the answers.** The
+adductor machine adds about 6 minutes on Monday and Thursday; the cable Y raise,
+one arm at a time, about 3 (not stated when he was asked); the weighted hip
+airplane at 10 reps about 2; the cable hip flexion, one leg at a time, about 2
+on Tuesday. The core sessions now model at Monday 67, Tuesday 61 and Thursday
+69 minutes: no rule broken, all three over the 60-minute target. Options put to
+him: keep them; trim (the hip airplane's range 6-10 and 45 seconds' rest on the
+adductor machine: 65, 61, 67); or the adductor ladder back at home (60, 61, 62).
