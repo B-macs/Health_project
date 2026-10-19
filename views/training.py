@@ -706,6 +706,9 @@ var _dtotal = {total};
 var _drem   = {total};
 var _div;
 var _TKEY = "{timer_key}";
+// A saved state older than the activity plus an hour is from another
+// session: drop it, never show it as DONE (fault F17).
+var _STALE_MS = (_dtotal + 3600) * 1000;
 {_AUDIO_JS}
 
 function _save(running) {{
@@ -719,6 +722,7 @@ function fmt(n) {{ var m=Math.floor(n/60),s=Math.round(n%60); return (m<10?'0':'
   try {{
     var s = JSON.parse(localStorage.getItem(_TKEY)||'null');
     if (!s || s.total !== _dtotal) return;
+    if (Date.now() - s.savedAt > _STALE_MS) {{ _clear(); return; }}
     var el = document.getElementById('dur-num');
     if (s.running) {{
       _drem = Math.max(0, s.remaining - (Date.now()-s.savedAt)/1000);
@@ -823,7 +827,7 @@ def _save_checkpoint(day_num: int, durable: bool = True) -> None:
     """
     try:
         state = {k: st.session_state[k] for k in sess.CHECKPOINT_FIELDS}
-        payload = json.dumps(sess.checkpoint_payload(day_num, state))
+        payload = sess.checkpoint_json(day_num, state)
     except Exception:
         return  # never block the training flow on a persistence failure
     try:
@@ -857,13 +861,7 @@ def _load_checkpoint(day_num: int) -> dict | None:
         raw = None
     if not raw:
         raw = r.get_config_value("training_progress")
-    if not raw:
-        return None
-    try:
-        data = json.loads(raw)
-    except Exception:
-        return None
-    return sess.restore_from_checkpoint(data, day_num)
+    return sess.parse_checkpoint(raw, day_num)
 
 
 def _init_state(day_num: int | None = None):
@@ -919,15 +917,9 @@ def _init_state(day_num: int | None = None):
         if checkpoint is None:
             checkpoint = _load_checkpoint(acc.ACCESSORY_DAY_KEY)
         if checkpoint:
-            for k in sess.CHECKPOINT_FIELDS:
-                if k not in checkpoint:
-                    continue
-                v = checkpoint[k]
-                # tp_actuals/tp_set_log round-trip through JSON (Notion-backed
-                # checkpoint storage) which silently turns their int keys into
-                # strings -- cast back so exercise-index lookups still hit.
-                if k in ("tp_actuals", "tp_set_log", "tp_notes") and isinstance(v, dict):
-                    v = {int(i): entry for i, entry in v.items()}
+            # sess.parse_checkpoint has turned the exercise-index keys back
+            # into numbers (JSON stores them as strings).
+            for k, v in checkpoint.items():
                 st.session_state[k] = v
         # A restored accessory session must be TODAY'S. Unlike a plan day
         # number, acc.ACCESSORY_DAY_KEY is the same every day, so
@@ -936,11 +928,8 @@ def _init_state(day_num: int | None = None):
         # session every morning. The date on the day dict is what separates
         # them; a stale one clears the whole flow rather than only its plan, so
         # nothing is left half-restored.
-        _acc_day = st.session_state.get("tp_accessory_plan") or {}
-        if _acc_day and _acc_day.get("accessory_date") != date.today().isoformat():
-            for k in ("tp_accessory_plan", "tp_started", "tp_done_today",
-                      "tp_session_logged", "tp_ex_idx", "tp_set", "tp_rep_in_set",
-                      "tp_actuals", "tp_previous", "tp_set_log", "tp_notes"):
+        if sess.accessory_is_stale(st.session_state.get("tp_accessory_plan"), date.today()):
+            for k in sess.ACCESSORY_STALE_RESET:
                 st.session_state[k] = defaults[k]
         # Authoritative check, independent of the checkpoint above: if a session is
         # already logged in Notion for today, never allow re-entering the exercise
@@ -951,13 +940,10 @@ def _init_state(day_num: int | None = None):
         # purpose), so applying its answer here would end a session it is not
         # talking about — and the accessory session is expressly allowed to run
         # on a day whose plan session is already done.
-        if not st.session_state.get("tp_accessory_plan"):
-            try:
-                if repo.get_repository().has_logged_session(date.today()):
-                    st.session_state.tp_done_today = True
-                    st.session_state.tp_session_logged = True
-            except Exception:
-                pass
+        if (not st.session_state.get("tp_accessory_plan")
+                and sess.logged_today(repo.get_repository(), date.today())):
+            st.session_state.tp_done_today = True
+            st.session_state.tp_session_logged = True
 
 
 def _reset_session(day_num: int | None = None):
@@ -3920,9 +3906,12 @@ def _render_guided_flow(day_num, exercises, n_ex,
     _side = st.session_state.tp_side
     _first = st.session_state.tp_first_side
     _second = sess.other_side(_first)
-    _hold_key = f"tp_h_{_eidx}_{_eset}_{_erep}_{_side}"
-    _rest_key = f"tp_r_{_eidx}_{_eset}"
-    _dur_key  = f"tp_d_{_eidx}"
+    # Dated keys (fault F17): one that was the same every day let a timer
+    # left running on an earlier day show DONE at once.
+    _timer_keys = sess.timer_keys(date.today(), day_num, _eidx, _eset, _erep, _side)
+    _hold_key = _timer_keys["hold"]
+    _rest_key = _timer_keys["rest"]
+    _dur_key  = _timer_keys["duration"]
 
     # Every place this screen PRINTS the prescription reads _shown, which is
     # `ex` overlaid with the resolved entry the stepper is bound to. Printing
@@ -4373,7 +4362,8 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 _tt_secs = None
                 if _timed_test:
                     _stopwatch(f"TIME — {_side.upper()} SIDE" if is_uni else "TIME",
-                               timer_key=f"tp_sw_{_eidx}_{cur_set}_{_side}")
+                               timer_key=sess.timer_keys(date.today(), day_num, _eidx,
+                                                         cur_set, 0, _side)["stopwatch"])
                     _tt_secs = st.number_input(
                         f"Seconds held — {_side} side" if is_uni else "Seconds held",
                         min_value=0, max_value=1800, value=None, step=1,

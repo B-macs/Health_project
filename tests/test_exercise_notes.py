@@ -113,20 +113,20 @@ def test_tp_notes_has_an_init_default():
 
 def test_note_int_keys_are_restored_from_json():
     """Same hazard tp_actuals/tp_set_log already carry: JSON turns the int
-    exercise index into a string, and every lookup then misses."""
-    src = _training_source()
-    assert '("tp_actuals", "tp_set_log", "tp_notes")' in src
+    exercise index into a string, and every lookup then misses. The restore
+    is sess.parse_checkpoint since move TRN-2 (2026-10-19)."""
+    import json
+    assert "tp_notes" in sess.CHECKPOINT_INT_KEYED
+    raw = json.dumps({"day_num": 7, "tp_notes": {"3": "left side shook"}})
+    assert sess.parse_checkpoint(raw, 7)["tp_notes"] == {3: "left side shook"}
 
 
 def test_a_stale_accessory_session_clears_its_notes():
-    src = _training_source()
-    start = src.index("_acc_day = st.session_state.get")
-    window = src[start:start + 700]
-    # Each name checked on its own rather than as one contiguous tuple string,
-    # so adding a further per-exercise slot to the reset (tp_previous did) does
-    # not break a test that is about tp_notes being cleared.
+    # The reset list is sess.ACCESSORY_STALE_RESET since move TRN-2
+    # (2026-10-19), and the page applies it whole.
     for field in ("tp_actuals", "tp_previous", "tp_set_log", "tp_notes"):
-        assert f'"{field}"' in window, field
+        assert field in sess.ACCESSORY_STALE_RESET, field
+    assert "for k in sess.ACCESSORY_STALE_RESET:" in _training_source()
 
 
 # ── behaviour of the mirror itself ───────────────────────────────────────────

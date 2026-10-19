@@ -13,6 +13,7 @@ tp_ex_idx etc.) and calls these functions with plain values pulled out of it.
 
 from __future__ import annotations
 
+import json
 import math
 import re
 from dataclasses import replace
@@ -147,6 +148,13 @@ CHECKPOINT_FIELDS = (
     # session_state with every name here, and a missing one silently stops
     # the whole checkpoint saving.
     "tp_accessory_plan",
+    # A walk or run's Garmin-verified minutes and its heart-rate detail, and
+    # the save screen's heart-rate panel with the athlete's own rating beside
+    # it (fault F19, 2026-10-19): without them a dropped connection logged
+    # the walk at its PLANNED minutes and lost the panel. The panel can hold
+    # date-times, which checkpoint_json stores as text.
+    "tp_garmin_minutes", "tp_garmin_activity_detail",
+    "tp_hr_au", "tp_reported_rpe", "tp_reported_au",
     # The save in progress (services/session_save.pending_save): the session's
     # id and one id per exercise, minted ONCE on the first press of Save, with
     # that press's duration and RPE. Every later press, and a reload, sends the
@@ -2667,3 +2675,81 @@ def hr_comparison(hr: dict | None, reported_rpe: float | None,
         "covered_exercises": hr.get("hr_covered_exercises"),
         "total_exercises": hr.get("hr_total_exercises"),
     }
+
+
+# ─── Checkpoint and restore, and the logged-today lock (move TRN-2, 2026-10-19) ─
+
+#: Checkpoint fields keyed by exercise index. JSON turns those keys into
+#: strings; a restore turns them back, or every index lookup misses.
+CHECKPOINT_INT_KEYED = ("tp_actuals", "tp_set_log", "tp_notes",
+                        "tp_garmin_minutes", "tp_garmin_activity_detail")
+
+#: What a stale accessory checkpoint clears: a session chosen on another day.
+ACCESSORY_STALE_RESET = (
+    "tp_accessory_plan", "tp_started", "tp_done_today", "tp_session_logged",
+    "tp_ex_idx", "tp_set", "tp_rep_in_set", "tp_actuals", "tp_previous",
+    "tp_set_log", "tp_notes", "tp_garmin_minutes", "tp_garmin_activity_detail",
+    "tp_hr_au", "tp_reported_rpe", "tp_reported_au",
+)
+
+
+def checkpoint_json(day_num: int, state: dict) -> str:
+    """The checkpoint to store, as JSON. A value JSON cannot hold (the
+    heart-rate panel's date-times) is stored as its text, so one such value
+    never stops the whole checkpoint saving."""
+    return json.dumps(checkpoint_payload(day_num, state), default=str)
+
+
+def _index_key(key):
+    text = str(key)
+    return int(text) if text.lstrip("-").isdigit() else key
+
+
+def parse_checkpoint(raw: str | None, day_num: int) -> dict | None:
+    """The fields to restore from a stored checkpoint, or None: nothing
+    stored, unreadable, or a checkpoint of another day. Exercise-index keys
+    come back as numbers."""
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    fields = restore_from_checkpoint(data if isinstance(data, dict) else None, day_num)
+    if fields is None:
+        return None
+    for name in CHECKPOINT_INT_KEYED:
+        if isinstance(fields.get(name), dict):
+            fields[name] = {_index_key(k): v for k, v in fields[name].items()}
+    return fields
+
+
+def accessory_is_stale(accessory_plan: dict | None, today: date) -> bool:
+    """A restored accessory session must be today's. Its checkpoint key is the
+    same every day, so only the date on its day dict tells a session abandoned
+    yesterday from one in progress now."""
+    return bool(accessory_plan) and accessory_plan.get("accessory_date") != today.isoformat()
+
+
+def logged_today(repo, day: date) -> bool:
+    """The "already logged" lock: True when a PLAN session is logged for
+    `day`, so the flow never starts a second one, whatever a checkpoint says.
+    Supplementary sessions (yoga, outdoor, the accessory session) never set
+    it. A failed read is not a lock: the save's own ids keep a repeat from
+    storing twice."""
+    try:
+        return bool(repo.has_logged_session(day))
+    except Exception:
+        return False
+
+
+def timer_keys(day: date, day_num: int, ex_idx: int, set_num: int, rep: int,
+               side: str) -> dict[str, str]:
+    """The browser-storage keys of the hold, rest and activity timers. They
+    carry the date and the day number (fault F17): a key that was the same
+    every day let a timer left running on an earlier day show DONE at once."""
+    stamp = f"{day.strftime('%Y%m%d')}_{day_num}"
+    return {"hold": f"tp_h_{stamp}_{ex_idx}_{set_num}_{rep}_{side}",
+            "rest": f"tp_r_{stamp}_{ex_idx}_{set_num}",
+            "duration": f"tp_d_{stamp}_{ex_idx}",
+            "stopwatch": f"tp_sw_{stamp}_{ex_idx}_{set_num}_{side}"}

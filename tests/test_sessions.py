@@ -1398,6 +1398,10 @@ _STATE = {
     # CHECKPOINT_FIELDS' own note on why a missing key kills the checkpoint.
     "tp_accessory_plan": None,
     "tp_pending_session": None,
+    # A walk's Garmin-verified minutes and heart-rate detail, and the save
+    # screen's heart-rate panel (fault F19, checkpointed since 2026-10-19).
+    "tp_garmin_minutes": {}, "tp_garmin_activity_detail": {},
+    "tp_hr_au": None, "tp_reported_rpe": None, "tp_reported_au": None,
 }
 
 

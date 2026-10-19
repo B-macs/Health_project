@@ -646,4 +646,9 @@ def test_exiting_overwrites_the_persisted_checkpoint_before_clearing_state():
 
 
 def test_a_stale_accessory_session_is_dropped_on_restore():
-    assert "accessory_date" in _training_source()
+    # sess.accessory_is_stale since move TRN-2 (2026-10-19).
+    from datetime import timedelta
+    assert sess.accessory_is_stale({"accessory_date": (TODAY - timedelta(days=1)).isoformat()}, TODAY)
+    assert not sess.accessory_is_stale({"accessory_date": TODAY.isoformat()}, TODAY)
+    assert not sess.accessory_is_stale(None, TODAY)
+    assert "sess.accessory_is_stale(" in _training_source()
