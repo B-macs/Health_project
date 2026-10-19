@@ -3622,12 +3622,18 @@ def render():
             st.rerun()
 
     # ── Dynamic scheduling — readiness-based auto-shift ─────────────────────────
-    # Reuses _rm_bio (already fetched above for the readiness modifier) as both
-    # the bio_rows and checkin_rows arguments — its rows already carry
-    # alcohol_units merged in from the Readiness DB (see
+    # Reads today._bio_for_readiness() — the same cached 14-day rows Home and
+    # the readiness modifier use — as both the bio_rows and checkin_rows
+    # arguments: its rows already carry alcohol_units (see
     # Repository.get_biometric_rolling / _alcohol_units_by_date), the same
     # per-date shape services.scheduling.should_shift_session expects for
-    # checkin_rows. No extra Notion/Sheets read is added for this feature.
+    # checkin_rows. No extra read is added for this feature.
+    #
+    # ⚠ From 2026-08-23 to 2026-10-19 this read `_rm_bio`, a name commit
+    # e43f59e had stopped assigning: every evaluation raised NameError, the
+    # except below swallowed it, and no shift was proposed for two months.
+    # tests/test_no_undefined_names.py now fails on any such name, and a
+    # failed check shows a caption instead of passing silently.
     #
     # scheduling.should_evaluate_shift is the idempotency guard and MUST run
     # before should_shift_session is even called — this is what stops every
@@ -3652,6 +3658,7 @@ def render():
             # (confirmed by adversarial review).
             _shift_write_succeeded = False
             try:
+                _rm_bio = today._bio_for_readiness()
                 _shift, _reason = scheduling.should_shift_session(_rm_bio, _rm_bio, date.today())
                 if _shift:
                     _plan_dict = sess.calendar_plan(active)
@@ -3691,8 +3698,12 @@ def render():
                             _rs_write(*scheduling.declined_entries(
                                 active, [date.today()], _reason))
                             _shift_write_succeeded = True
-            except Exception:
-                pass  # never let a scheduling-check failure crash the page
+            except Exception as _rs_exc:
+                # Never let a scheduling-check failure crash the page, and
+                # never let it pass unseen either: the error's type only, no
+                # reading (the reason text can name last night's sleep).
+                st.caption(f"Readiness check for moving today's session did not run "
+                           f"({type(_rs_exc).__name__}); the session stays as planned.")
             if _shift_write_succeeded:
                 st.rerun()
 
