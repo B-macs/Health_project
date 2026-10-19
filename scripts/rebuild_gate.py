@@ -260,13 +260,26 @@ P0_TARGETS: list[tuple[str, str, Callable[[dict], bool | None]]] = [
 
 def missed_targets(proof: dict, targets=P0_TARGETS) -> list[str]:
     """Targets that are missed OR not measured yet: an unmeasured target is
-    not a passed one."""
+    not a passed one. A target the OWNER waived (proof["waived_targets"],
+    key -> his reason in his words) is left out here and named by
+    waived_targets() instead, so the report shows the waiver, never hides it."""
+    waived = waived_targets(proof, targets)
     missed = []
     for key, label, check in targets:
+        if key in waived:
+            continue
         verdict = check(proof)
         if verdict is not True:
             missed.append(label + ("" if verdict is False else " (not measured)"))
     return missed
+
+
+def waived_targets(proof: dict, targets=P0_TARGETS) -> dict[str, str]:
+    """{target key: the owner's reason} for every waiver that names a real
+    target and gives a reason. A waiver without a reason waives nothing."""
+    keys = {key for key, _label, _check in targets}
+    raw = proof.get("waived_targets") or {}
+    return {k: str(v) for k, v in raw.items() if k in keys and str(v).strip()}
 
 
 def _owner_check(phase: str, key: str) -> bool | None:
@@ -369,7 +382,10 @@ def p0_proof_targets_missed() -> CounterResult:
     path = REBUILD_DOCS / "p0_proof.json"
     proof = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
     missed = missed_targets(proof)
-    return CounterResult(len(missed), "; ".join(missed) or "every target met")
+    labels = {key: label for key, label, _check in P0_TARGETS}
+    waived = [f"{labels[k]} WAIVED by the owner: {why}" for k, why in waived_targets(proof).items()]
+    detail = "; ".join(missed) or "every target met or waived"
+    return CounterResult(len(missed), detail + ("; " + "; ".join(waived) if waived else ""))
 
 
 @counter("p0", "secrets_in_repo", "secret-shaped strings in tracked files (file:line only)")

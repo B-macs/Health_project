@@ -79,6 +79,20 @@ def test_a_refused_cold_start_is_a_miss_even_when_the_timed_ones_are_fast():
     assert gate.missed_targets(good) == ["every timed cold start answered (not measured)"]
 
 
+def test_an_owners_waiver_needs_a_reason_and_names_a_real_target():
+    good = {"cold_start_median_s": 10.08, "cold_start_worst_s": 11.0,
+            "free_tier_max_share": 0.2, "garmin_ok": True, "image_size_mb": 180,
+            "upload_personal_files": 0, "cold_start_failures": 0}
+    assert gate.missed_targets(good) == ["cold start median <= 10 s"]
+    waived = dict(good, waived_targets={"cold_start_median_s": "owner: the timing does not matter"})
+    assert gate.missed_targets(waived) == []
+    assert gate.waived_targets(waived) == {"cold_start_median_s": "owner: the timing does not matter"}
+    # No reason, or a name that is not a target: nothing is waived.
+    assert gate.missed_targets(dict(good, waived_targets={"cold_start_median_s": " "})) == [
+        "cold start median <= 10 s"]
+    assert gate.waived_targets(dict(good, waived_targets={"tests_failing": "x"})) == {}
+
+
 def test_a_large_image_passes_only_when_its_cost_is_small():
     base = {"cold_start_median_s": 6.0, "cold_start_worst_s": 12.0,
             "free_tier_max_share": 0.2, "garmin_ok": True, "upload_personal_files": 0,

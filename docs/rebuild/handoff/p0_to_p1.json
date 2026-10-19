@@ -1,0 +1,38 @@
+{
+  "from_phase": "P0",
+  "to_phase": "P1",
+  "written": "2026-10-19",
+  "verdict": "GO, with the cold-start median target waived by the owner (docs/rebuild/p0_proof.json)",
+  "now_exists": {
+    "engine": "Cloud Run service health-engine, europe-west1 (Tier 1), revision 6: image of commit 2ff03cf (precompiled), min 0 / max 1 instance, 1 vCPU, 1 GiB, own service account with only Secret Accessor on its two secrets (pinned to version 1). GET /api/health, GET /api/readiness; X-Engine-Key on every route; X-Local-Date is the caller's day; every error is JSON. Probes removed.",
+    "worker": "Cloudflare Worker 'health' at https://health.lauscher-worker.workers.dev (version 639a4530): the app's static files with the single-page fallback; /api/* checked for origin and the owner's access key, passed to the engine with X-Engine-Key; retries Google's non-JSON 429/5xx after 1, 2, 4, 8 s within 60 s. Secrets ACCESS_KEY, ENGINE_KEY, ENGINE_URL set.",
+    "app": "app/: the Phase 0 placeholder (Health + version line); opens on the owner's iPhone.",
+    "gate": "scripts/rebuild_gate.py p0 (8 counters, HTML + JSON report, owner waivers with his reason); scripts/rebuild_p0_measure.py (cold, warm, oura, garmin, usage, project, summary); scripts/rebuild_secrets.py.",
+    "services_changes": "services/supabase_store.py: gzip on every Data API request (9.24 MB -> 1.36 MB per full copy), pull() fetches 4 tables at a time, a 401 PGRST303 'JWT issued at future' is retried after 0.5, 1, 2 s."
+  },
+  "pinned_versions": "docs/rebuild/stack.md (Python 3.12 engine: fastapi 0.142.2, uvicorn 0.54.0, garminconnect 0.3.17, numpy 2.5.3, pandas 3.0.6; Worker: hono 4.13.13, wrangler 4.147.0; app: react 19.3.0, vite 8.3.3)",
+  "owner_decisions": [
+    "Google Cloud Run free tier for the engine (2026-10-07); project health-project-512108, business billing, EUR 1 budget alert (2026-10-19).",
+    "Owner's time zone: Europe/Berlin.",
+    "The new app syncs once a day at the first morning open, and retries at a later open, at most hourly, while last night's data is missing.",
+    "Supabase answers are compressed.",
+    "Transform the whole app first; he removes the unused parts after the new app runs.",
+    "No fixes to the live Streamlit app: it is being replaced.",
+    "The cost does not decide the switch; the cold-start timing was stopped and its median target waived.",
+    "Later (months): the engine may move to an HP EliteBook 1040 G4 behind a Cloudflare Tunnel; only ENGINE_URL changes."
+  ],
+  "open_items": [
+    "The owner's push and his check that the live Streamlit app still opens (owner_checks.json streamlit_app_opens).",
+    "The Notion Phase 2 and Phase 9 pages still describe Notion as the store and a background_writer setting in Notion Config; Supabase has been the only store since 2026-10-09.",
+    "Live-app sync design faults the new app must not repeat (state.md): sync tied to a complete Home load, a 2-hour wait after a sync that found nothing, no re-read after a sync.",
+    "Import time on Cloud Run 2.3-5.5 s; the precompiled image is not timed. Lazy imports of gspread, notion_client and garminconnect are the next step if starts feel slow.",
+    "An unknown route answers {\"detail\": \"Not Found\"} (Starlette's HTTPException is not caught by FastAPI's handler); register the handler for Starlette's class in Phase 2.",
+    "Supabase Free pauses after 7 idle days; the new app syncs only when opened. Phase 9: a Worker cron keep-alive, or accept it.",
+    "The Home card's 14-day/60-day window choice still lives in app.py; Phase 2 moves it into services/."
+  ],
+  "next_phase_may_rely_on": [
+    "Phase 1 does not touch the engine or the Worker; both stay deployed as they are.",
+    "The main gate is green: python -m pytest tests/ passes at the floor in CLAUDE.md; the engine suite passes on Python 3.12 without the Streamlit tests.",
+    "Rebuild rule 2 still holds: only the Streamlit app syncs Oura and Garmin and runs the automatic writes until Phase 9."
+  ]
+}

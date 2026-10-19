@@ -7,23 +7,27 @@
       "description": "The rebuild contract: the 'Phone app rebuild (from 2026-10-07)' section in CLAUDE.md, word for word from the Notion Phase 0 page.",
       "depends_on": [],
       "gate": "control_files_missing",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-02",
       "phase": "P0",
       "description": "Control files: docs/rebuild/state.md, archive.md, feature_list.json, stack.md, streamlit_bound_tests.md, owner_checks.json, p0_proof.json, handoff/.",
-      "depends_on": ["P0-01"],
+      "depends_on": [
+        "P0-01"
+      ],
       "gate": "control_files_missing",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-03",
       "phase": "P0",
       "description": "scripts/rebuild_gate.py (counters, HTML + JSON report, --update-features) and tests/test_rebuild_gate.py.",
-      "depends_on": ["P0-02"],
+      "depends_on": [
+        "P0-02"
+      ],
       "gate": "tests_failing",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-04",
@@ -31,79 +35,98 @@
       "description": "M1: requirements-engine.txt and -dev.txt (exact pins); the suite passes in .venv-engine (Python 3.12) with the Streamlit tests excluded.",
       "depends_on": [],
       "gate": "engine_venv_fail",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-05",
       "phase": "P0",
       "description": "M2: api/healthapi with GET /api/health and GET /api/readiness (caller's date, the Home-card computation), X-Engine-Key auth, one Repository per request, cache rebuilt at startup; tests/api/.",
-      "depends_on": ["P0-04"],
+      "depends_on": [
+        "P0-04"
+      ],
       "gate": "tests_failing",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-06",
       "phase": "P0",
       "description": "M3: Dockerfile (python 3.12 slim, OS tzdata, non-root), .dockerignore, .gcloudignore as an allow-list; the Cloud Build upload list holds no personal file.",
-      "depends_on": ["P0-05"],
+      "depends_on": [
+        "P0-05"
+      ],
       "gate": "upload_personal_files",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-07",
       "phase": "P0",
       "description": "app/ placeholder (Health + version line) and worker/ (Hono: assets, access key, pass-through with X-Engine-Key, JSON 503) with Worker and app tests; shared/openapi.json and generated TS types.",
-      "depends_on": ["P0-05"],
+      "depends_on": [
+        "P0-05"
+      ],
       "gate": "pnpm_tests_failing",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-08",
       "phase": "P0",
       "description": "STOP 1, owner: Google Cloud CLI, billing, EUR 1 budget alert, the two Secret Manager secrets, wrangler login, the phone access key in .env.",
-      "depends_on": ["P0-06"],
+      "depends_on": [
+        "P0-06"
+      ],
       "gate": "proof_targets_missed",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-09",
       "phase": "P0",
       "description": "M4: Cloud Run service health-engine (min 0, max 1 instance), secrets mounted, cache mode, TZ; Artifact Registry clean-up and a 7-day rule on the source bucket.",
-      "depends_on": ["P0-08"],
+      "depends_on": [
+        "P0-08"
+      ],
       "gate": "proof_targets_missed",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-10",
       "phase": "P0",
       "description": "M7: the Worker deployed as 'health' with ACCESS_KEY, ENGINE_KEY and ENGINE_URL secrets; the placeholder opens on the iPhone.",
-      "depends_on": ["P0-07", "P0-09"],
+      "depends_on": [
+        "P0-07",
+        "P0-09"
+      ],
       "gate": "proof_targets_missed",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-11",
       "phase": "P0",
       "description": "M5: five forced cold starts, end to end through the Worker and direct, with the engine's own startup timings.",
-      "depends_on": ["P0-10"],
+      "depends_on": [
+        "P0-10"
+      ],
       "gate": "proof_targets_missed",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-12",
       "phase": "P0",
       "description": "M6: the read-only Oura probe (no refresh, ever) and, with the owner's OK, one Garmin login and read from Cloud Run.",
-      "depends_on": ["P0-09"],
+      "depends_on": [
+        "P0-09"
+      ],
       "gate": "proof_targets_missed",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-13",
       "phase": "P0",
       "description": "M8: billable time and requests from Cloud Monitoring, projected to a month against each free-tier figure.",
-      "depends_on": ["P0-11"],
+      "depends_on": [
+        "P0-11"
+      ],
       "gate": "proof_targets_missed",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-14",
@@ -111,13 +134,15 @@
       "description": "No secret-shaped string in any tracked file.",
       "depends_on": [],
       "gate": "secrets_in_repo",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P0-15",
       "phase": "P0",
       "description": "After the owner's push, the hosted Streamlit app still opens.",
-      "depends_on": ["P0-13"],
+      "depends_on": [
+        "P0-13"
+      ],
       "gate": "streamlit_app_broken",
       "passes": false
     }

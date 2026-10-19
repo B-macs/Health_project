@@ -1,26 +1,31 @@
 {
-  "_note": "Phase 0 proof numbers only, never a personal reading. null = not measured yet, and scripts/rebuild_gate.py counts an unmeasured target as missed.",
+  "_note": "Phase 0 proof numbers only, never a personal reading. null = not measured yet, and scripts/rebuild_gate.py counts an unmeasured target as missed unless the owner waived it (waived_targets, his words).",
   "engine_venv": {
     "python": "3.12.9",
-    "passed": 4588,
+    "passed": 4620,
     "skipped": 1,
-    "deselected": 1,
     "failed": 0,
-    "streamlit_files_excluded": 11,
-    "streamlit_tests_deselected": 1,
-    "measured_on": "2026-10-16"
+    "streamlit_entries_excluded": 12,
+    "measured_on": "2026-10-19"
   },
   "region": "europe-west1 (Belgium), Tier 1 on https://cloud.google.com/run/pricing, checked 2026-10-19",
   "image_size_mb": 115,
   "image_monthly_cost_eur": 0,
-  "image_note": "Artifact Registry repository cloud-run-source-deploy holds 115.1 MB after the first build; a clean-up policy keeps the 2 newest images (under the free 0.5 GB). Measured 2026-10-19.",
+  "image_note": "Artifact Registry repository cloud-run-source-deploy holds 115.1 MB after the first build and 185.9 MB with two images; a clean-up policy keeps the 2 newest (under the free 0.5 GB). Measured 2026-10-19.",
   "upload_personal_files": 0,
   "upload_note": "gcloud meta list-files-for-upload: 84 files, all engine code (61 in services/, 12 in api/, the seven root modules, Dockerfile, requirements-engine.txt and the two ignore files); the source zip was 687 KiB. 2026-10-19.",
-  "cold_start_median_s": null,
-  "cold_start_worst_s": null,
-  "cold_start_runs_s": [],
-  "warm_request_ms": null,
-  "worker_to_engine_ms": null,
+  "cold_start_runs_s": [9.13, 11.02],
+  "cold_start_median_s": 10.08,
+  "cold_start_worst_s": 11.02,
+  "cold_start_failures": 0,
+  "cold_start_engine_timings_median_s": {"imports_s": 4.98, "config_s": 0.07, "cache_rebuild_s": 2.54},
+  "cold_start_note": "Revision health-engine-00004 (commit 7291d6c): two natural cold starts, 20+ minutes apart, sent through the Worker as the phone sends them, both answered (9.13 s and 11.02 s). The owner stopped the timing there. Revision 5 (commit 2ff03cf) precompiles the engine's code into the image to cut the import time (4.5-5.5 s on Cloud Run against 1.3 s on the PC); it is deployed and not timed.",
+  "warm_request_ms": 440,
+  "worker_to_engine_ms": 0,
+  "warm_note": "From the owner's PC, each request on a new TLS connection: 440 ms straight to Cloud Run and 427 ms through the Worker, so the Worker's extra hop is lost in the noise (measured -13 ms).",
+  "waived_targets": {
+    "cold_start_median_s": "the owner, 2026-10-19: \"the cold start timing doesnt matter\" and \"if it's not free it's not going to change the outcome of switching\". Measured median of the two timed starts: 10.08 s against the 10 s target."
+  },
   "oura_probe": {
     "status": "ok",
     "rows": 1,
@@ -36,8 +41,24 @@
     "summary_fields": 94,
     "measured_on": "2026-10-19"
   },
+  "free_tier_max_share": 0.372,
+  "free_tier_projection": {
+    "pattern": "the owner's: one sync a day at the first morning open plus one retry, ten cold starts a day, each sync at twice the 77 s the Streamlit chain took; a cold start billed at the worst timed one, 11.02 s (scripts/rebuild_p0_measure.py project --start-s 11.02)",
+    "share": {
+      "cloud_run_vcpu_s": 0.11,
+      "cloud_run_gib_s": 0.037,
+      "cloud_run_requests": 0.001,
+      "artifact_registry_mb": 0.372,
+      "cloud_build_minutes": 0.014,
+      "secret_versions": 0.333,
+      "secret_accesses": 0.06,
+      "supabase_egress_gb": 0.082,
+      "worker_requests_per_day": 0.001
+    },
+    "egress_out_of_belgium": "0.08 GB a month, about $0.01 (Premium tier, no free amount in Europe)",
+    "google_meters_2h_sample": "33.4 billed instance-seconds and 12 requests on 2026-10-19 (two starts, the Garmin and Oura probes, the checks)"
+  },
   "cold_start_revision_2_note": "Revision health-engine-00002 (commit 6dd2fcf, compressed): the first request after the engine slept, sent through the Worker at 09:43:55 UTC, was REFUSED by Google (HTTP 500, 'The request was aborted because there was no available instance'; the instance started 5 s later). The Worker answered 503 after 11.3 s. Fixed: the Worker retries Google's refusals (1, 2, 4, 8 s), the engine answers JSON for every error so the two cannot be confused, and the copy from Supabase fetches 4 tables at a time (5.9 s -> 1.5 s from the PC). The timing script had read the 503 as 'Worker not ready' and timed a direct request that met a half-started engine (3.0 s); that sample is void.",
-  "cold_start_revision_1_note": "Revision health-engine-00001 (commit 84c88c6, before Supabase compression): one natural cold start, 10.66 s direct (imports 3.82 s, config 0.08 s, cache rebuild 4.98 s); the deploy-time start logged imports 2.61 s and cache rebuild 6.02 s. The five GO samples are taken on the compressed revision.",
-  "free_tier_max_share": null,
-  "free_tier_projection": null
+  "cold_start_revision_3_note": "Revision health-engine-00003 (commit 5f772c4) never started: Supabase answered one request of its copy with 401 PGRST303 'JWT issued at future' (a moment of clock difference inside Supabase; the same requests worked minutes later). Fixed in commit 7291d6c: that one error is tried again after 0.5, 1 and 2 s.",
+  "cold_start_revision_1_note": "Revision health-engine-00001 (commit 84c88c6, before Supabase compression): one natural cold start, 10.66 s direct (imports 3.82 s, config 0.08 s, cache rebuild 4.98 s); the deploy-time start logged imports 2.61 s and cache rebuild 6.02 s."
 }

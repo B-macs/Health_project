@@ -3,7 +3,9 @@
 *The phone-app rebuild: see the "Phone app rebuild (from 2026-10-07)" section of CLAUDE.md. Update this file during every rebuild session.*
 
 ## Now
-**Phase 0 — Foundation & engine proof on Cloud Run.** PROMPT 1, at **STOP 1**: waiting for the owner's Google Cloud and Cloudflare steps (2026-10-07). Nothing was deployed, so nothing needs redoing.
+**Phase 0 — at the GATE (PROMPT 2), 2026-10-19.** Everything is built, deployed and measured; the owner asked to move on (*"Yes push, and move on to the next stpe, the cold start timing doesnt maketter"*). **Waiting on the owner:** his `git push origin main` (this shell has no GitHub login), then his check that the live Streamlit app still opens (owner_checks.json `streamlit_app_opens`), then his sign-off of the gate. Then Phase 1 (separate Voice Training).
+
+**GO, with one target waived by the owner** (p0_proof.json): Garmin login and read from Cloud Run OK; Oura read OK without a refresh; projected use at most 37% of any free amount (image storage), data out of Belgium about $0.01 a month; image 115 MB (186 MB for the two kept); no personal file in the 84-file upload; both timed cold starts through the Worker answered (9.13 s, 11.02 s; worst under 20 s). The median target (10 s) read 10.08 s on two starts and is WAIVED by the owner; the precompiled revision that followed is deployed and not timed. Three faults found by measuring and fixed: Google refusing the first request after sleep (Worker retry), Supabase's "JWT issued at future" (retry), and the uncompressed 9.24 MB copy (gzip, 1.36 MB; parallel fetch 5.9 s → 1.5 s).
 
 **Re-checked 2026-10-16 against the app after 84 commits** (Supabase the only store, switched on the hosted app 2026-10-13; the 12-week block, `goal_block.py`):
 - **Broken and fixed:** the image's file list. services/ now imports `goal_block`, which the Dockerfile and both ignore files did not admit, so 12 services/ modules (repository, sessions among them) would not have imported in a container built that day. `goal_block.py` is admitted, and `tests/api/test_image_file_set.py` now fails when services/ or api/ imports a root module the image does not copy (or copies one nothing imports, or would upload the clinical record).
@@ -12,7 +14,7 @@
 
 **STOP 1 done, 2026-10-19:** the Google Cloud CLI is installed (Google's own installer; `winget` was off this PC's user PATH, like Python) and logged in; the project is `health-project-512108` and is gcloud's default; the owner made a business billing account and a €1 budget, and linked it after a first `UREQ_PROJECT_BILLING_NOT_FOUND`; all five services on; both secrets created (`health-engine-secrets` trimmed to the engine's six keys, `health-engine-key`); `wrangler login` done; HEALTH_ACCESS_KEY in .env (checked without showing it); the owner's time zone is **Europe/Berlin**.
 
-**After STOP 1, 2026-10-19 (see stack.md "Deployed"):** the upload list is 84 engine files, no personal file. **M4 done:** `health-engine` deployed in europe-west1 (124 s, revision 00001, commit 84c88c6) under its own service account; 401 without the key, 404 for the docs routes, Europe/Berlin's date, logs clean. Startup inside the container: imports 2.6 s, config 0.06 s, cache rebuild 6.0 s. Image 115 MB, clean-up policy and the 7-day source rule set. **M6 Oura done:** ok, one read, no refresh. **M7 half done:** the Worker is deployed with ENGINE_URL; the placeholder page and the single-page fallback answer 200. **Running:** M5, five natural cold starts 20 minutes apart (`scripts/rebuild_p0_measure.py cold`). **Waiting on the owner:** the Worker's two keys (`worker-access-key`, `worker-engine-key`), the placeholder on the iPhone, and his OK for the one Garmin login.
+**After STOP 1, 2026-10-19 (see stack.md "Deployed"):** the upload list is 84 engine files, no personal file. **M4:** `health-engine` in europe-west1 under its own service account; 401 without the key, 404 for the docs routes, Europe/Berlin's date, logs clean; image clean-up and the 7-day source rule set. **M6:** Oura ok (one read, no refresh); Garmin ok with the owner's OK (login + read, tokens storable). **M7:** the Worker with all three secrets, checked end to end; the placeholder opens on the owner's iPhone. **M5:** two natural cold starts through the Worker on revision 4, then stopped by the owner. **M8:** Google's own meters read and a tested month projection over the owner's pattern. The engine at the gate is revision 6 (image 2ff03cf, probes off).
 
 **Later, in a few months (owner, 2026-10-19):** the engine may move from Cloud Run to an **HP EliteBook 1040 G4** running day and night behind a free Cloudflare Tunnel; only the Worker's ENGINE_URL changes. Not now.
 
@@ -26,8 +28,8 @@
 - Main gate: 4276 passed, 1 skipped (floor 4226 + 50).
 
 ## Next
-- Owner: `worker-access-key` and `worker-engine-key`; open the placeholder on the iPhone; OK (or not) for the Garmin probe.
-- Then: M5's cold starts end to end through the Worker, M6 Garmin (with the OK), M8 cost, a last deploy with `HEALTH_PROBES` off, the go or no-go, then ask before the push.
+- Owner: `git push origin main`; open the live Streamlit app (Home and one other page) and report; sign off the Phase 0 gate.
+- Then Phase 1: separate Voice Training (Notion: Health Project › the prompt set › Phase 1). Before it, the Notion Phase 2 and Phase 9 pages need updating: they still describe Notion as the store and a `background_writer` setting in Notion Config.
 
 ## The owner's decisions, 2026-10-19 (after the cost estimate)
 - **The new app syncs ONCE A DAY, at the first app open in the morning** — not every 2 hours (*"that is enough"*). This sets the engine's sync design for Phase 2 and Phase 9; the Streamlit app keeps its own 2-hourly-on-open cadence until the switch-over (recommended, and he asked for no change there). **When last night's data is still missing after that first sync, a later open syncs again, at most once an hour, until last night is in** (*"Retry the sync"*, 2026-10-19) — otherwise a morning opened before the ring has reached Oura stays empty until the next day.
@@ -42,3 +44,6 @@
 - The Home card's choice between the 14-day and the 60-day window lives in app.py (and today.py). The Phase 0 /api/readiness endpoint repeats that choice; Phase 2 moves it into services/ and makes app.py call it.
 - `services/clients/local_cache.py` writes `.sync_state.json` next to the repo root with no setting to move it; the container makes /app writable for its user. Phase 2 can add a setting if needed.
 - Starlette 1.7 warns that its TestClient on httpx is deprecated (httpx2). A warning only; revisit in Phase 2.
+- **Import time on Cloud Run** was 2.3–5.5 s against 1.3 s on the PC. The precompiled image (2ff03cf) is not timed. If starts feel slow in Phase 5+, the next step is lazy imports of what Supabase mode never uses at start: gspread (0.19 s on the PC), notion_client (0.11 s), garminconnect (0.24 s).
+- **An unknown route answers `{"detail": "Not Found"}`**, not the engine's `{"error": ...}` shape: Starlette's own HTTPException is not caught by the handler registered for FastAPI's. Still JSON, so the Worker never retries it. Phase 2: register the handler for Starlette's class.
+- **Supabase's Free plan pauses after 7 days without activity.** The new app syncs only when it is opened, so a week away still pauses it. Phase 9: a small daily keep-alive from the Worker's cron, or accept it.
