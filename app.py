@@ -24,7 +24,6 @@ import streamlit as st
 import nav
 import repo
 import today
-from services import verdict as vd
 import styles
 import training_constants as _tc
 from services import dashboard as dash
@@ -34,6 +33,7 @@ from services import hr_load as _hr_load
 from services import plan as plan_svc
 from services import readiness as readiness_model
 from services import sleep_score as sleep_score_model
+from services import sleep_screen
 from services import strain_regions as _sr
 
 # ─── Page config ─────────────────────────────────────────────────────────────
@@ -408,7 +408,8 @@ def _metrics_history_rolling(end_iso: str, days: int = home.HISTORY_DAYS) -> lis
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _wake_time_adjustments_rolling(end_iso: str, days: int = home.HISTORY_DAYS) -> dict[str, float]:
+def _wake_time_adjustments_rolling(end_iso: str, days: int = home.HISTORY_DAYS
+                                   ) -> tuple[dict[str, float], dict[str, str]]:
     """Per-night wake-time corrections for the same window as the Metrics
     History trend — threaded into dash.compute_daily_metrics_snapshot below
     so Sleep Score reflects any correction, and read again by the Sleep card
@@ -421,9 +422,9 @@ def _wake_time_adjustments_rolling(end_iso: str, days: int = home.HISTORY_DAYS) 
     both subtract the same minutes, so exactly one wins per night. See
     services/sleep_fusion.py::effective_wake_adjustments."""
     start = home.window_start(date.fromisoformat(end_iso), days)
-    adjustments, _sources = repo.get_repository().get_effective_wake_adjustments(
-        start=start, end=end_iso)
-    return adjustments
+    # The SOURCE comes too: on a fused night the fusion figure wins, which the
+    # wake-time stepper must know (sleep_screen.wake_control, fault F5).
+    return repo.get_repository().get_effective_wake_adjustments(start=start, end=end_iso)
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -455,16 +456,6 @@ def _sleep_daily_context(start: str, end: str) -> dict[str, dict]:
     """Blood oxygen and breathing from the Oura Daily tab — stored since the
     schema widened, surfaced nowhere until now."""
     return repo.get_repository().get_oura_daily_sleep_context(start, end)
-
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _wake_adjustment_sources(days: int = 60) -> dict[str, str]:
-    """{date: "fusion"|"manual"} for the same window — lets the Sleep card
-    say which correction it applied rather than showing an unexplained
-    number."""
-    start = (date.today() - timedelta(days=days)).isoformat()
-    _adjustments, sources = repo.get_repository().get_effective_wake_adjustments(start=start)
-    return sources
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -642,8 +633,9 @@ _today_metrics_row = next(
 _day_settled = dash.snapshot_is_complete(_today_metrics_row)
 
 _wake_adjustments: dict[str, float] = {}
+_wake_sources: dict[str, str] = {}
 try:
-    _wake_adjustments = _wake_time_adjustments_rolling(selected_date.isoformat())
+    _wake_adjustments, _wake_sources = _wake_time_adjustments_rolling(selected_date.isoformat())
 except Exception:
     pass
 
@@ -1123,21 +1115,10 @@ def _sleep_contributors_block() -> str:
             'earlier night.</span></div>'
         )
     rows = "".join(_contributor_row(r) for r in dash.sleep_breakdown_rows(breakdown))
-    caption = dash.sleep_coverage_caption(breakdown)
-
     # Total sleep and Efficiency here are the ADJUSTED figures the score was
-    # computed from; Key metrics below shows Oura's raw readings. Without
-    # this line the screen carries two different "total sleep" numbers a few
-    # centimetres apart with nothing explaining the gap.
-    # ⚠ This note used to end "Key metrics below shows Oura's raw readings",
-    # which was the screen explaining a gap instead of closing it. Since
-    # 2026-08-25 the figures below are the SAME corrected ones, so the note
-    # names the correction and stops there.
-    adj = breakdown.get("wake_adjustment_minutes") or 0
-    if adj:
-        note = (f"Total sleep and Efficiency include a {adj:.0f} min wake-time "
-                f"correction, and so do the figures below.")
-        caption = f"{caption} {note}".strip()
+    # computed from, and the figures below are the same corrected ones; the
+    # caption names the correction (sleep_screen.contributors_caption).
+    caption = sleep_screen.contributors_caption(dash.sleep_coverage_caption(breakdown), breakdown)
     return _panel("Contributors", rows, caption)
 
 
@@ -1173,11 +1154,7 @@ def _readiness_contributors_block() -> str:
     # 66 against 56.2 — the gap that produced "I saw 66 but then saw reduce load
     # in training". _sleep_contributors_block already solved this exact shape
     # with a one-line caption; this is its readiness twin.
-    caption = " ".join(c for c in (
-        vd.readiness_scale_caption(_readiness_score, breakdown.get("score")),
-        dash.readiness_coverage_caption(breakdown),
-        dash.readiness_alcohol_caption(breakdown),
-    ) if c)
+    caption = home.readiness_contributors_caption(_readiness_score, breakdown)
     return _panel("Contributors", rows, caption)
 
 
@@ -1187,19 +1164,7 @@ def _readiness_key_metrics_block() -> str:
     the first two from the blend, the last two Oura-only."""
     detail = _sleep_details.get(selected_date.isoformat()) or {}
     row = next((r for r in _bio_rows if r.get("date") == selected_date.isoformat()), {})
-
-    def num(v, fmt, suffix=""):
-        return "—" if v is None else f"{fmt.format(v)}{suffix}"
-
-    dev = row.get("oura_temperature_deviation")
-    return _key_metric_grid([
-        {"label": "Resting Heart Rate", "value": num(row.get("resting_heart_rate"), "{:.0f}", " bpm")},
-        {"label": "Heart Rate Variability", "value": num(row.get("hrv_ms"), "{:.0f}", " ms")},
-        # Signed deliberately: +0.4 and -0.4 are physiologically opposite and
-        # an unsigned "0.4 °C" would read as the same reading.
-        {"label": "Body Temperature", "value": "—" if dev is None else f"{dev:+.2f} °C"},
-        {"label": "Respiratory Rate", "value": num(detail.get("average_breath"), "{:.1f}", " /min")},
-    ])
+    return _key_metric_grid(home.readiness_key_metrics(row, detail))
 
 
 def _kv_rows(rows: list[dict], label_key: str = "label", value_key: str = "value") -> str:
@@ -1281,11 +1246,6 @@ def _naps_block(naps: dict | None) -> str:
                   "vitals and efficiency above describe the night only.")
 
 
-_SLEEP_SOURCE_TITLES = {
-    "fused": "Fused (Oura + Garmin)",
-    "oura_only": "Oura",
-    "garmin_only": "Garmin",
-}
 
 # {code: name} — styles.STAGE_BAND stores (colour, name), and everything on the
 # click path wants only the name. Derived once rather than unpacked at each of
@@ -1308,23 +1268,15 @@ def _hypnogram_strip(detail: dict | None) -> str:
     timeline worth drawing."""
     detail = detail or {}
     fused = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
-    codes = str(fused.get("master_hypnogram") or "") or detail.get("hypnogram_30sec") or ""
+    # The fused master when there is one, else Oura's own sequence, and a
+    # failed fusion read named as such (sleep_screen.strip_source).
+    _src = sleep_screen.strip_source(fused, detail, _sleep_fusion_loaded)
+    codes, title, phantom = _src["codes"], _src["title"], _src["phantom"]
     if not codes:
         return ('<div style="color:#444;font-size:12px;font-style:italic;padding:14px 0;'
                 'text-align:center;">No stage timeline recorded for this night.</div>')
 
-    if fused.get("master_hypnogram"):
-        source = str(fused.get("source") or "oura_only")
-        title = _SLEEP_SOURCE_TITLES.get(source, "Oura")
-    else:
-        # Fell back to Oura's own column. Distinguish "this night genuinely
-        # has no fusion row" from "the fusion read failed" — labelling a
-        # failed read as plain Oura would quietly misattribute the strip.
-        source = "oura_only"
-        title = "Oura" if _sleep_fusion_loaded else "Oura (fusion unavailable)"
-
-    phantom = fused.get("phantom_wake_minutes")
-    if source == "fused" and phantom:
+    if _src["note"] == "phantom":
         # ⚠ This used to end "Display only; the score above uses Oura." That
         # was false and had been for as long as fusion fed
         # get_effective_wake_adjustments: phantom_wake_minutes reaches
@@ -1335,7 +1287,7 @@ def _hypnogram_strip(detail: dict | None) -> str:
                 f'<b style="color:#8FCDF0;">{title}</b> · {phantom} min of Oura wake '
                 f'counted as sleep — Garmin saw no movement. Everything on this '
                 f'screen, the score included, is this fused night.</div>')
-    elif source == "garmin_only":
+    elif _src["note"] == "watch":
         # Say plainly that this is the weaker sensor. Garmin mislabels REM as
         # Light, so presenting its hypnogram as equivalent to a ring night
         # would overstate it — and the stage percentages below are the ones
@@ -1353,16 +1305,9 @@ def _hypnogram_strip(detail: dict | None) -> str:
     # 30-second, the fused master per-minute, movement 30-second), so one
     # start + one duration describes every tick on either of them — which is
     # what makes a single shared time axis honest rather than approximate.
-    start_iso = detail.get("bedtime_start") or fused.get("window_start_utc")
-    total_minutes = dash.minutes_between(detail.get("bedtime_start"),
-                                         detail.get("bedtime_end"))
-    if total_minutes is None and fused.get("minutes"):
-        # garmin_only: no Oura sleep period, so the fusion row's own window is
-        # the only description of the night that exists.
-        try:
-            total_minutes = float(fused["minutes"])
-        except (TypeError, ValueError):
-            total_minutes = None
+    # A watch-only night has no Oura sleep period, so the fusion row's own
+    # window is the only description of the night (sleep_screen.strip_window).
+    start_iso, total_minutes = sleep_screen.strip_window(detail, fused, dash.minutes_between)
     x_labels = dash.clock_axis_labels(start_iso, total_minutes, max_ticks=5)
 
     hyp_height = 56
@@ -1453,19 +1398,11 @@ def _movement_strip(fused: dict, start_iso, total_minutes) -> tuple[dict | None,
     strip under the hypnogram inside one frame while the captions collect
     below it — keeping both charts on one axis instead of giving each its own.
     """
-    codes = str(fused.get("master_movement") or "")
-    if not codes:
+    caption = sleep_screen.movement_caption(fused)
+    if caption is None:
         return None, ""
-
-    source = str(fused.get("movement_source") or "")
-    title = _SLEEP_SOURCE_TITLES.get(source, "Movement")
-    shifts = fused.get("movement_position_shifts")
-    detail_bits = []
-    if source == "fused":
-        detail_bits.append("ring resolves small motion, watch confirms whole-body")
-    if shifts not in (None, ""):
-        detail_bits.append(f"{shifts} position shift{'s' if shifts != 1 else ''}")
-    suffix = f" · {' · '.join(detail_bits)}" if detail_bits else ""
+    codes, title = caption["codes"], caption["title"]
+    suffix = f" · {' · '.join(caption['details'])}" if caption["details"] else ""
 
     sel = (dash.run_at(codes, _point_index)
            if _point_chart == "mov" and _point_index is not None else None)
@@ -1492,12 +1429,10 @@ def _garmin_only_stage_rows(fused: dict) -> str:
     seconds, which is exactly what a garmin_only night does not have. Same
     visual shape so the two paths look identical on screen even though they
     are sourced differently."""
-    total = sum(_float_or_zero(fused.get(f"master_{k}_minutes"))
-                for k in ("deep", "light", "rem"))
     rows = []
-    for key, code in (("awake", "4"), ("rem", "3"), ("light", "2"), ("deep", "1")):
-        mins = _float_or_zero(fused.get(f"master_{key}_minutes"))
-        pct = f"{mins / total * 100:.0f} %" if total and key != "awake" else "—"
+    for stage in sleep_screen.watch_only_stages(fused):
+        code, mins = stage["code"], stage["minutes"]
+        pct = f"{stage['pct']:.0f} %" if stage["pct"] is not None else "—"
         rows.append(
             f'<div style="display:flex;align-items:center;gap:9px;padding:5px 0;font-size:12px;">'
             f'<span style="width:26px;height:6px;border-radius:3px;flex:none;'
@@ -1506,13 +1441,6 @@ def _garmin_only_stage_rows(fused: dict) -> str:
             f'<span style="color:#D4DCEE;">{dash.format_duration(mins * 60)}</span>'
             f'<span style="color:#6B7A9B;margin-left:auto;">{pct}</span></div>')
     return "".join(rows)
-
-
-def _float_or_zero(v) -> float:
-    try:
-        return float(v)
-    except (TypeError, ValueError):
-        return 0.0
 
 
 def _sleep_night_blocks() -> str:
@@ -1532,10 +1460,13 @@ def _sleep_night_blocks() -> str:
     no way to tell which half to believe. So the score decides for everything:
     no score, no night panels, and the day arrows in the header are how you go
     and look at a night that has one."""
-    if not _sleep_is_scored():
-        fused_only = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
-        if (str(fused_only.get("source")) == "garmin_only"
-                and fused_only.get("master_hypnogram")):
+    detail = _sleep_details.get(selected_date.isoformat())
+    context = _sleep_context.get(selected_date.isoformat(), {})
+    fused = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
+    mode = sleep_screen.screen_mode(_sleep_is_scored(), fused, detail, _sleep_details_loaded)
+    if mode != sleep_screen.SCORED:
+        if mode == sleep_screen.WATCH_ONLY:
+            fused_only = fused
             # The ONE exception, and it earns it by saying so in its own text:
             # the ring was not worn, the watch has the night, and the panel
             # states in terms that there is no Sleep Score and that only the
@@ -1548,13 +1479,7 @@ def _sleep_night_blocks() -> str:
                 'Garmin recorded the night, so the stage timeline below is real.</div>'
                 + _hypnogram_strip(None)
                 + f'<div style="margin-top:12px;">{_garmin_only_stage_rows(fused_only)}</div>')
-        return ""
-
-    detail = _sleep_details.get(selected_date.isoformat())
-    context = _sleep_context.get(selected_date.isoformat(), {})
-    fused = _sleep_fusion_rows.get(selected_date.isoformat()) or {}
-    if detail is None:
-        if not _sleep_details_loaded:
+        if mode == sleep_screen.DETAIL_FAILED:
             # The read failed. Silently rendering nothing here would be
             # indistinguishable from "this night has no sleep data", which is
             # a different and much more alarming statement.
@@ -1562,9 +1487,7 @@ def _sleep_night_blocks() -> str:
                 "Night detail",
                 '<div style="font-size:12px;color:#8A99A3;line-height:1.5;">'
                 'Could not load this night&rsquo;s detail — try again shortly.</div>')
-        # A scored night whose detail read failed is the only case left here:
-        # the garmin-only night is handled by the gate above, and an unscored
-        # night never reaches this line at all.
+        # BLANK, or a scored night without a detail row: nothing below the score.
         return ""
 
     # EVERY FIGURE ON THIS SCREEN IS THE FUSED NIGHT — athlete, 2026-08-25.
@@ -1611,14 +1534,7 @@ def _sleep_night_blocks() -> str:
 
     out += _naps_block(dash.sleep_naps_display(detail))
 
-    out += _overnight_panel(
-        "Lowest heart rate", detail.get("hr_series"), "bpm",
-        headline="low", secondary="average", colour="#8FCDF0", detail=detail,
-        chart="ohr")
-    out += _overnight_panel(
-        "Average HRV", detail.get("hrv_series"), "ms",
-        headline="average", secondary="high", colour="#6BAF8B", detail=detail,
-        chart="ohrv")
+    out += _overnight_panels(detail)
 
     vitals = dash.sleep_vitals_rows(detail, context)
     if vitals:
@@ -1626,10 +1542,19 @@ def _sleep_night_blocks() -> str:
     return out
 
 
-_OVERNIGHT_LABELS = {"low": "Lowest", "high": "Max", "average": "Average"}
-
-
 _OVERNIGHT_CHART_HEIGHT = 78
+#: Each overnight series' colour and chart id; which series and which figures
+#: lead are sleep_screen.OVERNIGHT_PANELS.
+_OVERNIGHT_DRAW = {"hr_series": ("#8FCDF0", "ohr"), "hrv_series": ("#6BAF8B", "ohrv")}
+
+
+def _overnight_panels(detail: dict) -> str:
+    """The two overnight series, as Oura shows them on both screens."""
+    return "".join(
+        _overnight_panel(heading, detail.get(key), unit, headline=big, secondary=small,
+                         colour=_OVERNIGHT_DRAW[key][0], detail=detail,
+                         chart=_OVERNIGHT_DRAW[key][1])
+        for heading, key, unit, big, small in sleep_screen.OVERNIGHT_PANELS)
 
 
 def _overnight_panel(overline: str, payload, unit: str, headline: str,
@@ -1685,11 +1610,8 @@ def _overnight_panel(overline: str, payload, unit: str, headline: str,
     # Prefer the series' own timestamps; fall back to the night's bedtime
     # window, which is all an older night (stored before the interval and
     # timestamp fields were captured) has.
-    x_labels = dash.overnight_axis_labels(series, max_ticks=4)
-    if not x_labels:
-        start = dash.format_clock(detail.get("bedtime_start"))
-        end = dash.format_clock(detail.get("bedtime_end"))
-        x_labels = [(0.0, start), (1.0, end)] if start and end else []
+    x_labels = sleep_screen.overnight_axis(
+        dash.overnight_axis_labels(series, max_ticks=4), detail, dash.format_clock)
 
     body = styles.chart_frame(
         [{"svg": plot, "height": height, "y_labels": y_labels,
@@ -1709,7 +1631,7 @@ def _overnight_panel(overline: str, payload, unit: str, headline: str,
         f'<span style="font-size:28px;font-weight:700;color:#D4DCEE;">{big:g}</span>'
         f'<span style="font-size:12px;color:#6B7A9B;">{unit}</span>'
         f'<span style="font-size:11px;color:#6B7A9B;margin-left:auto;">'
-        f'{_OVERNIGHT_LABELS[secondary]} {small:g} {unit}</span></div>'
+        f'{sleep_screen.OVERNIGHT_LABELS[secondary]} {small:g} {unit}</span></div>'
         f'<div style="margin-top:12px;">{body}</div>'
         + _point_detail_block(point_detail))
 
@@ -2144,18 +2066,14 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
         pre_blocks = (
             _readiness_contributors_block()
             + _readiness_key_metrics_block()
-            + _overnight_panel("Lowest heart rate", _r_detail.get("hr_series"), "bpm",
-                               headline="low", secondary="average",
-                               colour="#8FCDF0", detail=_r_detail, chart="ohr")
-            + _overnight_panel("Average HRV", _r_detail.get("hrv_series"), "ms",
-                               headline="average", secondary="high",
-                               colour="#6BAF8B", detail=_r_detail, chart="ohrv")
+            + _overnight_panels(_r_detail)
         )
         extra_blocks = ""
     elif view == "sleep":
         col, disp, lbl, _, _ = dash.sleep_meta(_sleep_score, _sleep_need, _sleep_base_window)
-        _today_wake_adj = _wake_adjustments.get(selected_date.isoformat(), 0.0)
-        detail_label = f"SLEEP · {date_label}" + (" · ADJUSTED" if _today_wake_adj else "")
+        _wake_view = sleep_screen.wake_display(selected_date, _wake_adjustments,
+                                               home.trend_window(selected_date))
+        detail_label = f"SLEEP · {date_label}" + (" · ADJUSTED" if _wake_view["adjusted"] else "")
         hist_key, hist_unit, hist_title, hist_color = "sleep_score", "", "Sleep Score Trend", "#4FC3F7"
         hist_metric = "Sleep Score"
         hist_floor, hist_cap = 0.0, 100.0
@@ -2225,7 +2143,8 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
     # sparkline annotation.
     adjusted_marker = ""
     if view == "sleep":
-        adjusted_nights = sum(1 for d in hist_dates if _wake_adjustments.get(d.isoformat()))
+        adjusted_nights = sleep_screen.wake_display(
+            selected_date, _wake_adjustments, hist_dates)["nights_adjusted"]
         if adjusted_nights:
             adjusted_marker = (
                 f'<div style="font-size:10px;color:#4FC3F7;margin:-4px 0 10px;">'
@@ -2272,13 +2191,19 @@ def _render_wake_time_control(d: date) -> None:
     string). Writes via Repository.set_wake_time_adjustment and reruns so
     the Sleep Score/trend immediately reflect the new value — the raw Oura
     reading itself is never touched."""
-    current = _wake_adjustments.get(d.isoformat(), 0.0)
+    control = sleep_screen.wake_control(d, _wake_adjustments, _wake_sources or {})
+    current = control["minutes"]
     st.markdown(
         "<div style='padding:0 16px;'><div style='font-size:10px;color:#6B7A9B;"
         "letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;'>"
         "Adjust Wake Time</div></div>",
         unsafe_allow_html=True,
     )
+    if not control["editable"]:
+        # A fused night: the fusion figure wins, so a manual value would change
+        # nothing (inventory fault F5). Say so instead of offering − and +.
+        st.caption(control["caption"])
+        return
     wc1, wc2, wc3 = st.columns([1, 2, 1])
     with wc1:
         if st.button("−", key="wt_adj_dec", use_container_width=True):
@@ -2301,11 +2226,8 @@ def _render_wake_time_control(d: date) -> None:
             )
             st.cache_data.clear()
             st.rerun()
-    if current:
-        st.caption(
-            f"Wake time corrected −{current:.0f} min for {d.isoformat()} "
-            "(known Oura wake-time-overestimation pattern)."
-        )
+    if control["caption"]:
+        st.caption(control["caption"])
 
 
 # ─── Fixed UI elements ────────────────────────────────────────────────────────

@@ -21,6 +21,7 @@ from datetime import date, timedelta
 
 from services import dashboard as dash
 from services import readiness
+from services import verdict
 
 #: Biometric days read: 60 supports the 56-night progressive sleep baseline.
 BIO_DAYS = 60
@@ -171,3 +172,37 @@ def trend_series(metrics_history: list[dict], day: date,
     by_date = {r.get("date"): r.get(key) for r in metrics_history}
     values = [by_date.get(d.isoformat()) for d in dates]
     return dates, values, next((v for v in reversed(values) if v is not None), None)
+
+
+# ─── The Readiness drill-down (moves HOME-14, HOME-15) ──────────────────────
+
+def readiness_key_metrics(row: dict | None, detail: dict | None) -> list[dict]:
+    """The 2x2 Oura puts on its own Readiness screen, each {label, value}:
+    resting heart rate and HRV from the blend, body temperature and
+    respiratory rate from Oura alone. "—" where a night has no reading. The
+    temperature is signed on purpose: +0.4 and -0.4 °C are physiologically
+    opposite, and an unsigned figure would read as the same reading."""
+    row, detail = row or {}, detail or {}
+
+    def num(value, fmt: str, suffix: str = "") -> str:
+        return "—" if value is None else f"{fmt.format(value)}{suffix}"
+
+    dev = row.get("oura_temperature_deviation")
+    return [
+        {"label": "Resting Heart Rate", "value": num(row.get("resting_heart_rate"), "{:.0f}", " bpm")},
+        {"label": "Heart Rate Variability", "value": num(row.get("hrv_ms"), "{:.0f}", " ms")},
+        {"label": "Body Temperature", "value": "—" if dev is None else f"{dev:+.2f} °C"},
+        {"label": "Respiratory Rate", "value": num(detail.get("average_breath"), "{:.1f}", " /min")},
+    ]
+
+
+def readiness_contributors_caption(trend: float | None, breakdown: dict) -> str:
+    """The caption under the readiness contributors: why the card's trend and
+    this breakdown's daily differ, how much of the model was measured, and
+    the alcohol shown but not scored. Each part only when it has something
+    to say."""
+    return " ".join(c for c in (
+        verdict.readiness_scale_caption(trend, breakdown.get("score")),
+        dash.readiness_coverage_caption(breakdown),
+        dash.readiness_alcohol_caption(breakdown),
+    ) if c)
