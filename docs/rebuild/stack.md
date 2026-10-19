@@ -84,3 +84,11 @@ source again before relying on one (rebuild rule 10).
 
 - **pnpm's minimum release age is kept on.** On the first install pnpm added `minimumReleaseAgeExclude` entries for three packages released days earlier (wrangler 4.148.0, @cloudflare/vitest-plugin 1.3.7, a miniflare alpha). They were removed and the Worker pinned to Lauscher's proven versions instead: a bad release is usually caught in its first days. `pnpm install` now reports that the lockfile passes the supply-chain policies with no exception.
 - **The engine runs with PYTHONPATH=<root>:<root>/api** (Dockerfile). `uvicorn --app-dir api` alone would put only api/ on the path, and `services` would not import.
+
+## Phase 2 (2026-10-19)
+- **Engine revision `health-engine-00007-fs7`** from commit 5c05933, deployed with `gcloud run deploy health-engine --source . --region europe-west1 --update-env-vars HEALTH_BUILD_COMMIT=<sha>,HEALTH_BUILD_TIME=<utc>`: every other setting of the service unchanged (min 0 / max 1, 1 vCPU, 1 GiB, the two pinned secrets, Europe/Berlin). Start: imports 5.6 s, config 0.09 s, the copy rebuilt from Supabase in 3.45 s. Upload list: 116 files, no personal file.
+- **Image store:** six images on 2026-10-19 (115-120 MB each, sharing layers), 455.5 MB in all after revision 7, measured with `gcloud artifacts repositories list`; the free amount is 0.5 GiB-month. The clean-up keeps the two newest once the rest are a day old (about 190 MB). Check the size before the next deploy.
+- **New settings, both optional:** `HEALTH_CACHE_MAX_AGE_MINUTES` (default 15: a local copy older than this is pulled again; `services/cache_freshness.py`) and `HEALTH_PROCESS` (each process names itself: "streamlit" in repo.py, "engine" in the API; `services/background_writer.py`).
+- **The store's config rows the engine reads:** `background_writer` (absent = "streamlit"), `engine_sync_status` (the engine's last sync run), `oura_login_state` (a login in progress), `strength_reference` (the Strength screen's personal reference; written by `scripts/upload_strength_reference.py --apply`).
+- **FastAPI wraps an included router** (`_IncludedRouter`), so `app.routes` lists five entries; read the contract (`create_app(...).openapi()["paths"]`) to see the routes.
+

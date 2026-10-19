@@ -1,0 +1,36 @@
+{
+  "from_phase": "P2",
+  "to_phase": "P3",
+  "written": "2026-10-19",
+  "verdict": "The engine API serves every screen from services/. Every p2 counter is 0 except streamlit_app_broken, the owner's check after the night's pushes; self-rated 🟠.",
+  "what_exists": {
+    "endpoints": "50 operations (shared/openapi.json; TypeScript types in app/src/generated/api.ts): Today (cards and the three drill-downs, the wake-time correction), status and sync, Check-in, Training (week, day, session with the guided flow walked in advance, completion, the idempotent save, the schedule answers, the Garmin taps, the heart-rate match, yoga, outdoor), Insights (Strength, Metabolism, Flexibility with its capture, Engine Data, the queue, trends, sleep architecture), the Sync tab's tables and manual syncs, the Oura login, Settings.",
+    "inventory": "282 of 282 KEEP or MOVE rows mapped (docs/rebuild/inventory_endpoints.json)",
+    "moves": "55 of 55 view rules moved into services/ with their tests",
+    "faults": "27 of 27 fixed (F1-F27; F27 found in milestone 5: the strain drill-down's stage start)",
+    "background_writer": "the store's config row names the one process that runs background writes; absent = streamlit; unknown or unreadable = nobody",
+    "freshness": "each process's local copy is pulled again after 15 minutes; a row written during a pull is kept (record_cache.WRITE_LOCK)",
+    "engine_revision": "health-engine-00007-fs7 from commit 5c05933 (europe-west1)",
+    "tests": "main gate 5501 passed, 1 skipped; tests/api 171 in the engine venv"
+  },
+  "pinned_versions": "unchanged from Phase 0 (docs/rebuild/stack.md); no new package",
+  "owner_decisions": [
+    "Auto-approve each step overnight and review in one morning batch (2026-10-19).",
+    "Approved all recommendations: the drop list; a session on a rest day counts toward passing a week, never toward a perfect or ultimate week (F25).",
+    "Metabolism readings live in two Supabase tables (he pasted the SQL; 139 weigh-ins and 5 scans imported).",
+    "Earlier, still binding: once-a-day sync at the first morning open with an hourly retry while last night is missing; Europe/Berlin; transform the whole app; cost does not decide; push automatically after each finished step and say so."
+  ],
+  "open_items": [
+    "The owner's check of the hosted Streamlit app after the night's pushes (owner_checks.json p2).",
+    "The Strength reference: the store's config row (recommended; scripts/upload_strength_reference.py --apply) or a secret. Until then the engine's Strength screen answers 409 strength_reference_missing.",
+    "Carried: the voice app's address; [voxplot_supabase] out of the health app's secrets; the image store (455.5 MB of the 0.5 GiB free on 2026-10-19, about 190 MB once the clean-up has run: check it before the next deploy); Supabase's 7-day pause (Phase 9: a keep-alive from the Worker's cron).",
+    "The engine's start is about 9 s; lazy imports are the lever if the phone's first open feels slow."
+  ],
+  "next_phase_may_rely_on": [
+    "Every screen's data and action is an endpoint with a typed answer; the phone computes nothing and holds no training, readiness or safety rule.",
+    "Every chart arrives with its axes and one tap detail per point; every guided-flow position arrives walked in advance (steps), so a session runs offline from one GET.",
+    "Every save is idempotent on ids the phone mints once; a failed save answers 503 save_incomplete and the same body completes it.",
+    "Fixed screen text (headings, button words, static notes) is the phone's strings file; sentences that carry values come from the engine.",
+    "Until Phase 9 the Streamlit app is the background writer: the engine's sync, manual syncs and Oura login answer 409 not_the_writer."
+  ]
+}

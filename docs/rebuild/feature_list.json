@@ -230,7 +230,7 @@
         "P2-01"
       ],
       "gate": "view_logic_left",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P2-03",
@@ -240,7 +240,7 @@
         "P2-01"
       ],
       "gate": "faults_open",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P2-04",
@@ -250,7 +250,7 @@
         "P2-02"
       ],
       "gate": "idempotency_fail",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P2-05",
@@ -260,7 +260,7 @@
         "P2-01"
       ],
       "gate": "background_writer_leaks",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P2-06",
@@ -272,7 +272,7 @@
         "P2-05"
       ],
       "gate": "inventory_unmapped",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P2-07",
