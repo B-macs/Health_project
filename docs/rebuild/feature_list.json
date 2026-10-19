@@ -152,7 +152,7 @@
       "description": "The Phase 1 gate: the p1 counters in scripts/rebuild_gate.py (tests_failing, voice_refs_left, voice_libs_left, submodule_left, device_checklist_open), each with tests.",
       "depends_on": [],
       "gate": "tests_failing",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P1-02",
@@ -180,7 +180,7 @@
         "P1-01"
       ],
       "gate": "submodule_left",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P1-05",
@@ -190,7 +190,7 @@
         "P1-01"
       ],
       "gate": "voice_libs_left",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P1-06",
@@ -202,7 +202,7 @@
         "P1-05"
       ],
       "gate": "tests_failing",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P1-07",

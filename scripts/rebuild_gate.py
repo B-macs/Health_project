@@ -453,6 +453,7 @@ VOICE_REF_ALLOW = {
     "tests/test_rebuild_gate.py": "the gate's own tests",
     "tests/test_rebuild_secrets.py": "proves another app's [voxplot_supabase] secrets never go to the engine",
     "tests/api/test_api_phase0.py": "proves the engine's config drops another app's [voxplot_supabase] section",
+    "tests/test_voice_app_moved_out.py": "the test that keeps the voice app out names what it keeps out",
 }
 VOICE_LIBS = ("praat-parselmouth", "scipy", "soundfile", "imageio-ffmpeg")
 VOICE_REQUIREMENT_FILES = ("requirements.txt", "requirements-engine.txt")
