@@ -275,4 +275,7 @@ def test_the_home_card_stream_still_uses_the_unwidened_au_window():
     """_au_history was deliberately NOT widened — the regional series has its
     own fetch so the three-card stream pays nothing for it."""
     src = _app_source()
-    assert "def _au_history(days: int = 28)" in src
+    # Keyed by the day shown since 2026-10-19 (services/home.py's windows).
+    from services import home
+    assert "def _au_history(end_iso: str, days: int = home.AU_DAYS)" in src
+    assert home.AU_DAYS == 28

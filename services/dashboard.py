@@ -132,7 +132,7 @@ def compute_daily_metrics_snapshot(
     d: date,
     bio_rows: list[dict],
     au_rows: list[dict],
-    stage: int,
+    stage: int | None,
     sleep_base_hours: float | None = None,
     rolling_reference_date: date | None = None,
     wake_time_adjustments: dict[str, float] | None = None,
@@ -169,6 +169,11 @@ def compute_daily_metrics_snapshot(
     minutes to subtract from that date's recorded awake time. None (the
     default) reproduces the exact prior sleep_score behavior.
 
+    stage: the clinical stage, or None when it could not be read. Then no
+    strain is scored at all (strain None, source "none") rather than one
+    computed at a guessed stage: a failed read used to become stage 1, which
+    moved the number through the stage's scaling (inventory fault F7).
+
     hr_rows: persisted per-session heart-rate load
     (Repository.get_session_hr_history). When this date has a row, its
     Edwards'-TRIMP-derived strain becomes the primary signal and the RPE
@@ -203,6 +208,19 @@ def compute_daily_metrics_snapshot(
     if sleep_score == _sleep_score.NOT_COMPUTED:
         sleep_score = None
 
+    if stage is None:
+        return {
+            "readiness_score": readiness_score,
+            "sleep_pct": sleep_pct,
+            "sleep_score": sleep_score,
+            "strain": None,
+            "strain_is_rolling": False,
+            "strain_source": _hr_load.SOURCE_NONE,
+            "strain_source_label": _hr_load.SOURCE_LABELS.get(_hr_load.SOURCE_NONE, ""),
+            "strain_rpe_only": None,
+            "strain_hr_only": None,
+            "hr_detail": None,
+        }
     au_day = next((r for r in au_rows if r.get("date") == d_str), None)
     rpe_strain = au_to_strain_or_none(au_day["total_au"] if au_day else None, stage)
 

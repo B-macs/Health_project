@@ -29,6 +29,7 @@ import styles
 import training_constants as _tc
 from services import dashboard as dash
 from services import engine
+from services import home
 from services import hr_load as _hr_load
 from services import plan as plan_svc
 from services import readiness as readiness_model
@@ -179,7 +180,6 @@ _CARD_BG: dict[str, Path] = {
     "sleep":     _BG_DIR / "Calm-iphone-11.jpg",
 }
 
-_SLEEP_NEED_HOURS = 8.0
 _NOT_COMPUTED     = readiness_model.NOT_COMPUTED
 
 # ─── URL state ───────────────────────────────────────────────────────────────
@@ -368,38 +368,47 @@ _NAV_BUTTON_CSS = """<style>
    back button for those three views and is on screen whatever the scroll. */
 </style>"""
 
+# Never a day after today; the arrows step one day (home.day_bounds).
+selected_date, prev_date, _after = home.day_bounds(selected_date, _today)
 is_today    = (selected_date == _today)
 date_label  = "TODAY" if is_today else selected_date.isoformat()
-prev_date   = selected_date - timedelta(days=1)
 next_date   = selected_date + timedelta(days=1)
-can_go_next = next_date <= _today
+can_go_next = _after is not None
 
 # ─── Data fetching ────────────────────────────────────────────────────────────
 
+# EVERY WINDOW BELOW ENDS ON THE DAY SHOWN, and each cache is keyed by that day
+# (services/home.py's windows; inventory faults F8 and F9). They counted back
+# from the server's today, so a day more than 60 days back read "not scored"
+# and blamed the ring, and for half an hour after midnight the windows still
+# ended yesterday.
+
 @st.cache_data(ttl=1800, show_spinner=False)
-def _bio_rolling(days: int = 32) -> list[dict]:
+def _bio_rolling(end_iso: str, days: int = home.BIO_DAYS) -> list[dict]:
     # engine.py/readiness.py still work on plain dicts -- asdict() converts
     # the typed BiometricRecord back to the exact shape they expect.
-    return [asdict(r) for r in repo.get_repository().get_biometric_rolling(days=days)]
+    return [asdict(r) for r in repo.get_repository().get_biometric_rolling(
+        days=days, today=date.fromisoformat(end_iso))]
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _au_history(days: int = 28) -> list[dict]:
-    return repo.get_repository().get_daily_session_au_weighted(days)
+def _au_history(end_iso: str, days: int = home.AU_DAYS) -> list[dict]:
+    return repo.get_repository().get_daily_session_au_weighted(
+        days, today=date.fromisoformat(end_iso))
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _metrics_history_rolling(days: int = 60) -> list[dict]:
+def _metrics_history_rolling(end_iso: str, days: int = home.HISTORY_DAYS) -> list[dict]:
     """Persisted Readiness/Sleep%/Strain history (Repository.
     get_metrics_history) for the Readiness/Sleep/Strain card drill-downs'
     trend sparklines — a fixed record, unlike the live recompute this page
     otherwise always does for `selected_date` itself."""
-    start = (date.today() - timedelta(days=days)).isoformat()
-    return repo.get_repository().get_metrics_history(start=start)
+    return repo.get_repository().get_metrics_history(
+        start=home.window_start(date.fromisoformat(end_iso), days), end=end_iso)
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _wake_time_adjustments_rolling(days: int = 60) -> dict[str, float]:
+def _wake_time_adjustments_rolling(end_iso: str, days: int = home.HISTORY_DAYS) -> dict[str, float]:
     """Per-night wake-time corrections for the same window as the Metrics
     History trend — threaded into dash.compute_daily_metrics_snapshot below
     so Sleep Score reflects any correction, and read again by the Sleep card
@@ -411,8 +420,9 @@ def _wake_time_adjustments_rolling(days: int = 60) -> dict[str, float]:
     exception) against the Oura+Garmin fusion's own phantom-wake figure —
     both subtract the same minutes, so exactly one wins per night. See
     services/sleep_fusion.py::effective_wake_adjustments."""
-    start = (date.today() - timedelta(days=days)).isoformat()
-    adjustments, _sources = repo.get_repository().get_effective_wake_adjustments(start=start)
+    start = home.window_start(date.fromisoformat(end_iso), days)
+    adjustments, _sources = repo.get_repository().get_effective_wake_adjustments(
+        start=start, end=end_iso)
     return adjustments
 
 
@@ -488,12 +498,12 @@ def _stage_start_cached():
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _session_hr_rolling(days: int = 60) -> list[dict]:
+def _session_hr_rolling(end_iso: str, days: int = home.HISTORY_DAYS) -> list[dict]:
     """Persisted per-session heart-rate load (Repository.
     get_session_hr_history) — Edwards'-TRIMP-derived strain for any day whose
     logged session matched a Garmin activity. Days with no row simply aren't
     in this list, and the strain for those falls back to RPE."""
-    start = (date.today() - timedelta(days=days)).isoformat()
+    start = home.window_start(date.fromisoformat(end_iso), days)
     return repo.get_repository().get_session_hr_history(start=start)
 
 
@@ -526,7 +536,7 @@ _garmin_sync_ok, _garmin_sync_err = st.session_state.get("_sync_status_garmin", 
 # the biometric rows now do too.
 _bio_rows_failed = False
 try:
-    _bio_rows = _bio_rolling(days=60)   # 60d to support 56d sleep baseline
+    _bio_rows = _bio_rolling(selected_date.isoformat())   # 60d: the 56-night sleep baseline
 except Exception:
     _bio_rows = []
     _bio_rows_failed = True
@@ -594,7 +604,7 @@ if _bio_rows_stale and not _bio_rows_failed:
         st.session_state[_refresh_key] = True
         try:
             _bio_rolling.clear()
-            _bio_rows = _bio_rolling(days=60)
+            _bio_rows = _bio_rolling(selected_date.isoformat())
         except Exception:
             pass
     # Re-checked, not assumed: if the row is still absent after the re-read,
@@ -605,13 +615,13 @@ if _bio_rows_stale and not _bio_rows_failed:
 
 _au_rows = []
 try:
-    _au_rows = _au_history()
+    _au_rows = _au_history(selected_date.isoformat())
 except Exception:
     pass
 
 _metrics_hist = []
 try:
-    _metrics_hist = _metrics_history_rolling(days=60)
+    _metrics_hist = _metrics_history_rolling(selected_date.isoformat())
 except Exception:
     pass
 
@@ -622,63 +632,59 @@ except Exception:
 # CURRENT day still needs. A failed read leaves this False, which errs
 # towards syncing in the foreground — the safe direction, since the cards are
 # blank in that case anyway.
+try:
+    _today_hist = _metrics_hist if is_today else _metrics_history_rolling(_today.isoformat())
+except Exception:
+    _today_hist = []
 _today_metrics_row = next(
-    (r for r in _metrics_hist if r.get("date") == _today.isoformat()), None,
+    (r for r in _today_hist if r.get("date") == _today.isoformat()), None,
 )
 _day_settled = dash.snapshot_is_complete(_today_metrics_row)
 
 _wake_adjustments: dict[str, float] = {}
 try:
-    _wake_adjustments = _wake_time_adjustments_rolling(days=60)
+    _wake_adjustments = _wake_time_adjustments_rolling(selected_date.isoformat())
 except Exception:
     pass
 
 _hr_rows: list[dict] = []
 try:
-    _hr_rows = _session_hr_rolling(days=60)
+    _hr_rows = _session_hr_rolling(selected_date.isoformat())
 except Exception:
     pass
 
+# An unreadable stage is None, never stage 1: strain is then not scored and
+# says why (inventory fault F7; it moved the number through the stage's
+# scaling and could print a Stage 1 ceiling).
 try:
     _current_stage = _current_stage_cached()
 except Exception:
-    _current_stage = 1
+    _current_stage = None
 
-_window_start = (selected_date - timedelta(days=6)).isoformat()
-_window_end   = selected_date.isoformat()
-_bio_7d = sorted(
-    [r for r in _bio_rows if r.get("date") and _window_start <= r["date"] <= _window_end],
-    key=lambda r: r["date"],
-)
 
 # ─── Computed values ──────────────────────────────────────────────────────────
 
-# Progressive sleep baseline (7→14→28→56 nights, outliers <4h/>11h removed) —
-# computed once here since sleep_meta()'s description text needs the window
-# size too, not just the score; passed into the snapshot below so it isn't
-# recomputed a second time there.
-_sleep_base_hours, _sleep_base_window = readiness_model.sleep_baseline(_bio_rows)
-_sleep_need = _sleep_base_hours if _sleep_base_hours else _SLEEP_NEED_HOURS
-
-# Shared with Repository.sync_metrics_history so the persisted trend history
-# can never drift from what's actually shown here. rolling_reference_date
-# stays pinned to the real "today" (not selected_date) — the rolling-prior-
-# strain fallback and step modifier represent body load accumulated heading
-# into training right now, a concept anchored to the present even while
-# browsing a past day's card for reference.
-_snapshot = dash.compute_daily_metrics_snapshot(
-    selected_date, _bio_rows, _au_rows, _current_stage,
-    sleep_base_hours=_sleep_base_hours, rolling_reference_date=date.today(),
-    wake_time_adjustments=_wake_adjustments,
-    hr_rows=_hr_rows,
-)
+# The three numbers, from services/home.py (the phone's API computes the same
+# ones): compute_daily_metrics_snapshot, shared with
+# Repository.sync_metrics_history, with the progressive sleep baseline
+# (7→14→28→56 nights) computed once. The rest-day load is counted back from
+# the DAY SHOWN, as each stored trend point is, so a past day's card agrees
+# with its own point (inventory fault F8; it counted back from the server's
+# today, i.e. described the load heading into today under a past day's card).
+_snapshot = home.snapshot(home.HomeReads(
+    day=selected_date, bio_rows=_bio_rows, bio_failed=_bio_rows_failed,
+    au_rows=_au_rows, metrics_history=_metrics_hist,
+    wake_adjustments=_wake_adjustments, hr_rows=_hr_rows, stage=_current_stage))
+_sleep_need         = _snapshot["sleep_need_hours"]
+_sleep_base_window  = _snapshot["sleep_base_window"]
 _readiness_score    = _snapshot["readiness_score"]
 _sleep_score        = _snapshot["sleep_score"]
 _display_strain     = _snapshot["strain"]
 _strain_is_rolling  = _snapshot["strain_is_rolling"]
 
-_hrv_7d = dash.fill_7day(_bio_7d, "hrv_ms", selected_date)
-_rhr_7d = dash.fill_7day(_bio_7d, "resting_heart_rate", selected_date)
+# The 7 days ending on the day shown (dash.fill_7day picks them from the rows).
+_hrv_7d = dash.fill_7day(_bio_rows, "hrv_ms", selected_date)
+_rhr_7d = dash.fill_7day(_bio_rows, "resting_heart_rate", selected_date)
 
 # ─── Image loading ────────────────────────────────────────────────────────────
 
@@ -1147,7 +1153,12 @@ def _readiness_contributors_block() -> str:
 
     Pure math over _bio_rows, which is already loaded and cached — computed
     inline for the same reason _sleep_contributors_block is."""
-    breakdown = readiness_model.readiness_breakdown(selected_date, _bio_rows)
+    # The breakdown of the SAME score the card shows (home.readiness_daily):
+    # on today the engine's own rows, so the card and these rows cannot
+    # disagree (inventory fault F6: they were computed from 60 rows while the
+    # card showed the 14-row score).
+    breakdown = _readiness_breakdown or readiness_model.readiness_breakdown(
+        selected_date, _bio_rows)
     if breakdown["score"] == _NOT_COMPUTED:
         return _panel(
             "Contributors",
@@ -2162,6 +2173,8 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
         _region_data: dict = {"has_split": False, "unmapped_names": [],
                               "is_rolling": _strain_is_rolling}
         try:
+            if _current_stage is None:
+                raise ValueError(home.STAGE_UNREAD)
             _regions = _region_au_history()
             _acwr = _sr.region_acwr(
                 _regions["rows"], _current_stage, today=date.today(),
@@ -2184,7 +2197,11 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
             # panel states its own absence instead.
             pass
         globals()["_STRAIN_REGION_DATA"] = _region_data
-        pre_blocks = _region_block(_region_data, _display_strain, _current_stage)
+        pre_blocks = (_region_block(_region_data, _display_strain, _current_stage)
+                      if _current_stage is not None else
+                      _panel("Where it landed",
+                             f'<div style="font-size:12px;color:{skin["ink2"]};line-height:1.5;">'
+                             f'{home.STAGE_UNREAD}</div>', skin=skin))
         # 21.0 is the same ceiling the strain arc is drawn against above
         # (_arc_svg(_display_strain, 21, ...)) and the one engine.load_to_strain
         # saturates at.
@@ -2200,9 +2217,7 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
                            "#BFA06A", floor=0.0)
         )
 
-    hist_dates = [selected_date - timedelta(days=29 - i) for i in range(30)]
-    hist_by_date = {r["date"]: r.get(hist_key) for r in _metrics_hist}
-    hist_values = [hist_by_date.get(d.isoformat()) for d in hist_dates]
+    hist_dates, hist_values, _latest = home.trend_series(_metrics_hist, selected_date, hist_key)
 
     # Sleep-only: a simple marker for how many nights in this 30-day window
     # carry a wake-time adjustment (CLAUDE.md rule 4's narrow manual-entry
@@ -2429,19 +2444,19 @@ _home_css = """<style>
 # exists to remove, so today's figure comes from the engine's own reader.
 # A past date has no live decision to agree with, so it uses the rows Home
 # already holds.
+# The daily and its breakdown come from ONE set of rows (home.readiness_daily):
+# today's are the engine's own 14 (today._bio_for_readiness, the rows
+# today.today_readiness_raw scores), a past day's are Home's rows ending on it.
 try:
-    if is_today:
-        _readiness_today = today.today_readiness_raw()
-    else:
-        _readiness_today = readiness_model.compute_readiness(
-            for_date=selected_date, bio_rows=_bio_rows)
-    if isinstance(_readiness_today, str):       # NOT_COMPUTED
-        _readiness_today = None
+    _readiness_today, _readiness_breakdown = home.readiness_daily(
+        selected_date, home.readiness_rows_for(
+            selected_date, _today,
+            today._bio_for_readiness() if is_today else None, _bio_rows))
 except Exception:
-    _readiness_today = None
+    _readiness_today, _readiness_breakdown = None, None
 # A day with no reading of its own still shows the trend rather than nothing,
 # which is the pre-existing behaviour of this card.
-_r_card = _readiness_today if _readiness_today is not None else _readiness_score
+_r_card = home.readiness_card(_readiness_today, _readiness_score)
 r_col, r_disp, r_lbl, r_hdr, r_desc, r_tert = dash.readiness_meta(_r_card)
 # BOTH FIGURES, EACH TITLED, ALWAYS — including when one or both are blank.
 # Athlete, 2026-08-25: "Rather always see both labeled even when blank."
@@ -2477,7 +2492,7 @@ if is_today:
 _verdict_html = _verdict_line(_verdict) if _verdict else ""
 _card_readiness = _card_html(
     "READINESS", _bg["readiness"],
-    _arc_svg(_r_card, 100, r_col),
+    _arc_svg(_r_card, home.SCALES["readiness"], r_col),
     r_disp, r_lbl, r_col, r_hdr, r_desc, r_tert,
     badge=(_verdict.badge if _verdict else ""),
     badge_tone=(_verdict.tone if _verdict else ""),
@@ -2485,17 +2500,20 @@ _card_readiness = _card_html(
 )
 
 s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
+if _snapshot.get("strain_unscored_reason"):
+    # Not "no workload logged": the load may well be there, the stage is not.
+    s_hdr, s_desc = "Not scored", _snapshot["strain_unscored_reason"]
 _strain_card_label = "STRAIN  ·  7D AVG" if _strain_is_rolling else "STRAIN"
 _card_strain = _card_html(
     _strain_card_label, _bg["strain"],
-    _arc_svg(_display_strain, 21, s_col),
+    _arc_svg(_display_strain, home.SCALES["strain"], s_col),
     s_disp, s_lbl, s_col, s_hdr, s_desc,
 )
 
 sl_col, sl_disp, sl_lbl, sl_hdr, sl_desc = dash.sleep_meta(_sleep_score, _sleep_need, _sleep_base_window)
 _card_sleep = _card_html(
     "SLEEP", _bg["sleep"],
-    _arc_svg(_sleep_score, 100, sl_col),
+    _arc_svg(_sleep_score, home.SCALES["sleep"], sl_col),
     sl_disp, sl_lbl, sl_col, sl_hdr, sl_desc,
 )
 

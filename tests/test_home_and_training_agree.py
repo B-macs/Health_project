@@ -324,7 +324,11 @@ def test_the_card_shows_both_numbers_side_by_side_with_titles():
     assert "font-size:58px" not in r, "the single-number block must not also render"
 
     src = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "_arc_svg(_r_card, 100, r_col)" in src, "the gauge must track the card's number"
+    # The scale is services/home.py's since 2026-10-19 (the phone draws the same arc).
+    from services import home as home_service
+    assert '_arc_svg(_r_card, home.SCALES["readiness"], r_col)' in src, (
+        "the gauge must track the card's number")
+    assert home_service.SCALES["readiness"] == 100
     assert "score_pair=_r_pair" in src
 
 
@@ -413,9 +417,12 @@ def test_the_daily_number_is_computed_for_the_selected_date():
     """⚠ Home renders a PAST day whenever the `d` query param is set.
     today.today_readiness_raw() always answers for date.today(), so using it
     for the card would pair a past day's trend with today's daily score under
-    one pair of titles — two different dates, no way to tell."""
+    one pair of titles — two different dates, no way to tell. Since
+    2026-10-19 the card computes the daily through services/home.py for the
+    day shown (tests/test_home.py)."""
     src = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "for_date=selected_date, bio_rows=_bio_rows" in src
+    assert "_readiness_today, _readiness_breakdown = home.readiness_daily(" in src
+    assert "selected_date, home.readiness_rows_for(" in src
 
 
 def test_todays_displayed_daily_is_the_number_the_engine_bucketed():
@@ -423,10 +430,13 @@ def test_todays_displayed_daily_is_the_number_the_engine_bucketed():
     it is: measured once over the engine's 14 days against the card's 60, the
     two differed by half a point. Both rounded the same and both bucketed the
     same, so it was invisible; near a bucket edge the card would show one
-    number while the session was decided on another."""
+    number while the session was decided on another. On today the card's rows
+    are the engine's own (today._bio_for_readiness, the rows
+    today.today_readiness_raw scores), and home.readiness_daily over them is
+    the engine's number (tests/test_home.py)."""
     src = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert "_readiness_today = today.today_readiness_raw()" in src, (
-        "today's daily must come from the engine's own reader")
+    assert "today._bio_for_readiness() if is_today else None, _bio_rows" in src, (
+        "today's daily must come from the engine's own rows")
     assert "if is_today:" in src
 
 

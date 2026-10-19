@@ -6,10 +6,10 @@
     {"id": "F3", "what": "A second check-in the same day could not set a field back to its default (pain 4 -> 0)", "fixed": "2026-10-19 live (1714ddd)", "test": "tests/test_checkin_view_edits.py::test_a_saved_day_opens_filled_in_and_a_pain_of_zero_is_stored"},
     {"id": "F4", "what": "Insights Engine Data drops the readiness signal Home passes to load_policy", "test": "tests/test_engine_data_panel.py::test_a_day_only_readiness_reduces_reads_the_same_on_both_screens", "fixed": "2026-10-19 in the move (the tab shows today.py's shared verdict)"},
     {"id": "F5", "what": "The wake-time stepper writes a value that changes nothing on a fused night; the caption credits Oura", "test": null},
-    {"id": "F6", "what": "The Readiness drill-down's contributors use the 60-day raw score while today's card uses the 14-day one", "test": null},
-    {"id": "F7", "what": "A failed stage read becomes stage 1 (changes strain, can print Stage 1 text)", "test": null},
-    {"id": "F8", "what": "Read windows and the rest-day strain count back from the server's today, not the day shown", "test": null},
-    {"id": "F9", "what": "No cached read is keyed by date (windows end yesterday for up to 30 minutes after midnight)", "test": null},
+    {"id": "F6", "what": "The Readiness drill-down's contributors use the 60-day raw score while today's card uses the 14-day one", "test": "tests/test_home.py::test_the_daily_and_its_breakdown_come_from_one_set_of_rows", "fixed": "2026-10-19 in the move (services/home.py)"},
+    {"id": "F7", "what": "A failed stage read becomes stage 1 (changes strain, can print Stage 1 text)", "test": "tests/test_home.py::test_an_unreadable_stage_scores_no_strain_and_says_why", "fixed": "2026-10-19 in the move (services/home.py)"},
+    {"id": "F8", "what": "Read windows and the rest-day strain count back from the server's today, not the day shown", "test": "tests/test_home.py::test_a_past_days_rest_day_load_counts_back_from_that_day", "fixed": "2026-10-19 in the move (services/home.py)"},
+    {"id": "F9", "what": "No cached read is keyed by date (windows end yesterday for up to 30 minutes after midnight)", "test": "tests/test_home.py::test_home_reads_are_keyed_by_the_day_shown", "fixed": "2026-10-19 in the move (services/home.py)"},
     {"id": "F10", "what": "Flexibility prints 'of 4 slots' and 'N not measured' with 4 typed in; the battery has 3", "test": null},
     {"id": "F11", "what": "Metabolism colours every rise amber and fall green, and shows 'Normal' on every derived value", "test": null},
     {"id": "F12", "what": "Sleep Architecture's 'Oura only' count includes watch-only nights", "test": null},
@@ -22,6 +22,7 @@
     {"id": "F19", "what": "Garmin-verified walk minutes and the heart-rate panel are not checkpointed", "test": null},
     {"id": "F20", "what": "The overview, estimate, 'Planned Reps' and review weight show plan values while the flow uses dosed values", "test": null},
     {"id": "F21", "what": "Out-of-date text: 'not Google Sheets', 'Garmin once a day', 'Add OURA_TOKEN', '14-Day Plan', Notion in docstrings and warnings", "test": null},
-    {"id": "F22", "what": "A swap refused on one side was written half: with today a forced rest and a day in another week, that day got the rest, today kept it, and the swapped session disappeared from the schedule (found 2026-10-19 in the move of the writers)", "fixed": "2026-10-19 in the move (a change is applied whole or not at all)", "test": "tests/test_schedule_change.py::test_a_swap_refused_on_one_side_is_refused_whole_and_no_session_is_lost"}
+    {"id": "F22", "what": "A swap refused on one side was written half: with today a forced rest and a day in another week, that day got the rest, today kept it, and the swapped session disappeared from the schedule (found 2026-10-19 in the move of the writers)", "fixed": "2026-10-19 in the move (a change is applied whole or not at all)", "test": "tests/test_schedule_change.py::test_a_swap_refused_on_one_side_is_refused_whole_and_no_session_is_lost"},
+    {"id": "F23", "what": "Repository.get_current_stage() returns stage 1 when the stored stage is missing or unreadable: the same silent guess F7 removed from Home, inherited by every reader of the stage (strain scaling, ACWR ceilings, movement rules). Found 2026-10-19 in the Home move; changes every caller, so it gets its own step", "test": null}
   ]
 }
