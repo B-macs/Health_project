@@ -156,6 +156,7 @@ def test_the_warning_survives_the_tp_resets():
 
 def test_the_check_in_sends_after_it_saves():
     src = (ROOT / "views" / "checkin.py").read_text(encoding="utf-8")
-    save = src.index("save_check_in(")
+    # The save goes through services/checkin_form.save since move INS-7.
+    save = src.index("cf.save(")
     assert "send_mirror_now()" in src[save:], "the check-in no longer sends its copy"
 

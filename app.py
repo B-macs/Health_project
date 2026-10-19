@@ -29,6 +29,7 @@ import training_constants as _tc
 from services import dashboard as dash
 from services import engine
 from services import home
+from services import navigation
 from services import plan as plan_svc
 from services import readiness as readiness_model
 from services import sleep_score as sleep_score_model
@@ -86,13 +87,8 @@ if _repository.offline:
 # Primary: session_state["_nav_page"] set by nav trigger buttons (WebSocket rerun,
 #          no page reload, same connection).
 # Fallback: st.query_params["page"] for direct URL access and first load.
-_page = st.session_state.get("_nav_page") or st.query_params.get("page", "home")
-# An unknown page is Home: an old ?page=sync bookmark from before the voice app
-# moved out (rebuild Phase 1, 2026-10-19) must not keep the address bar on a
-# page that no longer exists.
-_PAGES = ("home", "training", "insights", "checkin")
-if _page not in _PAGES:
-    _page = "home"
+# An unknown page is Home (services/navigation.py).
+_page = navigation.resolve_page(st.session_state.get("_nav_page"), st.query_params.get("page"))
 
 # Keep the URL in sync with whichever page _nav_page resolved to. Nav
 # buttons (nav.py's bottom nav, training.py's two internal "back to home"

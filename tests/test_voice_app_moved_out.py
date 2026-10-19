@@ -29,9 +29,11 @@ def test_the_nav_bar_has_three_tabs_and_no_voice_tab():
 
 
 def test_every_tab_routes_somewhere_and_an_unknown_page_falls_back_to_home():
-    pages = _assigned(APP, "_PAGES")
-    assert set(pages) == {"home", "training", "insights", "checkin"}
-    assert 'if _page not in _PAGES:\n    _page = "home"' in APP
+    # The routing moved to services/navigation.py (move INS-8, 2026-10-19).
+    from services import navigation
+    assert set(navigation.PAGES) == {"home", "training", "insights", "checkin"}
+    assert navigation.resolve_page(None, "sync") == "home"
+    assert "_page = navigation.resolve_page(" in APP
 
 
 def test_no_route_or_file_loads_the_voice_page():

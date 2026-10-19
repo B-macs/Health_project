@@ -6,8 +6,8 @@ Call render() from the SPA router in app.py.
 from datetime import date, timedelta
 import streamlit as st
 import repo
+from services import checkin_form as cf
 from services.checkin_form import CONDITIONS, initial_values as _initial_values
-from services.models import CheckInRecord
 from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
 
 
@@ -62,7 +62,12 @@ def render() -> None:
     # Today + the previous 3 days, for backfilling a missed entry. Always
     # defaults to today (index=0) regardless of which of those days already
     # has an entry — no "smart" jump to the most recent gap.
-    date_options = [today - timedelta(days=i) for i in range(4)]
+    date_options = cf.date_options(today)
+    _w, _d = cf.WHOLE_RANGES, cf.DECIMAL_RANGES
+
+    def _steps(field: str) -> list[int]:
+        low, high = _w[field]
+        return list(range(low, high + 1))
 
     def _date_label(d: date) -> str:
         if d == today:
@@ -114,13 +119,14 @@ def render() -> None:
         with col_tissue:
             st.subheader("Tissue State")
             tightness_score = st.slider(
-                "Tightness Score", min_value=0, max_value=10,
+                "Tightness Score", min_value=_w["tightness_score"][0],
+                max_value=_w["tightness_score"][1],
                 value=form["tightness_score"], step=1,
                 help="Clinical scale. 0 = no restriction, 10 = severe.",
                 key=f"checkin_tightness{k}",
             )
             pain_score = st.slider(
-                "Pain Score", min_value=0, max_value=10,
+                "Pain Score", min_value=_w["pain_score"][0], max_value=_w["pain_score"][1],
                 value=form["pain_score"], step=1,
                 help="0 = pain-free, 10 = worst imaginable.",
                 key=f"checkin_pain{k}",
@@ -156,7 +162,8 @@ def render() -> None:
         with col_lifestyle:
             st.subheader("Lifestyle Factors")
             psych_stress = st.select_slider(
-                "Psychological Stress", options=[1, 2, 3, 4, 5], value=form["psych_stress_score"],
+                "Psychological Stress", options=_steps("psych_stress_score"),
+                value=form["psych_stress_score"],
                 help=(
                     "Combined scale — emotional load and mental clarity together, "
                     "deliberately one metric rather than two overlapping ones.\n\n"
@@ -174,8 +181,9 @@ def render() -> None:
                 key=f"checkin_stress{k}",
             )
             alcohol_units = st.number_input(
-                "Alcohol Units (last 24 h)", min_value=0.0, max_value=20.0,
-                value=form["alcohol_units"], step=0.5,
+                "Alcohol Units (last 24 h)", min_value=_d["alcohol_units"][0],
+                max_value=_d["alcohol_units"][1],
+                value=form["alcohol_units"], step=cf.DECIMAL_STEPS["alcohol_units"],
                 help="Standard drink = 1 unit. 0 = none consumed.",
                 key=f"checkin_alcohol{k}",
             )
@@ -191,13 +199,14 @@ def render() -> None:
         with col_joint_gut:
             st.subheader("Joint / Gut")
             instability_events = st.number_input(
-                "Instability Events", min_value=0, max_value=20,
+                "Instability Events", min_value=_w["instability_events"][0],
+                max_value=_w["instability_events"][1],
                 value=form["instability_events"], step=1,
                 help="Count of joint subluxation/instability events since yesterday (HSD).",
                 key=f"checkin_instability{k}",
             )
             bristol_type = st.select_slider(
-                "Bristol Stool Type", options=[0, 1, 2, 3, 4, 5, 6, 7], value=form["bristol_type"],
+                "Bristol Stool Type", options=_steps("bristol_type"), value=form["bristol_type"],
                 help="0 = no stool passed in the last 24h. 1 = severe constipation, "
                      "7 = watery/diarrhea. 3–4 = normal.",
                 key=f"checkin_bristol{k}",
@@ -210,12 +219,14 @@ def render() -> None:
         with col_body_hydration:
             st.subheader("Body / Hydration")
             hunger_deviation = st.select_slider(
-                "Hunger vs Baseline", options=[-2, -1, 0, 1, 2], value=form["hunger_deviation"],
+                "Hunger vs Baseline", options=_steps("hunger_deviation"),
+                value=form["hunger_deviation"],
                 help="−2 = far below normal appetite, +2 = far above normal appetite.",
                 key=f"checkin_hunger{k}",
             )
             thirst_intensity = st.select_slider(
-                "Morning Thirst Intensity", options=[1, 2, 3, 4, 5], value=form["thirst_intensity"],
+                "Morning Thirst Intensity", options=_steps("thirst_intensity"),
+                value=form["thirst_intensity"],
                 key=f"checkin_thirst{k}",
             )
             electrolytes_taken = st.toggle(
@@ -226,13 +237,15 @@ def render() -> None:
         with col_meditation:
             st.subheader("Meditation")
             meditation_minutes = st.number_input(
-                "Meditation Minutes", min_value=0.0, max_value=120.0,
-                value=form["meditation_minutes"], step=5.0,
+                "Meditation Minutes", min_value=_d["meditation_minutes"][0],
+                max_value=_d["meditation_minutes"][1],
+                value=form["meditation_minutes"], step=cf.DECIMAL_STEPS["meditation_minutes"],
                 help="Practice Done is inferred automatically — any minutes logged counts as done.",
                 key=f"checkin_meditation_minutes{k}",
             )
             relaxation_depth = st.select_slider(
-                "Relaxation Depth", options=[1, 2, 3, 4, 5], value=form["relaxation_depth"],
+                "Relaxation Depth", options=_steps("relaxation_depth"),
+                value=form["relaxation_depth"],
                 help="1 = restless/distracted, 5 = deeply relaxed. Only meaningful if practice was done.",
                 key=f"checkin_relaxation{k}",
             )
@@ -243,29 +256,32 @@ def render() -> None:
         )
 
     if submitted:
-        # No explicit "Practice Done" toggle — inferred from minutes logged.
-        meditation_done = meditation_minutes > 0
-        repo.get_repository().save_check_in(CheckInRecord(
-            date=str(selected_date),
-            current_condition=current_condition,
-            tightness_score=tightness_score,
-            pain_score=pain_score,
-            anatomical_locations=anatomical_locations,
-            sensation_tags=sensation_tags,
-            subjective_tightness=subjective_note,
-            alcohol_units=alcohol_units,
-            travel_flag=travel_flag,
-            psych_stress_score=psych_stress,
-            instability_events=instability_events,
-            bristol_type=bristol_type,
-            unusual_stool_colour=unusual_stool_colour,
-            hunger_deviation=hunger_deviation,
-            thirst_intensity=thirst_intensity,
-            electrolytes_taken=electrolytes_taken,
-            meditation_done=meditation_done,
-            meditation_minutes=meditation_minutes,
-            relaxation_depth=relaxation_depth,
-        ), replace=existing is not None)
+        # Every field is sent as the form shows it, and "Practice Done" is
+        # inferred from the minutes (services/checkin_form.py).
+        try:
+            record = cf.record_from_form(selected_date, today, {
+                "current_condition": current_condition,
+                "tightness_score": tightness_score,
+                "pain_score": pain_score,
+                "anatomical_locations": anatomical_locations,
+                "sensation_tags": sensation_tags,
+                "subjective_tightness": subjective_note,
+                "alcohol_units": alcohol_units,
+                "travel_flag": travel_flag,
+                "psych_stress_score": psych_stress,
+                "instability_events": instability_events,
+                "bristol_type": bristol_type,
+                "unusual_stool_colour": unusual_stool_colour,
+                "hunger_deviation": hunger_deviation,
+                "thirst_intensity": thirst_intensity,
+                "electrolytes_taken": electrolytes_taken,
+                "meditation_minutes": meditation_minutes,
+                "relaxation_depth": relaxation_depth,
+            }, ANATOMICAL_LOCATIONS, SENSATION_TAGS)
+        except cf.CheckInError as exc:
+            st.error(f"The check-in was not saved: {exc}")
+            st.stop()
+        cf.save(repo.get_repository(), record, opened_entry=existing is not None)
         # Readiness (Home page) reads today's alcohol units via cached
         # get_biometric_rolling() — clear so it recomputes with this
         # check-in's value instead of serving a stale pre-checkin score.

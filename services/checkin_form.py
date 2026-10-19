@@ -16,6 +16,8 @@ entry; tests/test_checkin_form.py keeps the two equal. The phone app's form
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from services.models import CheckInRecord
 
 CONDITIONS: tuple[str, ...] = ("Excellent", "Good", "Average", "Below Average", "Poor")
@@ -89,3 +91,107 @@ def initial_values(record: CheckInRecord | None, locations=(), tags=()) -> dict[
         else:
             values[field] = str(got)
     return values
+
+
+# ─── Saving (move INS-7, 2026-10-19) ─────────────────────────────────────────
+
+#: A check-in can be saved for today and the BACKFILL_DAYS days before, for a
+#: missed morning. The form opens on today whatever is already filled in.
+BACKFILL_DAYS = 3
+
+#: The ranges every control draws from and the engine API enforces.
+WHOLE_RANGES = _WHOLE
+DECIMAL_RANGES = _DECIMAL
+SWITCHES = _SWITCHES
+#: The decimal controls' steps.
+DECIMAL_STEPS: dict[str, float] = {"alcohol_units": 0.5, "meditation_minutes": 5.0}
+_LISTS = ("anatomical_locations", "sensation_tags")
+
+
+class CheckInError(ValueError):
+    """A check-in that cannot be stored; `errors` names every reason."""
+
+    def __init__(self, errors: list[str]):
+        super().__init__("; ".join(errors))
+        self.errors = errors
+
+
+def date_options(today: date) -> list[date]:
+    """The days a check-in can be saved for: today first, then back."""
+    return [today - timedelta(days=i) for i in range(BACKFILL_DAYS + 1)]
+
+
+def meditation_done(minutes: float | None) -> bool:
+    """There is no "practice done" control: any minutes logged count."""
+    return bool(minutes) and minutes > 0
+
+
+def _number(value, whole: bool) -> bool:
+    if isinstance(value, bool):
+        return False
+    return isinstance(value, int) if whole else isinstance(value, (int, float))
+
+
+def problems(day: date, today: date, values: dict, locations=(), tags=()) -> list[str]:
+    """Every reason the form's values cannot be stored, or [].
+
+    EVERY field is required. "Not set" is never read from a value equal to
+    its default (fault F3: a second check-in the same day could not set pain
+    back to 0), so a value the athlete did not touch is sent as what the form
+    shows. `locations` and `tags` are the multi-select options; when given,
+    a choice outside them is refused."""
+    errors: list[str] = []
+    if day not in date_options(today):
+        errors.append(f"the date {day.isoformat()} is not today or one of the "
+                      f"{BACKFILL_DAYS} days before")
+    for field in FORM_DEFAULTS:
+        if field not in values or values[field] is None:
+            errors.append(f"{field} is not set")
+            continue
+        value = values[field]
+        if field in _WHOLE:
+            low, high = _WHOLE[field]
+            if not _number(value, whole=True) or not low <= value <= high:
+                errors.append(f"{field} must be a whole number from {low} to {high}")
+        elif field in _DECIMAL:
+            low, high = _DECIMAL[field]
+            if not _number(value, whole=False) or not low <= value <= high:
+                errors.append(f"{field} must be a number from {low:g} to {high:g}")
+        elif field == "current_condition":
+            if value not in CONDITIONS:
+                errors.append(f"{field} must be one of {', '.join(CONDITIONS)}")
+        elif field in _LISTS:
+            allowed = set(locations if field == "anatomical_locations" else tags)
+            if not isinstance(value, list) or not all(isinstance(x, str) for x in value):
+                errors.append(f"{field} must be a list of names")
+            elif allowed and any(x not in allowed for x in value):
+                errors.append(f"{field} has a choice that is not an option: "
+                              f"{', '.join(x for x in value if x not in allowed)}")
+        elif field in _SWITCHES:
+            if not isinstance(value, bool):
+                errors.append(f"{field} must be true or false")
+        elif not isinstance(value, str):
+            errors.append(f"{field} must be text")
+    unknown = sorted(set(values) - set(FORM_DEFAULTS))
+    if unknown:
+        errors.append(f"unknown fields: {', '.join(unknown)}")
+    return errors
+
+
+def record_from_form(day: date, today: date, values: dict, locations=(), tags=()) -> CheckInRecord:
+    """The record to store, with meditation_done inferred from the minutes,
+    or CheckInError naming every problem."""
+    errors = problems(day, today, values, locations, tags)
+    if errors:
+        raise CheckInError(errors)
+    return CheckInRecord(date=day.isoformat(),
+                         **{field: values[field] for field in FORM_DEFAULTS},
+                         meditation_done=meditation_done(values["meditation_minutes"]))
+
+
+def save(repo, record: CheckInRecord, opened_entry: bool) -> None:
+    """Store a check-in. `opened_entry`: the form opened the day's stored
+    entry, so what it shows replaces it (fault F3). A form that could not
+    read the entry opened at its defaults, and the save merges field by
+    field, which never overwrites a real earlier reading with a default."""
+    repo.save_check_in(record, replace=opened_entry)
