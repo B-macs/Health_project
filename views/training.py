@@ -1622,10 +1622,7 @@ def _render_weekly_rollup_banner(history: list, streak) -> None:
 @st.cache_data(ttl=300, show_spinner=False)
 def _gate1_lift_weights(since_iso: str) -> dict:
     """Each gate-1 main lift's (first, latest) working weight in the block."""
-    r = repo.get_repository()
-    since = date.fromisoformat(since_iso)
-    return {lift: g1.lift_weights(r.get_recent_session_sets(lift, limit=60), since)
-            for lift in g1.MAIN_LIFTS}
+    return g1.read_lift_weights(repo.get_repository(), date.fromisoformat(since_iso))
 
 
 def _fmt_kg(w) -> str:
@@ -1641,33 +1638,26 @@ def _render_gate1(active, in_session: bool) -> None:
         return
     try:
         r = repo.get_repository()
-        raw = r.get_config_value(g1.CONFIG_KEY)
-        reasons = g1.read_reasons(raw)
         today_ = date.today()
-        mondays = g1.week_mondays(active, today_)
-        plan_dict = sess.calendar_plan(active)
-        logged = _plan_logged_dates(active.start_date, today_.isoformat()) if mondays else set()
-        weeks = [g1.WeekCount(m, g1.core_sessions_done(active, plan_dict, logged, m),
-                              reasons.get(m.isoformat())) for m in mondays]
-        counted = g1.count(weeks)
-        rows = g1.strength_rows(_gate1_lift_weights(active.start_date))
+        card = g1.read_card(
+            r, active, today_, weights=_gate1_lift_weights(active.start_date),
+            logged_dates=_plan_logged_dates(active.start_date, today_.isoformat()))
     except Exception:
         return  # never let the gate's read block the training page
-    waiting = counted["waiting"]
+    counted, rows, waiting = card["count"], card["rows"], card["waiting"]
     if waiting is not None:
-        done = next(w.core_done for w in weeks if w.monday == waiting)
         st.warning(
-            f"The week of {waiting.strftime('%d %b')} ran {done} of 3 core sessions. "
+            f"The week of {waiting['monday'].strftime('%d %b')} ran {waiting['core_done']} of "
+            f"{g1.CORE_REQUIRED} core sessions. "
             "What was the reason? The 6-week count waits for your answer."
         )
         for col, (key, label) in zip(st.columns(len(g1.REASONS)), g1.REASONS.items()):
             if col.button(label, key=f"g1_reason_{key}", use_container_width=True):
-                r.set_config(g1.CONFIG_KEY, g1.with_reason(raw, waiting, key))
+                g1.record_reason(r, active, today_, waiting["monday"], key)
                 st.rerun()
-    met = sum(1 for row in rows if row["met"])
     with st.expander(
             f"Gate 1 — the first run  ·  {counted['run']} of {counted['required']} weeks  ·  "
-            f"{met} of {len(rows)} lifts", expanded=False):
+            f"{card['lifts_met']} of {len(rows)} lifts", expanded=False):
         st.caption(
             "Running starts when all of these are true: 6 weeks in a row with all 3 core "
             "sessions and no flare-up; each main lift 10% above its first weight in this "
@@ -1681,14 +1671,13 @@ def _render_gate1(active, in_session: bool) -> None:
                 f"{mark} **{row['lift']}** — first {_fmt_kg(row['first'])}, now "
                 f"{_fmt_kg(row['latest'])}, target {_fmt_kg(row['target'])}"
             )
-        monday = today_ - timedelta(days=today_.weekday())
-        if reasons.get(monday.isoformat()) == g1.REASON_FLARE:
+        if card["flare_this_week"]:
             st.caption("A flare-up is recorded for this week.")
         elif st.session_state.get("g1_flare_confirm"):
             st.warning("Record a flare-up for this week? It resets the 6-week count.")
             c_yes, c_no = st.columns(2)
             if c_yes.button("Yes, record it", key="g1_flare_yes", use_container_width=True):
-                r.set_config(g1.CONFIG_KEY, g1.with_reason(raw, monday, g1.REASON_FLARE))
+                g1.record_flare(r, active, today_)
                 st.session_state.g1_flare_confirm = False
                 st.rerun()
             if c_no.button("Cancel", key="g1_flare_no", use_container_width=True):

@@ -21,7 +21,9 @@ gate 1 passes, and all of these must be true:
 4. **The test day before the first run** (a 30-minute brisk walk, then
    single-leg calf raises and hops, without pain) — built when 1-3 pass.
 
-No I/O and no Streamlit, like the rest of services/.
+The rules are pure. `read_card`, `record_reason` and `record_flare` are the
+one reader and the two writers (move TRN-13, 2026-10-19), so the training page
+and the engine API show and answer gate 1 the same way. No Streamlit.
 """
 from __future__ import annotations
 
@@ -32,6 +34,7 @@ from datetime import date, timedelta
 
 import goal_block as gb
 from services import plan
+from services import sessions
 from services.models import Phase
 
 #: The blocks gate 1 reads: the goal system's stage 1.
@@ -179,3 +182,90 @@ def steps_to_target(row: dict, step: float) -> int | None:
     if row["target"] is None or row["latest"] is None or not step:
         return None
     return max(0, math.ceil((row["target"] - row["latest"]) / step - 1e-9))
+
+
+# ─── The card, read and answered (move TRN-13, 2026-10-19) ───────────────────
+
+#: How many sessions of each main lift are read back for its weights.
+LIFT_HISTORY_SESSIONS = 60
+
+
+def this_monday(today: date) -> date:
+    return today - timedelta(days=today.weekday())
+
+
+def card(phase: Phase, today: date, raw: str | None, logged_dates: set[str],
+         weights: dict[str, tuple[float | None, float | None]],
+         plan_dict: dict | None = None) -> dict:
+    """Everything the gate-1 card shows, from the stored answers (`raw`), the
+    PLAN-day logged dates and each main lift's (first, latest) weight.
+
+    {"weeks", "count", "rows", "lifts_met", "waiting", "this_monday",
+    "flare_this_week", "passed"}: `waiting` is the first ended week that
+    needs a reason, as {"monday", "core_done"}, or None; `flare_this_week`
+    says a flare-up is already recorded for the current week."""
+    reasons = read_reasons(raw)
+    plan_dict = sessions.calendar_plan(phase) if plan_dict is None else plan_dict
+    weeks = [WeekCount(m, core_sessions_done(phase, plan_dict, logged_dates, m),
+                       reasons.get(m.isoformat()))
+             for m in week_mondays(phase, today)]
+    counted = count(weeks)
+    rows = strength_rows(weights)
+    waiting = counted["waiting"]
+    monday = this_monday(today)
+    return {
+        "weeks": weeks,
+        "count": counted,
+        "rows": rows,
+        "lifts_met": sum(1 for row in rows if row["met"]),
+        "waiting": None if waiting is None else {
+            "monday": waiting,
+            "core_done": next(w.core_done for w in weeks if w.monday == waiting)},
+        "this_monday": monday,
+        "flare_this_week": reasons.get(monday.isoformat()) == REASON_FLARE,
+        "passed": passed(counted, rows),
+    }
+
+
+def read_lift_weights(repo, since: date) -> dict[str, tuple[float | None, float | None]]:
+    """Each main lift's (first, latest) working weight since `since`."""
+    return {lift: lift_weights(repo.get_recent_session_sets(lift, limit=LIFT_HISTORY_SESSIONS),
+                               since)
+            for lift in MAIN_LIFTS}
+
+
+def read_card(repo, phase: Phase, today: date, *, weights=None, logged_dates=None) -> dict:
+    """The card, read in the order the training page read it: the stored
+    answers, the PLAN-day logged dates (a yoga session is not a core
+    session; read only once a week has ended), the lifts. A caller with its
+    own cached reads passes `weights` and `logged_dates`."""
+    raw = repo.get_config_value(CONFIG_KEY)
+    start = date.fromisoformat(phase.start_date)
+    if logged_dates is None:
+        logged_dates = (repo.get_logged_session_dates(start, today, include_supplementary=False)
+                        if week_mondays(phase, today) else set())
+    if weights is None:
+        weights = read_lift_weights(repo, start)
+    return card(phase, today, raw, logged_dates, weights)
+
+
+def answerable_mondays(phase: Phase, today: date) -> list[date]:
+    """The weeks an answer can be stored for: every ended week of the block,
+    and the current week (a flare-up in a week that has not ended)."""
+    return week_mondays(phase, today) + [this_monday(today)]
+
+
+def record_reason(repo, phase: Phase, today: date, monday: date, reason: str) -> None:
+    """Store one week's one-tap answer, over the stored answers read just
+    before the write. Refuses a reason outside REASONS and a week outside
+    answerable_mondays, so a stray answer cannot move the count."""
+    if monday not in answerable_mondays(phase, today):
+        raise ValueError(f"{monday.isoformat()} is not a week of this block that can be answered")
+    repo.set_config(CONFIG_KEY, with_reason(repo.get_config_value(CONFIG_KEY), monday, reason))
+
+
+def record_flare(repo, phase: Phase, today: date) -> None:
+    """A session this week was shortened or changed because of the hips or
+    the back: the current week's answer is a flare-up, which resets the
+    count."""
+    record_reason(repo, phase, today, this_monday(today), REASON_FLARE)
