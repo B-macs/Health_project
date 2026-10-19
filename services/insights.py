@@ -190,3 +190,11 @@ def trend_gate(trend_data: dict) -> dict:
     return {"bio_days": bio_days, "sessions": len(trend_data.get("sessions") or []),
             "needed": engine.MIN_OBSERVATION_DAYS,
             "enough": bio_days >= engine.MIN_OBSERVATION_DAYS}
+
+
+def directive_words(verdict) -> str:
+    """The Engine Data banner's words: the verdict's own badge (the words
+    Home and Training show, fault F4), else NO READING YET on a morning with
+    nothing to judge, else NO CHANGE TO LOAD."""
+    return verdict.badge or {"neutral": "NO READING YET"}.get(verdict.banner_kind,
+                                                               "NO CHANGE TO LOAD")

@@ -2061,8 +2061,7 @@ def _render_engine_data() -> None:
     _verdict = today_mod.today_verdict()
     rec = today_mod.today_directive()
     sig_color = _verdict.tone
-    _words = (_verdict.badge
-              or {"neutral": "NO READING YET"}.get(_verdict.banner_kind, "NO CHANGE TO LOAD"))
+    _words = insights_svc.directive_words(_verdict)
     st.markdown(
         f"<div style='background:{sig_color}20;border-left:4px solid {sig_color};"
         f"border-radius:6px;padding:12px 16px;margin-bottom:16px;'>"

@@ -362,6 +362,566 @@
         "tests/api/test_api_today_detail.py::test_a_night_the_detail_holds_but_the_rows_lack_is_not_blamed_on_the_ring"
       ]
     },
+    "I1": {
+      "client": "phone",
+      "why": "The phone groups the Insights screens its own way (KEEP: regroup for the phone); the tabs are its navigation."
+    },
+    "I2": {
+      "client": "phone",
+      "why": "Four fixed category cards with static images; each opens its screen."
+    },
+    "I3": {
+      "client": "phone",
+      "why": "Opening a category's screen is the phone's navigation."
+    },
+    "I4": {
+      "client": "phone",
+      "why": "Cardio is a fixed coming-soon card (the owner will add Cardio later)."
+    },
+    "I5": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I6": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_failed_training_read_is_named_on_strength"
+      ]
+    },
+    "I7": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I8": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I9": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I10": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I11": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I12": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I13": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I15": {
+      "endpoint": "GET /api/insights/strength",
+      "test": [
+        "tests/api/test_api_insights.py::test_strength_reads_its_reference_from_the_store"
+      ]
+    },
+    "I16": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_shows_the_period_and_colours_the_change_by_its_measure"
+      ]
+    },
+    "I17": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_names_a_failed_read_and_shows_the_latest_scan"
+      ]
+    },
+    "I18": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_shows_the_period_and_colours_the_change_by_its_measure"
+      ]
+    },
+    "I19": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_shows_the_period_and_colours_the_change_by_its_measure"
+      ]
+    },
+    "I20": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_shows_the_period_and_colours_the_change_by_its_measure"
+      ]
+    },
+    "I21": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_shows_the_period_and_colours_the_change_by_its_measure"
+      ]
+    },
+    "I22": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_shows_the_period_and_colours_the_change_by_its_measure"
+      ]
+    },
+    "I23": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_names_a_failed_read_and_shows_the_latest_scan"
+      ]
+    },
+    "I24": {
+      "endpoint": "GET /api/insights/metabolism",
+      "test": [
+        "tests/api/test_api_insights.py::test_metabolism_shows_the_period_and_colours_the_change_by_its_measure"
+      ]
+    },
+    "I26": {
+      "endpoint": "GET /api/insights/flexibility",
+      "test": [
+        "tests/api/test_api_insights.py::test_an_unreadable_flexibility_record_is_not_an_empty_one"
+      ]
+    },
+    "I27": {
+      "endpoint": [
+        "GET /api/insights/flexibility",
+        "POST /api/insights/flexibility/capture"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I28": {
+      "endpoint": [
+        "GET /api/insights/flexibility",
+        "POST /api/insights/flexibility/capture"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_flexibility_opens_empty_with_its_guide",
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I29": {
+      "client": "phone",
+      "why": "\"What this produces\" is fixed text on the empty screen."
+    },
+    "I30": {
+      "endpoint": "GET /api/insights/flexibility",
+      "test": [
+        "tests/api/test_api_insights.py::test_flexibility_opens_empty_with_its_guide"
+      ]
+    },
+    "I31": {
+      "endpoint": "GET /api/insights/flexibility",
+      "test": [
+        "tests/api/test_api_insights.py::test_flexibility_opens_empty_with_its_guide"
+      ]
+    },
+    "I32": {
+      "endpoint": "POST /api/insights/flexibility/capture",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I33": {
+      "endpoint": "GET /api/insights/flexibility",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_leg_day_yesterday_warns_the_cold_reading"
+      ]
+    },
+    "I34": {
+      "endpoint": [
+        "GET /api/insights/flexibility",
+        "POST /api/insights/flexibility/capture"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_flexibility_opens_empty_with_its_guide",
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I35": {
+      "endpoint": [
+        "POST /api/insights/flexibility/capture",
+        "DELETE /api/insights/flexibility/capture"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report",
+        "tests/api/test_api_insights.py::test_a_capture_can_be_dropped"
+      ]
+    },
+    "I36": {
+      "endpoint": [
+        "PUT /api/insights/flexibility/capture",
+        "POST /api/insights/flexibility/capture/finish"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I37": {
+      "endpoint": [
+        "POST /api/insights/flexibility/capture",
+        "PUT /api/insights/flexibility/capture"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I38": {
+      "endpoint": "POST /api/insights/flexibility/capture",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I39": {
+      "endpoint": "PUT /api/insights/flexibility/capture",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I40": {
+      "client": "phone",
+      "why": "Skip and Back move the phone's step over the capture order; Pause leaves the screen, and the draft stays in the store (F13)."
+    },
+    "I41": {
+      "endpoint": [
+        "GET /api/insights/flexibility",
+        "POST /api/insights/flexibility/missing"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_missing_readings_are_added_without_repeating_the_slot"
+      ]
+    },
+    "I42": {
+      "endpoint": "POST /api/insights/flexibility/missing",
+      "test": [
+        "tests/api/test_api_insights.py::test_missing_readings_are_added_without_repeating_the_slot"
+      ]
+    },
+    "I43": {
+      "endpoint": "POST /api/insights/flexibility/capture/finish",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I44": {
+      "endpoint": "POST /api/insights/flexibility/capture/finish",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I45": {
+      "endpoint": "POST /api/insights/flexibility/capture/finish",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I46": {
+      "endpoint": "POST /api/insights/flexibility/capture/finish",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I47": {
+      "endpoint": "POST /api/insights/flexibility/capture/finish",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I48": {
+      "endpoint": "POST /api/insights/flexibility/capture/finish",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I49": {
+      "endpoint": "POST /api/insights/flexibility/capture/finish",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I50": {
+      "endpoint": "POST /api/insights/flexibility/capture/finish",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I51": {
+      "endpoint": "POST /api/insights/flexibility/capture",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_capture_is_kept_in_the_store_and_finishes_into_a_report"
+      ]
+    },
+    "I52": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I53": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I54": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I55": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I56": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I57": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I58": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I59": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I60": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I61": {
+      "endpoint": "GET /api/insights/engine",
+      "test": [
+        "tests/api/test_api_insights.py::test_engine_data_shows_the_shared_verdicts_words"
+      ]
+    },
+    "I62": {
+      "endpoint": "GET /api/insights/queue",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar",
+        "tests/api/test_api_insights.py::test_the_queue_opens_on_a_month_and_steps"
+      ]
+    },
+    "I63": {
+      "endpoint": [
+        "POST /api/insights/queue/process",
+        "PUT /api/checkin"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar",
+        "tests/api/test_api_insights.py::test_the_queue_opens_on_a_month_and_steps"
+      ]
+    },
+    "I64": {
+      "endpoint": "GET /api/insights/queue",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar"
+      ]
+    },
+    "I65": {
+      "endpoint": "GET /api/insights/trends",
+      "test": [
+        "tests/api/test_api_insights.py::test_trends_wait_for_enough_data"
+      ]
+    },
+    "I66": {
+      "endpoint": "GET /api/insights/trends",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar"
+      ]
+    },
+    "I67": {
+      "endpoint": "GET /api/insights/trends",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar"
+      ]
+    },
+    "I68": {
+      "endpoint": "GET /api/insights/trends",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar"
+      ]
+    },
+    "I69": {
+      "endpoint": "GET /api/insights/trends",
+      "test": [
+        "tests/api/test_api_insights.py::test_trends_wait_for_enough_data",
+        "tests/api/test_api_insights.py::test_the_trend_analysis_runs_once_the_gate_opens"
+      ]
+    },
+    "I70": {
+      "endpoint": "GET /api/insights/trends",
+      "test": [
+        "tests/api/test_api_insights.py::test_the_trend_analysis_runs_once_the_gate_opens"
+      ]
+    },
+    "I71": {
+      "endpoint": "GET /api/insights/trends",
+      "test": [
+        "tests/api/test_api_insights.py::test_the_trend_analysis_runs_once_the_gate_opens"
+      ]
+    },
+    "I72": {
+      "endpoint": "GET /api/insights/trends",
+      "test": [
+        "tests/api/test_api_insights.py::test_the_trend_analysis_runs_once_the_gate_opens"
+      ]
+    },
+    "I73": {
+      "client": "phone",
+      "why": "The method caption is fixed text."
+    },
+    "I74": {
+      "endpoint": "GET /api/insights/sleep-architecture",
+      "test": [
+        "tests/api/test_api_insights.py::test_sleep_architecture_counts_and_says_when_its_read_fails"
+      ]
+    },
+    "I75": {
+      "endpoint": "GET /api/insights/sleep-architecture",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_fused_night_shows_its_three_strips"
+      ]
+    },
+    "I76": {
+      "endpoint": "GET /api/insights/sleep-architecture",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_fused_night_shows_its_three_strips"
+      ]
+    },
+    "I77": {
+      "endpoint": "GET /api/insights/sleep-architecture",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_fused_night_shows_its_three_strips"
+      ]
+    },
+    "I78": {
+      "endpoint": "GET /api/insights/sleep-architecture",
+      "test": [
+        "tests/api/test_api_insights.py::test_sleep_architecture_counts_and_says_when_its_read_fails"
+      ]
+    },
+    "I79": {
+      "client": "phone",
+      "why": "The store caption is fixed text: Supabase holds all data."
+    },
+    "I82": {
+      "endpoint": "GET /api/data/tables/{table}",
+      "test": [
+        "tests/api/test_api_insights.py::test_the_data_tables_answer_and_filter"
+      ]
+    },
+    "I83": {
+      "endpoint": "GET /api/data/tables/{table}",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_history_table_filters_by_its_dates"
+      ]
+    },
+    "I84": {
+      "endpoint": "POST /api/data/sync/{kind}",
+      "test": [
+        "tests/api/test_api_insights.py::test_each_manual_sync_runs_its_wider_window"
+      ]
+    },
+    "I85": {
+      "endpoint": "GET /api/data/tables/{table}",
+      "test": [
+        "tests/api/test_api_insights.py::test_the_data_tables_answer_and_filter"
+      ]
+    },
+    "I86": {
+      "endpoint": "GET /api/data/session-checks",
+      "test": [
+        "tests/api/test_api_insights.py::test_the_session_checks_name_a_repeat_save"
+      ]
+    },
+    "I87": {
+      "client": "phone",
+      "why": "The sync's cadence is fixed text; its state comes with GET /api/status."
+    },
+    "I88": {
+      "endpoint": [
+        "GET /api/settings",
+        "POST /api/data/sync/{kind}"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_the_plan_start_seeds_a_first_block_once",
+        "tests/api/test_api_insights.py::test_a_manual_sync_is_the_background_writers"
+      ]
+    },
+    "I89": {
+      "endpoint": "POST /api/data/sync/{kind}",
+      "test": [
+        "tests/api/test_api_insights.py::test_each_manual_sync_runs_its_wider_window",
+        "tests/api/test_api_insights.py::test_a_manual_sync_is_the_background_writers"
+      ]
+    },
+    "I90": {
+      "endpoint": [
+        "POST /api/data/sync/{kind}",
+        "POST /api/sync"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_each_manual_sync_runs_its_wider_window",
+        "tests/api/test_api_status_sync.py::test_the_first_request_of_the_callers_day_syncs_and_stores_the_run"
+      ]
+    },
+    "I91": {
+      "endpoint": "POST /api/data/sync/{kind}",
+      "test": [
+        "tests/api/test_api_insights.py::test_a_manual_sync_is_the_background_writers"
+      ]
+    },
+    "I92": {
+      "endpoint": [
+        "GET /api/settings",
+        "POST /api/oura/login",
+        "POST /api/oura/callback"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_the_oura_login_ties_the_answer_to_its_request",
+        "tests/api/test_api_insights.py::test_the_oura_login_is_the_background_writers"
+      ]
+    },
+    "I93": {
+      "endpoint": "POST /api/data/sync/{kind}",
+      "test": [
+        "tests/api/test_api_insights.py::test_each_manual_sync_runs_its_wider_window"
+      ]
+    },
     "I94": {
       "endpoint": "GET /api/checkin",
       "test": [
@@ -721,6 +1281,15 @@
       "endpoint": "GET /api/training/week",
       "test": [
         "tests/api/test_api_training.py::test_no_block_today_shows_the_gap_and_a_stranded_block"
+      ]
+    },
+    "T29": {
+      "endpoint": [
+        "GET /api/settings",
+        "PUT /api/settings/plan-start"
+      ],
+      "test": [
+        "tests/api/test_api_insights.py::test_the_plan_start_seeds_a_first_block_once"
       ]
     },
     "T30": {

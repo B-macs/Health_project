@@ -25,8 +25,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa
 
 from . import __version__, engine, settings  # noqa: E402
 from .auth import require_engine_key  # noqa: E402
-from .routes import (checkin, health, probes, readiness, status, today,  # noqa: E402
-                     today_detail, training)
+from .routes import (checkin, health, insights, probes, readiness, status,  # noqa: E402
+                     today, today_detail, training)
 
 _IMPORT_SECONDS = time.perf_counter() - _T0
 
@@ -89,6 +89,7 @@ def create_app(startup: bool = True, with_probes: bool | None = None) -> FastAPI
     app.include_router(status.router)
     app.include_router(checkin.router)
     app.include_router(training.router)
+    app.include_router(insights.router)
     if settings.probes_enabled() if with_probes is None else with_probes:
         app.include_router(probes.router)
     return app

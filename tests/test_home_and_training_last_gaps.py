@@ -102,7 +102,13 @@ def test_the_engine_data_panel_speaks_in_homes_words():
     src = (ROOT / "views" / "insights.py").read_text(encoding="utf-8")
     assert "_verdict = today_mod.today_verdict()" in src
     assert "sig_color = _verdict.tone" in src
-    assert "_verdict.badge" in src
+    # The words are the shared verdict's own badge, through the one function
+    # the phone's API uses too (services/insights.directive_words).
+    assert "insights_svc.directive_words(_verdict)" in src
+    from types import SimpleNamespace
+    assert insights.directive_words(SimpleNamespace(badge="REDUCED LOAD",
+                                                    banner_kind="warning")) == "REDUCED LOAD"
+    assert insights.directive_words(SimpleNamespace(badge="", banner_kind="neutral")) ==         "NO READING YET"
     assert "load_policy(" not in src
     # The directive line itself; the per-metric table below it rightly keeps
     # each metric's own signal colour (sig_k).

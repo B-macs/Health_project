@@ -307,6 +307,8 @@ def save(repo, body: dict, today: date) -> dict:
     except ValueError as exc:
         raise SessionRefused("invalid_session", [str(exc)]) from None
     written = session_save.save_session(repo, session)
+    from services import processing_queue
+    processing_queue.parse_after_save(repo)     # the session notes: parse on save (I63)
     return {"stored": True, "session_id": session.session_id, "exercise_ids": written,
             "duration_minutes": session.duration_minutes, "session_rpe": session.session_rpe,
             "au": session.session_au}

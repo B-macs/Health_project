@@ -65,6 +65,19 @@ def process_all(repo, injury_profile: dict, queue: dict | None = None,
     return {"total": len(items), "errors": errors}
 
 
+def parse_after_save(repo) -> dict | None:
+    """The keyword parse right after a save: the approved move for the
+    Processing Queue (inventory I63, "parse on save"), so a note never waits
+    for a button press. It never fails the save that ran it: the save is
+    already stored, and an item it could not parse stays pending, on the
+    queue, which runs the same job (process_all) on demand. None when the
+    job itself could not start."""
+    try:
+        return process_all(repo, repo.get_diagnostic_profile())
+    except Exception:
+        return None
+
+
 # ─── The warnings calendar ──────────────────────────────────────────────────
 
 def entry_date(entry: dict) -> str:

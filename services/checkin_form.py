@@ -248,7 +248,9 @@ def submit(repo, day: date, today: date, values: dict, opened_entry: bool) -> di
     replaces it (fault F3); otherwise the save merges field by field. One
     row per date, so the same request sent twice stores one entry.
     CheckInError names every problem; nothing is stored then."""
+    from services import processing_queue
     locations, tags = options_lists()
     record = record_from_form(day, today, values, locations, tags)
     save(repo, record, opened_entry)
+    processing_queue.parse_after_save(repo)     # the sensation note: parse on save (I63)
     return form_state(repo, day, today)

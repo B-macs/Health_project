@@ -22,6 +22,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data/session-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Session Checks */
+        get: operations["get_session_checks_api_data_session_checks_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data/sync/{kind}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Manual Sync */
+        post: operations["post_manual_sync_api_data_sync__kind__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/data/tables/{table}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Table */
+        get: operations["get_table_api_data_tables__table__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -39,6 +90,229 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/insights/engine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Engine */
+        get: operations["get_engine_api_insights_engine_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/flexibility": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Flexibility */
+        get: operations["get_flexibility_api_insights_flexibility_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/flexibility/capture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Capture */
+        put: operations["put_capture_api_insights_flexibility_capture_put"];
+        /** Post Capture */
+        post: operations["post_capture_api_insights_flexibility_capture_post"];
+        /** Delete Capture */
+        delete: operations["delete_capture_api_insights_flexibility_capture_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/flexibility/capture/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Capture Finish */
+        post: operations["post_capture_finish_api_insights_flexibility_capture_finish_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/flexibility/missing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Missing */
+        post: operations["post_missing_api_insights_flexibility_missing_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/metabolism": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Metabolism */
+        get: operations["get_metabolism_api_insights_metabolism_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Queue */
+        get: operations["get_queue_api_insights_queue_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/queue/process": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Queue Process */
+        post: operations["post_queue_process_api_insights_queue_process_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/sleep-architecture": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Sleep Architecture */
+        get: operations["get_sleep_architecture_api_insights_sleep_architecture_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/strength": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Strength */
+        get: operations["get_strength_api_insights_strength_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/insights/trends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Trends */
+        get: operations["get_trends_api_insights_trends_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/oura/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Oura Callback */
+        post: operations["post_oura_callback_api_oura_callback_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/oura/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Oura Login */
+        post: operations["post_oura_login_api_oura_login_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/readiness": {
         parameters: {
             query?: never;
@@ -49,6 +323,40 @@ export interface paths {
         /** Get Readiness */
         get: operations["get_readiness_api_readiness_get"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Settings */
+        get: operations["get_settings_api_settings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/settings/plan-start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Plan Start */
+        put: operations["put_plan_start_api_settings_plan_start_put"];
         post?: never;
         delete?: never;
         options?: never;
@@ -534,6 +842,29 @@ export interface components {
             /** Mode */
             mode: string;
         };
+        /** CaptureStartIn */
+        CaptureStartIn: {
+            /** Cold */
+            cold: boolean;
+        };
+        /** CaptureStepIn */
+        CaptureStepIn: {
+            /** Entered */
+            entered: {
+                [key: string]: number | null;
+            };
+            /** Load */
+            load?: number | null;
+            /** Setup Value */
+            setup_value?: number | null;
+            /** Test Key */
+            test_key: string;
+            /**
+             * Void
+             * @default false
+             */
+            void: boolean;
+        };
         /**
          * CarryPrompt
          * @description A missed session's proposed carry; nothing moves until the athlete answers.
@@ -543,6 +874,22 @@ export interface components {
             in_order: boolean;
             /** Lines */
             lines: string[];
+        };
+        /** Cellular */
+        Cellular: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Days Old */
+            days_old: number;
+            /** Device */
+            device: string;
+            /** Ecw Tbw */
+            ecw_tbw: number | null;
+            /** Phase Angle Deg */
+            phase_angle_deg: number | null;
         };
         /** CheckInFormOut */
         CheckInFormOut: {
@@ -627,6 +974,11 @@ export interface components {
             /** Unusual Stool Colour */
             unusual_stool_colour: boolean;
         };
+        /** ClearedOut */
+        ClearedOut: {
+            /** Cleared */
+            cleared: boolean;
+        };
         /** CompletionIn */
         CompletionIn: {
             /** End Ts */
@@ -682,6 +1034,29 @@ export interface components {
             /** Unscored Reason */
             unscored_reason: string;
         };
+        /** DataTableOut */
+        DataTableOut: {
+            /** Earliest */
+            earliest: string | null;
+            /** Latest */
+            latest: string | null;
+            /** Rows */
+            rows: {
+                [key: string]: unknown;
+            }[];
+            /** Table */
+            table: string;
+        };
+        /** DatedValue */
+        DatedValue: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Value */
+            value: number;
+        };
         /** DecimalRange */
         DecimalRange: {
             /** Field */
@@ -692,6 +1067,39 @@ export interface components {
             min: number;
             /** Step */
             step: number;
+        };
+        /** EngineDataOut */
+        EngineDataOut: {
+            /** Acwr */
+            acwr?: {
+                [key: string]: unknown;
+            } | null;
+            /** Directive */
+            directive?: {
+                [key: string]: unknown;
+            } | null;
+            /** Load Error */
+            load_error: string | null;
+            /** Stage */
+            stage?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+            /** Traffic Light */
+            traffic_light?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Volume
+             * @default []
+             */
+            volume: {
+                [key: string]: unknown;
+            }[];
         };
         /** ExerciseLine */
         ExerciseLine: {
@@ -707,6 +1115,154 @@ export interface components {
             prescription: string;
             /** Type */
             type: string | null;
+        };
+        /** FlexCapture */
+        FlexCapture: {
+            /** Cluster */
+            cluster: string;
+            /** Cold */
+            cold: boolean;
+            /** Done */
+            done: string[];
+            /** Early Pattern */
+            early_pattern: string | null;
+            /** Early Pattern Label */
+            early_pattern_label: string;
+            /** Order */
+            order: components["schemas"]["FlexTest"][];
+            /** Progress */
+            progress: {
+                [key: string]: number;
+            };
+            /** Readings */
+            readings: components["schemas"]["FlexReading"][];
+            /** Skip Notes */
+            skip_notes: string[];
+            /**
+             * Taken On
+             * Format: date
+             */
+            taken_on: string;
+        };
+        /** FlexReading */
+        FlexReading: {
+            /** Load Kg */
+            load_kg: number | null;
+            /** Setup Value */
+            setup_value: number | null;
+            /** Side */
+            side: string;
+            /** Test Key */
+            test_key: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number;
+            /** Voided */
+            voided: boolean;
+        };
+        /** FlexReport */
+        FlexReport: {
+            /** Assessed On */
+            assessed_on: string | null;
+            /** Baseline Required */
+            baseline_required: number;
+            /** Baseline Sessions */
+            baseline_sessions: number;
+            /** Cold */
+            cold: boolean;
+            /** Ladder */
+            ladder: {
+                [key: string]: unknown;
+            }[];
+            /** Missing */
+            missing: {
+                [key: string]: unknown;
+            }[];
+            /** Pattern */
+            pattern: string | null;
+            /** Pattern Label */
+            pattern_label: string;
+            /** Readings */
+            readings: components["schemas"]["FlexReading"][];
+            /** Reason */
+            reason: string;
+            /** Retest */
+            retest: {
+                [key: string]: unknown;
+            } | null;
+            /** Retest Text */
+            retest_text: string;
+            /** Slots */
+            slots: {
+                [key: string]: unknown;
+            }[];
+            /** Slots Not Run */
+            slots_not_run: number;
+            /** Slots Total */
+            slots_total: number;
+            /** Stack */
+            stack: {
+                [key: string]: unknown;
+            } | null;
+            /** Stack Refused */
+            stack_refused: string;
+            /** Trusted */
+            trusted: boolean;
+        };
+        /** FlexTest */
+        FlexTest: {
+            /** Adapted From */
+            adapted_from: string;
+            /** Bilateral */
+            bilateral: boolean;
+            /** Input Hint */
+            input_hint: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Lock */
+            lock: string;
+            /** Measurement */
+            measurement: string;
+            /** Prior Setup */
+            prior_setup: number | null;
+            /** Prior Setup From Earlier */
+            prior_setup_from_earlier: boolean;
+            /** Safety */
+            safety: string;
+            /** Setup */
+            setup: string;
+            /** Setup Input */
+            setup_input: string;
+            /** Slot */
+            slot: number;
+            /** Slot Label */
+            slot_label: string;
+            /** Takes Load */
+            takes_load: boolean;
+            /** Unit */
+            unit: string;
+            /** What Youre Testing */
+            what_youre_testing: string;
+        };
+        /** FlexibilityOut */
+        FlexibilityOut: {
+            capture: components["schemas"]["FlexCapture"] | null;
+            /** Count */
+            count: number;
+            /** Guide */
+            guide: {
+                [key: string]: unknown;
+            };
+            /** Legs Loaded Yesterday */
+            legs_loaded_yesterday: boolean;
+            /** Load Error */
+            load_error?: string | null;
+            report: components["schemas"]["FlexReport"] | null;
+            /** State */
+            state: string;
         };
         /**
          * FlowStep
@@ -969,6 +1525,22 @@ export interface components {
             /** Value */
             value: string;
         };
+        /** LatestWeighIn */
+        LatestWeighIn: {
+            /** Body Fat Pct */
+            body_fat_pct: number | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Fat Free Mass Kg */
+            fat_free_mass_kg: number | null;
+            /** Fat Mass Kg */
+            fat_mass_kg: number | null;
+            /** Weight Kg */
+            weight_kg: number;
+        };
         /** LengthChoice */
         LengthChoice: {
             /** Au */
@@ -1005,6 +1577,15 @@ export interface components {
             /** Rpe */
             rpe: number | null;
         };
+        /** ManualSyncOut */
+        ManualSyncOut: {
+            /** Kind */
+            kind: string;
+            /** Result */
+            result: {
+                [key: string]: unknown;
+            };
+        };
         /** Masthead */
         Masthead: {
             /** Colour */
@@ -1013,6 +1594,105 @@ export interface components {
             display: string;
             /** Label */
             label: string;
+        };
+        /** MetabolismMetric */
+        MetabolismMetric: {
+            /** Better */
+            better: string | null;
+            /** Dp */
+            dp: number;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Span */
+            span: number;
+            /** Src */
+            src: string;
+            /** Unit */
+            unit: string;
+        };
+        /** MetabolismOut */
+        MetabolismOut: {
+            /** Analysis */
+            analysis: {
+                [key: string]: unknown;
+            }[];
+            cellular: components["schemas"]["Cellular"] | null;
+            /** Kind */
+            kind: string;
+            latest: components["schemas"]["LatestWeighIn"] | null;
+            /** Load Error */
+            load_error: string | null;
+            /** Metric */
+            metric: string;
+            /** Metrics */
+            metrics: components["schemas"]["MetabolismMetric"][];
+            /** Offset */
+            offset: number;
+            /** Ranges */
+            ranges: components["schemas"]["PeriodOption"][];
+            series: components["schemas"]["MetabolismSeries"];
+            /** Split */
+            split: {
+                [key: string]: number;
+            } | null;
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+        };
+        /** MetabolismSeries */
+        MetabolismSeries: {
+            /** Can Back */
+            can_back: boolean;
+            /** Can Forward */
+            can_forward: boolean;
+            /** Change */
+            change: number | null;
+            first: components["schemas"]["DatedValue"] | null;
+            last: components["schemas"]["DatedValue"] | null;
+            /** Points */
+            points: components["schemas"]["DatedValue"][];
+            /** Runs */
+            runs: components["schemas"]["DatedValue"][][];
+            /** Tone */
+            tone: string | null;
+            window: components["schemas"]["PeriodWindow"];
+        };
+        /** MetricOption */
+        MetricOption: {
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Short */
+            short?: string | null;
+            /** Unit */
+            unit: string;
+        };
+        /** MissingEntry */
+        MissingEntry: {
+            /**
+             * Setup
+             * @default false
+             */
+            setup: boolean;
+            /**
+             * Side
+             * @default
+             */
+            side: string;
+            /** Test Key */
+            test_key: string;
+            /** Value */
+            value: number | null;
+        };
+        /** MissingIn */
+        MissingIn: {
+            /** Entries */
+            entries: components["schemas"]["MissingEntry"][];
         };
         /** MovementStrip */
         MovementStrip: {
@@ -1073,6 +1753,38 @@ export interface components {
             activity: components["schemas"]["GarminActivity"] | null;
             /** Found */
             found: boolean;
+        };
+        /** OuraCallbackIn */
+        OuraCallbackIn: {
+            /** Code */
+            code: string;
+            /** State */
+            state: string;
+        };
+        /** OuraLoginIn */
+        OuraLoginIn: {
+            /** Redirect Uri */
+            redirect_uri: string;
+        };
+        /** OuraLoginOut */
+        OuraLoginOut: {
+            /** Authorize Url */
+            authorize_url: string;
+        };
+        /** OuraLoginStatus */
+        OuraLoginStatus: {
+            /** Expires At */
+            expires_at: string | null;
+            /** Kind */
+            kind: string | null;
+            /** Needs Authorisation */
+            needs_authorisation: boolean | null;
+            /** Oauth Configured */
+            oauth_configured: boolean | null;
+            /** Seconds Remaining */
+            seconds_remaining: number | null;
+            /** State */
+            state: string | null;
         };
         /**
          * OuraStatus
@@ -1176,6 +1888,34 @@ export interface components {
             /** Y Labels */
             y_labels: components["schemas"]["AxisTick"][];
         };
+        /** PeriodOption */
+        PeriodOption: {
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+        };
+        /** PeriodWindow */
+        PeriodWindow: {
+            /**
+             * End
+             * Format: date
+             */
+            end: string;
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+            /** Offset */
+            offset: number;
+            /**
+             * Start
+             * Format: date
+             */
+            start: string;
+            /** Sub */
+            sub: string;
+        };
         /** PhaseOut */
         PhaseOut: {
             /** Day Num */
@@ -1189,6 +1929,14 @@ export interface components {
             /** Plan Days */
             plan_days: number;
             /** Start Date */
+            start_date: string;
+        };
+        /** PlanStartIn */
+        PlanStartIn: {
+            /**
+             * Start Date
+             * Format: date
+             */
             start_date: string;
         };
         /** PlannedDay */
@@ -1222,6 +1970,57 @@ export interface components {
             rows: components["schemas"]["LabelValue"][];
             /** Title */
             title: string;
+        };
+        /** ProcessOut */
+        ProcessOut: {
+            /** Errors */
+            errors: string[];
+            /** Total */
+            total: number;
+        };
+        /** QueueDay */
+        QueueDay: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Entries */
+            entries: components["schemas"]["QueueEntry"][];
+            /** In Month */
+            in_month: boolean;
+            /** Is Today */
+            is_today: boolean;
+            /** Level */
+            level: string | null;
+        };
+        /** QueueEntry */
+        QueueEntry: {
+            /** Level */
+            level: string;
+            /** Movement */
+            movement?: string | null;
+            /** Parts */
+            parts: string;
+            /** Source */
+            source: string;
+            /** Summary */
+            summary: string;
+        };
+        /** QueueOut */
+        QueueOut: {
+            /** Month */
+            month: number;
+            next: components["schemas"]["YearMonth"];
+            /** Pending Notes */
+            pending_notes: number;
+            /** Pending Readiness */
+            pending_readiness: number;
+            previous: components["schemas"]["YearMonth"];
+            /** Weeks */
+            weeks: components["schemas"]["QueueDay"][][];
+            /** Year */
+            year: number;
         };
         /**
          * ReadinessBand
@@ -1327,6 +2126,27 @@ export interface components {
             reason: string;
             /** Value */
             value: string;
+        };
+        /** RegionCard */
+        RegionCard: {
+            /** Band */
+            band: string;
+            /** Confidence */
+            confidence: number;
+            /** Index Label */
+            index_label: string;
+            /** Index Text */
+            index_text: string;
+            /** Off */
+            off: boolean;
+            /** Pct */
+            pct: number;
+            /** Points */
+            points: number;
+            /** Region */
+            region: string;
+            /** Tone */
+            tone: string;
         };
         /**
          * RegionPanel
@@ -1454,6 +2274,22 @@ export interface components {
             moved: boolean;
             /** Text */
             text: string;
+        };
+        /** Sector */
+        Sector: {
+            /** Kg */
+            kg: number;
+            /** Sets */
+            sets: number;
+            /** Unloaded Reps */
+            unloaded_reps: number;
+            /** Unloaded Seconds */
+            unloaded_seconds: number;
+        };
+        /** SessionChecksOut */
+        SessionChecksOut: {
+            /** Warnings */
+            warnings: string[];
         };
         /** SessionExercise */
         SessionExercise: {
@@ -1624,6 +2460,21 @@ export interface components {
             /** Stored */
             stored: boolean;
         };
+        /** SettingsOut */
+        SettingsOut: {
+            /** Active Phase */
+            active_phase?: string | null;
+            /** Garmin Configured */
+            garmin_configured: boolean;
+            /** Oura Configured */
+            oura_configured: boolean;
+            /** Plan Start Date */
+            plan_start_date: string | null;
+            /** Seeded */
+            seeded?: boolean | null;
+            /** Writer */
+            writer: string | null;
+        };
         /**
          * ShiftPrompt
          * @description Readiness suggests moving today's session; nothing moves until the athlete answers.
@@ -1631,6 +2482,30 @@ export interface components {
         ShiftPrompt: {
             /** Reason */
             reason: string;
+        };
+        /** SleepArchitectureOut */
+        SleepArchitectureOut: {
+            /** Counts */
+            counts?: {
+                [key: string]: number;
+            } | null;
+            /** Load Error */
+            load_error: string | null;
+            /** Median Phantom Wake */
+            median_phantom_wake?: number | null;
+            /** Night */
+            night?: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * Nights
+             * @default []
+             */
+            nights: string[];
+            /** Shadow */
+            shadow?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** SleepCardOut */
         SleepCardOut: {
@@ -1724,6 +2599,15 @@ export interface components {
             stages: components["schemas"]["StageRow"][];
             /** Vitals */
             vitals: components["schemas"]["LabelValue"][];
+        };
+        /** SplitPart */
+        SplitPart: {
+            /** Pct */
+            pct: number;
+            /** Points */
+            points: number;
+            /** Region */
+            region: string;
         };
         /** StageRow */
         StageRow: {
@@ -1835,6 +2719,70 @@ export interface components {
             /** Label */
             label: string;
         };
+        /** StrengthOut */
+        StrengthOut: {
+            /** Axis */
+            axis: {
+                [key: string]: number;
+            };
+            /** Calibrating */
+            calibrating: boolean;
+            /** Imbalance Count */
+            imbalance_count: number | null;
+            /** Imbalances */
+            imbalances: {
+                [key: string]: unknown;
+            };
+            /** Load Error */
+            load_error: string | null;
+            /** Metric */
+            metric: string;
+            /** Metrics */
+            metrics: components["schemas"]["MetricOption"][];
+            /** Overall */
+            overall: number | null;
+            readout: components["schemas"]["StrengthReadout"];
+            /** Regions */
+            regions: components["schemas"]["RegionCard"][];
+            /** Score Series */
+            score_series: {
+                [key: string]: unknown;
+            }[];
+            /** Split */
+            split: components["schemas"]["SplitPart"][];
+            /**
+             * Today
+             * Format: date
+             */
+            today: string;
+            /** Tonnage */
+            tonnage: components["schemas"]["TonnageWeekOut"][];
+            /** Unloaded */
+            unloaded: components["schemas"]["TextLine"][];
+            /** Unmapped */
+            unmapped: string[];
+            /** Week Labels */
+            week_labels: string[];
+        };
+        /** StrengthReadout */
+        StrengthReadout: {
+            /** Current */
+            current: number | null;
+            /** Delta */
+            delta: number | null;
+            /** Labels */
+            labels: string[];
+            /** Pct */
+            pct: number | null;
+            /** Points */
+            points: boolean;
+            /** Previous */
+            previous: number | null;
+            /** Tone */
+            tone: string | null;
+            /** Unit */
+            unit: string;
+        };
         /** Strip */
         Strip: {
             /** Bands */
@@ -1942,6 +2890,13 @@ export interface components {
             /** Width */
             width: number;
         };
+        /** TextLine */
+        TextLine: {
+            /** Label */
+            label: string;
+            /** Text */
+            text: string;
+        };
         /** TitledValue */
         TitledValue: {
             /** Title */
@@ -2019,6 +2974,20 @@ export interface components {
             screen: string;
             /** Subtitle */
             subtitle?: string | null;
+        };
+        /** TonnageWeekOut */
+        TonnageWeekOut: {
+            core: components["schemas"]["Sector"];
+            lower_body: components["schemas"]["Sector"];
+            overall: components["schemas"]["Sector"];
+            /** Training Days */
+            training_days: number;
+            upper_body: components["schemas"]["Sector"];
+            /**
+             * Week Start
+             * Format: date
+             */
+            week_start: string;
         };
         /**
          * TrainingDayOut
@@ -2118,6 +3087,31 @@ export interface components {
             x_labels: components["schemas"]["AxisTick"][];
             /** Y Labels */
             y_labels: components["schemas"]["AxisTick"][];
+        };
+        /** TrendsOut */
+        TrendsOut: {
+            /** Analysis */
+            analysis: {
+                [key: string]: unknown;
+            } | null;
+            /** Gate */
+            gate: {
+                [key: string]: unknown;
+            };
+            /** Levels */
+            levels: {
+                [key: string]: {
+                    [key: string]: unknown;
+                }[];
+            };
+            /** Regions */
+            regions: {
+                [key: string]: unknown;
+            }[];
+            /** Timeline */
+            timeline: {
+                [key: string]: unknown;
+            }[];
         };
         /** ValidationError */
         ValidationError: {
@@ -2279,6 +3273,13 @@ export interface components {
             /** Rpe Target */
             rpe_target: number;
         };
+        /** YearMonth */
+        YearMonth: {
+            /** Month */
+            month: number;
+            /** Year */
+            year: number;
+        };
         /** YogaCatalogueOut */
         YogaCatalogueOut: {
             /** Flows */
@@ -2419,6 +3420,109 @@ export interface operations {
             };
         };
     };
+    get_session_checks_api_data_session_checks_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionChecksOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_manual_sync_api_data_sync__kind__post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path: {
+                kind: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ManualSyncOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_table_api_data_tables__table__get: {
+        parameters: {
+            query?: {
+                start?: string | null;
+                end?: string | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path: {
+                table: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataTableOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;
@@ -2437,6 +3541,515 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_engine_api_insights_engine_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EngineDataOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_flexibility_api_insights_flexibility_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlexibilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_capture_api_insights_flexibility_capture_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureStepIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlexCapture"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_capture_api_insights_flexibility_capture_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CaptureStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlexCapture"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_capture_api_insights_flexibility_capture_delete: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClearedOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_capture_finish_api_insights_flexibility_capture_finish_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlexibilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_missing_api_insights_flexibility_missing_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MissingIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlexibilityOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_metabolism_api_insights_metabolism_get: {
+        parameters: {
+            query?: {
+                metric?: string;
+                kind?: string;
+                offset?: number;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetabolismOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_queue_api_insights_queue_get: {
+        parameters: {
+            query?: {
+                year?: number | null;
+                month?: number | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["QueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_queue_process_api_insights_queue_process_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sleep_architecture_api_insights_sleep_architecture_get: {
+        parameters: {
+            query?: {
+                night?: string | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SleepArchitectureOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strength_api_insights_strength_get: {
+        parameters: {
+            query?: {
+                metric?: string;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrengthOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trends_api_insights_trends_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TrendsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_oura_callback_api_oura_callback_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OuraCallbackIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OuraLoginStatus"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_oura_login_api_oura_login_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OuraLoginIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OuraLoginOut"];
                 };
             };
             /** @description Validation Error */
@@ -2471,6 +4084,73 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_settings_api_settings_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_plan_start_api_settings_plan_start_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanStartIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SettingsOut"];
                 };
             };
             /** @description Validation Error */
