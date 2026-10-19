@@ -1,5 +1,5 @@
 {
-  "phase": "P1",
+  "phase": "P2",
   "tasks": [
     {
       "id": "P0-01",
@@ -213,6 +213,118 @@
       ],
       "gate": "device_checklist_open",
       "passes": true
+    },
+    {
+      "id": "P2-01",
+      "phase": "P2",
+      "description": "Screen inventory of every Streamlit feature with a KEEP, MOVE or DROP proposal (docs/rebuild/screen_inventory.md); the owner decided every row on 2026-10-19 (STOP 1).",
+      "depends_on": [],
+      "gate": "drops_without_approval",
+      "passes": true
+    },
+    {
+      "id": "P2-02",
+      "phase": "P2",
+      "description": "Move each calculation that lives only in a view into services/ with its test (docs/rebuild/view_logic_moves.json); the Streamlit views then call the moved functions.",
+      "depends_on": [
+        "P2-01"
+      ],
+      "gate": "view_logic_left",
+      "passes": false
+    },
+    {
+      "id": "P2-03",
+      "phase": "P2",
+      "description": "Fix the 21 inventory faults in the move, each with a test that fails without the fix (docs/rebuild/faults.json); F1 and F3 are also fixed in the live app.",
+      "depends_on": [
+        "P2-01"
+      ],
+      "gate": "faults_open",
+      "passes": false
+    },
+    {
+      "id": "P2-04",
+      "phase": "P2",
+      "description": "The session save takes a complete session with caller-minted ids: the same save sent three times stores one session (tests/api/test_save_idempotency.py).",
+      "depends_on": [
+        "P2-02"
+      ],
+      "gate": "idempotency_fail",
+      "passes": false
+    },
+    {
+      "id": "P2-05",
+      "phase": "P2",
+      "description": "The background_writer setting in Supabase's config table: the Streamlit app checks it before its sync and its automatic writes; the engine refuses the sync, the Oura login and the automatic writes unless it reads 'engine' (tests/test_background_writer.py).",
+      "depends_on": [
+        "P2-01"
+      ],
+      "gate": "background_writer_leaks",
+      "passes": false
+    },
+    {
+      "id": "P2-06",
+      "phase": "P2",
+      "description": "The API routers by screen with Pydantic models: every KEEP or MOVE row maps to an endpoint and a test, or to the phone alone with a reason (docs/rebuild/inventory_endpoints.json).",
+      "depends_on": [
+        "P2-02",
+        "P2-04",
+        "P2-05"
+      ],
+      "gate": "inventory_unmapped",
+      "passes": false
+    },
+    {
+      "id": "P2-07",
+      "phase": "P2",
+      "description": "shared/openapi.json and the generated TypeScript types in app/src/generated/api.ts are current.",
+      "depends_on": [
+        "P2-06"
+      ],
+      "gate": "schema_stale",
+      "passes": true
+    },
+    {
+      "id": "P2-08",
+      "phase": "P2",
+      "description": "No API route reads the server's own day: the caller's date comes from X-Local-Date (rebuild rule 3).",
+      "depends_on": [
+        "P2-06"
+      ],
+      "gate": "date_from_server",
+      "passes": true
+    },
+    {
+      "id": "P2-09",
+      "phase": "P2",
+      "description": "Every API write goes through Repository's Supabase-first path; no API module imports sqlite3, supabase_store or the datastore writer (rebuild rule 5).",
+      "depends_on": [
+        "P2-06"
+      ],
+      "gate": "supabase_write_bypass",
+      "passes": true
+    },
+    {
+      "id": "P2-10",
+      "phase": "P2",
+      "description": "The main gate stays at or above its floor with tests/api included.",
+      "depends_on": [
+        "P2-02",
+        "P2-03",
+        "P2-06"
+      ],
+      "gate": "tests_failing",
+      "passes": true
+    },
+    {
+      "id": "P2-11",
+      "phase": "P2",
+      "description": "Deploy the engine to Cloud Run with the Phase 0 settings; after the push the owner confirms the hosted Streamlit app still works.",
+      "depends_on": [
+        "P2-10"
+      ],
+      "gate": "streamlit_app_broken",
+      "passes": false
     }
   ]
 }

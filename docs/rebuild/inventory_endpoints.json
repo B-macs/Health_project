@@ -1,0 +1,4 @@
+{
+  "_note": "Rebuild Phase 2: every KEEP or MOVE row of docs/rebuild/screen_inventory.md maps either to an endpoint and the test that covers it ({\"endpoint\": \"GET /api/...\", \"test\": \"tests/api/x.py::test_y\"}) or to the phone alone with its reason ({\"client\": \"phone\", \"why\": \"...\"}, for example a timer's sound or the screen's styling). scripts/rebuild_gate.py p2 counts the rows that have neither (inventory_unmapped). Filled as milestone 5 builds the endpoints.",
+  "rows": {}
+}

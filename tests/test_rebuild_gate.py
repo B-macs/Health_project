@@ -226,3 +226,292 @@ def test_reports_list_open_counters_first(tmp_path, monkeypatch):
     assert page.index(">open<") < page.index(">zero<")
     assert "&lt;b&gt;escaped&lt;/b&gt;" in page
     assert json.loads(json_path.read_text("utf-8"))["total"] == 2
+
+
+# ── Phase 2: the engine API ──────────────────────────────────────────────────
+
+_INVENTORY = """\
+## D1. DROP proposals
+
+| Id | Screen | Feature | Why it can go | Decision |
+|---|---|---|---|---|
+| H3 | Shell | Toast | Cannot appear | **DROP** — approved 2026-10-19 |
+| I4 | BioAge | Cardio card | A placeholder | **KEEP** — the owner, 2026-10-19 |
+| T9 | Training | Old banner | Dead | **DROP** — proposed, not approved |
+
+## D2. MOVE proposals
+
+| Id | From | Feature | New place | Decision |
+|---|---|---|---|---|
+| H2 | Shell | Banner | Shell status | **MOVE** — approved 2026-10-19 |
+
+## Home (`app.py`) — 4 rows
+
+| Id | Area | Feature | Source | Computed | Writes | Proposal |
+|---|---|---|---|---|---|---|
+| H1 | Shell | Layout | css | — | — | KEEP (becomes the phone shell) |
+| H2 | Shell | Banner | repo | x | — | MOVE (app-wide status) |
+| H3 | Shell | Toast | repo | — | — | DROP (cannot appear) |
+| H61 | Home | Summary | — | — | — | Nothing to inventory |
+
+## Training (`views/training.py`) — 1 row
+
+### Banners
+
+| Id | Area | Feature | Source | Computed | Writes | Proposal |
+|---|---|---|---|---|---|---|
+| T9 | Banner | Old banner | — | — | — | DROP (dead) |
+
+## Insights, Check-in and the shell — 1 row
+
+| Id | Tab | Feature | What it shows | Source | Computed | Writes | Proposal |
+|---|---|---|---|---|---|---|---|
+| I4 | BioAge | Cardio | Coming soon | — | — | — | DROP (placeholder) |
+
+## Computations that must move into `services/` (milestone 3)
+
+| HOME-1 | not an inventory row | KEEP |
+"""
+
+
+def test_phase_2_has_the_counters_its_prompt_names():
+    assert set(gate.REGISTRY["p2"]) == {
+        "tests_failing", "inventory_unmapped", "view_logic_left", "faults_open",
+        "idempotency_fail", "supabase_write_bypass", "date_from_server",
+        "background_writer_leaks", "schema_stale", "drops_without_approval",
+        "streamlit_app_broken"}
+
+
+def test_inventory_rows_read_the_proposal_and_the_owners_keep_wins():
+    assert gate.inventory_rows(_INVENTORY) == {
+        "H1": "KEEP", "H2": "MOVE", "H3": "DROP", "H61": "", "T9": "DROP", "I4": "KEEP"}
+
+
+def test_a_drop_counts_as_decided_only_with_the_owners_word():
+    assert gate.drop_decisions(_INVENTORY) == {"H3", "I4"}
+
+
+def test_the_drop_counter_names_a_drop_without_a_decision(tmp_path, monkeypatch):
+    inventory = tmp_path / "inventory.md"
+    inventory.write_text(_INVENTORY, encoding="utf-8")
+    monkeypatch.setattr(gate, "SCREEN_INVENTORY", inventory)
+    result = gate.p2_drops_without_approval()
+    assert (result.count, result.detail) == (1, "T9")
+
+
+def test_the_real_inventory_has_every_drop_decided_and_the_cardio_card_kept():
+    text = gate.SCREEN_INVENTORY.read_text(encoding="utf-8")
+    rows = gate.inventory_rows(text)
+    drops = {rid for rid, word in rows.items() if word == "DROP"}
+    assert drops and drops <= gate.drop_decisions(text)
+    assert rows["I4"] == "KEEP"
+
+
+def test_openapi_operations_list_method_and_path():
+    spec = {"paths": {"/api/x": {"get": {}, "post": {}, "parameters": []},
+                      "/api/y": {"delete": {}}}}
+    assert gate.openapi_operations(spec) == {"GET /api/x", "POST /api/x", "DELETE /api/y"}
+    assert gate.openapi_operations({}) == set()
+
+
+def test_a_row_is_mapped_by_a_contract_endpoint_with_a_test_or_by_a_phone_reason():
+    rows = {"H1": "KEEP", "H2": "MOVE", "H3": "DROP", "H4": "KEEP", "H5": "KEEP",
+            "H6": "KEEP", "H7": "", "H8": "KEEP", "H9": "MOVE"}
+    test = "tests/api/t.py::test_status"
+    mapping = {
+        "H1": {"client": "phone", "why": "styling only"},
+        "H2": {"endpoint": "GET /api/status", "test": test},
+        "H4": {"endpoint": "GET /api/gone", "test": test},                  # not in the contract
+        "H5": {"endpoint": "GET /api/status", "test": "tests/api/t.py::test_gone"},
+        "H6": {"client": "phone", "why": "  "},                             # no reason given
+        "H8": {"endpoint": ["GET /api/status", "POST /api/save"], "test": [test]},
+    }
+    operations = {"GET /api/status", "POST /api/save"}
+    assert gate.unmapped_rows(rows, mapping, operations,
+                              ref_exists=lambda ref: ref == test) == ["H4", "H5", "H6", "H9"]
+
+
+def test_the_inventory_counter_reads_the_contract_file(tmp_path, monkeypatch):
+    inventory, mapping, spec = (tmp_path / n for n in ("inv.md", "map.json", "openapi.json"))
+    inventory.write_text(_INVENTORY, encoding="utf-8")
+    real_test = "tests/test_rebuild_gate.py::test_phase_2_has_the_counters_its_prompt_names"
+    mapping.write_text(json.dumps({"rows": {
+        "H1": {"client": "phone", "why": "styling"},
+        "H2": {"endpoint": "GET /api/status", "test": real_test}}}), encoding="utf-8")
+    spec.write_text(json.dumps({"paths": {"/api/status": {"get": {}}}}), encoding="utf-8")
+    monkeypatch.setattr(gate, "SCREEN_INVENTORY", inventory)
+    monkeypatch.setattr(gate, "INVENTORY_ENDPOINTS", mapping)
+    monkeypatch.setattr(gate, "OPENAPI_JSON", spec)
+    result = gate.p2_inventory_unmapped()
+    assert result.count == 1 and result.detail == "2 of 3 rows mapped; open: I4"
+
+
+def test_a_move_or_a_fault_is_open_until_its_service_and_test_exist():
+    entries = [
+        {"id": "A", "service": "services/x.py::f", "test": "tests/t.py::test_f"},
+        {"id": "B", "service": None, "test": "tests/t.py::test_f"},
+        {"id": "C", "service": "services/x.py::gone", "test": "tests/t.py::test_f"},
+        {"id": "D", "service": ["services/x.py::f", "services/x.py::g"], "test": "tests/t.py::test_f"},
+        {"id": "E", "service": ["services/x.py::f", "services/x.py::gone"], "test": "tests/t.py::test_f"},
+        {"id": "F", "service": "services/x.py::f", "test": ""},
+    ]
+    known = {"services/x.py::f", "services/x.py::g", "tests/t.py::test_f"}
+    assert gate.open_items(entries, ("service", "test"), ref_exists=known.__contains__) == [
+        "B", "C", "E", "F"]
+
+
+def test_a_reference_must_name_a_real_definition(tmp_path, monkeypatch):
+    monkeypatch.setattr(gate, "REPO_ROOT", tmp_path)
+    (tmp_path / "services").mkdir()
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "services" / "x.py").write_text(
+        "LIMIT: int = 4\nCONSTANT = 3\n# def ghost(): only a comment\n\n"
+        "def f():\n    pass\n\nclass Thing:\n    pass\n\nasync def g():\n    pass\n",
+        encoding="utf-8")
+    (tmp_path / "tests" / "test_t.py").write_text(
+        "class TestGroup:\n    def test_inside(self):\n        pass\n\n"
+        "def test_param(x):\n    pass\n", encoding="utf-8")
+    for ref in ("services/x.py::f", "services/x.py::Thing", "services/x.py::g",
+                "services/x.py::CONSTANT", "services/x.py::LIMIT", "services/x.py",
+                "tests/test_t.py::TestGroup::test_inside", "tests/test_t.py::test_param[1]"):
+        assert gate._ref_exists(ref), ref
+    for ref in ("services/x.py::ghost", "services/x.py::Thin", "services/missing.py::f",
+                "", None):
+        assert not gate._ref_exists(ref), ref
+
+
+@pytest.mark.parametrize("xml, count, words", [
+    (None, 1, "no junit file"),
+    ('<testsuite tests="2" failures="0" errors="0" skipped="2"/>', 1, "nothing passed"),
+    ('<testsuite tests="0" failures="0" errors="0" skipped="0"/>', 1, "nothing passed"),
+    ('<testsuite tests="3" failures="1" errors="0" skipped="0"/>', 1, "2 passed, 1 failed"),
+    ('<testsuite tests="3" failures="0" errors="0" skipped="0"/>', 0, "3 passed"),
+])
+def test_a_test_file_counts_green_only_when_something_in_it_passed(tmp_path, monkeypatch,
+                                                                   xml, count, words):
+    venv_python = _fake_repo(tmp_path, monkeypatch)
+    seen = []
+
+    def fake_run(python, junit, log, extra=None, target="tests/"):
+        seen.append((python, target))
+        junit.parent.mkdir(parents=True, exist_ok=True)
+        if xml is not None:
+            junit.write_text(xml, encoding="utf-8")
+        return 0
+
+    monkeypatch.setattr(gate, "_run_pytest", fake_run)
+    result = gate._pytest_file_failures("p2", "tests/test_x.py")
+    assert result.count == count and words in result.detail
+    assert seen == [(venv_python, "tests/test_x.py")]      # the repo's venv, one file
+
+
+def _fake_repo(tmp_path, monkeypatch):
+    """A repo in tmp_path with one test file and a venv/ Python; returns it."""
+    monkeypatch.setattr(gate, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(gate, "REPORTS_DIR", tmp_path / "reports")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_x.py").write_text("", encoding="utf-8")
+    venv_python = tmp_path / "venv" / "Scripts" / "python.exe"
+    venv_python.parent.mkdir(parents=True)
+    venv_python.write_text("", encoding="utf-8")
+    return venv_python
+
+
+def test_the_suites_never_run_in_the_python_that_started_the_gate(tmp_path, monkeypatch):
+    monkeypatch.setattr(gate, "REPO_ROOT", tmp_path)
+    assert gate.main_python() == tmp_path / "venv" / "bin" / "python"
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "test_x.py").write_text("", encoding="utf-8")
+    result = gate._pytest_file_failures("p2", "tests/test_x.py")
+    assert result.count == 1 and "venv/ is missing" in result.detail
+    assert gate._main_gate_counter("p2").count == 1
+
+
+def test_a_test_file_that_does_not_exist_is_open(tmp_path, monkeypatch):
+    monkeypatch.setattr(gate, "REPO_ROOT", tmp_path)
+    result = gate._pytest_file_failures("p2", "tests/api/test_save_idempotency.py")
+    assert result.count == 1 and "does not exist yet" in result.detail
+
+
+def test_a_crashed_run_cannot_leave_the_last_runs_results(tmp_path, monkeypatch):
+    junit = tmp_path / "run.xml"
+    junit.write_text('<testsuite tests="5"/>', encoding="utf-8")
+
+    class _Crashed:
+        stdout, stderr, returncode = "", "collection error", 2
+
+    monkeypatch.setattr(gate.subprocess, "run", lambda *a, **k: _Crashed())
+    gate._run_pytest("python", junit, tmp_path / "run.log")
+    assert not junit.exists()
+
+
+_CLOCK_CODE = '''\
+"""Reads date.today() in a docstring: not a call."""
+from datetime import date, datetime, timezone
+import datetime as dt
+
+# date.today() in a comment
+STARTED = datetime.now(timezone.utc)
+
+def route():
+    a = date.today()
+    b = datetime.now()
+    c = datetime.now(timezone.utc).date()
+    d = dt.datetime.utcnow().date()
+    e = dt.date.today()
+    f = datetime.now(tz=timezone.utc)
+    return a, b, c, d, e, f
+
+def health():
+    return date.today()
+'''
+
+
+def test_the_clock_check_finds_each_read_of_the_servers_day_and_allows_an_instant():
+    path = "api/healthapi/routes/x.py"
+    assert gate.server_clock_hits({path: _CLOCK_CODE}) == [
+        f"{path}:{n}" for n in (9, 10, 11, 12, 13, 18)]
+
+
+def test_the_allowed_diagnostic_function_is_the_only_exception():
+    path = "api/healthapi/routes/health.py"
+    assert gate.server_clock_hits({path: _CLOCK_CODE}) == [
+        f"{path}:{n}" for n in (9, 10, 11, 12, 13)]
+    for key, reason in gate.SERVER_CLOCK_ALLOWED.items():
+        assert reason and gate._ref_exists(key), key
+
+
+def test_an_api_import_that_goes_around_repository_is_found():
+    code = ('"""import sqlite3 in a docstring is not an import."""\n'
+            "import json\n"
+            "import sqlite3\n"
+            "from services import supabase_store\n"
+            "from services.clients import datastore_writer\n"
+            "from services.clients.datastore_writer import apply_rows\n"
+            "import services.supabase_store as store\n"
+            "from services import record_cache, repository\n"
+            "from .engine import STATE\n")
+    assert gate.write_bypass_hits({"api/x.py": code}) == [
+        "api/x.py:3", "api/x.py:4", "api/x.py:5", "api/x.py:6", "api/x.py:7"]
+
+
+def test_the_real_api_reads_no_server_day_and_writes_only_through_repository():
+    texts = gate._api_texts()
+    assert texts, "api/healthapi has no Python files"
+    assert gate.server_clock_hits(texts) == []
+    assert gate.write_bypass_hits(texts) == []
+
+
+def test_the_tracking_files_are_well_formed():
+    faults = gate._json(gate.FAULTS, {})["faults"]
+    ids = [f["id"] for f in faults]
+    assert len(set(ids)) == len(ids)
+    assert {f"F{n}" for n in range(1, 22)} <= set(ids)      # the owner's 21 stay listed
+    moves = gate._json(gate.VIEW_LOGIC_MOVES, {})["moves"]
+    assert moves and len({m["id"] for m in moves}) == len(moves)
+    for entry in faults + moves:
+        for key in ("service", "test"):
+            for ref in gate._as_list(entry.get(key)):
+                assert gate._ref_exists(ref), f"{entry['id']}: {ref} does not exist"
+    rows = gate.inventory_rows(gate.SCREEN_INVENTORY.read_text(encoding="utf-8"))
+    assert set(gate._json(gate.INVENTORY_ENDPOINTS, {})["rows"]) <= set(rows)

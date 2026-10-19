@@ -20,6 +20,7 @@ See docs/rebuild/ and the "Phone app rebuild" section of CLAUDE.md.
 from __future__ import annotations
 
 import argparse
+import ast
 import html
 import json
 import os
@@ -156,6 +157,15 @@ def engine_run_exclusions(entries: list[str]) -> list[str]:
     return [f"--deselect={e}" if "::" in e else f"--ignore={e}" for e in entries]
 
 
+def main_python(root: Path | None = None) -> Path:
+    """The repo's own venv/, whatever Python started the gate: the system
+    Python on this PC has none of the app's libraries, and a suite run there
+    reads as 57 collection errors, not as the app's state."""
+    root = root or REPO_ROOT
+    windows = root / "venv" / "Scripts" / "python.exe"
+    return windows if windows.exists() else root / "venv" / "bin" / "python"
+
+
 def engine_python(root: Path = REPO_ROOT) -> Path:
     windows = root / ".venv-engine" / "Scripts" / "python.exe"
     return windows if windows.exists() else root / ".venv-engine" / "bin" / "python"
@@ -169,9 +179,10 @@ def _child_env() -> dict[str, str]:
 
 
 def _run_pytest(python: Path | str, junit: Path, log: Path,
-                extra: list[str] | None = None) -> int:
+                extra: list[str] | None = None, target: str = "tests/") -> int:
     junit.parent.mkdir(parents=True, exist_ok=True)
-    cmd = [str(python), "-m", "pytest", "tests/", "-q", "-p", "no:cacheprovider",
+    junit.unlink(missing_ok=True)      # a crashed run must not read the last run's file
+    cmd = [str(python), "-m", "pytest", target, "-q", "-p", "no:cacheprovider",
            f"--junitxml={junit}", *(extra or [])]
     proc = subprocess.run(cmd, cwd=REPO_ROOT, env=_child_env(), capture_output=True,
                           text=True, encoding="utf-8", errors="replace")
@@ -294,10 +305,13 @@ def _owner_check(phase: str, key: str) -> bool | None:
 def _main_gate_counter(phase: str) -> CounterResult:
     """The main suite in venv/: its failures and errors, plus 1 when the pass
     count is under the floor in CLAUDE.md's "Deterministic Gate"."""
+    if not main_python().exists():
+        return CounterResult(1, "venv/ is missing (python -m venv venv, then pip install -r "
+                                "requirements.txt)")
     out = REPORTS_DIR / phase
     junit, log = out / "pytest-main.xml", out / "pytest-main.log"
     if not (REUSE_TEST_RUNS and junit.exists()):
-        _run_pytest(sys.executable, junit, log)
+        _run_pytest(main_python(), junit, log)
     if not junit.exists():
         return CounterResult(1, "pytest wrote no junit file", [f"{phase}/pytest-main.log"])
     summary = read_junit(junit)
@@ -555,6 +569,345 @@ review("p1",
        "The health app opens with three tabs and no Voice Training; Home, Training and Insights work.",
        "The voice app opens from its own icon and records.",
        "The [voxplot_supabase] section is removed from the health app's Streamlit secrets.")
+
+
+# ── Phase 2 counters: the engine API ─────────────────────────────────────────
+
+SCREEN_INVENTORY = REBUILD_DOCS / "screen_inventory.md"
+INVENTORY_ENDPOINTS = REBUILD_DOCS / "inventory_endpoints.json"
+VIEW_LOGIC_MOVES = REBUILD_DOCS / "view_logic_moves.json"
+FAULTS = REBUILD_DOCS / "faults.json"
+OPENAPI_JSON = REPO_ROOT / "shared" / "openapi.json"
+GENERATED_TYPES = REPO_ROOT / "app" / "src" / "generated" / "api.ts"
+API_DIR = REPO_ROOT / "api" / "healthapi"
+_ROW_ID = re.compile(r"^(H|T|I)\d+$")
+_HTTP_METHODS = ("get", "post", "put", "patch", "delete")
+
+
+def _table_rows(markdown: str):
+    """(section, cells) for each table row whose first cell is an inventory row
+    id. The section is the two characters after "## ": D1, D2 and D3 are the
+    decision tables, anything else is a screen's own table."""
+    section = ""
+    for line in markdown.splitlines():
+        if line.startswith("## "):
+            section = line[3:5]
+        if line.startswith("| "):
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if cells and _ROW_ID.match(cells[0]):
+                yield section, cells
+
+
+def _proposal(cell: str) -> str:
+    """KEEP, MOVE or DROP from the first word of a proposal cell, else ""."""
+    word = cell.replace("*", "").split(" ", 1)[0].strip("(").upper()
+    return word if word in ("KEEP", "MOVE", "DROP") else ""
+
+
+def inventory_rows(markdown: str) -> dict[str, str]:
+    """{row id: KEEP, MOVE, DROP or ""} for every row of the screens' tables:
+    the first word of the last column ("Nothing to inventory" and "(see I13)"
+    read as ""). The owner's decision in D1 wins: a DROP he kept is KEEP."""
+    rows: dict[str, str] = {}
+    kept: list[str] = []
+    for section, cells in _table_rows(markdown):
+        if section == "D1":
+            if _proposal(cells[-1]) == "KEEP":
+                kept.append(cells[0])
+        elif section not in ("D2", "D3"):
+            rows[cells[0]] = _proposal(cells[-1])
+    rows.update({rid: "KEEP" for rid in kept})
+    return rows
+
+
+def drop_decisions(markdown: str) -> set[str]:
+    """Ids whose D1 row carries the owner's decision: approved, or kept."""
+    return {cells[0] for section, cells in _table_rows(markdown)
+            if section == "D1" and (re.search(r"(?<!not )\bapproved\b", cells[-1])
+                                    or _proposal(cells[-1]) == "KEEP")}
+
+
+def _as_list(value) -> list[str]:
+    if not value:
+        return []
+    return [str(v) for v in value] if isinstance(value, list) else [str(value)]
+
+
+def _ref_exists(ref: str) -> bool:
+    """`path::name` names a repo file that defines `name` (a function, a class
+    or a module-level name). A test id may carry its class and [parameters];
+    a bare path needs only the file."""
+    path, _, name = (ref or "").partition("::")
+    target = REPO_ROOT / path
+    if not path or not target.is_file():
+        return False
+    name = name.rsplit("::", 1)[-1].split("[", 1)[0]
+    if not name:
+        return True
+    pattern = (rf"^\s*(?:async\s+)?(?:def|class)\s+{re.escape(name)}\b"
+               rf"|^{re.escape(name)}\s*[:=]")
+    return re.search(pattern, target.read_text(encoding="utf-8"), flags=re.MULTILINE) is not None
+
+
+def openapi_operations(spec: dict) -> set[str]:
+    """"METHOD /path" for every operation in an OpenAPI document."""
+    return {f"{method.upper()} {path}" for path, ops in (spec.get("paths") or {}).items()
+            for method in ops if method in _HTTP_METHODS}
+
+
+def unmapped_rows(rows: dict[str, str], mapping: dict[str, dict], operations: set[str],
+                  ref_exists=_ref_exists) -> list[str]:
+    """KEEP or MOVE rows that map neither to endpoints of the contract with
+    tests that exist ({"endpoint": "GET /api/x" or a list, "test": ...}) nor to
+    the phone alone with a reason ({"client": "phone", "why": "..."})."""
+    missing = []
+    for rid, word in rows.items():
+        if word not in ("KEEP", "MOVE"):
+            continue
+        entry = mapping.get(rid) or {}
+        phone_only = entry.get("client") == "phone" and str(entry.get("why") or "").strip()
+        endpoints, tests = _as_list(entry.get("endpoint")), _as_list(entry.get("test"))
+        served = (endpoints and tests and all(e in operations for e in endpoints)
+                  and all(ref_exists(t) for t in tests))
+        if not (phone_only or served):
+            missing.append(rid)
+    return missing
+
+
+def open_items(entries: list[dict], needs: tuple[str, ...], ref_exists=_ref_exists) -> list[str]:
+    """Ids of entries where a field in `needs` is empty, or names a file and a
+    definition that do not exist ("services/x.py::fn", "tests/x.py::test_y")."""
+    return [e.get("id", "?") for e in entries
+            if not all(_as_list(e.get(k)) and all(ref_exists(r) for r in _as_list(e.get(k)))
+                       for k in needs)]
+
+
+def _open_list(ids: list[str], limit: int = 30) -> str:
+    if not ids:
+        return ""
+    more = f" and {len(ids) - limit} more" if len(ids) > limit else ""
+    return "; open: " + ", ".join(ids[:limit]) + more
+
+
+def _json(path: Path, default):
+    return json.loads(path.read_text(encoding="utf-8")) if path.exists() else default
+
+
+def _pytest_file_failures(phase: str, test_file: str) -> CounterResult:
+    """Failures and errors in one test file, plus 1 when nothing in it passed:
+    a missing file, an empty one or one that only skips proves nothing."""
+    if not (REPO_ROOT / test_file).is_file():
+        return CounterResult(1, f"{test_file} does not exist yet")
+    if not main_python().exists():
+        return CounterResult(1, "venv/ is missing")
+    out = REPORTS_DIR / phase
+    stem = Path(test_file).stem
+    junit, log = out / f"{stem}.xml", out / f"{stem}.log"
+    if not (REUSE_TEST_RUNS and junit.exists()):
+        _run_pytest(main_python(), junit, log, target=test_file)
+    if not junit.exists():
+        return CounterResult(1, "pytest wrote no junit file", [f"{phase}/{stem}.log"])
+    s = read_junit(junit)
+    none_passed = 1 if s.passed == 0 else 0
+    return CounterResult(s.failures + s.errors + none_passed,
+                         f"{s.passed} passed, {s.failures} failed, {s.errors} errors"
+                         + ("; nothing passed" if none_passed else ""),
+                         [f"{phase}/{stem}.log"])
+
+
+#: Reads of the server's own day the API may keep: "path::function" -> reason.
+SERVER_CLOCK_ALLOWED = {
+    "api/healthapi/routes/health.py::health":
+        "the diagnostic server_local_date, shown so a missing TZ is visible",
+}
+
+
+def _clock_call(node: ast.AST) -> str | None:
+    """"today", "now" or "utcnow" when `node` is date.X() or datetime.X()."""
+    if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+            and node.func.attr in ("today", "now", "utcnow")):
+        return None
+    base = node.func.value
+    name = base.id if isinstance(base, ast.Name) else getattr(base, "attr", "")
+    return node.func.attr if name in ("date", "datetime") else None
+
+
+def _reads_server_day(node: ast.Call) -> bool:
+    """date.today(), datetime.today(), datetime.now() with no time zone (the
+    server's wall clock), and .date() taken straight off any now() or utcnow().
+    datetime.now(timezone.utc) on its own is an instant (a start time, a
+    token's expiry), not the caller's day."""
+    kind = _clock_call(node)
+    if kind == "today" or (kind == "now" and not node.args and not node.keywords):
+        return True
+    return (isinstance(node.func, ast.Attribute) and node.func.attr == "date"
+            and not node.args and _clock_call(node.func.value) is not None)
+
+
+def server_clock_hits(files: dict[str, str]) -> list[str]:
+    """"path:line" for each read of the server's own day outside the allowed
+    functions (rebuild rule 3: the phone sends its date)."""
+    hits: list[str] = []
+    for rel, text in files.items():
+        lines: set[int] = set()
+
+        def visit(node: ast.AST, function: str) -> None:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                function = node.name
+            if (isinstance(node, ast.Call) and _reads_server_day(node)
+                    and f"{rel}::{function}" not in SERVER_CLOCK_ALLOWED):
+                lines.add(node.lineno)
+            for child in ast.iter_child_nodes(node):
+                visit(child, function)
+
+        visit(ast.parse(text), "")
+        hits += [f"{rel}:{n}" for n in sorted(lines)]
+    return hits
+
+
+#: Modules that reach the store without Repository: a write through one skips
+#: the Supabase-first path (rebuild rule 5).
+STORE_BYPASS_MODULES = {"sqlite3", "supabase_store", "datastore_writer"}
+
+
+def write_bypass_hits(files: dict[str, str]) -> list[str]:
+    """"path:line" for each import of sqlite3, services.supabase_store or the
+    datastore writer."""
+    hits = []
+    for rel, text in files.items():
+        for node in ast.walk(ast.parse(text)):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                module = node.module or ""
+                names = [module] + [f"{module}.{alias.name}" for alias in node.names]
+            else:
+                continue
+            if any(set(name.split(".")) & STORE_BYPASS_MODULES for name in names):
+                hits.append(f"{rel}:{node.lineno}")
+    return hits
+
+
+def _api_texts() -> dict[str, str]:
+    return {str(p.relative_to(REPO_ROOT)).replace("\\", "/"): p.read_text(encoding="utf-8")
+            for p in sorted(API_DIR.rglob("*.py"))}
+
+
+def _lf(text: str) -> str:
+    return text.replace("\r\n", "\n")
+
+
+@counter("p2", "tests_failing",
+         "main gate failures in venv/ (tests/api included), plus 1 if the pass count is under the floor")
+def p2_tests_failing() -> CounterResult:
+    return _main_gate_counter("p2")
+
+
+@counter("p2", "inventory_unmapped",
+         "KEEP or MOVE inventory rows without an endpoint of the contract and a test, "
+         "or a reason they live on the phone alone")
+def p2_inventory_unmapped() -> CounterResult:
+    rows = inventory_rows(SCREEN_INVENTORY.read_text(encoding="utf-8"))
+    mapping = _json(INVENTORY_ENDPOINTS, {}).get("rows", {})
+    missing = unmapped_rows(rows, mapping, openapi_operations(_json(OPENAPI_JSON, {})))
+    needed = sum(1 for word in rows.values() if word in ("KEEP", "MOVE"))
+    return CounterResult(len(missing), f"{needed - len(missing)} of {needed} rows mapped"
+                         + _open_list(missing))
+
+
+@counter("p2", "view_logic_left",
+         "calculations an endpoint needs that still live only in a view "
+         "(docs/rebuild/view_logic_moves.json)")
+def p2_view_logic_left() -> CounterResult:
+    entries = _json(VIEW_LOGIC_MOVES, {}).get("moves", [])
+    left = open_items(entries, ("service", "test"))
+    return CounterResult(len(left), f"{len(entries) - len(left)} of {len(entries)} moved"
+                         + _open_list(left))
+
+
+@counter("p2", "faults_open",
+         "inventory faults (docs/rebuild/faults.json) without a test that proves the fix")
+def p2_faults_open() -> CounterResult:
+    entries = _json(FAULTS, {}).get("faults", [])
+    left = open_items(entries, ("test",))
+    return CounterResult(len(left), f"{len(entries) - len(left)} of {len(entries)} fixed"
+                         + _open_list(left))
+
+
+@counter("p2", "idempotency_fail", "failing save-replay tests (tests/api/test_save_idempotency.py)")
+def p2_idempotency_fail() -> CounterResult:
+    return _pytest_file_failures("p2", "tests/api/test_save_idempotency.py")
+
+
+@counter("p2", "supabase_write_bypass",
+         "API imports that reach the store around Repository (sqlite3, supabase_store, "
+         "datastore_writer)")
+def p2_supabase_write_bypass() -> CounterResult:
+    hits = write_bypass_hits(_api_texts())
+    return CounterResult(len(hits), "; ".join(hits) or "none")
+
+
+@counter("p2", "date_from_server", "API reads of the server's own day (rebuild rule 3)")
+def p2_date_from_server() -> CounterResult:
+    hits = server_clock_hits(_api_texts())
+    return CounterResult(len(hits), "; ".join(hits) or "none")
+
+
+@counter("p2", "background_writer_leaks",
+         "failing background_writer tests (tests/test_background_writer.py)")
+def p2_background_writer_leaks() -> CounterResult:
+    return _pytest_file_failures("p2", "tests/test_background_writer.py")
+
+
+@counter("p2", "schema_stale", "shared/openapi.json or app/src/generated/api.ts out of date")
+def p2_schema_stale() -> CounterResult:
+    stale = []
+    env = {**_child_env(), "PYTHONPATH": os.pathsep.join([str(REPO_ROOT), str(API_DIR.parent)])}
+    proc = subprocess.run([str(main_python()), "-m", "healthapi.export_openapi", "--check"],
+                          cwd=REPO_ROOT, env=env, capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
+    if proc.returncode != 0:
+        stale.append("shared/openapi.json")
+    pnpm = shutil.which("pnpm")
+    if not pnpm:
+        stale.append("app/src/generated/api.ts (pnpm is not on PATH)")
+    elif not GENERATED_TYPES.exists():
+        stale.append("app/src/generated/api.ts (missing)")
+    else:
+        fresh = REPORTS_DIR / "p2" / "api.check.ts"
+        fresh.parent.mkdir(parents=True, exist_ok=True)
+        fresh.unlink(missing_ok=True)
+        subprocess.run([pnpm, "exec", "openapi-typescript", str(OPENAPI_JSON), "-o", str(fresh)],
+                       cwd=REPO_ROOT, env=_child_env(), capture_output=True)
+        if not fresh.exists() or _lf(fresh.read_text(encoding="utf-8")) != _lf(
+                GENERATED_TYPES.read_text(encoding="utf-8")):
+            stale.append("app/src/generated/api.ts")
+    return CounterResult(len(stale), ", ".join(stale) or "both current")
+
+
+@counter("p2", "drops_without_approval", "DROP rows without the owner's recorded decision in D1")
+def p2_drops_without_approval() -> CounterResult:
+    text = SCREEN_INVENTORY.read_text(encoding="utf-8")
+    decided = drop_decisions(text)
+    missing = [rid for rid, word in inventory_rows(text).items()
+               if word == "DROP" and rid not in decided]
+    return CounterResult(len(missing), ", ".join(missing) or "every drop decided")
+
+
+@counter("p2", "streamlit_app_broken",
+         "1 unless the owner confirmed the hosted Streamlit app works after the Phase 2 push")
+def p2_streamlit_app_broken() -> CounterResult:
+    verdict = _owner_check("p2", "streamlit_app_opens")
+    if verdict is True:
+        return CounterResult(0, "the owner confirmed it works")
+    return CounterResult(1, "the owner reported it broken" if verdict is False
+                         else "not confirmed yet (docs/rebuild/owner_checks.json)")
+
+
+review("p2",
+       "Open Check-in on a day that already has an entry: it opens filled in, and pain can go back to 0.",
+       "After the push, Home, Training, Insights and Check-in still work in the hosted app.",
+       "Three sample API responses, personal values masked, look right.")
 
 
 # ── output ───────────────────────────────────────────────────────────────────
