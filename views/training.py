@@ -38,6 +38,7 @@ from services import strain_regions
 from services import week_repeat
 from services import flexibility as fx
 from services import gate1 as g1
+from services import training_week
 from services import yoga as yg
 from services.repository import PhasesCorruptError
 
@@ -1509,16 +1510,17 @@ _WEEK_STRIP_BASE_CSS = f"""
 """
 
 
-def _marker_glyph_and_color(cell, is_today: bool) -> tuple[str, str]:
-    if cell.state == "completed":
-        return "✓", _MARKER_GREEN
-    if is_today:
-        return "●", _MARKER_GREEN
-    if cell.state == "missed":
-        return "○", _MARKER_MISSED
-    if cell.state == "planned":
-        return "●", _MARKER_PLANNED
-    return "○", _MARKER_REST  # rest
+_MARKER_DRAW = {   # services/training_week.strip_marker decides which
+    "done": ("✓", _MARKER_GREEN),
+    "today": ("●", _MARKER_GREEN),
+    "missed": ("○", _MARKER_MISSED),
+    "planned": ("●", _MARKER_PLANNED),
+    "rest": ("○", _MARKER_REST),
+}
+
+
+def _marker_glyph_and_color(cell, today: date) -> tuple[str, str]:
+    return _MARKER_DRAW[training_week.strip_marker(cell, today)]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1545,42 +1547,35 @@ _VERDICT_COLOR = {
 }
 
 
-def _streak_label(streak, all_ultimate: bool) -> str:
-    n = streak.current_streak
-    if n == 0:
+def _streak_label(weeks: int, all_ultimate: bool) -> str:
+    if weeks == 0:
         return "No active streak"
     kind = " ultimate" if all_ultimate else ""
-    return f"{n} week{kind} streak"
+    return f"{weeks} week{kind} streak"
 
 
-def _current_week_tier(scheduled: int, completed: int) -> tuple[str, str]:
-    """(label, color) for the live current-week progress line. Integer math,
-    matching metrics_logic.score_week's own thresholds."""
-    if scheduled == 0:
-        return "No sessions scheduled this week", _OV_TEXT_SEC
-    if completed == scheduled:
-        return "ULTIMATE WEEK", _MARKER_GREEN
-    if completed * 5 >= scheduled * 4:
-        return f"PERFECT WEEK — {scheduled - completed} to go for ultimate", _MARKER_GREEN
-    if completed <= ml.FAILED_WEEK_MAX_DAYS:
-        # Below the failed-week line the next thing that matters is not a
-        # perfect week but whether this week runs again (services/week_repeat.py).
-        short = ml.FAILED_WEEK_MAX_DAYS + 1 - completed
-        return f"{short} more to pass this week", _MARKER_MISSED
-    needed = -(-(scheduled * 4) // 5)  # ceil(scheduled*4/5)
-    remaining = max(1, needed - completed)
-    return f"{remaining} more for a perfect week", _OV_TEXT_SEC
+def _current_week_tier(kind: str, to_go: int) -> tuple[str, str]:
+    """(label, color) for the live current-week progress line, from
+    metrics_logic.week_progress (its thresholds, not re-coded here). Below
+    the failed-week line the next thing that matters is not a perfect week
+    but whether this week runs again (services/week_repeat.py)."""
+    return {
+        "no_plan": ("No sessions scheduled this week", _OV_TEXT_SEC),
+        "ultimate": ("ULTIMATE WEEK", _MARKER_GREEN),
+        "perfect": (f"PERFECT WEEK — {to_go} to go for ultimate", _MARKER_GREEN),
+        "failing": (f"{to_go} more to pass this week", _MARKER_MISSED),
+        "normal": (f"{to_go} more for a perfect week", _OV_TEXT_SEC),
+    }[kind]
 
 
-def _render_weekly_rollup_banner(history: list, streak) -> None:
+def _render_weekly_rollup_banner(banner: dict) -> None:
     """Elevated-surface banner above the day strip — streak / live current-
     week progress / lifetime tallies — plus, directly under it, last week's
-    verdict once at least one week has actually ended."""
-    current = next((w for w in history if w.status == "in_progress"), None)
-    scheduled = current.scheduled if current else 0
-    completed = current.completed if current else 0
-    tier_label, tier_color = _current_week_tier(scheduled, completed)
-    streak_label = _streak_label(streak, ml.current_streak_is_all_ultimate(history))
+    verdict once at least one week has actually ended
+    (services/training_week.banner)."""
+    scheduled, completed = banner["scheduled"], banner["completed"]
+    tier_label, tier_color = _current_week_tier(banner["progress"], banner["to_go"])
+    streak_label = _streak_label(banner["streak_weeks"], banner["streak_all_ultimate"])
 
     st.markdown(
         f"""
@@ -1597,21 +1592,17 @@ def _render_weekly_rollup_banner(history: list, streak) -> None:
   </div>
   <div style='flex:1;min-width:120px;text-align:right;'>
     <div style='color:{_OV_TEXT_SEC};font-size:12px;'>
-      {streak.perfect_count} perfect · {streak.ultimate_count} ultimate</div>
+      {banner["perfect_count"]} perfect · {banner["ultimate_count"]} ultimate</div>
   </div>
 </div>
 """,
         unsafe_allow_html=True,
     )
 
-    ended = [w for w in history if w.status not in ("in_progress", "no_plan")]
-    if ended:
-        last_week = max(ended, key=lambda w: w.week_start)
-        # A failed week's line is Monday's only (week_repeat.last_week_line_is_due).
-        if not week_repeat.last_week_line_is_due(last_week.status, date.today()):
-            return
-        text = _VERDICT_TEXT[last_week.status]
-        color = _VERDICT_COLOR[last_week.status]
+    # A failed week's line is Monday's only (week_repeat.last_week_line_is_due).
+    if banner["last_week"]:
+        text = _VERDICT_TEXT[banner["last_week"]]
+        color = _VERDICT_COLOR[banner["last_week"]]
         st.markdown(
             f"<div style='color:{_OV_TEXT_SEC};font-size:12px;margin-bottom:12px;'>"
             f"Last week: <span style='color:{color};font-weight:600;'>{text}</span></div>",
@@ -1762,20 +1753,14 @@ def _render_week_status_badge(history: list, viewed_week_start) -> None:
     other than the current one — that week's persisted verdict. The current
     week's status is already covered by the banner above, so this renders
     nothing for it."""
-    if viewed_week_start is None:
+    status = training_week.viewed_week_status(history, viewed_week_start, date.today())
+    if status is None:
         return
-    today = date.today()
-    current_week_start = today - timedelta(days=today.weekday())
-    if viewed_week_start == current_week_start:
-        return
-    week = next((w for w in history if w.week_start == viewed_week_start.isoformat()), None)
-    if week is None or week.status == "in_progress":
-        return
-    text = _VERDICT_TEXT[week.status]
-    color = _VERDICT_COLOR[week.status]
+    text = _VERDICT_TEXT[status]
+    color = _VERDICT_COLOR[status]
     st.markdown(
         f"<div style='color:{_OV_TEXT_SEC};font-size:12px;margin:-8px 0 14px 0;'>"
-        f"Week of {week.week_start}: <span style='color:{color};font-weight:600;'>{text}</span></div>",
+        f"Week of {viewed_week_start.isoformat()}: <span style='color:{color};font-weight:600;'>{text}</span></div>",
         unsafe_allow_html=True,
     )
 
@@ -1816,8 +1801,8 @@ def _render_day_strip(active: dict | None) -> None:
         logged_dates = _week_logged_dates(week_start.isoformat())
     except Exception:
         logged_dates = set()
-    sessions = [{"date": d} for d in logged_dates]
-    cells = ph.get_week_view(week_start, active, sessions, today=today)
+    # A planned rest day reads "rest", never "planned" or "missed" (F24).
+    cells = training_week.week_strip(week_start, active, logged_dates, today)
 
     at_lo = at_hi = False
     if active:
@@ -1846,8 +1831,7 @@ def _render_day_strip(active: dict | None) -> None:
     # computed fresh each render since we already know every cell's state here.
     marker_rules = []
     for i, cell in enumerate(cells):
-        is_today = cell.date == today
-        _, color = _marker_glyph_and_color(cell, is_today)
+        _, color = _marker_glyph_and_color(cell, today)
         marker_rules.append(
             f"""[data-testid="stElementContainer"]:has(.stWeekRow) + [data-testid="stElementContainer"]
                 [data-testid="stColumn"]:nth-child({i + 2}) button p::first-line {{
@@ -1878,8 +1862,7 @@ def _render_day_strip(active: dict | None) -> None:
             st.session_state.tp_week_start = ph.clamp_week_start(candidate, active) if active else candidate
             st.rerun()
     for i, (col, cell) in enumerate(zip(day_cols, cells)):
-        is_today = cell.date == today
-        glyph, _ = _marker_glyph_and_color(cell, is_today)
+        glyph, _ = _marker_glyph_and_color(cell, today)
         label = cell.date.strftime("%d/%m") if i == selected_idx else cell.weekday_label
         with col:
             if st.button(f"{glyph}  \n{label}", key=f"tp_day_{cell.date.isoformat()}",
@@ -3417,7 +3400,6 @@ def render():
     #     every state (matching the day strip's own universality) ───────────
     _sync_ok, _sync_err = _sync_weekly_rollup_cached()
     _garmin_sync_ok, _garmin_sync_err = _sync_garmin_daily_cached()
-    history: list = []
     _logged: set = set()
     if phases:
         _earliest = min(date.fromisoformat(p.start_date) for p in phases)
@@ -3425,9 +3407,9 @@ def render():
             _logged = _all_logged_dates(_earliest.isoformat(), date.today().isoformat())
         except Exception:
             _logged = set()
-        history = ml.compute_week_history(date.today(), phases, [{"date": d} for d in _logged])
-    streak = ml.compute_streak(history)
-    _render_weekly_rollup_banner(history, streak)
+    history = training_week.read_week_history(repo.get_repository(), phases, date.today(),
+                                              logged_dates=_logged)
+    _render_weekly_rollup_banner(training_week.banner(history, date.today()))
     if not _sync_ok and _sync_err:
         st.caption("Weekly rollup sync unavailable — showing live data only.")
     if not _garmin_sync_ok and _garmin_sync_err:

@@ -16,6 +16,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from services import plan as _plan
+from services import sessions as _sess
 from services.models import Phase, StreakInfo, WeekScore
 
 _GOOD_STATUSES = ("perfect", "ultimate")
@@ -28,31 +29,68 @@ _GOOD_STATUSES = ("perfect", "ultimate")
 FAILED_WEEK_MAX_DAYS = 2
 
 
-def score_week(week_start: date, today: date, scheduled: int, completed: int,
-                phase_number: int | None = None) -> WeekScore:
-    """Pure verdict for one week. Integer math only (no float thresholds):
-      - current week (week_start <= today <= week_end): "in_progress",
-        unconditionally — this overrides even a 0-scheduled week, since the
-        live week is always still "in progress", never "no_plan".
-      - else scheduled == 0: "no_plan" (reassessment gap / pre-plan)
-      - else completed == scheduled: "ultimate"
-      - else completed*5 >= scheduled*4 (>=80%): "perfect"
-      - else completed > FAILED_WEEK_MAX_DAYS (3 or more days): "normal"
+#: A week is perfect at 80% of its planned sessions: completed * 5 >=
+#: scheduled * 4, integer math.
+PERFECT_SHARE = (4, 5)
+
+
+def _is_perfect(scheduled: int, completed: int) -> bool:
+    num, den = PERFECT_SHARE
+    return completed * den >= scheduled * num
+
+
+def week_status(scheduled: int, completed: int, logged_days: int | None = None) -> str:
+    """The verdict of an ENDED week, integer math only:
+      - scheduled == 0: "no_plan" (reassessment gap / pre-plan)
+      - completed == scheduled: "ultimate"
+      - completed*5 >= scheduled*4 (>=80%): "perfect"
+      - logged_days > FAILED_WEEK_MAX_DAYS (3 or more days): "normal"
       - else: "failed"
-    """
+    `completed` is the planned sessions done; `logged_days` every day with a
+    logged session (Key Rule 22: all seven days count toward passing), and
+    defaults to `completed`."""
+    logged_days = completed if logged_days is None else logged_days
+    if scheduled == 0:
+        return "no_plan"
+    if completed == scheduled:
+        return "ultimate"
+    if _is_perfect(scheduled, completed):
+        return "perfect"
+    if logged_days > FAILED_WEEK_MAX_DAYS:
+        return "normal"
+    return "failed"
+
+
+def week_progress(scheduled: int, completed: int,
+                  logged_days: int | None = None) -> tuple[str, int]:
+    """The live week's line, from the same thresholds as week_status:
+    (kind, sessions to go). kind is "no_plan", "ultimate", "perfect" (to go:
+    to ultimate), "failing" (to go: to pass the week, Key Rule 22) or
+    "normal" (to go: to a perfect week, at least 1)."""
+    logged_days = completed if logged_days is None else logged_days
+    status = week_status(scheduled, completed, logged_days)
+    if status in ("no_plan", "ultimate"):
+        return status, 0
+    if status == "perfect":
+        return "perfect", max(0, scheduled - completed)
+    if status == "failed":
+        return "failing", FAILED_WEEK_MAX_DAYS + 1 - logged_days
+    num, den = PERFECT_SHARE
+    needed = -(-(scheduled * num) // den)  # ceil(scheduled * 4 / 5)
+    return "normal", max(1, needed - completed)
+
+
+def score_week(week_start: date, today: date, scheduled: int, completed: int,
+               phase_number: int | None = None, logged_days: int | None = None) -> WeekScore:
+    """Pure verdict for one week: "in_progress" for the current week
+    (week_start <= today <= week_end), unconditionally — this overrides even
+    a 0-scheduled week, since the live week is always still "in progress",
+    never "no_plan" — else week_status."""
     week_end = week_start + timedelta(days=6)
     if week_start <= today <= week_end:
         status = "in_progress"
-    elif scheduled == 0:
-        status = "no_plan"
-    elif completed == scheduled:
-        status = "ultimate"
-    elif completed * 5 >= scheduled * 4:
-        status = "perfect"
-    elif completed > FAILED_WEEK_MAX_DAYS:
-        status = "normal"
     else:
-        status = "failed"
+        status = week_status(scheduled, completed, logged_days)
 
     return WeekScore(
         week_start=week_start.isoformat(),
@@ -61,6 +99,7 @@ def score_week(week_start: date, today: date, scheduled: int, completed: int,
         scheduled=scheduled,
         completed=completed,
         status=status,
+        logged_days=completed if logged_days is None else logged_days,
     )
 
 
@@ -114,19 +153,44 @@ def compute_week_history(today: date, phases: list[Phase], sessions: list[dict])
     latest = current_week
 
     logged = {s["date"] for s in sessions}
+    contents: dict[int, dict] = {}
 
     history: list[WeekScore] = []
     week_start = earliest
     while week_start <= latest:
         days = [week_start + timedelta(days=i) for i in range(7)]
         covering = [_phase_covering_date(phases, d) for d in days]
-        scheduled = sum(1 for c in covering if c is not None)
-        completed = sum(1 for d in days if d.isoformat() in logged)
+        # A PLANNED REST day is not a scheduled session (fault F25, found
+        # 2026-10-19): the 12-week block's Wednesday and Saturday have
+        # nothing to do, and counting them made a perfect week impossible
+        # (5 of 7 is under 80%). A session logged on one still counts toward
+        # passing the week, never toward a perfect or ultimate one. No block
+        # before the 12-week block has an empty rest day, so no earlier week
+        # changes.
+        rest = {d for d, c in zip(days, covering)
+                if c is not None and _planned_rest(c, d, contents)}
+        scheduled = sum(1 for d, c in zip(days, covering) if c is not None and d not in rest)
+        logged_days = sum(1 for d in days if d.isoformat() in logged)
+        completed = logged_days - sum(1 for d in rest if d.isoformat() in logged)
         phase_number = _majority_phase_number(covering)
-        history.append(score_week(week_start, today, scheduled, completed, phase_number=phase_number))
+        history.append(score_week(week_start, today, scheduled, completed,
+                                  phase_number=phase_number, logged_days=logged_days))
         week_start += timedelta(days=7)
 
     return history
+
+
+def _planned_rest(phase: Phase, d: date, contents: dict[int, dict]) -> bool:
+    """Whether `d` is a planned rest day of `phase` (sessions.is_planned_rest),
+    reading each phase's content once. A phase whose content cannot be read
+    has no planned rest day, which is how every week was counted before."""
+    key = id(phase)
+    if key not in contents:
+        try:
+            contents[key] = _sess.calendar_plan(phase)
+        except Exception:
+            contents[key] = {}
+    return _sess.is_planned_rest(contents[key].get(_plan.day_number_in_phase(phase, d)))
 
 
 def compute_streak(history: list[WeekScore]) -> StreakInfo:

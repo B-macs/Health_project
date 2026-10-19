@@ -228,10 +228,14 @@ def test_the_failed_week_message_is_mondays_only_and_the_hold_is_not():
 
 
 def test_the_screen_asks_the_day_rule_before_either_failed_week_line():
-    src = (Path(__file__).resolve().parent.parent / "views" / "training.py").read_text(
-        encoding="utf-8")
+    root = Path(__file__).resolve().parent.parent
+    src = (root / "views" / "training.py").read_text(encoding="utf-8")
     assert "week_repeat.repeat_notice_is_due(_today)" in src
-    assert "week_repeat.last_week_line_is_due(last_week.status" in src
+    # The last-week line is composed in services/training_week.banner since
+    # move TRN-10 (2026-10-19); the page draws only what the banner returns.
+    week = (root / "services" / "training_week.py").read_text(encoding="utf-8")
+    assert "_wr.last_week_line_is_due(last.status, today)" in week
+    assert "training_week.banner(" in src and 'banner["last_week"]' in src
 
 
 # ═════════════════════════════════════════════════════════════════════════════

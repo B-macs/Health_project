@@ -205,6 +205,11 @@ class WeekScore:
     completed: int
     status: WeekStatus
     computed_at: str | None = None
+    #: Every day of the week with a logged session, which decides the failed
+    #: line (Key Rule 22). `completed` counts the planned sessions done; the
+    #: two differ only by a session on a planned rest day (the 12-week
+    #: block's Wednesday and Saturday). Not stored: None on a row read back.
+    logged_days: int | None = None
 
 
 @dataclass(frozen=True)
