@@ -56,6 +56,7 @@ handled and simply stays missed.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date, timedelta
 
 from services import plan
@@ -715,3 +716,33 @@ def in_order_summary(phase: Phase, plan_dict: dict, overrides: dict[str, int],
         else:
             lines.append(f"Session {s} does not run this week")
     return lines
+
+
+# ─── The one write path for a schedule change ───────────────────────────────
+
+def apply_schedule_change(phases: list[Phase], active: Phase, overrides: dict[str, int],
+                          reasons: dict[str, str]) -> tuple[list[Phase], list[dict]]:
+    """The phases to store for one schedule change, and what was refused.
+
+    The manual swap, the missed-session carry and the readiness shift all
+    write `date_overrides` through this, and so will the phone's API. THE
+    WEEK IS ITSELF A BLOCK (Key Rule 18b): plan.reject_violating_overrides
+    refuses a move into another week of the block or past its last date.
+
+    A change is applied WHOLE or not at all. Its moves are one change (a swap
+    is a pair, a carry is a chain), and half of one can lose a session: with
+    today a forced rest, a swap with a day in another week gave that day the
+    rest, refused today its session, and the session disappeared from the
+    schedule. A refused change also records no reason, so no banner says
+    "Session moved" over a day that did not move (inventory fault F2).
+
+    Returns (phases, rejected). When nothing is refused, `phases` is the
+    list to store, with `active` changed; otherwise it is the input list
+    unchanged, `rejected` says why, and nothing should be written."""
+    _allowed, rejected = plan.reject_violating_overrides(active, overrides)
+    if rejected:
+        return list(phases), rejected
+    changed = replace(active,
+                      date_overrides={**active.date_overrides, **overrides},
+                      shift_reasons={**active.shift_reasons, **reasons})
+    return [changed if p.phase_number == active.phase_number else p for p in phases], []

@@ -2163,6 +2163,24 @@ def _render_past_missed(d: date, active, phases: list) -> None:
     )
 
 
+def _write_schedule_change(phases: list, active, overrides: dict, reasons: dict,
+                           refused: str) -> bool:
+    """Store one schedule change through scheduling.apply_schedule_change, the
+    path the phone's API uses too; True when it was stored.
+
+    A refused change (Key Rule 18b) writes nothing and shows why on THIS run:
+    `refused` is formatted with each refusal's {detail}. The callers rerun only
+    after a write, so the warning stays on the screen (inventory fault F2: it
+    used to vanish with the rerun that followed a half-applied change)."""
+    new_phases, rejected = scheduling.apply_schedule_change(phases, active, overrides, reasons)
+    for refusal in rejected:
+        st.warning(refused.format(detail=refusal["detail"]))
+    if rejected:
+        return False
+    repo.get_repository().set_phases(new_phases)
+    return True
+
+
 def _render_swap_with_today(d: date, active, phases: list, *,
                             intro: str, button_label: str) -> None:
     """The swap-with-today offer shared by the past-missed and future day
@@ -2203,26 +2221,13 @@ def _render_swap_with_today(d: date, active, phases: list, *,
                 min(d, _today), max(d, _today), include_supplementary=False)
             if not scheduling.manual_swap_blockers(active, d, _today, _fresh):
                 _ovr, _rsn = scheduling.manual_swap_entries(active, d, _today)
-                # THE WEEK IS ITSELF A BLOCK. A move that would put a day in a
+                # THE WEEK IS ITSELF A BLOCK. A swap that would put a day in a
                 # different week of the block, or past the block's last date, is
-                # refused here rather than written — see plan.override_violations.
-                _ovr, _rejected = ph.reject_violating_overrides(active, _ovr)
-                for _v in _rejected:
-                    st.warning(
-                        f"That swap was not saved: {_v['detail']}. Every week is "
-                        f"its own block, so a session can move within its week "
-                        f"but not into the next one."
-                    )
-                _new_active = replace(
-                    active,
-                    date_overrides={**active.date_overrides, **_ovr},
-                    shift_reasons={**active.shift_reasons, **_rsn},
-                )
-                repo.get_repository().set_phases([
-                    _new_active if p.phase_number == active.phase_number else p
-                    for p in phases
-                ])
-                _sw_write_ok = True
+                # refused whole and nothing is written — see plan.override_violations.
+                _sw_write_ok = _write_schedule_change(
+                    phases, active, _ovr, _rsn,
+                    "That swap was not saved: {detail}. Every week is its own block, "
+                    "so a session can move within its week but not into the next one.")
         except Exception:
             st.error("Couldn't save the swap — nothing was changed. Try again.")
         if _sw_write_ok:
@@ -3477,29 +3482,19 @@ def render():
                 return scheduling.missed_reschedules(
                     active, _mr_plan_dict, _fresh, _mr_today)
 
-            def _mr_write(_ovr, _rsn):
-                # THE WEEK IS ITSELF A BLOCK — refuse anything that would carry
-                # a session out of its own week or past the block's last date.
-                _ovr, _rej = ph.reject_violating_overrides(active, _ovr)
-                for _v in _rej:
-                    st.warning(f"Carry-forward not saved: {_v['detail']}.")
-                _mr_active = replace(
-                    active,
-                    date_overrides={**active.date_overrides, **_ovr},
-                    shift_reasons={**active.shift_reasons, **_rsn},
-                )
-                repo.get_repository().set_phases([
-                    _mr_active if p.phase_number == active.phase_number else p
-                    for p in phases
-                ])
+            def _mr_write(_ovr, _rsn) -> bool:
+                # THE WEEK IS ITSELF A BLOCK — a carry that would take a session
+                # out of its own week or past the block's last date is refused
+                # whole, and nothing is written.
+                return _write_schedule_change(phases, active, _ovr, _rsn,
+                                              "Carry-forward not saved: {detail}.")
 
             if _mr_overrides and not scheduling.has_real_move(active, _mr_overrides):
                 # Drops only — a record that nothing could be carried, not a
                 # move; needs no permission (the calendar is unchanged).
                 _d_ovr, _d_rsn = _mr_recompute()
                 if _d_ovr and not scheduling.has_real_move(active, _d_ovr):
-                    _mr_write(_d_ovr, _d_rsn)
-                    _mr_write_succeeded = True
+                    _mr_write_succeeded = _mr_write(_d_ovr, _d_rsn)
             elif _mr_overrides:
                 if _mr_in_order:
                     st.warning(
@@ -3520,17 +3515,15 @@ def render():
                                         key="mr_apply"):
                     _a_ovr, _a_rsn = _mr_recompute()
                     if _a_ovr:
-                        _mr_write(_a_ovr, _a_rsn)
-                        _mr_write_succeeded = True
+                        _mr_write_succeeded = _mr_write(_a_ovr, _a_rsn)
                 if _mr_keep_col.button("Keep as planned" if _mr_in_order else "Leave as missed",
                                        key="mr_dismiss"):
                     _k_ovr, _k_rsn = _mr_recompute()
                     _k_miss_dates = [date.fromisoformat(_iso) for _iso in _k_ovr
                                      if date.fromisoformat(_iso) < _mr_today]
                     if _k_miss_dates:
-                        _mr_write(*scheduling.declined_entries(
+                        _mr_write_succeeded = _mr_write(*scheduling.declined_entries(
                             active, _k_miss_dates, scheduling.LEFT_AS_MISSED))
-                        _mr_write_succeeded = True
         except Exception:
             pass  # never let a scheduling-check failure crash the page
         if _mr_write_succeeded:
@@ -3581,25 +3574,14 @@ def render():
                     _new_reasons = scheduling.shift_reason_entries(
                         _new_overrides, _reason, phase=active)
 
-                    def _rs_write(_ovr, _rsn):
+                    def _rs_write(_ovr, _rsn) -> bool:
                         # THE WEEK IS ITSELF A BLOCK — same refusal as the
                         # manual swap and the missed-session carry.
-                        _ovr, _rej = ph.reject_violating_overrides(active, _ovr)
-                        for _v in _rej:
-                            st.warning(f"Readiness shift not saved: {_v['detail']}.")
-                        _shifted_active = replace(
-                            active,
-                            date_overrides={**active.date_overrides, **_ovr},
-                            shift_reasons={**active.shift_reasons, **_rsn},
-                        )
-                        repo.get_repository().set_phases([
-                            _shifted_active if p.phase_number == active.phase_number else p
-                            for p in phases
-                        ])
+                        return _write_schedule_change(phases, active, _ovr, _rsn,
+                                                      "Readiness shift not saved: {detail}.")
 
                     if not scheduling.has_real_move(active, _new_overrides):
-                        _rs_write(_new_overrides, _new_reasons)
-                        _shift_write_succeeded = True
+                        _shift_write_succeeded = _rs_write(_new_overrides, _new_reasons)
                     else:
                         st.warning(
                             f"Readiness suggests moving today's session — {_reason}. "
@@ -3607,12 +3589,10 @@ def render():
                         )
                         _rs_move_col, _rs_keep_col = st.columns(2)
                         if _rs_move_col.button("Move session", key="rs_apply"):
-                            _rs_write(_new_overrides, _new_reasons)
-                            _shift_write_succeeded = True
+                            _shift_write_succeeded = _rs_write(_new_overrides, _new_reasons)
                         if _rs_keep_col.button("Keep as planned", key="rs_dismiss"):
-                            _rs_write(*scheduling.declined_entries(
+                            _shift_write_succeeded = _rs_write(*scheduling.declined_entries(
                                 active, [date.today()], _reason))
-                            _shift_write_succeeded = True
             except Exception as _rs_exc:
                 # Never let a scheduling-check failure crash the page, and
                 # never let it pass unseen either: the error's type only, no

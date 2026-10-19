@@ -369,8 +369,23 @@ def test_a_rejected_move_never_partially_applies():
 def test_every_override_write_site_passes_through_the_rule():
     """Three places write date_overrides — the manual swap, the missed-session
     carry, and the readiness auto-shift. A fourth added without this guard puts
-    the block back where Stage 2A was."""
+    the block back where Stage 2A was. Since 2026-10-19 all three store through
+    scheduling.apply_schedule_change (the path the phone's API uses too), which
+    applies the rule, so the page builds no override map of its own."""
+    import ast
+    import inspect
     from pathlib import Path
+
+    from services import scheduling
     src = (Path(__file__).resolve().parent.parent / "views" / "training.py").read_text(encoding="utf-8")
-    assert src.count("date_overrides={**active.date_overrides") == 3
-    assert src.count("reject_violating_overrides") == 3
+    assert src.count("date_overrides={**active.date_overrides") == 0
+    assert "reject_violating_overrides" not in src
+    calls = [n for n in ast.walk(ast.parse(src)) if isinstance(n, ast.Call)
+             and getattr(n.func, "id", None) == "_write_schedule_change"]
+    callers = {line for line in src.splitlines() if "_write_schedule_change(" in line}
+    assert len(calls) == 3, callers                     # the swap, the carry, the shift
+    helper = src[src.index("def _write_schedule_change("):]
+    helper = helper[:helper.index("\ndef ")]
+    assert "scheduling.apply_schedule_change(" in helper
+    assert "plan.reject_violating_overrides(" in inspect.getsource(
+        scheduling.apply_schedule_change)
