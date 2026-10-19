@@ -34,6 +34,7 @@ from services import readiness as readiness_model
 from services import sleep_score as sleep_score_model
 from services import sleep_screen
 from services import strain_screen
+from services import sync_policy
 from services import strain_regions as _sr
 
 # ─── Page config ─────────────────────────────────────────────────────────────
@@ -2490,24 +2491,26 @@ try:
     _oura_auth = repo.get_repository().oura_auth_status()
 except Exception:
     _oura_auth = {"needs_authorisation": False}
-if _oura_auth.get("needs_authorisation"):
-    st.error(
+# Which notices show, in order, is sync_policy.sync_notices: a dead
+# credential is an error, a failed step a caption, and a chain that blew up
+# before any step reported says so too.
+_SYNC_NOTICE_TEXT = {
+    sync_policy.OURA_UNAUTHORISED: (
         "**Oura is not authorised — your sleep is not being recorded.** Readiness "
         "and HRV are running without it, so today's numbers are not comparable "
         "with last week's. Re-authorise with `python scripts/authorize_oura.py`, "
-        "then backfill the missed nights.",
-        icon="🔴",
-    )
-elif not _oura_sync_ok and _oura_sync_err:
-    st.caption("Oura sync unavailable — will retry next visit.")
-if not _garmin_sync_ok and _garmin_sync_err:
-    st.caption("Garmin sync unavailable — will retry next visit.")
-# A per-step failure surfaces above. This is the case those two can't cover:
-# the whole chain blew up before any step reported, so every status is still
-# its (True, None) default and the page would claim everything is fine.
-_sync_run_error = repo.get_sync_runner().last_error()
-if _sync_run_error:
-    st.caption("Device sync failed to run — will retry next visit.")
+        "then backfill the missed nights."),
+    sync_policy.OURA_UNAVAILABLE: "Oura sync unavailable — will retry next visit.",
+    sync_policy.GARMIN_UNAVAILABLE: "Garmin sync unavailable — will retry next visit.",
+    sync_policy.SYNC_FAILED_TO_RUN: "Device sync failed to run — will retry next visit.",
+}
+for _level, _code in sync_policy.sync_notices(
+        _oura_auth, (_oura_sync_ok, _oura_sync_err), (_garmin_sync_ok, _garmin_sync_err),
+        repo.get_sync_runner().last_error()):
+    if _level == "error":
+        st.error(_SYNC_NOTICE_TEXT[_code], icon="🔴")
+    else:
+        st.caption(_SYNC_NOTICE_TEXT[_code])
 nav.inject("home")
 
 
