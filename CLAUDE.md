@@ -672,7 +672,7 @@ The health app leaves Streamlit and becomes a Home-Screen phone app on Cloudflar
 8. Free tiers only (Workers free plan, Cloud Run, Cloud Build, Artifact Registry, Secret Manager). Stop and ask before any change that would cost money.
 9. The screen rules carry over: Key Rules 17, 19 and 20, the patient-facing text rules, no Stage 1 text, and the Sleep screen's all-or-nothing rule. All screen text lives in one strings file, and the existing text scanners run over it.
 10. Verify before trusting: versions, limits and prices change. Check the live docs, then record the version and the source URL in docs/rebuild/stack.md.
-11. Commit after every working milestone. Push only when the owner says so: a push to main redeploys the hosted Streamlit app.
+11. Commit after every working milestone. **Push by yourself after each finished step, only when the full gate passes** (`python -m pytest tests/` at or above the floor), and say so in the same message each time: a push to main redeploys the hosted Streamlit app, so the owner checks it (owner, 2026-10-19: *"Yes to both, add the setting and change the rule"*; until then the rule was "push only when the owner says so"). This PC holds two GitHub accounts (B-macs and bmac-work); the repo's own setting `credential.https://github.com.username=B-macs` makes git use B-macs without asking, which is what lets a non-interactive shell push.
 12. When blocked by something only the owner can do (billing, a login, a secret, a test on the phone), stop and give exact steps. Never read, print or paste a secret; the owner pastes it.
 
 ### Control files

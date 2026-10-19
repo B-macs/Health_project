@@ -144,7 +144,7 @@
         "P0-13"
       ],
       "gate": "streamlit_app_broken",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P1-01",
@@ -160,7 +160,7 @@
       "description": "Owner: the standalone voice app on Streamlit Community Cloud from B-macs/health-voice-training, its secrets trimmed to [voxplot_supabase] (done 2026-10-19, after he restored its paused Supabase project).",
       "depends_on": [],
       "gate": "device_checklist_open",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P1-03",
@@ -170,7 +170,7 @@
         "P1-01"
       ],
       "gate": "voice_refs_left",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P1-04",
@@ -212,7 +212,7 @@
         "P1-06"
       ],
       "gate": "device_checklist_open",
-      "passes": false
+      "passes": true
     }
   ]
 }

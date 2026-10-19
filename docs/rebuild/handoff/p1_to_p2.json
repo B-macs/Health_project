@@ -1,0 +1,44 @@
+{
+  "from_phase": "P1",
+  "to_phase": "P2",
+  "written": "2026-10-19",
+  "verdict": "Voice Training runs as its own app; the health app no longer contains it. Every p1 counter 0 once the owner's phone checks are recorded (2026-10-19: all passed).",
+  "voice_app": {
+    "repo": "B-macs/health-voice-training (branch main), deployed by the owner on Streamlit Community Cloud",
+    "address": "pending: the owner has not sent it yet",
+    "secrets_by_name": ["[voxplot_supabase].url", "[voxplot_supabase].secret_key (an sb_secret_ key)"],
+    "storage": "its own Supabase project (not the health project). It had paused after a week unused, which made its address stop resolving; the owner restored it on 2026-10-19. It pauses again after 7 days without use.",
+    "home_screen": "added by the owner; opens and records (2026-10-19)"
+  },
+  "removed_from_health": [
+    "the Voice Training nav tab (three tabs remain: Home, Training, Insights)",
+    "the 'sync' route in app.py and views/sync.py; an unknown page now lands on Home",
+    "the voice_training/voxplot submodule (.gitmodules, the gitlink, its config and the checkout)",
+    "praat-parselmouth, scipy, soundfile and imageio-ffmpeg from requirements.txt (nothing else imported them)"
+  ],
+  "tests": {
+    "moved_or_retired": "none",
+    "ended_with_the_file_they_checked": [
+      "tests/test_manual_sync_serialised.py::test_every_manual_sync_holds_the_runner_lock[sync.py]",
+      "tests/test_no_stage_one_on_screen.py::test_no_stage_one_in_any_string_the_screen_can_print[sync.py]"
+    ],
+    "added": "the five p1 gate counters' tests and tests/test_voice_app_moved_out.py",
+    "floor": "4963 -> 4970"
+  },
+  "engine_image": "unchanged: the image never contained Voice Training (allow-list), so it was not rebuilt. Artifact Registry held 402 MB on 2026-10-19 from the day's five builds (110-114 MB each); the clean-up keeps the two newest once the rest are a day old (about 190 MB).",
+  "owner_decisions": [
+    "Push automatically: after each finished step, only when the full gate passes, and say so each time (CLAUDE.md rebuild rule 11, 2026-10-19). The repo setting credential.https://github.com.username=B-macs picks his account; the PC also holds bmac-work.",
+    "He pasted all of the health app's secrets into the voice app at first, then trimmed them to [voxplot_supabase]; he was asked to delete [voxplot_supabase] from the health app's secrets."
+  ],
+  "open_items": [
+    "The voice app's address, for this handoff.",
+    "The Notion Phase 2 and Phase 9 pages still describe Notion as the store and a background_writer setting in Notion Config; Supabase has been the only store since 2026-10-09. Update them before Phase 2 starts.",
+    "Carried from Phase 0: the live app's sync faults the new app must not repeat; lazy imports if starts feel slow; Starlette's 404 shape; Supabase's 7-day pause; the Home card's 14/60-day window choice still in app.py.",
+    "Check the Artifact Registry size on 2026-10-20 (about 190 MB expected)."
+  ],
+  "next_phase_may_rely_on": [
+    "The health app has three pages (Home, Training, Insights) plus Check-in; no voice code or library is left.",
+    "The engine and the Worker are unchanged since Phase 0 and stay deployed.",
+    "Only the Streamlit app syncs Oura and Garmin until Phase 9 (rebuild rule 2)."
+  ]
+}
