@@ -34,6 +34,7 @@ import gzip
 import json
 import sqlite3
 import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -57,6 +58,20 @@ _TIMEOUT = 60
 
 #: pull() fetches this many tables at once (see its docstring for the measurement).
 PULL_WORKERS = 4
+
+#: The waits before trying again a request PostgREST refused as "JWT issued at
+#: future" (PGRST303). With the new secret keys (sb_secret_...) Supabase's own
+#: gateway mints a short JWT for every request, and a moment of clock difference
+#: between the gateway and PostgREST rejects it: on 2026-10-19 10:08 UTC one
+#: such refusal stopped the hosted engine's start, and the same requests worked
+#: minutes later. A refused request never ran, so trying it again cannot write
+#: anything twice. Only this one error is retried.
+CLOCK_SKEW_RETRY_S = (0.5, 1.0, 2.0)
+_sleep = time.sleep
+
+
+def _is_clock_skew(status: int, detail: str) -> bool:
+    return status == 401 and "PGRST303" in detail
 
 
 def _unpacked(raw: bytes, headers) -> bytes:
@@ -126,15 +141,19 @@ class SupabaseStore:
             f"{self.url}/rest/v1/{path}", data=data, method=method,
             headers=self._headers({"Accept-Encoding": "gzip", **(headers or {})}),
         )
-        try:
-            with urllib.request.urlopen(req, timeout=_TIMEOUT) as r:
-                raw = _unpacked(r.read(), r.headers)
-                return r.headers, (json.loads(raw) if raw else None)
-        except urllib.error.HTTPError as exc:
-            detail = _unpacked(exc.read(), exc.headers).decode(errors="replace")[:400]
-            # The key never appears in the message — only the path and Postgres'
-            # own complaint, which is what actually says what went wrong.
-            raise SupabaseError(f"{method} {path} → HTTP {exc.code}: {detail}") from None
+        for attempt in range(len(CLOCK_SKEW_RETRY_S) + 1):
+            try:
+                with urllib.request.urlopen(req, timeout=_TIMEOUT) as r:
+                    raw = _unpacked(r.read(), r.headers)
+                    return r.headers, (json.loads(raw) if raw else None)
+            except urllib.error.HTTPError as exc:
+                detail = _unpacked(exc.read(), exc.headers).decode(errors="replace")[:400]
+                if _is_clock_skew(exc.code, detail) and attempt < len(CLOCK_SKEW_RETRY_S):
+                    _sleep(CLOCK_SKEW_RETRY_S[attempt])
+                    continue
+                # The key never appears in the message — only the path and Postgres'
+                # own complaint, which is what actually says what went wrong.
+                raise SupabaseError(f"{method} {path} → HTTP {exc.code}: {detail}") from None
 
     # ─── reads ───────────────────────────────────────────────────────────
 
