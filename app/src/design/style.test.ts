@@ -1,40 +1,40 @@
 // Every colour comes from the tokens (rebuild Phase 3): no screen file or stylesheet
 // writes a colour of its own, and the stylesheet writes no size of its own either.
-// tokens.ts is the one place colours and sizes are written.
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+// tokens.ts is the one place colours and sizes are written. The files are read through
+// Vite's own loader (?raw), so the test needs no Node types.
 import { describe, expect, it } from 'vitest'
+import stylesheet from '../bakeoff/bakeoff.css?raw'
 
-const SRC = join(__dirname, '..')
 const COLOUR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/
 
-function files(dir: string): string[] {
-  return readdirSync(dir).flatMap((name) => {
-    const path = join(dir, name)
-    return statSync(path).isDirectory() ? files(path) : [path]
-  })
+const SOURCES = import.meta.glob(['../**/*.tsx', '../**/*.css'], {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>
+
+function code(text: string): string {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('//'))
+    .join('\n')
 }
 
-const SCREEN_FILES = files(SRC).filter(
-  (f) => /\.(tsx|css)$/.test(f) && !f.endsWith('tokens.ts') && !f.includes(`${join('mock', '')}`),
-)
-
 describe('colours and sizes come from the tokens', () => {
-  it.each(SCREEN_FILES.map((f) => [f.slice(SRC.length + 1), f]))('%s writes no colour', (_name, path) => {
-    const text = readFileSync(path, 'utf-8')
-      .split('\n')
-      .filter((line) => !line.trim().startsWith('//') && !line.trim().startsWith('*'))
-      .join('\n')
-    expect(text).not.toMatch(COLOUR)
+  it('finds the screen files', () => {
+    expect(Object.keys(SOURCES).length).toBeGreaterThan(5)
+  })
+
+  it.each(Object.entries(SOURCES))('%s writes no colour', (_name, text) => {
+    expect(code(text)).not.toMatch(COLOUR)
   })
 
   it('the stylesheet writes no px, rem or em size outside the base font size', () => {
-    const css = readFileSync(join(SRC, 'bakeoff', 'bakeoff.css'), 'utf-8')
-    const declarations = css
-      .replace(/\/\*[\s\S]*?\*\//g, '')
+    const sized = code(stylesheet)
       .split('\n')
       .filter((line) => /:\s/.test(line) && !/^\s*font-size:\s*17px;/.test(line))
-    const sized = declarations.filter((line) => /\d(px|rem|em)\b/.test(line))
+      .filter((line) => /\d(px|rem|em)\b/.test(line))
     expect(sized).toEqual([])
   })
 })

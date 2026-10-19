@@ -4,6 +4,7 @@
 // The appearance is remembered on this phone only (localStorage, wrapped: a private
 // window has none). The address can carry the screen and the appearance too, for the
 // screenshot report:  ?s=today|training|insights|checkin|settings  &t=auto|light|dark
+// &still (motion off, as with Reduce Motion, so a picture never catches a ring half-drawn)
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 import { DESIGN } from '../design/tokens'
 import { cssVars, useMode, useReducedMotion, type ThemePref } from '../design/theme'
@@ -47,7 +48,7 @@ function initial() {
   const s = q.get('s')
   const theme = THEMES.includes(t as ThemePref) ? (t as ThemePref) : 'auto'
   const tab = TABS.some((x) => x.key === s) ? (s as Tab) : 'today'
-  return { theme, tab }
+  return { theme, tab, still: q.has('still') }
 }
 
 function Settings(p: { theme: ThemePref; onTheme: (t: ThemePref) => void }) {
@@ -112,7 +113,7 @@ export function BakeOff() {
   const [tab, setTab] = useState<Tab>(start.tab)
   const [dayIndex, setDayIndex] = useState(MOCK.days.length - 1)
   const mode = useMode(theme)
-  const reduced = useReducedMotion()
+  const reduced = useReducedMotion() || start.still
   const scroller = useRef<HTMLElement>(null)
   const vars = useMemo(() => cssVars(DESIGN, mode, reduced), [mode, reduced])
 
