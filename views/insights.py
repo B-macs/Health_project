@@ -11,7 +11,6 @@ Caller is responsible for st.set_page_config(), styles.inject_css(), nav.inject(
 
 import base64
 import calendar as cal_mod
-import json
 import math
 import os
 from contextlib import contextmanager
@@ -43,6 +42,7 @@ from services import flexibility as fx
 from services import stats as stats_mod
 from services import insights as insights_svc
 from services import metabolism_screen as ms
+from services import processing_queue
 from services import sleep_architecture
 from services import sessions as sessions_svc
 from services import strength as strength_svc
@@ -2443,8 +2443,8 @@ def render() -> None:
     # =========================================================================
 
     with tab_queue:
-        unparsed_notes     = repo.get_repository().get_unparsed_session_notes()
-        unparsed_readiness = repo.get_repository().get_unparsed_readiness()
+        queue = processing_queue.pending(repo.get_repository())
+        unparsed_notes, unparsed_readiness = queue["notes"], queue["readiness"]
 
         col_a, col_b = st.columns(2)
         col_a.metric("Session notes pending",    len(unparsed_notes))
@@ -2462,46 +2462,13 @@ def render() -> None:
 
             if st.button("Process All", type="primary", use_container_width=True, key="queue_process_btn"):
                 progress = st.progress(0, text="Starting...")
-                total    = total_pending
-                done     = 0
-                errors   = []
-
-                for note in unparsed_notes:
-                    try:
-                        result = ai.parse_session_note(note["raw_text"], injury_profile)
-                        repo.get_repository().update_session_note_ai(
-                            note_id=note["id"],
-                            summary=result["summary"],
-                            sentiment_score=result["sentiment_score"],
-                            flagged_body_parts=result["flagged_body_parts"],
-                            warning_level=result["warning_level"],
-                        )
-                    except Exception as exc:
-                        errors.append(f"Note {note['id']}: {exc}")
-                    done += 1
-                    progress.progress(done / total, text=f"Parsed {done}/{total}...")
-
-                for entry in unparsed_readiness:
-                    try:
-                        result = ai.parse_tightness(entry["subjective_tightness"], injury_profile)
-                        repo.get_repository().update_readiness_ai(
-                            row_id=entry["id"],
-                            severity=result["severity"],
-                            body_parts=result["body_parts"],
-                            sensation_type=result["sensation_type"],
-                            warning_level=result["warning_level"],
-                            # readiness_checkins is keyed by DATE, not by
-                            # page id, so the Supabase mirror cannot name the
-                            # row without this. `timestamp` is the Date
-                            # property, read by the same call that populates
-                            # the `date` column.
-                            entry_date=entry.get("timestamp"),
-                        )
-                    except Exception as exc:
-                        errors.append(f"Readiness {entry['id']}: {exc}")
-                    done += 1
-                    progress.progress(done / total, text=f"Parsed {done}/{total}...")
-
+                # services/processing_queue.process_all: one failure never
+                # stops the rest, and each error names its item.
+                errors = processing_queue.process_all(
+                    repo.get_repository(), injury_profile, queue,
+                    on_progress=lambda done, total: progress.progress(
+                        done / total, text=f"Parsed {done}/{total}..."),
+                )["errors"]
                 progress.progress(1.0, text="Complete.")
                 if errors:
                     st.warning(f"Completed with {len(errors)} error(s):")
@@ -2517,27 +2484,19 @@ def render() -> None:
             st.divider()
             st.subheader("Active Warnings")
 
-            def _entry_date_str(entry: dict) -> str:
-                d = entry.get("session_date") or entry.get("timestamp") or ""
-                return str(d)[:10]
-
-            by_date: dict[str, list[dict]] = {}
-            for entry in flagged:
-                by_date.setdefault(_entry_date_str(entry), []).append(entry)
+            by_date = processing_queue.warnings_by_date(flagged)
 
             if "queue_cal_year" not in st.session_state:
-                anchor = date.fromisoformat(max(by_date)) if by_date else date.today()
-                st.session_state["queue_cal_year"]  = anchor.year
-                st.session_state["queue_cal_month"] = anchor.month
+                (st.session_state["queue_cal_year"],
+                 st.session_state["queue_cal_month"]) = processing_queue.calendar_anchor(
+                    by_date, date.today())
 
             cal_year  = st.session_state["queue_cal_year"]
             cal_month = st.session_state["queue_cal_month"]
 
             nav_prev, nav_label, nav_next = st.columns([1, 3, 1])
             if nav_prev.button("◀", key="queue_cal_prev"):
-                cal_month -= 1
-                if cal_month < 1:
-                    cal_month, cal_year = 12, cal_year - 1
+                cal_year, cal_month = processing_queue.step_month(cal_year, cal_month, -1)
                 st.session_state["queue_cal_year"]  = cal_year
                 st.session_state["queue_cal_month"] = cal_month
                 st.rerun()
@@ -2547,9 +2506,7 @@ def render() -> None:
                 unsafe_allow_html=True,
             )
             if nav_next.button("▶", key="queue_cal_next"):
-                cal_month += 1
-                if cal_month > 12:
-                    cal_month, cal_year = 1, cal_year + 1
+                cal_year, cal_month = processing_queue.step_month(cal_year, cal_month, 1)
                 st.session_state["queue_cal_year"]  = cal_year
                 st.session_state["queue_cal_month"] = cal_month
                 st.rerun()
@@ -2562,7 +2519,7 @@ def render() -> None:
                 )
 
             selected_date = st.session_state.get("queue_selected_date")
-            weeks = cal_mod.Calendar(firstweekday=0).monthdatescalendar(cal_year, cal_month)
+            weeks = processing_queue.month_weeks(cal_year, cal_month)
 
             today = date.today()
 
@@ -2574,8 +2531,8 @@ def render() -> None:
                     is_today    = day == today
                     cell        = col.container(border=True) if is_today else col
                     if day_entries:
-                        levels = {e.get("warning_level") for e in day_entries}
-                        ball   = "🔴" if "flag" in levels else "🟡"
+                        ball = ("🔴" if processing_queue.day_level(day_entries) == "flag"
+                                else "🟡")
                         is_selected = selected_date == day_str
                         if cell.button(
                             f"{day.day} {ball}",
@@ -2601,21 +2558,20 @@ def render() -> None:
                 st.divider()
                 st.markdown(f"**{date.fromisoformat(selected_date).strftime('%A, %d %B %Y')}**")
                 for entry in by_date[selected_date]:
-                    level    = entry.get("warning_level", "monitor")
+                    shown    = processing_queue.entry_view(entry)
+                    level    = shown["level"]
                     color    = engine.WARNING_LEVEL_ICONS.get(level, "⚫")
-                    source   = entry.get("source", "?")
-                    parts    = entry.get("body_parts", "")
-                    if isinstance(parts, str) and parts.startswith("["):
-                        parts = ", ".join(json.loads(parts))
-                    summary  = entry.get("summary", "")
-                    movement = entry.get("movement_name", "")
+                    source   = shown["source"]
+                    parts    = shown["parts"]
+                    summary  = shown["summary"]
+                    movement = shown["movement"]
                     st.markdown(
                         f"{color} **{level.upper()}** &nbsp;·&nbsp; {source}"
                         + (f" &nbsp;·&nbsp; _{movement}_" if movement else ""),
                         unsafe_allow_html=True,
                     )
                     if summary:
-                        st.caption(str(summary)[:200])
+                        st.caption(summary)
                     if parts:
                         st.caption(f"Body areas: {parts}")
                     st.markdown("---")
@@ -2676,9 +2632,7 @@ def render() -> None:
             st.divider()
             st.subheader("Warning Level History")
 
-            rows_by_level: dict[str, list[dict]] = {"none": [], "monitor": [], "flag": []}
-            for row in parsed_rows:
-                rows_by_level.setdefault(row.get("ai_warning_level") or "none", []).append(row)
+            rows_by_level = processing_queue.rows_by_warning_level(parsed_rows)
 
             selected_level = st.session_state.get("tight_warn_level")
 
@@ -2704,18 +2658,8 @@ def render() -> None:
                 icon = engine.WARNING_LEVEL_ICONS.get(selected_level, "⚫")
                 st.markdown(f"**{icon} {selected_level.upper()} entries**")
                 for row in rows_by_level[selected_level]:
-                    parts = row.get("ai_body_parts") or ""
-                    if isinstance(parts, str) and parts.startswith("["):
-                        try:
-                            parts = ", ".join(json.loads(parts))
-                        except Exception:
-                            pass
-                    sensation = row.get("ai_sensation_type") or ""
-                    if isinstance(sensation, str) and sensation.startswith("["):
-                        try:
-                            sensation = ", ".join(json.loads(sensation))
-                        except Exception:
-                            pass
+                    parts = processing_queue.names(row.get("ai_body_parts") or "")
+                    sensation = processing_queue.names(row.get("ai_sensation_type") or "")
                     severity = row.get("ai_tightness_severity")
                     st.markdown(
                         f"**{row.get('date', '?')}** &nbsp;·&nbsp; "
@@ -2734,17 +2678,16 @@ def render() -> None:
         st.subheader("Multi-Week Trend Analysis")
 
         trend_data = repo.get_repository().get_macro_trend_data(90)
-        n_bio      = len(trend_data["biometrics"])
-        n_sessions = len(trend_data["sessions"])
+        gate = insights_svc.trend_gate(trend_data)
 
         col_d, col_s = st.columns(2)
-        col_d.metric("Biometric days available",    n_bio)
-        col_s.metric("Training sessions available", n_sessions)
+        col_d.metric("Biometric days available",    gate["bio_days"])
+        col_s.metric("Training sessions available", gate["sessions"])
 
-        if n_bio < engine.MIN_OBSERVATION_DAYS:
+        if not gate["enough"]:
             st.warning(
-                f"Need at least {engine.MIN_OBSERVATION_DAYS} days of biometric data for trend "
-                f"analysis. Currently have {n_bio}. Keep logging daily."
+                f"Need at least {gate['needed']} days of biometric data for trend "
+                f"analysis. Currently have {gate['bio_days']}. Keep logging daily."
             )
         else:
             computed     = stats_mod.compute_all_correlations(trend_data)
@@ -2754,7 +2697,7 @@ def render() -> None:
 
             st.markdown(
                 f"**Recovery direction (deterministic):** "
-                f"**{recovery_dir.replace('_', ' ').title()}**"
+                f"**{insights_svc.recovery_label(recovery_dir)}**"
                 f" -- computed from pain/tightness trend slopes"
             )
 
@@ -2789,16 +2732,9 @@ def render() -> None:
             st.divider()
             st.markdown(f"### {r.get('headline', '--')}")
 
-            recovery     = r.get("recovery_direction", "insufficient_data")
-            recovery_map = {
-                "improving":        "Improving",
-                "stable":           "Stable",
-                "degrading":        "Degrading",
-                "insufficient_data": "Insufficient data",
-            }
             st.markdown(
                 f"**Recovery trajectory:** "
-                f"{recovery_map.get(recovery, recovery.replace('_', ' ').title())}"
+                f"{insights_svc.recovery_label(r.get('recovery_direction', 'insufficient_data'))}"
             )
 
             load_note = r.get("load_management_note", "")

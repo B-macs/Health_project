@@ -168,3 +168,25 @@ def rows_between(rows: list[dict], start: date, end: date) -> list[dict]:
     the engine API takes too."""
     lo, hi = start.isoformat(), end.isoformat()
     return [r for r in rows if lo <= str(r["date"])[:10] <= hi]
+
+
+# ─── Macro Trends (move INS-5, 2026-10-19) ───────────────────────────────────
+
+#: How the recovery direction reads on screen.
+RECOVERY_LABELS: dict[str, str] = {
+    "improving": "Improving", "stable": "Stable", "degrading": "Degrading",
+    "insufficient_data": "Insufficient data",
+}
+
+
+def recovery_label(direction: str) -> str:
+    return RECOVERY_LABELS.get(direction, direction.replace("_", " ").title())
+
+
+def trend_gate(trend_data: dict) -> dict:
+    """Whether the multi-week trend analysis has enough biometric days:
+    {"bio_days", "sessions", "needed", "enough"}."""
+    bio_days = len(trend_data.get("biometrics") or [])
+    return {"bio_days": bio_days, "sessions": len(trend_data.get("sessions") or []),
+            "needed": engine.MIN_OBSERVATION_DAYS,
+            "enough": bio_days >= engine.MIN_OBSERVATION_DAYS}

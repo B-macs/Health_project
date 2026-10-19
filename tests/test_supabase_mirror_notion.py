@@ -240,12 +240,16 @@ def test_readiness_ai_needs_its_date_and_is_skipped_without_one():
 
 
 def test_the_caller_passes_the_date_through():
-    """views/insights.py has it for free: get_unparsed_readiness returns it as
-    `timestamp`, read by the same get_property call that populates `date`."""
-    src = (ROOT / "views" / "insights.py").read_text(encoding="utf-8")
-    call = src.split("update_readiness_ai(")[1].split("\n                    except")[0]
+    """The parse job has it for free: get_unparsed_readiness returns it as
+    `timestamp`, read by the same get_property call that populates `date`.
+    The job moved from views/insights.py to services/processing_queue.py on
+    2026-10-19 (move INS-5)."""
+    src = (ROOT / "services" / "processing_queue.py").read_text(encoding="utf-8")
+    call = src.split("update_readiness_ai(")[1].split("\n\n")[0]
     assert "entry_date" in call, "the date is not threaded through to the mirror"
     assert 'entry.get("timestamp")' in call
+    assert "update_readiness_ai(" not in (ROOT / "views" / "insights.py").read_text(
+        encoding="utf-8"), "the page parses through the job, never on its own"
 
 
 # ─── nothing is posted that is not a column ──────────────────────────────

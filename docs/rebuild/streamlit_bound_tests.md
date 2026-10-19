@@ -23,6 +23,7 @@ approves. Found 2026-10-07 by an import scan of `tests/`.
 - `tests/test_engine_data_screen.py` — Insights › Engine Data rendered alone (added 2026-10-19)
 - `tests/test_gate1_view.py` — the training page's gate-1 card rendered alone (added 2026-10-19)
 - `tests/test_metabolism_view.py` — the Metabolism page rendered alone (added 2026-10-19)
+- `tests/test_insights_tabs_view.py` — the whole Insights page with a stub store (added 2026-10-19)
 - `tests/test_core_hold_score.py::test_core_s_card_shows_the_hold_time_marked_provisional` — ONE test (added 2026-10-16): it renders the strength card with views/insights.py; the rest of the file is engine-only and stays in the engine run
 
 ## Tests that only READ the screen files as text
