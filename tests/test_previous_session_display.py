@@ -80,8 +80,17 @@ def test_the_previous_block_is_not_inside_an_expander():
 
 # ── 2. the raw reading is kept apart from the proposal ───────────────────────
 
+def _seed_tree() -> ast.Module:
+    """The seeding moved to services/prescription.py on 2026-10-19; the page
+    stores what it returns (tp_previous[idx] = seed.previous)."""
+    path = os.path.join(os.path.dirname(_TRAINING), os.pardir, "services", "prescription.py")
+    return ast.parse(io.open(path, encoding="utf-8").read())
+
+
 def test_tp_previous_is_seeded_from_previous_performance():
-    tree = _tree()
+    assert "st.session_state.tp_previous[idx] = seed.previous" in io.open(
+        _TRAINING, encoding="utf-8").read()
+    tree = _seed_tree()
     seeds = [n for n in ast.walk(tree)
              if isinstance(n, ast.Assign)
              and isinstance(n.value, ast.Call)
@@ -94,7 +103,7 @@ def test_previous_performance_is_handed_the_repository_reads_not_the_entry():
     """Its two arguments must be the raw lookups. Handing it the resolved entry
     would reintroduce exactly the bug: a previous reading that has been through
     the readiness nudge and the clamp."""
-    tree = _tree()
+    tree = _seed_tree()
     call = next(n for n in ast.walk(tree)
                 if isinstance(n, ast.Call)
                 and isinstance(n.func, ast.Attribute)

@@ -63,8 +63,11 @@ def test_a_changed_count_is_what_the_set_logs_and_what_the_screen_says():
 
 def test_the_screen_seeds_steppers_and_saves_them_for_unloaded_exercises():
     src = (ROOT / "views" / "training.py").read_text(encoding="utf-8")
-    assert "sess.bodyweight_entry(ex)" in src
-    assert "if not loaded and not sess.reps_are_editable(ex):" in src
+    # The seeding moved to services/prescription.py on 2026-10-19.
+    seed_src = (ROOT / "services" / "prescription.py").read_text(encoding="utf-8")
+    assert "prescription.seed_exercise(" in src
+    assert "sess.bodyweight_entry(ex)" in seed_src
+    assert "if not loaded and not sess.reps_are_editable(ex):" in seed_src
     # The save moved to services/session_save.py on 2026-10-19 (the save the
     # phone's API uses too); tests/test_session_save.py stores a march's reps.
     save_src = (ROOT / "services" / "session_save.py").read_text(encoding="utf-8")

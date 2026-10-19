@@ -28,6 +28,7 @@ from services import block_changeover
 from services import metrics
 from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
+from services import prescription
 from services import scheduling
 from services import session_save
 from services import sessions as sess
@@ -1266,10 +1267,10 @@ def _pop_nav_state() -> bool:
 def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
                              policy: dict, day_num: int,
                              lift_entry: dict | None = None) -> None:
-    """Seeds st.session_state.tp_actuals[idx] the first time this exercise
-    is shown this session, via sess.resolve_prescription — a live +/- stepper,
-    not a re-seed, drives every render after that. Guarded so it never
-    re-queries Notion or re-resolves on subsequent reruns of the same exercise.
+    """Seeds st.session_state.tp_actuals[idx] and tp_previous[idx] the first
+    time this exercise is shown this session, from services/prescription.py
+    (the reads and the resolution the phone's API uses too). A live +/-
+    stepper, not a re-seed, drives every render after that.
 
     `policy` is sess.load_policy's output, the SAME object the reduced-load
     banner at the top of this page is rendered from. That shared object is
@@ -1277,108 +1278,35 @@ def _seed_actuals_if_needed(idx: int, ex: dict, readiness_modifier: dict,
     steppers below it seed higher than last session — the contradiction
     observed 2026-08-06. See services/sessions.py's LOAD RESOLUTION section.
 
-    The full per-set array is now fetched for EVERY loaded exercise, not just
-    the double-progression ones: it is what the clamp's ceiling is derived
-    from, and get_last_performance alone returns the LAST set rather than the
-    top one. Same Notion query either way, and the guard above means it runs
-    once per exercise per session.
-
-    TWO THINGS ARE SEEDED FROM THE SAME PAIR OF READS, and they are kept apart
-    on purpose. tp_actuals[idx] is the PROPOSAL — nudged by readiness, clamped
-    to the ceiling, and mutated by every stepper tap after that. tp_previous[idx]
-    is the RAW previous session, never touched by any of that, because it is the
-    number the athlete checks the proposal against. Deriving the second from the
-    first is the bug this replaced: actual_caption used to print the proposal
-    under a "Last time:" label, so a genuine +2.5 kg step displayed as no change.
-
-    The two guards are independent. A restored checkpoint carries tp_actuals but
-    not tp_previous (the latter is a reading of the log, not session state, so it
-    is re-fetched rather than persisted), and an exercise whose entry is already
-    seeded must still be able to fill in its previous reading.
-
-    An UNLOADED "reps" exercise gets an entry too since 2026-10-13
-    (sess.reps_are_editable — the athlete: "I should be able to adjust the reps
-    on the body weight exercises"): its previous session, and a reps-only entry
-    whose start value is today's prescription (sess.bodyweight_entry). None of
-    the loaded path below applies to it."""
-    loaded = bool(ex.get("equipment_type"))
-    if not loaded and not sess.reps_are_editable(ex):
-        return
+    tp_actuals[idx] is the PROPOSAL and tp_previous[idx] the RAW previous
+    session (see services/prescription.py). The two guards are independent:
+    a restored checkpoint carries tp_actuals but not tp_previous (a reading of
+    the log, not session state, so it is re-fetched rather than persisted),
+    and an exercise whose entry is already seeded must still be able to fill
+    in its previous reading."""
     need_actuals  = idx not in st.session_state.tp_actuals
     need_previous = idx not in st.session_state.tp_previous
     if not (need_actuals or need_previous):
         return
-    last = None
-    try:
-        last = repo.get_repository().get_last_performance(ex["name"])
-    except Exception:
-        pass  # never block the live flow on a lookup failure
-    last_session_sets = None
-    try:
-        last_session_sets = repo.get_repository().get_last_session_all_sets(ex["name"])
-    except Exception:
-        pass  # never block the live flow on a lookup failure
-    st.session_state.tp_previous[idx] = sess.previous_performance(last, last_session_sets)
+    seed = prescription.seed_exercise(
+        repo.get_repository(), ex,
+        streak_label=readiness_modifier.get("streak_label", "unknown"), policy=policy,
+        today=date.today(), lift_entry=lift_entry, with_entry=need_actuals)
+    if seed is None:
+        return  # no stepper: a hold, a timed item, a fixed-protocol release
+    st.session_state.tp_previous[idx] = seed.previous
     if not need_actuals:
         return
-    if lift_entry is not None:
-        # A ramp that follows its lift (sess.ramp_lift_index): about 60% of the
-        # lift's weight for today, whatever the ramp itself logged last time.
-        st.session_state.tp_actuals[idx] = sess.ramp_entry(ex, lift_entry)
-        _save_checkpoint(day_num)
-        return
-    if not loaded:
-        st.session_state.tp_actuals[idx] = sess.bodyweight_entry(ex)
-        _save_checkpoint(day_num)
-        return
-    # The lift's recent sessions: the rep range (engine.range_progression,
-    # approved 2026-10-16) steps the weight when the last set reached the top
-    # of the range in every session within 7 days. Fetched only for a lift
-    # with a range, and a failed read means no step, never a guessed one.
-    history = None
-    if ex.get("rep_min") is not None and ex.get("rep_max") is not None:
-        try:
-            history = repo.get_repository().get_recent_session_sets(ex["name"])
-        except Exception:
-            history = []  # never block the live flow on a lookup failure
-    # The pain gate (athlete, 2026-09-16): a weight step waits on today's
-    # check-in. Read only when a session exists, i.e. when a step is possible,
-    # and re-read per exercise so a check-in made mid-session counts. A read
-    # that fails BLOCKS, like a missing check-in: an unread score is not a
-    # clean one.
-    step_block = None
-    if history:
-        try:
-            step_block = sess.step_block_reason(sess.todays_check_in(
-                repo.get_repository().get_recent_readiness(days=1), date.today()))
-        except Exception:
-            step_block = "today's check-in could not be read"
-    try:
-        entry = sess.resolve_prescription(
-            ex, last, readiness_modifier.get("streak_label", "unknown"),
-            policy,
-            weight_increment=ex.get("increment_size", 2.5),
-            last_session_sets=last_session_sets,
-            history=history,
-            step_block=step_block,
-        )
-    except sess.PrescriptionContradiction as exc:
-        # Hard error, surfaced not swallowed. The clamp should already have
-        # made this unreachable, so reaching it means the resolution itself is
-        # broken. Show it, then fall back to the ceiling — the athlete is
-        # mid-session and blocking the screen is worse than continuing at last
-        # session's numbers, which is the safe direction by definition.
-        st.error(f"⚠️ Prescription contradiction — {exc}")
+    if seed.contradiction:
+        # Hard error, surfaced not swallowed; the entry has fallen back to the
+        # last completed session (see prescription.seed_exercise).
+        st.error(f"⚠️ Prescription contradiction — {seed.contradiction}")
         st.caption(
             "The engine flagged today as reduced load but produced a higher "
             "prescription. Falling back to your last completed session. "
             "Please report this."
         )
-        ceiling = sess.last_completed_ceiling(last, last_session_sets)
-        entry = {"reps": ceiling.get("reps"), "weight_kg": ceiling.get("weight_kg"),
-                  "band_tier": ceiling.get("band_tier"), "source": "last_time",
-                  "last_seen_date": ceiling.get("session_date"), "clamped": {}}
-    st.session_state.tp_actuals[idx] = entry
+    st.session_state.tp_actuals[idx] = seed.entry
     _save_checkpoint(day_num)
 
 
