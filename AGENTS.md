@@ -51,8 +51,9 @@ app.py (entry point — SPA router)
   ├── "home"      → inline home dashboard
   ├── "checkin"   → views/checkin.py
   ├── "training"  → views/training.py
-  ├── "insights"  → views/insights.py
-  └── "sync"      → views/sync.py
+  └── "insights"  → views/insights.py
+  (an unknown page is Home; Voice Training, once "sync" → views/sync.py, is its
+   own app since rebuild Phase 1, 2026-10-19)
 
 repo.py — Streamlit-layer bootstrap: builds a services.config.Config from
   st.secrets and hands back a cached services.repository.Repository

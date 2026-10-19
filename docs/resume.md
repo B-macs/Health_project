@@ -69,7 +69,6 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `views/checkin.py` | Morning Check-In | Daily readiness entry: pain score, tightness, sensation tags, lifestyle factors |
 | `views/training.py` | Training Plan | Interactive guided session runner for the active phase (Phase 1 → `training_plan.PLAN`, 21 days; Phase 2 → `training_plan.PLAN_STAGE2`, 28 days — mapped in `services/sessions.py::_PLAN_BY_PHASE_NUMBER`, so the day range is however many days are authored, never a fixed 14) with live timers, per-set capture, auto-logging and exit confirmation |
 | `views/insights.py` | Insights | Six tabs: BioAge (four category cards — **Strength** via `services/strength.py` + `services/tonnage.py` + `services/bioage.py`, **Metabolism** via `services/body_composition.py`, **Flexibility** via `services/flexibility.py`; only **Cardio** is still "coming soon"), Engine Data (stage progression, ACWR, biometric traffic light, injury weight), Processing Queue, Macro Trends (tightness map + multi-week trend analysis), Sleep Architecture, Sync |
-| `views/sync.py` | Voice Training | Embedded Voxplot voice-analysis UI |
 
 ### Removed Pages (intentionally)
 | Page | Reason Removed |
@@ -108,7 +107,6 @@ AI components may only populate advisory fields — summaries, tags, flagged bod
 | `_pages/` | **Deleted** — triggered Streamlit 1.36+ auto top-nav; all routing is in `app.py` SPA router |
 | `scripts/` | One-shot CLI tools: `init_notion.py`, `build_datastore.py` (rebuilds `services/datastore.py`'s snapshot), `backfill_oura_history.py`, `backfill_garmin_sleep_stages.py`, `backfill_garmin_from_sheet1.py`, `compare_readiness_to_oura.py`, `merge_duplicate_checkins.py`, `prepare_bioage_illustrations.py`, `garmin_login_test.py` |
 | `docs/` | `INVENTORY.md`, `resume.md`, `focus.md`, `playbook.md`, `clinical_profile_weighting.md`, `REFACTOR_NOTES.md`, `progress.json`, `training/*.md` |
-| `voice_training/voxplot` | Git submodule — standalone Voxplot voice-analysis source; Health pins its commit and embeds its renderer |
 
 ---
 
@@ -929,12 +927,18 @@ Two visual themes applied automatically via CSS media query at 768px breakpoint:
 
 ### Voice Training / Voxplot Boundary
 
-Voxplot remains a separate Git repository, embedded in Health as the
-`voice_training/voxplot` submodule. Health owns the route in `views/sync.py`;
-Voxplot owns acoustic analysis, its presentation, and its independent test
-suite. Health records a specific Voxplot commit rather than duplicating its
-source. Voxplot's recordings, research datasets, logs, virtual environment,
-and generated validation output are ignored locally and are never staged.
+**Since 2026-10-19 (rebuild Phase 1) Voxplot is its own app, not part of
+Health.** It runs on Streamlit Community Cloud from its own repository,
+`B-macs/health-voice-training`, with its own Supabase project and one secrets
+section, `[voxplot_supabase]` (`url`, `secret_key`). Health no longer has the
+Voice Training tab, the `views/sync.py` route, the `voice_training/voxplot`
+submodule or the voice libraries. The sections below record the embedded
+period (2026-07 to 2026-10); their documents live in the voice repository.
+
+Before that, Voxplot was a separate Git repository embedded in Health as the
+`voice_training/voxplot` submodule: Health owned the route in `views/sync.py`
+and pinned a Voxplot commit; Voxplot owned acoustic analysis, its presentation
+and its independent test suite.
 
 ### Voice Training Measurement Policy (2026-07-14)
 
@@ -968,7 +972,8 @@ German-phone clinical cutoff.
 
 Full rationale, implementation details, citations, and still-required
 external validation are in
-[`voice_training/voxplot/docs/voice_quality_measurement_policy.md`](../voice_training/voxplot/docs/voice_quality_measurement_policy.md).
+[`docs/voice_quality_measurement_policy.md`](https://github.com/B-macs/health-voice-training/blob/main/docs/voice_quality_measurement_policy.md)
+in the voice repository.
 
 ### Voice Training Activity Library (2026-07-14)
 
@@ -1038,7 +1043,8 @@ desk-posture interscapular pattern. The latest Voice Training
 recording was quality-limited by low sustained-vowel SNR, so this expansion
 does not use its score to progress work or claim a voice change. Complete
 rationale, source links, library behaviour, and stop/escalation rules are in
-[`voice_training/voxplot/docs/training_activity_catalogue.md`](../voice_training/voxplot/docs/training_activity_catalogue.md).
+[`docs/training_activity_catalogue.md`](https://github.com/B-macs/health-voice-training/blob/main/docs/training_activity_catalogue.md)
+in the voice repository.
 
 ---
 
@@ -1193,7 +1199,7 @@ is a label on the stage, not a separate term list — no such list exists in cod
 
 12. **The keyword library above is the living document** for the deterministic parser. Update it in this file whenever new terms are added to the code.
 
-13. **Bottom nav (Home / Training / Insights / Voice Training) must be present and functional on every page at all times.** The fourth item's route key is still `"sync"` (`nav.py`'s `_ITEMS`), which is why `app.py` dispatches it to `views/sync.py` — but that route is the embedded Voxplot Voice Training page; device-sync controls live in the Insights → Sync tab, not on the nav. `nav.inject(active)` must be called on every route in `app.py`. The call must come *after* all page content is rendered, because the nav is real `st.button()` widgets in document order — inject early and they appear above the cards. The FAB (+) for Check-In does **not** go through the nav at all: it is a plain `<a href="?page=checkin">`, the only real link in the app, which is precisely why `app.py` mirrors the resolved page back into `?page=X` (a reload after using the FAB would otherwise land back on Check-In). Do not remove or reorder `nav.inject()` without testing both the bottom bar and the FAB.
+13. **Bottom nav (Home / Training / Insights) must be present and functional on every page at all times.** Three items since 2026-10-19: the fourth, Voice Training (route key `"sync"`, `views/sync.py`), left when the voice app became its own app, and `app.py` now sends any unknown page, an old `?page=sync` link included, to Home. Device-sync controls live in the Insights → Sync tab, not on the nav. `nav.inject(active)` must be called on every route in `app.py`. The call must come *after* all page content is rendered, because the nav is real `st.button()` widgets in document order — inject early and they appear above the cards. The FAB (+) for Check-In does **not** go through the nav at all: it is a plain `<a href="?page=checkin">`, the only real link in the app, which is precisely why `app.py` mirrors the resolved page back into `?page=X` (a reload after using the FAB would otherwise land back on Check-In). Do not remove or reorder `nav.inject()` without testing both the bottom bar and the FAB.
 
 14. **A gym session has a shape, and blocks are authored to it (2026-09-11, athlete).** Three main lifts, one core item, one hip-flexor item; no one-set training entries; a ramp set and a heavy top set nested immediately before their own lift; at most seven preparation entries; at most 70 modelled minutes with the MEASURED changeovers (74 s to a floor item, 117 s to a station, 158 s to a band set-up — medians of his own set timestamps, `services/sessions.py::CHANGEOVER_SECONDS`, re-measured with `scripts/measure_changeovers.py`). `sessions.session_shape_violations` is the check and `tests/test_session_shape_rules.py` runs it over every registered block from phase 4 on. The history that produced it: Stage 2A gym days were 10 exercises and ~60 min, Stage 2B grew to 20 entries and 81 min one justified addition at a time, and the estimate never saw it because it charged 30 s per exercise change. CLAUDE.md Key Rule 21.
 

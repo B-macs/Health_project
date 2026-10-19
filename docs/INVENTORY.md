@@ -48,7 +48,7 @@ Confidence key: 🟢 fully read, high confidence · 🟠 partially read or conta
 | 14 | `views/checkin.py` | Morning check-in form. Collects tightness/pain/locations/sensations/lifestyle and saves via `db.save_daily_readiness()`. | `render()`; `ANATOMICAL_LOCATIONS` (21 items ⚠️ dup), `SENSATION_TAGS` (9 items ⚠️ dup), `CONDITION_OPTIONS` | `db` | `app.py` (SPA router) | 🟢 |
 | 15 | `views/training.py` | Interactive 14-day session guide. LocalStorage-persisted timers (hold/rest/duration). Session state preserved across SPA navigation. Auto-logs completed sessions to Notion. | `render()`; `_hold_timer`, `_rest_timer`, `_duration_timer` (JS components) | `db`, `engine`, `sync_sheets`, `training_plan` (as `tp`) | `app.py` (SPA router) | 🟢 |
 | 16 | `views/insights.py` | 6-tab insights page: Training Directive, Engine Data, Processing Queue, Tightness Map, Macro Trends, MRI Intelligence. Module-level `@st.cache_data(ttl=1800)` fetchers. | `render()`; cached `_bio()`, `_au()`, `_streak()`, `_tight()`, `_diag()`, `_stage()` | `db`, `ai`, `engine`, `sync_sheets`, `stats` (as `stats_mod`) | `app.py` (SPA router) | 🟢 |
-| 17 | `views/sync.py` | Raw biometric data viewer from Google Sheets. Cache-busting refresh button. | `render()`, `_load()` | `sync_sheets` | `app.py` (SPA router) | 🟢 |
+| 17 | ~~`views/sync.py`~~ | Removed 2026-10-19 (rebuild Phase 1): it had become the embedded Voice Training page, and Voice Training is now its own app. | — | — | — | — |
 | 18 | `views/__init__.py` | Empty package init | — | — | — | 🟢 |
 | 19 | `_pages/0_Training_Plan.py` | Redirect stub → `app.py` via `st.switch_page` | `st.switch_page("app.py")` | — | Streamlit multi-page router (suppressed) | 🟢 |
 | 20 | `_pages/1_Home.py` | Redirect stub → `app.py` | `st.switch_page("app.py")` | — | Streamlit multi-page router (suppressed) | 🟢 |
@@ -80,8 +80,7 @@ Streamlit URL-nav (each nav tap reloads to ?page=X, Streamlit reconnects)
        │ reads st.query_params["page"]      │ rendered inline
        ├── "checkin"  → views/checkin.py    │
        ├── "training" → views/training.py   │
-       ├── "insights" → views/insights.py   │
-       └── "sync"     → views/sync.py       │
+       └── "insights" → views/insights.py   │
   
   nav.py ← injected by app.py               │
     JS bridge: stNav(page) sets ?page=X     │
