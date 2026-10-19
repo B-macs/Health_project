@@ -353,15 +353,15 @@ def p0_engine_venv_fail() -> CounterResult:
         ["p0/pytest-engine.log"])
 
 
-@counter("p0", "pnpm_tests_failing",
-         "failures in `pnpm test` (builds the app, then the app and Worker tests)")
-def p0_pnpm_tests_failing() -> CounterResult:
+def _pnpm_test_counter(phase: str) -> CounterResult:
+    """`pnpm test`: it builds the app (with its type check), then runs the app's and the
+    Worker's Vitest suites. A failed build with no failed test still counts 1."""
     pnpm = shutil.which("pnpm")
     if not pnpm:
         return CounterResult(1, "pnpm is not on PATH")
     if not (REPO_ROOT / "node_modules").exists():
         return CounterResult(1, "node_modules is missing (pnpm install)")
-    out = REPORTS_DIR / "p0"
+    out = REPORTS_DIR / phase
     out.mkdir(parents=True, exist_ok=True)
     proc = subprocess.run([pnpm, "test"], cwd=REPO_ROOT, env=_child_env(),
                           capture_output=True, text=True, encoding="utf-8", errors="replace")
@@ -371,7 +371,13 @@ def p0_pnpm_tests_failing() -> CounterResult:
     if proc.returncode != 0 and failed == 0:
         failed = 1
     passed = sum(int(n) for n in re.findall(r"Tests\s+(\d+) passed", log))
-    return CounterResult(failed, f"{passed} passed, {failed} failed", ["p0/pnpm-test.log"])
+    return CounterResult(failed, f"{passed} passed, {failed} failed", [f"{phase}/pnpm-test.log"])
+
+
+@counter("p0", "pnpm_tests_failing",
+         "failures in `pnpm test` (builds the app, then the app and Worker tests)")
+def p0_pnpm_tests_failing() -> CounterResult:
+    return _pnpm_test_counter("p0")
 
 
 @counter("p0", "upload_personal_files",
@@ -916,6 +922,134 @@ review("p2",
        "Open Check-in on a day that already has an entry: it opens filled in, and pain can go back to 0.",
        "After the push, Home, Training, Insights and Check-in still work in the hosted app.",
        "Three sample API responses, personal values masked, look right.")
+
+
+# ── Phase 3 counters ─────────────────────────────────────────────────────────
+
+APP_SRC = REPO_ROOT / "app" / "src"
+DESIGN_MD = REBUILD_DOCS / "design.md"
+STRINGS_TS = APP_SRC / "strings.ts"
+MAKE_MOCK = REPO_ROOT / "app" / "scripts" / "make-mock.ts"
+_COLOUR = re.compile(r"#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(")
+_CSS_SIZE = re.compile(r"\d(?:px|rem|em)\b")
+_BASE_FONT = re.compile(r"^\s*font-size:\s*17px;")
+_TS_STRING = re.compile(r"'((?:[^'\\\n]|\\.)*)'|\"((?:[^\"\\\n]|\\.)*)\"|`((?:[^`\\]|\\.)*)`")
+
+
+def owner_choice(text: str) -> str | None:
+    """The owner's own words on design.md's choice line:  **Owner's choice** ... *"..."*"""
+    match = re.search(r"^\*\*Owner's choice\*\*[^\n]*?\*\"([^\"]+)\"\*", text, re.MULTILINE)
+    return match.group(1) if match else None
+
+
+def _blank_comments(text: str) -> str:
+    """Comments emptied in place, so line numbers stay the file's own."""
+    text = re.sub(r"/\*.*?\*/", lambda m: "\n" * m.group(0).count("\n"), text, flags=re.DOTALL)
+    return "\n".join("" if line.strip().startswith("//") else line for line in text.split("\n"))
+
+
+def token_misses(files: dict[str, str]) -> list[str]:
+    """`path:line kind` for every colour a screen file writes, and every size the
+    stylesheet writes, outside app/src/design/tokens.ts (the one place they are written).
+    The stylesheet's base font size (17px, the size 1rem falls back to) is the exception."""
+    hits = []
+    for rel, text in sorted(files.items()):
+        is_css = rel.endswith(".css")
+        for number, line in enumerate(_blank_comments(text).split("\n"), 1):
+            if _COLOUR.search(line):
+                hits.append(f"{rel}:{number} colour")
+            elif is_css and ":" in line and _CSS_SIZE.search(line) and not _BASE_FONT.match(line):
+                hits.append(f"{rel}:{number} size")
+    return hits
+
+
+def _screen_files() -> dict[str, str]:
+    files = {}
+    for path in sorted(APP_SRC.rglob("*")):
+        if path.suffix in (".tsx", ".css") and not {"mock", "generated"} & set(path.parts):
+            files[path.relative_to(REPO_ROOT).as_posix()] = path.read_text(encoding="utf-8")
+    return files
+
+
+def ts_string_literals(text: str) -> list[str]:
+    """Every quoted or template string in a TypeScript file, comments left out."""
+    return [next(g for g in m.groups() if g is not None)
+            for m in _TS_STRING.finditer(_blank_comments(text))]
+
+
+def text_rule_hits(literals: list[str]) -> list[str]:
+    """Strings that fail the screen-text scanners already in tests/: the jargon, the
+    repo-internal and the hedge lists (Key Rule 19, the patient-facing text rules), and
+    no Stage 1 text."""
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    from tests.test_cluster_a import _HEDGES, _JARGON, _REPO_INTERNALS
+    from tests.test_no_stage_one_on_screen import _STAGE_ONE
+    hits = []
+    for text in literals:
+        low = text.lower()
+        hits += [f"{word!r} in {text[:48]!r}" for word in (*_JARGON, *_REPO_INTERNALS, *_HEDGES)
+                 if word in low]
+        if _STAGE_ONE.search(text):
+            hits.append(f"Stage 1 in {text[:48]!r}")
+    return hits
+
+
+@counter("p3", "choice_missing", "1 until the owner's choice is recorded in docs/rebuild/design.md")
+def p3_choice_missing() -> CounterResult:
+    if not DESIGN_MD.exists():
+        return CounterResult(1, "docs/rebuild/design.md is missing")
+    words = owner_choice(DESIGN_MD.read_text(encoding="utf-8"))
+    if not words:
+        return CounterResult(1, "design.md has no **Owner's choice** line with his words")
+    return CounterResult(0, f'recorded: "{words}"')
+
+
+@counter("p3", "tokens_unused",
+         "colours a screen file writes, and sizes the stylesheet writes, instead of a token")
+def p3_tokens_unused() -> CounterResult:
+    hits = token_misses(_screen_files())
+    return CounterResult(len(hits), "; ".join(hits) or "every colour and size is a token")
+
+
+@counter("p3", "real_data_in_app",
+         "1 when app/src/mock/data.ts is not exactly the seeded generator's output")
+def p3_real_data_in_app() -> CounterResult:
+    node = shutil.which("node")
+    if not node:
+        return CounterResult(1, "node is not on PATH")
+    proc = subprocess.run([node, str(MAKE_MOCK), "--check"], cwd=REPO_ROOT, env=_child_env(),
+                          capture_output=True, text=True, encoding="utf-8", errors="replace")
+    lines = (proc.stdout + proc.stderr).strip().splitlines()
+    return CounterResult(0 if proc.returncode == 0 else 1,
+                         lines[-1] if lines else f"make-mock --check exited {proc.returncode}")
+
+
+@counter("p3", "text_rule_violations",
+         "strings in app/src/strings.ts that fail the jargon, hedge and Stage 1 scans in tests/")
+def p3_text_rule_violations() -> CounterResult:
+    if not STRINGS_TS.exists():
+        return CounterResult(1, "app/src/strings.ts is missing")
+    literals = ts_string_literals(STRINGS_TS.read_text(encoding="utf-8"))
+    hits = text_rule_hits(literals)
+    return CounterResult(len(hits), "; ".join(hits) or f"{len(literals)} strings, none flagged")
+
+
+@counter("p3", "test_failures",
+         "the main gate's failures in venv/ (plus 1 under the floor) and `pnpm test`'s (Vitest)")
+def p3_test_failures() -> CounterResult:
+    main_gate = _main_gate_counter("p3")
+    vitest = _pnpm_test_counter("p3")
+    return CounterResult(main_gate.count + vitest.count,
+                         f"Python: {main_gate.detail}; pnpm: {vitest.detail}",
+                         main_gate.evidence + vitest.evidence)
+
+
+review("p3",
+       "Open the preview from the iPhone's Home Screen: Today, Training, Insights and Settings, "
+       "in light and dark.",
+       "On the Training tab, let the timer run and read it from 1.5 m away.",
+       "Say yes to the design, or what to change.")
 
 
 # ── output ───────────────────────────────────────────────────────────────────

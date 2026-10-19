@@ -1,7 +1,9 @@
 // Writes app/src/mock/data.ts from the seeded generator (rebuild Phase 3).
 // Run from the repo root:  node app/scripts/make-mock.ts
+// With --check it writes nothing and exits 1 when data.ts differs from the generator
+// (the p3 gate's real_data_in_app counter).
 // Node runs this TypeScript file directly (type stripping), so it uses no TS-only syntax.
-import { writeFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 import { generate, SEED } from '../src/mock/generate.ts'
 
 const data = generate(SEED)
@@ -10,5 +12,15 @@ const text =
   `// change generate.ts and run \`node app/scripts/make-mock.ts\`. Synthetic values only.\n` +
   `import type { Mock } from './generate.ts'\n\n` +
   `export const MOCK: Mock = ${JSON.stringify(data, null, 2)}\n`
-writeFileSync(new URL('../src/mock/data.ts', import.meta.url), text)
-console.log(`wrote src/mock/data.ts (seed ${SEED})`)
+const target = new URL('../src/mock/data.ts', import.meta.url)
+if (process.argv.includes('--check')) {
+  const current = readFileSync(target, 'utf-8').replace(/\r\n/g, '\n')
+  if (current !== text) {
+    console.error('src/mock/data.ts differs from the generator: run node app/scripts/make-mock.ts')
+    process.exit(1)
+  }
+  console.log(`src/mock/data.ts matches the generator (seed ${SEED})`)
+} else {
+  writeFileSync(target, text)
+  console.log(`wrote src/mock/data.ts (seed ${SEED})`)
+}

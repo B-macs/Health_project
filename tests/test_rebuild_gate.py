@@ -526,3 +526,47 @@ def test_the_tracking_files_are_well_formed():
                 assert gate._ref_exists(ref), f"{entry['id']}: {ref} does not exist"
     rows = gate.inventory_rows(gate.SCREEN_INVENTORY.read_text(encoding="utf-8"))
     assert set(gate._json(gate.INVENTORY_ENDPOINTS, {})["rows"]) <= set(rows)
+
+
+# ── Phase 3 ──────────────────────────────────────────────────────────────────
+
+def test_phase_3_has_the_counters_its_prompt_names():
+    assert set(gate.REGISTRY["p3"]) == {
+        "choice_missing", "tokens_unused", "real_data_in_app", "text_rule_violations",
+        "test_failures"}
+
+
+def test_the_owners_choice_needs_his_own_words_on_the_choice_line():
+    assert gate.owner_choice('**Owner\'s choice** (2026-10-20): *"Yes, this one"*') == "Yes, this one"
+    assert gate.owner_choice("**Owner's choice**: not yet") is None
+    assert gate.owner_choice('Somewhere else: *"Yes"*') is None
+
+
+def test_a_colour_or_a_stylesheet_size_outside_the_tokens_is_found_with_its_line():
+    files = {
+        "app/src/a.tsx": "const ok = 'var(--accent)'\nconst bad = '#FF0000'\n",
+        "app/src/b.css": ".x {\n  padding: var(--sp-m);\n  margin: 12px;\n  color: rgba(0, 0, 0, 0.5);\n}\n",
+        "app/src/c.css": "html {\n  font-size: 17px;\n}\n/* a #comment 12px */\n",
+    }
+    assert gate.token_misses(files) == [
+        "app/src/a.tsx:2 colour", "app/src/b.css:3 size", "app/src/b.css:4 colour"]
+
+
+def test_string_literals_are_read_from_typescript_without_its_comments():
+    text = "// 'not this'\nconst S = { a: 'one', b: \"two's\", c: (n: number) => `three ${n}` }\n"
+    assert gate.ts_string_literals(text) == ["one", "two's", "three ${n}"]
+
+
+def test_the_text_scan_flags_a_hedge_and_stage_one_and_passes_plain_words():
+    hits = gate.text_rule_hits(["Pick either works for you", "Back to Stage 1 work", "Start session"])
+    assert len(hits) == 2 and "either works" in hits[0] and "Stage 1" in hits[1]
+
+
+def test_the_real_strings_file_passes_the_text_scan():
+    literals = gate.ts_string_literals(gate.STRINGS_TS.read_text(encoding="utf-8"))
+    assert len(literals) > 50
+    assert gate.text_rule_hits(literals) == []
+
+
+def test_the_real_screen_files_write_no_colour_or_size_of_their_own():
+    assert gate.token_misses(gate._screen_files()) == []

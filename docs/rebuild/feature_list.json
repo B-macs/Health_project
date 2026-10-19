@@ -1,5 +1,5 @@
 {
-  "phase": "P2",
+  "phase": "P3",
   "tasks": [
     {
       "id": "P0-01",
@@ -324,6 +324,66 @@
         "P2-10"
       ],
       "gate": "streamlit_app_broken",
+      "passes": false
+    },
+    {
+      "id": "P3-01",
+      "phase": "P3",
+      "description": "Design research (docs/rebuild/design_research.md): Oura, Whoop, Apple Fitness, Strong, Hevy and Lauscher; the sizes that read from 1.5 m in a gym.",
+      "depends_on": [],
+      "gate": "choice_missing",
+      "passes": false
+    },
+    {
+      "id": "P3-02",
+      "phase": "P3",
+      "description": "Design tokens in light and dark (app/src/design/tokens.ts) and the screens on them: Today, the training screen mid-set, the Strength card, the tab bar. No colour or size outside the tokens. The owner saw three directions (A Calm, B Board, C Logbook) and asked for one Oura-style design instead (2026-10-19).",
+      "depends_on": [
+        "P3-01"
+      ],
+      "gate": "tokens_unused",
+      "passes": true
+    },
+    {
+      "id": "P3-03",
+      "phase": "P3",
+      "description": "Seeded synthetic mock data (app/src/mock, app/scripts/make-mock.ts); never the owner's readings, because the repo and the preview address are public.",
+      "depends_on": [],
+      "gate": "real_data_in_app",
+      "passes": true
+    },
+    {
+      "id": "P3-04",
+      "phase": "P3",
+      "description": "One strings file (app/src/strings.ts) that passes the jargon, hedge and Stage 1 scans of tests/.",
+      "depends_on": [
+        "P3-02"
+      ],
+      "gate": "text_rule_violations",
+      "passes": true
+    },
+    {
+      "id": "P3-05",
+      "phase": "P3",
+      "description": "Tests: the Python gate at the floor, and the app and Worker Vitest suites (contrast in both modes, tap targets of 44 pt or more, rem text sizes, tokens only, the mock equal to its generator).",
+      "depends_on": [
+        "P3-02",
+        "P3-03"
+      ],
+      "gate": "test_failures",
+      "passes": true
+    },
+    {
+      "id": "P3-06",
+      "phase": "P3",
+      "description": "The preview on the Worker's preview alias `design` and the report reports/rebuild/p3_bakeoff.html; the owner tries it on the iPhone and his choice is recorded in docs/rebuild/design.md.",
+      "depends_on": [
+        "P3-02",
+        "P3-03",
+        "P3-04",
+        "P3-05"
+      ],
+      "gate": "choice_missing",
       "passes": false
     }
   ]
