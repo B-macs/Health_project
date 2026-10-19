@@ -291,15 +291,15 @@ def _owner_check(phase: str, key: str) -> bool | None:
 
 # ── Phase 0 counters ─────────────────────────────────────────────────────────
 
-@counter("p0", "tests_failing",
-         "main gate failures in venv/, plus 1 if the pass count is under the floor")
-def p0_tests_failing() -> CounterResult:
-    out = REPORTS_DIR / "p0"
+def _main_gate_counter(phase: str) -> CounterResult:
+    """The main suite in venv/: its failures and errors, plus 1 when the pass
+    count is under the floor in CLAUDE.md's "Deterministic Gate"."""
+    out = REPORTS_DIR / phase
     junit, log = out / "pytest-main.xml", out / "pytest-main.log"
     if not (REUSE_TEST_RUNS and junit.exists()):
         _run_pytest(sys.executable, junit, log)
     if not junit.exists():
-        return CounterResult(1, "pytest wrote no junit file", ["p0/pytest-main.log"])
+        return CounterResult(1, "pytest wrote no junit file", [f"{phase}/pytest-main.log"])
     summary = read_junit(junit)
     floor = gate_floor(CLAUDE_MD.read_text(encoding="utf-8"))
     under = 1 if floor is None or summary.passed < floor else 0
@@ -307,7 +307,13 @@ def p0_tests_failing() -> CounterResult:
         summary.failures + summary.errors + under,
         f"{summary.passed} passed, {summary.failures} failed, {summary.errors} errors, "
         f"{summary.skipped} skipped; floor {floor}",
-        ["p0/pytest-main.log"])
+        [f"{phase}/pytest-main.log"])
+
+
+@counter("p0", "tests_failing",
+         "main gate failures in venv/, plus 1 if the pass count is under the floor")
+def p0_tests_failing() -> CounterResult:
+    return _main_gate_counter("p0")
 
 
 @counter("p0", "engine_venv_fail",
@@ -434,6 +440,117 @@ review("p0",
        "Open the Worker address on the iPhone: the placeholder shows \"Health\" and the version.",
        "After the push, open the hosted Streamlit app and check that it still works.",
        "Compare /api/readiness for yesterday with the Streamlit Home card's daily score.")
+
+
+# ── Phase 1 counters: Voice Training leaves the health app ───────────────────
+
+VOICE_REF_PATTERN = re.compile(
+    r"voxplot|voice_training|Voice Training|views[/.]sync\b|from views import sync")
+#: Tracked files that may still name the voice app, each with its reason. Docs
+#: and Markdown never count: they keep the history of the move.
+VOICE_REF_ALLOW = {
+    "scripts/rebuild_gate.py": "this gate: it holds the patterns it looks for",
+    "tests/test_rebuild_gate.py": "the gate's own tests",
+    "tests/test_rebuild_secrets.py": "proves another app's [voxplot_supabase] secrets never go to the engine",
+    "tests/api/test_api_phase0.py": "proves the engine's config drops another app's [voxplot_supabase] section",
+}
+VOICE_LIBS = ("praat-parselmouth", "scipy", "soundfile", "imageio-ffmpeg")
+VOICE_REQUIREMENT_FILES = ("requirements.txt", "requirements-engine.txt")
+P1_DEVICE_CHECKS = {
+    "health_three_tabs": "the health app opens with three tabs (Home, Training, Insights) and no Voice Training",
+    "health_pages_work": "Home, Training and Insights work in the health app",
+    "voice_app_records": "the voice app opens from its own Home Screen icon and records",
+}
+
+
+def voice_ref_hits(files: dict[str, str]) -> list[str]:
+    """"path:line" for every line of tracked code or config that still names
+    Voice Training. `files` maps repo-relative paths to their text."""
+    hits = []
+    for rel, text in files.items():
+        if rel.startswith("docs/") or rel.endswith(".md") or rel in VOICE_REF_ALLOW:
+            continue
+        for lineno, line in enumerate(text.splitlines(), 1):
+            if VOICE_REF_PATTERN.search(line):
+                hits.append(f"{rel}:{lineno}")
+    return hits
+
+
+def voice_lib_hits(files: dict[str, str]) -> list[str]:
+    """"path: library" for each voice-only library a requirements file names."""
+    hits = []
+    for rel, text in files.items():
+        for line in text.splitlines():
+            name = re.split(r"[\s<>=!~;\[#]", line.strip(), maxsplit=1)[0].lower()
+            if name in VOICE_LIBS:
+                hits.append(f"{rel}: {name}")
+    return hits
+
+
+def _tracked_texts() -> dict[str, str]:
+    proc = subprocess.run(["git", "ls-files", "-z"], cwd=REPO_ROOT, capture_output=True)
+    texts: dict[str, str] = {}
+    for raw in proc.stdout.split(b"\0"):
+        rel = raw.decode("utf-8", errors="replace")
+        path = REPO_ROOT / rel
+        try:
+            if not rel or not path.is_file() or path.stat().st_size > 2_000_000:
+                continue
+            data = path.read_bytes()
+        except OSError:
+            continue
+        if b"\0" not in data[:4096]:
+            texts[rel] = data.decode("utf-8", errors="replace")
+    return texts
+
+
+@counter("p1", "tests_failing",
+         "main gate failures in venv/, plus 1 if the pass count is under the floor")
+def p1_tests_failing() -> CounterResult:
+    return _main_gate_counter("p1")
+
+
+@counter("p1", "voice_refs_left",
+         "lines of tracked code or config that still name Voice Training (docs and *.md excluded)")
+def p1_voice_refs_left() -> CounterResult:
+    hits = voice_ref_hits(_tracked_texts())
+    return CounterResult(len(hits), "; ".join(hits[:20]) or "none")
+
+
+@counter("p1", "voice_libs_left",
+         "voice-only libraries in requirements.txt or requirements-engine.txt")
+def p1_voice_libs_left() -> CounterResult:
+    files = {name: (REPO_ROOT / name).read_text(encoding="utf-8")
+             for name in VOICE_REQUIREMENT_FILES if (REPO_ROOT / name).exists()}
+    hits = voice_lib_hits(files)
+    return CounterResult(len(hits), "; ".join(hits) or "none")
+
+
+@counter("p1", "submodule_left", "1 while .gitmodules or the voice_training/voxplot gitlink exists")
+def p1_submodule_left() -> CounterResult:
+    proc = subprocess.run(["git", "ls-files", "-s", "voice_training/voxplot"], cwd=REPO_ROOT,
+                          capture_output=True, text=True)
+    left = [what for what, there in ((".gitmodules", (REPO_ROOT / ".gitmodules").exists()),
+                                     ("the gitlink", proc.stdout.startswith("160000")))
+            if there]
+    return CounterResult(1 if left else 0, " and ".join(left) or "gone")
+
+
+@counter("p1", "device_checklist_open",
+         "the owner's phone checks not yet confirmed (docs/rebuild/owner_checks.json, p1)")
+def p1_device_checklist_open() -> CounterResult:
+    open_items = []
+    for key, label in P1_DEVICE_CHECKS.items():
+        verdict = _owner_check("p1", key)
+        if verdict is not True:
+            open_items.append(label + (" (reported failing)" if verdict is False else " (not checked)"))
+    return CounterResult(len(open_items), "; ".join(open_items) or "all confirmed")
+
+
+review("p1",
+       "The health app opens with three tabs and no Voice Training; Home, Training and Insights work.",
+       "The voice app opens from its own icon and records.",
+       "The [voxplot_supabase] section is removed from the health app's Streamlit secrets.")
 
 
 # ── output ───────────────────────────────────────────────────────────────────

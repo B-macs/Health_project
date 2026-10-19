@@ -1,5 +1,5 @@
 {
-  "phase": "P0",
+  "phase": "P1",
   "tasks": [
     {
       "id": "P0-01",
@@ -144,6 +144,74 @@
         "P0-13"
       ],
       "gate": "streamlit_app_broken",
+      "passes": false
+    },
+    {
+      "id": "P1-01",
+      "phase": "P1",
+      "description": "The Phase 1 gate: the p1 counters in scripts/rebuild_gate.py (tests_failing, voice_refs_left, voice_libs_left, submodule_left, device_checklist_open), each with tests.",
+      "depends_on": [],
+      "gate": "tests_failing",
+      "passes": false
+    },
+    {
+      "id": "P1-02",
+      "phase": "P1",
+      "description": "Owner: the standalone voice app on Streamlit Community Cloud from B-macs/health-voice-training, its secrets trimmed to [voxplot_supabase] (done 2026-10-19, after he restored its paused Supabase project).",
+      "depends_on": [],
+      "gate": "device_checklist_open",
+      "passes": false
+    },
+    {
+      "id": "P1-03",
+      "phase": "P1",
+      "description": "Remove Voice Training from the health app's code: the 'sync' route in app.py, the nav item in nav.py, views/sync.py, and the docstrings that point at Voxplot paths. Docs are updated by hand (not counted).",
+      "depends_on": [
+        "P1-01"
+      ],
+      "gate": "voice_refs_left",
+      "passes": false
+    },
+    {
+      "id": "P1-04",
+      "phase": "P1",
+      "description": "Remove the voice_training/voxplot submodule: deinit, .gitmodules, the gitlink, .git/modules.",
+      "depends_on": [
+        "P1-01"
+      ],
+      "gate": "submodule_left",
+      "passes": false
+    },
+    {
+      "id": "P1-05",
+      "phase": "P1",
+      "description": "Remove the voice-only libraries (praat-parselmouth, scipy, soundfile, imageio-ffmpeg) from requirements.txt; requirements-engine.txt names none.",
+      "depends_on": [
+        "P1-01"
+      ],
+      "gate": "voice_libs_left",
+      "passes": false
+    },
+    {
+      "id": "P1-06",
+      "phase": "P1",
+      "description": "The main gate stays at or above its floor: no test exists only for the voice embedding, and the nav tests follow the new tab list.",
+      "depends_on": [
+        "P1-03",
+        "P1-04",
+        "P1-05"
+      ],
+      "gate": "tests_failing",
+      "passes": false
+    },
+    {
+      "id": "P1-07",
+      "phase": "P1",
+      "description": "After the owner's push, his phone checks: the health app has three tabs and no Voice Training; Home, Training and Insights work; the voice app opens from its own icon and records.",
+      "depends_on": [
+        "P1-06"
+      ],
+      "gate": "device_checklist_open",
       "passes": false
     }
   ]

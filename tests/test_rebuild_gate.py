@@ -159,6 +159,50 @@ def test_the_real_streamlit_bound_list_names_existing_tests():
             assert f"def {name}(" in source, entry
 
 
+# ── Phase 1: Voice Training leaves the health app ────────────────────────────
+
+def test_phase_1_has_the_five_counters_its_prompt_names():
+    assert set(gate.REGISTRY["p1"]) == {"tests_failing", "voice_refs_left", "voice_libs_left",
+                                        "submodule_left", "device_checklist_open"}
+
+
+def test_a_voice_reference_in_code_is_found_with_its_line():
+    files = {
+        "app.py": "x = 1\nelif _page == 'sync':\n    from views import sync as _view\n",
+        "nav.py": '    ("↻",  "Voice Training", "sync"),\n',
+        "views/insights.py": "with tab_sync:\n    st.button('Sync')\n",     # the Insights Sync tab stays
+        ".gitmodules": '[submodule "voice_training/voxplot"]\n',
+    }
+    assert gate.voice_ref_hits(files) == ["app.py:3", "nav.py:1", ".gitmodules:1"]
+
+
+def test_docs_markdown_and_the_named_exceptions_do_not_count():
+    files = {
+        "docs/resume.md": "Voxplot (voice_training/voxplot) moved out on 2026-10-19\n",
+        "CLAUDE.md": "- Voice Training: its own Streamlit app\n",
+        "tests/test_rebuild_secrets.py": '"voxplot_supabase": {"url": "x"}\n',
+    }
+    assert gate.voice_ref_hits(files) == []
+    assert all(reason for reason in gate.VOICE_REF_ALLOW.values())
+
+
+def test_a_voice_library_is_found_by_its_name_not_by_a_longer_one():
+    text = ("streamlit>=1.58.0\npraat-parselmouth>=0.4.3\nscipy>=1.11\n"
+            "soundfile>=0.12\nimageio-ffmpeg>=0.5\nscipy-stubs==1.0\n# scipy left in 2026\n")
+    assert gate.voice_lib_hits({"requirements.txt": text}) == [
+        "requirements.txt: praat-parselmouth", "requirements.txt: scipy",
+        "requirements.txt: soundfile", "requirements.txt: imageio-ffmpeg"]
+
+
+def test_the_phone_checks_count_until_the_owner_confirms_each(tmp_path, monkeypatch):
+    checks = tmp_path / "owner_checks.json"
+    monkeypatch.setattr(gate, "OWNER_CHECKS", checks)
+    checks.write_text('{"p1": {"health_three_tabs": true, "health_pages_work": false}}', encoding="utf-8")
+    result = gate.p1_device_checklist_open()
+    assert result.count == 2
+    assert "reported failing" in result.detail and "not checked" in result.detail
+
+
 def test_update_feature_list_flips_only_this_phases_tasks(tmp_path):
     path = tmp_path / "fl.json"
     path.write_text(json.dumps({"phase": "P0", "tasks": [

@@ -4,5 +4,11 @@
     "streamlit_app_opens": null,
     "placeholder_opens_on_iphone": true,
     "placeholder_opens_on_iphone_note": "2026-10-19: the owner read the version line off his iPhone: 0.1.0 (84c88c6) · built 19 Oct, 10:56."
+  },
+  "p1": {
+    "health_three_tabs": null,
+    "health_pages_work": null,
+    "voice_app_records": null,
+    "voice_app_note": "2026-10-19: the owner created the voice app, restored its paused Supabase project and trimmed its secrets to [voxplot_supabase]; he reports it works. The Home Screen icon is not confirmed yet."
   }
 }
