@@ -151,3 +151,20 @@ def slope_direction_rows(slopes: dict) -> list[dict]:
             "Direction": direction,
         })
     return rows
+
+
+# ─── The Sync tab's history tables (move INS-6, 2026-10-19) ──────────────────
+
+def date_span(rows: list[dict]) -> tuple[date, date] | None:
+    """The first and last date of rows sorted by their ISO "date", or None."""
+    if not rows:
+        return None
+    return date.fromisoformat(str(rows[0]["date"])[:10]), date.fromisoformat(str(rows[-1]["date"])[:10])
+
+
+def rows_between(rows: list[dict], start: date, end: date) -> list[dict]:
+    """The rows dated from `start` to `end`, both included: the From and To
+    filters of the Biometric Blend and Metrics History tables, as parameters
+    the engine API takes too."""
+    lo, hi = start.isoformat(), end.isoformat()
+    return [r for r in rows if lo <= str(r["date"])[:10] <= hi]

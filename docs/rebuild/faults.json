@@ -12,7 +12,7 @@
     {"id": "F9", "what": "No cached read is keyed by date (windows end yesterday for up to 30 minutes after midnight)", "test": "tests/test_home.py::test_home_reads_are_keyed_by_the_day_shown", "fixed": "2026-10-19 in the move (services/home.py)"},
     {"id": "F10", "what": "Flexibility prints 'of 4 slots' and 'N not measured' with 4 typed in; the battery has 3", "test": null},
     {"id": "F11", "what": "Metabolism colours every rise amber and fall green, and shows 'Normal' on every derived value", "test": "tests/test_metabolism_screen.py::test_a_change_is_coloured_by_its_own_measure", "fixed": "2026-10-19"},
-    {"id": "F12", "what": "Sleep Architecture's 'Oura only' count includes watch-only nights", "test": null},
+    {"id": "F12", "what": "Sleep Architecture's 'Oura only' count includes watch-only nights", "test": "tests/test_sleep_architecture.py::test_each_source_has_its_own_count", "fixed": "2026-10-19"},
     {"id": "F13", "what": "An unfinished flexibility assessment lives only in the local .sync_state.json", "test": null},
     {"id": "F14", "what": "Nothing runs 'Sync Garmin Activities' automatically, yet it feeds the HR-max estimate", "test": null},
     {"id": "F15", "what": "Metabolism reads a local git-ignored CSV and hard-coded scans: empty on a server (Supabase tables approved)", "test": "tests/test_body_composition_store.py::test_the_store_writes_supabase_first_and_reads_back_from_the_copy", "fixed": "2026-10-19"},

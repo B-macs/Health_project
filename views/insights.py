@@ -43,6 +43,7 @@ from services import flexibility as fx
 from services import stats as stats_mod
 from services import insights as insights_svc
 from services import metabolism_screen as ms
+from services import sleep_architecture
 from services import sessions as sessions_svc
 from services import strength as strength_svc
 from services import tonnage as tonnage_svc
@@ -2841,7 +2842,10 @@ def render() -> None:
             fusion_loaded = True
         except Exception:
             fusion_rows, fusion_loaded = [], False
-        fused_only = [r for r in fusion_rows if r.get("source") == "fused"]
+        # The counts per source (services/sleep_architecture.py). "Oura only"
+        # counted the watch-only nights too until 2026-10-19 (fault F12).
+        arch = sleep_architecture.summary(fusion_rows)
+        fused_only = arch["fused_rows"]
 
         if not fusion_loaded:
             st.warning(
@@ -2854,17 +2858,17 @@ def render() -> None:
                 "Fusion needs both an Oura hypnogram and a matching Garmin night."
             )
         else:
-            oura_only_n = len(fusion_rows) - len(fused_only)
-            c1, c2, c3 = st.columns(3, gap="small")
-            c1.metric("Nights fused", len(fused_only))
-            c2.metric("Oura only", oura_only_n)
-            if fused_only:
-                phantom = [float(r.get("phantom_wake_minutes") or 0) for r in fused_only]
-                c3.metric("Median phantom wake removed", f"{sorted(phantom)[len(phantom) // 2]:.0f} min")
+            c1, c2, c3, c4 = st.columns(4, gap="small")
+            c1.metric("Nights fused", arch["fused"])
+            c2.metric("Oura only", arch["oura_only"])
+            c3.metric("Watch only", arch["watch_only"])
+            if arch["median_phantom_wake"] is not None:
+                c4.metric("Median phantom wake removed", f"{arch['median_phantom_wake']:.0f} min")
             st.caption(
-                f"{oura_only_n} night(s) have no matching Garmin stage data and pass "
+                f"{arch['oura_only']} night(s) have no matching Garmin stage data and pass "
                 "Oura through unchanged — Garmin only began returning stage segments "
-                "in May 2026."
+                f"in May 2026. {arch['watch_only']} night(s) the ring did not record "
+                "use the watch's stages alone."
             )
 
             if fused_only:
@@ -2912,11 +2916,8 @@ def render() -> None:
                 "effect is not directional — the same argument that keeps ACWR off "
                 "heart-rate-derived strain."
             )
-            fused_hours = {
-                r["date"]: float(r["master_sleep_hours"])
-                for r in fused_only if str(r.get("master_sleep_hours") or "").strip() != ""
-            }
-            shadow = dash.sleep_fusion_shadow_report(_bio(), fused_hours)
+            shadow = dash.sleep_fusion_shadow_report(
+                _bio(), sleep_architecture.fused_hours(fusion_rows))
             if not shadow["nights_compared"]:
                 st.info("No fused night overlaps the current biometric window yet.")
             else:
@@ -2997,15 +2998,11 @@ def render() -> None:
             st.warning(f"Could not load blend history: {exc}")
 
         if blend_history:
-            earliest = date.fromisoformat(blend_history[0]["date"])
-            latest = date.fromisoformat(blend_history[-1]["date"])
+            earliest, latest = insights_svc.date_span(blend_history)
             col_from, col_to = st.columns(2)
             start_pick = col_from.date_input("From", value=earliest, key="blend_hist_from")
             end_pick = col_to.date_input("To", value=latest, key="blend_hist_to")
-            filtered = [
-                r for r in blend_history
-                if str(start_pick) <= r["date"] <= str(end_pick)
-            ]
+            filtered = insights_svc.rows_between(blend_history, start_pick, end_pick)
             st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
         elif blend_history is not None:
             st.info(
@@ -3030,15 +3027,11 @@ def render() -> None:
             st.warning(f"Could not load metrics history: {exc}")
 
         if metrics_history:
-            earliest = date.fromisoformat(metrics_history[0]["date"])
-            latest = date.fromisoformat(metrics_history[-1]["date"])
+            earliest, latest = insights_svc.date_span(metrics_history)
             col_from, col_to = st.columns(2)
             start_pick = col_from.date_input("From", value=earliest, key="metrics_hist_from")
             end_pick = col_to.date_input("To", value=latest, key="metrics_hist_to")
-            filtered = [
-                r for r in metrics_history
-                if str(start_pick) <= r["date"] <= str(end_pick)
-            ]
+            filtered = insights_svc.rows_between(metrics_history, start_pick, end_pick)
             st.dataframe(pd.DataFrame(filtered), use_container_width=True, height=400)
         elif metrics_history is not None:
             st.info("No persisted history yet — wait for the automatic once-a-day sync.")
