@@ -23,7 +23,6 @@ import altair as alt
 import streamlit as st
 import pandas as pd
 
-import body_composition_baselines as bcb
 import cluster_a_battery as cba
 import cluster_a_mechanics
 import cluster_a_prescription
@@ -36,7 +35,6 @@ import today as today_mod
 import training_constants
 from services import ai
 from services import bioage
-from services import body_composition as bc
 from services import dashboard as dash
 from services import decision
 from services import engine
@@ -44,6 +42,7 @@ from services import battery as btry
 from services import flexibility as fx
 from services import stats as stats_mod
 from services import insights as insights_svc
+from services import metabolism_screen as ms
 from services import sessions as sessions_svc
 from services import strength as strength_svc
 from services import tonnage as tonnage_svc
@@ -844,25 +843,12 @@ def _render_strength_detail() -> None:
 
 _METAB_FAT, _METAB_LEAN, _METAB_DEV = "#B8822A", "#9B6BFF", "#3FA895"
 
-#: label → (series key, unit, decimals, minimum axis span, colour, source)
-_METAB_METRICS: dict[str, dict] = {
-    "Weight":            {"key": "weight",  "unit": "kg", "dp": 1, "span": 2.0,
-                          "colour": _METAB_LEAN, "src": "scale"},
-    "Fat mass":          {"key": "fat",     "unit": "kg", "dp": 1, "span": 1.5,
-                          "colour": _METAB_FAT,  "src": "scale"},
-    "Fat-free mass":     {"key": "ffm",     "unit": "kg", "dp": 1, "span": 1.5,
-                          "colour": _METAB_LEAN, "src": "scale"},
-    "Body fat percent":  {"key": "bf",      "unit": "%",  "dp": 1, "span": 1.5,
-                          "colour": _METAB_FAT,  "src": "scale"},
-    "Phase angle":       {"key": "phase",   "unit": "°",  "dp": 1, "span": 0.5,
-                          "colour": _METAB_DEV,  "src": "inbody"},
-    "ECW / TBW ratio":   {"key": "ecw",     "unit": "",   "dp": 3, "span": 0.008,
-                          "colour": _METAB_DEV,  "src": "inbody"},
+#: Each measure's chart colour. The measures themselves, with their units,
+#: spans and better directions, are services/metabolism_screen.METRICS.
+_METAB_COLOURS: dict[str, str] = {
+    "Weight": _METAB_LEAN, "Fat mass": _METAB_FAT, "Fat-free mass": _METAB_LEAN,
+    "Body fat percent": _METAB_FAT, "Phase angle": _METAB_DEV, "ECW / TBW ratio": _METAB_DEV,
 }
-
-_METAB_RANGES: tuple[tuple[str, str], ...] = (
-    ("Week", "week"), ("Month", "month"), ("Year", "year"), ("All", "all"),
-)
 
 _METABOLISM_CSS = f"""
 <style>
@@ -1008,14 +994,13 @@ def _metab_hero_html(fat: float | None, lean: float | None,
     )
 
 
-def _metab_split_html(fat: float | None, lean: float | None) -> str:
-    """Fat against fat-free, which must total the weight. It does so by
-    construction — `fat = weight * pct` and `lean = weight - fat` — so this bar
-    is a restatement of one number, never corroboration of it."""
-    if fat is None or lean is None or (fat + lean) <= 0:
+def _metab_split_html(split: dict | None) -> str:
+    """Fat against fat-free (services/metabolism_screen.split), which total the
+    weight by construction — a restatement of one number, never corroboration
+    of it."""
+    if split is None:
         return ""
-    total = fat + lean
-    pct = fat / total * 100
+    fat, lean, total, pct = split["fat"], split["lean"], split["total"], split["fat_pct"]
     return (
         f'<div class="mb-splitbar">'
         f'<i style="width:{pct:.1f}%;background:{_METAB_FAT}"></i>'
@@ -1028,27 +1013,35 @@ def _metab_split_html(fat: float | None, lean: float | None) -> str:
     )
 
 
-def _metab_readout_html(first: tuple | None, last: tuple | None,
-                        unit: str, dp: int) -> str:
-    """Latest, and the change across what the chart is showing.
+#: How a change is coloured, by services/metabolism_screen.change_tone.
+_METAB_TONE: dict[str, str] = {"flat": _INK3, "neutral": _INK2, "good": _GOOD, "bad": _WARN}
+
+
+def _metab_readout_html(s: dict) -> str:
+    """Latest, and the change across what the chart is showing
+    (services/metabolism_screen.series).
 
     The change is first-to-last of the VISIBLE points, not of the whole series
     — a number that disagrees with the picture beside it teaches the reader to
-    trust neither."""
+    trust neither — and it is coloured by what is better for this measure
+    (fault F11: every rise used to be amber and every fall green)."""
+    unit, dp = s["metric"]["unit"], s["metric"]["dp"]
+
     def cell(key: str, value: str) -> str:
         return f'<div><div class="k">{key}</div><div class="v">{value}</div></div>'
 
+    first, last = s["first"], s["last"]
     if last is None:
         return (f'<div class="mb-readout">{cell("Latest", "—")}'
                 f'{cell("Change", "—")}</div>')
     last_day, last_val = last
     latest = cell(f"Latest · {last_day.strftime('%d %b %Y').lstrip('0')}",
                   f"{last_val:.{dp}f}<u>{unit}</u>" if unit else f"{last_val:.{dp}f}")
-    if first is None or first[0] == last_day and first[1] == last_val:
+    if s["change"] is None:
         return f'<div class="mb-readout">{latest}{cell("Change · one reading only", "—")}</div>'
-    delta = last_val - first[1]
-    colour = _INK3 if abs(delta) < 10 ** -dp / 2 else (_WARN if delta > 0 else _GOOD)
-    sign = "" if abs(delta) < 10 ** -dp / 2 else ("−" if delta < 0 else "+")
+    delta = s["change"]
+    colour = _METAB_TONE[s["tone"]]
+    sign = "" if s["tone"] == "flat" else ("−" if delta < 0 else "+")
     span = (f"Change · {first[0].strftime('%d %b %Y').lstrip('0')} → "
             f"{last_day.strftime('%d %b %Y').lstrip('0')}")
     body = (f'<span style="color:{colour}">{sign}{abs(delta):.{dp}f}'
@@ -1156,52 +1149,19 @@ def _metab_cellular_html(scan, days_old: int, accent: str) -> str:
     return f'<div class="mb-cards">{"".join(cards)}</div>'
 
 
-def _metab_analysis_html(reading, accent: str) -> str:
-    """Every remaining figure, each labelled with what it really is.
-
-    `services.body_composition.DERIVED_COLUMNS` is the source of truth for which
-    of these are arithmetic; nothing here is stored, it is all recomputed from
-    the weight so that the screen cannot drift from the docstring."""
-    if reading is None:
-        return ""
-    when = reading.day.strftime("%d %b %Y").lstrip("0")
-    weight, pct = reading.weight_kg, reading.body_fat_pct
-    fat, lean = reading.fat_mass_kg, reading.fat_free_mass_kg
-    height = bc.TRUE_HEIGHT_M
-    rows: list[tuple] = [
-        ("MASS", "what the body is made of, in kilograms", [
-            ("Weight", f"{weight:.1f}", "kg", "measured", ("ok", "Normal")),
-            ("Body mass index", f"{weight / height ** 2:.1f}", "kg/m²", "derived", None),
-        ]),
-    ]
-    if pct is not None and fat is not None and lean is not None:
-        rows[0][2].extend([
-            ("Body fat", f"{fat:.1f}", "kg", "derived", ("ok", "Normal")),
-            ("Body fat", f"{pct:.1f}", "%", "derived", ("ok", "Normal")),
-            ("Fat-free mass", f"{lean:.1f}", "kg", "derived", None),
-            ("Bone mass", f"{lean * 0.04994:.1f}", "kg", "derived", None),
-        ])
-        rows.append(("ENERGY", "what it costs to run", [
-            ("Basal metabolic rate", f"{370 + 21.6 * lean:.0f}", "kcal", "derived", None),
-        ]))
-        rows.append(("WATER", "how that mass is hydrated", [
-            ("Body water", f"{0.72201 * (100 - pct):.1f}", "%", "derived", None),
-            ("Protein", f"{0.22797 * (100 - pct):.1f}", "%", "derived", None),
-        ]))
-        rows.append(("RISK", "what it implies", [
-            ("Visceral fat level", f"{-2.8932 + 0.5927 * pct:.1f}", "", "derived",
-             ("ok", "Normal")),
-            ("Subcutaneous fat", f"{pct - 2.25:.1f}", "%", "derived", None),
-            ("Waist circumference", "—", "cm", "absent", None),
-            ("Hip circumference", "—", "cm", "absent", None),
-        ]))
+def _metab_analysis_html(groups: list[dict], when: str, accent: str) -> str:
+    """Every remaining figure, each labelled with what it really is
+    (services/metabolism_screen.analysis). No card carries a status pill: the
+    "Normal" each derived card printed was no check (fault F11)."""
     out = ""
-    for group, blurb, cards in rows:
-        out += f'<div class="mb-grp">{group}<span>{blurb}</span></div><div class="mb-cards">'
-        out += "".join(
-            _metab_card_html(n, v, u, when if v != "—" else "no reading", s, p, accent)
-            for n, v, u, s, p in cards
-        )
+    for group in groups:
+        out += (f'<div class="mb-grp">{group["group"]}<span>{group["blurb"]}</span></div>'
+                f'<div class="mb-cards">')
+        for card in group["cards"]:
+            value = "—" if card["value"] is None else f'{card["value"]:.{card["dp"]}f}'
+            out += _metab_card_html(card["name"], value, card["unit"],
+                                    when if value != "—" else "no reading",
+                                    card["source"], None, accent)
         out += "</div>"
     return out
 
@@ -1224,15 +1184,12 @@ def _render_metabolism_detail() -> None:
     )
     if data.get("load_error"):
         st.warning(
-            "The scale export could not be read, so the figures below are "
+            "The readings could not be read, so the figures below are "
             f"showing their no-data state — {data['load_error']}",
             icon="⚠️",
         )
     if latest:
-        st.markdown(
-            _metab_split_html(latest.fat_mass_kg, latest.fat_free_mass_kg),
-            unsafe_allow_html=True,
-        )
+        st.markdown(_metab_split_html(ms.split(latest)), unsafe_allow_html=True)
 
     # ── Progress ──────────────────────────────────────────────────────────
     head_l, head_r = st.columns([2, 1])
@@ -1242,15 +1199,16 @@ def _render_metabolism_detail() -> None:
         unsafe_allow_html=True,
     )
     with head_r:
-        chosen = st.selectbox("Progress metric", list(_METAB_METRICS),
+        chosen = st.selectbox("Progress metric", list(ms.METRICS),
                               key="metab_metric", label_visibility="collapsed")
-    metric = _METAB_METRICS[chosen]
 
     kind = st.session_state.get("metab_range", "all")
     offset = st.session_state.get("metab_offset", 0)
+    shown = ms.series(data, chosen, kind, offset)
+    metric, window = shown["metric"], shown["window"]
 
     cols = st.columns([1, 1, 1, 1, 1, 3, 1])
-    for i, (label, key) in enumerate(_METAB_RANGES):
+    for i, (label, key) in enumerate(ms.RANGES):
         if cols[i].button(label, key=f"metab_r_{key}", use_container_width=True,
                           type="primary" if key == kind else "secondary"):
             # A new granularity always opens on the period containing today —
@@ -1259,55 +1217,39 @@ def _render_metabolism_detail() -> None:
             st.session_state["metab_offset"] = 0
             st.rerun()
 
-    earliest = readings[0].day if readings else None
     if cols[4].button("‹", key="metab_p_prev", use_container_width=True,
-                      disabled=not bc.can_step(kind, offset, -1, today, earliest)):
+                      disabled=not shown["can_back"]):
         st.session_state["metab_offset"] = offset - 1
         st.rerun()
-    window = bc.period_window(kind, offset, today, earliest)
     cols[5].markdown(
         f'<div class="mb-plabel"><b>{window.label}</b><i>{window.sub}</i></div>',
         unsafe_allow_html=True,
     )
     if cols[6].button("›", key="metab_p_next", use_container_width=True,
-                      disabled=not bc.can_step(kind, offset, 1, today, earliest)):
+                      disabled=not shown["can_forward"]):
         st.session_state["metab_offset"] = offset + 1
         st.rerun()
 
-    source = scans if metric["src"] == "inbody" else readings
-    gap = (bc.INBODY_GAP_BREAK_DAYS if metric["src"] == "inbody"
-           else bc.SCALE_GAP_BREAK_DAYS)
-    visible = bc.readings_in(source, window)
-    points = [(r.day, v) for r in visible
-              if (v := _metab_value(r, metric["key"])) is not None]
-    runs = [[(r.day, v) for r in run if (v := _metab_value(r, metric["key"])) is not None]
-            for run in bc.split_runs(visible, gap)]
-
-    st.markdown(
-        _metab_readout_html(points[0] if points else None,
-                            points[-1] if points else None,
-                            metric["unit"], metric["dp"]),
-        unsafe_allow_html=True,
-    )
+    st.markdown(_metab_readout_html(shown), unsafe_allow_html=True)
     st.markdown(
         f'<div class="mb-chartbox">'
-        f'{_metab_chart_svg(points, metric["colour"], metric["dp"], metric["span"], window, runs, chosen)}'
+        f'{_metab_chart_svg(shown["points"], _METAB_COLOURS[chosen], metric["dp"], metric["span"], window, shown["runs"], chosen)}'
         f"</div>",
         unsafe_allow_html=True,
     )
 
     # ── Cellular health ───────────────────────────────────────────────────
-    if scans:
-        clean = scans[-1]
+    cell = ms.cellular(scans, today)
+    if cell:
         st.markdown(
             f"<div style='color:{_INK};font-size:18px;font-weight:600;margin:6px 0 2px;'>"
             f"Cellular health</div>"
             f"<div style='font-size:11px;color:{_INK3};margin-bottom:9px;'>"
-            f"{bcb.DEVICE} · nothing else measures these</div>",
+            f"{cell['device']} · nothing else measures these</div>",
             unsafe_allow_html=True,
         )
         st.markdown(
-            _metab_cellular_html(clean, (today - clean.day).days, accent),
+            _metab_cellular_html(cell["scan"], cell["days_old"], accent),
             unsafe_allow_html=True,
         )
 
@@ -1317,25 +1259,12 @@ def _render_metabolism_detail() -> None:
         f"Body analysis</div>",
         unsafe_allow_html=True,
     )
-    st.markdown(_metab_analysis_html(latest, accent), unsafe_allow_html=True)
-
-
-def _metab_value(record, key: str) -> float | None:
-    """One accessor for both record types, so the chart does not need to know
-    which device a series came from."""
-    if key == "weight":
-        return getattr(record, "weight_kg", None)
-    if key == "fat":
-        return record.fat_mass_kg
-    if key == "ffm":
-        return record.fat_free_mass_kg
-    if key == "bf":
-        return record.body_fat_pct
-    if key == "phase":
-        return getattr(record, "phase_angle_deg", None)
-    if key == "ecw":
-        return getattr(record, "ecw_tbw", None)
-    return None
+    st.markdown(
+        _metab_analysis_html(ms.analysis(latest),
+                             latest.day.strftime("%d %b %Y").lstrip("0") if latest else "",
+                             accent),
+        unsafe_allow_html=True,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2168,43 +2097,13 @@ def _render_flexibility_detail() -> None:
 
 
 
-#: Where the Foryond export lands. Gitignored with the rest of `Input_files/`,
-#: so a deployment without it renders the empty state rather than crashing —
-#: which is also what a first-time user sees, and is the correct thing to show.
-_FITDAYS_EXPORT = Path(__file__).resolve().parent.parent / "Input_files" / "Fitdays.csv"
-
-
 @st.cache_data(ttl=1800, show_spinner=False)
 def _metabolism_screen_data() -> dict:
-    """Everything the Metabolism screen renders.
-
-    The file read lives here rather than in `services/body_composition.py` —
-    that module is pure by contract, so it takes CSV *text* and this layer owns
-    the I/O, the same split every other service in this app uses.
-
-    A read failure must not render as "you have never weighed yourself". The
-    two are indistinguishable once the list is empty, and only one of them is a
-    real reading — so the error is carried through and surfaced."""
-    load_error: str | None = None
-    readings: list = []
-    try:
-        if _FITDAYS_EXPORT.exists():
-            readings = bc.parse_fitdays_csv(
-                _FITDAYS_EXPORT.read_text(encoding="utf-8-sig"))
-    except Exception as exc:
-        readings, load_error = [], f"{type(exc).__name__}: {exc}"
-
-    # Every gym scan corrected to the true height before it is shown. Four of
-    # the five were run against a height 3-7 cm out, and height is squared
-    # inside InBody's first step — see body_composition_baselines.py.
-    scans = [s.at_height() for s in bcb.SCANS]
-
-    return {
-        "readings": readings,
-        "scans": scans,
-        "today": date.today(),
-        "load_error": load_error,
-    }
+    """Everything the Metabolism screen renders: the readings from the store
+    (services/metabolism_screen.read_data; fault F15 — they came from a local,
+    git-ignored CSV, so a server showed none). A read failure is carried
+    through as load_error, never shown as "you have never weighed yourself"."""
+    return ms.read_data(repo.get_repository(), date.today())
 
 
 @st.cache_data(ttl=1800, show_spinner=False)

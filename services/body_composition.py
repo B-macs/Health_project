@@ -196,6 +196,10 @@ class InBodyScan:
     ecw_tbw: float
     phase_angle_deg: float | None = None
     note: str = ""
+    #: The machine model. Scans are never pooled across models (the same rule
+    #: as the Garmin 645 -> 265 calibration); stored with every scan since
+    #: 2026-10-19, when the scans moved into Supabase.
+    device: str = ""
 
     @property
     def day(self) -> date:
@@ -406,3 +410,77 @@ def split_runs(readings: list, gap_days: int) -> list[list]:
     if current:
         runs.append(current)
     return runs
+
+
+# ── stored rows (fault F15, 2026-10-19) ──────────────────────────────────────
+#
+# The readings live in two Supabase tables, scale_readings and inbody_scans.
+# These turn a reading into its row and back; services/repository.py does the
+# I/O. taken_at is the local wall time, to the second.
+
+def _stamp(taken_at: datetime) -> str:
+    return taken_at.isoformat(timespec="seconds")
+
+
+def _float(value) -> float | None:
+    if value in (None, ""):
+        return None
+    return float(value)
+
+
+def scale_reading_row(reading: ScaleReading) -> dict:
+    return {"taken_at": _stamp(reading.taken_at), "weight_kg": reading.weight_kg,
+            "bmi": reading.bmi, "body_fat_pct": reading.body_fat_pct}
+
+
+def scale_readings_from_rows(rows: list[dict]) -> list[ScaleReading]:
+    """Stored rows back to readings, oldest first; a row without a time or a
+    weight is skipped rather than raising, as the CSV parser does."""
+    out = []
+    for row in rows:
+        weight = _float(row.get("weight_kg"))
+        if not row.get("taken_at") or weight is None:
+            continue
+        out.append(ScaleReading(taken_at=datetime.fromisoformat(str(row["taken_at"])),
+                                weight_kg=weight, bmi=_float(row.get("bmi")),
+                                body_fat_pct=_float(row.get("body_fat_pct"))))
+    return dedupe_readings(sorted(out, key=lambda r: r.taken_at))
+
+
+def inbody_scan_row(scan: InBodyScan) -> dict:
+    """The scan as printed: store the console's figures, never the height
+    correction, which runs on read (InBodyScan.at_height)."""
+    if not scan.device:
+        raise ValueError("an InBody scan is stored with its device model")
+    return {"taken_at": _stamp(scan.taken_at), "device": scan.device,
+            "weight_kg": scan.weight_kg, "bmi": scan.bmi,
+            "total_body_water_l": scan.total_body_water_l,
+            "skeletal_muscle_kg": scan.skeletal_muscle_kg, "ecw_tbw": scan.ecw_tbw,
+            "phase_angle_deg": scan.phase_angle_deg, "note": scan.note or None}
+
+
+def inbody_scans_from_rows(rows: list[dict]) -> list[InBodyScan]:
+    """Stored rows back to scans, oldest first."""
+    out = []
+    for row in rows:
+        if not row.get("taken_at"):
+            continue
+        out.append(InBodyScan(
+            taken_at=datetime.fromisoformat(str(row["taken_at"])),
+            weight_kg=float(row["weight_kg"]), bmi=float(row["bmi"]),
+            total_body_water_l=float(row["total_body_water_l"]),
+            skeletal_muscle_kg=float(row["skeletal_muscle_kg"]),
+            ecw_tbw=float(row["ecw_tbw"]),
+            phase_angle_deg=_float(row.get("phase_angle_deg")),
+            note=str(row.get("note") or ""), device=str(row.get("device") or "")))
+    return sorted(out, key=lambda s: s.taken_at)
+
+
+def latest_device_scans(scans: list[InBodyScan]) -> list[InBodyScan]:
+    """The scans of the machine model that ran the latest scan. A new machine
+    starts its own series; its scans are never drawn on one line with the
+    old machine's."""
+    if not scans:
+        return []
+    device = scans[-1].device
+    return [s for s in scans if s.device == device]

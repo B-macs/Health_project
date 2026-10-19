@@ -42,7 +42,8 @@ def test_every_column_of_every_table_survives():
 
 
 def test_the_translation_is_not_empty_or_truncated():
-    assert len(dp.table_names(POSTGRES)) == 21
+    # 21, plus the two Metabolism tables of 2026-10-19 (fault F15).
+    assert len(dp.table_names(POSTGRES)) == 23
     assert POSTGRES.rstrip().endswith(";")
 
 

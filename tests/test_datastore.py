@@ -137,6 +137,8 @@ _ALL_TABLES = [
     "oura_sleep_periods", "oura_sessions", "oura_rest_mode", "biometric_blend",
     "metrics_history", "wake_time_adjustments", "weekly_rollup",
     "sheet1_legacy_biometrics", "config", "datastore_meta",
+    # The Metabolism readings, Supabase-only (fault F15, 2026-10-19).
+    "scale_readings", "inbody_scans",
 ]
 
 

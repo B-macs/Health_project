@@ -431,6 +431,34 @@ CREATE TABLE weekly_rollup (
     -- consumer; omitted here rather than re-deriving it in datastore.py.
 );
 
+-- The Metabolism screen's readings (rebuild Phase 2, inventory fault F15,
+-- 2026-10-19). Kept only in Supabase and its local copy: no Sheets tab or
+-- Notion database ever held them. Before, the scale readings came from a
+-- git-ignored CSV and the gym scans from a Python tuple, so the hosted app
+-- showed no weight at all. Created in Supabase by
+-- scripts/migrate_2026-10-19_metabolism_tables.sql; filled by
+-- scripts/import_body_composition.py.
+DROP TABLE IF EXISTS scale_readings;
+CREATE TABLE scale_readings (
+    taken_at      TEXT PRIMARY KEY,  -- local wall time, 'YYYY-MM-DDTHH:MM:SS'
+    weight_kg     REAL NOT NULL,     -- the one measurement
+    bmi           REAL,              -- as the device printed it
+    body_fat_pct  REAL               -- as the device printed it (a fit on weight and age)
+);
+
+DROP TABLE IF EXISTS inbody_scans;
+CREATE TABLE inbody_scans (
+    taken_at            TEXT PRIMARY KEY,
+    device              TEXT NOT NULL,   -- never pool scans across machine models
+    weight_kg           REAL NOT NULL,
+    bmi                 REAL NOT NULL,   -- as printed: it carries the height typed at the console
+    total_body_water_l  REAL NOT NULL,
+    skeletal_muscle_kg  REAL NOT NULL,
+    ecw_tbw             REAL NOT NULL,
+    phase_angle_deg     REAL,
+    note                TEXT
+);
+
 DROP TABLE IF EXISTS sheet1_legacy_biometrics;
 CREATE TABLE sheet1_legacy_biometrics (
     date                  TEXT PRIMARY KEY,

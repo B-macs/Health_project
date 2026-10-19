@@ -34,6 +34,7 @@ from datetime import date, datetime, timedelta
 
 from services import backup
 from services import biometrics
+from services import body_composition
 from services import content_weighting
 from services import dashboard
 from services import flexibility
@@ -6418,6 +6419,54 @@ class Repository:
             )
         except Exception as exc:
             return False, str(exc)
+
+    # ─── Body composition (the Metabolism screen; fault F15, 2026-10-19) ──
+    #  Two tables kept only in Supabase and its local copy. The readings came
+    #  from a git-ignored CSV and a Python tuple, so on a server the screen
+    #  was empty. scripts/import_body_composition.py fills them.
+
+    def _store_only_rows(self, table: str) -> list[dict]:
+        """Every row of a Supabase-only table, from the local copy. A mode
+        with no local copy raises, which the screen shows as a read error
+        rather than as "no readings"."""
+        if not self.local_datastore:
+            raise RuntimeError(f"{table} is kept in Supabase; this mode has no local copy")
+        return datastore_reader.OfflineWorksheet(self._ds, table, table).get_all_records()
+
+    def _write_store_only_rows(self, table: str, rows: dict[str, dict]) -> int:
+        """Upsert rows of a Supabase-only table: Supabase first and waited
+        for, then the local copy (_write_record). Only Supabase as the record
+        can hold them."""
+        if not self.supabase_record:
+            raise RuntimeError(f"{table} is kept in Supabase; this mode cannot write it")
+        if rows:
+            self._write_record(table, rows, supabase_store.UPSERT)
+        return len(rows)
+
+    def get_scale_readings(self) -> list:
+        """Every Foryond weigh-in, oldest first (body_composition.ScaleReading)."""
+        return body_composition.scale_readings_from_rows(self._store_only_rows("scale_readings"))
+
+    def get_inbody_scans(self) -> list:
+        """Every gym scan as printed, oldest first (body_composition.InBodyScan);
+        the height correction runs on read, in the caller."""
+        return body_composition.inbody_scans_from_rows(self._store_only_rows("inbody_scans"))
+
+    def save_scale_readings(self, readings: list) -> int:
+        """Upsert weigh-ins by their minute; the number of rows sent."""
+        rows = {}
+        for reading in readings:
+            row = body_composition.scale_reading_row(reading)
+            rows[row["taken_at"]] = row
+        return self._write_store_only_rows("scale_readings", rows)
+
+    def save_inbody_scans(self, scans: list) -> int:
+        """Upsert gym scans by their time; each carries its device model."""
+        rows = {}
+        for scan in scans:
+            row = body_composition.inbody_scan_row(scan)
+            rows[row["taken_at"]] = row
+        return self._write_store_only_rows("inbody_scans", rows)
 
     # ─── In-progress training checkpoint (local mirror) ──────────────────
     #  The durable copy lives in Notion under set_config("training_progress").

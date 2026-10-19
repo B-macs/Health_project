@@ -55,30 +55,35 @@ SCANS: tuple[InBodyScan, ...] = (
         weight_kg=82.2, bmi=23.9, total_body_water_l=52.5,
         skeletal_muscle_kg=40.5, ecw_tbw=0.379, phase_angle_deg=None,
         note="height 185.5 cm entered — 3.5 cm too tall, reads too lean",
+        device=DEVICE,
     ),
     InBodyScan(
         taken_at=datetime(2025, 3, 13, 12, 19),
         weight_kg=82.2, bmi=26.8, total_body_water_l=48.3,
         skeletal_muscle_kg=37.1, ecw_tbw=0.378, phase_angle_deg=None,
         note="height 175.1 cm entered — 6.9 cm too short, reads too fat",
+        device=DEVICE,
     ),
     InBodyScan(
         taken_at=datetime(2025, 5, 21, 12, 16),
         weight_kg=79.5, bmi=26.0, total_body_water_l=46.7,
         skeletal_muscle_kg=35.9, ecw_tbw=0.377, phase_angle_deg=6.1,
         note="height 174.9 cm entered — 7.1 cm too short",
+        device=DEVICE,
     ),
     InBodyScan(
         taken_at=datetime(2025, 5, 21, 12, 24),
         weight_kg=79.5, bmi=24.1, total_body_water_l=50.2,
         skeletal_muscle_kg=38.8, ecw_tbw=0.377, phase_angle_deg=6.1,
         note="re-run 8 minutes later with the height corrected to 181.6 cm",
+        device=DEVICE,
     ),
     InBodyScan(
         taken_at=datetime(2025, 6, 27, 10, 6),
         weight_kg=78.7, bmi=23.8, total_body_water_l=51.0,
         skeletal_muscle_kg=39.5, ecw_tbw=0.375, phase_angle_deg=6.1,
         note="height 181.8 cm entered — 0.2 cm off, the only clean scan",
+        device=DEVICE,
     ),
 )
 
