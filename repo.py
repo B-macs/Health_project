@@ -17,7 +17,6 @@ import threading
 import streamlit as st
 
 from services import datastore
-from services import record_cache
 from services import switchover
 from services.background_sync import BackgroundSyncRunner
 from services.config import load_config
@@ -31,15 +30,6 @@ def get_config():
     build its OWN Repository per run — see services/background_sync.py for
     why it must not borrow this thread's."""
     return load_config(dict(st.secrets))
-
-
-# Set by get_repository() when it hydrates the cache, drained by
-# pop_cache_hydration_notice(). A module global rather than a return value
-# because get_repository's result is what every caller wants, and rather than
-# session_state because the hydration happens on whichever session opened the
-# process first — see pop_cache_hydration_notice for why it cannot simply be
-# rendered where it is produced.
-_cache_hydration_notice: str | None = None
 
 
 @st.cache_resource(show_spinner=False)
@@ -68,15 +58,11 @@ def get_repository() -> Repository:
     to see. Ordinary elements (st.warning, st.write) replay fine; this is not a
     general ban on drawing from a cached function.
     """
-    global _cache_hydration_notice
     config = get_config()
-    filled = datastore.ensure_local_cache(config)
-    if filled and not record_cache.is_supabase_record(config):
-        # With Supabase as the record the copy is rebuilt at EVERY process
-        # start, so saying so on every start would be noise.
-        _cache_hydration_notice = (
-            f"Rebuilt the local read cache from Supabase ({filled})."
-        )
+    # With Supabase as the record the copy is rebuilt at EVERY process start,
+    # so there is no notice to show; the "Rebuilt the local read cache" toast
+    # of the legacy cache mode was dropped 2026-10-19 (inventory H3).
+    datastore.ensure_local_cache(config)
     repository = Repository(config)
     # The switch to Supabase as the only store — the marker, then the one-time
     # add-only catch-up from Notion and Sheets (services/switchover.py). Only
@@ -88,20 +74,6 @@ def get_repository() -> Repository:
         threading.Thread(target=switchover.finish, args=(config,),
                          name="switchover", daemon=True).start()
     return repository
-
-
-def pop_cache_hydration_notice() -> str | None:
-    """The hydration message, once, for the caller to render.
-
-    Returns None every time after the first. The rebuild happens once per
-    process, so the notice is worth exactly one showing — and it has to be
-    rendered by the caller rather than by get_repository itself, because a
-    toast emitted inside a cache-decorated function is replayed on every
-    subsequent cache hit and crashes the app (see get_repository's docstring).
-    """
-    global _cache_hydration_notice
-    notice, _cache_hydration_notice = _cache_hydration_notice, None
-    return notice
 
 
 @st.cache_resource(show_spinner=False)

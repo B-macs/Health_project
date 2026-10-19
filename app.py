@@ -59,20 +59,8 @@ st.markdown(nav.CHROME_CSS, unsafe_allow_html=True)
 # failure this mode must never produce silently. Costs nothing when unset.
 #
 # This is also the first touch of the Repository in any script run, which is
-# where cache mode hydrates datastore.db from Supabase if a redeploy wiped the
-# disk. Bind it once, THEN drain the notice: the hydration happens inside the
-# call, so popping before it would find nothing on the very run that rebuilt
-# and fire the toast a run late. Rendered here rather than inside
-# get_repository because a toast emitted from a cache-decorated function is
-# replayed on every later cache hit and raises CacheReplayClosureError — see
-# repo.get_repository's docstring. Outside the offline branch, deliberately:
-# `offline` is False in cache mode (Repository.offline is
-# `datastore_mode != "cache"`), and cache mode is the only mode that hydrates.
+# where the local copy is rebuilt from Supabase at the process's first start.
 _repository = repo.get_repository()
-
-_hydration_notice = repo.pop_cache_hydration_notice()
-if _hydration_notice:
-    st.toast(_hydration_notice)
 
 if _repository.offline:
     _built = _repository.datastore_built_at() or "unknown"
@@ -468,7 +456,7 @@ def _region_au_history(end_iso: str, days: int = strain_screen.REGION_DAYS) -> d
     Deliberately its OWN fetch rather than widening _au_history: this is
     called only from the strain drill-down, so the three-card Home stream
     never pays for it. Opening a drill-down is a deliberate click that can
-    afford a read, which is the same trade services/home_snapshot.py makes
+    afford a read, which is the same trade the dropped Home snapshot made
     when it declines to cache hr_detail.
 
     31 days so the 30-day trend window is fully covered, ending on the day

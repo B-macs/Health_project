@@ -114,8 +114,8 @@ def test_no_replay_unsafe_element_inside_a_cached_function():
         "and every one after, and it will not reproduce locally if the call site "
         "only runs on the hosted deploy.\n\n"
         + "\n".join(offenders)
-        + "\n\nFix: record the message and let the CALLER render it — see "
-        "repo.pop_cache_hydration_notice() for the worked example."
+        + "\n\nFix: record the message and let the CALLER render it, outside "
+        "the cache-decorated function."
     )
 
 
@@ -138,55 +138,7 @@ def test_repo_get_repository_does_not_toast():
             assert not _unsafe_calls_within(node), (
                 "get_repository() must not call st.toast — it is replayed on "
                 "every cache hit and raises CacheReplayClosureError on the "
-                "hosted deploy. Use pop_cache_hydration_notice() instead."
+                "hosted deploy. Record the message and let the caller render it."
             )
             return
     raise AssertionError("repo.get_repository() not found")
-
-
-def test_hydration_notice_is_drained_once():
-    """pop_cache_hydration_notice returns the message exactly once.
-
-    Imports repo lazily so this test does not require streamlit at collection
-    time in environments where the rest of the suite runs headless.
-    """
-    import repo as repo_module
-
-    repo_module._cache_hydration_notice = "Rebuilt the local read cache (x)."
-    assert repo_module.pop_cache_hydration_notice() == "Rebuilt the local read cache (x)."
-    assert repo_module.pop_cache_hydration_notice() is None
-    assert repo_module.pop_cache_hydration_notice() is None
-
-
-def test_app_renders_the_hydration_notice():
-    """app.py must actually drain it, or the rebuild becomes silent.
-
-    Also pins that the drain is NOT nested inside the `offline` branch:
-    Repository.offline is `datastore_mode != "cache"`, and cache mode is the
-    only mode that ever hydrates, so a drain inside that branch is dead code.
-    """
-    source = (REPO_ROOT / "app.py").read_text(encoding="utf-8")
-    assert "pop_cache_hydration_notice()" in source, (
-        "app.py must drain the hydration notice — otherwise a cache rebuilt "
-        "from Supabase is never reported to the athlete"
-    )
-
-    tree = ast.parse(source)
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.If):
-            continue
-        # `if <...>.offline:` — the offline banner branch.
-        test = node.test
-        if isinstance(test, ast.Attribute) and test.attr == "offline":
-            nested = [
-                sub
-                for sub in ast.walk(node)
-                if isinstance(sub, ast.Call)
-                and isinstance(sub.func, ast.Attribute)
-                and sub.func.attr == "pop_cache_hydration_notice"
-            ]
-            assert not nested, (
-                "pop_cache_hydration_notice() is inside `if ....offline:`, where "
-                "it can never fire: offline is False in cache mode and cache "
-                "mode is the only mode that hydrates."
-            )

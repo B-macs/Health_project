@@ -12,18 +12,18 @@ criterion for the whole change is that every number and every key below is
 bit-identical afterwards. If a regional feature moves one of these, the
 regional feature is wrong.
 
-The golden tables also pin the two persistence shapes that CLAUDE.md records as
-traps: `_METRICS_HISTORY_HEADER` is positional and append-only (a tab created
+The golden tables also pin the persistence shape that CLAUDE.md records as a
+trap: `_METRICS_HISTORY_HEADER` is positional and append-only (a tab created
 before a column joined it discards that column forever — this already bit
-`hrv_ms`), and `home_snapshot` keys a fixed set that the durable Home cache
-round-trips.
+`hrv_ms`). The durable Home cache's key set was pinned here too until the cache
+was dropped on 2026-10-19 (inventory H59).
 """
 
 from datetime import date, timedelta
 
 import pytest
 
-from services import dashboard, engine, home_snapshot, readiness
+from services import dashboard, engine, readiness
 from services import repository as repo_mod
 
 
@@ -144,10 +144,10 @@ def test_compute_daily_metrics_snapshot_is_bit_identical(case):
 def test_compute_daily_metrics_snapshot_returns_exactly_these_keys():
     """Deliberately duplicates tests/test_dashboard.py's own key assertion.
     THIS file's name is what tells a future reader why the set must not grow:
-    three consumers read it positionally or by literal key set —
-    Repository._metrics_history_row (bracket access, so a rename KeyErrors),
-    home_snapshot.build, and the Home page itself. A regional metric belongs in
-    a SIBLING function, not in here."""
+    two consumers read it positionally or by literal key set —
+    Repository._metrics_history_row (bracket access, so a rename KeyErrors)
+    and the Home page itself (a third, the durable Home snapshot, was dropped
+    2026-10-19). A regional metric belongs in a SIBLING function, not in here."""
     snap = dashboard.compute_daily_metrics_snapshot(
         _D, [], [{"date": "2026-07-20", "total_au": 360.0}], 2,
     )
@@ -189,16 +189,3 @@ def test_metrics_history_row_maps_a_populated_snapshot_unchanged():
         "sleep_score": 80.0, "strain": 16.3,
         "readiness_model_version": readiness.MODEL_VERSION,
     }
-
-
-def test_home_snapshot_entry_shape_is_unchanged():
-    snap = dashboard.compute_daily_metrics_snapshot(
-        _D, [], [{"date": "2026-07-20", "total_au": 360.0}], 2,
-    )
-    entry = home_snapshot.build(snap, 8.0, 56)
-    assert set(entry) == {
-        "schema", "computed_at", "readiness_score", "sleep_score",
-        "strain", "strain_is_rolling", "sleep_need_hours",
-        "sleep_baseline_window",
-    }
-    assert home_snapshot.SCHEMA_VERSION == 1

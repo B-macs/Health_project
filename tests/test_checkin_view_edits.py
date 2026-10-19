@@ -35,8 +35,6 @@ class _Stub:
         return None
     def save_check_in(self, record, replace=False):
         st.session_state["_saved"] = (record.pain_score, record.subjective_tightness, replace)
-    def send_mirror_now(self):
-        return None
 
 repo.get_repository = lambda: _Stub()
 from views import checkin

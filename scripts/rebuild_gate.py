@@ -676,10 +676,18 @@ def unmapped_rows(rows: dict[str, str], mapping: dict[str, dict], operations: se
 
 def open_items(entries: list[dict], needs: tuple[str, ...], ref_exists=_ref_exists) -> list[str]:
     """Ids of entries where a field in `needs` is empty, or names a file and a
-    definition that do not exist ("services/x.py::fn", "tests/x.py::test_y")."""
-    return [e.get("id", "?") for e in entries
-            if not all(_as_list(e.get(k)) and all(ref_exists(r) for r in _as_list(e.get(k)))
-                       for k in needs)]
+    definition that do not exist ("services/x.py::fn", "tests/x.py::test_y").
+
+    An entry the owner approved to DROP carries "dropped" (the date) and
+    "gone" (what was removed) instead: it is closed once none of "gone"
+    exists any more, so a drop counts only when its code is really gone."""
+    def closed(e: dict) -> bool:
+        if e.get("dropped"):
+            gone = _as_list(e.get("gone"))
+            return bool(gone) and not any(ref_exists(r) for r in gone)
+        return all(_as_list(e.get(k)) and all(ref_exists(r) for r in _as_list(e.get(k)))
+                   for k in needs)
+    return [e.get("id", "?") for e in entries if not closed(e)]
 
 
 def _open_list(ids: list[str], limit: int = 30) -> str:

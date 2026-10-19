@@ -360,6 +360,17 @@ def test_a_move_or_a_fault_is_open_until_its_service_and_test_exist():
         "B", "C", "E", "F"]
 
 
+def test_a_dropped_move_closes_only_once_its_code_is_gone():
+    entries = [
+        {"id": "A", "dropped": "2026-10-19", "gone": ["services/old.py"]},
+        {"id": "B", "dropped": "2026-10-19", "gone": ["services/still_here.py"]},
+        {"id": "C", "dropped": "2026-10-19", "gone": []},
+    ]
+    known = {"services/still_here.py"}
+    assert gate.open_items(entries, ("service", "test"), ref_exists=known.__contains__) == [
+        "B", "C"]
+
+
 def test_a_reference_must_name_a_real_definition(tmp_path, monkeypatch):
     monkeypatch.setattr(gate, "REPO_ROOT", tmp_path)
     (tmp_path / "services").mkdir()

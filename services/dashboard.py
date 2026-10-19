@@ -327,7 +327,7 @@ def strain_meta(score, is_rolling: bool = False) -> tuple:
 #
 # compute_daily_metrics_snapshot's key set is read positionally or by literal
 # set in three places — Repository._metrics_history_row (bracket access, so a
-# rename raises), home_snapshot.build, and the Home page — and
+# rename raises), the Home page and the engine API — and
 # tests/test_dashboard.py already asserts it exactly. Localised strain is
 # additive information beside the headline, so it gets its own function and
 # leaves that contract alone.

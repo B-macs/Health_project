@@ -57,8 +57,8 @@ from training_plan import _ex
 BLOCK_NAME = "12-Week Block — Hips, Back and Strength"
 WEEKS = 12
 #: The Monday after the push (athlete, 2026-10-16: "it starts on the next
-#: monday"). services/block_changeover places the block here and ends Block B
-#: the day before; set it to the real Monday if the push moves.
+#: monday"). The changeover stored the block here on 2026-10-16 and ended
+#: Block B the day before (its code was dropped 2026-10-19).
 START = date(2026, 10, 19)
 #: The timed plank test (session A, in place of that day's abs) and the rib
 #: and pelvis test (Sunday morning): week 1 and week 12.

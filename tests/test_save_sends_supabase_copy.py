@@ -9,12 +9,14 @@ rebuilt the hosted read cache from Supabase, so the sessions of 2026-10-06,
 10-07 and 10-08 disappeared from the app while Notion still held them.
 
 Repository.send_mirror_now sends the queue at once and returns the error text
-of a failed send. Every saver that writes a training session or a check-in
-calls it, and these tests fail if one stops.
+of a failed send. These tests pin that method, which the legacy (Notion) mode
+keeps. The pages stopped calling it on 2026-10-19 (inventory T3, I113, dropped
+with the owner's approval): with Supabase as the record a save is written
+there first and waited for, so there is no copy left to send and no warning
+that could fire.
 """
 from __future__ import annotations
 
-import ast
 from pathlib import Path
 
 import pytest
@@ -105,58 +107,3 @@ def test_an_old_error_is_not_reported_for_a_send_that_worked():
 
 def test_nothing_queued_is_not_an_error():
     assert _repo(FakeStore()).send_mirror_now() is None
-
-
-# ─── every saver sends ──────────────────────────────────────────────────────
-
-def _function(path: Path, name: str) -> ast.FunctionDef:
-    tree = ast.parse(path.read_text(encoding="utf-8"))
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name == name:
-            return node
-    raise AssertionError(f"{name} not found in {path.name}")
-
-
-def _calls(node: ast.AST) -> set[str]:
-    names = set()
-    for sub in ast.walk(node):
-        if isinstance(sub, ast.Call):
-            fn = sub.func
-            names.add(fn.attr if isinstance(fn, ast.Attribute) else getattr(fn, "id", ""))
-    return names
-
-
-@pytest.mark.parametrize("saver", [
-    "_auto_log_session", "_log_yoga_completion", "_log_outdoor_activity"])
-def test_every_training_saver_sends_the_copy(saver):
-    assert "_send_backup_copy" in _calls(_function(ROOT / "views" / "training.py", saver))
-
-
-def test_the_send_helper_uses_the_repository_send():
-    helper = _function(ROOT / "views" / "training.py", "_send_backup_copy")
-    assert "send_mirror_now" in _calls(helper)
-
-
-def test_the_training_page_shows_a_failed_send():
-    assert "_render_backup_warning" in _calls(
-        _function(ROOT / "views" / "training.py", "render"))
-
-
-def test_the_warning_survives_the_tp_resets():
-    src = (ROOT / "views" / "training.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in tree.body:
-        if (isinstance(node, ast.AnnAssign) and getattr(node.target, "id", "") == "_BACKUP_SEND_ERROR") or (
-                isinstance(node, ast.Assign)
-                and any(getattr(t, "id", "") == "_BACKUP_SEND_ERROR" for t in node.targets)):
-            assert not node.value.value.startswith("tp_")
-            return
-    raise AssertionError("_BACKUP_SEND_ERROR not found")
-
-
-def test_the_check_in_sends_after_it_saves():
-    src = (ROOT / "views" / "checkin.py").read_text(encoding="utf-8")
-    # The save goes through services/checkin_form.save since move INS-7.
-    save = src.index("cf.save(")
-    assert "send_mirror_now()" in src[save:], "the check-in no longer sends its copy"
-

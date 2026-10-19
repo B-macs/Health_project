@@ -25,7 +25,6 @@ import training_plan as tp
 from services import accessory as acc
 from services import background_sync
 from services import decision
-from services import block_changeover
 from services import metrics
 from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
@@ -1032,7 +1031,6 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     # checkpointed, so it must be cleared here or the NEXT session would be
     # sent under this one's ids.
     st.session_state.tp_pending_session = None
-    _send_backup_copy(r)
 
     # A logged session is the one thing that legitimately changes today's
     # numbers after the morning sync has already run: it moves Session AU,
@@ -1041,36 +1039,6 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
     # session you just finished would not appear for up to half an hour.
     # Mirrors views/checkin.py's clear after a check-in save.
     st.cache_data.clear()
-
-
-#: Not under "tp_": two reset paths clear every tp_ key, and this must stay
-#: on the page until a later send works.
-_BACKUP_SEND_ERROR = "_backup_send_error"
-
-
-def _send_backup_copy(r) -> None:
-    """Send this save's Supabase copy before the page moves on.
-
-    The hosted app rebuilds its data from Supabase after a restart, so a save
-    that reached only Notion vanished from the app at the next restart: the
-    sessions of 2026-10-06, 10-07 and 10-08 (Repository.send_mirror_now). A
-    failed send is kept in session state and shown at the top of the page
-    until a later send works."""
-    err = r.send_mirror_now()
-    if err:
-        st.session_state[_BACKUP_SEND_ERROR] = err
-    else:
-        st.session_state.pop(_BACKUP_SEND_ERROR, None)
-
-
-def _render_backup_warning() -> None:
-    err = st.session_state.get(_BACKUP_SEND_ERROR)
-    if err:
-        st.warning(
-            "Your last save is in Notion, but its copy in Supabase did not send "
-            f"({err}). The app rebuilds from that copy when it restarts, so until "
-            "the copy is made, a restart hides this save from the app."
-        )
 
 
 def _record_note(idx: int, day_num: int | None) -> None:
@@ -2830,7 +2798,6 @@ def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> bool:
             session_save.new_exercise_ids(len(session.poses)), note)
     if not logged:
         return False
-    _send_backup_copy(r)
     return True
 
 
@@ -2941,7 +2908,6 @@ def _log_outdoor_activity(d: date, act: dict, session_rpe: int) -> bool:
             session_save.new_exercise_ids(1)[0])
     if not logged:
         return False
-    _send_backup_copy(r)
     st.cache_data.clear()  # the day strip and AU caches must see it now
     return True
 
@@ -3038,7 +3004,6 @@ def _render_hike_import() -> None:
 def render():
     st.markdown(_PAGE_CSS, unsafe_allow_html=True)
     _audio_unlock_component()
-    _render_backup_warning()
 
     # ── "Add Training" — floating + menu on every state below; the yoga-picker
     #     sub-screen short-circuits everything else (same page, no navigation).
@@ -3114,34 +3079,8 @@ def render():
         nav.inject("training")
         st.stop()
 
-    # ── The 12-week block replaces Block B (athlete, 2026-10-16) ──────────────
-    # "When we push this new session block ... it will overwrite all of the
-    # current block ... it starts on the next monday." The first visit after
-    # the push stores it (services/block_changeover.py): Block B ends the day
-    # before goal_block.START, its last week is recorded as not judged so the
-    # failed-week rule below cannot move the new block, and the block is placed
-    # on START. His decision, so not ask-first; once stored it never runs again.
-    # Like the rule below, the write is rebuilt from a LIVE read of the stored
-    # phases, never from the local copy alone.
-    if phases and not _in_session:
-        _co_written = False
-        try:
-            if block_changeover.due(phases) is not None:
-                _co_repo = repo.get_repository()
-                _co_stored = _co_repo.get_phases_live()
-                _co_new = block_changeover.due(_co_stored)
-                if _co_new is not None:
-                    _co_repo.set_phases(_co_new)
-                    _co_written = True
-                elif _co_stored != phases:
-                    # Already stored, but not in the copy this page reads:
-                    # write the stored list back, which repairs the copy.
-                    _co_repo.set_phases(_co_stored)
-                    _co_written = True
-        except Exception:
-            pass  # never let the changeover's check crash the page; it runs again next render
-        if _co_written:
-            st.rerun()
+    # (The 12-week block's changeover from Block B ran once, on 2026-10-16,
+    # and its code was dropped 2026-10-19, inventory T15.)
 
     # ── The failed-week rule — a week with 0-2 logged days runs again ─────────
     # The athlete's rule (2026-09-15): "make it automatic for 0-2 days". NOT
@@ -3499,12 +3438,6 @@ def render():
             st.rerun()
 
     st.divider()
-
-    # ── Before plan start ─────────────────────────────────────────────────────
-    if day_num < 1:
-        days_until = (plan_start - date.today()).days
-        st.info(f"Your plan starts in {days_until} day(s) on {plan_start}. Come back then.")
-        st.stop()
 
     # ── Plan complete ─────────────────────────────────────────────────────────
     if day_num > _plan_days:

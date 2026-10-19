@@ -293,16 +293,6 @@ def render() -> None:
             f"Check-in saved{date_note} — Tightness {tightness_score}/10, Pain {pain_score}/10. "
             "Head to Training Plan when ready to start your session."
         )
-        # Send the Supabase copy now: the hosted app rebuilds from it after a
-        # restart, and the routine send runs only from the Home page
-        # (Repository.send_mirror_now).
-        send_error = repo.get_repository().send_mirror_now()
-        if send_error:
-            st.warning(
-                "The check-in is in Notion, but its copy in Supabase did not send "
-                f"({send_error}). The app rebuilds from that copy when it restarts, "
-                "so until the copy is made, a restart hides this check-in from the app."
-            )
 
     st.divider()
     with st.expander("Scale Reference — Tightness & Pain", expanded=False):

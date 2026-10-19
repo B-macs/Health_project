@@ -813,15 +813,9 @@ def _render_strength_detail() -> None:
                 unsafe_allow_html=True)
 
     # ── Muscle balance ────────────────────────────────────────────────────
-    bal_l, bal_r = st.columns([2, 1])
-    bal_l.markdown(
+    st.markdown(
         f"<div style='color:{_INK};font-size:18px;font-weight:600;margin:18px 0 12px;'>"
         f"Muscle balance analysis</div>",
-        unsafe_allow_html=True,
-    )
-    bal_r.markdown(
-        f"<div style='text-align:right;font-size:13px;color:{accent};margin-top:22px;'>"
-        f"View All &rsaquo;</div>",
         unsafe_allow_html=True,
     )
     st.markdown(_muscle_balance_card_html(data["imbalance_count"]), unsafe_allow_html=True)
@@ -1325,16 +1319,6 @@ def _render_metabolism_detail() -> None:
     )
     st.markdown(_metab_analysis_html(latest, accent), unsafe_allow_html=True)
 
-    # ── Add measurement ───────────────────────────────────────────────────
-    st.markdown('<div class="mb-grp">Add measurement</div>', unsafe_allow_html=True)
-    add_l, add_r = st.columns(2)
-    add_l.button("＋  Foryond weigh-in", key="metab_add_weight",
-                 use_container_width=True, disabled=True,
-                 help="Weight entry — not wired up yet")
-    add_r.button("＋  Tape baseline", key="metab_add_tape",
-                 use_container_width=True, disabled=True,
-                 help="Waist and hip — not wired up yet")
-
 
 def _metab_value(record, key: str) -> float | None:
     """One accessor for both record types, so the chart does not need to know
@@ -1369,10 +1353,6 @@ def _bio():
 # _stage, _stage_start) were removed on 2026-10-19: the tab reads
 # decision.engine_state through _engine_state below, the same reads and
 # arithmetic as the directive Home and Training show.
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _sync_raw(sheet_id: str) -> list[dict]:
-    return repo.get_repository().get_raw_sheet_rows()
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _sync_engine_view(sheet_id: str) -> list[dict]:
@@ -3062,77 +3042,16 @@ def render() -> None:
     # =========================================================================
 
     with tab_sync:
-        # The Supabase mirror's health. It runs behind every sync and nothing
-        # reads from Postgres yet, so a mirror that stopped working is
-        # INVISIBLE by construction — it looks exactly like one that is up to
-        # date. This is the only place that difference is shown.
-        _mirror_repo = repo.get_repository()
-        if _mirror_repo.supabase_record:
-            # Supabase is the only store (2026-10-09): a save is written there
-            # and waited for before the screen confirms it, so there is no
-            # queued copy that can fall behind.
+        # Supabase is the only store (2026-10-09): a save is written there and
+        # waited for before the screen confirms it, so there is no queued copy
+        # that can fall behind. The legacy mirror warning and the Sheet1 table
+        # were dropped 2026-10-19 (inventory I80, I81).
+        if repo.get_repository().supabase_record:
             st.caption(
                 "Supabase holds all data. Each save is written there before "
                 "the screen confirms it. Notion and Google Sheets are no longer used."
             )
-            sheet_id = ""
-        else:
-            if _mirror_repo.supabase_configured():
-                _mirror_err = _mirror_repo.mirror_last_error
-                if _mirror_err:
-                    st.warning(
-                        f"**Supabase mirror failing on `{_mirror_err[0]}`** — "
-                        f"Notion and Sheets are unaffected and still hold "
-                        f"everything; the Postgres copy is behind. Repair with "
-                        f"`python scripts/push_datastore_to_supabase.py`.\n\n"
-                        f"```\n{_mirror_err[1]}\n```"
-                    )
-                else:
-                    st.caption("Supabase mirror: no errors recorded this session.")
-
-            st.caption(
-                "Legacy Apple Health export (Sheet1) — no longer read by the engine. "
-                "Kept for historical reference and the one-time Garmin backfill "
-                "(scripts/backfill_garmin_from_sheet1.py) only."
-            )
-
-            try:
-                sheet_id = st.secrets["GOOGLE_SHEETS_ID"]
-            except Exception:
-                sheet_id = None
-                st.error("GOOGLE_SHEETS_ID missing from .streamlit/secrets.toml")
-
-            # Only the raw Sheet1 table depends on Sheet1 being readable. The
-            # sections below it used to be nested inside this block, so a
-            # failed Sheet1 read (always, on the hosted app's local copy) hid
-            # the history tables and every sync button with it.
-            if sheet_id:
-                if st.button("Refresh", use_container_width=False, key="sync_refresh"):
-                    st.cache_data.clear()
-                    st.rerun()
-
-                with st.spinner("Reading Sheet1 from Google Sheets…"):
-                    try:
-                        sync_rows = _sync_raw(sheet_id)
-                    except Exception as exc:
-                        sync_rows = None
-                        st.error(f"Could not read Sheet1: {exc}")
-
-                if sync_rows is not None:
-                    if not sync_rows:
-                        st.info("Sheet1 is empty — no data yet.")
-                    else:
-                        df_sync = pd.DataFrame(sync_rows)
-
-                        col1, col2, col3 = st.columns(3)
-                        col1.metric("Total rows", len(df_sync))
-                        col2.metric("Earliest",   str(df_sync["Date/Time"].iloc[0])[:10])
-                        col3.metric("Latest",     str(df_sync["Date/Time"].iloc[-1])[:10])
-
-                        st.divider()
-
-                        st.subheader("Raw Sheet Data")
-                        st.dataframe(df_sync, use_container_width=True, height=400)
+        sheet_id = ""
 
         st.divider()
         st.subheader("Engine View — Last 28 Days (live)")

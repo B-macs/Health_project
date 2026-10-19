@@ -37,7 +37,6 @@ from services import biometrics
 from services import content_weighting
 from services import dashboard
 from services import flexibility
-from services import home_snapshot
 from services import hr_load
 from services import hr_matching
 from services import models
@@ -296,9 +295,6 @@ _OURA_SCOPE_GAPS_KEY = "oura_scope_gaps"
 # something no current deployment can do.
 _OURA_REFRESH_LOCK = threading.Lock()
 
-# .sync_state.json key holding the durable Home-card snapshot, keyed by ISO
-# date. See services/home_snapshot.py.
-_HOME_SNAPSHOT_KEY = "home_snapshots"
 
 #: Completed flexibility assessments, and the one in-progress draft.
 #: Kept on local disk rather than in Sheets deliberately: the capture flow runs
@@ -6422,52 +6418,6 @@ class Repository:
             )
         except Exception as exc:
             return False, str(exc)
-
-    # ─── Durable Home-card snapshot ──────────────────────────────────────
-    #  Lets a reopened app repaint Readiness/Strain/Sleep from local disk
-    #  instead of ~6 Sheets reads. All the rules about when that is safe
-    #  live in services/home_snapshot.py — read its docstring first.
-
-    def get_home_snapshot(self, d: date, today: date | None = None) -> dict | None:
-        """The stored card values for `d`, or None when there is nothing
-        safe to serve (no entry, an older schema, or today's entry still
-        incomplete — see home_snapshot.is_serveable)."""
-        store = local_cache.read().get(_HOME_SNAPSHOT_KEY) or {}
-        entry = home_snapshot.get(store, d)
-        if home_snapshot.is_serveable(entry, d, today or date.today()):
-            return entry
-        return None
-
-    def save_home_snapshot(self, d: date, snapshot: dict,
-                           sleep_need_hours: float | None,
-                           sleep_baseline_window: int | None,
-                           computed_at: datetime | None = None,
-                           today: date | None = None) -> dict:
-        """Persists what the cards show for `d`. Incomplete entries are
-        stored too, deliberately: get_home_snapshot refuses to serve them,
-        but keeping them means a day whose sleep never arrives is a visible
-        record rather than an absent one, and the next complete recompute
-        simply overwrites in place."""
-        entry = home_snapshot.build(
-            snapshot, sleep_need_hours, sleep_baseline_window, computed_at=computed_at,
-        )
-        local_cache.mutate(
-            _HOME_SNAPSHOT_KEY,
-            lambda store: home_snapshot.prune(
-                home_snapshot.put(store or {}, d, entry), today or date.today()),
-        )
-        return entry
-
-    def invalidate_home_snapshot(self, d: date) -> None:
-        """Drops `d`'s entry. Called wherever something happens that can move
-        a card — a logged session (strain), a saved check-in, a wake-time
-        correction (sleep score) — since this cache outlives the process and
-        would otherwise survive the very events that invalidate it."""
-        local_cache.mutate(
-            _HOME_SNAPSHOT_KEY,
-            lambda store: store if home_snapshot.get(store or {}, d) is None
-            else home_snapshot.drop(store or {}, d),
-        )
 
     # ─── In-progress training checkpoint (local mirror) ──────────────────
     #  The durable copy lives in Notion under set_config("training_progress").
