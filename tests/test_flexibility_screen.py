@@ -52,7 +52,7 @@ class _Stub:
         _draft["v"] = None
     def save_flexibility_assessment(self, a):
         _saved.append(a)
-    def get_recent_sessions(self, days=3):
+    def get_recent_sessions(self, days=3, today=None):
         return list(_recent)
 
 # A session logged YESTERDAY (real yesterday — the view compares against

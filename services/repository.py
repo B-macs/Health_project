@@ -6603,17 +6603,39 @@ class Repository:
     def get_flexibility_draft(self):
         """The in-progress assessment, or None. This is what makes the flow
         resumable — 40 minutes is long enough to be interrupted, and a
-        half-finished assessment that vanishes will not be attempted twice."""
-        return flexibility.assessment_from_dict(
-            local_cache.read().get(_FLEXIBILITY_DRAFT_KEY) or {})
+        half-finished assessment that vanishes will not be attempted twice.
+
+        The local mirror wins; an empty one falls back to the stored config
+        row and heals the mirror, the same two tiers as the finished
+        assessments (fault F13, 2026-10-19: the draft lived only in the local
+        .sync_state.json, so a hosted restart lost an unfinished assessment)."""
+        raw = local_cache.read().get(_FLEXIBILITY_DRAFT_KEY)
+        if not raw:
+            try:
+                stored = self.get_config_value(_FLEXIBILITY_DRAFT_KEY)
+                raw = json.loads(stored) if stored else None
+            except Exception:
+                raw = None
+            if raw:
+                try:
+                    local_cache.update({_FLEXIBILITY_DRAFT_KEY: raw})
+                except Exception:
+                    pass
+        return flexibility.assessment_from_dict(raw or {})
 
     def save_flexibility_draft(self, assessment) -> None:
         """Called after EVERY step, not at the end. The whole point is that
-        nothing is lost mid-flow."""
-        local_cache.update(
-            {_FLEXIBILITY_DRAFT_KEY: flexibility.assessment_to_dict(assessment)})
+        nothing is lost mid-flow. Local mirror first, then the config row: a
+        failed store write leaves the fresher copy on disk and still reaches
+        the caller."""
+        payload = flexibility.assessment_to_dict(assessment)
+        local_cache.update({_FLEXIBILITY_DRAFT_KEY: payload})
+        self.set_config(_FLEXIBILITY_DRAFT_KEY, json.dumps(payload))
 
     def clear_flexibility_draft(self) -> None:
+        """The stored row first, so a draft cleared here cannot come back from
+        the store into an empty mirror."""
+        self.set_config(_FLEXIBILITY_DRAFT_KEY, "")
         local_cache.update({_FLEXIBILITY_DRAFT_KEY: None})
 
     def _sync_oura_daily(self, token: str, start: str, end: str) -> int:

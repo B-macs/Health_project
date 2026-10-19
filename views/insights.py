@@ -35,6 +35,7 @@ from services import decision
 from services import engine
 from services import battery as btry
 from services import flexibility as fx
+from services import flexibility_screen as fxs
 from services import stats as stats_mod
 from services import insights as insights_svc
 from services import metabolism_screen as ms
@@ -1440,11 +1441,7 @@ def _fx_render_empty(accent: str) -> None:
 # ── state 2: capture ─────────────────────────────────────────────────────────
 
 def _fx_steps_html(order: list, step: int, draft) -> str:
-    done = {r.test_key for r in draft.readings if r.usable} if draft else set()
-    ticks = []
-    for i, key in enumerate(order):
-        cls = "now" if i == step else ("done" if key in done else "")
-        ticks.append(f'<i class="{cls}"></i>')
+    ticks = [f'<i class="{state}"></i>' for state in fxs.step_ticks(order, step, draft)]
     return f'<div class="fx-steps">{"".join(ticks)}</div>'
 
 
@@ -1475,16 +1472,12 @@ def _fx_render_capture(accent: str) -> None:
         # reads as extra tightness in exactly the areas being tested, so even a
         # genuinely cold reading this morning measures the leg day, not the
         # baseline. Warn, never block — but say what the reading would mean.
-        try:
-            yesterday = date.today() - timedelta(days=1)
-            if yesterday in fx.leg_loading_days(repo_.get_recent_sessions(days=3)):
-                st.warning("Yesterday's session loaded your legs. A cold reading this "
-                           "morning will read tighter than your real baseline in "
-                           "exactly the areas being tested — measure after a legs-free "
-                           "day, or record today knowing it is not comparable with a "
-                           "clean morning.", icon="⚠️")
-        except Exception:                                      # noqa: BLE001
-            pass
+        if fxs.legs_loaded_yesterday(repo_, date.today()):
+            st.warning("Yesterday's session loaded your legs. A cold reading this "
+                       "morning will read tighter than your real baseline in "
+                       "exactly the areas being tested — measure after a legs-free "
+                       "day, or record today knowing it is not comparable with a "
+                       "clean morning.", icon="⚠️")
 
         with st.expander("How to understand the three numbers", expanded=True):
             for measure, short, long in flexibility_baselines.MEASURES_EXPLAINED:
@@ -1516,10 +1509,8 @@ def _fx_render_capture(accent: str) -> None:
 
         c1, c2 = st.columns([2, 1])
         if c1.button("Begin", key="fx_begin", use_container_width=True, type="primary"):
-            repo_.save_flexibility_draft(btry.Assessment(
-                cluster=spec["key"], taken_on=date.today(), readings=(),
-                cold=cold.startswith("Cold"),
-            ))
+            repo_.save_flexibility_draft(fxs.begin(date.today(), cold.startswith("Cold"),
+                                                   spec["key"]))
             st.rerun()
         if c2.button("Cancel", key="fx_cancel0", use_container_width=True):
             st.session_state["fx_mode"] = None
@@ -1532,7 +1523,7 @@ def _fx_render_capture(accent: str) -> None:
     # the battery cannot disagree about when to stop. This is the early exit,
     # and it is the method rather than a convenience: once a slot has failed,
     # everything below it is unreadable and collecting it wastes 30 minutes.
-    live = btry.run(spec["key"], battery_mod.SLOT_EVALUATORS, draft)
+    live = fxs.live_result(draft)
     if live.pattern:
         st.markdown(
             f'<div class="fx-card hi"><div class="fx-cap" style="color:{_GOOD};">'
@@ -1548,8 +1539,7 @@ def _fx_render_capture(accent: str) -> None:
         c1, c2 = st.columns([2, 1])
         if c1.button("Save assessment", key="fx_finish_early", use_container_width=True,
                      type="primary"):
-            repo_.save_flexibility_assessment(draft)
-            repo_.clear_flexibility_draft()
+            fxs.finish(repo_, draft)
             _flexibility_screen_data.clear()
             st.session_state["fx_mode"] = None
             st.rerun()
@@ -1563,19 +1553,14 @@ def _fx_render_capture(accent: str) -> None:
     # a neutral reading well off the floor puts the turned-out comparison out
     # of scope, and the module owns that rule so the screen cannot disagree
     # with the evaluator about when it matters.
-    order = list(getattr(battery_mod, "applicable_tests", lambda _d: battery_mod.AVAILABLE_TESTS)(draft))
-
-    step = int(st.session_state.get("fx_step", 0))
-    step = max(0, min(step, len(order) - 1))
+    order = fxs.capture_order(draft)
+    step = fxs.clamp_step(st.session_state.get("fx_step", 0), order)
     key = order[step]
     test = battery_mod.TESTS[key]
 
     st.markdown(_fx_steps_html(order, step, draft), unsafe_allow_html=True)
-    for skipped_key in battery_mod.AVAILABLE_TESTS:
-        if skipped_key not in order:
-            note = getattr(battery_mod, "SKIP_NOTES", {}).get(skipped_key)
-            if note:
-                st.caption(note)
+    for note in fxs.skip_notes(draft):
+        st.caption(note)
     st.markdown(
         f'<div class="fx-row"><span class="fx-nm">{test.label}</span>'
         f'<span class="fx-cap">{step + 1} of {len(order)} &middot; slot {test.slot} '
@@ -1645,23 +1630,17 @@ def _fx_render_capture(accent: str) -> None:
             # The setup number is the SAME number every session by design, so
             # the last recorded one is offered back: re-measuring it fresh by
             # eye is exactly what makes two sessions incomparable.
-            prior_setup = next((r.setup_value for r in draft.readings
-                                if r.test_key == key and r.setup_value is not None), None)
-            if prior_setup is None:
-                try:
-                    for past in reversed(repo_.get_flexibility_assessments()):
-                        prior_setup = next((r.setup_value for r in past.readings
-                                            if r.test_key == key
-                                            and r.setup_value is not None), None)
-                        if prior_setup is not None:
-                            st.caption(f"Last time you used **{prior_setup:g}**. Use the "
-                                       f"same number unless something real changed — a "
-                                       f"new setup number starts a new comparison, and "
-                                       f"every reading against the old one stops being "
-                                       f"comparable.")
-                            break
-                except Exception:                              # noqa: BLE001
-                    prior_setup = None
+            try:
+                earlier = repo_.get_flexibility_assessments()
+            except Exception:                                  # noqa: BLE001
+                earlier = ()
+            prior_setup, from_earlier = fxs.prior_setup(draft, earlier, key)
+            if from_earlier:
+                st.caption(f"Last time you used **{prior_setup:g}**. Use the "
+                           f"same number unless something real changed — a "
+                           f"new setup number starts a new comparison, and "
+                           f"every reading against the old one stops being "
+                           f"comparable.")
             setup_value = st.number_input(
                 f"{test.setup_input} — recorded beside the reading, they are one datum",
                 value=float(prior_setup) if prior_setup is not None else None,
@@ -1675,18 +1654,11 @@ def _fx_render_capture(accent: str) -> None:
             use_container_width=True, type="primary")
 
     if submitted:
-        updated = draft
-        for side, value in entered.items():
-            if value is None:
-                continue
-            updated = fx.merge_reading(updated, btry.Reading(
-                test_key=key, value=float(value), unit=test.unit, side=side,
-                load_kg=load, setup_value=setup_value, voided=bool(void),
-            ))
+        updated = fxs.apply_entries(draft, key, entered, load=load,
+                                    setup_value=setup_value, void=bool(void))
         repo_.save_flexibility_draft(updated)
         if last:
-            repo_.save_flexibility_assessment(updated)
-            repo_.clear_flexibility_draft()
+            fxs.finish(repo_, updated)
             _flexibility_screen_data.clear()
             st.session_state["fx_mode"] = None
         else:
@@ -1793,7 +1765,7 @@ def _fx_fill_missing(report) -> None:
     if not stored:
         return
     assessment = stored[-1]
-    missing = battery_mod.missing_inputs(assessment, report.result)
+    missing = fxs.missing_inputs(assessment, report)
     if not missing:
         return
 
@@ -1819,25 +1791,7 @@ def _fx_fill_missing(report) -> None:
         if not st.form_submit_button("Add and re-run", use_container_width=True):
             return
 
-    updated = assessment
-    for item, value in entered.items():
-        if value is None:
-            continue
-        if item.setup:
-            # The setup number belongs to a reading that already exists; carry
-            # every other field through rather than rebuilding it.
-            existing = updated.reading(item.test_key)
-            if existing is None:
-                continue
-            updated = fx.merge_reading(updated, btry.Reading(
-                test_key=existing.test_key, value=existing.value, unit=existing.unit,
-                side=existing.side, load_kg=existing.load_kg,
-                setup_value=float(value), note=existing.note, voided=existing.voided))
-        else:
-            test = battery_mod.TESTS[item.test_key]
-            updated = fx.merge_reading(updated, btry.Reading(
-                test_key=item.test_key, value=float(value), unit=test.unit,
-                side=item.side))
+    updated = fxs.fill_missing(assessment, entered)
 
     if updated is assessment:
         st.warning("Nothing was entered, so nothing changed.", icon="⚠️")
@@ -1875,7 +1829,8 @@ def _fx_render_populated(report, accent: str) -> None:
         f'<div class="fx-big" style="color:{_BAD};">{report.pattern_label}</div>'
         f'<div class="fx-kv"><span>pattern <b>{report.pattern}</b></span>'
         f'<span>stopped at <b>{report.stopped_at_label}</b></span>'
-        f'<span><b>{len(result.slots)}</b> of 4 slots run</span></div></div>',
+        f'<span><b>{len(result.slots)}</b> of {fxs.slots_total(report)} slots run</span>'
+        f'</div></div>',
         unsafe_allow_html=True,
     )
     st.caption(result.slots[-1].reason)
@@ -1962,7 +1917,7 @@ def _fx_render_populated(report, accent: str) -> None:
             st.markdown(f"**{mark} Slot {slot.slot} · {btry.SLOT_LABELS[slot.slot]}** — "
                         f"{btry.SLOT_QUESTIONS[slot.slot]}  ·  *{basis}*")
             st.caption(slot.reason)
-        skipped = 4 - len(result.slots)
+        skipped = fxs.slots_not_run(report)
         if skipped:
             st.caption(f"{skipped} slot(s) below the failure were NOT measured. That is the "
                        f"method, not an omission — a reading taken below a failing slot "
@@ -2004,13 +1959,7 @@ def _fx_render_populated(report, accent: str) -> None:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _flexibility_screen_data() -> dict:
-    today = date.today()
-    stored = repo.get_repository().get_flexibility_assessments()
-    latest = stored[-1] if stored else None
-    return {
-        "report": fx.assess(latest, today, baseline_sessions=len(stored)),
-        "count": len(stored),
-    }
+    return fxs.read_data(repo.get_repository(), date.today())
 
 
 def _render_flexibility_detail() -> None:
