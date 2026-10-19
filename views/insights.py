@@ -2039,7 +2039,13 @@ def _render_engine_data() -> None:
         st.rerun()
 
     with st.spinner("Loading…"):
-        _state      = _engine_state()
+        try:
+            _state = _engine_state()
+        except Exception as exc:
+            # A failed read, including an unreadable stage (fault F23), is
+            # said here instead of taking the whole Insights page down.
+            st.warning(f"The engine's readings could not be read: {exc}", icon="⚠️")
+            return
         bio_rows    = _state["bio_rows"]
         tl          = _state["traffic_light"]
         acwr_result = _state["acwr"]

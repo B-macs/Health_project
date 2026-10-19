@@ -68,6 +68,14 @@ class PhasesCorruptError(Exception):
     caller to auto-seed from. See get_phases's docstring."""
 
 
+class StageUnknownError(RuntimeError):
+    """The stored clinical stage is missing or unreadable. Raised rather than
+    guessed (fault F23, 2026-10-19): it read as stage 1, the same silent
+    guess F7 removed from Home, and every reader of the stage takes a safety
+    ceiling, a strain scale or a movement rule from it. Each caller decides
+    in the open what an unknown stage means for it."""
+
+
 class LegacyStoreDisconnectedError(RuntimeError):
     """Notion or Google Sheets was called while Supabase is the system of
     record (2026-10-09). Raised, never caught here: a write that reached a
@@ -2988,13 +2996,16 @@ class Repository:
         return self._config_pages().get(key)
 
     def get_current_stage(self) -> int:
+        """The stored clinical stage. StageUnknownError when it is missing or
+        unreadable, never a guess (fault F23)."""
         page = self._config_page("current_stage")
-        if page:
-            try:
-                return int(notion.get_property(page, "Value", "rich_text") or "1")
-            except (TypeError, ValueError):
-                pass
-        return 1
+        raw = notion.get_property(page, "Value", "rich_text") if page else None
+        try:
+            return int(str(raw).strip())
+        except (TypeError, ValueError):
+            raise StageUnknownError(
+                "the stored stage is missing" if raw in (None, "")
+                else f"the stored stage is unreadable ({raw!r})") from None
 
     #: Config keys whose mirror row is flushed to Supabase IMMEDIATELY rather
     #: than waiting for the end of run_home_syncs.

@@ -1297,9 +1297,22 @@ def test_get_avg_tightness_empty_returns_zero():
     assert repo.get_avg_tightness(today=datetime.date(2026, 7, 7)) == 0.0
 
 
-def test_get_current_stage_defaults_to_1():
-    repo = _repo({"db-config": []})
-    assert repo.get_current_stage() == 1
+def _stage_page(value):
+    return {"id": "cfg-stage", "properties": {
+        "Key": _title_prop("current_stage"), "Value": _rich_text_prop(value)}}
+
+
+def test_a_missing_or_unreadable_stage_is_refused_never_guessed():
+    """Fault F23 (2026-10-19): a missing stage read as stage 1, the silent
+    guess F7 removed from Home, and every reader takes a safety ceiling, a
+    strain scale or a movement rule from it. This test pinned that default
+    until then; the owner approved the fix in the Phase 2 inventory."""
+    from services.repository import StageUnknownError
+    with pytest.raises(StageUnknownError):
+        _repo({"db-config": []}).get_current_stage()
+    with pytest.raises(StageUnknownError):
+        _repo({"db-config": [_stage_page("two")]}).get_current_stage()
+    assert _repo({"db-config": [_stage_page("2")]}).get_current_stage() == 2
 
 
 # ─── No Streamlit import ────────────────────────────────────────────────────

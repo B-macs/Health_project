@@ -85,3 +85,22 @@ def test_every_insights_tab_still_draws():
     assert metrics.get("Session notes pending") == "1"
     assert metrics.get("Oura only") == "0" and metrics.get("Watch only") == "1", "F12"
     assert metrics.get("Biometric days available") == "0"
+
+
+def test_an_unreadable_stage_is_a_warning_not_a_broken_page():
+    """Fault F23: the stage is refused rather than guessed, and Engine Data
+    says so instead of taking the whole Insights page down."""
+    old = "    def get_current_stage(self):\n        return 2\n"
+    new = ("    def get_current_stage(self):\n"
+           "        from services.repository import StageUnknownError\n"
+           "        raise StageUnknownError('the stored stage is missing')\n")
+    script = _SCRIPT.format(root=_ROOT)
+    assert old in script and "insights.render()" in script
+    # The first test's run cached a readable engine state in this process.
+    script = script.replace(old, new).replace(
+        "insights.render()", "insights._engine_state.clear()\ninsights.render()")
+    at = AppTest.from_string(script, default_timeout=180)
+    at.run()
+    assert not at.exception, at.exception
+    assert any("could not be read" in w.value for w in at.warning)
+

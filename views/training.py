@@ -2792,7 +2792,8 @@ def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> bool:
     try:
         current_stage = r.get_current_stage()
     except Exception:
-        current_stage = 1
+        # The strictest stage's safety notes go with the poses (F23).
+        current_stage = yg.STAGE_WHEN_UNKNOWN
     with _SUPPLEMENTARY_SAVE_LOCK:
         logged = supplementary_save.save_yoga(
             r, session, date.today(), current_stage,
@@ -2822,7 +2823,10 @@ def _render_yoga_detail(session: yg.YogaSession) -> None:
     try:
         current_stage = repo.get_repository().get_current_stage()
     except Exception:
-        current_stage = 1
+        # Said on screen, never a silent guess (fault F23).
+        current_stage = yg.STAGE_WHEN_UNKNOWN
+        st.caption("The training stage could not be read, so the cautions below "
+                   "are the strictest set.")
     cautions = session.cautions(current_stage)
     if cautions:
         notes_html = "".join(

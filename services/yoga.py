@@ -35,6 +35,11 @@ from dataclasses import dataclass, field
 
 from services import rules as _rules
 
+#: The stage a pose's safety is judged at when the stored stage cannot be
+#: read: the strictest one, never a silent default, and the screen says so
+#: (fault F23, 2026-10-19).
+STAGE_WHEN_UNKNOWN = min(_rules.STAGE_CONSTRAINTS)
+
 _SEVERITY_RANK = {"contraindicated": 0, "caution": 1, "cleared": 2, "unknown": 3}
 
 
