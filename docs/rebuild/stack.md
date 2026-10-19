@@ -12,7 +12,7 @@ source again before relying on one (rebuild rule 10).
 | uv | 0.12.23 | builds `.venv-engine` only; NO pyproject.toml or uv.lock at the repo root (see below) |
 | Python (Streamlit app, `venv/`) | 3.11.9 | unchanged |
 | Python (engine, `.venv-engine/`, container) | 3.12.9 locally, `python:3.12-slim` in the image | garminconnect 0.3.17 and numpy 2.5.3 need 3.12 or newer |
-| Google Cloud CLI | not installed | the owner installs it (`winget install --id Google.CloudSDK -e`) |
+| Google Cloud CLI | installed 2026-10-19 with Google's own installer | `winget` was not on this PC's user PATH; gcloud is at `%LOCALAPPDATA%\Google\Cloud SDK\google-cloud-sdk\bin` |
 | Docker | not installed, not needed | Cloud Build builds the image from source |
 | gitleaks | not installed | the gate uses its own pattern scan (scripts/rebuild_gate.py) |
 
@@ -63,7 +63,19 @@ source again before relying on one (rebuild rule 10).
 - **Google Cloud project** (2026-10-19): `health-project-512108` (number 230738513464), created by the owner in the console on a business billing account with a €1 budget alert. `gcloud init` had refused the ID `health_project`: an ID and a display name cannot hold `_`.
 - **The Worker's ENGINE_URL is a secret, not a `vars` entry,** so the engine's address is not in this public repo.
 - **The account's workers.dev subdomain is `lauscher-worker`.** The Worker named `health` is `health.lauscher-worker.workers.dev`. Changing the subdomain would also change Lauscher's address.
-- **Region:** europe-west1 (Belgium) is planned as a Tier 1 European region. Checked again at the deploy (M4) and recorded in p0_proof.json.
+- **Region:** europe-west1 (Belgium), **Tier 1**, checked on https://cloud.google.com/run/pricing on 2026-10-19 (Frankfurt, europe-west3, and Berlin, europe-west10, are Tier 2).
+
+## Deployed (2026-10-19)
+
+- **Cloud Run service `health-engine`**, europe-west1, revision `health-engine-00001-9sq` from commit 84c88c6: min 0 / max 1 instance, 1 vCPU, 1 GiB, timeout 900 s, concurrency 80, request-based billing. **Startup CPU boost is ON** — gcloud 2026 sets it by default on a new service (`run.googleapis.com/startup-cpu-boost: true`); it was not asked for. `--allow-unauthenticated`, and every request is checked against `X-Engine-Key`: no key or a wrong key gives 401, and /docs, /redoc and /openapi.json give 404 (checked live). The address is NOT written in this repo; read it with `gcloud run services describe health-engine --region=europe-west1 --format="value(status.url)"`.
+- **Runtime identity: `health-engine@health-project-512108.iam.gserviceaccount.com`**, made for the engine, with NO project role — only Secret Accessor on its two secrets. The Compute Engine default account (project Editor) is left as Cloud Build's build account only.
+- **Secrets are PINNED to version 1** (`/secrets/health/secrets.toml=health-engine-secrets:1`, `HEALTH_ENGINE_KEY=health-engine-key:1`). Google discourages `latest` for an environment variable, and a mounted `latest` is fetched from Secret Manager at every read of the file (https://docs.cloud.google.com/run/docs/configuring/services/secrets, 2026-10-19). The engine reads the file once per start (`engine.startup`). A new secret version therefore needs a redeploy that names it — deliberate.
+- **Environment:** `HEALTH_TIMEZONE=Europe/Berlin`, `TZ=Europe/Berlin` (the owner's zone, 2026-10-19), `HEALTH_PROBES=1` for Phase 0 only (switched off by the last Phase 0 deploy), `HEALTH_BUILD_COMMIT`, `HEALTH_BUILD_TIME`.
+- **Logs** (checked 2026-10-19): the startup timings and uvicorn's request lines (method, path, status) only — no address, no key, no value.
+- **Image:** 115.1 MB in Artifact Registry `cloud-run-source-deploy` (europe-west1). Clean-up policy: keep the 2 newest, delete the rest after a day (`--no-dry-run`; it runs about once a day).
+- **Uploaded source:** `gs://run-sources-health-project-512108-europe-west1`, 687 KiB a deploy, deleted after 7 days by a lifecycle rule. Cloud Storage's free tier covers US regions only, so this costs about $0.00002 a month.
+- **Data out:** Cloud Run's free 1 GiB covers traffic within North America only; from Belgium it is billed at Google's Premium network rates. The engine sends little out (a few KB per answer), so this is a fraction of a cent a month (M8).
+- **Cloudflare Worker `health`:** https://health.lauscher-worker.workers.dev, deployed 2026-10-19 (version 706717f6). `ENGINE_URL` is set; `ACCESS_KEY` and `ENGINE_KEY` are the owner's to set (`scripts/rebuild_secrets.py worker-access-key` / `worker-engine-key`). Until then /api answers 503 `not_configured` without calling the engine.
 
 - **pnpm's minimum release age is kept on.** On the first install pnpm added `minimumReleaseAgeExclude` entries for three packages released days earlier (wrangler 4.148.0, @cloudflare/vitest-plugin 1.3.7, a miniflare alpha). They were removed and the Worker pinned to Lauscher's proven versions instead: a bad release is usually caught in its first days. `pnpm install` now reports that the lockfile passes the supply-chain policies with no exception.
 - **The engine runs with PYTHONPATH=<root>:<root>/api** (Dockerfile). `uvicorn --app-dir api` alone would put only api/ on the path, and `services` would not import.

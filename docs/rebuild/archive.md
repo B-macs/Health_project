@@ -21,3 +21,11 @@
 - Broken: the engine image's allow-list. services/ had started importing `goal_block`, the Dockerfile, .gcloudignore and .dockerignore did not admit it, and a scratch copy of the allowed files failed to import 12 services/ modules. Fixed, and `tests/api/test_image_file_set.py` (5 tests, static) now checks the list against the code both ways.
 - Stale: `tests/test_core_hold_score.py` gained one test that renders a Streamlit screen; the Streamlit list can now name a single test (deselected in the engine run).
 - Holding: the API, the gate, the Worker and the app tests; the startup path under Supabase record mode; the readiness rule of 2026-10-13, which lives in services/.
+
+## 2026-10-19 — STOP 1 done; the engine and the Worker deployed
+- The owner's steps, with help: the Google Cloud CLI from Google's installer (`winget` and `python` were not on his user PATH; he was given the Environment Variables fix and wants `python` to mean 3.12); the project ID `health_project` was refused (no `_` allowed), so the project is `health-project-512108`, made in the console; a business billing account and a €1 budget; the five services; the two secrets, the engine's keys trimmed to six; `wrangler login`; the access key in `.env`; time zone Europe/Berlin.
+- Checked before the deploy, on the live pages: europe-west1 is Tier 1; the request-based free tier is 180,000 vCPU-s, 360,000 GiB-s and 2 million requests a month per billing account; start-up and shut-down time are billed; a mounted `latest` secret is fetched at every read, and `latest` is discouraged for environment variables — so both secrets are pinned to version 1.
+- M4: deployed in 124 s. The engine has its own service account with no project role. Startup CPU boost came on by default. The engine refuses a missing or wrong key (401) and has no docs routes (404).
+- M6 Oura: one read of yesterday's readiness from Cloud Run, 1 row, the token untouched.
+- M7: the Worker deployed; ENGINE_URL set; the two keys wait for the owner.
+- The owner's later plan: the engine may move to an HP EliteBook 1040 G4 behind a Cloudflare Tunnel in a few months; only ENGINE_URL would change.
