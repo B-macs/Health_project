@@ -1,24 +1,22 @@
-// Drawing parts. Each draws in token colours only (a kind or tone class sets --tone,
-// and the stylesheet sets every size). Geometry is in each SVG's own small box.
+// Drawing parts. Each draws in the page's colour family only (--f1, --f2, --f3; the
+// app's root picks the family for the page), and the stylesheet sets every size.
+// Geometry is in each SVG's own small box.
 import { useId, type ReactNode } from 'react'
-import type { Tone } from '../mock/generate'
 import { useGrow } from './hooks'
 
-export type Kind = 'readiness' | 'sleep' | 'strain' | 'rest'
+/** "main" draws in the family's two strongest shades; "rest" in its faintest. */
+export type Shade = 'main' | 'rest'
 
 const R = 45
 const C = 2 * Math.PI * R
 
-/** The two gradient stops of a ring, as CSS colours from the tokens. */
-function stops(kind: Kind): [string, string] {
-  if (kind === 'readiness') return ['var(--readiness)', 'var(--readiness-to)']
-  if (kind === 'sleep' || kind === 'rest') return ['var(--sleep)', 'var(--sleep)']
-  return ['var(--strain)', 'var(--strain)']
+function stops(shade: Shade): [string, string] {
+  return shade === 'rest' ? ['var(--f3)', 'var(--f3)'] : ['var(--f1)', 'var(--f2)']
 }
 
-/** A glowing score ring, as on Oura's Today: the value sweeps clockwise from the top. */
+/** A glowing ring, as on Oura's Today: the value sweeps clockwise from the top. */
 export function Ring(props: {
-  kind: Kind
+  shade?: Shade
   fraction: number
   reduced: boolean
   label: string
@@ -28,10 +26,10 @@ export function Ring(props: {
 }) {
   const id = useId()
   const shown = useGrow(Math.max(0, Math.min(1, props.fraction)), props.reduced)
-  const [from, to] = stops(props.kind)
+  const [from, to] = stops(props.shade ?? 'main')
   const angle = (shown * 360 - 90) * (Math.PI / 180)
   return (
-    <div className={`ring ${props.className} kind-${props.kind}`} role="img" aria-label={props.label}>
+    <div className={`ring ${props.className}`} role="img" aria-label={props.label}>
       <svg viewBox="0 0 100 100" aria-hidden="true">
         <defs>
           <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
@@ -66,8 +64,9 @@ function smooth(points: readonly (readonly [number, number])[]): string {
   return d
 }
 
-/** A soft area chart: a smooth line, a fading fill under it, a glowing last point. */
-export function AreaChart(props: { values: readonly number[]; kind: Kind; label: string; className?: string }) {
+/** A soft area chart in the page colour: a smooth line, a fading fill, a glowing last
+ *  point. `level` 1 draws in the strongest shade, 2 in the middle one. */
+export function AreaChart(props: { values: readonly number[]; level: 1 | 2; label: string; className?: string }) {
   const id = useId()
   const lo = Math.min(...props.values)
   const hi = Math.max(...props.values)
@@ -76,13 +75,13 @@ export function AreaChart(props: { values: readonly number[]; kind: Kind; label:
   const points = props.values.map((v, i) => [(i / (n - 1)) * 96 + 2, 30 - ((v - lo) / span) * 24] as const)
   const line = smooth(points)
   const last = points[n - 1]
-  const [from] = stops(props.kind)
+  const colour = props.level === 1 ? 'var(--f1)' : 'var(--f2)'
   return (
-    <svg className={`area ${props.className ?? ''} kind-${props.kind}`} viewBox="0 0 100 34" role="img" aria-label={props.label}>
+    <svg className={`area area--l${props.level} ${props.className ?? ''}`} viewBox="0 0 100 34" role="img" aria-label={props.label}>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" className="area__fade-top" style={{ stopColor: from }} />
-          <stop offset="1" className="area__fade-bottom" style={{ stopColor: from }} />
+          <stop offset="0" className="area__fade-top" style={{ stopColor: colour }} />
+          <stop offset="1" className="area__fade-bottom" style={{ stopColor: colour }} />
         </linearGradient>
       </defs>
       <path className="area__fill" d={`${line} L${last[0]},34 L${points[0][0]},34 Z`} fill={`url(#${id})`} />
@@ -114,7 +113,7 @@ export function DayBars(props: { values: readonly number[]; days: readonly strin
 }
 
 /** An Oura-style contributor: name and value on one line, a thin bar, a note. */
-export function Contributor(props: { name: string; value: string; fraction: number | null; note: string; tone?: Tone; reduced: boolean }) {
+export function Contributor(props: { name: string; value: string; fraction: number | null; note: string; reduced: boolean }) {
   const shown = useGrow(props.fraction ?? 0, props.reduced)
   return (
     <div className="contrib">
@@ -123,9 +122,7 @@ export function Contributor(props: { name: string; value: string; fraction: numb
         <span className="num contrib__value">{props.value}</span>
       </div>
       <div className="contrib__track">
-        {props.fraction != null && (
-          <span className={`contrib__fill tone-${props.tone ?? 'good'}`} style={{ width: `${shown * 100}%` }} />
-        )}
+        {props.fraction != null && <span className="contrib__fill" style={{ width: `${shown * 100}%` }} />}
       </div>
       {props.note && <div className="contrib__note">{props.note}</div>}
     </div>

@@ -1,6 +1,6 @@
-// The guided training screen in the middle of a set, Oura-style: one thin glowing ring
-// around large light digits, the glow teal while you hold and lilac while you rest,
-// glass controls, and the next set below. What to do, the numbers and the timer only:
+// The guided training screen in the middle of a set, Oura-style, in the page's one
+// colour family (amber): one thin glowing ring around large light digits, in the bright
+// shades while you hold and the faintest while you rest, and the next set below. What to do, the numbers and the timer only:
 // no "why" panel (Key Rule 20), no machine units, and the screen stays on.
 import type { Exercise, Mock, Step } from '../mock/generate'
 import { S } from '../strings'
@@ -109,7 +109,7 @@ export function Training({ mock, onClose, reduced }: Props) {
       </div>
 
       <div className="train__ring">
-        <Ring kind={resting ? 'rest' : 'readiness'} className="ring--timer" head fraction={1 - timer.fraction}
+        <Ring shade={resting ? 'rest' : 'main'} className="ring--timer" head fraction={1 - timer.fraction}
           reduced={reduced} label={`${phaseWord(timer)} ${clock(seconds)}`}>
           <span className="num timer__digits">{clock(seconds)}</span>
           <span className="timer__word">{phaseWord(timer)}</span>
@@ -118,7 +118,7 @@ export function Training({ mock, onClose, reduced }: Props) {
 
       <Controls timer={timer} />
 
-      <section className="glass next">
+      <section className="card next">
         <div className="eyebrow">{S.training.next}</div>
         <div className="next__main">
           {finished || !next ? S.training.nextExercise(mock.guided.nextExercise) : stepText(next, ex)}

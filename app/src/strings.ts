@@ -4,6 +4,26 @@
 
 export const S = {
   app: 'Health',
+  styles: {
+    pick: 'Pick a style',
+    lead: 'Four styles of the same screens. Each page keeps one colour: Today teal, Training amber, Insights indigo, Settings slate. Every number is made up.',
+    label: 'Style',
+    chip: (id: string) => `Style ${id}`,
+    names: { '1': 'Glow', '2': 'Halo', '3': 'Mist', '4': 'Line' },
+    ideas: {
+      '1': 'A soft glow at the top, glass cards, three rings in a row.',
+      '2': 'One large readiness ring with a halo, cards tinted in the page colour, the button in the page colour.',
+      '3': 'The page colour washes down the whole screen, lighter numbers, a floating tab bar.',
+      '4': 'Clean black or white, thin lines, outlined cards, no glow.',
+    },
+    howTitle: 'How to test',
+    how: [
+      'Add this page to your Home Screen: tap Share, then Add to Home Screen.',
+      'Open each style and look at Today, Training and Insights, in light and dark.',
+      'On the Training tab, let the timer run and read it from 1.5 m away.',
+      'Then tell me 1, 2, 3 or 4, or which parts of each.',
+    ],
+  },
   greeting: { morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening' },
   nav: { today: 'Today', checkin: 'Check-in', training: 'Training', insights: 'Insights', settings: 'Settings' },
   today: {

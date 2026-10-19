@@ -1,6 +1,8 @@
-// Today, Oura-style: a night sky that takes the colour of today's readiness, the three
-// scores as glowing rings in a row, one sentence about the day, the vitals, and today's
-// session on a glass card with a white button.
+// Today, Oura-style, in the page's one colour family (teal): the three scores as rings,
+// one sentence about the day, the vitals, and today's session with its button. Two
+// layouts: "trio" (three equal rings in a row, styles 1, 3 and 4) and "hero" (one large
+// readiness ring with a halo and two small cards, style 2). A status is a word; the
+// light at the top is dimmer on a morning that needs care.
 import { useRef, type TouchEvent } from 'react'
 import type { Day, Exercise, Mock } from '../mock/generate'
 import { S } from '../strings'
@@ -8,6 +10,7 @@ import { IconBack, IconForward } from './icons'
 import { AreaChart, Ring, greetingKey, longDate } from './parts'
 
 export type TodayProps = {
+  layout: 'trio' | 'hero'
   day: Day
   mock: Mock
   canPrev: boolean
@@ -41,87 +44,154 @@ function useSwipe(p: TodayProps) {
   }
 }
 
+function TopBar(p: TodayProps) {
+  return (
+    <header className="topbar">
+      <button className="iconbtn" onClick={p.onPrev} disabled={!p.canPrev} aria-label={S.today.previousDay}>
+        <IconBack />
+      </button>
+      <div className="topbar__title">
+        <div className="greeting">{S.greeting[greetingKey(new Date().getHours())]}</div>
+        <div className="topbar__date">{longDate(p.day.date)}</div>
+      </div>
+      <button className="iconbtn" onClick={p.onNext} disabled={!p.canNext} aria-label={S.today.nextDay}>
+        <IconForward />
+      </button>
+    </header>
+  )
+}
+
+function Status({ name, label, main }: { name: string; label: string; main?: boolean }) {
+  return (
+    <span className={`status${main ? ' status--main' : ''}`}>
+      <span className="status__dot" />
+      {name} · {label}
+    </span>
+  )
+}
+
+function Bubbles({ day, reduced }: { day: Day; reduced: boolean }) {
+  const { readiness: r, sleep: s, strain: t } = day
+  return (
+    <section className="bubbles">
+      <figure className="bubble">
+        <Ring className="ring--bubble" fraction={r.value / 100} reduced={reduced}
+          label={`${S.today.readiness} ${r.value}, ${r.label}`}>
+          <span className="num bubble__value">{r.value}</span>
+        </Ring>
+        <figcaption className="bubble__name">{S.today.readiness}</figcaption>
+      </figure>
+      <figure className="bubble">
+        <Ring className="ring--bubble" fraction={s.value / 100} reduced={reduced}
+          label={`${S.today.sleep} ${s.value}, ${s.label}`}>
+          <span className="num bubble__value">{s.value}</span>
+        </Ring>
+        <figcaption className="bubble__name">{S.today.sleep}</figcaption>
+      </figure>
+      <figure className="bubble">
+        <Ring className="ring--bubble" fraction={t.value / 21} reduced={reduced}
+          label={`${S.today.strain} ${t.value}, ${t.label}`}>
+          <span className="num bubble__value">{t.value.toFixed(1)}</span>
+        </Ring>
+        <figcaption className="bubble__name">{S.today.strain}</figcaption>
+      </figure>
+    </section>
+  )
+}
+
+function Insight({ day }: { day: Day }) {
+  const { readiness: r, sleep: s, strain: t } = day
+  return (
+    <section className="card insight">
+      <Status name={S.today.readiness} label={r.label} main />
+      <p className="insight__line">{S.today.readinessLine[r.tone]}</p>
+      <div className="insight__meta">
+        <Status name={S.today.sleep} label={s.label} />
+        <Status name={S.today.strain} label={t.label} />
+      </div>
+    </section>
+  )
+}
+
+/** Style 2: one large readiness ring with its halo, then sleep and strain as two cards. */
+function Hero({ day, reduced }: { day: Day; reduced: boolean }) {
+  const { readiness: r, sleep: s, strain: t } = day
+  return (
+    <>
+      <section className="hero">
+        <div className="hero__halo" aria-hidden="true" />
+        <Ring className="ring--hero" fraction={r.value / 100} reduced={reduced}
+          label={`${S.today.readiness} ${r.value}, ${r.label}`}>
+          <span className="num hero__value">{r.value}</span>
+          <span className="hero__word">{r.label}</span>
+        </Ring>
+        <div className="hero__name">{S.today.readiness}</div>
+        <p className="hero__line">{S.today.readinessLine[r.tone]}</p>
+      </section>
+      <section className="pair">
+        <article className="card mini">
+          <Ring className="ring--mini" fraction={s.value / 100} reduced={reduced}
+            label={`${S.today.sleep} ${s.value}, ${s.label}`}>
+            <span className="num mini__value">{s.value}</span>
+          </Ring>
+          <div className="mini__text">
+            <span className="mini__name">{S.today.sleep}</span>
+            <span className="mini__word">{s.label}</span>
+            <span className="mini__note">{S.today.asleep(s.minutes)}</span>
+          </div>
+        </article>
+        <article className="card mini">
+          <Ring className="ring--mini" fraction={t.value / 21} reduced={reduced}
+            label={`${S.today.strain} ${t.value}, ${t.label}`}>
+            <span className="num mini__value">{t.value.toFixed(1)}</span>
+          </Ring>
+          <div className="mini__text">
+            <span className="mini__name">{S.today.strain}</span>
+            <span className="mini__word">{t.label}</span>
+            <span className="mini__note">{t.soFar ? S.today.soFar : S.today.outOf(21)}</span>
+          </div>
+        </article>
+      </section>
+    </>
+  )
+}
+
 export function Today(p: TodayProps) {
-  const { readiness: r, sleep: s, strain: t } = p.day
+  const { readiness: r, sleep: s } = p.day
   const hrv = p.mock.hrv[p.mock.hrv.length - 1]
   const rhr = p.mock.rhr[p.mock.rhr.length - 1]
   return (
     <div className={`screen today tone-${r.tone}`} {...useSwipe(p)}>
       <div className="sky" aria-hidden="true" />
+      <TopBar {...p} />
 
-      <header className="topbar">
-        <button className="iconbtn" onClick={p.onPrev} disabled={!p.canPrev} aria-label={S.today.previousDay}>
-          <IconBack />
-        </button>
-        <div className="topbar__title">
-          <div className="greeting">{S.greeting[greetingKey(new Date().getHours())]}</div>
-          <div className="topbar__date">{longDate(p.day.date)}</div>
-        </div>
-        <button className="iconbtn" onClick={p.onNext} disabled={!p.canNext} aria-label={S.today.nextDay}>
-          <IconForward />
-        </button>
-      </header>
-
-      <section className="bubbles">
-        <figure className="bubble">
-          <Ring kind="readiness" className="ring--bubble" fraction={r.value / 100} reduced={p.reduced}
-            label={`${S.today.readiness} ${r.value}, ${r.label}`}>
-            <span className="num bubble__value">{r.value}</span>
-          </Ring>
-          <figcaption className="bubble__name">{S.today.readiness}</figcaption>
-        </figure>
-        <figure className="bubble">
-          <Ring kind="sleep" className="ring--bubble" fraction={s.value / 100} reduced={p.reduced}
-            label={`${S.today.sleep} ${s.value}, ${s.label}`}>
-            <span className="num bubble__value">{s.value}</span>
-          </Ring>
-          <figcaption className="bubble__name">{S.today.sleep}</figcaption>
-        </figure>
-        <figure className="bubble">
-          <Ring kind="strain" className="ring--bubble" fraction={t.value / 21} reduced={p.reduced}
-            label={`${S.today.strain} ${t.value}, ${t.label}`}>
-            <span className="num bubble__value">{t.value.toFixed(1)}</span>
-          </Ring>
-          <figcaption className="bubble__name">{S.today.strain}</figcaption>
-        </figure>
-      </section>
-
-      <section className="glass insight">
-        <div className={`status tone-${r.tone}`}>
-          <span className="status__dot" />
-          {S.today.readiness} · {r.label}
-        </div>
-        <p className="insight__line">{S.today.readinessLine[r.tone]}</p>
-        <div className="insight__meta">
-          <span className={`status tone-${s.tone}`}>
-            <span className="status__dot" />
-            {S.today.sleep} · {s.label}
-          </span>
-          <span className={`status tone-${t.tone}`}>
-            <span className="status__dot" />
-            {S.today.strain} · {t.label}
-          </span>
-        </div>
-      </section>
+      {p.layout === 'hero' ? (
+        <Hero day={p.day} reduced={p.reduced} />
+      ) : (
+        <>
+          <Bubbles day={p.day} reduced={p.reduced} />
+          <Insight day={p.day} />
+        </>
+      )}
 
       <section className="section">
         <h2 className="section__title">{S.today.vitals}</h2>
         <div className="tiles">
-          <div className="glass tile">
+          <div className="card tile">
             <span className="tile__name">{S.today.hrv}</span>
             <span className="tile__value">
               <span className="num">{hrv}</span> <span className="unit">{S.today.ms}</span>
             </span>
-            <AreaChart values={p.mock.hrv} kind="readiness" label={`${S.today.hrv}, ${S.today.sevenDays}`} className="area--mini" />
+            <AreaChart values={p.mock.hrv} level={1} label={`${S.today.hrv}, ${S.today.sevenDays}`} className="area--mini" />
           </div>
-          <div className="glass tile">
+          <div className="card tile">
             <span className="tile__name">{S.today.rhrShort}</span>
             <span className="tile__value">
               <span className="num">{rhr}</span> <span className="unit">{S.today.bpm}</span>
             </span>
-            <AreaChart values={p.mock.rhr} kind="strain" label={`${S.today.rhr}, ${S.today.sevenDays}`} className="area--mini" />
+            <AreaChart values={p.mock.rhr} level={2} label={`${S.today.rhr}, ${S.today.sevenDays}`} className="area--mini" />
           </div>
-          <div className="glass tile">
+          <div className="card tile">
             <span className="tile__name">{S.today.sleep}</span>
             <span className="tile__value">
               <span className="num">{S.today.sleepClock(s.minutes)}</span>
@@ -131,7 +201,7 @@ export function Today(p: TodayProps) {
         </div>
       </section>
 
-      <section className="glass session">
+      <section className="card session">
         <div className="session__head">
           <div>
             <div className="eyebrow">{S.today.session}</div>

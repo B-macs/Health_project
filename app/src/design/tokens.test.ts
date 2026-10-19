@@ -1,8 +1,8 @@
-// The design's tokens are complete and readable in both modes (rebuild Phase 3).
-// Contrast is WCAG 2's: 4.5 for text, 3 for large numbers and graphics; a glass
-// colour is laid over the page colour before it is measured.
+// The design's tokens are complete and readable in both modes and in every style
+// (rebuild Phase 3). Contrast is WCAG 2's: 4.5 for text, 3 for large numbers and
+// graphics; a glass colour is laid over the page colour before it is measured.
 import { describe, expect, it } from 'vitest'
-import { DESIGN, type Mode, type Palette } from './tokens'
+import { FAMILIES, NEUTRALS, PAGE_FAMILY, STYLE_IDS, STYLES, type FamilyId, type Mode } from './tokens'
 
 type RGB = [number, number, number]
 
@@ -38,51 +38,70 @@ function contrast(a: RGB, b: RGB): number {
 }
 
 const MODES: Mode[] = ['dark', 'light']
-const KEYS = Object.keys(DESIGN.dark) as (keyof Palette)[]
+const FAMILY_IDS = Object.keys(FAMILIES.dark) as FamilyId[]
 
-describe('the palettes', () => {
-  it('name the same colours in both modes', () => {
-    expect(Object.keys(DESIGN.light).sort()).toEqual([...KEYS].sort())
+/** Every page colour a style can show: its own page, and a card on it. */
+function surfaces(mode: Mode): { name: string; rgb: RGB }[] {
+  return STYLE_IDS.flatMap((id) => {
+    const n = { ...NEUTRALS[mode], ...(STYLES[id].neutrals?.[mode] ?? {}) }
+    return [
+      { name: `style ${id} page`, rgb: parse(n.bg).rgb },
+      { name: `style ${id} card`, rgb: over(n.glass, n.bg) },
+      { name: `style ${id} solid card`, rgb: parse(n.solid).rgb },
+    ]
+  })
+}
+
+describe('the colour rule', () => {
+  it('every page has one colour family', () => {
+    for (const family of Object.values(PAGE_FAMILY)) expect(FAMILY_IDS).toContain(family)
   })
 
-  it.each(MODES)('%s: every colour parses', (mode) => {
-    for (const key of KEYS) expect(() => parse(DESIGN[mode][key]), key).not.toThrow()
+  it('both modes name the same families, shades and neutrals', () => {
+    expect(Object.keys(FAMILIES.light).sort()).toEqual([...FAMILY_IDS].sort())
+    expect(Object.keys(NEUTRALS.light).sort()).toEqual(Object.keys(NEUTRALS.dark).sort())
+  })
+
+  it('a style changes no family colour', () => {
+    for (const id of STYLE_IDS) {
+      for (const mode of MODES) {
+        const keys = Object.keys(STYLES[id].neutrals?.[mode] ?? {})
+        expect(keys.every((k) => !k.startsWith('f'))).toBe(true)
+      }
+    }
   })
 })
 
 describe.each(MODES)('%s mode contrast', (mode) => {
-  const p = DESIGN[mode]
-  const page = parse(p.bg).rgb
-  const card = over(p.glass, p.bg)
+  const n = NEUTRALS[mode]
 
-  it('body text reads at 7:1 or more on the page and on a card', () => {
-    expect(contrast(parse(p.text).rgb, page)).toBeGreaterThanOrEqual(7)
-    expect(contrast(parse(p.text).rgb, card)).toBeGreaterThanOrEqual(7)
+  it.each(surfaces(mode).map((s) => [s.name, s.rgb] as const))('text and muted text read on the %s', (_name, rgb) => {
+    expect(contrast(parse(n.text).rgb, rgb)).toBeGreaterThanOrEqual(7)
+    expect(contrast(parse(n.muted).rgb, rgb)).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('muted text reads at 4.5:1 or more on the page and on a card', () => {
-    expect(contrast(parse(p.muted).rgb, page)).toBeGreaterThanOrEqual(4.5)
-    expect(contrast(parse(p.muted).rgb, card)).toBeGreaterThanOrEqual(4.5)
+  it('the button word reads on the white (or black) button', () => {
+    expect(contrast(parse(n.onAccent).rgb, parse(n.accent).rgb)).toBeGreaterThanOrEqual(4.5)
   })
 
-  it('the button word reads on the button', () => {
-    expect(contrast(parse(p.onAccent).rgb, parse(p.accent).rgb)).toBeGreaterThanOrEqual(4.5)
+  it.each(FAMILY_IDS)('%s: the strongest shade carries text, the middle one draws lines', (id) => {
+    const f = FAMILIES[mode][id]
+    for (const s of surfaces(mode)) {
+      expect(contrast(parse(f.f1).rgb, s.rgb), `${id} f1 on ${s.name}`).toBeGreaterThanOrEqual(4.5)
+      expect(contrast(parse(f.f2).rgb, s.rgb), `${id} f2 on ${s.name}`).toBeGreaterThanOrEqual(3)
+    }
+    expect(contrast(parse(n.onAccent).rgb, parse(f.f1).rgb), `${id}: the word on a family button`).toBeGreaterThanOrEqual(4.5)
   })
-
-  it.each(['readiness', 'sleep', 'strain', 'good', 'fair', 'low'] as const)(
-    '%s is visible on a card (3:1, graphics and large text)',
-    (key) => {
-      expect(contrast(parse(p[key]).rgb, card)).toBeGreaterThanOrEqual(3)
-    },
-  )
 })
 
-describe('sizes', () => {
+describe.each(STYLE_IDS)('style %s sizes', (id) => {
+  const s = STYLES[id]
+
   it('every tap target is 44 pt or more', () => {
-    for (const size of [DESIGN.size.tap, DESIGN.size.gym]) expect(parseFloat(size)).toBeGreaterThanOrEqual(44)
+    for (const size of [s.size.tap, s.size.gym]) expect(parseFloat(size)).toBeGreaterThanOrEqual(44)
   })
 
   it('text sizes are in rem, so they follow the iPhone text size', () => {
-    for (const size of Object.values(DESIGN.type)) expect(size).toMatch(/rem/)
+    for (const size of Object.values(s.type)) expect(size).toMatch(/rem/)
   })
 })

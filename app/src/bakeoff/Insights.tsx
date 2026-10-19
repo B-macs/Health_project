@@ -1,6 +1,7 @@
-// Insights, Oura-style: the Strength card on glass — one thin number, the change with
-// its period, a soft area chart, the body areas as contributor bars, and the week's
-// work — above the list of the other insights (not part of the preview).
+// Insights, Oura-style, in the page's one colour family (indigo): the Strength card —
+// one thin number, the change with its period, a soft area chart, the body areas as
+// contributor bars, and the week's work — above the list of the other insights (not
+// part of the preview).
 import type { Mock, Region } from '../mock/generate'
 import { S } from '../strings'
 import { IconForward } from './icons'
@@ -19,7 +20,6 @@ function regionNote(r: Region): string {
 
 export function Insights({ mock, reduced }: Props) {
   const st = mock.strength
-  const down = st.change4w < 0
   return (
     <div className="screen insights">
       <div className="sky sky--quiet" aria-hidden="true" />
@@ -27,7 +27,7 @@ export function Insights({ mock, reduced }: Props) {
         <h1 className="pagehead__title">{S.insights.title}</h1>
       </header>
 
-      <article className="glass strength">
+      <article className="card strength">
         <div className="strength__head">
           <span className="eyebrow">{S.insights.strength}</span>
           <IconForward />
@@ -36,14 +36,14 @@ export function Insights({ mock, reduced }: Props) {
           <span className="num strength__value">{st.score.toFixed(1)}</span>
           <span className="strength__unit">{S.insights.points}</span>
         </div>
-        <span className={`chip-status tone-${down ? 'fair' : 'good'}`}>{S.insights.change(st.change4w)}</span>
-        <AreaChart values={st.weekly} kind="readiness" label={`${S.insights.overall}, ${S.insights.weeks}`} className="area--wide" />
+        <span className="chip-status">{S.insights.change(st.change4w)}</span>
+        <AreaChart values={st.weekly} level={1} label={`${S.insights.overall}, ${S.insights.weeks}`} className="area--wide" />
         <div className="caption">{S.insights.weeks}</div>
 
         <div className="eyebrow strength__sub">{S.insights.byArea}</div>
         {st.regions.map((r) => (
           <Contributor key={r.key} name={S.insights.regions[r.key]} value={regionValue(r)}
-            fraction={r.value == null ? null : r.value / 100} note={regionNote(r)} tone="good" reduced={reduced} />
+            fraction={r.value == null ? null : r.value / 100} note={regionNote(r)} reduced={reduced} />
         ))}
 
         <div className="work">
@@ -58,7 +58,7 @@ export function Insights({ mock, reduced }: Props) {
 
       <ul className="more">
         {S.insights.more.map((title) => (
-          <li key={title} className="glass more__item">
+          <li key={title} className="card more__item">
             <span>{title}</span>
             <IconForward />
           </li>
