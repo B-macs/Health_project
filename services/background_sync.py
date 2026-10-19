@@ -48,6 +48,7 @@ import threading
 from contextlib import contextmanager
 from datetime import date, datetime
 
+from services import background_writer
 from services.config import Config
 from services.repository import Repository
 
@@ -81,6 +82,7 @@ class BackgroundSyncRunner:
         self._results: dict[str, tuple[bool, str | None]] = {}
         self._last_finished: datetime | None = None
         self._last_error: str | None = None
+        self._skipped: str | None = None
         self._thread: threading.Thread | None = None
 
     # ── state, readable from the UI thread at any time ──────────────────
@@ -98,6 +100,12 @@ class BackgroundSyncRunner:
     def last_finished(self) -> datetime | None:
         with self._state_lock:
             return self._last_finished
+
+    def skipped_for(self) -> str | None:
+        """The writer the last run deferred to, when this process is not the
+        background writer; None when it ran."""
+        with self._state_lock:
+            return self._skipped
 
     def last_error(self) -> str | None:
         """Set only when the run itself blew up, as opposed to an individual
@@ -216,6 +224,16 @@ class BackgroundSyncRunner:
         error: str | None = None
         try:
             repository = self._repository_factory(self._config)
+            # Only the background writer syncs (rebuild rule 2). A live read
+            # of the store's setting, here on the worker, so the page never
+            # waits for it. A process that names nothing is not checked.
+            process = getattr(self._config, "background_process", "")
+            if process and not background_writer.may_write(repository, process):
+                with self._state_lock:
+                    self._skipped = background_writer.current(repository) or "unknown"
+                return results
+            with self._state_lock:
+                self._skipped = None
             results = repository.run_home_syncs(today=today)
         except Exception as exc:
             error = str(exc)

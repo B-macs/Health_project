@@ -29,7 +29,8 @@ def get_config():
     from get_repository because the background sync runner needs a Config to
     build its OWN Repository per run — see services/background_sync.py for
     why it must not borrow this thread's."""
-    return load_config(dict(st.secrets))
+    # This process is the Streamlit app (services/background_writer.py).
+    return load_config({**dict(st.secrets), "HEALTH_PROCESS": "streamlit"})
 
 
 @st.cache_resource(show_spinner=False)

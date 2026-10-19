@@ -119,6 +119,12 @@ class Config:
     # by hand keeps testing what it always tested. load_config() resolves the
     # production default instead: "supabase" whenever Supabase is configured.
     system_of_record: str = "notion"
+    # WHICH PROCESS THIS CONFIG RUNS IN (rebuild rule 2, 2026-10-19):
+    # "streamlit" (repo.py) or "engine" (the API's settings), set through
+    # HEALTH_PROCESS. The background writes run only in the process the
+    # store's background_writer setting names (services/background_writer.py).
+    # "" (a script, a test) is not checked.
+    background_process: str = ""
 
 
 SYSTEMS_OF_RECORD = ("notion", "supabase")
@@ -281,4 +287,5 @@ def load_config(overrides: dict | None = None) -> Config:
         supabase_secret_key=supabase_secret_key,
         timezone=_resolve_optional_str("HEALTH_TIMEZONE", overrides),
         system_of_record=record,
+        background_process=_resolve_optional_str("HEALTH_PROCESS", overrides).strip().lower(),
     )

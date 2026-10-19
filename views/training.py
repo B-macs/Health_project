@@ -36,6 +36,7 @@ from services import sessions as sess
 from services import strain_regions
 from services import week_repeat
 from services import flexibility as fx
+from services import background_writer
 from services import gate1 as g1
 from services import guided_flow
 from services import training_week
@@ -1362,6 +1363,14 @@ def _all_logged_dates(start_iso: str, today_iso: str) -> set[str]:
     start = date.fromisoformat(start_iso)
     today = date.fromisoformat(today_iso)
     return repo.get_repository().get_logged_session_dates(start, today)
+
+
+@st.cache_data(ttl=60, show_spinner=False)
+def _streamlit_writes() -> bool:
+    """Whether this app is the background writer (services/background_writer.py,
+    rebuild rule 2): the failed-week rule and the records written unasked run
+    only then. Cached a minute: it is a live read of the store."""
+    return background_writer.may_write(repo.get_repository(), background_writer.STREAMLIT)
 
 
 @st.cache_data(ttl=300, show_spinner=False)
@@ -3110,7 +3119,7 @@ def render():
     # week_repeat.store_failed_week_rule (the path the phone's engine runs too),
     # because it replaces the whole phase list with no button press. A copy
     # missing two logged days failed a four-day week on 2026-09-22.
-    if phases and not _in_session:
+    if phases and not _in_session and _streamlit_writes():
         _fw_written = False
         try:
             _fw_today = date.today()
@@ -3181,9 +3190,11 @@ def render():
 
             if _mr_overrides and not scheduling.has_real_move(active, _mr_overrides):
                 # Drops only — a record that nothing could be carried, not a
-                # move; needs no permission (the calendar is unchanged).
+                # move; needs no permission (the calendar is unchanged), but
+                # it is written unasked, so only by the background writer.
                 _d_ovr, _d_rsn = _mr_recompute()
-                if _d_ovr and not scheduling.has_real_move(active, _d_ovr):
+                if (_d_ovr and not scheduling.has_real_move(active, _d_ovr)
+                        and _streamlit_writes()):
                     _mr_write_succeeded = _mr_write(_d_ovr, _d_rsn)
             elif _mr_overrides:
                 if _mr_in_order:
@@ -3271,7 +3282,9 @@ def render():
                                                       "Readiness shift not saved: {detail}.")
 
                     if not scheduling.has_real_move(active, _new_overrides):
-                        _shift_write_succeeded = _rs_write(_new_overrides, _new_reasons)
+                        # Written unasked: only by the background writer.
+                        if _streamlit_writes():
+                            _shift_write_succeeded = _rs_write(_new_overrides, _new_reasons)
                     else:
                         st.warning(
                             f"Readiness suggests moving today's session — {_reason}. "

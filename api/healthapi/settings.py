@@ -41,7 +41,8 @@ def secrets_overrides(path: Path | None = None) -> dict:
 
 
 def build_config(path: Path | None = None) -> Config:
-    return load_config(secrets_overrides(path))
+    # This process is the engine (services/background_writer.py).
+    return load_config({**secrets_overrides(path), "HEALTH_PROCESS": "engine"})
 
 
 def engine_key() -> str | None:

@@ -33,6 +33,7 @@ import uuid
 from datetime import date, datetime, timedelta
 
 from services import backup
+from services import background_writer
 from services import biometrics
 from services import body_composition
 from services import content_weighting
@@ -807,6 +808,10 @@ class Repository:
         next one in existence — returning it to a caller that might not store
         it is how a credential gets destroyed by a successful call.
         """
+        # Only the background writer may spend the refresh token (rebuild
+        # rule 2): two processes refreshing break the login.
+        if self.config.background_process:
+            background_writer.require(self, self.config.background_process)
         payload = oura.refresh_access_token(
             self.config.oura_client_id, self.config.oura_client_secret,
             token.refresh_token,
@@ -3086,6 +3091,17 @@ class Repository:
     def get_config_value(self, key: str) -> str | None:
         page = self._config_page(key)
         return notion.get_property(page, "Value", "rich_text") if page else None
+
+    def get_config_value_live(self, key: str) -> str | None:
+        """A config value read from the system of record ITSELF, past the
+        local copy: for a setting another process may have changed since
+        this one built its copy (services/background_writer.py)."""
+        if self.offline:
+            return self.get_config_value(key)
+        pages = self._live_query(
+            self.config.notion_db_config,
+            filter_={"property": "Key", "title": {"equals": key}})
+        return notion.get_property(pages[0], "Value", "rich_text") if pages else None
 
     def mark_record_since(self, now: datetime | None = None) -> str | None:
         """Record, once, when Supabase became the system of record; returns
