@@ -458,3 +458,58 @@ def repeat_notice(phases: list[Phase], today: date) -> str | None:
         nxt = following[0]
         text += f" {nxt.name} starts Monday {_long_date(_start(nxt))}."
     return text
+
+
+# ─── Storing it: the one write path, for the Training page and the engine ───
+
+def store_failed_week_rule(repo, phases: list[Phase], today: date,
+                           logged_dates=None) -> bool:
+    """Judge every ended week and store the verdicts; True when the phases
+    were written.
+
+    `phases` and `logged_dates` are the caller's local copy (the logged dates
+    are read from the repository's local copy when not given), and they only
+    decide whether a write is DUE. The write itself is rebuilt from LIVE reads
+    of both the stored phases and the log (Repository.get_phases_live and
+    get_logged_session_dates_live): it replaces the whole phase list with no
+    button press, a list built from a stale copy would put an older schedule
+    over a newer one, and on 2026-09-22 a copy missing two logged days failed a
+    four-day week. When the stored list already holds the verdict and the copy
+    does not, the stored list is written back as it is, which repairs the copy.
+
+    Not ask-first, on purpose (Key Rule 22): a consequence the athlete set for
+    himself, and one that waits for permission is a suggestion."""
+    if not phases:
+        return False
+    first = min(_start(p) for p in phases)
+    if logged_dates is None:
+        logged_dates = repo.get_logged_session_dates(first, today)
+    due, _ = apply_failed_week_rule(phases, logged_dates, today)
+    if due is phases:
+        return False
+    stored = repo.get_phases_live()
+    fresh, _ = apply_failed_week_rule(
+        stored, repo.get_logged_session_dates_live(first, today), today)
+    if fresh is stored and stored == phases:
+        return False
+    repo.set_phases(fresh)
+    return True
+
+
+def store_redo(repo, today: date) -> tuple[list[Phase] | None, str | None]:
+    """The athlete's "Yes, redo this week", stored. Returns (the phases
+    written, None), or (None, why this week was not set to repeat).
+
+    A permanent write with no undo on the screen, so it is rebuilt from LIVE
+    reads of the stored phases and the log, never from the copy a screen
+    started with. Whether to OFFER the redo is redo_is_offered's question,
+    asked before the button is drawn; this only applies it."""
+    stored = repo.get_phases_live()
+    if not stored:
+        return None, "there is no training block"
+    first = min(_start(p) for p in stored)
+    fresh, why = redo_this_week(stored, repo.get_logged_session_dates_live(first, today), today)
+    if fresh is None:
+        return None, why
+    repo.set_phases(fresh)
+    return fresh, None

@@ -1820,17 +1820,13 @@ def _render_week_repeat(phases: list, in_session: bool) -> None:
     if _yes_col.button("Yes, redo this week", key="tp_redo_yes"):
         _redo_ok = False
         try:
-            # A permanent write with no undo on screen: rebuild it from a
-            # fresh read of the stored phases and the log, never from the
-            # copies this render started with.
-            _r = repo.get_repository()
-            _stored = _r.get_phases_live()
-            _fresh, _why = week_repeat.redo_this_week(
-                _stored, _r.get_logged_session_dates(_first, _today), _today)
+            # A permanent write with no undo on screen: week_repeat.store_redo
+            # rebuilds it from live reads of the stored phases and the log,
+            # never from the copies this render started with.
+            _fresh, _why = week_repeat.store_redo(repo.get_repository(), _today)
             if _fresh is None:
                 st.warning(f"This week was not set to repeat: {_why}.")
             else:
-                _r.set_phases(_fresh)
                 _redo_ok = True
         except Exception:
             st.error("Couldn't save the redo — nothing was changed. Try again.")
@@ -3400,34 +3396,19 @@ def render():
     # suggestion. It runs before them because it decides which block and which
     # week today belongs to. services/week_repeat.py holds the whole rule.
     #
-    # The cached read only decides whether a write is DUE. The write itself is
-    # recomputed from a FRESH read of both the log and the stored phases —
-    # BOTH from Notion itself, past the local copy (the log read was the local
-    # copy until 2026-09-22, when it failed a four-day week) — because this path
-    # replaces the whole phase list with no button press, and a list built from
-    # a stale local copy would put an older schedule over a newer one. When the
-    # fresh list already holds the verdict but the local copy does not, the
-    # fresh list is written back as it is, which repairs the copy the rest of
-    # this page reads.
+    # The cached read only decides whether a write is DUE; the write is rebuilt
+    # from LIVE reads of both the log and the stored phases, in
+    # week_repeat.store_failed_week_rule (the path the phone's engine runs too),
+    # because it replaces the whole phase list with no button press. A copy
+    # missing two logged days failed a four-day week on 2026-09-22.
     if phases and not _in_session:
         _fw_written = False
         try:
             _fw_today = date.today()
             _fw_first = min(date.fromisoformat(p.start_date) for p in phases)
-            _fw_due, _ = week_repeat.apply_failed_week_rule(
-                phases, _all_logged_dates(_fw_first.isoformat(), _fw_today.isoformat()),
-                _fw_today)
-            if _fw_due is not phases:
-                _fw_repo = repo.get_repository()
-                _fw_stored = _fw_repo.get_phases_live()
-                # The COUNT from Notion too, not only the schedule: the cache is
-                # rebuilt from Supabase on a restart and can be missing logged
-                # days, which failed a four-day week on 2026-09-22.
-                _fw_logged = _fw_repo.get_logged_session_dates_live(_fw_first, _fw_today)
-                _fw_new, _ = week_repeat.apply_failed_week_rule(_fw_stored, _fw_logged, _fw_today)
-                if _fw_new is not _fw_stored or _fw_stored != phases:
-                    _fw_repo.set_phases(_fw_new)
-                    _fw_written = True
+            _fw_written = week_repeat.store_failed_week_rule(
+                repo.get_repository(), phases, _fw_today,
+                _all_logged_dates(_fw_first.isoformat(), _fw_today.isoformat()))
         except Exception:
             pass  # never let the rule's check crash the page; it runs again next render
         if _fw_written:

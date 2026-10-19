@@ -734,32 +734,44 @@ def _function_source(name: str) -> str:
     return ast.get_source_segment(_VIEW, node)
 
 
+def _service_source(name: str) -> str:
+    import inspect
+    return inspect.getsource(getattr(wr, name))
+
+
 def test_the_automatic_repeat_rereads_notion_before_it_writes():
-    render = _function_source("render")
-    rule_at = render.index("week_repeat.apply_failed_week_rule(")
-    write_at = render.index("set_phases(_fw_new)")
-    assert rule_at < render.index("get_phases_live()", rule_at) < write_at
+    """The write moved into week_repeat.store_failed_week_rule on 2026-10-19
+    (the page and the phone's engine run the same one); the page only calls it.
+    tests/test_week_repeat_store.py proves the order with a recording store."""
+    assert "week_repeat.store_failed_week_rule(" in _function_source("render")
+    src = _service_source("store_failed_week_rule")
+    rule_at = src.index("apply_failed_week_rule(phases")
+    write_at = src.index("repo.set_phases(fresh)")
+    assert rule_at < src.index("get_phases_live()", rule_at) < write_at
 
 
 def test_the_automatic_repeat_counts_logged_days_from_notion_before_it_writes():
     """The schedule AND the count come from Notion before a verdict is written.
     Only the schedule did until 2026-09-22, when a cache missing two logged days
     failed a four-day week."""
-    render = _function_source("render")
-    rule_at = render.index("week_repeat.apply_failed_week_rule(")
-    write_at = render.index("set_phases(_fw_new)")
-    assert rule_at < render.index("get_logged_session_dates_live(", rule_at) < write_at
-    assert "get_logged_session_dates(" not in render[rule_at:write_at]
+    src = _service_source("store_failed_week_rule")
+    rule_at = src.index("apply_failed_week_rule(phases")
+    write_at = src.index("repo.set_phases(fresh)")
+    assert rule_at < src.index("get_logged_session_dates_live(", rule_at) < write_at
+    assert "get_logged_session_dates(" not in src[rule_at:write_at]
 
 
 def test_the_redo_rereads_notion_before_it_writes():
-    redo = _function_source("_render_week_repeat")
-    assert redo.index("get_phases_live()") < redo.index("set_phases(_fresh)")
+    assert "week_repeat.store_redo(" in _function_source("_render_week_repeat")
+    src = _service_source("store_redo")
+    assert src.index("get_phases_live()") < src.index("get_logged_session_dates_live(") \
+        < src.index("repo.set_phases(fresh)")
 
 
 def test_the_rule_runs_before_the_scheduling_writers_that_depend_on_it():
     render = _function_source("render")
-    assert render.index("apply_failed_week_rule(") < render.index("missed_reschedules(")
+    assert render.index("week_repeat.store_failed_week_rule(") < render.index(
+        "missed_reschedules(")
 
 
 def test_the_screen_holds_the_load_before_anything_reads_the_policy():

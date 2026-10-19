@@ -125,6 +125,8 @@ def test_the_training_page_runs_it_before_the_failed_week_rule():
 
     src = (Path(__file__).resolve().parent.parent / "views" / "training.py").read_text(
         encoding="utf-8")
-    assert src.index("block_changeover.due(") < src.index("week_repeat.apply_failed_week_rule(")
-    block = src[src.index("block_changeover.due("):src.index("week_repeat.apply_failed_week_rule(")]
+    # The failed-week rule is week_repeat.store_failed_week_rule since 2026-10-19.
+    rule = "week_repeat.store_failed_week_rule("
+    assert src.index("block_changeover.due(") < src.index(rule)
+    block = src[src.index("block_changeover.due("):src.index(rule)]
     assert "get_phases_live()" in block, "the write must be rebuilt from a live read"
