@@ -50,6 +50,15 @@ def test_the_summary_reads_cold_samples_only():
     assert out["cold_start_engine_timings_median_s"] == {"cache_rebuild_s": 5.0, "imports_s": 2.2}
 
 
+def test_a_follow_up_counts_as_warm_even_when_its_flag_reads_cold():
+    out = m.summarise([
+        {"kind": "cold", "via": "worker", "status": 200, "seconds": 9.1, "cold": True},
+        {"kind": "warm_after_cold", "via": "direct", "status": 200, "seconds": 0.40, "cold": True},
+        {"kind": "warm_after_cold", "via": "worker", "status": 200, "seconds": 0.45, "cold": True},
+    ])
+    assert out["warm_request_ms"] == 400 and out["worker_to_engine_ms"] == 50
+
+
 def test_no_cold_sample_means_no_number():
     out = m.summarise([{"kind": "cold", "status": 200, "seconds": 0.2, "cold": False}])
     assert out["cold_start_median_s"] is None and out["cold_start_worst_s"] is None

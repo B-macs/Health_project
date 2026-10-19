@@ -32,6 +32,14 @@ COPY training_plan.py training_constants.py cluster_a_battery.py \
      goal_block.py ./
 COPY api/ api/
 
+# Compiled once here, never at a cold start. PYTHONDONTWRITEBYTECODE stops the
+# running engine writing .pyc files, but it still READS them; without this line
+# every cold start compiled services/ and api/ again (the engine's imports took
+# 2.3-5.5 s on Cloud Run on 2026-10-19 against 1.3 s on the PC). unchecked-hash:
+# the image never changes, so Python need not compare the .pyc with its source.
+RUN python -m compileall -q -j 0 --invalidation-mode unchecked-hash \
+        /app/services /app/api /app/*.py /usr/local/lib/python3.12/site-packages
+
 # A non-root user that owns /app: services/clients/local_cache.py writes
 # .sync_state.json next to services/, and the cache lives under /tmp/health.
 RUN useradd --create-home --uid 10001 engine \

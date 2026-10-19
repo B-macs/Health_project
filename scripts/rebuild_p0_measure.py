@@ -354,12 +354,17 @@ def cmd_project(args) -> None:
 def summarise(samples: list[dict]) -> dict:
     """The proof numbers from the samples: cold starts as the caller saw them."""
     cold = [s["seconds"] for s in samples if s.get("kind") == "cold" and s.get("cold")]
-    warm_direct = [s["seconds"] for s in samples
-                   if s.get("kind") in ("warm", "warm_after_cold") and s.get("via") == "direct"
-                   and s.get("status") == 200 and s.get("cold") is False]
-    warm_worker = [s["seconds"] for s in samples
-                   if s.get("kind") in ("warm", "warm_after_cold") and s.get("via") == "worker"
-                   and s.get("status") == 200 and s.get("cold") is False]
+
+    def warm(s: dict, via: str) -> bool:
+        # A follow-up is warm by construction: one instance at most, and it has
+        # just answered. Its own cold flag can read True, because started_at is
+        # written to the second and COLD_MARGIN_S reaches back 2 s.
+        return (s.get("via") == via and s.get("status") == 200
+                and (s.get("kind") == "warm_after_cold"
+                     or (s.get("kind") == "warm" and s.get("cold") is False)))
+
+    warm_direct = [s["seconds"] for s in samples if warm(s, "direct")]
+    warm_worker = [s["seconds"] for s in samples if warm(s, "worker")]
     out = {
         "cold_start_failures": sum(1 for s in samples
                                    if s.get("kind") == "cold" and s.get("status") != 200),
