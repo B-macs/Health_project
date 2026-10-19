@@ -4,7 +4,7 @@
     {"id": "F1", "what": "The readiness auto-shift had not run since 2026-08-23 (undefined _rm_bio, error swallowed)", "fixed": "2026-10-19 live (9bcc342)", "test": "tests/test_no_undefined_names.py::test_no_function_reads_an_undefined_name"},
     {"id": "F2", "what": "The date_overrides writers record reasons for refused moves; the rejection warning vanishes on the rerun", "test": "tests/test_schedule_change.py::test_a_refused_change_writes_nothing_and_records_no_reason", "fixed": "2026-10-19 in the move (scheduling.apply_schedule_change)"},
     {"id": "F3", "what": "A second check-in the same day could not set a field back to its default (pain 4 -> 0)", "fixed": "2026-10-19 live (1714ddd)", "test": "tests/test_checkin_view_edits.py::test_a_saved_day_opens_filled_in_and_a_pain_of_zero_is_stored"},
-    {"id": "F4", "what": "Insights Engine Data drops the readiness signal Home passes to load_policy", "test": null},
+    {"id": "F4", "what": "Insights Engine Data drops the readiness signal Home passes to load_policy", "test": "tests/test_engine_data_panel.py::test_a_day_only_readiness_reduces_reads_the_same_on_both_screens", "fixed": "2026-10-19 in the move (the tab shows today.py's shared verdict)"},
     {"id": "F5", "what": "The wake-time stepper writes a value that changes nothing on a fused night; the caption credits Oura", "test": null},
     {"id": "F6", "what": "The Readiness drill-down's contributors use the 60-day raw score while today's card uses the 14-day one", "test": null},
     {"id": "F7", "what": "A failed stage read becomes stage 1 (changes strain, can print Stage 1 text)", "test": null},

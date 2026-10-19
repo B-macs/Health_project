@@ -32,19 +32,19 @@ import patient_profile
 import repo
 import strength_baselines
 import styles
+import today as today_mod
 import training_constants
 from services import ai
 from services import bioage
 from services import body_composition as bc
 from services import dashboard as dash
+from services import decision
 from services import engine
 from services import battery as btry
 from services import flexibility as fx
 from services import stats as stats_mod
 from services import insights as insights_svc
-from services import plan as plan_svc
 from services import sessions as sessions_svc
-from services import verdict as verdict_svc
 from services import strength as strength_svc
 from services import tonnage as tonnage_svc
 from services import volume as volume_svc
@@ -1365,38 +1365,10 @@ def _bio():
     # the typed BiometricRecord back to the exact shape they expect.
     return [asdict(r) for r in repo.get_repository().get_biometric_rolling(days=28)]
 
-@st.cache_data(ttl=1800, show_spinner=False)
-def _bio_drift():
-    """Wide history feeding ONLY engine.traffic_light's baseline-drift guard.
-    Kept separate from _bio() because the same list is handed to
-    readiness.compute_readiness elsewhere on this page, whose sleep_baseline
-    silently widens from a 28- to a 56-night window on a longer list — see
-    engine.traffic_light's drift_rows docstring."""
-    records = repo.get_repository().get_biometric_rolling(
-        days=engine.DRIFT_RECOMMENDED_FETCH_DAYS)
-    return [asdict(r) for r in records]
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _au():          return repo.get_repository().get_daily_session_au_weighted(28)
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _streak():      return repo.get_repository().get_pain_free_streak()
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _tight():       return repo.get_repository().get_avg_tightness(14)
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _diag():        return repo.get_repository().get_diagnostic_profile()
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _stage():       return repo.get_repository().get_current_stage()
-
-@st.cache_data(ttl=1800, show_spinner=False)
-def _stage_start():
-    """Start date of the active phase — scopes ACWR's chronic baseline to the
-    current stage. None during a reassessment gap; acwr() then falls back to
-    the flat 28-day calendar window."""
-    return plan_svc.current_stage_start(repo.get_repository().get_phases(), date.today())
+# The Engine Data tab's own readers (_bio_drift, _au, _streak, _tight, _diag,
+# _stage, _stage_start) were removed on 2026-10-19: the tab reads
+# decision.engine_state through _engine_state below, the same reads and
+# arithmetic as the directive Home and Training show.
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _sync_raw(sheet_id: str) -> list[dict]:
@@ -1444,6 +1416,13 @@ def _manual_sync(spinner_message: str):
 
 # Sleep-stage rendering moved to styles.py (shared with app.py's Sleep
 # drill-down) — see styles.STAGE_BAND / hypnogram_svg / stage_legend_html.
+
+@st.cache_data(ttl=1800, show_spinner=False)
+def _engine_state() -> dict:
+    """Everything Engine Data shows below its banner, read once for today
+    (decision.engine_state: the same reads and arithmetic as the directive)."""
+    return decision.engine_state(repo.get_repository(), date.today(), with_stage_status=True)
+
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _recent_sessions():
@@ -2323,6 +2302,198 @@ def _strength_screen_data() -> dict:
 #  render()
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _render_engine_data() -> None:
+    """Insights › Engine Data. Its own function since 2026-10-19 so it can be
+    rendered alone in a test (tests/test_engine_data_panel.py)."""
+    st.caption(f"Data as of {date.today().strftime('%A %d %B')} · refreshes every 30 min")
+
+    if st.button("Refresh engine data", use_container_width=False, key="engine_refresh_btn"):
+        st.cache_data.clear()
+        st.rerun()
+
+    with st.spinner("Loading…"):
+        _state      = _engine_state()
+        bio_rows    = _state["bio_rows"]
+        tl          = _state["traffic_light"]
+        acwr_result = _state["acwr"]
+        stage_info  = _state["stage_status"]
+
+    # ── Directive banner ──────────────────────────────────────────────────
+    # THE VERDICT HOME SHOWS, the same cached object (today.py), in Home's
+    # words and tone. Until 2026-10-19 this panel built its own load policy
+    # from the directive alone, without the readiness signal Home passes, so
+    # on a day only readiness asked for less, Home said REDUCED LOAD and this
+    # panel said NO CHANGE TO LOAD (inventory fault F4). The raw engine
+    # label stays, as a caption.
+    _verdict = today_mod.today_verdict()
+    rec = today_mod.today_directive()
+    sig_color = _verdict.tone
+    _words = (_verdict.badge
+              or {"neutral": "NO READING YET"}.get(_verdict.banner_kind, "NO CHANGE TO LOAD"))
+    st.markdown(
+        f"<div style='background:{sig_color}20;border-left:4px solid {sig_color};"
+        f"border-radius:6px;padding:12px 16px;margin-bottom:16px;'>"
+        f"<div style='font-size:10px;color:{sig_color};font-family:monospace;"
+        f"letter-spacing:2px;margin-bottom:2px;'>DIRECTIVE</div>"
+        f"<div style='font-size:17px;font-weight:700;color:#E8EAF0;'>{_words}</div>"
+        f"<div style='font-size:12px;color:#9AA3B2;margin-top:4px;'>{rec['action']}</div>"
+        f"<div style='font-size:10px;color:#6B7A9B;margin-top:6px;font-family:monospace;'>"
+        f"engine label: {rec['label']}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+    # ACWR rides alongside the directive rather than driving it while the
+    # engine is in advisory mode — see engine.ACWR_ADVISORY_MODE.
+    if rec.get("acwr_advisory"):
+        st.caption(rec["acwr_advisory"])
+
+    acwr_val = acwr_result.get("acwr")
+
+    st.divider()
+
+    # ── Stage progression ─────────────────────────────────────────────────
+    st.subheader("Stage Progression")
+    st.markdown(f"**{stage_info['stage_label']}**")
+    st.caption(stage_info["message"])
+
+    if stage_info.get("progress_days") and stage_info["progress_days"] != "—":
+        st.markdown(f"Pain-free days: `{stage_info['progress_days']}`")
+        st.progress(stage_info["days_progress_pct"])
+
+    if stage_info.get("progress_tightness") and stage_info["progress_tightness"] != "—":
+        st.markdown(f"Tightness target: `{stage_info['progress_tightness']}`")
+        st.progress(stage_info["tight_progress_pct"])
+
+    st.divider()
+
+    # ── Biometric traffic light ───────────────────────────────────────────
+    st.subheader("Biometric Traffic Light")
+    if tl["status"] in engine.NO_READING_STATUSES:
+        st.info(tl["message"])
+    else:
+        overall_color = engine.SIGNAL_COLORS.get(tl["overall"], engine.SIGNAL_COLORS["grey"])
+        st.markdown(
+            f"Overall: <span style='color:{overall_color};font-weight:700;'>"
+            f"{tl['overall'].upper()}</span> — {tl['message']}",
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        metrics = tl.get("metrics", {})
+        c_hrv, c_rhr, c_sleep, c_temp = st.columns(4)
+
+        # Which source (if any) was missing for today's blended reading —
+        # populated by services/biometrics.py's blend_biometric_day().
+        _today_bio = next((r for r in bio_rows if r.get("date") == date.today().isoformat()), None)
+        _sources_missing = set((_today_bio or {}).get("sources_missing") or ())
+
+        def _metric_card(col, key, label):
+            card      = insights_svc.metric_card(metrics.get(key, {}))
+            color     = engine.SIGNAL_COLORS.get(card["signal"], engine.SIGNAL_COLORS["grey"])
+            val_str, base_str, delta_str = card["value"], card["comparison"], card["change"]
+            col.markdown(
+                f"<div style='background:#1A1F2E;border-left:4px solid {color};"
+                f"border-radius:6px;padding:12px 14px;'>"
+                f"<div style='font-size:10px;color:#888;font-family:monospace;"
+                f"letter-spacing:1px;'>{label}</div>"
+                f"<div style='font-size:26px;font-weight:700;color:#E8EAF0;"
+                f"font-family:monospace;'>{val_str}</div>"
+                f"<div style='font-size:11px;color:#888;'>{base_str}</div>"
+                f"<div style='font-size:11px;color:{color};'>{delta_str}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            missing_source = insights_svc.missing_source(_sources_missing, key)
+            if missing_source:
+                col.caption(f"⚠ {missing_source.title()} pending — using the other source only.")
+
+        _metric_card(c_hrv,   "hrv_ms",              "HRV")
+        _metric_card(c_rhr,   "resting_heart_rate",   "RHR")
+        _metric_card(c_sleep, "sleep_duration_hours", "SLEEP")
+        _metric_card(c_temp,  "oura_temperature_deviation", "BODY TEMP")
+
+        # ── Baseline-drift guard ──────────────────────────────────────
+        # Shown whenever drift is detected, not only when it changed the
+        # light: "your baseline is sliding" is worth reading on a day the
+        # light was already yellow for other reasons.
+        _drift = tl.get("drift", {})
+        if _drift.get("drifted"):
+            _dc = engine.SIGNAL_COLORS["yellow"]
+            _applied_line = (
+                "<div style='font-size:11px;color:#9AA3B2;margin-top:4px;'>"
+                "Light downgraded green → yellow.</div>"
+                if tl.get("drift_applied") else ""
+            )
+            st.write("")
+            st.markdown(
+                f"<div style='background:{_dc}18;border-left:4px solid {_dc};"
+                f"border-radius:6px;padding:10px 14px;'>"
+                f"<div style='font-size:10px;color:{_dc};font-family:monospace;"
+                f"letter-spacing:2px;'>BASELINE DRIFT — "
+                f"{_drift.get('severity','').upper()}</div>"
+                f"<div style='font-size:12px;color:#C8CEDA;margin-top:4px;'>"
+                f"{_drift.get('message','')}</div>"
+                f"{_applied_line}"
+                f"</div>",
+                unsafe_allow_html=True,
+            )
+            with st.expander("Drift detail", expanded=False):
+                for _line in insights_svc.drift_lines(_drift, metrics):
+                    st.caption(_line)
+
+    st.divider()
+
+    # ── ACWR workload chart ───────────────────────────────────────────────
+    st.subheader("Workload Trend — 28 Days")
+    col_vals, col_chart = st.columns([1, 3], gap="large")
+
+    with col_vals:
+        st.metric("ACWR",            f"{acwr_val:.3f}" if acwr_val else "—")
+        st.metric("Acute 7d avg AU", str(acwr_result["acute_avg"]))
+        _chronic_label, _chronic_help = insights_svc.acwr_chronic_label(acwr_result)
+        st.metric(_chronic_label, str(acwr_result["chronic_avg"]), help=_chronic_help)
+        st.metric("Stage ceiling",   str(acwr_result["ceiling"]))
+        _acwr_status = insights_svc.acwr_status(acwr_result)
+        if _acwr_status:
+            {"error": st.error, "info": st.info, "warning": st.warning}[_acwr_status[0]](
+                _acwr_status[1])
+
+    with col_chart:
+        daily_au = acwr_result.get("daily_au_28", [0.0] * 28)
+        chart    = insights_svc.acwr_chart_data(daily_au, today=date.today())
+        df_au = pd.DataFrame({
+            "Date":   chart["dates"],
+            "AU":     chart["au"],
+            "Window": chart["windows"],
+        })
+        df_c = df_au[df_au["Window"] == "Chronic (28d)"].set_index("Date")["AU"]
+        df_a = df_au[df_au["Window"] == "Acute (7d)"].set_index("Date")["AU"]
+        st.caption("Daily session AU — last 28 days")
+        st.bar_chart(
+            pd.concat([df_c.rename("Chronic 28d"), df_a.rename("Acute 7d")], axis=1),
+            color=["#3D4F6B", "#00E874"],
+        )
+
+    st.divider()
+
+    # ── Weekly Volume Load (tonnage) chart ──────────────────────────────
+    st.subheader("Weekly Volume Load")
+    st.caption(
+        "Total kg moved (Σ reps × weight) per Monday-anchored week — only "
+        "meaningful once loaded double-progression exercises are logged "
+        "(Stage 2A+). Complements ACWR (session RPE × duration) with actual "
+        "tonnage lifted."
+    )
+    _volume = volume_svc.weekly_volume_series(_recent_sessions(), date.today())
+    if any(kg > 0 for _week, kg in _volume):
+        df_vol = pd.DataFrame(
+            {"Volume (kg)": [kg for _week, kg in _volume]},
+            index=[week.isoformat() for week, _kg in _volume],
+        )
+        st.bar_chart(df_vol, color=["#00E874"])
+    else:
+        st.info("No logged volume yet for loaded, countable-reps exercises in the last 8 weeks.")
+
+
 def render() -> None:
     st.title("Insights")
     st.caption("Engine metrics, biometric trends, session pattern analysis.")
@@ -2385,248 +2556,7 @@ def render() -> None:
     # =========================================================================
 
     with tab_engine:
-        st.caption(f"Data as of {date.today().strftime('%A %d %B')} · refreshes every 30 min")
-
-        if st.button("Refresh engine data", use_container_width=False, key="engine_refresh_btn"):
-            st.cache_data.clear()
-            st.rerun()
-
-        with st.spinner("Loading…"):
-            bio_rows      = _bio()
-            au_rows       = _au()
-            pain_streak   = _streak()
-            avg_tight     = _tight()
-            diagnostic    = _diag()
-            current_stage = _stage()
-            lambda_val    = float(diagnostic.get("injury_weight_decay_lambda") or 0.05)
-
-            tl          = engine.traffic_light(bio_rows, drift_rows=_bio_drift(),
-                                              for_date=date.today())
-            acwr_result = engine.acwr(au_rows, current_stage,
-                                      stage_start=_stage_start())
-            inj_weight  = engine.injury_weight(lambda_val, pain_streak)
-            obs_rem     = engine.observation_days_remaining(tl["data_days"])
-            rec         = engine.volume_recommendation(tl, acwr_result, current_stage, obs_rem, inj_weight)
-            stage_info  = engine.stage_status(current_stage, pain_streak, avg_tight)
-
-        # ── Directive banner ──────────────────────────────────────────────────
-        # In Home's words and tone, from the same load_policy (2026-10-13): this
-        # panel printed the raw engine label — "CONSERVATIVE LOAD (injury weight
-        # 95%)" — in the bright signal yellow on a day Home called VOLUME HELD
-        # in blue. The raw label stays, as a caption.
-        _kind = sessions_svc.load_policy(rec, {})["banner_kind"]
-        sig_color = verdict_svc.HOME_TONES.get(_kind, verdict_svc.HOME_TONES[""])
-        _words = (verdict_svc.BADGE_WORDS.get(_kind)
-                  or {"neutral": "NO READING YET"}.get(_kind, "NO CHANGE TO LOAD"))
-        st.markdown(
-            f"<div style='background:{sig_color}20;border-left:4px solid {sig_color};"
-            f"border-radius:6px;padding:12px 16px;margin-bottom:16px;'>"
-            f"<div style='font-size:10px;color:{sig_color};font-family:monospace;"
-            f"letter-spacing:2px;margin-bottom:2px;'>DIRECTIVE</div>"
-            f"<div style='font-size:17px;font-weight:700;color:#E8EAF0;'>{_words}</div>"
-            f"<div style='font-size:12px;color:#9AA3B2;margin-top:4px;'>{rec['action']}</div>"
-            f"<div style='font-size:10px;color:#6B7A9B;margin-top:6px;font-family:monospace;'>"
-            f"engine label: {rec['label']}</div>"
-            f"</div>",
-            unsafe_allow_html=True,
-        )
-        # ACWR rides alongside the directive rather than driving it while the
-        # engine is in advisory mode — see engine.ACWR_ADVISORY_MODE.
-        if rec.get("acwr_advisory"):
-            st.caption(rec["acwr_advisory"])
-
-        acwr_val = acwr_result.get("acwr")
-
-        st.divider()
-
-        # ── Stage progression ─────────────────────────────────────────────────
-        st.subheader("Stage Progression")
-        st.markdown(f"**{stage_info['stage_label']}**")
-        st.caption(stage_info["message"])
-
-        if stage_info.get("progress_days") and stage_info["progress_days"] != "—":
-            st.markdown(f"Pain-free days: `{stage_info['progress_days']}`")
-            st.progress(stage_info["days_progress_pct"])
-
-        if stage_info.get("progress_tightness") and stage_info["progress_tightness"] != "—":
-            st.markdown(f"Tightness target: `{stage_info['progress_tightness']}`")
-            st.progress(stage_info["tight_progress_pct"])
-
-        st.divider()
-
-        # ── Biometric traffic light ───────────────────────────────────────────
-        st.subheader("Biometric Traffic Light")
-        if tl["status"] in engine.NO_READING_STATUSES:
-            st.info(tl["message"])
-        else:
-            overall_color = engine.SIGNAL_COLORS.get(tl["overall"], engine.SIGNAL_COLORS["grey"])
-            st.markdown(
-                f"Overall: <span style='color:{overall_color};font-weight:700;'>"
-                f"{tl['overall'].upper()}</span> — {tl['message']}",
-                unsafe_allow_html=True,
-            )
-            st.write("")
-            metrics = tl.get("metrics", {})
-            c_hrv, c_rhr, c_sleep, c_temp = st.columns(4)
-
-            # Which source (if any) was missing for today's blended reading —
-            # populated by services/biometrics.py's blend_biometric_day().
-            _today_bio = next((r for r in bio_rows if r.get("date") == date.today().isoformat()), None)
-            _sources_missing = set((_today_bio or {}).get("sources_missing") or ())
-
-            def _metric_card(col, key, label):
-                m         = metrics.get(key, {})
-                val       = m.get("value")
-                unit      = m.get("unit", "")
-                baseline  = m.get("baseline_28d")
-                delta     = m.get("delta_pct")
-                sig_k     = m.get("signal", "grey")
-                color     = engine.SIGNAL_COLORS.get(sig_k, engine.SIGNAL_COLORS["grey"])
-                val_str   = f"{val} {unit}" if val is not None else "—"
-                base_str  = f"28d avg: {baseline} {unit}" if baseline else "No baseline"
-                delta_str = insights_svc.metric_delta_str(delta)
-                # Temperature deviation is scored against fixed cut points, not
-                # a rolling baseline — "No baseline" would read as missing data
-                # when it actually means "this metric doesn't use one".
-                thresholds = m.get("absolute_thresholds")
-                if thresholds:
-                    val_str  = f"{val:+.2f} {unit}" if val is not None else "—"
-                    base_str = f"vs personal norm · red ≥ +{thresholds['red']:.2f}"
-                    delta_str = {
-                        "red":    "Possible illness onset",
-                        "yellow": "Elevated — re-check tomorrow",
-                        "green":  "Normal range",
-                    }.get(sig_k, "No reading")
-                col.markdown(
-                    f"<div style='background:#1A1F2E;border-left:4px solid {color};"
-                    f"border-radius:6px;padding:12px 14px;'>"
-                    f"<div style='font-size:10px;color:#888;font-family:monospace;"
-                    f"letter-spacing:1px;'>{label}</div>"
-                    f"<div style='font-size:26px;font-weight:700;color:#E8EAF0;"
-                    f"font-family:monospace;'>{val_str}</div>"
-                    f"<div style='font-size:11px;color:#888;'>{base_str}</div>"
-                    f"<div style='font-size:11px;color:{color};'>{delta_str}</div>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-                missing_source = next(
-                    (s.split(":")[1] for s in _sources_missing if s.startswith(f"{key}:")), None,
-                )
-                if missing_source:
-                    col.caption(f"⚠ {missing_source.title()} pending — using the other source only.")
-
-            _metric_card(c_hrv,   "hrv_ms",              "HRV")
-            _metric_card(c_rhr,   "resting_heart_rate",   "RHR")
-            _metric_card(c_sleep, "sleep_duration_hours", "SLEEP")
-            _metric_card(c_temp,  "oura_temperature_deviation", "BODY TEMP")
-
-            # ── Baseline-drift guard ──────────────────────────────────────
-            # Shown whenever drift is detected, not only when it changed the
-            # light: "your baseline is sliding" is worth reading on a day the
-            # light was already yellow for other reasons.
-            _drift = tl.get("drift", {})
-            if _drift.get("drifted"):
-                _dc = engine.SIGNAL_COLORS["yellow"]
-                _applied_line = (
-                    "<div style='font-size:11px;color:#9AA3B2;margin-top:4px;'>"
-                    "Light downgraded green → yellow.</div>"
-                    if tl.get("drift_applied") else ""
-                )
-                st.write("")
-                st.markdown(
-                    f"<div style='background:{_dc}18;border-left:4px solid {_dc};"
-                    f"border-radius:6px;padding:10px 14px;'>"
-                    f"<div style='font-size:10px;color:{_dc};font-family:monospace;"
-                    f"letter-spacing:2px;'>BASELINE DRIFT — "
-                    f"{_drift.get('severity','').upper()}</div>"
-                    f"<div style='font-size:12px;color:#C8CEDA;margin-top:4px;'>"
-                    f"{_drift.get('message','')}</div>"
-                    f"{_applied_line}"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
-                with st.expander("Drift detail", expanded=False):
-                    for _k, _v in _drift.get("metrics", {}).items():
-                        _lbl = metrics.get(_k, {}).get("label", _k)
-                        st.caption(
-                            f"**{_lbl}** — last {engine.DRIFT_RECENT_DAYS} readings "
-                            f"{_v['recent']} vs prior {_drift['prior_days']} "
-                            f"{_v['prior']} ({_v['delta_pct']:+.1f}%)"
-                            + ("  ⚠ adverse" if _v["adverse"] else "")
-                        )
-
-        st.divider()
-
-        # ── ACWR workload chart ───────────────────────────────────────────────
-        st.subheader("Workload Trend — 28 Days")
-        col_vals, col_chart = st.columns([1, 3], gap="large")
-
-        with col_vals:
-            st.metric("ACWR",            f"{acwr_val:.3f}" if acwr_val else "—")
-            st.metric("Acute 7d avg AU", str(acwr_result["acute_avg"]))
-            _basis = acwr_result.get("chronic_basis", "calendar")
-            st.metric(
-                "Chronic avg" if _basis == "stage" else "Chronic 28d avg",
-                str(acwr_result["chronic_avg"]),
-                help=(f"Averaged over the {acwr_result.get('in_stage_days', 28)} days "
-                      f"of the current stage only — a window spanning a stage "
-                      f"transition divides training load by rehab load."
-                      if _basis == "stage" else
-                      "Flat 28-day calendar window."),
-            )
-            st.metric("Stage ceiling",   str(acwr_result["ceiling"]))
-            if acwr_result["hard_locked"]:
-                st.error("Hard lock — do not increase volume.")
-            elif not acwr_result.get("baseline_established", True):
-                st.info(f"Baseline establishing — {acwr_result.get('in_stage_days', 0)}"
-                        f"/{engine.ACWR_MIN_IN_STAGE_DAYS} days into this stage. "
-                        f"Ratio is not diagnostic yet.")
-            elif acwr_result.get("exceeds_ceiling"):
-                st.warning("Above ceiling — advisory only, volume is not capped.")
-
-        with col_chart:
-            daily_au = acwr_result.get("daily_au_28", [0.0] * 28)
-            chart    = insights_svc.acwr_chart_data(daily_au, today=date.today())
-            df_au = pd.DataFrame({
-                "Date":   chart["dates"],
-                "AU":     chart["au"],
-                "Window": chart["windows"],
-            })
-            df_c = df_au[df_au["Window"] == "Chronic (28d)"].set_index("Date")["AU"]
-            df_a = df_au[df_au["Window"] == "Acute (7d)"].set_index("Date")["AU"]
-            st.caption("Daily session AU — last 28 days")
-            st.bar_chart(
-                pd.concat([df_c.rename("Chronic 28d"), df_a.rename("Acute 7d")], axis=1),
-                color=["#3D4F6B", "#00E874"],
-            )
-
-        st.divider()
-
-        # ── Weekly Volume Load (tonnage) chart ──────────────────────────────
-        st.subheader("Weekly Volume Load")
-        st.caption(
-            "Total kg moved (Σ reps × weight) per Monday-anchored week — only "
-            "meaningful once loaded double-progression exercises are logged "
-            "(Stage 2A+). Complements ACWR (session RPE × duration) with actual "
-            "tonnage lifted."
-        )
-        recent_sessions = _recent_sessions()
-        # Monday-anchored week starts, oldest to newest, last ~8 weeks —
-        # same "Monday minus weekday()" formula as services.plan._monday.
-        today = date.today()
-        current_week_start = today - timedelta(days=today.weekday())
-        week_starts = [current_week_start - timedelta(weeks=n) for n in range(7, -1, -1)]
-        volume_by_week = [
-            volume_svc.weekly_volume_load(recent_sessions, ws) for ws in week_starts
-        ]
-        if any(v > 0 for v in volume_by_week):
-            df_vol = pd.DataFrame(
-                {"Volume (kg)": volume_by_week},
-                index=[ws.isoformat() for ws in week_starts],
-            )
-            st.bar_chart(df_vol, color=["#00E874"])
-        else:
-            st.info("No logged volume yet for loaded, countable-reps exercises in the last 8 weeks.")
+        _render_engine_data()
 
     # =========================================================================
     #  Tab 2 — Processing Queue

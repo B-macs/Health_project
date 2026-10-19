@@ -34,37 +34,62 @@ NO_OPINION = {"signal_color": "grey", "label": "", "action": "", "multiplier": 1
 READINESS_WINDOW_DAYS = 14
 
 
-def directive(repo, day: date) -> dict:
-    """Traffic light + ACWR + injury weight, as one directive for `day`.
+def engine_state(repo, day: date, *, with_stage_status: bool = False) -> dict:
+    """The reads and the arithmetic behind the directive for `day`, every part
+    kept: the rows, the traffic light (its metrics and baseline drift), ACWR
+    with its windows, the injury weight, and the recommendation they make.
+    The directive is this state's recommendation; Insights › Engine Data
+    shows the rest. A failed read raises (directive() turns it into
+    NO_OPINION).
 
-    A failed read degrades to NO_OPINION. `for_date` is what stops a stale row
-    being graded as this morning (engine.traffic_light's _row_can_be_judged
-    note), and ACWR's chronic baseline is scoped to the current stage
-    (engine.ACWR_MIN_IN_STAGE_DAYS)."""
+    `for_date` is what stops a stale row being graded as this morning
+    (engine.traffic_light's _row_can_be_judged note), and ACWR's chronic
+    baseline is scoped to the current stage (engine.ACWR_MIN_IN_STAGE_DAYS).
+    `with_stage_status` adds engine.stage_status, which needs one more read,
+    the average tightness, that the directive does not."""
+    bio = [asdict(b) for b in repo.get_biometric_rolling(days=28, today=day)]
+    # Separate, deliberately wide fetch feeding ONLY the baseline-drift guard —
+    # see engine.traffic_light's drift_rows docstring for why this can't just
+    # be a longer `bio`.
+    drift = [asdict(b) for b in repo.get_biometric_rolling(
+        days=engine.DRIFT_RECOMMENDED_FETCH_DAYS, today=day)]
+    au = repo.get_daily_session_au_weighted(28, today=day)
+    diag = repo.get_diagnostic_profile()
+    stage = repo.get_current_stage()
+    streak = repo.get_pain_free_streak(today=day)
+    lam = float(diag.get("injury_weight_decay_lambda") or 0.05)
+    tl = engine.traffic_light(bio, drift_rows=drift, for_date=day)
+    acwr_r = engine.acwr(au, stage,
+                         stage_start=_plan.current_stage_start(repo.get_phases(), day))
+    inj_w = engine.injury_weight(lam, streak)
+    obs_rem = engine.observation_days_remaining(tl["data_days"])
+    state = {
+        "bio_rows": bio,
+        "stage": stage,
+        "pain_free_streak": streak,
+        "traffic_light": tl,
+        "acwr": acwr_r,
+        "injury_weight": inj_w,
+        "recommendation": engine.volume_recommendation(tl, acwr_r, stage, obs_rem, inj_w),
+    }
+    if with_stage_status:
+        state["stage_status"] = engine.stage_status(
+            stage, streak, repo.get_avg_tightness(14, today=day))
+    return state
+
+
+def directive(repo, day: date) -> dict:
+    """Traffic light + ACWR + injury weight, as one directive for `day`
+    (engine_state's recommendation). A failed read degrades to NO_OPINION."""
     try:
-        bio = [asdict(b) for b in repo.get_biometric_rolling(days=28, today=day)]
-        # Separate, deliberately wide fetch feeding ONLY the baseline-drift
-        # guard — see engine.traffic_light's drift_rows docstring for why this
-        # can't just be a longer `bio`.
-        drift = [asdict(b) for b in repo.get_biometric_rolling(
-            days=engine.DRIFT_RECOMMENDED_FETCH_DAYS, today=day)]
-        au = repo.get_daily_session_au_weighted(28, today=day)
-        diag = repo.get_diagnostic_profile()
-        stage = repo.get_current_stage()
-        streak = repo.get_pain_free_streak(today=day)
-        lam = float(diag.get("injury_weight_decay_lambda") or 0.05)
-        tl = engine.traffic_light(bio, drift_rows=drift, for_date=day)
-        acwr_r = engine.acwr(au, stage,
-                             stage_start=_plan.current_stage_start(repo.get_phases(), day))
-        inj_w = engine.injury_weight(lam, streak)
-        obs_rem = engine.observation_days_remaining(tl["data_days"])
-        rec = engine.volume_recommendation(tl, acwr_r, stage, obs_rem, inj_w)
-        # Carried so the HRV note can be suppressed when the light ALREADY
-        # names HRV. Not read by any decision.
-        rec["_traffic_drivers"] = tuple(tl.get("drivers") or ())
-        return rec
+        state = engine_state(repo, day)
     except Exception:
         return dict(NO_OPINION)
+    rec = state["recommendation"]
+    # Carried so the HRV note can be suppressed when the light ALREADY names
+    # HRV. Not read by any decision.
+    rec["_traffic_drivers"] = tuple(state["traffic_light"].get("drivers") or ())
+    return rec
 
 
 def readiness_rows(repo, day: date) -> list[dict]:

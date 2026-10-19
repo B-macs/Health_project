@@ -94,10 +94,16 @@ def test_the_training_badge_and_the_adapt_box_follow_the_kind():
 # ── 4. the Engine Data panel, and the dead copy function ────────────────────
 
 def test_the_engine_data_panel_speaks_in_homes_words():
+    """Since 2026-10-19 the panel shows THE verdict Home shows, the same cached
+    object, so its tone and badge are Home's by construction. It used to build
+    its own policy as load_policy(rec, {}), without the readiness signal Home
+    passes, and on a day only readiness asked for less the two screens
+    disagreed (inventory fault F4, tests/test_engine_data_panel.py)."""
     src = (ROOT / "views" / "insights.py").read_text(encoding="utf-8")
-    assert 'sessions_svc.load_policy(rec, {})["banner_kind"]' in src
-    assert "verdict_svc.HOME_TONES.get(_kind" in src
-    assert "verdict_svc.BADGE_WORDS.get(_kind)" in src
+    assert "_verdict = today_mod.today_verdict()" in src
+    assert "sig_color = _verdict.tone" in src
+    assert "_verdict.badge" in src
+    assert "load_policy(" not in src
     # The directive line itself; the per-metric table below it rightly keeps
     # each metric's own signal colour (sig_k).
     assert 'engine.SIGNAL_COLORS.get(sig, engine.SIGNAL_COLORS["grey"])' not in src

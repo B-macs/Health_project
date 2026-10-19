@@ -44,3 +44,12 @@ def weekly_volume_load(sessions: list[SessionRecord], week_start: date) -> float
         for ex in session.exercises:
             total += ex.total_volume_kg or 0.0
     return round(total, 1)
+
+
+def weekly_volume_series(sessions: list[SessionRecord], today: date,
+                         weeks: int = 8) -> list[tuple[date, float]]:
+    """(Monday, kg) for the last `weeks` Monday-anchored weeks ending with the
+    one holding `today`, oldest first, through weekly_volume_load."""
+    current = today - timedelta(days=today.weekday())
+    starts = [current - timedelta(weeks=n) for n in range(weeks - 1, -1, -1)]
+    return [(start, weekly_volume_load(sessions, start)) for start in starts]
