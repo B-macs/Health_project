@@ -1,8 +1,8 @@
-// Today, Oura-style, in the page's one colour family (teal): the three scores as rings,
-// one sentence about the day, the vitals, and today's session with its button. Two
-// layouts: "trio" (three equal rings in a row, styles 1, 3 and 4) and "hero" (one large
-// readiness ring with a halo and two small cards, style 2). A status is a word; the
-// light at the top is dimmer on a morning that needs care.
+// Today in style 1 (Glow), in the page's one colour family (teal): the three scores as
+// rings in a row, one sentence about the day, the vitals, and today's session with its
+// button. The three variations (Calm, Cards, Week) live in variants/ and share the
+// props and helpers exported here. A status is a word; the light at the top is dimmer
+// on a morning that needs care.
 import { useRef, type TouchEvent } from 'react'
 import type { Day, Exercise, Mock } from '../mock/generate'
 import { S } from '../strings'
@@ -10,13 +10,14 @@ import { IconBack, IconForward } from './icons'
 import { AreaChart, Ring, greetingKey, longDate } from './parts'
 
 export type TodayProps = {
-  layout: 'trio' | 'hero'
   day: Day
+  dayIndex: number
   mock: Mock
   canPrev: boolean
   canNext: boolean
   onPrev: () => void
   onNext: () => void
+  onDay: (index: number) => void
   onStart: () => void
   reduced: boolean
 }
@@ -27,7 +28,7 @@ export function dose(ex: Exercise): string {
 }
 
 /** A horizontal swipe changes the day, as the arrows do. */
-function useSwipe(p: TodayProps) {
+export function useSwipe(p: TodayProps) {
   const start = useRef<number | null>(null)
   return {
     onTouchStart: (e: TouchEvent) => {
@@ -44,6 +45,39 @@ function useSwipe(p: TodayProps) {
   }
 }
 
+export function greeting(): string {
+  return S.greeting[greetingKey(new Date().getHours())]
+}
+
+export function Status({ name, label, main }: { name: string; label: string; main?: boolean }) {
+  return (
+    <span className={`status${main ? ' status--main' : ''}`}>
+      <span className="status__dot" />
+      {name} · {label}
+    </span>
+  )
+}
+
+export function ExerciseRows({ mock, numbered }: { mock: Mock; numbered?: boolean }) {
+  return (
+    <ol className="rows">
+      {mock.session.exercises.map((ex, i) => (
+        <li key={ex.name} className="row">
+          <span className="row__name">
+            {numbered && <span className="row__index num">{i + 1}</span>}
+            {ex.name}
+            {ex.warmup && <span className="tag">{S.today.warmup}</span>}
+          </span>
+          <span className="row__dose">
+            <span>{dose(ex)}</span>
+            {ex.weightKg != null && <span className="row__kg">{S.dose.kg(ex.weightKg)}</span>}
+          </span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
 function TopBar(p: TodayProps) {
   return (
     <header className="topbar">
@@ -51,22 +85,13 @@ function TopBar(p: TodayProps) {
         <IconBack />
       </button>
       <div className="topbar__title">
-        <div className="greeting">{S.greeting[greetingKey(new Date().getHours())]}</div>
+        <div className="greeting">{greeting()}</div>
         <div className="topbar__date">{longDate(p.day.date)}</div>
       </div>
       <button className="iconbtn" onClick={p.onNext} disabled={!p.canNext} aria-label={S.today.nextDay}>
         <IconForward />
       </button>
     </header>
-  )
-}
-
-function Status({ name, label, main }: { name: string; label: string; main?: boolean }) {
-  return (
-    <span className={`status${main ? ' status--main' : ''}`}>
-      <span className="status__dot" />
-      {name} · {label}
-    </span>
   )
 }
 
@@ -99,80 +124,24 @@ function Bubbles({ day, reduced }: { day: Day; reduced: boolean }) {
   )
 }
 
-function Insight({ day }: { day: Day }) {
-  const { readiness: r, sleep: s, strain: t } = day
-  return (
-    <section className="card insight">
-      <Status name={S.today.readiness} label={r.label} main />
-      <p className="insight__line">{S.today.readinessLine[r.tone]}</p>
-      <div className="insight__meta">
-        <Status name={S.today.sleep} label={s.label} />
-        <Status name={S.today.strain} label={t.label} />
-      </div>
-    </section>
-  )
-}
-
-/** Style 2: one large readiness ring with its halo, then sleep and strain as two cards. */
-function Hero({ day, reduced }: { day: Day; reduced: boolean }) {
-  const { readiness: r, sleep: s, strain: t } = day
-  return (
-    <>
-      <section className="hero">
-        <div className="hero__halo" aria-hidden="true" />
-        <Ring className="ring--hero" fraction={r.value / 100} reduced={reduced}
-          label={`${S.today.readiness} ${r.value}, ${r.label}`}>
-          <span className="num hero__value">{r.value}</span>
-          <span className="hero__word">{r.label}</span>
-        </Ring>
-        <div className="hero__name">{S.today.readiness}</div>
-        <p className="hero__line">{S.today.readinessLine[r.tone]}</p>
-      </section>
-      <section className="pair">
-        <article className="card mini">
-          <Ring className="ring--mini" fraction={s.value / 100} reduced={reduced}
-            label={`${S.today.sleep} ${s.value}, ${s.label}`}>
-            <span className="num mini__value">{s.value}</span>
-          </Ring>
-          <div className="mini__text">
-            <span className="mini__name">{S.today.sleep}</span>
-            <span className="mini__word">{s.label}</span>
-            <span className="mini__note">{S.today.asleep(s.minutes)}</span>
-          </div>
-        </article>
-        <article className="card mini">
-          <Ring className="ring--mini" fraction={t.value / 21} reduced={reduced}
-            label={`${S.today.strain} ${t.value}, ${t.label}`}>
-            <span className="num mini__value">{t.value.toFixed(1)}</span>
-          </Ring>
-          <div className="mini__text">
-            <span className="mini__name">{S.today.strain}</span>
-            <span className="mini__word">{t.label}</span>
-            <span className="mini__note">{t.soFar ? S.today.soFar : S.today.outOf(21)}</span>
-          </div>
-        </article>
-      </section>
-    </>
-  )
-}
-
 export function Today(p: TodayProps) {
-  const { readiness: r, sleep: s } = p.day
+  const { readiness: r, sleep: s, strain: t } = p.day
   const hrv = p.mock.hrv[p.mock.hrv.length - 1]
   const rhr = p.mock.rhr[p.mock.rhr.length - 1]
   return (
     <div className={`screen today tone-${r.tone}`} {...useSwipe(p)}>
       <div className="sky" aria-hidden="true" />
       <TopBar {...p} />
+      <Bubbles day={p.day} reduced={p.reduced} />
 
-      {p.layout === 'hero' ? (
-        <Hero day={p.day} reduced={p.reduced} />
-      ) : (
-        <>
-          <Bubbles day={p.day} reduced={p.reduced} />
-          <Insight day={p.day} />
-        </>
-      )}
+      <section className="card insight">
+        <Status name={S.today.readiness} label={r.label} main />
+        <p className="insight__line">{S.today.readinessLine[r.tone]}</p>
+        <div className="insight__meta">
+          <Status name={S.today.sleep} label={s.label} />
+          <Status name={S.today.strain} label={t.label} />
+        </div>
+      </section>
 
       <section className="section">
         <h2 className="section__title">{S.today.vitals}</h2>
@@ -211,20 +180,7 @@ export function Today(p: TodayProps) {
             {S.today.sessionMeta(p.mock.session.exercises.length, p.mock.session.minutes)}
           </div>
         </div>
-        <ol className="rows">
-          {p.mock.session.exercises.map((ex) => (
-            <li key={ex.name} className="row">
-              <span className="row__name">
-                {ex.name}
-                {ex.warmup && <span className="tag">{S.today.warmup}</span>}
-              </span>
-              <span className="row__dose">
-                <span>{dose(ex)}</span>
-                {ex.weightKg != null && <span className="row__kg">{S.dose.kg(ex.weightKg)}</span>}
-              </span>
-            </li>
-          ))}
-        </ol>
+        <ExerciseRows mock={p.mock} />
         <button className="btn btn--primary btn--wide" onClick={p.onStart}>
           {S.today.start}
         </button>

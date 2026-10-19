@@ -49,6 +49,53 @@ export function Ring(props: {
   )
 }
 
+/** A soft glowing orb (style 2, Calm): the page colour as light, the value as a hairline
+ *  arc around it, the number in the middle. */
+export function Orb(props: { fraction: number; reduced: boolean; label: string; className?: string; children: ReactNode }) {
+  const shown = useGrow(Math.max(0, Math.min(1, props.fraction)), props.reduced)
+  return (
+    <div className={`orb ${props.className ?? ''}`} role="img" aria-label={props.label}>
+      <div className="orb__light" aria-hidden="true" />
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle className="orb__track" cx="50" cy="50" r={R} />
+        <circle className="orb__arc" cx="50" cy="50" r={R} strokeDasharray={`${C * shown} ${C}`}
+          transform="rotate(-90 50 50)" />
+      </svg>
+      <div className="orb__center">{props.children}</div>
+    </div>
+  )
+}
+
+const NARROW = new Intl.DateTimeFormat('en-GB', { weekday: 'narrow', timeZone: 'UTC' })
+export const narrowDay = (iso: string) => NARROW.format(new Date(`${iso}T00:00:00Z`))
+export const dayOfMonth = (iso: string) => String(Number(iso.slice(8, 10)))
+
+/** Bars over days or weeks (style 3, Cards): the selected one in the strongest shade,
+ *  the others in the faintest. `floor` is where a bar starts, so small changes show. */
+export function TrendBars(props: {
+  values: readonly number[]
+  floor: number
+  max: number
+  selected: number
+  labels?: readonly string[]
+  label: string
+}) {
+  const span = props.max - props.floor || 1
+  return (
+    <div className="trend" role="img" aria-label={props.label}>
+      {props.values.map((v, i) => (
+        <div key={i} className="trend__col">
+          <div className="trend__slot">
+            <span className={`trend__bar${i === props.selected ? ' trend__bar--on' : ''}`}
+              style={{ height: `${Math.max(6, ((v - props.floor) / span) * 100)}%` }} />
+          </div>
+          {props.labels && <span className="trend__day">{props.labels[i]}</span>}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 /** A smooth line through the points (Catmull-Rom as cubic Béziers). */
 function smooth(points: readonly (readonly [number, number])[]): string {
   let d = `M${points[0][0]},${points[0][1]}`

@@ -1,4 +1,5 @@
-/* The design preview's one stylesheet (rebuild Phase 3): four Oura-style styles.
+/* The design preview's one stylesheet (rebuild Phase 3): style 1 (Glow) and its three
+ * variations — 2 Calm (the relaxed Oura look), 3 Cards, 4 Week.
  *
  * Every colour, size, corner, line and timing is a var() from design/tokens.ts (theme.ts
  * writes them on .app). Plain numbers here are ratios, opacities, z-indexes, angles and
@@ -9,8 +10,8 @@
  * --f3 (faintest), --f-glow and --f-soft from the four families. Nothing below names a
  * hue: a rule draws in the family's shades or in the neutrals.
  *
- * THE STYLES change shape, type and light, never colour: .style-N, plus one class per
- * choice (.today-trio/.today-hero, .sky-*, .card-*, .tabbar-*, .button-*).
+ * All four styles share style 1's glass cards, glass tab bar and white button; a
+ * variation changes the layout (.layout-*) and the light (.sky-*).
  *
  * Page shape (Lauscher's): html and body never scroll; one inner scroller fills a
  * 100dvh column and the tab bar docks below it, so iOS never misplaces a fixed bar. */
@@ -163,7 +164,7 @@ ul {
   transition: opacity var(--slow) var(--ease);
 }
 
-/* 1 Glow: one glow at the top centre, softer light at both corners. */
+/* Styles 1, 3, 4: one glow at the top centre, softer light at both corners. */
 .sky-glow .sky {
   background:
     radial-gradient(60% 55% at 50% 4%, var(--f-glow) 0%, transparent 72%),
@@ -171,24 +172,13 @@ ul {
     radial-gradient(50% 45% at 92% 0%, var(--f-soft) 0%, transparent 70%);
 }
 
-/* 2 Halo: a quiet top; the light sits behind the readiness ring instead. */
-.sky-halo .sky {
-  background: radial-gradient(70% 60% at 50% 0%, var(--f-soft) 0%, transparent 75%);
-}
-
-/* 3 Mist: the colour washes far down the page. */
-.sky-wash .sky {
+/* Style 2, Calm: a wider, gentler light that reaches the orb. */
+.sky-soft .sky {
   background:
-    radial-gradient(70% 40% at 20% 10%, var(--f-glow) 0%, transparent 70%),
-    radial-gradient(60% 35% at 85% 25%, var(--f-soft) 0%, transparent 70%),
-    linear-gradient(to bottom, var(--f-soft) 0%, transparent 85%);
+    radial-gradient(75% 45% at 50% 30%, var(--f-soft) 0%, transparent 75%),
+    radial-gradient(90% 40% at 50% 0%, var(--f-soft) 0%, transparent 80%);
   -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
   mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
-}
-
-/* 4 Line: no light at all. */
-.sky-none .sky {
-  display: none;
 }
 
 .sky--quiet {
@@ -202,6 +192,10 @@ ul {
 
 .today.tone-low .sky {
   opacity: 0.55;
+}
+
+.train--rest .sky {
+  opacity: 0.5;
 }
 
 /* ── Type ────────────────────────────────────────────────────────────────────────── */
@@ -265,6 +259,7 @@ ul {
   font-weight: var(--w-title);
   color: var(--f1);
   background: var(--f-soft);
+  white-space: nowrap;
 }
 
 .tag {
@@ -275,43 +270,17 @@ ul {
   border: var(--hair) solid var(--glass-line);
 }
 
-/* ── Cards, by style ─────────────────────────────────────────────────────────────── */
+/* ── Cards and controls ──────────────────────────────────────────────────────────── */
 
 .card {
   border-radius: var(--r-card);
   padding: var(--sp-m);
-}
-
-/* 1 Glow: frosted glass. */
-.card-glass .card {
   background: var(--glass);
   border: var(--hair) solid var(--glass-line);
   -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4);
   backdrop-filter: blur(var(--blur)) saturate(1.4);
   box-shadow: 0 var(--sp-s) var(--sp-l) var(--shadow);
 }
-
-/* 2 Halo: solid cards with a breath of the page colour in one corner. */
-.card-tint .card {
-  background: linear-gradient(150deg, var(--f-soft) 0%, transparent 55%), var(--solid);
-  box-shadow: 0 var(--sp-s) var(--sp-l) var(--shadow);
-}
-
-/* 3 Mist: the lightest glass, the page's wash showing through. */
-.card-mist .card {
-  background: var(--glass);
-  border: var(--hair) solid var(--glass-line);
-  -webkit-backdrop-filter: blur(var(--blur));
-  backdrop-filter: blur(var(--blur));
-}
-
-/* 4 Line: an outline and nothing else. */
-.card-line .card {
-  background: transparent;
-  border: var(--hair) solid var(--line);
-}
-
-/* ── Controls ────────────────────────────────────────────────────────────────────── */
 
 .btn {
   white-space: nowrap;
@@ -339,23 +308,12 @@ ul {
   color: var(--on-accent);
 }
 
-/* 2 Halo: the main button in the page colour. */
-.button-family .btn--primary {
-  background: var(--f1);
-  color: var(--on-accent);
-}
-
 .btn--glass {
   background: var(--glass-strong);
   border: var(--hair) solid var(--glass-line);
   color: var(--text);
   -webkit-backdrop-filter: blur(var(--blur));
   backdrop-filter: blur(var(--blur));
-}
-
-.card-line .btn--glass {
-  background: transparent;
-  border-color: var(--line);
 }
 
 .btn--wide {
@@ -380,13 +338,25 @@ ul {
   border: var(--hair) solid var(--glass-line);
 }
 
-.card-line .iconbtn {
-  background: transparent;
-  border-color: var(--line);
+.iconbtn:disabled,
+.plainbtn:disabled {
+  opacity: 0.3;
 }
 
-.iconbtn:disabled {
-  opacity: 0.3;
+/* A control with no frame (style 2): still a full tap target. */
+.plainbtn {
+  min-width: var(--tap);
+  min-height: var(--tap);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-s);
+  color: var(--muted);
+}
+
+.plainbtn--text {
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
 }
 
 .icon {
@@ -418,6 +388,31 @@ ul {
   background: var(--glass-strong);
   color: var(--text);
   box-shadow: 0 var(--sp-xs) var(--sp-s) var(--shadow);
+}
+
+.progress {
+  height: var(--bar);
+  border-radius: var(--r-pill);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--f2), var(--f1));
+  transition: width var(--quick) linear;
+}
+
+.train--rest .progress__fill {
+  background: var(--f3);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-s);
 }
 
 /* ── Header bars ─────────────────────────────────────────────────────────────────── */
@@ -509,12 +504,11 @@ ul {
   gap: var(--sp-xs);
 }
 
-.app--light .ring__value,
-.sky-none .ring__value {
+.app--light .ring__value {
   filter: none;
 }
 
-/* ── Today: three rings in a row (styles 1, 3, 4) ────────────────────────────────── */
+/* ── Style 1, Glow: Today ────────────────────────────────────────────────────────── */
 
 .bubbles {
   display: grid;
@@ -564,111 +558,6 @@ ul {
   padding-top: var(--sp-s);
   border-top: var(--hair) solid var(--glass-line);
 }
-
-.card-line .insight__meta {
-  border-top-color: var(--line);
-}
-
-/* ── Today: one large ring with its halo (style 2) ───────────────────────────────── */
-
-.hero {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--sp-s);
-  padding: var(--sp-l) 0 var(--sp-s);
-  text-align: center;
-}
-
-.hero__halo {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  width: calc(var(--hero-ring) * 1.7);
-  height: calc(var(--hero-ring) * 1.7);
-  transform: translate(-50%, -12%);
-  border-radius: var(--r-pill);
-  background: radial-gradient(closest-side, var(--f-glow) 0%, transparent 100%);
-  pointer-events: none;
-}
-
-.app--light .hero__halo {
-  opacity: 0.7;
-}
-
-.ring--hero {
-  width: var(--hero-ring);
-  height: var(--hero-ring);
-}
-
-.hero__value {
-  font-size: var(--fs-hero);
-  font-weight: var(--w-hero);
-}
-
-.hero__word {
-  font-size: var(--fs-small);
-  font-weight: var(--w-title);
-  color: var(--f1);
-}
-
-.hero__name {
-  margin-top: var(--sp-s);
-  font-size: var(--fs-small);
-  font-weight: var(--w-label);
-  color: var(--muted);
-}
-
-.hero__line {
-  font-size: var(--fs-title);
-  line-height: 1.3;
-}
-
-.pair {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--sp-s);
-}
-
-.mini {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--sp-s);
-}
-
-.ring--mini {
-  width: var(--bubble);
-  height: var(--bubble);
-}
-
-.mini__value {
-  font-size: var(--fs-score);
-}
-
-.mini__text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-xs);
-  min-width: 0;
-}
-
-.mini__name {
-  font-weight: var(--w-title);
-}
-
-.mini__word {
-  font-size: var(--fs-small);
-  font-weight: var(--w-title);
-  color: var(--f1);
-}
-
-.mini__note {
-  font-size: var(--fs-caption);
-  color: var(--muted);
-}
-
-/* ── Today: vitals and the session ───────────────────────────────────────────────── */
 
 .section {
   display: flex;
@@ -754,10 +643,6 @@ ul {
   border-bottom: var(--hair) solid var(--glass-line);
 }
 
-.card-line .row {
-  border-bottom-color: var(--line);
-}
-
 .row:last-child {
   border-bottom: 0;
 }
@@ -767,6 +652,18 @@ ul {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--sp-s);
+}
+
+/* Style 3 numbers its exercises in small tinted circles. */
+.row__index {
+  display: inline-grid;
+  place-items: center;
+  width: calc(var(--tap) / 2);
+  height: calc(var(--tap) / 2);
+  border-radius: var(--r-pill);
+  background: var(--f-soft);
+  color: var(--f1);
+  font-size: var(--fs-caption);
 }
 
 .row__dose {
@@ -826,14 +723,23 @@ ul {
   margin-top: var(--sp-xs);
 }
 
-.daybars {
+.daybars,
+.trend {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: var(--sp-s);
   height: calc(var(--tap) * 1.7);
 }
 
-.daybars__col {
+.trend {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: var(--sp-xs);
+}
+
+.daybars__col,
+.trend__col {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -841,7 +747,8 @@ ul {
   min-height: 0;
 }
 
-.daybars__slot {
+.daybars__slot,
+.trend__slot {
   flex: 1;
   width: 100%;
   display: flex;
@@ -856,6 +763,19 @@ ul {
   background: linear-gradient(to top, var(--f3), var(--f1));
 }
 
+.trend__bar {
+  display: block;
+  width: 70%;
+  border-radius: var(--r-pill);
+  background: var(--f3);
+  transition: height var(--slow) var(--ease);
+}
+
+.trend__bar--on {
+  background: linear-gradient(to top, var(--f2), var(--f1));
+  box-shadow: 0 0 var(--glow) var(--f-glow);
+}
+
 .daybars__rest {
   width: var(--sp-xs);
   height: var(--sp-xs);
@@ -863,7 +783,8 @@ ul {
   background: var(--track);
 }
 
-.daybars__day {
+.daybars__day,
+.trend__day {
   font-size: var(--fs-caption);
   color: var(--faint);
 }
@@ -905,11 +826,7 @@ ul {
   color: var(--muted);
 }
 
-/* ── Training ────────────────────────────────────────────────────────────────────── */
-
-.train--rest .sky {
-  opacity: 0.5;
-}
+/* ── Style 1, Glow: Training ─────────────────────────────────────────────────────── */
 
 .train__title {
   text-align: center;
@@ -949,12 +866,15 @@ ul {
 }
 
 .ring--timer .ring__track,
-.ring--timer .ring__value {
+.ring--timer .ring__value,
+.ring--weektimer .ring__track,
+.ring--weektimer .ring__value {
   stroke-width: var(--timer-ring-w);
 }
 
 /* A timer ring moves every tick: a short linear step, not the slow grow-in. */
-.ring--timer .ring__value {
+.ring--timer .ring__value,
+.ring--weektimer .ring__value {
   transition: stroke-dasharray var(--quick) linear;
 }
 
@@ -994,7 +914,7 @@ ul {
   color: var(--muted);
 }
 
-/* ── Insights, settings and the picker ───────────────────────────────────────────── */
+/* ── Style 1, Glow: Insights, settings and the picker ────────────────────────────── */
 
 .strength {
   display: flex;
@@ -1029,11 +949,6 @@ ul {
   padding-top: var(--sp-m);
   margin-top: var(--sp-s);
   border-top: var(--hair) solid var(--glass-line);
-}
-
-.card-line .strength__sub,
-.card-line .work {
-  border-top-color: var(--line);
 }
 
 .work {
@@ -1090,6 +1005,15 @@ ul {
   width: 100%;
 }
 
+.ring--mini {
+  width: calc(var(--tap) * 1.3);
+  height: calc(var(--tap) * 1.3);
+}
+
+.mini__value {
+  font-size: var(--fs-title);
+}
+
 .picker__text {
   flex: 1;
   display: flex;
@@ -1110,11 +1034,643 @@ ul {
   gap: var(--sp-s);
 }
 
-/* ── The tab bar, by style ───────────────────────────────────────────────────────── */
+/* ═══ Style 2, Calm — the relaxed Oura look ════════════════════════════════════════ */
+
+.calm {
+  gap: var(--sp-l);
+}
+
+.calm-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-m);
+  padding-top: var(--sp-l);
+}
+
+.calm-head__date {
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.calm-head__greeting {
+  font-size: var(--fs-display);
+  font-weight: var(--w-number);
+  letter-spacing: var(--number-tracking);
+  line-height: 1.15;
+}
+
+.calm-head__arrows {
+  display: flex;
+}
+
+.orb {
+  position: relative;
+  align-self: center;
+  width: var(--hero-ring);
+  height: var(--hero-ring);
+  display: grid;
+  place-items: center;
+}
+
+.orb__light {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  background:
+    radial-gradient(closest-side, var(--f-glow) 0%, var(--f-soft) 55%, transparent 100%);
+  transform: scale(1.18);
+}
+
+.orb svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.orb__track {
+  fill: none;
+  stroke: var(--track);
+  stroke-width: var(--ring-w);
+}
+
+.orb__arc {
+  fill: none;
+  stroke: var(--f1);
+  stroke-width: var(--ring-w);
+  stroke-linecap: round;
+  transition: stroke-dasharray var(--slow) var(--ease);
+}
+
+.orb__center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-xs);
+}
+
+.orb--timer {
+  width: var(--timer-ring);
+  height: var(--timer-ring);
+}
+
+.orb--timer .orb__arc {
+  transition: stroke-dasharray var(--quick) linear;
+}
+
+.train--rest .orb__arc {
+  stroke: var(--f3);
+}
+
+.calm-orb__label {
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.calm-orb__value {
+  font-size: var(--fs-hero);
+  font-weight: var(--w-hero);
+}
+
+.calm-orb__word {
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
+  color: var(--f1);
+}
+
+.calm-line {
+  text-align: center;
+  font-size: var(--fs-title);
+  font-weight: var(--w-number);
+  line-height: 1.5;
+  color: var(--muted);
+  padding: 0 var(--sp-m);
+}
+
+.calm .card {
+  padding: var(--sp-l);
+}
+
+.calm-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-s);
+}
+
+.calm-vitals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-s);
+}
+
+.calm-vital {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.calm-vital__value {
+  font-size: var(--fs-title);
+}
+
+.calm-session {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-s);
+}
+
+.calm-session__title {
+  font-size: var(--fs-display);
+  font-weight: var(--w-number);
+  letter-spacing: var(--number-tracking);
+}
+
+.calm-session__start {
+  margin-top: var(--sp-m);
+}
+
+.calm-trainhead {
+  display: grid;
+  grid-template-columns: var(--tap) 1fr var(--tap);
+  align-items: center;
+  text-align: center;
+  padding-top: var(--sp-s);
+}
+
+.calm-trainhead__on {
+  text-align: right;
+}
+
+.calm-train__title {
+  text-align: center;
+}
+
+.calm-train__name {
+  font-size: var(--fs-display);
+  font-weight: var(--w-number);
+  letter-spacing: var(--number-tracking);
+}
+
+.calm-train__meta {
+  margin-top: var(--sp-xs);
+  color: var(--muted);
+}
+
+.calm-timer {
+  font-size: var(--fs-timer);
+  font-weight: var(--w-hero);
+}
+
+.calm-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-s);
+}
+
+.calm-controls__row {
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-l);
+}
+
+.calm-next {
+  text-align: center;
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.calm-chart {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-s);
+}
+
+/* ═══ Style 3, Cards ═══════════════════════════════════════════════════════════════ */
+
+.cards-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--sp-m);
+  padding-top: var(--sp-m);
+}
+
+.cards-head__title {
+  font-size: var(--fs-display);
+  font-weight: var(--w-title);
+  letter-spacing: var(--number-tracking);
+}
+
+.cards-head__arrows {
+  display: flex;
+  gap: var(--sp-xs);
+}
+
+.scorecard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-s);
+}
+
+.scorecard__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-s);
+}
+
+.scorecard__name {
+  font-weight: var(--w-title);
+}
+
+.scorecard__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: end;
+  gap: var(--sp-m);
+}
+
+.scorecard__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.scorecard__value {
+  font-size: var(--fs-hero);
+  font-weight: var(--w-hero);
+}
+
+.cards-vitals {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-m);
+}
+
+.cards-vital {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.cards-vital__value {
+  font-size: var(--fs-title);
+}
+
+.cards-ex {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+}
+
+.cards-ex__name {
+  font-size: var(--fs-display);
+  font-weight: var(--w-title);
+  letter-spacing: var(--number-tracking);
+}
+
+.tracker {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--sp-xs);
+}
+
+.tracker__chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-xs);
+  padding: var(--sp-s) 0;
+  border-radius: var(--r-tile);
+  background: var(--track);
+  color: var(--faint);
+}
+
+.tracker__chip--done {
+  background: var(--f-soft);
+  color: var(--f1);
+}
+
+.tracker__chip--now {
+  background: var(--f1);
+  color: var(--on-accent);
+  box-shadow: 0 0 var(--glow) var(--f-glow);
+}
+
+.tracker__set {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-title);
+}
+
+.tracker__side {
+  display: grid;
+  place-items: center;
+  min-height: var(--icon);
+  font-size: var(--fs-caption);
+}
+
+.cards-timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-s);
+  padding: var(--sp-m) 0;
+}
+
+.cards-timer__word {
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
+  color: var(--f1);
+}
+
+.train--rest .cards-timer__word {
+  color: var(--muted);
+}
+
+.cards-timer__digits {
+  font-size: var(--fs-timer);
+  font-weight: var(--w-hero);
+}
+
+.cards-timer .progress {
+  align-self: stretch;
+}
+
+.work-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-s);
+}
+
+/* ═══ Style 4, Week ════════════════════════════════════════════════════════════════ */
+
+.week-head {
+  padding-top: var(--sp-m);
+}
+
+.week-head__title {
+  font-size: var(--fs-display);
+  font-weight: var(--w-title);
+  letter-spacing: var(--number-tracking);
+}
+
+.weekstrip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--sp-xs);
+}
+
+.weekstrip__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-xs);
+  padding: var(--sp-s) 0;
+  border-radius: var(--r-tile);
+  color: var(--muted);
+  transition: background-color var(--quick) var(--ease);
+}
+
+.weekstrip__day--on {
+  background: var(--f-soft);
+  color: var(--text);
+}
+
+.weekstrip__letter {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-label);
+}
+
+.ring--day {
+  width: calc(var(--tap) * 0.9);
+  height: calc(var(--tap) * 0.9);
+}
+
+.ring--day .ring__track,
+.ring--day .ring__value {
+  stroke-width: calc(var(--ring-w) * 1.4);
+}
+
+.weekstrip__date {
+  font-size: var(--fs-small);
+}
+
+.week-ready {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-m);
+}
+
+.ring--ready {
+  width: var(--hero-ring);
+  height: var(--hero-ring);
+}
+
+.week-ready__value {
+  font-size: var(--fs-score);
+}
+
+.week-ready__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  min-width: 0;
+}
+
+.week-ready__word,
+.week-tile__word {
+  font-size: var(--fs-small);
+  font-weight: var(--w-title);
+  color: var(--f1);
+}
+
+.week-ready__line {
+  line-height: 1.3;
+}
+
+.week-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  border-radius: var(--r-tile);
+}
+
+.week-tile__value {
+  font-size: var(--fs-hero);
+  font-weight: var(--w-hero);
+}
+
+/* A long number (kilograms) takes the smaller size, so it stays on one line. */
+.week-tile__value--long {
+  font-size: var(--fs-display);
+  white-space: nowrap;
+}
+
+.week-plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--sp-l) 1fr;
+  grid-template-areas:
+    'dot name'
+    'dot dose';
+  column-gap: var(--sp-s);
+  padding: var(--sp-s) 0;
+}
+
+/* The line runs through every dot but stops at the first and the last. */
+.timeline__item::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--sp-l) / 2 - var(--hair) / 2);
+  top: 0;
+  bottom: 0;
+  width: var(--hair);
+  background: var(--f3);
+}
+
+.timeline__item:first-child::before {
+  top: 50%;
+}
+
+.timeline__item:last-child::before {
+  bottom: 50%;
+}
+
+.timeline__dot {
+  grid-area: dot;
+  align-self: center;
+  justify-self: center;
+  position: relative;
+  width: var(--sp-s);
+  height: var(--sp-s);
+  border-radius: var(--r-pill);
+  background: var(--f1);
+  box-shadow: 0 0 var(--glow) var(--f-glow);
+}
+
+.timeline__item--warmup .timeline__dot {
+  background: var(--bg);
+  border: var(--hair) solid var(--f1);
+  box-shadow: none;
+}
+
+.timeline__name {
+  grid-area: name;
+}
+
+.timeline__dose {
+  grid-area: dose;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.week-timer {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-m);
+  padding: var(--sp-s) 0;
+}
+
+.ring--weektimer {
+  width: var(--timer-ring);
+  height: var(--timer-ring);
+}
+
+.week-timer__digits {
+  font-size: var(--fs-timer);
+  font-weight: var(--w-hero);
+}
+
+.week-timer__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  min-width: 0;
+}
+
+.week-timer__name {
+  font-size: var(--fs-title);
+  font-weight: var(--w-title);
+}
+
+.steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.steps__row {
+  display: grid;
+  grid-template-columns: var(--icon) 1fr auto;
+  align-items: center;
+  gap: var(--sp-s);
+  min-height: var(--tap);
+  padding: 0 var(--sp-m);
+  border-radius: var(--r-tile);
+  color: var(--muted);
+}
+
+.steps__row--done {
+  color: var(--faint);
+}
+
+.steps__row--done .icon {
+  color: var(--f2);
+}
+
+.steps__row--now {
+  color: var(--text);
+  background: var(--f-soft);
+  border: var(--hair) solid var(--f3);
+  font-weight: var(--w-title);
+}
+
+.steps__dot {
+  justify-self: center;
+  width: var(--sp-s);
+  height: var(--sp-s);
+  border-radius: var(--r-pill);
+  border: var(--hair) solid var(--faint);
+}
+
+.steps__row--now .steps__dot {
+  border: 0;
+  background: var(--f1);
+  box-shadow: 0 0 var(--glow) var(--f-glow);
+}
+
+.steps__time {
+  font-size: var(--fs-small);
+}
+
+.steps__row--now .steps__time {
+  color: var(--f1);
+}
+
+/* ── The tab bar ─────────────────────────────────────────────────────────────────── */
 
 .tabbar {
   flex: none;
   padding: var(--sp-xs) var(--sp-s) calc(env(safe-area-inset-bottom) + var(--sp-xs));
+  background: var(--tab-bar);
+  border-top: var(--hair) solid var(--glass-line);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.6);
+  backdrop-filter: blur(var(--blur)) saturate(1.6);
 }
 
 .tabbar__inner {
@@ -1137,9 +1693,7 @@ ul {
   color: var(--faint);
   font-size: var(--fs-caption);
   font-weight: var(--w-label);
-  transition:
-    color var(--quick) var(--ease),
-    background-color var(--quick) var(--ease);
+  transition: color var(--quick) var(--ease);
 }
 
 .tab--on {
@@ -1149,61 +1703,6 @@ ul {
 .tab--on .icon {
   color: var(--f1);
   filter: drop-shadow(0 0 calc(var(--glow) / 2) var(--f-glow));
-}
-
-/* 1 Glow: a glass dock. */
-.tabbar-dock .tabbar {
-  background: var(--tab-bar);
-  border-top: var(--hair) solid var(--glass-line);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.6);
-  backdrop-filter: blur(var(--blur)) saturate(1.6);
-}
-
-/* 2 Halo: a solid dock; the open page sits in a tinted pill. */
-.tabbar-pill .tabbar {
-  background: var(--bg);
-  border-top: var(--hair) solid var(--glass-line);
-}
-
-.tabbar-pill .tab--on {
-  background: var(--f-soft);
-  color: var(--f1);
-}
-
-/* 3 Mist: a capsule that floats above the home indicator. */
-.tabbar-float .tabbar {
-  background: transparent;
-  padding: 0 var(--sp-m) calc(env(safe-area-inset-bottom) + var(--sp-s));
-}
-
-.tabbar-float .tabbar__inner {
-  padding: var(--sp-xs);
-  border-radius: var(--r-pill);
-  background: var(--tab-bar);
-  border: var(--hair) solid var(--glass-line);
-  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.6);
-  backdrop-filter: blur(var(--blur)) saturate(1.6);
-  box-shadow: 0 var(--sp-s) var(--sp-l) var(--shadow);
-}
-
-/* 4 Line: a hairline; the open page has a dot under its word. */
-.tabbar-line .tabbar {
-  background: var(--tab-bar);
-  border-top: var(--hair) solid var(--line);
-}
-
-.tabbar-line .tab--on .icon {
-  filter: none;
-}
-
-.tabbar-line .tab--on::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  width: var(--sp-xs);
-  height: var(--sp-xs);
-  border-radius: var(--r-pill);
-  background: var(--f1);
 }
 
 /* ── Less motion: one rule, as in Lauscher ───────────────────────────────────────── */

@@ -1,5 +1,5 @@
-// The design preview (rebuild Phase 3): four Oura-style styles of Today, Training,
-// Insights and the tab bar, on seeded mock data. The first screen picks the style;
+// The design preview (rebuild Phase 3): style 1 (Glow) and its three variations
+// (Calm, Cards, Week) of Today, Training, Insights and the tab bar, on seeded mock data. The first screen picks the style;
 // Settings changes it. Each page keeps its one colour family (PAGE_FAMILY): the app's
 // root carries the page's family class, so the tab bar takes the page's colour too.
 //
@@ -17,8 +17,11 @@ import { versionLine } from '../version'
 import { IconCheckin, IconForward, IconInsights, IconSettings, IconToday, IconTraining } from './icons'
 import { Insights } from './Insights'
 import { Ring } from './parts'
-import { Today } from './Today'
-import { Training } from './Training'
+import { Today, type TodayProps } from './Today'
+import { Training, type TrainingProps } from './Training'
+import { CalmInsights, CalmToday, CalmTraining } from './variants/calm'
+import { CardsInsights, CardsToday, CardsTraining } from './variants/cards'
+import { WeekInsights, WeekToday, WeekTraining } from './variants/week'
 
 type Tab = 'today' | 'checkin' | 'training' | 'insights' | 'settings'
 const TABS: { key: Tab; icon: () => ReactElement }[] = [
@@ -29,6 +32,19 @@ const TABS: { key: Tab; icon: () => ReactElement }[] = [
   { key: 'settings', icon: IconSettings },
 ]
 const THEMES: ThemePref[] = ['auto', 'light', 'dark']
+
+type Screens = {
+  Today: (p: TodayProps) => ReactElement
+  Training: (p: TrainingProps) => ReactElement
+  Insights: (p: { mock: typeof MOCK; reduced: boolean }) => ReactElement
+}
+/** Each layout's three screens (Glow, and its three variations). */
+const SCREENS: Record<'glow' | 'calm' | 'cards' | 'week', Screens> = {
+  glow: { Today, Training, Insights },
+  calm: { Today: CalmToday, Training: CalmTraining, Insights: CalmInsights },
+  cards: { Today: CardsToday, Training: CardsTraining, Insights: CardsInsights },
+  week: { Today: WeekToday, Training: WeekTraining, Insights: WeekInsights },
+}
 
 function read(key: string): string | null {
   try {
@@ -174,6 +190,7 @@ export function BakeOff() {
   const reduced = useReducedMotion() || start.still
   const scroller = useRef<HTMLElement>(null)
   const style = STYLES[styleId ?? '1']
+  const screens = SCREENS[style.look.layout]
   const vars = useMemo(() => cssVars(style, mode, reduced), [style, mode, reduced])
 
   // The page behind the app, the status bar and the browser chrome take the app's colours.
@@ -209,14 +226,14 @@ export function BakeOff() {
       <main className="scroller" ref={scroller}>
         {picking && <Picker theme={theme} onTheme={chooseTheme} onPick={pick} reduced={reduced} />}
         {!picking && tab === 'today' && (
-          <Today layout={style.look.today} day={MOCK.days[dayIndex]} mock={MOCK} reduced={reduced}
+          <screens.Today day={MOCK.days[dayIndex]} dayIndex={dayIndex} mock={MOCK} reduced={reduced}
             canPrev={dayIndex > 0} canNext={dayIndex < MOCK.days.length - 1}
             onPrev={() => setDayIndex((i) => Math.max(0, i - 1))}
             onNext={() => setDayIndex((i) => Math.min(MOCK.days.length - 1, i + 1))}
-            onStart={() => go('training')} />
+            onDay={setDayIndex} onStart={() => go('training')} />
         )}
-        {!picking && tab === 'training' && <Training mock={MOCK} reduced={reduced} onClose={() => go('today')} />}
-        {!picking && tab === 'insights' && <Insights mock={MOCK} reduced={reduced} />}
+        {!picking && tab === 'training' && <screens.Training mock={MOCK} reduced={reduced} onClose={() => go('today')} />}
+        {!picking && tab === 'insights' && <screens.Insights mock={MOCK} reduced={reduced} />}
         {!picking && tab === 'checkin' && <NotInPreview title={S.nav.checkin} />}
         {!picking && tab === 'settings' && styleId && (
           <Settings style={styleId} theme={theme} onStyle={pick} onTheme={chooseTheme}

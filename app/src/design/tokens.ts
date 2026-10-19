@@ -5,13 +5,17 @@
 // style" (2026-10-19). He liked the Oura-style result, then set the colour rule: "reduce
 // the number of new colours and use of more shades of the same colour for each page",
 // and asked for "3 other like this with slightly different styles but the colour rule".
+// From those four he took style 1 in dark: "Take style 1 dark and change it give me 3
+// different variations not just the shades of colour and font. Make one of them a
+// relaxed easy oura look". So the styles are now Glow and three layouts of it: Calm
+// (the relaxed Oura look), Cards and Week.
 //
 // THE COLOUR RULE: every page has ONE colour family, used in its shades — Today teal,
 // Training amber, Insights indigo, Settings and Check-in slate — as Oura gives each
 // section its own hue. Everything else is neutral: the page, the cards, the text, the
 // button. A status (Good, Fair, Pay attention) is a word, never a colour of its own.
-// The families and the neutrals are shared by all four styles; a style changes shape,
-// type, light and surface, never the colours.
+// The families and the neutrals are shared by all four styles; a style changes layout,
+// shape, type and light, never the colours.
 //
 // Every colour, size, corner, line and timing a screen uses comes from here, through the
 // CSS custom properties theme.ts writes on the app's root. Sizes are in rem where text
@@ -103,13 +107,11 @@ export const PAGE_FAMILY = {
 
 export type StyleId = '1' | '2' | '3' | '4'
 
-/** How a style draws the shared screens. Each value is a class the stylesheet reads. */
+/** How a style draws the screens. `layout` picks the screen components; the rest are
+ *  classes the stylesheet reads. */
 export type Look = {
-  today: 'trio' | 'hero'
-  sky: 'glow' | 'halo' | 'wash' | 'none'
-  card: 'glass' | 'tint' | 'mist' | 'line'
-  tabbar: 'dock' | 'pill' | 'float' | 'line'
-  button: 'white' | 'family'
+  layout: 'glow' | 'calm' | 'cards' | 'week'
+  sky: 'glow' | 'soft'
 }
 
 export type Style = {
@@ -148,7 +150,7 @@ export type Style = {
     glow: string
   }
   motion: { quick: string; slow: string; easing: string }
-  /** Per-style changes to the neutrals (for example a true black page). */
+  /** Per-style changes to the neutrals. */
   neutrals?: Partial<Record<Mode, Partial<Neutrals>>>
 }
 
@@ -156,10 +158,7 @@ const SYSTEM = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sy
 const DISPLAY = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif'
 const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
 
-/** 1 Glow: a night-sky glow at the top, glass cards, three rings in a row. */
-const GLOW: Style = {
-  id: '1',
-  look: { today: 'trio', sky: 'glow', card: 'glass', tabbar: 'dock', button: 'white' },
+const GLOW_BASE: Omit<Style, 'id' | 'look'> = {
   fontBody: SYSTEM,
   fontNumber: DISPLAY,
   weightHero: 200,
@@ -175,69 +174,48 @@ const GLOW: Style = {
   motion: { quick: '240ms', slow: '900ms', easing: EASE },
 }
 
-/** 2 Halo: one large readiness ring with a soft halo, cards tinted in the page colour,
- *  the main button in the page colour. */
-const HALO: Style = {
-  id: '2',
-  look: { today: 'hero', sky: 'halo', card: 'tint', tabbar: 'pill', button: 'family' },
-  fontBody: SYSTEM,
-  fontNumber: DISPLAY,
-  weightHero: 200,
-  weightNumber: 300,
-  weightTitle: 600,
-  weightLabel: 500,
-  numberTracking: '-0.03em',
-  type: { caption: '0.76rem', small: '0.86rem', body: '1rem', title: '1.2rem', display: '1.8rem', score: '1.55rem', hero: '5rem', timer: 'min(7rem, 28vw)' },
-  space: { xs: '4px', s: '8px', m: '16px', l: '24px', xl: '40px' },
-  radius: { card: '22px', tile: '18px', pill: '999px' },
-  line: { hair: '1px', ring: '7px', timerRing: '5px', bar: '6px', icon: '1.6px' },
-  size: { tap: '46px', gym: '60px', icon: '1.5rem', bubble: '4.4rem', heroRing: 'min(66vw, 15.5rem)', timerRing: 'min(84vw, 21rem)', sky: '26rem', content: '36rem', blur: '0px', glow: '16px' },
-  motion: { quick: '240ms', slow: '1000ms', easing: EASE },
-}
+/** 1 Glow: a glow at the top, glass cards, three rings in a row (the one he took). */
+const GLOW: Style = { ...GLOW_BASE, id: '1', look: { layout: 'glow', sky: 'glow' } }
 
-/** 3 Mist: the page colour washes down the whole screen, lighter and larger numbers,
- *  very light glass, a floating tab bar. */
-const MIST: Style = {
-  id: '3',
-  look: { today: 'trio', sky: 'wash', card: 'mist', tabbar: 'float', button: 'white' },
-  fontBody: SYSTEM,
-  fontNumber: DISPLAY,
+/** 2 Calm, the relaxed Oura look: one soft glowing orb, a big greeting, plenty of space,
+ *  the detail one tap away; the lightest numbers and the slowest motion. */
+const CALM: Style = {
+  ...GLOW_BASE,
+  id: '2',
+  look: { layout: 'calm', sky: 'soft' },
   weightHero: 100,
   weightNumber: 200,
   weightTitle: 500,
-  weightLabel: 500,
-  numberTracking: '-0.035em',
-  type: { caption: '0.78rem', small: '0.88rem', body: '1.02rem', title: '1.28rem', display: '2.05rem', score: '2.05rem', hero: '4.9rem', timer: 'min(7.4rem, 29vw)' },
-  space: { xs: '4px', s: '10px', m: '18px', l: '28px', xl: '44px' },
-  radius: { card: '30px', tile: '24px', pill: '999px' },
-  line: { hair: '1px', ring: '4px', timerRing: '2.5px', bar: '4px', icon: '1.4px' },
-  size: { tap: '48px', gym: '62px', icon: '1.5rem', bubble: '6.6rem', heroRing: '0rem', timerRing: 'min(86vw, 22rem)', sky: '52rem', content: '36rem', blur: '32px', glow: '14px' },
-  motion: { quick: '260ms', slow: '1100ms', easing: EASE },
+  type: { caption: '0.78rem', small: '0.88rem', body: '1.02rem', title: '1.3rem', display: '2.15rem', score: '1.9rem', hero: '5.4rem', timer: 'min(7.6rem, 30vw)' },
+  space: { xs: '4px', s: '10px', m: '20px', l: '32px', xl: '52px' },
+  radius: { card: '30px', tile: '22px', pill: '999px' },
+  line: { hair: '1px', ring: '2px', timerRing: '2px', bar: '4px', icon: '1.4px' },
+  size: { ...GLOW_BASE.size, heroRing: 'min(76vw, 17rem)', timerRing: 'min(84vw, 20rem)', sky: '42rem', blur: '28px', glow: '16px' },
+  motion: { quick: '300ms', slow: '1300ms', easing: EASE },
 }
 
-/** 4 Line: clean black (or white), thin lines, no glow, cards drawn with outlines only,
- *  steadier medium-weight numbers. */
-const LINE: Style = {
+/** 3 Cards: each score on its own card with its last seven days; the timer with a set
+ *  tracker and a bar. */
+const CARDS: Style = {
+  ...GLOW_BASE,
+  id: '3',
+  look: { layout: 'cards', sky: 'glow' },
+  type: { ...GLOW_BASE.type, hero: '3.6rem', timer: 'min(7.2rem, 29vw)' },
+  radius: { card: '22px', tile: '18px', pill: '999px' },
+  line: { ...GLOW_BASE.line, bar: '10px' },
+}
+
+/** 4 Week: a week strip on top, tiles for the scores, the session as a timeline; the
+ *  timer above the list of the exercise's sets. */
+const WEEK: Style = {
+  ...GLOW_BASE,
   id: '4',
-  look: { today: 'trio', sky: 'none', card: 'line', tabbar: 'line', button: 'white' },
-  fontBody: SYSTEM,
-  fontNumber: DISPLAY,
-  weightHero: 300,
-  weightNumber: 400,
-  weightTitle: 600,
-  weightLabel: 500,
-  numberTracking: '-0.02em',
-  type: { caption: '0.76rem', small: '0.86rem', body: '1rem', title: '1.18rem', display: '1.75rem', score: '1.7rem', hero: '4rem', timer: 'min(7rem, 28vw)' },
+  look: { layout: 'week', sky: 'glow' },
+  type: { ...GLOW_BASE.type, score: '1.6rem', hero: '3.4rem', timer: 'min(4.6rem, 19vw)' },
   space: { xs: '4px', s: '8px', m: '14px', l: '20px', xl: '32px' },
-  radius: { card: '16px', tile: '14px', pill: '999px' },
-  line: { hair: '1px', ring: '3px', timerRing: '3px', bar: '3px', icon: '1.6px' },
-  size: { tap: '46px', gym: '58px', icon: '1.45rem', bubble: '6rem', heroRing: '0rem', timerRing: 'min(82vw, 20rem)', sky: '0rem', content: '36rem', blur: '0px', glow: '0px' },
-  motion: { quick: '200ms', slow: '700ms', easing: EASE },
-  neutrals: {
-    dark: { bg: '#000000', tabBar: '#000000' },
-    light: { bg: '#FFFFFF', tabBar: '#FFFFFF' },
-  },
+  radius: { card: '22px', tile: '18px', pill: '999px' },
+  size: { ...GLOW_BASE.size, bubble: '4.4rem', heroRing: '6.6rem', timerRing: 'min(62vw, 15rem)' },
 }
 
-export const STYLES: Record<StyleId, Style> = { '1': GLOW, '2': HALO, '3': MIST, '4': LINE }
+export const STYLES: Record<StyleId, Style> = { '1': GLOW, '2': CALM, '3': CARDS, '4': WEEK }
 export const STYLE_IDS: StyleId[] = ['1', '2', '3', '4']

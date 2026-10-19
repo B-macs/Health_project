@@ -79,8 +79,7 @@ export function cssVars(s: Style, mode: Mode, reduced: boolean): Record<string, 
 
 /** The classes that tell the stylesheet how this style draws the shared screens. */
 export function lookClasses(s: Style): string {
-  const l = s.look
-  return `style-${s.id} today-${l.today} sky-${l.sky} card-${l.card} tabbar-${l.tabbar} button-${l.button}`
+  return `style-${s.id} layout-${s.look.layout} sky-${s.look.sky}`
 }
 
 function systemMode(): Mode {
