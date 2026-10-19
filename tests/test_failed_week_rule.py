@@ -776,9 +776,16 @@ def test_the_rule_runs_before_the_scheduling_writers_that_depend_on_it():
 
 def test_the_screen_holds_the_load_before_anything_reads_the_policy():
     render = _function_source("render")
-    hold_at = render.index("sess.hold_for_failed_week(_policy)")
-    assert "week_repeat.failed_week_holds_load(phases" in render
-    assert render.index("_policy = _verdict.policy") < hold_at
+    # The hold is decision.training_policy since 2026-10-19 (the phone's
+    # engine applies the same one); tests/test_decision.py proves it holds.
+    hold_at = render.index("_policy = decision.training_policy(_verdict.policy, phases")
+    import inspect
+
+    from services import decision
+    held = inspect.getsource(decision.training_policy)
+    assert "week_repeat.failed_week_holds_load(phases" in held
+    assert "hold_for_failed_week(policy)" in held
+    assert render.index("_verdict = today.today_verdict()") < hold_at
     assert hold_at < render.index('_volume_factor = _policy["volume_factor"]')
     assert hold_at < render.index("_render_accessory_session(")
 

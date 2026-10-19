@@ -102,7 +102,7 @@ class Verdict:
     readiness_display: float | None = None   # the trend — Home's big number
     readiness_raw:     float | None = None   # what the engine actually bucketed
     readiness_band:    str = ""              # readiness_meta's word
-    hrv_note:          str = ""              # opaque; composed in today.py
+    hrv_note:          str = ""              # opaque; composed in services/decision.py
     #: The reading the engine named for a reduced or rest day (the directive's
     #: own `cause`), printed on Home's line the way Training prints it as the
     #: headline. On a baseline-drift day it is the only reason there is.

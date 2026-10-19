@@ -205,9 +205,10 @@ def test_the_hrv_note_never_appears_in_the_reasons_that_clamp():
 
 
 def test_the_verdict_module_cannot_reach_the_trend_module():
-    """The note arrives as an opaque string from today.py, which sits OUTSIDE
-    services/ precisely so no guardrail module gains a name through which the
-    device-dependent 60/40 combined figure could be reached."""
+    """The note arrives as an opaque string from services/decision.py (until
+    2026-10-19 from today.py, outside services/), which no guardrail may import
+    (tests/test_decision.py), so no guardrail module gains a name through which
+    the device-dependent 60/40 combined figure could be reached."""
     tree = ast.parse((ROOT / "services" / "verdict.py").read_text(encoding="utf-8"))
     names = set()
     for node in ast.walk(tree):

@@ -24,6 +24,7 @@ import today
 import training_plan as tp
 from services import accessory as acc
 from services import background_sync
+from services import decision
 from services import block_changeover
 from services import metrics
 from services import metrics_logic as ml
@@ -3263,17 +3264,12 @@ def render():
     # (header said reduced load, Lat Pulldown seeded 45x10 -> 47.5x11); see
     # services/sessions.py's LOAD RESOLUTION section.
     _verdict = today.today_verdict()
-    _policy = _verdict.policy
     # A week that runs again because it FAILED holds the load (Key Rule 22,
-    # athlete 2026-09-16). Folded into the same object, before anything reads
-    # it, so the volume factor, the seeded numbers and the accessory session
-    # all see one decision. The banner is the verdict's and stays about today;
-    # the repeat notice says the week is held.
-    try:
-        if phases and week_repeat.failed_week_holds_load(phases, date.today()):
-            _policy = sess.hold_for_failed_week(_policy)
-    except Exception:
-        pass  # a failed check leaves progression as it was; + adds load either way
+    # athlete 2026-09-16), folded into the same object before anything reads
+    # it (decision.training_policy), so the volume factor, the seeded numbers
+    # and the accessory session all see one decision. The banner is the
+    # verdict's and stays about today; the repeat notice says the week is held.
+    _policy = decision.training_policy(_verdict.policy, phases, date.today())
     _volume_factor = _policy["volume_factor"]
 
     # ── The accessory session owns the page while one is running ────────────
