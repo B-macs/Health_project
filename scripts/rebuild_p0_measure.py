@@ -4,7 +4,7 @@
     python scripts/rebuild_p0_measure.py warm [--runs 5]
     python scripts/rebuild_p0_measure.py oura
     python scripts/rebuild_p0_measure.py garmin --confirm owner-approved
-    python scripts/rebuild_p0_measure.py summary
+    python scripts/rebuild_p0_measure.py summary [--build COMMIT]
 
 Every sample is one line in reports/rebuild/p0_measure.jsonl (gitignored). A
 sample holds timings, status codes and the engine's own startup timings only:
@@ -30,6 +30,7 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
+import ssl
 import statistics
 import subprocess
 import sys
@@ -51,6 +52,7 @@ OWNER_TZ = "Europe/Berlin"
 # A started_at is written to the second; an instance whose start falls this
 # close before the request was sent still counts as started by it.
 COLD_MARGIN_S = 2.0
+USER_AGENT = "health-rebuild-p0-measure/1.0"
 
 
 def _gcloud() -> str:
@@ -91,11 +93,27 @@ def owner_today() -> date:
     return datetime.now(ZoneInfo(OWNER_TZ)).date()
 
 
+def _ssl_context() -> ssl.SSLContext:
+    """certifi's roots when present. On this PC (2026-10-19) the default
+    context refuses the Worker's address with "certificate has expired": the
+    Windows store leads OpenSSL through ISRG Root X2's cross-signature of
+    Let's Encrypt's Root YE, which expired 2025-09-15, while Windows itself and
+    Safari accept the same certificate through ISRG Root X1."""
+    try:
+        import certifi
+    except ImportError:
+        return ssl.create_default_context()
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 def call(via: str, path: str, *, method: str = "GET", body: dict | None = None,
          target: tuple[str, str] | None = None, timeout: float = 90.0) -> dict:
     """One timed request. Returns the status, the seconds it took and the JSON
     answer; the address and the key never leave this function."""
-    headers = {"Accept": "application/json", "X-Local-Date": owner_today().isoformat()}
+    # Cloudflare answers Python's default User-Agent ("Python-urllib/3.x") with a
+    # 403 challenge page before the Worker runs (checked 2026-10-19).
+    headers = {"Accept": "application/json", "X-Local-Date": owner_today().isoformat(),
+               "User-Agent": USER_AGENT}
     if via == "direct":
         base, key = target or engine_target()
         headers["X-Engine-Key"] = key
@@ -112,7 +130,7 @@ def call(via: str, path: str, *, method: str = "GET", body: dict | None = None,
     sent = datetime.now(timezone.utc)
     t0 = time.perf_counter()
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as resp:
+        with urllib.request.urlopen(request, timeout=timeout, context=_ssl_context()) as resp:
             status, raw = resp.status, resp.read()
     except urllib.error.HTTPError as exc:
         status, raw = exc.code, exc.read()
@@ -245,9 +263,12 @@ def summarise(samples: list[dict]) -> dict:
     return out
 
 
-def cmd_summary(_args) -> None:
+def cmd_summary(args) -> None:
     samples = [json.loads(line) for line in LOG.read_text(encoding="utf-8").splitlines()
                if line.strip()] if LOG.exists() else []
+    if args.build:
+        # One revision's numbers: a sample names the commit its engine was built from.
+        samples = [s for s in samples if s.get("build") == args.build]
     print(json.dumps(summarise(samples), indent=2))
 
 
@@ -267,7 +288,9 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("garmin")
     p.add_argument("--confirm", default="")
     p.set_defaults(func=cmd_garmin)
-    sub.add_parser("summary").set_defaults(func=cmd_summary)
+    p = sub.add_parser("summary")
+    p.add_argument("--build", default="", help="only the samples of the engine built from this commit")
+    p.set_defaults(func=cmd_summary)
     args = parser.parse_args(argv)
     args.func(args)
 

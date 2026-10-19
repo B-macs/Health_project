@@ -55,6 +55,17 @@ def test_no_cold_sample_means_no_number():
     assert out["cold_start_median_s"] is None and out["cold_start_worst_s"] is None
 
 
+def test_the_summary_can_keep_to_one_build(monkeypatch, tmp_path, capsys):
+    log = tmp_path / "p0_measure.jsonl"
+    log.write_text("\n".join(json.dumps(s) for s in [
+        {"kind": "cold", "status": 200, "seconds": 10.7, "cold": True, "build": "old"},
+        {"kind": "cold", "status": 200, "seconds": 8.0, "cold": True, "build": "new"},
+    ]), encoding="utf-8")
+    monkeypatch.setattr(m, "LOG", log)
+    m.main(["summary", "--build", "new"])
+    assert json.loads(capsys.readouterr().out)["cold_start_runs_s"] == [8.0]
+
+
 def test_the_access_key_is_read_from_env_with_or_without_a_bom(tmp_path):
     env = tmp_path / ".env"
     env.write_bytes(b"\xef\xbb\xbfHEALTH_ACCESS_KEY=\"abc-DEF_123\"\n")
@@ -74,7 +85,7 @@ class _Response(io.BytesIO):
 def test_a_sample_and_its_printed_line_carry_no_key_and_no_address(monkeypatch, tmp_path, capsys):
     sent = {}
 
-    def fake_urlopen(request, timeout):
+    def fake_urlopen(request, timeout, context=None):
         sent["url"], sent["headers"] = request.full_url, dict(request.header_items())
         return _Response(json.dumps({"started_at": None, "timings": {}}).encode())
 
@@ -84,6 +95,8 @@ def test_a_sample_and_its_printed_line_carry_no_key_and_no_address(monkeypatch, 
     m.record(sample)
     assert sent["url"] == URL + "/api/health"
     assert sent["headers"]["X-engine-key"] == KEY                 # it IS sent ...
+    # Cloudflare answers Python's default User-Agent with a 403 page.
+    assert sent["headers"]["User-agent"] == m.USER_AGENT
     written = (tmp_path / "p0_measure.jsonl").read_text(encoding="utf-8")
     printed = capsys.readouterr().out
     for text in (json.dumps(sample), written, printed):           # ... and never kept or shown

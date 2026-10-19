@@ -28,8 +28,15 @@
     "seconds": 0.93,
     "measured_on": "2026-10-19"
   },
-  "garmin_ok": null,
-  "garmin_probe": null,
+  "garmin_ok": true,
+  "garmin_probe": {
+    "status": "ok",
+    "what": "one login (email and password) and one read of yesterday's daily summary from Cloud Run, with the owner's OK; the tokens can be stored",
+    "seconds": 12.0,
+    "summary_fields": 94,
+    "measured_on": "2026-10-19"
+  },
+  "cold_start_revision_1_note": "Revision health-engine-00001 (commit 84c88c6, before Supabase compression): one natural cold start, 10.66 s direct (imports 3.82 s, config 0.08 s, cache rebuild 4.98 s); the deploy-time start logged imports 2.61 s and cache rebuild 6.02 s. The five GO samples are taken on the compressed revision.",
   "free_tier_max_share": null,
   "free_tier_projection": null
 }

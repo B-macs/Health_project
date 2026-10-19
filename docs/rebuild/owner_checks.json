@@ -2,6 +2,7 @@
   "_note": "The owner's own checks, recorded as the owner reports them. true = confirmed, false = reported broken, null = not checked yet. scripts/rebuild_gate.py reads this.",
   "p0": {
     "streamlit_app_opens": null,
-    "placeholder_opens_on_iphone": null
+    "placeholder_opens_on_iphone": true,
+    "placeholder_opens_on_iphone_note": "2026-10-19: the owner read the version line off his iPhone: 0.1.0 (84c88c6) · built 19 Oct, 10:56."
   }
 }

@@ -30,6 +30,7 @@ comparison a true round trip: the same rows, through Postgres, back out.
 """
 from __future__ import annotations
 
+import gzip
 import json
 import sqlite3
 import threading
@@ -52,6 +53,20 @@ LOAD_ORDER = ("training_sessions", "training_exercises", "training_sets")
 BATCH = 500
 
 _TIMEOUT = 60
+
+
+def _unpacked(raw: bytes, headers) -> bytes:
+    """The answer as the server wrote it before compressing it.
+
+    Every Data API request asks for gzip (_request). Measured 2026-10-19, one
+    full pull of every table is 9.24 MB uncompressed (the largest table 2.84 MB,
+    0.42 MB gzipped). The hosted engine (docs/rebuild/) pulls it at every cold
+    start, several times a day, and Supabase's Free plan includes 5 GB of egress
+    a month. urllib does not undo the compression by itself, so this does, and
+    only when the server says it compressed (Content-Encoding)."""
+    if raw and (headers.get("Content-Encoding") or "").lower() == "gzip":
+        return gzip.decompress(raw)
+    return raw
 
 
 class SupabaseError(RuntimeError):
@@ -101,16 +116,18 @@ class SupabaseStore:
 
     def _request(self, method: str, path: str, body=None, headers=None):
         data = json.dumps(body).encode() if body is not None else None
+        # Accept-Encoding here, not in _headers(): services/backup.py sends its
+        # Storage calls with _headers() and reads the answers as they come.
         req = urllib.request.Request(
             f"{self.url}/rest/v1/{path}", data=data, method=method,
-            headers=self._headers(headers),
+            headers=self._headers({"Accept-Encoding": "gzip", **(headers or {})}),
         )
         try:
             with urllib.request.urlopen(req, timeout=_TIMEOUT) as r:
-                raw = r.read()
+                raw = _unpacked(r.read(), r.headers)
                 return r.headers, (json.loads(raw) if raw else None)
         except urllib.error.HTTPError as exc:
-            detail = exc.read().decode(errors="replace")[:400]
+            detail = _unpacked(exc.read(), exc.headers).decode(errors="replace")[:400]
             # The key never appears in the message — only the path and Postgres'
             # own complaint, which is what actually says what went wrong.
             raise SupabaseError(f"{method} {path} → HTTP {exc.code}: {detail}") from None
