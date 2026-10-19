@@ -693,7 +693,7 @@ Read CLAUDE.md, docs/rebuild/state.md, the latest handoff summary, docs/rebuild/
 2. Write reports/rebuild/pN_gate.html (gitignored): 🔴 items first, every counter with its evidence, and what the owner must check on the phone.
 3. Update state.md, archive.md and stack.md; flip passes only where the counter is 0.
 4. Write handoff/pN_to_pM.json + _summary.md: what now exists, pinned versions, the owner's decisions, open items, what the next phase may rely on.
-5. Commit `chore(rebuild-pN): gate` and HARD STOP until the owner signs off.
+5. Commit `chore(rebuild-pN): gate` and HARD STOP until the owner signs off. **From Phase 2 on the owner signs every gate off in advance** (owner, 2026-10-19: *"I said auto sign off of phase 2 and onwards, untill all the steps are completed not just step 2"*): record the gate as signed off under that instruction and start the next phase; he reviews all gates in one batch. Still stop for a step only he can do (a login, a secret, a test on his phone, a payment, the Oura redirect URI, deleting the Streamlit app) and for a choice he keeps (the Phase 3 design: *"provide the UI Designs and ill decide one of them"*). An owner check stays open until he does it; never mark it done for him.
 
 ### Roadmap
 P0 Foundation & engine proof · P1 Separate Voice Training · P2 Engine API · P3 Design bake-off · P4 App shell · P5 Today & check-in · P6 Training session · P7 Training week & extras · P8 Insights · P9 Side by side & switch-over · P10 Retire Streamlit. Each phase = PROMPT 1 (build) + PROMPT 2 (gate). Hard stop at the end of every phase.
