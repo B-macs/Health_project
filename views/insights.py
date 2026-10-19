@@ -11,8 +11,6 @@ Caller is responsible for st.set_page_config(), styles.inject_css(), nav.inject(
 
 import base64
 import calendar as cal_mod
-import math
-import os
 from contextlib import contextmanager
 from dataclasses import asdict
 from datetime import date, timedelta
@@ -31,9 +29,7 @@ import repo
 import strength_baselines
 import styles
 import today as today_mod
-import training_constants
 from services import ai
-from services import bioage
 from services import dashboard as dash
 from services import decision
 from services import engine
@@ -45,7 +41,7 @@ from services import metabolism_screen as ms
 from services import processing_queue
 from services import sleep_architecture
 from services import sessions as sessions_svc
-from services import strength as strength_svc
+from services import strength_screen as ss
 from services import tonnage as tonnage_svc
 from services import volume as volume_svc
 
@@ -256,21 +252,12 @@ _STRENGTH_REGIONS: tuple[dict, ...] = (
     {"id": "lower_body", "name": "Lower body", "colour": "#D9663A", "ratio": "893/534"},
 )
 
-# label → (series key, unit, short unit, accent). "score" is the strength
-# metric; the other four are tonnage. Order is the dropdown's order.
-_STRENGTH_METRICS: dict[str, dict] = {
-    "Overall Strength Score":   {"key": "score",      "unit": "points", "short": "pts", "colour": "#FF8C42"},
-    "Overall Strength Tonnage": {"key": "overall",    "unit": "kg",     "short": "kg",  "colour": "#FF8C42"},
-    "Upper Body Tonnage":       {"key": "upper_body", "unit": "kg",     "short": "kg",  "colour": "#FF8C42"},
-    "Core Tonnage":             {"key": "core",       "unit": "kg",     "short": "kg",  "colour": "#E8B04B"},
-    "Lower Body Tonnage":       {"key": "lower_body", "unit": "kg",     "short": "kg",  "colour": "#D9663A"},
+#: Each progress series' colour. The series themselves, their units and the
+#: window are services/strength_screen.METRICS and WEEKS.
+_STRENGTH_COLOURS: dict[str, str] = {
+    "Overall Strength Score": "#FF8C42", "Overall Strength Tonnage": "#FF8C42",
+    "Upper Body Tonnage": "#FF8C42", "Core Tonnage": "#E8B04B", "Lower Body Tonnage": "#D9663A",
 }
-
-# Weeks of history in the progress display. Six bars is what the 640-unit
-# chart can label without crowding, and it is a rolling window — a week with
-# no eligible work is drawn as an explicit zero rather than dropped, so the
-# series is always exactly this long.
-_STRENGTH_WEEKS: int = 6
 
 _INK, _INK2, _INK3 = "#F4F6FB", "#9AA3B2", "#5A6377"
 _PANEL, _HAIR = "#0E1018", "rgba(255,255,255,0.06)"
@@ -371,10 +358,8 @@ def _signed(value: float, points: bool) -> str:
     return f"{sign}{abs(value):.1f}" if points else f"{sign}{_kg(abs(value))}"
 
 
-def _tone(value: float) -> str:
-    if abs(value) < 5e-2:
-        return _INK2
-    return _GOOD if value > 0 else _BAD
+#: How a week-over-week change is coloured (services/strength_screen.readout).
+_TONE: dict[str | None, str] = {"up": _GOOD, "down": _BAD, "flat": _INK2, None: _INK3}
 
 
 def _svg_frame(y_labels: list[str], x_labels: list[str], w: int, h: int,
@@ -407,11 +392,9 @@ def _tonnage_chart_svg(series: list, key: str, colour: str, label: str) -> str:
     claims, and tonnage is a statement about the week."""
     w, h, pl, pr, pt, pb = 640, 220, 44, 14, 14, 24
     iw, ih = w - pl - pr, h - pt - pb
-    values = [wk.value(key).kg for wk in series]
-    top = tonnage_svc.nice_axis_max(max(values) if values else 0.0)
+    _values, top = ss.tonnage_axis(series, key)
     y_labels = [_kg(top * i / 4) for i in range(4, -1, -1)]
-    x_labels = [wk.week_start.strftime("%-d %b") if os.name != "nt"
-                else wk.week_start.strftime("%d %b").lstrip("0") for wk in series]
+    x_labels = [ss.week_label(wk.week_start) for wk in series]
     out = _svg_frame(y_labels, x_labels, w, h, pl, pr, pt, pb)
     bw = iw / max(1, len(series)) * 0.52
     for i, wk in enumerate(series):
@@ -462,12 +445,8 @@ def _unloaded_note_html(series: list, key: str) -> str:
     draws a zero bar. The tooltip said what was done, and a tooltip never
     shows on a touch screen (WP-15, 2026-10-13). Empty when neither week did
     any, so a loaded-only sector carries no extra line."""
-    lines = []
-    for label, week in (("This week", series[-1] if series else None),
-                        ("Last week", series[-2] if len(series) > 1 else None)):
-        text = tonnage_svc.unloaded_text(week.value(key)) if week is not None else None
-        if text:
-            lines.append(f'<div style="font-size:13px;color:{_INK2};">{label}: {text}</div>')
+    lines = [f'<div style="font-size:13px;color:{_INK2};">{label}: {text}</div>'
+             for label, text in ss.unloaded_lines(series, key)]
     if not lines:
         return ""
     return (f'<div class="sb-unloaded" style="margin:-4px 0 16px;">'
@@ -481,19 +460,10 @@ def _score_chart_svg(points: list[dict], colour: str) -> str:
     evidence the score is allowed to respond to."""
     w, h, pl, pr, pt, pb = 640, 220, 44, 14, 14, 24
     iw, ih = w - pl - pr, h - pt - pb
-    seen = [v for p in points for v in (p["measured"], p["level"]) if v is not None]
-    if seen:
-        lo = max(0.0, (min(seen) // 10) * 10 - 10)
-        hi = ((max(seen) // 10) + 2) * 10
-        # The span has to divide into 4 gridlines cleanly, or the labels are
-        # rounded to whole points while the lines sit on halves — 90/77.5/65/
-        # 52.5/40 printing as 90/78/65/52/40, which misreads the chart.
-        hi = lo + math.ceil((hi - lo) / 20.0) * 20.0
-    else:
-        lo, hi = 0.0, 100.0
+    # The span divides into 4 gridlines cleanly (services/strength_screen).
+    lo, hi = ss.score_axis(points)
     y_labels = [f"{hi - (hi - lo) * i / 4:.0f}" for i in range(0, 5)]
-    x_labels = [p["week"].strftime("%-d %b") if os.name != "nt"
-                else p["week"].strftime("%d %b").lstrip("0") for p in points]
+    x_labels = [ss.week_label(p["week"]) for p in points]
     out = _svg_frame(y_labels, x_labels, w, h, pl, pr, pt, pb)
 
     def x_at(i: int) -> float:
@@ -586,9 +556,10 @@ def _strength_hero_html(value: float | None, calibrating: bool) -> str:
     )
 
 
-def _strength_readout_html(current: float | None, previous: float | None,
-                           labels: tuple[str, str], unit: str, points: bool,
-                           year: int) -> str:
+def _strength_readout_html(r: dict, year: int) -> str:
+    """This week, last week and the change (services/strength_screen.readout)."""
+    unit, points = r["unit"], r["points"]
+
     def cell(k: str, v: str, sub: str, colour: str = _INK3) -> str:
         return (f'<div><div class="k">{k}</div><div class="v">{v}</div>'
                 f'<div class="p" style="color:{colour}">{sub}</div></div>')
@@ -598,13 +569,14 @@ def _strength_readout_html(current: float | None, previous: float | None,
             return "—"
         return f'{v:.1f}<u>{unit}</u>' if points else f'{_kg(v)}<u>{unit}</u>'
 
-    if current is None or previous is None:
+    labels = r["labels"]
+    if r["delta"] is None:
         delta_html, delta_sub, delta_col = "—", "no comparable previous week", _INK3
     else:
-        delta, pct = tonnage_svc.change(current, previous)
-        delta_col = _tone(delta)
-        delta_html = (f'<span style="color:{delta_col}">{_signed(delta, points)}'
+        delta_col = _TONE[r["tone"]]
+        delta_html = (f'<span style="color:{delta_col}">{_signed(r["delta"], points)}'
                       f"<u>{unit}</u></span>")
+        pct = r["pct"]
         if pct is None:
             delta_sub = "no percentage — the previous week was zero"
         else:
@@ -612,8 +584,8 @@ def _strength_readout_html(current: float | None, previous: float | None,
             delta_sub = f"{sign}{abs(pct):.1f}% week over week"
     return (
         '<div class="sb-readout">'
-        + cell(f"This week · {labels[0]}", show(current), f"week of {labels[0]} {year}")
-        + cell(f"Last week · {labels[1]}", show(previous), f"week of {labels[1]} {year}")
+        + cell(f"This week · {labels[0]}", show(r["current"]), f"week of {labels[0]} {year}")
+        + cell(f"Last week · {labels[1]}", show(r["previous"]), f"week of {labels[1]} {year}")
         + cell("Change", delta_html, delta_sub, delta_col)
         + "</div>"
     )
@@ -624,36 +596,28 @@ def _strength_region_strip_html(regions: list, core_hold: dict | None = None) ->
     timed plank test its card shows its hold-time index instead, marked
     provisional (services/strength.core_hold_index, decided 2026-10-13) — it
     is never part of the headline."""
-    by_id = {r.region: r for r in regions}
+    # Each card's numbers, index ("—", never 0, with nothing measured) and
+    # band come from services/strength_screen.region_cards.
+    meta_by_id = {m["id"]: m for m in _STRENGTH_REGIONS}
+    tone_colour = {"good": _GOOD, "warn": _WARN, "bad": _BAD}
     rows = ""
-    for meta in _STRENGTH_REGIONS:
-        state = by_id.get(meta["id"])
-        if state is None:
-            continue
+    for card in ss.region_cards(regions, core_hold):
+        meta = meta_by_id[card["region"]]
         plate = _bioage_b64(str(_STRENGTH_FACEPLATE_DIR / f"{meta['id']}.png"))
-        conf = state.confidence
-        conf_col = _GOOD if conf >= strength_svc.CALIBRATION_EXIT else (_WARN if conf > 0 else _BAD)
-        band = "established" if conf >= strength_svc.CALIBRATION_EXIT else "provisional"
-        off = " off" if conf <= 0 else ""
-        # No measurement prints "—", never 0 (WP-15): core has no 2025
-        # kilogram baseline, so nothing it does can be measured on this scale.
-        index_text = ("—" if state.displayed_index is None
-                      else f"{state.displayed_index:.1f}")
-        index_label = "Index"
-        if meta["id"] == "core" and state.displayed_index is None and core_hold:
-            index_label, index_text = "Hold time", f"{core_hold['index']:.1f}"
-            band = f"provisional · hold time · {core_hold['date'].strftime('%d %b').lstrip('0')}"
-            conf_col, off = _WARN, ""
-        aria = (f'{meta["name"]}, {state.contribution_points:.1f} points, '
-                f'{state.contribution_pct:.1f} percent of overall, '
+        conf = card["confidence"]
+        conf_col = tone_colour[card["tone"]]
+        band, off = card["band"], " off" if card["off"] else ""
+        index_label, index_text = card["index_label"], card["index_text"]
+        aria = (f'{meta["name"]}, {card["points"]:.1f} points, '
+                f'{card["pct"]:.1f} percent of overall, '
                 f'{index_label.lower()} {"not measured" if index_text == "—" else index_text}, '
                 f'confidence {conf:.2f}')
         rows += (
             f'<div class="sb-region" role="group" aria-label="{aria}">'
             f'<div class="txt">'
             f'<div class="nm" style="color:{meta["colour"]}">{meta["name"]}</div>'
-            f'<div class="sc">{state.contribution_points:.1f}'
-            f'<u>pts&thinsp;<s>{state.contribution_pct:.1f}%</s></u></div>'
+            f'<div class="sc">{card["points"]:.1f}'
+            f'<u>pts&thinsp;<s>{card["pct"]:.1f}%</s></u></div>'
             f'<div class="idx">{index_label} <em>{index_text}</em></div>'
             f'<div class="sb-cbar"><i style="width:{max(round(conf * 100), 2)}%;'
             f'background:{conf_col}"></i></div>'
@@ -677,16 +641,16 @@ def _strength_region_strip_html(regions: list, core_hold: dict | None = None) ->
 def _strength_split_html(regions: list) -> str:
     # Looked up by id, not zipped: zip() would pair by position and silently
     # recolour every segment if services.strength.REGIONS were ever reordered.
-    by_id = {r.region: r for r in regions}
-    ordered = [(m, by_id[m["id"]]) for m in _STRENGTH_REGIONS if m["id"] in by_id]
+    meta_by_id = {m["id"]: m for m in _STRENGTH_REGIONS}
+    ordered = [(meta_by_id[p["region"]], p) for p in ss.split(regions)]
     bar = "".join(
-        f'<i style="width:{r.contribution_pct:.1f}%;background:{m["colour"]}"></i>'
-        for m, r in ordered
+        f'<i style="width:{p["pct"]:.1f}%;background:{m["colour"]}"></i>'
+        for m, p in ordered
     )
     key = "".join(
         f'<span><b style="background:{m["colour"]}"></b>{m["name"]} '
-        f'{r.contribution_points:.1f} pts · {r.contribution_pct:.1f}%</span>'
-        for m, r in ordered
+        f'{p["points"]:.1f} pts · {p["pct"]:.1f}%</span>'
+        for m, p in ordered
     )
     return f'<div class="sb-splitbar">{bar}</div><div class="sb-splitkey">{key}</div>'
 
@@ -762,10 +726,10 @@ def _render_strength_detail() -> None:
     )
     with head_r:
         chosen = st.selectbox(
-            "Progress metric", list(_STRENGTH_METRICS), key="strength_metric",
+            "Progress metric", list(ss.METRICS), key="strength_metric",
             label_visibility="collapsed",
         )
-    metric = _STRENGTH_METRICS[chosen]
+    metric = ss.METRICS[chosen]
     is_score = metric["key"] == "score"
 
     sub_l, sub_r = st.columns([2, 1])
@@ -779,22 +743,11 @@ def _render_strength_detail() -> None:
         unsafe_allow_html=True,
     )
 
-    if is_score:
-        points = data["score_series"]
-        current = points[-1]["level"] if points else None
-        previous = points[-2]["level"] if len(points) > 1 else None
-        labels = (data["week_labels"][-1], data["week_labels"][-2])
-        chart = _score_chart_svg(points, accent)
-    else:
-        series = data["tonnage"]
-        current = series[-1].value(metric["key"]).kg if series else None
-        previous = series[-2].value(metric["key"]).kg if len(series) > 1 else None
-        labels = (data["week_labels"][-1], data["week_labels"][-2])
-        chart = _tonnage_chart_svg(series, metric["key"], metric["colour"], chosen)
-
+    chart = (_score_chart_svg(data["score_series"], accent) if is_score
+             else _tonnage_chart_svg(data["tonnage"], metric["key"],
+                                     _STRENGTH_COLOURS[chosen], chosen))
     st.markdown(
-        _strength_readout_html(current, previous, labels, metric["unit"], is_score,
-                               data["today"].year),
+        _strength_readout_html(ss.readout(data, chosen), data["today"].year),
         unsafe_allow_html=True,
     )
     st.markdown(f'<div class="sb-chartbox">{chart}</div>', unsafe_allow_html=True)
@@ -2109,73 +2062,18 @@ def _metabolism_screen_data() -> dict:
 
 @st.cache_data(ttl=1800, show_spinner=False)
 def _strength_screen_data() -> dict:
-    """Everything the Strength screen renders, from one unwindowed read.
-
-    `get_all_training_exercises_raw()` is the only source with per-set reps and
-    weight — `get_recent_sessions()` parses the Sets JSON and then keeps only
-    `actual_sets` and `total_volume_kg`, so an estimated 1RM cannot be built
-    from it, and neither can the loaded/unloaded split tonnage eligibility
-    needs.
-
-    Falls back to an empty log on a repository error rather than crashing the
-    page — the muscle-imbalance findings still render, since they read the
-    clinical profile rather than the network. Same spirit as
-    Repository.run_home_syncs' per-step (ok, error) contract."""
-    # A failure must not render as "you have never trained". The two are
-    # indistinguishable once the log is empty — overall 50.0, three regions at
-    # 50.0, every tonnage week zero — and only one of them is a real reading.
-    load_error: str | None = None
-    try:
-        rows = repo.get_repository().get_all_training_exercises_raw()
-    except Exception as exc:
-        rows, load_error = [], f"{type(exc).__name__}: {exc}"
-
-    today = date.today()
-    movement_weights = {
-        name: weight
-        for name, (_category, weight) in training_constants.EXERCISE_MOVEMENT_WEIGHT.items()
-    }
-
-    # One call, so the headline IS the chart's current level and each region
-    # leaves calibration on its own confidence (WP-15, 2026-10-13).
-    snapshot = strength_svc.screen(
-        rows,
-        strength_baselines.PEAKS_2025,
-        training_constants.EXERCISE_BODY_REGION,
-        movement_weights,
-        strength_baselines.REGION_PRIOR,
-        strength_baselines.PR_RIR,
-        strength_baselines.ANCHOR_DATE,
-        strength_baselines.ANCHOR_VALUE,
-        today=today,
-        weeks=_STRENGTH_WEEKS,
-        hold_baselines=strength_baselines.HOLD_BASELINES_2025,
-    )
-    series, unmapped = tonnage_svc.weekly_tonnage(
-        rows, training_constants.EXERCISE_BODY_REGION, today=today, weeks=_STRENGTH_WEEKS,
-    )
-    score_points = snapshot["score_series"]
-    labels = [
-        w.week_start.strftime("%-d %b") if os.name != "nt"
-        else w.week_start.strftime("%d %b").lstrip("0")
-        for w in series
-    ]
-    imbalances = patient_profile.PROFILE.get("imbalances", {})
-    return {
-        "today":           today,
-        "load_error":      load_error,
-        "overall":         snapshot["overall"],
-        "calibrating":     snapshot["calibrating"],
-        "regions":         snapshot["regions"],
-        "core_hold":       snapshot["core_hold"],
-        "exercises":       snapshot["exercises"],
-        "tonnage":         series,
-        "unmapped":        sorted(unmapped),
-        "score_series":    score_points,
-        "week_labels":     labels,
-        "imbalances":      imbalances,
-        "imbalance_count": bioage.muscle_imbalance_count(imbalances),
-    }
+    """Everything the Strength screen renders (services/strength_screen.read_data:
+    one unwindowed read of the training log). A failed read is carried as
+    load_error, never shown as "you have never trained"."""
+    return ss.read_data(repo.get_repository(), date.today(), {
+        "peaks": strength_baselines.PEAKS_2025,
+        "region_prior": strength_baselines.REGION_PRIOR,
+        "pr_rir": strength_baselines.PR_RIR,
+        "anchor_date": strength_baselines.ANCHOR_DATE,
+        "anchor_value": strength_baselines.ANCHOR_VALUE,
+        "hold_baselines": strength_baselines.HOLD_BASELINES_2025,
+        "imbalances": patient_profile.PROFILE.get("imbalances", {}),
+    })
 
 
 # ─────────────────────────────────────────────────────────────────────────────
