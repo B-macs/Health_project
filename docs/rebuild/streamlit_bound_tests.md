@@ -19,6 +19,7 @@ approves. Found 2026-10-07 by an import scan of `tests/`.
 - `tests/test_strain_screen.py` — the strain screen
 - `tests/test_strength_screen.py` — the strength screen
 - `tests/test_training_guided_flow_fragment.py` — the guided training flow
+- `tests/test_training_save_view.py` — the Training page's own save, run in Streamlit's test runtime (added 2026-10-19)
 - `tests/test_core_hold_score.py::test_core_s_card_shows_the_hold_time_marked_provisional` — ONE test (added 2026-10-16): it renders the strength card with views/insights.py; the rest of the file is engine-only and stays in the engine run
 
 ## Tests that only READ the screen files as text
