@@ -50,6 +50,9 @@ class HomeReads:
     au_rows: list = field(default_factory=list)
     metrics_history: list = field(default_factory=list)
     wake_adjustments: dict = field(default_factory=dict)
+    #: Where each night's correction comes from (fusion or manual): the wake
+    #: stepper offers a change only where the manual value would count (F5).
+    wake_sources: dict = field(default_factory=dict)
     hr_rows: list = field(default_factory=list)
     stage: int | None = None
 
@@ -75,7 +78,7 @@ def read_home(repo, day: date) -> HomeReads:
     except Exception:
         pass
     try:
-        reads.wake_adjustments, _sources = repo.get_effective_wake_adjustments(
+        reads.wake_adjustments, reads.wake_sources = repo.get_effective_wake_adjustments(
             start=start, end=day.isoformat())
     except Exception:
         pass
@@ -206,3 +209,112 @@ def readiness_contributors_caption(trend: float | None, breakdown: dict) -> str:
         dash.readiness_coverage_caption(breakdown),
         dash.readiness_alcohol_caption(breakdown),
     ) if c)
+
+
+# ─── The three cards, composed (rebuild Phase 2, milestone 5) ────────────────
+
+def date_label(day: date, caller_today: date) -> str:
+    """The date bar's words: "TODAY", or the day's ISO date."""
+    return "TODAY" if day == caller_today else day.isoformat()
+
+
+def score_pair(daily: float | None, trend: float | None) -> tuple[tuple[str, str], tuple[str, str]]:
+    """The readiness card's two figures, EACH TITLED, ALWAYS: "--" where one
+    does not exist yet (athlete, 2026-08-25: "Rather always see both labeled
+    even when blank"). Rounded, where the band's own figure truncates
+    (dashboard.readiness_meta); the pair is what the card shows."""
+    def fmt(value: float | None) -> str:
+        return "--" if value is None else f"{float(value):.0f}"
+    return ("DAILY", fmt(daily)), ("TREND", fmt(trend))
+
+
+def _verdict_out(v) -> dict | None:
+    if v is None:
+        return None
+    return {"badge": v.badge, "tone": v.tone, "banner_kind": v.banner_kind,
+            "banner_text": v.banner_text, "cause": v.cause, "hrv_note": v.hrv_note,
+            "reduced": v.reduced, "has_something_to_say": v.has_something_to_say}
+
+
+def cards(repo, requested: date | None, caller_today: date) -> dict:
+    """Home's three cards for the day asked for (never after the caller's
+    today), composed as the Streamlit Home page composes them: the reads
+    ending on that day, the snapshot, the DAILY readiness from one set of
+    rows (the engine's own on today, F6), each card's band words, and the
+    verdict on today only. What the phone's Today screen shows."""
+    from services import decision        # here: the heavier module, read on demand
+    from services import strain_screen
+
+    day, before, after = day_bounds(requested, caller_today)
+    reads = read_home(repo, day)
+    snap = snapshot(reads)
+    is_today = day == caller_today
+    trend = snap["readiness_score"]
+    try:
+        engine_rows = decision.readiness_rows(repo, day) if is_today else None
+        daily, _breakdown = readiness_daily(
+            day, readiness_rows_for(day, caller_today, engine_rows, reads.bio_rows))
+    except Exception:
+        daily = None
+    headline = readiness_card(daily, trend)
+    r_col, _r_disp, r_lbl, r_hdr, r_desc, r_tert = dash.readiness_meta(headline)
+    verdict_out = None
+    if verdict_is_due(day, caller_today):
+        try:
+            verdict_out = _verdict_out(decision.day_verdict(
+                repo, day, readiness_display=trend, readiness_band=r_lbl))
+        except Exception:
+            verdict_out = None
+    s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(
+        snap["strain"], is_rolling=snap["strain_is_rolling"])
+    if snap["strain_unscored_reason"]:
+        # Not "no workload logged": the load may well be there, the stage is not.
+        s_hdr, s_desc = "Not scored", snap["strain_unscored_reason"]
+    label = date_label(day, caller_today)
+    strain_card_label, _detail = strain_screen.strain_labels(bool(snap["strain_is_rolling"]), label)
+    sl_col, sl_disp, sl_lbl, sl_hdr, sl_desc = dash.sleep_meta(
+        snap["sleep_score"], snap["sleep_need_hours"], snap["sleep_base_window"])
+    return {
+        "date": day, "previous": before, "next": after, "is_today": is_today,
+        "date_label": label, "bio_failed": reads.bio_failed,
+        # No single "display" figure for readiness: the card shows the pair.
+        "readiness": {"daily": daily, "trend": trend, "headline": headline,
+                      "pair": [{"title": t_, "value": v_} for t_, v_ in score_pair(daily, trend)],
+                      "colour": r_col, "label": r_lbl, "header": r_hdr,
+                      "description": r_desc, "tertiary": r_tert,
+                      "scale": SCALES["readiness"]},
+        "strain": {"value": snap["strain"], "display": s_disp,
+                   "is_rolling": bool(snap["strain_is_rolling"]),
+                   "card_label": strain_card_label, "colour": s_col, "label": s_lbl,
+                   "header": s_hdr, "description": s_desc,
+                   "unscored_reason": snap["strain_unscored_reason"],
+                   "scale": SCALES["strain"]},
+        "sleep": {"score": snap["sleep_score"], "display": sl_disp,
+                  "need_hours": snap["sleep_need_hours"],
+                  "base_window": snap["sleep_base_window"], "colour": sl_col,
+                  "label": sl_lbl, "header": sl_hdr, "description": sl_desc,
+                  "scale": SCALES["sleep"]},
+        "verdict": verdict_out,
+        "hrv_7d": dash.fill_7day(reads.bio_rows, "hrv_ms", day),
+        "rhr_7d": dash.fill_7day(reads.bio_rows, "resting_heart_rate", day),
+    }
+
+
+def readiness_figures(repo, day: date, caller_today: date) -> dict:
+    """The readiness card's figures alone, for GET /api/readiness: DAILY from
+    one set of rows (the engine's 14 on the caller's today, else the 60
+    ending on `day`), TREND over the 60 ending on `day`, and the headline.
+    Not clamped to the caller's today: a later day has no reading, and says
+    so. Each window ends on `day` (F8), where Phase 0's route counted a past
+    day's 60 rows back from the caller's today."""
+    from services import decision
+
+    rows_60 = [asdict(r) for r in repo.get_biometric_rolling(days=BIO_DAYS, today=day)]
+    engine_rows = decision.readiness_rows(repo, day) if day == caller_today else None
+    daily, _breakdown = readiness_daily(
+        day, readiness_rows_for(day, caller_today, engine_rows, rows_60))
+    trend = readiness.compute_readiness_trend(day, rows_60)
+    trend = None if trend == readiness.NOT_COMPUTED else float(trend)
+    return {"daily": daily, "trend": trend, "headline": readiness_card(daily, trend),
+            "window_days": (decision.READINESS_WINDOW_DAYS if engine_rows is not None
+                            else BIO_DAYS)}

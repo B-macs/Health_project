@@ -7,6 +7,7 @@ import math
 import streamlit as st
 
 from services import dashboard as _dash
+from services import sleep_screen as _sleep_screen
 
 # ─── Colour palettes ───────────────────────────────────────────────────────────
 
@@ -538,12 +539,12 @@ def plot_y_fraction(value, lo, hi, height: int = 0, pad: int = PLOT_PAD) -> floa
 #  reading a normal part of every night as a fault. Cream separates "awake"
 #  from "problem".
 
+_STAGE_COLOURS: dict[str, str] = {
+    "1": "#1E4D7B", "2": "#3C8FD4", "3": "#8FCDF0", "4": "#EFE9DD", "0": "#2A2E37",
+}
+# The names are services/sleep_screen.py's, the one table the API reads too.
 STAGE_BAND: dict[str, tuple[str, str]] = {
-    "1": ("#1E4D7B", "Deep"),
-    "2": ("#3C8FD4", "Light"),
-    "3": ("#8FCDF0", "REM"),
-    "4": ("#EFE9DD", "Awake"),
-    "0": ("#2A2E37", "No data"),
+    code: (colour, _sleep_screen.STAGE_NAMES[code]) for code, colour in _STAGE_COLOURS.items()
 }
 # Awake on top descending to deep — the vertical order a clinical hypnogram
 # uses, so the shape reads the way a sleep chart is expected to.
@@ -624,9 +625,7 @@ def stage_legend_html() -> str:
 #  scale movement actually is. Opacity encodes magnitude, which is what an
 #  ordinal 1-4 class means.
 MOVEMENT_HUE = "#8FCDF0"
-MOVEMENT_LABELS: dict[str, str] = {
-    "1": "No motion", "2": "Restless", "3": "Tossing", "4": "Active",
-}
+MOVEMENT_LABELS: dict[str, str] = dict(_sleep_screen.MOVEMENT_NAMES)
 MOVEMENT_OPACITY: dict[str, float] = {"1": 0.16, "2": 0.42, "3": 0.72, "4": 1.0}
 
 

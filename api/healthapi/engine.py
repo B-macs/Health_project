@@ -14,12 +14,14 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from services import datastore
+from services.background_sync import BackgroundSyncRunner
 from services.config import Config
 from services.repository import Repository
 
@@ -34,9 +36,11 @@ class EngineState:
     started_at: datetime | None = None
     cache_rebuilt: bool | None = None
     timings: dict[str, float] = field(default_factory=dict)
+    runner: BackgroundSyncRunner | None = None
 
 
 STATE = EngineState()
+_RUNNER_LOCK = threading.Lock()
 
 
 def startup(import_seconds: float | None = None) -> None:
@@ -59,6 +63,18 @@ def new_repository() -> Repository:
     if STATE.config is None:
         raise RuntimeError("engine not started")
     return Repository(STATE.config)
+
+
+def sync_runner() -> BackgroundSyncRunner:
+    """The engine's one sync runner. Its lock keeps the daily sync and a
+    manual sync from overlapping (Key Rule 16), and it builds its own
+    Repository for every run (Key Rule 12)."""
+    with _RUNNER_LOCK:
+        if STATE.runner is None:
+            if STATE.config is None:
+                raise RuntimeError("engine not started")
+            STATE.runner = BackgroundSyncRunner(STATE.config)
+        return STATE.runner
 
 
 def cache_info() -> dict:

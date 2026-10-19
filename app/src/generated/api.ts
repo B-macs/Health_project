@@ -38,10 +38,139 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/sleep/wake-adjustment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Put Wake Adjustment */
+        put: operations["put_wake_adjustment_api_sleep_wake_adjustment_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Status */
+        get: operations["get_status_api_status_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Post Sync */
+        post: operations["post_sync_api_sync_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/today": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Today */
+        get: operations["get_today_api_today_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/today/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Readiness Detail */
+        get: operations["get_readiness_detail_api_today_readiness_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/today/sleep": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Sleep Detail */
+        get: operations["get_sleep_detail_api_today_sleep_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/today/strain": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Strain Detail */
+        get: operations["get_strain_detail_api_today_strain_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * AxisTick
+         * @description `at` is the fraction across (an X tick) or down from the top (a Y tick).
+         */
+        AxisTick: {
+            /** At */
+            at: number;
+            /** Text */
+            text: string;
+        };
         /** BuildInfo */
         BuildInfo: {
             /** Built */
@@ -59,6 +188,34 @@ export interface components {
             exists: boolean;
             /** Mode */
             mode: string;
+        };
+        /** ContributorRow */
+        ContributorRow: {
+            /** Bar Pct */
+            bar_pct: number;
+            /** Colour */
+            colour: string;
+            /** Key */
+            key?: string | null;
+            /** Label */
+            label: string;
+            /** Scored */
+            scored: boolean;
+            /** Value Display */
+            value_display: string;
+            /** Weight Display */
+            weight_display?: string | null;
+        };
+        /** Contributors */
+        Contributors: {
+            /** Caption */
+            caption: string;
+            /** Rows */
+            rows: components["schemas"]["ContributorRow"][];
+            /** Scored */
+            scored: boolean;
+            /** Unscored Reason */
+            unscored_reason: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -93,6 +250,153 @@ export interface components {
             };
         };
         /**
+         * Hypnogram
+         * @description The stage strip and the movement strip on one clock. `note` is what the
+         *     source line says: "phantom", "watch" or "plain".
+         */
+        Hypnogram: {
+            /** Empty */
+            empty: boolean;
+            /** Minutes */
+            minutes: number | null;
+            movement: components["schemas"]["MovementStrip"] | null;
+            /** Note */
+            note: string;
+            /** Phantom Minutes */
+            phantom_minutes: number | null;
+            /** Source */
+            source: string;
+            stages: components["schemas"]["Strip"] | null;
+            /** Start */
+            start: string | null;
+            /** Title */
+            title: string;
+            /** X Labels */
+            x_labels: components["schemas"]["AxisTick"][];
+        };
+        /** LabelValue */
+        LabelValue: {
+            /** Label */
+            label: string;
+            /** Value */
+            value: string;
+        };
+        /** Masthead */
+        Masthead: {
+            /** Colour */
+            colour: string;
+            /** Display */
+            display: string;
+            /** Label */
+            label: string;
+        };
+        /** MovementStrip */
+        MovementStrip: {
+            /** Bands */
+            bands: components["schemas"]["TapBand"][];
+            /** Codes */
+            codes: string;
+            /** Details */
+            details: string[];
+            /** Runs */
+            runs: components["schemas"]["StripRun"][];
+            /** Title */
+            title: string;
+        };
+        /** NapRow */
+        NapRow: {
+            /** Duration */
+            duration: string;
+            /** Efficiency */
+            efficiency: string;
+            /** Label */
+            label: string;
+        };
+        /** Naps */
+        Naps: {
+            /** Count */
+            count: number;
+            /** Day Total */
+            day_total: string;
+            /** Nap Total */
+            nap_total: string;
+            /** Night Total */
+            night_total: string;
+            /** Rows */
+            rows: components["schemas"]["NapRow"][];
+        };
+        /**
+         * Notice
+         * @description A sync notice: level "error" or "caption"; the phone holds each code's words.
+         */
+        Notice: {
+            /** Code */
+            code: string;
+            /** Level */
+            level: string;
+        };
+        /**
+         * OuraStatus
+         * @description The Oura login's state. Never a token.
+         */
+        OuraStatus: {
+            /** Expires At */
+            expires_at: string | null;
+            /** Kind */
+            kind: string | null;
+            /** Needs Authorisation */
+            needs_authorisation: boolean | null;
+            /** Oauth Configured */
+            oauth_configured: boolean | null;
+            /** Seconds Remaining */
+            seconds_remaining: number | null;
+            /** State */
+            state: string | null;
+        };
+        /** OvernightPanel */
+        OvernightPanel: {
+            /** Average */
+            average: number | null;
+            axis: components["schemas"]["ValueAxis"];
+            /** Bands */
+            bands: components["schemas"]["TapBand"][];
+            /** Headline */
+            headline: number;
+            /** Key */
+            key: string;
+            /** Secondary */
+            secondary: number;
+            /** Secondary Label */
+            secondary_label: string;
+            /** Title */
+            title: string;
+            /** Unit */
+            unit: string;
+            /** Values */
+            values: (number | null)[];
+            /** X Labels */
+            x_labels: components["schemas"]["AxisTick"][];
+            /** Y Labels */
+            y_labels: components["schemas"]["AxisTick"][];
+        };
+        /**
+         * PointDetail
+         * @description What one tapped point of a chart says about itself.
+         */
+        PointDetail: {
+            /**
+             * Extra
+             * @default []
+             */
+            extra: components["schemas"]["LabelValue"][];
+            /** Open Date */
+            open_date?: string | null;
+            /** Rows */
+            rows: components["schemas"]["LabelValue"][];
+            /** Title */
+            title: string;
+        };
+        /**
          * ReadinessBand
          * @description The words services/dashboard.readiness_meta gives a score. The phone
          *     shows them; it never maps a number to a band itself.
@@ -104,6 +408,61 @@ export interface components {
             header: string;
             /** Label */
             label: string;
+        };
+        /** ReadinessCardOut */
+        ReadinessCardOut: {
+            /** Colour */
+            colour: string;
+            /** Daily */
+            daily: number | null;
+            /** Description */
+            description: string;
+            /** Header */
+            header: string;
+            /** Headline */
+            headline: number | null;
+            /** Label */
+            label: string;
+            /** Pair */
+            pair: components["schemas"]["TitledValue"][];
+            /** Scale */
+            scale: number;
+            /** Tertiary */
+            tertiary: string;
+            /** Trend */
+            trend: number | null;
+        };
+        /** ReadinessDetailOut */
+        ReadinessDetailOut: {
+            /** Bio Failed */
+            bio_failed: boolean;
+            contributors: components["schemas"]["Contributors"];
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Date Label */
+            date_label: string;
+            /** Is Today */
+            is_today: boolean;
+            /** Key Metrics */
+            key_metrics: components["schemas"]["LabelValue"][];
+            masthead: components["schemas"]["Masthead"];
+            /** Next */
+            next: string | null;
+            /** Overnight */
+            overnight: components["schemas"]["OvernightPanel"][];
+            /**
+             * Previous
+             * Format: date
+             */
+            previous: string;
+            /** Screen Title */
+            screen_title: string;
+            /** Title */
+            title: string;
+            trend: components["schemas"]["TrendChart"];
         };
         /** ReadinessOut */
         ReadinessOut: {
@@ -124,6 +483,414 @@ export interface components {
             /** Window Days */
             window_days: number;
         };
+        /** RegionAcwr */
+        RegionAcwr: {
+            /** Colour */
+            colour: string;
+            /** Diagnostic */
+            diagnostic: boolean;
+            /** Reason */
+            reason: string;
+            /** Value */
+            value: string;
+        };
+        /**
+         * RegionPanel
+         * @description Where the load landed. state "empty" carries `reason` ("rolling" or
+         *     "no_split") and the unmapped names; state "split" carries the rest.
+         */
+        RegionPanel: {
+            /** Can Show Window */
+            can_show_window: boolean;
+            /** Ceiling */
+            ceiling?: number | null;
+            /** Mapped Only */
+            mapped_only?: boolean | null;
+            /** Non Additive Note */
+            non_additive_note?: string | null;
+            /** Overall */
+            overall?: number | null;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Regions
+             * @default []
+             */
+            regions: components["schemas"]["RegionRow"][];
+            /** Regions Total */
+            regions_total?: number | null;
+            /** Shares Basis */
+            shares_basis?: string | null;
+            /** Shares Version */
+            shares_version?: number | null;
+            /** Showing Week */
+            showing_week: boolean;
+            /** Stage */
+            stage?: number | null;
+            /** State */
+            state: string;
+            /** Thin Sample Pct */
+            thin_sample_pct?: number | null;
+            /** Tick Pct */
+            tick_pct?: number | null;
+            /** Unattributed Pct */
+            unattributed_pct?: number | null;
+            /** Unmapped Names */
+            unmapped_names: string[];
+            /** Week */
+            week?: boolean | null;
+            /** Window Days */
+            window_days?: number | null;
+        };
+        /** RegionRow */
+        RegionRow: {
+            acwr: components["schemas"]["RegionAcwr"] | null;
+            /** Au */
+            au: number | null;
+            /** Au Pct */
+            au_pct: number;
+            /** Colour */
+            colour: string;
+            /** Fill Pct */
+            fill_pct: number | null;
+            /** Id */
+            id: string;
+            /** Name */
+            name: string;
+            /** Short */
+            short: string;
+            /** Strain */
+            strain: number | null;
+        };
+        /** SleepCardOut */
+        SleepCardOut: {
+            /** Base Window */
+            base_window: number | null;
+            /** Colour */
+            colour: string;
+            /** Description */
+            description: string;
+            /** Display */
+            display: string;
+            /** Header */
+            header: string;
+            /** Label */
+            label: string;
+            /** Need Hours */
+            need_hours: number;
+            /** Scale */
+            scale: number;
+            /** Score */
+            score: number | null;
+        };
+        /** SleepDebt */
+        SleepDebt: {
+            /** Band */
+            band: string;
+            /** Colour */
+            colour: string;
+            /** Filled */
+            filled: number;
+            /** Hours */
+            hours: number;
+            /** Threshold */
+            threshold: number;
+            /** Value Display */
+            value_display: string;
+        };
+        /** SleepDetailOut */
+        SleepDetailOut: {
+            /** Adjusted */
+            adjusted: boolean;
+            /** Bio Failed */
+            bio_failed: boolean;
+            contributors: components["schemas"]["Contributors"];
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Date Label */
+            date_label: string;
+            /** Is Today */
+            is_today: boolean;
+            masthead: components["schemas"]["Masthead"];
+            /** Mode */
+            mode: string;
+            /** Next */
+            next: string | null;
+            night: components["schemas"]["SleepNight"] | null;
+            /** Nights Adjusted */
+            nights_adjusted: number;
+            /**
+             * Previous
+             * Format: date
+             */
+            previous: string;
+            /** Screen Title */
+            screen_title: string;
+            /** Title */
+            title: string;
+            trend: components["schemas"]["TrendChart"];
+            wake: components["schemas"]["WakeControl"] | null;
+            watch_only: components["schemas"]["WatchOnlyNight"] | null;
+        };
+        /** SleepNight */
+        SleepNight: {
+            /** Asleep */
+            asleep: string;
+            debt: components["schemas"]["SleepDebt"] | null;
+            /** Fusion Caption */
+            fusion_caption: string;
+            hypnogram: components["schemas"]["Hypnogram"];
+            /** In Bed */
+            in_bed: string;
+            /** Key Metrics */
+            key_metrics: components["schemas"]["LabelValue"][];
+            naps: components["schemas"]["Naps"] | null;
+            /** Overnight */
+            overnight: components["schemas"]["OvernightPanel"][];
+            /** Stages */
+            stages: components["schemas"]["StageRow"][];
+            /** Vitals */
+            vitals: components["schemas"]["LabelValue"][];
+        };
+        /** StageRow */
+        StageRow: {
+            /** Code */
+            code: string;
+            /** Duration */
+            duration: string;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Pct */
+            pct: string;
+        };
+        /** StatusOut */
+        StatusOut: {
+            /** Datastore Built At */
+            datastore_built_at: string | null;
+            last_sync: components["schemas"]["SyncRun"] | null;
+            /** Notices */
+            notices: components["schemas"]["Notice"][];
+            /** Offline */
+            offline: boolean;
+            oura: components["schemas"]["OuraStatus"] | null;
+            /** Sync Due */
+            sync_due: string | null;
+            /** Writer */
+            writer: string | null;
+        };
+        /** StrainBlend */
+        StrainBlend: {
+            /** Hr Strain */
+            hr_strain: number;
+            /** Hr Weight Pct */
+            hr_weight_pct: number;
+            /** Rpe Strain */
+            rpe_strain: number;
+        };
+        /** StrainCardOut */
+        StrainCardOut: {
+            /** Card Label */
+            card_label: string;
+            /** Colour */
+            colour: string;
+            /** Description */
+            description: string;
+            /** Display */
+            display: string;
+            /** Header */
+            header: string;
+            /** Is Rolling */
+            is_rolling: boolean;
+            /** Label */
+            label: string;
+            /** Scale */
+            scale: number;
+            /** Unscored Reason */
+            unscored_reason: string;
+            /** Value */
+            value: number | null;
+        };
+        /** StrainDetailOut */
+        StrainDetailOut: {
+            /** Bio Failed */
+            bio_failed: boolean;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Date Label */
+            date_label: string;
+            hrv_7d: components["schemas"]["TrendChart"];
+            /** Is Rolling */
+            is_rolling: boolean;
+            /** Is Today */
+            is_today: boolean;
+            masthead: components["schemas"]["Masthead"];
+            /** Next */
+            next: string | null;
+            /**
+             * Previous
+             * Format: date
+             */
+            previous: string;
+            region: components["schemas"]["RegionPanel"] | null;
+            rhr_7d: components["schemas"]["TrendChart"];
+            /** Screen Title */
+            screen_title: string;
+            source: components["schemas"]["StrainSource"] | null;
+            /** Stage Unread */
+            stage_unread: string;
+            /** Title */
+            title: string;
+            trend: components["schemas"]["TrendChart"];
+        };
+        /** StrainSource */
+        StrainSource: {
+            blend: components["schemas"]["StrainBlend"] | null;
+            /** Hr Rows */
+            hr_rows: components["schemas"]["LabelValue"][];
+            /** Kind */
+            kind: string;
+            /** Label */
+            label: string;
+        };
+        /** Strip */
+        Strip: {
+            /** Bands */
+            bands: components["schemas"]["TapBand"][];
+            /** Codes */
+            codes: string;
+            /** Runs */
+            runs: components["schemas"]["StripRun"][];
+        };
+        /** StripRun */
+        StripRun: {
+            /** Code */
+            code: string;
+            /** End */
+            end: number;
+            /** Name */
+            name: string;
+            /** Start */
+            start: number;
+        };
+        /** SyncIn */
+        SyncIn: {
+            /**
+             * Force
+             * @default false
+             */
+            force: boolean;
+        };
+        /** SyncOut */
+        SyncOut: {
+            /** Ran */
+            ran: boolean;
+            /** Reason */
+            reason: string | null;
+            status: components["schemas"]["SyncRun"];
+        };
+        /**
+         * SyncRun
+         * @description The engine's last sync run: each step's (ok, error).
+         */
+        SyncRun: {
+            /** At */
+            at: string | null;
+            /** Day */
+            day: string | null;
+            /** Error */
+            error: string | null;
+            /** Results */
+            results: {
+                [key: string]: [
+                    boolean,
+                    string | null
+                ];
+            };
+        };
+        /**
+         * TapBand
+         * @description A tappable band over a chart or strip, with the detail of the reading
+         *     (or the run) at its centre.
+         */
+        TapBand: {
+            detail: components["schemas"]["PointDetail"] | null;
+            /** Index */
+            index: number;
+            /** Left */
+            left: number;
+            /** Width */
+            width: number;
+        };
+        /** TitledValue */
+        TitledValue: {
+            /** Title */
+            title: string;
+            /** Value */
+            value: string;
+        };
+        /** TodayOut */
+        TodayOut: {
+            /** Bio Failed */
+            bio_failed: boolean;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Date Label */
+            date_label: string;
+            /** Hrv 7D */
+            hrv_7d: (number | null)[];
+            /** Is Today */
+            is_today: boolean;
+            /** Next */
+            next: string | null;
+            /**
+             * Previous
+             * Format: date
+             */
+            previous: string;
+            readiness: components["schemas"]["ReadinessCardOut"];
+            /** Rhr 7D */
+            rhr_7d: (number | null)[];
+            sleep: components["schemas"]["SleepCardOut"];
+            strain: components["schemas"]["StrainCardOut"];
+            verdict: components["schemas"]["VerdictOut"] | null;
+        };
+        /** TrendChart */
+        TrendChart: {
+            axis: components["schemas"]["ValueAxis"] | null;
+            /** Dates */
+            dates: string[];
+            /** Decimals */
+            decimals: number;
+            /** Empty */
+            empty: boolean;
+            /** Headline */
+            headline: string;
+            /** Points */
+            points: (components["schemas"]["PointDetail"] | null)[];
+            /** Subtitle */
+            subtitle: string;
+            /** Title */
+            title: string;
+            /** Unit */
+            unit: string;
+            /** Values */
+            values: (number | null)[];
+            /** X Labels */
+            x_labels: components["schemas"]["AxisTick"][];
+            /** Y Labels */
+            y_labels: components["schemas"]["AxisTick"][];
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -136,6 +903,91 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** ValueAxis */
+        ValueAxis: {
+            /** Hi */
+            hi: number;
+            /** Lo */
+            lo: number;
+            /** Step */
+            step: number;
+            /** Ticks */
+            ticks: number[];
+        };
+        /**
+         * VerdictOut
+         * @description Today's training decision, as Home and Training both show it.
+         */
+        VerdictOut: {
+            /** Badge */
+            badge: string;
+            /** Banner Kind */
+            banner_kind: string;
+            /** Banner Text */
+            banner_text: string;
+            /** Cause */
+            cause: string;
+            /** Has Something To Say */
+            has_something_to_say: boolean;
+            /** Hrv Note */
+            hrv_note: string;
+            /** Reduced */
+            reduced: boolean;
+            /** Tone */
+            tone: string;
+        };
+        /** WakeAdjustmentIn */
+        WakeAdjustmentIn: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Minutes */
+            minutes: number;
+        };
+        /**
+         * WakeControl
+         * @description The wake-time correction (Key Rule 4's one manual correction). The −
+         *     and + buttons send `decrease_to` and `increase_to`.
+         */
+        WakeControl: {
+            /** Caption */
+            caption: string;
+            /** Decrease To */
+            decrease_to: number;
+            /** Editable */
+            editable: boolean;
+            /** Increase To */
+            increase_to: number;
+            /** Label */
+            label: string;
+            /** Minutes */
+            minutes: number;
+            /** Source */
+            source: string;
+        };
+        /** WatchOnlyNight */
+        WatchOnlyNight: {
+            hypnogram: components["schemas"]["Hypnogram"];
+            /** Stages */
+            stages: components["schemas"]["WatchStage"][];
+        };
+        /** WatchStage */
+        WatchStage: {
+            /** Code */
+            code: string;
+            /** Duration */
+            duration: string;
+            /** Minutes */
+            minutes: number;
+            /** Name */
+            name: string;
+            /** Pct */
+            pct: number | null;
+            /** Stage */
+            stage: string;
         };
     };
     responses: never;
@@ -198,6 +1050,247 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReadinessOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_wake_adjustment_api_sleep_wake_adjustment_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WakeAdjustmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WakeControl"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_status_api_status_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StatusOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_sync_api_sync_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["SyncIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_today_api_today_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_readiness_detail_api_today_readiness_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sleep_detail_api_today_sleep_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SleepDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_strain_detail_api_today_strain_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+                week?: boolean;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrainDetailOut"];
                 };
             };
             /** @description Validation Error */

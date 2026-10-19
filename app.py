@@ -356,7 +356,7 @@ _NAV_BUTTON_CSS = """<style>
 # Never a day after today; the arrows step one day (home.day_bounds).
 selected_date, prev_date, _after = home.day_bounds(selected_date, _today)
 is_today    = (selected_date == _today)
-date_label  = "TODAY" if is_today else selected_date.isoformat()
+date_label  = home.date_label(selected_date, _today)
 next_date   = selected_date + timedelta(days=1)
 can_go_next = _after is not None
 
@@ -466,12 +466,16 @@ def _region_au_history(end_iso: str, days: int = strain_screen.REGION_DAYS) -> d
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _stage_start_cached():
-    """Start date of the active phase — scopes the per-region ACWR's chronic
-    baseline to the current stage, exactly as views/insights.py does for the
-    overall one. None during a reassessment gap, where engine.acwr falls back
-    to the flat 28-day calendar window."""
-    return plan_svc.current_stage_start(repo.get_repository().get_phases(), date.today())
+def _stage_start_cached(end_iso: str):
+    """Start date of the phase active ON THE DAY SHOWN — scopes the per-region
+    ACWR's chronic baseline to that stage, exactly as views/insights.py does
+    for the overall one. None during a reassessment gap, where engine.acwr
+    falls back to the flat 28-day calendar window. As of the day shown, like
+    every other Home read (fault F27, 2026-10-19: it was the phase active on
+    the server's today, so a past day in an earlier block got a stage start
+    after itself)."""
+    return plan_svc.current_stage_start(repo.get_repository().get_phases(),
+                                        date.fromisoformat(end_iso))
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -2057,7 +2061,8 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
             # asked for (strain_screen.region_data).
             _region_data = strain_screen.region_data(
                 _region_au_history(selected_date.isoformat()), _current_stage,
-                selected_date, _stage_start_cached(), _snapshot, _strain_window_week)
+                selected_date, _stage_start_cached(selected_date.isoformat()), _snapshot,
+                _strain_window_week)
         except Exception:
             # A failed read must not take the strain number down with it — the
             # panel states its own absence instead.
@@ -2344,9 +2349,7 @@ r_col, r_disp, r_lbl, r_hdr, r_desc, r_tert = dash.readiness_meta(_r_card)
 # to say. Both go blank together by construction — compute_readiness_trend
 # returns NOT_COMPUTED whenever the date carries no score of its own — so this
 # never shows one figure beside a hole.
-_fmt_r = lambda v: "--" if v is None else f"{float(v):.0f}"
-_r_pair = (("DAILY", _fmt_r(_readiness_today)),
-           ("TREND", _fmt_r(_readiness_score)))
+_r_pair = home.score_pair(_readiness_today, _readiness_score)
 # The SAME verdict object views/training.py renders from — one load_policy call
 # per process, so the two screens cannot describe different days.
 # ⚠ ONLY ON TODAY. The verdict describes today's session; rendering it under

@@ -145,3 +145,16 @@ def test_the_readiness_caption_joins_only_what_has_something_to_say():
     assert home.readiness_contributors_caption(None, {"missing": [], "available_weight": 1.0,
                                                       "alcohol_units": None,
                                                       "components": []}) == ""
+
+
+def test_the_drawing_and_the_api_name_the_stages_from_one_table():
+    """The stage and movement names live in services/sleep_screen.py: the
+    Streamlit strips draw under them and the API's tap details use them, so
+    the two can never name a stage differently. styles.py is read as text
+    (it imports Streamlit)."""
+    from pathlib import Path
+    src = (Path(__file__).resolve().parents[1] / "styles.py").read_text(encoding="utf-8")
+    assert "_sleep_screen.STAGE_NAMES[code]" in src
+    assert "MOVEMENT_LABELS: dict[str, str] = dict(_sleep_screen.MOVEMENT_NAMES)" in src
+    assert ss.STAGE_NAMES == {"1": "Deep", "2": "Light", "3": "REM", "4": "Awake", "0": "No data"}
+    assert ss.MOVEMENT_NAMES == {"1": "No motion", "2": "Restless", "3": "Tossing", "4": "Active"}

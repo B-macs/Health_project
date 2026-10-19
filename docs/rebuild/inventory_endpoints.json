@@ -1,4 +1,414 @@
 {
   "_note": "Rebuild Phase 2: every KEEP or MOVE row of docs/rebuild/screen_inventory.md maps either to an endpoint and the test that covers it ({\"endpoint\": \"GET /api/...\", \"test\": \"tests/api/x.py::test_y\"}) or to the phone alone with its reason ({\"client\": \"phone\", \"why\": \"...\"}, for example a timer's sound or the screen's styling). scripts/rebuild_gate.py p2 counts the rows that have neither (inventory_unmapped). Filled as milestone 5 builds the endpoints.",
-  "rows": {}
+  "rows": {
+    "H1": {
+      "client": "phone",
+      "why": "The phone app's own shell and styling; the Streamlit CSS is not ported."
+    },
+    "H2": {
+      "endpoint": "GET /api/status",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_an_offline_snapshot_is_named_with_its_age"
+      ]
+    },
+    "H4": {
+      "client": "phone",
+      "why": "The phone's own router; an unknown route opens Today. The Streamlit rule stays in services/navigation.py for the Streamlit app."
+    },
+    "H5": {
+      "client": "phone",
+      "why": "The phone's tab bar, drawn by the shell outside every screen, so a failing screen keeps it."
+    },
+    "H6": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_a_past_day_has_no_verdict_and_steps_both_ways",
+        "tests/api/test_api_today.py::test_the_cards_are_the_home_service_for_the_callers_day"
+      ]
+    },
+    "H7": {
+      "client": "phone",
+      "why": "The phone opens on its own date and sends it as X-Local-Date (rebuild rule 3); a picked past day is the phone's own screen state."
+    },
+    "H8": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_a_past_day_has_no_verdict_and_steps_both_ways",
+        "tests/api/test_api_today.py::test_no_day_after_the_callers_day"
+      ]
+    },
+    "H9": {
+      "endpoint": [
+        "GET /api/today/readiness",
+        "GET /api/today/sleep",
+        "GET /api/today/strain"
+      ],
+      "test": [
+        "tests/api/test_api_today_detail.py::test_the_30_day_trend_ends_on_the_day_and_details_every_point"
+      ]
+    },
+    "H10": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_a_past_day_has_no_verdict_and_steps_both_ways"
+      ]
+    },
+    "H11": {
+      "client": "phone",
+      "why": "A button on the phone's Today screen that opens Check-in; no data."
+    },
+    "H12": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_the_cards_are_the_home_service_for_the_callers_day"
+      ]
+    },
+    "H13": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_the_cards_are_the_home_service_for_the_callers_day",
+        "tests/api/test_api_today.py::test_a_past_day_has_no_verdict_and_steps_both_ways"
+      ]
+    },
+    "H14": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_the_cards_are_the_home_service_for_the_callers_day"
+      ]
+    },
+    "H15": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_the_cards_are_the_home_service_for_the_callers_day"
+      ]
+    },
+    "H16": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_an_unreadable_stage_scores_no_strain_and_says_why",
+        "tests/api/test_api_today.py::test_the_cards_are_the_home_service_for_the_callers_day"
+      ]
+    },
+    "H17": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_the_cards_are_the_home_service_for_the_callers_day"
+      ]
+    },
+    "H18": {
+      "client": "phone",
+      "why": "Tapping a card opens its drill-down screen: the phone's navigation."
+    },
+    "H19": {
+      "client": "phone",
+      "why": "Static images bundled with the phone app."
+    },
+    "H20": {
+      "endpoint": "GET /api/today",
+      "test": [
+        "tests/api/test_api_today.py::test_a_failed_biometric_read_says_so"
+      ]
+    },
+    "H21": {
+      "endpoint": "GET /api/status",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_a_dead_login_is_an_error_and_a_failed_step_a_caption",
+        "tests/api/test_api_status_sync.py::test_the_oura_login_is_described_without_a_token"
+      ]
+    },
+    "H22": {
+      "endpoint": "GET /api/status",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_a_dead_login_is_an_error_and_a_failed_step_a_caption"
+      ]
+    },
+    "H23": {
+      "endpoint": "GET /api/status",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_a_dead_login_is_an_error_and_a_failed_step_a_caption"
+      ]
+    },
+    "H24": {
+      "endpoint": "GET /api/status",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_a_chain_that_failed_to_run_says_so"
+      ]
+    },
+    "H25": {
+      "endpoint": "GET /api/today/readiness",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_readiness_detail_is_the_service_for_the_callers_day"
+      ]
+    },
+    "H26": {
+      "endpoint": "GET /api/today/readiness",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_readiness_detail_is_the_service_for_the_callers_day"
+      ]
+    },
+    "H27": {
+      "endpoint": "GET /api/today/readiness",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_readiness_detail_is_the_service_for_the_callers_day"
+      ]
+    },
+    "H28": {
+      "endpoint": "GET /api/today/readiness",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_failed_biometric_read_says_so_in_the_contributors"
+      ]
+    },
+    "H29": {
+      "endpoint": "GET /api/today/readiness",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_readiness_detail_is_the_service_for_the_callers_day"
+      ]
+    },
+    "H30": {
+      "endpoint": [
+        "GET /api/today/readiness",
+        "GET /api/today/sleep"
+      ],
+      "test": [
+        "tests/api/test_api_today_detail.py::test_readiness_detail_is_the_service_for_the_callers_day"
+      ]
+    },
+    "H31": {
+      "endpoint": [
+        "GET /api/today/readiness",
+        "GET /api/today/sleep"
+      ],
+      "test": [
+        "tests/api/test_api_today_detail.py::test_readiness_detail_is_the_service_for_the_callers_day"
+      ]
+    },
+    "H32": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_fused_night_offers_no_stepper_and_says_why"
+      ]
+    },
+    "H33": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper"
+      ]
+    },
+    "H34": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_no_score_means_no_night_panels_and_no_stepper"
+      ]
+    },
+    "H35": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_no_score_means_no_night_panels_and_no_stepper"
+      ]
+    },
+    "H36": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_watch_only_night_says_it_has_no_score_and_shows_the_watch"
+      ]
+    },
+    "H37": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_failed_night_read_says_so_rather_than_showing_nothing"
+      ]
+    },
+    "H38": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper",
+        "tests/api/test_api_today_detail.py::test_a_fused_night_offers_no_stepper_and_says_why"
+      ]
+    },
+    "H39": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper"
+      ]
+    },
+    "H40": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper"
+      ]
+    },
+    "H41": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper",
+        "tests/api/test_api_today_detail.py::test_a_fused_night_offers_no_stepper_and_says_why"
+      ]
+    },
+    "H42": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_fused_night_offers_no_stepper_and_says_why"
+      ]
+    },
+    "H43": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper"
+      ]
+    },
+    "H44": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_naps_carry_the_day_total"
+      ]
+    },
+    "H45": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper"
+      ]
+    },
+    "H46": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_fused_night_offers_no_stepper_and_says_why"
+      ]
+    },
+    "H47": {
+      "endpoint": [
+        "GET /api/today/sleep",
+        "PUT /api/sleep/wake-adjustment"
+      ],
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_correction_is_stored_once_and_returned",
+        "tests/api/test_api_today_detail.py::test_no_correction_where_the_fusion_figure_wins",
+        "tests/api/test_api_today_detail.py::test_no_correction_for_a_night_with_no_score"
+      ]
+    },
+    "H48": {
+      "endpoint": "GET /api/today/strain",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_strain_detail_names_the_regions_and_the_stage_ceiling"
+      ]
+    },
+    "H49": {
+      "endpoint": "GET /api/today/strain",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_strain_detail_names_the_regions_and_the_stage_ceiling",
+        "tests/api/test_api_today_detail.py::test_the_region_acwr_starts_at_the_stage_active_on_the_day_shown"
+      ]
+    },
+    "H50": {
+      "endpoint": "GET /api/today/strain",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_rest_day_offers_the_week_and_shows_it_when_asked",
+        "tests/api/test_api_today_detail.py::test_an_unreadable_stage_leaves_the_region_panel_out_and_says_why"
+      ]
+    },
+    "H51": {
+      "endpoint": "GET /api/today/strain",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_rest_day_offers_the_week_and_shows_it_when_asked"
+      ]
+    },
+    "H52": {
+      "endpoint": "GET /api/today/strain",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_strain_detail_names_the_regions_and_the_stage_ceiling"
+      ]
+    },
+    "H53": {
+      "endpoint": [
+        "GET /api/today",
+        "GET /api/today/strain"
+      ],
+      "test": [
+        "tests/api/test_api_today_detail.py::test_strain_detail_names_the_regions_and_the_stage_ceiling",
+        "tests/api/test_api_today.py::test_the_cards_are_the_home_service_for_the_callers_day"
+      ]
+    },
+    "H54": {
+      "endpoint": [
+        "GET /api/today/readiness",
+        "GET /api/today/sleep",
+        "GET /api/today/strain"
+      ],
+      "test": [
+        "tests/api/test_api_today_detail.py::test_the_30_day_trend_ends_on_the_day_and_details_every_point"
+      ]
+    },
+    "H55": {
+      "endpoint": "GET /api/today/readiness",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_the_30_day_trend_ends_on_the_day_and_details_every_point"
+      ]
+    },
+    "H56": {
+      "endpoint": "GET /api/today/readiness",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_chart_with_fewer_than_two_readings_is_empty"
+      ]
+    },
+    "H57": {
+      "endpoint": "POST /api/sync",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_the_first_request_of_the_callers_day_syncs_and_stores_the_run",
+        "tests/api/test_api_status_sync.py::test_a_sync_refuses_unless_the_engine_is_the_writer"
+      ]
+    },
+    "H58": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_night_the_detail_holds_but_the_rows_lack_is_not_blamed_on_the_ring"
+      ]
+    },
+    "I115": {
+      "client": "phone",
+      "why": "The phone's tab bar."
+    },
+    "I116": {
+      "client": "phone",
+      "why": "The phone's shell draws the tab bar outside each screen, so a failing screen keeps it."
+    },
+    "I117": {
+      "client": "phone",
+      "why": "A button on the phone's Today screen that opens Check-in; no data."
+    },
+    "I118": {
+      "client": "phone",
+      "why": "The phone uses one palette (the Oura palette); styling is the phone's."
+    },
+    "I120": {
+      "endpoint": [
+        "GET /api/today/readiness",
+        "GET /api/today/sleep"
+      ],
+      "test": [
+        "tests/api/test_api_today_detail.py::test_readiness_detail_is_the_service_for_the_callers_day",
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper"
+      ]
+    },
+    "I122": {
+      "endpoint": [
+        "GET /api/today/readiness",
+        "GET /api/today/strain"
+      ],
+      "test": [
+        "tests/api/test_api_today_detail.py::test_the_30_day_trend_ends_on_the_day_and_details_every_point",
+        "tests/api/test_api_today_detail.py::test_a_chart_with_fewer_than_two_readings_is_empty"
+      ]
+    },
+    "I123": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_scored_night_carries_every_panel_and_the_wake_stepper"
+      ]
+    },
+    "I124": {
+      "endpoint": "GET /api/today/sleep",
+      "test": [
+        "tests/api/test_api_today_detail.py::test_a_fused_night_offers_no_stepper_and_says_why"
+      ]
+    }
+  }
 }

@@ -6,7 +6,7 @@ network.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -160,6 +160,34 @@ def test_each_process_names_itself(tmp_path):
     assert settings.build_config(secrets).background_process == bw.ENGINE
     assert load_config({"HEALTH_PROCESS": " Streamlit ", "SUPABASE_URL": "https://example.supabase.co",
                         "SUPABASE_SECRET_KEY": "not-a-key"}).background_process == bw.STREAMLIT
+
+
+def test_the_engines_sync_job_refuses_while_streamlit_writes():
+    """POST /api/sync's job (services/engine_sync.py): while the store names
+    the Streamlit app, nothing reaches a device and nothing is stored."""
+    from services import engine_sync
+
+    class Runner:
+        asked = False
+
+        def run_now(self, today=None):
+            Runner.asked = True
+            return {}
+
+    class Store(_Store):
+        stored = {}
+
+        def get_config_value(self, key):
+            return None
+
+        def set_config(self, key, value, today=None):
+            Store.stored[key] = value
+
+    for stored in (None, "streamlit", "both"):
+        with pytest.raises(bw.NotTheWriterError):
+            engine_sync.run(Store(stored), Runner(), date(2026, 10, 19),
+                            datetime(2026, 10, 19, 6, 0, tzinfo=timezone.utc), force=True)
+    assert not Runner.asked and Store.stored == {}
 
 
 def test_the_training_page_writes_unasked_only_as_the_writer():

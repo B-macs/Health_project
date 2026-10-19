@@ -41,9 +41,15 @@ TODAY = date(2026, 10, 7)
 
 
 def _rows(end: date, days: int) -> list[BiometricRecord]:
+    """The stored readings in the `days` ending on `end`: one a day up to
+    TODAY, the last measured day, and each date's reading the same whatever
+    the window (a real store's rows do not move with the question)."""
     rows = []
-    for i in range(days):
-        d = end - timedelta(days=days - 1 - i)
+    for k in range(days):
+        d = end - timedelta(days=days - 1 - k)
+        if d > TODAY:
+            continue
+        i = d.toordinal()
         rows.append(BiometricRecord(
             date=d.isoformat(), hrv_ms=40.0 + i % 5, resting_heart_rate=55.0,
             sleep_duration_hours=7.0 + (i % 3) * 0.25,
@@ -60,7 +66,7 @@ class FakeRepository:
 
     def get_biometric_rolling(self, days: int = 28, today: date | None = None):
         self.calls.append((days, today))
-        return _rows(today or date.today(), days)
+        return _rows(today or TODAY, days)
 
 
 @pytest.fixture
@@ -162,16 +168,20 @@ def test_today_uses_the_14_day_window_anchored_on_the_callers_day(client, fake_r
 
 
 def test_another_day_uses_the_60_day_window(client, fake_repo):
+    # The 60 days END ON THE DAY ASKED FOR (inventory fault F8). Phase 0's
+    # route counted them back from the caller's today, so a past day's DAILY
+    # was scored against later nights; this test pinned that until
+    # 2026-10-19, when the route moved onto services/home.py.
     day = TODAY - timedelta(days=3)
     r = _get(client, f"/api/readiness?date={day}")
-    assert fake_repo.calls == [(60, TODAY)]
+    assert fake_repo.calls == [(60, day)]
     assert r.json()["window_days"] == 60
 
 
 def test_readiness_equals_the_service_chain(client):
     day = TODAY - timedelta(days=1)
     body = _get(client, f"/api/readiness?date={day}").json()
-    rows_60 = [asdict(r) for r in _rows(TODAY, 60)]
+    rows_60 = [asdict(r) for r in _rows(day, 60)]
     daily = readiness.compute_readiness(for_date=day, bio_rows=rows_60)
     trend = readiness.compute_readiness_trend(day, rows_60)
     assert body["daily"] == daily and body["trend"] == trend

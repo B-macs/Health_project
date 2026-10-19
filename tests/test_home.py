@@ -204,5 +204,18 @@ def test_home_reads_are_keyed_by_the_day_shown():
         encoding="utf-8"))
     readers = {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
     for name in ("_bio_rolling", "_au_history", "_metrics_history_rolling",
-                 "_wake_time_adjustments_rolling", "_session_hr_rolling"):
+                 "_wake_time_adjustments_rolling", "_session_hr_rolling",
+                 "_stage_start_cached"):    # F27: the stage start as of the day shown
         assert readers[name].args.args[0].arg == "end_iso", name
+
+
+def test_the_date_bar_says_today_or_the_date():
+    assert home.date_label(TODAY, TODAY) == "TODAY"
+    assert home.date_label(PAST, TODAY) == PAST.isoformat()
+
+
+def test_the_readiness_pair_is_always_both_figures_titled():
+    # Athlete, 2026-08-25: "Rather always see both labeled even when blank."
+    assert home.score_pair(56.7, 61.2) == (("DAILY", "57"), ("TREND", "61"))
+    assert home.score_pair(None, 61.2) == (("DAILY", "--"), ("TREND", "61"))
+    assert home.score_pair(None, None) == (("DAILY", "--"), ("TREND", "--"))

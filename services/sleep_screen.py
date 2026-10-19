@@ -42,6 +42,13 @@ OVERNIGHT_PANELS = (
 )
 OVERNIGHT_LABELS = {"low": "Lowest", "high": "Max", "average": "Average"}
 
+#: What each hypnogram code is called (1 deep, 2 light, 3 REM, 4 awake, 0
+#: no data). styles.STAGE_BAND draws the stages under these names, and the
+#: API's tap details use them, so the two cannot name a stage differently.
+STAGE_NAMES = {"1": "Deep", "2": "Light", "3": "REM", "4": "Awake", "0": "No data"}
+#: What each movement code is called (sleep_movement's 1-4 classes).
+MOVEMENT_NAMES = {"1": "No motion", "2": "Restless", "3": "Tossing", "4": "Active"}
+
 #: The stage keys of a fusion row's master_*_minutes, in the order the
 #: legend lists them, with the hypnogram code each is drawn in.
 STAGES = (("awake", "4"), ("rem", "3"), ("light", "2"), ("deep", "1"))

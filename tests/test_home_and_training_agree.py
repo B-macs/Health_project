@@ -359,7 +359,10 @@ def test_the_pair_is_shown_on_every_day_including_a_blank_one():
     src = (ROOT / "app.py").read_text(encoding="utf-8")
     assert "round(_readiness_today) != round(_readiness_score)" not in src, \
         "the pair is unconditional now — see the docstring above"
-    assert '_r_pair = (("DAILY", _fmt_r(_readiness_today)),' in src
+    # Unconditional: services/home.py:score_pair titles both figures always
+    # (tests/test_home.py pins its "--" for a blank one), and the API returns
+    # the same pair.
+    assert "_r_pair = home.score_pair(_readiness_today, _readiness_score)" in src
 
     home = load_app()   # app.py's definitions, never its page
 
@@ -379,9 +382,13 @@ def test_the_pair_is_shown_on_every_day_including_a_blank_one():
 def test_blank_formats_as_two_dashes_not_none_or_zero():
     """"None" or "0" under DAILY would both read as a measurement. The card's
     own formatter is the one place that decides, so pin it here rather than
-    trusting the caller."""
+    trusting the caller. Since 2026-10-19 that formatter is services/home.py's
+    score_pair, which the card and the API both use."""
+    from services import home as home_svc
     src = (ROOT / "app.py").read_text(encoding="utf-8")
-    assert '_fmt_r = lambda v: "--" if v is None else f"{float(v):.0f}"' in src
+    assert "home.score_pair(" in src
+    assert home_svc.score_pair(None, None) == (("DAILY", "--"), ("TREND", "--"))
+    assert home_svc.score_pair(0.0, 61.4) == (("DAILY", "0"), ("TREND", "61"))
 
 
 def test_the_trend_is_still_what_gets_persisted():

@@ -1,6 +1,25 @@
 {
   "components": {
     "schemas": {
+      "AxisTick": {
+        "description": "`at` is the fraction across (an X tick) or down from the top (a Y tick).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "number"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "text"
+        ],
+        "title": "AxisTick",
+        "type": "object"
+      },
       "BuildInfo": {
         "properties": {
           "built": {
@@ -66,6 +85,92 @@
           "age_s"
         ],
         "title": "CacheInfo",
+        "type": "object"
+      },
+      "ContributorRow": {
+        "properties": {
+          "bar_pct": {
+            "title": "Bar Pct",
+            "type": "number"
+          },
+          "colour": {
+            "title": "Colour",
+            "type": "string"
+          },
+          "key": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Key"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "scored": {
+            "title": "Scored",
+            "type": "boolean"
+          },
+          "value_display": {
+            "title": "Value Display",
+            "type": "string"
+          },
+          "weight_display": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Display"
+          }
+        },
+        "required": [
+          "label",
+          "value_display",
+          "scored",
+          "bar_pct",
+          "colour"
+        ],
+        "title": "ContributorRow",
+        "type": "object"
+      },
+      "Contributors": {
+        "properties": {
+          "caption": {
+            "title": "Caption",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/ContributorRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "scored": {
+            "title": "Scored",
+            "type": "boolean"
+          },
+          "unscored_reason": {
+            "title": "Unscored Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scored",
+          "rows",
+          "caption",
+          "unscored_reason"
+        ],
+        "title": "Contributors",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -158,6 +263,477 @@
         "title": "HealthOut",
         "type": "object"
       },
+      "Hypnogram": {
+        "description": "The stage strip and the movement strip on one clock. `note` is what the\nsource line says: \"phantom\", \"watch\" or \"plain\".",
+        "properties": {
+          "empty": {
+            "title": "Empty",
+            "type": "boolean"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          },
+          "movement": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MovementStrip"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "phantom_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phantom Minutes"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "stages": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Strip"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "start": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "x_labels": {
+            "items": {
+              "$ref": "#/components/schemas/AxisTick"
+            },
+            "title": "X Labels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "empty",
+          "source",
+          "title",
+          "note",
+          "phantom_minutes",
+          "start",
+          "minutes",
+          "x_labels",
+          "stages",
+          "movement"
+        ],
+        "title": "Hypnogram",
+        "type": "object"
+      },
+      "LabelValue": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "LabelValue",
+        "type": "object"
+      },
+      "Masthead": {
+        "properties": {
+          "colour": {
+            "title": "Colour",
+            "type": "string"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "colour",
+          "display",
+          "label"
+        ],
+        "title": "Masthead",
+        "type": "object"
+      },
+      "MovementStrip": {
+        "properties": {
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/TapBand"
+            },
+            "title": "Bands",
+            "type": "array"
+          },
+          "codes": {
+            "title": "Codes",
+            "type": "string"
+          },
+          "details": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Details",
+            "type": "array"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/StripRun"
+            },
+            "title": "Runs",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "codes",
+          "runs",
+          "bands",
+          "title",
+          "details"
+        ],
+        "title": "MovementStrip",
+        "type": "object"
+      },
+      "NapRow": {
+        "properties": {
+          "duration": {
+            "title": "Duration",
+            "type": "string"
+          },
+          "efficiency": {
+            "title": "Efficiency",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "duration",
+          "efficiency"
+        ],
+        "title": "NapRow",
+        "type": "object"
+      },
+      "Naps": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "day_total": {
+            "title": "Day Total",
+            "type": "string"
+          },
+          "nap_total": {
+            "title": "Nap Total",
+            "type": "string"
+          },
+          "night_total": {
+            "title": "Night Total",
+            "type": "string"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/NapRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows",
+          "nap_total",
+          "day_total",
+          "night_total",
+          "count"
+        ],
+        "title": "Naps",
+        "type": "object"
+      },
+      "Notice": {
+        "description": "A sync notice: level \"error\" or \"caption\"; the phone holds each code's words.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          }
+        },
+        "required": [
+          "level",
+          "code"
+        ],
+        "title": "Notice",
+        "type": "object"
+      },
+      "OuraStatus": {
+        "description": "The Oura login's state. Never a token.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expires At"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          },
+          "needs_authorisation": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Needs Authorisation"
+          },
+          "oauth_configured": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oauth Configured"
+          },
+          "seconds_remaining": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds Remaining"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          }
+        },
+        "required": [
+          "kind",
+          "state",
+          "needs_authorisation",
+          "expires_at",
+          "seconds_remaining",
+          "oauth_configured"
+        ],
+        "title": "OuraStatus",
+        "type": "object"
+      },
+      "OvernightPanel": {
+        "properties": {
+          "average": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average"
+          },
+          "axis": {
+            "$ref": "#/components/schemas/ValueAxis"
+          },
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/TapBand"
+            },
+            "title": "Bands",
+            "type": "array"
+          },
+          "headline": {
+            "title": "Headline",
+            "type": "number"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "secondary": {
+            "title": "Secondary",
+            "type": "number"
+          },
+          "secondary_label": {
+            "title": "Secondary Label",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "array"
+          },
+          "x_labels": {
+            "items": {
+              "$ref": "#/components/schemas/AxisTick"
+            },
+            "title": "X Labels",
+            "type": "array"
+          },
+          "y_labels": {
+            "items": {
+              "$ref": "#/components/schemas/AxisTick"
+            },
+            "title": "Y Labels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "title",
+          "unit",
+          "headline",
+          "secondary_label",
+          "secondary",
+          "average",
+          "values",
+          "axis",
+          "y_labels",
+          "x_labels",
+          "bands"
+        ],
+        "title": "OvernightPanel",
+        "type": "object"
+      },
+      "PointDetail": {
+        "description": "What one tapped point of a chart says about itself.",
+        "properties": {
+          "extra": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LabelValue"
+            },
+            "title": "Extra",
+            "type": "array"
+          },
+          "open_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Open Date"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/LabelValue"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "rows"
+        ],
+        "title": "PointDetail",
+        "type": "object"
+      },
       "ReadinessBand": {
         "description": "The words services/dashboard.readiness_meta gives a score. The phone\nshows them; it never maps a number to a band itself.",
         "properties": {
@@ -180,6 +756,174 @@
           "description"
         ],
         "title": "ReadinessBand",
+        "type": "object"
+      },
+      "ReadinessCardOut": {
+        "properties": {
+          "colour": {
+            "title": "Colour",
+            "type": "string"
+          },
+          "daily": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Daily"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "header": {
+            "title": "Header",
+            "type": "string"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "pair": {
+            "items": {
+              "$ref": "#/components/schemas/TitledValue"
+            },
+            "title": "Pair",
+            "type": "array"
+          },
+          "scale": {
+            "title": "Scale",
+            "type": "number"
+          },
+          "tertiary": {
+            "title": "Tertiary",
+            "type": "string"
+          },
+          "trend": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trend"
+          }
+        },
+        "required": [
+          "colour",
+          "label",
+          "header",
+          "description",
+          "daily",
+          "trend",
+          "headline",
+          "pair",
+          "tertiary",
+          "scale"
+        ],
+        "title": "ReadinessCardOut",
+        "type": "object"
+      },
+      "ReadinessDetailOut": {
+        "properties": {
+          "bio_failed": {
+            "title": "Bio Failed",
+            "type": "boolean"
+          },
+          "contributors": {
+            "$ref": "#/components/schemas/Contributors"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "date_label": {
+            "title": "Date Label",
+            "type": "string"
+          },
+          "is_today": {
+            "title": "Is Today",
+            "type": "boolean"
+          },
+          "key_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/LabelValue"
+            },
+            "title": "Key Metrics",
+            "type": "array"
+          },
+          "masthead": {
+            "$ref": "#/components/schemas/Masthead"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "overnight": {
+            "items": {
+              "$ref": "#/components/schemas/OvernightPanel"
+            },
+            "title": "Overnight",
+            "type": "array"
+          },
+          "previous": {
+            "format": "date",
+            "title": "Previous",
+            "type": "string"
+          },
+          "screen_title": {
+            "title": "Screen Title",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "trend": {
+            "$ref": "#/components/schemas/TrendChart"
+          }
+        },
+        "required": [
+          "date",
+          "previous",
+          "next",
+          "is_today",
+          "date_label",
+          "screen_title",
+          "title",
+          "masthead",
+          "bio_failed",
+          "trend",
+          "contributors",
+          "key_metrics",
+          "overnight"
+        ],
+        "title": "ReadinessDetailOut",
         "type": "object"
       },
       "ReadinessOut": {
@@ -246,6 +990,1381 @@
         "title": "ReadinessOut",
         "type": "object"
       },
+      "RegionAcwr": {
+        "properties": {
+          "colour": {
+            "title": "Colour",
+            "type": "string"
+          },
+          "diagnostic": {
+            "title": "Diagnostic",
+            "type": "boolean"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "reason",
+          "colour",
+          "diagnostic"
+        ],
+        "title": "RegionAcwr",
+        "type": "object"
+      },
+      "RegionPanel": {
+        "description": "Where the load landed. state \"empty\" carries `reason` (\"rolling\" or\n\"no_split\") and the unmapped names; state \"split\" carries the rest.",
+        "properties": {
+          "can_show_window": {
+            "title": "Can Show Window",
+            "type": "boolean"
+          },
+          "ceiling": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ceiling"
+          },
+          "mapped_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mapped Only"
+          },
+          "non_additive_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Non Additive Note"
+          },
+          "overall": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Overall"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "regions": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RegionRow"
+            },
+            "title": "Regions",
+            "type": "array"
+          },
+          "regions_total": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Regions Total"
+          },
+          "shares_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Basis"
+          },
+          "shares_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Shares Version"
+          },
+          "showing_week": {
+            "title": "Showing Week",
+            "type": "boolean"
+          },
+          "stage": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stage"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "thin_sample_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Thin Sample Pct"
+          },
+          "tick_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tick Pct"
+          },
+          "unattributed_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unattributed Pct"
+          },
+          "unmapped_names": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Unmapped Names",
+            "type": "array"
+          },
+          "week": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week"
+          },
+          "window_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Window Days"
+          }
+        },
+        "required": [
+          "state",
+          "unmapped_names",
+          "can_show_window",
+          "showing_week"
+        ],
+        "title": "RegionPanel",
+        "type": "object"
+      },
+      "RegionRow": {
+        "properties": {
+          "acwr": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegionAcwr"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "au": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Au"
+          },
+          "au_pct": {
+            "title": "Au Pct",
+            "type": "number"
+          },
+          "colour": {
+            "title": "Colour",
+            "type": "string"
+          },
+          "fill_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fill Pct"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "short": {
+            "title": "Short",
+            "type": "string"
+          },
+          "strain": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Strain"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "short",
+          "colour",
+          "strain",
+          "au",
+          "au_pct",
+          "acwr",
+          "fill_pct"
+        ],
+        "title": "RegionRow",
+        "type": "object"
+      },
+      "SleepCardOut": {
+        "properties": {
+          "base_window": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base Window"
+          },
+          "colour": {
+            "title": "Colour",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "header": {
+            "title": "Header",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "need_hours": {
+            "title": "Need Hours",
+            "type": "number"
+          },
+          "scale": {
+            "title": "Scale",
+            "type": "number"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          }
+        },
+        "required": [
+          "colour",
+          "label",
+          "header",
+          "description",
+          "score",
+          "display",
+          "need_hours",
+          "base_window",
+          "scale"
+        ],
+        "title": "SleepCardOut",
+        "type": "object"
+      },
+      "SleepDebt": {
+        "properties": {
+          "band": {
+            "title": "Band",
+            "type": "string"
+          },
+          "colour": {
+            "title": "Colour",
+            "type": "string"
+          },
+          "filled": {
+            "title": "Filled",
+            "type": "integer"
+          },
+          "hours": {
+            "title": "Hours",
+            "type": "number"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "number"
+          },
+          "value_display": {
+            "title": "Value Display",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value_display",
+          "band",
+          "filled",
+          "colour",
+          "hours",
+          "threshold"
+        ],
+        "title": "SleepDebt",
+        "type": "object"
+      },
+      "SleepDetailOut": {
+        "properties": {
+          "adjusted": {
+            "title": "Adjusted",
+            "type": "boolean"
+          },
+          "bio_failed": {
+            "title": "Bio Failed",
+            "type": "boolean"
+          },
+          "contributors": {
+            "$ref": "#/components/schemas/Contributors"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "date_label": {
+            "title": "Date Label",
+            "type": "string"
+          },
+          "is_today": {
+            "title": "Is Today",
+            "type": "boolean"
+          },
+          "masthead": {
+            "$ref": "#/components/schemas/Masthead"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "night": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SleepNight"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "nights_adjusted": {
+            "title": "Nights Adjusted",
+            "type": "integer"
+          },
+          "previous": {
+            "format": "date",
+            "title": "Previous",
+            "type": "string"
+          },
+          "screen_title": {
+            "title": "Screen Title",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "trend": {
+            "$ref": "#/components/schemas/TrendChart"
+          },
+          "wake": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WakeControl"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "watch_only": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WatchOnlyNight"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "previous",
+          "next",
+          "is_today",
+          "date_label",
+          "screen_title",
+          "title",
+          "masthead",
+          "bio_failed",
+          "trend",
+          "adjusted",
+          "mode",
+          "contributors",
+          "watch_only",
+          "night",
+          "wake",
+          "nights_adjusted"
+        ],
+        "title": "SleepDetailOut",
+        "type": "object"
+      },
+      "SleepNight": {
+        "properties": {
+          "asleep": {
+            "title": "Asleep",
+            "type": "string"
+          },
+          "debt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SleepDebt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "fusion_caption": {
+            "title": "Fusion Caption",
+            "type": "string"
+          },
+          "hypnogram": {
+            "$ref": "#/components/schemas/Hypnogram"
+          },
+          "in_bed": {
+            "title": "In Bed",
+            "type": "string"
+          },
+          "key_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/LabelValue"
+            },
+            "title": "Key Metrics",
+            "type": "array"
+          },
+          "naps": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Naps"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "overnight": {
+            "items": {
+              "$ref": "#/components/schemas/OvernightPanel"
+            },
+            "title": "Overnight",
+            "type": "array"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/StageRow"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "vitals": {
+            "items": {
+              "$ref": "#/components/schemas/LabelValue"
+            },
+            "title": "Vitals",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key_metrics",
+          "fusion_caption",
+          "debt",
+          "asleep",
+          "in_bed",
+          "stages",
+          "hypnogram",
+          "naps",
+          "overnight",
+          "vitals"
+        ],
+        "title": "SleepNight",
+        "type": "object"
+      },
+      "StageRow": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "duration": {
+            "title": "Duration",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "pct": {
+            "title": "Pct",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "code",
+          "label",
+          "duration",
+          "pct"
+        ],
+        "title": "StageRow",
+        "type": "object"
+      },
+      "StatusOut": {
+        "properties": {
+          "datastore_built_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datastore Built At"
+          },
+          "last_sync": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SyncRun"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "notices": {
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "title": "Notices",
+            "type": "array"
+          },
+          "offline": {
+            "title": "Offline",
+            "type": "boolean"
+          },
+          "oura": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OuraStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "sync_due": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sync Due"
+          },
+          "writer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Writer"
+          }
+        },
+        "required": [
+          "writer",
+          "offline",
+          "datastore_built_at",
+          "oura",
+          "last_sync",
+          "notices",
+          "sync_due"
+        ],
+        "title": "StatusOut",
+        "type": "object"
+      },
+      "StrainBlend": {
+        "properties": {
+          "hr_strain": {
+            "title": "Hr Strain",
+            "type": "number"
+          },
+          "hr_weight_pct": {
+            "title": "Hr Weight Pct",
+            "type": "integer"
+          },
+          "rpe_strain": {
+            "title": "Rpe Strain",
+            "type": "number"
+          }
+        },
+        "required": [
+          "hr_strain",
+          "rpe_strain",
+          "hr_weight_pct"
+        ],
+        "title": "StrainBlend",
+        "type": "object"
+      },
+      "StrainCardOut": {
+        "properties": {
+          "card_label": {
+            "title": "Card Label",
+            "type": "string"
+          },
+          "colour": {
+            "title": "Colour",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "display": {
+            "title": "Display",
+            "type": "string"
+          },
+          "header": {
+            "title": "Header",
+            "type": "string"
+          },
+          "is_rolling": {
+            "title": "Is Rolling",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "scale": {
+            "title": "Scale",
+            "type": "number"
+          },
+          "unscored_reason": {
+            "title": "Unscored Reason",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "colour",
+          "label",
+          "header",
+          "description",
+          "value",
+          "display",
+          "is_rolling",
+          "card_label",
+          "unscored_reason",
+          "scale"
+        ],
+        "title": "StrainCardOut",
+        "type": "object"
+      },
+      "StrainDetailOut": {
+        "properties": {
+          "bio_failed": {
+            "title": "Bio Failed",
+            "type": "boolean"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "date_label": {
+            "title": "Date Label",
+            "type": "string"
+          },
+          "hrv_7d": {
+            "$ref": "#/components/schemas/TrendChart"
+          },
+          "is_rolling": {
+            "title": "Is Rolling",
+            "type": "boolean"
+          },
+          "is_today": {
+            "title": "Is Today",
+            "type": "boolean"
+          },
+          "masthead": {
+            "$ref": "#/components/schemas/Masthead"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "previous": {
+            "format": "date",
+            "title": "Previous",
+            "type": "string"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RegionPanel"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rhr_7d": {
+            "$ref": "#/components/schemas/TrendChart"
+          },
+          "screen_title": {
+            "title": "Screen Title",
+            "type": "string"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrainSource"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stage_unread": {
+            "title": "Stage Unread",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "trend": {
+            "$ref": "#/components/schemas/TrendChart"
+          }
+        },
+        "required": [
+          "date",
+          "previous",
+          "next",
+          "is_today",
+          "date_label",
+          "screen_title",
+          "title",
+          "masthead",
+          "bio_failed",
+          "trend",
+          "is_rolling",
+          "stage_unread",
+          "region",
+          "source",
+          "hrv_7d",
+          "rhr_7d"
+        ],
+        "title": "StrainDetailOut",
+        "type": "object"
+      },
+      "StrainSource": {
+        "properties": {
+          "blend": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StrainBlend"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hr_rows": {
+            "items": {
+              "$ref": "#/components/schemas/LabelValue"
+            },
+            "title": "Hr Rows",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "hr_rows",
+          "blend"
+        ],
+        "title": "StrainSource",
+        "type": "object"
+      },
+      "Strip": {
+        "properties": {
+          "bands": {
+            "items": {
+              "$ref": "#/components/schemas/TapBand"
+            },
+            "title": "Bands",
+            "type": "array"
+          },
+          "codes": {
+            "title": "Codes",
+            "type": "string"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/StripRun"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "codes",
+          "runs",
+          "bands"
+        ],
+        "title": "Strip",
+        "type": "object"
+      },
+      "StripRun": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "end": {
+            "title": "End",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "code",
+          "name"
+        ],
+        "title": "StripRun",
+        "type": "object"
+      },
+      "SyncIn": {
+        "properties": {
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "title": "SyncIn",
+        "type": "object"
+      },
+      "SyncOut": {
+        "properties": {
+          "ran": {
+            "title": "Ran",
+            "type": "boolean"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SyncRun"
+          }
+        },
+        "required": [
+          "ran",
+          "reason",
+          "status"
+        ],
+        "title": "SyncOut",
+        "type": "object"
+      },
+      "SyncRun": {
+        "description": "The engine's last sync run: each step's (ok, error).",
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "results": {
+            "additionalProperties": {
+              "maxItems": 2,
+              "minItems": 2,
+              "prefixItems": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              ],
+              "type": "array"
+            },
+            "title": "Results",
+            "type": "object"
+          }
+        },
+        "required": [
+          "day",
+          "at",
+          "results",
+          "error"
+        ],
+        "title": "SyncRun",
+        "type": "object"
+      },
+      "TapBand": {
+        "description": "A tappable band over a chart or strip, with the detail of the reading\n(or the run) at its centre.",
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PointDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "left": {
+            "title": "Left",
+            "type": "number"
+          },
+          "width": {
+            "title": "Width",
+            "type": "number"
+          }
+        },
+        "required": [
+          "left",
+          "width",
+          "index",
+          "detail"
+        ],
+        "title": "TapBand",
+        "type": "object"
+      },
+      "TitledValue": {
+        "properties": {
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "value"
+        ],
+        "title": "TitledValue",
+        "type": "object"
+      },
+      "TodayOut": {
+        "properties": {
+          "bio_failed": {
+            "title": "Bio Failed",
+            "type": "boolean"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "date_label": {
+            "title": "Date Label",
+            "type": "string"
+          },
+          "hrv_7d": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Hrv 7D",
+            "type": "array"
+          },
+          "is_today": {
+            "title": "Is Today",
+            "type": "boolean"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "previous": {
+            "format": "date",
+            "title": "Previous",
+            "type": "string"
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/ReadinessCardOut"
+          },
+          "rhr_7d": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Rhr 7D",
+            "type": "array"
+          },
+          "sleep": {
+            "$ref": "#/components/schemas/SleepCardOut"
+          },
+          "strain": {
+            "$ref": "#/components/schemas/StrainCardOut"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerdictOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "previous",
+          "next",
+          "is_today",
+          "date_label",
+          "bio_failed",
+          "readiness",
+          "strain",
+          "sleep",
+          "verdict",
+          "hrv_7d",
+          "rhr_7d"
+        ],
+        "title": "TodayOut",
+        "type": "object"
+      },
+      "TrendChart": {
+        "properties": {
+          "axis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ValueAxis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "dates": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Dates",
+            "type": "array"
+          },
+          "decimals": {
+            "title": "Decimals",
+            "type": "integer"
+          },
+          "empty": {
+            "title": "Empty",
+            "type": "boolean"
+          },
+          "headline": {
+            "title": "Headline",
+            "type": "string"
+          },
+          "points": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PointDetail"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Points",
+            "type": "array"
+          },
+          "subtitle": {
+            "title": "Subtitle",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Values",
+            "type": "array"
+          },
+          "x_labels": {
+            "items": {
+              "$ref": "#/components/schemas/AxisTick"
+            },
+            "title": "X Labels",
+            "type": "array"
+          },
+          "y_labels": {
+            "items": {
+              "$ref": "#/components/schemas/AxisTick"
+            },
+            "title": "Y Labels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "title",
+          "dates",
+          "values",
+          "unit",
+          "decimals",
+          "headline",
+          "subtitle",
+          "axis",
+          "y_labels",
+          "x_labels",
+          "points",
+          "empty"
+        ],
+        "title": "TrendChart",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -284,6 +2403,214 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "ValueAxis": {
+        "properties": {
+          "hi": {
+            "title": "Hi",
+            "type": "number"
+          },
+          "lo": {
+            "title": "Lo",
+            "type": "number"
+          },
+          "step": {
+            "title": "Step",
+            "type": "number"
+          },
+          "ticks": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Ticks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lo",
+          "hi",
+          "step",
+          "ticks"
+        ],
+        "title": "ValueAxis",
+        "type": "object"
+      },
+      "VerdictOut": {
+        "description": "Today's training decision, as Home and Training both show it.",
+        "properties": {
+          "badge": {
+            "title": "Badge",
+            "type": "string"
+          },
+          "banner_kind": {
+            "title": "Banner Kind",
+            "type": "string"
+          },
+          "banner_text": {
+            "title": "Banner Text",
+            "type": "string"
+          },
+          "cause": {
+            "title": "Cause",
+            "type": "string"
+          },
+          "has_something_to_say": {
+            "title": "Has Something To Say",
+            "type": "boolean"
+          },
+          "hrv_note": {
+            "title": "Hrv Note",
+            "type": "string"
+          },
+          "reduced": {
+            "title": "Reduced",
+            "type": "boolean"
+          },
+          "tone": {
+            "title": "Tone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "badge",
+          "tone",
+          "banner_kind",
+          "banner_text",
+          "cause",
+          "hrv_note",
+          "reduced",
+          "has_something_to_say"
+        ],
+        "title": "VerdictOut",
+        "type": "object"
+      },
+      "WakeAdjustmentIn": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "minutes"
+        ],
+        "title": "WakeAdjustmentIn",
+        "type": "object"
+      },
+      "WakeControl": {
+        "description": "The wake-time correction (Key Rule 4's one manual correction). The −\nand + buttons send `decrease_to` and `increase_to`.",
+        "properties": {
+          "caption": {
+            "title": "Caption",
+            "type": "string"
+          },
+          "decrease_to": {
+            "title": "Decrease To",
+            "type": "number"
+          },
+          "editable": {
+            "title": "Editable",
+            "type": "boolean"
+          },
+          "increase_to": {
+            "title": "Increase To",
+            "type": "number"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "number"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "minutes",
+          "source",
+          "editable",
+          "label",
+          "caption",
+          "decrease_to",
+          "increase_to"
+        ],
+        "title": "WakeControl",
+        "type": "object"
+      },
+      "WatchOnlyNight": {
+        "properties": {
+          "hypnogram": {
+            "$ref": "#/components/schemas/Hypnogram"
+          },
+          "stages": {
+            "items": {
+              "$ref": "#/components/schemas/WatchStage"
+            },
+            "title": "Stages",
+            "type": "array"
+          }
+        },
+        "required": [
+          "stages",
+          "hypnogram"
+        ],
+        "title": "WatchOnlyNight",
+        "type": "object"
+      },
+      "WatchStage": {
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "duration": {
+            "title": "Duration",
+            "type": "string"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage",
+          "code",
+          "name",
+          "minutes",
+          "duration",
+          "pct"
+        ],
+        "title": "WatchStage",
         "type": "object"
       }
     }
@@ -410,6 +2737,537 @@
           }
         },
         "summary": "Get Readiness"
+      }
+    },
+    "/api/sleep/wake-adjustment": {
+      "put": {
+        "operationId": "put_wake_adjustment_api_sleep_wake_adjustment_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WakeAdjustmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WakeControl"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Wake Adjustment"
+      }
+    },
+    "/api/status": {
+      "get": {
+        "operationId": "get_status_api_status_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatusOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Status"
+      }
+    },
+    "/api/sync": {
+      "post": {
+        "operationId": "post_sync_api_sync_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SyncIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Sync"
+      }
+    },
+    "/api/today": {
+      "get": {
+        "operationId": "get_today_api_today_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TodayOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Today"
+      }
+    },
+    "/api/today/readiness": {
+      "get": {
+        "operationId": "get_readiness_detail_api_today_readiness_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReadinessDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Readiness Detail"
+      }
+    },
+    "/api/today/sleep": {
+      "get": {
+        "operationId": "get_sleep_detail_api_today_sleep_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SleepDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Sleep Detail"
+      }
+    },
+    "/api/today/strain": {
+      "get": {
+        "operationId": "get_strain_detail_api_today_strain_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "query",
+            "name": "week",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Week",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StrainDetailOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Strain Detail"
       }
     }
   }

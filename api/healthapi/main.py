@@ -19,11 +19,13 @@ import logging  # noqa: E402
 from contextlib import asynccontextmanager  # noqa: E402
 
 from fastapi import Depends, FastAPI, HTTPException, Request  # noqa: E402
+from fastapi.exceptions import RequestValidationError  # noqa: E402
 from fastapi.responses import JSONResponse  # noqa: E402
+from starlette.exceptions import HTTPException as StarletteHTTPException  # noqa: E402
 
 from . import __version__, engine, settings  # noqa: E402
 from .auth import require_engine_key  # noqa: E402
-from .routes import health, probes, readiness  # noqa: E402
+from .routes import health, probes, readiness, status, today, today_detail  # noqa: E402
 
 _IMPORT_SECONDS = time.perf_counter() - _T0
 
@@ -46,6 +48,25 @@ def create_app(startup: bool = True, with_probes: bool | None = None) -> FastAPI
         return JSONResponse(status_code=exc.status_code, content={"error": str(exc.detail)},
                             headers={"Cache-Control": "no-store"})
 
+    # The router's own refusals (an unknown route, a wrong method) are
+    # Starlette's, not FastAPI's, and answered {"detail": ...} until
+    # 2026-10-19: one error shape for everything (Phase 0's open item).
+    _ROUTER_ERRORS = {404: "not_found", 405: "method_not_allowed"}
+
+    @app.exception_handler(StarletteHTTPException)
+    async def _router_error_shape(_request: Request, exc: StarletteHTTPException) -> JSONResponse:
+        return JSONResponse(status_code=exc.status_code,
+                            content={"error": _ROUTER_ERRORS.get(exc.status_code, str(exc.detail))},
+                            headers={"Cache-Control": "no-store"})
+
+    @app.exception_handler(RequestValidationError)
+    async def _invalid_request_shape(_request: Request, exc: RequestValidationError) -> JSONResponse:
+        first = exc.errors()[0] if exc.errors() else {}
+        where = ".".join(str(part) for part in first.get("loc", ()) if part != "body")
+        return JSONResponse(status_code=422,
+                            content={"error": f"invalid_request: {where} {first.get('msg', '')}".strip()},
+                            headers={"Cache-Control": "no-store"})
+
     @app.exception_handler(Exception)
     async def _crash_is_json_too(_request: Request, _exc: Exception) -> JSONResponse:
         # Every engine answer is JSON, a crash included: the Worker retries a
@@ -62,6 +83,9 @@ def create_app(startup: bool = True, with_probes: bool | None = None) -> FastAPI
 
     app.include_router(health.router)
     app.include_router(readiness.router)
+    app.include_router(today.router)
+    app.include_router(today_detail.router)
+    app.include_router(status.router)
     if settings.probes_enabled() if with_probes is None else with_probes:
         app.include_router(probes.router)
     return app
