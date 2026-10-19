@@ -2660,57 +2660,14 @@ def _warning_strains(today: date) -> tuple[dict | None, dict | None]:
 
 
 def _accessory_choice(active, day_num: int | None, policy_directive: dict):
-    """Everything services/accessory.choose needs, gathered defensively.
-
-    Every read here is wrapped, and each failure degrades to the conservative
-    side rather than to an error: no regional history means the tie-break
-    decides, and an unreadable phase means today is treated as unplanned. A
-    health page that
-    crashes because a Sheets read timed out is worse than one that offers a
-    slightly blunter session.
-    """
-    r = repo.get_repository()
-    today = date.today()
-
-    plan_day = tomorrow_day = None
-    if active is not None and day_num is not None:
-        _calendar = sess.calendar_plan(active)
-        plan_day = _calendar.get(day_num)
-        tomorrow_day = _calendar.get(day_num + 1)
-
+    """services/accessory.read_choice reads the choice's inputs defensively
+    and decides (move TRN-14); the page passes its cached region rows."""
     try:
         rows = _region_rows()
     except Exception:
         rows = []
-
-    region_acwr = None
-    try:
-        # PHASE_META's stage, never the phase number — Phase 3 is Stage 2B at
-        # clinical stage 2, and indexing STAGE_CONSTRAINTS by the phase number
-        # would read it as a Stage 3 ceiling.
-        stage = int(sess.PHASE_META.get(getattr(active, "phase_number", 0), {})
-                    .get("stage") or r.get_current_stage())
-        region_acwr = strain_regions.region_acwr(
-            rows, stage, today=today,
-            stage_start=ph.current_stage_start(r.get_phases(), today))
-    except Exception:
-        region_acwr = None
-
-    legs_clean = False
-    try:
-        stored = r.get_flexibility_assessments()
-        if stored:
-            status, _ = fx.retest_readiness(
-                stored[-1].taken_on, today,
-                fx.leg_loading_days(r.get_recent_sessions(days=3)))
-            legs_clean = status == fx.RETEST_TOMORROW
-    except Exception:
-        pass
-
-    return acc.choose(plan_day=plan_day, region_rows=rows, region_acwr=region_acwr,
-                      volume_rec=policy_directive,
-                      legs_must_stay_clean=legs_clean, tomorrow_plan_day=tomorrow_day,
-                      today=today)
+    return acc.read_choice(repo.get_repository(), active, day_num, policy_directive,
+                           date.today(), region_rows=rows)
 
 
 def _start_accessory_session() -> None:

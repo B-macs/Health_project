@@ -58,6 +58,8 @@ from datetime import date
 
 import training_constants as tc
 import training_plan as tp
+from services import flexibility as fx
+from services import plan as _plan
 from services import sessions as sess
 from services import strain_regions as sr
 
@@ -667,3 +669,60 @@ ACCESSORY_LIBRARY: tuple[dict, ...] = (
 def accessory_names() -> tuple[str, ...]:
     """Sorted, deduplicated names of everything emittable."""
     return tuple(sorted({ex["name"] for ex in ACCESSORY_LIBRARY}))
+
+
+# ─── The choice's inputs, read (move TRN-14, 2026-10-19) ─────────────────────
+
+#: Days of regional load read back for the choice.
+REGION_HISTORY_DAYS = 31
+
+
+def read_choice(repo, active, day_num: int | None, volume_rec: dict | None, today: date,
+                *, region_rows: list[dict] | None = None) -> AccessoryChoice:
+    """Everything `choose` needs, read defensively, then the choice.
+
+    Every read degrades to the conservative side rather than to an error: no
+    regional history means the tie-break decides, an unreadable stage means
+    no regional ACWR, and an unreadable retest history leaves the legs to
+    tomorrow's plan day alone. A health page that fails because a read timed
+    out is worse than one that offers a slightly blunter session. `today` is
+    the caller's day; a caller with its own cached region rows passes them."""
+    plan_day = tomorrow_day = None
+    if active is not None and day_num is not None:
+        calendar = sess.calendar_plan(active)
+        plan_day, tomorrow_day = calendar.get(day_num), calendar.get(day_num + 1)
+
+    rows = region_rows
+    if rows is None:
+        try:
+            rows = repo.get_daily_region_au(days=REGION_HISTORY_DAYS, today=today)["rows"]
+        except Exception:
+            rows = []
+
+    region_acwr = None
+    try:
+        # PHASE_META's stage, never the phase number: Phase 3 is Stage 2B at
+        # clinical stage 2, and indexing STAGE_CONSTRAINTS by the phase number
+        # would read it as a Stage 3 ceiling.
+        stage = int(sess.PHASE_META.get(getattr(active, "phase_number", 0), {}).get("stage")
+                    or repo.get_current_stage())
+        region_acwr = sr.region_acwr(
+            rows, stage, today=today,
+            stage_start=_plan.current_stage_start(repo.get_phases(), today))
+    except Exception:
+        region_acwr = None
+
+    legs_clean = False
+    try:
+        stored = repo.get_flexibility_assessments()
+        if stored:
+            status, _ = fx.retest_readiness(
+                stored[-1].taken_on, today,
+                fx.leg_loading_days(repo.get_recent_sessions(days=3, today=today)))
+            legs_clean = status == fx.RETEST_TOMORROW
+    except Exception:
+        legs_clean = False
+
+    return choose(plan_day=plan_day, region_rows=rows, region_acwr=region_acwr,
+                  volume_rec=volume_rec, legs_must_stay_clean=legs_clean,
+                  tomorrow_plan_day=tomorrow_day, today=today)
