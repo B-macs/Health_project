@@ -2148,7 +2148,16 @@ class Repository:
                                 session_duration_minutes: int = 0, session_rpe: int = 0,
                                 session_au: float = 0.0, today: date | None = None,
                                 garmin_avg_hr: float | None = None, garmin_max_hr: float | None = None,
-                                garmin_distance_km: float | None = None, garmin_calories: float | None = None) -> str:
+                                garmin_distance_km: float | None = None, garmin_calories: float | None = None,
+                                exercise_id: str | None = None) -> str:
+        """Store one exercise of a session; returns its id.
+
+        `exercise_id` is the caller's (services/session_save.py mints one per
+        exercise, once, before the first send): with Supabase as the record the
+        row is keyed on it, so the same exercise sent again replaces itself.
+        Without one, an id is minted here. With Notion as the record (the
+        frozen archive's mode) Notion issues the page id and `exercise_id` is
+        not used."""
         today = today or date.today()
         sid = str(session_id) if not isinstance(session_id, dict) else session_id.get("session_id", "")
 
@@ -2188,7 +2197,7 @@ class Repository:
             properties["Activity Calories"] = notion.number(garmin_calories)
 
         if self.supabase_record:
-            return self._save_training_exercise_record(properties, sets or [])
+            return self._save_training_exercise_record(properties, sets or [], exercise_id)
 
         page = notion.create_page(self._nc, self.config.notion_db_training, properties=properties)
         # AFTER the create, because the page id IS training_exercises' primary
@@ -2218,15 +2227,16 @@ class Repository:
     # build_set_record) and written in one shot by save_training_exercise
     # above, so a per-set round-trip to Notion mid-session is redundant.
 
-    def _save_training_exercise_record(self, properties: dict, sets: list) -> str:
+    def _save_training_exercise_record(self, properties: dict, sets: list,
+                                       exercise_id: str | None = None) -> str:
         """save_training_exercise with Supabase as the record.
 
-        The id Notion used to issue is minted here. Three writes (the session,
-        the exercise, its sets), each one waited for; if a later one fails, the
-        earlier exercise row is removed again, so the Save button's retry —
-        which writes this exercise afresh under a new id — cannot leave a
-        set-less duplicate behind."""
-        exercise_id = str(uuid.uuid4())
+        The caller's id, or one minted here (the id Notion used to issue).
+        Three writes (the session, the exercise, its sets), each one waited
+        for; if a later one fails, the exercise row is removed again, so a
+        failed write leaves no exercise without its sets: the exercise is
+        absent until the next send of the same save writes it whole."""
+        exercise_id = exercise_id or str(uuid.uuid4())
         try:
             self.mirror_notion_write(notion_reader.TRAINING, exercise_id,
                                      properties, sets=sets)

@@ -29,6 +29,7 @@ from services import metrics
 from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
 from services import scheduling
+from services import session_save
 from services import sessions as sess
 from services import strain_regions
 from services import week_repeat
@@ -899,9 +900,7 @@ def _init_state(day_num: int | None = None):
         "tp_notes":            {},       # {exercise_idx: note text} — the DURABLE copy of the per-exercise notes; see _record_note
         "tp_rest_started_at":  0,        # Unix timestamp, stamped when a rest phase BEGINS — see _record_rest_taken
         "tp_nav_stack":        [],       # "← Back" undo history — see _push_nav_state (not checkpointed)
-        "tp_pending_session":  None,     # the session dict minted by the FIRST press of Save; reused by every retry — see _auto_log_session
-        "tp_saved_exercise_idx": [],     # exercise indices already written under tp_pending_session
-        "tp_last_saved_exercise_id": None,
+        "tp_pending_session":  None,     # the ids and figures minted by the FIRST press of Save; resent by every retry — see _auto_log_session
         "tp_accessory_plan":   None,     # the accessory session's day dict while one is running; None on a plan session. MUST have a default — it is in sess.CHECKPOINT_FIELDS, and building that payload indexes session_state directly
     }
     is_fresh_session = "tp_ex_idx" not in st.session_state
@@ -991,128 +990,44 @@ def _get_plan_start() -> date | None:
 def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
                       duration_minutes: int, notes: str,
                       movement_type_override: str | None = None) -> None:
-    """Write a completed session to Notion, one row per exercise.
+    """Save the finished session through services/session_save.py, the one
+    save the phone's API uses too.
 
-    `movement_type_override` forces the `Type` select on every row, which is
-    how the accessory session logs as `acc.ACCESSORY_TYPE` rather than as a
-    per-exercise movement category. That single string is the whole
-    supplementary mechanism: `Repository.SUPPLEMENTARY_SESSION_TYPES` reads it,
-    and `has_logged_session` therefore keeps returning False, so an accessory
-    session can never mark a plan day done. Yoga and the Garmin outdoor import
-    do exactly the same thing with their own literals.
+    The ids are minted ONCE, on the first press of Save, and kept in
+    tp_pending_session, which is checkpointed: every later press, and a
+    reload, sends the same session again under the same ids, with the
+    duration and RPE of the first press. A save that stopped partway is
+    completed by the next press, and nothing is stored twice. 2026-09-10 was
+    logged three times when every press minted fresh ids.
+
+    `movement_type_override` stores every exercise under one Type, which is
+    how the accessory session logs as `acc.ACCESSORY_TYPE`: that one string
+    keeps it in `Repository.SUPPLEMENTARY_SESSION_TYPES`, so it can never
+    mark a plan day done. Yoga and the Garmin outdoor import do the same
+    with their own Types.
     """
     r = repo.get_repository()
-    garmin_minutes = st.session_state.get("tp_garmin_minutes", {})
-    garmin_detail = st.session_state.get("tp_garmin_activity_detail", {})
-    actuals = st.session_state.get("tp_actuals", {})
-    set_log = st.session_state.get("tp_set_log", {})
-    # ONE session id per save, however many presses it takes. A save that
-    # stops partway — a Notion 429 twenty rows in, a dropped connection — used
-    # to be retried by pressing Save again, and every press minted a fresh id
-    # and rewrote every exercise from the top. 2026-09-10 was logged three
-    # times that way: 8, 20 and 2 exercises under three ids, 1,306 AU for one
-    # session, strain 17.1 for the day. The pending session and the indices
-    # already written live in session_state AND in the checkpoint
-    # (sess.CHECKPOINT_FIELDS), so a retry — even after a reload — continues
-    # under the same id from the exercise that failed, with the duration and
-    # RPE the first press recorded.
-    session_info = st.session_state.get("tp_pending_session") or None
-    if not session_info:
-        session_info = r.create_training_session(
-            session_date=date.today(),
-            duration_minutes=duration_minutes,
-            session_rpe=session_rpe,
-        )
-        st.session_state.tp_pending_session = session_info
-        st.session_state.tp_saved_exercise_idx = []
-        st.session_state.tp_last_saved_exercise_id = None
-    saved = set(st.session_state.get("tp_saved_exercise_idx") or [])
-    last_id = st.session_state.get("tp_last_saved_exercise_id")
-    for idx, ex in enumerate(exercises):
-        if idx in saved:
-            continue
-        actual_min = garmin_minutes.get(idx)
-        # Garmin-verified duration and the live reps/weight/band-tier
-        # steppers both override the planned prescription for logging — a
-        # shallow copy so the shared training_plan.py PLAN dict is never
-        # mutated in place.
-        log_ex = dict(ex, duration_minutes=actual_min) if actual_min else dict(ex)
-        actual = actuals.get(idx)
-        if actual and (ex.get("equipment_type") or sess.reps_are_editable(ex)):
-            if ex["type"] == "hold_reps":
-                if actual.get("reps") is not None:
-                    log_ex["reps_in_set"] = actual["reps"]
-            elif actual.get("reps") is not None:
-                log_ex["reps"] = actual["reps"]
-            if ex.get("equipment_type") == "band":
-                if actual.get("band_tier"):
-                    log_ex["band_tier"] = actual["band_tier"]
-            elif actual.get("weight_kg") is not None:
-                log_ex["weight_kg"] = actual["weight_kg"]
-        garmin_note = (
-            f"Garmin-verified duration: {actual_min:.0f} min "
-            f"(planned {ex.get('duration_minutes')} min)."
-        ) if actual_min else ""
-        # tp_notes, NOT the tp_note_<idx> widget key this used to read. By the
-        # time this runs the flow is on the save screen, where tp_ex_idx >=
-        # n_ex and therefore NOT ONE note widget is instantiated — so every
-        # widget lookup returned None and every per-exercise note ever written
-        # was dropped on the floor. See _record_note.
-        user_note = (st.session_state.get("tp_notes", {}).get(idx) or "").strip()
-        note = "\n".join(n for n in (garmin_note, user_note) if n)
-        detail = garmin_detail.get(idx) or {}
-        # Real per-set records captured live by _record_completed_set as each
-        # set was finished (reps/weight as actually stepped, plus a timestamp).
-        # make_sets_data is the fallback only when nothing was captured — a
-        # session logged without going through the guided flow, or a
-        # checkpoint predating per-set capture — since it can only replicate
-        # the prescription N identical times.
-        logged_sets = set_log.get(idx) or sess.make_sets_data(log_ex)
-        last_id = r.save_training_exercise(
-            session_id=session_info["session_id"],
-            movement_name=ex["name"],
-            movement_type=movement_type_override or sess.movement_category(ex),
-            planned_sets=ex.get("sets", 1),
-            planned_reps=sess.planned_reps(ex),
-            # NOT session_rpe. Copying the session's single slider value onto
-            # every exercise asserted a per-exercise measurement nobody made,
-            # and it was visibly false at both ends: a 90-second pressure
-            # release and a top set of RDLs both read 8 because the session did.
-            # It also fed services/strength.py's 1RM estimates, which take
-            # exercise_rpe first and fall back to session_rpe — so the fallback
-            # was never reached and every lift was estimated at the session
-            # figure regardless.
-            #
-            # None until the heart-rate sync can assign a real one per exercise
-            # (Repository.reassign_exercise_rpe_from_hr). That sync runs after
-            # the fact by necessity: HR attribution needs the Garmin activity,
-            # which is not on the watch's servers when the last set is logged.
-            # Until it lands, strength.py's fallback to session_rpe gives the
-            # numbers this line used to write — identical arithmetic, minus the
-            # claim that each exercise was rated.
-            rpe=None,
-            sets=logged_sets,
-            note=note,
-            session_date=session_info["session_date"],
-            session_duration_minutes=session_info["duration_minutes"],
-            session_rpe=session_info["session_rpe"],
-            session_au=session_info["session_au"],
-            garmin_avg_hr=detail.get("avg_hr"),
-            garmin_max_hr=detail.get("max_hr"),
-            garmin_distance_km=detail.get("distance_km"),
-            garmin_calories=detail.get("calories"),
-        )
-        saved.add(idx)
-        st.session_state.tp_saved_exercise_idx = sorted(saved)
-        st.session_state.tp_last_saved_exercise_id = last_id
-    if notes.strip() and last_id:
-        r.save_session_notes(last_id, notes)
-    # Everything is written: the pending markers are spent, and they are
-    # checkpointed, so they must be cleared here or the NEXT session would
-    # resume into this one's id.
+    pending = session_save.pending_save(
+        date.today(), duration_minutes, session_rpe, len(exercises),
+        earlier=st.session_state.get("tp_pending_session"))
+    st.session_state.tp_pending_session = pending
+    session = session_save.build_session(
+        pending, exercises,
+        actuals=st.session_state.get("tp_actuals", {}),
+        set_log=st.session_state.get("tp_set_log", {}),
+        # tp_notes, NOT the tp_note_<idx> widget keys: on the save screen no
+        # note widget is drawn, so a widget lookup returns None. See _record_note.
+        notes_by_idx=st.session_state.get("tp_notes", {}),
+        garmin_minutes=st.session_state.get("tp_garmin_minutes", {}),
+        garmin_detail=st.session_state.get("tp_garmin_activity_detail", {}),
+        session_notes=notes,
+        movement_type_override=movement_type_override,
+    )
+    session_save.save_session(r, session)
+    # Everything is written: the pending save is spent, and it is
+    # checkpointed, so it must be cleared here or the NEXT session would be
+    # sent under this one's ids.
     st.session_state.tp_pending_session = None
-    st.session_state.tp_saved_exercise_idx = []
-    st.session_state.tp_last_saved_exercise_id = None
     _send_backup_copy(r)
 
     # A logged session is the one thing that legitimately changes today's
@@ -3012,8 +2927,8 @@ def _render_accessory_session(policy: dict, readiness_modifier: float,
                                       movement_type_override=acc.ACCESSORY_TYPE)
                 except Exception as exc:
                     _save_checkpoint(acc.ACCESSORY_DAY_KEY)
-                    st.error(f"Couldn't save the session: {exc} — press Save again; it "
-                             f"continues under the same session from the exercise that failed.")
+                    st.error(f"Couldn't save the session: {exc} — press Save again: it "
+                             f"sends the same session again, so nothing is stored twice.")
                 else:
                     st.session_state.tp_session_logged = True
                     _save_checkpoint(acc.ACCESSORY_DAY_KEY)
@@ -4088,17 +4003,16 @@ def render():
                     with st.spinner("Saving session…"):
                         _auto_log_session(day_num, exercises, session_rpe, elapsed_minutes, session_notes)
                 except Exception as exc:
-                    # Keep what was written. The pending session id and the
-                    # exercises already saved go into the checkpoint here, so
-                    # the next press — or a reload — continues under the SAME
-                    # session instead of starting a second one, which is how
-                    # 2026-09-10 was logged three times.
+                    # Keep what was written. The pending save's ids go into the
+                    # checkpoint here, so the next press — or a reload — sends
+                    # the SAME session again instead of starting a second one,
+                    # which is how 2026-09-10 was logged three times.
                     _save_checkpoint(day_num)
-                    n_saved = len(st.session_state.get("tp_saved_exercise_idx") or [])
+                    n_saved = exc.written if isinstance(exc, session_save.SessionSaveError) else 0
                     st.error(
                         f"Saving stopped after {n_saved} of {n_ex} exercises: {exc}. "
-                        f"Nothing is lost — press Save again and it continues from the "
-                        f"exercise that failed, under the same session."
+                        f"Nothing is lost — press Save again: it sends the same session "
+                        f"again, so nothing is stored twice."
                     )
                     st.stop()
                 # Keep the self-reported figures so the comparison below has

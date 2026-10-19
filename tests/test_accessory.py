@@ -602,7 +602,17 @@ def test_the_accessory_session_logs_under_the_supplementary_type():
     the app deciding the day's real training was finished."""
     source = _training_source()
     assert "movement_type_override=acc.ACCESSORY_TYPE" in source
-    assert "movement_type_override or sess.movement_category(ex)" in source
+    # Since 2026-10-19 the page saves through services/session_save.py, which
+    # puts the one Type on every stored row.
+    assert "movement_type_override=movement_type_override" in source
+    from services import session_save
+    saved = session_save.build_session(
+        {"session_id": "2026-10-19-0a1b2c3d", "session_date": "2026-10-19",
+         "duration_minutes": 12, "session_rpe": 3, "exercise_ids": ["a", "b"]},
+        [{"name": "Dead Hang", "type": "hold", "sets": 1, "hold_seconds": 20},
+         {"name": "Goblet Squat", "type": "reps", "sets": 2, "reps": 10}],
+        movement_type_override=acc.ACCESSORY_TYPE)
+    assert {e.movement_type for e in saved.exercises} == {acc.ACCESSORY_TYPE}
 
 
 def test_starting_an_accessory_session_refuses_while_one_is_in_flight():

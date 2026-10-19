@@ -25,15 +25,20 @@ from services import hr_load, strength
 
 
 def test_the_session_slider_is_no_longer_copied_onto_every_exercise():
-    """Source check: the save call passes rpe=None, not rpe=session_rpe."""
+    """Source check: the save call passes rpe=None, not rpe=session_rpe. Since
+    2026-10-19 the plan session saves through services/session_save.py, and
+    tests/test_session_save.py proves the stored rating is empty."""
     from pathlib import Path
-    src = (Path(__file__).resolve().parent.parent / "views" / "training.py").read_text(encoding="utf-8")
-    # Indented so it cannot match the legitimate `session_rpe=session_rpe,`
-    # keyword on the same call.
-    assert "\n            rpe=session_rpe," not in src, (
-        "the session RPE is being copied onto every exercise again"
-    )
-    assert "\n            rpe=None," in src
+    root = Path(__file__).resolve().parent.parent
+    for rel in ("views/training.py", "services/session_save.py"):
+        lines = [line.strip() for line in (root / rel).read_text(encoding="utf-8").splitlines()]
+        # A whole line, so it cannot match the legitimate `session_rpe=session_rpe,`
+        # keyword on the same call.
+        assert "rpe=session_rpe," not in lines, (
+            f"{rel}: the session RPE is being copied onto every exercise again"
+        )
+    save = (root / "services" / "session_save.py").read_text(encoding="utf-8")
+    assert "rpe=None," in [line.strip() for line in save.splitlines()]
 
 
 def test_a_null_exercise_rpe_falls_back_to_the_session_figure():

@@ -1397,8 +1397,7 @@ _STATE = {
     # is running. Present-but-None rather than absent is the point — see
     # CHECKPOINT_FIELDS' own note on why a missing key kills the checkpoint.
     "tp_accessory_plan": None,
-    "tp_pending_session": None, "tp_saved_exercise_idx": [],
-    "tp_last_saved_exercise_id": None,
+    "tp_pending_session": None,
 }
 
 

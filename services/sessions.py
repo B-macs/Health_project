@@ -147,16 +147,18 @@ CHECKPOINT_FIELDS = (
     # session_state with every name here, and a missing one silently stops
     # the whole checkpoint saving.
     "tp_accessory_plan",
-    # The save-in-progress markers. A session's id is minted ONCE, on the first
-    # press of Save, and every exercise written under it is remembered here, so
-    # a save that stops partway (a Notion 429 twenty rows in, a dropped
-    # connection) resumes under the SAME session from the exercise that failed.
-    # Before 2026-09-11 every press minted a fresh id and rewrote everything,
-    # which is how 2026-09-10 was logged three times: 8, 20 and 2 exercises
-    # under three ids, 1,306 AU for one session, strain 17.1 for the day.
+    # The save in progress (services/session_save.pending_save): the session's
+    # id and one id per exercise, minted ONCE on the first press of Save, with
+    # that press's duration and RPE. Every later press, and a reload, sends the
+    # same session again under the same ids, so a save that stopped partway is
+    # completed and nothing is stored twice. Before 2026-09-11 every press
+    # minted a fresh id and rewrote everything, which is how 2026-09-10 was
+    # logged three times: 8, 20 and 2 exercises under three ids, 1,306 AU for
+    # one session, strain 17.1 for the day. From 2026-09-11 to 2026-10-19 the
+    # page also kept the indices of the exercises already written
+    # (tp_saved_exercise_idx, tp_last_saved_exercise_id); ids minted by the
+    # caller made them unnecessary.
     "tp_pending_session",
-    "tp_saved_exercise_idx",
-    "tp_last_saved_exercise_id",
 )
 
 #: Read-time HOLD, the biometrics.HRV_GARMIN_HOLD idiom. `rest_taken_seconds`

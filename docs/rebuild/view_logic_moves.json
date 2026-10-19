@@ -29,7 +29,7 @@
     {"id": "HOME-26", "what": "The sync decision (moves with the sync to the engine; the owner's once-a-day rule with the retry)", "where": "app.py:618-628, 2651-2666", "service": null, "test": null},
     {"id": "HOME-27", "what": "Which status message wins: Oura auth state and each sync step's last result", "where": "app.py:2586-2607", "service": null, "test": null},
     {"id": "HOME-28", "what": "Each score's scale (100 or 21) for the arc", "where": "app.py:698-725", "service": null, "test": null},
-    {"id": "TRN-1", "what": "The session save: one idempotent save of a complete session with caller-minted ids", "where": "views/training.py:991-1124, 4074-4118, 3004-3020", "service": null, "test": null},
+    {"id": "TRN-1", "what": "The session save: one idempotent save of a complete session with caller-minted ids", "where": "views/training.py:991-1124, 4074-4118, 3004-3020", "service": "services/session_save.py::save_session", "test": "tests/test_session_save.py::test_a_session_sent_three_times_is_stored_once", "moved": "2026-10-19"},
     {"id": "TRN-2", "what": "Checkpoint and restore rules, and the 'already logged today' lock", "where": "views/training.py:790-958", "service": null, "test": null},
     {"id": "TRN-3", "what": "Prescription seeding: resolved numbers, previous performance, delta and caption parts per exercise", "where": "views/training.py:1351-1467, 4340-4349", "service": null, "test": null},
     {"id": "TRN-4", "what": "The load policy with the failed-week hold and the pain gate; per exercise next_step, step_blocked, held_because", "where": "views/training.py:3428-3432, 1434-1440, 4483", "service": null, "test": null},
