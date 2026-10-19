@@ -65,7 +65,7 @@ _repository = repo.get_repository()
 if _repository.offline:
     _built = _repository.datastore_built_at() or "unknown"
     st.warning(
-        f"**Offline** — reading the local datastore, not Google Sheets. "
+        f"**Offline** — reading a local snapshot, not the live store. "
         f"Snapshot built {_built}. Writes are disabled and today's data may "
         f"be missing. Unset `HEALTH_DATASTORE_PATH` to go live.",
         icon="🗄️",

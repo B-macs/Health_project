@@ -1430,7 +1430,7 @@ def _get_phases_and_active_phase() -> tuple[list, object | None]:
     overwriting real phase data (including a manual reschedule's
     date_overrides) is unacceptable collateral for a retryable glitch. This
     happened twice in one week. Phase 1's creation is now an explicit,
-    user-confirmed action tied to the "Begin 14-Day Plan" button — this
+    user-confirmed action tied to the "Begin the plan" button — this
     function only ever reads. (Later blocks need no button at all: they are
     seeded before their Monday and plan.active_phase picks them up on the
     date. Phase 1 keeps its screen because it is the one that has to ASK for
@@ -3324,7 +3324,7 @@ def render():
         )
         start_input = st.date_input("Plan start date", value=date.today(),
                                     help="You can backdate if you've already started.")
-        if st.button("Begin 14-Day Plan", type="primary", use_container_width=True):
+        if st.button("Begin the plan", type="primary", use_container_width=True):
             r = repo.get_repository()
             r.set_config("plan_start_date", str(start_input))
             # Phase 1 is created here, explicitly, tied to this one confirmed

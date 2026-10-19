@@ -2754,8 +2754,8 @@ def render() -> None:
         st.divider()
         st.subheader("Biometric Blend History (persisted)")
         st.caption(
-            "A fixed daily record of the blend above, written once a day "
-            "(Repository.sync_biometric_blend) to its own sheet tab. Unlike the "
+            "A fixed daily record of the blend above, written by the device sync "
+            "(Repository.sync_biometric_blend) to its own table. Unlike the "
             "live view above, a past day here doesn't change even if Oura/Garmin "
             "later revise that day's raw reading — this is what you actually saw "
             "at the time."
@@ -2797,7 +2797,7 @@ def render() -> None:
         st.subheader("Metrics History (persisted)")
         st.caption(
             "A fixed daily record of Readiness, Sleep Score, and Strain — written "
-            "once a day (Repository.sync_metrics_history) to its own sheet tab, "
+            "by the device sync (Repository.sync_metrics_history) to its own table, "
             "same rationale as Biometric Blend above. This is also what feeds the "
             "trend sparklines behind the Readiness/Sleep/Strain cards on Home "
             "(tap a card to see it)."
@@ -2838,9 +2838,10 @@ def render() -> None:
 
         st.divider()
         st.caption(
-            "Weekly Rollup syncs automatically once a week; Garmin Daily Metrics "
-            "syncs automatically once a day (both checked whenever the Home or "
-            "Training page loads — no button needed)."
+            "Garmin daily metrics and activities sync by themselves every 2 hours "
+            "while the app is open (daily metrics stop once the day's check-in is "
+            "saved); the weekly rollup is written when the Training page opens. "
+            "No button is needed."
         )
 
         st.divider()
@@ -2855,9 +2856,9 @@ def render() -> None:
         else:
             st.caption(
                 "Daily wellness metrics feed the readiness/ACWR engine (blended with "
-                "Oura) and archive to their own Sheet tabs (Garmin Daily, Garmin "
-                "Activities). Daily Metrics also syncs automatically once a day on "
-                "Home/Training page open; use the button below to run it on demand."
+                "Oura) and are stored in their own tables (Garmin Daily, Garmin "
+                "Activities). Both sync by themselves every 2 hours while the app is "
+                "open; the buttons below run them now."
             )
 
             col_daily, col_activities = st.columns(2, gap="small")
@@ -2895,7 +2896,7 @@ def render() -> None:
             "hypnogram — Oura reads stage well but over-reports Awake; "
             "Garmin's wrist sensor needs real rotational movement, so its "
             "Awake acts as a strict filter. Reads only the already-synced "
-            "Sheet tabs, so it never calls a device API and is safe to "
+            "tables, so it never calls a device API and is safe to "
             "re-run while Garmin is rate-limited. Display-only: the engine "
             "still reads the Oura/Garmin biometric blend."
         )
@@ -2920,9 +2921,10 @@ def render() -> None:
         st.subheader("Oura")
         if not sync_repo.oura_configured():
             st.info(
-                "Add OURA_TOKEN to .streamlit/secrets.toml to enable Oura sync. "
-                "Feeds the readiness/ACWR engine (70% weight for HRV/RHR/sleep, 20% "
-                "for steps, blended with Garmin) once configured."
+                "Oura is not connected. Authorise it once with "
+                "`python scripts/authorize_oura.py`. It feeds the readiness/ACWR "
+                "engine (70% weight for HRV/RHR/sleep, 20% for steps, blended with "
+                "Garmin) once connected."
             )
         else:
             st.caption(

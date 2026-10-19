@@ -6376,6 +6376,9 @@ class Repository:
         results: dict[str, tuple[bool, str | None]] = {}
         results["oura"] = self.sync_oura_all_if_due(days=7, **kw)
         results["garmin"] = self._garmin_daily_if_due_safe(days=2, **kw)
+        # Before session HR, which reads the heart-rate maximum estimated from
+        # these activities (fault F14, 2026-10-19).
+        results["garmin_activities"] = self.sync_garmin_activities_if_due(**kw)
         results["blend"] = self.sync_biometric_blend_if_due(days=7, **kw)
         results["session_hr"] = self.sync_session_hr_recent_if_due(days=2, **kw)
         results["metrics_history"] = self.sync_metrics_history_if_due(days=7, **kw)
@@ -6404,6 +6407,27 @@ class Repository:
         today = today or date.today()
         return self.run_sync_if_due(
             "supabase_backup", lambda: backup.run(self._sb, today), hours=hours, now=now)
+
+    def sync_garmin_activities_if_due(self, today: date | None = None,
+                                      now: datetime | None = None, hours: float = 2,
+                                      limit: int = 20) -> tuple[bool, str | None]:
+        """The recent Garmin activities, as a step of the automatic chain
+        (fault F14, 2026-10-19). A button was their only writer, and the
+        heart-rate maximum behind session heart rate (get_observed_hr_max)
+        reads them, so it went stale unless the button was pressed. Never
+        raises; nothing to do without Garmin or while its rate limit holds.
+        `today` is accepted for the chain's shared arguments."""
+        if not self.garmin_configured():
+            return True, None
+        now = now or datetime.now()
+        try:
+            if self.garmin_rate_limited(now=now):
+                return True, None
+        except Exception as exc:
+            return False, str(exc)
+        return self.run_sync_if_due(
+            "garmin_activities", lambda: self.sync_garmin_activities(limit=limit),
+            hours=hours, now=now)
 
     def _garmin_daily_if_due_safe(self, days: int = 2, today: date | None = None,
                                   now: datetime | None = None, hours: float = 2
