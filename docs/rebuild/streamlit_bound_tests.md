@@ -7,6 +7,7 @@ Streamlit. `scripts/rebuild_gate.py` reads this list (the lines that start with
 Phase 10 maps every one to a replacement, or to a retirement that the owner
 approves. Found 2026-10-07 by an import scan of `tests/`.
 
+- `tests/test_checkin_view_edits.py` — the check-in page opens a saved day filled in (added 2026-10-19, fault F3)
 - `tests/test_chart_axes.py` — chart axis rendering in app.py/styles.py
 - `tests/test_flexibility_screen.py` — the flexibility (Cluster A) screen
 - `tests/test_hold_timer_endings.py` — the guided flow's hold-timer endings

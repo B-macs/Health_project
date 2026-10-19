@@ -6,11 +6,16 @@ Call render() from the SPA router in app.py.
 from datetime import date, timedelta
 import streamlit as st
 import repo
+from services.checkin_form import CONDITIONS, initial_values as _initial_values
 from services.models import CheckInRecord
 from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
 
 
-CONDITION_OPTIONS = ["Excellent", "Good", "Average", "Below Average", "Poor"]
+CONDITION_OPTIONS = list(CONDITIONS)
+
+
+def initial_values(existing):
+    return _initial_values(existing, ANATOMICAL_LOCATIONS, SENSATION_TAGS)
 
 # Illustrative reference bands for the 0–10 sliders below — wording/ranges are
 # a starting point, not a clinical standard. Tweak freely; each tuple is
@@ -83,6 +88,24 @@ def render() -> None:
         st.caption(f"⚠ Backfilling {selected_date.strftime('%A, %d %B %Y')}")
     else:
         st.caption(selected_date.strftime('%A, %d %B %Y'))
+
+    # A day that already has a check-in opens WITH that entry's values, and the
+    # save then stores exactly what the form shows (replace=True). Before
+    # 2026-10-19 the form always opened at its defaults and a second save
+    # merged field by field, treating a value equal to its default as "not
+    # filled in" — so a pain of 4 could not be corrected back to 0 that day and
+    # the pain gate kept reading 4 (rebuild Phase 2 fault F3). A failed read
+    # opens the form at its defaults and the save merges as before, which
+    # never overwrites a real earlier reading with a default.
+    try:
+        existing = repo.get_repository().get_check_in(str(selected_date))
+    except Exception:
+        existing = None
+    if existing is not None:
+        st.info("You already saved a check-in for this day. It is filled in below; "
+                "what you save now replaces it.")
+    form = initial_values(existing)
+    k = f"_{selected_date.isoformat()}"   # a new day draws fresh widgets with that day's values
     st.divider()
 
     with st.form("morning_checkin", clear_on_submit=True):
@@ -91,40 +114,49 @@ def render() -> None:
         with col_tissue:
             st.subheader("Tissue State")
             tightness_score = st.slider(
-                "Tightness Score", min_value=0, max_value=10, value=0, step=1,
+                "Tightness Score", min_value=0, max_value=10,
+                value=form["tightness_score"], step=1,
                 help="Clinical scale. 0 = no restriction, 10 = severe.",
+                key=f"checkin_tightness{k}",
             )
             pain_score = st.slider(
-                "Pain Score", min_value=0, max_value=10, value=0, step=1,
+                "Pain Score", min_value=0, max_value=10,
+                value=form["pain_score"], step=1,
                 help="0 = pain-free, 10 = worst imaginable.",
+                key=f"checkin_pain{k}",
             )
             current_condition = st.selectbox(
-                "General Readiness", CONDITION_OPTIONS, key="checkin_condition"
+                "General Readiness", CONDITION_OPTIONS,
+                index=CONDITION_OPTIONS.index(form["current_condition"]),
+                key=f"checkin_condition{k}",
             )
 
         with col_location:
             st.subheader("Location & Sensation")
             anatomical_locations = st.multiselect(
                 "Affected Areas", ANATOMICAL_LOCATIONS,
+                default=form["anatomical_locations"],
                 placeholder="Select one or more regions…",
-                key="checkin_locations",
+                key=f"checkin_locations{k}",
             )
             sensation_tags = st.multiselect(
                 "Sensation Tags", SENSATION_TAGS,
+                default=form["sensation_tags"],
                 placeholder="Pick all that apply…",
-                key="checkin_tags",
+                key=f"checkin_tags{k}",
             )
             subjective_note = st.text_input(
                 "Sensation Note",
+                value=form["subjective_tightness"],
                 placeholder="e.g. Lower right back stiff when standing from chair, eases after 10 minutes",
                 help="One sentence. Stored raw for AI parsing.",
-                key="checkin_note",
+                key=f"checkin_note{k}",
             )
 
         with col_lifestyle:
             st.subheader("Lifestyle Factors")
             psych_stress = st.select_slider(
-                "Psychological Stress", options=[1, 2, 3, 4, 5], value=1,
+                "Psychological Stress", options=[1, 2, 3, 4, 5], value=form["psych_stress_score"],
                 help=(
                     "Combined scale — emotional load and mental clarity together, "
                     "deliberately one metric rather than two overlapping ones.\n\n"
@@ -139,18 +171,18 @@ def render() -> None:
                     "**5 — Very High**: Significant stress or emotional load, "
                     "foggy/scattered thinking, hard to focus on simple tasks."
                 ),
-                key="checkin_stress",
+                key=f"checkin_stress{k}",
             )
             alcohol_units = st.number_input(
                 "Alcohol Units (last 24 h)", min_value=0.0, max_value=20.0,
-                value=0.0, step=0.5,
+                value=form["alcohol_units"], step=0.5,
                 help="Standard drink = 1 unit. 0 = none consumed.",
-                key="checkin_alcohol",
+                key=f"checkin_alcohol{k}",
             )
             travel_flag = st.toggle(
-                "Travel / Location Change",
+                "Travel / Location Change", value=form["travel_flag"],
                 help="Hotel beds, flights, altitude changes — flags HRV/stiffness context for AI.",
-                key="checkin_travel",
+                key=f"checkin_travel{k}",
             )
 
         st.divider()
@@ -159,47 +191,50 @@ def render() -> None:
         with col_joint_gut:
             st.subheader("Joint / Gut")
             instability_events = st.number_input(
-                "Instability Events", min_value=0, max_value=20, value=0, step=1,
+                "Instability Events", min_value=0, max_value=20,
+                value=form["instability_events"], step=1,
                 help="Count of joint subluxation/instability events since yesterday (HSD).",
-                key="checkin_instability",
+                key=f"checkin_instability{k}",
             )
             bristol_type = st.select_slider(
-                "Bristol Stool Type", options=[0, 1, 2, 3, 4, 5, 6, 7], value=4,
+                "Bristol Stool Type", options=[0, 1, 2, 3, 4, 5, 6, 7], value=form["bristol_type"],
                 help="0 = no stool passed in the last 24h. 1 = severe constipation, "
                      "7 = watery/diarrhea. 3–4 = normal.",
-                key="checkin_bristol",
+                key=f"checkin_bristol{k}",
             )
             unusual_stool_colour = st.toggle(
-                "Unusual Colour?", key="checkin_stool_colour",
+                "Unusual Colour?", value=form["unusual_stool_colour"],
+                key=f"checkin_stool_colour{k}",
             )
 
         with col_body_hydration:
             st.subheader("Body / Hydration")
             hunger_deviation = st.select_slider(
-                "Hunger vs Baseline", options=[-2, -1, 0, 1, 2], value=0,
+                "Hunger vs Baseline", options=[-2, -1, 0, 1, 2], value=form["hunger_deviation"],
                 help="−2 = far below normal appetite, +2 = far above normal appetite.",
-                key="checkin_hunger",
+                key=f"checkin_hunger{k}",
             )
             thirst_intensity = st.select_slider(
-                "Morning Thirst Intensity", options=[1, 2, 3, 4, 5], value=1,
-                key="checkin_thirst",
+                "Morning Thirst Intensity", options=[1, 2, 3, 4, 5], value=form["thirst_intensity"],
+                key=f"checkin_thirst{k}",
             )
             electrolytes_taken = st.toggle(
-                "Salt/Electrolytes Taken", key="checkin_electrolytes",
+                "Salt/Electrolytes Taken", value=form["electrolytes_taken"],
+                key=f"checkin_electrolytes{k}",
             )
 
         with col_meditation:
             st.subheader("Meditation")
             meditation_minutes = st.number_input(
                 "Meditation Minutes", min_value=0.0, max_value=120.0,
-                value=0.0, step=5.0,
+                value=form["meditation_minutes"], step=5.0,
                 help="Practice Done is inferred automatically — any minutes logged counts as done.",
-                key="checkin_meditation_minutes",
+                key=f"checkin_meditation_minutes{k}",
             )
             relaxation_depth = st.select_slider(
-                "Relaxation Depth", options=[1, 2, 3, 4, 5], value=1,
+                "Relaxation Depth", options=[1, 2, 3, 4, 5], value=form["relaxation_depth"],
                 help="1 = restless/distracted, 5 = deeply relaxed. Only meaningful if practice was done.",
-                key="checkin_relaxation",
+                key=f"checkin_relaxation{k}",
             )
 
         st.divider()
@@ -230,7 +265,7 @@ def render() -> None:
             meditation_done=meditation_done,
             meditation_minutes=meditation_minutes,
             relaxation_depth=relaxation_depth,
-        ))
+        ), replace=existing is not None)
         # Readiness (Home page) reads today's alcohol units via cached
         # get_biometric_rolling() — clear so it recomputes with this
         # check-in's value instead of serving a stale pre-checkin score.

@@ -20,6 +20,7 @@ Pure: the store is a fake that keeps its own tables. No network.
 """
 from __future__ import annotations
 
+import dataclasses
 import sqlite3
 import uuid
 from datetime import date, datetime
@@ -190,6 +191,27 @@ def test_a_second_check_in_the_same_day_keeps_the_first_ones_values(local_copy):
     assert row["pain_score"] == 4.0, "an untouched default overwrote a real reading"
     assert row["meditation_minutes"] == 10
     assert len(store.tables["readiness_checkins"]) == 1
+
+
+def test_an_edited_check_in_stores_exactly_what_the_form_shows(local_copy):
+    """Fault F3 (2026-10-19): the form opens the day's entry filled in, so its
+    save is the whole day, and a value equal to a default is a real answer."""
+    store = FakeStore()
+    repo = _repo(local_copy, store)
+    repo.save_check_in(_check_in(pain=4.0, note="sore"))
+    edited = repo.get_check_in("2026-10-09")
+    assert edited.pain_score == 4.0 and edited.subjective_tightness == "sore"
+    repo.save_check_in(dataclasses.replace(edited, pain_score=0, tightness_score=0),
+                       replace=True)
+    row = store.tables["readiness_checkins"][0]
+    assert row["pain_score"] == 0 and row["tightness_score"] == 0
+    assert row["subjective_tightness"] == "sore", "an unchanged field kept its value"
+    assert _local(local_copy, "SELECT pain_score FROM readiness_checkins") == [(0.0,)]
+    assert len(store.tables["readiness_checkins"]) == 1
+
+
+def test_a_day_without_a_check_in_reads_back_as_none(local_copy):
+    assert _repo(local_copy, FakeStore()).get_check_in("2026-10-09") is None
 
 
 def test_a_failed_supabase_write_raises_and_leaves_the_local_copy_untouched(local_copy):

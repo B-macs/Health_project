@@ -1620,7 +1620,8 @@ class Repository:
         )
         return pages[0] if pages else None
 
-    def _merge_check_in(self, new: models.CheckInRecord, existing_page: dict) -> tuple[models.CheckInRecord, bool]:
+    def _merge_check_in(self, new: models.CheckInRecord, existing_page: dict,
+                        replace: bool = False) -> tuple[models.CheckInRecord, bool]:
         """Field-by-field upsert: a field on `new` only overwrites the
         existing page's value if it was actually filled in (i.e. it's not
         still sitting at that field's untouched-widget default). A
@@ -1629,12 +1630,20 @@ class Repository:
         rather than blanking it back to defaults. Returns (merged record,
         whether the note text changed — a previously-parsed note that just
         changed needs the AI parser to see it again, see
-        get_unparsed_readiness's Parsed filter)."""
+        get_unparsed_readiness's Parsed filter).
+
+        `replace=True` takes every field of `new` as it is. The caller then
+        sent the COMPLETE day — the check-in form opens a day that already has
+        an entry with that entry's values filled in (get_check_in) — so a
+        value equal to a default is a real answer, never "not filled in".
+        Without it a pain of 4 could not be corrected back to 0 the same day,
+        and the pain gate kept reading 4 (rebuild Phase 2 fault F3,
+        2026-10-19)."""
         changes: dict[str, object] = {}
         note_changed = False
         for field, (prop_name, kind, default) in _CHECKIN_FIELD_MAP.items():
             new_val = getattr(new, field)
-            if new_val != default:
+            if replace or new_val != default:
                 changes[field] = new_val
                 if field == "subjective_tightness":
                     old_val = notion.get_property(existing_page, prop_name, kind)
@@ -1645,7 +1654,29 @@ class Repository:
         changes["meditation_done"] = bool(changes["meditation_minutes"])
         return dataclasses.replace(new, **changes), note_changed
 
-    def save_check_in(self, record: models.CheckInRecord) -> None:
+    def get_check_in(self, iso_date: str) -> models.CheckInRecord | None:
+        """The check-in already saved for `iso_date`, with every field read
+        back (a blank field reads as its form default), or None. The form
+        fills itself from this, so a second visit the same day edits the
+        entry instead of guessing which fields were meant."""
+        page = self._find_check_in_page(iso_date)
+        if page is None:
+            return None
+        values = {}
+        for field, (prop_name, kind, default) in _CHECKIN_FIELD_MAP.items():
+            got = notion.get_property(page, prop_name, kind)
+            values[field] = default if got is None else got
+        return models.CheckInRecord(
+            date=iso_date,
+            meditation_done=bool(values["meditation_minutes"]),
+            **values,
+        )
+
+    def save_check_in(self, record: models.CheckInRecord, replace: bool = False) -> None:
+        """One row per date. A first save creates it; a later save the same
+        day merges into it (see _merge_check_in): field by field by default,
+        or every field as given with `replace=True`, which the form uses when
+        it opened the day's existing entry."""
         existing_page = self._find_check_in_page(record.date)
         if self.supabase_record:
             # The local copy is current for this date (rebuilt from Supabase
@@ -1661,7 +1692,7 @@ class Repository:
             # columns it names (the AI-parser ones are left alone), and if the
             # row were somehow missing from Supabase it is written instead of
             # the update vanishing.
-            merged, note_changed = self._merge_check_in(record, existing_page)
+            merged, note_changed = self._merge_check_in(record, existing_page, replace=replace)
             properties = self._check_in_properties(merged)
             if note_changed:
                 properties["Parsed"] = notion.checkbox(False)
@@ -1680,7 +1711,7 @@ class Repository:
             # widget default overwrite a real earlier reading — the exact thing
             # _merge_check_in exists to prevent.
             if existing_page is not None:
-                record, _ = self._merge_check_in(record, existing_page)
+                record, _ = self._merge_check_in(record, existing_page, replace=replace)
             properties = self._check_in_properties(record)
             notion.create_page(
                 self._nc, self.config.notion_db_readiness, properties=properties,
@@ -1696,7 +1727,7 @@ class Repository:
                 {**properties, "Parsed": notion.checkbox(False)})
             return
 
-        merged, note_changed = self._merge_check_in(record, existing_page)
+        merged, note_changed = self._merge_check_in(record, existing_page, replace=replace)
         properties = self._check_in_properties(merged)
         if note_changed:
             properties["Parsed"] = notion.checkbox(False)
