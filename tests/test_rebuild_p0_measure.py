@@ -74,6 +74,25 @@ def test_a_monitoring_total_adds_doubles_and_int64_strings():
     assert m.series_total([]) == 0.0
 
 
+def test_the_month_projection_adds_up():
+    p = m.project(start_s=10, cold_starts_per_day=1, syncs_per_day=1, sync_s=100,
+                  requests_per_day=10, request_s=0.5, copy_mb=2, image_mb=250,
+                  deploys_per_month=10, build_min=1, secret_versions=3)
+    # 30 starts x 10 s + 30 syncs x 100 s + 300 requests x 0.5 s = 3,450 billed seconds
+    assert p["use"]["cloud_run_gib_s"] == 3450
+    assert p["use"]["cloud_run_vcpu_s"] == 3450 + 30 * 20      # boost: start + 10 s, one more vCPU
+    assert p["use"]["cloud_run_requests"] == 330
+    assert p["use"]["supabase_egress_gb"] == 0.06
+    assert p["share"]["artifact_registry_mb"] == 0.5 and p["share"]["secret_versions"] == 0.5
+    assert p["max_share"] == 0.5
+
+
+def test_the_owners_pattern_stays_under_half_of_every_free_amount():
+    # One sync a day at the first open plus a retry, ten cold starts a day (2026-10-19).
+    p = m.project(start_s=12)
+    assert p["max_share"] <= 0.5, p["max_share_item"]
+
+
 def test_the_access_key_is_read_from_env_with_or_without_a_bom(tmp_path):
     env = tmp_path / ".env"
     env.write_bytes(b"\xef\xbb\xbfHEALTH_ACCESS_KEY=\"abc-DEF_123\"\n")

@@ -5,6 +5,7 @@
     python scripts/rebuild_p0_measure.py oura
     python scripts/rebuild_p0_measure.py garmin --confirm owner-approved
     python scripts/rebuild_p0_measure.py usage [--hours 24]
+    python scripts/rebuild_p0_measure.py project --start-s 11
     python scripts/rebuild_p0_measure.py summary [--build COMMIT]
 
 Every sample is one line in reports/rebuild/p0_measure.jsonl (gitignored). A
@@ -287,6 +288,62 @@ def cmd_usage(args) -> None:
     record({"kind": "usage", **out})
 
 
+# The free amounts a month (checked on Google's and Supabase's pages 2026-10-19;
+# docs/rebuild/stack.md). Per billing account; Cloudflare's is per day.
+FREE = {
+    "cloud_run_vcpu_s": 180_000,
+    "cloud_run_gib_s": 360_000,
+    "cloud_run_requests": 2_000_000,
+    "artifact_registry_mb": 500,
+    "cloud_build_minutes": 2_500,
+    "secret_versions": 6,
+    "secret_accesses": 10_000,
+    "supabase_egress_gb": 5,
+    "worker_requests_per_day": 100_000,
+}
+# Data sent out of Belgium has no free amount (Premium tier, $0.12 a GiB).
+EGRESS_USD_PER_GB = 0.12
+
+
+def project(*, start_s: float, cold_starts_per_day: float = 10, syncs_per_day: float = 2,
+            sync_s: float = 160, requests_per_day: float = 60, request_s: float = 0.3,
+            copy_mb: float = 1.36, image_mb: float = 186, deploys_per_month: float = 30,
+            build_min: float = 1.2, secret_versions: int = 2) -> dict:
+    """A 30-day month of use against each free amount, from measured unit costs.
+
+    The defaults are the owner's pattern, generous on purpose: one sync a day
+    at the first morning open plus one retry (2026-10-19), each sync at twice
+    the 77 s the Streamlit chain took (2026-08-01), ten cold starts a day.
+    Startup CPU boost is on, so each start is billed one extra vCPU for the
+    start and the 10 s after it."""
+    days = 30
+    starts = cold_starts_per_day * days
+    requests = (requests_per_day + syncs_per_day) * days
+    billed_s = starts * start_s + syncs_per_day * days * sync_s + requests_per_day * days * request_s
+    use = {
+        "cloud_run_vcpu_s": billed_s + starts * (start_s + 10),
+        "cloud_run_gib_s": billed_s,
+        "cloud_run_requests": requests,
+        "artifact_registry_mb": image_mb,
+        "cloud_build_minutes": deploys_per_month * build_min,
+        "secret_versions": secret_versions,
+        "secret_accesses": starts * 2,
+        "supabase_egress_gb": starts * copy_mb / 1000,
+        "worker_requests_per_day": requests_per_day + syncs_per_day,
+    }
+    share = {k: round(use[k] / FREE[k], 3) for k in FREE}
+    # Out of Belgium: ~20 KB an answer, ~200 KB of writes a sync, the daily 1.1 MB backup.
+    egress_gb = (requests * 20e3 + syncs_per_day * days * 200e3 + days * 1.1e6) / 1e9
+    return {"use": {k: round(v, 3) for k, v in use.items()}, "share": share,
+            "max_share": max(share.values()), "max_share_item": max(share, key=share.get),
+            "egress_out_gb": round(egress_gb, 3),
+            "egress_out_usd": round(egress_gb * EGRESS_USD_PER_GB, 3)}
+
+
+def cmd_project(args) -> None:
+    print(json.dumps(project(start_s=args.start_s), indent=2))
+
+
 def summarise(samples: list[dict]) -> dict:
     """The proof numbers from the samples: cold starts as the caller saw them."""
     cold = [s["seconds"] for s in samples if s.get("kind") == "cold" and s.get("cold")]
@@ -342,6 +399,9 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("usage")
     p.add_argument("--hours", type=float, default=24.0)
     p.set_defaults(func=cmd_usage)
+    p = sub.add_parser("project")
+    p.add_argument("--start-s", type=float, required=True, help="billed seconds of one cold start")
+    p.set_defaults(func=cmd_project)
     p = sub.add_parser("summary")
     p.add_argument("--build", default="", help="only the samples of the engine built from this commit")
     p.set_defaults(func=cmd_summary)
