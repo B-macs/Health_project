@@ -4,6 +4,24 @@
  */
 
 export interface paths {
+    "/api/checkin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Checkin */
+        get: operations["get_checkin_api_checkin_get"];
+        /** Put Checkin */
+        put: operations["put_checkin_api_checkin_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/health": {
         parameters: {
             query?: never;
@@ -189,6 +207,89 @@ export interface components {
             /** Mode */
             mode: string;
         };
+        /** CheckInFormOut */
+        CheckInFormOut: {
+            /** Conditions */
+            conditions: string[];
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Decimal */
+            decimal: components["schemas"]["DecimalRange"][];
+            /** Existing */
+            existing: boolean;
+            /** Is Today */
+            is_today: boolean;
+            /** Locations */
+            locations: string[];
+            /** Options */
+            options: string[];
+            /** Read Failed */
+            read_failed: boolean;
+            /** Switches */
+            switches: string[];
+            /** Tags */
+            tags: string[];
+            values: components["schemas"]["CheckInValues"];
+            /** Whole */
+            whole: components["schemas"]["WholeRange"][];
+        };
+        /** CheckInIn */
+        CheckInIn: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Opened Entry */
+            opened_entry: boolean;
+            /** Values */
+            values: {
+                [key: string]: unknown;
+            };
+        };
+        /**
+         * CheckInValues
+         * @description Every field of the morning check-in; all are required on a save.
+         */
+        CheckInValues: {
+            /** Alcohol Units */
+            alcohol_units: number;
+            /** Anatomical Locations */
+            anatomical_locations: string[];
+            /** Bristol Type */
+            bristol_type: number;
+            /** Current Condition */
+            current_condition: string;
+            /** Electrolytes Taken */
+            electrolytes_taken: boolean;
+            /** Hunger Deviation */
+            hunger_deviation: number;
+            /** Instability Events */
+            instability_events: number;
+            /** Meditation Minutes */
+            meditation_minutes: number;
+            /** Pain Score */
+            pain_score: number;
+            /** Psych Stress Score */
+            psych_stress_score: number;
+            /** Relaxation Depth */
+            relaxation_depth: number;
+            /** Sensation Tags */
+            sensation_tags: string[];
+            /** Subjective Tightness */
+            subjective_tightness: string;
+            /** Thirst Intensity */
+            thirst_intensity: number;
+            /** Tightness Score */
+            tightness_score: number;
+            /** Travel Flag */
+            travel_flag: boolean;
+            /** Unusual Stool Colour */
+            unusual_stool_colour: boolean;
+        };
         /** ContributorRow */
         ContributorRow: {
             /** Bar Pct */
@@ -216,6 +317,17 @@ export interface components {
             scored: boolean;
             /** Unscored Reason */
             unscored_reason: string;
+        };
+        /** DecimalRange */
+        DecimalRange: {
+            /** Field */
+            field: string;
+            /** Max */
+            max: number;
+            /** Min */
+            min: number;
+            /** Step */
+            step: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -989,6 +1101,15 @@ export interface components {
             /** Stage */
             stage: string;
         };
+        /** WholeRange */
+        WholeRange: {
+            /** Field */
+            field: string;
+            /** Max */
+            max: number;
+            /** Min */
+            min: number;
+        };
     };
     responses: never;
     parameters: never;
@@ -998,6 +1119,76 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    get_checkin_api_checkin_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_checkin_api_checkin_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckInFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_api_health_get: {
         parameters: {
             query?: never;

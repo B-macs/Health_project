@@ -195,3 +195,60 @@ def save(repo, record: CheckInRecord, opened_entry: bool) -> None:
     read the entry opened at its defaults, and the save merges field by
     field, which never overwrites a real earlier reading with a default."""
     repo.save_check_in(record, replace=opened_entry)
+
+
+# ─── The form, served (GET and PUT /api/checkin, rebuild Phase 2) ────────────
+
+def options_lists() -> tuple[list[str], list[str]]:
+    """The multi-select options: the anatomical locations and the sensation
+    tags (training_constants)."""
+    from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
+    return list(ANATOMICAL_LOCATIONS), list(SENSATION_TAGS)
+
+
+def form_state(repo, day: date | None, today: date) -> dict:
+    """What the check-in form shows for `day` (the caller's today without
+    one): the days it can be saved for, whether the day already has an entry
+    (and whether that read failed: a failed read opens at the defaults and
+    the save then merges), the starting values, and every control's options
+    and limits, so the phone draws the form from these and never holds a
+    range of its own. CheckInError for a day outside the backfill window."""
+    options = date_options(today)
+    day = day or today
+    if day not in options:
+        raise CheckInError([f"the date {day.isoformat()} is not today or one of the "
+                            f"{BACKFILL_DAYS} days before"])
+    locations, tags = options_lists()
+    read_failed = False
+    try:
+        existing = repo.get_check_in(day.isoformat())
+    except Exception:
+        existing, read_failed = None, True
+    return {
+        "date": day,
+        "options": options,
+        "is_today": day == today,
+        "existing": existing is not None,
+        "read_failed": read_failed,
+        "values": initial_values(existing, locations, tags),
+        "conditions": list(CONDITIONS),
+        "whole": [{"field": f, "min": low, "max": high} for f, (low, high) in _WHOLE.items()],
+        "decimal": [{"field": f, "min": low, "max": high, "step": DECIMAL_STEPS[f]}
+                    for f, (low, high) in _DECIMAL.items()],
+        "switches": list(_SWITCHES),
+        "locations": locations,
+        "tags": tags,
+    }
+
+
+def submit(repo, day: date, today: date, values: dict, opened_entry: bool) -> dict:
+    """Validate and store a check-in (every field required, each in its
+    control's limits), then return the form as the store now holds it.
+    `opened_entry`: the form opened the day's stored entry, so what it sends
+    replaces it (fault F3); otherwise the save merges field by field. One
+    row per date, so the same request sent twice stores one entry.
+    CheckInError names every problem; nothing is stored then."""
+    locations, tags = options_lists()
+    record = record_from_form(day, today, values, locations, tags)
+    save(repo, record, opened_entry)
+    return form_state(repo, day, today)

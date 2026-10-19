@@ -87,6 +87,221 @@
         "title": "CacheInfo",
         "type": "object"
       },
+      "CheckInFormOut": {
+        "properties": {
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "decimal": {
+            "items": {
+              "$ref": "#/components/schemas/DecimalRange"
+            },
+            "title": "Decimal",
+            "type": "array"
+          },
+          "existing": {
+            "title": "Existing",
+            "type": "boolean"
+          },
+          "is_today": {
+            "title": "Is Today",
+            "type": "boolean"
+          },
+          "locations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Locations",
+            "type": "array"
+          },
+          "options": {
+            "items": {
+              "format": "date",
+              "type": "string"
+            },
+            "title": "Options",
+            "type": "array"
+          },
+          "read_failed": {
+            "title": "Read Failed",
+            "type": "boolean"
+          },
+          "switches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Switches",
+            "type": "array"
+          },
+          "tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "values": {
+            "$ref": "#/components/schemas/CheckInValues"
+          },
+          "whole": {
+            "items": {
+              "$ref": "#/components/schemas/WholeRange"
+            },
+            "title": "Whole",
+            "type": "array"
+          }
+        },
+        "required": [
+          "date",
+          "options",
+          "is_today",
+          "existing",
+          "read_failed",
+          "values",
+          "conditions",
+          "whole",
+          "decimal",
+          "switches",
+          "locations",
+          "tags"
+        ],
+        "title": "CheckInFormOut",
+        "type": "object"
+      },
+      "CheckInIn": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "opened_entry": {
+            "title": "Opened Entry",
+            "type": "boolean"
+          },
+          "values": {
+            "additionalProperties": true,
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "date",
+          "opened_entry",
+          "values"
+        ],
+        "title": "CheckInIn",
+        "type": "object"
+      },
+      "CheckInValues": {
+        "description": "Every field of the morning check-in; all are required on a save.",
+        "properties": {
+          "alcohol_units": {
+            "title": "Alcohol Units",
+            "type": "number"
+          },
+          "anatomical_locations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Anatomical Locations",
+            "type": "array"
+          },
+          "bristol_type": {
+            "title": "Bristol Type",
+            "type": "integer"
+          },
+          "current_condition": {
+            "title": "Current Condition",
+            "type": "string"
+          },
+          "electrolytes_taken": {
+            "title": "Electrolytes Taken",
+            "type": "boolean"
+          },
+          "hunger_deviation": {
+            "title": "Hunger Deviation",
+            "type": "integer"
+          },
+          "instability_events": {
+            "title": "Instability Events",
+            "type": "integer"
+          },
+          "meditation_minutes": {
+            "title": "Meditation Minutes",
+            "type": "number"
+          },
+          "pain_score": {
+            "title": "Pain Score",
+            "type": "integer"
+          },
+          "psych_stress_score": {
+            "title": "Psych Stress Score",
+            "type": "integer"
+          },
+          "relaxation_depth": {
+            "title": "Relaxation Depth",
+            "type": "integer"
+          },
+          "sensation_tags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sensation Tags",
+            "type": "array"
+          },
+          "subjective_tightness": {
+            "title": "Subjective Tightness",
+            "type": "string"
+          },
+          "thirst_intensity": {
+            "title": "Thirst Intensity",
+            "type": "integer"
+          },
+          "tightness_score": {
+            "title": "Tightness Score",
+            "type": "integer"
+          },
+          "travel_flag": {
+            "title": "Travel Flag",
+            "type": "boolean"
+          },
+          "unusual_stool_colour": {
+            "title": "Unusual Stool Colour",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "current_condition",
+          "tightness_score",
+          "pain_score",
+          "anatomical_locations",
+          "sensation_tags",
+          "subjective_tightness",
+          "alcohol_units",
+          "travel_flag",
+          "psych_stress_score",
+          "instability_events",
+          "bristol_type",
+          "unusual_stool_colour",
+          "hunger_deviation",
+          "thirst_intensity",
+          "electrolytes_taken",
+          "meditation_minutes",
+          "relaxation_depth"
+        ],
+        "title": "CheckInValues",
+        "type": "object"
+      },
       "ContributorRow": {
         "properties": {
           "bar_pct": {
@@ -171,6 +386,34 @@
           "unscored_reason"
         ],
         "title": "Contributors",
+        "type": "object"
+      },
+      "DecimalRange": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "max": {
+            "title": "Max",
+            "type": "number"
+          },
+          "min": {
+            "title": "Min",
+            "type": "number"
+          },
+          "step": {
+            "title": "Step",
+            "type": "number"
+          }
+        },
+        "required": [
+          "field",
+          "min",
+          "max",
+          "step"
+        ],
+        "title": "DecimalRange",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2612,6 +2855,29 @@
         ],
         "title": "WatchStage",
         "type": "object"
+      },
+      "WholeRange": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "max": {
+            "title": "Max",
+            "type": "integer"
+          },
+          "min": {
+            "title": "Min",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "field",
+          "min",
+          "max"
+        ],
+        "title": "WholeRange",
+        "type": "object"
       }
     }
   },
@@ -2621,6 +2887,155 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/checkin": {
+      "get": {
+        "operationId": "get_checkin_api_checkin_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Checkin"
+      },
+      "put": {
+        "operationId": "put_checkin_api_checkin_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckInIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckInFormOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Checkin"
+      }
+    },
     "/api/health": {
       "get": {
         "operationId": "health_api_health_get",

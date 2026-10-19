@@ -473,3 +473,65 @@ class SyncOut(BaseModel):
     ran: bool
     reason: str | None
     status: SyncRun
+
+
+# ── Check-in (services/checkin_form.py) ──────────────────────────────────────
+
+class CheckInValues(BaseModel):
+    """Every field of the morning check-in; all are required on a save."""
+    current_condition: str
+    tightness_score: int
+    pain_score: int
+    anatomical_locations: list[str]
+    sensation_tags: list[str]
+    subjective_tightness: str
+    alcohol_units: float
+    travel_flag: bool
+    psych_stress_score: int
+    instability_events: int
+    bristol_type: int
+    unusual_stool_colour: bool
+    hunger_deviation: int
+    thirst_intensity: int
+    electrolytes_taken: bool
+    meditation_minutes: float
+    relaxation_depth: int
+
+
+class WholeRange(BaseModel):
+    field: str
+    min: int
+    max: int
+
+
+class DecimalRange(BaseModel):
+    field: str
+    min: float
+    max: float
+    step: float
+
+
+class CheckInFormOut(BaseModel):
+    date: date
+    #: The days a check-in can be saved for: the caller's today first, then back.
+    options: list[date]
+    is_today: bool
+    #: The day already has an entry: the form opens with it, and the save replaces it.
+    existing: bool
+    #: The entry could not be read: the form opens at the defaults, and the save merges.
+    read_failed: bool
+    values: CheckInValues
+    conditions: list[str]
+    whole: list[WholeRange]
+    decimal: list[DecimalRange]
+    switches: list[str]
+    locations: list[str]
+    tags: list[str]
+
+
+class CheckInIn(BaseModel):
+    date: date
+    #: The form opened the day's stored entry (GET said existing).
+    opened_entry: bool
+    #: Strictness lives in the service, which names every problem at once.
+    values: dict
