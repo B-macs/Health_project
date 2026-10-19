@@ -1,6 +1,86 @@
 {
   "components": {
     "schemas": {
+      "ActivityMinutesOut": {
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "number"
+          },
+          "window": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Window",
+            "type": "array"
+          }
+        },
+        "required": [
+          "minutes",
+          "detail",
+          "window"
+        ],
+        "title": "ActivityMinutesOut",
+        "type": "object"
+      },
+      "Adaptation": {
+        "properties": {
+          "badge_shown": {
+            "title": "Badge Shown",
+            "type": "boolean"
+          },
+          "banner_kind": {
+            "title": "Banner Kind",
+            "type": "string"
+          },
+          "reduced": {
+            "title": "Reduced",
+            "type": "boolean"
+          },
+          "volume_factor": {
+            "title": "Volume Factor",
+            "type": "number"
+          },
+          "volume_note": {
+            "title": "Volume Note",
+            "type": "string"
+          }
+        },
+        "required": [
+          "volume_factor",
+          "reduced",
+          "banner_kind",
+          "volume_note",
+          "badge_shown"
+        ],
+        "title": "Adaptation",
+        "type": "object"
+      },
+      "AnswerIn": {
+        "properties": {
+          "accept": {
+            "title": "Accept",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "accept"
+        ],
+        "title": "AnswerIn",
+        "type": "object"
+      },
       "AxisTick": {
         "description": "`at` is the fraction across (an X tick) or down from the top (a Y tick).",
         "properties": {
@@ -18,6 +98,24 @@
           "text"
         ],
         "title": "AxisTick",
+        "type": "object"
+      },
+      "BandTier": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "tier": {
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tier",
+          "label"
+        ],
+        "title": "BandTier",
         "type": "object"
       },
       "BuildInfo": {
@@ -85,6 +183,28 @@
           "age_s"
         ],
         "title": "CacheInfo",
+        "type": "object"
+      },
+      "CarryPrompt": {
+        "description": "A missed session's proposed carry; nothing moves until the athlete answers.",
+        "properties": {
+          "in_order": {
+            "title": "In Order",
+            "type": "boolean"
+          },
+          "lines": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Lines",
+            "type": "array"
+          }
+        },
+        "required": [
+          "in_order",
+          "lines"
+        ],
+        "title": "CarryPrompt",
         "type": "object"
       },
       "CheckInFormOut": {
@@ -302,6 +422,73 @@
         "title": "CheckInValues",
         "type": "object"
       },
+      "CompletionIn": {
+        "properties": {
+          "end_ts": {
+            "title": "End Ts",
+            "type": "number"
+          },
+          "kind": {
+            "default": "plan",
+            "title": "Kind",
+            "type": "string"
+          },
+          "model_minutes": {
+            "minimum": 0.0,
+            "title": "Model Minutes",
+            "type": "integer"
+          },
+          "rpe": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Rpe",
+            "type": "integer"
+          },
+          "start_ts": {
+            "title": "Start Ts",
+            "type": "number"
+          }
+        },
+        "required": [
+          "model_minutes",
+          "start_ts",
+          "end_ts",
+          "rpe"
+        ],
+        "title": "CompletionIn",
+        "type": "object"
+      },
+      "CompletionOut": {
+        "properties": {
+          "ask_length": {
+            "title": "Ask Length",
+            "type": "boolean"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/LengthChoice"
+            },
+            "title": "Choices",
+            "type": "array"
+          },
+          "clock_minutes": {
+            "title": "Clock Minutes",
+            "type": "integer"
+          },
+          "model_minutes": {
+            "title": "Model Minutes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "clock_minutes",
+          "model_minutes",
+          "ask_length",
+          "choices"
+        ],
+        "title": "CompletionOut",
+        "type": "object"
+      },
       "ContributorRow": {
         "properties": {
           "bar_pct": {
@@ -416,6 +603,397 @@
         "title": "DecimalRange",
         "type": "object"
       },
+      "ExerciseLine": {
+        "properties": {
+          "icon": {
+            "title": "Icon",
+            "type": "string"
+          },
+          "laterality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laterality"
+          },
+          "mechanics": {
+            "title": "Mechanics",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prescription": {
+            "title": "Prescription",
+            "type": "string"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "icon",
+          "prescription",
+          "laterality",
+          "mechanics"
+        ],
+        "title": "ExerciseLine",
+        "type": "object"
+      },
+      "FlowStep": {
+        "description": "One position of the guided flow (guided_flow.walk). `event` leads to\nthe next entry; \"skip\" leads to `skip_to`.",
+        "properties": {
+          "ending": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ending"
+          },
+          "event": {
+            "title": "Event",
+            "type": "string"
+          },
+          "ex_idx": {
+            "title": "Ex Idx",
+            "type": "integer"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "record_set": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Record Set"
+          },
+          "rep": {
+            "title": "Rep",
+            "type": "integer"
+          },
+          "rest_begins": {
+            "title": "Rest Begins",
+            "type": "boolean"
+          },
+          "rest_ends": {
+            "title": "Rest Ends",
+            "type": "boolean"
+          },
+          "set_num": {
+            "title": "Set Num",
+            "type": "integer"
+          },
+          "side": {
+            "title": "Side",
+            "type": "string"
+          },
+          "skip_to": {
+            "title": "Skip To",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "index",
+          "ex_idx",
+          "set_num",
+          "rep",
+          "phase",
+          "side",
+          "event",
+          "record_set",
+          "rest_begins",
+          "rest_ends",
+          "ending",
+          "skip_to"
+        ],
+        "title": "FlowStep",
+        "type": "object"
+      },
+      "GapNext": {
+        "properties": {
+          "days_away": {
+            "title": "Days Away",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "start_date": {
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "start_date",
+          "days_away"
+        ],
+        "title": "GapNext",
+        "type": "object"
+      },
+      "GapScreen": {
+        "properties": {
+          "next": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GapNext"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "stranded": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stranded"
+          }
+        },
+        "required": [
+          "next",
+          "stranded"
+        ],
+        "title": "GapScreen",
+        "type": "object"
+      },
+      "GarminActivity": {
+        "properties": {
+          "activity_id": {
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activity_id",
+          "name",
+          "type",
+          "duration_minutes"
+        ],
+        "title": "GarminActivity",
+        "type": "object"
+      },
+      "Gate1Card": {
+        "properties": {
+          "count": {
+            "additionalProperties": true,
+            "title": "Count",
+            "type": "object"
+          },
+          "flare_this_week": {
+            "title": "Flare This Week",
+            "type": "boolean"
+          },
+          "lifts_met": {
+            "title": "Lifts Met",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/Gate1Reason"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/Gate1Lift"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "waiting": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gate1Waiting"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "count",
+          "lifts_met",
+          "rows",
+          "waiting",
+          "reasons",
+          "flare_this_week"
+        ],
+        "title": "Gate1Card",
+        "type": "object"
+      },
+      "Gate1Lift": {
+        "properties": {
+          "first": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First"
+          },
+          "latest": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latest"
+          },
+          "lift": {
+            "title": "Lift",
+            "type": "string"
+          },
+          "met": {
+            "title": "Met",
+            "type": "boolean"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          }
+        },
+        "required": [
+          "lift",
+          "first",
+          "latest",
+          "target",
+          "met"
+        ],
+        "title": "Gate1Lift",
+        "type": "object"
+      },
+      "Gate1Reason": {
+        "properties": {
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "Gate1Reason",
+        "type": "object"
+      },
+      "Gate1ReasonIn": {
+        "properties": {
+          "monday": {
+            "format": "date",
+            "title": "Monday",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "monday",
+          "reason"
+        ],
+        "title": "Gate1ReasonIn",
+        "type": "object"
+      },
+      "Gate1Waiting": {
+        "properties": {
+          "core_done": {
+            "title": "Core Done",
+            "type": "integer"
+          },
+          "core_required": {
+            "title": "Core Required",
+            "type": "integer"
+          },
+          "monday": {
+            "format": "date",
+            "title": "Monday",
+            "type": "string"
+          }
+        },
+        "required": [
+          "monday",
+          "core_done",
+          "core_required"
+        ],
+        "title": "Gate1Waiting",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -504,6 +1082,271 @@
           "timings"
         ],
         "title": "HealthOut",
+        "type": "object"
+      },
+      "HeartRateIn": {
+        "properties": {
+          "activity_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity Id"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "title": "Duration Minutes",
+            "type": "number"
+          },
+          "reported_rpe": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reported Rpe"
+          },
+          "sets_by_exercise": {
+            "additionalProperties": {
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "type": "array"
+            },
+            "title": "Sets By Exercise",
+            "type": "object"
+          },
+          "shift_hours": {
+            "default": 0.0,
+            "title": "Shift Hours",
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "sets_by_exercise",
+          "duration_minutes"
+        ],
+        "title": "HeartRateIn",
+        "type": "object"
+      },
+      "HeartRateOut": {
+        "description": "`state`: matched (with `comparison`), choose (with `candidates`) or no_match.",
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/HrCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "comparison": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HrComparison"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "reason",
+          "candidates",
+          "comparison"
+        ],
+        "title": "HeartRateOut",
+        "type": "object"
+      },
+      "HrCandidate": {
+        "properties": {
+          "activity_id": {
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "quality": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quality"
+          },
+          "shift_hours": {
+            "title": "Shift Hours",
+            "type": "number"
+          },
+          "start_time_local": {
+            "title": "Start Time Local",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activity_id",
+          "name",
+          "type",
+          "start_time_local",
+          "duration_minutes",
+          "shift_hours",
+          "quality"
+        ],
+        "title": "HrCandidate",
+        "type": "object"
+      },
+      "HrComparison": {
+        "properties": {
+          "active_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Minutes"
+          },
+          "activity": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Activity"
+          },
+          "au_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Au Delta"
+          },
+          "coverage": {
+            "title": "Coverage",
+            "type": "number"
+          },
+          "covered_exercises": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered Exercises"
+          },
+          "low_coverage": {
+            "title": "Low Coverage",
+            "type": "boolean"
+          },
+          "measured_au": {
+            "title": "Measured Au",
+            "type": "number"
+          },
+          "measured_rpe": {
+            "title": "Measured Rpe",
+            "type": "number"
+          },
+          "rpe_delta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe Delta"
+          },
+          "total_exercises": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Exercises"
+          },
+          "verdict": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verdict"
+          }
+        },
+        "required": [
+          "measured_rpe",
+          "measured_au",
+          "active_minutes",
+          "rpe_delta",
+          "au_delta",
+          "verdict",
+          "coverage",
+          "low_coverage",
+          "activity",
+          "covered_exercises",
+          "total_exercises"
+        ],
+        "title": "HrComparison",
         "type": "object"
       },
       "Hypnogram": {
@@ -617,6 +1460,139 @@
           "value"
         ],
         "title": "LabelValue",
+        "type": "object"
+      },
+      "LengthChoice": {
+        "properties": {
+          "au": {
+            "title": "Au",
+            "type": "number"
+          },
+          "au_by_rpe": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Au By Rpe",
+            "type": "array"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "minutes",
+          "source",
+          "au",
+          "au_by_rpe"
+        ],
+        "title": "LengthChoice",
+        "type": "object"
+      },
+      "LoggedExercise": {
+        "properties": {
+          "movement_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Movement Type"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "planned_sets": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Planned Sets"
+          }
+        },
+        "required": [
+          "name",
+          "movement_type",
+          "planned_sets"
+        ],
+        "title": "LoggedExercise",
+        "type": "object"
+      },
+      "LoggedOut": {
+        "properties": {
+          "logged": {
+            "title": "Logged",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "logged"
+        ],
+        "title": "LoggedOut",
+        "type": "object"
+      },
+      "LoggedSession": {
+        "properties": {
+          "au": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Au"
+          },
+          "exercises": {
+            "items": {
+              "$ref": "#/components/schemas/LoggedExercise"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          },
+          "rpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe"
+          }
+        },
+        "required": [
+          "rpe",
+          "minutes",
+          "au",
+          "exercises"
+        ],
+        "title": "LoggedSession",
         "type": "object"
       },
       "Masthead": {
@@ -743,6 +1719,32 @@
         "title": "Naps",
         "type": "object"
       },
+      "NextDay": {
+        "properties": {
+          "day_num": {
+            "title": "Day Num",
+            "type": "integer"
+          },
+          "exercises": {
+            "items": {
+              "$ref": "#/components/schemas/ExerciseLine"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "objective": {
+            "title": "Objective",
+            "type": "string"
+          }
+        },
+        "required": [
+          "day_num",
+          "objective",
+          "exercises"
+        ],
+        "title": "NextDay",
+        "type": "object"
+      },
       "Notice": {
         "description": "A sync notice: level \"error\" or \"caption\"; the phone holds each code's words.",
         "properties": {
@@ -760,6 +1762,30 @@
           "code"
         ],
         "title": "Notice",
+        "type": "object"
+      },
+      "OpenActivityOut": {
+        "properties": {
+          "activity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GarminActivity"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "found": {
+            "title": "Found",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "found",
+          "activity"
+        ],
+        "title": "OpenActivityOut",
         "type": "object"
       },
       "OuraStatus": {
@@ -841,6 +1867,169 @@
           "oauth_configured"
         ],
         "title": "OuraStatus",
+        "type": "object"
+      },
+      "OutdoorActivity": {
+        "properties": {
+          "activity_id": {
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "au_by_rpe": {
+            "items": {
+              "type": "number"
+            },
+            "title": "Au By Rpe",
+            "type": "array"
+          },
+          "avg_hr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Hr"
+          },
+          "distance_km": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Distance Km"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "in_family": {
+            "title": "In Family",
+            "type": "boolean"
+          },
+          "logs_as": {
+            "title": "Logs As",
+            "type": "string"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "activity_id",
+          "name",
+          "type",
+          "duration_minutes",
+          "distance_km",
+          "avg_hr",
+          "logs_as",
+          "in_family",
+          "minutes",
+          "au_by_rpe"
+        ],
+        "title": "OutdoorActivity",
+        "type": "object"
+      },
+      "OutdoorListOut": {
+        "properties": {
+          "activities": {
+            "items": {
+              "$ref": "#/components/schemas/OutdoorActivity"
+            },
+            "title": "Activities",
+            "type": "array"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "activities"
+        ],
+        "title": "OutdoorListOut",
+        "type": "object"
+      },
+      "OutdoorLogIn": {
+        "properties": {
+          "activity_id": {
+            "title": "Activity Id",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "exercise_id": {
+            "title": "Exercise Id",
+            "type": "string"
+          },
+          "rpe": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Rpe",
+            "type": "integer"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "activity_id",
+          "rpe",
+          "session_id",
+          "exercise_id"
+        ],
+        "title": "OutdoorLogIn",
+        "type": "object"
+      },
+      "OutdoorLogOut": {
+        "properties": {
+          "au": {
+            "title": "Au",
+            "type": "number"
+          },
+          "logged": {
+            "title": "Logged",
+            "type": "boolean"
+          },
+          "logs_as": {
+            "title": "Logs As",
+            "type": "string"
+          }
+        },
+        "required": [
+          "logged",
+          "au",
+          "logs_as"
+        ],
+        "title": "OutdoorLogOut",
         "type": "object"
       },
       "OvernightPanel": {
@@ -934,6 +2123,109 @@
           "bands"
         ],
         "title": "OvernightPanel",
+        "type": "object"
+      },
+      "PhaseOut": {
+        "properties": {
+          "day_num": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Num"
+          },
+          "length_days": {
+            "title": "Length Days",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "number": {
+            "title": "Number",
+            "type": "integer"
+          },
+          "plan_days": {
+            "title": "Plan Days",
+            "type": "integer"
+          },
+          "start_date": {
+            "title": "Start Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "number",
+          "name",
+          "start_date",
+          "length_days",
+          "plan_days",
+          "day_num"
+        ],
+        "title": "PhaseOut",
+        "type": "object"
+      },
+      "PlannedDay": {
+        "properties": {
+          "day_num": {
+            "title": "Day Num",
+            "type": "integer"
+          },
+          "exercises": {
+            "items": {
+              "$ref": "#/components/schemas/ExerciseLine"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "home": {
+            "items": {
+              "$ref": "#/components/schemas/ExerciseLine"
+            },
+            "title": "Home",
+            "type": "array"
+          },
+          "objective": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective"
+          },
+          "plan_days": {
+            "title": "Plan Days",
+            "type": "integer"
+          },
+          "rpe_target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe Target"
+          }
+        },
+        "required": [
+          "day_num",
+          "plan_days",
+          "objective",
+          "rpe_target",
+          "exercises",
+          "home"
+        ],
+        "title": "PlannedDay",
         "type": "object"
       },
       "PointDetail": {
@@ -1231,6 +2523,27 @@
           "window_days"
         ],
         "title": "ReadinessOut",
+        "type": "object"
+      },
+      "RedoOffer": {
+        "properties": {
+          "consequences": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Consequences",
+            "type": "array"
+          },
+          "offered": {
+            "title": "Offered",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "offered",
+          "consequences"
+        ],
+        "title": "RedoOffer",
         "type": "object"
       },
       "RegionAcwr": {
@@ -1533,6 +2846,726 @@
           "fill_pct"
         ],
         "title": "RegionRow",
+        "type": "object"
+      },
+      "RestView": {
+        "properties": {
+          "is_today": {
+            "title": "Is Today",
+            "type": "boolean"
+          },
+          "yoga_suggestion": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/YogaSuggestion"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "is_today",
+          "yoga_suggestion"
+        ],
+        "title": "RestView",
+        "type": "object"
+      },
+      "RetestNotice": {
+        "description": "flexibility.retest_notice: kind warning or info; status tomorrow, ready or blocked.",
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "status",
+          "reason"
+        ],
+        "title": "RetestNotice",
+        "type": "object"
+      },
+      "SavedExerciseIn": {
+        "properties": {
+          "actual": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actual"
+          },
+          "exercise": {
+            "additionalProperties": true,
+            "title": "Exercise",
+            "type": "object"
+          },
+          "exercise_id": {
+            "title": "Exercise Id",
+            "type": "string"
+          },
+          "garmin_detail": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Garmin Detail"
+          },
+          "garmin_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Garmin Minutes"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "sets": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Sets",
+            "type": "array"
+          }
+        },
+        "required": [
+          "exercise_id",
+          "exercise"
+        ],
+        "title": "SavedExerciseIn",
+        "type": "object"
+      },
+      "ScheduleNote": {
+        "description": "Why a day's session sits where it does; `moved` only when it really moved.",
+        "properties": {
+          "moved": {
+            "title": "Moved",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "moved"
+        ],
+        "title": "ScheduleNote",
+        "type": "object"
+      },
+      "SessionExercise": {
+        "properties": {
+          "band_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band Tier"
+          },
+          "contradiction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contradiction"
+          },
+          "delta": {
+            "title": "Delta",
+            "type": "string"
+          },
+          "delta_direction": {
+            "title": "Delta Direction",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Minutes"
+          },
+          "entry": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry"
+          },
+          "entry_caption": {
+            "title": "Entry Caption",
+            "type": "string"
+          },
+          "equipment_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Equipment Type"
+          },
+          "estimated_minutes": {
+            "title": "Estimated Minutes",
+            "type": "integer"
+          },
+          "garmin_pull": {
+            "title": "Garmin Pull",
+            "type": "boolean"
+          },
+          "garmin_window": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "number"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Garmin Window"
+          },
+          "hold_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Seconds"
+          },
+          "icon": {
+            "title": "Icon",
+            "type": "string"
+          },
+          "increment_size": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Increment Size"
+          },
+          "increment_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Increment Unit"
+          },
+          "index": {
+            "title": "Index",
+            "type": "integer"
+          },
+          "laterality": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laterality"
+          },
+          "mechanics": {
+            "title": "Mechanics",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "prescription": {
+            "title": "Prescription",
+            "type": "string"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Previous"
+          },
+          "previous_caption": {
+            "title": "Previous Caption",
+            "type": "string"
+          },
+          "ramp_for": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ramp For"
+          },
+          "rep_max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rep Max"
+          },
+          "rep_min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rep Min"
+          },
+          "reps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reps"
+          },
+          "reps_editable": {
+            "title": "Reps Editable",
+            "type": "boolean"
+          },
+          "reps_in_set": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reps In Set"
+          },
+          "rest_seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rest Seconds"
+          },
+          "sets": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sets"
+          },
+          "tempo": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tempo"
+          },
+          "timed_test": {
+            "title": "Timed Test",
+            "type": "boolean"
+          },
+          "timer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "warmup": {
+            "title": "Warmup",
+            "type": "boolean"
+          },
+          "warning": {
+            "title": "Warning",
+            "type": "string"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "required": [
+          "index",
+          "name",
+          "type",
+          "laterality",
+          "sets",
+          "reps",
+          "reps_in_set",
+          "hold_seconds",
+          "duration_minutes",
+          "rest_seconds",
+          "tempo",
+          "rep_min",
+          "rep_max",
+          "equipment_type",
+          "increment_size",
+          "increment_unit",
+          "weight_kg",
+          "band_tier",
+          "icon",
+          "warmup",
+          "timed_test",
+          "timer",
+          "prescription",
+          "mechanics",
+          "warning",
+          "ramp_for",
+          "reps_editable",
+          "entry",
+          "previous",
+          "previous_caption",
+          "delta",
+          "delta_direction",
+          "entry_caption",
+          "contradiction",
+          "garmin_pull",
+          "garmin_window",
+          "estimated_minutes"
+        ],
+        "title": "SessionExercise",
+        "type": "object"
+      },
+      "SessionPlanOut": {
+        "description": "`kind`: plan or accessory.",
+        "properties": {
+          "adaptation": {
+            "$ref": "#/components/schemas/Adaptation"
+          },
+          "band_tiers": {
+            "items": {
+              "$ref": "#/components/schemas/BandTier"
+            },
+            "title": "Band Tiers",
+            "type": "array"
+          },
+          "banner": {
+            "$ref": "#/components/schemas/VerdictBanner"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "day_num": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Num"
+          },
+          "exercises": {
+            "items": {
+              "$ref": "#/components/schemas/SessionExercise"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "first_side": {
+            "title": "First Side",
+            "type": "string"
+          },
+          "garmin_configured": {
+            "title": "Garmin Configured",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "min_minutes": {
+            "title": "Min Minutes",
+            "type": "integer"
+          },
+          "model_minutes": {
+            "title": "Model Minutes",
+            "type": "integer"
+          },
+          "next_day": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NextDay"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "objective": {
+            "title": "Objective",
+            "type": "string"
+          },
+          "phase": {
+            "title": "Phase",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "rest_taken_max_seconds": {
+            "title": "Rest Taken Max Seconds",
+            "type": "integer"
+          },
+          "rpe_target": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rpe Target"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/FlowStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "kind",
+          "date",
+          "day_num",
+          "objective",
+          "phase",
+          "rpe_target",
+          "first_side",
+          "banner",
+          "adaptation",
+          "exercises",
+          "steps",
+          "model_minutes",
+          "min_minutes",
+          "rest_taken_max_seconds",
+          "garmin_configured",
+          "band_tiers",
+          "reasons",
+          "next_day"
+        ],
+        "title": "SessionPlanOut",
+        "type": "object"
+      },
+      "SessionSaveIn": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "duration_minutes": {
+            "minimum": 1.0,
+            "title": "Duration Minutes",
+            "type": "integer"
+          },
+          "exercises": {
+            "items": {
+              "$ref": "#/components/schemas/SavedExerciseIn"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "kind": {
+            "default": "plan",
+            "title": "Kind",
+            "type": "string"
+          },
+          "notes": {
+            "default": "",
+            "title": "Notes",
+            "type": "string"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_rpe": {
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Session Rpe",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "session_id",
+          "date",
+          "duration_minutes",
+          "session_rpe",
+          "exercises"
+        ],
+        "title": "SessionSaveIn",
+        "type": "object"
+      },
+      "SessionSaveOut": {
+        "properties": {
+          "au": {
+            "title": "Au",
+            "type": "number"
+          },
+          "duration_minutes": {
+            "title": "Duration Minutes",
+            "type": "integer"
+          },
+          "exercise_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Exercise Ids",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "session_rpe": {
+            "title": "Session Rpe",
+            "type": "integer"
+          },
+          "stored": {
+            "title": "Stored",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stored",
+          "session_id",
+          "exercise_ids",
+          "duration_minutes",
+          "session_rpe",
+          "au"
+        ],
+        "title": "SessionSaveOut",
+        "type": "object"
+      },
+      "ShiftPrompt": {
+        "description": "Readiness suggests moving today's session; nothing moves until the athlete answers.",
+        "properties": {
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "ShiftPrompt",
         "type": "object"
       },
       "SleepCardOut": {
@@ -1951,6 +3984,19 @@
         "title": "StatusOut",
         "type": "object"
       },
+      "StoredOut": {
+        "properties": {
+          "stored": {
+            "title": "Stored",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stored"
+        ],
+        "title": "StoredOut",
+        "type": "object"
+      },
       "StrainBlend": {
         "properties": {
           "hr_strain": {
@@ -2211,6 +4257,58 @@
         "title": "Strip",
         "type": "object"
       },
+      "StripDay": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "day_num": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Num"
+          },
+          "marker": {
+            "title": "Marker",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduleNote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "weekday_label": {
+            "title": "Weekday Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date",
+          "weekday_label",
+          "marker",
+          "state",
+          "day_num",
+          "note"
+        ],
+        "title": "StripDay",
+        "type": "object"
+      },
       "StripRun": {
         "properties": {
           "code": {
@@ -2237,6 +4335,59 @@
           "name"
         ],
         "title": "StripRun",
+        "type": "object"
+      },
+      "SwapIn": {
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "date"
+        ],
+        "title": "SwapIn",
+        "type": "object"
+      },
+      "SwapOffer": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Blockers",
+            "type": "array"
+          },
+          "check_failed": {
+            "title": "Check Failed",
+            "type": "boolean"
+          },
+          "today_objective": {
+            "title": "Today Objective",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "available",
+          "check_failed",
+          "blockers",
+          "warnings",
+          "today_objective"
+        ],
+        "title": "SwapOffer",
         "type": "object"
       },
       "SyncIn": {
@@ -2504,6 +4655,434 @@
         "title": "TodayOut",
         "type": "object"
       },
+      "TodayOverview": {
+        "description": "`screen`: overview, logged, not_started or complete.",
+        "properties": {
+          "adaptation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Adaptation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "banner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VerdictBanner"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "card": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkoutCard"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "day_num": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Num"
+          },
+          "first_side": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Side"
+          },
+          "first_side_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Side Note"
+          },
+          "headline": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Headline"
+          },
+          "home": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExerciseLine"
+            },
+            "title": "Home",
+            "type": "array"
+          },
+          "main": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExerciseLine"
+            },
+            "title": "Main",
+            "type": "array"
+          },
+          "objective": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Objective"
+          },
+          "phase_name": {
+            "title": "Phase Name",
+            "type": "string"
+          },
+          "plan_days": {
+            "title": "Plan Days",
+            "type": "integer"
+          },
+          "release": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ExerciseLine"
+            },
+            "title": "Release",
+            "type": "array"
+          },
+          "screen": {
+            "title": "Screen",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subtitle"
+          }
+        },
+        "required": [
+          "screen",
+          "day_num",
+          "plan_days",
+          "phase_name"
+        ],
+        "title": "TodayOverview",
+        "type": "object"
+      },
+      "TrainingDayOut": {
+        "description": "`route`: rest, past_completed (with `logged`; None when its detail could\nnot be read), past_missed and future (with `planned` and `swap`), today\n(with `overview`), no_phase (with `gap`) or phases_unreadable.",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GapScreen"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "logged": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LoggedSession"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "note": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduleNote"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "overview": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TodayOverview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PhaseOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phases_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Phases Error"
+          },
+          "planned": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlannedDay"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RestView"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "route": {
+            "title": "Route",
+            "type": "string"
+          },
+          "swap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SwapOffer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "date",
+          "route"
+        ],
+        "title": "TrainingDayOut",
+        "type": "object"
+      },
+      "TrainingWeekOut": {
+        "properties": {
+          "banner": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WeekBanner"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "can_go_back": {
+            "default": false,
+            "title": "Can Go Back",
+            "type": "boolean"
+          },
+          "can_go_forward": {
+            "default": false,
+            "title": "Can Go Forward",
+            "type": "boolean"
+          },
+          "carry_prompt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CarryPrompt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GapScreen"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gate1": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Gate1Card"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "is_current_week": {
+            "default": false,
+            "title": "Is Current Week",
+            "type": "boolean"
+          },
+          "load_held": {
+            "default": false,
+            "title": "Load Held",
+            "type": "boolean"
+          },
+          "phase": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PhaseOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "phases_error": {
+            "title": "Phases Error",
+            "type": "string"
+          },
+          "phases_readable": {
+            "title": "Phases Readable",
+            "type": "boolean"
+          },
+          "redo": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RedoOffer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "repeat_notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Repeat Notice"
+          },
+          "retest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RetestNotice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "shift_prompt": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ShiftPrompt"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "strip": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/StripDay"
+            },
+            "title": "Strip",
+            "type": "array"
+          },
+          "today": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Today"
+          },
+          "viewed_week_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Viewed Week Status"
+          },
+          "week_start": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Week Start"
+          }
+        },
+        "required": [
+          "phases_readable",
+          "phases_error"
+        ],
+        "title": "TrainingWeekOut",
+        "type": "object"
+      },
       "TrendChart": {
         "properties": {
           "axis": {
@@ -2677,6 +5256,35 @@
           "ticks"
         ],
         "title": "ValueAxis",
+        "type": "object"
+      },
+      "VerdictBanner": {
+        "description": "The session's load decision: kind error, warning, info, neutral or \"\".",
+        "properties": {
+          "acwr_advisory": {
+            "title": "Acwr Advisory",
+            "type": "string"
+          },
+          "cause": {
+            "title": "Cause",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text",
+          "cause",
+          "acwr_advisory"
+        ],
+        "title": "VerdictBanner",
         "type": "object"
       },
       "VerdictOut": {
@@ -2856,6 +5464,67 @@
         "title": "WatchStage",
         "type": "object"
       },
+      "WeekBanner": {
+        "description": "The rollup banner (training_week.banner); `progress` is\nmetrics_logic.week_progress's kind: no_plan, ultimate, perfect, failing\nor normal, with `to_go` sessions to the next line.",
+        "properties": {
+          "completed": {
+            "title": "Completed",
+            "type": "integer"
+          },
+          "last_week": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Week"
+          },
+          "perfect_count": {
+            "title": "Perfect Count",
+            "type": "integer"
+          },
+          "progress": {
+            "title": "Progress",
+            "type": "string"
+          },
+          "scheduled": {
+            "title": "Scheduled",
+            "type": "integer"
+          },
+          "streak_all_ultimate": {
+            "title": "Streak All Ultimate",
+            "type": "boolean"
+          },
+          "streak_weeks": {
+            "title": "Streak Weeks",
+            "type": "integer"
+          },
+          "to_go": {
+            "title": "To Go",
+            "type": "integer"
+          },
+          "ultimate_count": {
+            "title": "Ultimate Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "scheduled",
+          "completed",
+          "progress",
+          "to_go",
+          "streak_weeks",
+          "streak_all_ultimate",
+          "perfect_count",
+          "ultimate_count",
+          "last_week"
+        ],
+        "title": "WeekBanner",
+        "type": "object"
+      },
       "WholeRange": {
         "properties": {
           "field": {
@@ -2877,6 +5546,202 @@
           "max"
         ],
         "title": "WholeRange",
+        "type": "object"
+      },
+      "WorkoutCard": {
+        "properties": {
+          "exercise_count": {
+            "title": "Exercise Count",
+            "type": "integer"
+          },
+          "focus": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Focus",
+            "type": "array"
+          },
+          "loaded": {
+            "title": "Loaded",
+            "type": "boolean"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "rpe_target": {
+            "title": "Rpe Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "minutes",
+          "rpe_target",
+          "focus",
+          "loaded",
+          "exercise_count"
+        ],
+        "title": "WorkoutCard",
+        "type": "object"
+      },
+      "YogaCatalogueOut": {
+        "properties": {
+          "flows": {
+            "items": {
+              "$ref": "#/components/schemas/YogaFlow"
+            },
+            "title": "Flows",
+            "type": "array"
+          },
+          "stage_read": {
+            "title": "Stage Read",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "stage_read",
+          "flows"
+        ],
+        "title": "YogaCatalogueOut",
+        "type": "object"
+      },
+      "YogaCaution": {
+        "properties": {
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "pose": {
+            "title": "Pose",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pose",
+          "severity",
+          "note"
+        ],
+        "title": "YogaCaution",
+        "type": "object"
+      },
+      "YogaFlow": {
+        "properties": {
+          "cautions": {
+            "items": {
+              "$ref": "#/components/schemas/YogaCaution"
+            },
+            "title": "Cautions",
+            "type": "array"
+          },
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "poses": {
+            "items": {
+              "$ref": "#/components/schemas/YogaPoseOut"
+            },
+            "title": "Poses",
+            "type": "array"
+          },
+          "rpe": {
+            "title": "Rpe",
+            "type": "integer"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          },
+          "video_url": {
+            "title": "Video Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "minutes",
+          "rpe",
+          "video_url",
+          "poses",
+          "cautions"
+        ],
+        "title": "YogaFlow",
+        "type": "object"
+      },
+      "YogaLogIn": {
+        "properties": {
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "pose_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Pose Ids",
+            "type": "array"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "session_id",
+          "pose_ids"
+        ],
+        "title": "YogaLogIn",
+        "type": "object"
+      },
+      "YogaPoseOut": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "YogaPoseOut",
+        "type": "object"
+      },
+      "YogaSuggestion": {
+        "properties": {
+          "minutes": {
+            "title": "Minutes",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "slug": {
+            "title": "Slug",
+            "type": "string"
+          }
+        },
+        "required": [
+          "slug",
+          "name",
+          "minutes"
+        ],
+        "title": "YogaSuggestion",
         "type": "object"
       }
     }
@@ -3683,6 +6548,1299 @@
           }
         },
         "summary": "Get Strain Detail"
+      }
+    },
+    "/api/training/accessory": {
+      "get": {
+        "operationId": "get_accessory_api_training_accessory_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Accessory"
+      }
+    },
+    "/api/training/carry": {
+      "post": {
+        "operationId": "post_carry_api_training_carry_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Carry"
+      }
+    },
+    "/api/training/completion": {
+      "post": {
+        "operationId": "post_completion_api_training_completion_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompletionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompletionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Completion"
+      }
+    },
+    "/api/training/day": {
+      "get": {
+        "operationId": "get_day_api_training_day_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingDayOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Day"
+      }
+    },
+    "/api/training/garmin/activity-minutes": {
+      "get": {
+        "operationId": "get_activity_minutes_api_training_garmin_activity_minutes_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "planned_minutes",
+            "required": true,
+            "schema": {
+              "exclusiveMinimum": 0,
+              "title": "Planned Minutes",
+              "type": "number"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityMinutesOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Activity Minutes"
+      }
+    },
+    "/api/training/garmin/open-activity": {
+      "get": {
+        "operationId": "get_open_activity_api_training_garmin_open_activity_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OpenActivityOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Open Activity"
+      }
+    },
+    "/api/training/gate1/flare": {
+      "post": {
+        "operationId": "post_gate1_flare_api_training_gate1_flare_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Gate1 Flare"
+      }
+    },
+    "/api/training/gate1/reason": {
+      "post": {
+        "operationId": "post_gate1_reason_api_training_gate1_reason_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Gate1ReasonIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Gate1 Reason"
+      }
+    },
+    "/api/training/heart-rate": {
+      "post": {
+        "operationId": "post_heart_rate_api_training_heart_rate_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HeartRateIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HeartRateOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Heart Rate"
+      }
+    },
+    "/api/training/outdoor": {
+      "get": {
+        "operationId": "get_outdoor_api_training_outdoor_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutdoorListOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Outdoor"
+      },
+      "post": {
+        "operationId": "post_outdoor_api_training_outdoor_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OutdoorLogIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OutdoorLogOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Outdoor"
+      }
+    },
+    "/api/training/redo": {
+      "post": {
+        "operationId": "post_redo_api_training_redo_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Redo"
+      }
+    },
+    "/api/training/session": {
+      "get": {
+        "operationId": "get_session_api_training_session_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Session"
+      }
+    },
+    "/api/training/sessions": {
+      "post": {
+        "operationId": "post_session_api_training_sessions_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SessionSaveIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionSaveOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Session"
+      }
+    },
+    "/api/training/shift": {
+      "post": {
+        "operationId": "post_shift_api_training_shift_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Shift"
+      }
+    },
+    "/api/training/swap": {
+      "post": {
+        "operationId": "post_swap_api_training_swap_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Swap"
+      }
+    },
+    "/api/training/week": {
+      "get": {
+        "operationId": "get_week_api_training_week_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "week_start",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Week Start"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TrainingWeekOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Week"
+      }
+    },
+    "/api/training/yoga": {
+      "get": {
+        "operationId": "get_yoga_api_training_yoga_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/YogaCatalogueOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Yoga"
+      },
+      "post": {
+        "operationId": "post_yoga_api_training_yoga_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/YogaLogIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoggedOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Yoga"
       }
     }
   }

@@ -146,6 +146,8 @@ def test_the_first_request_of_the_callers_day_syncs_and_stores_the_run(monkeypat
     assert stored["day"] == TODAY.isoformat()
     assert stored["results"]["garmin"] == [False, "429 Too Many Requests"]
     assert stored["results"]["failed_week"] == [True, None]
+    # The two writes the Training page made on opening (T5): the weekly rollup.
+    assert stored["results"]["weekly_rollup"] == [True, None]
 
 
 def test_a_request_at_half_past_midnight_in_berlin_syncs_the_berlin_day(monkeypatch):

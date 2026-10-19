@@ -118,3 +118,44 @@ def attach_rest(set_rows: list[dict], seconds: int | None) -> None:
         return
     last = max(set_rows, key=lambda r: r.get("set_num") or 0)
     last["rest_taken_seconds"] = seconds
+
+
+def walk(exercises: list[dict], first: str) -> list[dict]:
+    """Every position of a session in order, for a phone that walks the
+    session offline (rebuild Phase 2, milestone 5): no step rule is copied
+    into the phone; it reads this list.
+
+    Each entry is one position and the event that leaves it ("complete"
+    while working, "next_set" in a rest), with what that event records
+    (step()'s record_set, rest_begins, rest_ends) and, for a hold, the ending
+    its timer's bell announces (sessions.hold_ending). The walk is linear:
+    the event leads to entry `index + 1`, and the last entry's event finishes
+    the session. "skip" from any entry leads to `skip_to`, the next
+    exercise's first entry, or len(list) (finished) from the last exercise.
+    `exercises` are as they run today (sessions.readiness_dose)."""
+    raw: list[tuple[Position, str, Step]] = []
+    pos = start(first)
+    while not finished(pos, len(exercises)):
+        event = NEXT_SET if pos.phase == RESTING else COMPLETE
+        nxt = step(pos, exercises[pos.ex_idx], event, first=first)
+        raw.append((pos, event, nxt))
+        pos = nxt.position
+    first_entry: dict[int, int] = {}
+    for i, (p, _event, _nxt) in enumerate(raw):
+        first_entry.setdefault(p.ex_idx, i)
+    out = []
+    for i, (p, event, nxt) in enumerate(raw):
+        ex = exercises[p.ex_idx]
+        ending = None
+        if ex["type"] in sessions.HOLD_TIMER_TYPES and p.phase == INTRO:
+            ending = sessions.hold_ending(
+                ex["type"], is_uni=ex.get("laterality") == "unilateral", side=p.side,
+                cur_set=p.set_num, total_sets=ex.get("sets", 1), cur_rep=p.rep,
+                reps_per_set=ex.get("reps_in_set", 5) if ex["type"] == "hold_reps" else 1,
+                first=first)
+        out.append({"index": i, "ex_idx": p.ex_idx, "set_num": p.set_num, "rep": p.rep,
+                    "phase": p.phase, "side": p.side, "event": event,
+                    "record_set": nxt.record_set, "rest_begins": nxt.rest_begins,
+                    "rest_ends": nxt.rest_ends, "ending": ending,
+                    "skip_to": first_entry.get(p.ex_idx + 1, len(raw))})
+    return out

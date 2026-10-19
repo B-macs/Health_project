@@ -172,3 +172,51 @@ def test_the_heart_rate_rematch_reads_the_saved_minutes():
     src = (ROOT / "views" / "training.py").read_text(encoding="utf-8")
     assert "st.session_state.tp_saved_minutes = elapsed_minutes" in src
     assert 'duration_minutes=st.session_state.get("tp_saved_minutes")' in src
+
+
+# ─── walk: the session's positions, precomputed for the phone ────────────────
+
+def test_the_walk_is_the_step_function_applied_in_order():
+    """Every entry's event, applied with step(), leads to the next entry's
+    position, and the last entry's event finishes the session: the phone
+    walking the list does exactly what the page's taps do."""
+    block = sess.calendar_plan(sess.build_phase(5, gb.START))
+    exercises = [sess.readiness_dose(ex, 1.0) for ex in block[1]["exercises"]]
+    entries = gf.walk(exercises, FIRST)
+    positions = [gf.Position(e["ex_idx"], e["set_num"], e["rep"], e["phase"], e["side"])
+                 for e in entries]
+    assert positions[0] == gf.start(FIRST)
+    for i, (pos, entry) in enumerate(zip(positions, entries)):
+        nxt = gf.step(pos, exercises[pos.ex_idx], entry["event"], first=FIRST)
+        assert (entry["record_set"], entry["rest_begins"], entry["rest_ends"]) == (
+            nxt.record_set, nxt.rest_begins, nxt.rest_ends), i
+        if i + 1 < len(entries):
+            assert nxt.position == positions[i + 1], i
+        else:
+            assert gf.finished(nxt.position, len(exercises))
+
+
+def test_skip_leads_to_the_next_exercise_first_entry():
+    exercises = [_ex("reps", sets=2), _ex("hold", sets=1, uni=True), _ex("duration")]
+    entries = gf.walk(exercises, FIRST)
+    for entry in entries:
+        skipped = gf.step(gf.Position(entry["ex_idx"], entry["set_num"], entry["rep"],
+                                      entry["phase"], entry["side"]),
+                          exercises[entry["ex_idx"]], gf.SKIP, first=FIRST).position
+        if entry["skip_to"] < len(entries):
+            target = entries[entry["skip_to"]]
+            assert (target["ex_idx"], target["set_num"], target["rep"], target["phase"],
+                    target["side"]) == (skipped.ex_idx, 1, 1, gf.INTRO, FIRST)
+        else:
+            assert gf.finished(skipped, len(exercises))
+
+
+def test_each_hold_entry_carries_the_bell_its_tap_then_keeps():
+    exercises = [_ex("hold_reps", sets=2, uni=True, reps_in_set=2)]
+    for entry in gf.walk(exercises, FIRST):
+        if entry["phase"] == gf.RESTING:
+            assert entry["ending"] is None and entry["event"] == gf.NEXT_SET
+            continue
+        assert entry["ending"] == sess.hold_ending(
+            "hold_reps", is_uni=True, side=entry["side"], cur_set=entry["set_num"],
+            total_sets=2, cur_rep=entry["rep"], reps_per_set=2, first=FIRST)

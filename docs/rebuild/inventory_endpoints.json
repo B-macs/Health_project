@@ -556,6 +556,686 @@
       "test": [
         "tests/api/test_api_today_detail.py::test_a_fused_night_offers_no_stepper_and_says_why"
       ]
+    },
+    "T1": {
+      "client": "phone",
+      "why": "The phone app's own styling; the Streamlit CSS is not ported."
+    },
+    "T2": {
+      "client": "phone",
+      "why": "Sound and notification permission are the phone's own (Web Audio, the browser's prompt)."
+    },
+    "T4": {
+      "endpoint": [
+        "GET /api/training/week",
+        "GET /api/training/day",
+        "GET /api/training/session"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_unreadable_phases_say_so_and_offer_nothing"
+      ]
+    },
+    "T5": {
+      "endpoint": "POST /api/sync",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_the_first_request_of_the_callers_day_syncs_and_stores_the_run"
+      ]
+    },
+    "T6": {
+      "endpoint": "POST /api/sync",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_the_first_request_of_the_callers_day_syncs_and_stores_the_run"
+      ]
+    },
+    "T7": {
+      "client": "phone",
+      "why": "The phone's tab bar and its Back to Today button."
+    },
+    "T8": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_the_week_shows_the_block_its_strip_and_gate_one"
+      ]
+    },
+    "T9": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_a_failed_weeks_repeat_says_so_on_its_monday_and_holds_the_load"
+      ]
+    },
+    "T10": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_a_failed_weeks_repeat_says_so_on_its_monday_and_holds_the_load"
+      ]
+    },
+    "T11": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_a_failed_weeks_repeat_says_so_on_its_monday_and_holds_the_load"
+      ]
+    },
+    "T12": {
+      "endpoint": [
+        "GET /api/training/week",
+        "POST /api/training/redo"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_a_failed_week_is_offered_again_on_its_monday"
+      ]
+    },
+    "T13": {
+      "endpoint": [
+        "GET /api/training/week",
+        "GET /api/training/session"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_a_failed_weeks_repeat_says_so_on_its_monday_and_holds_the_load"
+      ]
+    },
+    "T14": {
+      "endpoint": "POST /api/sync",
+      "test": [
+        "tests/api/test_api_status_sync.py::test_the_first_request_of_the_callers_day_syncs_and_stores_the_run"
+      ]
+    },
+    "T16": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_the_week_shows_the_block_its_strip_and_gate_one"
+      ]
+    },
+    "T17": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_the_week_pages_within_the_block_only"
+      ]
+    },
+    "T18": {
+      "endpoint": [
+        "GET /api/training/week",
+        "GET /api/training/day"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_a_missed_session_asks_before_the_rest_move_along"
+      ]
+    },
+    "T19": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_a_planned_rest_day_opens_the_rest_view",
+        "tests/api/test_api_training.py::test_a_future_day_previews_and_offers_the_swap_onto_today",
+        "tests/api/test_api_training.py::test_a_missed_day_shows_what_was_planned_and_the_swap"
+      ]
+    },
+    "T20": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_a_logged_day_locks_the_session_and_shows_what_was_logged"
+      ]
+    },
+    "T21": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_a_missed_day_shows_what_was_planned_and_the_swap"
+      ]
+    },
+    "T22": {
+      "endpoint": [
+        "GET /api/training/day",
+        "POST /api/training/swap"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_a_swap_moves_tuesdays_session_onto_today",
+        "tests/api/test_api_training.py::test_no_swap_once_today_has_trained"
+      ]
+    },
+    "T23": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_a_future_day_previews_and_offers_the_swap_onto_today"
+      ]
+    },
+    "T24": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_a_planned_rest_day_opens_the_rest_view"
+      ]
+    },
+    "T25": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_a_planned_rest_day_opens_the_rest_view"
+      ]
+    },
+    "T26": {
+      "endpoint": [
+        "GET /api/training/week",
+        "GET /api/training/day"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_no_block_today_shows_the_gap_and_a_stranded_block"
+      ]
+    },
+    "T27": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_no_block_today_shows_the_gap_and_a_stranded_block"
+      ]
+    },
+    "T30": {
+      "endpoint": [
+        "GET /api/training/week",
+        "POST /api/training/carry"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_a_priority_block_carries_a_missed_session_forward",
+        "tests/api/test_api_training.py::test_keeping_as_planned_records_it_and_stops_asking"
+      ]
+    },
+    "T31": {
+      "endpoint": [
+        "GET /api/training/week",
+        "POST /api/training/carry"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_a_missed_session_asks_before_the_rest_move_along",
+        "tests/api/test_api_training.py::test_keeping_as_planned_records_it_and_stops_asking"
+      ]
+    },
+    "T32": {
+      "endpoint": [
+        "GET /api/training/week",
+        "POST /api/training/shift"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_the_readiness_shift_asks_then_stores_the_answer"
+      ]
+    },
+    "T33": {
+      "endpoint": [
+        "GET /api/training/week",
+        "POST /api/training/gate1/reason"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_gate_one_takes_its_reason_and_a_flare_up"
+      ]
+    },
+    "T34": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_the_week_shows_the_block_its_strip_and_gate_one",
+        "tests/api/test_api_training.py::test_gate_one_takes_its_reason_and_a_flare_up"
+      ]
+    },
+    "T35": {
+      "endpoint": "POST /api/training/gate1/flare",
+      "test": [
+        "tests/api/test_api_training.py::test_gate_one_takes_its_reason_and_a_flare_up"
+      ]
+    },
+    "T36": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_the_flexibility_retest_notice_rides_with_the_week"
+      ]
+    },
+    "T37": {
+      "endpoint": [
+        "GET /api/training/day",
+        "GET /api/training/session"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_today_opens_the_overview_with_todays_dosed_values",
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T38": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_today_opens_the_overview_with_todays_dosed_values"
+      ]
+    },
+    "T39": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_today_opens_the_overview_with_todays_dosed_values"
+      ]
+    },
+    "T40": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_today_opens_the_overview_with_todays_dosed_values"
+      ]
+    },
+    "T41": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_today_opens_the_overview_with_todays_dosed_values"
+      ]
+    },
+    "T42": {
+      "client": "phone",
+      "why": "The before-you-start prompt is fixed text and a checkbox; the phone keeps the answer with its session (whether to check the watch before the save)."
+    },
+    "T43": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_today_opens_the_overview_with_todays_dosed_values"
+      ]
+    },
+    "T44": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_today_opens_the_overview_with_todays_dosed_values"
+      ]
+    },
+    "T45": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T46": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk",
+        "tests/api/test_api_training.py::test_a_failed_weeks_repeat_says_so_on_its_monday_and_holds_the_load"
+      ]
+    },
+    "T47": {
+      "endpoint": "GET /api/training/week",
+      "test": [
+        "tests/api/test_api_training.py::test_the_week_shows_the_block_its_strip_and_gate_one"
+      ]
+    },
+    "T48": {
+      "client": "phone",
+      "why": "A session lives on the phone until it is saved; leaving it or discarding it is the phone's own state."
+    },
+    "T50": {
+      "endpoint": "GET /api/training/day",
+      "test": [
+        "tests/api/test_api_training.py::test_a_day_past_the_blocks_content_reads_complete"
+      ]
+    },
+    "T51": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T52": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T53": {
+      "endpoint": [
+        "GET /api/training/session",
+        "POST /api/training/completion"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk",
+        "tests/api/test_api_training.py::test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan"
+      ]
+    },
+    "T54": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T55": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T56": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_lift_is_seeded_from_its_last_session_and_says_where_from"
+      ]
+    },
+    "T57": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_ramp_set_proposes_from_the_lift_it_prepares"
+      ]
+    },
+    "T58": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_lift_is_seeded_from_its_last_session_and_says_where_from"
+      ]
+    },
+    "T59": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_lift_is_seeded_from_its_last_session_and_says_where_from"
+      ]
+    },
+    "T60": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_lift_is_seeded_from_its_last_session_and_says_where_from"
+      ]
+    },
+    "T61": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_lift_is_seeded_from_its_last_session_and_says_where_from"
+      ]
+    },
+    "T62": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T63": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_the_warning_shows_only_while_its_area_is_strained"
+      ]
+    },
+    "T64": {
+      "endpoint": "POST /api/training/sessions",
+      "test": [
+        "tests/api/test_save_idempotency.py::test_a_session_sent_three_times_stores_one_session"
+      ]
+    },
+    "T65": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_lift_is_seeded_from_its_last_session_and_says_where_from",
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T66": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_lift_is_seeded_from_its_last_session_and_says_where_from",
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T67": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T68": {
+      "endpoint": [
+        "GET /api/training/session",
+        "POST /api/training/sessions"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk",
+        "tests/api/test_save_idempotency.py::test_a_session_sent_three_times_stores_one_session"
+      ]
+    },
+    "T69": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T70": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T71": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T72": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T73": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T74": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T75": {
+      "endpoint": [
+        "GET /api/training/session",
+        "GET /api/training/garmin/activity-minutes"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_a_walks_minutes_come_from_the_callers_day"
+      ]
+    },
+    "T76": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T77": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T78": {
+      "client": "phone",
+      "why": "Back walks the phone's own history of positions over the session's steps; no rule is involved."
+    },
+    "T79": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T80": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_a_logged_day_locks_the_session_and_shows_what_was_logged"
+      ]
+    },
+    "T81": {
+      "client": "phone",
+      "why": "The hold countdown, its ticks and its auto-press are the phone's timer; its ending comes with each step (steps[].ending)."
+    },
+    "T82": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T83": {
+      "client": "phone",
+      "why": "The rest countdown and its bell are the phone's timer; the rest's length comes with the exercise (rest_seconds)."
+    },
+    "T84": {
+      "client": "phone",
+      "why": "The activity timer is the phone's; its minutes come with the exercise, and its key is the phone's session, never a stale browser key (F17)."
+    },
+    "T85": {
+      "client": "phone",
+      "why": "The count-up stopwatch is the phone's; which exercise runs one comes with the session (timer: stopwatch)."
+    },
+    "T86": {
+      "client": "phone",
+      "why": "The 880 Hz countdown ticks are the phone's sound."
+    },
+    "T87": {
+      "client": "phone",
+      "why": "Background notifications are the phone's (only while hidden and allowed)."
+    },
+    "T88": {
+      "client": "phone",
+      "why": "Keeping the screen awake is a new phone requirement (the Wake Lock API)."
+    },
+    "T89": {
+      "client": "phone",
+      "why": "The day-complete banner is fixed text shown when the walk ends."
+    },
+    "T90": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T91": {
+      "endpoint": "GET /api/training/garmin/open-activity",
+      "test": [
+        "tests/api/test_api_training.py::test_the_watch_check_reads_the_callers_day"
+      ]
+    },
+    "T92": {
+      "endpoint": [
+        "POST /api/training/completion",
+        "POST /api/training/sessions"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan",
+        "tests/api/test_save_idempotency.py::test_a_session_sent_three_times_stores_one_session"
+      ]
+    },
+    "T93": {
+      "endpoint": "POST /api/training/completion",
+      "test": [
+        "tests/api/test_api_training.py::test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan"
+      ]
+    },
+    "T94": {
+      "endpoint": "POST /api/training/completion",
+      "test": [
+        "tests/api/test_api_training.py::test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan"
+      ]
+    },
+    "T95": {
+      "endpoint": "POST /api/training/sessions",
+      "test": [
+        "tests/api/test_save_idempotency.py::test_a_session_sent_three_times_stores_one_session"
+      ]
+    },
+    "T96": {
+      "endpoint": "POST /api/training/sessions",
+      "test": [
+        "tests/api/test_save_idempotency.py::test_a_session_sent_three_times_stores_one_session",
+        "tests/api/test_save_idempotency.py::test_a_save_that_stops_partway_is_completed_by_the_same_body",
+        "tests/api/test_save_idempotency.py::test_a_refused_write_answers_an_error_and_keeps_nothing_locally"
+      ]
+    },
+    "T97": {
+      "endpoint": "POST /api/training/heart-rate",
+      "test": [
+        "tests/api/test_api_training.py::test_the_heart_rate_match_compares_or_asks"
+      ]
+    },
+    "T98": {
+      "client": "phone",
+      "why": "The congratulations line is fixed text shown after the save answers."
+    },
+    "T99": {
+      "endpoint": "POST /api/training/heart-rate",
+      "test": [
+        "tests/api/test_api_training.py::test_the_heart_rate_match_compares_or_asks"
+      ]
+    },
+    "T100": {
+      "endpoint": "POST /api/training/heart-rate",
+      "test": [
+        "tests/api/test_api_training.py::test_the_heart_rate_match_compares_or_asks"
+      ]
+    },
+    "T101": {
+      "endpoint": "POST /api/training/heart-rate",
+      "test": [
+        "tests/api/test_api_training.py::test_the_heart_rate_match_compares_or_asks"
+      ]
+    },
+    "T102": {
+      "endpoint": "GET /api/training/session",
+      "test": [
+        "tests/api/test_api_training.py::test_todays_session_carries_every_exercise_and_the_walk"
+      ]
+    },
+    "T103": {
+      "client": "phone",
+      "why": "The + menu shows only while the phone runs no session of its own (F18): the session is the phone's state."
+    },
+    "T104": {
+      "client": "phone",
+      "why": "The phone runs one session at a time: an accessory session cannot start over a plan session in progress."
+    },
+    "T105": {
+      "endpoint": "GET /api/training/accessory",
+      "test": [
+        "tests/api/test_api_training.py::test_the_accessory_session_runs_through_the_same_flow"
+      ]
+    },
+    "T106": {
+      "endpoint": "GET /api/training/accessory",
+      "test": [
+        "tests/api/test_api_training.py::test_the_accessory_session_runs_through_the_same_flow"
+      ]
+    },
+    "T107": {
+      "endpoint": "GET /api/training/accessory",
+      "test": [
+        "tests/api/test_api_training.py::test_the_accessory_session_runs_through_the_same_flow"
+      ]
+    },
+    "T108": {
+      "endpoint": [
+        "POST /api/training/sessions",
+        "POST /api/training/completion"
+      ],
+      "test": [
+        "tests/api/test_save_idempotency.py::test_an_accessory_session_never_marks_the_plan_day_done"
+      ]
+    },
+    "T109": {
+      "endpoint": "GET /api/training/yoga",
+      "test": [
+        "tests/api/test_api_training.py::test_the_yoga_catalogue_names_each_flows_cautions"
+      ]
+    },
+    "T110": {
+      "endpoint": [
+        "GET /api/training/yoga",
+        "POST /api/training/yoga"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_the_yoga_catalogue_names_each_flows_cautions",
+        "tests/api/test_save_idempotency.py::test_a_yoga_flow_sent_twice_stores_one_session"
+      ]
+    },
+    "T111": {
+      "endpoint": "GET /api/training/outdoor",
+      "test": [
+        "tests/api/test_api_training.py::test_the_outdoor_list_puts_the_walking_family_first"
+      ]
+    },
+    "T112": {
+      "endpoint": [
+        "GET /api/training/outdoor",
+        "POST /api/training/outdoor"
+      ],
+      "test": [
+        "tests/api/test_api_training.py::test_the_outdoor_list_puts_the_walking_family_first",
+        "tests/api/test_save_idempotency.py::test_an_outdoor_activity_sent_twice_stores_one_session"
+      ]
     }
   }
 }

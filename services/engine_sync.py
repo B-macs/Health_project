@@ -15,10 +15,11 @@ in, nothing more that day. The phone asks on every open (GET /api/status
 says whether a sync is due), so whatever screen opens first starts it.
 
 WHAT: Repository.run_home_syncs, the same chain the Streamlit app runs,
-under the BackgroundSyncRunner's one lock, then the failed-week rule (Key
-Rule 22), the one automatic write the Training page makes on its own. The
-last run is stored in the store's config under STATUS_KEY, because the
-engine scales to zero and keeps nothing in memory between requests.
+under the BackgroundSyncRunner's one lock, then the two writes the Training
+page makes on its own when it opens: the failed-week rule (Key Rule 22) and
+the Weekly Rollup of ended weeks (metrics.sync_weekly_rollup). The last run
+is stored in the store's config under STATUS_KEY, because the engine scales
+to zero and keeps nothing in memory between requests.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from __future__ import annotations
 import json
 from datetime import date, datetime
 
-from services import background_writer, sync_policy, week_repeat
+from services import background_writer, metrics, sync_policy, week_repeat
 
 #: Where the engine stores its last sync run: {"day", "at", "results", "error"}.
 STATUS_KEY = "engine_sync_status"
@@ -103,6 +104,9 @@ def run(repo, runner, caller_today: date, now: datetime, *, force: bool = False)
         results["failed_week"] = [True, None]
     except Exception as exc:
         results["failed_week"] = [False, str(exc)]
+    # After the failed-week rule, whose verdicts the rollup's weeks read.
+    rollup = metrics.sync_weekly_rollup(repo, today=caller_today)
+    results["weekly_rollup"] = [bool(rollup.ok), rollup.error]
     status = {"day": caller_today.isoformat(), "at": now.isoformat(),
               "results": results, "error": runner.last_error()}
     repo.set_config(STATUS_KEY, json.dumps(status, sort_keys=True), today=caller_today)
