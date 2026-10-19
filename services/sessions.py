@@ -2614,3 +2614,56 @@ def days_back_to(day: date, today: date) -> int:
     """The lookback in days that reaches back to `day`'s session, with three
     days' room (Repository.get_recent_sessions counts back from today)."""
     return (today - day).days + 3
+
+
+# ─── The completion screen (move TRN-16, fault F16, 2026-10-19) ──────────────
+
+#: The shortest session the clock records, in minutes: a plan session, and
+#: the accessory session (the + button), which runs 10-20 minutes.
+MIN_SESSION_MINUTES = 5
+MIN_ACCESSORY_MINUTES = 3
+#: Below this share of the session's block time with heart rate, the watch was
+#: probably paused or stopped early, and the comparison says so.
+HR_COVERAGE_FULL = 0.85
+
+
+def elapsed_minutes(start_ts: float, now_ts: float, exercises: list[dict],
+                    floor: int = MIN_SESSION_MINUTES) -> int:
+    """The session's length by its clock: whole minutes since the first set,
+    at least `floor`; the modelled length when the clock never started (a
+    session saved without the guided flow)."""
+    if start_ts and start_ts > 0:
+        return max(floor, int((now_ts - start_ts) / 60))
+    return estimate_duration(exercises)
+
+
+def session_au(rpe: int | float, minutes: int | float) -> float:
+    """Foster's session load: the athlete's rating x minutes. The save's
+    preview uses the CHOSEN rating (inventory fault F16: it read RPE 5)."""
+    return float(rpe * minutes)
+
+
+def hr_comparison(hr: dict | None, reported_rpe: float | None,
+                  reported_au: float | None) -> dict | None:
+    """The measured-against-reported comparison after a save, or None
+    without a matched heart-rate figure. The rating is always collected,
+    Garmin or not, because its value is that it is independent of the
+    measurement; neither replaces the other (Key Rule 2b: session RPE drives
+    ACWR). verdict: "exact" within half a point, "under" when heart rate
+    rated it harder, "over" when easier, None without a rating."""
+    if not hr or hr.get("hr_au") is None:
+        return None
+    coverage = hr.get("hr_coverage") or 0
+    rpe_delta = (hr["hr_rpe"] - reported_rpe) if reported_rpe is not None else None
+    verdict = (None if rpe_delta is None else "exact" if abs(rpe_delta) < 0.5
+               else "under" if rpe_delta > 0 else "over")
+    return {
+        "measured_rpe": hr["hr_rpe"], "measured_au": hr["hr_au"],
+        "active_minutes": hr.get("hr_active_minutes"),
+        "rpe_delta": rpe_delta,
+        "au_delta": (hr["hr_au"] - (reported_au or 0)) if reported_rpe is not None else None,
+        "verdict": verdict, "coverage": coverage, "low_coverage": coverage < HR_COVERAGE_FULL,
+        "activity": hr.get("activity_name") or hr.get("activity_type"),
+        "covered_exercises": hr.get("hr_covered_exercises"),
+        "total_exercises": hr.get("hr_total_exercises"),
+    }

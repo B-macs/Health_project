@@ -16,7 +16,7 @@
     {"id": "F13", "what": "An unfinished flexibility assessment lives only in the local .sync_state.json", "test": null},
     {"id": "F14", "what": "Nothing runs 'Sync Garmin Activities' automatically, yet it feeds the HR-max estimate", "test": null},
     {"id": "F15", "what": "Metabolism reads a local git-ignored CSV and hard-coded scans: empty on a server (Supabase tables approved)", "test": null},
-    {"id": "F16", "what": "The 'Estimated AU' caption always uses RPE 5", "test": null},
+    {"id": "F16", "what": "The 'Estimated AU' caption always uses RPE 5", "test": "tests/test_session_completion.py::test_the_rating_sits_outside_the_save_form_and_drives_the_preview", "fixed": "2026-10-19"},
     {"id": "F17", "what": "The activity timer has no staleness guard and the same key every day", "test": null},
     {"id": "F18", "what": "The '+' menu is drawn during a session; Yoga and Hike can open mid-session", "test": null},
     {"id": "F19", "what": "Garmin-verified walk minutes and the heart-rate panel are not checkpointed", "test": null},

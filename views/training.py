@@ -2811,9 +2811,9 @@ def _render_accessory_session(policy: dict, readiness_modifier: float,
                 _exit_accessory_session()
             return
 
-        started = st.session_state.get("tp_session_start_ts") or 0
-        elapsed = (max(3, int((time.time() - started) / 60)) if started
-                   else sess.estimate_duration(exercises))
+        elapsed = sess.elapsed_minutes(st.session_state.get("tp_session_start_ts") or 0,
+                                       time.time(), exercises,
+                                       floor=sess.MIN_ACCESSORY_MINUTES)
         with st.form("log_accessory_form"):
             session_rpe = st.slider(
                 "Session RPE — how hard did it feel?", min_value=1, max_value=10,
@@ -3694,10 +3694,8 @@ def render():
             col_review_weight.metric("Weight", f"{review_weight} kg" if review_weight else "Bodyweight")
             st.divider()
 
-            if st.session_state.tp_session_start_ts > 0:
-                elapsed_minutes = max(5, int((time.time() - st.session_state.tp_session_start_ts) / 60))
-            else:
-                elapsed_minutes = sess.estimate_duration(exercises)
+            elapsed_minutes = sess.elapsed_minutes(
+                st.session_state.tp_session_start_ts, time.time(), exercises)
 
             # ── Garmin workout check, BEFORE the session is saved ──────────
             #
@@ -3749,27 +3747,32 @@ def render():
             # RPE x minutes, so a session left open multiplies it.
             _modelled_minutes = sess.estimate_duration(exercises)
             _check_length = sess.duration_needs_a_check(elapsed_minutes, _modelled_minutes)
-            with st.form("log_session_form"):
-                session_rpe = st.slider("Session RPE — how hard did it feel?",
-                                        min_value=1, max_value=10, value=5,
-                                        help="1 = very easy  ·  10 = maximal effort")
-                if _check_length:
-                    _save_minutes = st.radio(
-                        f"The clock says {elapsed_minutes} min, and this session plans about "
-                        f"{_modelled_minutes} min. Which length do you save?",
-                        options=[_modelled_minutes, elapsed_minutes], index=0,
-                        format_func=lambda m: (f"{m} min — the planned length"
-                                               if m == _modelled_minutes else
-                                               f"{m} min — the clock"),
-                        key="tp_length_choice",
-                    )
-                else:
-                    _save_minutes = elapsed_minutes
-                st.caption(
-                    f"Session duration: **{_save_minutes} min**"
-                    f"{' (your choice)' if _check_length else ' (auto-timed)'}  ·  "
-                    f"Estimated AU: **{5 * _save_minutes}** (RPE × duration)"
+            # The rating and the length sit OUTSIDE the form, so the AU below
+            # follows them as they change (inventory fault F16: inside the form
+            # a widget's value arrives only on submit, and the caption read RPE
+            # 5 whatever was chosen).
+            session_rpe = st.slider("Session RPE — how hard did it feel?",
+                                    min_value=1, max_value=10, value=5,
+                                    help="1 = very easy  ·  10 = maximal effort",
+                                    key="tp_save_rpe")
+            if _check_length:
+                _save_minutes = st.radio(
+                    f"The clock says {elapsed_minutes} min, and this session plans about "
+                    f"{_modelled_minutes} min. Which length do you save?",
+                    options=[_modelled_minutes, elapsed_minutes], index=0,
+                    format_func=lambda m: (f"{m} min — the planned length"
+                                           if m == _modelled_minutes else
+                                           f"{m} min — the clock"),
+                    key="tp_length_choice",
                 )
+            else:
+                _save_minutes = elapsed_minutes
+            st.caption(
+                f"Session duration: **{_save_minutes} min**"
+                f"{' (your choice)' if _check_length else ' (auto-timed)'}  ·  "
+                f"Estimated AU: **{sess.session_au(session_rpe, _save_minutes):.0f}** (RPE × duration)"
+            )
+            with st.form("log_session_form"):
                 session_notes = st.text_area(
                     "Session Notes (optional)",
                     placeholder="e.g. Hip flexors felt looser. Slight tightness on last bird-dog set.",
@@ -3801,7 +3804,7 @@ def render():
                 # measurement, and a rating only taken when the watch was off
                 # could never be compared against one.
                 st.session_state.tp_reported_rpe = session_rpe
-                st.session_state.tp_reported_au = session_rpe * elapsed_minutes
+                st.session_state.tp_reported_au = sess.session_au(session_rpe, elapsed_minutes)
                 # Derive the HR-based session RPE/AU while the per-set records
                 # are still in hand. Never blocks the save — the session is
                 # already in Notion by this point and a Garmin failure must
@@ -3841,6 +3844,7 @@ def render():
             # ── Measured vs reported — the comparison, side by side ────────
             _hr = st.session_state.get("tp_hr_au")
             _rep_rpe = st.session_state.get("tp_reported_rpe")
+            _cmp = sess.hr_comparison(_hr, _rep_rpe, st.session_state.get("tp_reported_au"))
 
             # The travel case. HEALTH_TIMEZONE names one zone; train in
             # another and the session's clock face sits an hour or more from
@@ -3888,11 +3892,9 @@ def render():
                     "saved — nothing is lost either way."
                 )
 
-            elif _hr and _hr.get("hr_au") is not None:
-                _cov = _hr.get("hr_coverage") or 0
-                _d_rpe = _hr["hr_rpe"] - _rep_rpe if _rep_rpe is not None else None
-                _d_au = (_hr["hr_au"] - st.session_state.get("tp_reported_au", 0)
-                         if _rep_rpe is not None else None)
+            elif _cmp:
+                _cov = _cmp["coverage"]
+                _d_rpe, _d_au = _cmp["rpe_delta"], _cmp["au_delta"]
                 m1, m2, m3 = st.columns(3)
                 m1.metric("Measured RPE", f"{_hr['hr_rpe']}",
                           delta=(f"{_d_rpe:+.1f} vs your {_rep_rpe}"
@@ -3905,10 +3907,10 @@ def render():
                           help="Measured RPE x session duration — Foster's own basis, so it "
                                "compares like for like with your self-reported AU.")
                 m3.metric("Active time", f"{_hr['hr_active_minutes']:.0f} min")
-                if _d_rpe is not None:
-                    _rpe_verdict = ("You called it almost exactly." if abs(_d_rpe) < 0.5 else
-                                    "You under-rated it." if _d_rpe > 0 else
-                                    "You over-rated it.")
+                if _cmp["verdict"]:
+                    _rpe_verdict = {"exact": "You called it almost exactly.",
+                                    "under": "You under-rated it.",
+                                    "over": "You over-rated it."}[_cmp["verdict"]]
                     st.caption(
                         f"**{_rpe_verdict}** You rated this {_rep_rpe}; heart rate says "
                         f"{_hr['hr_rpe']}. Neither replaces the other — yours measures how "
@@ -3922,7 +3924,7 @@ def render():
                 # Active minutes are RECORDED minutes, not wall clock. A
                 # paused watch shows up here and nowhere else, so say it
                 # rather than letting a short number read as a short session.
-                if _cov < 0.85:
+                if _cmp["low_coverage"]:
                     st.info(
                         f"Heart rate covers only {_cov:.0%} of this session — the watch was "
                         "probably paused or stopped early. The figures above describe the "
