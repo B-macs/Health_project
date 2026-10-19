@@ -1196,20 +1196,24 @@ class Repository:
         if not self.cached:
             return
         try:
-            conn = self._ds
-            with conn:
-                if mode == supabase_store.REPLACE:
-                    datastore_writer.replace_children(
-                        conn, table,
-                        supabase_store.REPLACE_PARENT_COLUMN[table],
-                        key_value, payload)
-                elif mode == supabase_store.PATCH:
-                    datastore_writer.patch(
-                        conn, table, supabase_store.primary_key(table),
-                        key_value, payload)
-                else:
-                    datastore_writer.upsert(
-                        conn, table, supabase_store.primary_key(table), payload)
+            # The copy's one writer at a time (record_cache.WRITE_LOCK): a
+            # pull that is running finishes first, so this row lands in the
+            # new copy and is never lost (rebuild Phase 2's freshness rule).
+            with record_cache.WRITE_LOCK:
+                conn = self._ds
+                with conn:
+                    if mode == supabase_store.REPLACE:
+                        datastore_writer.replace_children(
+                            conn, table,
+                            supabase_store.REPLACE_PARENT_COLUMN[table],
+                            key_value, payload)
+                    elif mode == supabase_store.PATCH:
+                        datastore_writer.patch(
+                            conn, table, supabase_store.primary_key(table),
+                            key_value, payload)
+                    else:
+                        datastore_writer.upsert(
+                            conn, table, supabase_store.primary_key(table), payload)
             # Every cached read is now stale, PROCESS-WIDE. Per-instance
             # invalidation would not do: the background sync writes through
             # on its own Repository (key rule 12) while the script thread

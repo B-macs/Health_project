@@ -16,6 +16,7 @@ import threading
 
 import streamlit as st
 
+from services import cache_freshness
 from services import datastore
 from services import switchover
 from services.background_sync import BackgroundSyncRunner
@@ -87,3 +88,16 @@ def get_sync_runner() -> BackgroundSyncRunner:
     value. It must NOT be recreated per session — two runners would each
     hold their own lock and defeat the one-at-a-time guarantee."""
     return BackgroundSyncRunner(get_config())
+
+
+def refresh_copy_if_stale() -> str:
+    """At an app open: pull the local copy again when it is older than the
+    freshness limit, because the engine writes to Supabase too and this copy
+    holds none of its rows since the last pull (services/cache_freshness.py).
+    Never waits: a running sync means the next open tries again, and a
+    failure leaves the copy as it was. Not cached, so every open asks."""
+    try:
+        return cache_freshness.refresh_if_stale(get_config(), get_sync_runner(),
+                                                wait_seconds=0.0)
+    except Exception:
+        return cache_freshness.FAILED

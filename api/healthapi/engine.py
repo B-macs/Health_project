@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from services import datastore
+from services import cache_freshness, datastore
 from services.background_sync import BackgroundSyncRunner
 from services.config import Config
 from services.repository import Repository
@@ -59,9 +59,20 @@ def startup(import_seconds: float | None = None) -> None:
     log.info("startup timings %s (cache rebuilt: %s)", STATE.timings, STATE.cache_rebuilt)
 
 
+#: How long a request waits for a running sync before it reads the copy it
+#: has (services/cache_freshness.py: a pull waits for a running sync).
+REFRESH_WAIT_SECONDS = 30.0
+
+
 def new_repository() -> Repository:
+    """A Repository for one request, over a local copy pulled again first
+    when it is older than the freshness limit: the Streamlit app writes to
+    Supabase too, and this copy holds none of its rows since the last pull
+    (services/cache_freshness.py)."""
     if STATE.config is None:
         raise RuntimeError("engine not started")
+    cache_freshness.refresh_if_stale(STATE.config, sync_runner(),
+                                     wait_seconds=REFRESH_WAIT_SECONDS)
     return Repository(STATE.config)
 
 

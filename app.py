@@ -61,6 +61,11 @@ st.markdown(nav.CHROME_CSS, unsafe_allow_html=True)
 # This is also the first touch of the Repository in any script run, which is
 # where the local copy is rebuilt from Supabase at the process's first start.
 _repository = repo.get_repository()
+# An open pulls the local copy again when it is older than the freshness limit
+# (the engine writes to Supabase too). Never waits, and only under a
+# Streamlit server: no test may run the app's device-facing work.
+if st.runtime.exists():
+    repo.refresh_copy_if_stale()
 
 if _repository.offline:
     _built = _repository.datastore_built_at() or "unknown"

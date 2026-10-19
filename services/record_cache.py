@@ -29,10 +29,23 @@ import os
 import sqlite3
 import tempfile
 import threading
+import time
 from pathlib import Path
 
 _LOCK = threading.Lock()
 _HYDRATED: set[str] = set()
+#: When each copy was last pulled from Supabase in this process (time.time()).
+_PULLED_AT: dict[str, float] = {}
+
+#: THE COPY'S ONE WRITER AT A TIME, process-wide: a pull (refresh) holds it
+#: from its first read of Supabase to the moment the new rows are in the
+#: file, and every write-through (Repository._write_through) holds it while
+#: it writes. A row written while a pull runs therefore lands AFTER the pull,
+#: in the new copy, and is never lost: its Supabase write came first, so the
+#: pull either read it or the write-through applies it again (rebuild Phase
+#: 2's freshness rule, 2026-10-19). Re-entrant, so a write-through inside a
+#: refresh's own thread cannot deadlock.
+WRITE_LOCK = threading.RLock()
 
 #: The config row the HOSTED app writes the first time it starts with
 #: Supabase as the record (repo.get_repository -> Repository.
@@ -77,7 +90,61 @@ def hydrate_once(config, store_factory=None) -> str | None:
             return None
         _rebuild(config, key, store_factory)
         _HYDRATED.add(key)
+        _PULLED_AT[key] = time.time()
         return config.datastore_path
+
+
+def pulled_at(path: str) -> float | None:
+    """When the copy at `path` was last pulled in this process, or None."""
+    return _PULLED_AT.get(_key(path))
+
+
+def is_stale(path: str, max_age_seconds: float, now: float | None = None) -> bool:
+    """The copy was pulled longer ago than `max_age_seconds`, or never in
+    this process. Not the file's own age: every write-through touches the
+    file, and a copy this process wrote to can still lack another process's
+    rows."""
+    at = pulled_at(path)
+    return at is None or (now if now is not None else time.time()) - at >= max_age_seconds
+
+
+def refresh(config, store_factory=None) -> str:
+    """Pull the copy again from Supabase, in this process, while it runs.
+
+    Two processes (the Streamlit app and the engine) each keep a copy, and
+    each copy holds only its own process's writes since its last pull. This
+    brings in the other's. Into a temp file first, so a failed pull leaves
+    the copy as it was; then copied INTO the live file with SQLite's backup,
+    not os.replace, because Repositories hold the live file open: through
+    the backup their connections see the new rows at their next read, where
+    a replaced file would leave them on the old one (and Windows will not
+    replace an open file at all). The whole pull holds WRITE_LOCK, so no row
+    this process writes meanwhile is lost."""
+    from services import supabase_store
+
+    key = _key(config.datastore_path)
+    store = (store_factory or supabase_store.SupabaseStore)(
+        config.supabase_url, config.supabase_secret_key)
+    with WRITE_LOCK:
+        fd, tmp = tempfile.mkstemp(dir=str(Path(key).parent), suffix=".refreshing")
+        os.close(fd)
+        try:
+            src = sqlite3.connect(tmp)
+            try:
+                supabase_store.pull(store, src)
+                dst = sqlite3.connect(key, timeout=30)
+                try:
+                    src.backup(dst)
+                finally:
+                    dst.close()
+            finally:
+                src.close()
+        finally:
+            Path(tmp).unlink(missing_ok=True)
+        with _LOCK:
+            _HYDRATED.add(key)
+            _PULLED_AT[key] = time.time()
+    return config.datastore_path
 
 
 def mark_hydrated(path: str) -> None:
@@ -91,6 +158,7 @@ def forget(path: str) -> None:
     """Undo mark_hydrated / hydrate_once for `path` (tests)."""
     with _LOCK:
         _HYDRATED.discard(_key(path))
+        _PULLED_AT.pop(_key(path), None)
 
 
 def _rebuild(config, path: str, store_factory=None) -> None:
