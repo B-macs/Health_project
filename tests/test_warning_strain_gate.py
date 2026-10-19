@@ -194,3 +194,25 @@ def test_every_warned_exercise_is_region_mapped():
         for day in plan.values() for e in day["exercises"]
         if e.get("warning") and sr.region_shares_for(e["name"])[0] is None)
     assert unmapped == [], unmapped
+
+
+# ─── the gate's inputs (move TRN-5, 2026-10-19) ──────────────────────────────
+
+def test_the_gate_reads_today_and_yesterday_from_one_set_of_rows():
+    from datetime import date, timedelta
+    day = date(2026, 10, 20)
+    rows = [{"date": (day - timedelta(days=1)).isoformat(), "upper_body": 40.0, "core": 30.0,
+             "lower_body": 230.0, "unattributed": 0.0, "total_au": 300.0, "regions_known": True}]
+    today, yesterday = sr.warning_strains(rows, 2, day)
+    assert today is not None and all(v is None for v in today.values())   # no session: unloaded
+    assert yesterday["lower_body"] > yesterday["upper_body"] > 0
+    due = sr.warning_is_due("Goblet Squat", today, yesterday)
+    assert due["regions"] == [] or set(due["regions"]) <= set(sr.REGIONS)
+
+
+def test_a_day_that_cannot_be_computed_fails_open():
+    from datetime import date
+    bad = [{"date": "2026-10-20", "upper_body": "x", "core": None, "lower_body": None,
+            "unattributed": None, "total_au": "y", "regions_known": True}]
+    today, _yesterday = sr.warning_strains(bad, 2, date(2026, 10, 20))
+    assert today is None

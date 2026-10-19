@@ -2684,14 +2684,7 @@ def _warning_strains(today: date) -> tuple[dict | None, dict | None]:
         stage = int(repo.get_repository().get_current_stage())
     except Exception:
         return None, None
-    out = []
-    for d in (today, today - timedelta(days=1)):
-        try:
-            out.append(strain_regions.region_strain(
-                strain_regions.region_au_for_date(rows, d), stage))
-        except Exception:
-            out.append(None)
-    return out[0], out[1]
+    return strain_regions.warning_strains(rows, stage, today)
 
 
 def _accessory_choice(active, day_num: int | None, policy_directive: dict):

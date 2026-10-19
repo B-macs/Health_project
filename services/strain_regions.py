@@ -457,6 +457,24 @@ WARNING_STRAIN_THRESHOLD: float = 16.0
 WARNING_MIN_REGION_SHARE: float = 0.25
 
 
+def warning_strains(rows: list[dict], stage: int,
+                    today: date) -> tuple[dict | None, dict | None]:
+    """(today's, yesterday's) per-region strain for warning_is_due, from ONE
+    set of region rows (Repository.get_daily_region_au's "rows"): the gate
+    runs on every exercise render, so a read per exercise would be one round
+    trip per set. A day whose strain cannot be computed is None, the gate's
+    fail-open signal; a day with no session is all-None, which the gate
+    reads as the area unloaded. Moved from views/training.py on 2026-10-19
+    (move TRN-5) so the phone's API returns the same gate."""
+    out: list[dict | None] = []
+    for d in (today, today - timedelta(days=1)):
+        try:
+            out.append(region_strain(region_au_for_date(rows, d), stage))
+        except Exception:
+            out.append(None)
+    return out[0], out[1]
+
+
 def warning_is_due(
     name: str,
     today_strains: dict[str, float | None] | None,
