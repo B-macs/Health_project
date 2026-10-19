@@ -1057,4 +1057,10 @@ def test_view_never_writes_a_real_move_without_a_button_press():
         assert marker in text, f"confirmation button {marker} missing"
     assert text.count("scheduling.has_real_move(") >= 3
     assert text.count("scheduling.declined_entries(") >= 2
-    assert "scheduling.DECLINED_REASON_PREFIX" in text  # banner honesty
+    # Banner honesty: since 2026-10-19 the page asks scheduling.shift_note_moved,
+    # which says a declined, held or dropped note did not move.
+    assert "scheduling.shift_note_moved(" in text
+    for prefix in (scheduling.DECLINED_REASON_PREFIX, scheduling.HELD_REASON_PREFIX,
+                   scheduling.DROPPED_REASON_PREFIX):
+        assert not scheduling.shift_note_moved(prefix + "x")
+    assert scheduling.shift_note_moved("Missed → moved to 2026-10-21")

@@ -746,3 +746,11 @@ def apply_schedule_change(phases: list[Phase], active: Phase, overrides: dict[st
                       date_overrides={**active.date_overrides, **overrides},
                       shift_reasons={**active.shift_reasons, **reasons})
     return [changed if p.phase_number == active.phase_number else p for p in phases], []
+
+
+def shift_note_moved(note: str) -> bool:
+    """Whether a day's shift note describes a session that MOVED. A dropped
+    miss, a held (refused or undone) shift and a declined proposal did not,
+    and "Session moved" over them would be false (move TRN-19)."""
+    return not note.startswith((DROPPED_REASON_PREFIX, HELD_REASON_PREFIX,
+                                DECLINED_REASON_PREFIX))

@@ -561,3 +561,26 @@ def flexibility_window(today: date,
         return _fb.WINDOW_POOR, ("the day after a hard session — peak fatigue, minimum "
                                  "adaptation")
     return _fb.WINDOW_GOOD, f"{since} days since the last hard session"
+
+
+#: The retest states the training page puts a banner up for, and how loud.
+RETEST_NOTICE_KIND = {RETEST_TOMORROW: "warning", RETEST_READY: "info",
+                      RETEST_BLOCKED: "warning"}
+
+
+def retest_notice(assessments: list, recent_sessions, today: date) -> tuple[str, str, str] | None:
+    """(kind, status, reason) for the training page's flexibility retest
+    banner, or None when there is nothing to say (move TRN-15).
+
+    The athlete's rule (2026-08-07): a leg day the day BEFORE a retest reads
+    as extra tightness in exactly the areas being tested. The day-before
+    notice protects tomorrow's reading while today's session can still be
+    kept off the legs; by the morning of, the only honest options are a
+    clean reading or waiting a day. `assessments` are the stored battery
+    runs, oldest first; `recent_sessions` the last three days' sessions."""
+    if not assessments:
+        return None
+    status, reason = retest_readiness(
+        assessments[-1].taken_on, today, leg_loading_days(recent_sessions))
+    kind = RETEST_NOTICE_KIND.get(status)
+    return (kind, status, reason) if kind else None

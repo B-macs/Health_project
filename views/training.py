@@ -308,7 +308,7 @@ HOLD_ENDINGS = sess.HOLD_ENDINGS
 #: 2026-08-17: "make sure that future exercises that are added like this get
 #: the same treatment". A timed exercise whose end is not announced is one he
 #: has to open his eyes to find the end of, which is the whole complaint.
-HOLD_TIMER_TYPES = ("hold", "hold_reps")
+HOLD_TIMER_TYPES = sess.HOLD_TIMER_TYPES   # see its note in services/sessions.py
 
 
 def _hold_timer(seconds: int, label: str = "HOLD", timer_key: str = "tp_h",
@@ -1804,14 +1804,9 @@ def _render_shift_banner(active, d: date, logged: bool = False) -> None:
     # `logged`: a "missed" note is wrong on a day that has a session.
     reason = scheduling.shift_note(active.shift_reasons, d.isoformat(), logged)
     if reason:
-        if reason.startswith((scheduling.DROPPED_REASON_PREFIX,
-                              scheduling.HELD_REASON_PREFIX,
-                              scheduling.DECLINED_REASON_PREFIX)):
-            # A dropped miss, a held (refused/undone) shift and a declined
-            # proposal did NOT move — "Session moved" would be a lie.
-            st.info(reason)
-        else:
-            st.info(f"Session moved — {reason}")
+        # A dropped miss, a held (refused/undone) shift and a declined
+        # proposal did NOT move — "Session moved" would be a lie.
+        st.info(f"Session moved — {reason}" if scheduling.shift_note_moved(reason) else reason)
 
 
 def _render_day_strip(active: dict | None) -> None:
@@ -1916,7 +1911,7 @@ def _render_workout_card(day_num: int, phase_obj, today_plan: dict,
     n_ex = len(exercises)
     phase_length = phase_obj.length_days
     phase_name = phase_obj.name
-    is_loaded = any(ex.get("weight_kg") for ex in exercises)
+    is_loaded = sess.is_loaded_session(exercises)
     equipment_icon = "🏋" if is_loaded else "🏠"
     equipment_label = "Loaded Session" if is_loaded else "Bodyweight Only"
     st.markdown(
@@ -2015,7 +2010,8 @@ def _render_past_completed(d: date) -> None:
     """Read-only log for a past date that was completed — no Start/complete actions."""
     _day_overline(d)
     try:
-        sessions = repo.get_repository().get_recent_sessions(days=(date.today() - d).days + 3)
+        sessions = repo.get_repository().get_recent_sessions(
+            days=sess.days_back_to(d, date.today()))
     except Exception:
         sessions = []
     day_session = next((s for s in sessions if s.session_date == d.isoformat()), None)
@@ -2232,17 +2228,12 @@ def _render_no_active_phase(phases: list) -> None:
     # nothing to offer and nothing to press — it reports a gap rather than
     # asking the athlete to close one. A gap now means only one thing: no
     # block was seeded for these dates.
-    upcoming = sorted(
-        (p for p in phases if p.status != "completed"
-         and date.fromisoformat(p.start_date) > date.today()),
-        key=lambda p: p.start_date,
-    )
-    if upcoming:
-        nxt = upcoming[0]
-        days = (date.fromisoformat(nxt.start_date) - date.today()).days
+    gap = sess.phase_gap(phases, date.today())
+    if gap["next"]:
+        nxt = gap["next"]
         next_line = (
-            f"Next block — <strong style='color:{_OV_TEXT_PRI};'>{nxt.name}</strong> "
-            f"— starts {nxt.start_date}, {days} day(s) from today. It begins on its "
+            f"Next block — <strong style='color:{_OV_TEXT_PRI};'>{nxt['name']}</strong> "
+            f"— starts {nxt['start_date']}, {nxt['days_away']} day(s) from today. It begins on its "
             f"own; there is nothing to press."
         )
     else:
@@ -2265,22 +2256,16 @@ def _render_no_active_phase(phases: list) -> None:
     # This screen is where that becomes visible — it is the one the athlete is
     # looking at on the morning the phase lapsed, which is exactly when a
     # dropped reassessment still costs nothing to run by hand.
-    for lapsed in sorted(phases, key=lambda p: p.start_date, reverse=True):
-        stranded = ph.stranded_override_days(lapsed)
-        if not stranded:
-            continue
-        plan_days = sess.calendar_plan(lapsed)
-        lines = ", ".join(
-            f"day {n} ({(plan_days.get(n) or {}).get('day_type', 'unknown')}) on {iso}"
-            for iso, n in stranded
-        )
+    stranded = gap["stranded"]
+    if stranded:
+        lines = ", ".join(f"day {n} ({day_type}) on {iso}"
+                          for n, day_type, iso in stranded["days"])
         st.warning(
-            f"**{lapsed.name} ended before its last days were reached.** Its schedule "
+            f"**{stranded['name']} ended before its last days were reached.** Its schedule "
             f"still lists {lines} — after the block's final date of "
-            f"{ph.phase_end_date(lapsed)}. Those sessions were never shown. Run anything "
+            f"{stranded['last_date']}. Those sessions were never shown. Run anything "
             f"that matters by hand before starting the next block."
         )
-        break
 
 def _render_day_detail(d: date, active, phases: list) -> None:
     """Dispatcher for any selected date other than today — active is guaranteed
@@ -2290,10 +2275,8 @@ def _render_day_detail(d: date, active, phases: list) -> None:
         is_logged = repo.get_repository().has_logged_session(d)
     except Exception:
         is_logged = False
-    state = sess.day_view_state(d, date.today(), active, is_logged)
-    if state != "rest" and not is_logged and sess.is_planned_rest(
-            sess.calendar_plan(active).get(ph.day_number_in_phase(active, d))):
-        state = "rest"
+    # A planned rest day without a session is "rest", never "missed".
+    state = sess.day_route(d, date.today(), active, is_logged)
     if state == "rest":
         _render_rest_day(d)
     elif state == "past_completed":
@@ -3435,16 +3418,15 @@ def render():
     # compute it never touches the page.
     try:
         _fx_stored = repo.get_repository().get_flexibility_assessments()
-        if _fx_stored:
-            _fx_legs = fx.leg_loading_days(repo.get_repository().get_recent_sessions(days=3))
-            _fx_status, _fx_reason = fx.retest_readiness(
-                _fx_stored[-1].taken_on, date.today(), _fx_legs)
-            if _fx_status == fx.RETEST_TOMORROW:
-                st.warning(f"Flexibility retest — {_fx_reason}", icon="🧘")
-            elif _fx_status == fx.RETEST_READY:
-                st.info(f"Flexibility retest due — {_fx_reason}", icon="🧘")
-            elif _fx_status == fx.RETEST_BLOCKED:
-                st.warning(f"Flexibility retest due, but {_fx_reason}", icon="🧘")
+        _fx_notice = fx.retest_notice(
+            _fx_stored, repo.get_repository().get_recent_sessions(days=3) if _fx_stored else [],
+            date.today())
+        if _fx_notice:
+            _fx_kind, _fx_status, _fx_reason = _fx_notice
+            _fx_text = {fx.RETEST_TOMORROW: f"Flexibility retest — {_fx_reason}",
+                        fx.RETEST_READY: f"Flexibility retest due — {_fx_reason}",
+                        fx.RETEST_BLOCKED: f"Flexibility retest due, but {_fx_reason}"}[_fx_status]
+            (st.warning if _fx_kind == "warning" else st.info)(_fx_text, icon="🧘")
     except Exception:
         pass
 
@@ -3523,14 +3505,9 @@ def render():
         nav.inject("training")
         st.stop()
 
-    if active.date_overrides.get(_today.isoformat()) == 0:
-        _render_rest_day(_today)
-        nav.inject("training")
-        st.stop()
-
-    # A planned rest day (the 12-week block's Wednesday and Saturday) has no
-    # exercises: the rest-day screen, never an empty session to Start.
-    if sess.is_planned_rest(sess.calendar_plan(active).get(day_num)):
+    # A forced rest, or a planned rest day (the 12-week block's Wednesday and
+    # Saturday, no exercises): the rest-day screen, never an empty session.
+    if sess.today_is_rest(active, _today):
         _render_rest_day(_today)
         nav.inject("training")
         st.stop()

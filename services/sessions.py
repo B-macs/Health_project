@@ -2522,3 +2522,95 @@ def hold_ending(ex_type: str, *, is_uni: bool, side: str, cur_set: int,
     if is_uni and side == first:
         return HOLD_ENDING_SWITCH
     return HOLD_ENDING_DONE if cur_set >= total_sets else HOLD_ENDING_FINISH
+
+
+# ─── The Training page's routing (moves TRN-11, TRN-12, TRN-19, 2026-10-19) ──
+
+def day_route(selected: date, today: date, active: Phase | None, is_logged: bool) -> str:
+    """Which screen a day of the Training page opens: day_view_state's answer
+    ("today", "past_completed", "past_missed", "future", "rest", "no_phase"),
+    except that a PLANNED rest day without a logged session is "rest": the
+    12-week block's Wednesday and Saturday have no exercises, so they never
+    show an empty session to Start or a "missed" mark. A forced rest (a 0
+    override) is outside the block's days and already reads "rest"."""
+    state = day_view_state(selected, today, active, is_logged)
+    if (state not in ("rest", "no_phase") and not is_logged
+            and is_planned_rest(calendar_plan(active).get(
+                _plan.day_number_in_phase(active, selected)))):
+        return "rest"
+    return state
+
+
+def today_is_rest(active: Phase, today: date) -> bool:
+    """Today opens the rest-day screen: a forced rest (a 0 override) or a
+    planned rest day with nothing to do."""
+    return (active.date_overrides.get(today.isoformat()) == 0
+            or is_planned_rest(calendar_plan(active).get(
+                _plan.day_number_in_phase(active, today))))
+
+
+def today_screen(day_num: int, plan_days: int, done_today: bool, started: bool) -> str:
+    """Which part of today's flow shows on a training day: "overview" until
+    Start is tapped, "session" once it has been (or once today is logged),
+    "not_started" before the block's first day, "complete" after its last."""
+    if day_num < 1:
+        return "not_started"
+    if day_num > plan_days:
+        return "complete"
+    if not done_today and not started:
+        return "overview"
+    return "session"
+
+
+def phase_gap(phases: list[Phase], today: date) -> dict:
+    """What the page says when no block covers today (move TRN-12).
+
+    BLOCKS START THEMSELVES (since 2026-08-18 a phase is seeded before its
+    Monday), so a gap means only that no block was seeded for these dates,
+    and there is nothing to press. {"next": the next block that has not
+    started, as {name, start_date, days_away}, or None; "stranded": the
+    latest block whose schedule lists days after its own last date, as
+    {name, last_date, days: [(day number, day type, date)]}, or None}. A
+    block that absorbed enough reschedules runs out of calendar before it
+    runs out of content, and those days are never shown; this screen is the
+    one in view on the morning the block lapsed."""
+    upcoming = sorted((p for p in phases if p.status != "completed"
+                       and date.fromisoformat(p.start_date) > today),
+                      key=lambda p: p.start_date)
+    nxt = None
+    if upcoming:
+        first = upcoming[0]
+        nxt = {"name": first.name, "start_date": first.start_date,
+               "days_away": (date.fromisoformat(first.start_date) - today).days}
+    stranded = None
+    for lapsed in sorted(phases, key=lambda p: p.start_date, reverse=True):
+        days = _plan.stranded_override_days(lapsed)
+        if days:
+            content = calendar_plan(lapsed)
+            stranded = {"name": lapsed.name, "last_date": _plan.phase_end_date(lapsed),
+                        "days": [(n, (content.get(n) or {}).get("day_type", "unknown"), iso)
+                                 for iso, n in days]}
+            break
+    return {"next": nxt, "stranded": stranded}
+
+
+#: Exercise `type` values whose work is measured by a hold timer, and which
+#: therefore get the three-bell treatment (moved from views/training.py).
+#: Named so a NEW timed exercise cannot be authored without the endings
+#: following it: tests/test_hold_timer_endings.py fails if any authored
+#: exercise carries hold_seconds while its type is absent from here — the
+#: athlete's rule, 2026-08-17: "make sure that future exercises that are added
+#: like this get the same treatment".
+HOLD_TIMER_TYPES = ("hold", "hold_reps")
+
+
+def is_loaded_session(exercises: list[dict]) -> bool:
+    """A session with any weighted exercise (the day card's "Loaded Session"
+    against "Bodyweight Only")."""
+    return any(ex.get("weight_kg") for ex in exercises)
+
+
+def days_back_to(day: date, today: date) -> int:
+    """The lookback in days that reaches back to `day`'s session, with three
+    days' room (Repository.get_recent_sessions counts back from today)."""
+    return (today - day).days + 3
