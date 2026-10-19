@@ -32,6 +32,7 @@ from services import plan as ph  # aliased: render()'s guided flow has a local v
 from services import prescription
 from services import scheduling
 from services import session_save
+from services import supplementary_save
 from services import sessions as sess
 from services import strain_regions
 from services import week_repeat
@@ -2901,72 +2902,31 @@ _SUPPLEMENTARY_SAVE_LOCK = threading.Lock()
 
 
 def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> bool:
-    """Persist a completed yoga session to Notion — mirrors _auto_log_session's
-    shape (one shared session_id/AU/RPE across a row per pose) so it feeds the
-    same get_daily_session_au_weighted() aggregate the Home strain card and
-    ACWR read from. Yoga pose names aren't in training_constants.
-    EXERCISE_MOVEMENT_WEIGHT, so they contribute at the unmapped fallback
-    weight (1.0, i.e. unchanged from raw AU) rather than being miscategorized.
-    Tagged Type="Yoga" so repo.has_logged_session() (which gates the rehab-plan
-    flow) skips it — see that method's docstring. `note` is the whole-session
-    note from the completion screen, attached to the last logged pose the same
-    way _auto_log_session attaches the rehab flow's session-wide notes.
+    """Persist a completed yoga session through supplementary_save.save_yoga,
+    the save the phone's API uses too: one row per pose under one session id,
+    Type="Yoga" so repo.has_logged_session() skips it, real AU toward strain
+    and ACWR. `note` is the whole-session note from the completion screen.
 
-    WRITES EACH POSE ONCE, under ONE session id (2026-10-05: one press wrote
-    51 sessions and 407 rows in a minute, every run minting its own id). It
-    reads today's yoga back from Notion first: an earlier write of this flow
-    is continued under its own id with its written poses skipped, and a flow
-    already fully logged writes nothing. Returns False in that last case, so
-    the screen can say so instead of claiming a new log."""
+    WRITES EACH POSE ONCE (2026-10-05: one press wrote 51 sessions and 407
+    rows in a minute). Under the lock, the save reads today's yoga back live:
+    an earlier write of this flow is continued under its own id with its
+    written poses skipped, and a flow already fully logged writes nothing.
+    Returns False in that last case, so the screen can say so instead of
+    claiming a new log."""
     r = repo.get_repository()
     try:
         current_stage = r.get_current_stage()
     except Exception:
         current_stage = 1
-    session_info = r.create_training_session(
-        session_date=date.today(),
-        duration_minutes=session.total_duration_minutes,
-        session_rpe=session.estimated_rpe,
-    )
     with _SUPPLEMENTARY_SAVE_LOCK:
-        existing_id, written = sess.yoga_save_plan(
-            r.get_supplementary_sessions_live(date.today(), "Yoga"),
-            [p.name for p in session.poses])
-        if existing_id:
-            session_info["session_id"] = existing_id
-        if written >= {p.name for p in session.poses}:
-            return False
-        last_id = None
-        for pose in session.poses:
-            if pose.name in written:
-                continue
-            last_id = _save_yoga_pose(r, session, session_info, pose, current_stage)
-            written.add(pose.name)
-        if note.strip() and last_id:
-            r.save_session_notes(last_id, note)
+        logged = supplementary_save.save_yoga(
+            r, session, date.today(), current_stage,
+            session_save.new_session_id(date.today()),
+            session_save.new_exercise_ids(len(session.poses)), note)
+    if not logged:
+        return False
     _send_backup_copy(r)
     return True
-
-
-def _save_yoga_pose(r, session: yg.YogaSession, session_info: dict, pose,
-                    current_stage: int) -> str:
-    """One pose's row, under the session the caller chose."""
-    severity, pose_note = yg.effective_safety(pose, current_stage)
-    return r.save_training_exercise(
-        session_id=session_info["session_id"],
-        movement_name=pose.name,
-        movement_type="Yoga",
-        planned_sets=1,
-        planned_reps=1,
-        rpe=session.estimated_rpe,
-        sets=[{"set_num": 1, "reps": 1, "weight": 0.0,
-               "rest": 10, "tut": pose.hold_seconds, "velocity": "isometric"}],
-        note=pose_note if severity != "cleared" else "",
-        session_date=session_info["session_date"],
-        session_duration_minutes=session_info["duration_minutes"],
-        session_rpe=session_info["session_rpe"],
-        session_au=session_info["session_au"],
-    )
 
 
 def _render_yoga_detail(session: yg.YogaSession) -> None:
@@ -3060,61 +3020,25 @@ def _render_yoga_select() -> None:
 
 
 def _log_outdoor_activity(d: date, act: dict, session_rpe: int) -> bool:
-    """Persist a Garmin-imported outdoor activity as a training session —
-    mirrors _log_yoga_completion's shape. Type="Outdoor" keeps it
-    SUPPLEMENTARY (real AU toward strain/ACWR, never a substitute for the
-    plan day); the CANONICAL exercise name (sess.outdoor_exercise_name)
-    carries the movement weight and the leg-day classification, and the
-    Garmin identity lives in the note. AU = RPE x duration, weighted 0.5 by
-    the content multiplier — rule 2b untouched: the activity's HR numbers
-    are persisted as context, never fed into AU.
+    """Persist a Garmin-imported outdoor activity through
+    supplementary_save.save_outdoor, the save the phone's API uses too:
+    Type="Outdoor" keeps it SUPPLEMENTARY (real AU toward strain/ACWR, never a
+    substitute for the plan day), and the activity id in the note is how a
+    second save is recognised.
 
     Writes an activity ONCE (2026-10-05, the yoga saver's 51 copies): under
-    the save lock it reads the day's outdoor sessions back from Notion, and an
-    activity whose id is already in a note writes nothing and returns False."""
+    the save lock the day's outdoor sessions are read back live, and an
+    activity already logged writes nothing and returns False."""
     r = repo.get_repository()
     with _SUPPLEMENTARY_SAVE_LOCK:
-        if sess.outdoor_activity_logged(r.get_supplementary_sessions_live(d, "Outdoor"),
-                                        act.get("activity_id")):
-            return False
-        _write_outdoor_activity(r, d, act, session_rpe)
+        logged = supplementary_save.save_outdoor(
+            r, d, act, session_rpe, session_save.new_session_id(d),
+            session_save.new_exercise_ids(1)[0])
+    if not logged:
+        return False
     _send_backup_copy(r)
     st.cache_data.clear()  # the day strip and AU caches must see it now
     return True
-
-
-def _write_outdoor_activity(r, d: date, act: dict, session_rpe: int) -> None:
-    minutes = max(1, int(round(float(act.get("duration_minutes") or 0))))
-    session = r.create_training_session(
-        session_date=d, duration_minutes=minutes, session_rpe=session_rpe)
-    name = sess.outdoor_exercise_name(act.get("type"))
-    sets = sess.make_sets_data({"name": name, "type": "duration",
-                                "duration_minutes": minutes})
-
-    def _num(v):
-        try:
-            return float(v) if v not in (None, "") else None
-        except (TypeError, ValueError):
-            return None
-
-    r.save_training_exercise(
-        session_id=session["session_id"],
-        movement_name=name,
-        movement_type="Outdoor",
-        planned_sets=1, planned_reps=1, rpe=session_rpe,
-        sets=sets,
-        note=(f"Garmin import: {act.get('name') or act.get('type')} "
-              f"[{act.get('type')}], started {act.get('start_time_local')}, "
-              f"activity {act.get('activity_id')}"),
-        session_date=session["session_date"],
-        session_duration_minutes=session["duration_minutes"],
-        session_rpe=session["session_rpe"],
-        session_au=session["session_au"],
-        garmin_avg_hr=_num(act.get("avg_hr")),
-        garmin_max_hr=_num(act.get("max_hr")),
-        garmin_distance_km=_num(act.get("distance_km")),
-        garmin_calories=_num(act.get("calories")),
-    )
 
 
 def _render_hike_import() -> None:
@@ -3158,9 +3082,7 @@ def _render_hike_import() -> None:
         st.info(f"Garmin has no activities recorded on {iso}.")
         return
 
-    outdoor = [r for r in rows
-               if (r.get("type") or "").lower() in sess.OUTDOOR_EXERCISE_BY_TYPE]
-    ordered = outdoor + [r for r in rows if r not in outdoor]
+    ordered = supplementary_save.order_activities(rows)
 
     def _label(i: int) -> str:
         r = ordered[i]
@@ -3183,9 +3105,12 @@ def _render_hike_import() -> None:
                          "and ACWR. The avg HR above is context; your rating "
                          "is the record, same as every gym session.")
     name = sess.outdoor_exercise_name(act.get("type"))
-    minutes = float(act.get("duration_minutes") or 0)
-    st.caption(f"Logs as **{name}** on {iso}: {minutes:.0f} min × RPE {rpe} "
-               f"= {rpe * minutes:.0f} AU into strain and ACWR. It counts as "
+    # The minutes and AU that are stored (supplementary_save.outdoor_minutes):
+    # the preview used the unrounded minutes, a few AU off the stored figure.
+    minutes = supplementary_save.outdoor_minutes(act)
+    au = supplementary_save.outdoor_au(act, rpe)
+    st.caption(f"Logs as **{name}** on {iso}: {minutes} min × RPE {rpe} "
+               f"= {au:.0f} AU into strain and ACWR. It counts as "
                "a leg day, and never marks a plan day as done.")
     if st.button(f"Log to training — {name}", key=f"tp_hike_log_{iso}",
                  type="primary", use_container_width=True):
@@ -3196,7 +3121,7 @@ def _render_hike_import() -> None:
         else:
             st.session_state.tp_hike_select = False
             st.session_state.pop("tp_hike_results", None)
-            st.toast(f"{name} on {iso} logged — {rpe * minutes:.0f} AU." if logged
+            st.toast(f"{name} on {iso} logged — {au:.0f} AU." if logged
                      else f"{name} on {iso} is already logged.")
             st.rerun()
 

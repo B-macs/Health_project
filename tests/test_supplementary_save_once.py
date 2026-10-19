@@ -106,25 +106,34 @@ def test_a_missing_activity_id_is_never_treated_as_logged():
 
 # ── the savers use them, under the lock, before writing ─────────────────────
 
+_SAVE = (_ROOT / "services" / "supplementary_save.py").read_text(encoding="utf-8")
+
+
 def test_the_yoga_saver_reads_the_day_back_under_the_lock_before_writing():
+    """Since 2026-10-19 the save is services/supplementary_save.save_yoga (the
+    phone's API uses it too), called under the page's lock;
+    tests/test_supplementary_save.py proves it against a fake Supabase."""
     body = _function_source(_VIEW, "_log_yoga_completion")
-    lock = body.index("with _SUPPLEMENTARY_SAVE_LOCK:")
-    read = body.index('r.get_supplementary_sessions_live(date.today(), "Yoga")')
-    plan = body.index("sess.yoga_save_plan(")
-    write = body.index("_save_yoga_pose(")
-    assert lock < plan < write and lock < read < write
-    assert 'session_info["session_id"] = existing_id' in body
-    assert "if pose.name in written:" in body and "continue" in body
-    assert "return False" in body
+    assert body.index("with _SUPPLEMENTARY_SAVE_LOCK:") < body.index(
+        "supplementary_save.save_yoga(")
+    save = _function_source(_SAVE, "save_yoga")
+    read = save.index("repo.get_supplementary_sessions_live(day, YOGA_TYPE)")
+    plan = save.index("sess.yoga_save_plan(")
+    write = save.index("repo.save_training_exercise(")
+    assert plan < write and read < write
+    assert "sid = existing_id or session_id" in save
+    assert "if pose.name not in written" in save
+    assert "return False" in save
 
 
 def test_the_outdoor_saver_checks_the_activity_under_the_lock_before_writing():
     body = _function_source(_VIEW, "_log_outdoor_activity")
-    lock = body.index("with _SUPPLEMENTARY_SAVE_LOCK:")
-    check = body.index("sess.outdoor_activity_logged(")
-    write = body.index("_write_outdoor_activity(")
-    assert lock < check < write
-    assert "return False" in body
+    assert body.index("with _SUPPLEMENTARY_SAVE_LOCK:") < body.index(
+        "supplementary_save.save_outdoor(")
+    save = _function_source(_SAVE, "save_outdoor")
+    assert save.index("sess.outdoor_activity_logged(") < save.index(
+        "repo.save_training_exercise(")
+    assert "return False" in save
 
 
 def test_the_lock_is_one_process_wide_lock():
@@ -132,20 +141,22 @@ def test_the_lock_is_one_process_wide_lock():
 
 
 def test_no_yoga_or_outdoor_write_bypasses_the_savers():
-    """The only Yoga/Outdoor save_training_exercise calls are the two row
-    writers, each called only from its guarded saver."""
-    for writer, saver in (("_save_yoga_pose", "_log_yoga_completion"),
-                          ("_write_outdoor_activity", "_log_outdoor_activity")):
+    """The only Yoga/Outdoor writes are supplementary_save.save_yoga and
+    save_outdoor, each called from the page only by its guarded saver."""
+    for writer, saver in (("supplementary_save.save_yoga", "_log_yoga_completion"),
+                          ("supplementary_save.save_outdoor", "_log_outdoor_activity")):
         callers = [node.name for node in ast.walk(ast.parse(_VIEW))
                    if isinstance(node, ast.FunctionDef)
-                   and f"{writer}(" in (ast.get_source_segment(_VIEW, node) or "")
-                   and node.name != writer]
+                   and f"{writer}(" in (ast.get_source_segment(_VIEW, node) or "")]
         assert callers == [saver], (writer, callers)
     for movement_type in ('movement_type="Yoga"', 'movement_type="Outdoor"'):
-        holders = [node.name for node in ast.walk(ast.parse(_VIEW))
+        assert movement_type not in _VIEW, movement_type
+    for constant, function in (("movement_type=YOGA_TYPE", "save_yoga"),
+                               ("movement_type=OUTDOOR_TYPE", "save_outdoor")):
+        holders = [node.name for node in ast.walk(ast.parse(_SAVE))
                    if isinstance(node, ast.FunctionDef)
-                   and movement_type in (ast.get_source_segment(_VIEW, node) or "")]
-        assert holders and set(holders) <= {"_save_yoga_pose", "_write_outdoor_activity"}, holders
+                   and constant in (ast.get_source_segment(_SAVE, node) or "")]
+        assert holders == [function], holders
 
 
 def test_the_day_is_read_from_the_record_itself_not_the_local_copy():
