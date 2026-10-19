@@ -157,14 +157,22 @@ def test_every_handler_in_the_flow_reruns_fragment_scoped_except_the_handoff():
     handler must be fragment-scoped or the tap pays render()'s prologue."""
     fn = _fn("_render_guided_flow")
 
+    # Since move TRN-9 (2026-10-19) most handlers apply a services/guided_flow
+    # step through _apply_flow_step, which reruns fragment-scoped itself.
     bare, scoped = [], []
     for node in ast.walk(fn):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
                 and node.func.attr == "rerun":
             bare.append(node.lineno)
         elif isinstance(node, ast.Call) and isinstance(node.func, ast.Name) \
-                and node.func.id == "_rerun_flow":
+                and node.func.id in ("_rerun_flow", "_apply_flow_step"):
             scoped.append(node.lineno)
+    helper = _fn("_apply_flow_step")
+    helper_calls = [n for n in ast.walk(helper) if isinstance(n, ast.Call)]
+    assert any(isinstance(c.func, ast.Name) and c.func.id == "_rerun_flow"
+               for c in helper_calls), "_apply_flow_step must rerun fragment-scoped"
+    assert not any(isinstance(c.func, ast.Attribute) and c.func.attr == "rerun"
+                   for c in helper_calls), "_apply_flow_step must never rerun the whole app"
 
     assert len(bare) == 1, (
         f"expected exactly one app-scoped st.rerun() in the flow (the "

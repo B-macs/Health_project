@@ -155,6 +155,11 @@ CHECKPOINT_FIELDS = (
     # date-times, which checkpoint_json stores as text.
     "tp_garmin_minutes", "tp_garmin_activity_detail",
     "tp_hr_au", "tp_reported_rpe", "tp_reported_au",
+    # The minutes the session was saved with. The heart-rate re-match after
+    # the save needs them (fault F26, 2026-10-19: it read a length defined
+    # only before the save, the error was caught, and the choice of activity
+    # vanished without a match).
+    "tp_saved_minutes",
     # The save in progress (services/session_save.pending_save): the session's
     # id and one id per exercise, minted ONCE on the first press of Save, with
     # that press's duration and RPE. Every later press, and a reload, sends the
@@ -2753,3 +2758,38 @@ def timer_keys(day: date, day_num: int, ex_idx: int, set_num: int, rep: int,
             "rest": f"tp_r_{stamp}_{ex_idx}_{set_num}",
             "duration": f"tp_d_{stamp}_{ex_idx}",
             "stopwatch": f"tp_sw_{stamp}_{ex_idx}_{set_num}_{side}"}
+
+
+# ─── The guided flow's surroundings (move TRN-9, faults F18 and F20, 2026-10-19) ─
+
+def add_menu_shown(started: bool, logged: bool, accessory_running: bool) -> bool:
+    """Whether the "+" menu (yoga, hike or walk, accessory) is offered: never
+    while a session is in progress, plan or accessory (fault F18: yoga and the
+    hike import could be opened mid-session; only the accessory start was
+    guarded)."""
+    return not ((started and not logged) or accessory_running)
+
+
+def dosed_day(exercises: list[dict], volume_factor: float,
+              day_type: str | None = None) -> list[dict]:
+    """Every exercise as it runs today (readiness_dose). The overview, the
+    time estimate and the save screen's review read this list (fault F20:
+    they showed the plan's values while the flow ran the dosed ones)."""
+    return [readiness_dose(ex, volume_factor, day_type) for ex in exercises]
+
+
+def review_figures(ex: dict, set_rows: list[dict] | None,
+                   garmin_minutes: float | None) -> dict:
+    """The save screen's review of one exercise as done today: its time (the
+    watch's minutes when it verified the activity, else the estimate), its
+    sets, and its weight from the last recorded working set (the prescribed
+    weight when no set was recorded). `ex` is the dosed exercise."""
+    if garmin_minutes:
+        time_label, minutes = "Time (Garmin-verified)", round(garmin_minutes)
+    else:
+        time_label = "Time (estimated)"
+        minutes = max(1, round(exercise_duration_seconds(ex) / 60))
+    work = [r for r in (set_rows or []) if not r.get("is_warmup")]
+    weight = work[-1].get("weight") if work else ex.get("weight_kg")
+    return {"time_label": time_label, "minutes": minutes, "sets": ex.get("sets", 1),
+            "weight_kg": weight or None}

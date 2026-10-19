@@ -37,6 +37,7 @@ from services import strain_regions
 from services import week_repeat
 from services import flexibility as fx
 from services import gate1 as g1
+from services import guided_flow
 from services import training_week
 from services import yoga as yg
 from services.repository import PhasesCorruptError
@@ -887,6 +888,7 @@ def _init_state(day_num: int | None = None):
         "tp_hr_au":            None,     # HR-derived session RPE/AU, computed after saving
         "tp_reported_rpe":     None,     # the athlete's own rating, kept for the measured-vs-reported comparison
         "tp_reported_au":      None,
+        "tp_saved_minutes":    None,     # the minutes the session was saved with; the heart-rate re-match after the save reads them (F26)
         "tp_actuals":          {},       # {exercise_idx: {reps, weight_kg, band_tier, source, last_seen_date}}
         # {exercise_idx: sess.previous_performance(...)} — the PREVIOUS session's
         # own completed sets, per exercise. Deliberately NOT in
@@ -1100,15 +1102,6 @@ def _record_completed_set(idx: int, ex: dict, set_num: int) -> None:
     )
 
 
-#: Anything longer than this was an interruption, not an inter-set rest — the
-#: athlete put the phone down, took a call, or the tab sat open over lunch. The
-#: raw wall-clock reading is still what gets recorded up to this point; past it
-#: the value is dropped entirely rather than stored as a rest that never
-#: happened. Twenty minutes is far above any prescribed rest in the repo (the
-#: ceiling is 90 s, rising to 180 s in Stage 2B) and far below a session gap.
-_REST_TAKEN_MAX_SECONDS = 1200
-
-
 def _begin_rest() -> None:
     """Enter the rest phase and start the clock on it.
 
@@ -1136,16 +1129,37 @@ def _record_rest_taken(idx: int) -> None:
     distinguishable from a genuinely short rest."""
     started = st.session_state.get("tp_rest_started_at") or 0
     st.session_state.tp_rest_started_at = 0
-    if not started:
-        return
-    elapsed = int(time.time() - started)
-    if elapsed <= 0 or elapsed > _REST_TAKEN_MAX_SECONDS:
-        return
-    rows = st.session_state.tp_set_log.get(idx) or []
-    if not rows:
-        return
-    last = max(rows, key=lambda r: r.get("set_num") or 0)
-    last["rest_taken_seconds"] = elapsed
+    guided_flow.attach_rest(st.session_state.tp_set_log.get(idx) or [],
+                            guided_flow.rest_taken(started, time.time()))
+
+
+def _flow_position() -> guided_flow.Position:
+    s = st.session_state
+    return guided_flow.Position(s.tp_ex_idx, s.tp_set, s.tp_rep_in_set, s.tp_phase, s.tp_side)
+
+
+def _apply_flow_step(event: str, ex: dict, day_num: int) -> None:
+    """One tap of the guided flow, applied (services/guided_flow.step decides
+    where it leads): the rest that just ended goes on the set it followed
+    BEFORE the "← Back" snapshot is taken; the set the tap completed is
+    recorded from the live steppers; a rest that begins is stamped; the new
+    position is checkpointed."""
+    idx = st.session_state.tp_ex_idx
+    nxt = guided_flow.step(_flow_position(), ex, event,
+                           first=st.session_state.tp_first_side)
+    if nxt.rest_ends:
+        _record_rest_taken(idx)
+    _push_nav_state()
+    if nxt.record_set is not None:
+        _record_completed_set(idx, ex, nxt.record_set)
+    pos = nxt.position
+    s = st.session_state
+    s.tp_ex_idx, s.tp_set, s.tp_rep_in_set, s.tp_phase, s.tp_side = (
+        pos.ex_idx, pos.set_num, pos.rep, pos.phase, pos.side)
+    if nxt.rest_begins:
+        _begin_rest()
+    _save_checkpoint(day_num)
+    _rerun_flow()
 
 
 def _sets_by_movement(exercises: list) -> dict[str, list[dict]]:
@@ -2334,6 +2348,8 @@ def _render_overview(day_num: int, active, today_plan: dict,
     The day strip, phase resolution, and past/future/rest routing all happen once
     in render() before this is ever called; this only ever renders today."""
     today = date.today()
+    # Today's dosed values, as the flow runs them (fault F20).
+    exercises = sess.dosed_day(exercises, policy["volume_factor"], today_plan.get("day_type"))
     duration_min       = sess.estimate_duration(exercises)
     # ABOVE THE HEADLINE, because it can overrule it. The headline is the
     # engine directive's own sentence; the banner is the resolved decision the
@@ -2996,6 +3012,15 @@ def render():
     #     Deliberately rendered BEFORE the phases fetch: yoga depends on no
     #     phase data, so a PhasesCorruptError below must not take the one
     #     always-available training path down with it. ─────────────────────────
+    # Never during a session, plan or accessory (fault F18): yoga and the hike
+    # import could be opened mid-session. A restored session is caught on the
+    # rerun after its restore, so a stale request is dropped here too.
+    _menu_ok = sess.add_menu_shown(bool(st.session_state.get("tp_started")),
+                                   bool(st.session_state.get("tp_session_logged")),
+                                   bool(st.session_state.get("tp_accessory_plan")))
+    if not _menu_ok:
+        st.session_state.pop("tp_yoga_select", None)
+        st.session_state.pop("tp_hike_select", None)
     if st.session_state.get("tp_yoga_select"):
         _render_yoga_select()
         nav.inject("training")
@@ -3004,7 +3029,8 @@ def render():
         _render_hike_import()
         nav.inject("training")
         st.stop()
-    _render_add_training_fab()
+    if _menu_ok:
+        _render_add_training_fab()
 
     # ── Session state initialisation — restores from a saved Notion checkpoint
     #     if this is a fresh session (e.g. the browser dropped its connection
@@ -3520,29 +3546,28 @@ def render():
             # until a weighted exercise dict actually carries the field.
             st.markdown("**Today's Training**")
             garmin_minutes = st.session_state.get("tp_garmin_minutes", {})
+            _dosed = sess.dosed_day(exercises, _volume_factor, today_plan.get("day_type"))
             review_idx = st.selectbox(
                 "Review an exercise",
                 options=range(n_ex),
                 format_func=lambda i: exercises[i]["name"],
                 key="tp_review_ex_idx",
             )
-            review_ex = exercises[review_idx]
-            garmin_actual_min = garmin_minutes.get(review_idx)
-            if garmin_actual_min:
-                time_label, time_value = "Time (Garmin-verified)", f"{garmin_actual_min:.0f} min"
-            else:
-                review_secs = sess.exercise_duration_seconds(review_ex)
-                time_label, time_value = "Time (estimated)", f"{max(1, round(review_secs / 60))} min"
-            review_weight = review_ex.get("weight_kg")
+            # As done today (fault F20): the dosed sets, and the weight of the
+            # last recorded working set rather than the plan's.
+            _review = sess.review_figures(
+                _dosed[review_idx], st.session_state.tp_set_log.get(review_idx),
+                garmin_minutes.get(review_idx))
+            review_weight = _review["weight_kg"]
 
             col_review_time, col_review_sets, col_review_weight = st.columns(3)
-            col_review_time.metric(time_label, time_value)
-            col_review_sets.metric("Sets", str(review_ex.get("sets", 1)))
-            col_review_weight.metric("Weight", f"{review_weight} kg" if review_weight else "Bodyweight")
+            col_review_time.metric(_review["time_label"], f"{_review['minutes']} min")
+            col_review_sets.metric("Sets", str(_review["sets"]))
+            col_review_weight.metric("Weight", f"{review_weight:g} kg" if review_weight else "Bodyweight")
             st.divider()
 
             elapsed_minutes = sess.elapsed_minutes(
-                st.session_state.tp_session_start_ts, time.time(), exercises)
+                st.session_state.tp_session_start_ts, time.time(), _dosed)
 
             # ── Garmin workout check, BEFORE the session is saved ──────────
             #
@@ -3592,7 +3617,7 @@ def render():
             # A clock that ran far past the plan asks before it saves
             # (sess.duration_needs_a_check, 2026-10-13): the session load is
             # RPE x minutes, so a session left open multiplies it.
-            _modelled_minutes = sess.estimate_duration(exercises)
+            _modelled_minutes = sess.estimate_duration(_dosed)
             _check_length = sess.duration_needs_a_check(elapsed_minutes, _modelled_minutes)
             # The rating and the length sit OUTSIDE the form, so the AU below
             # follows them as they change (inventory fault F16: inside the form
@@ -3652,6 +3677,7 @@ def render():
                 # could never be compared against one.
                 st.session_state.tp_reported_rpe = session_rpe
                 st.session_state.tp_reported_au = sess.session_au(session_rpe, elapsed_minutes)
+                st.session_state.tp_saved_minutes = elapsed_minutes
                 # Derive the HR-based session RPE/AU while the per-set records
                 # are still in hand. Never blocks the save — the session is
                 # already in Notion by this point and a Garmin failure must
@@ -3727,7 +3753,7 @@ def render():
                             st.session_state.tp_hr_au = repo.get_repository().compute_session_hr(
                                 date.today(),
                                 _sets_by_movement(exercises),
-                                duration_minutes=elapsed_minutes,
+                                duration_minutes=st.session_state.get("tp_saved_minutes"),
                                 force_activity_id=_c["activity"].get("activity_id"),
                                 shift_hours=_c["shift_hours"],
                             )
@@ -4261,7 +4287,6 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 _duration_timer(ex["duration_minutes"], timer_key=_dur_key)
             if st.button("✓ Activity Complete", type="primary", use_container_width=True):
                 _mark_start()
-                _push_nav_state()
                 if _is_garmin_activity:
                     r = repo.get_repository()
                     # Matches on the ACTIVITY'S OWN duration (± buffer) rather
@@ -4284,28 +4309,13 @@ def _render_guided_flow(day_num, exercises, n_ex,
                             f"No Garmin activity today lasting {_lo}-{_hi} min — "
                             f"logged with the planned duration."
                         )
-                _record_completed_set(_eidx, ex, 1)
-                st.session_state.tp_ex_idx += 1
-                st.session_state.tp_set = 1
-                st.session_state.tp_rep_in_set = 1
-                st.session_state.tp_side = _first
-                st.session_state.tp_phase = "intro"
-                _save_checkpoint(day_num)
-                _rerun_flow()
+                _apply_flow_step(guided_flow.COMPLETE, ex, day_num)
 
         elif ex_type == "reps":
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
-                    # Before _push_nav_state: the rest belongs to the set that
-                    # just ended, so it must be on that record before the record
-                    # is snapshotted for "← Back".
-                    _record_rest_taken(_eidx)
-                    _push_nav_state()
-                    st.session_state.tp_side = _first
-                    st.session_state.tp_phase = "intro"
-                    _save_checkpoint(day_num)
-                    _rerun_flow()
+                    _apply_flow_step(guided_flow.NEXT_SET, ex, day_num)
             else:
                 # Clear any stale tp_auto_start from the rest timer — reps exercises have no
                 # hold timer to consume it, so it must not leak into the next exercise.
@@ -4324,36 +4334,13 @@ def _render_guided_flow(day_num, exercises, n_ex,
                               else f"✓ Set {cur_set} Complete")
                 if st.button(_btn_label, type="primary", use_container_width=True):
                     _mark_start()
-                    _push_nav_state()
-                    if is_uni and _side == _first:
-                        st.session_state.tp_side = _second
-                    else:
-                        # Both sides done (or bilateral) — the set is complete.
-                        _record_completed_set(_eidx, ex, cur_set)
-                        st.session_state.tp_side = _first
-                        if cur_set >= total_sets:
-                            st.session_state.tp_ex_idx += 1
-                            st.session_state.tp_set = 1
-                            st.session_state.tp_phase = "intro"
-                        else:
-                            st.session_state.tp_set += 1
-                            _begin_rest()
-                    _save_checkpoint(day_num)
-                    _rerun_flow()
+                    _apply_flow_step(guided_flow.COMPLETE, ex, day_num)
 
         elif ex_type == "hold":
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
-                    # Before _push_nav_state: the rest belongs to the set that
-                    # just ended, so it must be on that record before the record
-                    # is snapshotted for "← Back".
-                    _record_rest_taken(_eidx)
-                    _push_nav_state()
-                    st.session_state.tp_side = _first
-                    st.session_state.tp_phase = "intro"
-                    _save_checkpoint(day_num)
-                    _rerun_flow()
+                    _apply_flow_step(guided_flow.NEXT_SET, ex, day_num)
             else:
                 # A timed test hold (the plank test, decided 2026-10-13): held
                 # until the line breaks, on a stopwatch that counts up, and the
@@ -4389,42 +4376,20 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 if st.button(_btn_label, type="primary", use_container_width=True,
                              disabled=_timed_test and _tt_secs is None):
                     _mark_start()
-                    _push_nav_state()
                     if _timed_test:
+                        # Before the step: the set it completes is recorded
+                        # from tp_actuals, which must hold the typed seconds.
                         st.session_state.tp_actuals[_eidx] = sess.timed_hold_entry(
                             st.session_state.tp_actuals.get(_eidx),
                             _side if is_uni else "right", int(_tt_secs))
-                    if is_uni and _side == _first:
-                        st.session_state.tp_side = _second
-                    else:
-                        # Both sides done (or bilateral) — the set is complete.
-                        _record_completed_set(_eidx, ex, cur_set)
-                        st.session_state.tp_side = _first
-                        if cur_set >= total_sets:
-                            st.session_state.tp_ex_idx += 1
-                            st.session_state.tp_set = 1
-                            st.session_state.tp_phase = "intro"
-                        else:
-                            st.session_state.tp_set += 1
-                            _begin_rest()
-                    _save_checkpoint(day_num)
-                    _rerun_flow()
+                    _apply_flow_step(guided_flow.COMPLETE, ex, day_num)
 
         elif ex_type == "hold_reps":
             reps_per_set = ex.get("reps_in_set", 5)
             if phase == "resting":
                 _rest_timer(ex["rest_seconds"], timer_key=_rest_key)
                 if st.button("→ Next Set", type="primary", use_container_width=True):
-                    # Before _push_nav_state: the rest belongs to the set that
-                    # just ended, so it must be on that record before the record
-                    # is snapshotted for "← Back".
-                    _record_rest_taken(_eidx)
-                    _push_nav_state()
-                    st.session_state.tp_rep_in_set = 1
-                    st.session_state.tp_side = _first
-                    st.session_state.tp_phase = "intro"
-                    _save_checkpoint(day_num)
-                    _rerun_flow()
+                    _apply_flow_step(guided_flow.NEXT_SET, ex, day_num)
             else:
                 _side_suffix = f" — {_side.upper()}" if is_uni else ""
                 # More reps in this set → next rep's hold timer needs to auto-start.
@@ -4447,28 +4412,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                             ending=_ending)
                 if st.button(f"✓ Rep {cur_rep} Done", type="primary", use_container_width=True):
                     _mark_start()
-                    _push_nav_state()
-                    if cur_rep >= reps_per_set:
-                        if is_uni and _side == _first:
-                            st.session_state.tp_side = _second
-                            st.session_state.tp_rep_in_set = 1
-                        else:
-                            # Final rep of the set, both sides done — set complete.
-                            _record_completed_set(_eidx, ex, cur_set)
-                            st.session_state.tp_side = _first
-                            if cur_set >= total_sets:
-                                st.session_state.tp_ex_idx += 1
-                                st.session_state.tp_set = 1
-                                st.session_state.tp_rep_in_set = 1
-                                st.session_state.tp_phase = "intro"
-                            else:
-                                st.session_state.tp_set += 1
-                                st.session_state.tp_rep_in_set = 1
-                                _begin_rest()
-                    else:
-                        st.session_state.tp_rep_in_set += 1
-                    _save_checkpoint(day_num)
-                    _rerun_flow()
+                    _apply_flow_step(guided_flow.COMPLETE, ex, day_num)
 
         # ── Undo the last transition ──────────────────────────────────────────
         # Covers both accidental-completion cases: a set marked done by
@@ -4510,11 +4454,4 @@ def _render_guided_flow(day_num, exercises, n_ex,
     with st.expander("Skip this exercise", expanded=False):
         st.caption("Only skip if pain prevents performance. Log the reason in session notes.")
         if st.button("Skip — move to next exercise", use_container_width=True):
-            _push_nav_state()
-            st.session_state.tp_ex_idx += 1
-            st.session_state.tp_set = 1
-            st.session_state.tp_rep_in_set = 1
-            st.session_state.tp_side = _first
-            st.session_state.tp_phase = "intro"
-            _save_checkpoint(day_num)
-            _rerun_flow()
+            _apply_flow_step(guided_flow.SKIP, ex, day_num)

@@ -1402,6 +1402,8 @@ _STATE = {
     # screen's heart-rate panel (fault F19, checkpointed since 2026-10-19).
     "tp_garmin_minutes": {}, "tp_garmin_activity_detail": {},
     "tp_hr_au": None, "tp_reported_rpe": None, "tp_reported_au": None,
+    # The minutes the session was saved with (fault F26).
+    "tp_saved_minutes": None,
 }
 
 
