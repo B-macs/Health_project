@@ -1,7 +1,7 @@
 # The engine's runtime on Google Cloud Run (see docs/rebuild/). Exact pins,
 # checked on PyPI on 2026-10-07 and recorded with their sources in
-# docs/rebuild/stack.md. Streamlit and the voice libraries are NOT here: the
-# engine never draws a screen, and Voice Training leaves in rebuild Phase 1.
+# docs/rebuild/stack.md. Streamlit is NOT here: the engine never draws a screen.
+# The voice app runs as its own app since rebuild Phase 1 (2026-10-19).
 # Needs Python 3.12 or newer: garminconnect 0.3.17 and numpy 2.5.3 require it.
 # requirements.txt stays the Streamlit app's file until rebuild Phase 10.
 fastapi==0.142.2

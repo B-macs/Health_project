@@ -1,15 +1,18 @@
 """
 nav.py — Bottom navigation bar.
 
-Single-layer pattern: four st.button() widgets in st.columns(4), positioned
-fixed at the bottom of the viewport via CSS. No separate visual HTML, no
+Single-layer pattern: one st.button() per item in st.columns(len(_ITEMS)),
+positioned fixed at the bottom of the viewport via CSS. No separate visual HTML, no
 invisible overlay — one layer, one source of truth.
 
 Navigation: on_click sets st.session_state["_nav_page"], triggering a WebSocket
 rerun without page reload or new connection.
 
 Call nav.inject(active) once per page, AFTER all page content is rendered.
-active keys: "home" | "training" | "insights" | "sync" | ""
+active keys: "home" | "training" | "insights" | ""
+
+Three items since 2026-10-19 (rebuild Phase 1): the fourth, the voice app's
+tab, left with the voice app, which now runs as its own app.
 """
 
 import streamlit as st
@@ -20,7 +23,6 @@ _ITEMS = [
     ("⌂",  "Home",     "home"),
     ("📋", "Training", "training"),
     ("🧠", "Insights", "insights"),
-    ("↻",  "Voice Training", "sync"),
 ]
 
 # ─── Chrome-suppression + nav CSS ─────────────────────────────────────────────

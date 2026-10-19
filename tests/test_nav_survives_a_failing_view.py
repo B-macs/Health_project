@@ -171,7 +171,7 @@ def test_injected_this_run_reports_the_flag():
         "import nav\n"
         "nav.start_run()\n"
         "st.text('before=' + str(nav.injected_this_run()))\n"
-        "nav.inject('sync')\n"
+        "nav.inject('insights')\n"
         "st.text('after=' + str(nav.injected_this_run()))\n"
     )
     at = AppTest.from_string(script)

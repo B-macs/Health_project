@@ -181,6 +181,7 @@ def test_docs_markdown_and_the_named_exceptions_do_not_count():
         "docs/resume.md": "Voxplot (voice_training/voxplot) moved out on 2026-10-19\n",
         "CLAUDE.md": "- Voice Training: its own Streamlit app\n",
         "tests/test_rebuild_secrets.py": '"voxplot_supabase": {"url": "x"}\n',
+        ".claude/settings.local.json": '"Bash(python -c \\"open(\'views/sync.py\')\\")"\n',
     }
     assert gate.voice_ref_hits(files) == []
     assert all(reason for reason in gate.VOICE_REF_ALLOW.values())

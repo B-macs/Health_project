@@ -4,7 +4,7 @@ The hosted engine reads the SAME secrets.toml the Streamlit app reads, mounted
 from Google Secret Manager as a file at HEALTH_SECRETS_FILE. Only the top-level
 string keys and the google_service_account table are kept, exactly what
 scripts/authorize_oura.py:_load_overrides keeps, so a section that belongs to
-another app ([voxplot_supabase]) never reaches load_config. Everything the TOML
+another app never reaches load_config. Everything the TOML
 does not carry (HEALTH_DATASTORE_MODE, HEALTH_DATASTORE_PATH, HEALTH_TIMEZONE)
 comes from environment variables, as services/config.py already expects.
 

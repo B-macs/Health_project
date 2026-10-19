@@ -3354,8 +3354,8 @@ class Repository:
     def _sheets_biometric_records(self) -> list[models.BiometricRecord]:
         """Every row in Sheet1, mapped once — the single place that knows the
         Sheets column names. Previously duplicated independently in
-        sync_sheets.py (field name `sleep_duration_hours`) and views/sync.py's
-        own preview-table loop (field name `sleep_hours` for the same data —
+        sync_sheets.py (field name `sleep_duration_hours`) and the old sheet
+        preview page's own table loop (field name `sleep_hours` for the same data —
         the two had already drifted; see REFACTOR_NOTES.md). Consolidated here
         and standardized on `sleep_duration_hours`, matching what the engine
         actually consumes.
@@ -5600,8 +5600,9 @@ class Repository:
         429 IP rate-limits this account has been hitting.
 
         Raises RuntimeError if Garmin isn't configured, or whatever
-        garminconnect raises on a real login/API failure — the caller
-        (views/sync.py) surfaces that as an error."""
+        garminconnect raises on a real login/API failure — the callers (the
+        Insights Sync tab's button; sync_garmin_daily_if_due) surface that as
+        an error."""
         client = self._gc
         if client is None:
             raise RuntimeError(
@@ -6672,8 +6673,8 @@ class Repository:
         re-running this (whether the 2-hour automatic trigger or the manual
         weekly button) never duplicates a row, only refreshes existing ones.
         Raises RuntimeError if Oura isn't configured, or whatever `requests`
-        raises on a real API failure — callers (views/sync.py, app.py's
-        cached wrapper) decide how to surface that. Returns
+        raises on a real API failure — callers (the Insights Sync tab's button,
+        sync_oura_all_if_due) decide how to surface that. Returns
         {tab_name: rows_written}.
 
         Interruption-tolerant in two independent ways, because a full run

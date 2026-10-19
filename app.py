@@ -85,6 +85,12 @@ if _repository.offline:
 #          no page reload, same connection).
 # Fallback: st.query_params["page"] for direct URL access and first load.
 _page = st.session_state.get("_nav_page") or st.query_params.get("page", "home")
+# An unknown page is Home: an old ?page=sync bookmark from before the voice app
+# moved out (rebuild Phase 1, 2026-10-19) must not keep the address bar on a
+# page that no longer exists.
+_PAGES = ("home", "training", "insights", "checkin")
+if _page not in _PAGES:
+    _page = "home"
 
 # Keep the URL in sync with whichever page _nav_page resolved to. Nav
 # buttons (nav.py's bottom nav, training.py's two internal "back to home"
@@ -121,7 +127,7 @@ nav.start_run()
 # ⚠ nav.inject RUNS IN A `finally`, AND THAT IS THE WHOLE POINT. The bottom bar
 # is the only way off a page, so a view that fails must not take the navigation
 # down with it. Before this, any exception inside render() left the screen
-# showing an error box and NO Home/Training/Insights/Voice buttons — the athlete
+# showing an error box and NO nav buttons at all — the athlete
 # was stranded on the broken page with hand-editing the URL as the only escape.
 # Reported 2026-08-18 against insights' UnserializableReturnValueError, which is
 # a separate bug; this is the reason that bug was unrecoverable rather than
@@ -145,8 +151,6 @@ if _page == "training":
     from views import training as _view
 elif _page == "insights":
     from views import insights as _view
-elif _page == "sync":
-    from views import sync as _view
 elif _page == "checkin":
     from views import checkin as _view
 

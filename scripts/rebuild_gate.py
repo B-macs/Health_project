@@ -468,7 +468,10 @@ def voice_ref_hits(files: dict[str, str]) -> list[str]:
     Voice Training. `files` maps repo-relative paths to their text."""
     hits = []
     for rel, text in files.items():
-        if rel.startswith("docs/") or rel.endswith(".md") or rel in VOICE_REF_ALLOW:
+        # .claude/ is Claude Code's own settings (its permission rules quote old
+        # commands), not the health app.
+        if (rel.startswith(("docs/", ".claude/")) or rel.endswith(".md")
+                or rel in VOICE_REF_ALLOW):
             continue
         for lineno, line in enumerate(text.splitlines(), 1):
             if VOICE_REF_PATTERN.search(line):

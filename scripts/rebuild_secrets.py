@@ -15,7 +15,7 @@ piped text, and the Worker's copy of a key would then not match Google's.
 engine-secrets uploads ONLY the keys the engine reads (ENGINE_SECRET_KEYS), not
 the whole .streamlit/secrets.toml. With Supabase as the only store (2026-10-09)
 the engine never calls Notion or Google Sheets, so their token and service-
-account key, and the Voice Training app's keys, stay on this PC.
+account key, and the voice app's keys, stay on this PC.
 """
 
 from __future__ import annotations

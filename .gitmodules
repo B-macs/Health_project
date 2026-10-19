@@ -1,3 +1,0 @@
-[submodule "voice_training/voxplot"]
-	path = voice_training/voxplot
-	url = https://github.com/B-macs/health-voice-training.git

@@ -9,8 +9,8 @@ right, which a load of 2,900 real rows answers and no amount of reading the
 DDL does.
 
 NO NEW DEPENDENCY. Supabase's Data API is PostgREST, which is plain HTTP over
-JSON, so this uses urllib -- the same choice voice_training/voxplot/storage/
-supabase.py already made in this repo. Adding psycopg would buy a nicer API in
+JSON, so this uses urllib -- the same choice the voice app's own storage layer
+made (its own repo since 2026-10-19). Adding psycopg would buy a nicer API in
 exchange for a build-tooling dependency and a second credential (the database
 password), neither of which this needs.
 
