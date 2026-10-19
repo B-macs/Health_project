@@ -65,15 +65,24 @@ def test_an_unmeasured_target_is_missed_not_passed():
     assert len(gate.missed_targets({})) == len(gate.P0_TARGETS)
     good = {"cold_start_median_s": 6.0, "cold_start_worst_s": 12.0,
             "free_tier_max_share": 0.2, "garmin_ok": True, "image_size_mb": 180,
-            "upload_personal_files": 0}
+            "upload_personal_files": 0, "cold_start_failures": 0}
     assert gate.missed_targets(good) == []
     slow = dict(good, cold_start_median_s=11.0)
     assert gate.missed_targets(slow) == ["cold start median <= 10 s"]
 
 
+def test_a_refused_cold_start_is_a_miss_even_when_the_timed_ones_are_fast():
+    good = {"cold_start_median_s": 6.0, "cold_start_worst_s": 12.0,
+            "free_tier_max_share": 0.2, "garmin_ok": True, "image_size_mb": 180,
+            "upload_personal_files": 0}
+    assert gate.missed_targets(dict(good, cold_start_failures=1)) == ["every timed cold start answered"]
+    assert gate.missed_targets(good) == ["every timed cold start answered (not measured)"]
+
+
 def test_a_large_image_passes_only_when_its_cost_is_small():
     base = {"cold_start_median_s": 6.0, "cold_start_worst_s": 12.0,
-            "free_tier_max_share": 0.2, "garmin_ok": True, "upload_personal_files": 0}
+            "free_tier_max_share": 0.2, "garmin_ok": True, "upload_personal_files": 0,
+            "cold_start_failures": 0}
     assert gate.missed_targets(dict(base, image_size_mb=900, image_monthly_cost_eur=0.04)) == []
     assert gate.missed_targets(dict(base, image_size_mb=900, image_monthly_cost_eur=0.20))
 

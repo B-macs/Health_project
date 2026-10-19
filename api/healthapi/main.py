@@ -46,6 +46,14 @@ def create_app(startup: bool = True, with_probes: bool | None = None) -> FastAPI
         return JSONResponse(status_code=exc.status_code, content={"error": str(exc.detail)},
                             headers={"Cache-Control": "no-store"})
 
+    @app.exception_handler(Exception)
+    async def _crash_is_json_too(_request: Request, _exc: Exception) -> JSONResponse:
+        # Every engine answer is JSON, a crash included: the Worker retries a
+        # non-JSON 5xx as Google's own refusal, which the engine never saw.
+        # The traceback still reaches the log (Starlette re-raises after this).
+        return JSONResponse(status_code=500, content={"error": "internal"},
+                            headers={"Cache-Control": "no-store"})
+
     @app.middleware("http")
     async def _no_store(request: Request, call_next):
         response = await call_next(request)

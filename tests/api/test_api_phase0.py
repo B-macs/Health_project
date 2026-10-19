@@ -110,6 +110,24 @@ def test_answers_are_never_cached(client):
     assert _get(client, "/api/health", key=None).headers["Cache-Control"] == "no-store"
 
 
+def test_a_crash_still_answers_json(monkeypatch):
+    # The Worker retries a non-JSON 5xx as Google's own refusal, so the engine's
+    # own failures must never look like one.
+    monkeypatch.setenv("HEALTH_ENGINE_KEY", KEY)
+    app = create_app(startup=False)
+
+    def broken():
+        raise RuntimeError("a bug")
+
+    app.dependency_overrides[readiness_route.get_repository] = broken
+    with TestClient(app, raise_server_exceptions=False) as c:
+        r = c.get(f"/api/readiness?date={TODAY}",
+                  headers={"X-Engine-Key": KEY, "X-Local-Date": TODAY.isoformat()})
+    assert r.status_code == 500 and r.json() == {"error": "internal"}
+    assert r.headers["content-type"].startswith("application/json")
+    assert r.headers["Cache-Control"] == "no-store"
+
+
 def test_no_docs_route_publishes_the_engine(client):
     for path in ("/docs", "/redoc", "/openapi.json"):
         assert _get(client, path).status_code == 404

@@ -162,6 +162,9 @@ def health_sample(kind: str, via: str, target: tuple[str, str] | None = None) ->
     result = call(via, "/api/health", target=target)
     answer = result.pop("answer", None) or {}
     sample = {"kind": kind, "via": via, **result}
+    if result.get("status") not in (None, 200):
+        # The Worker's and the engine's errors are JSON {"error": code}.
+        sample["error_code"] = answer.get("error") if isinstance(answer, dict) else None
     if result.get("status") == 200:
         sample["cold"] = is_cold(result["sent"], result["seconds"], answer.get("started_at"))
         sample["engine_timings"] = answer.get("timings")
@@ -187,10 +190,14 @@ def record(sample: dict) -> None:
 def cold_sample(via: str, target: tuple[str, str]) -> dict:
     """One cold-start try. `auto` goes through the Worker once the Worker holds
     its keys, and straight to the engine before that: a Worker without its keys
-    answers 503 itself and never wakes the engine, so trying it costs nothing."""
+    answers 503 not_configured itself and never wakes the engine, so trying it
+    costs nothing. ANY other failure through the Worker is a failed cold start
+    and is returned as one: on 2026-10-19 Google refused the first request after
+    the engine slept, and treating that 503 as "not ready" timed the direct
+    request that followed, which met an engine already half started (3.0 s)."""
     if via == "auto":
         sample = health_sample("cold", "worker")
-        if sample.get("status") == 200:
+        if sample.get("error_code") != "not_configured":
             return sample
         record({**sample, "kind": "worker_not_ready"})
         via = "direct"
@@ -354,6 +361,8 @@ def summarise(samples: list[dict]) -> dict:
                    if s.get("kind") in ("warm", "warm_after_cold") and s.get("via") == "worker"
                    and s.get("status") == 200 and s.get("cold") is False]
     out = {
+        "cold_start_failures": sum(1 for s in samples
+                                   if s.get("kind") == "cold" and s.get("status") != 200),
         "cold_start_runs_s": [round(x, 2) for x in cold],
         "cold_start_median_s": round(statistics.median(cold), 2) if cold else None,
         "cold_start_worst_s": round(max(cold), 2) if cold else None,

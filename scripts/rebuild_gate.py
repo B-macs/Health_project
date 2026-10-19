@@ -249,6 +249,12 @@ P0_TARGETS: list[tuple[str, str, Callable[[dict], bool | None]]] = [
     ("upload_clean", "no personal file in the Cloud Build upload",
      lambda p: None if p.get("upload_personal_files") is None
      else p["upload_personal_files"] == 0),
+    # Added 2026-10-19, after measurement and STRICTER only: Google refused the
+    # first request after the engine slept ("no available instance"), which no
+    # target above could see, because a refused start has no duration.
+    ("cold_start_failures", "every timed cold start answered",
+     lambda p: None if p.get("cold_start_failures") is None
+     else p["cold_start_failures"] == 0),
 ]
 
 

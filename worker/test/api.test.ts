@@ -2,7 +2,7 @@
 // global fetch is replaced, so each test sees exactly what would leave Cloudflare.
 import { exports } from 'cloudflare:workers'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { app } from '../src/index'
+import { app, RETRY_DELAYS_MS, timing } from '../src/index'
 
 const ACCESS = { authorization: 'Bearer test-access-key' }
 
@@ -111,6 +111,7 @@ describe('when the engine fails', () => {
   })
 
   it('never shows Google\'s own error page', async () => {
+    vi.spyOn(timing, 'wait').mockResolvedValue()
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       async () =>
         new Response('<html>Service Unavailable</html>', {
@@ -128,5 +129,79 @@ describe('when the engine fails', () => {
     const res = await app.request('/api/health', { headers: { authorization: 'Bearer k' } }, env)
     expect(res.status).toBe(503)
     expect(await res.json()).toEqual({ error: 'not_configured' })
+  })
+})
+
+// Google's refusal page while the engine starts from zero (2026-10-19: HTTP 500,
+// "The request was aborted because there was no available instance").
+function refusal(status = 500) {
+  return new Response('<html>Error: Server Error</html>', {
+    status,
+    headers: { 'content-type': 'text/html; charset=UTF-8' },
+  })
+}
+
+function engineOk() {
+  return new Response(JSON.stringify({ status: 'ok' }), {
+    status: 200,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+describe('when Google refuses a request while the engine starts', () => {
+  it('tries again after a second, and answers once the engine is up', async () => {
+    const wait = vi.spyOn(timing, 'wait').mockResolvedValue()
+    const spy = vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(async () => refusal())
+      .mockImplementationOnce(async () => engineOk())
+    const res = await call('/api/health', { headers: ACCESS })
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ status: 'ok' })
+    expect(spy).toHaveBeenCalledTimes(2)
+    expect(wait.mock.calls).toEqual([[1_000]])
+  })
+
+  it('also tries again on a 429 refusal', async () => {
+    vi.spyOn(timing, 'wait').mockResolvedValue()
+    const spy = vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(async () => refusal(429))
+      .mockImplementationOnce(async () => engineOk())
+    expect((await call('/api/health', { headers: ACCESS })).status).toBe(200)
+    expect(spy).toHaveBeenCalledTimes(2)
+  })
+
+  it('gives up after four tries more, with growing waits, and answers 503 JSON', async () => {
+    const wait = vi.spyOn(timing, 'wait').mockResolvedValue()
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => refusal())
+    const res = await call('/api/health', { headers: ACCESS })
+    expect(res.status).toBe(503)
+    expect(await res.json()).toEqual({ error: 'engine_unavailable' })
+    expect(spy).toHaveBeenCalledTimes(RETRY_DELAYS_MS.length + 1)
+    expect(wait.mock.calls.map(([ms]) => ms)).toEqual([...RETRY_DELAYS_MS])
+  })
+
+  it('never retries an answer from the engine itself, a JSON 500 included', async () => {
+    const wait = vi.spyOn(timing, 'wait').mockResolvedValue()
+    const spy = engineAnswers({ error: 'internal' }, 500)
+    const res = await call('/api/health', { headers: ACCESS })
+    expect(res.status).toBe(500)
+    expect(await res.json()).toEqual({ error: 'internal' })
+    expect(spy).toHaveBeenCalledTimes(1)
+    expect(wait).not.toHaveBeenCalled()
+  })
+
+  it('sends a POST body again on the second try', async () => {
+    vi.spyOn(timing, 'wait').mockResolvedValue()
+    const spy = vi.spyOn(globalThis, 'fetch')
+      .mockImplementationOnce(async () => refusal())
+      .mockImplementationOnce(async () => engineOk())
+    await call('/api/probe/garmin', {
+      method: 'POST',
+      headers: { ...ACCESS, 'content-type': 'application/json' },
+      body: JSON.stringify({ confirm: 'owner-approved' }),
+    })
+    for (const [, init] of spy.mock.calls as [URL, RequestInit][]) {
+      expect(new TextDecoder().decode(init.body as ArrayBuffer)).toBe('{"confirm":"owner-approved"}')
+    }
   })
 })

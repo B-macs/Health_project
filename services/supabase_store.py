@@ -37,6 +37,7 @@ import threading
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from services import datastore_postgres
@@ -53,6 +54,9 @@ LOAD_ORDER = ("training_sessions", "training_exercises", "training_sets")
 BATCH = 500
 
 _TIMEOUT = 60
+
+#: pull() fetches this many tables at once (see its docstring for the measurement).
+PULL_WORKERS = 4
 
 
 def _unpacked(raw: bytes, headers) -> bytes:
@@ -535,6 +539,13 @@ def pull(store: SupabaseStore, conn: sqlite3.Connection,
 
     Wholesale replace, like rebuild(): DROP+CREATE from the same schema file,
     so the two paths cannot produce differently-shaped databases.
+
+    The tables are FETCHED in parallel, PULL_WORKERS at a time, and written
+    one after another on this thread (the connection is not shared).
+    Measured 2026-10-19 against the real project: 5.9 s one after another,
+    1.5 s four at a time, 3.0 s eight at a time, the same rows each way. The
+    hosted engine runs this at every cold start, and a start that takes too
+    long is refused by Cloud Run ("no available instance").
     """
     ddl = datastore_postgres.to_postgres()
     all_tables = tables or datastore_postgres.table_names(ddl)
@@ -543,9 +554,11 @@ def pull(store: SupabaseStore, conn: sqlite3.Connection,
         (datastore_postgres.SCHEMA_PATH).read_text(encoding="utf-8"))
     conn.execute("BEGIN")
     try:
+        with ThreadPoolExecutor(max_workers=PULL_WORKERS) as pool:
+            fetched = dict(zip(all_tables, pool.map(store.select_all, all_tables)))
         counts: dict[str, int] = {}
         for table in all_tables:
-            rows = store.select_all(table)
+            rows = fetched[table]
             if rows:
                 cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
                 # training_sets.id is assigned by each store's own identity

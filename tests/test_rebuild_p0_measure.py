@@ -136,15 +136,26 @@ def test_auto_goes_through_the_worker_only_once_it_holds_its_keys(monkeypatch, t
 
     def fake_health_sample(kind, via, target=None):
         calls.append(via)
-        status = worker_status if via == "worker" else 200
-        return {"kind": kind, "via": via, "status": status, "seconds": 0.1}
+        if via == "worker" and worker_error:
+            return {"kind": kind, "via": via, "status": 503, "seconds": 0.1, "error_code": worker_error}
+        return {"kind": kind, "via": via, "status": 200, "seconds": 0.1}
 
     monkeypatch.setattr(m, "health_sample", fake_health_sample)
-    worker_status = 503                                           # no keys yet: the engine stays asleep
+    worker_error = "not_configured"                               # no keys yet: the engine stays asleep
     assert m.cold_sample("auto", (URL, KEY))["via"] == "direct" and calls == ["worker", "direct"]
     calls.clear()
-    worker_status = 200                                           # keys set: the Worker's answer IS the sample
+    worker_error = None                                           # keys set: the Worker's answer IS the sample
     assert m.cold_sample("auto", (URL, KEY))["via"] == "worker" and calls == ["worker"]
+    calls.clear()
+    worker_error = "engine_unavailable"                           # a refused start is a FAILED sample,
+    failed = m.cold_sample("auto", (URL, KEY))                    # never a reason to time the engine directly
+    assert failed["status"] == 503 and calls == ["worker"]
+
+
+def test_a_failed_cold_start_is_counted():
+    out = m.summarise([{"kind": "cold", "status": 503, "seconds": 11.3, "error_code": "engine_unavailable"},
+                       {"kind": "cold", "status": 200, "seconds": 8.0, "cold": True}])
+    assert out["cold_start_failures"] == 1 and out["cold_start_runs_s"] == [8.0]
 
 
 def test_the_garmin_probe_needs_the_owners_ok(monkeypatch):

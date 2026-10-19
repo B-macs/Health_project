@@ -24,7 +24,27 @@ export const FORWARDED_HEADERS = ['accept', 'content-type', 'x-local-date'] as c
 
 // Long enough for a cold start that rebuilds the cache; short of the engine's own
 // request timeout, so a hung engine answers 504 here rather than hanging the phone.
+// One budget for every try below.
 export const ENGINE_TIMEOUT_MS = 60_000
+
+// Google refuses a request before the engine sees it when the engine is still
+// starting from zero: "The request was aborted because there was no available
+// instance" (HTTP 500 with Google's own page; seen 2026-10-19 on the first request
+// after the engine slept). Google's troubleshooting guide asks the client to retry
+// with backoff. The engine answers JSON for every error, its own crashes included,
+// so a 429 or 5xx that is NOT JSON never reached it and a retry cannot run anything
+// twice.
+export const RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000] as const
+
+export function isGoogleRefusal(response: Response): boolean {
+  const type = response.headers.get('content-type') ?? ''
+  return (response.status === 429 || response.status >= 500) && !type.includes('application/json')
+}
+
+// An object, so a test can replace the wait without waiting.
+export const timing = {
+  wait: (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)),
+}
 
 const NO_STORE = { 'Cache-Control': 'no-store' }
 
@@ -67,12 +87,17 @@ app.all('/api/*', async (c) => {
   if (c.req.method !== 'GET' && c.req.method !== 'HEAD') init.body = await c.req.arrayBuffer()
 
   let response: Response
-  try {
-    response = await fetch(target, init)
-  } catch (err) {
-    const timedOut = err instanceof Error && err.name === 'TimeoutError'
-    return c.json({ error: timedOut ? 'engine_timeout' : 'engine_unavailable' },
-      timedOut ? 504 : 503, NO_STORE)
+  for (let attempt = 0; ; attempt++) {
+    try {
+      response = await fetch(target, init)
+    } catch (err) {
+      const timedOut = err instanceof Error && err.name === 'TimeoutError'
+      return c.json({ error: timedOut ? 'engine_timeout' : 'engine_unavailable' },
+        timedOut ? 504 : 503, NO_STORE)
+    }
+    if (!isGoogleRefusal(response) || attempt >= RETRY_DELAYS_MS.length) break
+    await response.body?.cancel()
+    await timing.wait(RETRY_DELAYS_MS[attempt])
   }
   const type = response.headers.get('content-type') ?? ''
   if (response.status >= 500 && !type.includes('application/json')) {
