@@ -29,11 +29,11 @@ import training_constants as _tc
 from services import dashboard as dash
 from services import engine
 from services import home
-from services import hr_load as _hr_load
 from services import plan as plan_svc
 from services import readiness as readiness_model
 from services import sleep_score as sleep_score_model
 from services import sleep_screen
+from services import strain_screen
 from services import strain_regions as _sr
 
 # ─── Page config ─────────────────────────────────────────────────────────────
@@ -464,7 +464,7 @@ def _current_stage_cached() -> int:
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
-def _region_au_history(days: int = 31) -> dict:
+def _region_au_history(end_iso: str, days: int = strain_screen.REGION_DAYS) -> dict:
     """Per-region AU for the strain drill-down — upper/core/lower plus an
     `unattributed` bucket, summing exactly to each day's own weighted AU.
 
@@ -474,9 +474,10 @@ def _region_au_history(days: int = 31) -> dict:
     afford a read, which is the same trade services/home_snapshot.py makes
     when it declines to cache hr_detail.
 
-    31 days so the 30-day trend window is fully covered.
+    31 days so the 30-day trend window is fully covered, ending on the day
+    shown, like Home's other reads (services/home.py).
     """
-    return repo.get_repository().get_daily_region_au(days)
+    return repo.get_repository().get_daily_region_au(days, today=date.fromisoformat(end_iso))
 
 
 @st.cache_data(ttl=1800, show_spinner=False)
@@ -1640,43 +1641,22 @@ def _strain_source_block() -> str:
     """Which method produced today's strain, and the HR detail behind it when
     there was one — so a fall back to RPE-only is visible rather than silent
     (the explicit ask in item 17)."""
-    source = _snapshot.get("strain_source")
-    label = _snapshot.get("strain_source_label") or ""
-    if not source or source == _NOT_COMPUTED:
+    info = strain_screen.strain_source(_snapshot)
+    if info is None:
         return ""
-    if source == "rpe":
-        tint, icon = "#8A99A3", "○"
-    elif source == "none":
-        return ""
-    else:
-        tint, icon = "#6BAF8B", "●"
-
-    rows = ""
-    hr = _snapshot.get("hr_detail") or {}
-    if hr:
-        zones = hr.get("zone_minutes") or {}
-        zone_txt = "  ".join(
-            f"Z{z} {m:g}m" for z, m in sorted(zones.items(), key=lambda kv: str(kv[0]))
+    label = info["label"]
+    tint, icon = ("#8A99A3", "○") if info["kind"] == "rpe" else ("#6BAF8B", "●")
+    rows = "".join(
+        f'<div style="display:flex;justify-content:space-between;'
+        f'font-size:11px;color:#8A99A3;margin-top:4px;">'
+        f'<span>{name}</span><span style="color:#C8CAD0;">{val}</span></div>'
+        for name, val in info["hr_rows"])
+    if info["blend"]:
+        hr_strain, rpe_strain, hr_weight = info["blend"]
+        rows += (
+            f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;">'
+            f'HR {hr_strain} · RPE {rpe_strain} → blended at {hr_weight}% HR</div>'
         )
-        for name, val in (
-            ("Edwards' load", f"{hr.get('edwards_load')} zone-weighted min"),
-            ("Avg / max HR", f"{hr.get('avg_hr') or '—'} / {hr.get('max_hr') or '—'} bpm"),
-            ("HRmax used", f"{hr.get('hr_max_used') or '—'} bpm (observed)"),
-            ("Banister TRIMP", f"{hr.get('banister_trimp') or '—'}  (cross-check)"),
-            ("Time in zones", zone_txt or "—"),
-        ):
-            rows += (
-                f'<div style="display:flex;justify-content:space-between;'
-                f'font-size:11px;color:#8A99A3;margin-top:4px;">'
-                f'<span>{name}</span><span style="color:#C8CAD0;">{val}</span></div>'
-            )
-        both = (_snapshot.get("strain_hr_only"), _snapshot.get("strain_rpe_only"))
-        if all(v is not None for v in both):
-            rows += (
-                f'<div style="font-size:10px;color:#6B7A9B;margin-top:8px;">'
-                f'HR {both[0]} · RPE {both[1]} → blended at '
-                f'{int(_hr_load.HR_BLEND_WEIGHT * 100)}% HR</div>'
-            )
 
     return (
         f'<div style="background:#1A2026;border-radius:12px;padding:12px 14px;margin:14px 0;">'
@@ -1690,7 +1670,7 @@ def _strain_source_block() -> str:
 _FACEPLATE_DIR = Path(__file__).resolve().parent / "background_templates" / "body_faceplates_v2"
 
 
-def _region_split_bar_html(data: dict) -> str:
+def _region_split_bar_html(panel: dict) -> str:
     """The AU share. THE exactly-additive quantity on this screen, which is
     why it leads and why its label says so.
 
@@ -1712,14 +1692,14 @@ def _region_split_bar_html(data: dict) -> str:
                 f'border-radius:2px;background:{colour};"></i>')
 
     segs, key = "", ""
-    for region in data["regions"]:
+    for region in panel["regions"]:
         meta = _tc.REGION_DISPLAY[region["id"]]
-        pct = region["au_pct"] or 0.0
+        pct = region["au_pct"]
         segs += _seg(pct, meta["colour"])
         key += (f'<span style="display:inline-flex;align-items:center;gap:6px;">'
                 f'<b style="width:8px;height:8px;border-radius:3px;display:inline-block;'
                 f'background:{meta["colour"]};"></b>{meta["short"]} {pct:.0f}%</span>')
-    un_pct = data.get("unattributed_pct") or 0.0
+    un_pct = panel["unattributed_pct"]
     if un_pct > 0:
         segs += _seg(un_pct, s["ink3"])
         key += (f'<span style="display:inline-flex;align-items:center;gap:6px;">'
@@ -1727,8 +1707,8 @@ def _region_split_bar_html(data: dict) -> str:
                 f'background:{s["ink3"]};"></b>Unattributed {un_pct:.0f}%</span>')
     # The label changes when coverage is partial. That one word swap is what
     # keeps the additive claim true rather than silently renormalising.
-    heading = ("Load share &middot; adds to 100%" if un_pct <= 0
-               else "Load share &middot; adds to 100% of MAPPED load")
+    heading = ("Load share &middot; adds to 100% of MAPPED load" if panel["mapped_only"]
+               else "Load share &middot; adds to 100%")
     return (
         f'<div style="font:600 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;'
         f'letter-spacing:.14em;text-transform:uppercase;color:{s["ink3"]};'
@@ -1739,7 +1719,7 @@ def _region_split_bar_html(data: dict) -> str:
     )
 
 
-def _region_rows_html(data: dict, overall: float | None) -> str:
+def _region_rows_html(panel: dict) -> str:
     """One row per region: name, its own 0-21 reading, a track against 21 with
     the OVERALL drawn on it as a tick, its advisory ACWR, and the faceplate.
 
@@ -1755,13 +1735,12 @@ def _region_rows_html(data: dict, overall: float | None) -> str:
     as a broken join; each plate gets its own soft container instead."""
     s = _SKIN_BOARD
     tick = ""
-    if overall is not None:
-        pct = max(0.0, min(100.0, overall / 21.0 * 100.0))
-        tick = (f'<u style="position:absolute;left:{pct:.1f}%;top:-4px;bottom:-4px;'
+    if panel["tick_pct"] is not None:
+        tick = (f'<u style="position:absolute;left:{panel["tick_pct"]:.1f}%;top:-4px;bottom:-4px;'
                 f'width:1px;text-decoration:none;background:rgba(212,220,238,0.65);"></u>')
 
     rows = ""
-    for region in data["regions"]:
+    for region in panel["regions"]:
         meta = _tc.REGION_DISPLAY[region["id"]]
         plate = _b64(str(_FACEPLATE_DIR / f'{region["id"]}.png'))
         strain = region["strain"]
@@ -1777,7 +1756,7 @@ def _region_rows_html(data: dict, overall: float | None) -> str:
                      f'margin-left:9px;">{region["au"]:,.0f} AU &middot; '
                      f'{region["au_pct"]:.0f}%</s>')
             fill = (f'<i style="display:block;height:100%;border-radius:4px;'
-                    f'width:{min(100.0, strain / 21.0 * 100.0):.1f}%;'
+                    f'width:{region["fill_pct"]:.1f}%;'
                     f'background:{meta["colour"]};"></i>')
             dim = ""
         plate_html = (
@@ -1862,10 +1841,10 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
     A rest day is the one blank the athlete can open: the week behind it is
     real load, already carried, and _render_week_toggle offers it."""
     s = _SKIN_BOARD
-    week = data.get("window") == "week"
+    panel = strain_screen.region_panel(data, overall, stage)
 
-    if not data.get("has_split"):
-        names = data.get("unmapped_names") or []
+    if panel["state"] == "empty":
+        names = panel["unmapped_names"]
         listed = ("" if not names else
                   f'<div style="font-size:11px;color:{s["ink3"]};margin-top:8px;'
                   f'line-height:1.6;">Not in the region map: '
@@ -1875,7 +1854,7 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
             "No session logged for this day, so there is no day to divide. "
             "The number above is the average of the last seven days &mdash; "
             "the load already carried into today, before any training."
-            if data.get("is_rolling") else
+            if panel["reason"] == "rolling" else
             "No regional split for this day. Either nothing was logged, or "
             "none of what was logged maps to a body region &mdash; so there "
             "is nothing to divide. The strain figure above is unaffected."
@@ -1889,15 +1868,14 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
             skin=s,
         )
 
-    gap = data.get("additivity_gap")
-    gap_txt = (f" They total {gap + (overall or 0):.1f} against {overall:.1f}."
-               if gap is not None and overall is not None else "")
+    week = panel["week"]
+    gap_txt = (f" They total {panel['regions_total']:.1f} against {overall:.1f}."
+               if panel["regions_total"] is not None else "")
     caveat = ""
-    frac = data.get("attributed_fraction")
-    if data.get("attributed_is_low") and frac is not None:
-        caveat = (f' Attributed from {frac * 100:.0f}% of logged session time, '
+    if panel["thin_sample_pct"] is not None:
+        caveat = (f' Attributed from {panel["thin_sample_pct"]:.0f}% of logged session time, '
                   f'so the split rests on a thin sample of the session.')
-    unmapped = data.get("unmapped_names") or []
+    unmapped = panel["unmapped_names"]
     unmapped_txt = ("" if not unmapped else
                     f' {len(unmapped)} item(s) have no region mapping and sit '
                     f'in the unattributed share: {" &middot; ".join(unmapped[:5])}'
@@ -1912,13 +1890,13 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
                  f'<div style="font-size:11.5px;line-height:1.55;color:{s["ink2"]};'
                  f'margin:0 0 12px;">These are the seven days before today, averaged '
                  f'&mdash; the load already carried in, before any training. '
-                 f'{data.get("window_days") or 0} of those 7 days had a session. '
+                 f'{panel["window_days"]} of those 7 days had a session. '
                  f'A weekly mean sits low on the strain curve, where it is steepest, '
                  f'so the three readings crowd together; the share above does not.</div>')
 
     body = (
         week_note
-        + _region_split_bar_html(data)
+        + _region_split_bar_html(panel)
         + f'<div style="font:600 8.5px/1 ui-monospace,SFMono-Regular,Menlo,monospace;'
           f'letter-spacing:.14em;text-transform:uppercase;color:{s["ink3"]};'
           f'margin:16px 0 8px;">'
@@ -1926,23 +1904,21 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
         + f'<div style="border-left:2px solid #BFA06A;padding:1px 0 1px 11px;'
           f'margin:0 0 6px;font-size:11.5px;line-height:1.55;color:#9AA6BE;">'
           f'{_sr.NON_ADDITIVE_NOTE}{gap_txt}</div>'
-        + _region_rows_html(data, overall)
+        + _region_rows_html(panel)
     )
-    ceiling = _rules_ceiling(stage)
+    # The ceiling from rules.STAGE_CONSTRAINTS only (Key Rule 3): none named
+    # for an unknown stage, where a copied 1.3 used to stand in.
+    ceiling_txt = (f' Stage {stage} ceiling {panel["ceiling"]:.2f}.'
+                   if panel["ceiling"] is not None else "")
     return _panel(
         "Where it landed &mdash; last 7 days" if week else "Where it landed",
         body,
         (f'Reported, never enforced &mdash; a regional ACWR informs, it never '
-         f'caps volume. Stage {stage} ceiling {ceiling:.2f}.{caveat}{unmapped_txt} '
-         f'The region weights are <b>{data["shares_basis"]}</b> (v{data["shares_version"]}): '
+         f'caps volume.{ceiling_txt}{caveat}{unmapped_txt} '
+         f'The region weights are <b>{panel["shares_basis"]}</b> (v{panel["shares_version"]}): '
          f'authored for this athlete, not measured.'),
         skin=s,
     )
-
-
-def _rules_ceiling(stage: int) -> float:
-    from services import rules as _rules
-    return _rules.STAGE_CONSTRAINTS.get(stage, {}).get("acwr_ceiling", 1.3)
 
 
 def _detail_header(detail_label: str, colour: str, display: str, tier: str) -> str:
@@ -2081,35 +2057,22 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
         extra_blocks = ""
     else:
         col, disp, lbl, _, _ = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
-        detail_label = "STRAIN · 7D AVG" if _strain_is_rolling else f"STRAIN · {date_label}"
+        _card_label, detail_label = strain_screen.strain_labels(_strain_is_rolling, date_label)
         hist_key, hist_unit, hist_title, hist_color = "strain", "", "Strain Trend", "#BFA06A"
         hist_metric = "Strain"
         # WHERE IT LANDED leads, above the 30-day trend: it explains the number
         # in the header, the way Sleep's contributor breakdown does. Every read
         # below happens only on this branch, so the three-card Home stream
         # never pays for it.
-        _region_data: dict = {"has_split": False, "unmapped_names": [],
-                              "is_rolling": _strain_is_rolling}
+        _region_data: dict = strain_screen.empty_region_data(_strain_is_rolling)
         try:
             if _current_stage is None:
                 raise ValueError(home.STAGE_UNREAD)
-            _regions = _region_au_history()
-            _acwr = _sr.region_acwr(
-                _regions["rows"], _current_stage, today=date.today(),
-                stage_start=_stage_start_cached(),
-            )
-            # Computed whenever the day is rolling — not only when the toggle
-            # is on — because whether the week HAS anything to show is what
-            # decides between offering the control and rendering a dead one.
-            _week_row = (_sr.rolling_prior_region_row(_regions["rows"], selected_date)
-                         if _strain_is_rolling else None)
-            _region_data = dash.compute_region_strain_snapshot(
-                selected_date, _regions["rows"], _current_stage,
-                overall_snapshot=_snapshot, provenance=_regions,
-                acwr_results=_acwr,
-                window_row=_week_row if _strain_window_week else None,
-            )
-            _region_data["can_show_window"] = bool(_strain_is_rolling and _week_row)
+            # As of the day shown, with the week's shape on a rest day when
+            # asked for (strain_screen.region_data).
+            _region_data = strain_screen.region_data(
+                _region_au_history(selected_date.isoformat()), _current_stage,
+                selected_date, _stage_start_cached(), _snapshot, _strain_window_week)
         except Exception:
             # A failed read must not take the strain number down with it — the
             # panel states its own absence instead.
@@ -2425,10 +2388,10 @@ s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, is_rolli
 if _snapshot.get("strain_unscored_reason"):
     # Not "no workload logged": the load may well be there, the stage is not.
     s_hdr, s_desc = "Not scored", _snapshot["strain_unscored_reason"]
-_strain_card_label = "STRAIN  ·  7D AVG" if _strain_is_rolling else "STRAIN"
+_strain_card_label, _strain_detail_label = strain_screen.strain_labels(_strain_is_rolling, date_label)
 _card_strain = _card_html(
     _strain_card_label, _bg["strain"],
-    _arc_svg(_display_strain, home.SCALES["strain"], s_col),
+    _arc_svg(_display_strain, strain_screen.STRAIN_TOP, s_col),
     s_disp, s_lbl, s_col, s_hdr, s_desc,
 )
 
