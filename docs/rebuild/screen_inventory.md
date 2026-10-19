@@ -4,7 +4,7 @@ Every feature of the Streamlit health app, what sits behind it, what the view co
 
 The owner wants the whole app transformed now and will remove parts himself once the new app runs (2026-10-19), so almost everything is KEEP. **DROP is proposed only for code that is dead, unreachable or a placeholder.** No safety or training rule is proposed for DROP.
 
-**Status: waiting for the owner's decisions (STOP 1).** They are recorded in the "Decision" column of D1-D3 below.
+**Status: decided by the owner on 2026-10-19** (*"Keep the cardio coming soon as I do want to add this at some point but for now the rest can be dropped. Yes. Yes fix the faults. Yes to all"*): 13 drops approved and the Cardio placeholder kept; every move approved; every fault fixed in the move, and F1 and F3 in the live app now as well; the scale and InBody readings get Supabase tables. The decisions are in the "Decision" column of D1-D3.
 
 ---
 
@@ -12,33 +12,33 @@ The owner wants the whole app transformed now and will remove parts himself once
 
 | Id | Screen | Feature | Why it can go | Decision |
 |---|---|---|---|---|
-| H3 | Shell | "Rebuilt the local read cache" toast | Cannot appear: the notice is set only when Supabase is not the record (repo.py:74-79). | |
-| H59 | Home | Durable Home snapshot (`services/home_snapshot.py`) | Never called by the app; the phone's own offline cache replaces it. Keep its one rule: show today's stored values only once readiness and sleep are both scored, with the "as of" time. | |
-| H60 | Home | `_wake_adjustment_sources` reader | Defined, never called. The API still returns which wake correction applied. | |
-| T3 | Training | "Your last save is in Notion, but its copy in Supabase did not send" warning | Cannot appear with Supabase as the record: a failed write raises and the save says "press Save again". | |
-| T15 | Training | Block B → 12-week block changeover | Ran on 2026-10-16 (stored and verified); it does nothing once phase 5 is stored. | |
-| T49 | Training | "Your plan starts in n day(s)" screen | Unreachable: an active phase always covers today. | |
-| I4 | Insights › BioAge | Cardio card and its "coming soon" detail | A placeholder with no metric behind it. | |
-| I14 | Insights › Strength | "View All ›" | Plain text that does nothing; the list below already shows everything. | |
-| I25 | Insights › Metabolism | "+ Foryond weigh-in" and "+ Tape baseline" | Disabled buttons with no write path. | |
-| I80 | Insights › Sync | "Supabase mirror failing" warning | Cannot show: the mirror ended when Supabase became the record. | |
-| I81 | Insights › Sync | Sheet1 raw table | Cannot show: Sheets is a frozen archive. | |
-| I113 | Check-in | "Its copy in Supabase did not send" warning | Cannot fire with Supabase as the record; the text also names Notion. | |
-| I119 | Shell | Unused desktop/phone component kit in `styles.py` | Nothing in the repo calls any of it. | |
-| I121 | Shell | Same-tab chart-link script | Streamlit-only workaround; the phone app has real taps. | |
+| H3 | Shell | "Rebuilt the local read cache" toast | Cannot appear: the notice is set only when Supabase is not the record (repo.py:74-79). | **DROP** — approved 2026-10-19 |
+| H59 | Home | Durable Home snapshot (`services/home_snapshot.py`) | Never called by the app; the phone's own offline cache replaces it. Keep its one rule: show today's stored values only once readiness and sleep are both scored, with the "as of" time. | **DROP** — approved 2026-10-19 |
+| H60 | Home | `_wake_adjustment_sources` reader | Defined, never called. The API still returns which wake correction applied. | **DROP** — approved 2026-10-19 |
+| T3 | Training | "Your last save is in Notion, but its copy in Supabase did not send" warning | Cannot appear with Supabase as the record: a failed write raises and the save says "press Save again". | **DROP** — approved 2026-10-19 |
+| T15 | Training | Block B → 12-week block changeover | Ran on 2026-10-16 (stored and verified); it does nothing once phase 5 is stored. | **DROP** — approved 2026-10-19 |
+| T49 | Training | "Your plan starts in n day(s)" screen | Unreachable: an active phase always covers today. | **DROP** — approved 2026-10-19 |
+| I4 | Insights › BioAge | Cardio card and its "coming soon" detail | A placeholder with no metric behind it. | **KEEP** — the owner, 2026-10-19: "Keep the cardio coming soon as I do want to add this at some point" |
+| I14 | Insights › Strength | "View All ›" | Plain text that does nothing; the list below already shows everything. | **DROP** — approved 2026-10-19 |
+| I25 | Insights › Metabolism | "+ Foryond weigh-in" and "+ Tape baseline" | Disabled buttons with no write path. | **DROP** — approved 2026-10-19 |
+| I80 | Insights › Sync | "Supabase mirror failing" warning | Cannot show: the mirror ended when Supabase became the record. | **DROP** — approved 2026-10-19 |
+| I81 | Insights › Sync | Sheet1 raw table | Cannot show: Sheets is a frozen archive. | **DROP** — approved 2026-10-19 |
+| I113 | Check-in | "Its copy in Supabase did not send" warning | Cannot fire with Supabase as the record; the text also names Notion. | **DROP** — approved 2026-10-19 |
+| I119 | Shell | Unused desktop/phone component kit in `styles.py` | Nothing in the repo calls any of it. | **DROP** — approved 2026-10-19 |
+| I121 | Shell | Same-tab chart-link script | Streamlit-only workaround; the phone app has real taps. | **DROP** — approved 2026-10-19 |
 
 ## D2. MOVE proposals
 
 | Id | From | Feature | Proposed new place | Decision |
 |---|---|---|---|---|
-| H2 | Shell | Offline-datastore banner | App-wide status in the shell (the engine reports its mode and the copy's age) | |
-| H57 | Home | Device sync at the foot of Home | The engine, run at the first open of the day on any screen, retried at most hourly while last night is missing (the owner's rule of 2026-10-19), with the screen updated when it ends | |
-| T5 | Training | Weekly rollup sync on open | The engine (same chain) | |
-| T6 | Training | Garmin daily sync on open | The engine (same chain) | |
-| T29 | Training | Plan start setup (first run; "Begin 14-Day Plan") | Settings / first run, without the Stage 1 wording | |
-| I62–I63 | Insights | Processing Queue (pending counts, "Process All") | Run on save in the engine; counts on Settings › Data | |
-| I78 | Insights › Sleep Architecture | Sleep-fusion shadow report | Settings › Data (an engineering check, not a daily reading) | |
-| I79, I82–I93 | Insights › Sync | Store caption, Engine View, Blend history and backfill, Metrics History, session checks, auto-sync caption, Garmin / Sleep Fusion / Oura sync buttons | Settings › Data (captions corrected: Garmin daily runs every 2 h, Oura needs the OAuth login) | |
+| H2 | Shell | Offline-datastore banner | App-wide status in the shell (the engine reports its mode and the copy's age) | **MOVE** — approved 2026-10-19 |
+| H57 | Home | Device sync at the foot of Home | The engine, run at the first open of the day on any screen, retried at most hourly while last night is missing (the owner's rule of 2026-10-19), with the screen updated when it ends | **MOVE** — approved 2026-10-19 |
+| T5 | Training | Weekly rollup sync on open | The engine (same chain) | **MOVE** — approved 2026-10-19 |
+| T6 | Training | Garmin daily sync on open | The engine (same chain) | **MOVE** — approved 2026-10-19 |
+| T29 | Training | Plan start setup (first run; "Begin 14-Day Plan") | Settings / first run, without the Stage 1 wording | **MOVE** — approved 2026-10-19 |
+| I62–I63 | Insights | Processing Queue (pending counts, "Process All") | Run on save in the engine; counts on Settings › Data | **MOVE** — approved 2026-10-19 |
+| I78 | Insights › Sleep Architecture | Sleep-fusion shadow report | Settings › Data (an engineering check, not a daily reading) | **MOVE** — approved 2026-10-19 |
+| I79, I82–I93 | Insights › Sync | Store caption, Engine View, Blend history and backfill, Metrics History, session checks, auto-sync caption, Garmin / Sleep Fusion / Oura sync buttons | Settings › Data (captions corrected: Garmin daily runs every 2 h, Oura needs the OAuth login) | **MOVE** — approved 2026-10-19 |
 
 ## D3. Faults found — the proposal is to fix each in the move into `services/`, so the new app has it right
 
@@ -46,27 +46,27 @@ The owner decided on 2026-10-19 that the live Streamlit app gets no more fixes. 
 
 | Id | Where | Fault | Effect | Decision |
 |---|---|---|---|---|
-| F1 | T32 | **The readiness auto-shift has not run since 2026-08-23.** It reads `_rm_bio`, which commit e43f59e removed; the error is caught and ignored (training.py L3655, L3694-3695). | No "Readiness suggests moving today's session" proposal has been shown or written for two months. Tests only check the source text. | |
-| F2 | T22, T30, T32 | The three `date_overrides` writers merge every shift reason, even for moves `reject_violating_overrides` refused; the rejection warning disappears on the rerun. | The day banner can say "Session moved" for a day that did not move. | |
-| F3 | I96, I112 | A second check-in the same day cannot set a field back to its default (the form's defaults double as "not filled in"). | Pain cannot be corrected from, say, 4 back to 0, and the pain gate (above 5 blocks a weight step) keeps reading the old value. | |
-| F4 | I53 | Insights › Engine Data calls `load_policy(rec, {})` without the readiness signal Home passes. | On a day only readiness asks for less, Home says REDUCED LOAD and Engine Data says NO CHANGE TO LOAD. | |
-| F5 | H47 | The wake-time stepper writes a manual value, but on a fused night the fusion figure wins; the caption credits Oura's pattern. | On fused nights the − / + buttons change nothing. | |
-| F6 | H26–H27 | The Readiness drill-down's contributors use the 60-day raw score; today's card uses the 14-day one. | On today the card and its breakdown can disagree. | |
-| F7 | H16 | A failed stage read becomes stage 1. | It changes the strain number (STAGE_CLF) and can print "Stage 1 ceiling" (rebuild rule 9 bans Stage 1 text). | |
-| F8 | H16, H54 | Read windows and the rest-day 7-day strain count back from the server's today, not the day shown. | Older days can show "not scored" and blame the ring; a past day's card can differ from its own point on the 30-day trend. | |
-| F9 | Home caches | No cached read is keyed by date. | Up to 30 minutes after midnight the windows still end yesterday. | |
-| F10 | I43, I48 | Flexibility prints "of 4 slots" and "N slots not measured" with 4 typed in; the battery has 3. | A full run says "3 of 4 slots run" and claims a slot was skipped. | |
-| F11 | I21, I24 | Metabolism colours every rise amber and every fall green, and shows "Normal" on every derived value. | Wrong for fat-free mass and phase angle (up is good); "Normal" is not a check. | |
-| F12 | I75 | Sleep Architecture's "Oura only" count includes watch-only nights. | The count is too high. | |
-| F13 | I27–I40 | A flexibility assessment in progress lives only in the local `.sync_state.json`. | A hosted restart loses an unfinished assessment. | |
-| F14 | I90 | "Sync Garmin Activities" is the only writer of `garmin_activities`, and nothing runs it automatically. | The HR-max estimate behind session heart rate goes stale unless the button is pressed. | |
-| F15 | I7, I16–I17 | Metabolism reads `Input_files/Fitdays.csv` (a local, git-ignored file) and hard-coded InBody scans. | On a server, and so through the API, the screen is empty: the readings need a store. | |
-| F16 | T94 | The "Estimated AU" caption always uses RPE 5. | The preview does not follow the slider. | |
-| F17 | T84 | The activity timer has no staleness guard and its key is the same every day. | A timer left running on an earlier day shows DONE at once. | |
-| F18 | T103 | The "+" menu is drawn during a session; only the accessory start is guarded. | Yoga and Hike can be opened mid-session. | |
-| F19 | T75 | Garmin-verified walk minutes and the heart-rate panel are not checkpointed. | After a dropped connection the walk logs its planned minutes. | |
-| F20 | T40, T90 | The overview, the duration estimate, "Planned Reps" and the review's Weight show plan values, while the flow uses the readiness-dosed values. | Small mismatches on a reduced-load day. | |
-| F21 | Text | Out-of-date text: "not Google Sheets" (H2), "Garmin once a day" (I87–I88), "Add OURA_TOKEN" (I92), "14-Day Plan" (T29), Notion in docstrings and warnings (T3, T110, I113). | Misleading captions. | |
+| F1 | T32 (live fix done 2026-10-19) | **The readiness auto-shift has not run since 2026-08-23.** It reads `_rm_bio`, which commit e43f59e removed; the error is caught and ignored (training.py L3655, L3694-3695). | No "Readiness suggests moving today's session" proposal has been shown or written for two months. Tests only check the source text. | **Fix in the move, and in the live app now** — approved 2026-10-19 |
+| F2 | T22, T30, T32 | The three `date_overrides` writers merge every shift reason, even for moves `reject_violating_overrides` refused; the rejection warning disappears on the rerun. | The day banner can say "Session moved" for a day that did not move. | **Fix in the move** — approved 2026-10-19 |
+| F3 | I96, I112 (live fix done 2026-10-19) | A second check-in the same day cannot set a field back to its default (the form's defaults double as "not filled in"). | Pain cannot be corrected from, say, 4 back to 0, and the pain gate (above 5 blocks a weight step) keeps reading the old value. | **Fix in the move, and in the live app now** — approved 2026-10-19 |
+| F4 | I53 | Insights › Engine Data calls `load_policy(rec, {})` without the readiness signal Home passes. | On a day only readiness asks for less, Home says REDUCED LOAD and Engine Data says NO CHANGE TO LOAD. | **Fix in the move** — approved 2026-10-19 |
+| F5 | H47 | The wake-time stepper writes a manual value, but on a fused night the fusion figure wins; the caption credits Oura's pattern. | On fused nights the − / + buttons change nothing. | **Fix in the move** — approved 2026-10-19 |
+| F6 | H26–H27 | The Readiness drill-down's contributors use the 60-day raw score; today's card uses the 14-day one. | On today the card and its breakdown can disagree. | **Fix in the move** — approved 2026-10-19 |
+| F7 | H16 | A failed stage read becomes stage 1. | It changes the strain number (STAGE_CLF) and can print "Stage 1 ceiling" (rebuild rule 9 bans Stage 1 text). | **Fix in the move** — approved 2026-10-19 |
+| F8 | H16, H54 | Read windows and the rest-day 7-day strain count back from the server's today, not the day shown. | Older days can show "not scored" and blame the ring; a past day's card can differ from its own point on the 30-day trend. | **Fix in the move** — approved 2026-10-19 |
+| F9 | Home caches | No cached read is keyed by date. | Up to 30 minutes after midnight the windows still end yesterday. | **Fix in the move** — approved 2026-10-19 |
+| F10 | I43, I48 | Flexibility prints "of 4 slots" and "N slots not measured" with 4 typed in; the battery has 3. | A full run says "3 of 4 slots run" and claims a slot was skipped. | **Fix in the move** — approved 2026-10-19 |
+| F11 | I21, I24 | Metabolism colours every rise amber and every fall green, and shows "Normal" on every derived value. | Wrong for fat-free mass and phase angle (up is good); "Normal" is not a check. | **Fix in the move** — approved 2026-10-19 |
+| F12 | I75 | Sleep Architecture's "Oura only" count includes watch-only nights. | The count is too high. | **Fix in the move** — approved 2026-10-19 |
+| F13 | I27–I40 | A flexibility assessment in progress lives only in the local `.sync_state.json`. | A hosted restart loses an unfinished assessment. | **Fix in the move** — approved 2026-10-19 |
+| F14 | I90 | "Sync Garmin Activities" is the only writer of `garmin_activities`, and nothing runs it automatically. | The HR-max estimate behind session heart rate goes stale unless the button is pressed. | **Fix in the move** — approved 2026-10-19 |
+| F15 | I7, I16–I17 | Metabolism reads `Input_files/Fitdays.csv` (a local, git-ignored file) and hard-coded InBody scans. | On a server, and so through the API, the screen is empty: the readings need a store. | **Fix: the scale and InBody readings get Supabase tables** — approved 2026-10-19 |
+| F16 | T94 | The "Estimated AU" caption always uses RPE 5. | The preview does not follow the slider. | **Fix in the move** — approved 2026-10-19 |
+| F17 | T84 | The activity timer has no staleness guard and its key is the same every day. | A timer left running on an earlier day shows DONE at once. | **Fix in the move** — approved 2026-10-19 |
+| F18 | T103 | The "+" menu is drawn during a session; only the accessory start is guarded. | Yoga and Hike can be opened mid-session. | **Fix in the move** — approved 2026-10-19 |
+| F19 | T75 | Garmin-verified walk minutes and the heart-rate panel are not checkpointed. | After a dropped connection the walk logs its planned minutes. | **Fix in the move** — approved 2026-10-19 |
+| F20 | T40, T90 | The overview, the duration estimate, "Planned Reps" and the review's Weight show plan values, while the flow uses the readiness-dosed values. | Small mismatches on a reduced-load day. | **Fix in the move** — approved 2026-10-19 |
+| F21 | Text | Out-of-date text: "not Google Sheets" (H2), "Garmin once a day" (I87–I88), "Add OURA_TOKEN" (I92), "14-Day Plan" (T29), Notion in docstrings and warnings (T3, T110, I113). | Misleading captions. | **Fix in the move** — approved 2026-10-19 |
 
 ---
 
@@ -303,7 +303,7 @@ The owner decided on 2026-10-19 that the live Streamlit app gets no more fixes. 
 | I1 | Insights | Title and 6-tab bar | BioAge, Engine Data, Processing Queue, Macro Trends, Sleep Architecture, Sync | get_diagnostic_profile | All six tabs run on every rerun (2326-2342) | — | KEEP (regroup for the phone) |
 | I2 | BioAge | Category cards | Four image cards (Strength, Flexibility, Metabolism, Cardio) | `_bioage_b64` | 158-203 | `_bioage_detail` | KEEP |
 | I3 | BioAge | Detail navigation | "← Back"; the open card survives a reconnect | — | 123-151 | session, ?bioage= | KEEP (native routing) |
-| I4 | BioAge › Cardio | Cardio detail | "coming soon" | — | 2367-2368 | — | DROP (placeholder; also its card) |
+| I4 | BioAge › Cardio | Cardio detail | "coming soon" | — | 2367-2368 | — | KEEP (the owner will add Cardio later; 2026-10-19) |
 | I5 | Strength | Overall Strength hero | Score or "—"; "Calibrating" pill | strength.screen() | 559-586, 743-746 | — | KEEP |
 | I6 | Strength | History read failure | Warning with the exception | get_all_training_exercises_raw | 2268-2272, 747-753 | — | KEEP |
 | I7 | Strength | Progress metric picker | Five series; "Updated on" | — | 261-267, 758-780 | widget | KEEP |
