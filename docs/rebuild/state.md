@@ -10,6 +10,8 @@
 - **Stale and fixed:** one new test needs Streamlit (`test_core_hold_score.py::test_core_s_card_shows_the_hold_time_marked_provisional`). The list can now name a single test, which the engine run deselects.
 - **Still holds:** the API (its 20 tests, the openapi contract), the gate, the Worker and the app. The engine's startup fits the Supabase record mode: `datastore.ensure_local_cache` leads into `services/record_cache.py`, which rebuilds the local copy from Supabase once per process. The readiness rule of 2026-10-13 (no readiness without a ring reading) lives in `services/readiness.py`, so `/api/readiness` inherits it. No new package in requirements.txt.
 
+**STOP 1 progress, 2026-10-19:** the Google Cloud CLI is installed (Google's own installer; `winget` is not on this PC) and logged in; the project is `health-project-512108` and is gcloud's default; the owner made a business billing account and a €1 budget. **Turning on the services failed: `UREQ_PROJECT_BILLING_NOT_FOUND` — the billing account is not linked to the project yet.** Only Monitoring is on. Still to do after the link: the four services, the two secrets (`scripts/rebuild_secrets.py engine-secrets` then `engine-key`), `wrangler login`, the access key in .env.
+
 ## Done
 - CLAUDE.md rebuild section added (word for word from the Notion Phase 0 page). Commit fa7afc1.
 - docs/rebuild/ control files; scripts/rebuild_gate.py with 30 tests.
