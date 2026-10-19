@@ -66,6 +66,14 @@ def test_the_summary_can_keep_to_one_build(monkeypatch, tmp_path, capsys):
     assert json.loads(capsys.readouterr().out)["cold_start_runs_s"] == [8.0]
 
 
+def test_a_monitoring_total_adds_doubles_and_int64_strings():
+    series = [{"points": [{"value": {"doubleValue": 10.5}}, {"value": {"doubleValue": 2.0}}]},
+              {"points": [{"value": {"int64Value": "7"}}]},
+              {"points": []}]
+    assert m.series_total(series) == 19.5
+    assert m.series_total([]) == 0.0
+
+
 def test_the_access_key_is_read_from_env_with_or_without_a_bom(tmp_path):
     env = tmp_path / ".env"
     env.write_bytes(b"\xef\xbb\xbfHEALTH_ACCESS_KEY=\"abc-DEF_123\"\n")

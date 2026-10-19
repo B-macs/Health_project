@@ -4,6 +4,7 @@
     python scripts/rebuild_p0_measure.py warm [--runs 5]
     python scripts/rebuild_p0_measure.py oura
     python scripts/rebuild_p0_measure.py garmin --confirm owner-approved
+    python scripts/rebuild_p0_measure.py usage [--hours 24]
     python scripts/rebuild_p0_measure.py summary [--build COMMIT]
 
 Every sample is one line in reports/rebuild/p0_measure.jsonl (gitignored). A
@@ -36,6 +37,7 @@ import subprocess
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -176,7 +178,8 @@ def record(sample: dict) -> None:
     with LOG.open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(sample) + "\n")
     shown = {k: v for k, v in sample.items() if k in
-             ("kind", "via", "status", "seconds", "cold", "engine_timings", "error")}
+             ("kind", "via", "status", "seconds", "cold", "engine_timings", "error", "probe",
+              "hours", "billable_instance_s", "requests")}
     print(json.dumps(shown), flush=True)
 
 
@@ -236,6 +239,54 @@ def cmd_garmin(args) -> None:
             "probe": {k: answer.get(k) for k in ("status", "detail", "count")}})
 
 
+MONITORED = {
+    # Cloud Run's own meters: what the free tier is counted against.
+    "billable_instance_s": ("run.googleapis.com/container/billable_instance_time", "ALIGN_SUM"),
+    "requests": ("run.googleapis.com/request_count", "ALIGN_SUM"),
+}
+
+
+def monitored_total(metric: str, aligner: str, hours: float) -> float:
+    """The sum of one Cloud Run metric for health-engine over the last `hours`,
+    from the Cloud Monitoring API. The access token goes into the header only."""
+    token = _gcloud_out("auth", "print-access-token").decode("ascii")
+    project = _gcloud_out("config", "get-value", "project").decode("ascii")
+    end = datetime.now(timezone.utc).replace(microsecond=0)
+    start = end - timedelta(hours=hours)
+    params = urllib.parse.urlencode({
+        "filter": (f'metric.type="{metric}" AND resource.type="cloud_run_revision" '
+                   f'AND resource.labels.service_name="{ENGINE_SERVICE}"'),
+        "interval.startTime": start.isoformat().replace("+00:00", "Z"),
+        "interval.endTime": end.isoformat().replace("+00:00", "Z"),
+        "aggregation.alignmentPeriod": f"{int(hours * 3600)}s",
+        "aggregation.perSeriesAligner": aligner,
+        "aggregation.crossSeriesReducer": "REDUCE_SUM",
+    })
+    request = urllib.request.Request(
+        f"https://monitoring.googleapis.com/v3/projects/{project}/timeSeries?{params}",
+        headers={"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT})
+    with urllib.request.urlopen(request, timeout=60, context=_ssl_context()) as resp:
+        return series_total(json.loads(resp.read()).get("timeSeries", []))
+
+
+def series_total(series: list[dict]) -> float:
+    """Every point of every series added up; a DOUBLE or an INT64 metric (the
+    API sends an int64 as a string)."""
+    total = 0.0
+    for s in series:
+        for point in s.get("points", []):
+            value = point["value"]
+            total += float(value.get("doubleValue", value.get("int64Value", 0)))
+    return total
+
+
+def cmd_usage(args) -> None:
+    out = {"hours": args.hours, "measured_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    for name, (metric, aligner) in MONITORED.items():
+        out[name] = round(monitored_total(metric, aligner, args.hours), 1)
+    record({"kind": "usage", **out})
+
+
 def summarise(samples: list[dict]) -> dict:
     """The proof numbers from the samples: cold starts as the caller saw them."""
     cold = [s["seconds"] for s in samples if s.get("kind") == "cold" and s.get("cold")]
@@ -288,6 +339,9 @@ def main(argv: list[str] | None = None) -> None:
     p = sub.add_parser("garmin")
     p.add_argument("--confirm", default="")
     p.set_defaults(func=cmd_garmin)
+    p = sub.add_parser("usage")
+    p.add_argument("--hours", type=float, default=24.0)
+    p.set_defaults(func=cmd_usage)
     p = sub.add_parser("summary")
     p.add_argument("--build", default="", help="only the samples of the engine built from this commit")
     p.set_defaults(func=cmd_summary)
