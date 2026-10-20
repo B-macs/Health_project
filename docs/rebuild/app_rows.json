@@ -1050,6 +1050,303 @@
       ],
       "test": "worker/test/alerts.test.ts",
       "note": "Built as Web Push timer alerts (the owner's choice, 2026-10-20: \"Yes id like a push alert\"): an iPhone web app runs no code while locked, so as the app goes to the background with a countdown running the phone asks the Worker for an alert at its end, and cancels it when it comes back. Also app/src/lib/alerts.test.ts and app/e2e/session.spec.ts."
+    },
+    "T1": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx",
+        "app/src/ui/app.css"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The week page in the app's own style; the \"+\" sits beside the title (no fixed bar)."
+    },
+    "T2": {
+      "built": [
+        "app/src/lib/sounds.ts",
+        "app/src/lib/alerts.ts"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Phase 6: the bells start on the first tap; the timer alerts ask for permission from Settings."
+    },
+    "T4": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "Damaged phases: the page says so and writes nothing; the + menu's yoga still opens."
+    },
+    "T7": {
+      "built": [
+        "app/src/App.tsx",
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The tab bar; leaving or finishing a session opens Today."
+    },
+    "T8": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "The rollup banner: streak, this week against the plan with the next line, tallies (training_week.banner)."
+    },
+    "T9": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "Last week's line while the engine sends it (a failed week's on its Monday only)."
+    },
+    "T10": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "Another week's stored verdict under the strip."
+    },
+    "T11": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The repeat notice the engine sends on the Monday."
+    },
+    "T12": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/lib/schedule.ts"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The Monday redo: two presses, the engine's list of what moves, one answer with its own id."
+    },
+    "T13": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx",
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "tests/test_failed_week_rule.py",
+      "note": "The hold is the engine's: the session's seeded numbers and captions; the message shows on the Monday only."
+    },
+    "T14": {
+      "built": [
+        "services/week_repeat.py",
+        "services/background_writer.py"
+      ],
+      "test": "tests/test_background_writer.py",
+      "note": "The rule stays the engine's; it runs in the app background_writer names (Streamlit until Phase 9). The phone shows the stored schedule."
+    },
+    "T16": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "The strip: the engine's markers (done, today, missed, planned, rest); a tap opens the day."
+    },
+    "T17": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The week arrows, clamped by the engine to the block; \"Today\" when another week shows."
+    },
+    "T18": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "\"Session moved\" only when the engine says the session moved (fault F2)."
+    },
+    "T19": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "Another day opens its rest, done, missed or future view (GET /api/training/day)."
+    },
+    "T20": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "A logged day: its effort, minutes, load and exercises."
+    },
+    "T21": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "A missed day: what was planned."
+    },
+    "T22": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/lib/schedule.ts"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The swap with today: blockers, warnings, one answer with its own id, applied once."
+    },
+    "T23": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "A future day: its plan, the at-home items and \"Do this session today\"."
+    },
+    "T24": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "A rest day: its yoga flow; today says how to train anyway."
+    },
+    "T25": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "A rest day today shows the rest view, never an empty Start."
+    },
+    "T26": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "No block: the next block and when it starts; nothing to press."
+    },
+    "T27": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "A block that ran out of calendar names its days never shown."
+    },
+    "T30": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/lib/schedule.ts"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The carry: asked first; Apply or Leave as missed; sent once with its id."
+    },
+    "T31": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/lib/schedule.ts"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The in-order carry: Run in order or Keep as planned."
+    },
+    "T32": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/lib/schedule.ts"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "The readiness shift (fault F1 fixed in Phase 2): Move session or Keep as planned."
+    },
+    "T33": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/lib/schedule.ts"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "Gate 1's one-tap reason for a short week."
+    },
+    "T34": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "Gate 1's card: the count, the four lifts, when running starts (gate1.how_text)."
+    },
+    "T35": {
+      "built": [
+        "app/src/screens/Week.tsx",
+        "app/src/lib/schedule.ts"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "Gate 1's flare-up, asked twice."
+    },
+    "T36": {
+      "built": [
+        "app/src/screens/Week.tsx"
+      ],
+      "test": "app/src/screens/week.test.tsx",
+      "note": "The flexibility retest: the day before, due, due but not today."
+    },
+    "T103": {
+      "built": [
+        "app/src/screens/Extras.tsx",
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The \"+\" menu on the week page only, never during a session (fault F18)."
+    },
+    "T104": {
+      "built": [
+        "app/src/screens/Extras.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "A session already kept on the phone: the accessory Start says why and waits."
+    },
+    "T105": {
+      "built": [
+        "app/src/screens/Extras.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The accessory session the engine chooses (GET /api/training/accessory)."
+    },
+    "T106": {
+      "built": [
+        "app/src/screens/Extras.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "Its overview: items, minutes, why this session, Start and Cancel."
+    },
+    "T107": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The same guided flow as the plan session; leaving it discards it."
+    },
+    "T108": {
+      "built": [
+        "app/src/screens/SessionSave.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "Saved as its own kind with its note (the engine joins it, sessions.join_notes); never marks a plan day done."
+    },
+    "T109": {
+      "built": [
+        "app/src/screens/Extras.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "The yoga flows."
+    },
+    "T110": {
+      "built": [
+        "app/src/screens/Extras.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "A flow's video, form notes, routine, note and Complete: saved once, logged or already logged."
+    },
+    "T111": {
+      "built": [
+        "app/src/screens/Extras.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "A day's Garmin activities, the walking family first."
+    },
+    "T112": {
+      "built": [
+        "app/src/screens/Extras.tsx"
+      ],
+      "test": "app/e2e/week.spec.ts",
+      "note": "Pick, rate (the engine's load for each rating) and log once."
     }
   }
 }

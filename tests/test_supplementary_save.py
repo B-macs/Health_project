@@ -52,7 +52,11 @@ def test_a_yoga_flow_sent_again_with_the_same_ids_stores_it_once(local_copy):
     repo = record_repo(local_copy, store)
     sid, ids = "2026-10-19-yoga0001", _ids(len(FLOW.poses))
     assert sup.save_yoga(repo, FLOW, DAY, 2, sid, ids, note="Hips opened up")
-    assert not sup.save_yoga(repo, FLOW, DAY, 2, sid, ids, note="Hips opened up")
+    # The same save sent again (the phone's outbox, after a lost answer) answers as it
+    # did the first time and writes nothing; another save of the flow is told "already".
+    assert sup.save_yoga(repo, FLOW, DAY, 2, sid, ids, note="Hips opened up")
+    assert not sup.save_yoga(repo, FLOW, DAY, 2, "2026-10-19-yoga0002",
+                             _ids(len(FLOW.poses)), note="Hips opened up")
     assert _sessions(store, sup.YOGA_TYPE) == {sid}
     assert len(store.tables["training_exercises"]) == len(FLOW.poses)
 
@@ -99,6 +103,8 @@ def test_an_outdoor_activity_is_logged_once_and_its_preview_is_what_is_stored(lo
     assert sup.outdoor_minutes(ACT) == 48 and sup.outdoor_au(ACT, 3) == 144.0
     assert sup.save_outdoor(repo, DAY, ACT, 3, "2026-10-19-out00001", "ex-1")
     assert not sup.save_outdoor(repo, DAY, ACT, 3, "2026-10-19-out00002", "ex-2")
+    # The first save sent again answers as it did, and writes nothing.
+    assert sup.save_outdoor(repo, DAY, ACT, 3, "2026-10-19-out00001", "ex-1")
     [row] = store.tables["training_exercises"]
     assert row["movement_name"] == "Outdoor Hike" and "activity 98765" in row["notes"]
     assert row["garmin_max_hr"] == 151.0 and row.get("garmin_calories") is None

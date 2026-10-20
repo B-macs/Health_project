@@ -19,6 +19,16 @@
 //   POST .../run (a made-up clean result);
 // - Today, its week, the day's plan, the three detail screens and the check-in answer
 //   made-up numbers (dev/fixtures.ts); a saved check-in is kept for the next read.
+// - the training week (Phase 7): GET /api/training/week and /day answer a made-up block
+//   (dev/fixtures.ts); a cookie `e2e_week` names what a test asks for, joined by dots
+//   (carry, carry_in_order, shift, redo, gate1, retest, gap, unreadable, rest_today,
+//   blocked, refuse, garmin_busy, accessory_yesterday), and a cookie `e2e_run` keeps one
+//   test's answers apart from the others' (GET /api/dev/week-run shows them). A move is
+//   applied once per id, as the engine applies it; `e2e_lose_answer=1` applies it and then
+//   answers "engine unavailable", so the phone sends it again;
+// - the "+" menu: the accessory session (the engine-made session as its own kind), one
+//   yoga flow, and two Garmin activities; a yoga flow or an activity is logged once (the
+//   same save sent again answers as it did, another save is told it is already logged).
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import * as fx from './fixtures.ts'
@@ -29,6 +39,61 @@ const received: { method: string; path: string; body: unknown; day: string | nul
 // Sessions saved through the mock, by session id: a save sent again replaces itself.
 const sessions = new Map<string, { session_id: string; notes: string; exercises: unknown[] }>()
 // Check-ins saved through the mock, by date.
+// Each week test's answers, by its `e2e_run` cookie.
+const runs = new Map<string, fx.WeekRun>()
+const runOf = (req: IncomingMessage) => {
+  const tag = cookie(req, 'e2e_run') ?? 'default'
+  if (!runs.has(tag)) runs.set(tag, fx.newRun())
+  return runs.get(tag)!
+}
+const scenarioOf = (req: IncomingMessage) => new Set((cookie(req, 'e2e_week') ?? '').split('.').filter(Boolean))
+const SCHEDULE = new Set(['/api/training/swap', '/api/training/carry', '/api/training/shift', '/api/training/redo',
+  '/api/training/gate1/reason', '/api/training/gate1/flare'])
+
+/** A schedule answer, as the engine answers it: applied once per id; refused when there is
+ *  nothing to move (or when the test asks for a refusal). */
+function answerSchedule(path: string, body: Record<string, unknown> | null, run: fx.WeekRun,
+  scenario: Set<string>): [number, unknown] {
+  const id = typeof body?.action_id === 'string' ? body.action_id : null
+  if (id && run.applied.includes(id)) return [200, { stored: true }]
+  const apply = (): [number, unknown] => {
+    if (id) run.applied.push(id)
+    return [200, { stored: true }]
+  }
+  if (path === '/api/training/swap') {
+    if (scenario.has('refuse')) return [409, { error: 'refused: made-up: the day would land in the next week' }]
+    run.swaps.push(String(body?.date))
+    return apply()
+  }
+  if (path === '/api/training/carry') {
+    if (run.carry || !(scenario.has('carry') || scenario.has('carry_in_order'))) return [409, { error: 'nothing_to_carry' }]
+    run.carry = true
+    return apply()
+  }
+  if (path === '/api/training/shift') {
+    if (run.shift || !scenario.has('shift')) return [409, { error: 'nothing_to_shift' }]
+    run.shift = true
+    return apply()
+  }
+  if (path === '/api/training/redo') {
+    if (run.redo || !scenario.has('redo')) return [409, { error: 'not_repeated: already set to run again' }]
+    run.redo = true
+    return apply()
+  }
+  if (path === '/api/training/gate1/reason') {
+    run.reasons[String(body?.monday)] = String(body?.reason)
+    return [200, { stored: true }]
+  }
+  run.flare = true
+  return [200, { stored: true }]
+}
+
+/** A yoga flow or an outdoor activity, logged once a day: the same save sent again answers
+ *  as it did; another save of it is told it is already logged. */
+function logOnce(kept: Record<string, string>, key: string, sessionId: string): boolean {
+  if (!(key in kept)) kept[key] = sessionId
+  return kept[key] === sessionId
+}
 const checkins = new Map<string, ReturnType<typeof fx.checkinForm>['values']>()
 // The daily data check as the Worker keeps it: none until one runs ("Check now").
 let lastCheck: unknown = null
@@ -79,6 +144,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
   }
   if (url.pathname === '/api/dev/received') return send(200, received)
   if (url.pathname === '/api/dev/sessions') return send(200, [...sessions.values()])
+  if (url.pathname === '/api/dev/week-run') return send(200, runOf(req))
   if (url.pathname === '/api/push/key' && req.headers.authorization === `Bearer ${KEY}`) {
     return send(503, { error: 'push_not_configured' })
   }
@@ -114,7 +180,19 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     if (url.pathname === '/api/today/strain') {
       return send(200, fx.strainDetail(shown, local, url.searchParams.get('week') === 'true'))
     }
-    if (url.pathname === '/api/training/day') return send(200, fx.trainingDay(asked ?? local, local))
+    if (url.pathname === '/api/training/day') return send(200, fx.trainingDay(asked ?? local, local, scenarioOf(req)))
+    if (url.pathname === '/api/training/week') {
+      return send(200, fx.trainingWeek(local, url.searchParams.get('week_start'), scenarioOf(req), runOf(req)))
+    }
+    if (url.pathname === '/api/training/accessory') {
+      // `accessory_yesterday`: an answer kept from the day before, which is never today's.
+      return send(200, fx.accessoryPlan(scenarioOf(req).has('accessory_yesterday') ? fx.addDays(local, -1) : local))
+    }
+    if (url.pathname === '/api/training/yoga') return send(200, fx.yogaCatalogue())
+    if (url.pathname === '/api/training/outdoor') {
+      if (scenarioOf(req).has('garmin_busy')) return send(409, { error: 'sync_running' })
+      return send(200, fx.outdoorList(asked ?? local))
+    }
     if (url.pathname === '/api/training/session') return send(200, { ...sessionFixture, date: local })
     if (url.pathname === '/api/training/garmin/open-activity') {
       if (cookie(req, 'e2e_watch') === 'missing') return send(200, { found: false, activity: null })
@@ -158,6 +236,22 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
           measured_rpe: 6.2, measured_au: 6.2 * b.duration_minutes, active_minutes: b.duration_minutes - 2,
           rpe_delta: 6.2 - rpe, au_delta: (6.2 - rpe) * b.duration_minutes, verdict: Math.abs(6.2 - rpe) < 0.5 ? 'exact' : 6.2 > rpe ? 'under' : 'over',
           coverage: 0.95, low_coverage: false, activity: 'Made-up strength', covered_exercises: 8, total_exercises: 9 } })
+      }
+      if (SCHEDULE.has(url.pathname) && req.method === 'POST') {
+        const [status, payload] = answerSchedule(url.pathname, body as Record<string, unknown> | null, runOf(req), scenarioOf(req))
+        if (status === 200 && cookie(req, 'e2e_lose_answer') === '1') return send(503, { error: 'engine_unavailable' })
+        return send(status, payload)
+      }
+      if (url.pathname === '/api/training/yoga' && req.method === 'POST') {
+        const b = body as { slug: string; session_id: string }
+        return send(200, { logged: logOnce(runOf(req).yoga, `${day}|${b.slug}`, b.session_id) })
+      }
+      if (url.pathname === '/api/training/outdoor' && req.method === 'POST') {
+        const b = body as { date: string; activity_id: string; rpe: number; session_id: string }
+        const act = fx.outdoorList(b.date).activities.find((a) => a.activity_id === b.activity_id)
+        if (!act) return send(422, { error: 'unknown_activity' })
+        const logged = logOnce(runOf(req).outdoor, b.activity_id, b.session_id)
+        return send(200, { logged, au: act.au_by_rpe[b.rpe - 1], logs_as: act.logs_as })
       }
       if (url.pathname === '/api/training/sessions' && req.method === 'POST') {
         const b = body as { session_id: string; notes: string; exercises: unknown[] }

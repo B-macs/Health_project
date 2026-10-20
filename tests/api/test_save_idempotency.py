@@ -185,10 +185,16 @@ def test_a_yoga_flow_sent_twice_stores_one_session(monkeypatch, local_copy):
     flow = yg.YOGA_LIBRARY[0]
     body = {"slug": flow.slug, "session_id": "2026-10-19-yoga0001",
             "pose_ids": [f"pose-{i}" for i in range(len(flow.poses))], "note": ""}
+    other = {**body, "session_id": "2026-10-19-yoga0002",
+             "pose_ids": [f"other-{i}" for i in range(len(flow.poses))]}
     with _client(monkeypatch, repo, local_copy) as c:
         first = _send(c, "post", "/api/training/yoga", body)
         again = _send(c, "post", "/api/training/yoga", body)
-    assert first.json() == {"logged": True} and again.json() == {"logged": False}
+        second_press = _send(c, "post", "/api/training/yoga", other)
+    # The same save sent again answers as it did (the outbox resends after a lost answer);
+    # another save of the flow the same day is the one told it was already logged.
+    assert first.json() == {"logged": True} and again.json() == {"logged": True}
+    assert second_press.json() == {"logged": False}
     exercises = _rows(store, "training_exercises")
     assert len(exercises) == len(flow.poses)
     assert {e["session_id"] for e in exercises} == {"2026-10-19-yoga0001"}
@@ -202,11 +208,14 @@ def test_an_outdoor_activity_sent_twice_stores_one_session(monkeypatch, local_co
     monkeypatch.setattr(repo, "get_garmin_activities_for_date", lambda d: [hike])
     body = {"date": TODAY.isoformat(), "activity_id": "12345", "rpe": 4,
             "session_id": "2026-10-19-hike0001", "exercise_id": "ex-hike"}
+    other = {**body, "session_id": "2026-10-19-hike0002", "exercise_id": "ex-hike-2"}
     with _client(monkeypatch, repo, local_copy) as c:
         first = _send(c, "post", "/api/training/outdoor", body)
         again = _send(c, "post", "/api/training/outdoor", body)
+        second_press = _send(c, "post", "/api/training/outdoor", other)
     assert first.status_code == 200 and first.json()["logged"] is True
-    assert again.json()["logged"] is False
+    assert again.json()["logged"] is True, "the same save sent again answers as it did"
+    assert second_press.json()["logged"] is False
     assert len(_rows(store, "training_exercises")) == 1
 
 

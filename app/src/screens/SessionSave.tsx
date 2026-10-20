@@ -194,7 +194,9 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
   const end = useMemo(() => Date.now(), [])
   const clock = clockMinutes(s, end)
   const ask = asksLength(s, clock)
-  const [rpe, setRpe] = useState(5)
+  const accessory = s.plan.kind === 'accessory'
+  // The slider starts at 5, and on the accessory session at its own effort target (low).
+  const [rpe, setRpe] = useState(accessory ? (s.plan.rpe_target ?? 3) : 5)
   const [choice, setChoice] = useState<'plan' | 'clock'>(ask ? 'plan' : 'clock')
   const [notes, setNotes] = useState('')
   const [completion, setCompletion] = useState<Completion | null>(null)
@@ -261,8 +263,8 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
       <div className="screen train">
         <div className="sky" aria-hidden="true" />
         <header className="head">
-          <h1 className="head__title">{S.session.congrats}</h1>
-          <div className="caption">{S.session.congratsNext(s.plan.exercises.length)}</div>
+          <h1 className="head__title">{accessory ? S.session.accessoryLogged : S.session.congrats}</h1>
+          {!accessory && <div className="caption">{S.session.congratsNext(s.plan.exercises.length)}</div>}
         </header>
         <section className="card group" role="status" data-testid="save-state" data-state={saved}>
           <p>{saved === 'confirmed' ? S.session.saved : saved === 'refused' ? S.session.refused : S.session.savedPhone}</p>
@@ -290,6 +292,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
           <input type="range" className="slider" min={1} max={10} step={1} value={rpe} aria-label={S.session.effort}
             onChange={(e) => setRpe(Number(e.target.value))} />
         </label>
+        {accessory && <p className="caption">{S.session.accessoryEffortHelp}</p>}
       </section>
       {ask && (
         <section className="card group">

@@ -1,29 +1,42 @@
-// The Training tab (rebuild Phase 6): today's session before Start (the overview the engine
-// sends, inventory T37-T47), the guided flow while it runs, and the save at its end. The
-// session the phone keeps (the database's `session` row) decides which: it survives a
-// reload, an app kill and an app update, so the app opens on it again.
+// The Training tab (rebuild Phases 6 and 7). The session the phone keeps (the database's
+// `session` row) decides what shows: while one exists, the guided flow or its save (a plan
+// session or the accessory session, the same flow); else the "+" menu's screen the address
+// names (yoga, outdoor, the accessory session before Start); else the week page.
 //
-// Start downloads the whole session (GET /api/training/session) and mints the ids once.
-// The day's and the session's answers are read cache-first when the tab opens, so a
-// session can start at the gym with no signal when the phone has read them earlier that
-// day. Every number and word of the overview is the engine's; the phone only lays it out.
+// The week page (screens/Week.tsx): the banner and the week's questions, the strip, and the
+// day picked in it. Today's day is the session overview before Start (inventory T37-T47):
+// Start downloads the whole session (GET /api/training/session) and mints the ids once. The
+// day's and the session's answers are read cache-first, so a session can start at the gym
+// with no signal when the phone has read them earlier that day. Every number and word is
+// the engine's; the phone only lays it out.
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useState } from 'react'
+import type { OutboxRow } from '../db/schema'
 import type { components } from '../generated/api'
 import { localDay } from '../lib/api'
 import { useApp } from '../lib/appState'
-import { useCached } from '../lib/cache'
+import { useCached, type View } from '../lib/cache'
+import {
+  answerCarry, answerShift, clearRefused, gate1Flare, gate1Reason, redoWeek, swapWithToday, useConfirmed,
+  useScheduleAnswers,
+} from '../lib/schedule'
 import { endSession, startSession } from '../lib/session'
 import { loadState, newExerciseIds, newSessionId, startSessionState, type Plan, type TrainingState } from '../lib/training'
 import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
+import { IconPlus } from '../ui/icons'
 import { Sheet } from '../ui/Sheet'
+import { HomeItems, Timeline } from '../ui/timeline'
+import { AccessoryOverview, ExtrasMenu, Outdoor, YogaDetail, YogaList } from './Extras'
 import { SessionFlow } from './Session'
 import { SessionSave } from './SessionSave'
+import {
+  DayView, Gate1, GapScreen, MovePrompts, RedoOffer, Refusals, RestView, Retest, RollupBanner, ScheduleNote, WeekStrip,
+  waiting, type Answer, type DayAnswer, type WeekAnswer,
+} from './Week'
 
 type Schemas = components['schemas']
 type DayPlan = Schemas['TrainingDayOut']
-type Line = Schemas['ExerciseLine']
 
 /** A date as the screens write it: "Tuesday 20 October". */
 export function longDate(iso: string): string {
@@ -101,23 +114,6 @@ function WorkoutCard({ o, plan }: { o: Schemas['TodayOverview']; plan: Plan }) {
   )
 }
 
-function Timeline({ title, items, warmups }: { title: string; items: Line[]; warmups: Set<string> }) {
-  return (
-    <section className="card group" aria-label={title}>
-      <h3 className="eyebrow">{title}</h3>
-      <ol className="timeline">
-        {items.map((ex, i) => (
-          <li key={`${ex.name}-${i}`} className={`timeline__item${warmups.has(ex.name) ? ' timeline__item--warmup' : ''}`}>
-            <span className="timeline__dot" aria-hidden="true" />
-            <span className="timeline__name">{ex.name}</span>
-            <span className="timeline__dose">{ex.prescription}</span>
-          </li>
-        ))}
-      </ol>
-    </section>
-  )
-}
-
 /** The adapt dialog (T44): what the day's load decision did to the volume, and how it
  *  works. The numbers are the engine's. */
 function AdaptSheet({ a, onClose }: { a: Plan['adaptation']; onClose: () => void }) {
@@ -144,28 +140,36 @@ function AdaptSheet({ a, onClose }: { a: Plan['adaptation']; onClose: () => void
   )
 }
 
-function Overview({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean) => void; starting: boolean }) {
+/** Today's view: the session overview before Start, or why there is none (a rest day with
+ *  its yoga flow, the gap between blocks). Start waits while an answer that can change
+ *  today's session waits to send (`waitingMove`), and until the session is read again after
+ *  the last such answer (`movedAt`). */
+function Overview({ day, onStart, starting, waitingMove, movedAt }: {
+  day: View<DayPlan>; onStart: (plan: Plan, garmin: boolean) => void; starting: boolean
+  waitingMove: boolean; movedAt: string | undefined
+}) {
   const { store, ctx } = useApp()
-  const day = useCached<DayPlan>(store, '/api/training/day', null, ctx)
   const session = useCached<Plan>(store, '/api/training/session', null, ctx)
+  const held = waitingMove || (movedAt !== undefined && (session.state !== 'fresh' || (session.fetchedAt ?? '') < movedAt))
   const [garmin, setGarmin] = useState(false)
   const [adapting, setAdapting] = useState(false)
   const today = localDay()
-  const o = day.data?.overview
+  const d = day.data && day.data.date === today ? day.data : undefined
+  const o = d?.overview
   const plan = session.data && session.data.date === today ? session.data : null
-  const reason = noSessionReason(day.data)
+  const reason = noSessionReason(d)
   const warmups = new Set((plan?.exercises ?? []).filter((e) => e.warmup).map((e) => e.name))
   // The day's own lists (today's dosed values, fault F20); the session's when only it is saved.
-  const main: Line[] = o && (o.main.length || o.release.length) ? o.main : (plan?.exercises ?? [])
+  const main = o && (o.main.length || o.release.length) ? o.main : (plan?.exercises ?? [])
+  if (d?.route === 'rest') return <><ScheduleNote note={d.note} /><RestView rest={d.rest} /></>
+  if (d?.route === 'no_phase') return <GapScreen gap={d.gap} />
+  if (d?.route === 'phases_unreadable') return <p className="alert">{S.week.phasesUnreadable}</p>
   return (
-    <div className="screen train">
-      <div className="sky" aria-hidden="true" />
-      <header className="head">
-        <h1 className="head__title">{S.session.title}</h1>
-        <div className="caption">{longDate(day.data?.date ?? today)}</div>
-      </header>
-      <Freshness view={session} />
-      {day.data?.phase && <StatusStrip phase={day.data.phase} today={today} />}
+    <div className="group" data-testid="today-overview">
+      {/* The week's read says how fresh the page is; the session's only when it failed. */}
+      {session.state !== 'fresh' && session.state !== 'loading' && <Freshness view={session} />}
+      <ScheduleNote note={d?.note} />
+      {d?.phase && <StatusStrip phase={d.phase} today={today} />}
       {o?.banner && <Banner kind={o.banner.kind} text={o.banner.text} />}
       {o?.banner?.acwr_advisory && <p className="caption">{o.banner.acwr_advisory}</p>}
       {plan ? (
@@ -187,17 +191,7 @@ function Overview({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
           {plan.adaptation.volume_note && <p className="caption">{plan.adaptation.volume_note}</p>}
           {o && o.release.length > 0 && <Timeline title={S.session.release} items={o.release} warmups={warmups} />}
           <Timeline title={S.session.workout} items={main} warmups={warmups} />
-          {o?.home && o.home.length > 0 && (
-            <section className="card group" aria-label={S.session.atHome}>
-              <h3 className="eyebrow">{S.session.atHome}</h3>
-              {o.home.map((h) => (
-                <details key={h.name} className="guide">
-                  <summary className="tapline">{`${h.name} · ${h.prescription}`}</summary>
-                  {h.mechanics && <p className="caption">{h.mechanics}</p>}
-                </details>
-              ))}
-            </section>
-          )}
+          {o?.home && <HomeItems items={o.home} />}
           {plan.garmin_configured && (
             <section className="card group" aria-label={S.session.beforeStart}>
               <h3 className="eyebrow">{S.session.beforeStart}</h3>
@@ -211,9 +205,10 @@ function Overview({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
             </section>
           )}
           {o?.first_side_note && <p className="caption">{o.first_side_note}</p>}
+          {held && <p className="note" data-testid="start-held">{S.week.startHeld}</p>}
           <div className="pair">
             <button className="btn btn--glass btn--gym" onClick={() => setAdapting(true)}>{S.session.adapt}</button>
-            <button className="btn btn--primary btn--gym" disabled={starting} onClick={() => onStart(plan, garmin)}>
+            <button className="btn btn--primary btn--gym" disabled={starting || held} onClick={() => onStart(plan, garmin)}>
               {starting ? S.session.starting : S.session.start}
             </button>
           </div>
@@ -232,7 +227,109 @@ function Overview({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
   )
 }
 
-export function TrainingTab() {
+/** The kinds of answer that can change today's session. */
+const MOVES_TODAY = ['swap', 'carry', 'shift']
+
+/** The page the owner's answers re-read: it is mounted again each time the engine confirms
+ *  one (`version`), so every read under it asks again. */
+function WeekBody({ weekStart, setWeekStart, selected, setSelected, answered, answer, rows, onStart, starting, onClear }: {
+  weekStart: string | null; setWeekStart: (week: string | null) => void
+  selected: string; setSelected: (day: string) => void
+  answered: Record<string, string>; answer: Answer; rows: OutboxRow[]
+  onStart: (plan: Plan, garmin: boolean) => void; starting: boolean; onClear: (row: OutboxRow) => void
+}) {
+  const { store, ctx } = useApp()
+  const today = localDay()
+  const week = useCached<WeekAnswer>(store, weekStart ? `/api/training/week?week_start=${weekStart}` : '/api/training/week', null, ctx)
+  const day = useCached<DayAnswer>(store, selected === today ? '/api/training/day' : `/api/training/day?date=${selected}`, null, ctx)
+  const w = week.data
+  // A question answered on this page stays closed until a read newer than the answer.
+  const isOpen = (key: string) => {
+    const at = answered[key]
+    return !at || (week.state === 'fresh' && week.fetchedAt !== null && week.fetchedAt > at)
+  }
+  const movedAt = Object.entries(answered).filter(([k]) => MOVES_TODAY.includes(k.split(':')[0]))
+    .map(([, at]) => at).sort().pop()
+  const waitingMove = MOVES_TODAY.some((k) => waiting(rows, k))
+  const swap = (date: string) => {
+    setSelected(today)
+    answer(`swap:${date}`, () => swapWithToday(store, date))
+  }
+  return (
+    <>
+      <Freshness view={week} />
+      <Refusals rows={rows} onClear={onClear} />
+      {w && !w.phases_readable ? <p className="alert" data-testid="phases-unreadable">{S.week.phasesUnreadable}</p> : w && (
+        <>
+          {w.banner && <RollupBanner banner={w.banner} />}
+          {w.repeat_notice && <p className="note" data-testid="repeat-notice">{w.repeat_notice}</p>}
+          <RedoOffer redo={w.redo} rows={rows} open={isOpen('redo')} answer={answer} redoWeek={() => redoWeek(store)} />
+          <MovePrompts week={w} rows={rows} isOpen={isOpen} answer={answer}
+            carry={(accept) => answerCarry(store, accept)} shift={(accept) => answerShift(store, accept)} />
+          {w.gate1 && (
+            <Gate1 card={w.gate1} rows={rows} isOpen={isOpen} answer={answer}
+              reason={(monday, key) => gate1Reason(store, monday, key)} flare={() => gate1Flare(store)} />
+          )}
+          {w.retest && <Retest notice={w.retest} />}
+          {w.strip.length > 0 && (
+            <WeekStrip week={w} selected={selected} onPick={setSelected}
+              onWeek={(step) => setWeekStart(shiftDay(w.week_start ?? today, step))}
+              onToday={() => { setWeekStart(null); setSelected(today) }} />
+          )}
+        </>
+      )}
+      {selected === today
+        ? <Overview day={day} onStart={onStart} starting={starting} waitingMove={waitingMove} movedAt={movedAt} />
+        : day.data && day.data.date === selected
+          ? <DayView day={day.data} rows={rows} onSwap={swap} />
+          : <Freshness view={day} />}
+    </>
+  )
+}
+
+/** An ISO day moved by whole days. */
+export function shiftDay(iso: string, days: number): string {
+  return new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
+}
+
+function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean) => void; starting: boolean }) {
+  const { store } = useApp()
+  const rows = useScheduleAnswers(store)
+  const confirmed = useConfirmed(rows)
+  const [cleared, setCleared] = useState(0)
+  const [weekStart, setWeekStart] = useState<string | null>(null)
+  const [selected, setSelected] = useState(localDay())
+  const [answered, setAnswered] = useState<Record<string, string>>({})
+  const [menu, setMenu] = useState(false)
+  const answer: Answer = (key, send) => {
+    setAnswered((a) => ({ ...a, [key]: new Date().toISOString() }))
+    void send()
+  }
+  const clear = (row: OutboxRow) => void clearRefused(store, row).then(() => setCleared((c) => c + 1))
+  return (
+    <div className="screen train" data-testid="week-page">
+      <div className="sky" aria-hidden="true" />
+      <header className="head head--row">
+        <div>
+          <h1 className="head__title">{S.session.title}</h1>
+          <div className="caption">{longDate(localDay())}</div>
+        </div>
+        <button className="iconbtn" aria-label={S.week.plus} data-testid="plus" onClick={() => setMenu(true)}>
+          <IconPlus />
+        </button>
+      </header>
+      <WeekBody key={confirmed + cleared} weekStart={weekStart} setWeekStart={setWeekStart}
+        selected={selected} setSelected={setSelected} answered={answered} answer={answer} rows={rows}
+        onStart={onStart} starting={starting} onClear={clear} />
+      {menu && <ExtrasMenu onClose={() => setMenu(false)} />}
+    </div>
+  )
+}
+
+/** The "+" menu's screens, by address. */
+export type Extra = 'yoga' | 'outdoor' | 'accessory'
+
+export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
   const { store, go } = useApp()
   // undefined while the database is read; null when no session is kept.
   const row = useLiveQuery(async () => (await store.session.get('current')) ?? null, [store])
@@ -257,7 +354,10 @@ export function TrainingTab() {
   }
   const leave = useCallback(() => void endSession(store).then(() => go('/')), [store, go])
   if (row === undefined) return null
-  if (!state) return <Overview onStart={(p, garmin) => void start(p, garmin)} starting={starting} />
-  if (state.saving) return <SessionSave s={state} update={update} onDone={leave} />
-  return <SessionFlow s={state} update={update} onExit={leave} />
+  if (state?.saving) return <SessionSave s={state} update={update} onDone={leave} />
+  if (state) return <SessionFlow s={state} update={update} onExit={leave} />
+  if (extra === 'yoga') return slug ? <YogaDetail slug={slug} /> : <YogaList />
+  if (extra === 'outdoor') return <Outdoor />
+  if (extra === 'accessory') return <AccessoryOverview />
+  return <WeekPage onStart={(p, garmin) => void start(p, garmin)} starting={starting} />
 }

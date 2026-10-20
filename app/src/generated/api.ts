@@ -1409,6 +1409,11 @@ export interface components {
             };
             /** Flare This Week */
             flare_this_week: boolean;
+            /**
+             * How
+             * @default
+             */
+            how: string;
             /** Lifts Met */
             lifts_met: number;
             /** Reasons */
@@ -2555,6 +2560,11 @@ export interface components {
              * @default
              */
             notes: string;
+            /**
+             * Plan Note
+             * @default
+             */
+            plan_note: string;
             /** Session Id */
             session_id: string;
             /** Session Rpe */
@@ -3487,6 +3497,8 @@ export interface components {
         };
         /** YogaPoseOut */
         YogaPoseOut: {
+            /** Hold Seconds */
+            hold_seconds?: number | null;
             /** Name */
             name: string;
         };

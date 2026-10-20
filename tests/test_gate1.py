@@ -141,3 +141,15 @@ def test_the_main_lifts_are_in_the_block():
     names = {e["name"] for e in PLAN[1]["exercises"] + PLAN[2]["exercises"]
              + PLAN[4]["exercises"]}
     assert set(g.MAIN_LIFTS) <= names
+
+
+def test_the_explanation_is_built_from_the_gates_own_numbers():
+    """When running starts (rebuild Phase 7): one sentence for the training page and the
+    phone, made from WEEKS_REQUIRED, CORE_REQUIRED and STRENGTH_GAIN, so a changed number
+    cannot leave an old one on either screen."""
+    text = g.how_text()
+    assert text == ("Running starts when all of these are true: 6 weeks in a row with all 3 core "
+                    "sessions and no flare-up; each main lift 10% above its first weight in this "
+                    "block; then a test day (a 30-minute brisk walk, single-leg calf raises and "
+                    "hops, all without pain).")
+    assert f"{g.WEEKS_REQUIRED} weeks" in text and f"all {g.CORE_REQUIRED} core" in text

@@ -89,3 +89,19 @@ export async function leaveSession(page: Page): Promise<void> {
   await page.getByRole('button', { name: S.session.exit }).click()
   await page.getByRole('button', { name: S.session.discard }).click()
 }
+
+/** Tap through a session's flow to its save screen: the main button, once per step, the
+ *  seconds typed first on a timed test; each tap waits until the flow has moved. */
+export async function tapToSave(page: Page): Promise<void> {
+  const flow = page.locator('.screen.train[data-step]')
+  const at = async () => ((await flow.count()) ? await flow.getAttribute('data-step') : 'save')
+  for (let taps = 0; taps < 400; taps++) {
+    const now = await at()
+    if (now === 'save') return
+    const seconds = page.getByRole('spinbutton')
+    if (await seconds.count()) await seconds.fill('30')
+    await page.locator('.controls .btn--primary').click()
+    await expect.poll(at).not.toBe(now)
+  }
+  throw new Error('the session never reached the save screen')
+}

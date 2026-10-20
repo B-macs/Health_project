@@ -873,6 +873,11 @@ ul {
   color: var(--text);
 }
 
+/* A disclosure's line, its words centred in the tap height. */
+summary.tapline {
+  align-content: center;
+}
+
 .log {
   margin: 0;
   font-family: var(--font-mono);
@@ -1433,4 +1438,107 @@ button.card {
     animation-iteration-count: 1 !important;
     transition: none !important;
   }
+}
+
+/* ── The training week (rebuild Phase 7) ─────────────────────────────────────────── */
+
+/* The page title with the "+" menu beside it. */
+.head--row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--sp-s);
+}
+
+/* The rollup banner: the streak, this week against the plan, the tallies. */
+.rollup {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-s) var(--sp-m);
+}
+
+.rollup__cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.rollup__value {
+  font-weight: var(--w-label);
+}
+
+.rollup[data-progress='failing'] .rollup__cell + .rollup__cell .rollup__value,
+.rollup[data-progress='perfect'] .rollup__cell + .rollup__cell .rollup__value,
+.rollup[data-progress='ultimate'] .rollup__cell + .rollup__cell .rollup__value {
+  color: var(--f1);
+}
+
+.rollup__tallies {
+  grid-column: 1 / -1;
+}
+
+/* A day's marker in the strip: done (a check), today and planned (filled), missed and
+ * rest (hollow). The page colour's shades only, never a hue of its own. */
+.mark {
+  width: var(--sp-m);
+  height: var(--sp-m);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+}
+
+.mark .icon {
+  width: var(--sp-m);
+  height: var(--sp-m);
+}
+
+.mark--done {
+  color: var(--f1);
+}
+
+.mark--today {
+  background: var(--f1);
+}
+
+.mark--planned {
+  background: var(--f3);
+}
+
+.mark--missed {
+  box-shadow: inset 0 0 0 var(--hair) var(--f1);
+}
+
+.mark--rest {
+  box-shadow: inset 0 0 0 var(--hair) var(--track);
+}
+
+/* Gate 1's lifts: reached, or not yet. */
+.lift {
+  display: flex;
+  gap: var(--sp-s);
+  align-items: baseline;
+  font-size: var(--fs-small);
+}
+
+.lift__mark {
+  flex: none;
+  width: var(--sp-m);
+  color: var(--f1);
+}
+
+.lift__mark .icon {
+  width: var(--sp-m);
+  height: var(--sp-m);
+}
+
+.logged {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  color: var(--f1);
+}
+
+.logged .icon {
+  width: var(--sp-m);
+  height: var(--sp-m);
 }

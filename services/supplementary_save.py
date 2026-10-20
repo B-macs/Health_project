@@ -33,7 +33,10 @@ OUTDOOR_TYPE = "Outdoor"
 
 def save_yoga(repo, flow: yg.YogaSession, day: date, stage: int, session_id: str,
               pose_ids: list[str], note: str = "") -> bool:
-    """Store a completed yoga flow; False when it is already fully logged.
+    """Store a completed yoga flow; False when it is already fully logged by
+    another save. The same save sent again (its session id already holds the
+    whole flow) answers True, as it did the first time (rebuild rule 4: the
+    phone's outbox sends a save again when the first answer was lost).
 
     One exercise per pose under one session id, each with the pose's hold as
     its one set and its safety note when the pose is not cleared at `stage`
@@ -49,6 +52,8 @@ def save_yoga(repo, flow: yg.YogaSession, day: date, stage: int, session_id: str
         repo.get_supplementary_sessions_live(day, YOGA_TYPE), [p.name for p in flow.poses])
     todo = [(pose, pid) for pose, pid in zip(flow.poses, pose_ids) if pose.name not in written]
     if not todo:
+        if existing_id == session_id:
+            return True     # this save, sent again: stored, nothing written now
         return False
     sid = existing_id or session_id
     duration = flow.total_duration_minutes
@@ -107,13 +112,16 @@ def _number(value) -> float | None:
 
 def save_outdoor(repo, day: date, activity: dict, session_rpe: int, session_id: str,
                  exercise_id: str) -> bool:
-    """Store a Garmin activity as one supplementary session; False when it is
-    already in the log. The canonical exercise name
+    """Store a Garmin activity as one supplementary session; False when
+    another save already put it in the log (the same save sent again, under its
+    own session id, answers True as it did the first time). The canonical exercise name
     (sessions.outdoor_exercise_name) carries the movement weight and the
     leg-day classification; AU is RPE x minutes (Key Rule 2b: the activity's
     heart rate is kept as context, never fed into AU)."""
-    if sess.outdoor_activity_logged(repo.get_supplementary_sessions_live(day, OUTDOOR_TYPE),
-                                    activity.get("activity_id")):
+    existing = repo.get_supplementary_sessions_live(day, OUTDOOR_TYPE)
+    if sess.outdoor_activity_logged(existing, activity.get("activity_id")):
+        if session_id in existing:
+            return True     # this save, sent again: stored, nothing written now
         return False
     minutes = outdoor_minutes(activity)
     name = sess.outdoor_exercise_name(activity.get("type"))

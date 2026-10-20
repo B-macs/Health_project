@@ -119,9 +119,4 @@ export function Contributor(props: { name: string; value: string; fraction: numb
   )
 }
 
-const LONG = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
-const NARROW = new Intl.DateTimeFormat('en-GB', { weekday: 'narrow', timeZone: 'UTC' })
-const at = (iso: string) => new Date(`${iso}T00:00:00Z`)
-export const longDate = (iso: string) => LONG.format(at(iso))
-export const narrowDay = (iso: string) => NARROW.format(at(iso))
-export const dayOfMonth = (iso: string) => String(Number(iso.slice(8, 10)))
+export { dayOfMonth, longDate, narrowDay, shortDate } from '../lib/dates'

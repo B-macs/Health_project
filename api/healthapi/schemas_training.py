@@ -87,6 +87,8 @@ class Gate1Card(BaseModel):
     waiting: Gate1Waiting | None
     reasons: list[Gate1Reason]
     flare_this_week: bool
+    #: When running starts, in the screen's words (gate1.how_text).
+    how: str = ""
 
 
 class RetestNotice(BaseModel):
@@ -465,6 +467,8 @@ class SessionSaveIn(BaseModel):
     duration_minutes: int = Field(ge=1)
     session_rpe: int = Field(ge=1, le=10)
     notes: str = ""
+    #: The session plan's own note (the accessory session's), stored before `notes`.
+    plan_note: str = ""
     exercises: list[SavedExerciseIn]
 
 
@@ -552,6 +556,7 @@ class YogaCaution(BaseModel):
 
 class YogaPoseOut(BaseModel):
     name: str
+    hold_seconds: int | None = None
 
 
 class YogaFlow(BaseModel):
@@ -578,7 +583,8 @@ class YogaLogIn(BaseModel):
 
 
 class LoggedOut(BaseModel):
-    #: False: it was already logged, and nothing was written.
+    #: False: another save already logged it, and nothing was written. The same save
+    #: sent again (the outbox, after a lost answer) answers True, as it did the first time.
     logged: bool
 
 

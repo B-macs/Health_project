@@ -29,6 +29,22 @@ export function backoff(attempts: number): number {
 /** The event that wakes the outbox loop when something is written. */
 export const OUTBOX_EVENT = 'health-outbox'
 
+/** The engine's answers to the items sent in this run of the app, by item id, for a screen
+ *  that shows what the answer said (yoga and outdoor: logged now, or logged before). An
+ *  item leaves the outbox after its answer is kept here, so a live query on the item sees
+ *  the answer the moment the item is gone. Memory only: the newest ANSWERS_KEPT. */
+const answers = new Map<string, unknown>()
+export const ANSWERS_KEPT = 50
+
+export function answerOf(id: string): unknown {
+  return answers.get(id)
+}
+
+function keep(id: string, answer: unknown): void {
+  answers.set(id, answer)
+  while (answers.size > ANSWERS_KEPT) answers.delete(answers.keys().next().value as string)
+}
+
 function notify(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(OUTBOX_EVENT))
 }
@@ -75,7 +91,7 @@ export async function drain(store: HealthDB, ctx: DrainCtx): Promise<DrainResult
       if (!item) return 'done'
       if (new Date(item.next_at) > now()) return 'later'
       try {
-        await api(item.path, {
+        const answer = await api(item.path, {
           method: item.method,
           body: item.body,
           key: ctx.key,
@@ -83,6 +99,7 @@ export async function drain(store: HealthDB, ctx: DrainCtx): Promise<DrainResult
           engineDown: ctx.engineDown,
           fetchImpl: ctx.fetchImpl,
         })
+        keep(item.id, answer)
         await store.outbox.delete(item.seq!)
       } catch (err) {
         const e = err instanceof ApiError ? err : new ApiError('server', null, 'unknown')

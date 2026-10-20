@@ -324,7 +324,7 @@ def build_save(body: dict) -> session_save.SessionSave:
                         if e.get("garmin_minutes")},
         garmin_detail={i: e["garmin_detail"] for i, e in enumerate(exercises)
                        if e.get("garmin_detail")},
-        session_notes=body.get("notes") or "",
+        session_notes=sess.join_notes(body.get("plan_note") or "", body.get("notes") or ""),
         movement_type_override=acc.ACCESSORY_TYPE if kind == ACCESSORY else None)
 
 
@@ -428,7 +428,7 @@ def yoga_catalogue(repo) -> dict:
         "stage_read": read_ok,
         "flows": [{"slug": s.slug, "name": s.name, "minutes": s.total_duration_minutes,
                    "rpe": s.estimated_rpe, "video_url": s.video_url,
-                   "poses": [{"name": p.name} for p in s.poses],
+                   "poses": [{"name": p.name, "hold_seconds": p.hold_seconds} for p in s.poses],
                    "cautions": [{"pose": pose.name, "severity": severity, "note": note}
                                 for pose, severity, note in s.cautions(stage)]}
                   for s in yg.YOGA_LIBRARY],

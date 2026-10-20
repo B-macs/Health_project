@@ -315,6 +315,8 @@ export function saveBody(s: TrainingState, minutes: number, rpe: number, notes: 
     duration_minutes: Math.max(1, Math.round(minutes)),
     session_rpe: rpe,
     notes,
+    // The session's own note (the accessory session's): the engine stores it before `notes`.
+    plan_note: s.plan.note ?? '',
     exercises: s.plan.exercises.map((ex, i) => {
       const live = s.live[ex.index]
       const right = sideValues(live, 'right', first)

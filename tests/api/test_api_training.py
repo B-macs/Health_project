@@ -403,6 +403,9 @@ def test_the_yoga_catalogue_names_each_flows_cautions(env, monkeypatch):
         s.slug for s in yg.YOGA_LIBRARY]
     flow = yg.YOGA_LIBRARY[0]
     assert len(out["flows"][0]["cautions"]) == len(flow.cautions(2))
+    # The full routine shows each pose's hold, as the Streamlit page does (T110).
+    assert [p["hold_seconds"] for p in out["flows"][0]["poses"]] == [
+        p.hold_seconds for p in flow.poses]
 
 
 def test_the_outdoor_list_puts_the_walking_family_first(env, monkeypatch):

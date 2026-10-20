@@ -1626,12 +1626,7 @@ def _render_gate1(active, in_session: bool) -> None:
     with st.expander(
             f"Gate 1 — the first run  ·  {counted['run']} of {counted['required']} weeks  ·  "
             f"{card['lifts_met']} of {len(rows)} lifts", expanded=False):
-        st.caption(
-            "Running starts when all of these are true: 6 weeks in a row with all 3 core "
-            "sessions and no flare-up; each main lift 10% above its first weight in this "
-            "block; then a test day (a 30-minute brisk walk, single-leg calf raises and hops, "
-            "all without pain)."
-        )
+        st.caption(g1.how_text())
         st.markdown(f"**Weeks in a row:** {counted['run']} of {counted['required']}")
         for row in rows:
             mark = "✓" if row["met"] else "·"
@@ -2733,9 +2728,7 @@ def _render_accessory_session(policy: dict, readiness_modifier: float,
             extra = st.text_area("Session Notes (optional)", height=80)
             if st.form_submit_button("Save Accessory Session", type="primary",
                                      use_container_width=True):
-                notes = day.get("accessory_note") or ""
-                if extra.strip():
-                    notes = f"{notes}\n{extra.strip()}".strip()
+                notes = sess.join_notes(day.get("accessory_note") or "", extra)
                 try:
                     _auto_log_session(acc.ACCESSORY_DAY_KEY, exercises, session_rpe,
                                       elapsed, notes,

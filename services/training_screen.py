@@ -276,6 +276,7 @@ def gate1_out(card: dict) -> dict:
                                                  "core_required": g1.CORE_REQUIRED},
         "reasons": [{"key": k, "label": v} for k, v in g1.REASONS.items()],
         "flare_this_week": bool(card.get("flare_this_week")),
+        "how": g1.how_text(),
     }
 
 

@@ -234,6 +234,15 @@ def read_lift_weights(repo, since: date) -> dict[str, tuple[float | None, float 
             for lift in MAIN_LIFTS}
 
 
+def how_text() -> str:
+    """When running starts, in the screen's words, from the gate's own numbers
+    (the training page and the phone print the same sentence)."""
+    return (f"Running starts when all of these are true: {WEEKS_REQUIRED} weeks in a row with "
+            f"all {CORE_REQUIRED} core sessions and no flare-up; each main lift "
+            f"{round(STRENGTH_GAIN * 100)}% above its first weight in this block; then a test "
+            "day (a 30-minute brisk walk, single-leg calf raises and hops, all without pain).")
+
+
 def read_card(repo, phase: Phase, today: date, *, weights=None, logged_dates=None) -> dict:
     """The card, read in the order the training page read it: the stored
     answers, the PLAN-day logged dates (a yoga session is not a core

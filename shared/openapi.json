@@ -1686,6 +1686,11 @@
             "title": "Flare This Week",
             "type": "boolean"
           },
+          "how": {
+            "default": "",
+            "title": "How",
+            "type": "string"
+          },
           "lifts_met": {
             "title": "Lifts Met",
             "type": "integer"
@@ -5319,6 +5324,11 @@
             "title": "Notes",
             "type": "string"
           },
+          "plan_note": {
+            "default": "",
+            "title": "Plan Note",
+            "type": "string"
+          },
           "session_id": {
             "title": "Session Id",
             "type": "string"
@@ -8176,6 +8186,17 @@
       },
       "YogaPoseOut": {
         "properties": {
+          "hold_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Seconds"
+          },
           "name": {
             "title": "Name",
             "type": "string"

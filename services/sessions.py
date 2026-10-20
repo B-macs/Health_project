@@ -2650,6 +2650,17 @@ def elapsed_minutes(start_ts: float, now_ts: float, exercises: list[dict],
     return estimate_duration(exercises)
 
 
+def join_notes(plan_note: str, typed: str) -> str:
+    """The session notes a save stores: the session's own note first (the
+    accessory session writes why it was chosen, so an upper-body day that
+    could confound the interscapular reading says so in the record), then
+    what the athlete typed, on its own line. Either may be empty."""
+    notes = (plan_note or "").strip()
+    if (typed or "").strip():
+        notes = f"{notes}\n{typed.strip()}".strip()
+    return notes
+
+
 def session_au(rpe: int | float, minutes: int | float) -> float:
     """Foster's session load: the athlete's rating x minutes. The save's
     preview uses the CHOSEN rating (inventory fault F16: it read RPE 5)."""

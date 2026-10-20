@@ -8,9 +8,10 @@
 // - With no access key saved, the first-open screen shows instead (screens/Welcome.tsx).
 // - Today and its three detail screens (/readiness, /sleep, /strain) share the day shown
 //   (lib/day.ts); Check-in is a sheet over Today; the page behind keeps its own colour.
-// - Training shows today's session before Start, the guided flow while it runs and the save
-//   at its end (screens/TrainingTab.tsx). While a session runs, the tab bar hides and an app
-//   update waits; a session left open (a reload, an app kill) opens again at the next start.
+// - Training shows the week and today's session before Start, the guided flow while it runs
+//   and the save at its end (screens/TrainingTab.tsx); its "+" menu's screens have their own
+//   addresses under /training/. While a session runs, the tab bar hides and an app update
+//   waits; a session left open (a reload, an app kill) opens again at the next start.
 // - The outbox sends what waits whenever the app is open (lib/outbox.ts).
 // - Insights still shows the design's sample numbers (Phase 8), and says so.
 //
@@ -55,6 +56,7 @@ const TABS: { key: Tab; path: string; icon: () => ReactElement }[] = [
 /** The tab an address belongs to: the detail screens are Today's. */
 export function tabOf(location: string): Tab {
   if (['/readiness', '/sleep', '/strain'].includes(location)) return 'today'
+  if (location.startsWith('/training/')) return 'training'
   return TABS.find((t) => t.path === location)?.key ?? 'today'
 }
 
@@ -155,6 +157,10 @@ function Shell(p: ShellProps) {
               <Route path="/sleep"><SleepScreen /></Route>
               <Route path="/strain"><StrainScreen /></Route>
               <Route path="/training"><TrainingTab /></Route>
+              <Route path="/training/yoga"><TrainingTab extra="yoga" /></Route>
+              <Route path="/training/yoga/:slug">{(params) => <TrainingTab extra="yoga" slug={params.slug} />}</Route>
+              <Route path="/training/outdoor"><TrainingTab extra="outdoor" /></Route>
+              <Route path="/training/accessory"><TrainingTab extra="accessory" /></Route>
               <Route path="/insights">
                 <Insights mock={MOCK} reduced={p.reduced} />
               </Route>
