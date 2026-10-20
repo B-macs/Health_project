@@ -3,7 +3,7 @@
 // tokens.ts is the one place colours and sizes are written. The files are read through
 // Vite's own loader (?raw), so the test needs no Node types.
 import { describe, expect, it } from 'vitest'
-import stylesheet from '../bakeoff/bakeoff.css?raw'
+import stylesheet from '../ui/app.css?raw'
 
 const COLOUR = /#[0-9a-fA-F]{3,8}\b|\brgba?\(|\bhsla?\(/
 

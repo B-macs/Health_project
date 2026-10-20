@@ -92,3 +92,10 @@ source again before relying on one (rebuild rule 10).
 - **The store's config rows the engine reads:** `background_writer` (absent = "streamlit"), `engine_sync_status` (the engine's last sync run), `oura_login_state` (a login in progress), `strength_reference` (the Strength screen's personal reference; written by `scripts/upload_strength_reference.py --apply`).
 - **FastAPI wraps an included router** (`_IncludedRouter`), so `app.routes` lists five entries; read the contract (`create_app(...).openapi()["paths"]`) to see the routes.
 
+## Phase 3 (2026-10-19 and 20)
+- **No new package.** Atkinson Hyperlegible Next (`@fontsource-variable/atkinson-hyperlegible-next` 5.3.0, Lauscher's) was added for direction C and removed with it.
+- **The preview**: `pnpm exec wrangler versions upload --preview-alias design` (in worker/) uploads a Worker VERSION with the app's files; it answers at `https://design-health.<account subdomain>.workers.dev`, and the production version is untouched (`wrangler versions deploy` would change that).
+- **Report pictures**: Microsoft Edge (already on the PC) headless — `msedge --headless=new --screenshot=<file> --window-size=… --force-device-scale-factor=2 --virtual-time-budget=4000 <url>`. Two traps: a headless window is never narrower than about 485 px, so the app goes in an exact 390 × 844 iframe and the picture is cropped; and the launcher returns before the browser writes the file, so the script waits for it. The app's `&still` address switch turns motion off for the pictures.
+- **Node 24 runs `app/scripts/make-mock.ts` directly** (type stripping); the script uses no TypeScript-only syntax. `--check` compares instead of writing (the p3 gate's real_data_in_app).
+- **Contrast** is a test, not a promise: `app/src/design/tokens.test.ts` checks every family's strongest shade at 4.5:1 and its middle shade at 3:1 on the page and on a card, in both modes.
+

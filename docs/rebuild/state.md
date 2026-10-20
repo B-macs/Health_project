@@ -4,18 +4,17 @@
 
 
 ## Now
-**Phase 3 — Design bake-off: the owner's design is on the preview address, 2026-10-19 evening.** He asked for the designs that evening (*"While we are here provide the UI Designs and ill decide one of them"*). Three directions were built on seeded mock data and shown (A Calm: the Oura look; B Board: the Whoop board; C Logbook: the research's warm-paper page, `docs/rebuild/design_research.md`). He chose none: *"None of those, make it more slick like oura style"*. One Oura-style design replaced them (never committed; this file and the report record them): a night sky whose glow takes today's readiness colour, glass cards, thin light numbers, three glowing score rings in a row, contributor bars, a white pill button; light mode the same in the morning. It runs as a Worker VERSION under the preview alias `design` (`wrangler versions upload --preview-alias design`); the production version is untouched. **Waiting for his yes or his changes**, then PROMPT 2 (design.md, the p3 counters, the report) and Phase 4.
+**Phase 3 — Design bake-off: signed off 2026-10-20 under the owner's standing instruction.** His choice, recorded in `docs/rebuild/design.md`: *"I pick week for everything but training, where I pick cards for training"*. The app (`app/src/`) is Week's Today, Insights and frame with Cards' training screen, on seeded mock data, in the colour rule he set (one colour family per page: Today teal, Training amber, Insights indigo, Check-in and Settings slate). Gate: every p3 counter 0 (Python 5508, pnpm 49). Handoff: `handoff/p3_to_p4_summary.md`; screenshots in `handoff/p3_screens/`. History: archive.md.
 
-**Phase 2 — signed off 2026-10-19 under the owner's standing instruction** (*"I said auto sign off of phase 2 and onwards, untill all the steps are completed not just step 2"*): every later gate is signed off the same way and he reviews them in one batch (CLAUDE.md, gate protocol step 5). The gate read 🟠: every counter 0 but `streamlit_app_broken`, his own check of the hosted app, which stays open in his batch (P2-11 stays false). History: archive.md; handoff: `handoff/p2_to_p3_summary.md`.
+**Phase 2 — signed off 2026-10-19** under the same instruction; its hosted-app check stays open in his batch (P2-11).
 
 ## Waiting on the owner (his batch)
-1. **The hosted Streamlit app after the night's pushes** (Home, Training, Insights, Check-in; a day that already has a check-in opens filled in, and pain can go back to 0): owner_checks.json p2 `streamlit_app_opens`.
-2. **The Strength reference for the engine**: the store's config row `strength_reference` (recommended) or a secret; on a yes, `python scripts/upload_strength_reference.py --apply`. Until then the engine's Strength screen answers 409 strength_reference_missing; the Streamlit app is unaffected.
-3. **The Phase 3 design**: yes to the Oura-style preview, or what to change (open it from the Home Screen on the iPhone).
-4. Carried: the voice app's address (for `p1_to_p2`); removing `[voxplot_supabase]` from the health app's secrets; the image store on 2026-10-20 (455.5 MB of the 0.5 GiB free tonight; about 190 MB once the clean-up has run).
+1. **The hosted Streamlit app** (owner_checks.json p2 `streamlit_app_opens`): Home, Training, Insights, Check-in still work after the pushes; a day that already has a check-in opens filled in, and pain can go back to 0.
+2. **The Strength reference for the engine**: the store's config row `strength_reference` (recommended) or a secret; on a yes, `python scripts/upload_strength_reference.py --apply`. Until then the engine's Strength screen answers 409 strength_reference_missing.
+3. Carried: the voice app's address (for `p1_to_p2`); removing `[voxplot_supabase]` from the health app's secrets; the image store (455.5 MB of the 0.5 GiB free on 2026-10-19, about 190 MB once the clean-up has run — check before the next engine deploy).
 
 ## Next
-- Phase 3 PROMPT 1: research, three directions (tokens + Today, the training screen mid-set, the Strength card, the tab bar) on seeded mock data, a preview address, the bake-off report. Then his pick, PROMPT 2 (gate), and Phase 4.
+- Phase 4 — iPhone app shell (offline PWA), from the Notion prompt set, on the chosen design.
 
 ## The owner's decisions, 2026-10-19 (after the cost estimate)
 - **The new app syncs ONCE A DAY, at the first app open in the morning** — not every 2 hours (*"that is enough"*). This sets the engine's sync design for Phase 2 and Phase 9; the Streamlit app keeps its own 2-hourly-on-open cadence until the switch-over (recommended, and he asked for no change there). **When last night's data is still missing after that first sync, a later open syncs again, at most once an hour, until last night is in** (*"Retry the sync"*, 2026-10-19) — otherwise a morning opened before the ring has reached Oura stays empty until the next day.

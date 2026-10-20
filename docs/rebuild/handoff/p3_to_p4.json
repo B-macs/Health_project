@@ -1,0 +1,35 @@
+{
+  "from_phase": "P3",
+  "to_phase": "P4",
+  "written": "2026-10-20",
+  "verdict": "Every p3 counter is 0. Signed off under the owner's standing instruction (2026-10-19).",
+  "owner_choice": "I pick week for everything but training, where I pick cards for training",
+  "design": "docs/rebuild/design.md",
+  "screenshots": "docs/rebuild/handoff/p3_screens/ (today, training, insights, settings; dark and light; made-up numbers)",
+  "what_exists": {
+    "app": "app/src: design/ (tokens.ts, theme.ts and their tests), ui/ (parts, icons, hooks, app.css), screens/ (Today, Training, Insights, Settings), App.tsx (the frame and the tab bar), strings.ts (every word), mock/ (seeded data and its generator)",
+    "colour_rule": "one colour family per page: Today teal, Training amber, Insights indigo, Check-in and Settings slate; a status is a word",
+    "preview": "a Worker version under the preview alias 'design' (production untouched)",
+    "gate_counters": "scripts/rebuild_gate.py p3: choice_missing, tokens_unused, real_data_in_app, text_rule_violations, test_failures",
+    "tests": "Python 5508 passed, 1 skipped; app 34 and Worker 15 Vitest tests"
+  },
+  "pinned_versions": "unchanged (docs/rebuild/stack.md); no new package",
+  "owner_decisions": [
+    "None of those, make it more slick like oura style (2026-10-19)",
+    "One colour family per page, in its shades (2026-10-19)",
+    "Week for everything but training; Cards for training (2026-10-20)",
+    "Standing: every rebuild gate is signed off in advance from Phase 2 on; stop only for his own steps"
+  ],
+  "open_items": [
+    "Not designed yet: the Check-in screen, the detail screens (readiness, sleep, strain), the sheet (its rule is in design.md), warnings (page colour, no new colour).",
+    "The app still shows the seeded mock; Phase 4 builds the offline shell around it and Phase 5 connects Today and the check-in to the engine.",
+    "Carried from Phase 2: the hosted-app check, the Strength reference, the voice app's address, [voxplot_supabase] out of the secrets, the image store size before the next engine deploy."
+  ],
+  "next_phase_may_rely_on": [
+    "design.md is the design: build every new screen from its tokens and components, in the page's colour family.",
+    "No component writes a colour or a size; tokens.ts holds them and the p3 counter tokens_unused checks it.",
+    "Every word is in app/src/strings.ts and passes the text scans.",
+    "The page shape: one inner scroller, the tab bar docked below, safe areas, dark mode following the iPhone, 1rem following the iPhone text size.",
+    "The training screen hides the tab bar and keeps the screen on (Wake Lock)."
+  ]
+}

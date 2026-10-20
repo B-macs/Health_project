@@ -1,22 +1,21 @@
-// The bridge from tokens.ts to CSS: a style and one mode become the custom properties
-// every stylesheet rule reads (the stylesheet never writes a colour or a size of its
-// own). All four colour families are written as --teal-1 ... --slate-soft; the page's
-// class (.fam-teal and so on) picks one as --f1, --f2, --f3, --f-glow and --f-soft.
-// The mode is the iPhone's own setting unless the owner picks one.
+// The bridge from tokens.ts to CSS: the design and one mode become the custom
+// properties every stylesheet rule reads (the stylesheet never writes a colour or a size
+// of its own). All four colour families are written as --teal-1 ... --slate-soft; the
+// page's class (.fam-teal and so on) picks one as --f1, --f2, --f3, --f-glow and
+// --f-soft. The mode is the iPhone's own setting unless the owner picks one.
 import { useEffect, useState } from 'react'
-import { FAMILIES, NEUTRALS, type FamilyId, type Mode, type Style } from './tokens'
+import { DESIGN, FAMILIES, NEUTRALS, type FamilyId, type Family, type Mode } from './tokens'
 
 export type ThemePref = 'auto' | Mode
 
-export function cssVars(s: Style, mode: Mode, reduced: boolean): Record<string, string> {
-  const n = { ...NEUTRALS[mode], ...(s.neutrals?.[mode] ?? {}) }
+export function cssVars(mode: Mode, reduced: boolean): Record<string, string> {
+  const n = NEUTRALS[mode]
+  const d = DESIGN
   const vars: Record<string, string> = {
     '--bg': n.bg,
-    '--solid': n.solid,
     '--glass': n.glass,
     '--glass-strong': n.glassStrong,
     '--glass-line': n.glassLine,
-    '--line': n.line,
     '--text': n.text,
     '--muted': n.muted,
     '--faint': n.faint,
@@ -25,49 +24,47 @@ export function cssVars(s: Style, mode: Mode, reduced: boolean): Record<string, 
     '--track': n.track,
     '--tab-bar': n.tabBar,
     '--shadow': n.shadow,
-    '--font-body': s.fontBody,
-    '--font-number': s.fontNumber,
-    '--w-hero': String(s.weightHero),
-    '--w-number': String(s.weightNumber),
-    '--w-title': String(s.weightTitle),
-    '--w-label': String(s.weightLabel),
-    '--number-tracking': s.numberTracking,
-    '--fs-caption': s.type.caption,
-    '--fs-small': s.type.small,
-    '--fs-body': s.type.body,
-    '--fs-title': s.type.title,
-    '--fs-display': s.type.display,
-    '--fs-score': s.type.score,
-    '--fs-hero': s.type.hero,
-    '--fs-timer': s.type.timer,
-    '--sp-xs': s.space.xs,
-    '--sp-s': s.space.s,
-    '--sp-m': s.space.m,
-    '--sp-l': s.space.l,
-    '--sp-xl': s.space.xl,
-    '--r-card': s.radius.card,
-    '--r-tile': s.radius.tile,
-    '--r-pill': s.radius.pill,
-    '--hair': s.line.hair,
-    '--ring-w': s.line.ring,
-    '--timer-ring-w': s.line.timerRing,
-    '--bar': s.line.bar,
-    '--icon-stroke': s.line.icon,
-    '--tap': s.size.tap,
-    '--gym': s.size.gym,
-    '--icon': s.size.icon,
-    '--bubble': s.size.bubble,
-    '--hero-ring': s.size.heroRing,
-    '--timer-ring': s.size.timerRing,
-    '--sky': s.size.sky,
-    '--content': s.size.content,
-    '--blur': s.size.blur,
-    '--glow': s.size.glow,
-    '--quick': reduced ? '0ms' : s.motion.quick,
-    '--slow': reduced ? '0ms' : s.motion.slow,
-    '--ease': s.motion.easing,
+    '--font-body': d.fontBody,
+    '--font-number': d.fontNumber,
+    '--w-hero': String(d.weightHero),
+    '--w-number': String(d.weightNumber),
+    '--w-title': String(d.weightTitle),
+    '--w-label': String(d.weightLabel),
+    '--number-tracking': d.numberTracking,
+    '--fs-caption': d.type.caption,
+    '--fs-small': d.type.small,
+    '--fs-body': d.type.body,
+    '--fs-title': d.type.title,
+    '--fs-display': d.type.display,
+    '--fs-score': d.type.score,
+    '--fs-hero': d.type.hero,
+    '--fs-timer': d.type.timer,
+    '--sp-xs': d.space.xs,
+    '--sp-s': d.space.s,
+    '--sp-m': d.space.m,
+    '--sp-l': d.space.l,
+    '--sp-xl': d.space.xl,
+    '--r-card': d.radius.card,
+    '--r-tile': d.radius.tile,
+    '--r-pill': d.radius.pill,
+    '--hair': d.line.hair,
+    '--ring-w': d.line.ring,
+    '--bar': d.line.bar,
+    '--timer-bar': d.line.timerBar,
+    '--icon-stroke': d.line.icon,
+    '--tap': d.size.tap,
+    '--gym': d.size.gym,
+    '--icon': d.size.icon,
+    '--ready-ring': d.size.readyRing,
+    '--sky': d.size.sky,
+    '--content': d.size.content,
+    '--blur': d.size.blur,
+    '--glow': d.size.glow,
+    '--quick': reduced ? '0ms' : d.motion.quick,
+    '--slow': reduced ? '0ms' : d.motion.slow,
+    '--ease': d.motion.easing,
   }
-  for (const [id, f] of Object.entries(FAMILIES[mode]) as [FamilyId, (typeof FAMILIES)[Mode][FamilyId]][]) {
+  for (const [id, f] of Object.entries(FAMILIES[mode]) as [FamilyId, Family][]) {
     vars[`--${id}-1`] = f.f1
     vars[`--${id}-2`] = f.f2
     vars[`--${id}-3`] = f.f3
@@ -75,11 +72,6 @@ export function cssVars(s: Style, mode: Mode, reduced: boolean): Record<string, 
     vars[`--${id}-soft`] = f.soft
   }
   return vars
-}
-
-/** The classes that tell the stylesheet how this style draws the shared screens. */
-export function lookClasses(s: Style): string {
-  return `style-${s.id} layout-${s.look.layout} sky-${s.look.sky}`
 }
 
 function systemMode(): Mode {

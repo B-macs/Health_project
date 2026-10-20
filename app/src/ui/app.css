@@ -1,0 +1,858 @@
+/* The app's one stylesheet (rebuild Phase 3, the owner's design: Week's Today,
+ * Insights and frame, Cards' training screen; docs/rebuild/design.md).
+ *
+ * Every colour, size, corner, line and timing is a var() from design/tokens.ts (theme.ts
+ * writes them on .app). Plain numbers here are ratios, opacities, z-indexes, angles and
+ * percentages, not sizes.
+ *
+ * THE COLOUR RULE (the owner, 2026-10-19): each page has ONE colour family. The app's
+ * root carries the page's .fam-* class, which picks --f1 (strongest), --f2 (middle),
+ * --f3 (faintest), --f-glow and --f-soft from the four families. Nothing below names a
+ * hue: a rule draws in the family's shades or in the neutrals.
+ *
+ * Page shape (Lauscher's): html and body never scroll; one inner scroller fills a
+ * 100dvh column and the tab bar docks below it, so iOS never misplaces a fixed bar. */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 17px;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 1rem follows the iPhone's own text size (Settings > Display & Brightness > Text Size). */
+@supports (font: -apple-system-body) {
+  html {
+    font: -apple-system-body;
+  }
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-align: inherit;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+h1,
+h2,
+p,
+ol,
+ul,
+figure {
+  margin: 0;
+}
+
+ol,
+ul {
+  padding: 0;
+  list-style: none;
+}
+
+/* ── The page's colour family ────────────────────────────────────────────────────── */
+
+.fam-teal {
+  --f1: var(--teal-1);
+  --f2: var(--teal-2);
+  --f3: var(--teal-3);
+  --f-glow: var(--teal-glow);
+  --f-soft: var(--teal-soft);
+}
+
+.fam-amber {
+  --f1: var(--amber-1);
+  --f2: var(--amber-2);
+  --f3: var(--amber-3);
+  --f-glow: var(--amber-glow);
+  --f-soft: var(--amber-soft);
+}
+
+.fam-indigo {
+  --f1: var(--indigo-1);
+  --f2: var(--indigo-2);
+  --f3: var(--indigo-3);
+  --f-glow: var(--indigo-glow);
+  --f-soft: var(--indigo-soft);
+}
+
+.fam-slate {
+  --f1: var(--slate-1);
+  --f2: var(--slate-2);
+  --f3: var(--slate-3);
+  --f-glow: var(--slate-glow);
+  --f-soft: var(--slate-soft);
+}
+
+/* ── The frame ───────────────────────────────────────────────────────────────────── */
+
+.app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: 1.4;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.scroller {
+  flex: 1;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-top: env(safe-area-inset-top);
+}
+
+.app--session .scroller {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.screen {
+  position: relative;
+  max-width: var(--content);
+  margin: 0 auto;
+  padding: var(--sp-s) max(var(--sp-m), env(safe-area-inset-right)) var(--sp-xl)
+    max(var(--sp-m), env(safe-area-inset-left));
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+}
+
+.screen > :not(.sky) {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── The light at the top of each page ───────────────────────────────────────────── */
+
+.sky {
+  position: absolute;
+  z-index: 0;
+  top: calc(-1 * env(safe-area-inset-top));
+  left: 50%;
+  width: 100vw;
+  height: var(--sky);
+  transform: translateX(-50%);
+  pointer-events: none;
+  background:
+    radial-gradient(60% 55% at 50% 4%, var(--f-glow) 0%, transparent 72%),
+    radial-gradient(50% 45% at 10% 0%, var(--f-soft) 0%, transparent 70%),
+    radial-gradient(50% 45% at 92% 0%, var(--f-soft) 0%, transparent 70%);
+  -webkit-mask-image: linear-gradient(to bottom, black 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 45%, transparent 100%);
+  transition: opacity var(--slow) var(--ease);
+}
+
+.sky--quiet {
+  opacity: 0.6;
+}
+
+/* A morning that needs care is a dimmer morning: the same colour, less light. */
+.today.tone-fair .sky {
+  opacity: 0.78;
+}
+
+.today.tone-low .sky {
+  opacity: 0.55;
+}
+
+.train--rest .sky {
+  opacity: 0.5;
+}
+
+/* ── Type ────────────────────────────────────────────────────────────────────────── */
+
+.num {
+  font-family: var(--font-number);
+  font-weight: var(--w-number);
+  letter-spacing: var(--number-tracking);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.eyebrow {
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
+  color: var(--muted);
+}
+
+.caption {
+  font-size: var(--fs-caption);
+  color: var(--muted);
+}
+
+/* A status (Good, Fair, Pay attention) is a word in the page colour, never a hue of
+ * its own. */
+.word {
+  font-size: var(--fs-small);
+  font-weight: var(--w-title);
+  color: var(--f1);
+}
+
+/* ── Cards and controls ──────────────────────────────────────────────────────────── */
+
+.card {
+  border-radius: var(--r-card);
+  padding: var(--sp-m);
+  background: var(--glass);
+  border: var(--hair) solid var(--glass-line);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.4);
+  backdrop-filter: blur(var(--blur)) saturate(1.4);
+  box-shadow: 0 var(--sp-s) var(--sp-l) var(--shadow);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-s);
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-s);
+}
+
+.btn {
+  white-space: nowrap;
+  min-height: calc(var(--tap) + var(--sp-xs));
+  padding: 0 var(--sp-l);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-body);
+  font-weight: var(--w-title);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-s);
+  transition:
+    transform var(--quick) var(--ease),
+    opacity var(--quick) var(--ease);
+}
+
+.btn:active {
+  transform: scale(0.97);
+  opacity: 0.85;
+}
+
+.btn--primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn--glass {
+  background: var(--glass-strong);
+  border: var(--hair) solid var(--glass-line);
+  color: var(--text);
+  -webkit-backdrop-filter: blur(var(--blur));
+  backdrop-filter: blur(var(--blur));
+}
+
+.btn--wide {
+  width: 100%;
+}
+
+.btn--gym {
+  flex: 1;
+  min-height: var(--gym);
+  font-size: var(--fs-title);
+}
+
+.iconbtn {
+  width: var(--tap);
+  height: var(--tap);
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  color: var(--text);
+  background: var(--glass);
+  border: var(--hair) solid var(--glass-line);
+}
+
+.icon {
+  width: var(--icon);
+  height: var(--icon);
+  flex: none;
+  stroke-width: var(--icon-stroke);
+}
+
+.segmented {
+  display: flex;
+  gap: var(--sp-xs);
+  padding: var(--sp-xs);
+  border-radius: var(--r-pill);
+  background: var(--track);
+}
+
+.segmented__item {
+  flex: 1;
+  min-height: var(--tap);
+  border-radius: var(--r-pill);
+  color: var(--muted);
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
+  text-align: center;
+}
+
+.segmented__item--on {
+  background: var(--glass-strong);
+  color: var(--text);
+  box-shadow: 0 var(--sp-xs) var(--sp-s) var(--shadow);
+}
+
+/* ── Headers ─────────────────────────────────────────────────────────────────────── */
+
+.head {
+  padding-top: var(--sp-m);
+}
+
+.head__title {
+  font-size: var(--fs-display);
+  font-weight: var(--w-title);
+  letter-spacing: var(--number-tracking);
+}
+
+.topbar {
+  display: grid;
+  grid-template-columns: var(--tap) 1fr var(--tap);
+  align-items: center;
+  gap: var(--sp-s);
+  padding-top: var(--sp-s);
+}
+
+.topbar__title {
+  text-align: center;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.topbar__note {
+  font-size: var(--fs-caption);
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.2;
+}
+
+/* ── Rings ───────────────────────────────────────────────────────────────────────── */
+
+.ring {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+}
+
+.ring svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.ring__track {
+  fill: none;
+  stroke: var(--track);
+  stroke-width: var(--ring-w);
+}
+
+.ring__value {
+  fill: none;
+  stroke-width: var(--ring-w);
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 calc(var(--glow) / 2) var(--f-glow));
+  transition: stroke-dasharray var(--slow) var(--ease);
+}
+
+.ring__center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.app--light .ring__value {
+  filter: none;
+}
+
+/* ── Today: the week strip ───────────────────────────────────────────────────────── */
+
+.weekstrip {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--sp-xs);
+}
+
+.weekstrip__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-xs);
+  padding: var(--sp-s) 0;
+  border-radius: var(--r-tile);
+  color: var(--muted);
+  transition: background-color var(--quick) var(--ease);
+}
+
+.weekstrip__day--on {
+  background: var(--f-soft);
+  color: var(--text);
+}
+
+.weekstrip__letter {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-label);
+}
+
+.ring--day {
+  width: calc(var(--tap) * 0.9);
+  height: calc(var(--tap) * 0.9);
+}
+
+.ring--day .ring__track,
+.ring--day .ring__value {
+  stroke-width: calc(var(--ring-w) * 1.4);
+}
+
+.weekstrip__date {
+  font-size: var(--fs-small);
+}
+
+/* ── Today: readiness, sleep and strain ──────────────────────────────────────────── */
+
+.ready {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-m);
+}
+
+.ring--ready {
+  width: var(--ready-ring);
+  height: var(--ready-ring);
+}
+
+.ready__value {
+  font-size: var(--fs-score);
+}
+
+.ready__text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  min-width: 0;
+}
+
+.ready__line {
+  line-height: 1.3;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  border-radius: var(--r-tile);
+}
+
+.tile__value {
+  font-size: var(--fs-hero);
+  font-weight: var(--w-hero);
+}
+
+/* A long number (kilograms) takes the smaller size, so it stays on one line. */
+.tile__value--long {
+  font-size: var(--fs-display);
+  white-space: nowrap;
+}
+
+/* ── Today: the plan as a timeline ───────────────────────────────────────────────── */
+
+.plan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+}
+
+.plan__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: var(--sp-m);
+}
+
+.plan__title {
+  font-size: var(--fs-title);
+  font-weight: var(--w-title);
+}
+
+.plan__meta {
+  font-size: var(--fs-caption);
+  color: var(--muted);
+  text-align: right;
+}
+
+.timeline {
+  display: flex;
+  flex-direction: column;
+}
+
+.timeline__item {
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--sp-l) 1fr;
+  grid-template-areas:
+    'dot name'
+    'dot dose';
+  column-gap: var(--sp-s);
+  padding: var(--sp-s) 0;
+}
+
+/* The line runs through every dot but stops at the first and the last. */
+.timeline__item::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--sp-l) / 2 - var(--hair) / 2);
+  top: 0;
+  bottom: 0;
+  width: var(--hair);
+  background: var(--f3);
+}
+
+.timeline__item:first-child::before {
+  top: 50%;
+}
+
+.timeline__item:last-child::before {
+  bottom: 50%;
+}
+
+.timeline__dot {
+  grid-area: dot;
+  align-self: center;
+  justify-self: center;
+  position: relative;
+  width: var(--sp-s);
+  height: var(--sp-s);
+  border-radius: var(--r-pill);
+  background: var(--f1);
+  box-shadow: 0 0 var(--glow) var(--f-glow);
+}
+
+.timeline__item--warmup .timeline__dot {
+  background: var(--bg);
+  border: var(--hair) solid var(--f1);
+  box-shadow: none;
+}
+
+.timeline__name {
+  grid-area: name;
+}
+
+.timeline__dose {
+  grid-area: dose;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+/* ── Training: the exercise, its set tracker, the timer ──────────────────────────── */
+
+.exercise {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+}
+
+.exercise__name {
+  font-size: var(--fs-display);
+  font-weight: var(--w-title);
+  letter-spacing: var(--number-tracking);
+}
+
+.tracker {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--sp-xs);
+}
+
+.tracker__chip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-xs);
+  padding: var(--sp-s) 0;
+  border-radius: var(--r-tile);
+  background: var(--track);
+  color: var(--faint);
+}
+
+.tracker__chip--done {
+  background: var(--f-soft);
+  color: var(--f1);
+}
+
+.tracker__chip--now {
+  background: var(--f1);
+  color: var(--on-accent);
+  box-shadow: 0 0 var(--glow) var(--f-glow);
+}
+
+.tracker__set {
+  font-size: var(--fs-caption);
+  font-weight: var(--w-title);
+}
+
+.tracker__side {
+  display: grid;
+  place-items: center;
+  min-height: var(--icon);
+  font-size: var(--fs-caption);
+}
+
+.timer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-s);
+  padding: var(--sp-m) 0;
+}
+
+.timer__word {
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
+  color: var(--f1);
+}
+
+.train--rest .timer__word {
+  color: var(--muted);
+}
+
+.timer__digits {
+  font-size: var(--fs-timer);
+  font-weight: var(--w-hero);
+}
+
+.timer__bar {
+  align-self: stretch;
+  height: var(--timer-bar);
+  border-radius: var(--r-pill);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.timer__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--f2), var(--f1));
+  transition: width var(--quick) linear;
+}
+
+.train--rest .timer__fill {
+  background: var(--f3);
+}
+
+.controls {
+  display: flex;
+  gap: var(--sp-s);
+}
+
+.next {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.next__main {
+  font-size: var(--fs-title);
+  font-weight: var(--w-title);
+}
+
+.next__then {
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+/* ── Insights: charts and bars in the page's shades ──────────────────────────────── */
+
+.area {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.area__line {
+  fill: none;
+  stroke: var(--f1);
+  stroke-width: calc(var(--icon-stroke) * 1.3);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.area__fade-top {
+  stop-opacity: 0.32;
+}
+
+.area__fade-bottom {
+  stop-opacity: 0;
+}
+
+.area__dot {
+  fill: var(--f1);
+  filter: drop-shadow(0 0 calc(var(--glow) / 2) var(--f-glow));
+}
+
+.daybars {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: var(--sp-s);
+  height: calc(var(--tap) * 1.7);
+}
+
+.daybars__col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-xs);
+  min-height: 0;
+}
+
+.daybars__slot {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.daybars__bar {
+  display: block;
+  width: 70%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(to top, var(--f3), var(--f1));
+}
+
+.daybars__rest {
+  width: var(--sp-xs);
+  height: var(--sp-xs);
+  border-radius: var(--r-pill);
+  background: var(--track);
+}
+
+.daybars__day {
+  font-size: var(--fs-caption);
+  color: var(--faint);
+}
+
+.contrib {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  padding: var(--sp-s) 0;
+}
+
+.contrib__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.contrib__value {
+  font-size: var(--fs-title);
+}
+
+.contrib__track {
+  height: var(--bar);
+  border-radius: var(--r-pill);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.contrib__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--f2), var(--f1));
+  transition: width var(--slow) var(--ease);
+}
+
+.contrib__note {
+  font-size: var(--fs-caption);
+  color: var(--muted);
+}
+
+/* ── The tab bar ─────────────────────────────────────────────────────────────────── */
+
+.tabbar {
+  flex: none;
+  padding: var(--sp-xs) var(--sp-s) calc(env(safe-area-inset-bottom) + var(--sp-xs));
+  background: var(--tab-bar);
+  border-top: var(--hair) solid var(--glass-line);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.6);
+  backdrop-filter: blur(var(--blur)) saturate(1.6);
+}
+
+.tabbar__inner {
+  max-width: var(--content);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: var(--sp-xs);
+}
+
+.tab {
+  min-height: var(--tap);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-xs);
+  border-radius: var(--r-pill);
+  color: var(--faint);
+  font-size: var(--fs-caption);
+  font-weight: var(--w-label);
+  transition: color var(--quick) var(--ease);
+}
+
+.tab--on {
+  color: var(--text);
+}
+
+.tab--on .icon {
+  color: var(--f1);
+  filter: drop-shadow(0 0 calc(var(--glow) / 2) var(--f-glow));
+}
+
+/* ── Less motion: one rule, as in Lauscher ───────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .app *,
+  .app *::before,
+  .app *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition: none !important;
+  }
+}

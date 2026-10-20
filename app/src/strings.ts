@@ -1,76 +1,28 @@
 // Every word the app shows, in one place (CLAUDE.md, rebuild rule 9). The text
-// scanners in tests/ read this file: plain English, how before why, no hedging, and no
-// Stage 1 text. A screen file never writes a sentence of its own.
+// scanners in tests/ read this file (the p3 gate's text_rule_violations): plain English,
+// how before why, no hedging, and no Stage 1 text. A screen file never writes a
+// sentence of its own.
 
 export const S = {
   app: 'Health',
-  styles: {
-    pick: 'Pick a style',
-    lead: 'Four styles of the same screens. Each page keeps one colour: Today teal, Training amber, Insights indigo, Settings slate. Every number is made up.',
-    label: 'Style',
-    chip: (id: string) => `Style ${id}`,
-    names: { '1': 'Glow', '2': 'Calm', '3': 'Cards', '4': 'Week' },
-    ideas: {
-      '1': 'A soft glow at the top, glass cards, three rings in a row.',
-      '2': 'The relaxed Oura look: one glowing number, a big greeting, plenty of space, the details one tap away.',
-      '3': 'Each score on its own card with its last seven days; a set tracker on the timer.',
-      '4': 'A week strip on top, tiles for the scores, and the session as a timeline.',
-    },
-    howTitle: 'How to test',
-    how: [
-      'Add this page to your Home Screen: tap Share, then Add to Home Screen.',
-      'Open each style and look at Today, Training and Insights.',
-      'On the Training tab, let the timer run and read it from 1.5 m away.',
-      'Then tell me 1, 2, 3 or 4, or which parts of each.',
-    ],
-  },
-  greeting: { morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening' },
-  calm: {
-    show: (n: number) => `See the ${n} exercises`,
-    hide: 'Hide the exercises',
-  },
-  cards: {
-    title: 'Today',
-    lastSeven: 'Last 7 days',
-    lastTwelve: 'Last 12 weeks',
-    set: (n: number) => `Set ${n}`,
-    side: { right: 'Right', left: 'Left' },
-  },
-  week: {
-    title: 'Today',
-    plan: 'The plan',
-    strip: 'The last seven days',
-    sets: 'This exercise',
-    done: 'Done',
-  },
   nav: { today: 'Today', checkin: 'Check-in', training: 'Training', insights: 'Insights', settings: 'Settings' },
   today: {
-    previousDay: 'Previous day',
-    nextDay: 'Next day',
+    title: 'Today',
+    strip: 'The last seven days',
     readiness: 'Readiness',
     sleep: 'Sleep',
     strain: 'Strain',
     soFar: 'So far today',
     outOf: (max: number) => `Out of ${max}`,
     asleep: (minutes: number) => `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min asleep`,
-    sleepClock: (minutes: number) => `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`,
     readinessLine: {
       good: 'Your body is ready. Train as planned.',
       fair: 'Train as planned, and take every rest in full.',
       low: 'Your body is still recovering. Today the load is lower.',
     },
-    vitals: 'Vitals',
-    hrv: 'HRV',
-    rhr: 'Resting heart rate',
-    rhrShort: 'Resting HR',
-    lastNight: 'Last night',
-    sevenDays: '7 days',
-    ms: 'ms',
-    bpm: 'bpm',
-    session: "Today's session",
+    plan: 'The plan',
     sessionMeta: (exercises: number, minutes: number) => `${exercises} exercises · about ${minutes} min`,
     start: 'Start session',
-    warmup: 'Warm-up',
   },
   dose: {
     reps: (sets: number, reps: number) => `${sets} × ${reps}`,
@@ -81,7 +33,9 @@ export const S = {
   training: {
     exerciseOf: (i: number, n: number) => `Exercise ${i} of ${n}`,
     setOf: (i: number, n: number) => `Set ${i} of ${n}`,
+    set: (n: number) => `Set ${n}`,
     side: { right: 'Right side', left: 'Left side' },
+    sideShort: { right: 'Right', left: 'Left' },
     hold: 'Hold',
     rest: 'Rest',
     ready: 'Ready',
@@ -118,14 +72,13 @@ export const S = {
     work: 'Work this week',
     workKg: (kg: number) => `${kg.toLocaleString('en-GB')} kg`,
     days: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
-    more: ['Body composition', 'Flexibility', 'Sleep stages', 'Long trends'],
   },
   settings: {
     title: 'Settings',
     appearance: 'Appearance',
     themes: { auto: 'Auto', light: 'Light', dark: 'Dark' },
     version: 'Version',
-    preview: 'This is a design preview. Every number is made up.',
+    preview: 'Every number is made up until the app is connected.',
   },
-  notInTest: 'This screen is not part of the design preview.',
+  notYet: 'This screen comes with the next phases.',
 } as const

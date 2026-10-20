@@ -116,12 +116,16 @@ def test_a_pull_waits_for_a_running_sync_and_the_page_never_does(copy_path):
 
 class SlowStore(FakeStore):
     """A pull that stops after reading the config table until `go` is set,
-    so a write can land between the pull's read and the copy's replacement."""
+    so a write can land between the pull's read and the copy's replacement.
+    `wrote` is set when a write reaches the store, so the test waits for the
+    event itself rather than for a fixed time (a 0.2 s sleep failed under a
+    loaded machine on 2026-10-20 while the behaviour was right)."""
 
     def __init__(self, tables=None):
         super().__init__(tables)
         self.config_read = threading.Event()
         self.go = threading.Event()
+        self.wrote = threading.Event()
 
     def select_all(self, table, order=""):
         rows = super().select_all(table, order)
@@ -129,6 +133,11 @@ class SlowStore(FakeStore):
             self.config_read.set()
             self.go.wait(timeout=10)
         return rows
+
+    def upsert(self, table, rows):
+        out = super().upsert(table, rows)
+        self.wrote.set()
+        return out
 
 
 def test_a_row_written_while_a_pull_runs_is_never_lost(copy_path):
@@ -140,8 +149,9 @@ def test_a_row_written_while_a_pull_runs_is_never_lost(copy_path):
     assert store.config_read.wait(timeout=10), "the pull read the config table"
     writer = threading.Thread(target=repo.set_config, args=("during", "the pull"))
     writer.start()
-    time.sleep(0.2)                     # the write reached Supabase; its copy write waits
+    assert store.wrote.wait(timeout=10), "the write reached Supabase"
     assert any(r["key"] == "during" for r in store.tables["config"])
+    time.sleep(0.05)                    # its copy write now waits on the pull's lock
     store.go.set()
     puller.join(timeout=10)
     writer.join(timeout=10)

@@ -10,24 +10,18 @@ export type Shade = 'main' | 'rest'
 const R = 45
 const C = 2 * Math.PI * R
 
-function stops(shade: Shade): [string, string] {
-  return shade === 'rest' ? ['var(--f3)', 'var(--f3)'] : ['var(--f1)', 'var(--f2)']
-}
-
-/** A glowing ring, as on Oura's Today: the value sweeps clockwise from the top. */
+/** A glowing score ring: the value sweeps clockwise from the top. */
 export function Ring(props: {
   shade?: Shade
   fraction: number
   reduced: boolean
   label: string
   className: string
-  head?: boolean
   children: ReactNode
 }) {
   const id = useId()
   const shown = useGrow(Math.max(0, Math.min(1, props.fraction)), props.reduced)
-  const [from, to] = stops(props.shade ?? 'main')
-  const angle = (shown * 360 - 90) * (Math.PI / 180)
+  const [from, to] = props.shade === 'rest' ? ['var(--f3)', 'var(--f3)'] : ['var(--f1)', 'var(--f2)']
   return (
     <div className={`ring ${props.className}`} role="img" aria-label={props.label}>
       <svg viewBox="0 0 100 100" aria-hidden="true">
@@ -40,58 +34,8 @@ export function Ring(props: {
         <circle className="ring__track" cx="50" cy="50" r={R} />
         <circle className="ring__value" cx="50" cy="50" r={R} stroke={`url(#${id})`}
           strokeDasharray={`${C * shown} ${C}`} transform="rotate(-90 50 50)" />
-        {props.head && shown > 0.01 && (
-          <circle className="ring__head" cx={50 + R * Math.cos(angle)} cy={50 + R * Math.sin(angle)} r="2.6" />
-        )}
       </svg>
       <div className="ring__center">{props.children}</div>
-    </div>
-  )
-}
-
-/** A soft glowing orb (style 2, Calm): the page colour as light, the value as a hairline
- *  arc around it, the number in the middle. */
-export function Orb(props: { fraction: number; reduced: boolean; label: string; className?: string; children: ReactNode }) {
-  const shown = useGrow(Math.max(0, Math.min(1, props.fraction)), props.reduced)
-  return (
-    <div className={`orb ${props.className ?? ''}`} role="img" aria-label={props.label}>
-      <div className="orb__light" aria-hidden="true" />
-      <svg viewBox="0 0 100 100" aria-hidden="true">
-        <circle className="orb__track" cx="50" cy="50" r={R} />
-        <circle className="orb__arc" cx="50" cy="50" r={R} strokeDasharray={`${C * shown} ${C}`}
-          transform="rotate(-90 50 50)" />
-      </svg>
-      <div className="orb__center">{props.children}</div>
-    </div>
-  )
-}
-
-const NARROW = new Intl.DateTimeFormat('en-GB', { weekday: 'narrow', timeZone: 'UTC' })
-export const narrowDay = (iso: string) => NARROW.format(new Date(`${iso}T00:00:00Z`))
-export const dayOfMonth = (iso: string) => String(Number(iso.slice(8, 10)))
-
-/** Bars over days or weeks (style 3, Cards): the selected one in the strongest shade,
- *  the others in the faintest. `floor` is where a bar starts, so small changes show. */
-export function TrendBars(props: {
-  values: readonly number[]
-  floor: number
-  max: number
-  selected: number
-  labels?: readonly string[]
-  label: string
-}) {
-  const span = props.max - props.floor || 1
-  return (
-    <div className="trend" role="img" aria-label={props.label}>
-      {props.values.map((v, i) => (
-        <div key={i} className="trend__col">
-          <div className="trend__slot">
-            <span className={`trend__bar${i === props.selected ? ' trend__bar--on' : ''}`}
-              style={{ height: `${Math.max(6, ((v - props.floor) / span) * 100)}%` }} />
-          </div>
-          {props.labels && <span className="trend__day">{props.labels[i]}</span>}
-        </div>
-      ))}
     </div>
   )
 }
@@ -112,8 +56,8 @@ function smooth(points: readonly (readonly [number, number])[]): string {
 }
 
 /** A soft area chart in the page colour: a smooth line, a fading fill, a glowing last
- *  point. `level` 1 draws in the strongest shade, 2 in the middle one. */
-export function AreaChart(props: { values: readonly number[]; level: 1 | 2; label: string; className?: string }) {
+ *  point. */
+export function AreaChart(props: { values: readonly number[]; label: string; className?: string }) {
   const id = useId()
   const lo = Math.min(...props.values)
   const hi = Math.max(...props.values)
@@ -122,13 +66,12 @@ export function AreaChart(props: { values: readonly number[]; level: 1 | 2; labe
   const points = props.values.map((v, i) => [(i / (n - 1)) * 96 + 2, 30 - ((v - lo) / span) * 24] as const)
   const line = smooth(points)
   const last = points[n - 1]
-  const colour = props.level === 1 ? 'var(--f1)' : 'var(--f2)'
   return (
-    <svg className={`area area--l${props.level} ${props.className ?? ''}`} viewBox="0 0 100 34" role="img" aria-label={props.label}>
+    <svg className={`area ${props.className ?? ''}`} viewBox="0 0 100 34" role="img" aria-label={props.label}>
       <defs>
         <linearGradient id={id} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" className="area__fade-top" style={{ stopColor: colour }} />
-          <stop offset="1" className="area__fade-bottom" style={{ stopColor: colour }} />
+          <stop offset="0" className="area__fade-top" style={{ stopColor: 'var(--f1)' }} />
+          <stop offset="1" className="area__fade-bottom" style={{ stopColor: 'var(--f1)' }} />
         </linearGradient>
       </defs>
       <path className="area__fill" d={`${line} L${last[0]},34 L${points[0][0]},34 Z`} fill={`url(#${id})`} />
@@ -177,11 +120,8 @@ export function Contributor(props: { name: string; value: string; fraction: numb
 }
 
 const LONG = new Intl.DateTimeFormat('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' })
-export const longDate = (iso: string) => LONG.format(new Date(`${iso}T00:00:00Z`))
-
-/** The greeting for the phone's own clock. */
-export function greetingKey(hour: number): 'morning' | 'afternoon' | 'evening' {
-  if (hour < 12) return 'morning'
-  if (hour < 18) return 'afternoon'
-  return 'evening'
-}
+const NARROW = new Intl.DateTimeFormat('en-GB', { weekday: 'narrow', timeZone: 'UTC' })
+const at = (iso: string) => new Date(`${iso}T00:00:00Z`)
+export const longDate = (iso: string) => LONG.format(at(iso))
+export const narrowDay = (iso: string) => NARROW.format(at(iso))
+export const dayOfMonth = (iso: string) => String(Number(iso.slice(8, 10)))

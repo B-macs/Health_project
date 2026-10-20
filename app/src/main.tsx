@@ -1,10 +1,10 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import './bakeoff/bakeoff.css'
-import { BakeOff } from './bakeoff/BakeOff'
+import './ui/app.css'
+import { App } from './App'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <BakeOff />
+    <App />
   </StrictMode>,
 )
