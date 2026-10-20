@@ -1,5 +1,5 @@
 {
-  "phase": "P5",
+  "phase": "P6",
   "tasks": [
     {
       "id": "P0-01",
@@ -554,6 +554,96 @@
       "description": "The owner's two mornings: the new app beside the Streamlit app, the scores and the night equal; on the second morning the check-in in the new app shows in the Streamlit app.",
       "depends_on": [
         "P5-07"
+      ],
+      "gate": "device_checklist_open",
+      "passes": false
+    },
+    {
+      "id": "P6-01",
+      "phase": "P6",
+      "description": "The session lives on the phone: GET /api/training/session downloads it whole at Start (every exercise as dosed today, its seeded numbers and captions, the pre-walked flow with the timer-start marks and the bells), the ids are minted once, and it is kept in the session table across a reload, an app kill and an app update; no network until Save.",
+      "depends_on": [],
+      "gate": "test_failures",
+      "passes": true
+    },
+    {
+      "id": "P6-02",
+      "phase": "P6",
+      "description": "Every training-session row of the inventory marked KEEP (T37-T102) is built and tested: the overview before Start, the guided flow and the save (docs/rebuild/app_rows.json).",
+      "depends_on": [
+        "P6-01"
+      ],
+      "gate": "inventory_rows_open",
+      "passes": false
+    },
+    {
+      "id": "P6-03",
+      "phase": "P6",
+      "description": "No training or safety rule in app/src: the rule for when a timer starts by itself moved from the Training page into services/guided_flow.py (hold_starts_next, the walk's timer_starts), and the page asks it too.",
+      "depends_on": [
+        "P6-01"
+      ],
+      "gate": "rule_in_typescript",
+      "passes": true
+    },
+    {
+      "id": "P6-04",
+      "phase": "P6",
+      "description": "Timers run on timestamps: after a simulated background no timer is off by over 1 s; a timer that ended while hidden says when it ended.",
+      "depends_on": [
+        "P6-01"
+      ],
+      "gate": "timer_drift",
+      "passes": true
+    },
+    {
+      "id": "P6-05",
+      "phase": "P6",
+      "description": "One idempotent save through the outbox with the ids minted at Start: the engine's three sends store one session, and the phone sends the same ids again after a lost answer.",
+      "depends_on": [
+        "P6-01"
+      ],
+      "gate": "duplicate_sessions",
+      "passes": true
+    },
+    {
+      "id": "P6-06",
+      "phase": "P6",
+      "description": "The save carries every field the Streamlit save writes: the raw facts of each set, its time with the UTC offset, the rest's clock readings, the walk's Garmin minutes.",
+      "depends_on": [
+        "P6-05"
+      ],
+      "gate": "fields_missing",
+      "passes": true
+    },
+    {
+      "id": "P6-07",
+      "phase": "P6",
+      "description": "A warning shows only on an exercise the engine sent one for (Key Rule 20).",
+      "depends_on": [
+        "P6-02"
+      ],
+      "gate": "warning_shown_when_not_due",
+      "passes": true
+    },
+    {
+      "id": "P6-08",
+      "phase": "P6",
+      "description": "Every screen word passes the jargon, hedge and Stage 1 scans.",
+      "depends_on": [
+        "P6-02"
+      ],
+      "gate": "text_rule_violations",
+      "passes": true
+    },
+    {
+      "id": "P6-09",
+      "phase": "P6",
+      "description": "The owner's real gym session in the new app: airplane mode for two exercises, a locked phone during a rest, the timer read from 1.5 m, the bells with the silent switch on, the screen on, saved once (scripts/session_field_check.py).",
+      "depends_on": [
+        "P6-02",
+        "P6-05",
+        "P6-06"
       ],
       "gate": "device_checklist_open",
       "passes": false

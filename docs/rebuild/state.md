@@ -4,6 +4,8 @@
 
 
 ## Now
+**Phase 6 — the training session: built 2026-10-20 (PROMPT 1), the gate next.** The Training tab shows today's session before Start (the overview, T37-T47), runs the guided flow on the engine's pre-walked steps (T48-T88) and saves through the outbox (T89-T102): every session row of the inventory is built and tested but T87 (background notifications: iOS runs no page code in the background; his decision). The rule for when a timer starts by itself moved into `services/guided_flow.py`. Found and fixed by the browser tests: the exercise note and the plank test's seconds lost what was typed. `scripts/session_field_check.py` compares his real session with the last Streamlit one, field names only. Python 5582, Vitest 166.
+
 **Phase 5 — Today, the detail screens and the check-in: signed off 2026-10-20 under the owner's standing instruction.** Today, readiness, sleep and strain and the check-in run on the engine's numbers at https://health.lauscher-worker.workers.dev (Worker f249a9d9, engine revision 9 from 5c00178). Parity over the 14 days to 2026-10-20: 0 differences. Gate: every p5 counter 0 except the owner's two mornings (6). Python 5556, Vitest 142, Playwright 47. Handoff: `handoff/p5_to_p6_summary.md`.
 
 **Phase 4 — signed off 2026-10-20** (its iPhone checklist open in his batch); **Phase 3 — signed off 2026-10-20**; **Phase 2 — signed off 2026-10-19** (P2-11 open).
@@ -11,6 +13,7 @@
 **Pushes held on 2026-10-20 from 08:22:** the owner trains on the Streamlit app, and a push redeploys it. The commits wait locally; push when he says he has finished.
 
 ## Waiting on the owner (his batch)
+0000. **The Phase 6 real session** (owner_checks.json p6): one gym session in the new app, airplane mode for at least two exercises, the phone locked during one rest, the timer read from 1.5 m, the bells with the silent switch on, the screen on, Save; then `python scripts/session_field_check.py --date <day>` (one session, no field missing). Also: **T87** — the Streamlit page could notify when a timer ended in the background; an iPhone web app runs no code in the background, so the new app instead shows, when it is opened again, the time the timer ended (it does not ring then, and it does not move on by itself). Keep that, or say what to do.
 0. **The Phase 4 iPhone checklist** (owner_checks.json p4): install from Safari, paste the key, open each tab, airplane mode and reopen, the "act as if the engine is down" switch.
 00. **The Phase 5 two mornings** (owner_checks.json p5): open the Streamlit app first, then the new app; compare the three scores and the sleep night; on the second morning do the check-in in the new app and check that the Streamlit app shows it within about 15 minutes. Also: confirm that the chosen design replaces the card photos (H19).
 000. **Phase 6 decision**: the "When did you finish?" question before saving a session whose last set was over 20 minutes before Save (the prompt asks for his OK before it is built).
@@ -19,7 +22,7 @@
 3. Carried: the voice app's address (for `p1_to_p2`); removing `[voxplot_supabase]` from the health app's secrets; the image store (455.5 MB of the 0.5 GiB free on 2026-10-19, about 190 MB once the clean-up has run — check before the next engine deploy).
 
 ## Next
-- Phase 6 — the training session (the guided flow on the phone, timers and sounds, the idempotent save through the outbox), from the Notion prompt set.
+- Phase 6 gate (PROMPT 2), then Phase 7 — the training week and the extras (the week banner and strip, a day's detail, swap and carry, gate 1, the "+" menu: accessory, yoga, outdoor), from the Notion prompt set.
 
 ## The owner's decisions, 2026-10-19 (after the cost estimate)
 - **The new app syncs ONCE A DAY, at the first app open in the morning** — not every 2 hours (*"that is enough"*). This sets the engine's sync design for Phase 2 and Phase 9; the Streamlit app keeps its own 2-hourly-on-open cadence until the switch-over (recommended, and he asked for no change there). **When last night's data is still missing after that first sync, a later open syncs again, at most once an hour, until last night is in** (*"Retry the sync"*, 2026-10-19) — otherwise a morning opened before the ring has reached Oura stays empty until the next day.
