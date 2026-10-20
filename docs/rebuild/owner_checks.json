@@ -28,5 +28,16 @@
     "morning2_sleep": null,
     "morning2_checkin": null,
     "morning2_checkin_in_streamlit": null
+  },
+  "p6": {
+    "session": null,
+    "airplane": null,
+    "lock_rest": null,
+    "read_timer": null,
+    "sounds": null,
+    "audio_after_lock": null,
+    "screen_on": null,
+    "saved": null,
+    "field_check": null
   }
 }

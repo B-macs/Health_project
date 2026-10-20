@@ -1484,6 +1484,244 @@ def p5_device_checklist_open() -> CounterResult:
 review("p5", *P5_CHECKLIST.values())
 
 
+# ── Phase 6 counters ─────────────────────────────────────────────────────────
+
+FIELD_CHECK_JSON = REPORTS_DIR / "p6" / "field_check.json"
+IDEMPOTENCY_TESTS = "tests/api/test_save_idempotency.py"
+TIMERS_TEST = "src/lib/timers.test.ts"
+#: The training-session rows of the inventory the phone builds (the guided flow, its
+#: overview before Start and its save).
+P6_ROW_RANGE = range(37, 103)
+#: The owner's real session (docs/rebuild/owner_checks.json, "p6"): true = as expected.
+P6_CHECKLIST = {
+    "session": "One real gym session in the new app, from Start to Save",
+    "airplane": "Airplane mode for at least two exercises: the session went on as before",
+    "lock_rest": "The phone locked during one rest: back in, the timer showed the right time, or when it ended",
+    "read_timer": "The timer reads from 1.5 m away",
+    "sounds": "The bells: rest end, hold end, the side switch, the set's end and the exercise's end, with the silent switch on",
+    "audio_after_lock": "The sounds still play after a pause on the lock screen",
+    "screen_on": "The screen stayed on during the session",
+    "saved": "Save showed 'Saved on the phone', then 'Saved'",
+    "field_check": "scripts/session_field_check.py: one session stored for the day, no field missing",
+}
+#: The engine's training and safety rules by name: none may be written into the phone's
+#: source (rebuild rule 1; also in camelCase). A field the engine SENDS is not here: the
+#: phone reads its value (timer_starts, ask_length_above_minutes, first_side_note).
+RULE_NAMES = (
+    "hold_ending", "hold_starts_next", "warning_is_due", "WARNING_STRAIN_THRESHOLD",
+    "step_block_reason", "hold_for_failed_week", "failed_week_holds_load", "readiness_scales",
+    "readiness_dose", "range_progression", "range_middle_bottom", "PROGRESSION_WINDOW_DAYS",
+    "STEP_BACK_SESSIONS", "FAILED_WEEK_MAX_DAYS", "duration_needs_a_check", "DURATION_CHECK_RATIO",
+    "REST_TAKEN_MAX_SECONDS", "session_au", "dosed_day", "estimate_duration",
+    "exercise_duration_seconds", "review_figures", "hr_comparison", "is_timed_test",
+    "is_run_or_walk", "GARMIN_ACTIVITY_BUFFER_MINUTES", "HR_COVERAGE_FULL", "volume_recommendation",
+)
+#: The engine's thresholds written as code (strings and comments are blanked first).
+RULE_THRESHOLDS = (
+    ("the length question's ratio (1.5 x the model)", re.compile(r"\b1\.5\s*\*|\*\s*1\.5\b")),
+    ("the longest rest kept (1200 s)", re.compile(r"\b1_?200\b")),
+    ("the reps a weight step costs (0.37)", re.compile(r"\b0\.37\b")),
+    ("the warning's strain threshold (16)", re.compile(r"strain[^\n]{0,40}\b16\b|\b16\b[^\n]{0,40}strain", re.I)),
+    ("the pain gate (above 5 of 10)", re.compile(r"pain[^\n]{0,30}[<>]=?\s*5\b", re.I)),
+)
+_PW_ANNOTATION_TESTS = ("a whole session runs from Start to Save", "a save whose answer is lost")
+_PYTEST_FILES: dict[tuple[str, str], CounterResult] = {}
+
+
+def _camel(name: str) -> str:
+    head, *rest = name.lower().split("_")
+    return head + "".join(w.title() for w in rest)
+
+
+def _phone_code_files() -> dict[str, str]:
+    """The phone's own source: app/src without the generated types, the mock data, the
+    test hooks and the tests."""
+    files = {}
+    for path in sorted(APP_SRC.rglob("*")):
+        rel = path.relative_to(REPO_ROOT).as_posix()
+        if (path.suffix in (".ts", ".tsx") and not {"generated", "mock", "debug"} & set(path.parts)
+                and ".test." not in path.name):
+            files[rel] = path.read_text(encoding="utf-8")
+    return files
+
+
+def rule_hits(files: dict[str, str]) -> list[str]:
+    """Training or safety rules in the phone's source: an engine rule's name (or its
+    camelCase), or one of its thresholds written as code."""
+    names = [(n, re.compile(rf"\b{re.escape(n)}\b")) for n in RULE_NAMES]
+    names += [(_camel(n), re.compile(rf"\b{re.escape(_camel(n))}\b")) for n in RULE_NAMES if "_" in n]
+    hits = []
+    for rel, text in files.items():
+        code = _blank_comments(text)
+        bare = _TS_STRING.sub('""', code)
+        for number, line in enumerate(code.splitlines(), 1):
+            hits += [f"{rel}:{number} {name}" for name, rx in names if rx.search(line)]
+        for number, line in enumerate(bare.splitlines(), 1):
+            hits += [f"{rel}:{number} {label}" for label, rx in RULE_THRESHOLDS if rx.search(line)]
+    return hits
+
+
+def p6_rows(markdown: str) -> list[str]:
+    """The training-session rows (T37-T102) marked KEEP."""
+    words = inventory_rows(markdown)
+    ids = [rid for rid, word in words.items()
+           if word == "KEEP" and rid.startswith("T") and int(rid[1:]) in P6_ROW_RANGE]
+    return sorted(ids, key=lambda rid: int(rid[1:]))
+
+
+def field_check() -> dict | None:
+    """The field check of the owner's real session (scripts/session_field_check.py
+    --json), once it has run; None before."""
+    try:
+        return json.loads(FIELD_CHECK_JSON.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+def _pytest_once(phase: str, test_file: str) -> CounterResult:
+    """One run of a test file per gate run, however many counters read it."""
+    key = (phase, test_file)
+    if key not in _PYTEST_FILES:
+        _PYTEST_FILES[key] = _pytest_file_failures(phase, test_file)
+    return _PYTEST_FILES[key]
+
+
+def _session_annotations(kind: str, real: int, real_note: str) -> CounterResult:
+    """A count the session browser tests record as an annotation, plus the real
+    session's own count from the field check."""
+    def count(tests):
+        total, notes = annotation_total(tests, kind)
+        return CounterResult(total + real, "; ".join(notes + ([real_note] if real_note else []))
+                             or f"{len(tests)} session test runs, none", ["p6/playwright.json"])
+    return _browser_counter("p6", lambda title: title.startswith(_PW_ANNOTATION_TESTS), count)
+
+
+def vitest_file(phase: str, target: str) -> dict | None:
+    """One Vitest file's JSON report (numPassedTests, numFailedTests, ...)."""
+    pnpm = shutil.which("pnpm")
+    if not pnpm:
+        return None
+    out = REPORTS_DIR / phase
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / f"vitest-{Path(target).stem}.json"
+    if not (REUSE_TEST_RUNS and path.exists()):
+        path.unlink(missing_ok=True)
+        subprocess.run([pnpm, "--filter", "@health/app", "exec", "vitest", "run", target,
+                        "--reporter=json", f"--outputFile={path}"], cwd=REPO_ROOT, env=_child_env(),
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
+@counter("p6", "test_failures",
+         "failures in the Python gate (plus 1 under the floor), `pnpm test` (the app's and the "
+         "Worker's Vitest, after the build) and the browser tests (Playwright)")
+def p6_test_failures() -> CounterResult:
+    main_gate = _main_gate_counter("p6")
+    vitest = _pnpm_test_counter("p6")
+    report = playwright_report("p6")
+    if report is None:
+        browser = CounterResult(1, "no report", ["p6/playwright.log"])
+    else:
+        stats = report.get("stats", {})
+        failed = int(stats.get("unexpected", 0)) + int(stats.get("flaky", 0))
+        browser = CounterResult(failed, f'{stats.get("expected", 0)} passed, {failed} failed or flaky',
+                                ["p6/playwright.json"])
+    return CounterResult(main_gate.count + vitest.count + browser.count,
+                         f"Python: {main_gate.detail}; pnpm: {vitest.detail}; Playwright: {browser.detail}",
+                         main_gate.evidence + vitest.evidence + browser.evidence)
+
+
+@counter("p6", "duplicate_sessions",
+         "sessions stored more than once: the replay tests (the engine's three sends, the "
+         "phone's lost answer) and, once checked, the owner's real session")
+def p6_duplicate_sessions() -> CounterResult:
+    engine = _pytest_once("p6", IDEMPOTENCY_TESTS)
+    real = field_check()
+    real_n = int(real.get("duplicates", 0)) if real else 0
+    phone = _session_annotations("duplicate_sessions", real_n,
+                                 f"the real session: {real_n} duplicate(s)" if real else "")
+    return CounterResult(engine.count + phone.count,
+                         f"engine replay: {engine.detail}; phone: {phone.detail}"
+                         + ("" if real else "; the real session is checked after it happens"),
+                         engine.evidence + phone.evidence)
+
+
+@counter("p6", "fields_missing",
+         "fields the Streamlit save writes and the new save does not: raw facts missing from the "
+         "phone's save in the browser tests, the engine's record rule, and the real session's field check")
+def p6_fields_missing() -> CounterResult:
+    engine = _pytest_once("p6", IDEMPOTENCY_TESTS)
+    real = field_check()
+    missing = list(real.get("missing", [])) if real else []
+    phone = _session_annotations("fields_missing", len(missing),
+                                 f"the real session: {', '.join(missing)}" if missing else "")
+    return CounterResult(engine.count + phone.count,
+                         f"engine: {engine.detail}; phone: {phone.detail}"
+                         + ("" if real else "; the real session is checked after it happens"),
+                         engine.evidence + phone.evidence)
+
+
+@counter("p6", "rule_in_typescript",
+         "training or safety rules in app/src: an engine rule's name, or one of its thresholds written as code")
+def p6_rule_in_typescript() -> CounterResult:
+    files = _phone_code_files()
+    hits = rule_hits(files)
+    return CounterResult(len(hits), "; ".join(hits[:20]) or f"{len(files)} files, no rule")
+
+
+@counter("p6", "warning_shown_when_not_due",
+         "warnings drawn on an exercise the engine sent none for, in the session browser tests")
+def p6_warning_shown_when_not_due() -> CounterResult:
+    def count(tests):
+        total, notes = annotation_total(tests, "warning_shown_when_not_due")
+        return CounterResult(total, "; ".join(notes) or f"{len(tests)} session runs, none", ["p6/playwright.json"])
+    return _browser_counter("p6", lambda title: title.startswith(_PW_ANNOTATION_TESTS[0]), count)
+
+
+@counter("p6", "timer_drift",
+         "timer errors over 1 s after a simulated background (app/src/lib/timers.test.ts): its "
+         "failures, plus 1 when nothing in it passed")
+def p6_timer_drift() -> CounterResult:
+    report = vitest_file("p6", TIMERS_TEST)
+    if report is None:
+        return CounterResult(1, "the timer tests gave no report", [f"p6/vitest-timers.test.json"])
+    passed, failed = int(report.get("numPassedTests", 0)), int(report.get("numFailedTests", 0))
+    return CounterResult(failed + (0 if passed else 1), f"{passed} passed, {failed} failed",
+                         ["p6/vitest-timers.test.json"])
+
+
+@counter("p6", "text_rule_violations",
+         "strings in app/src/strings.ts that fail the jargon, hedge and Stage 1 scans in tests/")
+def p6_text_rule_violations() -> CounterResult:
+    return p3_text_rule_violations()
+
+
+@counter("p6", "inventory_rows_open",
+         "training-session rows (T37-T102) marked KEEP that the phone app does not build "
+         "(docs/rebuild/app_rows.json: the files and the test)")
+def p6_inventory_rows_open() -> CounterResult:
+    rows = p6_rows(SCREEN_INVENTORY.read_text(encoding="utf-8"))
+    mapping = json.loads(APP_ROWS.read_text(encoding="utf-8"))["rows"] if APP_ROWS.exists() else {}
+    owner = DESIGN_MD.read_text(encoding="utf-8") if DESIGN_MD.exists() else ""
+    open_ = app_rows_open(rows, mapping, owner)
+    return CounterResult(len(open_), "; ".join(open_) or f"{len(rows)} rows built, each with a test")
+
+
+@counter("p6", "device_checklist_open",
+         "items of the owner's real-session checklist not confirmed yet (docs/rebuild/owner_checks.json, p6)")
+def p6_device_checklist_open() -> CounterResult:
+    data = json.loads(OWNER_CHECKS.read_text(encoding="utf-8")) if OWNER_CHECKS.exists() else {}
+    answers = data.get("p6", {})
+    missing = [key for key in P6_CHECKLIST if answers.get(key) is not True]
+    return CounterResult(len(missing), ", ".join(missing) or "the owner confirmed every item")
+
+
+review("p6", *P6_CHECKLIST.values())
+
+
 # ── output ───────────────────────────────────────────────────────────────────
 
 _PAGE = """<!doctype html>

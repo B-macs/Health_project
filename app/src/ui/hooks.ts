@@ -1,39 +1,12 @@
 // The screen wake lock, the rings' grow-in, and the timer's clock text. The session's
 // timers themselves run on timestamps (lib/timers.ts).
-import { useCallback, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { holdScreen, type WakeLockHost } from '../lib/wakelock'
 
-/** Keeps the screen on while `active`; true while the iPhone holds the lock. */
+/** Keeps the screen on while `active` (lib/wakelock.ts); true while the iPhone holds the lock. */
 export function useWakeLock(active: boolean): boolean {
   const [held, setHeld] = useState(false)
-  useEffect(() => {
-    if (!active || !('wakeLock' in navigator)) return
-    let lock: WakeLockSentinel | null = null
-    let stopped = false
-    const request = async () => {
-      try {
-        const next = await navigator.wakeLock.request('screen')
-        if (stopped) {
-          await next.release()
-          return
-        }
-        lock = next
-        setHeld(true)
-        next.addEventListener('release', () => setHeld(false))
-      } catch {
-        setHeld(false)
-      }
-    }
-    void request()
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void request()
-    }
-    document.addEventListener('visibilitychange', onVisible)
-    return () => {
-      stopped = true
-      document.removeEventListener('visibilitychange', onVisible)
-      void lock?.release().catch(() => undefined)
-    }
-  }, [active])
+  useEffect(() => (active ? holdScreen(navigator as WakeLockHost, document, setHeld) : undefined), [active])
   return held
 }
 

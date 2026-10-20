@@ -9,18 +9,21 @@
 // - with a Garmin workout started: the walk takes its minutes from the watch (or, with no
 //   connection, its planned minutes), the save screen checks the watch, and the heart-rate
 //   match shows after the engine has the save.
-// The gate (rebuild_gate.py p6) adds up two annotations of these tests:
-// duplicate_sessions and warning_shown_when_not_due.
+// The gate (rebuild_gate.py p6) adds up three annotations of these tests:
+// duplicate_sessions, fields_missing and warning_shown_when_not_due.
 import type { Page } from '@playwright/test'
 import fixture from '../dev/session_fixture.json' with { type: 'json' }
 import { stepWeight } from '../src/lib/training'
 import { S } from '../src/strings'
 import { expect, hook, leaveSession, onboard, ORIGIN, startTraining, test } from './helpers'
 
+type Side = { reps: number | null; weight_kg: number | null; seconds: number | null } | null
 type RawSet = {
   set_num: number
   completed_at: string
-  right: { reps: number | null; weight_kg: number | null; seconds: number | null } | null
+  right: Side
+  left: Side
+  band_tier?: string | null
   rest_started_at?: number
   rest_ended_at?: number
 }
@@ -71,6 +74,32 @@ async function walk(page: Page, atExercise?: (index: number) => Promise<void>) {
     await tap(page)
   }
   throw new Error('the session never reached the save screen')
+}
+
+/** Raw facts a set's record needs (the engine's build_set_record, the rule the Streamlit
+ *  save uses) that the phone's save left out: the gate's fields_missing. */
+function missingFacts(body: SaveBody): string[] {
+  const missing: string[] = []
+  body.exercises.forEach((e, i) => {
+    const ex = fixture.exercises[i]
+    for (const set of e.raw_sets) {
+      const at = `${ex.name} set ${set.set_num}`
+      if (!/[+-]\d\d:\d\d$/.test(set.completed_at)) missing.push(`${at}: time with its offset`)
+      if (ex.type === 'reps' && set.right?.reps == null) missing.push(`${at}: reps`)
+      if (ex.type === 'reps' && ex.laterality === 'unilateral' && set.left?.reps == null) missing.push(`${at}: left reps`)
+      if (ex.equipment_type && ex.equipment_type !== 'band' && set.right?.weight_kg == null) missing.push(`${at}: weight`)
+      if (ex.equipment_type === 'band' && !set.band_tier) missing.push(`${at}: band`)
+      if (ex.timer === 'stopwatch' && set.right?.seconds == null) missing.push(`${at}: seconds`)
+    }
+  })
+  // Every set the engine's walk says a rest follows carries the rest's two clock readings.
+  for (const st of fixture.steps.filter((x) => x.rest_begins && x.record_set != null)) {
+    const set = body.exercises[st.ex_idx].raw_sets.find((r) => r.set_num === st.record_set)
+    if (set && (set.rest_started_at == null || set.rest_ended_at == null)) {
+      missing.push(`${fixture.exercises[st.ex_idx].name} set ${st.record_set}: rest`)
+    }
+  }
+  return missing
 }
 
 async function sends(page: Page, tag: string): Promise<SaveBody[]> {
@@ -125,7 +154,13 @@ test('a whole session runs from Start to Save, offline in the middle, and is sto
   test.info().annotations.push({ type: 'duplicate_sessions', description: String(Math.max(0, kept.length - 1)) })
   expect(sent).toHaveLength(1)
   expect(kept).toHaveLength(1)
+  await expect(page.getByRole('heading', { name: S.session.congrats })).toBeVisible()
+  await expect(page.getByText(S.session.tomorrow(fixture.next_day!.day_num, fixture.next_day!.objective))).toBeVisible()
   const body = sent[0]
+  expect(body.session_rpe).toBe(5)
+  const lacking = missingFacts(body)
+  test.info().annotations.push({ type: 'fields_missing', description: String(lacking.length) })
+  expect(lacking).toEqual([])
   expect(body.session_id).toMatch(new RegExp(`^${fixture.date.slice(0, 4)}-\\d\\d-\\d\\d-[0-9a-f]{8}$`))
   expect(body.exercises.map((e) => e.raw_sets.length)).toEqual(fixture.exercises.map((e) => e.sets))
   // Every set carries the phone's clock with its UTC offset; every rest that began ended.
@@ -168,6 +203,9 @@ test('a save whose answer is lost is sent again with the same ids, and the engin
   expect(new Set(sent.map((b) => b.exercises.map((e) => e.exercise_id).join(','))).size).toBe(1)
   expect(kept).toHaveLength(1)
   expect(sent[0].exercises[walked].garmin_minutes).toBe(31)
+  const lacking = [...missingFacts(sent[0]), ...(sent[0].exercises[walked].garmin_minutes == null ? ['the walk: Garmin minutes'] : [])]
+  test.info().annotations.push({ type: 'fields_missing', description: String(lacking.length) })
+  expect(lacking).toEqual([])
   await expect(page.getByTestId('hr')).toHaveAttribute('data-state', 'matched')
 })
 
@@ -175,6 +213,16 @@ test('the overview offers the adapt dialog; a running watch is named; a session 
   const tag = `e2e-choose-${Date.now()}`
   await onboard(page)
   await page.getByRole('navigation', { name: S.app }).getByRole('button', { name: S.nav.training }).click()
+  // The overview: plan start, today and the day; the load banner; the workout card; the
+  // lists; the at-home item and its how-to; the first side.
+  await expect(page.getByRole('region', { name: S.session.blockProgress })).toContainText(S.session.planStart)
+  await expect(page.locator('[data-kind="warning"]')).toBeVisible()
+  await expect(page.getByTestId('workout-card')).toContainText(S.session.dayBig(fixture.day_num))
+  await expect(page.getByTestId('workout-card')).toContainText(S.session.sessionsOf(fixture.day_num, fixture.plan_days))
+  await expect(page.getByRole('region', { name: S.session.workout }).locator('.timeline__item')).toHaveCount(fixture.exercises.length)
+  await page.getByRole('region', { name: S.session.atHome }).getByText('Made-up home stretch', { exact: false }).click()
+  await expect(page.getByText('Made-up how-to for the tests.')).toBeVisible()
+  await expect(page.getByText('Start each one-side exercise on the left side today.')).toBeVisible()
   await page.getByRole('button', { name: S.session.adapt }).click()
   const sheet = page.getByRole('dialog', { name: S.session.adapt })
   await expect(sheet.getByText(S.session.adaptNone)).toBeVisible()

@@ -4,6 +4,7 @@
 // contract (src/generated/api.ts), so a change in the contract breaks this file's type
 // check instead of a browser test.
 import type { components } from '../src/generated/api'
+import session from './session_fixture.json' with { type: 'json' }
 
 type Schemas = components['schemas']
 
@@ -86,15 +87,25 @@ export function trainingDay(day: string, local: string): Schemas['TrainingDayOut
   if (day !== local) {
     return { ...base, route: 'past_completed', logged: { au: 300, minutes: 52, rpe: 6, exercises: [{ name: 'Made-up squat', movement_type: null, planned_sets: 3 }] } }
   }
-  const line = (name: string, prescription: string) => ({ icon: '', laterality: null, mechanics: '', name, prescription, type: null })
+  // Today's overview is the session fixture's own day (dev/session_fixture.json, made by the
+  // engine's walk), so the overview and the session that Start opens agree.
+  const line = (name: string, prescription: string, mechanics = '') => ({ icon: '', laterality: null, mechanics, name, prescription, type: null })
+  const days = session.plan_days ?? 84
+  const dayNum = session.day_num ?? 1
   return {
     ...base,
     route: 'today',
+    phase: { number: 5, name: session.phase, start_date: addDays(local, 1 - dayNum), length_days: days, plan_days: days, day_num: dayNum },
     overview: {
-      screen: 'overview', headline: 'Made-up session', subtitle: null, phase_name: 'Made-up block', day_num: 3, plan_days: 84,
-      card: { exercise_count: 2, minutes: 45, focus: [], loaded: true, rpe_target: 7 },
-      main: [line('Made-up squat', '3 × 10 · 20 kg'), line('Made-up row', '3 × 12 · 30 kg')],
-      home: [], release: [], adaptation: null, banner: null, first_side: null, first_side_note: null, objective: null,
+      screen: 'overview', headline: 'Made-up session', subtitle: 'Made-up subtitle for the tests.', phase_name: session.phase,
+      day_num: dayNum, plan_days: days,
+      card: { exercise_count: session.exercises.length, minutes: session.model_minutes, focus: ['Made-up focus'], loaded: true, rpe_target: session.rpe_target ?? 7 },
+      main: session.exercises.map((e) => line(e.name, e.prescription)),
+      home: [line('Made-up home stretch', '2 × 30 s', 'Made-up how-to for the tests.')],
+      release: [], adaptation: null,
+      banner: { kind: 'warning', text: 'Made-up reduced-load banner for the tests.', cause: '', acwr_advisory: '' },
+      first_side: session.first_side, first_side_note: 'Start each one-side exercise on the left side today.',
+      objective: session.objective,
     },
   }
 }

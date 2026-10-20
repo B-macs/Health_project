@@ -745,3 +745,87 @@ def test_the_parity_counters_read_the_parity_report(monkeypatch):
 
 def test_the_two_morning_checklist_is_open_until_the_owner_confirms_it():
     assert gate.p5_device_checklist_open().count == len(gate.P5_CHECKLIST)
+
+
+# ── Phase 6 ──────────────────────────────────────────────────────────────────
+
+def test_phase_6_has_the_counters_its_prompt_names():
+    assert set(gate.REGISTRY["p6"]) == {
+        "test_failures", "duplicate_sessions", "fields_missing", "rule_in_typescript",
+        "warning_shown_when_not_due", "timer_drift", "text_rule_violations", "device_checklist_open",
+        "inventory_rows_open"}
+
+
+def test_a_rule_name_or_threshold_written_into_the_phone_is_found():
+    files = {
+        "a.ts": "const ask = minutes > 1.5 * model\nconst e = holdEnding(step)\n",
+        "b.ts": "// hold_ending is the engine's; 1.5 * a comment is not code\nconst t = '1.5 * model'\n",
+        "c.ts": "if (strainToday > 16) show()\nconst x = rests.filter((r) => r < 1200)\n",
+        "d.ts": "const label = 'hold_ending'\nif (pain >= 5) block()\n",
+    }
+    hits = gate.rule_hits(files)
+    assert any(h.startswith("a.ts:1 ") and "ratio" in h for h in hits)
+    assert "a.ts:2 holdEnding" in hits
+    assert not any(h.startswith("b.ts") for h in hits), "comments and the text of a string are not code"
+    assert any(h.startswith("c.ts:1 ") and "strain" in h for h in hits)
+    assert any(h.startswith("c.ts:2 ") and "1200" in h for h in hits)
+    assert "d.ts:1 hold_ending" in hits, "a rule's name in a string is still the rule"
+    assert any(h.startswith("d.ts:2 ") and "pain" in h for h in hits)
+
+
+def test_the_real_phone_source_holds_no_rule():
+    assert gate.p6_rule_in_typescript().count == 0
+
+
+_P6_INVENTORY = """## Training
+| Id | Feature | Proposal |
+|---|---|---|
+| T36 | Banner | KEEP |
+| T37 | Load banner | KEEP |
+| T49 | Before plan start | DROP (unreachable) |
+| T88 | Screen awake | KEEP as a new phone requirement |
+| T102 | Tomorrow | KEEP |
+| T103 | Menu | KEEP |
+"""
+
+
+def test_phase_6_builds_the_kept_session_rows_only():
+    assert gate.p6_rows(_P6_INVENTORY) == ["T37", "T88", "T102"]
+
+
+def test_the_real_session_feeds_duplicates_and_missing_fields(tmp_path, monkeypatch):
+    check = tmp_path / "field_check.json"
+    monkeypatch.setattr(gate, "FIELD_CHECK_JSON", check)
+    monkeypatch.setattr(gate, "_pytest_once", lambda *a: gate.CounterResult(0, "2 passed"))
+    report = {"stats": {}, "suites": [{"specs": [{"title": "a whole session runs from Start to Save, offline", "tests": [
+        {"projectName": "chromium", "results": [{"status": "passed"}],
+         "annotations": [{"type": "duplicate_sessions", "description": "0"},
+                         {"type": "fields_missing", "description": "0"}]}]}]}]}
+    monkeypatch.setattr(gate, "playwright_report", lambda phase: report)
+    before = gate.p6_duplicate_sessions()
+    assert before.count == 0 and "checked after it happens" in before.detail
+    check.write_text(json.dumps({"duplicates": 1, "missing": ["training_sets.ts"]}), encoding="utf-8")
+    assert gate.p6_duplicate_sessions().count == 1
+    missing = gate.p6_fields_missing()
+    assert missing.count == 1 and "training_sets.ts" in missing.detail
+
+
+def test_the_timer_drift_counter_reads_the_timer_tests(monkeypatch):
+    monkeypatch.setattr(gate, "vitest_file", lambda *a: {"numPassedTests": 8, "numFailedTests": 0})
+    assert gate.p6_timer_drift().count == 0
+    monkeypatch.setattr(gate, "vitest_file", lambda *a: {"numPassedTests": 7, "numFailedTests": 1})
+    assert gate.p6_timer_drift().count == 1
+    monkeypatch.setattr(gate, "vitest_file", lambda *a: {"numPassedTests": 0, "numFailedTests": 0})
+    assert gate.p6_timer_drift().count == 1, "a file that passes nothing proves nothing"
+    monkeypatch.setattr(gate, "vitest_file", lambda *a: None)
+    assert gate.p6_timer_drift().count == 1
+
+
+def test_the_real_session_checklist_is_open_until_the_owner_confirms_it(tmp_path, monkeypatch):
+    checks = tmp_path / "owner_checks.json"
+    monkeypatch.setattr(gate, "OWNER_CHECKS", checks)
+    checks.write_text(json.dumps({"p6": {"session": True}}), encoding="utf-8")
+    assert gate.p6_device_checklist_open().count == len(gate.P6_CHECKLIST) - 1
+    checks.write_text(json.dumps({"p6": {k: True for k in gate.P6_CHECKLIST}}), encoding="utf-8")
+    assert gate.p6_device_checklist_open().count == 0
+

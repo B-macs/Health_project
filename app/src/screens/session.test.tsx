@@ -16,6 +16,8 @@ import {
 import { S } from '../strings'
 import { arrivalTimer, SessionFlow } from './Session'
 import { HeartRateMatch, reviewLine } from './SessionSave'
+import { Banner, longDate, noSessionReason } from './TrainingTab'
+import * as fx from '../../dev/fixtures'
 
 const plan = fixture as unknown as Plan
 const T0 = Date.parse('2026-10-20T08:00:00Z')
@@ -202,5 +204,52 @@ describe('the save screen', () => {
   it('no match says why and keeps the rating', () => {
     const hr: HeartRate = { state: 'no_match', reason: 'no activity today', candidates: [], comparison: null }
     expect(matchOf(savedState(true, hr))).toContain(S.session.hrNone('no activity today', 6))
+  })
+})
+
+describe('the overview and the flow, as drawn', () => {
+  it("the load banner keeps the page's shades: strongest for a rest or reduced day", () => {
+    const html = (kind: string) => renderToStaticMarkup(<Banner kind={kind} text="Made-up banner" />)
+    expect(html('error')).toContain('class="alert"')
+    expect(html('warning')).toContain('class="alert"')
+    expect(html('info')).toContain('class="note"')
+    expect(html('')).toContain('class="caption"')
+    expect(renderToStaticMarkup(<Banner kind="error" text="" />)).toBe('')
+  })
+
+  it("a day with no session to start says why, in the engine's own terms", () => {
+    const today = fx.trainingDay('2026-10-20', '2026-10-20')
+    expect(noSessionReason(today)).toBeNull()
+    const ended = { ...today, overview: { ...today.overview!, screen: 'complete' } }
+    expect(S.session.noSession[noSessionReason(ended)!]).toBe('The block is complete.')
+    expect(noSessionReason({ ...today, route: 'rest', overview: null })).toBe('rest_day')
+    expect(noSessionReason({ ...today, overview: { ...today.overview!, screen: 'logged' } })).toBe('already_logged')
+  })
+
+  it('the date is written out', () => {
+    expect(longDate('2026-10-20')).toBe('Tuesday 20 October')
+  })
+
+  it('the flow shows the day, the progress, the exercise list, the numbers and the how-to', () => {
+    const squat = at(firstEntry(2))
+    const shown = text(render(squat))
+    expect(shown).toContain(S.session.dayHeader(plan.day_num!, plan.plan_days ?? null, plan.rpe_target))
+    expect(shown).toContain(S.session.progressOf(2, plan.exercises.length))
+    for (const ex of plan.exercises) expect(shown).toContain(ex.name)
+    const ex = plan.exercises[2]
+    expect(shown).toContain(ex.prescription.replace(/\s+/g, ' '))
+    expect(shown).toContain(ex.previous_caption)
+    expect(shown).toContain(ex.entry_caption)
+    expect(shown).toContain(S.session.howTo)
+    expect(shown).toContain(S.session.kg(22.5))
+  })
+
+  it('a held set shows its rep; a walk with a watch shows what to do instead of a timer', () => {
+    const deadBug = plan.exercises.findIndex((e) => e.type === 'hold_reps')
+    expect(text(render(at(firstEntry(deadBug))))).toContain(S.session.repOf(1, plan.exercises[deadBug].reps_in_set ?? 1))
+    const walk = plan.exercises.findIndex((e) => e.garmin_pull)
+    const html = render(at(firstEntry(walk)))
+    expect(html).toContain('data-testid="garmin-activity"')
+    expect(html).not.toContain('role="timer"')
   })
 })

@@ -1,5 +1,5 @@
 {
-  "_note": "Rebuild Phase 5: every Home row and every Check-in, Home or Sleep row of docs/rebuild/screen_inventory.md marked KEEP, and where the phone app builds it. 'built' are the files; 'test' is the test that shows it. A row the owner's later decision replaced carries his words instead. scripts/rebuild_gate.py p5 inventory_rows_open reads this.",
+  "_note": "Rebuild Phases 5 and 6: every Home row, every Check-in, Home or Sleep row, and every training-session row (T37-T102) of docs/rebuild/screen_inventory.md marked KEEP, and where the phone app builds it. 'built' are the files; 'test' is the test that shows it. A row the owner's later decision replaced carries his words instead. scripts/rebuild_gate.py reads this: p5 and p6 inventory_rows_open.",
   "rows": {
     "H1": {
       "built": [
@@ -566,6 +566,479 @@
       ],
       "test": "app/src/screens/screens.test.tsx",
       "note": "The movement strip: four strengths as bar heights; an unmeasured slot stays blank; its title and lines."
+    },
+    "T37": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "The load decision's banner by its kind, in the page's shades; the load ratio's advisory line."
+    },
+    "T38": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The date written out, the engine's headline and subtitle."
+    },
+    "T39": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The workout card: block, day, minutes, effort cap, focus, loaded or not, n of N sessions with a bar."
+    },
+    "T40": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The release list (when the block has one) and the workout list, from the day's dosed values (F20)."
+    },
+    "T41": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "At-home items with their how-to, not logged."
+    },
+    "T42": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Before you start: the Garmin text and the switch; the choice rides with the session."
+    },
+    "T43": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The engine's first-side note."
+    },
+    "T44": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Adapt session: the volume decision and how it works, in a sheet."
+    },
+    "T45": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "Start mints the ids once and stores the session; the day's first side comes with the plan."
+    },
+    "T46": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The SESSION ADAPTED badge when the engine shows it."
+    },
+    "T47": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Plan start, today and the day of the block; the block's progress bar on the card."
+    },
+    "T48": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "The session survives a reload and an app kill; Leave asks first and forgets it. The tab bar hides during a session (the owner's chosen design)."
+    },
+    "T50": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "The engine's complete screen: 'The block is complete.'"
+    },
+    "T51": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "Day n of N and the effort cap above the exercise."
+    },
+    "T52": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "Today's session k/N with a bar, and every exercise marked done, now or next."
+    },
+    "T53": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "After the last entry the save screen opens."
+    },
+    "T54": {
+      "built": [
+        "services/training_session.py"
+      ],
+      "test": "tests/api/test_api_training.py",
+      "note": "The engine doses the day (sessions.dosed_day); the phone shows what it sent."
+    },
+    "T55": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "Exercise n of N and the engine's prescription line."
+    },
+    "T56": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "The steppers start at the engine's seeded entry, else the prescription."
+    },
+    "T57": {
+      "built": [
+        "services/training_session.py",
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "tests/api/test_api_training.py",
+      "note": "The ramp set's numbers are the engine's (ramp_for, the lift's seed)."
+    },
+    "T58": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "The engine's next-step line, the pain gate's words included (sessions: 'The weight is ready to go up, but it stays the same today')."
+    },
+    "T59": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "The engine's contradiction line, when it sends one."
+    },
+    "T60": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "The previous session and the difference, as the engine words them."
+    },
+    "T61": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "Where today's numbers came from and when the weight goes up next."
+    },
+    "T62": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "How to do it, folded."
+    },
+    "T63": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "A warning only when the engine sent one (warning_due on the engine's side)."
+    },
+    "T64": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "A note per exercise, kept across an app kill."
+    },
+    "T65": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "Reps stepper."
+    },
+    "T66": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Weight stepper by the engine's increment; the label never names machine units."
+    },
+    "T67": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "Band stepper over the engine's tiers."
+    },
+    "T68": {
+      "built": [
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "The second side follows the first until it is edited; each side's numbers in the set."
+    },
+    "T69": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "The side word and the first-side button; the engine's walk starts on the day's first side."
+    },
+    "T70": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "Set chips, Rep n of N, the tempo in the prescription."
+    },
+    "T71": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "Set n done records the set."
+    },
+    "T72": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "A hold: the timer, the side swap, the set."
+    },
+    "T73": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "Held reps: Rep n done, then the side or the set."
+    },
+    "T74": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "An activity: its timer, Activity done."
+    },
+    "T75": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "A walk or run takes its minutes from the watch; with no connection the save asks again; kept with the session (F19)."
+    },
+    "T76": {
+      "built": [
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The plank test: a count-up stopwatch, the seconds typed per side, Done waits for them."
+    },
+    "T77": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "The rest starts by itself; its length is measured on the phone's clock."
+    },
+    "T78": {
+      "built": [
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "Back undoes up to 30 taps."
+    },
+    "T79": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "Skip asks first, then the next exercise."
+    },
+    "T80": {
+      "built": [
+        "app/src/screens/TrainingTab.tsx",
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The phone keeps the session; the engine refuses a logged plan day (already_logged)."
+    },
+    "T81": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/timers.ts"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "Start, Pause, Resume, Reset; the last 3 s in the strongest shade; ticks; done 0.7 s after the bell; the next hold of the set starts by itself when the engine marks it."
+    },
+    "T82": {
+      "built": [
+        "app/src/lib/sounds.ts",
+        "app/src/screens/Session.tsx"
+      ],
+      "test": "tests/test_guided_flow.py",
+      "note": "The bell the engine's walk names: 1 strike, 2 falling, 3, 4."
+    },
+    "T83": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/timers.ts"
+      ],
+      "test": "app/src/lib/timers.test.ts",
+      "note": "The rest counts down by itself; GO with the rising pair; on to the next set 0.9 s later."
+    },
+    "T84": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/timers.ts"
+      ],
+      "test": "app/src/lib/timers.test.ts",
+      "note": "Start the n min timer; the last 30 s in the strongest shade; the four-strike bell; Done; Run the timer again."
+    },
+    "T85": {
+      "built": [
+        "app/src/screens/Session.tsx",
+        "app/src/lib/timers.ts"
+      ],
+      "test": "app/src/lib/timers.test.ts",
+      "note": "The stopwatch: Start, Stop, Reset; never rings."
+    },
+    "T86": {
+      "built": [
+        "app/src/lib/timers.ts",
+        "app/src/lib/sounds.ts"
+      ],
+      "test": "app/src/lib/timers.test.ts",
+      "note": "880 Hz ticks at 3, 2 and 1."
+    },
+    "T88": {
+      "built": [
+        "app/src/lib/wakelock.ts",
+        "app/src/ui/hooks.ts"
+      ],
+      "test": "app/src/lib/wakelock.test.ts",
+      "note": "The Screen Wake Lock API, asked again when the app comes back to the front."
+    },
+    "T89": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Day n complete: save your session; all n exercises done."
+    },
+    "T90": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "Each exercise: the watch's time or the estimate, the dosed sets, the weight."
+    },
+    "T91": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The watch check before the save, with Check again; the caption with no Garmin workout."
+    },
+    "T92": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The rating 1-10, 5 to start."
+    },
+    "T93": {
+      "built": [
+        "app/src/screens/SessionSave.tsx",
+        "app/src/lib/training.ts"
+      ],
+      "test": "app/src/lib/training.test.ts",
+      "note": "The length question past the engine's threshold."
+    },
+    "T94": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The length (chosen or timed) and the engine's load for the rating."
+    },
+    "T95": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Session notes."
+    },
+    "T96": {
+      "built": [
+        "app/src/screens/SessionSave.tsx",
+        "app/src/lib/outbox.ts"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "One idempotent save through the outbox; saved on the phone, then saved."
+    },
+    "T97": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The heart-rate match once the engine has the save."
+    },
+    "T98": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Congratulations: session logged; the check-in reminder."
+    },
+    "T99": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "The day's activities to choose from when the clocks disagree; Use this activity."
+    },
+    "T100": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "Measured effort and load against the rating, active time, the verdict, the cover."
+    },
+    "T101": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/src/screens/session.test.tsx",
+      "note": "No match: why, and the load is the rating; no Garmin workout: how to get a figure."
+    },
+    "T102": {
+      "built": [
+        "app/src/screens/SessionSave.tsx"
+      ],
+      "test": "app/e2e/session.spec.ts",
+      "note": "Next: day n+1 and its objective."
     }
   }
 }

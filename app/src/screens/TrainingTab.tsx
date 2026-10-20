@@ -32,11 +32,22 @@ export function longDate(iso: string): string {
 
 /** The load decision's banner (T37), in the page's own shades: strongest for a rest or a
  *  reduced day, a softer note for an injury cap or a missing reading. */
-function Banner({ kind, text }: { kind: string; text: string }) {
+export function Banner({ kind, text }: { kind: string; text: string }) {
   if (!text) return null
   if (kind === 'error' || kind === 'warning') return <p className="alert" data-kind={kind}>{text}</p>
   if (kind === 'info') return <p className="note" data-kind={kind}>{text}</p>
   return <p className="caption" data-kind={kind || 'neutral'}>{text}</p>
+}
+
+/** Why there is no session today, from the day's own answer (the block complete, T50,
+ *  among them): a key of S.session.noSession, or null. */
+export function noSessionReason(day: DayPlan | undefined): string | null {
+  const o = day?.overview
+  return day?.route === 'rest' ? 'rest_day'
+    : day?.route === 'no_phase' ? 'no_phase'
+      : o?.screen === 'logged' ? 'already_logged'
+        : o?.screen === 'not_started' ? 'not_started'
+          : o?.screen === 'complete' ? 'complete' : null
 }
 
 function Progress({ value, label }: { value: number; label: string }) {
@@ -142,12 +153,7 @@ function Overview({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
   const today = localDay()
   const o = day.data?.overview
   const plan = session.data && session.data.date === today ? session.data : null
-  // Why there is no session today, from the day's own answer.
-  const reason = day.data?.route === 'rest' ? 'rest_day'
-    : day.data?.route === 'no_phase' ? 'no_phase'
-      : o?.screen === 'logged' ? 'already_logged'
-        : o?.screen === 'not_started' ? 'not_started'
-          : o?.screen === 'complete' ? 'complete' : null
+  const reason = noSessionReason(day.data)
   const warmups = new Set((plan?.exercises ?? []).filter((e) => e.warmup).map((e) => e.name))
   // The day's own lists (today's dosed values, fault F20); the session's when only it is saved.
   const main: Line[] = o && (o.main.length || o.release.length) ? o.main : (plan?.exercises ?? [])
