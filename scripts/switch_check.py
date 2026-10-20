@@ -42,7 +42,7 @@ PARITY_DAYS = 28
 OURA_LOGIN_TESTS = ("tests/api/test_api_insights.py::test_the_oura_login_is_the_background_writers",
                     "tests/api/test_api_insights.py::test_the_oura_login_ties_the_answer_to_its_request",
                     "tests/api/test_api_status_sync.py::test_the_oura_login_is_described_without_a_token")
-#: Where the sync rehearsal records its run (scripts/sync_rehearsal.py, to come).
+#: Where the sync rehearsal records its Cloud Run run (scripts/sync_rehearsal.py --cloud).
 REHEARSAL_RECORD = ROOT / "reports" / "rebuild" / "p9" / "rehearsal.json"
 
 
@@ -116,12 +116,20 @@ def check_oura_login() -> dict:
 
 
 def check_rehearsal(record: Path = REHEARSAL_RECORD) -> dict:
+    """Passes only for a run on Cloud Run (scripts/sync_rehearsal.py --cloud)
+    with every step done, inside its limit."""
     if not record.exists():
         return result("rehearsal", False, "not run yet")
     run = json.loads(record.read_text(encoding="utf-8"))
-    ok = bool(run.get("ok")) and float(run.get("seconds", 1e9)) < float(run.get("limit_seconds", 0))
-    return result("rehearsal", ok, f'{run.get("seconds")} s against a limit of {run.get("limit_seconds")} s'
-                  f'{"" if run.get("ok") else ": " + str(run.get("error"))}')
+    on_cloud_run = run.get("where") == "cloud_run"
+    ok = (on_cloud_run and bool(run.get("ok"))
+          and float(run.get("seconds", 1e9)) < float(run.get("limit_seconds", 0)))
+    detail = f'{run.get("seconds")} s against a limit of {run.get("limit_seconds")} s'
+    if not on_cloud_run:
+        detail += f' (run {run.get("where") or "somewhere unnamed"}, not on Cloud Run)'
+    if not run.get("ok"):
+        detail += ": " + str(run.get("error"))
+    return result("rehearsal", ok, detail)
 
 
 def check_outbox() -> dict:

@@ -147,6 +147,25 @@ def refresh(config, store_factory=None) -> str:
     return config.datastore_path
 
 
+#: The local copy's tables, the same file services/datastore.py builds from.
+SCHEMA_PATH = Path(__file__).with_name("datastore_schema.sql")
+
+
+def empty_copy(path: str) -> str:
+    """An empty local copy at `path` with every table, marked as rebuilt so a
+    Repository over it never pulls from Supabase: for a store that is not
+    Supabase (the tests' and the sync rehearsal's in-memory one). Pair with
+    forget(path)."""
+    conn = sqlite3.connect(path)
+    try:
+        conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        conn.commit()
+    finally:
+        conn.close()
+    mark_hydrated(path)
+    return path
+
+
 def mark_hydrated(path: str) -> None:
     """Treat `path` as already rebuilt in this process. For tests that build
     a Supabase-record Repository over a fake store and a prepared file."""

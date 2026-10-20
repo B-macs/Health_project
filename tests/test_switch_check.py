@@ -45,10 +45,26 @@ def test_backups_name_each_day_without_a_copy_and_a_failed_listing_fails():
 def test_the_rehearsal_passes_only_inside_its_limit(tmp_path):
     assert sc.check_rehearsal(tmp_path / "none.json")["ok"] is False
     record = tmp_path / "rehearsal.json"
-    record.write_text(json.dumps({"ok": True, "seconds": 41.2, "limit_seconds": 280}))
+    record.write_text(json.dumps({"where": "cloud_run", "ok": True, "seconds": 41.2,
+                                  "limit_seconds": 280}))
     assert sc.check_rehearsal(record)["ok"] is True
-    record.write_text(json.dumps({"ok": True, "seconds": 300, "limit_seconds": 280}))
+    record.write_text(json.dumps({"where": "cloud_run", "ok": True, "seconds": 300,
+                                  "limit_seconds": 280}))
     assert sc.check_rehearsal(record)["ok"] is False
+
+
+def test_the_rehearsal_counts_only_on_cloud_run(tmp_path):
+    """A run on this PC says nothing about Cloud Run's CPU or its timeout."""
+    record = tmp_path / "rehearsal.json"
+    for where in ("local", None):
+        record.write_text(json.dumps({"where": where, "ok": True, "seconds": 9.0,
+                                      "limit_seconds": 280}))
+        check = sc.check_rehearsal(record)
+        assert check["ok"] is False and "not on Cloud Run" in check["detail"]
+    record.write_text(json.dumps({"where": "cloud_run", "ok": False, "seconds": 9.0,
+                                  "limit_seconds": 280, "error": "failed steps: oura"}))
+    check = sc.check_rehearsal(record)
+    assert check["ok"] is False and "failed steps: oura" in check["detail"]
 
 
 def test_the_owners_phone_is_his_check():
