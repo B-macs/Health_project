@@ -107,3 +107,20 @@ def test_slope_direction_none_value_is_dash():
 def test_slope_direction_variable_name_formatting():
     rows = insights.slope_direction_rows({"tightness_slope": -0.05})
     assert rows[0]["Variable"] == "Tightness"
+
+
+# ── the tightness timeline's scale (rebuild Phase 8) ─────────────────────────
+
+def test_the_timeline_scale_is_the_check_in_scale_with_its_end_dates():
+    from services import insights
+    axis = insights.score_timeline_axis(["2026-10-01", "2026-10-09", "2026-10-20"])
+    assert (axis["lo"], axis["hi"]) == (0.0, 10.0)
+    assert axis["y_labels"] == ["10", "5", "0"]
+    assert axis["x_labels"] == ["1 Oct", "20 Oct"]
+    assert (axis["start"], axis["end"]) == ("2026-10-01", "2026-10-20")
+
+
+def test_one_entry_has_one_date_and_none_has_no_scale():
+    from services import insights
+    assert insights.score_timeline_axis(["2026-10-20"])["x_labels"] == ["20 Oct"]
+    assert insights.score_timeline_axis([]) is None

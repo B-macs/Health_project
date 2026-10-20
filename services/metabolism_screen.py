@@ -129,6 +129,36 @@ def series(data: dict, label: str, kind: str, offset: int) -> dict:
     }
 
 
+#: The value labels from the top and the dates across the progress chart.
+CHART_TICKS = 5
+#: Up to this many days in a period, the dates read day and month; beyond, month and year.
+CHART_DAY_LABELS_UP_TO = 60
+
+
+def chart_axis(points: list, min_span: float, dp: int, window) -> dict | None:
+    """The progress chart's scale for one measure in one period (rebuild Phase 8: it
+    was worked out in the Streamlit view): centred on the readings, at least
+    `min_span` tall so a quiet week of near-equal readings is not magnified into
+    drama, and a quarter taller than the readings; five value labels from the top
+    and five dates across. None without a reading."""
+    if not points:
+        return None
+    values = [v for _d, v in points]
+    mid = (min(values) + max(values)) / 2
+    span_v = max(max(values) - min(values), min_span) * 1.25
+    lo, hi = mid - span_v / 2, mid + span_v / 2
+    lo_d, hi_d = window.start.toordinal(), window.end.toordinal()
+    span_d = max(1, hi_d - lo_d)
+    fmt = "%d %b" if span_d <= CHART_DAY_LABELS_UP_TO else "%b %y"
+    steps = CHART_TICKS - 1
+    return {
+        "lo": lo, "hi": hi,
+        "y_labels": [f"{hi - i / steps * (hi - lo):.{dp}f}" for i in range(CHART_TICKS)],
+        "x_labels": [date.fromordinal(lo_d + round(i / steps * span_d)).strftime(fmt).lstrip("0")
+                     for i in range(CHART_TICKS)],
+    }
+
+
 def split(reading) -> dict | None:
     """Fat against fat-free, which total the weight by construction (one
     number restated, never corroboration of it); None without a body fat."""

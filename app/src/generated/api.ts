@@ -932,6 +932,21 @@ export interface components {
             /** Phase Angle Deg */
             phase_angle_deg: number | null;
         };
+        /**
+         * ChartAxis
+         * @description The progress chart's scale (metabolism_screen.chart_axis): the value range and
+         *     the labels, five from the top and five dates across.
+         */
+        ChartAxis: {
+            /** Hi */
+            hi: number;
+            /** Lo */
+            lo: number;
+            /** X Labels */
+            x_labels: string[];
+            /** Y Labels */
+            y_labels: string[];
+        };
         /** CheckInFormOut */
         CheckInFormOut: {
             /** Conditions */
@@ -1176,6 +1191,8 @@ export interface components {
             volume: {
                 [key: string]: unknown;
             }[];
+            /** Volume Hi */
+            volume_hi?: number | null;
         };
         /** ExerciseLine */
         ExerciseLine: {
@@ -1204,6 +1221,11 @@ export interface components {
             early_pattern: string | null;
             /** Early Pattern Label */
             early_pattern_label: string;
+            /**
+             * Early Reason
+             * @default
+             */
+            early_reason: string;
             /** Order */
             order: components["schemas"]["FlexTest"][];
             /** Progress */
@@ -1222,6 +1244,11 @@ export interface components {
         };
         /** FlexReading */
         FlexReading: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
             /** Load Kg */
             load_kg: number | null;
             /** Setup Value */
@@ -1245,6 +1272,11 @@ export interface components {
             baseline_required: number;
             /** Baseline Sessions */
             baseline_sessions: number;
+            /**
+             * Cluster Label
+             * @default
+             */
+            cluster_label: string;
             /** Cold */
             cold: boolean;
             /** Ladder */
@@ -1283,6 +1315,11 @@ export interface components {
             } | null;
             /** Stack Refused */
             stack_refused: string;
+            /**
+             * Stopped At
+             * @default
+             */
+            stopped_at: string;
             /** Trusted */
             trusted: boolean;
         };
@@ -1732,6 +1769,7 @@ export interface components {
         };
         /** MetabolismSeries */
         MetabolismSeries: {
+            axis?: components["schemas"]["ChartAxis"] | null;
             /** Can Back */
             can_back: boolean;
             /** Can Forward */
@@ -3264,6 +3302,10 @@ export interface components {
             timeline: {
                 [key: string]: unknown;
             }[];
+            /** Timeline Axis */
+            timeline_axis?: {
+                [key: string]: unknown;
+            } | null;
         };
         /** ValidationError */
         ValidationError: {

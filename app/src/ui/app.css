@@ -1542,3 +1542,334 @@ button.card {
   width: var(--sp-m);
   height: var(--sp-m);
 }
+
+/* ── Insights (rebuild Phase 8) ──────────────────────────────────────────────────── */
+
+/* A card that opens its screen: a button laid out as a tile. */
+.tile--button {
+  text-align: left;
+  align-items: flex-start;
+}
+
+/* Three figures in a row: this week, last week, the change. */
+.figures--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.figure[data-tone='up'] .figure__value,
+.figure[data-tone='good'] .figure__value {
+  color: var(--f1);
+}
+
+/* The Insights charts: the engine's series on its own scale. */
+.ichart {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ichart__grid {
+  stroke: var(--track);
+  stroke-width: var(--hair);
+}
+
+.ichart__label {
+  fill: var(--muted);
+  font-size: var(--fs-caption);
+}
+
+.ichart__label--soft {
+  fill: var(--faint);
+}
+
+.ichart__value {
+  fill: var(--f1);
+  font-size: var(--fs-caption);
+  font-weight: var(--w-label);
+}
+
+.ichart__line {
+  fill: none;
+  stroke: var(--f1);
+  stroke-width: var(--icon-stroke);
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.ichart__line--soft {
+  stroke: var(--faint);
+  stroke-width: var(--hair);
+  stroke-dasharray: var(--sp-xs) var(--sp-xs);
+}
+
+.ichart__dot {
+  fill: var(--f1);
+}
+
+.ichart__dot--soft {
+  fill: var(--faint);
+}
+
+.ichart__halo {
+  fill: var(--f-glow);
+}
+
+.ichart__bar {
+  fill: var(--f3);
+}
+
+.ichart__bar--now {
+  fill: var(--f1);
+}
+
+/* A change that is worse for its measure stays in the ink; one too small to call stays quiet. */
+.figure[data-tone='flat'] .figure__value {
+  color: var(--muted);
+}
+
+/* A unit after a figure: smaller and quieter than the number. */
+.unit {
+  margin-left: var(--sp-xs);
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+/* Fat against fat-free: the weight in two parts. */
+.share__part--fat {
+  background: var(--f3);
+}
+
+.share__part--lean {
+  background: var(--f1);
+}
+
+/* The body-reading cards, two to a row. */
+.mcards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-s);
+}
+
+.mcard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  min-width: 0;
+}
+
+.mcard[data-source='absent'] .figure__value {
+  color: var(--faint);
+}
+
+.mcard[data-source='measured'] .mcard__source {
+  color: var(--f1);
+}
+
+.group--centre {
+  align-items: center;
+  text-align: center;
+}
+
+/* A longer note that is not a warning: the page's soft tint, in the ink colour. */
+.notice {
+  padding: var(--sp-s) var(--sp-m);
+  border-radius: var(--r-tile);
+  background: var(--f-soft);
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+
+/* Three buttons in a row: Skip, Back, Pause. */
+.trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-s);
+}
+
+/* The card that holds the answer: its edge in the page's strongest shade. */
+.card--hi {
+  border-color: var(--f1);
+  box-shadow: 0 0 var(--sp-l) var(--f-glow);
+}
+
+/* The ladder: the rung to work first stands out; an unknown rung stays quiet. */
+.rung {
+  padding: var(--sp-xs) var(--sp-s);
+  border-radius: var(--r-tile);
+  border: var(--hair) solid transparent;
+}
+
+.rung[data-state='limiting'] {
+  border-color: var(--f1);
+  background: var(--f-soft);
+}
+
+.rung[data-state='unmeasured'],
+.rung[data-state='unreadable'] {
+  opacity: 0.6;
+}
+
+.spectrum[data-spectrum='resisted'] {
+  color: var(--f1);
+}
+
+/* The assessment's place: one tick per test, the current one and the ones done marked. */
+.ticks {
+  display: flex;
+  gap: var(--sp-xs);
+}
+
+.tick {
+  flex: 1;
+  height: var(--bar);
+  border-radius: var(--r-pill);
+  background: var(--track);
+}
+
+.tick--done {
+  background: var(--f3);
+}
+
+.tick--now {
+  background: var(--f1);
+}
+
+.steptitle {
+  font-size: var(--fs-title);
+  font-weight: var(--w-title);
+}
+
+/* The LOCK: the loudest thing on the step, above the setup and the form. */
+.lockbox {
+  padding: var(--sp-s) var(--sp-m);
+  border-radius: var(--r-tile);
+  border: var(--hair) solid var(--f1);
+  background: var(--f-soft);
+  color: var(--text);
+  font-size: var(--fs-small);
+}
+
+/* An answer in words (a pattern, "Not measured"): large and thin, wrapping as it must. */
+.answer {
+  font-size: var(--fs-display);
+  font-weight: var(--w-hero);
+  line-height: 1.15;
+}
+
+/* Several series on one chart: the first solid, the second dashed, the third faint. */
+.ichart__series--1 .ichart__line {
+  stroke: var(--f2);
+  stroke-dasharray: var(--sp-xs) var(--sp-xs);
+}
+
+.ichart__series--1 .ichart__dot {
+  fill: var(--f2);
+}
+
+.ichart__series--2 .ichart__line {
+  stroke: var(--faint);
+}
+
+.ichart__series--2 .ichart__dot {
+  fill: var(--faint);
+}
+
+/* A chart's key: one swatch per series, in the series' style. */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-s) var(--sp-m);
+  font-size: var(--fs-caption);
+  color: var(--muted);
+}
+
+.legend__item::before {
+  content: '';
+  display: inline-block;
+  width: var(--sp-m);
+  height: var(--hair);
+  margin-right: var(--sp-xs);
+  vertical-align: middle;
+  border-top: var(--icon-stroke) solid var(--f1);
+}
+
+.legend__item--1::before {
+  border-top-color: var(--f2);
+  border-top-style: dashed;
+}
+
+.legend__item--2::before {
+  border-top-color: var(--faint);
+}
+
+/* A plain table of the engine's rows (the data tables), scrolled sideways in its card. */
+.dtable {
+  overflow-x: auto;
+}
+
+.dtable table {
+  border-collapse: collapse;
+  font-size: var(--fs-caption);
+}
+
+.dtable th,
+.dtable td {
+  padding: var(--sp-xs) var(--sp-s);
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: var(--hair) solid var(--track);
+}
+
+.dtable th {
+  color: var(--muted);
+  font-weight: var(--w-label);
+}
+
+/* The warnings calendar: seven columns, a marked day is a button. */
+.cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--sp-xs);
+  text-align: center;
+}
+
+.cal__head {
+  font-size: var(--fs-caption);
+  color: var(--muted);
+}
+
+.cal__day {
+  min-height: var(--tap);
+  border-radius: var(--r-tile);
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.cal__day--out {
+  color: var(--faint);
+}
+
+.cal__day--today {
+  box-shadow: inset 0 0 0 var(--hair) var(--f2);
+  color: var(--text);
+}
+
+.cal__day[data-level='monitor'] {
+  background: var(--f-soft);
+  color: var(--text);
+}
+
+.cal__day[data-level='flag'] {
+  background: var(--f1);
+  color: var(--bg);
+}
+
+.cal__day--on {
+  box-shadow: inset 0 0 0 var(--icon-stroke) var(--text);
+}
+
+/* A button that is the current choice (the warning level shown). */
+.btn--on {
+  background: var(--f-soft);
+  box-shadow: inset 0 0 0 var(--hair) var(--f2);
+}

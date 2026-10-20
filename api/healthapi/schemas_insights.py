@@ -128,6 +128,15 @@ class PeriodWindow(BaseModel):
     sub: str
 
 
+class ChartAxis(BaseModel):
+    """The progress chart's scale (metabolism_screen.chart_axis): the value range and
+    the labels, five from the top and five dates across."""
+    lo: float
+    hi: float
+    y_labels: list[str]
+    x_labels: list[str]
+
+
 class MetabolismSeries(BaseModel):
     window: PeriodWindow
     can_back: bool
@@ -139,6 +148,8 @@ class MetabolismSeries(BaseModel):
     change: float | None
     #: good, bad, neutral, flat, or None (fault F11).
     tone: str | None
+    #: None without a reading in the period.
+    axis: ChartAxis | None = None
 
 
 class LatestWeighIn(BaseModel):
@@ -177,6 +188,8 @@ class MetabolismOut(BaseModel):
 
 class FlexReading(BaseModel):
     test_key: str
+    #: The test's name as the screen writes it (the key is the store's).
+    label: str = ""
     side: str
     value: float
     unit: str
@@ -215,14 +228,19 @@ class FlexCapture(BaseModel):
     #: The battery's early answer: a pattern means stop here.
     early_pattern: str | None
     early_pattern_label: str
+    #: Why the slot that stopped answered as it did (empty with no early answer).
+    early_reason: str = ""
     skip_notes: list[str]
     progress: dict[str, int]
 
 
 class FlexReport(BaseModel):
+    cluster_label: str = ""
     assessed_on: date | None
     pattern: str | None
     pattern_label: str
+    #: The slot the battery stopped at.
+    stopped_at: str = ""
     trusted: bool
     cold: bool
     baseline_sessions: int
@@ -290,6 +308,8 @@ class EngineDataOut(BaseModel):
     traffic_light: dict[str, Any] | None = None
     acwr: dict[str, Any] | None = None
     volume: list[dict[str, Any]] = []
+    #: The volume chart's rounded top (the AU chart's is acwr.chart.hi).
+    volume_hi: float | None = None
 
 
 # ── The Processing Queue, Macro Trends and Sleep Architecture ────────────────
@@ -334,6 +354,8 @@ class ProcessOut(BaseModel):
 class TrendsOut(BaseModel):
     regions: list[dict[str, Any]]
     timeline: list[dict[str, Any]]
+    #: The timeline's 0-10 scale and its dates (insights.score_timeline_axis).
+    timeline_axis: dict[str, Any] | None = None
     levels: dict[str, list[dict[str, Any]]]
     gate: dict[str, Any]
     #: Once the data gate opens: the direction, slopes, correlations and interpretation.

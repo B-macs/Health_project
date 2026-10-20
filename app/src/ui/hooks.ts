@@ -30,6 +30,16 @@ export function useGrow(target: number, reduced: boolean): number {
   return grown ? target : 0
 }
 
+/** The last answer a screen showed, kept while another view of the same screen loads (another
+ *  series or period): the parts that do not depend on the choice stay on screen meanwhile. */
+export function useKept<T>(data: T | undefined): T | undefined {
+  const [kept, setKept] = useState<T | undefined>(data)
+  useEffect(() => {
+    if (data !== undefined) setKept(data)
+  }, [data])
+  return data ?? kept
+}
+
 export function clock(seconds: number): string {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`
 }

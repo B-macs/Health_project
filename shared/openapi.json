@@ -337,6 +337,41 @@
         "title": "Cellular",
         "type": "object"
       },
+      "ChartAxis": {
+        "description": "The progress chart's scale (metabolism_screen.chart_axis): the value range and\nthe labels, five from the top and five dates across.",
+        "properties": {
+          "hi": {
+            "title": "Hi",
+            "type": "number"
+          },
+          "lo": {
+            "title": "Lo",
+            "type": "number"
+          },
+          "x_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "X Labels",
+            "type": "array"
+          },
+          "y_labels": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Y Labels",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lo",
+          "hi",
+          "y_labels",
+          "x_labels"
+        ],
+        "title": "ChartAxis",
+        "type": "object"
+      },
       "CheckInFormOut": {
         "properties": {
           "conditions": {
@@ -981,6 +1016,17 @@
             },
             "title": "Volume",
             "type": "array"
+          },
+          "volume_hi": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Hi"
           }
         },
         "required": [
@@ -1074,6 +1120,11 @@
             "title": "Early Pattern Label",
             "type": "string"
           },
+          "early_reason": {
+            "default": "",
+            "title": "Early Reason",
+            "type": "string"
+          },
           "order": {
             "items": {
               "$ref": "#/components/schemas/FlexTest"
@@ -1125,6 +1176,11 @@
       },
       "FlexReading": {
         "properties": {
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
           "load_kg": {
             "anyOf": [
               {
@@ -1201,6 +1257,11 @@
           "baseline_sessions": {
             "title": "Baseline Sessions",
             "type": "integer"
+          },
+          "cluster_label": {
+            "default": "",
+            "title": "Cluster Label",
+            "type": "string"
           },
           "cold": {
             "title": "Cold",
@@ -1294,6 +1355,11 @@
           },
           "stack_refused": {
             "title": "Stack Refused",
+            "type": "string"
+          },
+          "stopped_at": {
+            "default": "",
+            "title": "Stopped At",
             "type": "string"
           },
           "trusted": {
@@ -2713,6 +2779,16 @@
       },
       "MetabolismSeries": {
         "properties": {
+          "axis": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChartAxis"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "can_back": {
             "title": "Can Back",
             "type": "boolean"
@@ -7592,6 +7668,18 @@
             },
             "title": "Timeline",
             "type": "array"
+          },
+          "timeline_axis": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline Axis"
           }
         },
         "required": [

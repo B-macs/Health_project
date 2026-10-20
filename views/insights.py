@@ -1028,20 +1028,14 @@ def _metab_chart_svg(points: list[tuple], colour: str, dp: int, min_span: float,
             f'No reading in {window.label}</text></svg>'
         )
 
-    values = [v for _, v in points]
-    mid = (min(values) + max(values)) / 2
-    span_v = max(max(values) - min(values), min_span) * 1.25
-    y_lo, y_hi = mid - span_v / 2, mid + span_v / 2
+    # The scale is the engine's (metabolism_screen.chart_axis), so the phone draws the same.
+    axis = ms.chart_axis(points, min_span, dp, window)
+    y_lo, y_hi = axis["lo"], axis["hi"]
 
     def y_at(value: float) -> float:
         return pt + (1 - (value - y_lo) / (y_hi - y_lo)) * ih
 
-    y_labels = [f"{y_hi - i / 4 * (y_hi - y_lo):.{dp}f}" for i in range(5)]
-    x_labels = []
-    for i in range(5):
-        day = date.fromordinal(lo_d + round(i / 4 * span_d))
-        x_labels.append(day.strftime("%d %b" if span_d <= 60 else "%b %y").lstrip("0"))
-    out = _svg_frame(y_labels, x_labels, w, h, pl, pr, pt, pb)
+    out = _svg_frame(axis["y_labels"], axis["x_labels"], w, h, pl, pr, pt, pb)
 
     for run in runs:
         if len(run) < 2:

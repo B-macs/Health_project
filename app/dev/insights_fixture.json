@@ -7,6 +7,7 @@
         "done": [],
         "early_pattern": null,
         "early_pattern_label": "",
+        "early_reason": "",
         "order": [
           {
             "adapted_from": "",
@@ -158,6 +159,7 @@
         ],
         "early_pattern": null,
         "early_pattern_label": "",
+        "early_reason": "",
         "order": [
           {
             "adapted_from": "",
@@ -299,6 +301,7 @@
         },
         "readings": [
           {
+            "label": "Knees fully bent",
             "load_kg": null,
             "setup_value": 60.0,
             "side": "left",
@@ -308,6 +311,7 @@
             "voided": false
           },
           {
+            "label": "Knees fully bent",
             "load_kg": null,
             "setup_value": 60.0,
             "side": "right",
@@ -329,6 +333,7 @@
         ],
         "early_pattern": "C",
         "early_pattern_label": "Whole adductor group",
+        "early_reason": "Both leverages short — the whole group.",
         "order": [
           {
             "adapted_from": "",
@@ -470,6 +475,7 @@
         },
         "readings": [
           {
+            "label": "Knees fully bent",
             "load_kg": null,
             "setup_value": 60.0,
             "side": "left",
@@ -479,6 +485,7 @@
             "voided": false
           },
           {
+            "label": "Knees fully bent",
             "load_kg": null,
             "setup_value": 60.0,
             "side": "right",
@@ -488,6 +495,7 @@
             "voided": false
           },
           {
+            "label": "Knees fully straight",
             "load_kg": null,
             "setup_value": null,
             "side": "",
@@ -567,6 +575,7 @@
           "2026-10-19",
           "2026-10-20"
         ],
+        "hi": 400,
         "windows": [
           "Chronic (28d)",
           "Chronic (28d)",
@@ -712,7 +721,8 @@
         "kg": 1725.0,
         "week_start": "2026-10-19"
       }
-    ]
+    ],
+    "volume_hi": 6000.0
   },
   "flexibility_capturing": {
     "capture": {
@@ -724,6 +734,7 @@
       ],
       "early_pattern": "C",
       "early_pattern_label": "Whole adductor group",
+      "early_reason": "Both leverages short — the whole group.",
       "order": [
         {
           "adapted_from": "",
@@ -865,6 +876,7 @@
       },
       "readings": [
         {
+          "label": "Knees fully bent",
           "load_kg": null,
           "setup_value": 60.0,
           "side": "left",
@@ -874,6 +886,7 @@
           "voided": false
         },
         {
+          "label": "Knees fully bent",
           "load_kg": null,
           "setup_value": 60.0,
           "side": "right",
@@ -883,6 +896,7 @@
           "voided": false
         },
         {
+          "label": "Knees fully straight",
           "load_kg": null,
           "setup_value": null,
           "side": "",
@@ -897,6 +911,7 @@
     },
     "count": 0,
     "guide": {
+      "cluster_label": "Side split & pancake",
       "frozen": [
         {
           "name": "straddle_width_cm",
@@ -979,6 +994,7 @@
     "capture": null,
     "count": 0,
     "guide": {
+      "cluster_label": "Side split & pancake",
       "frozen": [
         {
           "name": "straddle_width_cm",
@@ -1061,6 +1077,7 @@
     "capture": null,
     "count": 1,
     "guide": {
+      "cluster_label": "Side split & pancake",
       "frozen": [
         {
           "name": "straddle_width_cm",
@@ -1140,6 +1157,7 @@
       "assessed_on": "2026-10-20",
       "baseline_required": 3,
       "baseline_sessions": 1,
+      "cluster_label": "Side split & pancake",
       "cold": true,
       "ladder": [
         {
@@ -1337,6 +1355,7 @@
         "pattern": "C"
       },
       "stack_refused": "",
+      "stopped_at": "Regressed",
       "trusted": false
     },
     "state": "populated"
@@ -1553,6 +1572,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 18.9775,
+          "lo": 17.1025,
+          "x_labels": [
+            "Jul 26",
+            "Aug 26",
+            "Sep 26",
+            "Sep 26",
+            "Oct 26"
+          ],
+          "y_labels": [
+            "19.0",
+            "18.5",
+            "18.0",
+            "17.6",
+            "17.1"
+          ]
+        },
         "can_back": false,
         "can_forward": false,
         "change": -0.9200000000000017,
@@ -1991,6 +2028,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 0.378,
+          "lo": 0.368,
+          "x_labels": [
+            "Jul 26",
+            "Aug 26",
+            "Sep 26",
+            "Sep 26",
+            "Oct 26"
+          ],
+          "y_labels": [
+            "0.378",
+            "0.376",
+            "0.373",
+            "0.370",
+            "0.368"
+          ]
+        },
         "can_back": false,
         "can_forward": false,
         "change": -0.0020000000000000018,
@@ -2253,6 +2308,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 15.608998,
+          "lo": 13.733998,
+          "x_labels": [
+            "Jul 26",
+            "Aug 26",
+            "Sep 26",
+            "Sep 26",
+            "Oct 26"
+          ],
+          "y_labels": [
+            "15.6",
+            "15.1",
+            "14.7",
+            "14.2",
+            "13.7"
+          ]
+        },
         "can_back": false,
         "can_forward": false,
         "change": -0.9970039999999987,
@@ -2691,6 +2764,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 67.576002,
+          "lo": 65.701002,
+          "x_labels": [
+            "Jul 26",
+            "Aug 26",
+            "Sep 26",
+            "Sep 26",
+            "Oct 26"
+          ],
+          "y_labels": [
+            "67.6",
+            "67.1",
+            "66.6",
+            "66.2",
+            "65.7"
+          ]
+        },
         "can_back": false,
         "can_forward": false,
         "change": -0.38299599999999145,
@@ -3129,6 +3220,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 6.8125,
+          "lo": 6.1875,
+          "x_labels": [
+            "Jul 26",
+            "Aug 26",
+            "Sep 26",
+            "Sep 26",
+            "Oct 26"
+          ],
+          "y_labels": [
+            "6.8",
+            "6.7",
+            "6.5",
+            "6.3",
+            "6.2"
+          ]
+        },
         "can_back": false,
         "can_forward": false,
         "change": 0.1999999999999993,
@@ -3391,6 +3500,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 82.56,
+          "lo": 80.06,
+          "x_labels": [
+            "Jul 26",
+            "Aug 26",
+            "Sep 26",
+            "Sep 26",
+            "Oct 26"
+          ],
+          "y_labels": [
+            "82.6",
+            "81.9",
+            "81.3",
+            "80.7",
+            "80.1"
+          ]
+        },
         "can_back": false,
         "can_forward": false,
         "change": -1.3799999999999955,
@@ -3829,6 +3956,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 82.38,
+          "lo": 79.88,
+          "x_labels": [
+            "1 Sep",
+            "8 Sep",
+            "15 Sep",
+            "23 Sep",
+            "30 Sep"
+          ],
+          "y_labels": [
+            "82.4",
+            "81.8",
+            "81.1",
+            "80.5",
+            "79.9"
+          ]
+        },
         "can_back": true,
         "can_forward": true,
         "change": -0.4200000000000017,
@@ -4139,6 +4284,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 81.99000000000001,
+          "lo": 79.49000000000001,
+          "x_labels": [
+            "1 Oct",
+            "9 Oct",
+            "16 Oct",
+            "23 Oct",
+            "31 Oct"
+          ],
+          "y_labels": [
+            "82.0",
+            "81.4",
+            "80.7",
+            "80.1",
+            "79.5"
+          ]
+        },
         "can_back": true,
         "can_forward": false,
         "change": -0.23999999999999488,
@@ -4425,6 +4588,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 81.96000000000001,
+          "lo": 79.46000000000001,
+          "x_labels": [
+            "12 Oct",
+            "14 Oct",
+            "15 Oct",
+            "16 Oct",
+            "18 Oct"
+          ],
+          "y_labels": [
+            "82.0",
+            "81.3",
+            "80.7",
+            "80.1",
+            "79.5"
+          ]
+        },
         "can_back": true,
         "can_forward": true,
         "change": -0.05999999999998806,
@@ -4687,6 +4868,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 81.87,
+          "lo": 79.37,
+          "x_labels": [
+            "19 Oct",
+            "21 Oct",
+            "22 Oct",
+            "23 Oct",
+            "25 Oct"
+          ],
+          "y_labels": [
+            "81.9",
+            "81.2",
+            "80.6",
+            "80.0",
+            "79.4"
+          ]
+        },
         "can_back": true,
         "can_forward": false,
         "change": null,
@@ -4941,6 +5140,7 @@
         }
       ],
       "series": {
+        "axis": null,
         "can_back": false,
         "can_forward": true,
         "change": null,
@@ -5177,6 +5377,24 @@
         }
       ],
       "series": {
+        "axis": {
+          "hi": 82.56,
+          "lo": 80.06,
+          "x_labels": [
+            "Jan 26",
+            "Apr 26",
+            "Jul 26",
+            "Oct 26",
+            "Dec 26"
+          ],
+          "y_labels": [
+            "82.6",
+            "81.9",
+            "81.3",
+            "80.7",
+            "80.1"
+          ]
+        },
         "can_back": false,
         "can_forward": false,
         "change": -1.3799999999999955,
@@ -5714,19 +5932,1721 @@
       "phantom_wake_minutes": 0,
       "strips": [
         {
+          "bands": [
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Awake"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 24m"
+                  },
+                  {
+                    "label": "Total Awake tonight",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "5.3 %"
+                  }
+                ],
+                "title": "Awake"
+              },
+              "index": 0,
+              "left": 0.0,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 1,
+              "left": 0.05263157894736842,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 2,
+              "left": 0.10526315789473684,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 3,
+              "left": 0.15789473684210525,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 4,
+              "left": 0.21052631578947367,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 5,
+              "left": 0.2631578947368421,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 6,
+              "left": 0.3157894736842105,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 7,
+              "left": 0.3684210526315789,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 8,
+              "left": 0.42105263157894735,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 9,
+              "left": 0.47368421052631576,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 10,
+              "left": 0.5263157894736842,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 11,
+              "left": 0.5789473684210527,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 12,
+              "left": 0.631578947368421,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 13,
+              "left": 0.6842105263157895,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 14,
+              "left": 0.7368421052631579,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 24m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "5.3 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 15,
+              "left": 0.7894736842105263,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 16,
+              "left": 0.8421052631578947,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 17,
+              "left": 0.8947368421052632,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Awake"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 24m"
+                  },
+                  {
+                    "label": "Total Awake tonight",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "5.3 %"
+                  }
+                ],
+                "title": "Awake"
+              },
+              "index": 18,
+              "left": 0.9473684210526315,
+              "width": 0.05263157894736842
+            }
+          ],
           "codes": "4222233112222331224",
-          "label": "Oura (as recorded)"
+          "label": "Oura (as recorded)",
+          "runs": [
+            {
+              "code": "4",
+              "end": 1,
+              "name": "Awake",
+              "start": 0
+            },
+            {
+              "code": "2",
+              "end": 5,
+              "name": "Light",
+              "start": 1
+            },
+            {
+              "code": "3",
+              "end": 7,
+              "name": "REM",
+              "start": 5
+            },
+            {
+              "code": "1",
+              "end": 9,
+              "name": "Deep",
+              "start": 7
+            },
+            {
+              "code": "2",
+              "end": 13,
+              "name": "Light",
+              "start": 9
+            },
+            {
+              "code": "3",
+              "end": 15,
+              "name": "REM",
+              "start": 13
+            },
+            {
+              "code": "1",
+              "end": 16,
+              "name": "Deep",
+              "start": 15
+            },
+            {
+              "code": "2",
+              "end": 18,
+              "name": "Light",
+              "start": 16
+            },
+            {
+              "code": "4",
+              "end": 19,
+              "name": "Awake",
+              "start": 18
+            }
+          ]
         },
         {
+          "bands": [
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Awake"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 24m"
+                  },
+                  {
+                    "label": "Total Awake tonight",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "5.3 %"
+                  }
+                ],
+                "title": "Awake"
+              },
+              "index": 0,
+              "left": 0.0,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 1,
+              "left": 0.05263157894736842,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 2,
+              "left": 0.10526315789473684,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 3,
+              "left": 0.15789473684210525,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 4,
+              "left": 0.21052631578947367,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 5,
+              "left": 0.2631578947368421,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 6,
+              "left": 0.3157894736842105,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 7,
+              "left": 0.3684210526315789,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 8,
+              "left": 0.42105263157894735,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 9,
+              "left": 0.47368421052631576,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 10,
+              "left": 0.5263157894736842,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 11,
+              "left": 0.5789473684210527,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 12,
+              "left": 0.631578947368421,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 13,
+              "left": 0.6842105263157895,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 14,
+              "left": 0.7368421052631579,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 24m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "5.3 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 15,
+              "left": 0.7894736842105263,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 16,
+              "left": 0.8421052631578947,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "3h 57m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 17,
+              "left": 0.8947368421052632,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Awake"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 24m"
+                  },
+                  {
+                    "label": "Total Awake tonight",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "5.3 %"
+                  }
+                ],
+                "title": "Awake"
+              },
+              "index": 18,
+              "left": 0.9473684210526315,
+              "width": 0.05263157894736842
+            }
+          ],
           "codes": "4222233112222331224",
-          "label": "Master (fused)"
+          "label": "Master (fused)",
+          "runs": [
+            {
+              "code": "4",
+              "end": 1,
+              "name": "Awake",
+              "start": 0
+            },
+            {
+              "code": "2",
+              "end": 5,
+              "name": "Light",
+              "start": 1
+            },
+            {
+              "code": "3",
+              "end": 7,
+              "name": "REM",
+              "start": 5
+            },
+            {
+              "code": "1",
+              "end": 9,
+              "name": "Deep",
+              "start": 7
+            },
+            {
+              "code": "2",
+              "end": 13,
+              "name": "Light",
+              "start": 9
+            },
+            {
+              "code": "3",
+              "end": 15,
+              "name": "REM",
+              "start": 13
+            },
+            {
+              "code": "1",
+              "end": 16,
+              "name": "Deep",
+              "start": 15
+            },
+            {
+              "code": "2",
+              "end": 18,
+              "name": "Light",
+              "start": 16
+            },
+            {
+              "code": "4",
+              "end": 19,
+              "name": "Awake",
+              "start": 18
+            }
+          ]
         },
         {
+          "bands": [
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 58m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "26.3 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 0,
+              "left": 0.0,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 58m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "26.3 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 1,
+              "left": 0.05263157894736842,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 58m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "26.3 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 2,
+              "left": 0.10526315789473684,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 58m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "26.3 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 3,
+              "left": 0.15789473684210525,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 58m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "26.3 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 4,
+              "left": 0.21052631578947367,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 5,
+              "left": 0.2631578947368421,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 6,
+              "left": 0.3157894736842105,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 7,
+              "left": 0.3684210526315789,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 8,
+              "left": 0.42105263157894735,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 9,
+              "left": 0.47368421052631576,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 10,
+              "left": 0.5263157894736842,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 11,
+              "left": 0.5789473684210527,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "21.1 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 12,
+              "left": 0.631578947368421,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 13,
+              "left": 0.6842105263157895,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "REM"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 47m"
+                  },
+                  {
+                    "label": "Total REM tonight",
+                    "value": "1h 35m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "10.5 %"
+                  }
+                ],
+                "title": "REM"
+              },
+              "index": 14,
+              "left": 0.7368421052631579,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Deep"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "0h 24m"
+                  },
+                  {
+                    "label": "Total Deep tonight",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "5.3 %"
+                  }
+                ],
+                "title": "Deep"
+              },
+              "index": 15,
+              "left": 0.7894736842105263,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "15.8 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 16,
+              "left": 0.8421052631578947,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "15.8 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 17,
+              "left": 0.8947368421052632,
+              "width": 0.05263157894736842
+            },
+            {
+              "detail": {
+                "open_date": null,
+                "rows": [
+                  {
+                    "label": "Stage",
+                    "value": "Light"
+                  },
+                  {
+                    "label": "Duration",
+                    "value": "1h 11m"
+                  },
+                  {
+                    "label": "Total Light tonight",
+                    "value": "4h 44m"
+                  },
+                  {
+                    "label": "Share of night",
+                    "value": "15.8 %"
+                  }
+                ],
+                "title": "Light"
+              },
+              "index": 18,
+              "left": 0.9473684210526315,
+              "width": 0.05263157894736842
+            }
+          ],
           "codes": "2222233112222331222",
-          "label": "Garmin (as recorded)"
+          "label": "Garmin (as recorded)",
+          "runs": [
+            {
+              "code": "2",
+              "end": 5,
+              "name": "Light",
+              "start": 0
+            },
+            {
+              "code": "3",
+              "end": 7,
+              "name": "REM",
+              "start": 5
+            },
+            {
+              "code": "1",
+              "end": 9,
+              "name": "Deep",
+              "start": 7
+            },
+            {
+              "code": "2",
+              "end": 13,
+              "name": "Light",
+              "start": 9
+            },
+            {
+              "code": "3",
+              "end": 15,
+              "name": "REM",
+              "start": 13
+            },
+            {
+              "code": "1",
+              "end": 16,
+              "name": "Deep",
+              "start": 15
+            },
+            {
+              "code": "2",
+              "end": 19,
+              "name": "Light",
+              "start": 16
+            }
+          ]
         }
       ],
-      "window_overlap_pct": 97
+      "window_overlap_pct": 97,
+      "x_labels": []
     },
     "nights": [
       "2026-10-19",
@@ -8630,7 +10550,8 @@
     "regions": [
       {
         "mentions": 1,
-        "region": "Central Lower Back"
+        "region": "Central Lower Back",
+        "share": 1.0
       }
     ],
     "timeline": [
@@ -8640,7 +10561,21 @@
         "parsed_severity": 4.0,
         "self_reported": 4.0
       }
-    ]
+    ],
+    "timeline_axis": {
+      "end": "2026-10-20",
+      "hi": 10.0,
+      "lo": 0.0,
+      "start": "2026-10-20",
+      "x_labels": [
+        "20 Oct"
+      ],
+      "y_labels": [
+        "10",
+        "5",
+        "0"
+      ]
+    }
   },
   "trends_closed": {
     "analysis": null,
@@ -8667,7 +10602,8 @@
     "regions": [
       {
         "mentions": 1,
-        "region": "Central Lower Back"
+        "region": "Central Lower Back",
+        "share": 1.0
       }
     ],
     "timeline": [
@@ -8677,6 +10613,20 @@
         "parsed_severity": 4.0,
         "self_reported": 4.0
       }
-    ]
+    ],
+    "timeline_axis": {
+      "end": "2026-10-20",
+      "hi": 10.0,
+      "lo": 0.0,
+      "start": "2026-10-20",
+      "x_labels": [
+        "20 Oct"
+      ],
+      "y_labels": [
+        "10",
+        "5",
+        "0"
+      ]
+    }
   }
 }

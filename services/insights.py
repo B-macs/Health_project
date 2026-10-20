@@ -118,6 +118,23 @@ def acwr_chart_data(daily_au_28: list[float], today: date | None = None) -> dict
     return {"dates": dates, "au": list(daily_au_28), "windows": windows}
 
 
+#: The check-in's scores (tightness, pain) are given on 0-10.
+SCORE_SCALE = (0.0, 10.0)
+
+
+def score_timeline_axis(dates: list[str]) -> dict | None:
+    """The tightness timeline's scale: the 0-10 the check-in scores are given on, and its
+    first and last dates (oldest first). None with no entry."""
+    days = [date.fromisoformat(d) for d in dates if d]
+    if not days:
+        return None
+    lo, hi = SCORE_SCALE
+    ends = [days[0]] if days[0] == days[-1] else [days[0], days[-1]]
+    return {"lo": lo, "hi": hi, "y_labels": [f"{hi:g}", f"{(lo + hi) / 2:g}", f"{lo:g}"],
+            "x_labels": [d.strftime("%d %b").lstrip("0") for d in ends],
+            "start": days[0].isoformat(), "end": days[-1].isoformat()}
+
+
 def body_region_frequency(parsed_rows: list[dict]) -> dict[str, int]:
     """Count how often each body region appears across parsed readiness rows'
     ai_body_parts JSON field. Malformed JSON is skipped, not fabricated."""

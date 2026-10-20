@@ -22,7 +22,8 @@ from services import ai
 from services import dashboard as dash
 from services import decision, engine, insights, metabolism_screen, processing_queue
 from services import sessions as sess
-from services import sleep_architecture, stats, strength_screen, volume
+from services import home_detail, sleep_architecture, sleep_screen, stats, strength_screen
+from services import tonnage, volume
 
 
 def _error(exc: Exception) -> str:
@@ -180,6 +181,8 @@ def metabolism(repo, today: date, metric: str = "Weight", kind: str = "all",
             "first": _point(shown["first"]) if shown["first"] else None,
             "last": _point(shown["last"]) if shown["last"] else None,
             "change": shown["change"], "tone": shown["tone"],
+            "axis": metabolism_screen.chart_axis(shown["points"], shown["metric"]["span"],
+                                                 shown["metric"]["dp"], window),
         },
         "cellular": None if cell is None else {
             "device": cell["device"], "days_old": cell["days_old"], "date": cell["scan"].day,
@@ -216,6 +219,10 @@ def engine_data(repo, today: date) -> dict:
     chronic_label, chronic_help = insights.acwr_chronic_label(acwr_result)
     status = insights.acwr_status(acwr_result)
     sessions_ = repo.get_recent_sessions(days=60, today=today)
+    chart = insights.acwr_chart_data(acwr_result.get("daily_au_28", [0.0] * 28), today=today)
+    # Each chart's rounded top (tonnage.nice_axis_max), so the phone draws no scale of its own.
+    chart["hi"] = tonnage.nice_axis_max(max(chart["au"], default=0.0))
+    weeks = volume.weekly_volume_series(sessions_, today)
     return {
         "today": today, "load_error": None,
         "directive": {"tone": verdict.tone, "words": insights.directive_words(verdict),
@@ -241,10 +248,9 @@ def engine_data(repo, today: date) -> dict:
                  "chronic_label": chronic_label, "chronic_help": chronic_help,
                  "ceiling": acwr_result.get("ceiling"),
                  "status": None if status is None else {"kind": status[0], "text": status[1]},
-                 "chart": insights.acwr_chart_data(acwr_result.get("daily_au_28", [0.0] * 28),
-                                                    today=today)},
-        "volume": [{"week_start": week, "kg": kg}
-                   for week, kg in volume.weekly_volume_series(sessions_, today)],
+                 "chart": chart},
+        "volume": [{"week_start": week, "kg": kg} for week, kg in weeks],
+        "volume_hi": tonnage.nice_axis_max(max((kg for _week, kg in weeks), default=0.0)),
     }
 
 
@@ -312,12 +318,19 @@ def trends(repo, today: date) -> dict:
                 "recommendations": result.get("recommendations", []),
             },
         }
+    regions = sorted(insights.body_region_frequency(parsed).items(), key=lambda kv: -kv[1])
+    top = max((n for _r, n in regions), default=0)
+    oldest_first = sorted(parsed, key=lambda r: str(r.get("date") or ""))
     return {
-        "regions": [{"region": r, "mentions": n} for r, n in sorted(
-            insights.body_region_frequency(parsed).items(), key=lambda kv: -kv[1])],
+        # Each region's mentions, and its share of the most flagged one (the bar's length).
+        "regions": [{"region": r, "mentions": n, "share": n / top if top else 0.0}
+                    for r, n in regions],
+        # Oldest first, as a timeline reads (the parsed check-ins come newest first).
         "timeline": [{"date": r.get("date"), "self_reported": r.get("tightness_score"),
                       "parsed_severity": r.get("ai_tightness_severity"),
-                      "pain": r.get("pain_score")} for r in parsed],
+                      "pain": r.get("pain_score")}
+                     for r in oldest_first],
+        "timeline_axis": insights.score_timeline_axis([str(r.get("date") or "") for r in oldest_first]),
         "levels": {level: [{"date": r.get("date"), "tightness": r.get("tightness_score"),
                             "pain": r.get("pain_score"),
                             "severity": r.get("ai_tightness_severity"),
@@ -351,6 +364,9 @@ def sleep_architecture_view(repo, today: date, night: str | None = None) -> dict
     chosen = next((r for r in fused if r["date"] == night), fused[-1] if fused else None)
     bio = [asdict(r) for r in repo.get_biometric_rolling(days=28, today=today)]
     shadow = dash.sleep_fusion_shadow_report(bio, sleep_architecture.fused_hours(rows), today=today)
+    # The three strips on the night's own window (the fusion row's), each as the Sleep
+    # screen's strip: its runs named and a tap band per slot (home_detail.strip).
+    start_iso, total = sleep_screen.strip_window(None, chosen, dash.minutes_between)
     return {
         "load_error": None,
         "counts": {k: summary[k] for k in ("fused", "oura_only", "watch_only")},
@@ -358,8 +374,12 @@ def sleep_architecture_view(repo, today: date, night: str | None = None) -> dict
         "nights": [r["date"] for r in reversed(fused)],
         "night": None if chosen is None else {
             "date": chosen["date"],
-            "strips": [{"label": label, "codes": str(chosen.get(key) or "")}
+            "strips": [{"label": label,
+                        **home_detail.strip(str(chosen.get(key) or ""), start_iso, total,
+                                            sleep_screen.STAGE_NAMES, "Stage")}
                        for label, key in NIGHT_STRIPS],
+            "x_labels": [{"at": float(at), "text": str(text)}
+                         for at, text in dash.clock_axis_labels(start_iso, total, max_ticks=5)],
             **{k: chosen.get(k) for k in ("oura_sleep_hours", "master_sleep_hours",
                                           "phantom_wake_minutes", "window_overlap_pct",
                                           "agreement_pct", "cohen_kappa",

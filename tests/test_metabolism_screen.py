@@ -109,3 +109,35 @@ def test_the_split_and_the_scan_age():
     cell = ms.cellular([_scan(date(2026, 10, 9), 6.0)], TODAY)
     assert cell["days_old"] == 10 and cell["device"] == "Model A"
     assert ms.cellular([], TODAY) is None
+
+
+# ── the progress chart's scale (rebuild Phase 8: moved out of the Streamlit view) ──
+
+def test_the_chart_scale_is_centred_and_never_magnifies_a_quiet_period():
+    window = bc.period_window("month", 0, date(2026, 10, 20), date(2026, 7, 1))
+    points = [(date(2026, 10, 4), 80.9), (date(2026, 10, 20), 80.6)]
+    axis = ms.chart_axis(points, min_span=2.0, dp=1, window=window)
+    # The readings span 0.3 kg: the scale is the minimum span, a quarter taller, centred.
+    assert axis["hi"] - axis["lo"] == 2.0 * 1.25
+    assert (axis["hi"] + axis["lo"]) / 2 == (80.9 + 80.6) / 2
+    assert axis["y_labels"] == [f"{axis['hi'] - i / 4 * 2.5:.1f}" for i in range(5)]
+    assert axis["x_labels"] == ["1 Oct", "9 Oct", "16 Oct", "23 Oct", "31 Oct"]
+
+
+def test_a_wide_spread_sets_the_scale_and_a_long_period_names_months():
+    window = bc.period_window("year", 0, date(2026, 10, 20), date(2025, 1, 1))
+    points = [(date(2026, 2, 1), 85.0), (date(2026, 9, 1), 80.0)]
+    axis = ms.chart_axis(points, min_span=2.0, dp=1, window=window)
+    assert axis["hi"] - axis["lo"] == 5.0 * 1.25
+    assert axis["x_labels"][0] == "Jan 26" and axis["x_labels"][-1] == "Dec 26"
+
+
+def test_no_reading_has_no_scale():
+    window = bc.period_window("week", 0, date(2026, 10, 20), date(2026, 7, 1))
+    assert ms.chart_axis([], min_span=2.0, dp=1, window=window) is None
+
+
+def test_the_streamlit_chart_draws_with_the_engines_scale():
+    from pathlib import Path
+    source = (Path(__file__).resolve().parents[1] / "views" / "insights.py").read_text(encoding="utf-8")
+    assert "ms.chart_axis(points, min_span, dp, window)" in source

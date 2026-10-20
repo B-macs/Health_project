@@ -29,10 +29,18 @@
 // - the "+" menu: the accessory session (the engine-made session as its own kind), one
 //   yoga flow, and two Garmin activities; a yoga flow or an activity is logged once (the
 //   same save sent again answers as it did, another save is told it is already logged).
+// - Insights (Phase 8): the engine's own answers over made-up data (dev/insights_fixture.json,
+//   made by scripts/make_insights_fixture.py): Strength for each series (`e2e_week` with
+//   no_reference: the engine's refusal before the reference is stored), Metabolism for each
+//   measure and period (the nearest answer), Flexibility empty, capturing or finished per run
+//   (the capture walks the engine's own answers step by step, then its early stop), Engine data,
+//   the warnings calendar, Trends (trends_closed: before the data gate opens), Sleep
+//   architecture (sleep_empty: no fused night), the data tables, the session checks, Settings.
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import * as fx from './fixtures.ts'
 import sessionFixture from './session_fixture.json' with { type: 'json' }
+import insightsFixture from './insights_fixture.json' with { type: 'json' }
 
 const KEY = 'dev'
 const received: { method: string; path: string; body: unknown; day: string | null }[] = []
@@ -86,6 +94,22 @@ function answerSchedule(path: string, body: Record<string, unknown> | null, run:
   }
   run.flare = true
   return [200, { stored: true }]
+}
+
+const insights = insightsFixture as unknown as {
+  strength: Record<string, unknown>; metabolism: Record<string, unknown>
+  flexibility_empty: unknown; flexibility_capturing: Record<string, unknown>; flexibility_populated: unknown
+  capture: { states: unknown[] }; engine: unknown; queue: unknown; trends: unknown; trends_closed: unknown
+  sleep_architecture: unknown; sleep_architecture_empty: unknown; tables: Record<string, unknown>
+  session_checks: unknown; settings: unknown
+}
+const STRENGTH_DEFAULT = 'Overall Strength Score'
+
+/** The flexibility screen as one run has reached it: finished, capturing, or empty. */
+function flexibilityOf(run: fx.WeekRun, scenario: Set<string>): unknown {
+  if (run.flexFinished || scenario.has('flex_populated')) return insights.flexibility_populated
+  if (run.flexStep !== null) return { ...insights.flexibility_capturing, capture: insights.capture.states[run.flexStep] }
+  return insights.flexibility_empty
 }
 
 /** A yoga flow or an outdoor activity, logged once a day: the same save sent again answers
@@ -184,6 +208,33 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     if (url.pathname === '/api/training/week') {
       return send(200, fx.trainingWeek(local, url.searchParams.get('week_start'), scenarioOf(req), runOf(req)))
     }
+    if (url.pathname === '/api/insights/strength') {
+      if (scenarioOf(req).has('no_reference')) return send(409, { error: 'strength_reference_missing' })
+      const metric = url.searchParams.get('metric') ?? STRENGTH_DEFAULT
+      return send(200, insights.strength[metric] ?? insights.strength[STRENGTH_DEFAULT])
+    }
+    if (url.pathname === '/api/insights/metabolism') {
+      const metric = url.searchParams.get('metric') ?? 'Weight'
+      const kind = url.searchParams.get('kind') ?? 'all'
+      const offset = url.searchParams.get('offset') ?? '0'
+      const m = insights.metabolism
+      return send(200, m[`${metric}|${kind}|${offset}`] ?? m[`${metric}|${kind}|0`] ?? m[`${metric}|all|0`] ?? m['Weight|all|0'])
+    }
+    if (url.pathname === '/api/insights/flexibility') return send(200, flexibilityOf(runOf(req), scenarioOf(req)))
+    if (url.pathname === '/api/insights/engine') return send(200, insights.engine)
+    if (url.pathname === '/api/insights/queue') return send(200, insights.queue)
+    if (url.pathname === '/api/insights/trends') {
+      return send(200, scenarioOf(req).has('trends_closed') ? insights.trends_closed : insights.trends)
+    }
+    if (url.pathname === '/api/insights/sleep-architecture') {
+      return send(200, scenarioOf(req).has('sleep_empty') ? insights.sleep_architecture_empty : insights.sleep_architecture)
+    }
+    if (url.pathname.startsWith('/api/data/tables/')) {
+      const table = url.pathname.slice('/api/data/tables/'.length)
+      return table in insights.tables ? send(200, insights.tables[table]) : send(404, { error: 'unknown_table' })
+    }
+    if (url.pathname === '/api/data/session-checks') return send(200, insights.session_checks)
+    if (url.pathname === '/api/settings') return send(200, insights.settings)
     if (url.pathname === '/api/training/accessory') {
       // `accessory_yesterday`: an answer kept from the day before, which is never today's.
       return send(200, fx.accessoryPlan(scenarioOf(req).has('accessory_yesterday') ? fx.addDays(local, -1) : local))
@@ -236,6 +287,26 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
           measured_rpe: 6.2, measured_au: 6.2 * b.duration_minutes, active_minutes: b.duration_minutes - 2,
           rpe_delta: 6.2 - rpe, au_delta: (6.2 - rpe) * b.duration_minutes, verdict: Math.abs(6.2 - rpe) < 0.5 ? 'exact' : 6.2 > rpe ? 'under' : 'over',
           coverage: 0.95, low_coverage: false, activity: 'Made-up strength', covered_exercises: 8, total_exercises: 9 } })
+      }
+      if (url.pathname.startsWith('/api/insights/flexibility')) {
+        const run = runOf(req)
+        const last = insights.capture.states.length - 1
+        if (url.pathname === '/api/insights/flexibility/capture') {
+          if (req.method === 'POST') run.flexStep = run.flexStep ?? 0
+          else if (req.method === 'PUT') run.flexStep = Math.min((run.flexStep ?? 0) + 1, last)
+          else if (req.method === 'DELETE') {
+            run.flexStep = null
+            return send(200, { cleared: true })
+          }
+          return send(200, insights.capture.states[run.flexStep ?? 0])
+        }
+        if (url.pathname === '/api/insights/flexibility/capture/finish') {
+          if (run.flexStep === null) return send(409, { error: 'no_capture' })
+          run.flexStep = null
+          run.flexFinished = true
+          return send(200, insights.flexibility_populated)
+        }
+        if (url.pathname === '/api/insights/flexibility/missing') return send(200, insights.flexibility_populated)
       }
       if (SCHEDULE.has(url.pathname) && req.method === 'POST') {
         const [status, payload] = answerSchedule(url.pathname, body as Record<string, unknown> | null, runOf(req), scenarioOf(req))

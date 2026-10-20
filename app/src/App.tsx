@@ -13,7 +13,8 @@
 //   addresses under /training/. While a session runs, the tab bar hides and an app update
 //   waits; a session left open (a reload, an app kill) opens again at the next start.
 // - The outbox sends what waits whenever the app is open (lib/outbox.ts).
-// - Insights still shows the design's sample numbers (Phase 8), and says so.
+// - Insights shows the engine's long view (Phase 8): a hub of cards, each screen with its own
+//   address under /insights/; the data tables and the manual syncs are under /settings/data.
 //
 // The address can carry the appearance and less motion for the screenshot report:
 // ?t=auto|light|dark &still (motion off, so a picture never catches a ring half-drawn).
@@ -31,11 +32,19 @@ import { refreshAlerts } from './lib/alerts'
 import { useOutboxLoop } from './lib/outbox'
 import { useAppSettings, type AppSettings } from './lib/settings'
 import { isStandalone } from './lib/standalone'
-import { MOCK } from './mock/data'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CheckIn, formPath } from './screens/CheckIn'
 import { ReadinessScreen, SleepScreen, StrainScreen } from './screens/Details'
-import { Insights } from './screens/Insights'
+import { CardioScreen, Insights } from './screens/Insights'
+import { DataScreen } from './screens/DataTables'
+import { EngineScreen } from './screens/InsightsEngine'
+import { FlexibilityScreen } from './screens/InsightsFlexibility'
+import { FlexibilityCapture } from './screens/InsightsFlexibilityCapture'
+import { MetabolismScreen } from './screens/InsightsMetabolism'
+import { SleepArchScreen } from './screens/InsightsSleep'
+import { TrendsScreen } from './screens/InsightsTrends'
+import { WarningsScreen } from './screens/InsightsWarnings'
+import { StrengthScreen } from './screens/InsightsStrength'
 import { Settings, THEMES } from './screens/Settings'
 import { Today } from './screens/Today'
 import { TrainingTab } from './screens/TrainingTab'
@@ -57,6 +66,8 @@ const TABS: { key: Tab; path: string; icon: () => ReactElement }[] = [
 export function tabOf(location: string): Tab {
   if (['/readiness', '/sleep', '/strain'].includes(location)) return 'today'
   if (location.startsWith('/training/')) return 'training'
+  if (location.startsWith('/insights/')) return 'insights'
+  if (location.startsWith('/settings/')) return 'settings'
   return TABS.find((t) => t.path === location)?.key ?? 'today'
 }
 
@@ -161,9 +172,17 @@ function Shell(p: ShellProps) {
               <Route path="/training/yoga/:slug">{(params) => <TrainingTab extra="yoga" slug={params.slug} />}</Route>
               <Route path="/training/outdoor"><TrainingTab extra="outdoor" /></Route>
               <Route path="/training/accessory"><TrainingTab extra="accessory" /></Route>
-              <Route path="/insights">
-                <Insights mock={MOCK} reduced={p.reduced} />
-              </Route>
+              <Route path="/insights"><Insights /></Route>
+              <Route path="/insights/strength"><StrengthScreen /></Route>
+              <Route path="/insights/metabolism"><MetabolismScreen /></Route>
+              <Route path="/insights/flexibility"><FlexibilityScreen /></Route>
+              <Route path="/insights/flexibility/capture"><FlexibilityCapture /></Route>
+              <Route path="/insights/cardio"><CardioScreen /></Route>
+              <Route path="/insights/engine"><EngineScreen /></Route>
+              <Route path="/insights/warnings"><WarningsScreen /></Route>
+              <Route path="/insights/trends"><TrendsScreen /></Route>
+              <Route path="/insights/sleep"><SleepArchScreen /></Route>
+              <Route path="/settings/data"><DataScreen /></Route>
               <Route path="/settings">
                 <Settings store={p.store} ctx={p.ctx} theme={p.theme}
                   onTheme={(t) => void setSetting(p.store, KEYS.theme, t)} />

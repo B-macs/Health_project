@@ -1,56 +1,90 @@
-// Insights (the owner's pick, 2026-10-20: Week), in the page's one colour family
-// (indigo): two number tiles — strength and the week's work — then the strength over
-// twelve weeks as a soft area chart, then the body areas as contributor bars.
-import type { Mock, Region } from '../mock/generate'
+// Insights (rebuild Phase 8, inventory I1-I4): the long view, opened from one page. Four
+// cards carry each screen's headline as the engine sends it (strength, flexibility, body
+// composition, and cardio, which comes later), then the engine's own views and the trends.
+// Each card opens its screen in the app (Key Rule 17); every figure is read cache-first, so
+// the page shows the last answer with no connection.
+import { useApp } from '../lib/appState'
+import { useCached, type View } from '../lib/cache'
+import { shortDate } from '../lib/dates'
 import { S } from '../strings'
-import { AreaChart, Contributor, DayBars } from '../ui/parts'
+import { Freshness } from '../ui/Freshness'
+import { InsightsHead } from '../ui/InsightsHead'
+import { FLEXIBILITY, type FlexibilityAnswer } from './FlexibilityShared'
+import { METABOLISM, type MetabolismAnswer } from './InsightsMetabolism'
+import { REFERENCE_MISSING, STRENGTH, type StrengthAnswer } from './InsightsStrength'
 
-function regionValue(r: Region): string {
-  return r.value == null ? S.insights.none : String(r.value)
-}
 
-function regionNote(r: Region): string {
-  if (r.value == null) return S.insights.noMeasure
-  return r.learning ? S.insights.learning : ''
-}
-
-export function Insights({ mock, reduced }: { mock: Mock; reduced: boolean }) {
-  const st = mock.strength
+function Tile({ title, value, note, testId, onOpen }: {
+  title: string; value: string; note: string; testId: string; onOpen: () => void
+}) {
   return (
-    <div className="screen insights">
+    <button className="card tile tile--button" data-testid={testId} onClick={onOpen}>
+      <span className="eyebrow">{title}</span>
+      <span className="num tile__value">{value}</span>
+      <span className="caption">{note}</span>
+    </button>
+  )
+}
+
+/** The hub drawn from its three reads (cache-first): the tests draw it in each state. */
+export function InsightsHub({ strength, metab, flex, go }: {
+  strength: View<StrengthAnswer>; metab: View<MetabolismAnswer>; flex: View<FlexibilityAnswer>; go: (path: string) => void
+}) {
+  const st = strength.data
+  const latest = metab.data?.latest
+  const report = flex.data?.report
+  return (
+    <div className="screen insights" data-testid="insights-hub">
       <div className="sky sky--quiet" aria-hidden="true" />
       <header className="head">
         <h1 className="head__title">{S.insights.title}</h1>
       </header>
-      <p className="note">{S.sample}</p>
-
+      <Freshness view={strength.data ? strength : metab} />
       <section className="pair">
-        <article className="card tile">
-          <span className="eyebrow">{S.insights.strength}</span>
-          <span className="num tile__value">{st.score.toFixed(1)}</span>
-          <span className="word">{S.insights.change(st.change4w)}</span>
-          <span className="caption">{S.insights.points}</span>
-        </article>
-        <article className="card tile">
-          <span className="eyebrow">{S.insights.work}</span>
-          <span className="num tile__value tile__value--long">{S.insights.workKg(st.workKg)}</span>
-          <DayBars values={st.workByDay} days={S.insights.days} label={S.insights.work} />
-        </article>
+        <Tile title={S.ins.strength} testId="tile-strength" onOpen={() => go('/insights/strength')}
+          value={st?.overall != null ? st.overall.toFixed(1) : S.ins.none}
+          note={st ? (st.calibrating ? `${S.ins.points} · ${S.ins.calibrating}` : S.ins.points)
+            : strength.code === REFERENCE_MISSING ? S.ins.notMeasured : ''} />
+        <Tile title={S.ins.flexibility} testId="tile-flexibility" onOpen={() => go('/insights/flexibility')}
+          value={report?.pattern ?? S.ins.none}
+          note={report ? (report.pattern ? report.pattern_label : S.flex.noPattern) : S.ins.notMeasured} />
       </section>
-
-      <section className="card">
-        <div className="eyebrow">{S.insights.weeks}</div>
-        <AreaChart values={st.weekly} label={`${S.insights.overall}, ${S.insights.weeks}`} />
+      <section className="pair">
+        <Tile title={S.ins.metabolism} testId="tile-metabolism" onOpen={() => go('/insights/metabolism')}
+          value={latest ? latest.weight_kg.toFixed(1) : S.ins.none}
+          note={latest ? `kg · ${S.ins.measuredOn(shortDate(latest.date))}` : S.ins.noWeighIn} />
+        <Tile title={S.ins.cardio} testId="tile-cardio" onOpen={() => go('/insights/cardio')}
+          value={S.ins.none} note={S.ins.cardioSoon} />
       </section>
-
-      <section className="card">
-        <div className="eyebrow">{S.insights.byArea}</div>
-        {st.regions.map((r) => (
-          <Contributor key={r.key} name={S.insights.regions[r.key]} value={regionValue(r)}
-            fraction={r.value == null ? null : r.value / 100} note={regionNote(r)} reduced={reduced} />
+      <section className="card group" aria-label={S.ins.engineSection}>
+        <h2 className="eyebrow">{S.ins.engineSection}</h2>
+        {([['engine', S.ins.engine], ['warnings', S.ins.warnings], ['trends', S.ins.trends],
+          ['sleep', S.ins.sleepArch]] as const).map(([path, label]) => (
+          <button key={path} className="tapline kv" onClick={() => go(`/insights/${path}`)}>
+            <span>{label}</span>
+            <span className="caption">{S.ins.open}</span>
+          </button>
         ))}
       </section>
-      <p className="caption">{S.insights.scale}</p>
+    </div>
+  )
+}
+
+export function Insights() {
+  const { store, ctx, go } = useApp()
+  const strength = useCached<StrengthAnswer>(store, STRENGTH, null, ctx)
+  const metab = useCached<MetabolismAnswer>(store, METABOLISM, null, ctx)
+  const flex = useCached<FlexibilityAnswer>(store, FLEXIBILITY, null, ctx)
+  return <InsightsHub strength={strength} metab={metab} flex={flex} go={go} />
+}
+
+/** Cardio (I4): kept for later; the owner will add it (2026-10-19). */
+export function CardioScreen() {
+  return (
+    <div className="screen insights" data-testid="cardio">
+      <div className="sky sky--quiet" aria-hidden="true" />
+      <InsightsHead title={S.ins.cardio} />
+      <p className="caption">{S.ins.cardioText}</p>
     </div>
   )
 }

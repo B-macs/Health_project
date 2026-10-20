@@ -181,8 +181,10 @@ class CaptureRefused(ValueError):
         self.code = code
 
 
-def reading_out(r: btry.Reading) -> dict:
-    return {"test_key": r.test_key, "side": r.side, "value": r.value, "unit": r.unit,
+def reading_out(r: btry.Reading, cluster: str | None = None) -> dict:
+    test = _battery(cluster).TESTS.get(r.test_key)
+    return {"test_key": r.test_key, "label": test.label if test else r.test_key,
+            "side": r.side, "value": r.value, "unit": r.unit,
             "load_kg": r.load_kg, "setup_value": r.setup_value, "voided": r.voided}
 
 
@@ -219,6 +221,7 @@ def guide() -> dict:
         "gap": fb.GAP_EXPLAINED, "lock": fb.LOCK_EXPLAINED,
         "frozen": [{"name": n, "why": w} for n, w in fb.FROZEN_CONSTANTS],
         "progression_variable": {"name": moving_name, "why": moving_why},
+        "cluster_label": fx.CLUSTERS[fx.DEFAULT_CLUSTER]["label"],
         "nerve_check": cba.NERVE_CHECK, "medial_knee_note": cba.MEDIAL_KNEE_NOTE,
         "slots": [{"slot": s, "label": btry.SLOT_LABELS[s], "question": btry.SLOT_QUESTIONS[s],
                    "decides": btry.SLOT_DECIDES[s]}
@@ -253,6 +256,7 @@ def report_out(repo, report, today: date) -> dict:
     result = report.result
     slots = result.slots if result else ()
     out = {
+        "cluster_label": report.cluster_label, "stopped_at": report.stopped_at_label,
         "assessed_on": report.assessed_on, "pattern": report.pattern,
         "pattern_label": report.pattern_label, "trusted": report.trusted,
         "cold": bool(result.cold) if result else True,
@@ -269,7 +273,8 @@ def report_out(repo, report, today: date) -> dict:
                   for s in slots],
         "slots_total": slots_total(report),
         "slots_not_run": slots_not_run(report),
-        "readings": [reading_out(r) for r in (slots[-1].readings or ())] if slots else [],
+        "readings": ([reading_out(r, report.cluster) for r in (slots[-1].readings or ())]
+                     if slots else []),
         "missing": [],
         "stack": None,
         "stack_refused": "",
@@ -323,9 +328,10 @@ def capture_out(repo, today: date, draft: btry.Assessment) -> dict:
         "cluster": draft.cluster, "taken_on": draft.taken_on, "cold": draft.cold,
         "order": [test_out(battery.TESTS[k], earlier, draft) for k in order],
         "done": [k for k in order if any(r.test_key == k and r.usable for r in draft.readings)],
-        "readings": [reading_out(r) for r in draft.readings],
+        "readings": [reading_out(r, draft.cluster) for r in draft.readings],
         "early_pattern": live.pattern,
         "early_pattern_label": cba.PATTERNS.get(live.pattern, "") if live.pattern else "",
+        "early_reason": live.slots[-1].reason if live.pattern and live.slots else "",
         "skip_notes": skip_notes(draft),
         "progress": {"done": done, "total": total},
     }

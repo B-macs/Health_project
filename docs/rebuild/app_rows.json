@@ -1347,6 +1347,673 @@
       ],
       "test": "app/e2e/week.spec.ts",
       "note": "Pick, rate (the engine's load for each rating) and log once."
+    },
+    "I1": {
+      "built": [
+        "app/src/screens/Insights.tsx",
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "One Insights page instead of six tabs: the four category cards, then Engine data, Warnings, Trends and Sleep architecture; the data tables and syncs under Settings > Data."
+    },
+    "I2": {
+      "built": [
+        "app/src/screens/Insights.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The four cards with each screen's headline from the engine (no web images)."
+    },
+    "I3": {
+      "built": [
+        "app/src/screens/Insights.tsx",
+        "app/src/ui/InsightsHead.tsx",
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "Each screen has its own address under /insights/ and a back link; opened in the same page (Key Rule 17)."
+    },
+    "I4": {
+      "built": [
+        "app/src/screens/Insights.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Cardio stays as coming soon (the owner, 2026-10-19)."
+    },
+    "I5": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I6": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I7": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I8": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I9": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I10": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I11": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I12": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I13": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I15": {
+      "built": [
+        "app/src/screens/InsightsStrength.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Strength from /api/insights/strength: the headline and calibration, the read failure, the five series, the readout, the score and tonnage charts on the engine's axis, the work without load, the split, the region cards (core's hold time) and the imbalances."
+    },
+    "I16": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The composition in kg fat and fat-free with its date, the read failure, the split of the weight."
+    },
+    "I17": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The composition in kg fat and fat-free with its date, the read failure, the split of the weight."
+    },
+    "I18": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The composition in kg fat and fat-free with its date, the read failure, the split of the weight."
+    },
+    "I19": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The six measures, the four period sizes and the steps the engine allows, the latest and the change with its tone, the chart on the engine's scale (services/metabolism_screen.chart_axis), never bridging a gap."
+    },
+    "I20": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The six measures, the four period sizes and the steps the engine allows, the latest and the change with its tone, the chart on the engine's scale (services/metabolism_screen.chart_axis), never bridging a gap."
+    },
+    "I21": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The six measures, the four period sizes and the steps the engine allows, the latest and the change with its tone, the chart on the engine's scale (services/metabolism_screen.chart_axis), never bridging a gap."
+    },
+    "I22": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The six measures, the four period sizes and the steps the engine allows, the latest and the change with its tone, the chart on the engine's scale (services/metabolism_screen.chart_axis), never bridging a gap."
+    },
+    "I23": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The gym scan's phase angle and ECW/TBW with their age, and every other figure marked measured, worked out or not measured; no 'Normal' pill."
+    },
+    "I24": {
+      "built": [
+        "app/src/screens/InsightsMetabolism.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The gym scan's phase angle and ECW/TBW with their age, and every other figure marked measured, worked out or not measured; no 'Normal' pill."
+    },
+    "I26": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The unreadable record, the assessment in progress with Resume, and the empty state: the standing goal, Start, what it produces, the slots in order, the tests held back."
+    },
+    "I27": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The unreadable record, the assessment in progress with Resume, and the empty state: the standing goal, Start, what it produces, the slots in order, the tests held back."
+    },
+    "I28": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The unreadable record, the assessment in progress with Resume, and the empty state: the standing goal, Start, what it produces, the slots in order, the tests held back."
+    },
+    "I29": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The unreadable record, the assessment in progress with Resume, and the empty state: the standing goal, Start, what it produces, the slots in order, the tests held back."
+    },
+    "I30": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The unreadable record, the assessment in progress with Resume, and the empty state: the standing goal, Start, what it produces, the slots in order, the tests held back."
+    },
+    "I31": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The unreadable record, the assessment in progress with Resume, and the empty state: the standing goal, Start, what it produces, the slots in order, the tests held back."
+    },
+    "I32": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I33": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I34": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I35": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I36": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I37": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I38": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I39": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I40": {
+      "built": [
+        "app/src/screens/InsightsFlexibilityCapture.tsx",
+        "app/src/screens/FlexibilityShared.ts"
+      ],
+      "test": "app/e2e/insights.spec.ts",
+      "note": "The capture: cold or warm, the leg-day warning, the protocol, Begin and Cancel; each step the engine's order at the owner's place with its LOCK, setup, how to read it and the form (readings offered back, load, setup number, void); the engine's early answer with Save or Keep going; Skip, Back, Pause."
+    },
+    "I41": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I42": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I43": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I44": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I45": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I46": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I47": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I48": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I49": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I50": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I51": {
+      "built": [
+        "app/src/screens/InsightsFlexibility.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The report: no pattern with the readings it waits on, the pattern card (the slot it stopped at, the slots run), the trust warning, the ladder, the stack with how-to, the held-back items, the trail, every reading, the retest, Re-assess."
+    },
+    "I52": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I53": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I54": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I55": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I56": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I57": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I58": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I59": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I60": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I61": {
+      "built": [
+        "app/src/screens/InsightsEngine.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Engine data from /api/insights/engine: Read again, the directive in Home's words (F4) with the ACWR note, the stage, the traffic light and its four cards, the drift, the workload with its status, the 28-day AU chart and the weekly volume, each chart's top from the engine."
+    },
+    "I62": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Settings > Data: what waits for the keyword parse, and parsing it now (notes are parsed on save, I63)."
+    },
+    "I63": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Settings > Data: what waits for the keyword parse, and parsing it now (notes are parsed on save, I63)."
+    },
+    "I64": {
+      "built": [
+        "app/src/screens/InsightsWarnings.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The month's calendar of flagged entries; a marked day opens its entries."
+    },
+    "I65": {
+      "built": [
+        "app/src/screens/InsightsTrends.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "No parsed notes, the most flagged regions, tightness over time on the 0-10 scale, the levels, the data gate, the direction with its slopes and notable correlations, and the reading worked out on load."
+    },
+    "I66": {
+      "built": [
+        "app/src/screens/InsightsTrends.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "No parsed notes, the most flagged regions, tightness over time on the 0-10 scale, the levels, the data gate, the direction with its slopes and notable correlations, and the reading worked out on load."
+    },
+    "I67": {
+      "built": [
+        "app/src/screens/InsightsTrends.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "No parsed notes, the most flagged regions, tightness over time on the 0-10 scale, the levels, the data gate, the direction with its slopes and notable correlations, and the reading worked out on load."
+    },
+    "I68": {
+      "built": [
+        "app/src/screens/InsightsTrends.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "No parsed notes, the most flagged regions, tightness over time on the 0-10 scale, the levels, the data gate, the direction with its slopes and notable correlations, and the reading worked out on load."
+    },
+    "I69": {
+      "built": [
+        "app/src/screens/InsightsTrends.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "No parsed notes, the most flagged regions, tightness over time on the 0-10 scale, the levels, the data gate, the direction with its slopes and notable correlations, and the reading worked out on load."
+    },
+    "I70": {
+      "built": [
+        "app/src/screens/InsightsTrends.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "No parsed notes, the most flagged regions, tightness over time on the 0-10 scale, the levels, the data gate, the direction with its slopes and notable correlations, and the reading worked out on load."
+    },
+    "I71": {
+      "built": [
+        "app/src/screens/InsightsTrends.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "No parsed notes, the most flagged regions, tightness over time on the 0-10 scale, the levels, the data gate, the direction with its slopes and notable correlations, and the reading worked out on load."
+    },
+    "I72": {
+      "built": [
+        "app/src/screens/InsightsTrends.tsx",
+        "app/src/ui/InsightsCharts.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "No parsed notes, the most flagged regions, tightness over time on the 0-10 scale, the levels, the data gate, the direction with its slopes and notable correlations, and the reading worked out on load."
+    },
+    "I73": {
+      "built": [
+        "app/src/screens/InsightsSleep.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The method, a failed read against no fused night, the counts and the median phantom wake, a night's three strips on one clock (the Sleep screen's strip) and its figures."
+    },
+    "I74": {
+      "built": [
+        "app/src/screens/InsightsSleep.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The method, a failed read against no fused night, the counts and the median phantom wake, a night's three strips on one clock (the Sleep screen's strip) and its figures."
+    },
+    "I75": {
+      "built": [
+        "app/src/screens/InsightsSleep.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The method, a failed read against no fused night, the counts and the median phantom wake, a night's three strips on one clock (the Sleep screen's strip) and its figures."
+    },
+    "I76": {
+      "built": [
+        "app/src/screens/InsightsSleep.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The method, a failed read against no fused night, the counts and the median phantom wake, a night's three strips on one clock (the Sleep screen's strip) and its figures."
+    },
+    "I77": {
+      "built": [
+        "app/src/screens/InsightsSleep.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "The method, a failed read against no fused night, the counts and the median phantom wake, a night's three strips on one clock (the Sleep screen's strip) and its figures."
+    },
+    "I78": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: what wiring sleep fusion into the engine would change."
+    },
+    "I79": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: Supabase holds the data; Notion and Sheets are a frozen archive."
+    },
+    "I82": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the engine view, the blend history and the metrics history, the two histories with a date range."
+    },
+    "I83": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the engine view, the blend history and the metrics history, the two histories with a date range."
+    },
+    "I85": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the engine view, the blend history and the metrics history, the two histories with a date range."
+    },
+    "I84": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the manual syncs, off until the switch-over (\"Syncs run in the old app until the switch-over\")."
+    },
+    "I89": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the manual syncs, off until the switch-over (\"Syncs run in the old app until the switch-over\")."
+    },
+    "I90": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the manual syncs, off until the switch-over (\"Syncs run in the old app until the switch-over\")."
+    },
+    "I91": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the manual syncs, off until the switch-over (\"Syncs run in the old app until the switch-over\")."
+    },
+    "I93": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the manual syncs, off until the switch-over (\"Syncs run in the old app until the switch-over\")."
+    },
+    "I86": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the session checks (the engine's rule)."
+    },
+    "I87": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the sync times as they are, and whether Garmin and Oura are set up (the old text fixed)."
+    },
+    "I88": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the sync times as they are, and whether Garmin and Oura are set up (the old text fixed)."
+    },
+    "I92": {
+      "built": [
+        "app/src/screens/DataTables.tsx"
+      ],
+      "test": "app/src/screens/insights.test.tsx",
+      "note": "Moved to Settings > Data: the sync times as they are, and whether Garmin and Oura are set up (the old text fixed)."
     }
   }
 }

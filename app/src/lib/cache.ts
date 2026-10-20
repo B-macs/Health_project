@@ -12,6 +12,8 @@ export interface View<T> {
   data: T | undefined
   fetchedAt: string | null
   state: FetchState
+  /** The engine's own word for a refusal (its JSON error), when it refused. */
+  code?: string
 }
 
 export interface Ctx {
@@ -38,6 +40,13 @@ export async function refresh<T>(store: HealthDB, path: string, day: string | nu
   return body
 }
 
+/** Keep the screen a write answered with (the engine answers some writes with the whole
+ *  screen), so the screen shows it at once rather than the answer from before the write. */
+export async function keepAnswer(store: HealthDB, path: string, day: string | null, body: unknown,
+  now: Date = new Date()): Promise<void> {
+  await store.cache.put({ key: cacheKey(path, day), path, day, body, fetched_at: now.toISOString() })
+}
+
 /** The cache-first read: `show` gets the saved answer at once, then the engine's answer, or
  *  the saved answer again with why the engine did not answer. */
 export async function cacheFirst<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx,
@@ -50,7 +59,7 @@ export async function cacheFirst<T>(store: HealthDB, path: string, day: string |
     const row = await store.cache.get(cacheKey(path, day))
     show({ data: body, fetchedAt: row?.fetched_at ?? null, state: 'fresh' })
   } catch (err) {
-    show({ ...kept, state: err instanceof ApiError ? err.kind : 'server' })
+    show({ ...kept, state: err instanceof ApiError ? err.kind : 'server', code: err instanceof ApiError ? err.code : undefined })
   }
 }
 
@@ -75,7 +84,7 @@ export function useCached<T>(store: HealthDB, path: string, day: string | null, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, path, day, ctx.key, ctx.engineDown, tick])
   if (view.key !== key) return { data: undefined, fetchedAt: null, state: 'loading', again }
-  return { data: view.data, fetchedAt: view.fetchedAt, state: view.state, again }
+  return { data: view.data, fetchedAt: view.fetchedAt, state: view.state, code: view.code, again }
 }
 
 /** How old the shown answer is, in whole minutes (null when nothing is saved). */

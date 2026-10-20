@@ -190,6 +190,32 @@ def test_a_capture_is_kept_in_the_store_and_finishes_into_a_report(env, monkeypa
     assert report["retest_text"]
 
 
+def test_the_capture_names_its_tests_and_says_why_it_stopped(env, monkeypatch):
+    """The phone shows what the Streamlit screen shows: each reading by its test's name,
+    the cluster, why the slot that stopped answered early, and the slot it stopped at."""
+    assert env.ok(monkeypatch, "get", "/api/insights/flexibility")["guide"]["cluster_label"]
+    state = env.ok(monkeypatch, "post", "/api/insights/flexibility/capture", {"cold": True})
+    assert state["early_pattern"] is None and state["early_reason"] == ""
+    labels = {t["key"]: t["label"] for t in state["order"]}
+    values = {"left": 30.0, "right": 32.0}
+    for _ in range(12):
+        if state["early_pattern"]:
+            break
+        test = next(t for t in state["order"] if t["key"] not in state["done"])
+        state = env.ok(monkeypatch, "put", "/api/insights/flexibility/capture", {
+            "test_key": test["key"],
+            "entered": values if test["bilateral"] else {"": 45.0},
+            "setup_value": 60.0 if test["setup_input"] else None,
+            "load": 2.0 if test["takes_load"] else None})
+        values = {side: v + 25.0 for side, v in values.items()}
+    assert state["early_pattern"] and state["early_reason"], "the early answer says why"
+    assert all(r["label"] == labels[r["test_key"]] for r in state["readings"])
+    report = env.ok(monkeypatch, "post", "/api/insights/flexibility/capture/finish")["report"]
+    assert report["cluster_label"] and report["stopped_at"] == report["slots"][-1]["label"]
+    assert report["reason"] == state["early_reason"]
+    assert all(r["label"] == labels[r["test_key"]] for r in report["readings"])
+
+
 def test_a_capture_can_be_dropped(env, monkeypatch):
     env.ok(monkeypatch, "post", "/api/insights/flexibility/capture", {"cold": True})
     assert env.ok(monkeypatch, "delete", "/api/insights/flexibility/capture") == {"cleared": True}
@@ -223,6 +249,9 @@ def test_engine_data_shows_the_shared_verdicts_words(env, monkeypatch):
         decision.day_verdict(env.repo, TODAY))
     assert body["traffic_light"]["no_reading"] and len(body["traffic_light"]["cards"]) == 4
     assert len(body["acwr"]["chart"]["au"]) == 28 and body["stage"]
+    chart = body["acwr"]["chart"]
+    assert chart["hi"] >= max(chart["au"]) and chart["hi"] > 0, "the chart's top, from the engine"
+    assert body["volume_hi"] >= max(w["kg"] for w in body["volume"])
 
 
 def test_engine_data_says_when_its_reads_fail(env, monkeypatch):
@@ -422,6 +451,9 @@ def test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar(env, monkeyp
     assert today["level"] == "monitor" and today["entries"][0]["source"] == "readiness"
     trends = env.ok(monkeypatch, "get", "/api/insights/trends")
     assert {r["region"] for r in trends["regions"]} >= {"Central Lower Back"}
+    assert max(r["share"] for r in trends["regions"]) == 1.0
+    dates = [t["date"] for t in trends["timeline"]]
+    assert dates == sorted(dates), "the timeline reads oldest first"
     assert trends["levels"]["monitor"][0]["date"] == TODAY.isoformat()
     assert trends["timeline"][0]["self_reported"] == 4
 
@@ -460,6 +492,8 @@ def test_a_fused_night_shows_its_three_strips(env, monkeypatch):
     body = env.ok(monkeypatch, "get", "/api/insights/sleep-architecture")
     assert body["counts"] == {"fused": 1, "oura_only": 0, "watch_only": 1}
     assert [s["codes"] for s in body["night"]["strips"]] == ["4222331", "2222331", "2222231"]
+    first = body["night"]["strips"][0]
+    assert first["runs"][0]["code"] == "4" and first["bands"], "drawn as the Sleep screen's strip"
     assert body["night"]["phantom_wake_minutes"] == 10 and body["nights"] == ["2026-10-17"]
 
 

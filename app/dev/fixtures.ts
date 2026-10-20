@@ -296,10 +296,15 @@ export interface WeekRun {
   reasons: Record<string, string>
   yoga: Record<string, string>
   outdoor: Record<string, string>
+  /** The flexibility capture (Phase 8): the engine's answer the run has reached, or null. */
+  flexStep: number | null
+  flexFinished: boolean
 }
 
-export const newRun = (): WeekRun =>
-  ({ applied: [], swaps: [], carry: false, shift: false, redo: false, flare: false, reasons: {}, yoga: {}, outdoor: {} })
+export const newRun = (): WeekRun => ({
+  applied: [], swaps: [], carry: false, shift: false, redo: false, flare: false, reasons: {}, yoga: {},
+  outdoor: {}, flexStep: null, flexFinished: false,
+})
 
 const BANNER: Schemas['WeekBanner'] = {
   scheduled: 4, completed: 1, progress: 'normal', to_go: 2, streak_weeks: 2, streak_all_ultimate: false,

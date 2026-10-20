@@ -11,7 +11,7 @@ test('every tab opens its frame in the same page', async ({ page }) => {
   })
   await openTab(page, S.nav.insights)
   await expect(page.getByRole('heading', { name: S.insights.title })).toBeVisible()
-  await expect(page.getByText(S.sample)).toBeVisible()
+  await expect(page.getByTestId('insights-hub')).toBeVisible()
   await openTab(page, S.nav.settings)
   await expect(page.getByRole('heading', { name: S.settings.title })).toBeVisible()
   await openTab(page, S.nav.today)
