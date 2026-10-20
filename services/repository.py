@@ -1364,11 +1364,33 @@ class Repository:
                 self.mirror_last_error = (table, str(exc)[:300])
         return sent
 
+    #: How long the Streamlit app trusts its last read of the background writer before it
+    #: reads the store again (the retired-app refusal, _refuse_if_retired).
+    RETIRED_CHECK_SECONDS = 60.0
+
+    def _refuse_if_retired(self) -> None:
+        """AppRetiredError when THIS process is the Streamlit app and the engine is the
+        background writer (rebuild Phase 9, switch step 8): the old app then refuses every
+        write with the banner's words. The engine and scripts name no Streamlit process and
+        are never refused here. The setting is read live, at most once a minute; a failed
+        read refuses nothing (the write itself would then meet the same store)."""
+        if self.config.background_process != background_writer.STREAMLIT:
+            return
+        now = time.monotonic()
+        checked = getattr(self, "_retired_checked", None)
+        if checked is None or now - checked[0] >= self.RETIRED_CHECK_SECONDS:
+            checked = (now, background_writer.current(self) == background_writer.ENGINE)
+            self._retired_checked = checked
+        if checked[1]:
+            raise background_writer.AppRetiredError(background_writer.RETIRED_TEXT)
+
     def _send_group(self, table: str, mode: str, rows: dict) -> int:
         """Send one table's rows in one mode to Supabase; rows sent. Raises.
 
         Shared by the queued flush above and by _write_record, so the two
-        write paths cannot drift apart."""
+        write paths cannot drift apart. The retired old app writes nothing
+        (_refuse_if_retired)."""
+        self._refuse_if_retired()
         numeric = supabase_store.numeric_columns(table)
         if mode == supabase_store.REPLACE:
             parent = supabase_store.REPLACE_PARENT_COLUMN[table]
@@ -2287,6 +2309,7 @@ class Repository:
             raise LegacyStoreDisconnectedError(
                 "delete_training_rows deletes from Supabase as the system of "
                 "record; with Notion as the record, archive the Notion pages.")
+        self._refuse_if_retired()
         for exercise_id in exercise_ids:
             self._sb.delete_where("training_sets", "exercise_id", exercise_id)
             self._sb.delete_where("training_exercises", "exercise_id", exercise_id)

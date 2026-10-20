@@ -347,6 +347,17 @@ describe('Settings > Data', () => {
     expect(text(draw(<ShadowCard shadow={shadow} />))).toContain(S.data.shadowNights(shadow.nights_compared))
     const syncs = draw(<SyncsCard settings={F.settings} />)
     expect(text(syncs)).toContain(S.data.syncsWait)
-    expect(syncs.match(/disabled=""/g)?.length).toBe(5)
+    expect(syncs.match(/disabled=""/g)?.length).toBe(F.settings.manual_syncs.length)
+    for (const kind of F.settings.manual_syncs) expect(text(syncs)).toContain(S.data.syncButtons[kind]!)
+  })
+
+  it('turns the sync buttons on once the engine runs the syncs, and says how each one went', () => {
+    const on = draw(<SyncsCard settings={{ ...F.settings, writer: 'engine' }} results={{ sleep_fusion: S.data.syncDone }} />)
+    expect(text(on)).toContain(S.data.autoEngine)
+    expect(text(on)).not.toContain(S.data.syncsWait)
+    expect(on.match(/disabled=""/g)).toBeNull()
+    expect(text(on)).toContain(S.data.syncDone)
+    const running = draw(<SyncsCard settings={{ ...F.settings, writer: 'engine' }} results={{ oura_weekly: S.data.syncRunning }} />)
+    expect(running.match(/disabled=""/g)?.length).toBe(F.settings.manual_syncs.length)
   })
 })

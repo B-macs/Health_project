@@ -90,17 +90,21 @@ def start_oura_login(repo, redirect_uri: str, today: date) -> dict:
     if not redirect_uri.startswith("https://"):
         raise ActionRefused("redirect_not_https")
     state = secrets.token_urlsafe(24)
-    repo.set_config(LOGIN_KEY, json.dumps({"state": state, "redirect_uri": redirect_uri}),
-                    today=today)
+    # The phone's day is kept with the state: the answer comes back through the Worker,
+    # which has no phone date to send (rebuild rule 3).
+    repo.set_config(LOGIN_KEY, json.dumps({"state": state, "redirect_uri": redirect_uri,
+                                           "date": today.isoformat()}), today=today)
     return {"authorize_url": oura.authorize_url(repo.config.oura_client_id, redirect_uri,
                                                 oura_auth.DEFAULT_SCOPES, state)}
 
 
-def finish_oura_login(repo, code: str, state: str, today: date) -> dict:
+def finish_oura_login(repo, code: str, state: str, today: date | None = None) -> dict:
     """Trade the code Oura sent back for the token pair and store it
     (Repository.save_oura_oauth_token), when the state is the one this
     login started with. The login row is cleared either way once it is
-    used: a code is single-use. Answers the login's status, never a token."""
+    used: a code is single-use. Answers the login's status, never a token.
+    The day is the phone's, kept when the login started; `today` (the
+    caller's header) only stands in for a login started without one."""
     background_writer.require(repo, background_writer.ENGINE)
     try:
         stored = json.loads(repo.get_config_value(LOGIN_KEY) or "{}")
@@ -108,6 +112,12 @@ def finish_oura_login(repo, code: str, state: str, today: date) -> dict:
         stored = {}
     if not stored.get("state") or not hmac.compare_digest(str(stored["state"]), str(state)):
         raise ActionRefused("state_mismatch")
+    try:
+        today = date.fromisoformat(stored["date"]) if stored.get("date") else today
+    except ValueError:
+        pass
+    if today is None:
+        raise ActionRefused("x_local_date_missing")
     repo.set_config(LOGIN_KEY, "", today=today)
     payload = oura.exchange_code(repo.config.oura_client_id, repo.config.oura_client_secret,
                                  code, stored["redirect_uri"])
@@ -132,6 +142,9 @@ def settings(repo) -> dict:
     return {"plan_start_date": repo.get_config_value("plan_start_date") or None,
             "plan_running": running,
             "writer": background_writer.current(repo),
+            # The manual syncs Settings > Data offers, by the names POST
+            # /api/data/sync/{kind} takes (the phone draws a button for each).
+            "manual_syncs": list(MANUAL_SYNCS),
             "garmin_configured": bool(repo.garmin_configured()),
             "oura_configured": bool(repo.oura_configured())}
 

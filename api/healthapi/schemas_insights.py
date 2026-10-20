@@ -445,6 +445,8 @@ class SettingsOut(BaseModel):
     oura_configured: bool
     seeded: bool | None = None
     active_phase: str | None = None
+    #: The manual syncs Settings > Data offers (engine_actions.MANUAL_SYNCS).
+    manual_syncs: list[str] = []
 
 
 class PlanStartIn(BaseModel):

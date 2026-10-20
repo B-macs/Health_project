@@ -180,7 +180,33 @@ app.all('/api/*', async (c) => {
   return toEngine(c.env, c.req.method, incoming.pathname + incoming.search, headers, body, timeout)
 })
 
-// Anything else is the app (run_worker_first only sends /api/* here in production).
+// Where Oura sends the owner back after the login (rebuild Phase 9). The Worker hands the
+// code to the engine itself, so the login finishes wherever iOS opens this page (the Home
+// Screen app or Safari, which do not share the access key); the engine checks the state it
+// issued, so a made-up call changes nothing. Behind the same switch as the syncs. Then the
+// app's result page says how it went (app/src/screens/OuraDone.tsx).
+app.get('/oura/callback', async (c) => {
+  const query = new URL(c.req.url).searchParams
+  const code = query.get('code') ?? ''
+  const state = query.get('state') ?? ''
+  let result = 'denied'
+  if (c.env.SYNC_ENABLED !== 'true') {
+    result = 'sync_disabled'
+  } else if (code && state) {
+    const body = new TextEncoder().encode(JSON.stringify({ code, state }))
+    const answer = await toEngine(c.env, 'POST', '/api/oura/callback',
+      new Headers({ 'content-type': 'application/json', accept: 'application/json' }), body.buffer as ArrayBuffer)
+    if (answer.ok) {
+      result = 'ok'
+    } else {
+      const err = (await answer.json().catch(() => ({}))) as { error?: string }
+      result = err.error ?? 'refused'
+    }
+  }
+  return c.redirect(`/#/oura-done?result=${encodeURIComponent(result)}`, 302)
+})
+
+// Anything else is the app (run_worker_first only sends /api/* and /oura/* here in production).
 app.all('*', (c) => c.env.ASSETS.fetch(c.req.raw))
 
 export { app }

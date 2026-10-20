@@ -21,7 +21,7 @@
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
     // Only /api reaches the Worker; every other path is a static file or index.html.
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/oura/*"]
   },
   // Rebuild Phase 4. ONE trigger: the daily data check at 04:15 UTC (it only reads; the
   // Worker keeps its answer in STATE). The free plan allows 5 triggers per account and

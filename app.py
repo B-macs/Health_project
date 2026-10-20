@@ -26,6 +26,7 @@ import repo
 import today
 import styles
 import training_constants as _tc
+from services import background_writer
 from services import dashboard as dash
 from services import engine
 from services import home
@@ -66,6 +67,18 @@ _repository = repo.get_repository()
 # Streamlit server: no test may run the app's device-facing work.
 if st.runtime.exists():
     repo.refresh_copy_if_stale()
+
+# THE RETIRED APP (rebuild Phase 9, switch step 8): once the engine is the background
+# writer, every page says so, and every write is refused with the same words
+# (Repository._refuse_if_retired). Read live, at most once a minute, and only under a
+# Streamlit server.
+@st.cache_data(ttl=60, show_spinner=False)
+def _app_retired() -> bool:
+    return background_writer.current(repo.get_repository()) == background_writer.ENGINE
+
+
+if st.runtime.exists() and _app_retired():
+    st.error(background_writer.RETIRED_TEXT, icon="🔒")
 
 if _repository.offline:
     _built = _repository.datastore_built_at() or "unknown"

@@ -767,19 +767,48 @@ export const S = {
     syncs: 'Device syncs',
     syncsWait: 'Syncs run in the old app until the switch-over.',
     auto: 'The old app syncs Oura and Garmin once a day, at the first open each morning, and again at a later open while last night is missing.',
+    autoEngine: 'This app syncs Oura and Garmin once a day, at the first open each morning, and again at a later open while last night is missing.',
+    syncRunning: 'Syncing…',
+    syncDone: 'Done.',
+    syncFailed: 'The sync did not finish.',
+    syncRefused: {
+      not_the_writer: 'The old app still runs the syncs.',
+      sync_disabled: 'Syncs from this app are not turned on yet.',
+      sync_running: 'Another sync is running. Try again in a minute.',
+      garmin_not_configured: 'Garmin is not set up.',
+      oura_not_configured: 'Oura is not set up.',
+      unknown_sync: 'The engine does not know this sync.',
+    } as Record<string, string>,
     garmin: 'Garmin',
     garminOn: 'Garmin is set up.',
     garminOff: 'Garmin is not set up.',
     oura: 'Oura',
     ouraOn: 'Oura is set up.',
     ouraOff: 'Oura is not set up.',
+    // By the names the engine takes (Settings' manual_syncs, POST /api/data/sync/{kind}).
     syncButtons: {
       garmin_daily: 'Sync Garmin daily metrics',
       garmin_activities: 'Sync Garmin activities',
       sleep_fusion: 'Rebuild sleep fusion',
-      oura: 'Sync the week of Oura details',
-      biometric_blend: 'Backfill the blend history',
+      oura_weekly: 'Sync the week of Oura details',
+      blend_backfill: 'Backfill the blend history',
     } as Record<string, string>,
+  },
+  // Where Oura sends the owner back after the login (rebuild Phase 9; the Worker's
+  // /oura/callback finishes the login, then opens this page with its result).
+  ouraDone: {
+    title: 'Oura login',
+    result: {
+      ok: 'Oura is connected. This app now syncs your ring.',
+      denied: 'The Oura login was cancelled. Nothing changed.',
+      state_mismatch: 'This login link is old or was already used. Start the login again in Settings.',
+      not_the_writer: 'The old app still runs the syncs. The Oura login moves here at the switch-over.',
+      sync_disabled: 'Syncs from this app are not turned on yet. Nothing changed.',
+      oura_refused_the_code: 'Oura did not accept the login. Start it again in Settings.',
+    } as Record<string, string>,
+    failed: 'The Oura login did not finish. Start it again in Settings.',
+    safari: 'If this page opened in Safari, close it and open Health from your Home Screen.',
+    open: 'Open Settings',
   },
   // The first open: how to put the app on the Home Screen, and the access key.
   welcome: {
@@ -972,6 +1001,17 @@ export const S = {
     ouraState: {
       ok: 'valid', due: 'valid, renews at the next sync', stale: 'expired, renews at the next sync',
       expired: 'expired: log in again', unauthenticated: 'not logged in', pat: 'a personal token',
+    } as Record<string, string>,
+    // The Oura login (rebuild Phase 9): from this app once the engine runs the syncs.
+    ouraLogin: 'Oura login',
+    ouraLoginStart: 'Log in to Oura',
+    ouraLoginWhy: 'Opens Oura, where you allow this app to read your ring. Oura then sends you back here.',
+    ouraLoginLater: 'The Oura login moves to this app at the switch-over.',
+    ouraLoginRefused: {
+      not_the_writer: 'The old app still runs the syncs. The Oura login moves here at the switch-over.',
+      sync_disabled: 'Syncs from this app are not turned on yet.',
+      oauth_not_configured: 'The engine has no Oura app details yet.',
+      redirect_not_https: 'The return address must start with https.',
     } as Record<string, string>,
     // The plan's start, on a first run only (T29).
     plan: 'Training plan',

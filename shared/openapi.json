@@ -5484,6 +5484,14 @@
             "title": "Garmin Configured",
             "type": "boolean"
           },
+          "manual_syncs": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Manual Syncs",
+            "type": "array"
+          },
           "oura_configured": {
             "title": "Oura Configured",
             "type": "boolean"
@@ -9711,22 +9719,6 @@
         "parameters": [
           {
             "in": "header",
-            "name": "x-engine-key",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "X-Engine-Key"
-            }
-          },
-          {
-            "in": "header",
             "name": "x-local-date",
             "required": false,
             "schema": {
@@ -9739,6 +9731,22 @@
                 }
               ],
               "title": "X-Local-Date"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
             }
           }
         ],

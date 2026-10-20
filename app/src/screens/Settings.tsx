@@ -17,7 +17,7 @@ import { formatBytes, storageInfo, type StorageInfo } from '../lib/storage'
 import { updateWaiting } from '../lib/updates'
 import { S } from '../strings'
 import { DataLink } from './DataTables'
-import { PlanStart, SyncStatus } from './SettingsSync'
+import { OuraLogin, PlanStart, SyncStatus } from './SettingsSync'
 import { Freshness } from '../ui/Freshness'
 import { versionLine } from '../version'
 import { KeyForm } from './Welcome'
@@ -269,6 +269,7 @@ export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onThe
       <Engine store={p.store} ctx={p.ctx} />
       <Outbox store={p.store} ctx={p.ctx} />
       <SyncStatus />
+      <OuraLogin />
       <PlanStart />
       <DataCheckCard store={p.store} ctx={p.ctx} />
       <DataLink />

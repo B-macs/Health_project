@@ -159,6 +159,13 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
 
 function handler(req: IncomingMessage, res: ServerResponse, next: () => void): void {
   const url = new URL(req.url ?? '/', 'http://localhost')
+  if (url.pathname === '/oura/callback') {
+    // The Worker's return page (worker/src/index.ts), made up: the login always succeeds.
+    res.statusCode = 302
+    res.setHeader('Location', '/#/oura-done?result=ok')
+    res.end()
+    return
+  }
   if (!url.pathname.startsWith('/api/')) return next()
   const send = (status: number, body: unknown) => {
     res.statusCode = status
@@ -234,7 +241,10 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
       return table in insights.tables ? send(200, insights.tables[table]) : send(404, { error: 'unknown_table' })
     }
     if (url.pathname === '/api/data/session-checks') return send(200, insights.session_checks)
-    if (url.pathname === '/api/settings') return send(200, insights.settings)
+    if (url.pathname === '/api/settings') {
+      // Phase 9: with e2e_week writer_engine the engine runs the syncs (the sync buttons are on).
+      return send(200, scenarioOf(req).has('writer_engine') ? { ...(insights.settings as Record<string, unknown>), writer: 'engine' } : insights.settings)
+    }
     if (url.pathname === '/api/training/accessory') {
       // `accessory_yesterday`: an answer kept from the day before, which is never today's.
       return send(200, fx.accessoryPlan(scenarioOf(req).has('accessory_yesterday') ? fx.addDays(local, -1) : local))
@@ -302,6 +312,15 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
           measured_rpe: 6.2, measured_au: 6.2 * b.duration_minutes, active_minutes: b.duration_minutes - 2,
           rpe_delta: 6.2 - rpe, au_delta: (6.2 - rpe) * b.duration_minutes, verdict: Math.abs(6.2 - rpe) < 0.5 ? 'exact' : 6.2 > rpe ? 'under' : 'over',
           coverage: 0.95, low_coverage: false, activity: 'Made-up strength', covered_exercises: 8, total_exercises: 9 } })
+      }
+      if (url.pathname.startsWith('/api/data/sync/')) {
+        if (!scenarioOf(req).has('writer_engine')) return send(409, { error: 'not_the_writer' })
+        return send(200, { kind: url.pathname.slice('/api/data/sync/'.length), result: { count: 1 } })
+      }
+      if (url.pathname === '/api/oura/login') {
+        // The made-up login goes straight to the made-up return page (below), as Oura would.
+        if (!scenarioOf(req).has('writer_engine')) return send(409, { error: 'not_the_writer' })
+        return send(200, { authorize_url: '/oura/callback?code=made-up&state=made-up' })
       }
       if (url.pathname === '/api/sync') {
         const run = runOf(req)

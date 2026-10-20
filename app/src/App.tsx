@@ -47,6 +47,7 @@ import { TrendsScreen } from './screens/InsightsTrends'
 import { WarningsScreen } from './screens/InsightsWarnings'
 import { StrengthScreen } from './screens/InsightsStrength'
 import { Settings, THEMES } from './screens/Settings'
+import { OuraDone, ouraDoneResult } from './screens/OuraDone'
 import { Today } from './screens/Today'
 import { TrainingTab } from './screens/TrainingTab'
 import { Welcome } from './screens/Welcome'
@@ -105,6 +106,8 @@ function Shell(p: ShellProps) {
   const scroller = useRef<HTMLElement>(null)
   const [pick, setPick] = useState<Pick | null>(readPick)
   const sessionRow = useLiveQuery(() => p.store.session.get('current'), [p.store])
+  // The Oura login's result page (rebuild Phase 9), read once from the address it opened on.
+  const [ouraResult, setOuraResult] = useState<string | null>(() => ouraDoneResult(window.location.hash))
 
   // A session left open by a reload or an app kill opens again.
   useEffect(() => {
@@ -154,6 +157,19 @@ function Shell(p: ShellProps) {
     // once a start, with the key
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.key])
+
+  // The result page needs no key: on iOS the login can come back in Safari, which does not
+  // share the Home Screen app's storage. "Open Settings" leaves it for the app itself.
+  if (ouraResult !== null) {
+    return (
+      <div className={`app app--${p.mode} fam-${PAGE_FAMILY.settings}`} style={p.vars as CSSProperties}>
+        <OuraDone result={ouraResult} onDone={() => {
+          window.history.replaceState(null, '', '/#/settings')
+          setOuraResult(null)
+        }} />
+      </div>
+    )
+  }
 
   if (!p.settings.key) {
     return (

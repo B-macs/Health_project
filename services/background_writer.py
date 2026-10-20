@@ -38,6 +38,16 @@ class NotTheWriterError(RuntimeError):
     """This process is not the background writer, so it must not write."""
 
 
+#: What the Streamlit app shows on every page, and answers to every write, once the engine
+#: is the background writer (rebuild Phase 9, switch step 8). Keyed on the setting, so the
+#: switch and its undo need no push.
+RETIRED_TEXT = "This app is retired. Use the Health app on your Home Screen."
+
+
+class AppRetiredError(RuntimeError):
+    """The Streamlit app is retired (the engine is the background writer): no write."""
+
+
 def current(repo) -> str | None:
     """The writer the store names: the setting, DEFAULT when absent, None
     when the store cannot be read or the setting names no writer."""

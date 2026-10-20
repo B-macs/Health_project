@@ -187,6 +187,20 @@ def test_the_limit_is_a_setting(monkeypatch):
     assert cf.max_age_seconds() == cf.MAX_AGE_MINUTES * 60
 
 
+def test_off_turns_the_pull_off(copy_path, monkeypatch):
+    """Switch step 7 (rebuild Phase 9): once the engine is the only writer, its copy
+    holds every write and is never pulled again. Any case; a wrong value is the default."""
+    monkeypatch.setenv("HEALTH_CACHE_MAX_AGE_MINUTES", "Off")
+    assert cf.max_age_seconds() is None
+    pulled = []
+    out = cf.refresh_if_stale(record_config(copy_path), _runner(copy_path), wait_seconds=0.0,
+                              now=time.time() + 10 ** 9,
+                              store_factory=lambda *_a, **_k: pulled.append(1))
+    assert out == cf.OFF and pulled == []
+    monkeypatch.setenv("HEALTH_CACHE_MAX_AGE_MINUTES", "never")
+    assert cf.max_age_seconds() == cf.MAX_AGE_MINUTES * 60
+
+
 def test_the_engine_pulls_before_it_answers(monkeypatch):
     pytest.importorskip("fastapi")
     import sys

@@ -2629,6 +2629,11 @@ export interface components {
             active_phase?: string | null;
             /** Garmin Configured */
             garmin_configured: boolean;
+            /**
+             * Manual Syncs
+             * @default []
+             */
+            manual_syncs: string[];
             /** Oura Configured */
             oura_configured: boolean;
             /**
@@ -4243,8 +4248,8 @@ export interface operations {
         parameters: {
             query?: never;
             header?: {
-                "x-engine-key"?: string | null;
                 "x-local-date"?: string | null;
+                "x-engine-key"?: string | null;
             };
             path?: never;
             cookie?: never;

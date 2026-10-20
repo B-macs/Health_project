@@ -59,3 +59,21 @@ test('the engine reading a saved copy shows on every page', async ({ page, conte
   await openTab(page, S.nav.insights)
   await expect(page.getByTestId('engine-offline')).toBeVisible()
 })
+
+test('with the engine as the writer, Settings logs in to Oura and Settings > Data runs a sync', async ({ page, context }) => {
+  await scenario(context, `e2e-p9-${Date.now()}`, 'writer_engine')
+  await onboard(page)
+  await openTab(page, S.nav.settings)
+  // The Oura login: the made-up engine and return page bring the phone back to the result.
+  await page.getByTestId('oura-login-card').getByRole('button', { name: S.settings.ouraLoginStart }).click()
+  await expect(page.getByTestId('oura-done')).toHaveAttribute('data-result', 'ok')
+  await expect(page.getByText(S.ouraDone.result.ok!)).toBeVisible()
+  await page.getByRole('button', { name: S.ouraDone.open }).click()
+  await expect(page.getByTestId('sync-card')).toBeVisible()
+  // A manual sync from Settings > Data.
+  await page.getByRole('button', { name: S.data.open }).click()
+  const card = page.getByTestId('syncs')
+  await expect(card).toContainText(S.data.autoEngine)
+  await card.getByRole('button', { name: S.data.syncButtons.sleep_fusion! }).click()
+  await expect(card.locator('[data-sync="sleep_fusion"]')).toHaveText(S.data.syncDone)
+})

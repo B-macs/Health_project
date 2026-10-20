@@ -6,9 +6,10 @@
 // that is the old app. Every row, count and word about the data is the engine's.
 import { useState } from 'react'
 import type { components } from '../generated/api'
-import { api } from '../lib/api'
+import { ApiError, api } from '../lib/api'
 import { useApp } from '../lib/appState'
 import { useCached } from '../lib/cache'
+import { SYNC_TIMEOUT_MS } from '../lib/sync'
 import { yearDate } from '../lib/dates'
 import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
@@ -22,7 +23,6 @@ type Schemas = components['schemas']
 export const DATA_PAGE = '/settings/data'
 export const TABLES = ['engine_view', 'blend_history', 'metrics_history'] as const
 const RANGED = new Set<string>(['blend_history', 'metrics_history'])
-export const SYNCS = ['garmin_daily', 'garmin_activities', 'sleep_fusion', 'oura', 'biometric_blend'] as const
 
 /** What waits for the keyword parse (I62), and parsing it now (I63). */
 export function ParseQueueCard({ data, busy, result, error, onProcess }: {
@@ -199,20 +199,51 @@ export function ShadowCard({ shadow: s }: { shadow: Shadow | null | undefined })
   )
 }
 
-/** The device syncs (I84, I87-I93): set up or not, and the buttons, off until the switch. */
-export function SyncsCard({ settings: d }: { settings: Schemas['SettingsOut'] | undefined }) {
+/** The device syncs (I84, I87-I93): set up or not, and one button per sync the engine
+ *  names (Settings' manual_syncs), on only while the engine runs the syncs (rebuild Phase 9).
+ *  `results` holds each sync's last line: done, running, or why it was refused. */
+export function SyncsCard({ settings: d, results = {}, onRun }: {
+  settings: Schemas['SettingsOut'] | undefined
+  results?: Record<string, string>
+  onRun?: (kind: string) => void
+}) {
+  const engine = d?.writer === 'engine'
+  const busy = Object.values(results).includes(S.data.syncRunning)
   return (
-    <section className="card group" data-testid="syncs">
+    <section className="card group" data-testid="syncs" data-writer={d?.writer ?? ''}>
       <h2 className="eyebrow">{S.data.syncs}</h2>
-      <p className="notice">{S.data.syncsWait}</p>
-      <p className="caption">{S.data.auto}</p>
+      {!engine && <p className="notice">{S.data.syncsWait}</p>}
+      <p className="caption">{engine ? S.data.autoEngine : S.data.auto}</p>
       {d && <p>{d.garmin_configured ? S.data.garminOn : S.data.garminOff}</p>}
       {d && <p>{d.oura_configured ? S.data.ouraOn : S.data.ouraOff}</p>}
-      {SYNCS.map((kind) => (
-        <button key={kind} className="btn btn--glass" disabled title={S.data.syncsWait}>{S.data.syncButtons[kind]}</button>
+      {(d?.manual_syncs ?? []).map((kind) => (
+        <div key={kind} className="group">
+          <button className="btn btn--glass" disabled={!engine || busy} title={engine ? undefined : S.data.syncsWait}
+            onClick={() => onRun?.(kind)}>{S.data.syncButtons[kind] ?? kind}</button>
+          {results[kind] && <p className="caption" role="status" data-sync={kind}>{results[kind]}</p>}
+        </div>
       ))}
     </section>
   )
+}
+
+/** The syncs card with its buttons wired to the engine (POST /api/data/sync/{kind}). */
+function Syncs({ settings }: { settings: Schemas['SettingsOut'] | undefined }) {
+  const { ctx } = useApp()
+  const [results, setResults] = useState<Record<string, string>>({})
+  async function run(kind: string) {
+    setResults((r) => ({ ...r, [kind]: S.data.syncRunning }))
+    try {
+      await api<Schemas['ManualSyncOut']>(`/api/data/sync/${encodeURIComponent(kind)}`, {
+        method: 'POST', key: ctx.key, engineDown: ctx.engineDown, fetchImpl: ctx.fetchImpl, timeoutMs: SYNC_TIMEOUT_MS,
+      })
+      setResults((r) => ({ ...r, [kind]: S.data.syncDone }))
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : ''
+      setResults((r) => ({ ...r, [kind]: S.data.syncRefused[code] ?? S.data.syncFailed }))
+    }
+  }
+  return <SyncsCard settings={settings} results={results} onRun={(kind) => void run(kind)} />
 }
 
 export function DataScreen() {
@@ -229,7 +260,7 @@ export function DataScreen() {
       <ChecksCard data={checks.data} />
       <Tables />
       <ShadowCard shadow={arch.data?.shadow as Shadow | null | undefined} />
-      <SyncsCard settings={settings.data} />
+      <Syncs settings={settings.data} />
     </div>
   )
 }

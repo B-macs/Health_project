@@ -388,6 +388,38 @@ def test_the_oura_login_ties_the_answer_to_its_request(env, monkeypatch):
     assert reused.status_code == 409, "a login is used once"
 
 
+def test_the_oura_return_page_needs_no_phone_date(env, monkeypatch):
+    """The Worker's return page (GET /oura/callback) has no phone date to send: the day
+    the phone sent when the login started is used (rebuild rule 3)."""
+    env.write_as(bw.ENGINE)
+    _oauth(env)
+    env.ok(monkeypatch, "post", "/api/oura/login",
+           {"redirect_uri": "https://health.example/oura/callback"}, local=date(2026, 10, 18))
+    stored = json.loads(env.repo.get_config_value("oura_login_state"))
+    assert stored["date"] == "2026-10-18"
+    monkeypatch.setattr(oura, "exchange_code", lambda *_a: {
+        "access_token": "a", "refresh_token": "r", "expires_in": 86400, "scope": "daily"})
+    days = []
+    monkeypatch.setattr(env.repo, "save_oura_oauth_token",
+                        lambda payload, today=None: days.append(today))
+    monkeypatch.setenv("HEALTH_ENGINE_KEY", KEY)
+    app = create_app(startup=False)
+    app.dependency_overrides[get_repository] = lambda: env.repo
+    app.dependency_overrides[get_sync_runner] = lambda: env.runner
+    with TestClient(app) as c:
+        r = c.post("/api/oura/callback", json={"code": "c", "state": stored["state"]},
+                   headers={"X-Engine-Key": KEY})
+    assert r.status_code == 200, r.text
+    assert days == [date(2026, 10, 18)]
+
+
+def test_settings_names_the_manual_syncs_by_the_names_the_engine_takes(env, monkeypatch):
+    """The phone draws one button per sync from this list, so its names cannot drift from
+    POST /api/data/sync/{kind} (they had: "oura" and "biometric_blend")."""
+    from services import engine_actions
+    assert env.ok(monkeypatch, "get", "/api/settings")["manual_syncs"] == list(engine_actions.MANUAL_SYNCS)
+
+
 def test_the_plan_start_seeds_a_first_block_once(env, monkeypatch):
     settings = env.ok(monkeypatch, "get", "/api/settings")
     assert settings["writer"] == bw.STREAMLIT and settings["plan_running"]

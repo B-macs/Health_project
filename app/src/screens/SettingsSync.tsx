@@ -52,6 +52,49 @@ export function SyncCard({ status }: { status: Status | undefined }) {
   )
 }
 
+/** The Oura login (rebuild Phase 9): a button that opens Oura's own login page, on only
+ *  while the engine runs the syncs. Oura sends the owner back to /oura/callback, where the
+ *  Worker finishes the login and opens the result page (screens/OuraDone.tsx). */
+export function OuraLoginCard({ writer, busy, error, onLogin }: {
+  writer: string | null | undefined; busy: boolean; error: string | null; onLogin: () => void
+}) {
+  const engine = writer === 'engine'
+  return (
+    <section className="card group" data-testid="oura-login-card">
+      <h2 className="eyebrow">{S.settings.ouraLogin}</h2>
+      <p className="caption">{engine ? S.settings.ouraLoginWhy : S.settings.ouraLoginLater}</p>
+      {error && <p className="alert" role="alert">{error}</p>}
+      <button className="btn btn--glass btn--wide" disabled={!engine || busy} onClick={onLogin}>{S.settings.ouraLoginStart}</button>
+    </section>
+  )
+}
+
+/** Where Oura sends the owner back: the Worker's page on this app's own address. */
+export const ouraRedirect = (origin: string) => `${origin}/oura/callback`
+
+export function OuraLogin() {
+  const { store, ctx } = useApp()
+  const status = useCached<Status>(store, '/api/status', null, ctx)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  async function login() {
+    setBusy(true)
+    setError(null)
+    try {
+      const answer = await api<components['schemas']['OuraLoginOut']>('/api/oura/login', {
+        method: 'POST', key: ctx.key, engineDown: ctx.engineDown, fetchImpl: ctx.fetchImpl,
+        body: { redirect_uri: ouraRedirect(window.location.origin) },
+      })
+      window.location.assign(answer.authorize_url)
+    } catch (err) {
+      const code = err instanceof ApiError ? err.code : ''
+      setError(S.settings.ouraLoginRefused[code] ?? S.fresh.why[err instanceof ApiError ? err.kind : 'server'])
+      setBusy(false)
+    }
+  }
+  return <OuraLoginCard writer={status.data?.writer} busy={busy} error={error} onLogin={() => void login()} />
+}
+
 export function SyncStatus() {
   const { store, ctx } = useApp()
   const view = useCached<Status>(store, '/api/status', null, ctx)

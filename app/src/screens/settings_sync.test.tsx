@@ -8,7 +8,7 @@ import type { components } from '../generated/api'
 import { HealthDB } from '../db/schema'
 import { AppStateProvider } from '../lib/appState'
 import { S } from '../strings'
-import { PlanStartCard, SyncCard, clockTime } from './SettingsSync'
+import { OuraLoginCard, PlanStartCard, SyncCard, clockTime, ouraRedirect } from './SettingsSync'
 
 type Status = components['schemas']['StatusOut']
 type SettingsAnswer = components['schemas']['SettingsOut']
@@ -55,6 +55,7 @@ describe('the sync card', () => {
 describe('the plan start (first run)', () => {
   const settings = (running: boolean): SettingsAnswer => ({
     plan_start_date: null, plan_running: running, writer: 'streamlit', garmin_configured: true, oura_configured: true,
+    manual_syncs: [],
   })
 
   it('asks for the start day only while no plan is stored', () => {
@@ -70,5 +71,22 @@ describe('the plan start (first run)', () => {
       .toContain(S.settings.planStarted('Made-up block'))
     expect(text(draw(<PlanStartCard settings={settings(false)} busy={false} done={null}
       error={S.settings.planRefused.plan_already_running!} onStart={none} />))).toContain(S.settings.planRefused.plan_already_running!)
+  })
+})
+
+describe('the Oura login (Phase 9)', () => {
+  const card = (writer: string, error: string | null = null) =>
+    draw(<OuraLoginCard writer={writer} busy={false} error={error} onLogin={none} />)
+
+  it('is on only while the engine runs the syncs, and says why before', () => {
+    expect(text(card('streamlit'))).toContain(S.settings.ouraLoginLater)
+    expect(card('streamlit')).toMatch(/<button[^>]*disabled=""/)
+    expect(text(card('engine'))).toContain(S.settings.ouraLoginWhy)
+    expect(card('engine')).not.toMatch(/<button[^>]*disabled=""/)
+  })
+
+  it('says why the engine refused, and comes back to this app\'s own address', () => {
+    expect(text(card('engine', S.settings.ouraLoginRefused.sync_disabled!))).toContain(S.settings.ouraLoginRefused.sync_disabled!)
+    expect(ouraRedirect('https://health.example')).toBe('https://health.example/oura/callback')
   })
 })

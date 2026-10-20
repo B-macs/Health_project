@@ -21,8 +21,11 @@ clientsClaim()
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
-// Every page load is "/" (the app routes with #hashes), answered with the precached shell.
-registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//] }))
+// Every page load is "/" (the app routes with #hashes), answered with the precached shell,
+// except /api and /oura: Oura's login sends the phone to the Worker's /oura/callback, which
+// must reach the network to finish the login (rebuild Phase 9).
+export const NETWORK_ONLY_PAGES = [/^\/api\//, /^\/oura\//]
+registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: NETWORK_ONLY_PAGES }))
 
 interface Alert {
   title: string

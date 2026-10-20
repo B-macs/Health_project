@@ -5908,6 +5908,13 @@
   "settings": {
     "active_phase": null,
     "garmin_configured": false,
+    "manual_syncs": [
+      "garmin_daily",
+      "garmin_activities",
+      "sleep_fusion",
+      "oura_weekly",
+      "blend_backfill"
+    ],
     "oura_configured": false,
     "plan_running": true,
     "plan_start_date": null,

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from services import background_writer, data_check, engine_actions
 from services import flexibility_screen as fxs
@@ -209,10 +209,17 @@ def post_oura_login(body: OuraLoginIn, today: date = Depends(local_today),
 
 
 @router.post("/api/oura/callback", response_model=OuraLoginStatus)
-def post_oura_callback(body: OuraCallbackIn, today: date = Depends(local_today),
+def post_oura_callback(body: OuraCallbackIn,
+                       x_local_date: str | None = Header(default=None),
                        repo: Repository = Depends(get_repository)) -> dict:
+    # The Worker's return page (GET /oura/callback) calls this with no phone date: the day
+    # is the one the phone sent when the login started (engine_actions.finish_oura_login).
     try:
-        return engine_actions.finish_oura_login(repo, body.code, body.state, today)
+        fallback = date.fromisoformat(x_local_date) if x_local_date else None
+    except ValueError:
+        raise HTTPException(status_code=400, detail="x_local_date_invalid") from None
+    try:
+        return engine_actions.finish_oura_login(repo, body.code, body.state, fallback)
     except engine_actions.ActionRefused as exc:
         raise _refused(exc.code) from None
     except background_writer.NotTheWriterError:

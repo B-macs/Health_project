@@ -38,7 +38,12 @@ MAX_AGE_MINUTES = 15.0
 #: After a failed pull, the next try waits this long.
 RETRY_AFTER_SECONDS = 60.0
 
+#: HEALTH_CACHE_MAX_AGE_MINUTES=off: the copy is never pulled again after the start (rebuild
+#: Phase 9, switch step 7: once the engine is the only writer, its copy holds every write).
+OFF_SETTING = "off"
+
 #: What refresh_if_stale did.
+OFF = "off"                 # the setting turns the pull off
 NOT_RECORD = "not_record"   # no local copy of Supabase in this process
 FRESH = "fresh"             # pulled recently enough
 REFRESHED = "refreshed"     # pulled again now
@@ -48,9 +53,12 @@ FAILED = "failed"           # the pull failed, or failed recently: the copy stan
 _FAILED_AT: dict[str, float] = {}
 
 
-def max_age_seconds() -> float:
-    """The age limit in seconds: HEALTH_CACHE_MAX_AGE_MINUTES, else MAX_AGE_MINUTES."""
+def max_age_seconds() -> float | None:
+    """The age limit in seconds: HEALTH_CACHE_MAX_AGE_MINUTES, else MAX_AGE_MINUTES; None
+    when the setting is "off" (any case): never pull again."""
     raw = os.environ.get("HEALTH_CACHE_MAX_AGE_MINUTES", "").strip()
+    if raw.lower() == OFF_SETTING:
+        return None
     try:
         minutes = float(raw) if raw else MAX_AGE_MINUTES
     except ValueError:
@@ -61,14 +69,16 @@ def max_age_seconds() -> float:
 def refresh_if_stale(config, runner, *, wait_seconds: float, now: float | None = None,
                      store_factory=None) -> str:
     """Pull the copy again when it is older than the limit; one of FRESH,
-    REFRESHED, BUSY, FAILED or NOT_RECORD. `runner` is the process's
+    REFRESHED, BUSY, FAILED, NOT_RECORD or OFF. `runner` is the process's
     BackgroundSyncRunner; `wait_seconds` how long to wait for a running
     sync (0: never wait)."""
     if not record_cache.is_supabase_record(config):
         return NOT_RECORD
+    limit = max_age_seconds()
+    if limit is None:
+        return OFF
     path = config.datastore_path
     now = time.time() if now is None else now
-    limit = max_age_seconds()
     if not record_cache.is_stale(path, limit, now):
         return FRESH
     failed_at = _FAILED_AT.get(path)
