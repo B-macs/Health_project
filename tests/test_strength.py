@@ -1,9 +1,9 @@
 """Tests for services/strength.py — the Overall Strength Score and its split.
 
 The properties pinned here are the ones the design actually depends on:
-the contributions summing to the overall, measured performance never being
-able to push the level down, and confidence being a product so any one
-failure mode zeroes it.
+the contributions summing to the overall, the headline being the middle of
+the last three lifting weeks (the owner, 2026-10-20), and confidence being a
+product so any one failure mode zeroes it.
 """
 
 from __future__ import annotations
@@ -264,76 +264,67 @@ def test_the_remainder_absorbed_by_the_last_part_is_bounded():
     assert worst <= bound + 1e-9
 
 
-# ── the weekly model ────────────────────────────────────────────────────────
+# ── the headline: the measured index (the owner, 2026-10-20) ────────────────
+# It replaced a capped weekly model (+1.5 a lifting week at most, from an
+# assumed 50) whose tests went with it: the model counted lifting weeks rather
+# than measuring the lifts.
 
-def test_measured_performance_can_never_push_the_level_down():
-    """The safety property. Pain, a substitution, a rehab restriction or a
-    deliberately light week all show up as a low measured value — and none of
-    them may read as strength loss."""
-    level, why = strength.model_step(60.0, trend=30.0, has_stimulus=True, inactive_weeks=0)
-    assert level == 60.0
-    assert why == "flat"
-
-
-def test_a_trend_inside_the_deadband_does_not_move_the_level():
-    level, _ = strength.model_step(60.0, trend=60.5, has_stimulus=True, inactive_weeks=0)
-    assert level == 60.0
-
-
-def test_a_confirmed_gain_is_taken_only_partially_and_is_capped():
-    level, _ = strength.model_step(60.0, trend=100.0, has_stimulus=True, inactive_weeks=0)
-    assert level == pytest.approx(60.0 + strength.GAIN_CAP_POINTS)
+def _weekly(weights, today=date(2026, 10, 19)):
+    """One Lat Pulldown session a week, oldest first, the last in today's week;
+    None is a week without it."""
+    monday = today - timedelta(days=today.weekday())
+    rows = []
+    for back, weight in enumerate(reversed(weights)):
+        if weight is not None:
+            day = (monday - timedelta(weeks=back)).isoformat()
+            rows.append(_row("Lat Pulldown", day, [{"reps": 10, "weight": weight}], rpe=8))
+    return rows
 
 
-def test_one_freak_workout_cannot_move_the_level_far():
-    weeks = [(date(2026, 1, 5), 50.0), (date(2026, 1, 12), 51.0), (date(2026, 1, 19), 95.0)]
-    out = strength.run_model(weeks, seed=50.0)
-    assert out[-1][2] <= 50.0 + strength.GAIN_CAP_POINTS
+def _levels(weights, weeks=8, today=date(2026, 10, 19)):
+    return strength.score_series(_weekly(weights, today), sb.PEAKS_2025, MW, sb.PR_RIR,
+                                 today=today, weeks=weeks)
 
 
-def test_the_first_inactive_week_is_free():
-    level, why = strength.model_step(60.0, None, has_stimulus=False, inactive_weeks=1)
-    assert level == 60.0
-    assert why == "grace"
+def test_the_headline_is_the_middle_of_the_last_three_lifting_weeks():
+    points = _levels([50, 60, 70, 80])
+    assert points[-1]["level"] == pytest.approx(points[-2]["measured"], abs=0.05)
+    assert points[-1]["why"] == "middle of 3 lifting weeks"
+    assert strength.headline(points) == points[-1]["level"]
 
 
-def test_prolonged_inactivity_decays_and_accelerates():
-    early, _ = strength.model_step(60.0, None, False, 2)
-    late, _ = strength.model_step(60.0, None, False, 6)
-    assert late < early < 60.0
+def test_a_week_without_a_lift_is_skipped_not_counted_as_zero():
+    points = _levels([60, None, 70, 80])
+    assert points[-3]["measured"] is None
+    assert points[-1]["level"] == pytest.approx(points[-2]["measured"], abs=0.05)
 
 
-def test_decay_is_suspended_while_calibrating():
-    level, why = strength.model_step(60.0, None, False, 8, decay_suspended=True)
-    assert level == 60.0
-    assert "calibrating" in why
+def test_one_light_week_does_not_move_it_and_two_do():
+    steady = _levels([80, 80, 60])
+    assert steady[-1]["level"] == pytest.approx(steady[-2]["measured"], abs=0.05)
+    lighter = _levels([80, 60, 60])
+    assert lighter[-1]["level"] == pytest.approx(lighter[-1]["measured"], abs=0.05)
+    assert lighter[-1]["level"] < steady[-1]["level"], "it falls when the lifts fall"
 
 
-def test_returning_after_a_layoff_does_not_inherit_the_old_trend():
-    """The bug this pins: a positional "last 3 entries with data" window let a
-    six-week layoff sit invisibly between two entries, so the first week back
-    was compared against a median built from before the break and awarded a
-    gain the session did not support. A calendar window empties across a gap,
-    so the week back has no trend and the level cannot move."""
-    weeks = [(date(2026, 1, 5), 62.0), (date(2026, 1, 12), 62.0)]
-    weeks += [(date(2026, 1, 19) + timedelta(weeks=n), None) for n in range(6)]
-    weeks += [(date(2026, 3, 2), 54.0)]
-    out = strength.run_model(weeks, seed=57.72, decay_suspended=True)
-    before_return, week_back = out[-2], out[-1]
-    assert week_back[1] == 54.0
-    assert week_back[2] == pytest.approx(before_return[2])   # unchanged
-    assert week_back[3] == "no trend yet"
+def test_no_lift_in_the_look_back_is_no_headline():
+    weights = [80] + [None] * strength.HEADLINE_LOOKBACK_WEEKS
+    points = _levels(weights)
+    assert points[-1]["level"] is None and strength.headline(points) is None
+    assert points[-1]["why"] == f"no lift in {strength.HEADLINE_LOOKBACK_WEEKS} weeks"
 
 
-def test_a_second_week_back_still_cannot_gain_from_a_lower_result():
-    """Even once the calendar window refills, two weeks measured BELOW the
-    level produce a median below it — so the gain has to be re-earned rather
-    than resumed."""
-    weeks = [(date(2026, 1, 5), 62.0), (date(2026, 1, 12), 62.0)]
-    weeks += [(date(2026, 1, 19) + timedelta(weeks=n), None) for n in range(6)]
-    weeks += [(date(2026, 3, 2), 54.0), (date(2026, 3, 9), 57.0)]
-    out = strength.run_model(weeks, seed=57.72, decay_suspended=True)
-    assert out[-1][2] == pytest.approx(out[-3][2])
+def test_the_level_does_not_depend_on_how_many_weeks_are_drawn():
+    weights = [50, 60, None, 70, 80, 75, 72]
+    narrow, wide = _levels(weights, weeks=3), _levels(weights, weeks=12)
+    assert len(narrow) == 3 and len(wide) == 12
+    assert [p["level"] for p in narrow] == [p["level"] for p in wide[-3:]]
+
+
+def test_headline_is_the_last_point():
+    assert strength.headline([{"level": None}, {"level": 51.5}]) == 51.5
+    assert strength.headline([{"level": 51.5}, {"level": None}]) is None
+    assert strength.headline([]) is None
 
 
 # ── the whole snapshot ──────────────────────────────────────────────────────
@@ -512,47 +503,19 @@ def test_nothing_measured_is_still_calibrating():
     assert _snapshot([])["calibrating"] is True
 
 
-def _series(rows, weeks, today=date(2026, 10, 13)):
-    return strength.score_series(rows, sb.PEAKS_2025, MW, sb.PR_RIR, sb.ANCHOR_DATE,
-                                 sb.ANCHOR_VALUE, today=today, weeks=weeks)
-
-
-def _weekly_rows():
-    """One heavy upper session a week from the anchor on, enough to earn the
-    capped gain most weeks."""
-    out, day = [], date(2026, 7, 28)
-    while day <= date(2026, 10, 13):
-        out.append(_row("Lat Pulldown", day.isoformat(), [{"reps": 10, "weight": 60}], rpe=8))
-        day += timedelta(days=7)
-    return out
-
-
-def test_the_level_is_replayed_from_the_anchor_whatever_the_window():
-    """The bug: the model was replayed over the displayed weeks only, so it
-    restarted at the anchor value at the window's left edge — 54.5 on a
-    6-week chart where the model from 2026-07-30 read 59.0 (2026-10-13)."""
-    narrow, wide = _series(_weekly_rows(), 3), _series(_weekly_rows(), 12)
-    assert len(narrow) == 3 and len(wide) == 12
-    assert narrow[-1]["level"] == wide[-1]["level"]
-    assert narrow[0]["level"] == wide[-3]["level"]
-    assert narrow[0]["level"] > sb.ANCHOR_VALUE, "gains before the window are kept"
-
-
-def test_current_level_is_the_last_modelled_week():
-    points = [{"level": None}, {"level": 51.5}, {"level": 53.0}]
-    assert strength.current_level(points, 50.0) == 53.0
-    assert strength.current_level([{"level": None}], 50.0) == 50.0
-    assert strength.current_level([], 50.0) == 50.0
-
-
 def test_the_screen_headline_is_the_charts_level_and_the_regions_total_it():
-    rows = _weekly_rows()
+    rows = _weekly([60, 62, 64, 66])
     out = strength.screen(rows, sb.PEAKS_2025, tc.EXERCISE_BODY_REGION, MW, sb.REGION_PRIOR,
-                          sb.PR_RIR, sb.ANCHOR_DATE, sb.ANCHOR_VALUE,
-                          today=date(2026, 10, 13), weeks=6)
+                          sb.PR_RIR, today=date(2026, 10, 19), weeks=6)
     assert out["overall"] == out["score_series"][-1]["level"]
-    assert out["overall"] > sb.ANCHOR_VALUE
     assert sum(r.contribution_points for r in out["regions"]) == pytest.approx(out["overall"])
+
+
+def test_with_no_lift_the_screen_has_no_headline_and_no_points():
+    out = strength.screen([], sb.PEAKS_2025, tc.EXERCISE_BODY_REGION, MW, sb.REGION_PRIOR,
+                          sb.PR_RIR, today=date(2026, 10, 19))
+    assert out["overall"] is None
+    assert all(r.contribution_points == 0.0 for r in out["regions"])
 
 
 def test_the_estimate_reads_the_session_rpe_not_the_heart_rate_one():

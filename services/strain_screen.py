@@ -53,7 +53,8 @@ def region_data(region_au: dict, stage: int, day: date, stage_start: date | None
     one."""
     rows = region_au["rows"]
     acwr = sr.region_acwr(rows, stage, today=day, stage_start=stage_start)
-    is_rolling = bool(snapshot.get("strain_is_rolling"))
+    # A rest day (no session, 2026-10-20) offers the 7 days before it.
+    is_rolling = bool(snapshot.get("rest_day") or snapshot.get("strain_is_rolling"))
     week_row = sr.rolling_prior_region_row(rows, day) if is_rolling else None
     data = dash.compute_region_strain_snapshot(
         day, rows, stage, overall_snapshot=snapshot, provenance=region_au,
@@ -65,10 +66,10 @@ def region_data(region_au: dict, stage: int, day: date, stage_start: date | None
 def region_panel(data: dict, overall: float | None, stage: int | None) -> dict:
     """What the region panel shows, as fields (move HOME-21).
 
-    state "empty": no split for the day, `reason` "rolling" (a rest day: the
-    figure above is the 7-day average) or "no_split" (nothing logged, or
-    nothing that maps to a region), with the unmapped names. An unmapped
-    region has no number, never a 0.0.
+    state "empty": no split for the day, `reason` "rest_day" (no session that
+    day; the 7 days before can be shown) or "no_split" (nothing that maps to a
+    region), with the unmapped names. An unmapped region has no number, never
+    a 0.0.
 
     state "split": each region's strain, AU, share and track fill, the
     overall's tick on every track (a region can never read above it, and the
@@ -79,7 +80,7 @@ def region_panel(data: dict, overall: float | None, stage: int | None) -> dict:
     stage)."""
     unmapped = list(data.get("unmapped_names") or [])
     if not data.get("has_split"):
-        return {"state": "empty", "reason": "rolling" if data.get("is_rolling") else "no_split",
+        return {"state": "empty", "reason": "rest_day" if data.get("is_rolling") else "no_split",
                 "unmapped_names": unmapped}
     regions = []
     for region in data["regions"]:
@@ -116,6 +117,9 @@ SOURCE_WORDS = {
     hr_load.SOURCE_HR: "Your watch's heart rate",
     hr_load.SOURCE_BLENDED: "Your watch's heart rate and your session rating",
     hr_load.SOURCE_RPE: "Your session rating only: the watch had no heart rate for this session",
+    hr_load.SOURCE_GYM_RATED: ("Your session rating. A gym session is measured by your rating; "
+                               "the watch's heart rate below is shown, not used"),
+    hr_load.SOURCE_WALKS: "Your watch walks: no training session was logged this day",
 }
 
 #: Each heart-rate zone in plain words; hr_load.ZONE_LOWER_PCT sets its limits.
@@ -159,6 +163,8 @@ def strain_source(snapshot: dict) -> dict | None:
     if not source or source in (hr_load.SOURCE_NONE, "NOT_COMPUTED"):
         return None
     hr = snapshot.get("hr_detail") or {}
+    if source == hr_load.SOURCE_WALKS:
+        hr = {}
     hr_rows = []
     if hr:
         minutes = {int(z): m for z, m in (hr.get("zone_minutes") or {}).items()}
@@ -174,10 +180,17 @@ def strain_source(snapshot: dict) -> dict | None:
         ]
         if hr_max:
             hr_rows.append(("Zones use your top heart rate", _bpm(hr_max)))
+    # The watch's walks no session holds count on the day walked (2026-10-20).
+    for walk in snapshot.get("walks") or []:
+        hr_rows.append((f"Watch {walk.get('type') or 'walk'}".replace("_", " "),
+                        f"{float(walk.get('minutes') or 0):.0f} min, average "
+                        f"{_bpm(walk.get('avg_hr'))}, load {float(walk.get('load') or 0):.0f}"))
     both = (snapshot.get("strain_hr_only"), snapshot.get("strain_rpe_only"))
     blend = ((both[0], both[1], int(hr_load.HR_BLEND_WEIGHT * 100))
-             if hr and all(v is not None for v in both) else None)
-    return {"kind": "rpe" if source == hr_load.SOURCE_RPE else "hr",
+             if source == hr_load.SOURCE_BLENDED and hr and all(v is not None for v in both)
+             else None)
+    rated = source in (hr_load.SOURCE_RPE, hr_load.SOURCE_GYM_RATED)
+    return {"kind": "rpe" if rated else "hr",
             "label": SOURCE_WORDS.get(source) or snapshot.get("strain_source_label") or "",
             "hr_rows": hr_rows, "blend": blend}
 

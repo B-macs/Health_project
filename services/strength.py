@@ -31,27 +31,23 @@ With every regional index starting at CALIBRATION_INDEX (50), the overall is 50
 *whatever the shares turn out to be*. That is why calibration can run for months
 without the headline moving, and why nothing jumps the day it completes.
 
-⚠ SINCE 2026-10-13 (WP-15) THE HEADLINE IS THE MODELLED LEVEL, not the anchor.
-The page had shown a fixed 50 beside a chart whose level moved, and every
-region read 50 because the view forced calibration on all three for ever. Now
-the headline is current_level() of the weekly model (replayed from the anchor),
-the regions divide it by their shares, and each region leaves calibration on
-its own confidence — see snapshot() and screen().
+⚠ SINCE 2026-10-20 THE HEADLINE IS THE MEASURED INDEX (the owner's choice A:
+"your lifts as a % of 2025, measured"). It is the middle (median) of the
+weekly measured index over the last HEADLINE_WEEKS weeks that have a lift,
+looking back at most HEADLINE_LOOKBACK_WEEKS; the chart draws the same line,
+so the headline is the chart's last point. Each region still leaves
+calibration on its own confidence, and the regions divide the headline by
+their shares — see snapshot() and screen().
 
-THE ASYMMETRY THAT MAKES IT SAFE
---------------------------------
-Measured performance can only push the level UP. The only downward force is
-detraining decay from absent stimulus. One rule covers every case where a
-number falls for a reason that is not strength loss: pain, a substituted
-movement, a rehab restriction, a deliberately lighter week, a bad night's sleep.
-None of them can read as getting weaker, because nothing except an actual
-absence of training is allowed to subtract.
-
-Measured 2026-08-04 on the real log, which is why the rule exists: between 22
-and 30 July estimated 1RM moved +291% (RDL), +96% (Hip Thrust) and +76% (Lat
-Pulldown) while RPE went 5 -> 6. That is load-finding after a layoff, not a
-tripling of strength. Over the same window Face Pull fell 26% and Pallof 35% —
-deliberate de-loads. Both directions are protected by the same asymmetry.
+WHAT IT REPLACED, AND WHY. From 2026-08-04 the headline was a weekly model
+seeded at an assumed 50 on the anchor date that measured performance could
+only push UP, by at most 1.5 points a week (with decay the only downward
+force). The asymmetry was meant to stop a light week or a substitution from
+reading as strength loss — and it did — but the cap made the number count
+lifting weeks: a review on 2026-10-20 found it rising by exactly the cap every
+week with a lift, far below the measured index, and rising in a week the lifts
+fell. The median of three lifting weeks is the guard against one light week
+now; a lighter month reads as one, which is what a measurement does.
 
 TONNAGE IS A SEPARATE METRIC AND SHARES NO TERM WITH THIS ONE
 -------------------------------------------------------------
@@ -77,16 +73,9 @@ EPLEY_DIVISOR: float = 30.0
 # ~5-rep set at RPE 8, not a change to this constant.
 MAX_VALID_EFFECTIVE_REPS: float = 12.0
 
-# ── the weekly model ────────────────────────────────────────────────────────
-DEADBAND: float = 1.0        # points the trend must clear before the level moves
-ALPHA: float = 0.35          # fraction of the confirmed gap taken per week
-GAIN_CAP_POINTS: float = 1.5
-GAIN_CAP_PCT: float = 0.03
-TREND_WEEKS: int = 3         # width of the CALENDAR window the median is taken over
-TREND_MIN_WEEKS: int = 2     # weeks with data needed inside it before a trend exists
-GRACE_WEEKS: int = 1         # first week without stimulus costs nothing
-DECAY_EARLY: float = 0.0075  # weeks 2-3 without stimulus
-DECAY_LATE: float = 0.015    # week 4 onward
+# ── the headline (the owner, 2026-10-20) ────────────────────────────────────
+HEADLINE_WEEKS: int = 3            # lifting weeks the median is taken over
+HEADLINE_LOOKBACK_WEEKS: int = 8   # how far back a lifting week may be
 
 # ── calibration ─────────────────────────────────────────────────────────────
 CALIBRATION_INDEX: float = 50.0
@@ -358,73 +347,10 @@ def split_parts(shares: dict[str, float], total: float, dp: int = 1) -> dict[str
     return parts
 
 
-# ── the weekly model ────────────────────────────────────────────────────────
-
-def model_step(
-    previous_level: float,
-    trend: float | None,
-    has_stimulus: bool,
-    inactive_weeks: int,
-    decay_suspended: bool = False,
-) -> tuple[float, str]:
-    """One week of the Overall Strength Score.
-
-    Measured performance can only push the level UP; the only downward force
-    is detraining decay. See the module docstring for why that asymmetry is
-    the safety property and not a modelling shortcut.
-
-    `decay_suspended` holds the level flat through inactivity — used while the
-    regional split is still calibrating, because a number that has not yet
-    earned trust should not be allowed to fall on its own."""
-    if not has_stimulus:
-        if decay_suspended:
-            return previous_level, "calibrating — decay suspended"
-        if inactive_weeks <= GRACE_WEEKS:
-            return previous_level, "grace"
-        rate = DECAY_EARLY if inactive_weeks <= 3 else DECAY_LATE
-        return previous_level * (1.0 - rate), f"decay {rate * 100:.2f}%"
-    if trend is None:
-        return previous_level, "no trend yet"
-    gap = trend - previous_level
-    if gap <= DEADBAND:
-        return previous_level, "flat"
-    gain = min(ALPHA * gap, GAIN_CAP_POINTS, GAIN_CAP_PCT * previous_level)
-    return previous_level + gain, f"+{gain:.2f}"
-
+# ── the headline over time ──────────────────────────────────────────────────
 
 def week_start(day: date) -> date:
     return day - timedelta(days=day.weekday())
-
-
-def run_model(
-    weekly_measured: list[tuple[date, float | None]],
-    seed: float,
-    decay_suspended: bool = False,
-) -> list[tuple[date, float | None, float, str]]:
-    """Replay the weekly model over CONSECUTIVE calendar weeks.
-
-    The trend window is calendar-indexed, not "the last N weeks that happen to
-    have data". Indexing by position let a six-week layoff sit invisibly
-    between two entries, so the week you came back compared fresh numbers
-    against a median built from before the break and awarded a gain the
-    session did not support — caught by simulation, at +1.50 on a week whose
-    measured value was 54 against a level of 57.72. A calendar window empties
-    across a gap, so returning starts from no trend and has to re-earn it."""
-    out: list[tuple[date, float | None, float, str]] = []
-    level, inactive = seed, 0
-    seen: dict[int, float] = {}
-    for i, (label, measured) in enumerate(weekly_measured):
-        if measured is None:
-            inactive += 1
-            level, why = model_step(level, None, False, inactive, decay_suspended)
-        else:
-            inactive = 0
-            seen[i] = measured
-            window = [seen[j] for j in range(i - TREND_WEEKS + 1, i + 1) if j in seen]
-            trend = statistics.median(window) if len(window) >= TREND_MIN_WEEKS else None
-            level, why = model_step(level, trend, True, 0, decay_suspended)
-        out.append((label, measured, round(level, 2), why))
-    return out
 
 
 def weekly_measured_index(
@@ -488,56 +414,39 @@ def score_series(
     peaks: dict[str, tuple[float, int, float, str]],
     movement_weights: dict[str, float],
     pr_rir: float,
-    anchor_date: date,
-    anchor_value: float,
     today: date | None = None,
     weeks: int = 8,
-    calibrating: bool = True,
 ) -> list[dict]:
     """The Overall Strength Score, week by week, ready to plot: the last
-    `weeks` weeks.
+    `weeks` weeks, each {"week", "measured", "level", "why"}.
 
-    Weeks before the anchor carry a measured value but no modelled level —
-    there was no level yet. The model is seeded at the anchor and replayed
-    forward from there, with decay suspended while calibrating.
-
-    REPLAYED FROM THE ANCHOR, WHATEVER `weeks` IS (2026-10-13, WP-15). It used
-    to replay only the weeks it returned, so the level restarted at the anchor
-    value at the left edge of the display window: on 2026-10-13 the 6-week
-    chart read 54.5 where the model run from 2026-07-30 reads 59.0, and the
-    figure dropped every Monday a gained week slid out of the window. A level
-    is the model's memory; it cannot depend on how much of it is drawn."""
+    `measured` is that week's measured index (weekly_measured_index; None with
+    no lift). `level` is the headline as it read that week: the median of the
+    last HEADLINE_WEEKS weeks with a lift, up to and including it, among the
+    HEADLINE_LOOKBACK_WEEKS before it; None when none of them had a lift."""
     today = today or date.today()
-    anchor_week = week_start(anchor_date)
-    since_anchor = (week_start(today) - anchor_week).days // 7 + 1
-    measured = weekly_measured_index(rows, peaks, movement_weights, pr_rir,
-                                     today=today, weeks=max(weeks, since_anchor))
-    pre = [(w, m) for w, m in measured if w < anchor_week]
-    post = [(w, m) for w, m in measured if w >= anchor_week]
-    modelled = run_model(post, seed=anchor_value, decay_suspended=calibrating)
-    levels = {w: level for w, _m, level, _why in modelled}
-    reasons = {w: why for w, _m, _level, why in modelled}
-    points = (
-        [{"week": w, "measured": m, "level": None, "why": "before the anchor"} for w, m in pre]
-        + [{"week": w, "measured": m, "level": levels[w], "why": reasons[w]} for w, m in post]
-    )
-    return points[-weeks:]
+    measured = weekly_measured_index(rows, peaks, movement_weights, pr_rir, today=today,
+                                     weeks=weeks + HEADLINE_LOOKBACK_WEEKS - 1)
+    points = []
+    for i in range(HEADLINE_LOOKBACK_WEEKS - 1, len(measured)):
+        window = [m for _w, m in measured[i - HEADLINE_LOOKBACK_WEEKS + 1:i + 1] if m is not None]
+        used = window[-HEADLINE_WEEKS:]
+        # One decimal, as shown: the regions divide it at one decimal and must total it.
+        level = round(statistics.median(used), 1) if used else None
+        why = (f"middle of {len(used)} lifting week{'' if len(used) == 1 else 's'}" if used
+               else f"no lift in {HEADLINE_LOOKBACK_WEEKS} weeks")
+        week, value = measured[i]
+        points.append({"week": week, "measured": value, "level": level, "why": why})
+    return points
 
 
-def current_level(points: list[dict], fallback: float) -> float:
-    """The headline: the series' latest modelled level — the number the chart
-    ends on. `fallback` (the anchor value) only before any week is modelled.
-
-    The headline used to be the anchor itself, a fixed 50, while the chart
-    beside it drew a level that moved, so the page showed two different
-    "overall" numbers (WP-15)."""
-    for point in reversed(points):
-        if point.get("level") is not None:
-            return point["level"]
-    return fallback
+def headline(points: list[dict]) -> float | None:
+    """The headline: the series' last level, the number the chart ends on
+    (None when there is no lift in the look-back)."""
+    return points[-1]["level"] if points else None
 
 
-# ── the whole picture, in one call ──────────────────────────────────────────
+# ── the whole picture, in one call# ── the whole picture, in one call ──────────────────────────────────────────
 
 def snapshot(
     rows: list[dict],
@@ -551,7 +460,7 @@ def snapshot(
 ) -> dict:
     """The regional half of the Strength screen, from the raw exercise rows.
     `overall` is the headline the three regions divide; screen() passes the
-    modelled level.
+    measured headline (0.0 when there is none).
 
     CALIBRATION IS PER REGION (2026-10-13, WP-15). A region shows its measured
     index once its confidence reaches CALIBRATION_EXIT; below that it shows
@@ -663,26 +572,22 @@ def screen(
     movement_weights: dict[str, float],
     prior: dict[str, float],
     pr_rir: float,
-    anchor_date: date,
-    anchor_value: float,
     today: date | None = None,
     weeks: int = 8,
     hold_baselines: dict[str, tuple[float, str]] | None = None,
 ) -> dict:
-    """The whole Strength screen in one call, in the order its parts depend
-    on each other: calibration (per region) decides whether the model may
-    decay, the model decides the level, and the level is the headline the
-    regions divide. snapshot()'s keys plus `score_series`; `overall` is the
-    chart's current level (current_level). `core_hold` is core's hold-time
-    index (core_hold_index) when `hold_baselines` is given — shown on core's
-    card only, never part of `overall`."""
+    """The whole Strength screen in one call: the measured headline (headline
+    of score_series), the regions dividing it, and calibration per region.
+    snapshot()'s keys plus `score_series`; `overall` is the chart's last level,
+    None with no lift in the look-back. `core_hold` is core's hold-time index
+    (core_hold_index) when `hold_baselines` is given — shown on core's card
+    only, never part of `overall`."""
     today = today or date.today()
+    points = score_series(rows, peaks, movement_weights, pr_rir, today=today, weeks=weeks)
+    level = headline(points)
     regional = snapshot(rows, peaks, region_map, movement_weights, prior, pr_rir,
-                        anchor_value, today=today)
-    points = score_series(rows, peaks, movement_weights, pr_rir, anchor_date, anchor_value,
-                          today=today, weeks=weeks, calibrating=regional["calibrating"])
-    level = current_level(points, anchor_value)
-    divided = split_parts({s.region: s.share for s in regional["regions"]}, level)
+                        level or 0.0, today=today)
+    divided = split_parts({s.region: s.share for s in regional["regions"]}, level or 0.0)
     return {
         **regional,
         "overall": level,

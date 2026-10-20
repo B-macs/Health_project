@@ -405,11 +405,12 @@ def strain_detail(repo, requested: date | None, caller_today: date, show_week: b
     snap = home.snapshot(reads)
     label = home.date_label(day, caller_today)
     is_rolling = bool(snap["strain_is_rolling"])
-    colour, display, band, _header, _desc = dash.strain_meta(snap["strain"], is_rolling=is_rolling)
+    rest_day = bool(snap.get("rest_day"))
+    colour, display, band, _header, _desc = dash.strain_meta(snap["strain"], rest_day=rest_day)
     _card, title = strain_screen.strain_labels(is_rolling, label)
     region = None
     if reads.stage is not None:
-        data = strain_screen.empty_region_data(is_rolling)
+        data = strain_screen.empty_region_data(rest_day)
         try:
             stage_start = plan_svc.current_stage_start(repo.get_phases(), day)
             data = strain_screen.region_data(

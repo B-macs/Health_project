@@ -107,12 +107,14 @@ def test_a_past_days_rest_day_load_counts_back_from_that_day():
     before_today = [_au(TODAY - timedelta(days=n), 100.0) for n in range(1, 8)]
     reads = home.HomeReads(day=PAST, au_rows=before_past, stage=2)
     card = home.snapshot(reads)
-    assert card["strain_is_rolling"]
+    # Since 2026-10-20 the day reads its own strain (0) and the 7 days before
+    # are their own line, counted back from that day.
+    assert card["rest_day"] and card["strain"] == 0.0
     stored = dash.compute_daily_metrics_snapshot(PAST, [], before_past, 2)
-    assert card["strain"] == stored["strain"]
+    assert card["strain_7d"] == stored["strain_7d"]
     old = dash.compute_daily_metrics_snapshot(PAST, [], before_past + before_today, 2,
                                               rolling_reference_date=TODAY)
-    assert old["strain"] != card["strain"]
+    assert old["strain_7d"] != card["strain_7d"]
 
 
 _OURA_KEYS = ("oura_hrv_balance", "oura_recovery_index", "oura_previous_night",

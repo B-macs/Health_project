@@ -506,6 +506,14 @@ def _session_hr_rolling(end_iso: str, days: int = home.HISTORY_DAYS) -> list[dic
     return repo.get_repository().get_session_hr_history(start=start)
 
 
+@st.cache_data(ttl=1800, show_spinner=False)
+def _watch_cardio_rolling(end_iso: str, days: int = home.HISTORY_DAYS) -> dict:
+    """The watch's walks and runs no session holds (Repository.get_watch_cardio):
+    they count on the day walked (2026-10-20), as on the phone."""
+    start = home.window_start(date.fromisoformat(end_iso), days)
+    return repo.get_repository().get_watch_cardio(start=start, end=end_iso)
+
+
 # ─── Device sync runs AFTER the page paints — see _run_startup_sync() at the
 #     bottom of this file. It used to run here, before _bio_rolling(), so that
 #     a page load could never blend data the sync was about to refresh.
@@ -653,6 +661,12 @@ try:
 except Exception:
     pass
 
+_walks: dict = {}
+try:
+    _walks = _watch_cardio_rolling(selected_date.isoformat())
+except Exception:
+    pass
+
 # An unreadable stage is None, never stage 1: strain is then not scored and
 # says why (inventory fault F7; it moved the number through the stage's
 # scaling and could print a Stage 1 ceiling).
@@ -674,7 +688,8 @@ except Exception:
 _snapshot = home.snapshot(home.HomeReads(
     day=selected_date, bio_rows=_bio_rows, bio_failed=_bio_rows_failed,
     au_rows=_au_rows, metrics_history=_metrics_hist,
-    wake_adjustments=_wake_adjustments, hr_rows=_hr_rows, stage=_current_stage))
+    wake_adjustments=_wake_adjustments, hr_rows=_hr_rows, stage=_current_stage,
+    walks=_walks))
 _sleep_need         = _snapshot["sleep_need_hours"]
 _sleep_base_window  = _snapshot["sleep_base_window"]
 _readiness_score    = _snapshot["readiness_score"]
@@ -1856,9 +1871,8 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
         listed = ""
         reason = (
             "No session logged for this day, so there is no day to divide. "
-            "The number above is the average of the last seven days &mdash; "
-            "the load already carried into today, before any training."
-            if panel["reason"] == "rolling" else
+            "The number above is this day's own: its watch walks, or 0."
+            if panel["reason"] == "rest_day" else
             "No regional split for this day. Either nothing was logged, or "
             "none of what was logged maps to a body region &mdash; so there "
             "is nothing to divide. The strain figure above is unaffected."
@@ -2056,7 +2070,7 @@ def _metric_detail_parts(view: str) -> tuple[str, str]:
         pre_blocks = _sleep_contributors_block() + _sleep_night_blocks()
         extra_blocks = ""
     else:
-        col, disp, lbl, _, _ = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
+        col, disp, lbl, _, _ = dash.strain_meta(_display_strain, rest_day=bool(_snapshot.get("rest_day")))
         _card_label, detail_label = strain_screen.strain_labels(_strain_is_rolling, date_label)
         hist_key, hist_unit, hist_title, hist_color = "strain", "", "Strain Trend", "#BFA06A"
         hist_metric = "Strain"
@@ -2383,7 +2397,10 @@ _card_readiness = _card_html(
     score_pair=_r_pair,
 )
 
-s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, is_rolling=_strain_is_rolling)
+s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(_display_strain, rest_day=bool(_snapshot.get("rest_day")))
+if _snapshot.get("rest_day") and _snapshot.get("strain_7d") is not None:
+    # The 7-day average on its own line on a rest day, as on the phone (2026-10-20).
+    s_desc = f"{s_desc} 7-day average {_snapshot['strain_7d']:.1f}."
 if _snapshot.get("strain_unscored_reason"):
     # Not "no workload logged": the load may well be there, the stage is not.
     s_hdr, s_desc = "Not scored", _snapshot["strain_unscored_reason"]

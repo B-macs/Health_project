@@ -971,3 +971,14 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Rib and Pelvis Test (Test)":               ("mobility_core", 0.25),
     "Flexibility Retest (Test)":                ("mobility_core", 0.25),
 }
+
+
+# ─── Machines that show stack units, not kilograms (the owner, 2026-10-20) ───
+# The plans mark these exercises increment_unit="unit" (sessions.exercise_traits
+# reads it). Their logged weight is a number on the stack, so it is never added
+# to kilograms and never compared with a kilogram baseline: the face pull read
+# about 30% of its 2025 kilograms on units alone, and kept the upper-body region
+# calibrating for good. A machine's kilograms per unit goes here once it is
+# known; until then the lift is left out of the strength estimate, and tonnage
+# counts its reps on their own line.
+MACHINE_UNIT_KG: dict[str, float] = {}

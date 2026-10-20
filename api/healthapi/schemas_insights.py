@@ -43,6 +43,8 @@ class Sector(BaseModel):
     sets: int
     unloaded_reps: float
     unloaded_seconds: float
+    #: Reps on a machine whose stack shows units, not kilograms (never in `kg`).
+    unit_reps: float = 0.0
 
 
 class TonnageWeekOut(BaseModel):

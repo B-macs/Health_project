@@ -4835,6 +4835,11 @@
             "title": "Sets",
             "type": "integer"
           },
+          "unit_reps": {
+            "default": 0.0,
+            "title": "Unit Reps",
+            "type": "number"
+          },
           "unloaded_reps": {
             "title": "Unloaded Reps",
             "type": "number"
@@ -6180,9 +6185,25 @@
             "title": "Label",
             "type": "string"
           },
+          "rest_day": {
+            "default": false,
+            "title": "Rest Day",
+            "type": "boolean"
+          },
           "scale": {
             "title": "Scale",
             "type": "number"
+          },
+          "seven_day": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seven Day"
           },
           "unscored_reason": {
             "title": "Unscored Reason",

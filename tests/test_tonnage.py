@@ -299,3 +299,66 @@ def test_the_unloaded_line_names_held_time_and_reps_apart():
 
 def test_a_week_with_only_loaded_work_has_no_unloaded_line():
     assert tonnage.unloaded_text(tonnage.SectorWeek(kg=400.0, sets=4)) is None
+
+
+
+# ── both sides, and machines in stack units (the owner, 2026-10-20) ─────────
+
+TWO_SIDED = {"Made-up Row": {"sides": 2, "unit": "kg"},
+             "Made-up Cable": {"sides": 1, "unit": "unit"},
+             "Made-up Side Hold": {"sides": 2, "unit": "kg"}}
+MAP = {"Made-up Row": "upper_body", "Made-up Cable": "upper_body", "Made-up Side Hold": "core"}
+
+
+def _one(name, sets):
+    return [{"movement_name": name, "session_date": TODAY.isoformat(), "sets": sets}]
+
+
+def test_a_one_side_exercise_counts_both_sides():
+    """The left side is written only where it differs, so a missing left value
+    is the right's."""
+    rows = _one("Made-up Row", [{"reps": 10, "weight": 20.0},
+                                {"reps": 10, "weight": 20.0, "reps_left": 8, "weight_left": 18.0}])
+    series, _ = tonnage.weekly_tonnage(rows, MAP, today=TODAY, weeks=1, traits=TWO_SIDED)
+    assert series[-1].value("upper_body").kg == 10 * 20 * 2 + 10 * 20 + 8 * 18
+    assert series[-1].value("upper_body").sets == 2
+
+
+def test_a_one_side_hold_counts_both_sides_seconds():
+    rows = _one("Made-up Side Hold", [{"reps": 1, "weight": 0, "tut": 30, "tut_left": 25}])
+    series, _ = tonnage.weekly_tonnage(rows, MAP, today=TODAY, weeks=1, traits=TWO_SIDED)
+    assert series[-1].value("core").unloaded_seconds == 55
+
+
+def test_stack_units_are_never_kilograms():
+    rows = _one("Made-up Cable", [{"reps": 12, "weight": 6}, {"reps": 12, "weight": 6}])
+    series, _ = tonnage.weekly_tonnage(rows, MAP, today=TODAY, weeks=1, traits=TWO_SIDED)
+    cell = series[-1].value("upper_body")
+    assert cell.kg == 0 and cell.unit_reps == 24
+    assert series[-1].overall.unit_reps == 24
+    assert tonnage.unloaded_text(cell) == "24 cable reps in stack units"
+
+
+def test_without_traits_every_set_counts_once_in_kilograms():
+    rows = _one("Made-up Row", [{"reps": 10, "weight": 20.0, "reps_left": 8, "weight_left": 18.0}])
+    series, _ = tonnage.weekly_tonnage(rows, MAP, today=TODAY, weeks=1)
+    assert series[-1].value("upper_body").kg == 200
+
+
+def test_the_plans_name_their_sides_and_units():
+    from services import sessions
+    traits = sessions.exercise_traits()
+    assert traits["Face Pull (Cable)"]["unit"] == "unit"
+    assert traits["Single-Arm DB Row"]["sides"] == 2
+    assert traits["Right Posterior Hip Capsule Stretch (Revised Cue)"]["sides"] == 1, "right only"
+    assert all(t["sides"] in (1, 2) and t["unit"] in ("kg", "unit") for t in traits.values())
+
+
+def test_the_strength_estimate_leaves_out_stack_units_until_their_kg_is_known():
+    from services import strength_screen as ss
+    rows = [{"movement_name": "Made-up Cable", "sets": [{"reps": 12, "weight": 6}]},
+            {"movement_name": "Made-up Row", "sets": [{"reps": 10, "weight": 20.0}]}]
+    assert [r["movement_name"] for r in ss.kilogram_rows(rows, TWO_SIDED, unit_kg={})] == ["Made-up Row"]
+    converted = ss.kilogram_rows(rows, TWO_SIDED, unit_kg={"Made-up Cable": 2.5})
+    assert converted[0]["sets"][0]["weight"] == 15.0
+    assert rows[0]["sets"][0]["weight"] == 6, "the log itself is not changed"

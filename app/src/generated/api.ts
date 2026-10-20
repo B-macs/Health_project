@@ -2435,6 +2435,11 @@ export interface components {
             kg: number;
             /** Sets */
             sets: number;
+            /**
+             * Unit Reps
+             * @default 0
+             */
+            unit_reps: number;
             /** Unloaded Reps */
             unloaded_reps: number;
             /** Unloaded Seconds */
@@ -2852,8 +2857,15 @@ export interface components {
             is_rolling: boolean;
             /** Label */
             label: string;
+            /**
+             * Rest Day
+             * @default false
+             */
+            rest_day: boolean;
             /** Scale */
             scale: number;
+            /** Seven Day */
+            seven_day?: number | null;
             /** Unscored Reason */
             unscored_reason: string;
             /** Value */

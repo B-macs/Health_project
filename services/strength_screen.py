@@ -18,6 +18,7 @@ from datetime import date
 
 import training_constants
 from services import bioage
+from services import sessions
 from services import strength
 from services import tonnage
 
@@ -50,6 +51,29 @@ def week_label(day: date) -> str:
     return f"{day.day} {day.strftime('%b')}"
 
 
+def kilogram_rows(rows: list[dict], traits: dict[str, dict],
+                  unit_kg: dict[str, float] | None = None) -> list[dict]:
+    """The log as the strength estimate reads it (the owner, 2026-10-20): a lift
+    on a machine that shows stack units (traits' "unit") is converted to
+    kilograms where its kilograms per unit is known
+    (training_constants.MACHINE_UNIT_KG) and left out where it is not — a stack
+    number divided by a 2025 kilogram figure is not a measurement."""
+    unit_kg = training_constants.MACHINE_UNIT_KG if unit_kg is None else unit_kg
+    out = []
+    for row in rows:
+        name = row.get("movement_name")
+        if (traits.get(name) or {}).get("unit", "kg") == "kg":
+            out.append(row)
+            continue
+        factor = unit_kg.get(name)
+        if not factor:
+            continue
+        sets = [{**s, **{k: float(s[k]) * factor for k in ("weight", "weight_left")
+                         if s.get(k) not in (None, "")}} for s in row.get("sets") or []]
+        out.append({**row, "sets": sets})
+    return out
+
+
 def read_data(repo, today: date, reference: dict) -> dict:
     """Everything the screen shows, from one unwindowed read of the training
     log (get_all_training_exercises_raw: the only source with per-set reps and
@@ -66,15 +90,16 @@ def read_data(repo, today: date, reference: dict) -> dict:
         rows, load_error = [], f"{type(exc).__name__}: {exc}"
     movement_weights = {name: weight for name, (_category, weight)
                         in training_constants.EXERCISE_MOVEMENT_WEIGHT.items()}
+    # What a logged set cannot say by itself: its sides and its unit (2026-10-20).
+    traits = sessions.exercise_traits()
     # One call, so the headline IS the chart's current level and each region
     # leaves calibration on its own confidence (WP-15, 2026-10-13).
     snapshot = strength.screen(
-        rows, reference["peaks"], training_constants.EXERCISE_BODY_REGION,
+        kilogram_rows(rows, traits), reference["peaks"], training_constants.EXERCISE_BODY_REGION,
         movement_weights, reference["region_prior"], reference["pr_rir"],
-        reference["anchor_date"], reference["anchor_value"],
         today=today, weeks=WEEKS, hold_baselines=reference["hold_baselines"])
     series, unmapped = tonnage.weekly_tonnage(
-        rows, training_constants.EXERCISE_BODY_REGION, today=today, weeks=WEEKS)
+        rows, training_constants.EXERCISE_BODY_REGION, today=today, weeks=WEEKS, traits=traits)
     imbalances = reference["imbalances"] or {}
     return {
         "today": today, "load_error": load_error,

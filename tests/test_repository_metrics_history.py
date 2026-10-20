@@ -218,7 +218,9 @@ def test_the_stored_strain_blends_heart_rate_the_way_the_card_does(monkeypatch):
     ws = _FakeMetricsHistoryWorksheet()
     repo = _repo_with_ws(ws)
     au_rows = [{"date": "2026-07-20", "total_au": 300.0}]
-    hr_rows = [{"date": "2026-07-20", "hr_strain": 5.9, "edwards_load": 80.0}]
+    # A walk: heart rate leads only for walks and runs since 2026-10-20.
+    hr_rows = [{"date": "2026-07-20", "hr_strain": 5.9, "edwards_load": 80.0,
+                "activity_type": "walking"}]
     monkeypatch.setattr(repo, "get_biometric_rolling", lambda days=None, today=None: [])
     monkeypatch.setattr(repo, "get_daily_session_au_weighted", lambda days=None, today=None: au_rows)
     monkeypatch.setattr(repo, "get_current_stage", lambda: 2)

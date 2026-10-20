@@ -336,21 +336,7 @@ def test_engine_check_auto_stage_advance():
     check("Stage 3 -> next_stage is None",         s3_adv["next_stage"], None)
 
 
-def test_engine_step_strain_modifier():
-    # baseline [8,9,10,11,12]: mean=10, population std=sqrt(2)≈1.414
-    # z-scores: 13→+2.12, 12→+1.41, 10→0, 8→-1.41, 7→-2.12
-    _ssm_base = [8, 9, 10, 11, 12]
-
-    check("z >= +1.5 -> +1.5",              engine.step_strain_modifier(13, _ssm_base), 1.5)
-    check("+0.75 <= z < +1.5 -> +0.75",   engine.step_strain_modifier(12, _ssm_base), 0.75)
-    check("|z| < 0.75 -> 0.0",            engine.step_strain_modifier(10, _ssm_base), 0.0)
-    check("-1.5 < z <= -0.75 -> -0.5",    engine.step_strain_modifier(8,  _ssm_base), -0.5)
-    check("z <= -1.5 -> -1.0",            engine.step_strain_modifier(7,  _ssm_base), -1.0)
-    check("yesterday_steps None -> 0.0",  engine.step_strain_modifier(None, _ssm_base), 0.0)
-    check("< 4 baseline values -> 0.0",   engine.step_strain_modifier(15, [9, 10, 11]), 0.0)
-    check("exactly 4 baseline -> computes", engine.step_strain_modifier(13, [8, 9, 10, 11]), 1.5)
-    check("std == 0 -> 0.0",              engine.step_strain_modifier(12000, [10000] * 5), 0.0)
-
+# engine.step_strain_modifier went on 2026-10-20 (the owner removed the steps rule).
 
 def test_engine_readiness_training_modifier_buckets():
     # Pure bucket helper

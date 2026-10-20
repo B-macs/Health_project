@@ -445,3 +445,28 @@ def test_coverage_is_a_fraction_and_never_exceeds_one():
     contain, so an unbroken block computed marginally over 100% before this."""
     out = hr_load.session_hr_rpe([{"name": "A", "samples": _series(0, 50, 120)}], 54, 180)
     assert 0.0 <= out["coverage"] <= 1.0
+
+
+
+# ── who leads, and the watch's walks (the owner, 2026-10-20) ────────────────
+
+def test_heart_rate_leads_only_for_walks_and_runs():
+    assert hr_load.hr_leads("walking") and hr_load.hr_leads("Running") and hr_load.hr_leads("hiking")
+    assert not hr_load.hr_leads("indoor_cardio") and not hr_load.hr_leads("strength_training")
+    assert not hr_load.hr_leads(None) and not hr_load.hr_leads("")
+
+
+def test_a_walks_load_counts_every_minute_in_the_zone_of_its_average():
+    assert hr_load.load_from_average(60, 100, 178) == 60.0        # 56%: zone 1
+    assert hr_load.load_from_average(30, 130, 178) == 90.0        # 73%: zone 3
+    assert hr_load.load_from_average(60, 80, 178) == 0.0          # 45%: below zone 1
+    assert hr_load.load_from_average(60, 100, None) == 0.0
+    assert hr_load.load_from_average(None, 100, 178) == 0.0
+
+
+def test_extra_load_adds_on_the_load_scale_not_the_strain_scale():
+    base = engine.load_to_strain(100.0)
+    assert hr_load.with_extra_load(base, 0) == base
+    assert hr_load.with_extra_load(None, 50.0) == engine.load_to_strain(50.0)
+    # The base strain is rounded to 0.1, so turning it back into load costs up to ~1 unit.
+    assert hr_load.with_extra_load(base, 50.0) == pytest.approx(engine.load_to_strain(150.0), abs=0.15)

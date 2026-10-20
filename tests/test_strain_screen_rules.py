@@ -63,7 +63,7 @@ def test_a_rest_day_offers_its_week_only_when_the_week_had_load():
 
 def test_an_empty_panel_says_which_kind_of_empty():
     assert ss.region_panel(ss.empty_region_data(True), 8.0, 2) == {
-        "state": "empty", "reason": "rolling", "unmapped_names": []}
+        "state": "empty", "reason": "rest_day", "unmapped_names": []}
     no_split = ss.region_panel({"has_split": False, "is_rolling": False,
                                 "unmapped_names": ["Sun Salutation"]}, None, 2)
     assert (no_split["reason"], no_split["unmapped_names"]) == ("no_split", ["Sun Salutation"])

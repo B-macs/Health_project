@@ -94,7 +94,8 @@ def _week_out(week) -> dict:
         sector = week.value(key)
         out[key] = {"kg": sector.kg, "sets": sector.sets,
                     "unloaded_reps": sector.unloaded_reps,
-                    "unloaded_seconds": sector.unloaded_seconds}
+                    "unloaded_seconds": sector.unloaded_seconds,
+                    "unit_reps": sector.unit_reps}
     return out
 
 

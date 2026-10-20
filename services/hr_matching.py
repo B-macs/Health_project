@@ -383,3 +383,39 @@ def samples_for_block(
         return inside
     nearest = min(samples, key=lambda s: abs(s[0] - t0))
     return [nearest] if abs(nearest[0] - t0) <= 60 else []
+
+
+def held_activity_ids(hr_rows: list[dict], activities: list[dict]) -> set[str]:
+    """The ids of the Garmin activities that a logged session's heart-rate
+    match already holds (2026-10-20: a watch walk counts on the day walked
+    only when no session holds it).
+
+    A stored match row names its activity by date, type and name, never by
+    id, so each row holds the one activity of that date with the same type
+    and name; when several qualify, the one whose average heart rate is
+    closest. A row that names an id holds that id. Each activity is held at
+    most once."""
+    held: set[str] = set()
+    for row in hr_rows:
+        if row.get("activity_id") not in (None, ""):
+            held.add(str(row["activity_id"]))
+            continue
+        day = str(row.get("date") or "")[:10]
+        kind, name = str(row.get("activity_type") or ""), str(row.get("activity_name") or "")
+        same = [a for a in activities
+                if str(a.get("date") or "")[:10] == day
+                and str(a.get("type") or "") == kind
+                and str(a.get("name") or "") == name
+                and str(a.get("activity_id")) not in held]
+        if not same:
+            continue
+        target = row.get("avg_hr")
+
+        def gap(a):
+            try:
+                return abs(float(a.get("avg_hr")) - float(target))
+            except (TypeError, ValueError):
+                return float("inf")
+
+        held.add(str(min(same, key=gap).get("activity_id")))
+    return held

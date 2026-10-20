@@ -145,8 +145,7 @@ def test_the_latest_test_of_each_line_is_the_one_read():
 def test_the_score_stays_out_of_the_headline():
     rows = [_row(LATERAL, "2026-10-19", 33, 27), _row(MEDIAL, "2026-10-19", 45)]
     kwargs = dict(rows=rows, peaks=sb.PEAKS_2025, region_map={}, movement_weights={},
-                  prior=sb.REGION_PRIOR, pr_rir=sb.PR_RIR, anchor_date=sb.ANCHOR_DATE,
-                  anchor_value=sb.ANCHOR_VALUE, today=date(2026, 10, 20))
+                  prior=sb.REGION_PRIOR, pr_rir=sb.PR_RIR, today=date(2026, 10, 20))
     without = strength.screen(**kwargs)
     with_holds = strength.screen(**kwargs, hold_baselines=sb.HOLD_BASELINES_2025)
     assert without["core_hold"] is None and with_holds["core_hold"]["index"] == 165.0
@@ -160,8 +159,7 @@ def test_core_s_card_shows_the_hold_time_marked_provisional():
 
     rows = [_row(LATERAL, "2026-10-19", 33, 27), _row(MEDIAL, "2026-10-19", 45)]
     snap = strength.screen(rows, sb.PEAKS_2025, {}, {}, sb.REGION_PRIOR, sb.PR_RIR,
-                           sb.ANCHOR_DATE, sb.ANCHOR_VALUE, today=date(2026, 10, 20),
-                           hold_baselines=sb.HOLD_BASELINES_2025)
+                           today=date(2026, 10, 20), hold_baselines=sb.HOLD_BASELINES_2025)
     html = V._strength_region_strip_html(snap["regions"], snap["core_hold"])
     assert "Hold time <em>165.0</em>" in html
     assert "provisional · hold time" in html

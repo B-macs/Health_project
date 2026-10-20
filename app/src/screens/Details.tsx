@@ -206,7 +206,7 @@ function Regions({ panel, onWeek }: { panel: NonNullable<Schemas['RegionPanel']>
   return (
     <Section title={S.detail.byArea} testId="regions">
       {panel.state !== 'split' ? (
-        <p className="caption">{panel.reason ?? S.detail.noSplit}</p>
+        <p className="caption">{S.detail.regionReason[panel.reason ?? ''] ?? S.detail.noSplit}</p>
       ) : (
         <>
           <div className="share" aria-hidden="true">

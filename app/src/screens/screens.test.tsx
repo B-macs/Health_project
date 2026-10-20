@@ -66,6 +66,14 @@ describe('Today', () => {
     expect(html).not.toContain(S.fresh.saved)
   })
 
+  it('a rest day says so, with the 7 days before on their own line', () => {
+    const rest = { ...answer, strain: { ...answer.strain, value: 0, display: '0.0', label: 'Rest', rest_day: true, seven_day: 12.1 } }
+    const html = text(draw(<TodayView view={fresh(rest)} week={week} plan={plan} shownDay={LOCAL} />))
+    expect(html).toContain('Rest')
+    expect(html).toContain(S.today.sevenDay('12.1'))
+    expect(text(draw(<TodayView view={fresh(answer)} week={week} plan={plan} shownDay={LOCAL} />))).not.toContain(S.today.sevenDay('12.1'))
+  })
+
   it('with the engine down, the saved answer stays and says why', () => {
     const html = text(draw(<TodayView view={down(answer)} week={week} plan={plan} shownDay={LOCAL} />))
     expect(html).toContain(figure)
@@ -172,6 +180,14 @@ describe('the Readiness and Strain screens', () => {
     expect(html).toContain('Average heart rate')
     expect(html).toContain(S.detail.blend(70, 16.4, 16.2))
     expect(html).not.toContain('Made-up pose')
+  })
+
+  it('strain: a body-area panel with no split says why in words, never its code', () => {
+    const base = fx.strainDetail(LOCAL, LOCAL, false)
+    const d = { ...base, region: base.region && { ...base.region, state: 'empty', reason: 'rest_day' } }
+    const html = text(draw(<DetailFrame heading={S.detail.strain} view={fresh(d)}>{(x) => <StrainBody d={x} onWeek={() => undefined} />}</DetailFrame>))
+    expect(html).toContain(S.detail.regionReason.rest_day!)
+    expect(html).not.toContain('rest_day')
   })
 
   it('with nothing saved and the engine down, a detail screen says why', () => {

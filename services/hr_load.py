@@ -88,12 +88,28 @@ SOURCE_BLENDED = "blended"  # matched activity AND an RPE rating — the normal 
 SOURCE_RPE = "rpe"          # no matched activity — the pre-existing behaviour
 SOURCE_NONE = "none"        # nothing logged at all
 
+SOURCE_GYM_RATED = "gym_rated"  # a gym session: the rating leads, heart rate shown only
+SOURCE_WALKS = "walks"          # no logged session: the watch's walks and runs
+
 SOURCE_LABELS: dict[str, str] = {
     SOURCE_HR: "Garmin HR",
     SOURCE_BLENDED: "Garmin HR + RPE",
     SOURCE_RPE: "RPE only (no Garmin activity)",
     SOURCE_NONE: "No session logged",
+    SOURCE_GYM_RATED: "Session rating (gym)",
+    SOURCE_WALKS: "Watch walks",
 }
+
+#: The Garmin activity types where heart rate leads a day's strain (the owner,
+#: 2026-10-20: "Gym sessions use your session rating; heart rate leads only for
+#: walks and runs"). The session rating is the tested measure for resistance
+#: training, and a wrist reading during lifting is not reliable (grip and wrist
+#: flexion); the watch records his gym sessions as "indoor_cardio".
+HR_LED_ACTIVITY_TYPES: frozenset[str] = frozenset({
+    "walking", "casual_walking", "speed_walking", "hiking",
+    "running", "trail_running", "treadmill_running", "street_running",
+    "track_running", "indoor_running", "virtual_run",
+})
 
 # How much the HR-derived value counts for when both signals exist. HR is
 # weighted higher as the objective measurement; RPE is kept in the blend
@@ -243,6 +259,40 @@ def hr_strain(load: float) -> float:
     calibration note.
     """
     return _engine.load_to_strain(load)
+
+
+def hr_leads(activity_type) -> bool:
+    """Whether heart rate leads the strain of an activity of this Garmin type
+    (HR_LED_ACTIVITY_TYPES): walks and runs, never a gym session."""
+    return str(activity_type or "").strip().lower() in HR_LED_ACTIVITY_TYPES
+
+
+def load_from_average(minutes, avg_hr, hr_max) -> float:
+    """An activity's Edwards load when only its average heart rate is known (a
+    watch walk no logged session holds, 2026-10-20): every minute counted in
+    the zone of the average. An estimate: a steady walk sits in one or two
+    zones, where it is close; for intervals it reads low. 0 below zone 1, or
+    without the minutes, the average or a maximum."""
+    try:
+        minutes, avg_hr, hr_max = float(minutes or 0), float(avg_hr or 0), float(hr_max or 0)
+    except (TypeError, ValueError):
+        return 0.0
+    if minutes <= 0 or avg_hr <= 0 or hr_max <= 0:
+        return 0.0
+    share = avg_hr / hr_max
+    zones = [z for z, low in ZONE_LOWER_PCT.items() if share >= low]
+    return round(minutes * ZONE_WEIGHTS[max(zones)], 1) if zones else 0.0
+
+
+def with_extra_load(strain: float | None, extra_load: float) -> float | None:
+    """`strain` with `extra_load` (Edwards units: the walks of the day) added on
+    the load scale and put through the same 0-21 curve: two loads add, two
+    strains do not (the curve is a log). `strain` None is no other load."""
+    if not extra_load or extra_load <= 0:
+        return strain
+    base = 0.0 if strain is None else (
+        math.exp(float(strain) * math.log(_engine.STRAIN_CURVE_ANCHOR) / 21.0) - 1.0)
+    return _engine.load_to_strain(base + extra_load)
 
 
 def blend_strain(

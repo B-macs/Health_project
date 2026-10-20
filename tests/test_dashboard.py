@@ -7,6 +7,7 @@ from datetime import date, timedelta
 import pytest
 
 from services import dashboard
+from services import engine
 from services import hr_load
 
 
@@ -67,45 +68,9 @@ def test_rolling_prior_strain_averages_across_7_prior_days_including_rest_days()
     assert result is not None
 
 
-# ─── display_strain ──────────────────────────────────────────────────────────
-
-def test_display_strain_prefers_todays_actual_strain():
-    value, is_rolling = dashboard.display_strain(today_strain=8.0, rolling_strain=3.0)
-    assert value == 8.0
-    assert is_rolling is False
-
-
-def test_display_strain_falls_back_to_rolling_when_no_session_today():
-    value, is_rolling = dashboard.display_strain(today_strain=None, rolling_strain=3.0)
-    assert value == 3.0
-    assert is_rolling is True
-
-
-def test_display_strain_both_none():
-    value, is_rolling = dashboard.display_strain(None, None)
-    assert value is None
-    assert is_rolling is False
-
-
-# ─── apply_step_modifier ─────────────────────────────────────────────────────
-
-def test_apply_step_modifier_none_strain_stays_none():
-    assert dashboard.apply_step_modifier(None, [], today=date(2026, 7, 7)) is None
-
-
-def test_apply_step_modifier_no_step_data_returns_unmodified_strain():
-    assert dashboard.apply_step_modifier(10.0, [], today=date(2026, 7, 7)) == 10.0
-
-
-def test_apply_step_modifier_clamps_to_0_21_range():
-    # Extreme high yesterday steps vs. a low baseline should push toward the
-    # ceiling, never past 21.
-    bio_rows = [{"date": "2026-07-06", "steps": 40000}] + [
-        {"date": (date(2026, 7, 5) - __import__("datetime").timedelta(days=d)).isoformat(), "steps": 1000}
-        for d in range(7)
-    ]
-    result = dashboard.apply_step_modifier(20.5, bio_rows, today=date(2026, 7, 7))
-    assert 0.0 <= result <= 21.0
+# display_strain and apply_step_modifier went on 2026-10-20 with the owner's
+# answers: a day shows its own strain (never the 7-day stand-in), and the steps
+# rule is gone (a watch walk counts on the day walked instead).
 
 
 # ─── sleep_percent ───────────────────────────────────────────────────────────
@@ -232,6 +197,9 @@ def test_snapshot_returns_all_keys_with_minimal_data():
         # fallback visible instead of silent (services.hr_load.SOURCE_*).
         "strain_source", "strain_source_label", "strain_rpe_only",
         "strain_hr_only", "hr_detail",
+        # 2026-10-20: the rest-day flag, the 7 days before as their own line,
+        # and the day's watch walks.
+        "rest_day", "strain_7d", "walks",
     }
 
 
@@ -247,9 +215,9 @@ def test_snapshot_strain_falls_back_to_rpe_without_hr_rows():
     assert "RPE only" in baseline["strain_source_label"]
 
 
-def test_snapshot_strain_uses_hr_when_the_day_matched_an_activity():
+def test_snapshot_strain_uses_hr_when_the_day_matched_a_walk_or_a_run():
     au = [{"date": "2026-07-20", "total_au": 360.0}]
-    hr = [{"date": "2026-07-20", "hr_strain": 19.0}]
+    hr = [{"date": "2026-07-20", "hr_strain": 19.0, "activity_type": "walking"}]
     snap = dashboard.compute_daily_metrics_snapshot(
         date(2026, 7, 20), bio_rows=[], au_rows=au, stage=2, hr_rows=hr,
     )
@@ -271,26 +239,65 @@ def test_snapshot_hr_row_for_a_different_date_is_ignored():
     assert snap["strain_hr_only"] is None
 
 
-def test_snapshot_rolling_strain_day_reports_no_source():
-    """A day with no session shows the trailing-average stand-in, which isn't
-    attributable to either method."""
+def test_a_gym_session_is_measured_by_its_rating_not_heart_rate():
+    """The owner, 2026-10-20: gym sessions use the session rating; the watch
+    records them as indoor_cardio. Heart rate is kept, shown, not used."""
+    au = [{"date": "2026-07-20", "total_au": 360.0}]
+    hr = [{"date": "2026-07-20", "hr_strain": 19.0, "activity_type": "indoor_cardio"}]
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au, stage=2, hr_rows=hr,
+    )
+    assert snap["strain"] == dashboard.au_to_strain_or_none(360.0, 2)
+    assert snap["strain_source"] == hr_load.SOURCE_GYM_RATED
+    assert snap["strain_hr_only"] == 19.0
+
+
+def test_a_rest_day_reads_its_own_strain_and_the_7_days_before_apart():
+    """2026-10-20: no stand-in. A day with no session reads 0 and says it is a
+    rest day; the 7 days before are their own line."""
     au = [{"date": "2026-07-18", "total_au": 300.0}]
     snap = dashboard.compute_daily_metrics_snapshot(
         date(2026, 7, 20), bio_rows=[], au_rows=au, stage=2,
         rolling_reference_date=date(2026, 7, 20),
     )
-    assert snap["strain_is_rolling"] is True
+    assert snap["strain"] == 0.0 and snap["rest_day"] is True
+    assert snap["strain_is_rolling"] is False
     assert snap["strain_source"] == hr_load.SOURCE_NONE
+    assert snap["strain_7d"] == dashboard.rolling_prior_strain(au, 2, today=date(2026, 7, 20))
 
 
-def test_snapshot_no_data_everything_none():
+def test_a_watch_walk_counts_on_the_day_walked():
+    """No session: the walk is the day's strain, from its heart-rate load."""
+    walks = {"2026-07-20": [{"activity_id": "1", "type": "walking", "minutes": 60,
+                             "avg_hr": 100, "load": 60.0}]}
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=[], stage=2, walks=walks,
+    )
+    assert snap["strain"] == engine.load_to_strain(60.0)
+    assert snap["strain_source"] == hr_load.SOURCE_WALKS and snap["rest_day"] is True
+    assert snap["walks"] == walks["2026-07-20"]
+
+
+def test_a_walk_adds_to_a_training_day_on_the_load_scale():
+    au = [{"date": "2026-07-20", "total_au": 360.0}]
+    walks = {"2026-07-20": [{"load": 40.0}]}
+    snap = dashboard.compute_daily_metrics_snapshot(
+        date(2026, 7, 20), bio_rows=[], au_rows=au, stage=2, walks=walks,
+    )
+    session_load = 360.0 * engine.STAGE_CLF[2]
+    assert snap["strain"] == pytest.approx(engine.load_to_strain(session_load + 40.0), abs=0.1)
+    assert snap["strain_source"] == hr_load.SOURCE_RPE and snap["rest_day"] is False
+
+
+def test_snapshot_no_data_everything_none_and_strain_zero():
+    """Nothing logged reads 0 strain, a rest day (2026-10-20), not a blank."""
     snap = dashboard.compute_daily_metrics_snapshot(
         date(2026, 7, 20), bio_rows=[], au_rows=[], stage=1,
     )
     assert snap["readiness_score"] is None
     assert snap["sleep_pct"] is None
     assert snap["sleep_score"] is None
-    assert snap["strain"] is None
+    assert snap["strain"] == 0.0 and snap["rest_day"] is True and snap["strain_7d"] is None
 
 
 def test_snapshot_sleep_pct_uses_sleep_hours_for_the_given_date():
@@ -319,35 +326,33 @@ def test_snapshot_strain_uses_todays_au_when_logged_that_day():
     assert snap["strain_is_rolling"] is False
 
 
-def test_snapshot_strain_falls_back_to_rolling_when_no_session_that_day():
+def test_snapshot_rest_day_shows_its_own_strain_with_the_week_apart():
     au_rows = [{"date": "2026-07-13", "total_au": 700.0}]  # 7 days before, none on the target day
     snap = dashboard.compute_daily_metrics_snapshot(
         date(2026, 7, 20), bio_rows=[], au_rows=au_rows, stage=1,
     )
-    assert snap["strain_is_rolling"] is True
+    assert snap["strain"] == 0.0 and snap["strain_7d"] is not None
 
 
 def test_snapshot_rolling_reference_date_defaults_to_the_scored_date():
-    # Rolling strain looks at the 7 days BEFORE the reference date. With no
-    # default override, that's `d` itself -- so AU logged the day before `d`
-    # counts toward the rolling fallback.
+    # The 7-day line looks at the 7 days BEFORE the reference date. With no
+    # override, that's `d` itself -- so AU logged the day before `d` counts.
     au_rows = [{"date": "2026-07-19", "total_au": 700.0}]
     snap = dashboard.compute_daily_metrics_snapshot(
         date(2026, 7, 20), bio_rows=[], au_rows=au_rows, stage=1,
     )
-    assert snap["strain_is_rolling"] is True
-    assert snap["strain"] is not None
+    assert snap["strain_7d"] is not None
 
 
 def test_snapshot_rolling_reference_date_override_shifts_the_rolling_window():
-    # Same AU data, but the rolling window is now anchored to a date where
-    # the prior-7-days window no longer includes 07-19 -> no rolling fallback.
+    # Same AU data, but the window is anchored to a date whose prior 7 days no
+    # longer include 07-19 -> no 7-day figure.
     au_rows = [{"date": "2026-07-19", "total_au": 700.0}]
     snap = dashboard.compute_daily_metrics_snapshot(
         date(2026, 7, 20), bio_rows=[], au_rows=au_rows, stage=1,
         rolling_reference_date=date(2026, 8, 1),
     )
-    assert snap["strain"] is None
+    assert snap["strain_7d"] is None
 
 
 def test_snapshot_wake_time_adjustments_defaults_to_none_and_is_a_passthrough():

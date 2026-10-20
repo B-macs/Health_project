@@ -57,38 +57,6 @@ def rolling_prior_strain(au_rows: list[dict], stage: int, today: date | None = N
     return _engine.au_to_strain(prior_avg_au, stage) if prior_avg_au > 0 else None
 
 
-def display_strain(today_strain: float | None, rolling_strain: float | None) -> tuple[float | None, bool]:
-    """(value, is_rolling) — show today's actual strain once a session is
-    logged; otherwise fall back to the rolling prior-load figure."""
-    if today_strain is not None:
-        return today_strain, False
-    return rolling_strain, rolling_strain is not None
-
-
-def apply_step_modifier(strain: float | None, bio_rows: list[dict],
-                         today: date | None = None) -> float | None:
-    """Shift displayed strain by yesterday's non-training step load relative
-    to a 7-day baseline (today-8 .. today-2), clamped to [0, 21]."""
-    if strain is None:
-        return None
-    today = today or date.today()
-    yesterday_str = (today - timedelta(days=1)).isoformat()
-    baseline_strs = {(today - timedelta(days=d)).isoformat() for d in range(2, 9)}
-    yesterday_steps = next(
-        (r["steps"] for r in bio_rows
-         if r.get("date") == yesterday_str and r.get("steps") is not None),
-        None,
-    )
-    baseline_steps = [
-        r["steps"] for r in bio_rows
-        if r.get("date") in baseline_strs and r.get("steps") is not None
-    ]
-    step_mod = _engine.step_strain_modifier(yesterday_steps, baseline_steps)
-    if step_mod == 0.0:
-        return strain
-    return round(max(0.0, min(21.0, strain + step_mod)), 1)
-
-
 def sleep_percent(sleep_hours: float | None, sleep_need_hours: float) -> int | None:
     return round(sleep_hours / sleep_need_hours * 100) if sleep_hours else None
 
@@ -137,6 +105,7 @@ def compute_daily_metrics_snapshot(
     rolling_reference_date: date | None = None,
     wake_time_adjustments: dict[str, float] | None = None,
     hr_rows: list[dict] | None = None,
+    walks: dict[str, list[dict]] | None = None,
 ) -> dict:
     """The exact three numbers the Home page's cards show for date `d`: the
     smoothed readiness trend, sleep hours as a percent of the personal
@@ -220,38 +189,59 @@ def compute_daily_metrics_snapshot(
             "strain_rpe_only": None,
             "strain_hr_only": None,
             "hr_detail": None,
+            "rest_day": False,
+            "strain_7d": None,
+            "walks": [],
         }
     au_day = next((r for r in au_rows if r.get("date") == d_str), None)
     rpe_strain = au_to_strain_or_none(au_day["total_au"] if au_day else None, stage)
 
-    # Heart-rate-derived strain takes priority when this date's session
-    # matched a Garmin activity; RPE is kept in the blend at a lower weight
-    # (see services.hr_load.blend_strain). With no matched activity this
-    # collapses to exactly the RPE value computed above, which is the
-    # behaviour that existed before HR load was introduced.
+    # WHO LEADS (the owner, 2026-10-20). A gym session is measured by the
+    # session rating: wrist heart rate during lifting is not reliable, and the
+    # rating is the tested measure for resistance training. Heart rate leads,
+    # blended with the rating, only when the matched activity is a walk or a
+    # run (hr_load.hr_leads). With no matched activity this is the rating
+    # alone, as before heart-rate load existed.
     hr_row = next((r for r in (hr_rows or []) if r.get("date") == d_str), None)
     hr_strain_value = hr_row.get("hr_strain") if hr_row else None
-    today_strain, strain_source = _hr_load.blend_strain(hr_strain_value, rpe_strain)
+    if hr_row and rpe_strain is not None and not _hr_load.hr_leads(hr_row.get("activity_type")):
+        today_strain, strain_source = rpe_strain, _hr_load.SOURCE_GYM_RATED
+    else:
+        today_strain, strain_source = _hr_load.blend_strain(hr_strain_value, rpe_strain)
 
-    rolling_strain = rolling_prior_strain(au_rows, stage, today=rolling_reference_date)
-    strain, strain_is_rolling = display_strain(today_strain, rolling_strain)
-    strain = apply_step_modifier(strain, bio_rows, today=rolling_reference_date)
-    if strain_is_rolling:
-        # A rolling stand-in isn't attributable to either source — it's the
-        # trailing average shown on days with no session at all.
-        strain_source = _hr_load.SOURCE_NONE
+    # THE WALKS COUNT ON THE DAY YOU WALK (2026-10-20). A watch walk or run no
+    # logged session holds adds its heart-rate load to the day's, on the load
+    # scale. It replaced the steps rule, which moved the NEXT day's strain by
+    # -1.0 to +1.5 from yesterday's step count.
+    day_walks = (walks or {}).get(d_str) or []
+    walk_load = sum(float(w.get("load") or 0) for w in day_walks)
+    if walk_load > 0:
+        today_strain = _hr_load.with_extra_load(today_strain, walk_load)
+        if strain_source == _hr_load.SOURCE_NONE:
+            strain_source = _hr_load.SOURCE_WALKS
+
+    # EACH DAY ITS OWN STRAIN (2026-10-20): a day with no session reads its own
+    # figure (its walks, or 0) and says it is a rest day; the 7 days before it
+    # are their own line, not a stand-in for the day.
+    rest_day = not (au_day and au_day.get("total_au"))
+    strain = today_strain if today_strain is not None else 0.0
+    strain_7d = rolling_prior_strain(au_rows, stage, today=rolling_reference_date)
 
     return {
         "readiness_score": readiness_score,
         "sleep_pct": sleep_pct,
         "sleep_score": sleep_score,
         "strain": strain,
-        "strain_is_rolling": strain_is_rolling,
+        # Always False since 2026-10-20 (no rest-day stand-in); kept for its readers.
+        "strain_is_rolling": False,
         "strain_source": strain_source,
         "strain_source_label": _hr_load.SOURCE_LABELS.get(strain_source, ""),
         "strain_rpe_only": rpe_strain,
         "strain_hr_only": hr_strain_value,
         "hr_detail": hr_row,
+        "rest_day": rest_day,
+        "strain_7d": strain_7d,
+        "walks": day_walks,
     }
 
 
@@ -286,7 +276,13 @@ def readiness_meta(score) -> tuple:
 STRAIN_BANDS: tuple[float, float, float] = (8.0, 12.0, 16.0)
 
 
-def strain_meta(score, is_rolling: bool = False) -> tuple:
+def strain_meta(score, is_rolling: bool = False, rest_day: bool = False) -> tuple:
+    if score is not None and rest_day:
+        # A day with no training session (2026-10-20): its own figure, its walks or 0.
+        walked = float(score) > 0
+        return ("#6BAF8B", f"{float(score):.1f}", "Rest", "No session logged",
+                "Your watch walks are this day's strain." if walked
+                else "No training and no watch walk this day.")
     if score is None:
         return "#555555", "--", "No Readings", "No workload logged", \
                "No training data recorded for this day."
@@ -435,7 +431,8 @@ def compute_region_strain_snapshot(
     """
     provenance = provenance or {}
     overall_snapshot = overall_snapshot or {}
-    rolling = bool(overall_snapshot.get("strain_is_rolling"))
+    # A rest day (no session, 2026-10-20) offers the 7 days before it.
+    rolling = bool(overall_snapshot.get("rest_day") or overall_snapshot.get("strain_is_rolling"))
 
     # On a rest day the headline is a 7-day trailing average, so there is no
     # single day to divide and the panel is blank by default. `window_row`

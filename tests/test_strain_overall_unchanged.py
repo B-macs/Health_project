@@ -12,6 +12,14 @@ criterion for the whole change is that every number and every key below is
 bit-identical afterwards. If a regional feature moves one of these, the
 regional feature is wrong.
 
+⚠ 2026-10-20: THE OWNER CHANGED THE STRAIN RULES THEMSELVES (his answers to
+the accuracy review). A gym session is measured by its rating (heart rate
+leads only for walks and runs); a day with no session reads its own strain
+(0, or its watch walks) with the 7 days before as their own line; the steps
+rule is gone. The rows of the matrix those rules move are marked, and their
+values were pasted from a run of the new code, as the others were from the
+old. Nothing else moved.
+
 The golden tables also pin the persistence shape that CLAUDE.md records as a
 trap: `_METRICS_HISTORY_HEADER` is positional and append-only (a tab created
 before a column joined it discards that column forever — this already bit
@@ -51,20 +59,7 @@ def test_the_strain_curve_saturates_where_it_always_did():
     assert engine.STAGE_CLF == {1: 0.04, 2: 0.40, 3: 1.0}
 
 
-# ─── the step modifier ───────────────────────────────────────────────────────
-
-_STEP_BASELINE = [7000, 7100, 6900, 7050, 6950, 7000, 7100]
-
-
-@pytest.mark.parametrize("yesterday,expected", [
-    (14000, 1.5), (3000, -1.0), (7000, 0.0), (None, 0.0),
-])
-def test_step_strain_modifier_is_untouched(yesterday, expected):
-    assert engine.step_strain_modifier(yesterday, _STEP_BASELINE) == expected
-
-
-def test_step_modifier_needs_four_baseline_days():
-    assert engine.step_strain_modifier(14000, [7000, 7100, 6900]) == 0.0
+# The step modifier went on 2026-10-20 (the owner removed the steps rule).
 
 
 # ─── the rolling stand-in ────────────────────────────────────────────────────
@@ -85,9 +80,15 @@ _SNAPSHOT_KEYS = frozenset({
     "readiness_score", "sleep_pct", "sleep_score", "strain",
     "strain_is_rolling", "strain_source", "strain_source_label",
     "strain_rpe_only", "strain_hr_only", "hr_detail",
+    # 2026-10-20 (the owner's answers): the rest day, its 7-day line, its walks.
+    "rest_day", "strain_7d", "walks",
 })
 
 _D = date(2026, 7, 20)
+
+
+#: A steady week of steps: the steps scenarios pin that steps no longer move strain.
+_STEP_BASELINE = [7000, 7100, 6900, 7050, 6950, 7000, 7100]
 
 
 def _step_bio(yesterday_steps: int) -> list[dict]:
@@ -108,22 +109,29 @@ _MATRIX = [
      9.0, "rpe", False, 9.0, None),
     ("rpe_stage3",   [{"date": "2026-07-20", "total_au": 360.0}], 3, None, [],
      19.3, "rpe", False, 19.3, None),
+    # 2026-10-20: heart rate leads only for a walk or a run ...
     ("hr_blend",     [{"date": "2026-07-20", "total_au": 360.0}], 2,
-     [{"date": "2026-07-20", "hr_strain": 19.0}], [],
+     [{"date": "2026-07-20", "hr_strain": 19.0, "activity_type": "walking"}], [],
      18.2, "blended", False, 16.3, 19.0),
+    # ... and a gym session (the watch's indoor_cardio) is its rating.
+    ("hr_gym",       [{"date": "2026-07-20", "total_au": 360.0}], 2,
+     [{"date": "2026-07-20", "hr_strain": 19.0, "activity_type": "indoor_cardio"}], [],
+     16.3, "gym_rated", False, 16.3, 19.0),
     ("hr_only",      [], 2, [{"date": "2026-07-20", "hr_strain": 19.0}], [],
      19.0, "hr", False, None, 19.0),
     ("hr_other_day", [{"date": "2026-07-20", "total_au": 360.0}], 2,
      [{"date": "2026-07-19", "hr_strain": 19.0}], [],
      16.3, "rpe", False, 16.3, None),
+    # 2026-10-20: a rest day reads its own strain, 0 here (was the 5.3 stand-in) ...
     ("rolling",      [{"date": "2026-07-13", "total_au": 700.0}], 1, None, [],
-     5.3, "none", True, None, None),
+     0.0, "none", False, None, None),
     ("nodata",       [], 2, None, [],
-     None, "none", False, None, None),
+     0.0, "none", False, None, None),
+    # ... and steps no longer move it (were 17.8 and 15.3).
     ("steps_high",   [{"date": "2026-07-20", "total_au": 360.0}], 2, None,
-     _step_bio(14000), 17.8, "rpe", False, 16.3, None),
+     _step_bio(14000), 16.3, "rpe", False, 16.3, None),
     ("steps_low",    [{"date": "2026-07-20", "total_au": 360.0}], 2, None,
-     _step_bio(3000), 15.3, "rpe", False, 16.3, None),
+     _step_bio(3000), 16.3, "rpe", False, 16.3, None),
 ]
 
 
@@ -189,3 +197,11 @@ def test_metrics_history_row_maps_a_populated_snapshot_unchanged():
         "sleep_score": 80.0, "strain": 16.3,
         "readiness_model_version": readiness.MODEL_VERSION,
     }
+
+
+
+def test_a_rest_days_seven_day_line_is_the_old_stand_in():
+    """The 7 days before a rest day keep their old figure, now on their own line."""
+    snap = dashboard.compute_daily_metrics_snapshot(
+        _D, [], [{"date": "2026-07-13", "total_au": 700.0}], 1)
+    assert snap["strain_7d"] == 5.3 and snap["rest_day"] is True

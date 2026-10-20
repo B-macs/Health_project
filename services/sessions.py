@@ -2224,6 +2224,26 @@ _PLAN_BY_PHASE_NUMBER: dict[int, dict[int, dict]] = {
     5: gb.PLAN_GOAL_BLOCK,
 }
 
+
+def exercise_traits() -> dict[str, dict]:
+    """{name: {"sides": 1 or 2, "unit": "kg" or "unit"}} for every exercise of
+    every registered plan: what a logged set cannot say by itself (2026-10-20).
+
+    `sides` is sides(): 2 for an exercise done one side at a time, whose set
+    record keeps the right side's numbers and the left's only where they
+    differ (build_set_record). `unit` is the plan's increment_unit: "unit" for
+    a machine whose stack shows units, not kilograms. A later plan's entry wins
+    a name two plans define; a name no plan defines has no traits (one side,
+    kilograms)."""
+    traits: dict[str, dict] = {}
+    for number in sorted(_PLAN_BY_PHASE_NUMBER):
+        for day in _PLAN_BY_PHASE_NUMBER[number].values():
+            for ex in day.get("exercises") or []:
+                if ex.get("name"):
+                    traits[ex["name"]] = {"sides": sides(ex),
+                                          "unit": ex.get("increment_unit") or "kg"}
+    return traits
+
 #: Everything needed to CREATE a phase, per phase number. Only consulted when a
 #: new block is being started, so it never renames a phase already stored.
 #:

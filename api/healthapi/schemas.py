@@ -88,6 +88,10 @@ class StrainCardOut(Band):
     value: float | None
     display: str
     is_rolling: bool
+    #: No training session this day: the card says "Rest" (2026-10-20).
+    rest_day: bool = False
+    #: On a rest day, the 7 days before as their own line (strain of the mean load).
+    seven_day: float | None = None
     card_label: str
     unscored_reason: str
     scale: float

@@ -75,6 +75,9 @@ class SectorWeek:
     # Held/timed work, in seconds. Separate from unloaded_reps on purpose —
     # see the module docstring. Never add the two.
     unloaded_seconds: float = 0.0
+    # Reps on a machine whose stack shows units, not kilograms (2026-10-20):
+    # loaded work with no kilogram figure, so never added to `kg`.
+    unit_reps: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -91,6 +94,7 @@ class TonnageWeek:
             sessions=self.training_days,
             unloaded_reps=sum(s.unloaded_reps for s in self.sectors.values()),
             unloaded_seconds=sum(s.unloaded_seconds for s in self.sectors.values()),
+            unit_reps=sum(s.unit_reps for s in self.sectors.values()),
         )
 
     def value(self, key: str) -> SectorWeek:
@@ -105,18 +109,39 @@ def week_start(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
 
+def _side(s: dict, reps_key: str, weight_key: str, tut_key: str,
+          fallback: tuple[float, float, float] | None = None) -> tuple[float, float, float]:
+    """(reps, weight, seconds) of one side of a set record. A missing value is
+    the fallback side's (the left side is written only where it differs)."""
+    base = fallback or (0.0, 0.0, 0.0)
+    values = []
+    for key, default in zip((reps_key, weight_key, tut_key), base):
+        raw = s.get(key)
+        values.append(default if raw is None or raw == "" else float(raw or 0))
+    return values[0], values[1], values[2]
+
+
 def weekly_tonnage(
     rows: list[dict],
     region_map: dict[str, str],
     today: date | None = None,
     weeks: int = 8,
+    traits: dict[str, dict] | None = None,
 ) -> tuple[list[TonnageWeek], set[str]]:
     """`weeks` consecutive calendar weeks ending with the one containing
     `today`, so a week with no training is present and reads zero rather than
     being absent from the series.
 
     `rows` is Repository.get_all_training_exercises_raw()'s shape. Returns
-    (series, unmapped_exercise_names)."""
+    (series, unmapped_exercise_names).
+
+    `traits` is sessions.exercise_traits() (2026-10-20, the owner's "fix the
+    clear errors"): an exercise done one side at a time counts BOTH sides —
+    the set record holds the right side's reps, weight and time, and the
+    left's (reps_left, weight_left, tut_left) only where they differ, so a
+    missing left value is the right's — and a machine in stack units counts
+    its reps in `unit_reps`, never in kilograms. Without traits every set
+    counts once, in kilograms, as before."""
     today = today or date.today()
     last = week_start(today)
     span = [last - timedelta(weeks=n) for n in range(weeks - 1, -1, -1)]
@@ -126,6 +151,7 @@ def weekly_tonnage(
     sets: dict[date, dict[str, int]] = {w: {r: 0 for r in REGIONS} for w in span}
     unloaded: dict[date, dict[str, float]] = {w: {r: 0.0 for r in REGIONS} for w in span}
     held: dict[date, dict[str, float]] = {w: {r: 0.0 for r in REGIONS} for w in span}
+    stack: dict[date, dict[str, float]] = {w: {r: 0.0 for r in REGIONS} for w in span}
     sector_days: dict[date, dict[str, set[str]]] = {w: {r: set() for r in REGIONS} for w in span}
     all_days: dict[date, set[str]] = {w: set() for w in span}
     unmapped: set[str] = set()
@@ -154,29 +180,40 @@ def weekly_tonnage(
             continue
 
         all_days[wk].add(raw_date)
-        loaded_kg, loaded_sets, reps_only, seconds_only = 0.0, 0, 0.0, 0.0
+        trait = (traits or {}).get(name) or {}
+        two_sided = trait.get("sides") == 2
+        in_units = trait.get("unit", "kg") != "kg"
+        loaded_kg, loaded_sets, reps_only, seconds_only, stack_reps = 0.0, 0, 0.0, 0.0, 0.0
         for s in (row.get("sets") or []):
             if s.get("is_warmup"):
                 # A ramp set carries real reps at a real weight and is not work.
                 # Absent key = working set, which is every set logged before the
                 # flag existed — see services.sessions.is_working_set.
                 continue
-            reps = float(s.get("reps") or 0)
-            weight = float(s.get("weight") or 0)
-            tut = float(s.get("tut") or 0)
-            if reps and weight:
-                loaded_kg += reps * weight
+            right = _side(s, "reps", "weight", "tut")
+            passes = [right]
+            if two_sided:
+                passes.append(_side(s, "reps_left", "weight_left", "tut_left", right))
+            counted = False
+            for reps, weight, tut in passes:
+                if reps and weight and in_units:
+                    # A stack number is not kilograms: its reps stand alone.
+                    stack_reps += reps
+                elif reps and weight:
+                    loaded_kg += reps * weight
+                    counted = True
+                elif tut:
+                    # A hold or a timed piece: sessions.py writes reps=1 and puts
+                    # the actual work in tut. Counting its "1 rep" would hide it.
+                    # A set of held reps (a bird dog's six 5-second holds) writes
+                    # reps=6 and tut=5, so the time is tut per rep — the same rule
+                    # sessions.py's duration model uses. Counted once per set, a
+                    # 30-second set read as 5 (fixed 2026-10-13, WP-15).
+                    seconds_only += tut * max(reps, 1)
+                elif reps:
+                    reps_only += reps
+            if counted:
                 loaded_sets += 1
-            elif tut:
-                # A hold or a timed piece: sessions.py writes reps=1 and puts
-                # the actual work in tut. Counting its "1 rep" would hide it.
-                # A set of held reps (a bird dog's six 5-second holds) writes
-                # reps=6 and tut=5, so the time is tut per rep — the same rule
-                # sessions.py's duration model uses. Counted once per set, a
-                # 30-second set read as 5 (fixed 2026-10-13, WP-15).
-                seconds_only += tut * max(reps, 1)
-            elif reps:
-                reps_only += reps
         if loaded_kg:
             kg[wk][region] += loaded_kg
             sets[wk][region] += loaded_sets
@@ -185,6 +222,8 @@ def weekly_tonnage(
             unloaded[wk][region] += reps_only
         if seconds_only:
             held[wk][region] += seconds_only
+        if stack_reps:
+            stack[wk][region] += stack_reps
 
     series = [
         TonnageWeek(
@@ -197,6 +236,7 @@ def weekly_tonnage(
                     sessions=len(sector_days[w][r]),
                     unloaded_reps=round(unloaded[w][r], 1),
                     unloaded_seconds=round(held[w][r], 1),
+                    unit_reps=round(stack[w][r], 1),
                 )
                 for r in REGIONS
             },
@@ -266,4 +306,7 @@ def unloaded_text(cell: SectorWeek) -> str | None:
     if cell.unloaded_reps:
         reps = cell.unloaded_reps
         parts.append(f"{reps:g} rep{'' if reps == 1 else 's'}")
+    if cell.unit_reps:
+        reps = cell.unit_reps
+        parts.append(f"{reps:g} cable rep{'' if reps == 1 else 's'} in stack units")
     return ", ".join(parts) if parts else None

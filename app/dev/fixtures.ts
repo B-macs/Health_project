@@ -62,6 +62,7 @@ export function today(day: string, local: string): Schemas['TodayOut'] {
     strain: {
       value: t, display: t.toFixed(1), label: t < 8 ? 'Light' : t < 12 ? 'Moderate' : 'Hard', header: 'Training load',
       description: '', colour: '', card_label: 'STRAIN', is_rolling: false, unscored_reason: '', scale: 21,
+      rest_day: false, seven_day: null,
     },
     verdict: day === local
       ? { badge: '', banner_kind: '', banner_text: '', cause: '', has_something_to_say: false, hrv_note: '', reduced: false, tone: '' }

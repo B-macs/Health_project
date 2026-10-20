@@ -55,6 +55,9 @@ class HomeReads:
     wake_sources: dict = field(default_factory=dict)
     hr_rows: list = field(default_factory=list)
     stage: int | None = None
+    #: The watch's walks and runs no session holds, by date
+    #: (Repository.get_watch_cardio): they count on the day walked (2026-10-20).
+    walks: dict = field(default_factory=dict)
 
 
 def window_start(day: date, days: int) -> str:
@@ -88,6 +91,10 @@ def read_home(repo, day: date) -> HomeReads:
     except Exception:
         pass
     try:
+        reads.walks = repo.get_watch_cardio(start=start, end=day.isoformat())
+    except Exception:
+        pass
+    try:
         reads.stage = repo.get_current_stage()
     except Exception:
         reads.stage = None
@@ -110,7 +117,8 @@ def snapshot(reads: HomeReads) -> dict:
     snap = dash.compute_daily_metrics_snapshot(
         reads.day, reads.bio_rows, reads.au_rows, reads.stage,
         sleep_base_hours=base_hours, rolling_reference_date=reads.day,
-        wake_time_adjustments=reads.wake_adjustments, hr_rows=reads.hr_rows)
+        wake_time_adjustments=reads.wake_adjustments, hr_rows=reads.hr_rows,
+        walks=reads.walks)
     snap["sleep_need_hours"] = _need
     snap["sleep_base_window"] = base_window
     snap["strain_unscored_reason"] = STAGE_UNREAD if reads.stage is None else ""
@@ -266,7 +274,7 @@ def cards(repo, requested: date | None, caller_today: date) -> dict:
         except Exception:
             verdict_out = None
     s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(
-        snap["strain"], is_rolling=snap["strain_is_rolling"])
+        snap["strain"], rest_day=bool(snap.get("rest_day")))
     if snap["strain_unscored_reason"]:
         # Not "no workload logged": the load may well be there, the stage is not.
         s_hdr, s_desc = "Not scored", snap["strain_unscored_reason"]
@@ -285,6 +293,9 @@ def cards(repo, requested: date | None, caller_today: date) -> dict:
                       "scale": SCALES["readiness"]},
         "strain": {"value": snap["strain"], "display": s_disp,
                    "is_rolling": bool(snap["strain_is_rolling"]),
+                   # A rest day says so and shows the 7 days before as its own line.
+                   "rest_day": bool(snap.get("rest_day")),
+                   "seven_day": snap.get("strain_7d") if snap.get("rest_day") else None,
                    "card_label": strain_card_label, "colour": s_col, "label": s_lbl,
                    "header": s_hdr, "description": s_desc,
                    "unscored_reason": snap["strain_unscored_reason"],

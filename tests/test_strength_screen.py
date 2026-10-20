@@ -12,6 +12,7 @@ dataclasses the services return, and in the HTML builders.
 from __future__ import annotations
 
 import json
+from datetime import date, timedelta
 
 import pytest
 
@@ -69,8 +70,18 @@ _OPTIONS = [
 ]
 
 
+#: The rows moved so their unloaded week is the current one: the headline is the
+#: middle of the lifting weeks of the last 8 (2026-10-20), and the view reads today.
+_SHIFT = (date.today() - timedelta(days=date.today().weekday())) - date(2026, 8, 3)
+
+
+def _shifted(rows: list[dict]) -> list[dict]:
+    return [{**r, "session_date": (date.fromisoformat(r["session_date"]) + _SHIFT).isoformat()}
+            for r in rows]
+
+
 def _app():
-    script = _SCRIPT.replace("__ROWS__", json.dumps(FIXTURE_ROWS))
+    script = _SCRIPT.replace("__ROWS__", json.dumps(_shifted(FIXTURE_ROWS)))
     return AppTest.from_string(script, default_timeout=120).run()
 
 
@@ -114,7 +125,9 @@ def test_the_three_regions_always_render(app):
     assert _html(app).count('class="sb-region"') == 3
 
 
-def test_the_hero_shows_the_anchor_and_the_calibrating_badge(app):
+def test_the_hero_and_the_calibrating_badge_show(app):
+    """The hero names the score; the regions still calibrating show their 50.0
+    placeholder and the badge."""
     html = _html(app)
     assert ">Overall Strength<" in html
     assert ">50.0<" in html
@@ -239,7 +252,7 @@ def test_work_without_load_is_printed_under_a_tonnage_chart():
     series = [week("2026-09-28", unloaded_seconds=120.0),
               week("2026-10-05", unloaded_seconds=245.0, unloaded_reps=36.0)]
     note = V._unloaded_note_html(series, "core")
-    assert "Work without load" in note
+    assert "Work not counted in kg" in note
     assert "This week: 4 min 5 s held, 36 reps" in note
     assert "Last week: 2 min held" in note
     assert V._unloaded_note_html(series, "upper_body") == ""

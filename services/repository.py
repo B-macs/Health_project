@@ -28,6 +28,7 @@ import dataclasses
 import json
 import sqlite3
 import threading
+import re
 import time
 import uuid
 from datetime import date, datetime, timedelta
@@ -2877,8 +2878,10 @@ class Repository:
         column derived from constants you expect to change is the
         does-not-self-heal failure that bit the Stage 1 strain over-count.
         """
+        # The WEIGHTED load, as daily_region_au expects (fixed 2026-10-20: the
+        # raw Foster AU made each body area read above the day's own strain).
         return strain_regions.daily_region_au(
-            self._weighted_sessions(days=days, today=today),
+            [{**s, "au": s["weighted_au"]} for s in self._weighted_sessions(days=days, today=today)],
         )
 
     def get_unparsed_session_notes(self) -> list[dict]:
@@ -4056,6 +4059,11 @@ class Repository:
                 start=(today - timedelta(days=days + 28)).isoformat())
         except Exception:
             hr_rows = []
+        try:
+            walks = self.get_watch_cardio(start=(today - timedelta(days=days)).isoformat(),
+                                          end=today.isoformat())
+        except Exception:
+            walks = {}
 
         # One read of the tab up front, not one per row — see _rows_by_key.
         existing = self._rows_by_key(self._metrics_history_ws(), "date")
@@ -4067,7 +4075,7 @@ class Repository:
                 continue
             snapshot = dashboard.compute_daily_metrics_snapshot(
                 d, bio_rows, au_rows, stage, wake_time_adjustments=wake_adjustments,
-                hr_rows=hr_rows,
+                hr_rows=hr_rows, walks=walks,
             )
             snapshot["date"] = iso
             self.upsert_metrics_history_row(
@@ -4371,6 +4379,42 @@ class Repository:
                 out.append((epoch, float(hr)))
             except (TypeError, ValueError):
                 continue
+        return out
+
+    def get_watch_cardio(self, start: str, end: str | None = None,
+                         today: date | None = None) -> dict[str, list[dict]]:
+        """The watch's walks, runs and hikes (hr_load.HR_LED_ACTIVITY_TYPES)
+        that no logged session holds, by date (the owner, 2026-10-20: "count a
+        watch walk on the day you walk"): {date: [{"activity_id", "name",
+        "type", "minutes", "avg_hr", "load"}]}.
+
+        A session holds an activity when the date's heart-rate match names it
+        (get_session_hr_history, by date, type and name:
+        hr_matching.held_activity_ids) or a logged exercise's note names it
+        ("activity <id>", the outdoor import, sessions.outdoor_activity_logged).
+        Each load is hr_load.load_from_average against get_observed_hr_max,
+        the same maximum the session heart rate uses. Reads the synced tables
+        only; never calls the watch."""
+        end = end or (today or date.today()).isoformat()
+        rows = [r for r in self._read_records(self._garmin_activities_ws())
+                if start <= str(r.get("date") or "")[:10] <= end
+                and hr_load.hr_leads(r.get("type"))]
+        if not rows:
+            return {}
+        held = hr_matching.held_activity_ids(self.get_session_hr_history(start=start), rows)
+        notes = " ".join(str(r.get("notes") or "") for r in self.get_all_training_exercises_raw()
+                         if start <= str(r.get("session_date") or "") <= end)
+        held |= set(re.findall(r"\bactivity (\S+)", notes))
+        hr_max = self.get_observed_hr_max(today=date.fromisoformat(end))
+        out: dict[str, list[dict]] = {}
+        for r in rows:
+            if str(r.get("activity_id")) in held:
+                continue
+            minutes, avg_hr = _sheet_float(r.get("duration_minutes")), _sheet_float(r.get("avg_hr"))
+            out.setdefault(str(r["date"])[:10], []).append({
+                "activity_id": str(r.get("activity_id")), "name": r.get("name") or "",
+                "type": r.get("type") or "", "minutes": minutes, "avg_hr": avg_hr,
+                "load": hr_load.load_from_average(minutes, avg_hr, hr_max)})
         return out
 
     def get_observed_hr_max(self, days: int = 365, today: date | None = None) -> float | None:

@@ -206,10 +206,10 @@ def _bioage_card_css(key: str) -> str:
 #
 #  Two metrics, kept conceptually apart and sharing no term:
 #
-#    Overall Strength Score  — estimated strength CAPACITY, in points, where
-#      100 is the 2025 peak. services/strength.py. Moves on repeatable
-#      performance and estimated-1RM trend; a heavier training week cannot
-#      raise it on its own.
+#    Overall Strength Score  — the lifts as a % of the 2025 peak, measured:
+#      the middle of the last 3 lifting weeks (services/strength.py, the
+#      owner's choice of 2026-10-20). A heavier training week cannot raise it
+#      on its own; a stronger estimated 1RM does.
 #    Weekly tonnage          — the WORK COMPLETED in one week, in kilograms,
 #      overall and per body sector. services/tonnage.py. No decay, no
 #      carry-over; a week with no eligible loaded sets is zero.
@@ -453,13 +453,12 @@ def _unloaded_note_html(series: list, key: str) -> str:
         return ""
     return (f'<div class="sb-unloaded" style="margin:-4px 0 16px;">'
             f'<div style="font-size:12px;color:{_INK3};letter-spacing:.04em;'
-            f'margin-bottom:2px;">Work without load</div>{"".join(lines)}</div>')
+            f'margin-bottom:2px;">Work not counted in kg</div>{"".join(lines)}</div>')
 
 
 def _score_chart_svg(points: list[dict], colour: str) -> str:
-    """The modelled level, with the measured weeks beneath it. Measured is
-    drawn in a muted grey precisely because it is NOT the score — it is the
-    evidence the score is allowed to respond to."""
+    """The headline's line (the middle of the last 3 lifting weeks), with each
+    week's measured index beneath it in a muted grey (2026-10-20)."""
     w, h, pl, pr, pt, pb = 640, 220, 44, 14, 14, 24
     iw, ih = w - pl - pr, h - pt - pb
     # The span divides into 4 gridlines cleanly (services/strength_screen).

@@ -415,8 +415,10 @@ def test_a_rest_day_offers_the_week_and_shows_it_when_asked(monkeypatch):
     # H50, H51: no session on the day; the 7 days before it carry load.
     repo = HomeFake(session_days=range(1, 31, 2))
     day = _get(monkeypatch, repo, "/api/today/strain")
-    assert day["is_rolling"] and day["title"] == strain_screen.strain_labels(True, "TODAY")[1]
-    assert day["region"]["state"] == "empty" and day["region"]["reason"] == "rolling"
+    # 2026-10-20: the day's own strain under its own title, said to be a rest day.
+    assert not day["is_rolling"] and day["title"] == strain_screen.strain_labels(False, "TODAY")[1]
+    assert day["masthead"]["label"] == "Rest"
+    assert day["region"]["state"] == "empty" and day["region"]["reason"] == "rest_day"
     assert day["region"]["can_show_window"] and not day["region"]["showing_week"]
     week = _get(monkeypatch, repo, "/api/today/strain?week=true")["region"]
     assert week["state"] == "split" and week["week"] and week["showing_week"]
