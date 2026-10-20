@@ -83,3 +83,15 @@ def test_the_backup_runs_in_the_sync_chain():
     src = inspect.getsource(Repository.run_home_syncs)
     assert 'results["backup"] = self.backup_supabase_if_due(' in src
     assert src.index("backup_supabase_if_due") < src.index("flush_supabase_mirror()")
+
+
+def test_the_switch_check_names_each_day_of_the_last_week_without_a_copy():
+    """Rebuild Phase 9's check before the switch: a backup on each of the last 7
+    days. Today waits for its first sync; a name that is not ours counts for nothing."""
+    from datetime import date
+    from services import backup
+    today = date(2026, 10, 20)
+    names = [backup.object_name(date(2026, 10, d)) for d in (13, 14, 15, 16, 18, 19)] + ["notes.txt"]
+    assert backup.missing_days(names, today) == [date(2026, 10, 17)]
+    assert backup.missing_days(names + [backup.object_name(date(2026, 10, 17))], today) == []
+    assert backup.missing_days([], today, days=2) == [date(2026, 10, 18), date(2026, 10, 19)]

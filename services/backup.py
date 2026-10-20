@@ -147,6 +147,15 @@ def expired(names: list[str], today: date, keep_days: int = KEEP_DAYS) -> list[s
     return out
 
 
+def missing_days(names: list[str], today: date, days: int = 7) -> list[date]:
+    """The days among the `days` before `today` with no copy of ours (the check
+    before the switch-over, rebuild Phase 9: a backup on each of the last 7 days).
+    Today is left out: its copy is made by the day's first sync."""
+    have = set(names)
+    return [today - timedelta(days=back) for back in range(days, 0, -1)
+            if object_name(today - timedelta(days=back)) not in have]
+
+
 def run(store: supabase_store.SupabaseStore, today: date,
         storage: Storage | None = None, take=snapshot) -> str:
     """Take today's copy, upload it, delete expired ones; returns its name."""
