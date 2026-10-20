@@ -893,3 +893,63 @@ def test_the_week_checklist_is_open_until_the_owner_confirms_it(tmp_path, monkey
     checks.write_text(json.dumps({"p7": {"swap": True}}), encoding="utf-8")
     assert gate.p7_device_checklist_open().count == len(gate.P7_CHECKLIST) - 1
 
+
+
+# ── Phase 8 ──────────────────────────────────────────────────────────────────
+
+_P8_INVENTORY = """## Insights
+| Id | Feature | Proposal |
+|---|---|---|
+| I2 | Category cards | KEEP |
+| I14 | View all | DROP (keep the header) |
+| I62 | Pending counts | MOVE |
+| I80 | Mirror warning | DROP (cannot show) |
+| I93 | Oura sync | MOVE |
+| I94 | Check-in date | KEEP |
+"""
+
+
+def test_phase_8_builds_the_kept_and_moved_insights_rows_only():
+    assert gate.p8_rows(_P8_INVENTORY) == ["I2", "I62", "I93"]
+
+
+def test_a_line_joining_a_scale_figure_with_a_scan_figure_is_found():
+    files = {"app/src/screens/Metabolism.tsx":
+             "const fused = latest.body_fat_pct * 0.5 + cell.ecw_tbw\n"
+             "const shown = latest.body_fat_pct\n"
+             "// latest.weight_kg + cell.phase_angle_deg in a comment is fine\n"}
+    assert gate.figure_mixing_hits(files) == ["app/src/screens/Metabolism.tsx:1"]
+
+
+def test_a_line_adding_strength_to_tonnage_is_found_and_reading_both_apart_is_not():
+    files = {"app/src/screens/Strength.tsx":
+             "const total = data.overall + week.overall.kg\n"
+             "const a = data.overall; const b = week.overall.kg\n"}
+    assert gate.figure_mixing_hits(files) == ["app/src/screens/Strength.tsx:1"]
+
+
+def test_the_phone_choosing_a_test_itself_is_found():
+    files = {"app/src/screens/Flexibility.tsx":
+             "const first = 'leverage_bent'\n"
+             "const next = capture.order.filter((t) => !done.has(t.key))[0]\n"
+             "const shown = capture.order[step]\n"}
+    assert gate.battery_choice_hits(files, ["leverage_bent", "tilt_range"]) == [
+        "app/src/screens/Flexibility.tsx:1 the test key leverage_bent",
+        "app/src/screens/Flexibility.tsx:2 the engine's order rearranged",
+    ]
+
+
+def test_the_battery_keys_come_from_the_engine():
+    import cluster_a_battery as cba
+    assert gate.battery_test_keys() == sorted(cba.TESTS)
+
+
+def test_the_phase_8_parity_run_compares_the_insights_answers():
+    assert "p8" in gate.PARITY_INSIGHTS_PHASES and "p5" not in gate.PARITY_INSIGHTS_PHASES
+
+
+def test_the_insights_checklist_is_open_until_the_owner_confirms_it(tmp_path, monkeypatch):
+    checks = tmp_path / "owner_checks.json"
+    monkeypatch.setattr(gate, "OWNER_CHECKS", checks)
+    checks.write_text(json.dumps({"p8": {"strength": True, "data": False}}), encoding="utf-8")
+    assert gate.p8_device_checklist_open().count == len(gate.P8_CHECKLIST) - 1

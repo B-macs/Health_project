@@ -1356,9 +1356,14 @@ def app_rows_open(rows: list[str], mapping: dict, owner_words: str, root: Path |
     return out
 
 
+#: The phases whose parity run compares the Insights answers (--insights).
+PARITY_INSIGHTS_PHASES = {"p8"}
+
+
 def parity_report(phase: str) -> dict | None:
     """scripts/rebuild_parity.py --json: run once per gate run (it reads the live
-    engine and the store), then reused by the counters that read it."""
+    engine and the store), then reused by the counters that read it. Phase 8 runs
+    it over the Insights answers (--insights)."""
     if phase in _PARITY_REPORTS:
         return _PARITY_REPORTS[phase]
     out = REPORTS_DIR / phase
@@ -1367,7 +1372,8 @@ def parity_report(phase: str) -> dict | None:
     if not (REUSE_TEST_RUNS and path.exists()):
         path.unlink(missing_ok=True)
         if main_python().exists():
-            proc = subprocess.run([str(main_python()), str(PARITY), "--json"], cwd=REPO_ROOT,
+            mode = ["--insights"] if phase in PARITY_INSIGHTS_PHASES else []
+            proc = subprocess.run([str(main_python()), str(PARITY), *mode, "--json"], cwd=REPO_ROOT,
                                   env=_child_env(), capture_output=True, text=True,
                                   encoding="utf-8", errors="replace")
             path.write_text(proc.stdout, encoding="utf-8", newline="\n")
@@ -1907,6 +1913,204 @@ def p7_device_checklist_open() -> CounterResult:
 
 
 review("p7", *P7_CHECKLIST.values())
+
+
+# ── Phase 8 counters ─────────────────────────────────────────────────────────
+
+#: The Insights rows of the inventory (I1-I93) the phone builds: KEEP on Insights, MOVE to
+#: Settings > Data; the rows the owner dropped are left out by their word.
+P8_ROW_RANGE = range(1, 94)
+#: The owner's comparison (docs/rebuild/owner_checks.json, "p8"): true = as expected.
+P8_CHECKLIST = {
+    "strength": "Strength: the headline, the chart, the regions and the imbalances equal the Streamlit app's",
+    "metabolism": "Metabolism: the latest weigh-in, the chart and the cards equal the Streamlit app's",
+    "flexibility": "Flexibility: the pattern, the ladder and the stack equal the Streamlit app's",
+    "engine": "Engine data: the directive, the stage, the traffic light and the workload equal the Streamlit app's",
+    "warnings": "Warnings: the calendar's days and entries equal the Streamlit app's",
+    "trends": "Trends: the regions, the levels and the analysis equal the Streamlit app's",
+    "sleep": "Sleep architecture: the counts and the night's strips equal the Streamlit app's",
+    "data": "Settings > Data: the tables and the session checks equal the Sync tab's",
+    "assessment": "A flexibility assessment, when one is due, run in the new app (or: not due)",
+}
+INSIGHTS_FIXTURE_SCRIPT = REPO_ROOT / "scripts" / "make_insights_fixture.py"
+#: The engine's figures for the scale and for the gym scan, and for strength and for the
+#: tonnage: a screen that joins one family with the other in arithmetic is the fused body
+#: fat the engine refuses (services/body_composition.py) or the sum of strength and work
+#: the Strength screen never shows (services/strength.py beside services/tonnage.py).
+FIGURE_FAMILIES = (
+    (("weight_kg", "fat_mass_kg", "fat_free_mass_kg", "body_fat_pct"), ("phase_angle_deg", "ecw_tbw")),
+    (("overall", "points", "level", "measured"), ("kg", "unloaded_reps", "unloaded_seconds")),
+)
+_ARITHMETIC = re.compile(r"[^\s=!<>&|?:,(\[{][\s]*[-+*/][\s]*[^\s=>/*]")
+#: Engine tests that pin the two refusals.
+FIGURE_REFUSAL_TESTS = ("tests/test_body_composition.py", "tests/test_tonnage.py")
+#: The phone's Insights code (screens and helpers), read by the scans below.
+INSIGHTS_CODE_GLOB = ("Insights", "Flexibility", "Metabolism", "Strength", "Engine", "DataTables")
+
+
+def _insights_code() -> dict[str, str]:
+    return {rel: text for rel, text in _phone_code_files().items()
+            if any(part in Path(rel).stem for part in INSIGHTS_CODE_GLOB)}
+
+
+def figure_mixing_hits(files: dict[str, str]) -> list[str]:
+    """Lines of the phone's Insights code where an arithmetic operator sits on a line that
+    reads a figure of both families of one pair (the scale and the scan; strength and
+    tonnage)."""
+    hits = []
+    for rel, text in files.items():
+        code = _TS_STRING.sub('""', _blank_comments(text))
+        for number, line in enumerate(code.splitlines(), 1):
+            fields = set(re.findall(r"\.(\w+)", line))
+            for one, other in FIGURE_FAMILIES:
+                if fields & set(one) and fields & set(other) and _ARITHMETIC.search(line):
+                    hits.append(f"{rel}:{number}")
+    return hits
+
+
+def battery_choice_hits(files: dict[str, str], test_keys: list[str]) -> list[str]:
+    """Places where the phone's flexibility code chooses a test itself: a test key of
+    the battery written in the code, or the engine's order sorted, filtered or searched
+    (the step it shows is the engine's order at a position the owner moves)."""
+    hits = []
+    for rel, text in files.items():
+        code = _blank_comments(text)
+        for number, line in enumerate(code.splitlines(), 1):
+            for key in test_keys:
+                if re.search(rf"['\"`]{re.escape(key)}['\"`]", line):
+                    hits.append(f"{rel}:{number} the test key {key}")
+            if re.search(r"\border\??\.(sort|filter|find|findIndex|reverse|splice)\(", line):
+                hits.append(f"{rel}:{number} the engine's order rearranged")
+    return hits
+
+
+def battery_test_keys() -> list[str]:
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    import cluster_a_battery as cba
+    return sorted(cba.TESTS)
+
+
+def p8_rows(markdown: str) -> list[str]:
+    """The Insights rows (I1-I93) marked KEEP or MOVE."""
+    words = inventory_rows(markdown)
+    ids = [rid for rid, word in words.items()
+           if word in ("KEEP", "MOVE") and rid.startswith("I") and int(rid[1:]) in P8_ROW_RANGE]
+    return sorted(ids, key=lambda rid: int(rid[1:]))
+
+
+def _fixture_check() -> CounterResult:
+    """1 when app/dev/insights_fixture.json is not the engine's own output any more."""
+    if not main_python().exists():
+        return CounterResult(1, "no venv to run the fixture check")
+    proc = subprocess.run([str(main_python()), str(INSIGHTS_FIXTURE_SCRIPT), "--check"], cwd=REPO_ROOT,
+                          env=_child_env(), capture_output=True, text=True, encoding="utf-8",
+                          errors="replace")
+    lines = (proc.stdout + proc.stderr).strip().splitlines()
+    return CounterResult(0 if proc.returncode == 0 else 1,
+                         lines[-1] if lines else f"the fixture check exited {proc.returncode}")
+
+
+_P8_INSIGHTS_TITLES = ("insights", "strength", "metabolism", "flexibility", "the capture",
+                       "engine", "warnings", "trends", "sleep architecture", "settings > data")
+
+
+def _insights_annotations(phase: str, kind: str) -> CounterResult:
+    def count(tests):
+        total, notes = annotation_total(tests, kind)
+        return CounterResult(total, "; ".join(notes) or f"{len(tests)} Insights test runs, none",
+                             [f"{phase}/playwright.json"])
+    return _browser_counter(phase, lambda title: title.lower().startswith(_P8_INSIGHTS_TITLES), count)
+
+
+@counter("p8", "test_failures",
+         "failures in the Python gate (plus 1 under the floor), `pnpm test` (the app's and the "
+         "Worker's Vitest, after the build) and the browser tests (Playwright)")
+def p8_test_failures() -> CounterResult:
+    main_gate = _main_gate_counter("p8")
+    vitest = _pnpm_test_counter("p8")
+    report = playwright_report("p8")
+    if report is None:
+        browser = CounterResult(1, "no report", ["p8/playwright.log"])
+    else:
+        stats = report.get("stats", {})
+        failed = int(stats.get("unexpected", 0)) + int(stats.get("flaky", 0))
+        browser = CounterResult(failed, f'{stats.get("expected", 0)} passed, {failed} failed or flaky',
+                                ["p8/playwright.json"])
+    return CounterResult(main_gate.count + vitest.count + browser.count,
+                         f"Python: {main_gate.detail}; pnpm: {vitest.detail}; Playwright: {browser.detail}",
+                         main_gate.evidence + vitest.evidence + browser.evidence)
+
+
+@counter("p8", "parity_differences",
+         "differences between the live engine's Insights answers and the services' own over the "
+         "last 28 days, and answers only one side gave (scripts/rebuild_parity.py --insights)")
+def p8_parity_differences() -> CounterResult:
+    report = parity_report("p8")
+    if report is None:
+        return CounterResult(1, "the parity run gave no report", ["p8/parity.log"])
+    found = len(report.get("differences", [])) + len(report.get("unanswered", []))
+    refused = sorted({f'{r["endpoint"]} ({r["error"]})' for r in report.get("refused_alike", [])})
+    detail = (f'{report.get("days")} days: {len(report.get("differences", []))} differences, '
+              f'{len(report.get("unanswered", []))} answered by one side only'
+              + (f'; refused alike: {", ".join(refused)}' if refused else ""))
+    return CounterResult(found, detail, ["p8/parity.json"])
+
+
+@counter("p8", "fused_or_added_figures",
+         "phone lines that join a scale figure with a scan figure, or strength with tonnage, in "
+         "arithmetic; and failures of the engine tests that refuse both")
+def p8_fused_or_added_figures() -> CounterResult:
+    hits = figure_mixing_hits(_insights_code())
+    tests = [_pytest_once("p8", t) for t in FIGURE_REFUSAL_TESTS]
+    failed = sum(t.count for t in tests)
+    return CounterResult(len(hits) + failed,
+                         ("; ".join(hits) or f"{len(_insights_code())} files, none")
+                         + "; tests: " + "; ".join(t.detail for t in tests),
+                         [e for t in tests for e in t.evidence])
+
+
+@counter("p8", "battery_disagreement",
+         "capture steps where the screen chooses the next test instead of asking the engine: the "
+         "phone's code (a test key or the order rearranged), the capture browser tests, and the "
+         "mock's capture being the engine's own (make_insights_fixture.py --check)")
+def p8_battery_disagreement() -> CounterResult:
+    hits = battery_choice_hits(_insights_code(), battery_test_keys())
+    fixture = _fixture_check()
+    browser = _insights_annotations("p8", "battery_disagreement")
+    return CounterResult(len(hits) + fixture.count + browser.count,
+                         f'code: {"; ".join(hits) or "none"}; fixture: {fixture.detail}; '
+                         f"browser: {browser.detail}", browser.evidence)
+
+
+@counter("p8", "text_rule_violations",
+         "strings in app/src/strings.ts that fail the jargon, hedge and Stage 1 scans in tests/ "
+         "(the Cluster A screens' scans included)")
+def p8_text_rule_violations() -> CounterResult:
+    return p3_text_rule_violations()
+
+
+@counter("p8", "inventory_rows_open",
+         "Insights rows (I1-I93) marked KEEP or MOVE that the phone app does not build "
+         "(docs/rebuild/app_rows.json: the files and the test)")
+def p8_inventory_rows_open() -> CounterResult:
+    rows = p8_rows(SCREEN_INVENTORY.read_text(encoding="utf-8"))
+    mapping = json.loads(APP_ROWS.read_text(encoding="utf-8"))["rows"] if APP_ROWS.exists() else {}
+    owner = DESIGN_MD.read_text(encoding="utf-8") if DESIGN_MD.exists() else ""
+    open_ = app_rows_open(rows, mapping, owner)
+    return CounterResult(len(open_), "; ".join(open_[:30]) or f"{len(rows)} rows built, each with a test")
+
+
+@counter("p8", "device_checklist_open",
+         "items of the owner's Insights comparison not confirmed yet (docs/rebuild/owner_checks.json, p8)")
+def p8_device_checklist_open() -> CounterResult:
+    data = json.loads(OWNER_CHECKS.read_text(encoding="utf-8")) if OWNER_CHECKS.exists() else {}
+    answers = data.get("p8", {})
+    missing = [key for key in P8_CHECKLIST if answers.get(key) is not True]
+    return CounterResult(len(missing), ", ".join(missing) or "the owner confirmed every item")
+
+
+review("p8", *P8_CHECKLIST.values())
 
 
 # ── output ───────────────────────────────────────────────────────────────────

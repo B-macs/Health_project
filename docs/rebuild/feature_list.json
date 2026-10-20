@@ -1,5 +1,5 @@
 {
-  "phase": "P7",
+  "phase": "P8",
   "tasks": [
     {
       "id": "P0-01",
@@ -719,6 +719,70 @@
       "depends_on": [
         "P7-07"
       ],
+      "gate": "device_checklist_open",
+      "passes": false
+    },
+    {
+      "id": "P8-01",
+      "phase": "P8",
+      "description": "The Insights hub and its screens: Strength (I1-I15: the headline and calibration, the metric picker, the readout, the score and tonnage charts, the work without load, the split, the region cards, the imbalances), Metabolism (I16-I24), the Flexibility report (I26-I31, I41-I51), Cardio coming soon (I4), Engine data (I52-I61), the warnings calendar (I64), Trends (I65-I72) and Sleep architecture (I73-I77); every KEEP row of I1-I93 built and tested.",
+      "depends_on": [],
+      "gate": "inventory_rows_open",
+      "passes": false
+    },
+    {
+      "id": "P8-02",
+      "phase": "P8",
+      "description": "The flexibility capture asks the engine after every step: the cold gate, the leg-day warning, the protocol, each step's LOCK, setup and reading with the setup number offered back, the early answer (stop here), Skip, Back and Pause, and the missing readings; the screen shows the engine's order at the position the owner moves and chooses no test.",
+      "depends_on": [],
+      "gate": "battery_disagreement",
+      "passes": false
+    },
+    {
+      "id": "P8-03",
+      "phase": "P8",
+      "description": "The two body-composition lanes are never fused into one body-fat number, and strength and tonnage are never added: the screens show the engine's figures, and the engine's refusal tests stay green.",
+      "depends_on": [],
+      "gate": "fused_or_added_figures",
+      "passes": false
+    },
+    {
+      "id": "P8-04",
+      "phase": "P8",
+      "description": "Settings > Data: the engine view, the blend history and the metrics history tables, the session checks, the shadow report, the pending parse counts, the store caption, the Garmin and Oura texts, and the manual sync buttons, disabled with \"Syncs run in the old app until the switch-over\" until Phase 9 (I62, I78-I93).",
+      "depends_on": [],
+      "gate": "inventory_rows_open",
+      "passes": false
+    },
+    {
+      "id": "P8-05",
+      "phase": "P8",
+      "description": "scripts/rebuild_parity.py --insights: every Insights answer and the data tables, the live engine against the services, over the last 28 days; dates and field names only.",
+      "depends_on": [],
+      "gate": "parity_differences",
+      "passes": false
+    },
+    {
+      "id": "P8-06",
+      "phase": "P8",
+      "description": "Every screen word passes the jargon, hedge and Stage 1 scans, the Cluster A screens' scans included.",
+      "depends_on": [],
+      "gate": "text_rule_violations",
+      "passes": false
+    },
+    {
+      "id": "P8-07",
+      "phase": "P8",
+      "description": "Tests: Vitest for each card's states (from the cache, refreshed, not enough data, engine down), Playwright for the battery capture with its early stop (the engine-made fixture), the Worker tests and the Python gate; deployed.",
+      "depends_on": [],
+      "gate": "test_failures",
+      "passes": false
+    },
+    {
+      "id": "P8-08",
+      "phase": "P8",
+      "description": "The owner's comparison: each Insights card beside the Streamlit app, and an assessment in the new app when one is due.",
+      "depends_on": [],
       "gate": "device_checklist_open",
       "passes": false
     }

@@ -49,5 +49,16 @@
     "outdoor": null,
     "past_future": null,
     "once": null
+  },
+  "p8": {
+    "strength": null,
+    "metabolism": null,
+    "flexibility": null,
+    "engine": null,
+    "warnings": null,
+    "trends": null,
+    "sleep": null,
+    "data": null,
+    "assessment": null
   }
 }

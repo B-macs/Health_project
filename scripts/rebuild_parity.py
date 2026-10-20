@@ -19,6 +19,17 @@ It reads only. The access key comes from Health_project/.env
 (HEALTH_ACCESS_KEY) and the store's key from .streamlit/secrets.toml; neither
 is printed. A sync that runs between the two reads can show as a difference
 on the newest day: run it again before reading anything into one.
+
+    python scripts/rebuild_parity.py --insights --json   # Phase 8: the Insights answers
+
+With --insights it compares every Insights answer and the data tables the
+same way, over the last 28 days (rebuild Phase 8): each request carries that
+day as the caller's day, and the services compute the same day here. The two
+history tables, which hold every row whatever the day, are compared once. An
+answer both sides refuse alike (the Strength screen before its reference is
+in the store) is listed as such, never as a difference. The local side reads
+a throwaway local state file: the flexibility record keeps a mirror in the
+repo's .sync_state.json, and this PC's copy is not the store's.
 """
 from __future__ import annotations
 
@@ -116,15 +127,118 @@ def run(days: int = DAYS) -> dict:
     return report
 
 
+# ── Phase 8: the Insights answers ────────────────────────────────────────────
+
+INSIGHTS_DAYS = 28
+#: Compared on every day: the caller's day changes the answer.
+INSIGHTS_DAILY = {
+    "strength": "/api/insights/strength", "metabolism": "/api/insights/metabolism",
+    "flexibility": "/api/insights/flexibility", "engine": "/api/insights/engine",
+    "queue": "/api/insights/queue", "trends": "/api/insights/trends",
+    "sleep_architecture": "/api/insights/sleep-architecture",
+    "engine_view": "/api/data/tables/engine_view", "session_checks": "/api/data/session-checks",
+}
+#: Compared once: every row, whatever the day.
+INSIGHTS_ONCE = {"blend_history": "/api/data/tables/blend_history",
+                 "metrics_history": "/api/data/tables/metrics_history"}
+
+
+def local_insight(repo, name: str, day: date) -> tuple[int, dict]:
+    """(status, answer) the services give for one Insights endpoint with `day` as the
+    caller's day, through the engine's response models; a refusal as the engine words it."""
+    from healthapi import schemas_insights as si
+    from services import flexibility_screen as fxs
+    from services import insights_screens as ins
+    shaped = {
+        "strength": lambda: si.StrengthOut(**ins.strength(repo, day)),
+        "metabolism": lambda: si.MetabolismOut(**ins.metabolism(repo, day)),
+        "flexibility": lambda: si.FlexibilityOut(**fxs.screen(repo, day)),
+        "engine": lambda: si.EngineDataOut(**ins.engine_data(repo, day)),
+        "queue": lambda: si.QueueOut(**ins.queue(repo, day)),
+        "trends": lambda: si.TrendsOut(**ins.trends(repo, day)),
+        "sleep_architecture": lambda: si.SleepArchitectureOut(**ins.sleep_architecture_view(repo, day)),
+        "engine_view": lambda: si.DataTableOut(**ins.data_table(repo, day, "engine_view")),
+        "blend_history": lambda: si.DataTableOut(**ins.data_table(repo, day, "blend_history")),
+        "metrics_history": lambda: si.DataTableOut(**ins.data_table(repo, day, "metrics_history")),
+        "session_checks": lambda: si.SessionChecksOut(**ins.session_checks(repo, day)),
+    }
+    try:
+        return 200, shaped[name]().model_dump(mode="json")
+    except ins.ReferenceMissing:
+        return 409, {"error": "strength_reference_missing"}
+
+
+def compare_insight(report: dict, name: str, day: date, reply: dict, mine: tuple) -> None:
+    """One endpoint's comparison into the report: field differences when both answered,
+    a refusal both gave alike, or a mismatch of status (one side answered, the other not)."""
+    status, local = mine
+    if reply.get("status") == status == 200 and isinstance(reply.get("answer"), dict):
+        for field in differences(reply["answer"], local):
+            report["differences"].append({"date": day.isoformat(), "endpoint": name, "field": field})
+    elif reply.get("status") == status and reply.get("answer") == local:
+        report["refused_alike"].append({"date": day.isoformat(), "endpoint": name,
+                                        "error": str(local.get("error", ""))})
+    else:
+        report["unanswered"].append({"date": day.isoformat(), "endpoint": name,
+                                     "status": reply.get("status"), "local_status": status})
+
+
+def run_insights(days: int = INSIGHTS_DAYS) -> dict:
+    import tempfile
+
+    import rebuild_p0_measure as live
+    from services.clients import local_cache
+    from services.config import load_config
+    from services.repository import Repository
+
+    secrets = ROOT / ".streamlit" / "secrets.toml"
+    overrides = tomllib.loads(secrets.read_text(encoding="utf-8")) if secrets.exists() else {}
+    today = live.owner_today()
+    report: dict = {"today": today.isoformat(), "days": days, "differences": [],
+                    "refused_alike": [], "unanswered": []}
+    real_state = local_cache._DEFAULT_PATH
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
+        local_cache._DEFAULT_PATH = Path(tmp) / "sync_state.json"
+        try:
+            repo = Repository(load_config({**overrides, "HEALTH_SYSTEM_OF_RECORD": "supabase"}))
+            for back in range(days):
+                day = today - timedelta(days=back)
+                for name, path in INSIGHTS_DAILY.items():
+                    compare_insight(report, name, day, live.call("worker", path, local_date=day),
+                                    local_insight(repo, name, day))
+            for name, path in INSIGHTS_ONCE.items():
+                compare_insight(report, name, today, live.call("worker", path, local_date=today),
+                                local_insight(repo, name, today))
+        finally:
+            local_cache._DEFAULT_PATH = real_state
+    return report
+
+
 def main() -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true", help="print the report as JSON")
-    ap.add_argument("--days", type=int, default=DAYS)
+    ap.add_argument("--days", type=int, default=None)
+    ap.add_argument("--insights", action="store_true", help="the Insights answers (Phase 8)")
     args = ap.parse_args()
-    report = run(args.days)
+    if args.insights:
+        report = run_insights(args.days or INSIGHTS_DAYS)
+        if args.json:
+            print(json.dumps(report, indent=2))
+            return 0
+        print(f"{report['days']} days up to {report['today']}: {len(report['differences'])} differences, "
+              f"{len(report['unanswered'])} answered by one side only, "
+              f"{len(report['refused_alike'])} refused alike")
+        for d in report["differences"]:
+            print(f"  {d['date']}  {d['endpoint']:<18}  {d['field']}")
+        for u in report["unanswered"]:
+            print(f"  {u['date']}  {u['endpoint']:<18}  engine HTTP {u['status']}, services {u['local_status']}")
+        for endpoint, error in sorted({(r["endpoint"], r["error"]) for r in report["refused_alike"]}):
+            print(f"  refused alike: {endpoint} ({error})")
+        return 0
+    report = run(args.days or DAYS)
     if args.json:
         print(json.dumps(report, indent=2))
         return 0

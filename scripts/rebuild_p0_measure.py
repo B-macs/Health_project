@@ -110,12 +110,15 @@ def _ssl_context() -> ssl.SSLContext:
 
 
 def call(via: str, path: str, *, method: str = "GET", body: dict | None = None,
-         target: tuple[str, str] | None = None, timeout: float = 90.0) -> dict:
+         target: tuple[str, str] | None = None, timeout: float = 90.0,
+         local_date: date | None = None) -> dict:
     """One timed request. Returns the status, the seconds it took and the JSON
-    answer; the address and the key never leave this function."""
+    answer; the address and the key never leave this function. `local_date` is
+    the caller's day the request carries (the owner's today without it)."""
     # Cloudflare answers Python's default User-Agent ("Python-urllib/3.x") with a
     # 403 challenge page before the Worker runs (checked 2026-10-19).
-    headers = {"Accept": "application/json", "X-Local-Date": owner_today().isoformat(),
+    headers = {"Accept": "application/json",
+               "X-Local-Date": (local_date or owner_today()).isoformat(),
                "User-Agent": USER_AGENT}
     if via == "direct":
         base, key = target or engine_target()

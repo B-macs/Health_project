@@ -38,3 +38,51 @@ def test_the_sleep_rule_flags_a_panel_without_a_score_only():
 
 def test_the_parity_run_reads_every_today_endpoint():
     assert set(parity._paths(__import__("datetime").date(2026, 10, 20))) == set(parity.ENDPOINTS)
+
+
+# ── Phase 8: the Insights answers ────────────────────────────────────────────
+
+def _report() -> dict:
+    return {"differences": [], "refused_alike": [], "unanswered": []}
+
+
+def test_an_insights_answer_both_sides_give_alike_adds_nothing():
+    from datetime import date
+    report = _report()
+    parity.compare_insight(report, "engine", date(2026, 10, 20),
+                           {"status": 200, "answer": {"x": 1}}, (200, {"x": 1}))
+    assert report == _report()
+
+
+def test_an_insights_difference_names_the_day_the_endpoint_and_the_field():
+    from datetime import date
+    report = _report()
+    parity.compare_insight(report, "strength", date(2026, 10, 20),
+                           {"status": 200, "answer": {"overall": 59.0}}, (200, {"overall": 58.5}))
+    assert report["differences"] == [{"date": "2026-10-20", "endpoint": "strength", "field": "overall"}]
+
+
+def test_a_refusal_both_sides_give_is_listed_apart_and_is_no_difference():
+    from datetime import date
+    report = _report()
+    refused = {"error": "strength_reference_missing"}
+    parity.compare_insight(report, "strength", date(2026, 10, 20),
+                           {"status": 409, "answer": refused}, (409, refused))
+    assert report["differences"] == [] and report["unanswered"] == []
+    assert report["refused_alike"] == [{"date": "2026-10-20", "endpoint": "strength",
+                                        "error": "strength_reference_missing"}]
+
+
+def test_one_side_answering_and_the_other_not_is_counted():
+    from datetime import date
+    report = _report()
+    parity.compare_insight(report, "trends", date(2026, 10, 20),
+                           {"status": 503, "answer": {"error": "engine_unavailable"}}, (200, {"gate": {}}))
+    assert report["unanswered"] == [{"date": "2026-10-20", "endpoint": "trends", "status": 503,
+                                     "local_status": 200}]
+
+
+def test_every_insights_endpoint_has_a_local_answer():
+    assert set(parity.INSIGHTS_DAILY) | set(parity.INSIGHTS_ONCE) == {
+        "strength", "metabolism", "flexibility", "engine", "queue", "trends", "sleep_architecture",
+        "engine_view", "session_checks", "blend_history", "metrics_history"}
