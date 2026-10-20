@@ -3,9 +3,9 @@
 // Not one is lost: every write is either received by the engine or still in the outbox.
 // Phase 4 has no screen that writes yet, so the mock build's test hook writes
 // (src/debug/testHooks.ts, never part of a real build).
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { S } from '../src/strings'
-import { controlled, hook, onboard, openTab, setEngineDown } from './helpers'
+import { controlled, expect, hook, onboard, openTab, setEngineDown, test } from './helpers'
 
 type Received = { method: string; path: string; body: { n: number }; day: string | null }
 

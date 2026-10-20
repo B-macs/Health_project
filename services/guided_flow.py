@@ -28,6 +28,12 @@ INTRO, RESTING = "intro", "resting"
 COMPLETE, NEXT_SET, SKIP = "complete", "next_set", "skip"
 EVENTS = (COMPLETE, NEXT_SET, SKIP)
 
+#: When an entry's timer starts by itself (walk's "timer_starts"): a rest
+#: starts whenever the flow reaches it; a hold starts when the flow reaches it
+#: because the timer before it ran out (a rest, or the hold before it in the
+#: same set); anything else waits for the athlete's tap.
+ON_ARRIVAL, AFTER_TIMER = "on_arrival", "after_timer"
+
 #: A rest longer than this was an interruption (the phone put down, a call),
 #: not an inter-set rest: it is dropped rather than stored. Far above any
 #: prescribed rest (the ceiling is 180 s) and far below a session gap.
@@ -95,6 +101,37 @@ def step(pos: Position, ex: dict, event: str, *, first: str) -> Step:
                 record_set=pos.set_num, rest_begins=True)
 
 
+def hold_starts_next(ex: dict, pos: Position, first: str) -> bool:
+    """Whether this hold, when its timer runs out by itself, starts the next
+    hold by itself: the next rep of the set, or the second side's first rep
+    (the Training page's auto-start, rebuild Phase 6 move). A set's last hold
+    starts nothing itself: a rest follows, and the rest's own end starts the
+    next set's hold. A timed test (the plank test) never starts by itself."""
+    if ex.get("type") not in sessions.HOLD_TIMER_TYPES or sessions.is_timed_test(ex):
+        return False
+    if pos.phase != INTRO:
+        return False
+    nxt = step(pos, ex, COMPLETE, first=first).position
+    return (nxt.ex_idx, nxt.set_num, nxt.phase) == (pos.ex_idx, pos.set_num, INTRO)
+
+
+def timer_starts(exercises: list[dict], prev: Position | None, pos: Position,
+                 first: str) -> str | None:
+    """When the timer at `pos` starts by itself, after `prev` (None at the
+    session's start): ON_ARRIVAL for a rest, AFTER_TIMER for a hold that
+    follows a rest of its exercise or a hold that starts the next one
+    (hold_starts_next), None for everything the athlete starts."""
+    if pos.phase == RESTING:
+        return ON_ARRIVAL
+    ex = exercises[pos.ex_idx]
+    if (prev is None or prev.ex_idx != pos.ex_idx
+            or ex.get("type") not in sessions.HOLD_TIMER_TYPES or sessions.is_timed_test(ex)):
+        return None
+    if prev.phase == RESTING or hold_starts_next(ex, prev, first):
+        return AFTER_TIMER
+    return None
+
+
 def finished(pos: Position, n_exercises: int) -> bool:
     """Every exercise is behind the position: the save screen is next."""
     return pos.ex_idx >= n_exercises
@@ -127,8 +164,9 @@ def walk(exercises: list[dict], first: str) -> list[dict]:
 
     Each entry is one position and the event that leaves it ("complete"
     while working, "next_set" in a rest), with what that event records
-    (step()'s record_set, rest_begins, rest_ends) and, for a hold, the ending
-    its timer's bell announces (sessions.hold_ending). The walk is linear:
+    (step()'s record_set, rest_begins, rest_ends), for a hold, the ending
+    its timer's bell announces (sessions.hold_ending), and when its timer
+    starts by itself (timer_starts). The walk is linear:
     the event leads to entry `index + 1`, and the last entry's event finishes
     the session. "skip" from any entry leads to `skip_to`, the next
     exercise's first entry, or len(list) (finished) from the last exercise.
@@ -153,9 +191,11 @@ def walk(exercises: list[dict], first: str) -> list[dict]:
                 cur_set=p.set_num, total_sets=ex.get("sets", 1), cur_rep=p.rep,
                 reps_per_set=ex.get("reps_in_set", 5) if ex["type"] == "hold_reps" else 1,
                 first=first)
+        prev = raw[i - 1][0] if i else None
         out.append({"index": i, "ex_idx": p.ex_idx, "set_num": p.set_num, "rep": p.rep,
                     "phase": p.phase, "side": p.side, "event": event,
                     "record_set": nxt.record_set, "rest_begins": nxt.rest_begins,
                     "rest_ends": nxt.rest_ends, "ending": ending,
+                    "timer_starts": timer_starts(exercises, prev, p, first),
                     "skip_to": first_entry.get(p.ex_idx + 1, len(raw))})
     return out

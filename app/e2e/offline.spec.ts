@@ -4,9 +4,9 @@
 // - The service worker never answers /api: offline, /api fails at the network.
 // - With the engine down, no screen is blank: each tab renders, and the saved answer
 //   shows with "Showing saved data".
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { S } from '../src/strings'
-import { controlled, onboard, openTab, setEngineDown } from './helpers'
+import { controlled, expect, onboard, openTab, setEngineDown, test } from './helpers'
 
 async function engineCard(page: Page) {
   const card = page.getByTestId('engine')
@@ -53,7 +53,13 @@ test('the service worker caches no /api answer @offline', async ({ page }) => {
 
 // One test per screen, so the gate counts the screens that render nothing
 // (rebuild_gate.py p4 blank_screen_with_engine_down reads these titles).
-const SCREENS: { name: string; path: string; shows: (page: Page) => Promise<void> }[] = [
+const SCREENS: {
+  name: string
+  path: string
+  shows: (page: Page) => Promise<void>
+  /** A visit while the engine is up, so the phone has the screen's answer saved. */
+  before?: (page: Page) => Promise<void>
+}[] = [
   {
     name: S.nav.settings,
     path: '/#/settings',
@@ -67,7 +73,18 @@ const SCREENS: { name: string; path: string; shows: (page: Page) => Promise<void
   { name: S.nav.today, path: '/#/', shows: (page) => expect(page.getByRole('heading', { name: S.today.title })).toBeVisible() },
   { name: S.nav.insights, path: '/#/insights', shows: (page) => expect(page.getByRole('heading', { name: S.insights.title })).toBeVisible() },
   { name: S.nav.checkin, path: '/#/checkin', shows: (page) => expect(page.getByRole('dialog', { name: S.checkin.title })).toBeVisible() },
-  { name: S.nav.training, path: '/#/training', shows: (page) => expect(page.locator('.exercise__name')).toBeVisible() },
+  {
+    name: S.nav.training,
+    path: '/#/training',
+    before: async (page) => {
+      await openTab(page, S.nav.training)
+      await expect(page.getByRole('button', { name: S.session.start })).toBeVisible()
+    },
+    shows: async (page) => {
+      await expect(page.getByRole('button', { name: S.session.start })).toBeVisible()
+      await expect(page.getByText(S.fresh.why.engine_unavailable, { exact: false }).first()).toBeVisible()
+    },
+  },
 ]
 
 for (const screen of SCREENS) {
@@ -75,6 +92,7 @@ for (const screen of SCREENS) {
     await onboard(page)
     await openTab(page, S.nav.settings)
     await engineCard(page)
+    await screen.before?.(page)
     await setEngineDown(context, true)
     // A fresh start on the screen (a hash change alone would not load the app again).
     await page.goto(screen.path)

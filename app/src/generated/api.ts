@@ -1368,6 +1368,8 @@ export interface components {
             side: string;
             /** Skip To */
             skip_to: number;
+            /** Timer Starts */
+            timer_starts: ("on_arrival" | "after_timer") | null;
         };
         /** GapNext */
         GapNext: {

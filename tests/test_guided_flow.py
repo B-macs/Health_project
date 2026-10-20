@@ -220,3 +220,62 @@ def test_each_hold_entry_carries_the_bell_its_tap_then_keeps():
         assert entry["ending"] == sess.hold_ending(
             "hold_reps", is_uni=True, side=entry["side"], cur_set=entry["set_num"],
             total_sets=2, cur_rep=entry["rep"], reps_per_set=2, first=FIRST)
+
+
+# ─── when a timer starts by itself (rebuild Phase 6: the rule left the page) ──
+
+def _page_auto_start(ex, pos):
+    """The Training page's own two conditions before the move (views/training.py,
+    2026-08), kept here as the reference the engine's rule must match."""
+    is_uni = ex.get("laterality") == "unilateral"
+    if ex["type"] == "hold":
+        return is_uni and pos.side == FIRST
+    reps_per_set = ex.get("reps_in_set", 5)
+    return pos.rep < reps_per_set or (pos.rep >= reps_per_set and is_uni and pos.side == FIRST)
+
+
+@pytest.mark.parametrize("ex_type,uni,sets,reps_in_set", [
+    ("hold", False, 1, 3), ("hold", False, 3, 3), ("hold", True, 1, 3), ("hold", True, 3, 3),
+    ("hold_reps", False, 1, 1), ("hold_reps", False, 2, 3), ("hold_reps", True, 1, 1),
+    ("hold_reps", True, 2, 3), ("hold_reps", True, 3, 5),
+])
+def test_a_hold_starts_the_next_hold_exactly_where_the_page_did(ex_type, uni, sets, reps_in_set):
+    ex = _ex(ex_type, sets=sets, uni=uni, reps_in_set=reps_in_set)
+    for entry in gf.walk([ex], FIRST):
+        if entry["phase"] == gf.RESTING:
+            continue
+        pos = gf.Position(entry["ex_idx"], entry["set_num"], entry["rep"], entry["phase"], entry["side"])
+        assert gf.hold_starts_next(ex, pos, FIRST) == _page_auto_start(ex, pos), entry
+
+
+def test_a_rest_always_starts_and_a_hold_starts_only_after_a_timer():
+    """A rest starts whenever the flow reaches it; a hold starts by itself after
+    its exercise's rest or after the hold before it in the same set; the first
+    hold of an exercise, reps, an activity and the timed test wait for a tap."""
+    plank_test = {"name": "Front plank (Timed)", "type": "hold", "sets": 2, "laterality": "unilateral"}
+    assert sess.is_timed_test(plank_test)
+    exercises = [_ex("reps", sets=2), _ex("hold", sets=2, uni=True), _ex("hold_reps", sets=2, reps_in_set=2),
+                 plank_test, _ex("duration")]
+    entries = gf.walk(exercises, FIRST)
+    for i, entry in enumerate(entries):
+        ex = exercises[entry["ex_idx"]]
+        prev = entries[i - 1] if i else None
+        if entry["phase"] == gf.RESTING:
+            expected = gf.ON_ARRIVAL
+        elif ex is plank_test or ex["type"] not in sess.HOLD_TIMER_TYPES:
+            expected = None
+        elif prev is None or prev["ex_idx"] != entry["ex_idx"]:
+            expected = None
+        elif prev["phase"] == gf.RESTING or prev["set_num"] == entry["set_num"]:
+            expected = gf.AFTER_TIMER
+        else:
+            expected = None
+        assert entry["timer_starts"] == expected, entry
+    starts = [e["timer_starts"] for e in entries if exercises[e["ex_idx"]] is plank_test]
+    assert starts and all(s in (None, gf.ON_ARRIVAL) for s in starts)
+
+
+def test_the_page_asks_the_engine_when_a_hold_starts_itself():
+    source = (ROOT / "views" / "training.py").read_text(encoding="utf-8")
+    assert source.count("_set_auto_start = guided_flow.hold_starts_next(") == 2
+    assert "_set_auto_start = is_uni" not in source and "_set_auto_start = (cur_rep" not in source

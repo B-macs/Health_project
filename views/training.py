@@ -4377,7 +4377,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                     _hold_label = f"HOLD — {_side.upper()} SIDE" if is_uni else "HOLD"
                     # The side swap has no rest timer, so the hold timer itself must
                     # flag the second side's timer to auto-start.
-                    _set_auto_start = is_uni and _side == _first
+                    _set_auto_start = guided_flow.hold_starts_next(ex, _flow_position(), _first)
                     # One hold IS one set here (Full Side Bridge), so the only
                     # mid-exercise ending is the side swap; everything else ends
                     # the set, and the LAST set ends the exercise. The same
@@ -4412,9 +4412,7 @@ def _render_guided_flow(day_num, exercises, n_ex,
                 # More reps in this set → next rep's hold timer needs to auto-start.
                 # Last rep, side swap (unilateral, first side) → the second side's rep 1 needs to auto-start.
                 # Last rep, set ends → rest timer will set the flag; don't set it here.
-                _set_auto_start = (cur_rep < reps_per_set) or (
-                    cur_rep >= reps_per_set and is_uni and _side == _first
-                )
+                _set_auto_start = guided_flow.hold_starts_next(ex, _flow_position(), _first)
                 # Four endings, matching the completion handler below exactly:
                 # another rep, the swap to the second side, the set is over, or the
                 # exercise is over. Rep 8 of 8 on the McGill Curl-Up ends the

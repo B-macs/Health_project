@@ -1,9 +1,9 @@
 // The check-in in the browser (rebuild Phase 5): made with no connection, it waits in the
 // outbox and is sent once the phone is back online; the next open shows it as saved.
 // The gate (rebuild_gate.py p5 check_in_lost) adds up this test's check_in_lost count.
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import { S } from '../src/strings'
-import { controlled, hook, onboard, openTab } from './helpers'
+import { controlled, expect, hook, onboard, openTab, test } from './helpers'
 
 type Received = { method: string; path: string; body: { date: string; opened_entry: boolean; values: { pain_score: number; sensation_tags: string[] } } }
 

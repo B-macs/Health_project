@@ -8,7 +8,7 @@ model here and export again.
 from __future__ import annotations
 
 from datetime import date
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -338,6 +338,10 @@ class FlowStep(BaseModel):
     rest_begins: bool
     rest_ends: bool
     ending: str | None
+    #: When this entry's timer starts by itself (guided_flow.timer_starts):
+    #: "on_arrival" (a rest), "after_timer" (a hold reached because the timer
+    #: before it ran out), or None (the athlete starts it).
+    timer_starts: Literal["on_arrival", "after_timer"] | None
     skip_to: int
 
 

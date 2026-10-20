@@ -8,11 +8,11 @@
 // - With no access key saved, the first-open screen shows instead (screens/Welcome.tsx).
 // - Today and its three detail screens (/readiness, /sleep, /strain) share the day shown
 //   (lib/day.ts); Check-in is a sheet over Today; the page behind keeps its own colour.
-// - Training is the session screen. Opening it starts a session in the phone's database
-//   and closing it ends it; while it runs, the tab bar hides and an app update waits.
-//   A session left open (a reload, an app kill) opens again at the next start.
+// - Training shows today's session before Start, the guided flow while it runs and the save
+//   at its end (screens/TrainingTab.tsx). While a session runs, the tab bar hides and an app
+//   update waits; a session left open (a reload, an app kill) opens again at the next start.
 // - The outbox sends what waits whenever the app is open (lib/outbox.ts).
-// - Training and Insights still show the design's sample numbers (Phases 6 to 8), and say so.
+// - Insights still shows the design's sample numbers (Phase 8), and says so.
 //
 // The address can carry the appearance and less motion for the screenshot report:
 // ?t=auto|light|dark &still (motion off, so a picture never catches a ring half-drawn).
@@ -27,16 +27,16 @@ import { refresh, type Ctx } from './lib/cache'
 import { pickFor, readPick, writePick, type Pick } from './lib/day'
 import { localDay } from './lib/api'
 import { useOutboxLoop } from './lib/outbox'
-import { endSession, sessionActive, startSession } from './lib/session'
 import { useAppSettings, type AppSettings } from './lib/settings'
 import { isStandalone } from './lib/standalone'
 import { MOCK } from './mock/data'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { CheckIn, formPath } from './screens/CheckIn'
 import { ReadinessScreen, SleepScreen, StrainScreen } from './screens/Details'
 import { Insights } from './screens/Insights'
 import { Settings, THEMES } from './screens/Settings'
 import { Today } from './screens/Today'
-import { Training } from './screens/Training'
+import { TrainingTab } from './screens/TrainingTab'
 import { Welcome } from './screens/Welcome'
 import { S } from './strings'
 import { IconCheckin, IconInsights, IconSettings, IconToday, IconTraining } from './ui/icons'
@@ -73,14 +73,6 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (path: string) => void }) {
   )
 }
 
-/** The training session screen: opening it starts the session, closing it ends it. */
-function TrainingFrame({ store, onClose }: { store: HealthDB; onClose: () => void }) {
-  useEffect(() => {
-    if (!sessionActive()) void startSession(store, { kind: 'frame' })
-  }, [store])
-  return <Training mock={MOCK} onClose={() => void endSession(store).then(onClose)} />
-}
-
 type ShellProps = {
   store: HealthDB
   settings: AppSettings
@@ -97,6 +89,7 @@ function Shell(p: ShellProps) {
   const tab = tabOf(location)
   const scroller = useRef<HTMLElement>(null)
   const [pick, setPick] = useState<Pick | null>(readPick)
+  const sessionRow = useLiveQuery(() => p.store.session.get('current'), [p.store])
 
   // A session left open by a reload or an app kill opens again.
   useEffect(() => {
@@ -138,7 +131,8 @@ function Shell(p: ShellProps) {
       <Today />
     </div>
   )
-  const inSession = tab === 'training'
+  // The tab bar hides only while a session runs (the overview before Start keeps it).
+  const inSession = tab === 'training' && !!sessionRow
   const classes = `app app--${p.mode} fam-${PAGE_FAMILY[tab]}${inSession ? ' app--session' : ''}`
   return (
     <AppStateProvider value={state}>
@@ -151,9 +145,7 @@ function Shell(p: ShellProps) {
               <Route path="/readiness"><ReadinessScreen /></Route>
               <Route path="/sleep"><SleepScreen /></Route>
               <Route path="/strain"><StrainScreen /></Route>
-              <Route path="/training">
-                <TrainingFrame store={p.store} onClose={() => go('/')} />
-              </Route>
+              <Route path="/training"><TrainingTab /></Route>
               <Route path="/insights">
                 <Insights mock={MOCK} reduced={p.reduced} />
               </Route>

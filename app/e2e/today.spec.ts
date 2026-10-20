@@ -3,10 +3,10 @@
 // the week strip, a picked day survives a reload and "Back to today" returns, a card opens
 // its detail screen with its own day arrows, and a night with no Sleep Score shows only the
 // reason line.
-import { expect, test, type Page } from '@playwright/test'
+import type { Page } from '@playwright/test'
 import * as fx from '../dev/fixtures'
 import { S } from '../src/strings'
-import { onboard } from './helpers'
+import { expect, onboard, test } from './helpers'
 
 /** The phone's own day, as the app sends it (the browser's local date). */
 async function localDay(page: Page): Promise<string> {

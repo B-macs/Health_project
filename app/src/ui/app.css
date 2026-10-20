@@ -1322,6 +1322,45 @@ button.card {
   margin-top: var(--sp-xs);
 }
 
+/* ── The training session (rebuild Phase 6) ───────────────────────────────────────── */
+
+.steppers {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+}
+
+.bigstep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.bigstep__value {
+  font-size: var(--fs-hero);
+  font-weight: var(--w-hero);
+}
+
+/* The session's controls share the row at any phone width: long words wrap. */
+.controls .btn--gym {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.iconbtn--gym {
+  width: var(--gym);
+  height: var(--gym);
+  font-size: var(--fs-title);
+}
+
+.field--area {
+  min-height: calc(var(--tap) * 2);
+  padding: var(--sp-s) var(--sp-m);
+}
+
 /* ── The tab bar ─────────────────────────────────────────────────────────────────── */
 
 .tabbar {

@@ -1536,6 +1536,21 @@
           "skip_to": {
             "title": "Skip To",
             "type": "integer"
+          },
+          "timer_starts": {
+            "anyOf": [
+              {
+                "enum": [
+                  "on_arrival",
+                  "after_timer"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timer Starts"
           }
         },
         "required": [
@@ -1550,6 +1565,7 @@
           "rest_begins",
           "rest_ends",
           "ending",
+          "timer_starts",
           "skip_to"
         ],
         "title": "FlowStep",

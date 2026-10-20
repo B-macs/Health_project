@@ -2,9 +2,8 @@
 // DevTools protocol: the web app manifest parses and nothing would stop an install. iOS
 // reads the same manifest and the apple-touch-icon; the real iPhone checks the install
 // itself (the owner's checklist).
-import { expect, test } from '@playwright/test'
 import { S } from '../src/strings'
-import { controlled, keyField, onboard } from './helpers'
+import { controlled, expect, keyField, onboard, test } from './helpers'
 
 test('the app can be installed: a valid manifest, its icons, no installability errors @install', async ({ page }) => {
   await page.goto('/')

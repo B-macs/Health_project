@@ -4,18 +4,15 @@
 // session runs; once the session ends, the next return to the app takes the new version.
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { expect, test } from '@playwright/test'
 import { S } from '../src/strings'
-import { controlled, onboard, openTab, sessionStored } from './helpers'
+import { controlled, expect, leaveSession, onboard, startTraining, test } from './helpers'
 
 const SW = fileURLToPath(new URL('../../reports/rebuild/e2e-dist/sw.js', import.meta.url))
 
 test('an update waits while a training session runs, and loads after it @update', async ({ page }) => {
   await onboard(page)
   await controlled(page)
-  await openTab(page, S.nav.training)
-  await expect(page.locator('.exercise__name')).toBeVisible()
-  await sessionStored(page)
+  await startTraining(page)
   await page.evaluate(() => {
     ;(window as unknown as { __mark: string }).__mark = 'not reloaded'
   })
@@ -37,7 +34,7 @@ test('an update waits while a training session runs, and loads after it @update'
     expect(await page.evaluate(async () => Boolean((await navigator.serviceWorker.getRegistration())?.waiting))).toBe(true)
 
     // The session ends; at the next return to the app the new version takes over.
-    await page.getByRole('button', { name: S.training.close }).click()
+    await leaveSession(page)
     await expect(page.getByRole('heading', { name: S.today.title })).toBeVisible()
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')))
     await page.waitForFunction(() => !(window as unknown as { __mark?: string }).__mark, null, { timeout: 15_000 })

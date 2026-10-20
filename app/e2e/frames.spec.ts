@@ -1,9 +1,8 @@
-// The frames and the navigation (rebuild Phase 4): every tab opens its frame in the same
-// page (no reload), Check-in is a sheet over Today, and the training session survives a
-// reload: the app opens on it again.
-import { expect, test } from '@playwright/test'
+// The frames and the navigation (rebuild Phases 4 and 6): every tab opens its frame in the
+// same page (no reload), Check-in is a sheet over Today, and the training session survives
+// a reload: the app opens on it again.
 import { S } from '../src/strings'
-import { onboard, openTab, sessionStored } from './helpers'
+import { expect, leaveSession, onboard, openTab, startTraining, test } from './helpers'
 
 test('every tab opens its frame in the same page', async ({ page }) => {
   await onboard(page)
@@ -33,15 +32,17 @@ test('check-in opens as a sheet over Today and closes with Escape', async ({ pag
 
 test('the training session survives a reload, and closing it ends it', async ({ page }) => {
   await onboard(page)
+  // Before Start: today's session, with the tab bar.
   await openTab(page, S.nav.training)
-  await expect(page.locator('.exercise__name')).toBeVisible()
+  await expect(page.getByRole('button', { name: S.session.start })).toBeVisible()
+  await expect(page.getByRole('navigation', { name: S.app })).toBeVisible()
+  await startTraining(page)
   await expect(page.getByRole('navigation', { name: S.app })).toBeHidden()
-  await sessionStored(page)
   // An app kill: the app opens at "/" again, and goes back to the session.
   await page.goto('/')
   await expect(page.locator('.exercise__name')).toBeVisible()
   expect(new URL(page.url()).hash).toBe('#/training')
-  await page.getByRole('button', { name: S.training.close }).click()
+  await leaveSession(page)
   await expect(page.getByRole('heading', { name: S.today.title })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('heading', { name: S.today.title })).toBeVisible()

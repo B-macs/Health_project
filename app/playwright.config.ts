@@ -24,7 +24,8 @@ export default defineConfig({
     timeout: 180_000,
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 440, height: 956 } } },
+    // Muted: the session's bells must never sound on the PC that runs the tests.
+    { name: 'chromium', use: { ...devices['Desktop Chrome'], viewport: { width: 440, height: 956 }, launchOptions: { args: ['--mute-audio'] } } },
     { name: 'webkit', use: { ...devices['iPhone 17 Pro Max'] }, grepInvert: /@offline|@install|@outbox|@update/ },
   ],
 })

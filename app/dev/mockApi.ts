@@ -3,6 +3,12 @@
 // Cloud Run. The access key is "dev". It is never part of a build.
 // - a cookie `e2e_engine=down` makes every /api answer the Worker's "engine unavailable";
 // - GET /api/dev/received lists the writes the mock received (the outbox tests);
+// - a saved session is stored by its session id, as the engine stores it (rebuild rule 4),
+//   and GET /api/dev/sessions lists what is stored; a cookie `e2e_lose_answer=1` stores a
+//   save and then answers "engine unavailable", as when the answer is lost on the way
+//   back, so the phone sends it again;
+// - GET /api/training/session answers the engine-made session (dev/session_fixture.json)
+//   on the caller's day, and POST /api/training/completion made-up loads;
 // - the data check answers as the Worker does: GET .../last (null until a check ran) and
 //   POST .../run (a made-up clean result);
 // - Today, its week, the day's plan, the three detail screens and the check-in answer
@@ -10,9 +16,12 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
 import * as fx from './fixtures.ts'
+import sessionFixture from './session_fixture.json' with { type: 'json' }
 
 const KEY = 'dev'
 const received: { method: string; path: string; body: unknown; day: string | null }[] = []
+// Sessions saved through the mock, by session id: a save sent again replaces itself.
+const sessions = new Map<string, { session_id: string; notes: string; exercises: unknown[] }>()
 // Check-ins saved through the mock, by date.
 const checkins = new Map<string, ReturnType<typeof fx.checkinForm>['values']>()
 // The daily data check as the Worker keeps it: none until one runs ("Check now").
@@ -63,6 +72,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     res.end(JSON.stringify(body))
   }
   if (url.pathname === '/api/dev/received') return send(200, received)
+  if (url.pathname === '/api/dev/sessions') return send(200, [...sessions.values()])
   if (cookie(req, 'e2e_engine') === 'down') return send(503, { error: 'engine_unavailable' })
   if (req.headers.authorization !== `Bearer ${KEY}`) return send(401, { error: 'unauthorized' })
   const day = (req.headers['x-local-date'] as string | undefined) ?? null
@@ -96,6 +106,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
       return send(200, fx.strainDetail(shown, local, url.searchParams.get('week') === 'true'))
     }
     if (url.pathname === '/api/training/day') return send(200, fx.trainingDay(asked ?? local, local))
+    if (url.pathname === '/api/training/session') return send(200, { ...sessionFixture, date: local })
     if (url.pathname === '/api/status') {
       return send(200, { writer: 'streamlit', offline: false, datastore_built_at: null, oura: null, last_sync: null, notices: [], sync_due: null })
     }
@@ -107,6 +118,22 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
   if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE') {
     void readBody(req).then((body) => {
       received.push({ method: req.method!, path: url.pathname, body, day })
+      if (url.pathname === '/api/training/completion') {
+        const b = body as { model_minutes: number; start_ts: number; end_ts: number; rpe: number }
+        const clock = Math.max(5, Math.floor((b.end_ts - b.start_ts) / 60))
+        const choice = (minutes: number, source: string) => ({
+          minutes, source, au: b.rpe * minutes, au_by_rpe: Array.from({ length: 10 }, (_, i) => (i + 1) * minutes),
+        })
+        const ask = clock > 1.5 * b.model_minutes
+        return send(200, { clock_minutes: clock, model_minutes: b.model_minutes, ask_length: ask,
+          choices: ask ? [choice(b.model_minutes, 'plan'), choice(clock, 'clock')] : [choice(clock, 'clock')] })
+      }
+      if (url.pathname === '/api/training/sessions' && req.method === 'POST') {
+        const b = body as { session_id: string; notes: string; exercises: unknown[] }
+        sessions.set(b.session_id, b)
+        if (cookie(req, 'e2e_lose_answer') === '1') return send(503, { error: 'engine_unavailable' })
+        return send(200, { session_id: b.session_id, exercises: b.exercises.length })
+      }
       if (url.pathname === '/api/checkin' && req.method === 'PUT') {
         const b = body as { date: string; values: ReturnType<typeof fx.checkinForm>['values'] }
         checkins.set(b.date, b.values)

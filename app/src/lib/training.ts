@@ -12,6 +12,7 @@
 // at Save (session_save.records_from_raw). The steppers move by the engine's increment
 // and over the engine's band tiers.
 import type { components } from '../generated/api'
+import type { Timer } from './timers'
 
 type Schemas = components['schemas']
 export type Plan = Schemas['SessionPlanOut']
@@ -69,6 +70,13 @@ export interface TrainingState {
   lastSetAt: number | null
   /** Up to UNDO_LIMIT earlier positions, newest last (the flow's Back). */
   history: Snapshot[]
+  /** The running timer and the entry it belongs to; kept, so a reload shows it right. */
+  timer: { step: number; t: Timer } | null
+  /** The session is over and the save screen shows. */
+  saving: boolean
+  /** The outbox id of the save, once Save was pressed (the save waits there until the
+   *  engine confirms it), with the body it holds. */
+  savedId: string | null
 }
 
 /** How many taps Back can undo (the Streamlit flow's limit, T78). */
@@ -101,7 +109,19 @@ export function startSessionState(plan: Plan, sessionId: string, exerciseIds: st
     firstSetAt: null,
     lastSetAt: null,
     history: [],
+    timer: null,
+    saving: false,
+    savedId: null,
   }
+}
+
+/** The timer of the entry the flow is on, or null when it belongs to another entry. */
+export function timerHere(s: TrainingState): Timer | null {
+  return s.timer && s.timer.step === s.step ? s.timer.t : null
+}
+
+export function withTimer(s: TrainingState, t: Timer | null): TrainingState {
+  return { ...s, timer: t ? { step: s.step, t } : null }
 }
 
 export function currentStep(s: TrainingState): FlowStep | null {
