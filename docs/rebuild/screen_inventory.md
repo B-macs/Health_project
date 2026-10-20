@@ -366,7 +366,7 @@ The owner decided on 2026-10-19 that the live Streamlit app gets no more fixes. 
 | I64 | Processing Queue | Active warnings calendar | Month grid, day detail | get_flagged_entries | 2704-2811 | session | KEEP |
 | I65 | Macro Trends | Empty state | "No parsed readiness entries yet…" | get_parsed_readiness(90) | 2818-2821 | — | KEEP |
 | I66 | Macro Trends | Body areas selected most (until 2026-10-20 "Most flagged body regions", a keyword count of the note text, which did not match the areas he selects; the owner) | Bar chart | insights.selected_area_frequency | 2823-2851 | — | KEEP |
-| I67 | Macro Trends | Tightness severity timeline | Self-reported, parsed, pain | — | 2853-2864 | — | KEEP |
+| I67 | Macro Trends | Tightness severity timeline (since 2026-10-20 every check-in of the last 90 days, with the parsed severity where the note was read; until then only the parsed check-ins; the owner's choice) | Self-reported, parsed, pain | insights_screens.checkin_trend | 2853-2864 | — | KEEP |
 | I68 | Macro Trends | Warning level history | Clear / Monitor / Flag buttons with lists | — | 2866-2920 | session | KEEP |
 | I69 | Macro Trends | Data gate | Days available; "Need at least 14 days…" | get_macro_trend_data(90) | 2924-2938 | — | KEEP |
 | I70 | Macro Trends | Recovery direction and slopes | Table | stats.compute_all_correlations; insights.slope_direction_rows | 2940-2953 | — | KEEP |

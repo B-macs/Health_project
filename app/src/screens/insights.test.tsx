@@ -300,12 +300,20 @@ describe('Trends', () => {
     expect(html).not.toContain(S.trend.needMore(14, 0).slice(0, 30))
   })
 
-  it('says how much more data the analysis needs, and that there are no parsed notes', () => {
+  it('says how much more data the analysis needs, when there is no check-in, and when no note was parsed', () => {
     const closed = F.trends_closed
     const gate = closed.gate as { needed: number; bio_days: number }
     expect(text(draw(<TrendsBody view={fresh(closed)} reduced />))).toContain(S.trend.needMore(gate.needed, gate.bio_days))
-    const empty = { ...closed, regions: [], timeline: [], timeline_axis: null }
-    expect(text(draw(<TrendsBody view={fresh(empty)} reduced />))).toContain(S.trend.noParsed)
+    const empty = { ...closed, regions: [], timeline: [], timeline_axis: null, levels: {} }
+    const none = text(draw(<TrendsBody view={fresh(empty)} reduced />))
+    expect(none).toContain(S.trend.noCheckins)
+    expect(none).toContain(S.trend.noParsed)
+    // Every check-in is on the timeline, also when no note was parsed (the owner, 2026-10-20).
+    const unread = { ...F.trends, levels: { none: [], monitor: [], flag: [] } }
+    const html = text(draw(<TrendsBody view={fresh(unread)} reduced />))
+    expect(html).toContain(S.trend.timeline)
+    expect(html).toContain(S.trend.noParsed)
+    expect(html).not.toContain(S.trend.levels)
   })
 })
 

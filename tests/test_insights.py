@@ -141,3 +141,23 @@ def test_the_selected_areas_are_counted_once_per_check_in():
 def test_a_malformed_selection_is_skipped_never_guessed():
     from services import insights
     assert insights.selected_area_frequency([{"anatomical_locations": "not json"}]) == {}
+
+
+# ── the tightness timeline: every check-in (rebuild Phase 8, the owner, 2026-10-20) ──
+
+def test_every_check_in_is_on_the_timeline_with_a_severity_only_where_its_note_was_read():
+    from services import insights
+    checkins = [{"date": "2026-10-19", "tightness_score": 3, "pain_score": 0},
+                {"date": "2026-08-02", "tightness_score": 5, "pain_score": 1},
+                {"date": None, "tightness_score": 9, "pain_score": 9}]
+    parsed = [{"date": "2026-08-02", "ai_tightness_severity": 4},
+              {"date": "2026-06-30", "ai_tightness_severity": 7}]   # outside the window
+    assert insights.tightness_timeline(checkins, parsed) == [
+        {"date": "2026-08-02", "self_reported": 5, "parsed_severity": 4, "pain": 1},
+        {"date": "2026-10-19", "self_reported": 3, "parsed_severity": None, "pain": 0},
+    ]
+
+
+def test_no_check_in_draws_no_timeline():
+    from services import insights
+    assert insights.tightness_timeline([], [{"date": "2026-08-02", "ai_tightness_severity": 4}]) == []

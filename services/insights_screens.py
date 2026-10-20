@@ -291,10 +291,34 @@ def process_queue(repo) -> dict:
 
 # ─── Macro Trends ────────────────────────────────────────────────────────────
 
+def checkin_trend(repo, today: date) -> dict:
+    """The check-in half of Macro Trends, for the phone and the Streamlit app alike: the
+    body areas he selected (insights.selected_area_frequency, the owner 2026-10-20) and the
+    tightness timeline (insights.tightness_timeline), over the check-ins of the last
+    insights.CHECKIN_TREND_DAYS days.
+
+    The window's parsed check-ins are the newest parsed check-ins, and there are no more of
+    them than check-ins in the window (both are rows of the one check-in table, newest
+    first), so reading that many parsed rows finds every severity the timeline can show."""
+    checkins = repo.get_recent_readiness(days=insights.CHECKIN_TREND_DAYS, today=today)
+    regions = sorted(insights.selected_area_frequency(checkins).items(), key=lambda kv: (-kv[1], kv[0]))
+    top = max((n for _r, n in regions), default=0)
+    timeline = insights.tightness_timeline(
+        checkins, repo.get_parsed_readiness(limit=len(checkins)) if checkins else [])
+    return {
+        # Each area's check-ins, and its share of the most selected one (the bar's length).
+        "regions": [{"region": r, "mentions": n, "share": n / top if top else 0.0}
+                    for r, n in regions],
+        # Every check-in of the window, oldest first, as a timeline reads.
+        "timeline": timeline,
+        "timeline_axis": insights.score_timeline_axis([t["date"] for t in timeline]),
+    }
+
+
 def trends(repo, today: date) -> dict:
-    """Macro Trends: the most flagged body regions, the tightness timeline,
-    the parsed check-ins by warning level, and the multi-week analysis once
-    the data gate opens (the recovery direction, the slopes, the notable
+    """Macro Trends: the body areas he selected and the tightness timeline of every
+    check-in (checkin_trend), the parsed check-ins by warning level, and the multi-week
+    analysis once the data gate opens (the recovery direction, the slopes, the notable
     correlations, and the interpretation computed on load, I72)."""
     parsed = repo.get_parsed_readiness(limit=90)
     by_level = processing_queue.rows_by_warning_level(parsed)
@@ -318,22 +342,8 @@ def trends(repo, today: date) -> dict:
                 "recommendations": result.get("recommendations", []),
             },
         }
-    # The body areas he SELECTED in his check-ins (the owner, 2026-10-20), not the keyword
-    # reading of the note text (insights.selected_area_frequency).
-    checkins = repo.get_recent_readiness(days=insights.SELECTED_AREA_DAYS, today=today)
-    regions = sorted(insights.selected_area_frequency(checkins).items(), key=lambda kv: (-kv[1], kv[0]))
-    top = max((n for _r, n in regions), default=0)
-    oldest_first = sorted(parsed, key=lambda r: str(r.get("date") or ""))
     return {
-        # Each region's mentions, and its share of the most flagged one (the bar's length).
-        "regions": [{"region": r, "mentions": n, "share": n / top if top else 0.0}
-                    for r, n in regions],
-        # Oldest first, as a timeline reads (the parsed check-ins come newest first).
-        "timeline": [{"date": r.get("date"), "self_reported": r.get("tightness_score"),
-                      "parsed_severity": r.get("ai_tightness_severity"),
-                      "pain": r.get("pain_score")}
-                     for r in oldest_first],
-        "timeline_axis": insights.score_timeline_axis([str(r.get("date") or "") for r in oldest_first]),
+        **checkin_trend(repo, today),
         "levels": {level: [{"date": r.get("date"), "tightness": r.get("tightness_score"),
                             "pain": r.get("pain_score"),
                             "severity": r.get("ai_tightness_severity"),

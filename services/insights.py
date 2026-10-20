@@ -135,8 +135,9 @@ def score_timeline_axis(dates: list[str]) -> dict | None:
             "start": days[0].isoformat(), "end": days[-1].isoformat()}
 
 
-#: The check-ins the trend of selected body areas counts: the last 90 days.
-SELECTED_AREA_DAYS = 90
+#: The check-ins the Trends screen reads, for the body areas he selected and for the
+#: tightness timeline: the last 90 days.
+CHECKIN_TREND_DAYS = 90
 
 
 def selected_area_frequency(checkin_rows: list[dict]) -> dict[str, int]:
@@ -157,6 +158,22 @@ def selected_area_frequency(checkin_rows: list[dict]) -> dict[str, int]:
         for area in dict.fromkeys(a for a in areas if isinstance(a, str) and a.strip()):
             freq[area] = freq.get(area, 0) + 1
     return freq
+
+
+def tightness_timeline(checkin_rows: list[dict], parsed_rows: list[dict]) -> list[dict]:
+    """The Trends timeline: every check-in in `checkin_rows`, oldest first, with the
+    tightness and the pain he entered, and the severity the keyword parse read from its note
+    where the note was read (`parsed_rows`, matched by date; None where it was not).
+
+    The owner, 2026-10-20 (his choice between three options): the timeline had drawn only
+    the check-ins whose note was parsed, and those ended in early August, so every later
+    check-in was missing from it. A row without a date is skipped."""
+    severity = {str(r["date"]): r.get("ai_tightness_severity")
+                for r in parsed_rows if r.get("date")}
+    dated = sorted((r for r in checkin_rows if r.get("date")), key=lambda r: str(r["date"]))
+    return [{"date": str(r["date"]), "self_reported": r.get("tightness_score"),
+             "parsed_severity": severity.get(str(r["date"])), "pain": r.get("pain_score")}
+            for r in dated]
 
 
 def body_region_frequency(parsed_rows: list[dict]) -> dict[str, int]:

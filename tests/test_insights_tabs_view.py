@@ -58,6 +58,12 @@ class _Stub:
                   "pain_score": 0, "ai_warning_level": "monitor",
                   "ai_body_parts": '["Left hip"]', "ai_sensation_type": '["tight"]'}}]
 
+    def get_recent_readiness(self, days=60, today=None):
+        return [{{"date": "2026-10-03", "tightness_score": 3, "pain_score": 0,
+                  "anatomical_locations": '["Left hip"]'}},
+                {{"date": "2026-10-05", "tightness_score": 5, "pain_score": 1,
+                  "anatomical_locations": '[]'}}]
+
     def get_macro_trend_data(self, days=90):
         return {{"biometrics": [], "sessions": []}}
 
@@ -85,6 +91,10 @@ def test_every_insights_tab_still_draws():
     assert metrics.get("Session notes pending") == "1"
     assert metrics.get("Oura only") == "0" and metrics.get("Watch only") == "1", "F12"
     assert metrics.get("Biometric days available") == "0"
+    # Trends draws the selected areas and every check-in's tightness (2026-10-20).
+    subheaders = {s.value for s in at.subheader}
+    assert {"Body Areas You Selected Most", "Tightness Severity Timeline",
+            "Warning Level History"} <= subheaders
 
 
 def test_an_unreadable_stage_is_a_warning_not_a_broken_page():

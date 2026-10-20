@@ -468,6 +468,30 @@ def test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar(env, monkeyp
     assert trends["timeline"][0]["self_reported"] == 4
 
 
+def test_a_check_in_whose_note_was_never_read_is_on_the_timeline(env, monkeypatch):
+    """The timeline draws every check-in of the last 90 days (the owner, 2026-10-20): one
+    whose note no parse has read keeps its tightness and pain, without a severity. (A save
+    through the API parses every waiting note, so the unread one is stored after it.)"""
+    from services import checkin_form as cf
+    from services.models import CheckInRecord
+    env.ok(monkeypatch, "put", "/api/checkin", {
+        "date": TODAY.isoformat(), "opened_entry": False,
+        "values": {**cf.FORM_DEFAULTS, "tightness_score": 4,
+                   "subjective_tightness": "slight tightness lower back"}})
+    earlier = TODAY - timedelta(days=3)
+    env.repo.save_check_in(CheckInRecord(date=earlier.isoformat(), current_condition=None,
+                                         tightness_score=6, pain_score=2,
+                                         subjective_tightness="stiff all day"))
+    trends = env.ok(monkeypatch, "get", "/api/insights/trends")
+    assert [(t["date"], t["self_reported"], t["pain"]) for t in trends["timeline"]] == [
+        (earlier.isoformat(), 6, 2), (TODAY.isoformat(), 4, cf.FORM_DEFAULTS["pain_score"])]
+    assert trends["timeline"][0]["parsed_severity"] is None, "its note was never read"
+    assert trends["timeline"][1]["parsed_severity"] is not None, "read on save (I63)"
+    assert trends["timeline_axis"]["start"] == earlier.isoformat()
+    # The levels stay the parse's own classification: only the note read on save is there.
+    assert [e["date"] for level in trends["levels"].values() for e in level] == [TODAY.isoformat()]
+
+
 def test_the_trend_analysis_runs_once_the_gate_opens(env, monkeypatch):
     days = [TODAY - timedelta(days=30 - i) for i in range(30)]
     data = {

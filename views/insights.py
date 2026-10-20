@@ -38,6 +38,7 @@ from services import flexibility as fx
 from services import flexibility_screen as fxs
 from services import stats as stats_mod
 from services import insights as insights_svc
+from services import insights_screens
 from services import metabolism_screen as ms
 from services import processing_queue
 from services import sleep_architecture
@@ -2428,16 +2429,13 @@ def render() -> None:
 
     with tab_tightness:
         parsed_rows = repo.get_repository().get_parsed_readiness(limit=90)
-        # The body areas he SELECTED in his check-ins (2026-10-20), as the phone shows them.
-        body_freq = insights_svc.selected_area_frequency(
-            repo.get_repository().get_recent_readiness(days=insights_svc.SELECTED_AREA_DAYS))
-        if body_freq:
+        # The body areas he SELECTED and the tightness of every check-in (2026-10-20), from
+        # the service the phone reads, so the two apps show one answer.
+        checkin_trend = insights_screens.checkin_trend(repo.get_repository(), date.today())
+        if checkin_trend["regions"]:
             st.subheader("Body Areas You Selected Most")
-            df_freq = (
-                pd.DataFrame(list(body_freq.items()), columns=["Region", "Mentions"])
-                .sort_values("Mentions", ascending=False)
-                .reset_index(drop=True)
-            )
+            df_freq = pd.DataFrame([(r["region"], r["mentions"]) for r in checkin_trend["regions"]],
+                                   columns=["Region", "Mentions"])
             st.altair_chart(
                 alt.Chart(df_freq).mark_bar(color="#00E874").encode(
                     x=alt.X("Region:N", title=None, sort="-y",
@@ -2450,22 +2448,22 @@ def render() -> None:
             st.caption("How often you selected each area in your check-ins over the last 90 days.")
             st.divider()
 
+        if checkin_trend["timeline"]:
+            st.subheader("Tightness Severity Timeline")
+            df_time = pd.DataFrame(checkin_trend["timeline"]).rename(columns={
+                "self_reported":   "Self-reported",
+                "parsed_severity": "Keyword-parsed severity",
+                "pain":            "Pain score",
+            }).set_index("date").apply(pd.to_numeric, errors="coerce")
+            st.line_chart(df_time.dropna(how="all"))
+            st.caption("Your tightness and pain at each check-in over the last 90 days, on 0 to "
+                       "10. Keyword-parsed is the tightness read from your note, where the note "
+                       "was read.")
+            st.divider()
+
         if not parsed_rows:
             st.info("No parsed readiness entries yet. Run the Processing Queue first.")
         else:
-            st.subheader("Tightness Severity Timeline")
-            df_time = pd.DataFrame(parsed_rows)[
-                ["date", "tightness_score", "ai_tightness_severity", "pain_score"]
-            ]
-            df_time = df_time.rename(columns={
-                "tightness_score":       "Self-reported",
-                "ai_tightness_severity": "Keyword-parsed severity",
-                "pain_score":            "Pain score",
-            }).set_index("date")
-            st.line_chart(df_time.dropna(how="all"))
-            st.caption("Self-reported vs keyword-parsed tightness severity over time.")
-
-            st.divider()
             st.subheader("Warning Level History")
 
             rows_by_level = processing_queue.rows_by_warning_level(parsed_rows)

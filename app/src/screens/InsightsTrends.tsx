@@ -1,6 +1,7 @@
-// Insights › Trends (rebuild Phase 8, inventory I65-I72): what the parsed check-in notes said
-// over time, and the multi-week analysis once there is enough data. The most flagged body
-// regions, tightness over time beside pain, the entries by warning level, the data gate, the
+// Insights › Trends (rebuild Phase 8, inventory I65-I72): the check-ins over time, and the
+// multi-week analysis once there is enough data. The body areas he selected most, the
+// tightness and pain of every check-in (with the note's keyword reading where the note was
+// read; the owner, 2026-10-20), the parsed entries by warning level, the data gate, the
 // recovery direction with its slopes and notable correlations, and what they read as (worked
 // out on load, from templates). Every figure, word and scale is the engine's.
 import { useState } from 'react'
@@ -143,12 +144,14 @@ export function TrendsBody({ view, reduced }: { view: View<Trends>; reduced: boo
   const regions = (d?.regions ?? []) as Region[]
   const timeline = (d?.timeline ?? []) as Point[]
   const axis = d?.timeline_axis as Axis | null | undefined
+  const levels = (d?.levels ?? {}) as Record<string, Entry[]>
+  const parsed = LEVELS.some((l) => (levels[l] ?? []).length > 0)
   return (
     <div className="screen insights" data-testid="trends">
       <div className="sky sky--quiet" aria-hidden="true" />
       <InsightsHead title={S.ins.trends} />
       <Freshness view={view} />
-      {d && timeline.length === 0 && <p className="notice" data-testid="no-parsed">{S.trend.noParsed}</p>}
+      {d && timeline.length === 0 && <p className="notice" data-testid="no-checkins">{S.trend.noCheckins}</p>}
       {regions.length > 0 && (
         <section className="card group" data-testid="regions">
           <h2 className="eyebrow">{S.trend.regions}</h2>
@@ -159,7 +162,9 @@ export function TrendsBody({ view, reduced }: { view: View<Trends>; reduced: boo
         </section>
       )}
       {timeline.length > 0 && axis && <Timeline points={timeline} axis={axis} />}
-      {timeline.length > 0 && <Levels levels={d?.levels as Record<string, Entry[]>} />}
+      {d && (parsed
+        ? <Levels levels={levels} />
+        : <p className="notice" data-testid="no-parsed">{S.trend.noParsed}</p>)}
       {d && <AnalysisCard gate={d.gate as unknown as Gate} a={d.analysis as unknown as Analysis | null} />}
     </div>
   )
