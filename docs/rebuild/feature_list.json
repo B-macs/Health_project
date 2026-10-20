@@ -1,5 +1,5 @@
 {
-  "phase": "P4",
+  "phase": "P5",
   "tasks": [
     {
       "id": "P0-01",
@@ -473,6 +473,87 @@
         "P4-06",
         "P4-07",
         "P4-08"
+      ],
+      "gate": "device_checklist_open",
+      "passes": false
+    },
+    {
+      "id": "P5-01",
+      "phase": "P5",
+      "description": "Today from the API: the three scores, the week strip, today's session card, the engine's verdict and sync notices; day navigation (arrows, the strip, a swipe), the day kept for the visit and decided by the engine (picked_on).",
+      "depends_on": [],
+      "gate": "inventory_rows_open",
+      "passes": false
+    },
+    {
+      "id": "P5-02",
+      "phase": "P5",
+      "description": "The detail screens: sleep (the fused night, stages, the night strip, movement, contributors, debt, the wake-time correction), readiness (contributors, key figures, the verdict) and strain (overall, the split by body area, '—' when not known); SVG charts with taps, no link and no reload.",
+      "depends_on": [
+        "P5-01"
+      ],
+      "gate": "inventory_rows_open",
+      "passes": false
+    },
+    {
+      "id": "P5-03",
+      "phase": "P5",
+      "description": "The Sleep screen's all-or-nothing rule on the API answer and on the screen: no score, no night panel.",
+      "depends_on": [
+        "P5-02"
+      ],
+      "gate": "sleep_rule_violations",
+      "passes": false
+    },
+    {
+      "id": "P5-04",
+      "phase": "P5",
+      "description": "The check-in: the same fields as views/checkin.py, today and the three days before, saved through the outbox so it works offline; one per date (the engine merges).",
+      "depends_on": [],
+      "gate": "check_in_lost",
+      "passes": false
+    },
+    {
+      "id": "P5-05",
+      "phase": "P5",
+      "description": "scripts/rebuild_parity.py: the live API against services/ for the last 14 days, dates and field names only.",
+      "depends_on": [
+        "P5-01",
+        "P5-02"
+      ],
+      "gate": "parity_differences",
+      "passes": false
+    },
+    {
+      "id": "P5-06",
+      "phase": "P5",
+      "description": "Every screen word in app/src/strings.ts passes the jargon, hedge and Stage 1 scans.",
+      "depends_on": [
+        "P5-01",
+        "P5-02",
+        "P5-04"
+      ],
+      "gate": "text_rule_violations",
+      "passes": false
+    },
+    {
+      "id": "P5-07",
+      "phase": "P5",
+      "description": "Tests: Vitest for each screen state (from the cache, refreshed, no score, engine down), Playwright for the day navigation and a check-in made offline and sent later, the Worker tests and the Python gate; deployed.",
+      "depends_on": [
+        "P5-01",
+        "P5-02",
+        "P5-04"
+      ],
+      "gate": "test_failures",
+      "passes": false
+    },
+    {
+      "id": "P5-08",
+      "phase": "P5",
+      "description": "The owner's two mornings: the new app beside the Streamlit app, the scores and the night equal; on the second morning the check-in in the new app shows in the Streamlit app.",
+      "depends_on": [
+        "P5-07"
       ],
       "gate": "device_checklist_open",
       "passes": false

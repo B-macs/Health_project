@@ -663,3 +663,85 @@ def test_the_data_check_counter_reads_the_checks_answer(tmp_path, monkeypatch):
     assert result.count == 2 and "health-2026-10-19" in result.detail
     Done.stdout = json.dumps({"error": "store_unavailable"})
     assert gate.p4_mirror_gaps_open().count == 1
+
+
+# ── Phase 5 ──────────────────────────────────────────────────────────────────
+
+def test_phase_5_has_the_counters_its_prompt_names():
+    assert set(gate.REGISTRY["p5"]) == {
+        "test_failures", "parity_differences", "sleep_rule_violations", "check_in_lost",
+        "inventory_rows_open", "text_rule_violations", "device_checklist_open"}
+
+
+_P5_INVENTORY = """## Home
+| Id | Feature | Proposal |
+|---|---|---|
+| H1 | Layout | KEEP |
+| H2 | Banner | MOVE (elsewhere) |
+| H3 | Toast | DROP |
+## Insights
+| Id | Screen | Feature | Proposal |
+|---|---|---|---|
+| I5 | Strength | A chart | KEEP |
+| I94 | Check-in | Date | KEEP |
+| I123 | Sleep | Strip | KEEP |
+"""
+
+
+def test_phase_5_builds_every_kept_home_row_and_the_check_in_and_sleep_rows():
+    assert gate.p5_rows(_P5_INVENTORY) == ["H1", "I94", "I123"]
+
+
+def test_a_row_is_built_only_with_existing_files_and_a_test(tmp_path):
+    (tmp_path / "a.tsx").write_text("x", encoding="utf-8")
+    (tmp_path / "a.spec.ts").write_text("x", encoding="utf-8")
+    mapping = {
+        "H1": {"built": ["a.tsx"], "test": "a.spec.ts"},
+        "I94": {"built": ["gone.tsx"], "test": "a.spec.ts"},
+        "I123": {"built": ["a.tsx"]},
+    }
+    assert gate.app_rows_open(["H1", "I94", "I123", "H9"], mapping, "", root=tmp_path) == [
+        "I94: gone.tsx missing", "I123 names no file or no test", "H9 not mapped"]
+
+
+def test_a_replaced_row_needs_the_owners_recorded_words():
+    mapping = {"H19": {"replaced": "I pick week"}}
+    assert gate.app_rows_open(["H19"], mapping, 'Owner\'s choice: *"I pick week for everything"*') == []
+    assert gate.app_rows_open(["H19"], mapping, "nothing recorded") == [
+        "H19 replaced without the owner's recorded words"]
+
+
+def test_the_real_app_rows_cover_phase_5():
+    assert gate.p5_inventory_rows_open().count == 0
+
+
+def test_a_lost_check_in_counts_and_a_test_that_failed_before_counting_counts_one():
+    tests = [
+        {"title": "a check-in made offline", "project": "chromium", "status": "passed",
+         "annotations": [{"type": "check_in_lost", "description": "0"}]},
+        {"title": "a check-in made offline", "project": "webkit", "status": "failed", "annotations": []},
+    ]
+    assert gate.annotation_total(tests, "check_in_lost")[0] == 1
+    tests[0]["annotations"] = [{"type": "check_in_lost", "description": "2"}]
+    assert gate.annotation_total(tests, "check_in_lost")[0] == 3
+
+
+def test_the_parity_counters_read_the_parity_report(monkeypatch):
+    report = {"days": 14, "today": "2026-10-20",
+              "differences": [{"date": "2026-10-19", "endpoint": "today", "field": "sleep.score"}],
+              "unanswered": [{"date": "2026-10-18", "endpoint": "week", "status": 503}],
+              "sleep_rule_violations": ["2026-10-17"]}
+    monkeypatch.setattr(gate, "parity_report", lambda phase: report)
+    result = gate.p5_parity_differences()
+    assert result.count == 2 and "2026-10-19 today sleep.score" in result.detail
+    assert "2026-10-18 week unanswered" in result.detail
+    monkeypatch.setattr(gate, "playwright_report", lambda phase: {"suites": [{"specs": [
+        {"title": "a night with no Sleep Score shows only the reason line",
+         "tests": [{"projectName": "chromium", "results": [{"status": "passed"}], "annotations": []}]}]}]})
+    assert gate.p5_sleep_rule_violations().count == 1
+    monkeypatch.setattr(gate, "parity_report", lambda phase: None)
+    assert gate.p5_parity_differences().count == 1
+
+
+def test_the_two_morning_checklist_is_open_until_the_owner_confirms_it():
+    assert gate.p5_device_checklist_open().count == len(gate.P5_CHECKLIST)

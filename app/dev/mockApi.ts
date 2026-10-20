@@ -96,6 +96,9 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
       return send(200, fx.strainDetail(shown, local, url.searchParams.get('week') === 'true'))
     }
     if (url.pathname === '/api/training/day') return send(200, fx.trainingDay(asked ?? local, local))
+    if (url.pathname === '/api/status') {
+      return send(200, { writer: 'streamlit', offline: false, datastore_built_at: null, oura: null, last_sync: null, notices: [], sync_due: null })
+    }
     if (url.pathname === '/api/checkin') {
       const d = asked ?? local
       return send(200, fx.checkinForm(d, local, checkins.get(d)))

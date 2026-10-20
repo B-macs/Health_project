@@ -11,6 +11,7 @@ import { HealthDB } from '../db/schema'
 import { AppStateProvider, type AppState } from '../lib/appState'
 import type { View } from '../lib/cache'
 import { S } from '../strings'
+import { MovementStrip } from '../ui/charts'
 import { DetailFrame } from '../ui/detail'
 import { CheckInForm } from './CheckIn'
 import { ReadinessBody, SleepBody, StrainBody } from './Details'
@@ -83,6 +84,16 @@ describe('Today', () => {
     const past = fx.addDays(LOCAL, -2)
     const html = text(draw(<TodayView view={fresh(fx.today(past, LOCAL))} week={fx.week(past, LOCAL)} plan={fx.trainingDay(past, LOCAL)} shownDay={past} />))
     expect(html).toContain(S.today.backToToday)
+  })
+
+  it('the badge, a failed read and the sync notices show, each in its own words', () => {
+    const marked = { ...answer, bio_failed: true, verdict: { ...answer.verdict!, badge: 'REDUCED LOAD' } }
+    const notices = [{ level: 'error', code: 'oura_unauthorised' }, { level: 'caption', code: 'garmin_unavailable' }]
+    const html = text(draw(<TodayView view={fresh(marked)} week={week} plan={plan} shownDay={LOCAL} notices={notices} />))
+    expect(html).toContain('REDUCED LOAD')
+    expect(html).toContain(S.today.bioFailed)
+    expect(html).toContain(S.today.notices.oura_unauthorised)
+    expect(html).toContain(S.today.notices.garmin_unavailable)
   })
 
   it("the verdict's lines keep the Home page's order and drop empty ones", () => {
@@ -167,5 +178,22 @@ describe('the check-in form', () => {
     const stored = { ...fx.checkinForm(LOCAL, LOCAL, undefined).values, pain_score: 4 }
     const html = text(draw(<CheckInForm form={fx.checkinForm(LOCAL, LOCAL, stored)} onSaved={() => undefined} />))
     expect(html).toContain(S.checkin.existing)
+  })
+})
+
+describe('the movement strip', () => {
+  it('draws the four strengths as bars and leaves an unmeasured slot blank', () => {
+    const strip = {
+      title: 'Movement', codes: '1234000', details: [],
+      runs: [
+        { start: 0, end: 1, code: '1', name: 'No motion' }, { start: 1, end: 2, code: '2', name: 'Restless' },
+        { start: 2, end: 3, code: '3', name: 'Tossing' }, { start: 3, end: 4, code: '4', name: 'Active' },
+        { start: 4, end: 7, code: '0', name: '' },
+      ],
+      bands: [],
+    }
+    const html = draw(<MovementStrip strip={strip} />)
+    for (const level of ['1', '2', '3', '4']) expect(html).toContain(`move move--${level}`)
+    expect(html).not.toContain('move--0')
   })
 })

@@ -42,6 +42,13 @@ export const S = {
     notStarted: 'The block has not started yet.',
     blockDone: 'The block is complete.',
     yoga: (name: string, minutes: number) => `Yoga, if you want it: ${name}, ${minutes} min.`,
+    // The engine's sync notices (GET /api/status; services/sync_policy.py decides which show).
+    notices: {
+      oura_unauthorised: 'Oura is not authorised: your sleep is not recorded. Readiness and HRV run without it, so today does not compare with last week. Authorise Oura again on the PC, then fill in the missed nights.',
+      oura_unavailable: 'The Oura sync did not answer. It tries again at the next sync.',
+      garmin_unavailable: 'The Garmin sync did not answer. It tries again at the next sync.',
+      sync_failed_to_run: 'The device sync did not run. It tries again at the next sync.',
+    } as Record<string, string>,
   },
   // The three detail screens behind Today's cards.
   detail: {

@@ -1301,6 +1301,189 @@ def p4_device_checklist_open() -> CounterResult:
 review("p4", *P4_CHECKLIST.values())
 
 
+# ── Phase 5 counters ─────────────────────────────────────────────────────────
+
+APP_ROWS = REBUILD_DOCS / "app_rows.json"
+PARITY = REPO_ROOT / "scripts" / "rebuild_parity.py"
+#: The inventory's I rows that belong to Phase 5's screens (the H rows all do).
+P5_SCREENS = ("Check-in", "Home", "Sleep")
+#: The owner's two mornings (docs/rebuild/owner_checks.json, "p5"): true = as expected.
+P5_CHECKLIST = {
+    "morning1_scores": "Morning 1: the three scores in the new app equal the Streamlit app's",
+    "morning1_sleep": "Morning 1: the sleep night (asleep, in bed, stages) equals the Streamlit app's",
+    "morning2_scores": "Morning 2: the three scores equal again",
+    "morning2_sleep": "Morning 2: the sleep night equals again",
+    "morning2_checkin": "Morning 2: the check-in made in the new app saves",
+    "morning2_checkin_in_streamlit": "Morning 2: the Streamlit app shows that check-in within about 15 minutes",
+}
+_PARITY_REPORTS: dict[str, dict | None] = {}
+
+
+def p5_rows(markdown: str) -> list[str]:
+    """The KEEP rows Phase 5 must build: every Home row, and the I rows of the
+    Check-in, Home and Sleep screens."""
+    words = inventory_rows(markdown)
+    screens = {cells[0]: cells[1] for section, cells in _table_rows(markdown)
+               if section not in ("D1", "D2", "D3")}
+    ids = [rid for rid, word in words.items() if word == "KEEP"
+           and (rid.startswith("H") or (rid.startswith("I") and screens.get(rid) in P5_SCREENS))]
+    return sorted(ids, key=lambda rid: (rid[0], int(rid[1:])))
+
+
+def app_rows_open(rows: list[str], mapping: dict, owner_words: str, root: Path | None = None) -> list[str]:
+    """Rows not built: no entry, no file or no test named, a named file that does not
+    exist, or a 'replaced' entry whose words are not the owner's recorded words."""
+    root = root or REPO_ROOT
+    out = []
+    for rid in rows:
+        entry = mapping.get(rid)
+        if not entry:
+            out.append(f"{rid} not mapped")
+            continue
+        if entry.get("replaced") is not None:
+            words = str(entry["replaced"]).strip()
+            if not words or words not in owner_words:
+                out.append(f"{rid} replaced without the owner's recorded words")
+            continue
+        built = _as_list(entry.get("built"))
+        test = str(entry.get("test") or "")
+        if not built or not test:
+            out.append(f"{rid} names no file or no test")
+            continue
+        missing = [f for f in [*built, test] if not (root / f).exists()]
+        if missing:
+            out.append(f"{rid}: {', '.join(missing)} missing")
+    return out
+
+
+def parity_report(phase: str) -> dict | None:
+    """scripts/rebuild_parity.py --json: run once per gate run (it reads the live
+    engine and the store), then reused by the counters that read it."""
+    if phase in _PARITY_REPORTS:
+        return _PARITY_REPORTS[phase]
+    out = REPORTS_DIR / phase
+    out.mkdir(parents=True, exist_ok=True)
+    path = out / "parity.json"
+    if not (REUSE_TEST_RUNS and path.exists()):
+        path.unlink(missing_ok=True)
+        if main_python().exists():
+            proc = subprocess.run([str(main_python()), str(PARITY), "--json"], cwd=REPO_ROOT,
+                                  env=_child_env(), capture_output=True, text=True,
+                                  encoding="utf-8", errors="replace")
+            path.write_text(proc.stdout, encoding="utf-8", newline="\n")
+            (out / "parity.log").write_text(proc.stderr, encoding="utf-8", newline="\n")
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        report = None
+    _PARITY_REPORTS[phase] = report
+    return report
+
+
+def annotation_total(tests: list[dict], kind: str) -> tuple[int, list[str]]:
+    """The sum of a count the browser tests record as an annotation, and 1 for a test
+    that failed before it could record it."""
+    total, notes = 0, []
+    for t in tests:
+        counts = [int(a["description"]) for a in t["annotations"]
+                  if a.get("type") == kind and str(a.get("description", "")).lstrip("-").isdigit()]
+        if counts:
+            total += sum(counts)
+            if sum(counts):
+                notes.append(f'{t["project"]}: {t["title"]}: {sum(counts)}')
+        elif t["status"] != "passed":
+            total += 1
+            notes.append(f'{t["project"]}: {t["title"]}: failed before it counted')
+    return total, notes
+
+
+@counter("p5", "test_failures",
+         "failures in the Python gate (plus 1 under the floor), `pnpm test` (the app's and the "
+         "Worker's Vitest, after the build) and the browser tests (Playwright)")
+def p5_test_failures() -> CounterResult:
+    main_gate = _main_gate_counter("p5")
+    vitest = _pnpm_test_counter("p5")
+    report = playwright_report("p5")
+    if report is None:
+        browser = CounterResult(1, "no report", ["p5/playwright.log"])
+    else:
+        stats = report.get("stats", {})
+        failed = int(stats.get("unexpected", 0)) + int(stats.get("flaky", 0))
+        browser = CounterResult(failed, f'{stats.get("expected", 0)} passed, {failed} failed or flaky',
+                                ["p5/playwright.json"])
+    return CounterResult(main_gate.count + vitest.count + browser.count,
+                         f"Python: {main_gate.detail}; pnpm: {vitest.detail}; Playwright: {browser.detail}",
+                         main_gate.evidence + vitest.evidence + browser.evidence)
+
+
+@counter("p5", "parity_differences",
+         "fields where the live engine and services/ differ over the last 14 days, plus requests "
+         "the engine did not answer (scripts/rebuild_parity.py)")
+def p5_parity_differences() -> CounterResult:
+    report = parity_report("p5")
+    if report is None:
+        return CounterResult(1, "the parity run gave no report", ["p5/parity.log"])
+    diffs, unanswered = report.get("differences", []), report.get("unanswered", [])
+    names = [f'{d["date"]} {d["endpoint"]} {d["field"]}' for d in diffs[:10]]
+    names += [f'{u["date"]} {u["endpoint"]} unanswered' for u in unanswered[:5]]
+    return CounterResult(len(diffs) + len(unanswered),
+                         "; ".join(names) or f'{report.get("days")} days up to {report.get("today")}, none',
+                         ["p5/parity.json"])
+
+
+@counter("p5", "sleep_rule_violations",
+         "dates where the engine sends a night panel without a score (the parity run's 14 days), "
+         "plus failing screen tests of the rule")
+def p5_sleep_rule_violations() -> CounterResult:
+    report = parity_report("p5")
+    dates = list(report.get("sleep_rule_violations", [])) if report else ["no parity report"]
+
+    def count(tests):
+        failed = failed_tests(tests)
+        return CounterResult(len(dates) + len(failed), "; ".join(dates + failed)
+                             or f"none in {report.get('days') if report else 0} days; the screen test passes",
+                             ["p5/parity.json", "p5/playwright.json"])
+    return _browser_counter("p5", lambda title: "no Sleep Score" in title, count)
+
+
+@counter("p5", "check_in_lost", "check-ins lost in the outbox browser test")
+def p5_check_in_lost() -> CounterResult:
+    def count(tests):
+        lost, notes = annotation_total(tests, "check_in_lost")
+        return CounterResult(lost, "; ".join(notes) or "a check-in made offline was sent, none lost",
+                             ["p5/playwright.json"])
+    return _browser_counter("p5", lambda title: title.startswith("a check-in made offline"), count)
+
+
+@counter("p5", "inventory_rows_open",
+         "Home and check-in rows marked KEEP that the phone app does not build "
+         "(docs/rebuild/app_rows.json: the files and the test)")
+def p5_inventory_rows_open() -> CounterResult:
+    rows = p5_rows(SCREEN_INVENTORY.read_text(encoding="utf-8"))
+    mapping = json.loads(APP_ROWS.read_text(encoding="utf-8"))["rows"] if APP_ROWS.exists() else {}
+    owner = DESIGN_MD.read_text(encoding="utf-8") if DESIGN_MD.exists() else ""
+    open_ = app_rows_open(rows, mapping, owner)
+    return CounterResult(len(open_), "; ".join(open_) or f"{len(rows)} rows built, each with a test")
+
+
+@counter("p5", "text_rule_violations",
+         "strings in app/src/strings.ts that fail the jargon, hedge and Stage 1 scans in tests/")
+def p5_text_rule_violations() -> CounterResult:
+    return p3_text_rule_violations()
+
+
+@counter("p5", "device_checklist_open",
+         "items of the owner's two-morning checklist not confirmed yet (docs/rebuild/owner_checks.json, p5)")
+def p5_device_checklist_open() -> CounterResult:
+    data = json.loads(OWNER_CHECKS.read_text(encoding="utf-8")) if OWNER_CHECKS.exists() else {}
+    answers = data.get("p5", {})
+    missing = [key for key in P5_CHECKLIST if answers.get(key) is not True]
+    return CounterResult(len(missing), ", ".join(missing) or "the owner confirmed every item")
+
+
+review("p5", *P5_CHECKLIST.values())
+
+
 # ── output ───────────────────────────────────────────────────────────────────
 
 _PAGE = """<!doctype html>

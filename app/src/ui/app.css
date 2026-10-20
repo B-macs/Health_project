@@ -984,6 +984,17 @@ button.card {
   min-height: var(--tap);
 }
 
+/* A notice that needs the owner (a dead Oura login): the page colour's strongest shade on
+ * its soft tint, never a hue of its own. */
+.alert {
+  padding: var(--sp-s) var(--sp-m);
+  border-radius: var(--r-tile);
+  background: var(--f-soft);
+  color: var(--f1);
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
+}
+
 .verdict {
   display: flex;
   flex-direction: column;

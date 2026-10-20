@@ -1,0 +1,571 @@
+{
+  "_note": "Rebuild Phase 5: every Home row and every Check-in, Home or Sleep row of docs/rebuild/screen_inventory.md marked KEEP, and where the phone app builds it. 'built' are the files; 'test' is the test that shows it. A row the owner's later decision replaced carries his words instead. scripts/rebuild_gate.py p5 inventory_rows_open reads this.",
+  "rows": {
+    "H1": {
+      "built": [
+        "app/src/App.tsx",
+        "app/src/ui/app.css"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "One inner scroller and the tab bar docked below; safe areas."
+    },
+    "H4": {
+      "built": [
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "Hash routes; an unknown address opens Today; a failing screen keeps the tab bar (ScreenBoundary)."
+    },
+    "H5": {
+      "built": [
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "The tab bar, drawn whatever the screen does."
+    },
+    "H6": {
+      "built": [
+        "app/src/screens/Today.tsx",
+        "app/src/ui/detail.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "The day under the title; the detail screens' own title with the date."
+    },
+    "H7": {
+      "built": [
+        "app/src/lib/day.ts",
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "Opens on today; a picked day lasts the day it was picked on, decided by the engine (picked_on); tests/api/test_api_today.py"
+    },
+    "H8": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "The arrows; the next one is off on today."
+    },
+    "H9": {
+      "built": [
+        "app/src/ui/detail.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "'‹ Today' back, and the detail screen's own day arrows."
+    },
+    "H10": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "'Back to today' under the title on a past day."
+    },
+    "H11": {
+      "built": [
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "The Check-in tab opens the check-in as a sheet (the + button's job)."
+    },
+    "H12": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The readiness ring with DAILY and TREND, the band word and its line."
+    },
+    "H13": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The engine's badge (VOLUME HELD, REDUCED LOAD, REST ADVISED) on today."
+    },
+    "H14": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The verdict's lines in order: cause, banner, HRV note; today only."
+    },
+    "H15": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The HRV note, the verdict's last line."
+    },
+    "H16": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The strain tile with the engine's label and words."
+    },
+    "H17": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The sleep tile with the engine's band and words."
+    },
+    "H18": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "A card opens its detail screen."
+    },
+    "H19": {
+      "replaced": "I pick week for everything but training, where I pick cards for training",
+      "note": "The card photos: the design the owner chose on 2026-10-20 (Week) has no photos, and the photos' licence is unknown while the address is public. To confirm with him."
+    },
+    "H20": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "A failed read says so and is never shown as missing data."
+    },
+    "H21": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The engine's oura_unauthorised notice, as an alert (GET /api/status)."
+    },
+    "H22": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The oura_unavailable notice, a caption."
+    },
+    "H23": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The garmin_unavailable notice, a caption."
+    },
+    "H24": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The sync_failed_to_run notice, a caption."
+    },
+    "H25": {
+      "built": [
+        "app/src/ui/detail.tsx",
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The masthead: the figure and its word."
+    },
+    "H26": {
+      "built": [
+        "app/src/ui/detail.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The contributor rows; an unscored row is dimmed."
+    },
+    "H27": {
+      "built": [
+        "app/src/ui/detail.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The contributors' caption."
+    },
+    "H28": {
+      "built": [
+        "app/src/ui/detail.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The reason when not scored."
+    },
+    "H29": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The key figures, two by two."
+    },
+    "H30": {
+      "built": [
+        "app/src/ui/detail.tsx",
+        "app/src/ui/charts.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "The overnight heart rate and HRV panels with their average line."
+    },
+    "H31": {
+      "built": [
+        "app/src/ui/charts.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "A tap on a chart shows the reading under it."
+    },
+    "H32": {
+      "built": [
+        "app/src/ui/detail.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "'· ADJUSTED' is in the engine's title."
+    },
+    "H33": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The sleep contributors and caption."
+    },
+    "H34": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "The reason line on a night with no score."
+    },
+    "H35": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "No score: no night panels and no stepper (the engine sends none)."
+    },
+    "H36": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "A watch-only night: its own words and the watch's stages."
+    },
+    "H37": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "A night that failed to load says so in the reason line."
+    },
+    "H38": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The night's key figures and the fusion caption."
+    },
+    "H39": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Sleep debt: hours, band, four segments, the rest threshold."
+    },
+    "H40": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "Time asleep, in bed, and the stage rows."
+    },
+    "H41": {
+      "built": [
+        "app/src/ui/charts.tsx",
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "The night strip on a clock axis, and its source line."
+    },
+    "H42": {
+      "built": [
+        "app/src/ui/charts.tsx",
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "The movement strip on the same clock."
+    },
+    "H43": {
+      "built": [
+        "app/src/ui/charts.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "A tap on a strip shows its run."
+    },
+    "H44": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "The day total with the naps."
+    },
+    "H45": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The vitals while asleep."
+    },
+    "H46": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "How many nights carry a wake-time correction."
+    },
+    "H47": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The wake-time − / + through the outbox, scored nights only."
+    },
+    "H48": {
+      "built": [
+        "app/src/ui/detail.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The strain masthead."
+    },
+    "H49": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The split by body area: the share bar, the rows, the load ratio and its reason."
+    },
+    "H50": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "The split's empty states, in the engine's words."
+    },
+    "H51": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "'Show the week's shape' / 'Hide the week'."
+    },
+    "H52": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "tests/api/test_api_today_detail.py",
+      "note": "Where the strain comes from: heart rate, the rating, the blend."
+    },
+    "H53": {
+      "built": [
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The 7-day HRV and resting heart rate charts."
+    },
+    "H54": {
+      "built": [
+        "app/src/ui/detail.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "The 30-day trend in every detail screen; a point opens its day."
+    },
+    "H55": {
+      "built": [
+        "app/src/ui/charts.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "The reading's ✕ and 'Open {date}'."
+    },
+    "H56": {
+      "built": [
+        "app/src/ui/charts.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "'Not enough readings for a chart in this period.'"
+    },
+    "H58": {
+      "built": [
+        "app/src/screens/Today.tsx"
+      ],
+      "test": "tests/api/test_api_today.py",
+      "note": "One answer per day from the engine: no stale second read to repair."
+    },
+    "I94": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/e2e/checkin.spec.ts",
+      "note": "Today and the three days before (the engine's options)."
+    },
+    "I95": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/e2e/checkin.spec.ts",
+      "note": "Tightness, 0-10."
+    },
+    "I96": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/e2e/checkin.spec.ts",
+      "note": "Pain, 0-10."
+    },
+    "I97": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "General readiness, the engine's five words."
+    },
+    "I98": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/e2e/checkin.spec.ts",
+      "note": "Affected areas, chips."
+    },
+    "I99": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/e2e/checkin.spec.ts",
+      "note": "Sensation tags, chips."
+    },
+    "I100": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The one-line sensation note."
+    },
+    "I101": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Stress, 1-5."
+    },
+    "I102": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Alcohol units, 0-20 in 0.5."
+    },
+    "I103": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Travel or a new place, a switch."
+    },
+    "I104": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Joint instability events, 0-20."
+    },
+    "I105": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Bristol stool type, 0-7."
+    },
+    "I106": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Unusual colour, a switch."
+    },
+    "I107": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Hunger against normal, −2 to +2."
+    },
+    "I108": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Morning thirst, 1-5."
+    },
+    "I109": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Salt or electrolytes, a switch."
+    },
+    "I110": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Meditation minutes, 0-120 in 5; 'done' is the engine's."
+    },
+    "I111": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "Relaxation depth, 1-5."
+    },
+    "I112": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/e2e/checkin.spec.ts",
+      "note": "One save through the outbox; the engine merges or replaces per date."
+    },
+    "I114": {
+      "built": [
+        "app/src/screens/CheckIn.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The tightness and pain guides."
+    },
+    "I117": {
+      "built": [
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "The Check-in tab (the + button's job)."
+    },
+    "I120": {
+      "built": [
+        "app/src/ui/charts.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "Tap bands over every chart; the selection is outlined and its reading shown."
+    },
+    "I122": {
+      "built": [
+        "app/src/ui/charts.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The engine's axes; a missing reading breaks the line."
+    },
+    "I123": {
+      "built": [
+        "app/src/ui/charts.tsx",
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/e2e/today.spec.ts",
+      "note": "The night strip's four rows and the stage list."
+    },
+    "I124": {
+      "built": [
+        "app/src/ui/charts.tsx",
+        "app/src/screens/Details.tsx"
+      ],
+      "test": "app/src/screens/screens.test.tsx",
+      "note": "The movement strip: four strengths as bar heights; an unmeasured slot stays blank; its title and lines."
+    }
+  }
+}

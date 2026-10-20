@@ -23,6 +23,7 @@ type Schemas = components['schemas']
 type TodayAnswer = Schemas['TodayOut']
 type WeekAnswer = Schemas['TodayWeekOut']
 type DayPlan = Schemas['TrainingDayOut']
+type Status = Schemas['StatusOut']
 
 /** The light at the top follows the engine's verdict on today (presentation only). */
 export function tone(today: TodayAnswer | undefined): 'good' | 'fair' | 'low' {
@@ -135,14 +136,29 @@ export function Today() {
   useEffect(() => {
     if (answered && pick && answered !== pick.day) showDay(answeredToday ? null : answered)
   }, [answered, answeredToday, pick, showDay])
-  return <TodayView view={view} week={week.data} plan={plan.data} shownDay={shownDay} />
+  const status = useCached<Status>(store, '/api/status', null, ctx)
+  return <TodayView view={view} week={week.data} plan={plan.data} shownDay={shownDay} notices={status.data?.notices ?? []} />
 }
 
-export function TodayView({ view, week, plan, shownDay }: {
+/** The engine's sync notices (H21-H24): a dead Oura login is an alert, a failed step a caption. */
+function Notices({ notices }: { notices: readonly Schemas['Notice'][] }) {
+  return (
+    <>
+      {notices.map((n) => (
+        <p key={n.code} className={n.level === 'error' ? 'alert' : 'caption'} role={n.level === 'error' ? 'alert' : undefined}>
+          {S.today.notices[n.code] ?? n.code}
+        </p>
+      ))}
+    </>
+  )
+}
+
+export function TodayView({ view, week, plan, shownDay, notices = [] }: {
   view: View<TodayAnswer>
   week: WeekAnswer | undefined
   plan: DayPlan | undefined
   shownDay: string
+  notices?: readonly Schemas['Notice'][]
 }) {
   const { showDay, go, reduced } = useApp()
   const t = view.data
@@ -170,6 +186,7 @@ export function TodayView({ view, week, plan, shownDay }: {
       )}
       <Freshness view={view} />
       {t?.bio_failed && <p className="caption" role="alert">{S.today.bioFailed}</p>}
+      <Notices notices={notices} />
 
       {week && <WeekStrip week={week} reduced={reduced} />}
 
