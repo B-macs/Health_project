@@ -117,7 +117,8 @@ def main() -> int:
     args = ap.parse_args()
     fresh = text()
     if args.check:
-        same = OUT.exists() and OUT.read_text(encoding="utf-8") == fresh
+        # Line endings as git may check them out on Windows.
+        same = OUT.exists() and OUT.read_text(encoding="utf-8").replace("\r\n", "\n") == fresh
         print("session_fixture.json is current" if same else "session_fixture.json is stale: run the script")
         return 0 if same else 1
     OUT.write_text(fresh, encoding="utf-8", newline="\n")
