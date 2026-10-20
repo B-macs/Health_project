@@ -2631,6 +2631,11 @@ export interface components {
             garmin_configured: boolean;
             /** Oura Configured */
             oura_configured: boolean;
+            /**
+             * Plan Running
+             * @default true
+             */
+            plan_running: boolean;
             /** Plan Start Date */
             plan_start_date: string | null;
             /** Seeded */

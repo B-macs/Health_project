@@ -25,11 +25,12 @@ import { KEYS, setSetting, type HealthDB } from './db/schema'
 import { cssVars, useMode, useReducedMotion, type ThemePref } from './design/theme'
 import { PAGE_FAMILY, type Mode } from './design/tokens'
 import { AppStateProvider, type AppState } from './lib/appState'
-import { refresh, type Ctx } from './lib/cache'
+import { refresh, useCached, type Ctx } from './lib/cache'
 import { pickFor, readPick, writePick, type Pick } from './lib/day'
 import { localDay } from './lib/api'
 import { refreshAlerts } from './lib/alerts'
 import { useOutboxLoop } from './lib/outbox'
+import { syncIfDue } from './lib/sync'
 import { useAppSettings, type AppSettings } from './lib/settings'
 import { isStandalone } from './lib/standalone'
 import { useLiveQuery } from 'dexie-react-hooks'
@@ -131,6 +132,22 @@ function Shell(p: ShellProps) {
   const state = useMemo<AppState>(() => ({ store, ctx, reduced: p.reduced, pick, showDay, go, alerts }),
     [store, ctx, p.reduced, pick, showDay, go, alerts])
 
+  // The engine's device sync (Phase 9, H57): asked at every open and each return to the
+  // front, whatever the screen; it runs only when the engine, as the background writer, says
+  // one is due (lib/sync.ts), and every screen reads again when it has run.
+  useEffect(() => {
+    if (!ctx.key) return
+    const ask = () => {
+      if (document.visibilityState === 'visible') void syncIfDue(ctx)
+    }
+    ask()
+    document.addEventListener('visibilitychange', ask)
+    return () => document.removeEventListener('visibilitychange', ask)
+  }, [ctx])
+
+  // The engine's own mode on every page (H2): a line only when it reads a saved copy.
+  const status = useCached<{ offline: boolean; datastore_built_at: string | null }>(store, '/api/status', null, ctx)
+
   // The timer alerts' subscription again at every start (iOS has no event when it changes).
   useEffect(() => {
     if (ctx.key) void refreshAlerts(store, ctx)
@@ -160,6 +177,11 @@ function Shell(p: ShellProps) {
     <AppStateProvider value={state}>
       <div className={classes} style={p.vars as CSSProperties}>
         <main className="scroller" ref={scroller}>
+          {status.data?.offline && (
+            <p className="alert" role="status" data-testid="engine-offline">
+              {status.data.datastore_built_at ? S.status.offline(status.data.datastore_built_at) : S.status.offlineUnknown}
+            </p>
+          )}
           <ScreenBoundary key={location} title={S.nav[tab]}>
             <Switch>
               <Route path="/">{today}</Route>

@@ -438,6 +438,8 @@ class OuraLoginStatus(BaseModel):
 
 class SettingsOut(BaseModel):
     plan_start_date: str | None
+    #: A plan (any block) is stored: the start date is asked for only on a first run.
+    plan_running: bool = True
     writer: str | None
     garmin_configured: bool
     oura_configured: bool

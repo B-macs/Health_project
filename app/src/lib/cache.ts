@@ -2,9 +2,10 @@
 // once, asks the engine, and shows the new answer when it comes. The engine may be asleep
 // (Cloud Run starts in seconds) or down, and the gym has a weak signal: the screen never
 // waits blank. A saved answer is replaced only by a good one.
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { HealthDB } from '../db/schema'
 import { ApiError, api, localDay, type ApiErrorKind } from './api'
+import { currentEpoch, subscribe } from './refresh'
 
 export type FetchState = 'loading' | 'fresh' | ApiErrorKind
 
@@ -63,15 +64,17 @@ export async function cacheFirst<T>(store: HealthDB, path: string, day: string |
   }
 }
 
-/** The hook a screen uses. `again()` asks the engine once more. It answers only for its
- *  own address: when the address changes (another day), the previous address's answer is
- *  never shown under it, not even for one frame. */
+/** The hook a screen uses. `again()` asks the engine once more, and so does every engine
+ *  sync that ran (lib/refresh.ts). It answers only for its own address: when the address
+ *  changes (another day), the previous address's answer is never shown under it, not even
+ *  for one frame. */
 export function useCached<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx):
   View<T> & { again: () => void } {
   const key = cacheKey(path, day)
   const [view, setView] = useState<View<T> & { key: string }>({ key: '', data: undefined, fetchedAt: null, state: 'loading' })
   const [tick, setTick] = useState(0)
   const again = useCallback(() => setTick((t) => t + 1), [])
+  const epoch = useSyncExternalStore(subscribe, currentEpoch, currentEpoch)
   useEffect(() => {
     let alive = true
     void cacheFirst<T>(store, path, day, ctx, (next) => {
@@ -82,7 +85,7 @@ export function useCached<T>(store: HealthDB, path: string, day: string | null, 
     }
     // ctx is rebuilt on every render; its two values are the real inputs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, path, day, ctx.key, ctx.engineDown, tick])
+  }, [store, path, day, ctx.key, ctx.engineDown, tick, epoch])
   if (view.key !== key) return { data: undefined, fetchedAt: null, state: 'loading', again }
   return { data: view.data, fetchedAt: view.fetchedAt, state: view.state, code: view.code, again }
 }

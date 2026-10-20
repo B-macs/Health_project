@@ -2014,6 +2014,66 @@
       ],
       "test": "app/src/screens/insights.test.tsx",
       "note": "Moved to Settings > Data: the sync times as they are, and whether Garmin and Oura are set up (the old text fixed)."
+    },
+    "H2": {
+      "built": [
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/sync.spec.ts",
+      "note": "App-wide: a line on every page when the engine reads a saved copy, not the store (GET /api/status offline, with the copy's build time)."
+    },
+    "H57": {
+      "built": [
+        "app/src/lib/sync.ts",
+        "app/src/lib/refresh.ts",
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/sync.spec.ts",
+      "note": "The engine's sync, asked at every open and each return to the front whatever the screen; it runs only when the engine, as the background writer, says one is due (the owner's rule: the first open of the day, then hourly while last night is missing); every screen reads again when it has run."
+    },
+    "T5": {
+      "built": [
+        "app/src/lib/sync.ts"
+      ],
+      "test": "app/src/lib/sync.test.ts",
+      "note": "The weekly rollup runs in the engine's sync chain (services/engine_sync.run), started by the phone's sync at an open."
+    },
+    "T6": {
+      "built": [
+        "app/src/lib/sync.ts"
+      ],
+      "test": "app/src/lib/sync.test.ts",
+      "note": "The Garmin daily sync runs in the engine's sync chain (Repository.run_home_syncs), started by the phone's sync at an open."
+    },
+    "T29": {
+      "built": [
+        "app/src/screens/SettingsSync.tsx"
+      ],
+      "test": "app/src/screens/settings_sync.test.tsx",
+      "note": "Settings: the plan's start day, only while no plan is stored (a first run); the engine seeds the first block and refuses once a plan runs. No Stage 1 wording."
+    },
+    "I115": {
+      "built": [
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "The tab bar (Today, Check-in, Training, Insights, Settings), the current tab in the page's colour."
+    },
+    "I116": {
+      "built": [
+        "app/src/ui/ScreenBoundary.tsx",
+        "app/src/App.tsx"
+      ],
+      "test": "app/e2e/frames.spec.ts",
+      "note": "A failing screen keeps the tab bar (ScreenBoundary)."
+    },
+    "I118": {
+      "built": [
+        "app/src/design/theme.ts",
+        "app/src/design/tokens.ts"
+      ],
+      "test": "app/src/design/tokens.test.ts",
+      "note": "The phone's look is the Oura-style design he chose (Phase 3), in light and dark."
     }
   }
 }

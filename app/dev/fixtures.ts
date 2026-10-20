@@ -299,11 +299,13 @@ export interface WeekRun {
   /** The flexibility capture (Phase 8): the engine's answer the run has reached, or null. */
   flexStep: number | null
   flexFinished: boolean
+  /** The engine's sync (Phase 9): when the phone ran it in this run (null: not yet). */
+  syncedAt: string | null
 }
 
 export const newRun = (): WeekRun => ({
   applied: [], swaps: [], carry: false, shift: false, redo: false, flare: false, reasons: {}, yoga: {},
-  outdoor: {}, flexStep: null, flexFinished: false,
+  outdoor: {}, flexStep: null, flexFinished: false, syncedAt: null,
 })
 
 const BANNER: Schemas['WeekBanner'] = {

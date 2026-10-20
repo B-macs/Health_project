@@ -870,6 +870,11 @@ export const S = {
     },
   },
   // How fresh the shown data is (lib/cache.ts). Quiet when all is well.
+  // The engine's own mode, on every page (H2): only when it reads a saved copy, never the store.
+  status: {
+    offline: (built: string) => `The engine is reading a saved copy of the data (built ${built}), not the store. Saves will not go through.`,
+    offlineUnknown: 'The engine is reading a saved copy of the data, not the store. Saves will not go through.',
+  },
   fresh: {
     loading: 'Loading…',
     justNow: 'Updated just now',
@@ -946,6 +951,34 @@ export const S = {
     alertsTest: 'Send a test alert',
     alertsTestBody: 'Timer alerts are on.',
     alertsTestSent: 'A test alert is on its way.',
+    // The engine's sync and its writer (Phase 9).
+    sync: 'Sync',
+    writer: { streamlit: 'The old app syncs the devices', engine: 'This app syncs the devices' } as Record<string, string>,
+    writerUnknown: 'Which app syncs the devices could not be read.',
+    lastSync: (when: string) => `Last sync: ${when}`,
+    noSync: 'No sync by this app yet.',
+    syncError: (why: string) => `The sync did not finish: ${why}`,
+    stepOk: 'done',
+    stepFailed: 'failed',
+    steps: {
+      oura: 'Oura', garmin: 'Garmin daily', garmin_activities: 'Garmin activities', blend: 'Biometric blend',
+      session_hr: 'Session heart rate', metrics_history: 'Metrics history', sleep_fusion: 'Sleep fusion',
+      backup: 'Daily backup', supabase_mirror: 'Store send', failed_week: 'Failed-week rule',
+      weekly_rollup: 'Weekly rollup',
+    } as Record<string, string>,
+    syncDue: { first_open: 'A sync is due: the first open of the day.', last_night_missing: 'A sync is due: last night is still missing.' } as Record<string, string>,
+    syncNotDue: 'No sync is due.',
+    oura: (state: string, expires: string | null) => (expires ? `Oura login: ${state}, until ${expires}` : `Oura login: ${state}`),
+    ouraState: {
+      ok: 'valid', due: 'valid, renews at the next sync', stale: 'expired, renews at the next sync',
+      expired: 'expired: log in again', unauthenticated: 'not logged in', pat: 'a personal token',
+    } as Record<string, string>,
+    // The plan's start, on a first run only (T29).
+    plan: 'Training plan',
+    planWhy: 'No plan is stored yet. Pick the day the first block starts.',
+    planStart: 'Start the plan',
+    planStarted: (block: string | null) => (block ? `The plan runs: ${block}.` : 'The plan is stored.'),
+    planRefused: { plan_already_running: 'A plan already runs: its blocks start by date.' } as Record<string, string>,
     alertsTestFailed: 'The test alert did not go out.',
     alertsInstall: 'Open the app from the Home Screen to turn the alerts on.',
     alertsUnsupported: 'This browser cannot show alerts.',

@@ -4,7 +4,7 @@
 import { createExecutionContext, createScheduledController, waitOnExecutionContext } from 'cloudflare:test'
 import { env, exports } from 'cloudflare:workers'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import worker, { app, LAST_CHECK, SYNC_PATHS, type Bindings } from '../src/index'
+import worker, { app, ENGINE_TIMEOUT_MS, LAST_CHECK, SYNC_PATHS, SYNC_TIMEOUT_MS, type Bindings } from '../src/index'
 
 // The secrets are test bindings (vitest.config.ts), not in the generated Env type.
 const ENV = env as unknown as Bindings
@@ -138,5 +138,21 @@ describe('the sync switch', () => {
     const res = await app.request('/api/sync', { method: 'POST', headers: ACCESS }, on)
     expect(res.status).toBe(200)
     expect(spy).toHaveBeenCalledTimes(1)
+  })
+
+  it('gives a sync the longer wait, and every other path the usual one', async () => {
+    const timeouts: number[] = []
+    const real = AbortSignal.timeout.bind(AbortSignal)
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation((ms: number) => {
+      timeouts.push(ms)
+      return real(ms)
+    })
+    engineAnswers({ ran: true })
+    const on = { ...env, SYNC_ENABLED: 'true' } as never
+    await app.request('/api/sync', { method: 'POST', headers: ACCESS }, on)
+    await app.request('/api/status', { headers: ACCESS }, on)
+    expect(timeouts).toEqual([SYNC_TIMEOUT_MS, ENGINE_TIMEOUT_MS])
+    expect(SYNC_TIMEOUT_MS).toBeGreaterThan(77_000)
+    expect(SYNC_TIMEOUT_MS).toBeLessThan(300_000)
   })
 })

@@ -50,6 +50,14 @@ export const FORWARDED_HEADERS = ['accept', 'content-type', 'x-local-date'] as c
 // One budget for every try below.
 export const ENGINE_TIMEOUT_MS = 60_000
 
+// A device sync (and the Oura login) runs the device calls inside one request: the old app
+// measured about 77 s for Oura and Garmin alone (2026-08-01), past the 60 s above. A request
+// cut off mid-sync could leave Oura's refresh token spent and the new one unsaved, so these
+// paths wait longer: short of the phone's own 300 s and of Cloud Run's 900 s. Cloudflare sets
+// no wall-clock limit on an HTTP request while the client stays connected (checked
+// 2026-10-20, developers.cloudflare.com/workers/platform/limits).
+export const SYNC_TIMEOUT_MS = 280_000
+
 // Google refuses a request before the engine sees it when the engine is still
 // starting from zero: "The request was aborted because there was no available
 // instance" (HTTP 500 with Google's own page; seen 2026-10-19 on the first request
@@ -86,14 +94,14 @@ function jsonError(error: string, status: number): Response {
 
 /** One request to the engine, with the engine's key, the retries and the JSON errors. */
 export async function toEngine(env: Bindings, method: string, pathAndQuery: string,
-  headers: Headers, body?: ArrayBuffer): Promise<Response> {
+  headers: Headers, body?: ArrayBuffer, timeoutMs: number = ENGINE_TIMEOUT_MS): Promise<Response> {
   if (!env.ENGINE_URL || !env.ENGINE_KEY) return jsonError('not_configured', 503)
   headers.set('X-Engine-Key', env.ENGINE_KEY)
   const init: RequestInit = {
     method,
     headers,
     redirect: 'manual',
-    signal: AbortSignal.timeout(ENGINE_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   }
   if (body !== undefined) init.body = body
   const target = new URL(pathAndQuery, env.ENGINE_URL)
@@ -168,7 +176,8 @@ app.all('/api/*', async (c) => {
     if (value) headers.set(name, value)
   }
   const body = c.req.method !== 'GET' && c.req.method !== 'HEAD' ? await c.req.arrayBuffer() : undefined
-  return toEngine(c.env, c.req.method, incoming.pathname + incoming.search, headers, body)
+  const timeout = SYNC_PATHS.test(incoming.pathname) ? SYNC_TIMEOUT_MS : ENGINE_TIMEOUT_MS
+  return toEngine(c.env, c.req.method, incoming.pathname + incoming.search, headers, body, timeout)
 })
 
 // Anything else is the app (run_worker_first only sends /api/* here in production).

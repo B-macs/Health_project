@@ -17,6 +17,7 @@ import { formatBytes, storageInfo, type StorageInfo } from '../lib/storage'
 import { updateWaiting } from '../lib/updates'
 import { S } from '../strings'
 import { DataLink } from './DataTables'
+import { PlanStart, SyncStatus } from './SettingsSync'
 import { Freshness } from '../ui/Freshness'
 import { versionLine } from '../version'
 import { KeyForm } from './Welcome'
@@ -267,6 +268,8 @@ export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onThe
       </header>
       <Engine store={p.store} ctx={p.ctx} />
       <Outbox store={p.store} ctx={p.ctx} />
+      <SyncStatus />
+      <PlanStart />
       <DataCheckCard store={p.store} ctx={p.ctx} />
       <DataLink />
       <Alerts store={p.store} ctx={p.ctx} on={alertsOn === true} />

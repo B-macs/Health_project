@@ -5909,6 +5909,7 @@
     "active_phase": null,
     "garmin_configured": false,
     "oura_configured": false,
+    "plan_running": true,
     "plan_start_date": null,
     "seeded": null,
     "writer": "streamlit"

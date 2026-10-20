@@ -253,7 +253,22 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
       return send(200, { minutes: 31, detail: { activities: 1 }, window: [0, 6] })
     }
     if (url.pathname === '/api/status') {
-      return send(200, { writer: 'streamlit', offline: false, datastore_built_at: null, oura: null, last_sync: null, notices: [], sync_due: null })
+      // Phase 9: with e2e_week writer_engine the engine is the background writer, and a sync
+      // is due until this run has had one; offline_copy: the engine reads a saved copy.
+      const scenario = scenarioOf(req)
+      const run = runOf(req)
+      const engine = scenario.has('writer_engine')
+      const lastSync = run.syncedAt
+        ? { day: local, at: run.syncedAt, results: { oura: [true, null], garmin: [true, null], failed_week: [true, null] }, error: null }
+        : null
+      return send(200, {
+        writer: engine ? 'engine' : 'streamlit',
+        offline: scenario.has('offline_copy'),
+        datastore_built_at: scenario.has('offline_copy') ? '2026-10-20 06:00' : null,
+        oura: engine ? { kind: 'oauth', state: 'ok', needs_authorisation: false, expires_at: '2026-10-21T06:00:00+00:00', seconds_remaining: 80000, oauth_configured: true } : null,
+        last_sync: lastSync, notices: [],
+        sync_due: engine && !run.syncedAt ? 'first_open' : null,
+      })
     }
     if (url.pathname === '/api/checkin') {
       const d = asked ?? local
@@ -287,6 +302,13 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
           measured_rpe: 6.2, measured_au: 6.2 * b.duration_minutes, active_minutes: b.duration_minutes - 2,
           rpe_delta: 6.2 - rpe, au_delta: (6.2 - rpe) * b.duration_minutes, verdict: Math.abs(6.2 - rpe) < 0.5 ? 'exact' : 6.2 > rpe ? 'under' : 'over',
           coverage: 0.95, low_coverage: false, activity: 'Made-up strength', covered_exercises: 8, total_exercises: 9 } })
+      }
+      if (url.pathname === '/api/sync') {
+        const run = runOf(req)
+        if (!scenarioOf(req).has('writer_engine')) return send(409, { error: 'not_the_writer' })
+        run.syncedAt = new Date().toISOString()
+        return send(200, { ran: true, reason: 'first_open',
+          status: { day: local, at: run.syncedAt, results: { oura: [true, null] }, error: null } })
       }
       if (url.pathname.startsWith('/api/insights/flexibility')) {
         const run = runOf(req)

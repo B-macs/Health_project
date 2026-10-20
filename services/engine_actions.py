@@ -120,9 +120,17 @@ def finish_oura_login(repo, code: str, state: str, today: date) -> dict:
 # ─── Settings: the plan's start (T29) ────────────────────────────────────────
 
 def settings(repo) -> dict:
-    """What Settings shows: the plan's start, the background writer, and
-    which devices are configured."""
+    """What Settings shows: the plan's start, whether a plan already runs (the
+    start date is asked for only on a first run, T29), the background writer,
+    and which devices are configured."""
+    try:
+        running = bool(repo.get_phases())
+    except Exception:
+        # Unreadable is not "no plan": the setup must never offer itself over a
+        # plan that could not be read (set_plan_start checks the store again).
+        running = True
     return {"plan_start_date": repo.get_config_value("plan_start_date") or None,
+            "plan_running": running,
             "writer": background_writer.current(repo),
             "garmin_configured": bool(repo.garmin_configured()),
             "oura_configured": bool(repo.oura_configured())}

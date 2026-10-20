@@ -390,13 +390,20 @@ def test_the_oura_login_ties_the_answer_to_its_request(env, monkeypatch):
 
 def test_the_plan_start_seeds_a_first_block_once(env, monkeypatch):
     settings = env.ok(monkeypatch, "get", "/api/settings")
-    assert settings["writer"] == bw.STREAMLIT
+    assert settings["writer"] == bw.STREAMLIT and settings["plan_running"]
     r = env.call(monkeypatch, "put", "/api/settings/plan-start", {"start_date": "2026-10-19"})
     assert r.status_code == 409 and r.json() == {"error": "plan_already_running"}
     env.repo.set_phases([])
+    assert not env.ok(monkeypatch, "get", "/api/settings")["plan_running"], "a first run asks"
     seeded = env.ok(monkeypatch, "put", "/api/settings/plan-start", {"start_date": "2026-10-19"})
     assert seeded["seeded"] and seeded["plan_start_date"] == "2026-10-19"
-    assert len(env.repo.get_phases_live()) == 1
+    assert len(env.repo.get_phases_live()) == 1 and seeded["plan_running"]
+
+
+def test_an_unreadable_plan_never_offers_the_first_run(env, monkeypatch):
+    """A plan that cannot be read is not "no plan": Settings never offers to start one."""
+    monkeypatch.setattr(env.repo, "get_phases", _broken)
+    assert env.ok(monkeypatch, "get", "/api/settings")["plan_running"]
 
 
 # ── read failures say so (I6, I17, I26) ─────────────────────────────────────
