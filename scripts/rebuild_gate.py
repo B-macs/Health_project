@@ -1052,6 +1052,255 @@ review("p3",
        "Say yes to the design, or what to change.")
 
 
+# ── Phase 4 counters ─────────────────────────────────────────────────────────
+
+SW_SOURCE = APP_SRC / "sw" / "sw.ts"
+WRANGLER = REPO_ROOT / "worker" / "wrangler.jsonc"
+DATA_CHECK = REPO_ROOT / "scripts" / "data_check.py"
+#: The owner's iPhone checklist (docs/rebuild/owner_checks.json, "p4"): true = works.
+P4_CHECKLIST = {
+    "install": "Safari > Share > Add to Home Screen; Health opens from its icon, with no browser bars",
+    "key": "the access key, pasted once, opens the app",
+    "tabs": "Today, Check-in (a sheet), Training, Insights and Settings each open",
+    "airplane": "in airplane mode the app opens from the Home Screen",
+    "reopen": "closed and reopened, it opens on the same data; Settings says it shows saved data",
+    "engine_down": "with Settings > Testing > Act as if the engine is down, every screen still shows",
+}
+_PW_REPORTS: dict[str, dict | None] = {}
+
+
+def playwright_report(phase: str) -> dict | None:
+    """The browser tests' JSON report: run once per gate run (minutes), then reused by
+    every counter that reads it. None when the run gave no report."""
+    if phase in _PW_REPORTS:
+        return _PW_REPORTS[phase]
+    out = REPORTS_DIR / phase
+    out.mkdir(parents=True, exist_ok=True)
+    json_path = out / "playwright.json"
+    if not (REUSE_TEST_RUNS and json_path.exists()):
+        json_path.unlink(missing_ok=True)
+        pnpm = shutil.which("pnpm")
+        if pnpm:
+            proc = subprocess.run([pnpm, "--filter", "@health/app", "exec", "playwright", "test",
+                                   "--reporter=json"], cwd=REPO_ROOT, env=_child_env(),
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace")
+            json_path.write_text(proc.stdout, encoding="utf-8", newline="\n")
+            (out / "playwright.log").write_text(proc.stderr, encoding="utf-8", newline="\n")
+    try:
+        report = json.loads(json_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        report = None
+    _PW_REPORTS[phase] = report
+    return report
+
+
+def playwright_tests(report: dict) -> list[dict]:
+    """Every test of a Playwright JSON report, flat: its title, browser, last status and
+    annotations."""
+    out: list[dict] = []
+
+    def walk(suite: dict) -> None:
+        for child in suite.get("suites", []):
+            walk(child)
+        for spec in suite.get("specs", []):
+            for test in spec.get("tests", []):
+                results = test.get("results") or []
+                out.append({"title": spec.get("title", ""), "project": test.get("projectName", ""),
+                            "status": results[-1].get("status") if results else "none",
+                            "annotations": test.get("annotations", [])})
+
+    for suite in report.get("suites", []):
+        walk(suite)
+    return out
+
+
+def _browser_counter(phase: str, pick, count) -> CounterResult:
+    report = playwright_report(phase)
+    if report is None:
+        return CounterResult(1, "the browser tests gave no report", [f"{phase}/playwright.log"])
+    tests = [t for t in playwright_tests(report) if pick(t["title"])]
+    if not tests:
+        return CounterResult(1, "no browser test of this kind ran", [f"{phase}/playwright.json"])
+    return count(tests)
+
+
+def failed_tests(tests: list[dict]) -> list[str]:
+    return [f'{t["project"]}: {t["title"]}' for t in tests if t["status"] != "passed"]
+
+
+def outbox_losses(tests: list[dict]) -> tuple[int, list[str]]:
+    """Writes lost over the outbox tests: each test's own count (its outbox_loss
+    annotation), and 1 for a test that failed before it could count."""
+    lost, notes = 0, []
+    for t in tests:
+        counts = [int(a["description"]) for a in t["annotations"]
+                  if a.get("type") == "outbox_loss" and str(a.get("description", "")).lstrip("-").isdigit()]
+        if counts:
+            lost += sum(counts)
+            notes += [f'{t["project"]}: {t["title"]}: {sum(counts)} lost'] if sum(counts) else []
+        elif t["status"] != "passed":
+            lost += 1
+            notes.append(f'{t["project"]}: {t["title"]}: failed before it counted')
+    return lost, notes
+
+
+def sw_api_routes(text: str) -> list[str]:
+    """Ways the service worker source could answer /api: a route other than the page
+    route that names /api, or a page route without the /api denylist."""
+    code = _blank_comments(text)
+    calls = [m.group(0) for m in re.finditer(r"registerRoute\((?:[^()]|\([^()]*\))*\)", code)]
+    hits = []
+    for call in calls:
+        if "NavigationRoute" in call:
+            if not re.search(r"denylist:\s*\[[^\]]*\\/api", call):
+                hits.append("the page route has no /api denylist")
+        elif "api" in call:
+            hits.append(f"a route names /api: {call[:60]}")
+    return hits
+
+
+def jsonc(text: str):
+    """JSON with // and /* */ comments (wrangler.jsonc), strings left alone."""
+    out, i, n, in_string = [], 0, len(text), False
+    while i < n:
+        ch = text[i]
+        if in_string:
+            out.append(ch)
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 1
+            elif ch == '"':
+                in_string = False
+        elif ch == '"':
+            in_string = True
+            out.append(ch)
+        elif text.startswith("//", i):
+            while i < n and text[i] != "\n":
+                i += 1
+            continue
+        elif text.startswith("/*", i):
+            i = text.find("*/", i + 2)
+            i = n if i < 0 else i + 2
+            continue
+        else:
+            out.append(ch)
+        i += 1
+    return json.loads(re.sub(r",(\s*[}\]])", r"\1", "".join(out)))
+
+
+def checklist_open(data: dict) -> list[str]:
+    """The checklist items the owner has not confirmed (false = reported failing)."""
+    answers = data.get("p4", {})
+    return [key for key in P4_CHECKLIST if answers.get(key) is not True]
+
+
+@counter("p4", "test_failures",
+         "failures in the Python gate (plus 1 under the floor), `pnpm test` (the app's and the "
+         "Worker's Vitest, after the build) and the browser tests (Playwright)")
+def p4_test_failures() -> CounterResult:
+    main_gate = _main_gate_counter("p4")
+    vitest = _pnpm_test_counter("p4")
+    report = playwright_report("p4")
+    if report is None:
+        browser = CounterResult(1, "no report", ["p4/playwright.log"])
+    else:
+        stats = report.get("stats", {})
+        failed = int(stats.get("unexpected", 0)) + int(stats.get("flaky", 0))
+        browser = CounterResult(failed, f'{stats.get("expected", 0)} passed, {failed} failed '
+                                        f'or flaky', ["p4/playwright.json"])
+    return CounterResult(main_gate.count + vitest.count + browser.count,
+                         f"Python: {main_gate.detail}; pnpm: {vitest.detail}; "
+                         f"Playwright: {browser.detail}",
+                         main_gate.evidence + vitest.evidence + browser.evidence)
+
+
+@counter("p4", "offline_boot_fail", "1 if the app shell fails to load offline (the @offline browser test)")
+def p4_offline_boot_fail() -> CounterResult:
+    def count(tests):
+        failed = failed_tests(tests)
+        return CounterResult(1 if failed else 0, "; ".join(failed) or "opens in airplane mode",
+                             ["p4/playwright.json"])
+    return _browser_counter("p4", lambda title: "airplane mode" in title, count)
+
+
+@counter("p4", "blank_screen_with_engine_down",
+         "screens that render nothing when the engine is down (one browser test per screen and "
+         "browser)")
+def p4_blank_screen_with_engine_down() -> CounterResult:
+    def count(tests):
+        failed = failed_tests(tests)
+        return CounterResult(len(failed), "; ".join(failed) or f"{len(tests)} screen runs, none blank",
+                             ["p4/playwright.json"])
+    return _browser_counter("p4", lambda title: title.startswith("with the engine down, "), count)
+
+
+@counter("p4", "outbox_loss", "writes lost in the outbox browser tests")
+def p4_outbox_loss() -> CounterResult:
+    def count(tests):
+        lost, notes = outbox_losses(tests)
+        return CounterResult(lost, "; ".join(notes) or f"{len(tests)} outbox tests, nothing lost",
+                             ["p4/playwright.json"])
+    return _browser_counter("p4", lambda title: title.endswith("@outbox"), count)
+
+
+@counter("p4", "api_cached_by_sw",
+         "1 if the service worker caches an /api answer: a route for /api in its source, or an "
+         "/api entry in its caches in the browser test")
+def p4_api_cached_by_sw() -> CounterResult:
+    hits = sw_api_routes(SW_SOURCE.read_text(encoding="utf-8")) if SW_SOURCE.exists() else ["no sw.ts"]
+
+    def count(tests):
+        failed = failed_tests(tests)
+        return CounterResult(1 if failed or hits else 0, "; ".join(hits + failed)
+                             or "no /api route, and no /api entry in its caches", ["p4/playwright.json"])
+    return _browser_counter("p4", lambda title: "caches no /api answer" in title, count)
+
+
+@counter("p4", "cron_enabled_early",
+         "1 if worker/wrangler.jsonc sets SYNC_ENABLED to anything but \"false\" before Phase 9")
+def p4_cron_enabled_early() -> CounterResult:
+    config = jsonc(WRANGLER.read_text(encoding="utf-8"))
+    value = config.get("vars", {}).get("SYNC_ENABLED")
+    crons = config.get("triggers", {}).get("crons", [])
+    return CounterResult(0 if value == "false" else 1,
+                         f"SYNC_ENABLED = {value!r}; triggers: {', '.join(crons) or 'none'}")
+
+
+@counter("p4", "mirror_gaps_open",
+         "rows the daily data check reports missing from Supabase, not repaired yet "
+         "(scripts/data_check.py: the newest backup against the store, read only)")
+def p4_mirror_gaps_open() -> CounterResult:
+    if not main_python().exists():
+        return CounterResult(1, "venv/ is missing")
+    proc = subprocess.run([str(main_python()), str(DATA_CHECK), "--json"], cwd=REPO_ROOT,
+                          env=_child_env(), capture_output=True, text=True, encoding="utf-8",
+                          errors="replace")
+    out = REPORTS_DIR / "p4"
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "data-check.json").write_text(proc.stdout, encoding="utf-8", newline="\n")
+    try:
+        result = json.loads(proc.stdout)
+    except ValueError:
+        return CounterResult(1, f"the check gave no answer (exit {proc.returncode})", ["p4/data-check.json"])
+    if "error" in result:
+        return CounterResult(1, f"the check did not run: {result['error']}", ["p4/data-check.json"])
+    missing = int(result.get("missing_rows", 0))
+    stale = " (the backup is older than two days)" if result.get("backup_stale") else ""
+    return CounterResult(missing, f"{missing} rows missing against {result.get('backup_name') or 'no backup'}"
+                         f"{stale}", ["p4/data-check.json"])
+
+
+@counter("p4", "device_checklist_open",
+         "items of the owner's iPhone checklist not confirmed yet (docs/rebuild/owner_checks.json, p4)")
+def p4_device_checklist_open() -> CounterResult:
+    data = json.loads(OWNER_CHECKS.read_text(encoding="utf-8")) if OWNER_CHECKS.exists() else {}
+    missing = checklist_open(data)
+    return CounterResult(len(missing), ", ".join(missing) or "the owner confirmed every item")
+
+
+review("p4", *P4_CHECKLIST.values())
+
+
 # ── output ───────────────────────────────────────────────────────────────────
 
 _PAGE = """<!doctype html>

@@ -12,5 +12,13 @@
     "voice_app_records": true,
     "voice_app_note": "2026-10-19: the owner created the voice app, restored its paused Supabase project and trimmed its secrets to [voxplot_supabase]; after the push he confirmed it opens from its Home Screen icon and records.",
     "checked_note": "2026-10-19, the owner after the Phase 1 push: \"all checks above are passed\" (three tabs, Home/Training/Insights work, the voice app opens from its Home Screen icon and records)."
+  },
+  "p4": {
+    "install": null,
+    "key": null,
+    "tabs": null,
+    "airplane": null,
+    "reopen": null,
+    "engine_down": null
   }
 }

@@ -99,3 +99,14 @@
 - **One flaky test fixed**: `test_a_row_written_while_a_pull_runs_is_never_lost` (Phase 2) slept 0.2 s for a thread to reach the store and failed once under a loaded machine; it now waits on the store's write signal and checks the same thing.
 - **The gate**: every p3 counter 0 (choice recorded; no colour or size outside the tokens; the mock equal to its generator; 85 strings, none flagged; Python 5508, pnpm 49). Signed off under the owner's standing instruction.
 
+
+## 2026-10-20 — Phase 4: the iPhone app shell
+- **Stack** as Lauscher's, publish dates checked on npm: Dexie, dexie-react-hooks, wouter, Eruda, Workbox 7.4.1, vite-plugin-pwa 2.0.0, @vite-pwa/assets-generator, fake-indexeddb, Playwright 1.63; @types/node 24.19.2 added (Lauscher gets Node's types by accident of its store), with the config files in their own tsconfig.
+- **Install and first open**: one logo makes the icons and iPhone splash screens; the browser shows the Add to Home Screen steps first, because iOS keeps the Home Screen app's data apart from Safari's, so the key is pasted where it is used.
+- **The data layer**: Dexie schema v1 with a migration plan; cache-first reads; the outbox with ULIDs, order, backoff and refusals kept; the session store; the debug log across reloads.
+- **The daily check, adapted**: the prompt's Notion-against-Supabase comparison would report everything since the 2026-10-09 switch, so the check compares the store with its newest backup instead (`services/data_check.py`, GET /api/data/check, `scripts/data_check.py`). Run on the real store: 0 rows missing against the 2026-10-19 backup.
+- **The Worker**: one Cron Trigger (04:15 UTC) runs the check and keeps it in KV `health-state`; SYNC_ENABLED "false" closes the syncs and the Oura login at the edge. No sync trigger: the owner's one sync a day at the first open, and a trigger has no phone to give it the day.
+- **Found by the browser tests**: the mock answered the data check in an old shape and the whole app went blank on Settings; fixed, and a screen that throws now shows a message instead (ScreenBoundary). Four tests raced the database writes; they now wait for what the phone has stored.
+- **Deploys**: engine revision 8 (5a9b5eb; the image store at 455.5 MiB before it, the clean-up not yet run), Worker be3cb6b4. Checked live without the key: the files answer, /api answers 401 JSON, the service worker controls the page.
+- **Pushes held** from 08:22: the owner trained on the Streamlit app, and a push redeploys it.
+- **The gate**: every p4 counter 0 except the owner's iPhone checklist (6). Python 5534, Vitest 117, Playwright 32. Signed off under the owner's standing instruction.

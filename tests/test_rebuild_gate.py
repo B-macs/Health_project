@@ -570,3 +570,96 @@ def test_the_real_strings_file_passes_the_text_scan():
 
 def test_the_real_screen_files_write_no_colour_or_size_of_their_own():
     assert gate.token_misses(gate._screen_files()) == []
+
+
+# ── Phase 4 ──────────────────────────────────────────────────────────────────
+
+def test_phase_4_has_the_counters_its_prompt_names():
+    assert set(gate.REGISTRY["p4"]) == {
+        "test_failures", "offline_boot_fail", "blank_screen_with_engine_down", "outbox_loss",
+        "api_cached_by_sw", "cron_enabled_early", "mirror_gaps_open", "device_checklist_open"}
+
+
+_REPORT = {"stats": {"expected": 3, "unexpected": 1}, "suites": [{"suites": [{"specs": [
+    {"title": "with the engine down, Today renders and shows the saved data",
+     "tests": [{"projectName": "chromium", "results": [{"status": "passed"}], "annotations": []},
+               {"projectName": "webkit", "results": [{"status": "failed"}], "annotations": []}]},
+    {"title": "writes made offline go out in order @outbox",
+     "tests": [{"projectName": "chromium", "results": [{"status": "passed"}],
+                "annotations": [{"type": "outbox_loss", "description": "0"}]}]},
+    {"title": "writes made while the engine is down wait @outbox",
+     "tests": [{"projectName": "chromium", "results": [{"status": "failed"}], "annotations": []}]},
+]}]}]}
+
+
+def test_a_browser_report_is_read_flat_with_each_browsers_last_result():
+    tests = gate.playwright_tests(_REPORT)
+    assert [(t["project"], t["status"]) for t in tests] == [
+        ("chromium", "passed"), ("webkit", "failed"), ("chromium", "passed"), ("chromium", "failed")]
+    assert gate.failed_tests(tests[:2]) == [
+        "webkit: with the engine down, Today renders and shows the saved data"]
+
+
+def test_an_outbox_test_that_failed_before_counting_counts_one_lost_write():
+    tests = [t for t in gate.playwright_tests(_REPORT) if t["title"].endswith("@outbox")]
+    lost, notes = gate.outbox_losses(tests)
+    assert lost == 1 and "failed before it counted" in notes[0]
+    tests[0]["annotations"] = [{"type": "outbox_loss", "description": "2"}]
+    assert gate.outbox_losses(tests)[0] == 3
+
+
+def test_a_missing_browser_report_or_test_is_an_open_item(monkeypatch):
+    monkeypatch.setattr(gate, "playwright_report", lambda phase: None)
+    assert gate.p4_offline_boot_fail().count == 1
+    monkeypatch.setattr(gate, "playwright_report", lambda phase: {"suites": []})
+    assert gate.p4_blank_screen_with_engine_down().count == 1
+
+
+def test_the_service_worker_scan_finds_an_api_route_and_a_page_route_without_its_denylist():
+    good = r"registerRoute(new NavigationRoute(createHandlerBoundToURL('/index.html'), { denylist: [/^\/api\//] }))"
+    assert gate.sw_api_routes(good) == []
+    assert gate.sw_api_routes("registerRoute(new NavigationRoute(handler))") == [
+        "the page route has no /api denylist"]
+    hits = gate.sw_api_routes(good + "\nregisterRoute(({ url }) => url.pathname.startsWith('/api/'), new NetworkFirst())")
+    assert len(hits) == 1 and hits[0].startswith("a route names /api")
+    assert gate.sw_api_routes("// registerRoute(api)\n" + good) == []
+
+
+def test_the_real_service_worker_has_no_api_route():
+    assert gate.sw_api_routes(gate.SW_SOURCE.read_text(encoding="utf-8")) == []
+
+
+def test_wrangler_jsonc_is_read_with_its_comments_and_a_url_in_a_string():
+    text = '{\n  // a comment\n  "url": "https://x.test/a",  /* block */\n  "vars": { "SYNC_ENABLED": "false", },\n}\n'
+    assert gate.jsonc(text) == {"url": "https://x.test/a", "vars": {"SYNC_ENABLED": "false"}}
+
+
+def test_the_sync_switch_is_off_in_the_real_worker_config():
+    assert gate.p4_cron_enabled_early().count == 0
+
+
+def test_the_sync_switch_counts_one_when_it_is_on(tmp_path, monkeypatch):
+    config = tmp_path / "wrangler.jsonc"
+    config.write_text('{ "vars": { "SYNC_ENABLED": "true" } }', encoding="utf-8")
+    monkeypatch.setattr(gate, "WRANGLER", config)
+    assert gate.p4_cron_enabled_early().count == 1
+
+
+def test_the_iphone_checklist_is_open_until_the_owner_confirms_each_item():
+    assert gate.checklist_open({}) == list(gate.P4_CHECKLIST)
+    every = {key: True for key in gate.P4_CHECKLIST}
+    assert gate.checklist_open({"p4": every}) == []
+    assert gate.checklist_open({"p4": {**every, "airplane": False}}) == ["airplane"]
+
+
+def test_the_data_check_counter_reads_the_checks_answer(tmp_path, monkeypatch):
+    class Done:
+        returncode = 0
+        stdout = json.dumps({"missing_rows": 2, "backup_name": "health-2026-10-19.db.gz",
+                             "backup_stale": False})
+    monkeypatch.setattr(gate, "REPORTS_DIR", tmp_path)
+    monkeypatch.setattr(gate.subprocess, "run", lambda *a, **k: Done())
+    result = gate.p4_mirror_gaps_open()
+    assert result.count == 2 and "health-2026-10-19" in result.detail
+    Done.stdout = json.dumps({"error": "store_unavailable"})
+    assert gate.p4_mirror_gaps_open().count == 1

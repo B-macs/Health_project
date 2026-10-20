@@ -1,0 +1,81 @@
+{
+  "from_phase": "P4",
+  "to_phase": "P5",
+  "written": "2026-10-20",
+  "verdict": "Every p4 counter is 0 except device_checklist_open (6: the owner's iPhone checks, not done yet). Signed off under the owner's standing instruction (2026-10-19); the checklist stays open in his batch.",
+  "address": "https://health.lauscher-worker.workers.dev (Worker version be3cb6b4; engine revision health-engine-00008-gk6, commit 5a9b5eb)",
+  "what_exists": {
+    "install": "app/public/manifest.webmanifest (Health, standalone, #07090E), icons and iPhone 17 Pro Max splash screens from app/public/logo.svg (pnpm --filter @health/app icons); the first open shows the Add to Home Screen steps in the browser, then the access key (screens/Welcome.tsx)",
+    "data_layer": "app/src/db/schema.ts (Dexie), lib/api.ts (every request: Bearer key, X-Local-Date, one ApiError), lib/cache.ts (cache first), lib/outbox.ts (the outbox), lib/session.ts, lib/settings.ts, lib/storage.ts, lib/updates.ts, debug/console.ts",
+    "service_worker": "app/src/sw/sw.ts (injectManifest): precaches the shell, answers every page load with index.html, no /api route",
+    "shell": "App.tsx: wouter hash routes /, /checkin (a sheet over Today), /training, /insights, /settings; a ScreenBoundary per screen; the outbox loop; a session left open opens again",
+    "settings": "screens/Settings.tsx: engine status (cache first), saves waiting and refused (Send now, Send again), the daily data check (Check now), the access key, the phone's storage, the appearance, 'Act as if the engine is down', the debug log, the version line (seven taps open Eruda)",
+    "worker": "worker/src/index.ts: the key check, the engine call with retries and JSON errors, GET /api/data/check/last (KV), POST /api/data/check/run, the daily Cron Trigger 15 4 * * *, SYNC_ENABLED 'false' closing /api/sync, /api/data/sync/* and /api/oura/*",
+    "engine": "GET /api/data/check (services/data_check.py, read only); scripts/data_check.py runs it from the PC",
+    "gate_counters": "scripts/rebuild_gate.py p4: test_failures, offline_boot_fail, blank_screen_with_engine_down, outbox_loss, api_cached_by_sw, cron_enabled_early, mirror_gaps_open, device_checklist_open",
+    "tests": "Python 5534 passed, 1 skipped; app Vitest 88 and Worker Vitest 29; Playwright 32 (19 in Chromium, 13 in the iPhone 17 Pro Max WebKit profile)"
+  },
+  "dexie_schema": {
+    "name": "health",
+    "version": 1,
+    "stores": {
+      "cache": "key, fetched_at — {key: path|day, path, day, body, fetched_at}: the last answer of every GET",
+      "outbox": "++seq, &id, state, next_at — {id (ULID), kind, method, path, body, day, created_at, attempts, next_at, state: waiting|failed, last_error}",
+      "session": "id — {id: 'current', started_at, data}: the training session in progress",
+      "settings": "key — {key, value}: access_key, theme, debug_engine_down, install_skipped",
+      "debuglog": "++id, at — {at, line}: the last 300 lines"
+    },
+    "migration_plan": [
+      "A new version only adds stores or indexes; the outbox and the session are never renamed or dropped while they can hold something the engine has not received.",
+      "The cache can be cleared in upgrade() whenever its shape changes: it is rebuilt from the engine.",
+      "On versionchange the connection closes (a newer tab or version opened).",
+      "Every new version gets a fake-indexeddb test that upgrades a v(n-1) database holding data."
+    ]
+  },
+  "cache_first_pattern": [
+    "useCached(db, path, day, ctx) / cacheFirst(): show the saved answer for (path, day) at once with state 'loading', ask the engine, then show the new answer ('fresh') and keep it.",
+    "When the engine does not answer, the saved answer stays with the reason as its state: offline, engine_unavailable, unauthorized, rejected or server. It is never replaced by an error.",
+    "Under the data, <Freshness view> says 'Updated N min ago' quietly, or 'Showing saved data · Updated N min ago.' and the reason.",
+    "A screen with nothing saved and no answer says why instead of rendering blank; a screen that throws shows a message (ScreenBoundary) and the tab bar stays."
+  ],
+  "outbox_contract": [
+    "Every write goes through enqueue(db, {kind, method, path, body, day}): the phone mints its ULID; the engine's saves are idempotent on the ids the body carries (rebuild rule 4).",
+    "Sent strictly in the order written (seq), each with its own X-Local-Date (the day it was written).",
+    "Offline, the engine starting or down, or a 5xx: the item waits 5 s, 15 s, 1 min, 5 min, then 15 min, and nothing after it overtakes it.",
+    "A refusal (4xx): the item is kept as 'failed' with the engine's code and the queue goes on; Settings sends it again on the owner's tap.",
+    "A wrong key (401): the queue stops until the key changes; every item stays.",
+    "An item leaves the outbox ONLY on a 2xx. Back online, every waiting item may go at once. The loop runs at the start, after each write, when the app comes to the front, and when the first wait ends.",
+    "With Supabase as the system of record a 2xx means the store has the row (the engine waits for Supabase before it answers), so there is no mirror_warning to keep."
+  ],
+  "service_worker_rules": [
+    "Precache the shell only (index.html, the CSS, the JS, the manifest, the logo); Eruda and the splash screens stay out.",
+    "Every navigation is answered with the precached index.html, /api excluded; there is NO route for /api, so it always goes to the network and the phone's database owns the data.",
+    "clientsClaim on the first install; a new version WAITS and takes over (SKIP_WAITING) only when the app starts or comes to the front with no training session (lib/updates.ts mayTakeUpdate); a timer reloads too because iOS does not always fire controllerchange.",
+    "Registered with updateViaCache 'none' so a new sw.js is always fetched."
+  ],
+  "cron_trigger_plan": [
+    "Now: ONE trigger, 15 4 * * * (04:15 UTC), the daily data check (read only). Lauscher's trigger is the account's other one (2 of the free 5).",
+    "No trigger syncs the devices: the owner chose one sync a day at the first app open, retried at most hourly while last night is missing (2026-10-19), and a trigger has no phone to give it the day (rebuild rule 3).",
+    "Phase 9 (the switch-over): set SYNC_ENABLED to 'true' in worker/wrangler.jsonc together with background_writer = engine; the phone then calls POST /api/sync at its first open."
+  ],
+  "device_findings": "Not tested on the iPhone yet: the owner was training on the Streamlit app when the gate ran (2026-10-20). Checked in the built-in browser at phone width: the first-open screen, the service worker controls the page, no console error.",
+  "owner_decisions": [
+    "Standing: every rebuild gate is signed off in advance from Phase 2 on; stop only for his own steps (2026-10-19).",
+    "One sync a day at the first app open, retried at most hourly while last night is missing (2026-10-19): no sync trigger.",
+    "Push automatically after each finished step when the gate passes (2026-10-19); held on 2026-10-20 while he trained on the Streamlit app, because a push redeploys it."
+  ],
+  "open_items": [
+    "The owner's iPhone checklist (docs/rebuild/owner_checks.json p4): install, key, tabs, airplane, reopen, engine_down.",
+    "The daily check compares the store with its newest BACKUP, and the backup is taken by the Streamlit app's sync chain, which runs only when its Home page loads; a stale backup is reported (backup_stale). After Phase 9 the engine's sync takes it.",
+    "The image store held 455.5 MiB before revision 8 (about 525 MiB after, for a day); the clean-up keeps the two newest. Check it before the next engine deploy.",
+    "Carried: the hosted-app check (P2-11), the Strength reference, the voice app's address, [voxplot_supabase] out of the health app's secrets."
+  ],
+  "next_phase_may_rely_on": [
+    "Read every screen's data with useCached(db, path, day, ctx); show <Freshness view> under it; never render blank.",
+    "Write only through enqueue(); never call api() for a write from a screen. Mint the session and exercise ids on the phone (lib/ulid.ts).",
+    "The training session lives in the session store (startSession / endSession); while it exists, updates wait.",
+    "Every word goes in app/src/strings.ts; every colour and size comes from the tokens.",
+    "The mock build (vite --mode mock) and dev/mockApi.ts answer the API locally for the browser tests; extend the mock with each endpoint a screen uses.",
+    "Types come only from app/src/generated/api.ts (pnpm gen:types after export_openapi)."
+  ]
+}

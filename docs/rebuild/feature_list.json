@@ -1,5 +1,5 @@
 {
-  "phase": "P3",
+  "phase": "P4",
   "tasks": [
     {
       "id": "P0-01",
@@ -385,6 +385,97 @@
       ],
       "gate": "choice_missing",
       "passes": true
+    },
+    {
+      "id": "P4-01",
+      "phase": "P4",
+      "description": "Stack as Lauscher's, versions checked on npm and recorded in docs/rebuild/stack.md: Vite, React 19, TypeScript, vite-plugin-pwa (injectManifest), Dexie, wouter, Vitest with fake-indexeddb, Playwright (Chromium and the iPhone WebKit profile), @vite-pwa/assets-generator.",
+      "depends_on": [],
+      "gate": "test_failures",
+      "passes": false
+    },
+    {
+      "id": "P4-02",
+      "phase": "P4",
+      "description": "Install and first launch: the manifest (Health, standalone, the design's colours, icons and apple-touch-icon), the Add to Home Screen steps when not standalone, the access key pasted once and kept in IndexedDB (never in a URL), navigator.storage.persist() and estimate() shown in Settings.",
+      "depends_on": [
+        "P4-01"
+      ],
+      "gate": "test_failures",
+      "passes": false
+    },
+    {
+      "id": "P4-03",
+      "phase": "P4",
+      "description": "The data layer (Dexie schema v1 with a migration plan): cache-first reads that never render blank, the outbox (ULIDs, in order, retried with backoff, removed only on the engine's yes), the session, settings and the debug log; every request sends the phone's day.",
+      "depends_on": [
+        "P4-01"
+      ],
+      "gate": "outbox_loss",
+      "passes": false
+    },
+    {
+      "id": "P4-04",
+      "phase": "P4",
+      "description": "The service worker: the app shell opens offline; /api is never cached; an update waits while a training session runs and installs at the next open.",
+      "depends_on": [
+        "P4-01"
+      ],
+      "gate": "offline_boot_fail",
+      "passes": false
+    },
+    {
+      "id": "P4-05",
+      "phase": "P4",
+      "description": "The service worker caches no /api answer (no /api route in its source, none in its caches in the browser test).",
+      "depends_on": [
+        "P4-04"
+      ],
+      "gate": "api_cached_by_sw",
+      "passes": false
+    },
+    {
+      "id": "P4-06",
+      "phase": "P4",
+      "description": "Navigation and frames: the tab bar; Today, Check-in (a sheet), Training, Insights and Settings render with the engine down; Settings has the version line, Eruda after seven taps, the debug log, the engine status and the outbox count.",
+      "depends_on": [
+        "P4-03"
+      ],
+      "gate": "blank_screen_with_engine_down",
+      "passes": false
+    },
+    {
+      "id": "P4-07",
+      "phase": "P4",
+      "description": "The Worker: the key check, the engine's secret, no /api caching, a JSON error when the engine is starting or down; SYNC_ENABLED false until Phase 9 (no sync trigger: the owner's one sync a day at the first open, 2026-10-19).",
+      "depends_on": [],
+      "gate": "cron_enabled_early",
+      "passes": false
+    },
+    {
+      "id": "P4-08",
+      "phase": "P4",
+      "description": "The daily data check (adapted: the newest backup against the store, since Notion is a frozen archive): a read-only engine endpoint, a daily Cron Trigger, the last result in KV and in Settings; rows it reports missing are repaired with the owner's OK.",
+      "depends_on": [
+        "P4-07"
+      ],
+      "gate": "mirror_gaps_open",
+      "passes": false
+    },
+    {
+      "id": "P4-09",
+      "phase": "P4",
+      "description": "Deploy (engine revision and Worker), the address and the iPhone checklist; the owner's results in docs/rebuild/owner_checks.json (p4).",
+      "depends_on": [
+        "P4-02",
+        "P4-03",
+        "P4-04",
+        "P4-06",
+        "P4-07",
+        "P4-08"
+      ],
+      "gate": "device_checklist_open",
+      "passes": false
     }
   ]
 }
