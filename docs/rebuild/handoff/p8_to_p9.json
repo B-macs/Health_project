@@ -1,0 +1,54 @@
+{
+  "from_phase": "P8",
+  "to_phase": "P9",
+  "written": "2026-10-20",
+  "verdict": "Every p8 counter is 0 except device_checklist_open (9: the owner's comparison of each Insights screen with the Streamlit app, and one assessment when one is due). Signed off under the owner's standing instruction (2026-10-19); his comparison stays open in his batch.",
+  "address": "https://health.lauscher-worker.workers.dev (Worker 00b0373a; engine revision health-engine-00012-qq2, commit 6fb84c9)",
+  "insights_screens": {
+    "hub": "/insights: Strength (the overall score, or 'Not measured' while the engine refuses), Flexibility (the pattern, 'No pattern reached' or 'Not measured'), Metabolism (the latest weight with its date), Cardio (coming soon); then Engine data, Warnings, Trends and Sleep architecture",
+    "strength": "/insights/strength: the headline and calibration, a read failure said, the five series (the score's weekly level, the four tonnage sectors), this week against last, the chart on the engine's axis, the work without load, the body-part split and the region cards (core's hold time), the imbalances; the engine's 409 before the 2025 reference is stored is said as such",
+    "metabolism": "/insights/metabolism: kg fat and fat-free with the weigh-in's date, the split of the weight, six measures, Week/Month/Year/All with the steps the engine allows, the latest and the change with its tone, the chart on the engine's scale (never bridging a gap), the gym scan's two readings with their age, every other figure marked measured, worked out or not measured",
+    "flexibility": "/insights/flexibility: unreadable (said, never shown as empty), empty (the standing goal, Start, what it produces, the slots in order, the tests held back), the assessment in progress with Resume, and the report (the pattern card, the trust warning, the ladder, the stack with its how-to, the held-back items, the trail, every reading, the retest, Re-assess) or no pattern with the readings the battery waits on",
+    "capture": "/insights/flexibility/capture: the cold gate (cold or warm, yesterday's leg day, the protocol in four parts, Begin and Cancel), each step the engine's order at the owner's place (the ticks, the LOCK first, the setup, how to read it, the form with the readings offered back, the load on an isometric spectrum test, the setup number offered back, the void switch, Save & next or Save & finish; Skip, Back, Pause), the engine's early answer (Save assessment, Keep going anyway)",
+    "engine_data": "/insights/engine: Read again, the directive in Home's words (fault F4) with the ACWR note, the stage with its two progress bars, the traffic light with its four cards and the drift, the workload (ACWR, both windows, the ceiling, its status, the 28-day AU chart with the acute window marked), the weekly volume",
+    "warnings": "/insights/warnings: the month's calendar with the engine's marker on each flagged day, a marked day's entries, the month stepped as the engine names it",
+    "trends": "/insights/trends: no parsed notes, the most flagged regions (each bar the engine's share), tightness over time beside pain on the 0-10 scale, the levels with their entries, the data gate, the recovery direction with its slopes and notable correlations, and the reading worked out on load",
+    "sleep_architecture": "/insights/sleep: the method, a failed read against no fused night, the counts and the median phantom wake, a night's three strips on one clock (the Sleep screen's strip) and its figures",
+    "settings_data": "/settings/data (from Settings > Data tables and syncs): what waits for the keyword parse and parsing it now, the session checks, the three tables (the engine view; the blend history and the metrics history with a date range), what wiring sleep fusion into the engine would change, the syncs (set up or not; the five buttons off with 'Syncs run in the old app until the switch-over')"
+  },
+  "rules_as_built": [
+    "No rule and no scale in the phone: every figure, word, chart scale and chart top is the engine's. The phone draws the engine's numbers where the engine says.",
+    "No figure fused or added: no line of the Insights code joins a scale figure with a gym-scan figure, or strength with tonnage, in arithmetic (counter fused_or_added_figures; tests/test_body_composition.py and tests/test_tonnage.py pin the engine's refusals).",
+    "The capture never chooses a test: it shows the engine's order at the position the owner moves, with no test key in the code and the order never sorted, filtered or searched; the early answer is the engine's (counter battery_disagreement, the browser test's annotation, and the mock being the engine's own output).",
+    "The capture writes straight to the engine, not through the outbox: the engine decides the next test and the early answer after every reading, so the assessment needs the engine. The draft is stored after every step, so Pause or a closed app loses nothing. With no engine the screen says so.",
+    "Each screen is a thin read and a pure body; a screen that changes series or period keeps its last answer on screen while the next loads."
+  ],
+  "engine_changes": [
+    "metabolism_screen.chart_axis: the metabolism chart's scale and labels, used by the Streamlit view too",
+    "flexibility_screen: the guide's and the report's cluster name, the report's stop slot, the capture's early reason, each reading's test name",
+    "insights_screens.engine_data: the AU chart's top (acwr.chart.hi) and the volume chart's top (volume_hi), both tonnage.nice_axis_max",
+    "insights_screens.trends: each region's share of the most flagged one; the timeline oldest first; its scale (insights.score_timeline_axis: 0-10, the first and last dates)",
+    "insights_screens.sleep_architecture_view: a night's three strips in the Sleep screen's shape (home_detail.strip) on the night's own clock"
+  ],
+  "parity": "scripts/rebuild_parity.py --insights over the 28 days to 2026-10-20: 0 differences, 0 answered by one side only; Strength refused alike on every day (strength_reference_missing). A first run found 3 differences in the shadow report's fused sleep debt; all three came from the interpreter: the gate computed the services' side under Python 3.11 (venv/) and the engine runs 3.12, whose sum() adds floats more exactly, so a 28-night average crossed a 2-decimal rounding step. The parity run now uses .venv-engine (3.12): 0 differences.",
+  "tests": "Python 5629 passed, 1 skipped (floor 5629); app Vitest 242, Worker 42; Playwright 101 (12 Insights tests in Chromium and WebKit)",
+  "waits_for_phase_9": [
+    "The five manual syncs in Settings > Data are drawn off; POST /api/data/sync/{kind} refuses unless background_writer is 'engine'. Phase 9 turns them on with the writer.",
+    "The Oura login pair (POST /api/oura/login and /callback) needs the Oura redirect URI (the owner's step).",
+    "The scheduled syncs (the Worker's Cron Triggers) and the automatic writes (the failed-week rule, the stored no-movement records) stay with the Streamlit app until the switch.",
+    "The plan start setup (T29) belongs to Settings or a first run; no block needs it now."
+  ],
+  "phase_9_may_rely_on": [
+    "Every Insights answer through the Worker, equal to the services' own under the engine's Python (parity 0 over 28 days)",
+    "The thin-read and pure-body pattern for any screen Phase 9 adds, and ui/hooks.ts useKept for a screen whose choice changes its address",
+    "The mock's Insights answers from scripts/make_insights_fixture.py (the engine's own output; --check)",
+    "scripts/rebuild_gate.py parity_python: the parity's local side under .venv-engine"
+  ],
+  "open": [
+    "The owner's Insights comparison (owner_checks.json p8, 9 items): each screen against the Streamlit app, and one assessment when one is due (or: not due).",
+    "The Strength reference (scripts/upload_strength_reference.py --apply): until it is stored, both apps' engines refuse the Strength screen.",
+    "Python 3.11 against 3.12: the repo's venv/ is 3.11.9, the engine 3.12.15. A sum of floats can differ in the last digits, and a rounded figure (a sleep need, a sleep debt) by one step. The hosted Streamlit app's Python version is not recorded in the repo. For the Phase 9 side by side: compare under 3.12, or let the services add with math.fsum (interpreter-proof; a decision for the owner, since it can move a 3.11 figure by one rounding step).",
+    "Carried: the Phase 7 training week, the Phase 6 real session, the Phase 5 two mornings, the Phase 4 iPhone checklist, the hosted-app check, his answers 4a and 4b, the voice app's address and secrets",
+    "Artifact Registry at 743 MB before revision 12; the clean-up keeps the two newest images once they are a day old"
+  ]
+}

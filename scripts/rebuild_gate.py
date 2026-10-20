@@ -171,6 +171,16 @@ def engine_python(root: Path = REPO_ROOT) -> Path:
     return windows if windows.exists() else root / ".venv-engine" / "bin" / "python"
 
 
+def parity_python(root: Path = REPO_ROOT) -> Path:
+    """The interpreter the parity run computes the services' side with: the engine's
+    (.venv-engine, the Python the engine runs), so the run measures the deployment and
+    not the interpreter. Python 3.12 adds floats in sum() more exactly than 3.11 (the
+    repo's venv/), and a 28-night average then lands on the other side of a rounding
+    step: on 2026-10-20 that alone was 3 "differences" in the fused sleep debt."""
+    engine = engine_python(root)
+    return engine if engine.exists() else main_python(root)
+
+
 def _child_env() -> dict[str, str]:
     env = dict(os.environ)
     env.update({"NO_COLOR": "1", "FORCE_COLOR": "0", "CI": "1",
@@ -1371,9 +1381,9 @@ def parity_report(phase: str) -> dict | None:
     path = out / "parity.json"
     if not (REUSE_TEST_RUNS and path.exists()):
         path.unlink(missing_ok=True)
-        if main_python().exists():
+        if parity_python().exists():
             mode = ["--insights"] if phase in PARITY_INSIGHTS_PHASES else []
-            proc = subprocess.run([str(main_python()), str(PARITY), *mode, "--json"], cwd=REPO_ROOT,
+            proc = subprocess.run([str(parity_python()), str(PARITY), *mode, "--json"], cwd=REPO_ROOT,
                                   env=_child_env(), capture_output=True, text=True,
                                   encoding="utf-8", errors="replace")
             path.write_text(proc.stdout, encoding="utf-8", newline="\n")

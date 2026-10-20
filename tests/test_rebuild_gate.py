@@ -953,3 +953,15 @@ def test_the_insights_checklist_is_open_until_the_owner_confirms_it(tmp_path, mo
     monkeypatch.setattr(gate, "OWNER_CHECKS", checks)
     checks.write_text(json.dumps({"p8": {"strength": True, "data": False}}), encoding="utf-8")
     assert gate.p8_device_checklist_open().count == len(gate.P8_CHECKLIST) - 1
+
+
+def test_the_parity_run_computes_with_the_engines_python(tmp_path):
+    """The parity's local side runs under the engine's interpreter (.venv-engine), and
+    under the repo's venv/ only when there is none: Python 3.11 and 3.12 add floats
+    differently, and the run must measure the deployment, not the interpreter."""
+    (tmp_path / "venv" / "bin").mkdir(parents=True)
+    (tmp_path / "venv" / "bin" / "python").write_text("")
+    assert gate.parity_python(tmp_path) == tmp_path / "venv" / "bin" / "python"
+    (tmp_path / ".venv-engine" / "bin").mkdir(parents=True)
+    (tmp_path / ".venv-engine" / "bin" / "python").write_text("")
+    assert gate.parity_python(tmp_path) == tmp_path / ".venv-engine" / "bin" / "python"
