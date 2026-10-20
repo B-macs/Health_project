@@ -7703,6 +7703,32 @@
   },
   "strength": {
     "Core Tonnage": {
+      "areas": [
+        {
+          "hold_date": null,
+          "lifts": 12,
+          "pct_of_2025": 114.0,
+          "progress": null,
+          "region": "upper_body",
+          "state": "measured"
+        },
+        {
+          "hold_date": null,
+          "lifts": 0,
+          "pct_of_2025": null,
+          "progress": null,
+          "region": "core",
+          "state": "none"
+        },
+        {
+          "hold_date": null,
+          "lifts": 6,
+          "pct_of_2025": null,
+          "progress": 0.0,
+          "region": "lower_body",
+          "state": "too_few"
+        }
+      ],
       "axis": {
         "hi": 100.0,
         "lo": 0.0
@@ -8051,8 +8077,112 @@
           "week_start": "2026-10-19"
         }
       ],
+      "trend": [
+        {
+          "label": "14 Sep",
+          "level": 85.3,
+          "measured": 86.68172237277928
+        },
+        {
+          "label": "21 Sep",
+          "level": 86.7,
+          "measured": 91.45137006925624
+        },
+        {
+          "label": "28 Sep",
+          "level": 91.5,
+          "measured": 96.22101776573324
+        },
+        {
+          "label": "5 Oct",
+          "level": 96.2,
+          "measured": 100.99066546221017
+        },
+        {
+          "label": "12 Oct",
+          "level": 101.0,
+          "measured": 105.76031315868714
+        },
+        {
+          "label": "19 Oct",
+          "level": 102.8,
+          "measured": 102.84552845528457
+        }
+      ],
+      "trend_axis": {
+        "hi": 130.0,
+        "lo": 70.0
+      },
       "unloaded": [],
       "unmapped": [],
+      "volume": {
+        "hi": 8000.0,
+        "last_full": {
+          "delta": 300.0,
+          "kg": 6525.0,
+          "label": "12 Oct",
+          "pct": 4.819277108433735,
+          "previous_kg": 6225.0,
+          "previous_label": "5 Oct",
+          "tone": "up"
+        },
+        "this_week": {
+          "days": 1,
+          "kg": 1725.0,
+          "label": "19 Oct"
+        },
+        "unloaded": [],
+        "weeks": [
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "14 Sep",
+            "lower_body": 2475.0,
+            "total": 5325.0,
+            "upper_body": 2850.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "21 Sep",
+            "lower_body": 2550.0,
+            "total": 5625.0,
+            "upper_body": 3075.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "28 Sep",
+            "lower_body": 2625.0,
+            "total": 5925.0,
+            "upper_body": 3300.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "5 Oct",
+            "lower_body": 2700.0,
+            "total": 6225.0,
+            "upper_body": 3525.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "12 Oct",
+            "lower_body": 2775.0,
+            "total": 6525.0,
+            "upper_body": 3750.0
+          },
+          {
+            "core": 0.0,
+            "current": true,
+            "label": "19 Oct",
+            "lower_body": 0.0,
+            "total": 1725.0,
+            "upper_body": 1725.0
+          }
+        ]
+      },
       "week_labels": [
         "14 Sep",
         "21 Sep",
@@ -8063,6 +8193,32 @@
       ]
     },
     "Lower Body Tonnage": {
+      "areas": [
+        {
+          "hold_date": null,
+          "lifts": 12,
+          "pct_of_2025": 114.0,
+          "progress": null,
+          "region": "upper_body",
+          "state": "measured"
+        },
+        {
+          "hold_date": null,
+          "lifts": 0,
+          "pct_of_2025": null,
+          "progress": null,
+          "region": "core",
+          "state": "none"
+        },
+        {
+          "hold_date": null,
+          "lifts": 6,
+          "pct_of_2025": null,
+          "progress": 0.0,
+          "region": "lower_body",
+          "state": "too_few"
+        }
+      ],
       "axis": {
         "hi": 3000.0,
         "lo": 0.0
@@ -8411,8 +8567,112 @@
           "week_start": "2026-10-19"
         }
       ],
+      "trend": [
+        {
+          "label": "14 Sep",
+          "level": 85.3,
+          "measured": 86.68172237277928
+        },
+        {
+          "label": "21 Sep",
+          "level": 86.7,
+          "measured": 91.45137006925624
+        },
+        {
+          "label": "28 Sep",
+          "level": 91.5,
+          "measured": 96.22101776573324
+        },
+        {
+          "label": "5 Oct",
+          "level": 96.2,
+          "measured": 100.99066546221017
+        },
+        {
+          "label": "12 Oct",
+          "level": 101.0,
+          "measured": 105.76031315868714
+        },
+        {
+          "label": "19 Oct",
+          "level": 102.8,
+          "measured": 102.84552845528457
+        }
+      ],
+      "trend_axis": {
+        "hi": 130.0,
+        "lo": 70.0
+      },
       "unloaded": [],
       "unmapped": [],
+      "volume": {
+        "hi": 8000.0,
+        "last_full": {
+          "delta": 300.0,
+          "kg": 6525.0,
+          "label": "12 Oct",
+          "pct": 4.819277108433735,
+          "previous_kg": 6225.0,
+          "previous_label": "5 Oct",
+          "tone": "up"
+        },
+        "this_week": {
+          "days": 1,
+          "kg": 1725.0,
+          "label": "19 Oct"
+        },
+        "unloaded": [],
+        "weeks": [
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "14 Sep",
+            "lower_body": 2475.0,
+            "total": 5325.0,
+            "upper_body": 2850.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "21 Sep",
+            "lower_body": 2550.0,
+            "total": 5625.0,
+            "upper_body": 3075.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "28 Sep",
+            "lower_body": 2625.0,
+            "total": 5925.0,
+            "upper_body": 3300.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "5 Oct",
+            "lower_body": 2700.0,
+            "total": 6225.0,
+            "upper_body": 3525.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "12 Oct",
+            "lower_body": 2775.0,
+            "total": 6525.0,
+            "upper_body": 3750.0
+          },
+          {
+            "core": 0.0,
+            "current": true,
+            "label": "19 Oct",
+            "lower_body": 0.0,
+            "total": 1725.0,
+            "upper_body": 1725.0
+          }
+        ]
+      },
       "week_labels": [
         "14 Sep",
         "21 Sep",
@@ -8423,6 +8683,32 @@
       ]
     },
     "Overall Strength Score": {
+      "areas": [
+        {
+          "hold_date": null,
+          "lifts": 12,
+          "pct_of_2025": 114.0,
+          "progress": null,
+          "region": "upper_body",
+          "state": "measured"
+        },
+        {
+          "hold_date": null,
+          "lifts": 0,
+          "pct_of_2025": null,
+          "progress": null,
+          "region": "core",
+          "state": "none"
+        },
+        {
+          "hold_date": null,
+          "lifts": 6,
+          "pct_of_2025": null,
+          "progress": 0.0,
+          "region": "lower_body",
+          "state": "too_few"
+        }
+      ],
       "axis": {
         "hi": 130.0,
         "lo": 70.0
@@ -8771,8 +9057,112 @@
           "week_start": "2026-10-19"
         }
       ],
+      "trend": [
+        {
+          "label": "14 Sep",
+          "level": 85.3,
+          "measured": 86.68172237277928
+        },
+        {
+          "label": "21 Sep",
+          "level": 86.7,
+          "measured": 91.45137006925624
+        },
+        {
+          "label": "28 Sep",
+          "level": 91.5,
+          "measured": 96.22101776573324
+        },
+        {
+          "label": "5 Oct",
+          "level": 96.2,
+          "measured": 100.99066546221017
+        },
+        {
+          "label": "12 Oct",
+          "level": 101.0,
+          "measured": 105.76031315868714
+        },
+        {
+          "label": "19 Oct",
+          "level": 102.8,
+          "measured": 102.84552845528457
+        }
+      ],
+      "trend_axis": {
+        "hi": 130.0,
+        "lo": 70.0
+      },
       "unloaded": [],
       "unmapped": [],
+      "volume": {
+        "hi": 8000.0,
+        "last_full": {
+          "delta": 300.0,
+          "kg": 6525.0,
+          "label": "12 Oct",
+          "pct": 4.819277108433735,
+          "previous_kg": 6225.0,
+          "previous_label": "5 Oct",
+          "tone": "up"
+        },
+        "this_week": {
+          "days": 1,
+          "kg": 1725.0,
+          "label": "19 Oct"
+        },
+        "unloaded": [],
+        "weeks": [
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "14 Sep",
+            "lower_body": 2475.0,
+            "total": 5325.0,
+            "upper_body": 2850.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "21 Sep",
+            "lower_body": 2550.0,
+            "total": 5625.0,
+            "upper_body": 3075.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "28 Sep",
+            "lower_body": 2625.0,
+            "total": 5925.0,
+            "upper_body": 3300.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "5 Oct",
+            "lower_body": 2700.0,
+            "total": 6225.0,
+            "upper_body": 3525.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "12 Oct",
+            "lower_body": 2775.0,
+            "total": 6525.0,
+            "upper_body": 3750.0
+          },
+          {
+            "core": 0.0,
+            "current": true,
+            "label": "19 Oct",
+            "lower_body": 0.0,
+            "total": 1725.0,
+            "upper_body": 1725.0
+          }
+        ]
+      },
       "week_labels": [
         "14 Sep",
         "21 Sep",
@@ -8783,6 +9173,32 @@
       ]
     },
     "Overall Strength Tonnage": {
+      "areas": [
+        {
+          "hold_date": null,
+          "lifts": 12,
+          "pct_of_2025": 114.0,
+          "progress": null,
+          "region": "upper_body",
+          "state": "measured"
+        },
+        {
+          "hold_date": null,
+          "lifts": 0,
+          "pct_of_2025": null,
+          "progress": null,
+          "region": "core",
+          "state": "none"
+        },
+        {
+          "hold_date": null,
+          "lifts": 6,
+          "pct_of_2025": null,
+          "progress": 0.0,
+          "region": "lower_body",
+          "state": "too_few"
+        }
+      ],
       "axis": {
         "hi": 8000.0,
         "lo": 0.0
@@ -9131,8 +9547,112 @@
           "week_start": "2026-10-19"
         }
       ],
+      "trend": [
+        {
+          "label": "14 Sep",
+          "level": 85.3,
+          "measured": 86.68172237277928
+        },
+        {
+          "label": "21 Sep",
+          "level": 86.7,
+          "measured": 91.45137006925624
+        },
+        {
+          "label": "28 Sep",
+          "level": 91.5,
+          "measured": 96.22101776573324
+        },
+        {
+          "label": "5 Oct",
+          "level": 96.2,
+          "measured": 100.99066546221017
+        },
+        {
+          "label": "12 Oct",
+          "level": 101.0,
+          "measured": 105.76031315868714
+        },
+        {
+          "label": "19 Oct",
+          "level": 102.8,
+          "measured": 102.84552845528457
+        }
+      ],
+      "trend_axis": {
+        "hi": 130.0,
+        "lo": 70.0
+      },
       "unloaded": [],
       "unmapped": [],
+      "volume": {
+        "hi": 8000.0,
+        "last_full": {
+          "delta": 300.0,
+          "kg": 6525.0,
+          "label": "12 Oct",
+          "pct": 4.819277108433735,
+          "previous_kg": 6225.0,
+          "previous_label": "5 Oct",
+          "tone": "up"
+        },
+        "this_week": {
+          "days": 1,
+          "kg": 1725.0,
+          "label": "19 Oct"
+        },
+        "unloaded": [],
+        "weeks": [
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "14 Sep",
+            "lower_body": 2475.0,
+            "total": 5325.0,
+            "upper_body": 2850.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "21 Sep",
+            "lower_body": 2550.0,
+            "total": 5625.0,
+            "upper_body": 3075.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "28 Sep",
+            "lower_body": 2625.0,
+            "total": 5925.0,
+            "upper_body": 3300.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "5 Oct",
+            "lower_body": 2700.0,
+            "total": 6225.0,
+            "upper_body": 3525.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "12 Oct",
+            "lower_body": 2775.0,
+            "total": 6525.0,
+            "upper_body": 3750.0
+          },
+          {
+            "core": 0.0,
+            "current": true,
+            "label": "19 Oct",
+            "lower_body": 0.0,
+            "total": 1725.0,
+            "upper_body": 1725.0
+          }
+        ]
+      },
       "week_labels": [
         "14 Sep",
         "21 Sep",
@@ -9143,6 +9663,32 @@
       ]
     },
     "Upper Body Tonnage": {
+      "areas": [
+        {
+          "hold_date": null,
+          "lifts": 12,
+          "pct_of_2025": 114.0,
+          "progress": null,
+          "region": "upper_body",
+          "state": "measured"
+        },
+        {
+          "hold_date": null,
+          "lifts": 0,
+          "pct_of_2025": null,
+          "progress": null,
+          "region": "core",
+          "state": "none"
+        },
+        {
+          "hold_date": null,
+          "lifts": 6,
+          "pct_of_2025": null,
+          "progress": 0.0,
+          "region": "lower_body",
+          "state": "too_few"
+        }
+      ],
       "axis": {
         "hi": 4000.0,
         "lo": 0.0
@@ -9491,8 +10037,112 @@
           "week_start": "2026-10-19"
         }
       ],
+      "trend": [
+        {
+          "label": "14 Sep",
+          "level": 85.3,
+          "measured": 86.68172237277928
+        },
+        {
+          "label": "21 Sep",
+          "level": 86.7,
+          "measured": 91.45137006925624
+        },
+        {
+          "label": "28 Sep",
+          "level": 91.5,
+          "measured": 96.22101776573324
+        },
+        {
+          "label": "5 Oct",
+          "level": 96.2,
+          "measured": 100.99066546221017
+        },
+        {
+          "label": "12 Oct",
+          "level": 101.0,
+          "measured": 105.76031315868714
+        },
+        {
+          "label": "19 Oct",
+          "level": 102.8,
+          "measured": 102.84552845528457
+        }
+      ],
+      "trend_axis": {
+        "hi": 130.0,
+        "lo": 70.0
+      },
       "unloaded": [],
       "unmapped": [],
+      "volume": {
+        "hi": 8000.0,
+        "last_full": {
+          "delta": 300.0,
+          "kg": 6525.0,
+          "label": "12 Oct",
+          "pct": 4.819277108433735,
+          "previous_kg": 6225.0,
+          "previous_label": "5 Oct",
+          "tone": "up"
+        },
+        "this_week": {
+          "days": 1,
+          "kg": 1725.0,
+          "label": "19 Oct"
+        },
+        "unloaded": [],
+        "weeks": [
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "14 Sep",
+            "lower_body": 2475.0,
+            "total": 5325.0,
+            "upper_body": 2850.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "21 Sep",
+            "lower_body": 2550.0,
+            "total": 5625.0,
+            "upper_body": 3075.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "28 Sep",
+            "lower_body": 2625.0,
+            "total": 5925.0,
+            "upper_body": 3300.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "5 Oct",
+            "lower_body": 2700.0,
+            "total": 6225.0,
+            "upper_body": 3525.0
+          },
+          {
+            "core": 0.0,
+            "current": false,
+            "label": "12 Oct",
+            "lower_body": 2775.0,
+            "total": 6525.0,
+            "upper_body": 3750.0
+          },
+          {
+            "core": 0.0,
+            "current": true,
+            "label": "19 Oct",
+            "lower_body": 0.0,
+            "total": 1725.0,
+            "upper_body": 1725.0
+          }
+        ]
+      },
       "week_labels": [
         "14 Sep",
         "21 Sep",

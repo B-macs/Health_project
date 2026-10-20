@@ -45,11 +45,14 @@ test('Insights opens each screen in the same page, each drawn from the engine\'s
     ;(window as unknown as { __kept: string }).__kept = 'same page'
   })
   await openTab(page, S.nav.insights)
-  const overall = F.strength['Overall Strength Score']!.overall.toFixed(1)
+  const overall = S.ins.pct(F.strength['Overall Strength Score']!.overall)
   await expect(page.getByTestId('tile-strength')).toContainText(overall)
   await page.getByTestId('tile-strength').click()
   await expect(page.getByTestId('overall')).toHaveText(overall)
   await expect(page.getByTestId('body-parts')).toBeVisible()
+  // The redone page (2026-10-20): the whole page from one answer, no button per series.
+  await expect(page.getByTestId('volume')).toBeVisible()
+  await expect(page.getByRole('radio')).toHaveCount(0)
   await back(page).click()
   await page.getByRole('button', { name: S.ins.engine }).click()
   await expect(page.getByTestId('directive')).toContainText(F.engine.directive.words)

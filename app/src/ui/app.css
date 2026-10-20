@@ -39,6 +39,18 @@ body,
   overflow: hidden;
 }
 
+/* iOS 26 sizes an installed web app's screen area short by the status bar's height while the
+ * page is shorter than the screen (WebKit bug 301108), so the app stopped above the bottom
+ * edge with a strip of background under the tab bar (the owner's iPhone, 2026-10-20). A page
+ * at least as tall as the screen gets the full area; min() keeps a page with an opaque
+ * status bar from scrolling by the bar's height (WebKit 316008). The rule frappe-ui shipped
+ * for the same fault (github.com/frappe/frappe-ui/pull/1289, checked on iOS 26.2). */
+@media (display-mode: standalone) {
+  html {
+    min-height: min(100lvh, calc(100% + env(safe-area-inset-top)));
+  }
+}
+
 button {
   font: inherit;
   color: inherit;
@@ -125,6 +137,28 @@ ul {
   flex-direction: column;
   /* A contained sheet slides up from the bar's top edge, never over the bar. */
   overflow: hidden;
+}
+
+/* Behind the iPhone's status bar: text that scrolls up passes under glass, never under the
+ * clock (2026-10-20). It shows only once the page has moved, so the light at the top of each
+ * page is untouched at rest. */
+.statusband {
+  position: absolute;
+  z-index: 5;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top);
+  pointer-events: none;
+  background: var(--tab-bar);
+  -webkit-backdrop-filter: blur(var(--blur)) saturate(1.6);
+  backdrop-filter: blur(var(--blur)) saturate(1.6);
+  opacity: 0;
+  transition: opacity var(--quick) var(--ease);
+}
+
+.stage--scrolled .statusband {
+  opacity: 1;
 }
 
 .scroller {
@@ -825,6 +859,16 @@ ul {
 
 .fresh--warn {
   color: var(--muted);
+}
+
+/* "Read again" after a read that did not answer: a word in the page's colour, a full tap. */
+.fresh__again {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--tap);
+  color: var(--f1);
+  font-weight: 600;
+  text-decoration: underline;
 }
 
 /* "Sample numbers": the frames show the design's made-up numbers until they are wired. */
@@ -1642,6 +1686,57 @@ button.card {
 
 .ichart__bar {
   fill: var(--f3);
+}
+
+/* The strength page's weeks by body area (2026-10-20): the share bar's three shades. */
+.ichart__seg--upper_body {
+  fill: var(--f1);
+}
+
+.ichart__seg--core {
+  fill: var(--f2);
+}
+
+.ichart__seg--lower_body {
+  fill: var(--f3);
+}
+
+.ichart__stack--now {
+  opacity: 0.55;
+}
+
+/* The strength page's key to the body areas' shades (a dot each, not a line). */
+.areakey {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-xs) var(--sp-m);
+  font-size: var(--fs-caption);
+  color: var(--muted);
+}
+
+.areakey__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+}
+
+.areakey__chip {
+  width: var(--timer-bar);
+  height: var(--timer-bar);
+  border-radius: var(--r-pill);
+  background: var(--track);
+}
+
+.areakey__chip--upper_body {
+  background: var(--f1);
+}
+
+.areakey__chip--core {
+  background: var(--f2);
+}
+
+.areakey__chip--lower_body {
+  background: var(--f3);
 }
 
 .ichart__bar--now {

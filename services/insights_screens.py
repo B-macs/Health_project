@@ -135,6 +135,12 @@ def strength(repo, today: date, metric: str = DEFAULT_STRENGTH_METRIC) -> dict:
         "unmapped": data["unmapped"],
         "imbalances": data["imbalances"],
         "imbalance_count": data["imbalance_count"],
+        # The phone's page since 2026-10-20 (strength_screen, the redo): the whole page in
+        # one answer, whatever `metric` asked for.
+        "trend": strength_screen.trend(data),
+        "trend_axis": dict(zip(("lo", "hi"), strength_screen.score_axis(data["score_series"]))),
+        "areas": strength_screen.area_rows(data["regions"], data.get("core_hold")),
+        "volume": strength_screen.volume(data["tonnage"]),
     }
 
 

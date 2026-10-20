@@ -42,9 +42,8 @@ export function InsightsHub({ strength, metab, flex, go }: {
       <Freshness view={strength.data ? strength : metab} />
       <section className="pair">
         <Tile title={S.ins.strength} testId="tile-strength" onOpen={() => go('/insights/strength')}
-          value={st?.overall != null ? st.overall.toFixed(1) : S.ins.none}
-          note={st ? (st.calibrating ? `${S.ins.points} · ${S.ins.calibrating}` : S.ins.points)
-            : strength.code === REFERENCE_MISSING ? S.ins.notMeasured : ''} />
+          value={st?.overall != null ? S.ins.pct(st.overall) : S.ins.none}
+          note={st ? S.ins.ofBest : strength.code === REFERENCE_MISSING ? S.ins.notMeasured : ''} />
         <Tile title={S.ins.flexibility} testId="tile-flexibility" onOpen={() => go('/insights/flexibility')}
           value={report?.pattern ?? S.ins.none}
           note={report ? (report.pattern ? report.pattern_label : S.flex.noPattern) : S.ins.notMeasured} />

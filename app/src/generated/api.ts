@@ -848,6 +848,21 @@ export interface components {
             /** Action Id */
             action_id?: string | null;
         };
+        /** AreaRow */
+        AreaRow: {
+            /** Hold Date */
+            hold_date: string | null;
+            /** Lifts */
+            lifts: number;
+            /** Pct Of 2025 */
+            pct_of_2025: number | null;
+            /** Progress */
+            progress: number | null;
+            /** Region */
+            region: string;
+            /** State */
+            state: string;
+        };
         /**
          * AxisTick
          * @description `at` is the fraction across (an X tick) or down from the top (a Y tick).
@@ -2918,6 +2933,11 @@ export interface components {
         };
         /** StrengthOut */
         StrengthOut: {
+            /**
+             * Areas
+             * @default []
+             */
+            areas: components["schemas"]["AreaRow"][];
             /** Axis */
             axis: {
                 [key: string]: number;
@@ -2954,10 +2974,23 @@ export interface components {
             today: string;
             /** Tonnage */
             tonnage: components["schemas"]["TonnageWeekOut"][];
+            /**
+             * Trend
+             * @default []
+             */
+            trend: components["schemas"]["TrendWeek"][];
+            /**
+             * Trend Axis
+             * @default {}
+             */
+            trend_axis: {
+                [key: string]: number;
+            };
             /** Unloaded */
             unloaded: components["schemas"]["TextLine"][];
             /** Unmapped */
             unmapped: string[];
+            volume?: components["schemas"]["VolumeOut"] | null;
             /** Week Labels */
             week_labels: string[];
         };
@@ -3300,6 +3333,15 @@ export interface components {
             /** Y Labels */
             y_labels: components["schemas"]["AxisTick"][];
         };
+        /** TrendWeek */
+        TrendWeek: {
+            /** Label */
+            label: string;
+            /** Level */
+            level: number | null;
+            /** Measured */
+            measured: number | null;
+        };
         /** TrendsOut */
         TrendsOut: {
             /** Analysis */
@@ -3388,6 +3430,67 @@ export interface components {
             reduced: boolean;
             /** Tone */
             tone: string;
+        };
+        /** VolumeFull */
+        VolumeFull: {
+            /** Delta */
+            delta: number;
+            /** Kg */
+            kg: number;
+            /** Label */
+            label: string;
+            /** Pct */
+            pct: number | null;
+            /** Previous Kg */
+            previous_kg: number;
+            /** Previous Label */
+            previous_label: string;
+            /** Tone */
+            tone: string;
+        };
+        /** VolumeLine */
+        VolumeLine: {
+            /** Area */
+            area: string;
+            /** Text */
+            text: string;
+            /** Week */
+            week: string;
+        };
+        /** VolumeNow */
+        VolumeNow: {
+            /** Days */
+            days: number;
+            /** Kg */
+            kg: number;
+            /** Label */
+            label: string;
+        };
+        /** VolumeOut */
+        VolumeOut: {
+            /** Hi */
+            hi: number;
+            last_full: components["schemas"]["VolumeFull"] | null;
+            this_week: components["schemas"]["VolumeNow"] | null;
+            /** Unloaded */
+            unloaded: components["schemas"]["VolumeLine"][];
+            /** Weeks */
+            weeks: components["schemas"]["VolumeWeek"][];
+        };
+        /** VolumeWeek */
+        VolumeWeek: {
+            /** Core */
+            core: number;
+            /** Current */
+            current: boolean;
+            /** Label */
+            label: string;
+            /** Lower Body */
+            lower_body: number;
+            /** Total */
+            total: number;
+            /** Upper Body */
+            upper_body: number;
         };
         /** WakeAdjustmentIn */
         WakeAdjustmentIn: {

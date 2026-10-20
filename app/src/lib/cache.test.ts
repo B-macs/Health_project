@@ -3,7 +3,7 @@
 // screen with the reason. Nothing ever renders blank once something was saved.
 import { describe, expect, it, vi } from 'vitest'
 import { HealthDB } from '../db/schema'
-import { ageMinutes, cacheFirst, cacheKey, type View } from './cache'
+import { READ_TIMEOUT_MS, SAVED_MS, ageMinutes, cacheFirst, cacheKey, within, type View } from './cache'
 
 let n = 0
 const freshDb = () => new HealthDB(`cache-test-${++n}-${Date.now()}`)
@@ -69,6 +69,41 @@ describe('the cache-first read', () => {
     await views(freshDb(), fetchImpl, '2026-10-18')
     const init = (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1]
     expect(new Headers(init.headers).get('x-local-date')).toBe('2026-10-18')
+  })
+})
+
+describe("a read that never finishes (the owner's iPhone, 2026-10-20)", () => {
+  it('ends at the time limit with the saved answer and the reason, never waits for good', async () => {
+    expect(READ_TIMEOUT_MS).toBeGreaterThan(10_000)
+    const store = freshDb()
+    await store.cache.put({ key: cacheKey('/api/today', '2026-10-20'), path: '/api/today', day: '2026-10-20',
+      body: { score: 60 }, fetched_at: '2026-10-20T03:00:00.000Z' })
+    // A request that never answers, as a stalled connection does; it ends only when aborted.
+    const fetchImpl = vi.fn((_url: string, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })) as unknown as typeof fetch
+    const seen: View<{ score: number }>[] = []
+    await cacheFirst<{ score: number }>(store, '/api/today', '2026-10-20',
+      { key: 'k', engineDown: false, fetchImpl, readTimeoutMs: 60 }, (v) => seen.push(v))
+    expect(seen.map((v) => [v.state, v.data])).toEqual([['loading', { score: 60 }], ['offline', { score: 60 }]])
+    expect(seen[1]!.code).toBe('timeout')
+  })
+
+  it("shows the engine's answer even when the phone's database stalls on keeping it", async () => {
+    expect(SAVED_MS).toBeGreaterThan(0)
+    const store = freshDb()
+    vi.spyOn(store.cache, 'put').mockReturnValue(new Promise(() => undefined) as never)
+    const seen: View<{ score: number }>[] = []
+    await cacheFirst<{ score: number }>(store, '/api/today', '2026-10-20',
+      { key: 'k', engineDown: false, fetchImpl: answer(200, { score: 71 }), savedMs: 60 }, (v) => seen.push(v))
+    expect(seen.at(-1)?.state).toBe('fresh')
+    expect(seen.at(-1)?.data).toEqual({ score: 71 })
+  })
+
+  it('within: the value, or undefined after the limit or on a failure', async () => {
+    expect(await within(Promise.resolve(3), 50)).toBe(3)
+    expect(await within(Promise.reject(new Error('no')), 50)).toBeUndefined()
+    expect(await within(new Promise(() => undefined), 30)).toBeUndefined()
   })
 })
 

@@ -22,22 +22,57 @@ export interface Ctx {
   engineDown: boolean
   fetchImpl?: typeof fetch
   now?: () => Date
+  /** The tests' shorter limits (READ_TIMEOUT_MS, SAVED_MS). */
+  readTimeoutMs?: number
+  savedMs?: number
 }
 
 export function cacheKey(path: string, day: string | null): string {
   return day ? `${path}|${day}` : path
 }
 
-/** Ask the engine and keep its answer. Throws an ApiError; the saved row stays. */
-export async function refresh<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx): Promise<T> {
-  const body = await api<T>(path, {
+/** How long a screen waits for the engine before it shows its saved answer with the reason
+ *  (2026-10-20: on the owner's iPhone, reads that never finished left every screen on its
+ *  saved copy with no word of why, and the Strength buttons seemed dead). The Worker gives
+ *  up at 60 s; an engine starting from sleep answers in about 10 s. */
+export const READ_TIMEOUT_MS = 30_000
+/** How long the phone's own database may take to read or keep an answer. IndexedDB can stall
+ *  on iOS after the app comes back from the background; the engine is asked regardless. */
+export const SAVED_MS = 3_000
+
+/** `promise`'s value, or undefined when it fails or takes longer than `ms`. */
+export function within<T>(promise: Promise<T>, ms: number): Promise<T | undefined> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(undefined), ms)
+    promise.then(
+      (value) => {
+        clearTimeout(timer)
+        resolve(value)
+      },
+      () => {
+        clearTimeout(timer)
+        resolve(undefined)
+      },
+    )
+  })
+}
+
+function ask<T>(path: string, day: string | null, ctx: Ctx): Promise<T> {
+  return api<T>(path, {
     key: ctx.key,
     day: day ?? localDay(ctx.now?.()),
     engineDown: ctx.engineDown,
     fetchImpl: ctx.fetchImpl,
+    timeoutMs: ctx.readTimeoutMs ?? READ_TIMEOUT_MS,
   })
+}
+
+/** Ask the engine and keep its answer. Throws an ApiError; the saved row stays. */
+export async function refresh<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx): Promise<T> {
+  const body = await ask<T>(path, day, ctx)
   const fetchedAt = (ctx.now?.() ?? new Date()).toISOString()
-  await store.cache.put({ key: cacheKey(path, day), path, day, body, fetched_at: fetchedAt })
+  await within(store.cache.put({ key: cacheKey(path, day), path, day, body, fetched_at: fetchedAt }),
+    ctx.savedMs ?? SAVED_MS)
   return body
 }
 
@@ -49,19 +84,25 @@ export async function keepAnswer(store: HealthDB, path: string, day: string | nu
 }
 
 /** The cache-first read: `show` gets the saved answer at once, then the engine's answer, or
- *  the saved answer again with why the engine did not answer. */
+ *  the saved answer again with why the engine did not answer. The engine's answer is shown
+ *  before it is kept, so a stalled database never holds it back, and a read that takes
+ *  longer than READ_TIMEOUT_MS ends as "no connection" with the code "timeout". */
 export async function cacheFirst<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx,
   show: (view: View<T>) => void): Promise<void> {
-  const saved = await store.cache.get(cacheKey(path, day))
+  const savedMs = ctx.savedMs ?? SAVED_MS
+  const saved = await within(store.cache.get(cacheKey(path, day)), savedMs)
   const kept: View<T> = { data: saved?.body as T | undefined, fetchedAt: saved?.fetched_at ?? null, state: 'loading' }
   show(kept)
+  let body: T
   try {
-    const body = await refresh<T>(store, path, day, ctx)
-    const row = await store.cache.get(cacheKey(path, day))
-    show({ data: body, fetchedAt: row?.fetched_at ?? null, state: 'fresh' })
+    body = await ask<T>(path, day, ctx)
   } catch (err) {
     show({ ...kept, state: err instanceof ApiError ? err.kind : 'server', code: err instanceof ApiError ? err.code : undefined })
+    return
   }
+  const fetchedAt = (ctx.now?.() ?? new Date()).toISOString()
+  show({ data: body, fetchedAt, state: 'fresh' })
+  await within(store.cache.put({ key: cacheKey(path, day), path, day, body, fetched_at: fetchedAt }), savedMs)
 }
 
 /** The hook a screen uses. `again()` asks the engine once more, and so does every engine

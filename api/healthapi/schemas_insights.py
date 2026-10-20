@@ -79,6 +79,66 @@ class RegionCard(BaseModel):
     off: bool
 
 
+class TrendWeek(BaseModel):
+    label: str
+    #: That week's lifts as a % of 2025; None without a lift.
+    measured: float | None
+    #: The headline as it read that week.
+    level: float | None
+
+
+class AreaRow(BaseModel):
+    region: str
+    #: measured, too_few, none or hold_time (services/strength_screen.AREA_*).
+    state: str
+    pct_of_2025: float | None
+    #: How far a too-early area is toward showing a number (0-1).
+    progress: float | None
+    lifts: int
+    hold_date: date | None
+
+
+class VolumeWeek(BaseModel):
+    label: str
+    upper_body: float
+    core: float
+    lower_body: float
+    total: float
+    #: The caller's own week, not finished.
+    current: bool
+
+
+class VolumeFull(BaseModel):
+    label: str
+    kg: float
+    previous_label: str
+    previous_kg: float
+    delta: float
+    pct: float | None
+    tone: str
+
+
+class VolumeNow(BaseModel):
+    label: str
+    kg: float
+    days: int
+
+
+class VolumeLine(BaseModel):
+    #: last_full or this_week.
+    week: str
+    area: str
+    text: str
+
+
+class VolumeOut(BaseModel):
+    weeks: list[VolumeWeek]
+    hi: float
+    last_full: VolumeFull | None
+    this_week: VolumeNow | None
+    unloaded: list[VolumeLine]
+
+
 class StrengthOut(BaseModel):
     today: date
     load_error: str | None
@@ -97,6 +157,10 @@ class StrengthOut(BaseModel):
     unmapped: list[str]
     imbalances: dict[str, Any]
     imbalance_count: int | None
+    trend: list[TrendWeek] = []
+    trend_axis: dict[str, float] = {}
+    areas: list[AreaRow] = []
+    volume: VolumeOut | None = None
 
 
 # ── Metabolism ───────────────────────────────────────────────────────────────

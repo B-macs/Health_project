@@ -127,7 +127,13 @@ def test_strength_reads_its_reference_from_the_store(env, monkeypatch):
     assert len(body["tonnage"]) == 6 and body["readout"]["points"]
     assert [m["label"] for m in body["metrics"]][0] == ins.DEFAULT_STRENGTH_METRIC
     assert body["imbalance_count"] == 1 and {c["region"] for c in body["regions"]}
+    # The redone page (2026-10-20): the whole page in every answer, whatever metric asked.
+    assert {a["region"] for a in body["areas"]} == {"upper_body", "core", "lower_body"}
+    assert len(body["trend"]) == 6 and body["trend_axis"]["hi"] > body["trend_axis"]["lo"]
+    assert body["volume"]["last_full"]["kg"] == 2 * 3 * 10 * 50.0, "the last full week"
+    assert body["volume"]["this_week"]["kg"] == 0.0, "this week so far, apart: nothing yet"
     upper = env.ok(monkeypatch, "get", "/api/insights/strength?metric=Upper Body Tonnage")
+    assert upper["volume"] == body["volume"] and upper["areas"] == body["areas"]
     assert not upper["readout"]["points"] and upper["axis"]["lo"] == 0.0
     assert upper["tonnage"][-2]["upper_body"]["kg"] == 2 * 3 * 10 * 50.0, "two sessions last week"
     r = env.call(monkeypatch, "get", "/api/insights/strength?metric=Biceps")

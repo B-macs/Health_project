@@ -211,3 +211,90 @@ def split(regions: list) -> list[dict]:
     return [{"region": rid, "points": by_id[rid].contribution_points,
              "pct": by_id[rid].contribution_pct}
             for rid in REGION_ORDER if rid in by_id]
+
+
+# ─── The phone's Strength page, redone (the owner, 2026-10-20) ──────────────
+# "Can you review that page and redo it": one answer carries the whole page, so
+# no part of it waits on a request of its own (his buttons seemed dead while
+# each tap waited for one), and nothing sets an unfinished week against a full
+# one (a Tuesday read -54%). Words are the phone's; these give it states and
+# numbers.
+
+#: A body area's state on the page (area_rows).
+AREA_MEASURED = "measured"   # its % of 2025 is shown
+AREA_TOO_FEW = "too_few"     # lifts measured, but not yet enough to show a number
+AREA_NONE = "none"           # nothing comparable measured (core: no kilogram scale)
+AREA_HOLD = "hold_time"      # core's plank-test score, provisional, never in the headline
+
+
+def trend(data: dict) -> list[dict]:
+    """The strength chart's weeks, oldest first (strength.score_series): the
+    week's label, its measured % of 2025 (None without a lift) and the
+    headline as it read that week (the middle of its last lifting weeks)."""
+    return [{"label": week_label(p["week"]), "measured": p["measured"], "level": p["level"]}
+            for p in data["score_series"]]
+
+
+def area_rows(regions: list, core_hold: dict | None = None) -> list[dict]:
+    """Each body area, in REGION_ORDER: `state` (AREA_*), `pct_of_2025` when a
+    number may be shown (calibration holds it until the area's confidence
+    reaches strength.CALIBRATION_EXIT, never a placeholder 50), `progress`
+    toward that point while it is too early (0-1), the lifts measured, and
+    for core's plank test its date."""
+    by_id = {r.region: r for r in regions}
+    rows = []
+    for region in REGION_ORDER:
+        state = by_id.get(region)
+        if state is None:
+            continue
+        row = {"region": region, "state": AREA_NONE, "pct_of_2025": None, "progress": None,
+               "lifts": state.observations, "hold_date": None}
+        if state.index is not None and state.confidence >= strength.CALIBRATION_EXIT:
+            row.update(state=AREA_MEASURED, pct_of_2025=round(state.displayed_index, 1))
+        elif state.index is not None:
+            row.update(state=AREA_TOO_FEW,
+                       progress=round(min(1.0, state.confidence / strength.CALIBRATION_EXIT), 2))
+        elif region == "core" and core_hold:
+            row.update(state=AREA_HOLD, pct_of_2025=core_hold["index"], hold_date=core_hold["date"])
+        rows.append(row)
+    return rows
+
+
+def volume(series: list) -> dict:
+    """The work in kilograms by week (tonnage.weekly_tonnage's window, oldest
+    first; its last week is the caller's own and unfinished): each week's
+    kilograms by body area; the last FULL week against the full week before
+    it (`last_full`, None without two); this week so far (`this_week`); the
+    work not counted in kilograms in those two weeks, by area (held time,
+    unloaded reps, cable reps in stack units: tonnage.unloaded_text); and the
+    chart's top."""
+    weeks = [{"label": week_label(w.week_start),
+              **{area: w.value(area).kg for area in REGION_ORDER},
+              "total": w.value("overall").kg, "current": i == len(series) - 1}
+             for i, w in enumerate(series)]
+    last_full = None
+    if len(series) >= 3:
+        full, before = series[-2], series[-3]
+        kg, previous = full.value("overall").kg, before.value("overall").kg
+        delta, pct = tonnage.change(kg, previous)
+        last_full = {"label": week_label(full.week_start), "kg": kg,
+                     "previous_label": week_label(before.week_start), "previous_kg": previous,
+                     "delta": delta, "pct": pct,
+                     "tone": "flat" if abs(delta) < 5e-2 else ("up" if delta > 0 else "down")}
+    this_week = None
+    if series:
+        now = series[-1]
+        this_week = {"label": week_label(now.week_start), "kg": now.value("overall").kg,
+                     "days": now.training_days}
+    unloaded = []
+    for which, week in (("last_full", series[-2] if len(series) > 1 else None),
+                        ("this_week", series[-1] if series else None)):
+        if week is None:
+            continue
+        for area in REGION_ORDER:
+            text = tonnage.unloaded_text(week.value(area))
+            if text:
+                unloaded.append({"week": which, "area": area, "text": text})
+    top = tonnage.nice_axis_max(max((w["total"] for w in weeks), default=0.0))
+    return {"weeks": weeks, "hi": top, "last_full": last_full, "this_week": this_week,
+            "unloaded": unloaded}

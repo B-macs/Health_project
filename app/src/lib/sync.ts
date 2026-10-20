@@ -18,6 +18,8 @@ export type SyncOutcome = 'ran' | 'not_due' | 'skipped' | 'failed'
 
 /** The quickest the phone asks again after an answer (a foreground and back is no new open). */
 export const ASK_GAP_MS = 60_000
+/** The question "is a sync due?" gives up after this long. */
+export const STATUS_TIMEOUT_MS = 30_000
 /** A sync runs the device calls inside one request: the phone waits for it. */
 export const SYNC_TIMEOUT_MS = 300_000
 
@@ -39,7 +41,8 @@ export function syncIfDue(ctx: Ctx, now: () => number = Date.now): Promise<SyncO
   const options = { key: ctx.key, engineDown: ctx.engineDown, fetchImpl: ctx.fetchImpl }
   running = (async (): Promise<SyncOutcome> => {
     try {
-      const status = await api<Status>('/api/status', options)
+      // A status read that never answers would hold `running` for good: it gives up.
+      const status = await api<Status>('/api/status', { ...options, timeoutMs: STATUS_TIMEOUT_MS })
       if (!status.sync_due) return 'not_due'
       const out = await api<SyncOut>('/api/sync', { ...options, method: 'POST', body: {}, timeoutMs: SYNC_TIMEOUT_MS })
       if (out.ran) bump()

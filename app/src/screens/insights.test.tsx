@@ -21,6 +21,7 @@ import type { Guide } from './FlexibilityShared'
 import { MetabolismBody } from './InsightsMetabolism'
 import { SleepArchBody } from './InsightsSleep'
 import { REFERENCE_MISSING, StrengthBody } from './InsightsStrength'
+import { thinLabels } from '../ui/InsightsCharts'
 import { TrendsBody } from './InsightsTrends'
 import { WarningsBody } from './InsightsWarnings'
 
@@ -65,7 +66,7 @@ const WEIGHT = F.metabolism['Weight|all|0']!
 describe('the Insights page', () => {
   it('shows each screen\'s headline as the engine sends it, and opens the engine views', () => {
     const html = text(draw(<InsightsHub strength={fresh(STRENGTH)} metab={fresh(WEIGHT)} flex={fresh(F.flexibility_empty)} go={none} />))
-    expect(html).toContain(`${S.ins.strength} ${STRENGTH.overall!.toFixed(1)} ${S.ins.points} · ${S.ins.calibrating}`)
+    expect(html).toContain(`${S.ins.strength} ${S.ins.pct(STRENGTH.overall!)} ${S.ins.ofBest}`)
     expect(html).toContain(`${S.ins.metabolism} ${WEIGHT.latest!.weight_kg.toFixed(1)} kg`)
     expect(html).toContain(`${S.ins.flexibility} ${S.ins.none} ${S.ins.notMeasured}`)
     expect(html).toContain(S.ins.cardioSoon)
@@ -87,35 +88,71 @@ describe('the Insights page', () => {
     const off = text(draw(<InsightsHub strength={down(STRENGTH)} metab={down(WEIGHT)} flex={down(F.flexibility_empty)} go={none} />))
     expect(off).toContain(S.fresh.saved)
     expect(off).toContain(S.fresh.why.engine_unavailable)
-    expect(off).toContain(STRENGTH.overall!.toFixed(1))
+    expect(off).toContain(S.ins.pct(STRENGTH.overall!))
   })
 })
 
-describe('Strength', () => {
-  it('draws the headline, the readout, the regions and the imbalances from a fresh answer', () => {
-    const raw = draw(<StrengthBody view={fresh(STRENGTH)} reduced onMetric={none} />)
+describe('Strength (redone 2026-10-20)', () => {
+  it('draws the whole page from one answer: headline, trend, areas, volume and imbalances', () => {
+    const raw = draw(<StrengthBody view={fresh(STRENGTH)} reduced />)
     const html = text(raw)
-    expect(html).toContain(`${S.ins.overall} ${STRENGTH.overall!.toFixed(1)} ${S.ins.calibrating}`)
-    expect(html).toContain(S.ins.thisWeek(STRENGTH.readout.labels[0]!))
-    expect(raw).toContain(`aria-label="${S.ins.scoreChart}"`)
-    for (const r of STRENGTH.regions) expect(html).toContain(S.ins.region[r.region]!)
+    expect(html).toContain(`${S.ins.overall} ${S.ins.pct(STRENGTH.overall!)}`)
+    expect(raw).toContain(`aria-label="${S.ins.trendChart}"`)
+    expect(raw).toContain(`aria-label="${S.ins.volumeChart}"`)
+    for (const a of STRENGTH.areas!) expect(html).toContain(S.ins.region[a.region]!)
     expect(html).toContain(`${S.ins.imbalances} ${STRENGTH.imbalance_count}`)
-    for (const m of STRENGTH.metrics) expect(html).toContain(m.label)
   })
 
-  it('draws a sector\'s tonnage as its own chart, never beside the score', () => {
-    const sector = Object.values(F.strength).find((d) => d.metrics.find((m) => m.label === d.metric)?.key !== 'score')!
-    const raw = draw(<StrengthBody view={fresh(sector)} reduced onMetric={none} />)
-    expect(raw).toContain(`aria-label="${S.ins.tonnageChart(sector.metric)}"`)
-    expect(raw).not.toContain(`aria-label="${S.ins.scoreChart}"`)
+  it('has no button that asks the engine for another series', () => {
+    const raw = draw(<StrengthBody view={fresh(STRENGTH)} reduced />)
+    expect(raw).not.toContain('role="radio"')
+    for (const m of STRENGTH.metrics) expect(text(raw)).not.toContain(m.label)
+  })
+
+  it('words each body area by its state, never a placeholder number', () => {
+    const areas: Schemas['AreaRow'][] = [
+      { region: 'upper_body', state: 'measured', pct_of_2025: 84.8, progress: null, lifts: 22, hold_date: null },
+      { region: 'core', state: 'hold_time', pct_of_2025: 81.7, progress: null, lifts: 0, hold_date: '2026-10-19' },
+      { region: 'lower_body', state: 'too_few', pct_of_2025: null, progress: 0.79, lifts: 33, hold_date: null },
+    ]
+    const html = text(draw(<StrengthBody view={fresh({ ...STRENGTH, areas })} reduced />))
+    expect(html).toContain(`${S.ins.region.upper_body} ${S.ins.pct(84.8)} ${S.ins.areaMeasured(22)}`)
+    expect(html).toContain(`${S.ins.region.lower_body} ${S.ins.notYet} ${S.ins.areaTooFew}`)
+    expect(html).toContain(`${S.ins.region.core} ${S.ins.pct(81.7)}`)
+    expect(html).not.toContain('50.0')
+  })
+
+  it('sets the last full week against the one before, and this week apart', () => {
+    const volume: Schemas['VolumeOut'] = {
+      weeks: [
+        { label: '5 Oct', upper_body: 3135, core: 0, lower_body: 3447.5, total: 6582.5, current: false },
+        { label: '12 Oct', upper_body: 3172.5, core: 0, lower_body: 3150, total: 6322.5, current: false },
+        { label: '19 Oct', upper_body: 2870, core: 0, lower_body: 3545, total: 6415, current: true },
+      ],
+      hi: 8000,
+      last_full: { label: '12 Oct', kg: 6322.5, previous_label: '5 Oct', previous_kg: 6582.5, delta: -260, pct: -3.95, tone: 'down' },
+      this_week: { label: '19 Oct', kg: 6415, days: 2 },
+      unloaded: [{ week: 'this_week', area: 'core', text: '1 min 24 s held, 72 reps' }],
+    }
+    const html = text(draw(<StrengthBody view={fresh({ ...STRENGTH, volume })} reduced />))
+    expect(html).toContain(`${S.ins.lastFullWeek('12 Oct')} ${S.ins.kg(6322.5)} ${S.ins.vsWeekBefore(-3.95, -260)}`)
+    expect(html).toContain(`${S.ins.thisWeekSoFar('19 Oct')} ${S.ins.kg(6415)} ${S.ins.trainingDays(2)}`)
+    expect(html).toContain(`${S.ins.notInKg} ${S.ins.weekWord.this_week} ${S.ins.region.core} 1 min 24 s held, 72 reps`)
+  })
+
+  it('labels at most four weeks under a chart, the newest always among them', () => {
+    const six = ['14 Sep', '21 Sep', '28 Sep', '5 Oct', '12 Oct', '19 Oct']
+    expect(thinLabels(six)).toEqual(['', '21 Sep', '', '5 Oct', '', '19 Oct'])
+    expect(thinLabels(six.slice(0, 4))).toEqual(six.slice(0, 4))
+    expect(thinLabels(six).filter(Boolean).length).toBeLessThanOrEqual(4)
   })
 
   it('says why there are no figures before the reference is stored, and nothing saved when the engine is down', () => {
-    expect(text(draw(<StrengthBody view={refused(REFERENCE_MISSING)} reduced onMetric={none} />))).toContain(S.ins.referenceMissing)
-    const off = text(draw(<StrengthBody view={down<Schemas['StrengthOut']>(undefined)} reduced onMetric={none} />))
+    expect(text(draw(<StrengthBody view={refused(REFERENCE_MISSING)} reduced />))).toContain(S.ins.referenceMissing)
+    const off = text(draw(<StrengthBody view={down<Schemas['StrengthOut']>(undefined)} reduced />))
     expect(off).toContain(S.fresh.nothingSaved)
     expect(off).not.toContain(S.ins.overall)
-    expect(text(draw(<StrengthBody view={saved(STRENGTH)} reduced onMetric={none} />))).toContain(STRENGTH.overall!.toFixed(1))
+    expect(text(draw(<StrengthBody view={saved(STRENGTH)} reduced />))).toContain(S.ins.pct(STRENGTH.overall!))
   })
 })
 

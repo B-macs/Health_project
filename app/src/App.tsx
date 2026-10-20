@@ -30,6 +30,7 @@ import { pickFor, readPick, writePick, type Pick } from './lib/day'
 import { localDay } from './lib/api'
 import { refreshAlerts } from './lib/alerts'
 import { useOutboxLoop } from './lib/outbox'
+import { REREAD_AFTER_MS, bump } from './lib/refresh'
 import { syncIfDue } from './lib/sync'
 import { useAppSettings, type AppSettings } from './lib/settings'
 import { isStandalone } from './lib/standalone'
@@ -104,6 +105,7 @@ function Shell(p: ShellProps) {
   const [location, navigate] = useLocation()
   const tab = tabOf(location)
   const scroller = useRef<HTMLElement>(null)
+  const stage = useRef<HTMLDivElement>(null)
   const [pick, setPick] = useState<Pick | null>(readPick)
   const sessionRow = useLiveQuery(() => p.store.session.get('current'), [p.store])
   // The Oura login's result page (rebuild Phase 9), read once from the address it opened on.
@@ -138,15 +140,34 @@ function Shell(p: ShellProps) {
   // The engine's device sync (Phase 9, H57): asked at every open and each return to the
   // front, whatever the screen; it runs only when the engine, as the background writer, says
   // one is due (lib/sync.ts), and every screen reads again when it has run.
+  // Back at the front after a while, every screen also reads again (lib/refresh.ts).
   useEffect(() => {
     if (!ctx.key) return
+    let hiddenAt = 0
     const ask = () => {
-      if (document.visibilityState === 'visible') void syncIfDue(ctx)
+      if (document.visibilityState !== 'visible') {
+        hiddenAt = Date.now()
+        return
+      }
+      void syncIfDue(ctx)
+      if (hiddenAt && Date.now() - hiddenAt >= REREAD_AFTER_MS) bump()
+      hiddenAt = 0
     }
     ask()
     document.addEventListener('visibilitychange', ask)
     return () => document.removeEventListener('visibilitychange', ask)
   }, [ctx])
+
+  // The status-bar band shows once the page has moved (.statusband); no render per scroll.
+  useEffect(() => {
+    const el = scroller.current
+    const box = stage.current
+    if (!el || !box) return
+    const onScroll = () => box.classList.toggle('stage--scrolled', el.scrollTop > 4)
+    onScroll()
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [p.settings.key, ouraResult])
 
   // The engine's own mode on every page (H2): a line only when it reads a saved copy.
   const status = useCached<{ offline: boolean; datastore_built_at: string | null }>(store, '/api/status', null, ctx)
@@ -193,7 +214,8 @@ function Shell(p: ShellProps) {
     <AppStateProvider value={state}>
       <div className={classes} style={p.vars as CSSProperties}>
         {/* The screen area: the screens, and the Check-in sheet over them, above the bar. */}
-        <div className="stage">
+        <div className="stage" ref={stage}>
+        <div className="statusband" aria-hidden="true" />
         <main className="scroller" ref={scroller}>
           {status.data?.offline && (
             <p className="alert" role="status" data-testid="engine-offline">

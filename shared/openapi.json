@@ -95,6 +95,66 @@
         "title": "AnswerIn",
         "type": "object"
       },
+      "AreaRow": {
+        "properties": {
+          "hold_date": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hold Date"
+          },
+          "lifts": {
+            "title": "Lifts",
+            "type": "integer"
+          },
+          "pct_of_2025": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct Of 2025"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
+          "region": {
+            "title": "Region",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "region",
+          "state",
+          "pct_of_2025",
+          "progress",
+          "lifts",
+          "hold_date"
+        ],
+        "title": "AreaRow",
+        "type": "object"
+      },
       "AxisTick": {
         "description": "`at` is the fraction across (an X tick) or down from the top (a Y tick).",
         "properties": {
@@ -6381,6 +6441,14 @@
       },
       "StrengthOut": {
         "properties": {
+          "areas": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AreaRow"
+            },
+            "title": "Areas",
+            "type": "array"
+          },
           "axis": {
             "additionalProperties": {
               "type": "number"
@@ -6478,6 +6546,22 @@
             "title": "Tonnage",
             "type": "array"
           },
+          "trend": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/TrendWeek"
+            },
+            "title": "Trend",
+            "type": "array"
+          },
+          "trend_axis": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Trend Axis",
+            "type": "object"
+          },
           "unloaded": {
             "items": {
               "$ref": "#/components/schemas/TextLine"
@@ -6491,6 +6575,16 @@
             },
             "title": "Unmapped",
             "type": "array"
+          },
+          "volume": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VolumeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "week_labels": {
             "items": {
@@ -7657,6 +7751,43 @@
         "title": "TrendChart",
         "type": "object"
       },
+      "TrendWeek": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "measured": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Measured"
+          }
+        },
+        "required": [
+          "label",
+          "measured",
+          "level"
+        ],
+        "title": "TrendWeek",
+        "type": "object"
+      },
       "TrendsOut": {
         "properties": {
           "analysis": {
@@ -7873,6 +8004,191 @@
           "has_something_to_say"
         ],
         "title": "VerdictOut",
+        "type": "object"
+      },
+      "VolumeFull": {
+        "properties": {
+          "delta": {
+            "title": "Delta",
+            "type": "number"
+          },
+          "kg": {
+            "title": "Kg",
+            "type": "number"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pct"
+          },
+          "previous_kg": {
+            "title": "Previous Kg",
+            "type": "number"
+          },
+          "previous_label": {
+            "title": "Previous Label",
+            "type": "string"
+          },
+          "tone": {
+            "title": "Tone",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "kg",
+          "previous_label",
+          "previous_kg",
+          "delta",
+          "pct",
+          "tone"
+        ],
+        "title": "VolumeFull",
+        "type": "object"
+      },
+      "VolumeLine": {
+        "properties": {
+          "area": {
+            "title": "Area",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "week": {
+            "title": "Week",
+            "type": "string"
+          }
+        },
+        "required": [
+          "week",
+          "area",
+          "text"
+        ],
+        "title": "VolumeLine",
+        "type": "object"
+      },
+      "VolumeNow": {
+        "properties": {
+          "days": {
+            "title": "Days",
+            "type": "integer"
+          },
+          "kg": {
+            "title": "Kg",
+            "type": "number"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "kg",
+          "days"
+        ],
+        "title": "VolumeNow",
+        "type": "object"
+      },
+      "VolumeOut": {
+        "properties": {
+          "hi": {
+            "title": "Hi",
+            "type": "number"
+          },
+          "last_full": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VolumeFull"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "this_week": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VolumeNow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "unloaded": {
+            "items": {
+              "$ref": "#/components/schemas/VolumeLine"
+            },
+            "title": "Unloaded",
+            "type": "array"
+          },
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/VolumeWeek"
+            },
+            "title": "Weeks",
+            "type": "array"
+          }
+        },
+        "required": [
+          "weeks",
+          "hi",
+          "last_full",
+          "this_week",
+          "unloaded"
+        ],
+        "title": "VolumeOut",
+        "type": "object"
+      },
+      "VolumeWeek": {
+        "properties": {
+          "core": {
+            "title": "Core",
+            "type": "number"
+          },
+          "current": {
+            "title": "Current",
+            "type": "boolean"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "lower_body": {
+            "title": "Lower Body",
+            "type": "number"
+          },
+          "total": {
+            "title": "Total",
+            "type": "number"
+          },
+          "upper_body": {
+            "title": "Upper Body",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "upper_body",
+          "core",
+          "lower_body",
+          "total",
+          "current"
+        ],
+        "title": "VolumeWeek",
         "type": "object"
       },
       "WakeAdjustmentIn": {

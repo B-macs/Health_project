@@ -1,23 +1,17 @@
-// Insights › Strength (rebuild Phase 8, inventory I5-I15): the overall strength score and
-// whether it is still calibrating, the progress of one series (the score's weekly level, or a
-// body sector's tonnage) with this week against last, the work without load, the body-part
-// split with each region's card, and the muscle-balance findings.
-//
-// What a figure may claim is the engine's rule (services/strength.py): calibration holds a
-// region's index until its confidence clears, core has no kilogram scale, and the strength
-// score and the tonnage are separate metrics that are never added. Every number here is the
-// engine's; the screen lays them out. Until the owner's 2025 reference is in the store the
-// engine refuses the screen, and the screen says why.
-import { useState } from 'react'
+// Insights › Strength, redone (the owner, 2026-10-20: "Can you review that page and redo
+// it"). One answer draws the whole page: the headline, the weekly trend, each body area, the
+// training volume and the muscle-balance findings. No part of the page waits for a request
+// of its own, so nothing on it can look dead on a weak signal (his five buttons each waited
+// for one). Every number is the engine's (services/strength_screen.py); the page lays the
+// numbers out and words their states.
 import type { components } from '../generated/api'
 import { useApp } from '../lib/appState'
 import { useCached, type View } from '../lib/cache'
-import { longDate } from '../lib/dates'
+import { longDate, shortDate } from '../lib/dates'
 import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
-import { useKept } from '../ui/hooks'
 import { InsightsHead } from '../ui/InsightsHead'
-import { WeekBars, WeekLine } from '../ui/InsightsCharts'
+import { StackedWeeks, WeekLine } from '../ui/InsightsCharts'
 import { Contributor } from '../ui/parts'
 
 type Schemas = components['schemas']
@@ -26,70 +20,122 @@ export type StrengthAnswer = Schemas['StrengthOut']
 export const STRENGTH = '/api/insights/strength'
 export const REFERENCE_MISSING = 'strength_reference_missing'
 
-/** One series' readout (I8): this week, last week and the change, as the engine reads them. */
-function Readout({ r }: { r: Schemas['StrengthReadout'] }) {
-  const dp = r.points ? 1 : 0
-  const show = (v: number | null) => (v == null ? S.ins.none : r.points ? `${v.toFixed(1)} ${r.unit}` : S.ins.kg(v))
+/** The body areas' order and their chart shades (the share bar's). */
+const AREAS = ['upper_body', 'core', 'lower_body'] as const
+
+/** The headline (I5, I6): his lifts as a % of 2025. */
+function Headline({ d }: { d: StrengthAnswer }) {
   return (
-    <div className="figures figures--three" data-testid="readout">
-      <div className="figure">
-        <span className="eyebrow">{S.ins.thisWeek(r.labels[0] ?? '')}</span>
-        <span className="num figure__value">{show(r.current)}</span>
-      </div>
-      <div className="figure">
-        <span className="eyebrow">{S.ins.lastWeek(r.labels[1] ?? '')}</span>
-        <span className="num figure__value">{show(r.previous)}</span>
-      </div>
-      <div className="figure" data-tone={r.tone ?? 'none'}>
-        <span className="eyebrow">{S.ins.change}</span>
-        <span className="num figure__value">
-          {r.delta == null ? S.ins.none : `${S.ins.signed(r.delta, dp)}${r.points ? ` ${r.unit}` : ' kg'}`}
-        </span>
-        <span className="caption">
-          {r.delta == null ? S.ins.noPrevious : r.pct == null ? S.ins.noPct : S.ins.pctWeek(r.pct)}
-        </span>
-      </div>
-    </div>
+    <section className="card group" aria-label={S.ins.overall}>
+      <span className="eyebrow">{S.ins.overall}</span>
+      <span className="num masthead__value" data-testid="overall">
+        {d.overall == null ? S.ins.none : S.ins.pct(d.overall)}
+      </span>
+      <span className="caption">{S.ins.scale}</span>
+      <span className="caption">{S.ins.updated(longDate(d.today))}</span>
+    </section>
   )
 }
 
-/** The chosen series' chart (I9, I10): the score's level by week, or a sector's tonnage. */
-function Progress({ d }: { d: StrengthAnswer }) {
-  const chosen = d.metrics.find((m) => m.label === d.metric)
-  if (chosen?.key === 'score') {
-    return (
-      <WeekLine level={d.score_series.map((p) => (p.level as number | null) ?? null)}
-        measured={d.score_series.map((p) => (p.measured as number | null) ?? null)}
-        axis={{ lo: d.axis.lo, hi: d.axis.hi }} labels={d.week_labels} label={S.ins.scoreChart}
-        measuredWord={S.ins.chartMeasured} emptyWord={S.ins.noProgress} />
-    )
-  }
-  const key = (chosen?.key ?? 'overall') as 'overall' | 'upper_body' | 'core' | 'lower_body'
+/** The weekly trend (I9): each week's lifts against 2025, and the headline as it read. */
+function Trend({ d }: { d: StrengthAnswer }) {
+  const weeks = d.trend ?? []
+  const axis = { lo: d.trend_axis?.lo ?? 0, hi: d.trend_axis?.hi ?? 100 }
   return (
-    <WeekBars values={d.tonnage.map((w) => w[key].kg)} hi={d.axis.hi} labels={d.week_labels}
-      label={S.ins.tonnageChart(d.metric)} />
+    <section className="card group" aria-label={S.ins.trend} data-testid="trend">
+      <h2 className="eyebrow">{S.ins.trend}</h2>
+      <WeekLine level={weeks.map((w) => w.level)} measured={weeks.map((w) => w.measured)} axis={axis}
+        labels={weeks.map((w) => w.label)} label={S.ins.trendChart} emptyWord={S.ins.noProgress}
+        valueText={S.ins.pct} />
+      <p className="caption">{S.ins.trendKey}</p>
+    </section>
   )
 }
 
-/** The body-part split (I12) and each region's card (I13): points, share, the index or "—",
- *  and the confidence the calibration reads. */
-function BodyParts({ d, reduced }: { d: StrengthAnswer; reduced: boolean }) {
+function areaValue(a: Schemas['AreaRow']): string {
+  if ((a.state === 'measured' || a.state === 'hold_time') && a.pct_of_2025 != null) return S.ins.pct(a.pct_of_2025)
+  return a.state === 'too_few' ? S.ins.notYet : S.ins.none
+}
+
+function areaFraction(a: Schemas['AreaRow']): number | null {
+  if (a.pct_of_2025 != null) return Math.min(1, a.pct_of_2025 / 100)
+  return a.progress ?? null
+}
+
+function areaNote(a: Schemas['AreaRow']): string {
+  if (a.state === 'measured') return S.ins.areaMeasured(a.lifts)
+  if (a.state === 'too_few') return S.ins.areaTooFew
+  if (a.state === 'hold_time') return S.ins.areaHold(a.hold_date ? shortDate(a.hold_date) : '')
+  return a.region === 'core' ? S.ins.areaNoneCore : S.ins.areaNone
+}
+
+/** Each body area (I12, I13): a number only once the engine may show one. */
+function Areas({ d, reduced }: { d: StrengthAnswer; reduced: boolean }) {
   return (
-    <section className="card group" aria-label={S.ins.bodyParts} data-testid="body-parts">
-      <h2 className="eyebrow">{S.ins.bodyParts}</h2>
-      <div className="share" aria-hidden="true">
-        {d.split.map((p) => (
-          <span key={p.region} className={`share__part share__part--${p.region}`} style={{ width: `${p.pct}%` }} />
-        ))}
-      </div>
-      {d.regions.map((r) => (
-        <div key={r.region} className={r.off ? 'contrib--off' : undefined} data-region={r.region} data-band={r.band}>
-          <Contributor name={S.ins.region[r.region] ?? r.region} value={`${r.index_label} ${r.index_text}`}
-            fraction={r.confidence} reduced={reduced}
-            note={`${S.ins.regionShare(r.points, r.pct)} · ${r.band}${r.index_label === 'Index' ? ` · ${S.ins.confidence(r.confidence)}` : ''}`} />
+    <section className="card group" aria-label={S.ins.areas} data-testid="body-parts">
+      <h2 className="eyebrow">{S.ins.areas}</h2>
+      {(d.areas ?? []).map((a) => (
+        <div key={a.region} data-region={a.region} data-state={a.state}
+          className={a.state === 'none' ? 'contrib--off' : undefined}>
+          <Contributor name={S.ins.region[a.region] ?? a.region} value={areaValue(a)}
+            fraction={areaFraction(a)} note={areaNote(a)} reduced={reduced} />
         </div>
       ))}
-      {d.unmapped.length > 0 && <p className="caption">{S.ins.unmapped(d.unmapped.join(', '))}</p>}
+    </section>
+  )
+}
+
+/** The training volume (I8, I10, I11): the last full week against the one before, this
+ *  week so far, the weeks by body area, and the work not counted in kilograms. */
+function Volume({ v }: { v: Schemas['VolumeOut'] }) {
+  const full = v.last_full
+  const now = v.this_week
+  return (
+    <section className="card group" aria-label={S.ins.volume} data-testid="volume">
+      <h2 className="eyebrow">{S.ins.volume}</h2>
+      <div className="figures">
+        <div className="figure" data-testid="last-full-week">
+          <span className="eyebrow">{full ? S.ins.lastFullWeek(full.label) : S.ins.lastFullWeek('')}</span>
+          <span className="num figure__value">{full ? S.ins.kg(full.kg) : S.ins.none}</span>
+          <span className="caption">{full ? S.ins.vsWeekBefore(full.pct, full.delta) : S.ins.noFullWeek}</span>
+        </div>
+        <div className="figure" data-testid="this-week">
+          <span className="eyebrow">{S.ins.thisWeekSoFar(now?.label ?? '')}</span>
+          <span className="num figure__value">{now ? S.ins.kg(now.kg) : S.ins.none}</span>
+          <span className="caption">{now ? S.ins.trainingDays(now.days) : ''}</span>
+        </div>
+      </div>
+      <StackedWeeks label={S.ins.volumeChart} hi={v.hi}
+        weeks={v.weeks.map((w) => ({ label: w.label, current: w.current,
+          parts: AREAS.map((key) => ({ key, value: w[key] })) }))} />
+      <ul className="areakey" aria-hidden="true">
+        {AREAS.map((key) => (
+          <li key={key} className="areakey__item">
+            <span className={`areakey__chip areakey__chip--${key}`} />
+            {S.ins.region[key]}
+          </li>
+        ))}
+      </ul>
+      {v.unloaded.length > 0 && (
+        <div className="group" data-testid="unloaded">
+          <span className="caption">{S.ins.notInKg}</span>
+          {(['last_full', 'this_week'] as const).map((week) => {
+            const lines = v.unloaded.filter((u) => u.week === week)
+            if (lines.length === 0) return null
+            return (
+              <div key={week} className="group">
+                <span className="eyebrow">{S.ins.weekWord[week]}</span>
+                {lines.map((u) => (
+                  <span key={`${week}-${u.area}`} className="kv">
+                    <span>{S.ins.region[u.area] ?? u.area}</span>
+                    <span>{u.text}</span>
+                  </span>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }
@@ -122,9 +168,7 @@ function Imbalances({ d }: { d: StrengthAnswer }) {
 }
 
 /** The screen drawn from one read (cache-first): the tests draw it in each state. */
-export function StrengthBody({ view, reduced, onMetric }: {
-  view: View<StrengthAnswer>; reduced: boolean; onMetric: (label: string) => void
-}) {
+export function StrengthBody({ view, reduced }: { view: View<StrengthAnswer>; reduced: boolean }) {
   const d = view.data
   return (
     <div className="screen insights" data-testid="strength">
@@ -134,35 +178,11 @@ export function StrengthBody({ view, reduced, onMetric }: {
       {!d && view.code === REFERENCE_MISSING && <p className="notice" data-testid="reference-missing">{S.ins.referenceMissing}</p>}
       {d && (
         <>
-          <section className="card group" aria-label={S.ins.overall}>
-            <span className="eyebrow">{S.ins.overall}</span>
-            <div className="kv">
-              <span className="num tile__value" data-testid="overall">{d.overall == null ? S.ins.none : d.overall.toFixed(1)}</span>
-              {d.calibrating && <span className="badge" data-testid="calibrating">{S.ins.calibrating}</span>}
-            </div>
-            <span className="caption">{S.ins.points} · {S.ins.scale}</span>
-            <span className="caption">{S.ins.updated(longDate(d.today))}</span>
-          </section>
+          <Headline d={d} />
           {d.load_error && <p className="alert" data-testid="load-error">{S.ins.loadError(d.load_error)}</p>}
-          <section className="card group" aria-label={S.ins.progress}>
-            <h2 className="eyebrow">{S.ins.progress}</h2>
-            <div className="segmented segmented--wrap" role="radiogroup" aria-label={S.ins.progress}>
-              {d.metrics.map((m) => (
-                <button key={m.label} role="radio" aria-checked={d.metric === m.label}
-                  className={`segmented__item${d.metric === m.label ? ' segmented__item--on' : ''}`}
-                  onClick={() => onMetric(m.label)}>{m.label}</button>
-              ))}
-            </div>
-            <Readout r={d.readout} />
-            <Progress d={d} />
-            {d.unloaded.length > 0 && (
-              <div className="group" data-testid="unloaded">
-                <span className="caption">{S.ins.workWithoutLoad}</span>
-                {d.unloaded.map((u) => <span key={u.label} className="kv"><span>{u.label}</span><span>{u.text}</span></span>)}
-              </div>
-            )}
-          </section>
-          <BodyParts d={d} reduced={reduced} />
+          <Trend d={d} />
+          <Areas d={d} reduced={reduced} />
+          {d.volume && <Volume v={d.volume} />}
           <Imbalances d={d} />
         </>
       )}
@@ -172,9 +192,6 @@ export function StrengthBody({ view, reduced, onMetric }: {
 
 export function StrengthScreen() {
   const { store, ctx, reduced } = useApp()
-  const [metric, setMetric] = useState<string | null>(null)
-  const view = useCached<StrengthAnswer>(store, metric ? `${STRENGTH}?metric=${encodeURIComponent(metric)}` : STRENGTH, null, ctx)
-  // While another series loads, the last answer stays on screen rather than a blank page.
-  const kept = useKept(view.data)
-  return <StrengthBody view={view.data ? view : { ...view, data: kept }} reduced={reduced} onMetric={setMetric} />
+  const view = useCached<StrengthAnswer>(store, STRENGTH, null, ctx)
+  return <StrengthBody view={view} reduced={reduced} />
 }
