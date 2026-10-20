@@ -50,3 +50,6 @@ app/dist/
 .wrangler/
 reports/rebuild/
 .venv-*/
+
+# TypeScript build state (tsc -b)
+*.tsbuildinfo
