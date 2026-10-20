@@ -483,7 +483,7 @@
       "description": "Today from the API: the three scores, the week strip, today's session card, the engine's verdict and sync notices; day navigation (arrows, the strip, a swipe), the day kept for the visit and decided by the engine (picked_on).",
       "depends_on": [],
       "gate": "inventory_rows_open",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P5-02",
@@ -493,7 +493,7 @@
         "P5-01"
       ],
       "gate": "inventory_rows_open",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P5-03",
@@ -503,7 +503,7 @@
         "P5-02"
       ],
       "gate": "sleep_rule_violations",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P5-04",
@@ -511,7 +511,7 @@
       "description": "The check-in: the same fields as views/checkin.py, today and the three days before, saved through the outbox so it works offline; one per date (the engine merges).",
       "depends_on": [],
       "gate": "check_in_lost",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P5-05",
@@ -522,7 +522,7 @@
         "P5-02"
       ],
       "gate": "parity_differences",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P5-06",
@@ -534,7 +534,7 @@
         "P5-04"
       ],
       "gate": "text_rule_violations",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P5-07",
@@ -546,7 +546,7 @@
         "P5-04"
       ],
       "gate": "test_failures",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P5-08",

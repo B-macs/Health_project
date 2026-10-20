@@ -110,3 +110,12 @@
 - **Deploys**: engine revision 8 (5a9b5eb; the image store at 455.5 MiB before it, the clean-up not yet run), Worker be3cb6b4. Checked live without the key: the files answer, /api answers 401 JSON, the service worker controls the page.
 - **Pushes held** from 08:22: the owner trained on the Streamlit app, and a push redeploys it.
 - **The gate**: every p4 counter 0 except the owner's iPhone checklist (6). Python 5534, Vitest 117, Playwright 32. Signed off under the owner's standing instruction.
+
+## 2026-10-20 — Phase 5: Today, the detail screens and the check-in
+- **Engine**: GET /api/today/week, one readiness figure per day of the strip — the headline that day's own card shows, so a ring never disagrees with the card it opens; and `picked_on` on the four day endpoints, so the engine (not the phone) decides the day to open on (the Home page's rule H7). Revision 9.
+- **Today**: the week strip, the readiness card with the engine's verdict, badge and sync notices, sleep and strain tiles, the day's session; arrows, the strip and a swipe; the day kept for the visit.
+- **The detail screens**: readiness, sleep and strain, every panel the inventory keeps; charts drawn as SVG from the engine's axes and tap bands (no library: a library would compute a second set of axes); a tap shows the reading and "Open" moves to its day.
+- **The check-in**: every field from the engine's ranges; saved through the outbox, so it works offline; the cached form updated at once.
+- **Found by the browser tests**: switching the day kept the previous day's answer on screen for a frame, and the "follow the engine" rule reset the pick at once. A cached read now answers only for its own address.
+- **Parity**: `scripts/rebuild_parity.py` over the 14 days to 2026-10-20: 0 differences between the live engine and services/, 0 sleep-rule violations.
+- **The feature map**: `docs/rebuild/app_rows.json` maps the 80 kept Home and check-in rows to their files and tests; the card photos (H19) are replaced by the owner's design choice, to confirm with him.

@@ -4,20 +4,22 @@
 
 
 ## Now
-**Phase 4 — iPhone app shell: signed off 2026-10-20 under the owner's standing instruction.** The app is an installable, offline-first Home Screen app at https://health.lauscher-worker.workers.dev (Worker be3cb6b4, engine revision 8 from 5a9b5eb): the phone's database (Dexie), cache-first reads, the outbox, the service worker, the frames on the design's sample numbers, Settings with the engine status, the saves waiting, the daily data check, storage, the debug log and the console. Gate: every p4 counter 0 except the owner's iPhone checklist (6 items). Python 5534, app and Worker Vitest 117, Playwright 32. Handoff: `handoff/p4_to_p5_summary.md`. History: archive.md.
+**Phase 5 — Today, the detail screens and the check-in: signed off 2026-10-20 under the owner's standing instruction.** Today, readiness, sleep and strain and the check-in run on the engine's numbers at https://health.lauscher-worker.workers.dev (Worker f249a9d9, engine revision 9 from 5c00178). Parity over the 14 days to 2026-10-20: 0 differences. Gate: every p5 counter 0 except the owner's two mornings (6). Python 5556, Vitest 142, Playwright 47. Handoff: `handoff/p5_to_p6_summary.md`.
 
-**Phase 3 — signed off 2026-10-20**; **Phase 2 — signed off 2026-10-19**, its hosted-app check still in his batch (P2-11).
+**Phase 4 — signed off 2026-10-20** (its iPhone checklist open in his batch); **Phase 3 — signed off 2026-10-20**; **Phase 2 — signed off 2026-10-19** (P2-11 open).
 
-**Pushes held on 2026-10-20 from 08:22:** the owner trains on the Streamlit app for an hour, and a push redeploys it. The Phase 4 commits wait locally; push when he says he has finished.
+**Pushes held on 2026-10-20 from 08:22:** the owner trains on the Streamlit app, and a push redeploys it. The commits wait locally; push when he says he has finished.
 
 ## Waiting on the owner (his batch)
 0. **The Phase 4 iPhone checklist** (owner_checks.json p4): install from Safari, paste the key, open each tab, airplane mode and reopen, the "act as if the engine is down" switch.
+00. **The Phase 5 two mornings** (owner_checks.json p5): open the Streamlit app first, then the new app; compare the three scores and the sleep night; on the second morning do the check-in in the new app and check that the Streamlit app shows it within about 15 minutes. Also: confirm that the chosen design replaces the card photos (H19).
+000. **Phase 6 decision**: the "When did you finish?" question before saving a session whose last set was over 20 minutes before Save (the prompt asks for his OK before it is built).
 1. **The hosted Streamlit app** (owner_checks.json p2 `streamlit_app_opens`): Home, Training, Insights, Check-in still work after the pushes; a day that already has a check-in opens filled in, and pain can go back to 0.
 2. **The Strength reference for the engine**: the store's config row `strength_reference` (recommended) or a secret; on a yes, `python scripts/upload_strength_reference.py --apply`. Until then the engine's Strength screen answers 409 strength_reference_missing.
 3. Carried: the voice app's address (for `p1_to_p2`); removing `[voxplot_supabase]` from the health app's secrets; the image store (455.5 MB of the 0.5 GiB free on 2026-10-19, about 190 MB once the clean-up has run — check before the next engine deploy).
 
 ## Next
-- Phase 5 — Today, check-in and the detail screens, from the Notion prompt set: the real numbers in the chosen design, the check-in through the outbox, rebuild_parity.py, and the owner's two-morning checklist.
+- Phase 6 — the training session (the guided flow on the phone, timers and sounds, the idempotent save through the outbox), from the Notion prompt set.
 
 ## The owner's decisions, 2026-10-19 (after the cost estimate)
 - **The new app syncs ONCE A DAY, at the first app open in the morning** — not every 2 hours (*"that is enough"*). This sets the engine's sync design for Phase 2 and Phase 9; the Streamlit app keeps its own 2-hourly-on-open cadence until the switch-over (recommended, and he asked for no change there). **When last night's data is still missing after that first sync, a later open syncs again, at most once an hour, until last night is in** (*"Retry the sync"*, 2026-10-19) — otherwise a morning opened before the ring has reached Oura stays empty until the next day.

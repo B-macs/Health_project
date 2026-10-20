@@ -1,0 +1,52 @@
+{
+  "from_phase": "P5",
+  "to_phase": "P6",
+  "written": "2026-10-20",
+  "verdict": "Every p5 counter is 0 except device_checklist_open (6: the owner's two mornings, not done yet). Signed off under the owner's standing instruction (2026-10-19); the mornings stay open in his batch.",
+  "address": "https://health.lauscher-worker.workers.dev (Worker f249a9d9; engine revision health-engine-00009-wwr, commit 5c00178)",
+  "what_exists": {
+    "today": "app/src/screens/Today.tsx: Today (reads /api/today, /api/today/week, /api/training/day, /api/status cache-first) and TodayView (draws them); the week strip, readiness with the engine's verdict, badge and notices, sleep and strain tiles, the day's session; arrows, the strip and a swipe change the day",
+    "details": "app/src/screens/Details.tsx: ReadinessScreen/ReadinessBody, SleepScreen/SleepBody, StrainScreen/StrainBody; the wake-time correction through the outbox",
+    "check_in": "app/src/screens/CheckIn.tsx: CheckIn (the sheet, the day choice) and CheckInForm (every field from the engine's ranges); saved through the outbox, the cached form updated at once; today's form read at the app start",
+    "day": "app/src/lib/day.ts: the picked day for the visit (sessionStorage) with the day it was picked on; dayPath() adds date and picked_on; the engine decides (home.opening_day)",
+    "engine": "GET /api/today/week (home.week_strip); picked_on on /api/today, /api/today/week and the three drill-downs",
+    "parity": "scripts/rebuild_parity.py: the live API against services/ over 14 days, dates and field names only",
+    "gate_counters": "scripts/rebuild_gate.py p5: test_failures, parity_differences, sleep_rule_violations, check_in_lost, inventory_rows_open (docs/rebuild/app_rows.json), text_rule_violations, device_checklist_open",
+    "tests": "Python 5556 passed, 1 skipped; app and Worker Vitest 142; Playwright 47; parity 0 differences over 14 days"
+  },
+  "reusable_for_training": [
+    "ui/detail.tsx: DetailFrame (back '‹ Today', the day arrows, the masthead, the freshness line; the body keyed by the day so a new day starts clean), Section, ContributorList, KeyFigures, OvernightPanels, TrendSection.",
+    "ui/charts.tsx: LineChart (the engine's axis, ticks and tap bands; a missing reading breaks the line; a tap shows PointPanel), slotBands (bands for a series without its own), StageStrip, MovementStrip, PointPanel.",
+    "ui/Sheet.tsx (a sheet over the page, Escape and a tap outside close it), ui/Freshness.tsx, ui/ScreenBoundary.tsx (a failing screen shows a message; the tab bar stays).",
+    "lib/appState.tsx: useApp() gives the store, the request context, the picked day, showDay() and go().",
+    "The data/drawing split: a Screen reads with useCached and a Body/View draws an answer, so Vitest draws every state without a browser (react-dom/server, src/screens/screens.test.tsx).",
+    "A save through the outbox with its own confirmation: enqueue() returns the id; a live query on that id says 'saving', 'refused' (kept for Settings) or gone (confirmed, read again) — the wake-time stepper in Details.tsx.",
+    "A save that must show at once: put the saved answer into the cache under the read's own key (the check-in), then let the engine's answer replace it.",
+    "dev/fixtures.ts: made-up engine answers typed against the contract, for the mock API and the tests; extend it for the training endpoints."
+  ],
+  "chart_approach": "Hand-drawn SVG from the engine's series, axes, tick fractions and tap bands; no chart library (stack.md, Phase 5). Taps are buttons over the plot; no link, no reload.",
+  "parity": {
+    "run": "2026-10-20 (owner's day), the 14 days to 2026-10-20",
+    "differences": 0,
+    "sleep_rule_violations": 0,
+    "unanswered": 0
+  },
+  "owner_decisions": [
+    "Standing: every rebuild gate is signed off in advance from Phase 2 on; stop only for his own steps (2026-10-19).",
+    "Week for everything but Training, Cards for Training (2026-10-20): Today and its detail screens are in Week's language.",
+    "Pushes held on 2026-10-20 while he trained on the Streamlit app."
+  ],
+  "open_items": [
+    "The owner's two mornings (owner_checks.json p5) and the Phase 4 iPhone checklist (p4).",
+    "H19, the card photos: the chosen design has none; confirm with him that the design choice replaces them.",
+    "The check-in form needs the engine once a day before it opens offline: the app reads today's form at its start.",
+    "The Oura re-authorise path on the phone (H21's notice says 'on the PC'): the API's login pair exists; the screen comes with Settings in a later phase, after the engine is the writer.",
+    "The image store: revisions 8 and 9 were deployed on 2026-10-20; check its size before the next engine deploy.",
+    "Carried: the hosted-app check (P2-11), the Strength reference, the voice app's address, the voice secrets."
+  ],
+  "next_phase_may_rely_on": [
+    "Every number on Today and its detail screens equals the services' own (parity 0 over 14 days).",
+    "The day shown is shared by Today and its detail screens through useApp(); the training week can use the same shape.",
+    "Every kept Home and check-in feature is mapped in app_rows.json; Phase 6 adds the Training rows the same way."
+  ]
+}
