@@ -150,6 +150,57 @@ def test_a_past_day_has_no_verdict_and_steps_both_ways(monkeypatch):
     assert body["date_label"] == past.isoformat()
 
 
+# ── The phone's week strip and the day it opens on (rebuild Phase 5) ─────────
+
+def test_the_week_strip_shows_each_days_own_card_headline(monkeypatch):
+    with _client(monkeypatch, FakeRepository()) as c:
+        body = _get(c, "/api/today/week").json()
+    days = body["days"]
+    assert [d["date"] for d in days] == [(TODAY - timedelta(days=6 - i)).isoformat() for i in range(7)]
+    assert [d["selected"] for d in days] == [False] * 6 + [True]
+    assert [d["is_today"] for d in days] == [False] * 6 + [True]
+    for d in days:
+        card = home.cards(FakeRepository(), date.fromisoformat(d["date"]), TODAY)
+        assert d["readiness"] == card["readiness"]["headline"], d["date"]
+        assert d["label"] == card["readiness"]["label"], d["date"]
+
+
+def test_a_day_older_than_the_week_is_on_its_own_strip(monkeypatch):
+    old = TODAY - timedelta(days=10)
+    with _client(monkeypatch, FakeRepository()) as c:
+        body = _get(c, f"/api/today/week?date={old}").json()
+    assert body["days"][-1]["date"] == old.isoformat() and body["days"][-1]["selected"]
+    assert home.week_days(TODAY - timedelta(days=3), TODAY)[-1] == TODAY
+
+
+def test_a_day_with_no_reading_has_no_ring_figure(monkeypatch):
+    with _client(monkeypatch, FakeRepository(bio_fails=True)) as c:
+        body = _get(c, "/api/today/week").json()
+    assert all(d["readiness"] is None and d["label"] == "No Readings" for d in body["days"])
+
+
+@pytest.mark.parametrize("picked_on,opens", [
+    (TODAY, TODAY - timedelta(days=4)),                     # picked today: it stays
+    (TODAY - timedelta(days=1), TODAY),                     # picked yesterday: today
+])
+def test_a_past_day_lasts_the_day_it_was_picked_on(monkeypatch, picked_on, opens):
+    past = TODAY - timedelta(days=4)
+    with _client(monkeypatch, FakeRepository()) as c:
+        body = _get(c, f"/api/today?date={past}&picked_on={picked_on}").json()
+        week = _get(c, f"/api/today/week?date={past}&picked_on={picked_on}").json()
+    assert body["date"] == opens.isoformat()
+    assert week["date"] == opens.isoformat()
+
+
+def test_the_opening_day_is_the_home_pages_rule():
+    past = TODAY - timedelta(days=2)
+    assert home.opening_day(past, None, TODAY) == past            # no pick: as asked
+    assert home.opening_day(past, TODAY, TODAY) == past
+    assert home.opening_day(past, TODAY - timedelta(days=1), TODAY) is None
+    assert home.opening_day(TODAY + timedelta(days=1), TODAY, TODAY) is None
+    assert home.opening_day(None, TODAY, TODAY) is None
+
+
 def test_no_day_after_the_callers_day(monkeypatch):
     with _client(monkeypatch, FakeRepository()) as c:
         body = _get(c, f"/api/today?date={TODAY + timedelta(days=3)}").json()

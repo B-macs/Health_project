@@ -505,6 +505,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/today/week": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Today Week */
+        get: operations["get_today_week_api_today_week_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/training/accessory": {
         parameters: {
             query?: never;
@@ -3032,6 +3049,19 @@ export interface components {
             /** Subtitle */
             subtitle?: string | null;
         };
+        /**
+         * TodayWeekOut
+         * @description The Today screen's week strip (services/home.py:week_strip).
+         */
+        TodayWeekOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Days */
+            days: components["schemas"]["WeekDayOut"][];
+        };
         /** TonnageWeekOut */
         TonnageWeekOut: {
             core: components["schemas"]["Sector"];
@@ -3307,6 +3337,22 @@ export interface components {
             to_go: number;
             /** Ultimate Count */
             ultimate_count: number;
+        };
+        /** WeekDayOut */
+        WeekDayOut: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Is Today */
+            is_today: boolean;
+            /** Label */
+            label: string;
+            /** Readiness */
+            readiness: number | null;
+            /** Selected */
+            selected: boolean;
         };
         /** WholeRange */
         WholeRange: {
@@ -4360,6 +4406,7 @@ export interface operations {
         parameters: {
             query?: {
                 date?: string | null;
+                picked_on?: string | null;
             };
             header?: {
                 "x-engine-key"?: string | null;
@@ -4394,6 +4441,7 @@ export interface operations {
         parameters: {
             query?: {
                 date?: string | null;
+                picked_on?: string | null;
             };
             header?: {
                 "x-engine-key"?: string | null;
@@ -4428,6 +4476,7 @@ export interface operations {
         parameters: {
             query?: {
                 date?: string | null;
+                picked_on?: string | null;
             };
             header?: {
                 "x-engine-key"?: string | null;
@@ -4462,6 +4511,7 @@ export interface operations {
         parameters: {
             query?: {
                 date?: string | null;
+                picked_on?: string | null;
                 week?: boolean;
             };
             header?: {
@@ -4480,6 +4530,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StrainDetailOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_today_week_api_today_week_get: {
+        parameters: {
+            query?: {
+                date?: string | null;
+                picked_on?: string | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TodayWeekOut"];
                 };
             };
             /** @description Validation Error */

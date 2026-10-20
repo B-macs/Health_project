@@ -128,6 +128,21 @@ class TodayOut(BaseModel):
     rhr_7d: list[float | None]
 
 
+class WeekDayOut(BaseModel):
+    date: date
+    #: The headline that day's own card shows; None when there is no reading.
+    readiness: float | None
+    label: str
+    is_today: bool
+    selected: bool
+
+
+class TodayWeekOut(BaseModel):
+    """The Today screen's week strip (services/home.py:week_strip)."""
+    date: date
+    days: list[WeekDayOut]
+
+
 # ── Today's drill-downs (services/home_detail.py) ────────────────────────────
 
 class LabelValue(BaseModel):

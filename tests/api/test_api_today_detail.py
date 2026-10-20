@@ -228,6 +228,16 @@ def test_the_30_day_trend_ends_on_the_day_and_details_every_point(monkeypatch):
     assert {r["label"] for r in last["extra"]} == {"Sleep Score", "Strain"}
 
 
+@pytest.mark.parametrize("path", ["/api/today/readiness", "/api/today/sleep", "/api/today/strain"])
+def test_a_drill_down_follows_the_same_opening_day_as_the_cards(monkeypatch, path):
+    """rebuild Phase 5: with picked_on, the engine decides the day (home.opening_day)."""
+    past = TODAY - timedelta(days=3)
+    kept = _get(monkeypatch, HomeFake(), f"{path}?date={past}&picked_on={TODAY}")
+    reset = _get(monkeypatch, HomeFake(), f"{path}?date={past}&picked_on={TODAY - timedelta(days=1)}")
+    assert kept["date"] == past.isoformat() and not kept["is_today"]
+    assert reset["date"] == TODAY.isoformat() and reset["is_today"]
+
+
 def test_a_failed_biometric_read_says_so_in_the_contributors(monkeypatch):
     class Failing(HomeFake):
         def get_biometric_rolling(self, days=28, today=None):

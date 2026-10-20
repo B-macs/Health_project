@@ -318,3 +318,45 @@ def readiness_figures(repo, day: date, caller_today: date) -> dict:
     return {"daily": daily, "trend": trend, "headline": readiness_card(daily, trend),
             "window_days": (decision.READINESS_WINDOW_DAYS if engine_rows is not None
                             else BIO_DAYS)}
+
+
+# ── The phone's Today screen (rebuild Phase 5) ───────────────────────────────
+
+#: The week strip on the phone's Today screen: seven days, one readiness ring each.
+WEEK_DAYS = 7
+
+
+def opening_day(requested: date | None, picked_on: date | None, caller_today: date) -> date | None:
+    """The day Today opens on when the phone sends the day it shows and the
+    day it was picked on (H7, dashboard.home_date_on_open): a past day picked
+    today, else today (None). Without `picked_on` the request is taken as it is."""
+    if picked_on is None:
+        return requested
+    chosen = dash.home_date_on_open(requested.isoformat() if requested else None,
+                                    picked_on.isoformat(), caller_today)
+    return None if chosen == caller_today else chosen
+
+
+def week_days(day: date, caller_today: date) -> list[date]:
+    """The strip's seven days: the seven ending on the caller's today, or,
+    when the day shown is older than those, the seven ending on it, so the
+    day shown is always on the strip."""
+    end = caller_today if (caller_today - day).days < WEEK_DAYS else day
+    return [end - timedelta(days=WEEK_DAYS - 1 - i) for i in range(WEEK_DAYS)]
+
+
+def week_strip(repo, requested: date | None, caller_today: date) -> dict:
+    """GET /api/today/week: one readiness figure per day of the strip, each the
+    headline that day's own card shows (readiness_figures, the figure
+    cards() computes), so a ring and the card it opens never disagree. A day
+    whose read fails has no figure, and says "No Readings"."""
+    day, _before, _after = day_bounds(requested, caller_today)
+    days = []
+    for d in week_days(day, caller_today):
+        try:
+            figure = readiness_figures(repo, d, caller_today)["headline"]
+        except Exception:
+            figure = None
+        days.append({"date": d, "readiness": figure, "label": dash.readiness_meta(figure)[2],
+                     "is_today": d == caller_today, "selected": d == day})
+    return {"date": day, "days": days}

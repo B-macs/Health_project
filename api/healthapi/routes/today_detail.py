@@ -3,7 +3,9 @@
 
 GET /api/today/readiness, /api/today/sleep and /api/today/strain answer for
 the `date` query parameter, or the caller's day without one, never a day
-after the caller's day. PUT /api/sleep/wake-adjustment stores one night's
+after the caller's day; with `picked_on` the engine decides the day as GET
+/api/today does (home.opening_day, H7), so a drill-down opened after
+midnight follows the same day as the cards. PUT /api/sleep/wake-adjustment stores one night's
 correction (Key Rule 4's one manual correction) under the rules the
 Streamlit stepper keeps; the value is absolute, so a repeated request
 stores one correction.
@@ -15,7 +17,7 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from services import home_detail
+from services import home, home_detail
 from services.repository import Repository
 
 from ..deps import get_repository, local_today
@@ -32,29 +34,33 @@ _WAKE_STATUS = {"future_day": 422, "minutes_invalid": 422,
 @router.get("/api/today/readiness", response_model=ReadinessDetailOut)
 def get_readiness_detail(
     day: date | None = Query(default=None, alias="date"),
+    picked_on: date | None = Query(default=None),
     today: date = Depends(local_today),
     repo: Repository = Depends(get_repository),
 ) -> dict:
-    return home_detail.readiness_detail(repo, day, today)
+    return home_detail.readiness_detail(repo, home.opening_day(day, picked_on, today), today)
 
 
 @router.get("/api/today/sleep", response_model=SleepDetailOut)
 def get_sleep_detail(
     day: date | None = Query(default=None, alias="date"),
+    picked_on: date | None = Query(default=None),
     today: date = Depends(local_today),
     repo: Repository = Depends(get_repository),
 ) -> dict:
-    return home_detail.sleep_detail(repo, day, today)
+    return home_detail.sleep_detail(repo, home.opening_day(day, picked_on, today), today)
 
 
 @router.get("/api/today/strain", response_model=StrainDetailOut)
 def get_strain_detail(
     day: date | None = Query(default=None, alias="date"),
+    picked_on: date | None = Query(default=None),
     week: bool = Query(default=False),
     today: date = Depends(local_today),
     repo: Repository = Depends(get_repository),
 ) -> dict:
-    return home_detail.strain_detail(repo, day, today, show_week=week)
+    return home_detail.strain_detail(repo, home.opening_day(day, picked_on, today), today,
+                                     show_week=week)
 
 
 @router.put("/api/sleep/wake-adjustment", response_model=WakeControl)
