@@ -22,5 +22,22 @@
     "not_found_handling": "single-page-application",
     // Only /api reaches the Worker; every other path is a static file or index.html.
     "run_worker_first": ["/api/*"]
-  }
+  },
+  // Rebuild Phase 4. ONE trigger: the daily data check at 04:15 UTC (it only reads; the
+  // Worker keeps its answer in STATE). The free plan allows 5 triggers per account and
+  // 10 ms of CPU per run (developers.cloudflare.com/workers/platform/limits, 2026-10-20);
+  // Lauscher uses one. No trigger syncs the devices: the owner chose one sync a day at
+  // the first app open (2026-10-19), and a trigger has no phone to give it the day.
+  "triggers": {
+    "crons": ["15 4 * * *"]
+  },
+  "vars": {
+    // The second lock on the device syncs and the Oura login (src/index.ts). "true" only
+    // at the switch-over (Phase 9), when the engine becomes the one background writer.
+    "SYNC_ENABLED": "false"
+  },
+  "kv_namespaces": [
+    // health-state: the last data check. Free plan: 1,000 writes and 100,000 reads a day.
+    { "binding": "STATE", "id": "84ff9d3f5e48499592ed8fe85b461359" }
+  ]
 }
