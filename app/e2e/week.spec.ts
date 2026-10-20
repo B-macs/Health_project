@@ -18,7 +18,7 @@ import { longDate } from '../src/lib/dates'
 import { expect, leaveSession, onboard, openTab, ORIGIN, startTraining, tapToSave, test } from './helpers'
 
 type Received = { method: string; path: string; body: Record<string, unknown> }
-type Run = { applied: string[]; swaps: string[]; carry: boolean; reasons: Record<string, string> }
+type Run = { applied: string[]; swaps: string[]; carry: boolean; redo: boolean; reasons: Record<string, string> }
 
 const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/
 
