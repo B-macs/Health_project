@@ -4,12 +4,17 @@
 // - a cookie `e2e_engine=down` makes every /api answer the Worker's "engine unavailable";
 // - GET /api/dev/received lists the writes the mock received (the outbox tests);
 // - the data check answers as the Worker does: GET .../last (null until a check ran) and
-//   POST .../run (a made-up clean result).
+//   POST .../run (a made-up clean result);
+// - Today, its week, the day's plan, the three detail screens and the check-in answer
+//   made-up numbers (dev/fixtures.ts); a saved check-in is kept for the next read.
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Plugin } from 'vite'
+import * as fx from './fixtures.ts'
 
 const KEY = 'dev'
 const received: { method: string; path: string; body: unknown; day: string | null }[] = []
+// Check-ins saved through the mock, by date.
+const checkins = new Map<string, ReturnType<typeof fx.checkinForm>['values']>()
 // The daily data check as the Worker keeps it: none until one runs ("Check now").
 let lastCheck: unknown = null
 const sampleCheck = () => ({
@@ -79,9 +84,31 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     lastCheck = sampleCheck()
     return send(200, lastCheck)
   }
+  const local = day ?? new Date().toISOString().slice(0, 10)
+  const asked = url.searchParams.get('date')
+  const shown = fx.opening(asked, url.searchParams.get('picked_on'), local)
+  if (req.method === 'GET') {
+    if (url.pathname === '/api/today') return send(200, fx.today(shown, local))
+    if (url.pathname === '/api/today/week') return send(200, fx.week(shown, local))
+    if (url.pathname === '/api/today/readiness') return send(200, fx.readinessDetail(shown, local))
+    if (url.pathname === '/api/today/sleep') return send(200, fx.sleepDetail(shown, local))
+    if (url.pathname === '/api/today/strain') {
+      return send(200, fx.strainDetail(shown, local, url.searchParams.get('week') === 'true'))
+    }
+    if (url.pathname === '/api/training/day') return send(200, fx.trainingDay(asked ?? local, local))
+    if (url.pathname === '/api/checkin') {
+      const d = asked ?? local
+      return send(200, fx.checkinForm(d, local, checkins.get(d)))
+    }
+  }
   if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE') {
     void readBody(req).then((body) => {
       received.push({ method: req.method!, path: url.pathname, body, day })
+      if (url.pathname === '/api/checkin' && req.method === 'PUT') {
+        const b = body as { date: string; values: ReturnType<typeof fx.checkinForm>['values'] }
+        checkins.set(b.date, b.values)
+        return send(200, fx.checkinForm(b.date, local, b.values))
+      }
       send(200, { saved: true })
     })
     return

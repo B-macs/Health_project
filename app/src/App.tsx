@@ -1,34 +1,38 @@
-// The app's frame (rebuild Phase 4: the offline shell over the owner's Phase 3 design).
-// Today, Check-in, Training, Insights and Settings over one inner scroller, with the tab
-// bar docked below. Each page keeps its one colour family: the root carries the page's
-// .fam-* class, so the tab bar takes the page's colour too.
+// The app's frame (rebuild Phases 4 and 5: the offline shell over the owner's Phase 3
+// design). Today, Check-in, Training, Insights and Settings over one inner scroller, with
+// the tab bar docked below. Each page keeps its one colour family: the root carries the
+// page's .fam-* class, so the tab bar takes the page's colour too.
 //
 // - Routes are #hashes (wouter's hash location): every page load is "/", which the
 //   service worker answers from the precache, so the app opens with no connection.
 // - With no access key saved, the first-open screen shows instead (screens/Welcome.tsx).
-// - Check-in is a sheet over Today; the page behind keeps its own colour.
+// - Today and its three detail screens (/readiness, /sleep, /strain) share the day shown
+//   (lib/day.ts); Check-in is a sheet over Today; the page behind keeps its own colour.
 // - Training is the session screen. Opening it starts a session in the phone's database
 //   and closing it ends it; while it runs, the tab bar hides and an app update waits.
 //   A session left open (a reload, an app kill) opens again at the next start.
 // - The outbox sends what waits whenever the app is open (lib/outbox.ts).
-// - Until Phases 5 to 8 wire the engine's data, Today, Training and Insights show the
-//   design's seeded sample numbers, and say so.
+// - Training and Insights still show the design's sample numbers (Phases 6 to 8), and say so.
 //
 // The address can carry the appearance and less motion for the screenshot report:
 // ?t=auto|light|dark &still (motion off, so a picture never catches a ring half-drawn).
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react'
 import { Redirect, Route, Router, Switch, useLocation } from 'wouter'
 import { useHashLocation } from 'wouter/use-hash-location'
 import { KEYS, setSetting, type HealthDB } from './db/schema'
 import { cssVars, useMode, useReducedMotion, type ThemePref } from './design/theme'
 import { PAGE_FAMILY, type Mode } from './design/tokens'
-import type { Ctx } from './lib/cache'
+import { AppStateProvider, type AppState } from './lib/appState'
+import { refresh, type Ctx } from './lib/cache'
+import { pickFor, readPick, writePick, type Pick } from './lib/day'
+import { localDay } from './lib/api'
 import { useOutboxLoop } from './lib/outbox'
 import { endSession, sessionActive, startSession } from './lib/session'
 import { useAppSettings, type AppSettings } from './lib/settings'
 import { isStandalone } from './lib/standalone'
 import { MOCK } from './mock/data'
-import { CheckIn } from './screens/CheckIn'
+import { CheckIn, formPath } from './screens/CheckIn'
+import { ReadinessScreen, SleepScreen, StrainScreen } from './screens/Details'
 import { Insights } from './screens/Insights'
 import { Settings, THEMES } from './screens/Settings'
 import { Today } from './screens/Today'
@@ -47,7 +51,9 @@ const TABS: { key: Tab; path: string; icon: () => ReactElement }[] = [
   { key: 'settings', path: '/settings', icon: IconSettings },
 ]
 
+/** The tab an address belongs to: the detail screens are Today's. */
 export function tabOf(location: string): Tab {
+  if (['/readiness', '/sleep', '/strain'].includes(location)) return 'today'
   return TABS.find((t) => t.path === location)?.key ?? 'today'
 }
 
@@ -90,7 +96,7 @@ function Shell(p: ShellProps) {
   const [location, navigate] = useLocation()
   const tab = tabOf(location)
   const scroller = useRef<HTMLElement>(null)
-  const [dayIndex, setDayIndex] = useState(MOCK.days.length - 1)
+  const [pick, setPick] = useState<Pick | null>(readPick)
 
   // A session left open by a reload or an app kill opens again.
   useEffect(() => {
@@ -99,10 +105,23 @@ function Shell(p: ShellProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const go = (path: string) => {
+  // Today's check-in form is read at the start, so the sheet opens with no connection later.
+  const { store, ctx } = p
+  useEffect(() => {
+    if (ctx.key) void refresh(store, formPath(localDay()), null, ctx).catch(() => undefined)
+  }, [store, ctx])
+
+  const go = useCallback((path: string) => {
     navigate(path)
     scroller.current?.scrollTo(0, 0)
-  }
+  }, [navigate])
+  const showDay = useCallback((day: string | null) => {
+    const next = pickFor(day)
+    writePick(next)
+    setPick(next)
+  }, [])
+  const state = useMemo<AppState>(() => ({ store, ctx, reduced: p.reduced, pick, showDay, go }),
+    [store, ctx, p.reduced, pick, showDay, go])
 
   if (!p.settings.key) {
     return (
@@ -116,41 +135,42 @@ function Shell(p: ShellProps) {
 
   const today = (
     <div className={`fam-${PAGE_FAMILY.today}`}>
-      <Today day={MOCK.days[dayIndex]} dayIndex={dayIndex} mock={MOCK} reduced={p.reduced}
-        canPrev={dayIndex > 0} canNext={dayIndex < MOCK.days.length - 1}
-        onPrev={() => setDayIndex((i) => Math.max(0, i - 1))}
-        onNext={() => setDayIndex((i) => Math.min(MOCK.days.length - 1, i + 1))}
-        onDay={setDayIndex} onStart={() => go('/training')} />
+      <Today />
     </div>
   )
   const inSession = tab === 'training'
   const classes = `app app--${p.mode} fam-${PAGE_FAMILY[tab]}${inSession ? ' app--session' : ''}`
   return (
-    <div className={classes} style={p.vars as CSSProperties}>
-      <main className="scroller" ref={scroller}>
-        <ScreenBoundary key={location} title={S.nav[tab]}>
-          <Switch>
-            <Route path="/">{today}</Route>
-            <Route path="/checkin">{today}</Route>
-            <Route path="/training">
-              <TrainingFrame store={p.store} onClose={() => go('/')} />
-            </Route>
-            <Route path="/insights">
-              <Insights mock={MOCK} reduced={p.reduced} />
-            </Route>
-            <Route path="/settings">
-              <Settings store={p.store} ctx={p.ctx} theme={p.theme}
-                onTheme={(t) => void setSetting(p.store, KEYS.theme, t)} />
-            </Route>
-            <Route>
-              <Redirect to="/" replace />
-            </Route>
-          </Switch>
-        </ScreenBoundary>
-      </main>
-      {!inSession && <TabBar tab={tab} onTab={go} />}
-      {tab === 'checkin' && <CheckIn onClose={() => go('/')} />}
-    </div>
+    <AppStateProvider value={state}>
+      <div className={classes} style={p.vars as CSSProperties}>
+        <main className="scroller" ref={scroller}>
+          <ScreenBoundary key={location} title={S.nav[tab]}>
+            <Switch>
+              <Route path="/">{today}</Route>
+              <Route path="/checkin">{today}</Route>
+              <Route path="/readiness"><ReadinessScreen /></Route>
+              <Route path="/sleep"><SleepScreen /></Route>
+              <Route path="/strain"><StrainScreen /></Route>
+              <Route path="/training">
+                <TrainingFrame store={p.store} onClose={() => go('/')} />
+              </Route>
+              <Route path="/insights">
+                <Insights mock={MOCK} reduced={p.reduced} />
+              </Route>
+              <Route path="/settings">
+                <Settings store={p.store} ctx={p.ctx} theme={p.theme}
+                  onTheme={(t) => void setSetting(p.store, KEYS.theme, t)} />
+              </Route>
+              <Route>
+                <Redirect to="/" replace />
+              </Route>
+            </Switch>
+          </ScreenBoundary>
+        </main>
+        {!inSession && <TabBar tab={tab} onTab={go} />}
+        {tab === 'checkin' && <CheckIn onClose={() => go('/')} />}
+      </div>
+    </AppStateProvider>
   )
 }
 

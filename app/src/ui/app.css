@@ -954,6 +954,363 @@ ul {
   }
 }
 
+/* ── Today and its detail screens (rebuild Phase 5) ──────────────────────────────── */
+
+/* A card that opens a screen is a button; it keeps the card's look and spans its row. */
+button.card {
+  width: 100%;
+  text-align: left;
+}
+
+.dayarrows {
+  display: grid;
+  grid-template-columns: var(--tap) 1fr var(--tap);
+  align-items: center;
+  gap: var(--sp-s);
+}
+
+.dayarrows__label {
+  text-align: center;
+  font-size: var(--fs-small);
+  color: var(--muted);
+}
+
+.iconbtn:disabled {
+  opacity: 0.35;
+}
+
+.pill {
+  align-self: center;
+  min-height: var(--tap);
+}
+
+.verdict {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.badge {
+  align-self: flex-start;
+  padding: var(--sp-xs) var(--sp-s);
+  border-radius: var(--r-pill);
+  border: var(--hair) solid var(--f2);
+  color: var(--f1);
+  font-size: var(--fs-caption);
+  font-weight: var(--w-title);
+  letter-spacing: var(--number-tracking);
+}
+
+.masthead {
+  display: flex;
+  align-items: baseline;
+  gap: var(--sp-s);
+}
+
+.masthead__value {
+  font-size: var(--fs-hero);
+  font-weight: var(--w-hero);
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--sp-s);
+}
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.figure__value {
+  font-size: var(--fs-title);
+}
+
+.figure__big {
+  font-size: var(--fs-display);
+}
+
+.contrib--off {
+  opacity: 0.55;
+}
+
+.segments {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--sp-xs);
+}
+
+.segments__one {
+  height: var(--bar);
+  border-radius: var(--r-pill);
+  background: var(--track);
+}
+
+.segments__one--on {
+  background: linear-gradient(90deg, var(--f2), var(--f1));
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-m);
+}
+
+.stepper__value {
+  min-width: var(--tap);
+  text-align: center;
+  font-size: var(--fs-title);
+}
+
+.share {
+  display: flex;
+  height: var(--timer-bar);
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  background: var(--track);
+}
+
+.share__part--upper_body {
+  background: var(--f1);
+}
+
+.share__part--core {
+  background: var(--f2);
+}
+
+.share__part--lower_body {
+  background: var(--f3);
+}
+
+/* Charts: the engine's series drawn as SVG; taps land on buttons laid over the plot. */
+.chart {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-s);
+}
+
+.chart__plot {
+  position: relative;
+  aspect-ratio: 8 / 3;
+  margin-left: var(--tap);
+  margin-bottom: var(--sp-l);
+}
+
+.chart--strip .chart__plot {
+  aspect-ratio: 8 / 3;
+  margin-left: 0;
+}
+
+.chart--movement .chart__plot {
+  aspect-ratio: 16 / 3;
+  margin-left: 0;
+  margin-bottom: 0;
+}
+
+.chart__plot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.chart__grid {
+  stroke: var(--track);
+  stroke-width: var(--hair);
+}
+
+.chart__avg {
+  stroke: var(--f3);
+  stroke-width: var(--hair);
+  stroke-dasharray: 4 4;
+}
+
+.chart__line {
+  fill: none;
+  stroke: var(--f1);
+  stroke-width: var(--icon-stroke);
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.chart__cursor {
+  stroke: var(--muted);
+  stroke-width: var(--hair);
+}
+
+.chart__y span,
+.chart__x span {
+  position: absolute;
+  font-size: var(--fs-caption);
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.chart__y span {
+  right: 100%;
+  padding-right: var(--sp-xs);
+  transform: translateY(-50%);
+}
+
+.chart__x span {
+  top: 100%;
+  transform: translateX(-50%);
+}
+
+/* The first and last time labels sit inside the plot's width, clear of the value labels. */
+.chart__x span:first-child {
+  transform: none;
+}
+
+.chart__x span:last-child {
+  transform: translateX(-100%);
+}
+
+/* "‹ Today": back from a detail screen; the day arrows below it change the day. */
+.backlink {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  min-height: var(--tap);
+  color: var(--f1);
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
+}
+
+.detail .topbar {
+  grid-template-columns: 1fr auto 1fr;
+}
+
+.chart__hits {
+  position: absolute;
+  inset: 0;
+}
+
+.chart__hit {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.chart__hit--on {
+  background: var(--f-soft);
+}
+
+.stage--4 {
+  fill: var(--muted);
+}
+
+.stage--3 {
+  fill: var(--f1);
+}
+
+.stage--2 {
+  fill: var(--f2);
+}
+
+.stage--1 {
+  fill: var(--f3);
+}
+
+.move {
+  fill: var(--f2);
+}
+
+.point {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  padding: var(--sp-s) var(--sp-m);
+  border-radius: var(--r-tile);
+  background: var(--f-soft);
+}
+
+.point__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--sp-s);
+}
+
+.point__title {
+  font-weight: var(--w-title);
+}
+
+.iconbtn--small {
+  width: calc(var(--tap) * 0.75);
+  height: calc(var(--tap) * 0.75);
+}
+
+/* The check-in form. */
+.checkin {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-m);
+  min-height: var(--tap);
+}
+
+.slider {
+  width: 100%;
+  min-height: var(--tap);
+  accent-color: var(--f1);
+}
+
+.switch {
+  width: var(--tap);
+  height: calc(var(--tap) * 0.6);
+  accent-color: var(--f1);
+}
+
+.segmented--wrap {
+  flex-wrap: wrap;
+  border-radius: var(--r-tile);
+}
+
+.segmented--wrap .segmented__item {
+  flex: 1 0 auto;
+  padding: 0 var(--sp-m);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-xs);
+}
+
+.chip {
+  min-height: var(--tap);
+  padding: 0 var(--sp-m);
+  border-radius: var(--r-pill);
+  background: var(--track);
+  color: var(--muted);
+  font-size: var(--fs-small);
+}
+
+.chip--on {
+  background: var(--f-soft);
+  color: var(--text);
+  box-shadow: inset 0 0 0 var(--hair) var(--f2);
+}
+
+.guide summary {
+  color: var(--muted);
+}
+
+.guide p {
+  margin-top: var(--sp-xs);
+}
+
 /* ── The tab bar ─────────────────────────────────────────────────────────────────── */
 
 .tabbar {
