@@ -1,5 +1,5 @@
 {
-  "phase": "P6",
+  "phase": "P7",
   "tasks": [
     {
       "id": "P0-01",
@@ -644,6 +644,80 @@
         "P6-02",
         "P6-05",
         "P6-06"
+      ],
+      "gate": "device_checklist_open",
+      "passes": false
+    },
+    {
+      "id": "P7-01",
+      "phase": "P7",
+      "description": "The week page on the Training tab: the rollup banner, last week's line and the past-week badge, the repeat notice and the load hold, the Monday redo, gate 1, the retest banner, the strip with its week arrows, and each day's view (logged, missed, future, rest, the gap screen); every KEEP row of T1-T36 and T103-T112 built and tested.",
+      "depends_on": [],
+      "gate": "inventory_rows_open",
+      "passes": false
+    },
+    {
+      "id": "P7-02",
+      "phase": "P7",
+      "description": "Moves only on a button press: the week and day reads write nothing, and each answer (swap, carry, shift, redo) carries an id the phone mints, applied once by the engine (training_screen.once).",
+      "depends_on": [
+        "P7-01"
+      ],
+      "gate": "unasked_moves",
+      "passes": false
+    },
+    {
+      "id": "P7-03",
+      "phase": "P7",
+      "description": "Every date_overrides write goes through scheduling.apply_schedule_change (plan.reject_violating_overrides, Key Rule 18b) or the week repeat.",
+      "depends_on": [],
+      "gate": "override_writes_unchecked",
+      "passes": false
+    },
+    {
+      "id": "P7-04",
+      "phase": "P7",
+      "description": "No content lookup by the authored day number in the training endpoints or app/src (sessions.calendar_plan only).",
+      "depends_on": [],
+      "gate": "day_number_lookups",
+      "passes": false
+    },
+    {
+      "id": "P7-05",
+      "phase": "P7",
+      "description": "The + menu: the accessory session in the same guided flow (Discard discards; yesterday's is never offered as today's), yoga (advisory cautions) and outdoor activities from Garmin, each saved once.",
+      "depends_on": [
+        "P7-01"
+      ],
+      "gate": "duplicate_supplementary",
+      "passes": false
+    },
+    {
+      "id": "P7-06",
+      "phase": "P7",
+      "description": "The automatic writes (the failed-week rule, the stored no-movement records) stay with the Streamlit app, the background writer, until Phase 9; the engine refuses them while background_writer is \"streamlit\".",
+      "depends_on": [],
+      "gate": "automatic_writes_in_engine",
+      "passes": false
+    },
+    {
+      "id": "P7-07",
+      "phase": "P7",
+      "description": "Tests: Vitest for the week states, Playwright for a swap blocked, warned and allowed, a declined move that does not come back, the Monday redo, the accessory flow and Discard, a yoga save sent twice and an outdoor import; the Worker tests and the Python gate; deployed.",
+      "depends_on": [
+        "P7-01",
+        "P7-02",
+        "P7-05"
+      ],
+      "gate": "test_failures",
+      "passes": false
+    },
+    {
+      "id": "P7-08",
+      "phase": "P7",
+      "description": "The owner's training week in the new app: swap one day, decline one move, log a short extra session, a yoga flow and an outdoor activity, open a past and a future day, every save stored once.",
+      "depends_on": [
+        "P7-07"
       ],
       "gate": "device_checklist_open",
       "passes": false

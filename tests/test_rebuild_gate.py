@@ -829,3 +829,67 @@ def test_the_real_session_checklist_is_open_until_the_owner_confirms_it(tmp_path
     checks.write_text(json.dumps({"p6": {k: True for k in gate.P6_CHECKLIST}}), encoding="utf-8")
     assert gate.p6_device_checklist_open().count == 0
 
+
+# ── Phase 7 ──────────────────────────────────────────────────────────────────
+
+def test_phase_7_has_the_counters_its_prompt_names():
+    assert set(gate.REGISTRY["p7"]) == {
+        "test_failures", "unasked_moves", "override_writes_unchecked", "day_number_lookups",
+        "duplicate_supplementary", "automatic_writes_in_engine", "inventory_rows_open",
+        "device_checklist_open"}
+
+
+def test_an_override_written_outside_the_checked_path_is_found():
+    files = {
+        "services/scheduling.py": "def apply_schedule_change(a):\n    return replace(a, date_overrides={})\n",
+        "services/rogue.py": ("def sneak(a):\n    return replace(a, date_overrides={'x': 1})\n"
+                              "def other(a):\n    a.date_overrides = {}\n"),
+    }
+    assert gate.override_write_hits(files) == ["services/rogue.py:2 in sneak", "services/rogue.py:4 in other"]
+
+
+def test_the_real_engine_writes_overrides_only_on_the_checked_path():
+    assert gate.override_write_hits(gate._engine_files()) == []
+
+
+def test_an_authored_day_lookup_is_found_in_python_and_typescript():
+    files = {
+        "services/training_screen.py": "import training_plan\nfrom goal_block import START\nx = s.plan_dict_for_phase(p)\n",
+        "app/src/x.ts": "// training_plan in a comment is fine\nconst a = goal_block.START\n",
+    }
+    assert gate.authored_lookup_hits(files) == [
+        "services/training_screen.py:1 import training_plan",
+        "services/training_screen.py:2 from goal_block",
+        "services/training_screen.py:3 plan_dict_for_phase",
+        "app/src/x.ts:2 an authored plan",
+    ]
+
+
+def test_the_real_training_endpoints_and_phone_look_nothing_up_by_authored_day():
+    assert gate.p7_day_number_lookups().count == 0
+
+
+_P7_INVENTORY = """## Training
+| Id | Feature | Proposal |
+|---|---|---|
+| T5 | Rollup sync | MOVE (engine) |
+| T8 | Banner | KEEP |
+| T28 | Offer | Removed |
+| T36 | Retest | KEEP |
+| T37 | Load banner | KEEP |
+| T103 | Menu | KEEP |
+| T112 | Outdoor | KEEP |
+| T113 | AI note | Not on Training |
+"""
+
+
+def test_phase_7_builds_the_kept_week_rows_only():
+    assert gate.p7_rows(_P7_INVENTORY) == ["T8", "T36", "T103", "T112"]
+
+
+def test_the_week_checklist_is_open_until_the_owner_confirms_it(tmp_path, monkeypatch):
+    checks = tmp_path / "owner_checks.json"
+    monkeypatch.setattr(gate, "OWNER_CHECKS", checks)
+    checks.write_text(json.dumps({"p7": {"swap": True}}), encoding="utf-8")
+    assert gate.p7_device_checklist_open().count == len(gate.P7_CHECKLIST) - 1
+

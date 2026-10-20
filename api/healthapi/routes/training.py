@@ -24,7 +24,7 @@ from services.background_sync import BackgroundSyncRunner, SyncBusyError
 from services.repository import Repository
 
 from ..deps import get_repository, get_sync_runner, local_today
-from ..schemas_training import (ActivityMinutesOut, AnswerIn, CompletionIn, CompletionOut,
+from ..schemas_training import (ActivityMinutesOut, AnswerIn, CompletionIn, CompletionOut, RedoIn,
                                 Gate1ReasonIn, HeartRateIn, HeartRateOut, LoggedOut,
                                 OpenActivityOut, OutdoorListOut, OutdoorLogIn, OutdoorLogOut,
                                 SessionPlanOut, SessionSaveIn, SessionSaveOut, StoredOut,
@@ -82,28 +82,35 @@ def _action(run):
         raise _refused(exc) from None
 
 
+# Each answer may carry the id the phone minted for it (ts.once): the outbox sends it again
+# after a lost answer, and it is applied once.
+
 @router.post("/api/training/swap", response_model=StoredOut)
 def post_swap(body: SwapIn, today: date = Depends(local_today),
               repo: Repository = Depends(get_repository)) -> dict:
-    return _action(lambda: ts.swap_with_today(repo, today, body.date))
+    return _action(lambda: ts.once(repo, body.action_id, today,
+                                   lambda: ts.swap_with_today(repo, today, body.date)))
 
 
 @router.post("/api/training/carry", response_model=StoredOut)
 def post_carry(body: AnswerIn, today: date = Depends(local_today),
                repo: Repository = Depends(get_repository)) -> dict:
-    return _action(lambda: ts.apply_carry(repo, today, body.accept))
+    return _action(lambda: ts.once(repo, body.action_id, today,
+                                   lambda: ts.apply_carry(repo, today, body.accept)))
 
 
 @router.post("/api/training/shift", response_model=StoredOut)
 def post_shift(body: AnswerIn, today: date = Depends(local_today),
                repo: Repository = Depends(get_repository)) -> dict:
-    return _action(lambda: ts.apply_shift(repo, today, body.accept))
+    return _action(lambda: ts.once(repo, body.action_id, today,
+                                   lambda: ts.apply_shift(repo, today, body.accept)))
 
 
 @router.post("/api/training/redo", response_model=StoredOut)
-def post_redo(today: date = Depends(local_today),
+def post_redo(body: RedoIn | None = None, today: date = Depends(local_today),
               repo: Repository = Depends(get_repository)) -> dict:
-    return _action(lambda: ts.redo_week(repo, today))
+    action_id = body.action_id if body else None
+    return _action(lambda: ts.once(repo, action_id, today, lambda: ts.redo_week(repo, today)))
 
 
 @router.post("/api/training/gate1/reason", response_model=StoredOut)

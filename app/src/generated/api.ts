@@ -845,6 +845,8 @@ export interface components {
         AnswerIn: {
             /** Accept */
             accept: boolean;
+            /** Action Id */
+            action_id?: string | null;
         };
         /**
          * AxisTick
@@ -2208,6 +2210,11 @@ export interface components {
             /** Window Days */
             window_days: number;
         };
+        /** RedoIn */
+        RedoIn: {
+            /** Action Id */
+            action_id?: string | null;
+        };
         /** RedoOffer */
         RedoOffer: {
             /** Consequences */
@@ -2942,6 +2949,8 @@ export interface components {
         };
         /** SwapIn */
         SwapIn: {
+            /** Action Id */
+            action_id?: string | null;
             /**
              * Date
              * Format: date
@@ -5011,7 +5020,11 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["RedoIn"] | null;
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {

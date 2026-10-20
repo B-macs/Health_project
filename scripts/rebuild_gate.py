@@ -1723,6 +1723,192 @@ def p6_device_checklist_open() -> CounterResult:
 review("p6", *P6_CHECKLIST.values())
 
 
+# ── Phase 7 counters ─────────────────────────────────────────────────────────
+
+#: The training-week rows of the inventory the phone builds: the page around the session
+#: (T1-T36) and the "+" menu (T103-T112).
+P7_ROW_RANGES = (range(1, 37), range(103, 113))
+#: The owner's training week (docs/rebuild/owner_checks.json, "p7"): true = as expected.
+P7_CHECKLIST = {
+    "swap": "Swap one day with today (a missed day carried forward, or a future day pulled in)",
+    "decline": "Decline one proposed move; the question does not come back",
+    "extra": "Log one short extra session (the + button)",
+    "yoga": "Log one yoga flow",
+    "outdoor": "Log one outdoor activity from Garmin",
+    "past_future": "Open a past day and a future day",
+    "once": "Every save of the week is stored exactly once",
+}
+#: The functions that may write `date_overrides`: the one checked path for a move
+#: (scheduling.apply_schedule_change runs plan.reject_violating_overrides, Key Rule 18b) and
+#: the week repeat, which moves a block's overrides along with its dates (Key Rule 22).
+OVERRIDE_WRITERS = {("services/scheduling.py", "apply_schedule_change"),
+                    ("services/week_repeat.py", "repeat_week")}
+#: The training endpoints and the services behind them: day content comes only from
+#: sessions.calendar_plan, never by the authored day number (a repeated week would show the
+#: wrong session with no error).
+TRAINING_API_FILES = ("api/healthapi/routes/training.py", "services/training_screen.py",
+                      "services/training_session.py")
+_AUTHORED_IMPORTS = ("training_plan", "goal_block")
+_P7_MOVE_TESTS = "tests/api/test_moves_once_and_reads_write_nothing.py"
+_P7_WEEK_TITLES = ("the week", "a move", "a swap", "the +", "yoga", "an outdoor", "the extra")
+
+
+def override_write_hits(files: dict[str, str]) -> list[str]:
+    """Writes of `date_overrides` (a keyword in a call, or an assignment to the attribute)
+    outside OVERRIDE_WRITERS: a move that could skip Key Rule 18b's check."""
+    hits = []
+    for rel, text in files.items():
+        tree = ast.parse(text)
+        for fn in ast.walk(tree):
+            if not isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                continue
+            for node in ast.walk(fn):
+                targets = getattr(node, "targets", None) or [getattr(node, "target", None)]
+                writes = (isinstance(node, ast.keyword) and node.arg == "date_overrides") or (
+                    isinstance(node, (ast.Assign, ast.AugAssign, ast.AnnAssign)) and any(
+                        isinstance(t, ast.Attribute) and t.attr == "date_overrides" for t in targets))
+                if writes and (rel, fn.name) not in OVERRIDE_WRITERS:
+                    hits.append(f"{rel}:{node.lineno} in {fn.name}")
+    return sorted(set(hits))
+
+
+def authored_lookup_hits(files: dict[str, str]) -> list[str]:
+    """Content looked up by the authored day: a call of plan_dict_for_phase, or an import of
+    the authored plans, where sessions.calendar_plan is the one way in."""
+    hits = []
+    for rel, text in files.items():
+        if rel.endswith(".py"):
+            for node in ast.walk(ast.parse(text)):
+                if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) \
+                        and node.func.attr == "plan_dict_for_phase":
+                    hits.append(f"{rel}:{node.lineno} plan_dict_for_phase")
+                if isinstance(node, ast.Import):
+                    hits += [f"{rel}:{node.lineno} import {a.name}" for a in node.names
+                             if a.name.split(".")[0] in _AUTHORED_IMPORTS]
+                if isinstance(node, ast.ImportFrom) and (node.module or "").split(".")[0] in _AUTHORED_IMPORTS:
+                    hits.append(f"{rel}:{node.lineno} from {node.module}")
+        else:
+            code = _blank_comments(text)
+            for number, line in enumerate(code.splitlines(), 1):
+                if "plan_dict_for_phase" in line or re.search(r"\b(training_plan|goal_block)\b", line):
+                    hits.append(f"{rel}:{number} an authored plan")
+    return hits
+
+
+def _engine_files() -> dict[str, str]:
+    files = {}
+    for folder in ("services", "api"):
+        for path in sorted((REPO_ROOT / folder).rglob("*.py")):
+            files[path.relative_to(REPO_ROOT).as_posix()] = path.read_text(encoding="utf-8")
+    return files
+
+
+def p7_rows(markdown: str) -> list[str]:
+    """The training-week rows (T1-T36, T103-T112) marked KEEP."""
+    words = inventory_rows(markdown)
+    ids = [rid for rid, word in words.items()
+           if word == "KEEP" and rid.startswith("T") and any(int(rid[1:]) in r for r in P7_ROW_RANGES)]
+    return sorted(ids, key=lambda rid: int(rid[1:]))
+
+
+def _week_annotations(phase: str, kind: str) -> CounterResult:
+    def count(tests):
+        total, notes = annotation_total(tests, kind)
+        return CounterResult(total, "; ".join(notes) or f"{len(tests)} week test runs, none",
+                             [f"{phase}/playwright.json"])
+    return _browser_counter(phase, lambda title: title.lower().startswith(_P7_WEEK_TITLES), count)
+
+
+@counter("p7", "test_failures",
+         "failures in the Python gate (plus 1 under the floor), `pnpm test` (the app's and the "
+         "Worker's Vitest, after the build) and the browser tests (Playwright)")
+def p7_test_failures() -> CounterResult:
+    main_gate = _main_gate_counter("p7")
+    vitest = _pnpm_test_counter("p7")
+    report = playwright_report("p7")
+    if report is None:
+        browser = CounterResult(1, "no report", ["p7/playwright.log"])
+    else:
+        stats = report.get("stats", {})
+        failed = int(stats.get("unexpected", 0)) + int(stats.get("flaky", 0))
+        browser = CounterResult(failed, f'{stats.get("expected", 0)} passed, {failed} failed or flaky',
+                                ["p7/playwright.json"])
+    return CounterResult(main_gate.count + vitest.count + browser.count,
+                         f"Python: {main_gate.detail}; pnpm: {vitest.detail}; Playwright: {browser.detail}",
+                         main_gate.evidence + vitest.evidence + browser.evidence)
+
+
+@counter("p7", "unasked_moves",
+         "session moves written without a button press: the engine's reads that write, a move sent "
+         "twice that applies twice (" + _P7_MOVE_TESTS + "), and moves the week browser tests saw "
+         "sent with no tap")
+def p7_unasked_moves() -> CounterResult:
+    engine = _pytest_once("p7", _P7_MOVE_TESTS)
+    phone = _week_annotations("p7", "unasked_moves")
+    return CounterResult(engine.count + phone.count, f"engine: {engine.detail}; phone: {phone.detail}",
+                         engine.evidence + phone.evidence)
+
+
+@counter("p7", "override_writes_unchecked",
+         "date_overrides writes that bypass plan.reject_violating_overrides (a scan of services/ and "
+         "api/, and tests/test_schedule_change.py)")
+def p7_override_writes_unchecked() -> CounterResult:
+    hits = override_write_hits(_engine_files())
+    tests = _pytest_once("p7", "tests/test_schedule_change.py")
+    return CounterResult(len(hits) + tests.count,
+                         "; ".join(hits) + (f"; tests: {tests.detail}" if hits else f"none; tests: {tests.detail}"),
+                         tests.evidence)
+
+
+@counter("p7", "day_number_lookups",
+         "content looked up by the authored day number in app/src or the training endpoints")
+def p7_day_number_lookups() -> CounterResult:
+    files = {rel: (REPO_ROOT / rel).read_text(encoding="utf-8") for rel in TRAINING_API_FILES}
+    files.update(_phone_code_files())
+    hits = authored_lookup_hits(files)
+    return CounterResult(len(hits), "; ".join(hits) or f"{len(files)} files, none")
+
+
+@counter("p7", "duplicate_supplementary",
+         "yoga, outdoor or extra sessions stored more than once: tests/test_supplementary_save_once.py "
+         "and the week browser tests that send one twice")
+def p7_duplicate_supplementary() -> CounterResult:
+    engine = _pytest_once("p7", "tests/test_supplementary_save_once.py")
+    phone = _week_annotations("p7", "duplicate_supplementary")
+    return CounterResult(engine.count + phone.count, f"engine: {engine.detail}; phone: {phone.detail}",
+                         engine.evidence + phone.evidence)
+
+
+@counter("p7", "automatic_writes_in_engine",
+         "automatic writes the engine runs while background_writer is \"streamlit\" "
+         "(tests/test_background_writer.py)")
+def p7_automatic_writes_in_engine() -> CounterResult:
+    return _pytest_once("p7", "tests/test_background_writer.py")
+
+
+@counter("p7", "inventory_rows_open",
+         "training-week rows (T1-T36, T103-T112) marked KEEP that the phone app does not build "
+         "(docs/rebuild/app_rows.json: the files and the test)")
+def p7_inventory_rows_open() -> CounterResult:
+    rows = p7_rows(SCREEN_INVENTORY.read_text(encoding="utf-8"))
+    mapping = json.loads(APP_ROWS.read_text(encoding="utf-8"))["rows"] if APP_ROWS.exists() else {}
+    owner = DESIGN_MD.read_text(encoding="utf-8") if DESIGN_MD.exists() else ""
+    open_ = app_rows_open(rows, mapping, owner)
+    return CounterResult(len(open_), "; ".join(open_[:30]) or f"{len(rows)} rows built, each with a test")
+
+
+@counter("p7", "device_checklist_open",
+         "items of the owner's training-week checklist not confirmed yet (docs/rebuild/owner_checks.json, p7)")
+def p7_device_checklist_open() -> CounterResult:
+    data = json.loads(OWNER_CHECKS.read_text(encoding="utf-8")) if OWNER_CHECKS.exists() else {}
+    answers = data.get("p7", {})
+    missing = [key for key in P7_CHECKLIST if answers.get(key) is not True]
+    return CounterResult(len(missing), ", ".join(missing) or "the owner confirmed every item")
+
+
+review("p7", *P7_CHECKLIST.values())
+
+
 # ── output ───────────────────────────────────────────────────────────────────
 
 _PAGE = """<!doctype html>

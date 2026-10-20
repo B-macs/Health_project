@@ -8,7 +8,7 @@ model here and export again.
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -258,14 +258,24 @@ class TrainingDayOut(BaseModel):
 
 # ── The actions ──────────────────────────────────────────────────────────────
 
+#: An id the phone mints for one answer; the same answer sent again is applied once.
+ActionId = Annotated[str, Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")]
+
+
 class SwapIn(BaseModel):
     #: The other day: its session comes to today, and today's goes there.
     date: date
+    action_id: ActionId | None = None
 
 
 class AnswerIn(BaseModel):
     #: True: apply the proposal; False: keep as planned, and it is not asked again.
     accept: bool
+    action_id: ActionId | None = None
+
+
+class RedoIn(BaseModel):
+    action_id: ActionId | None = None
 
 
 class Gate1ReasonIn(BaseModel):

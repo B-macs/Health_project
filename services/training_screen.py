@@ -24,6 +24,7 @@ list built from one copy could put an older schedule over a newer one.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -440,6 +441,37 @@ def today_overview(repo, r: Reads, decided: dict | None = None) -> dict:
 
 
 # ─── The actions ─────────────────────────────────────────────────────────────
+
+#: The schedule answers the phone sent, by the id it minted (rebuild rule 4): its outbox
+#: sends an answer again when the first answer was lost on the way back, and a swap applied
+#: twice puts the two days back where they were. An id already applied is answered as
+#: stored and changes nothing. The newest ACTIONS_KEPT ids are kept, in config.
+APPLIED_ACTIONS_KEY = "applied_actions"
+ACTIONS_KEPT = 200
+
+
+def applied_actions(repo) -> list[str]:
+    """The ids already applied, read from the store itself (another process may have
+    applied one since this one built its copy). A read that fails raises: answering
+    "not applied" then could apply a move twice."""
+    raw = repo.get_config_value_live(APPLIED_ACTIONS_KEY)
+    try:
+        ids = json.loads(raw) if raw else []
+    except ValueError:
+        ids = []
+    return [i for i in ids if isinstance(i, str)] if isinstance(ids, list) else []
+
+
+def once(repo, action_id: str | None, today: date, run) -> dict:
+    """Run a schedule answer once per id. Without an id it runs as before."""
+    if not action_id:
+        return run()
+    done = applied_actions(repo)
+    if action_id in done:
+        return {"stored": True}
+    out = run()
+    repo.set_config(APPLIED_ACTIONS_KEY, json.dumps((done + [action_id])[-ACTIONS_KEPT:]), today)
+    return out
 
 def _store(repo, r: Reads, overrides: dict, reasons: dict) -> list[Phase]:
     """One schedule change through scheduling.apply_schedule_change (Key Rule
