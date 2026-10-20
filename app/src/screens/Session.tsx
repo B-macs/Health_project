@@ -13,14 +13,17 @@
 // was hidden at the end, nothing moves by itself and the screen says when it ended. The
 // screen stays on (the Wake Lock API).
 import { useCallback, useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
+import { api, ApiError } from '../lib/api'
+import { useApp } from '../lib/appState'
 import { bell, restOver, tick, unlockAudio, type Ending } from '../lib/sounds'
 import {
   endsAt, extendTimer, hasEnded, isRunning, pauseTimer, remainingMs, resumeTimer, shownSeconds, startTimer,
   ticksCrossed, type Timer,
 } from '../lib/timers'
 import {
-  advance, back, currentStep, exerciseOf, finished, setBand, setNote, setSide, sideValues, skip, stepBand,
-  stepWeight, timerHere, withTimer, type Exercise, type FlowStep, type Side, type TrainingState,
+  advance, back, currentStep, exerciseOf, exerciseProgress, finished, setBand, setGarmin, setNote, setSide,
+  sideValues, skip, stepBand, stepWeight, timerHere, withTimer, type Exercise, type FlowStep, type GarminPull,
+  type Side, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { clock, useWakeLock } from '../ui/hooks'
@@ -28,6 +31,11 @@ import { IconCheck, IconClose, IconPause, IconPlay } from '../ui/icons'
 
 const HOLD_AUTO_MS = 700
 const REST_AUTO_MS = 900
+/** How long the watch may take to answer at the end of a walk before the flow moves on. */
+const GARMIN_WAIT_MS = 8000
+/** The digits turn to the page's strongest shade near the end: a hold's last 3 seconds, an
+ *  activity's last 30 (the Streamlit page's timers, T81 and T84). */
+const LAST_MS: Record<string, number> = { hold: 3000, duration: 30_000 }
 
 const time = (ms: number) => new Date(ms).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
@@ -75,6 +83,40 @@ function Field({ initial, onValue, ...props }: {
       setValue(typed)
       onValue(typed)
     }} />
+  )
+}
+
+/** Where the session is (T51, T52): the day, today's progress, and every exercise with
+ *  done, now and next marked. */
+function SessionHeader({ s }: { s: TrainingState }) {
+  const { done, total } = exerciseProgress(s)
+  return (
+    <section className="group" aria-label={S.session.todaysSession}>
+      {s.plan.day_num != null && (
+        <p className="caption">{S.session.dayHeader(s.plan.day_num, s.plan.plan_days ?? null, s.plan.rpe_target)}</p>
+      )}
+      <div className="kv">
+        <span className="caption">{S.session.todaysSession}</span>
+        <span className="caption num">{S.session.progressOf(done, total)}</span>
+      </div>
+      <div className="progress" role="progressbar" aria-label={S.session.todaysSession} aria-valuemin={0}
+        aria-valuemax={total} aria-valuenow={done}>
+        <span className="progress__fill" style={{ width: `${total ? (done / total) * 100 : 0}%` }} />
+      </div>
+      <details className="guide">
+        <summary className="tapline">{S.session.allExercises}</summary>
+        <ol className="list">
+          {s.plan.exercises.map((ex, i) => (
+            <li key={ex.index} className="kv" data-state={i < done ? 'done' : i === done ? 'now' : 'todo'}>
+              <span>{ex.name}</span>
+              <span className="caption">
+                {i < done ? S.session.doneMark : i === done ? S.session.nowMark : i === done + 1 ? S.session.nextMark : ''}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </details>
+    </section>
   )
 }
 
@@ -177,6 +219,8 @@ export function SessionFlow({ s, update, onExit }: {
   const handled = useRef<Timer | null>(null)
   const held = useWakeLock(true)
   const [asking, setAsking] = useState<'exit' | 'skip' | null>(null)
+  const [pulling, setPulling] = useState(false)
+  const { ctx } = useApp()
 
   /** Move the flow with `f` at the clock, starting the timer the next entry runs itself;
    *  `byTimer` when a timer that ran out moved it, not a tap. */
@@ -234,6 +278,38 @@ export function SessionFlow({ s, update, onExit }: {
     update((x) => withTimer(x, timer))
   }
 
+  /** The main button. At the end of a walk or run the watch is asked for its minutes first
+   *  (T75); with no answer in a few seconds the flow moves on and the save asks again. */
+  const done = async () => {
+    unlockAudio()
+    if (!(ex.garmin_pull && step.event === 'complete' && ex.garmin_window)) {
+      move((x, at) => advance(x, at))
+      return
+    }
+    const [low, high] = ex.garmin_window
+    setPulling(true)
+    let pull: GarminPull
+    let notice: string
+    try {
+      const got = await api<{ minutes: number; detail: Record<string, unknown> | null }>(
+        `/api/training/garmin/activity-minutes?planned_minutes=${ex.duration_minutes ?? 0}`,
+        { key: ctx.key, engineDown: ctx.engineDown, day: s.plan.date, timeoutMs: GARMIN_WAIT_MS })
+      pull = got.minutes > 0 ? { state: 'found', minutes: got.minutes, detail: got.detail } : { state: 'none' }
+      notice = got.minutes > 0 ? S.session.garminPulled(got.minutes, ex.name) : S.session.garminNone(low, high)
+    } catch (err) {
+      const reachable = err instanceof ApiError && (err.kind === 'rejected' || err.kind === 'server')
+      pull = reachable ? { state: 'none' } : { state: 'pending' }
+      notice = reachable ? S.session.garminNone(low, high) : S.session.garminLater
+    } finally {
+      setPulling(false)
+    }
+    const index = ex.index
+    move((x, at) => {
+      const moved = advance(x, at)
+      return { ...setGarmin(moved, index, pull, notice) }
+    })
+  }
+
   return (
     <div className={`screen train ${resting ? 'train--rest' : 'train--hold'}`} data-step={s.step}
       onPointerDown={() => unlockAudio()}>
@@ -245,6 +321,9 @@ export function SessionFlow({ s, update, onExit }: {
         <div className="topbar__title">{S.session.exerciseOf(ex.index + 1, n)}</div>
         <span className="topbar__note">{held ? S.session.screenOn : ''}</span>
       </header>
+
+      <SessionHeader s={s} />
+      {s.notice && <p className="note" role="status" data-testid="notice">{s.notice}</p>}
 
       {asking && (
         <section className="card group" role="alertdialog" aria-label={asking === 'exit' ? S.session.exit : S.session.skip}>
@@ -269,10 +348,19 @@ export function SessionFlow({ s, update, onExit }: {
         {ex.warning && <p className="alert" data-testid="warning">{ex.warning}</p>}
       </section>
 
-      {(t || resting || ex.timer) && (
+      {ex.garmin_pull && ex.garmin_window && !resting && (
+        <p className="note" data-testid="garmin-activity">
+          {S.session.garminActivity(ex.name, ex.garmin_window[0], ex.garmin_window[1])}
+        </p>
+      )}
+
+      {(t || resting || (ex.timer && !ex.garmin_pull)) && (
         <div className="timer" role="timer" aria-live="off">
-          <span className="timer__word">{ended && t?.kind !== 'stopwatch' ? S.session.go : word}</span>
-          <span className="num timer__digits">
+          <span className="timer__word">
+            {ended && t?.kind === 'duration' ? S.session.timerDone : ended && t?.kind !== 'stopwatch' ? S.session.go : word}
+          </span>
+          <span className={`num timer__digits${t && isRunning(t) && LAST_MS[t.kind] != null
+            && remainingMs(t, now) <= LAST_MS[t.kind] ? ' timer__digits--last' : ''}`}>
             {seconds != null ? clock(seconds) : ex.timer === 'duration' ? clock((ex.duration_minutes ?? 0) * 60) : clock(ex.hold_seconds ?? 0)}
           </span>
           {t && t.kind !== 'stopwatch' && (
@@ -305,7 +393,7 @@ export function SessionFlow({ s, update, onExit }: {
             <IconPlay /> {S.session.startHold}
           </button>
         )}
-        {!t && ex.timer === 'duration' && !resting && (
+        {!t && ex.timer === 'duration' && !ex.garmin_pull && !resting && (
           <button className="btn btn--glass btn--gym" onClick={() => start(startTimer('duration', (ex.duration_minutes ?? 0) * 60_000, Date.now()))}>
             <IconPlay /> {S.session.startTimer(ex.duration_minutes ?? 0)}
           </button>
@@ -337,9 +425,9 @@ export function SessionFlow({ s, update, onExit }: {
         {resting && t && !ended && (
           <button className="btn btn--glass btn--gym" onClick={() => update((x) => withTimer(x, extendTimer(t, 15_000)))}>{S.session.plus15}</button>
         )}
-        <button className="btn btn--primary btn--gym" disabled={ex.timer === 'stopwatch' && !resting && typed == null}
-          onClick={() => { unlockAudio(); move((x, at) => advance(x, at)) }}>
-          {doneLabel}
+        <button className="btn btn--primary btn--gym" disabled={pulling || (ex.timer === 'stopwatch' && !resting && typed == null)}
+          onClick={() => void done()}>
+          {pulling ? S.session.garminChecking : doneLabel}
         </button>
       </div>
 

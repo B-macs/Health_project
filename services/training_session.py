@@ -216,6 +216,7 @@ def session_plan(repo, today: date) -> dict:
     decided = ts.todays_decision(repo, r.phases, today)
     out = compose(repo, today, kind=PLAN, day_num=r.day_num, content=r.plan[r.day_num],
                   decided=decided)
+    out["plan_days"] = len(r.plan)
     following = r.plan.get(r.day_num + 1)
     out["next_day"] = (None if not following else {
         "day_num": r.day_num + 1, "objective": following["objective"],
@@ -275,6 +276,23 @@ def _set_log(exercises: list[dict], flow_ex: list[dict]) -> dict[int, list[dict]
             out[i] = session_save.records_from_raw(flow_ex[i], list(e["raw_sets"]))
         elif e.get("sets"):
             out[i] = list(e["sets"])
+    return out
+
+
+def sets_by_name(body: dict) -> dict[str, list[dict]]:
+    """A saved session's recorded sets keyed by exercise NAME, built exactly as
+    the save builds them (_set_log), for the heart-rate match: the phone sends
+    the session it saved, and the match reads the same set records the store
+    holds. Keyed by name, never by index, for the Training page's reason
+    (_sets_by_movement): the name means the same thing on both sides. An
+    exercise with no recorded set is left out."""
+    exercises = body.get("exercises") or []
+    flow_ex = [dict(e.get("exercise") or {}) for e in exercises]
+    out: dict[str, list[dict]] = {}
+    for i, rows in _set_log(exercises, flow_ex).items():
+        name = flow_ex[i].get("name")
+        if name and rows:
+            out.setdefault(name, []).extend(rows)
     return out
 
 

@@ -267,6 +267,7 @@ def test_gate_one_takes_its_reason_and_a_flare_up(env, monkeypatch):
 def test_todays_session_carries_every_exercise_and_the_walk(env, monkeypatch):
     plan = env.ok(monkeypatch, "get", "/api/training/session")
     assert plan["kind"] == "plan" and plan["day_num"] == 1
+    assert plan["plan_days"] == len(sess.calendar_plan(sess.build_phase(5, MONDAY)))
     content = sess.calendar_plan(sess.build_phase(5, MONDAY))[1]
     assert [e["name"] for e in plan["exercises"]] == [e["name"] for e in content["exercises"]]
     for e in plan["exercises"]:
@@ -298,6 +299,7 @@ def test_the_accessory_session_runs_through_the_same_flow(env, monkeypatch):
     assert plan["kind"] == "accessory" and plan["exercises"] and plan["steps"]
     assert plan["min_minutes"] == sess.MIN_ACCESSORY_MINUTES and plan["reasons"]
     assert plan["ask_length_above_minutes"] is None, "the accessory session never asks the length"
+    assert plan["plan_days"] is None
 
 
 def test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan(env, monkeypatch):
@@ -371,6 +373,26 @@ def test_the_heart_rate_match_compares_or_asks(env, monkeypatch):
     monkeypatch.setattr(env.repo, "compute_session_hr", lambda *a, **k: None)
     assert env.ok(monkeypatch, "post", "/api/training/heart-rate",
                   body=body)["state"] == "no_match"
+
+
+def test_the_heart_rate_match_reads_the_session_the_phone_saved(env, monkeypatch):
+    """The phone sends the session it saved; the match gets the set records the
+    save builds from its raw facts, keyed by exercise name, with their times."""
+    from services import session_save
+    split = {"name": "Split Squat", "type": "reps", "laterality": "unilateral", "sets": 1,
+             "reps": 8, "weight_kg": 9.0, "equipment_type": "dumbbell", "rest_seconds": 60}
+    raw = [{"set_num": 1, "completed_at": "2026-10-19T08:05:00+02:00",
+            "right": {"reps": 8, "weight_kg": 9.0}, "left": {"reps": 7, "weight_kg": 9.0}}]
+    saved = {"session_id": "2026-10-19-1a2b3c4d", "date": MONDAY.isoformat(), "kind": "plan",
+             "duration_minutes": 40, "session_rpe": 7, "notes": "",
+             "exercises": [{"exercise_id": "ex-1", "exercise": split, "raw_sets": raw},
+                           {"exercise_id": "ex-2", "exercise": {**split, "name": "Skipped"}}]}
+    seen = []
+    monkeypatch.setattr(env.repo, "compute_session_hr", lambda d, sets, **k: seen.append(sets) or None)
+    body = {"date": MONDAY.isoformat(), "session": saved, "duration_minutes": 40, "reported_rpe": 7}
+    assert env.ok(monkeypatch, "post", "/api/training/heart-rate", body=body)["state"] == "no_match"
+    assert list(seen[0]) == ["Split Squat"], "keyed by name; a skipped exercise is left out"
+    assert seen[0]["Split Squat"] == json.loads(json.dumps(session_save.records_from_raw(split, raw)))
 
 
 # ── the "+" menu ─────────────────────────────────────────────────────────────

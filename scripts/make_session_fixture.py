@@ -65,6 +65,8 @@ def build() -> dict:
     exercises = _exercises()
     out = []
     for i, ex in enumerate(exercises):
+        pulls = ex["type"] == "duration" and sess.is_run_or_walk(ex)
+        minutes = ex.get("duration_minutes") or 0
         entry = None
         if ex.get("weight_kg") is not None or ex.get("band_tier"):
             entry = {"reps": ex.get("reps"), "weight_kg": ex.get("weight_kg"),
@@ -83,12 +85,15 @@ def build() -> dict:
             "previous_caption": "Last: 3 × 9 at 20.25 kg" if i == 2 else "",
             "delta": "+2.25 kg" if i == 2 else "", "delta_direction": "up" if i == 2 else "",
             "entry_caption": "Every set reached the top of the range, so the weight goes up one step today." if i == 2 else "",
-            "contradiction": None, "garmin_pull": False, "garmin_window": None,
+            "contradiction": None, "garmin_pull": pulls,
+            "garmin_window": ([max(0, minutes - sess.GARMIN_ACTIVITY_BUFFER_MINUTES),
+                               minutes + sess.GARMIN_ACTIVITY_BUFFER_MINUTES] if pulls else None),
             "estimated_minutes": max(1, round(sess.exercise_duration_seconds(ex) / 60)),
         })
     model = sess.estimate_duration(exercises)
     plan = {
-        "kind": "plan", "date": DAY, "day_num": 2, "objective": "Made-up objective for the tests.",
+        "kind": "plan", "date": DAY, "day_num": 2, "plan_days": 84,
+        "objective": "Made-up objective for the tests.",
         "phase": "Made-up block", "rpe_target": 7, "first_side": FIRST,
         "banner": {"kind": "", "text": "", "cause": "", "acwr_advisory": ""},
         "adaptation": {"volume_factor": 1.0, "reduced": False, "banner_kind": "", "volume_note": "",
@@ -98,7 +103,7 @@ def build() -> dict:
         "model_minutes": model, "min_minutes": sess.MIN_SESSION_MINUTES,
         "ask_length_above_minutes": sess.DURATION_CHECK_RATIO * model,
         "rest_taken_max_seconds": guided_flow.REST_TAKEN_MAX_SECONDS,
-        "garmin_configured": False,
+        "garmin_configured": True,
         "band_tiers": [{"tier": t, "label": sess.BAND_TIER_LABELS.get(t, "")} for t in sess.BAND_TIERS],
         "reasons": [],
         "next_day": {"day_num": 3, "objective": "Made-up next day.", "exercises": []},

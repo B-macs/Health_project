@@ -36,6 +36,8 @@ export interface RequestOptions {
   day?: string
   engineDown?: boolean
   fetchImpl?: typeof fetch
+  /** Give up after this long (a weak signal at the gym): the request fails as offline. */
+  timeoutMs?: number
 }
 
 const ENGINE_DOWN = new Set(['engine_unavailable', 'engine_timeout', 'not_configured'])
@@ -49,15 +51,20 @@ export async function api<T>(path: string, options: RequestOptions): Promise<T> 
   if (options.key) headers.Authorization = `Bearer ${options.key}`
   if (options.body !== undefined) headers['Content-Type'] = 'application/json'
   let response: Response
+  const abort = options.timeoutMs ? new AbortController() : null
+  const timer = abort ? setTimeout(() => abort.abort(), options.timeoutMs) : null
   try {
     response = await (options.fetchImpl ?? fetch)(path, {
       method: options.method ?? 'GET',
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       cache: 'no-store',
+      signal: abort?.signal,
     })
   } catch {
-    throw new ApiError('offline', null, 'network')
+    throw new ApiError('offline', null, abort?.signal.aborted ? 'timeout' : 'network')
+  } finally {
+    if (timer) clearTimeout(timer)
   }
   const text = await response.text()
   let payload: unknown = null

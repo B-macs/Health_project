@@ -18,7 +18,16 @@ type Schemas = components['schemas']
 export type Plan = Schemas['SessionPlanOut']
 export type Exercise = Schemas['SessionExercise']
 export type FlowStep = Schemas['FlowStep']
+export type HeartRate = Schemas['HeartRateOut']
 export type Side = 'right' | 'left'
+
+/** A walk's or run's minutes from the watch (T75): found, none of that length today, or
+ *  not asked yet because there was no connection when the activity ended (the save screen
+ *  asks again). */
+export type GarminPull =
+  | { state: 'found'; minutes: number; detail: Record<string, unknown> | null }
+  | { state: 'none' }
+  | { state: 'pending' }
 
 /** One side's live numbers. */
 export interface SideValues {
@@ -77,6 +86,18 @@ export interface TrainingState {
   /** The outbox id of the save, once Save was pressed (the save waits there until the
    *  engine confirms it), with the body it holds. */
   savedId: string | null
+  /** The athlete started a Garmin workout for this session (T42): the save screen checks
+   *  the watch, and the heart-rate match runs after the save. */
+  garminDeclared: boolean
+  /** A walk's or run's minutes from the watch, by exercise index (T75). */
+  garmin: Record<number, GarminPull>
+  /** A line for the next screen only (the watch's minutes). */
+  notice: string | null
+  /** What Save stored: the rating, the length and the notes (the heart-rate match reads
+   *  them, and the saved screen words them). */
+  saved: { rpe: number; minutes: number; notes: string } | null
+  /** The heart-rate match's answer after the save (T97-T101), kept across a reload. */
+  hr: HeartRate | null
 }
 
 /** How many taps Back can undo (the Streamlit flow's limit, T78). */
@@ -95,7 +116,8 @@ export function startingLive(ex: Exercise): Live {
   return { right: { ...side }, left: { ...side }, band_tier: band, secondEdited: false }
 }
 
-export function startSessionState(plan: Plan, sessionId: string, exerciseIds: string[]): TrainingState {
+export function startSessionState(plan: Plan, sessionId: string, exerciseIds: string[],
+  garminDeclared = false): TrainingState {
   if (exerciseIds.length !== plan.exercises.length) throw new Error('one id per exercise')
   return {
     version: 1,
@@ -112,7 +134,23 @@ export function startSessionState(plan: Plan, sessionId: string, exerciseIds: st
     timer: null,
     saving: false,
     savedId: null,
+    garminDeclared,
+    garmin: {},
+    notice: null,
+    saved: null,
+    hr: null,
   }
+}
+
+/** The stored session as this version reads it: a field a session stored by an earlier
+ *  version lacks takes its starting value. Null for anything that is not a session. */
+export function loadState(data: unknown): TrainingState | null {
+  const s = data as Partial<TrainingState> | null
+  if (!s || s.version !== 1 || !s.plan) return null
+  return {
+    garminDeclared: false, garmin: {}, notice: null, saved: null, hr: null,
+    ...s,
+  } as TrainingState
 }
 
 /** The timer of the entry the flow is on, or null when it belongs to another entry. */
@@ -194,14 +232,19 @@ export function advance(s: TrainingState, now: number): TrainingState {
     firstSetAt ??= now
     lastSetAt = now
   }
-  return { ...s, history: remember(s), step: s.step + 1, sets, firstSetAt, lastSetAt }
+  return { ...s, history: remember(s), step: s.step + 1, sets, firstSetAt, lastSetAt, notice: null }
+}
+
+/** The watch's answer for a walk or run (T75), kept with the session. */
+export function setGarmin(s: TrainingState, exIdx: number, pull: GarminPull, notice: string | null): TrainingState {
+  return { ...s, garmin: { ...s.garmin, [exIdx]: pull }, notice }
 }
 
 /** Skip the rest of this exercise: on to the next exercise's first entry (T79). */
 export function skip(s: TrainingState): TrainingState {
   const step = currentStep(s)
   if (!step) return s
-  return { ...s, history: remember(s), step: step.skip_to }
+  return { ...s, history: remember(s), step: step.skip_to, notice: null }
 }
 
 /** Back: the position and the numbers before the last tap (T78). */
@@ -284,11 +327,24 @@ export function saveBody(s: TrainingState, minutes: number, rpe: number, notes: 
         sets: [],
         raw_sets: (s.sets[ex.index] ?? []).map((r) => ({ ...r, right: r.right ?? null, left: r.left ?? null })),
         note: s.notes[ex.index] ?? '',
-        garmin_minutes: null,
-        garmin_detail: null,
+        // The watch's minutes for a walk or run, when it had them (T75).
+        garmin_minutes: pulled(s, ex.index)?.minutes ?? null,
+        garmin_detail: pulled(s, ex.index)?.detail ?? null,
       }
     }),
   }
+}
+
+function pulled(s: TrainingState, exIdx: number) {
+  const pull = s.garmin[exIdx]
+  return pull?.state === 'found' ? pull : null
+}
+
+/** Where the flow is in today's list: the exercises behind it, and the one it is on. */
+export function exerciseProgress(s: TrainingState): { done: number; total: number } {
+  const step = currentStep(s)
+  const total = s.plan.exercises.length
+  return { done: step ? step.ex_idx : total, total }
 }
 
 /** A session id in the Training page's shape (the date, then 8 hex digits), minted once. */

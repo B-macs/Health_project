@@ -8,10 +8,14 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import fixture from '../../dev/session_fixture.json'
 import { HealthDB } from '../db/schema'
+import { AppStateProvider } from '../lib/appState'
 import { drain, enqueue } from '../lib/outbox'
-import { advance, finished, saveBody, startSessionState, type Plan, type TrainingState } from '../lib/training'
+import {
+  advance, finished, saveBody, setGarmin, setSide, startSessionState, type HeartRate, type Plan, type TrainingState,
+} from '../lib/training'
 import { S } from '../strings'
 import { arrivalTimer, SessionFlow } from './Session'
+import { HeartRateMatch, reviewLine } from './SessionSave'
 
 const plan = fixture as unknown as Plan
 const T0 = Date.parse('2026-10-20T08:00:00Z')
@@ -22,8 +26,27 @@ function at(step: number): TrainingState {
 
 const firstEntry = (exIdx: number) => plan.steps.findIndex((st) => st.ex_idx === exIdx)
 
+function provide(node: React.ReactNode): string {
+  const app = {
+    store: new HealthDB(`session-render-${Math.random()}`), ctx: { key: 'k', engineDown: false },
+    reduced: true, pick: null, showDay: () => undefined, go: () => undefined,
+  }
+  return renderToStaticMarkup(<AppStateProvider value={app}>{node}</AppStateProvider>)
+}
+
 function render(s: TrainingState): string {
-  return renderToStaticMarkup(<SessionFlow s={s} update={() => undefined} onExit={() => undefined} />)
+  return provide(<SessionFlow s={s} update={() => undefined} onExit={() => undefined} />)
+}
+
+const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;/g, "'").replace(/\s+/g, ' ')
+
+function walked(s: TrainingState): TrainingState {
+  let t = T0
+  while (!finished(s)) {
+    s = advance(s, t)
+    t += 30_000
+  }
+  return s
 }
 
 describe('the timer an entry starts by itself', () => {
@@ -119,5 +142,65 @@ describe('the save through the outbox', () => {
     expect(bodies[1]).toEqual(bodies[0])
     expect(bodies[0].session_id).toBe('2026-10-20-0a1b2c3d')
     expect(bodies[0].exercises.map((e) => e.exercise_id)).toEqual(plan.exercises.map((_, i) => `ex-${i}`))
+  })
+})
+
+describe('the save screen', () => {
+  it('each exercise shows its time (the watch, else the estimate), its dosed sets and its weight', () => {
+    const walk = plan.exercises.findIndex((e) => e.garmin_pull)
+    let s = at(0)
+    // The ramp's weight changed during the set: a ramp is not a working set, so its line keeps
+    // the prescribed weight (sessions.review_figures).
+    s = setSide(s, 1, 'right', { weight_kg: 18 })
+    s = walked(setGarmin(s, walk, { state: 'found', minutes: 31.4, detail: null }, null))
+    const lines = plan.exercises.map((ex) => reviewLine(s, ex))
+    expect(lines[walk].time).toBe(S.session.timeGarmin(31))
+    expect(lines[2].time).toBe(S.session.timeEstimated(plan.exercises[2].estimated_minutes))
+    expect(lines.map((l) => l.sets)).toEqual(plan.exercises.map((e) => e.sets ?? 1))
+    expect(lines[1].weight).toBe(S.session.kg(plan.exercises[1].weight_kg!))
+    expect(lines[2].weight).toBe(S.session.kg(22.5))
+    expect(lines[0].weight).toBe(S.session.bodyweightShort)
+  })
+
+  const savedState = (declared: boolean, hr: HeartRate | null): TrainingState => ({
+    ...walked(startSessionState(plan, '2026-10-20-0a1b2c3d', plan.exercises.map((_, i) => `ex-${i}`), declared)),
+    saving: true, savedId: 'outbox-1', saved: { rpe: 6, minutes: 30, notes: '' }, hr,
+  })
+  const matchOf = (s: TrainingState, confirmed = true) =>
+    text(provide(<HeartRateMatch s={s} update={() => undefined} confirmed={confirmed} />))
+
+  it('with no Garmin workout, the session keeps the rating and says how to get a measured figure', () => {
+    expect(matchOf(savedState(false, null))).toContain(S.session.hrNotStarted(6))
+  })
+
+  it('the match waits for the engine to have the save', () => {
+    expect(matchOf(savedState(true, null), false).trim()).toBe('')
+  })
+
+  it('a match shows the measured figures against the rating, in the engine\'s numbers', () => {
+    const hr: HeartRate = { state: 'matched', reason: '', candidates: [], comparison: {
+      measured_rpe: 6.8, measured_au: 204, active_minutes: 28, rpe_delta: 0.8, au_delta: 24, verdict: 'under',
+      coverage: 0.6, low_coverage: true, activity: 'Strength', covered_exercises: 7, total_exercises: 9 } }
+    const shown = matchOf(savedState(true, hr))
+    expect(shown).toContain(S.session.hrMeasuredRpe)
+    expect(shown).toContain(S.session.hrVsYours(0.8, 6))
+    expect(shown).toContain(S.session.hrVsYoursAu(24, 180))
+    expect(shown).toContain(S.session.hrVerdict.under)
+    expect(shown).toContain(S.session.hrLowCover(0.6))
+  })
+
+  it('a session the watch cannot place offers the day\'s activities to choose from', () => {
+    const hr: HeartRate = { state: 'choose', reason: 'no activity lines up', comparison: null, candidates: [
+      { activity_id: '7', name: 'Strength', type: 'strength', start_time_local: '2026-10-20 07:05:00',
+        duration_minutes: 52, shift_hours: -1, quality: 0.8 }] }
+    const html = provide(<HeartRateMatch s={savedState(true, hr)} update={() => undefined} confirmed />)
+    expect(text(html)).toContain(S.session.hrChoose('no activity lines up'))
+    expect((html.match(/role="radio"/g) ?? []).length).toBe(1)
+    expect(text(html)).toContain(S.session.hrUse)
+  })
+
+  it('no match says why and keeps the rating', () => {
+    const hr: HeartRate = { state: 'no_match', reason: 'no activity today', candidates: [], comparison: null }
+    expect(matchOf(savedState(true, hr))).toContain(S.session.hrNone('no activity today', 6))
   })
 })

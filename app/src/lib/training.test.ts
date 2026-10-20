@@ -6,9 +6,9 @@
 import { describe, expect, it } from 'vitest'
 import fixture from '../../dev/session_fixture.json'
 import {
-  advance, asksLength, back, clockMinutes, currentStep, exerciseOf, finished, localStamp, newExerciseIds,
-  newSessionId, saveBody, setBand, setSide, sideValues, skip, startSessionState, stepBand, stepWeight,
-  UNDO_LIMIT, type Plan, type TrainingState,
+  advance, asksLength, back, clockMinutes, currentStep, exerciseOf, exerciseProgress, finished, loadState,
+  localStamp, newExerciseIds, newSessionId, saveBody, setBand, setGarmin, setSide, sideValues, skip,
+  startSessionState, stepBand, stepWeight, UNDO_LIMIT, type Plan, type TrainingState,
 } from './training'
 
 const plan = fixture as unknown as Plan
@@ -160,5 +160,46 @@ describe('the ids and the clock', () => {
   it('a set time carries the phone UTC offset', () => {
     expect(localStamp(T0)).toMatch(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d[+-]\d\d:\d\d$/)
     expect(new Date(localStamp(T0)).getTime()).toBe(T0)
+  })
+})
+
+describe('the watch and the stored session', () => {
+  it('a session stored by an earlier version takes the new fields at their start', () => {
+    const old = { ...fresh() } as unknown as Record<string, unknown>
+    for (const key of ['garminDeclared', 'garmin', 'notice', 'saved', 'hr']) delete old[key]
+    const s = loadState(old)!
+    expect([s.garminDeclared, s.garmin, s.notice, s.saved, s.hr]).toEqual([false, {}, null, null, null])
+    expect(loadState({ version: 2 })).toBeNull()
+    expect(loadState(null)).toBeNull()
+  })
+
+  it("a walk's minutes from the watch ride with the save; a pending ask does not", () => {
+    const walk = plan.exercises.findIndex((e) => e.garmin_pull)
+    expect(walk).toBeGreaterThanOrEqual(0)
+    const found = saveBody(walkAll(setGarmin(fresh(), walk, { state: 'found', minutes: 31, detail: { n: 1 } }, null)), 30, 6, '')
+    expect([found.exercises[walk].garmin_minutes, found.exercises[walk].garmin_detail]).toEqual([31, { n: 1 }])
+    const pending = saveBody(walkAll(setGarmin(fresh(), walk, { state: 'pending' }, null)), 30, 6, '')
+    expect([pending.exercises[walk].garmin_minutes, pending.exercises[walk].garmin_detail]).toEqual([null, null])
+  })
+
+  it('a notice lasts until the next tap', () => {
+    const s = setGarmin(fresh(), 8, { state: 'none' }, 'shown once')
+    expect(s.notice).toBe('shown once')
+    expect(advance(s, T0).notice).toBeNull()
+    expect(skip(s).notice).toBeNull()
+  })
+
+  it('the progress counts the exercises behind the flow', () => {
+    const total = plan.exercises.length
+    expect(exerciseProgress(fresh())).toEqual({ done: 0, total })
+    const second = plan.steps.findIndex((st) => st.ex_idx === 1)
+    expect(exerciseProgress({ ...fresh(), step: second })).toEqual({ done: 1, total })
+    expect(exerciseProgress(walkAll(fresh()))).toEqual({ done: total, total })
+  })
+
+  it('a Garmin workout declared at Start is kept with the session', () => {
+    const s = startSessionState(plan, '2026-10-20-0a1b2c3d', plan.exercises.map((_, i) => `ex-${i}`), true)
+    expect(s.garminDeclared).toBe(true)
+    expect(fresh().garminDeclared).toBe(false)
   })
 })

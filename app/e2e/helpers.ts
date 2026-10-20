@@ -73,9 +73,11 @@ export async function sessionStored(page: Page): Promise<void> {
   await expect.poll(() => page.evaluate(() => window.__health!.sessionActive())).toBe(true)
 }
 
-/** Open Training and start today's session (the mock engine's made-up one). */
-export async function startTraining(page: Page): Promise<void> {
+/** Open Training and start today's session (the mock engine's made-up one), with a Garmin
+ *  workout declared when `garmin` is set. */
+export async function startTraining(page: Page, options: { garmin?: boolean } = {}): Promise<void> {
   await openTab(page, S.nav.training)
+  if (options.garmin) await page.getByRole('switch', { name: S.session.garminDeclare }).check()
   await page.getByRole('button', { name: S.session.start }).click()
   await expect(page.locator('.exercise__name')).toBeVisible()
   await sessionStored(page)

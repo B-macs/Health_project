@@ -1324,6 +1324,26 @@ button.card {
 
 /* ── The training session (rebuild Phase 6) ───────────────────────────────────────── */
 
+/* A progress bar in the page's shades: the block's days, today's exercises. */
+.progress {
+  height: var(--bar);
+  border-radius: var(--r-pill);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.progress__fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--r-pill);
+  background: linear-gradient(90deg, var(--f2), var(--f1));
+}
+
+/* A timer's last seconds: the page's strongest shade. */
+.timer__digits--last {
+  color: var(--f1);
+}
+
 .steppers {
   display: flex;
   flex-direction: column;

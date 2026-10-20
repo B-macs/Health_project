@@ -2,6 +2,7 @@
   "kind": "plan",
   "date": "2026-10-20",
   "day_num": 2,
+  "plan_days": 84,
   "objective": "Made-up objective for the tests.",
   "phase": "Made-up block",
   "rpe_target": 7,
@@ -394,8 +395,11 @@
       "delta_direction": "",
       "entry_caption": "",
       "contradiction": null,
-      "garmin_pull": false,
-      "garmin_window": null,
+      "garmin_pull": true,
+      "garmin_window": [
+        0.0,
+        6.0
+      ],
       "estimated_minutes": 1
     }
   ],
@@ -900,7 +904,7 @@
   "min_minutes": 5,
   "ask_length_above_minutes": 43.5,
   "rest_taken_max_seconds": 1200,
-  "garmin_configured": false,
+  "garmin_configured": true,
   "band_tiers": [
     {
       "tier": "Green",

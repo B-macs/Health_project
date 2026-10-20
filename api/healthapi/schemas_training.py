@@ -361,6 +361,8 @@ class SessionPlanOut(BaseModel):
     kind: str
     date: date
     day_num: int | None
+    #: The block's length in plan days ("Day n of N"); None for the accessory session.
+    plan_days: int | None = None
     objective: str
     phase: str
     rpe_target: int | None
@@ -487,7 +489,10 @@ class ActivityMinutesOut(BaseModel):
 class HeartRateIn(BaseModel):
     date: date
     #: The session's recorded sets by exercise name (each with its time stamp).
-    sets_by_exercise: dict[str, list[dict[str, Any]]]
+    sets_by_exercise: dict[str, list[dict[str, Any]]] = {}
+    #: Or the session as the phone saved it: the engine builds its sets the way
+    #: the save does (training_session.sets_by_name).
+    session: SessionSaveIn | None = None
     duration_minutes: float
     reported_rpe: int | None = None
     #: The athlete's pick when the session did not line up with the watch.

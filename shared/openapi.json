@@ -1950,6 +1950,16 @@
             ],
             "title": "Reported Rpe"
           },
+          "session": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionSaveIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sets_by_exercise": {
             "additionalProperties": {
               "items": {
@@ -1958,6 +1968,7 @@
               },
               "type": "array"
             },
+            "default": {},
             "title": "Sets By Exercise",
             "type": "object"
           },
@@ -1969,7 +1980,6 @@
         },
         "required": [
           "date",
-          "sets_by_exercise",
           "duration_minutes"
         ],
         "title": "HeartRateIn",
@@ -5181,6 +5191,17 @@
           "phase": {
             "title": "Phase",
             "type": "string"
+          },
+          "plan_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Plan Days"
           },
           "reasons": {
             "items": {

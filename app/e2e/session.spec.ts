@@ -5,7 +5,10 @@
 //   until Save, the save waits in the outbox, goes out once the phone is online again, and
 //   the engine stores it once, with every set;
 // - a save whose answer is lost is sent again with the same ids, and the engine keeps one;
-// - an app kill in the middle opens the session again at the same place, with its numbers.
+// - an app kill in the middle opens the session again at the same place, with its numbers;
+// - with a Garmin workout started: the walk takes its minutes from the watch (or, with no
+//   connection, its planned minutes), the save screen checks the watch, and the heart-rate
+//   match shows after the engine has the save.
 // The gate (rebuild_gate.py p6) adds up two annotations of these tests:
 // duplicate_sessions and warning_shown_when_not_due.
 import type { Page } from '@playwright/test'
@@ -26,7 +29,7 @@ type SaveBody = {
   notes: string
   session_rpe: number
   duration_minutes: number
-  exercises: { exercise_id: string; raw_sets: RawSet[] }[]
+  exercises: { exercise_id: string; raw_sets: RawSet[]; garmin_minutes: number | null }[]
 }
 type Sent = { method: string; path: string; body: SaveBody }
 
@@ -89,7 +92,7 @@ async function saveWithNotes(page: Page, tag: string): Promise<void> {
 test('a whole session runs from Start to Save, offline in the middle, and is stored once', async ({ page, context }) => {
   const tag = `e2e-session-${Date.now()}`
   await onboard(page)
-  await startTraining(page)
+  await startTraining(page, { garmin: true })
   // Offline from the fourth exercise to the save: the session needs no network.
   const warnings = await walk(page, async (i) => {
     if (i === 3) await context.setOffline(true)
@@ -98,8 +101,11 @@ test('a whole session runs from Start to Save, offline in the middle, and is sto
   expect(warnings.shownNotDue).toBe(0)
   expect(warnings.shownDue).toBe(fixture.exercises.filter((e) => e.warning).length)
 
-  // Offline, the load is worked out when the save is sent.
+  // Offline, the load is worked out when the save is sent, and the watch cannot be asked:
+  // the walk keeps its planned minutes.
   await expect(page.getByText(S.session.loadLater)).toBeVisible()
+  await expect(page.getByTestId('watch-check')).toHaveAttribute('data-state', 'offline')
+  await expect(page.getByTestId('review-line')).toHaveCount(fixture.exercises.length)
   await saveWithNotes(page, tag)
   const state = page.getByTestId('save-state')
   await expect(state).toHaveAttribute('data-state', 'waiting')
@@ -111,6 +117,8 @@ test('a whole session runs from Start to Save, offline in the middle, and is sto
   await context.setOffline(false)
   await expect(state).toHaveAttribute('data-state', 'confirmed', { timeout: 20_000 })
   await expect(state).toContainText(S.session.saved)
+  // The engine has the session: the heart-rate match runs.
+  await expect(page.getByTestId('hr')).toHaveAttribute('data-state', 'matched')
 
   const sent = await sends(page, tag)
   const kept = await stored(page, tag)
@@ -127,6 +135,8 @@ test('a whole session runs from Start to Save, offline in the middle, and is sto
   }
   const timed = fixture.exercises.findIndex((e) => e.timer === 'stopwatch')
   expect(body.exercises[timed].raw_sets[0].right?.seconds).toBe(30)
+  const walked = fixture.exercises.findIndex((e) => e.garmin_pull)
+  expect(body.exercises[walked].garmin_minutes).toBeNull()
 
   await page.getByRole('button', { name: S.session.done }).click()
   await expect(page.getByRole('heading', { name: S.today.title })).toBeVisible()
@@ -136,8 +146,13 @@ test('a whole session runs from Start to Save, offline in the middle, and is sto
 test('a save whose answer is lost is sent again with the same ids, and the engine keeps one', async ({ page, context }) => {
   const tag = `e2e-replay-${Date.now()}`
   await onboard(page)
-  await startTraining(page)
+  await startTraining(page, { garmin: true })
   await walk(page)
+  // Online: the walk took its minutes from the watch, and the watch check found the workout.
+  const walked = fixture.exercises.findIndex((e) => e.garmin_pull)
+  await expect(page.getByTestId('notice')).toHaveText(S.session.garminPulled(31, fixture.exercises[walked].name))
+  await expect(page.getByTestId('review-line').nth(walked)).toContainText(S.session.timeGarmin(31))
+  await expect(page.getByTestId('watch-check')).toHaveAttribute('data-state', 'found')
   // The engine stores the save, and its answer is lost on the way back: the phone tries again.
   await context.addCookies([{ name: 'e2e_lose_answer', value: '1', url: ORIGIN }])
   await saveWithNotes(page, tag)
@@ -152,6 +167,40 @@ test('a save whose answer is lost is sent again with the same ids, and the engin
   expect(new Set(sent.map((b) => b.session_id)).size).toBe(1)
   expect(new Set(sent.map((b) => b.exercises.map((e) => e.exercise_id).join(','))).size).toBe(1)
   expect(kept).toHaveLength(1)
+  expect(sent[0].exercises[walked].garmin_minutes).toBe(31)
+  await expect(page.getByTestId('hr')).toHaveAttribute('data-state', 'matched')
+})
+
+test('the overview offers the adapt dialog; a running watch is named; a session the watch cannot place asks which', async ({ page, context }) => {
+  const tag = `e2e-choose-${Date.now()}`
+  await onboard(page)
+  await page.getByRole('navigation', { name: S.app }).getByRole('button', { name: S.nav.training }).click()
+  await page.getByRole('button', { name: S.session.adapt }).click()
+  const sheet = page.getByRole('dialog', { name: S.session.adapt })
+  await expect(sheet.getByText(S.session.adaptNone)).toBeVisible()
+  await sheet.getByRole('button', { name: S.session.close }).last().click()
+  await expect(sheet).toBeHidden()
+  // The watch is still running when the save screen opens: it says so, and checks again.
+  await context.addCookies([{ name: 'e2e_watch', value: 'missing', url: ORIGIN },
+    { name: 'e2e_hr', value: 'choose', url: ORIGIN }])
+  await page.getByRole('switch', { name: S.session.garminDeclare }).check()
+  await page.getByRole('button', { name: S.session.start }).click()
+  await expect(page.locator('.exercise__name')).toBeVisible()
+  await walk(page)
+  const watch = page.getByTestId('watch-check')
+  await expect(watch).toHaveAttribute('data-state', 'missing')
+  await expect(watch).toContainText(S.session.watchStop)
+  await context.clearCookies({ name: 'e2e_watch' })
+  await watch.getByRole('button', { name: S.session.watchAgain }).click()
+  await expect(watch).toHaveAttribute('data-state', 'found')
+  // The engine cannot line the session up with the watch: the athlete picks the activity.
+  await saveWithNotes(page, tag)
+  const hr = page.getByTestId('hr')
+  await expect(hr).toHaveAttribute('data-state', 'choose', { timeout: 20_000 })
+  await hr.getByRole('radio').first().click()
+  await hr.getByRole('button', { name: S.session.hrUse }).click()
+  await expect(hr).toHaveAttribute('data-state', 'matched')
+  await context.clearCookies({ name: 'e2e_hr' })
 })
 
 test('an app kill in the middle opens the session again at the same place, with its numbers', async ({ page }) => {

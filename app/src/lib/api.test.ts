@@ -65,6 +65,13 @@ describe('the failures', () => {
     expect(await kindOf(api('/api/x', { key: 'k', fetchImpl: answer(status, body) }))).toBe(kind)
   })
 
+  it('no answer in time is offline, so a weak signal never holds the session up', async () => {
+    const fetchImpl = ((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })) as typeof fetch
+    await expect(api('/api/x', { key: 'k', fetchImpl, timeoutMs: 20 })).rejects.toMatchObject({ kind: 'offline', code: 'timeout' })
+  })
+
   it('no network is offline', async () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError('Failed to fetch')

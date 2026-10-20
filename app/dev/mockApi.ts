@@ -9,6 +9,10 @@
 //   back, so the phone sends it again;
 // - GET /api/training/session answers the engine-made session (dev/session_fixture.json)
 //   on the caller's day, and POST /api/training/completion made-up loads;
+// - the watch: GET .../garmin/open-activity finds a made-up workout (a cookie
+//   `e2e_watch=missing` finds none), GET .../garmin/activity-minutes gives a walk 31 min,
+//   and POST /api/training/heart-rate answers a made-up match (`e2e_hr=choose` asks which
+//   activity, `e2e_hr=none` finds no match);
 // - the data check answers as the Worker does: GET .../last (null until a check ran) and
 //   POST .../run (a made-up clean result);
 // - Today, its week, the day's plan, the three detail screens and the check-in answer
@@ -107,6 +111,13 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     }
     if (url.pathname === '/api/training/day') return send(200, fx.trainingDay(asked ?? local, local))
     if (url.pathname === '/api/training/session') return send(200, { ...sessionFixture, date: local })
+    if (url.pathname === '/api/training/garmin/open-activity') {
+      if (cookie(req, 'e2e_watch') === 'missing') return send(200, { found: false, activity: null })
+      return send(200, { found: true, activity: { activity_id: '1', name: 'Made-up strength', type: 'strength', duration_minutes: 41 } })
+    }
+    if (url.pathname === '/api/training/garmin/activity-minutes') {
+      return send(200, { minutes: 31, detail: { activities: 1 }, window: [0, 6] })
+    }
     if (url.pathname === '/api/status') {
       return send(200, { writer: 'streamlit', offline: false, datastore_built_at: null, oura: null, last_sync: null, notices: [], sync_due: null })
     }
@@ -127,6 +138,21 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
         const ask = clock > 1.5 * b.model_minutes
         return send(200, { clock_minutes: clock, model_minutes: b.model_minutes, ask_length: ask,
           choices: ask ? [choice(b.model_minutes, 'plan'), choice(clock, 'clock')] : [choice(clock, 'clock')] })
+      }
+      if (url.pathname === '/api/training/heart-rate' && req.method === 'POST') {
+        const b = body as { reported_rpe: number | null; duration_minutes: number; activity_id?: string }
+        const hr = cookie(req, 'e2e_hr')
+        if (hr === 'none') return send(200, { state: 'no_match', reason: 'no activity today', candidates: [], comparison: null })
+        if (hr === 'choose' && !b.activity_id) {
+          return send(200, { state: 'choose', reason: 'no activity lines up with the session', comparison: null,
+            candidates: [{ activity_id: '7', name: 'Made-up strength', type: 'strength',
+              start_time_local: '2026-10-20 07:05:00', duration_minutes: 52, shift_hours: -1, quality: 0.8 }] })
+        }
+        const rpe = b.reported_rpe ?? 5
+        return send(200, { state: 'matched', reason: '', candidates: [], comparison: {
+          measured_rpe: 6.2, measured_au: 6.2 * b.duration_minutes, active_minutes: b.duration_minutes - 2,
+          rpe_delta: 6.2 - rpe, au_delta: (6.2 - rpe) * b.duration_minutes, verdict: Math.abs(6.2 - rpe) < 0.5 ? 'exact' : 6.2 > rpe ? 'under' : 'over',
+          coverage: 0.95, low_coverage: false, activity: 'Made-up strength', covered_exercises: 8, total_exercises: 9 } })
       }
       if (url.pathname === '/api/training/sessions' && req.method === 'POST') {
         const b = body as { session_id: string; notes: string; exercises: unknown[] }

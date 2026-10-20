@@ -1502,7 +1502,11 @@ export interface components {
             duration_minutes: number;
             /** Reported Rpe */
             reported_rpe?: number | null;
-            /** Sets By Exercise */
+            session?: components["schemas"]["SessionSaveIn"] | null;
+            /**
+             * Sets By Exercise
+             * @default {}
+             */
             sets_by_exercise: {
                 [key: string]: {
                     [key: string]: unknown;
@@ -2512,6 +2516,8 @@ export interface components {
             objective: string;
             /** Phase */
             phase: string;
+            /** Plan Days */
+            plan_days?: number | null;
             /** Reasons */
             reasons: string[];
             /** Rest Taken Max Seconds */
