@@ -29,6 +29,7 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import date
 
+from services import guided_flow
 from services import sessions as sess
 
 #: The longest note the Notes column is given, kept from
@@ -119,6 +120,49 @@ def with_session_note(note: str, session_note: str) -> str:
         return note or ""
     own = (note or "").strip()
     return (f"{own}\n\n{extra}" if own else extra)[:NOTE_LIMIT]
+
+
+def actual_from_sides(right: dict | None, left: dict | None,
+                      band_tier: str | None = None) -> dict:
+    """The live stepper entry from the phone's numbers for each side
+    (rebuild Phase 6): the right side owns reps and weight_kg and the left its
+    own pair (sessions.side_keys); a timed hold's seconds go to tut and
+    tut_left (sessions.timed_hold_entry). The phone sends sides; which key a
+    side writes stays here."""
+    actual: dict = {}
+    for side, values in (("right", right), ("left", left)):
+        if not values:
+            continue
+        reps_key, weight_key = sess.side_keys(side)
+        if values.get("reps") is not None:
+            actual[reps_key] = int(values["reps"])
+        if values.get("weight_kg") is not None:
+            actual[weight_key] = float(values["weight_kg"])
+        if values.get("seconds") is not None:
+            actual = sess.timed_hold_entry(actual, side, int(values["seconds"]))
+    if band_tier:
+        actual["band_tier"] = band_tier
+    return actual
+
+
+def records_from_raw(ex: dict, raw_sets: list[dict]) -> list[dict]:
+    """The per-set records of one exercise from the phone's raw facts
+    (rebuild Phase 6): when each set was done (the phone's clock, with its UTC
+    offset), each side's numbers, and the clock readings around the rest that
+    followed it. The record is sessions.build_set_record's and the rest is
+    guided_flow.rest_taken's, so the phone holds neither rule. A set sent
+    twice (the flow's "Back" redid it) keeps its last version
+    (sessions.upsert_set_record)."""
+    rows: list[dict] = []
+    for raw in raw_sets:
+        started, ended = raw.get("rest_started_at"), raw.get("rest_ended_at")
+        rest = guided_flow.rest_taken(started, ended) if started and ended else None
+        record = sess.build_set_record(
+            ex, int(raw["set_num"]),
+            actual_from_sides(raw.get("right"), raw.get("left"), raw.get("band_tier")),
+            str(raw["completed_at"]), rest)
+        sess.upsert_set_record(rows, record)
+    return rows
 
 
 def exercise_from_flow(ex: dict, exercise_id: str, *, actual: dict | None = None,

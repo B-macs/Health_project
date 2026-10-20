@@ -367,6 +367,9 @@ class SessionPlanOut(BaseModel):
     steps: list[FlowStep]
     model_minutes: int
     min_minutes: int
+    #: The save asks which length to keep when the clock passes this (T93); None
+    #: when it never asks (the accessory session).
+    ask_length_above_minutes: float | None = None
     rest_taken_max_seconds: int
     garmin_configured: bool
     band_tiers: list[BandTier]
@@ -401,6 +404,27 @@ class CompletionOut(BaseModel):
     choices: list[LengthChoice]
 
 
+class SideIn(BaseModel):
+    """One side's numbers in a set: reps and weight, or a timed hold's seconds."""
+    reps: int | None = None
+    weight_kg: float | None = None
+    seconds: float | None = None
+
+
+class RawSetIn(BaseModel):
+    """One set as the phone saw it (rebuild Phase 6); the engine builds the
+    record (session_save.records_from_raw)."""
+    set_num: int = Field(ge=1)
+    #: When the set was done: the phone's own clock, ISO with its UTC offset.
+    completed_at: str
+    right: SideIn | None = None
+    left: SideIn | None = None
+    band_tier: str | None = None
+    #: The rest that followed the set: the phone's clock, epoch seconds.
+    rest_started_at: float | None = None
+    rest_ended_at: float | None = None
+
+
 class SavedExerciseIn(BaseModel):
     #: Minted by the phone once, before the first send.
     exercise_id: str
@@ -410,6 +434,8 @@ class SavedExerciseIn(BaseModel):
     actual: dict[str, Any] | None = None
     #: The sets as recorded, one dict per set.
     sets: list[dict[str, Any]] = []
+    #: Or the sets' raw facts, from which the engine builds the records.
+    raw_sets: list[RawSetIn] = []
     note: str = ""
     garmin_minutes: float | None = None
     garmin_detail: dict[str, Any] | None = None

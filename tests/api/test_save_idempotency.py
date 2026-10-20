@@ -240,3 +240,66 @@ def test_an_accessory_session_never_marks_the_plan_day_done(monkeypatch, local_c
     assert [r["exercise_id"] for r in rows] == ["ex-acc"]
     assert {r.get("movement_type") for r in rows} == {acc.ACCESSORY_TYPE}
     assert not repo.has_logged_session(TODAY)
+
+
+# ── the phone's raw sets (rebuild Phase 6) ───────────────────────────────────
+
+SPLIT = {"name": "Split Squat", "type": "reps", "laterality": "unilateral", "sets": 2, "reps": 8,
+         "weight_kg": 9.0, "equipment_type": "dumbbell", "rest_seconds": 60}
+TEST_HOLD = {"name": "Side Plank (Timed)", "type": "hold", "laterality": "unilateral", "sets": 1,
+             "hold_seconds": 30, "rest_seconds": 0}
+RAMP = {"name": "Goblet Squat Ramp", "type": "reps", "sets": 1, "reps": 5, "weight_kg": 13.5,
+        "equipment_type": "dumbbell", "rest_seconds": 30, "warmup": True}
+
+RAW_BODY = {
+    "session_id": "2026-10-19-1a2b3c4d", "date": TODAY.isoformat(), "kind": "plan",
+    "duration_minutes": 40, "session_rpe": 7, "notes": "",
+    "exercises": [
+        {"exercise_id": "ex-ramp", "exercise": RAMP, "raw_sets": [
+            {"set_num": 1, "completed_at": "2026-10-19T08:01:00+02:00",
+             "right": {"reps": 5, "weight_kg": 13.5}, "rest_started_at": 1000.0, "rest_ended_at": 1030.0}]},
+        {"exercise_id": "ex-split", "exercise": SPLIT, "raw_sets": [
+            {"set_num": 1, "completed_at": "2026-10-19T08:05:00+02:00",
+             "right": {"reps": 8, "weight_kg": 9.0}, "left": {"reps": 7, "weight_kg": 9.0},
+             "rest_started_at": 2000.0, "rest_ended_at": 2061.0},
+            # The flow's Back redid set 2: the later version is kept.
+            {"set_num": 2, "completed_at": "2026-10-19T08:07:00+02:00",
+             "right": {"reps": 6, "weight_kg": 9.0}, "left": {"reps": 6, "weight_kg": 9.0}},
+            {"set_num": 2, "completed_at": "2026-10-19T08:08:00+02:00",
+             "right": {"reps": 8, "weight_kg": 9.0}, "left": {"reps": 8, "weight_kg": 9.0}}]},
+        {"exercise_id": "ex-test", "exercise": TEST_HOLD, "raw_sets": [
+            {"set_num": 1, "completed_at": "2026-10-19T08:12:00+02:00",
+             "right": {"seconds": 41}, "left": {"seconds": 37},
+             # A rest of 25 minutes was an interruption, not a rest.
+             "rest_started_at": 3000.0, "rest_ended_at": 4500.0}]},
+    ],
+}
+
+
+def test_raw_sets_become_the_engines_own_set_records(monkeypatch, local_copy):
+    from services import guided_flow, session_save
+    from services import sessions as sess
+    store = FakeStore()
+    repo = record_repo(local_copy, store)
+    with _client(monkeypatch, repo, local_copy) as c:
+        answers = [_send(c, "post", "/api/training/sessions", RAW_BODY) for _ in range(3)]
+    assert [a.status_code for a in answers] == [200, 200, 200]
+    assert len(_rows(store, "training_sessions")) == 1, "three sends, one session"
+    sets = {}
+    for s in _rows(store, "training_sets"):
+        sets.setdefault(s["exercise_id"], []).append(s)
+    ramp, split, test = sets["ex-ramp"], sets["ex-split"], sets["ex-test"]
+    assert len(ramp) == 1 and ramp[0]["is_warmup"] in (1, True), "a ramp stays a ramp"
+    assert ramp[0]["rest_taken_seconds"] == 30
+    assert sorted(s["set_num"] for s in split) == [1, 2], "a set sent twice is stored once"
+    one = next(s for s in split if s["set_num"] == 1)
+    two = next(s for s in split if s["set_num"] == 2)
+    assert (one["reps"], one["reps_left"], one["rest_taken_seconds"]) == (8, 7, 61)
+    assert two["reps"] == 8 and two.get("reps_left") is None, "the later version, equal sides"
+    assert (test[0]["tut"], test[0]["tut_left"]) == (41, 37)
+    assert test[0].get("rest_taken_seconds") is None, "an interruption is not a rest"
+    # Each record is build_set_record's, the same rule the Streamlit save uses.
+    expected = sess.build_set_record(
+        SPLIT, 1, {"reps": 8, "weight_kg": 9.0, "reps_left": 7, "weight_kg_left": 9.0},
+        "2026-10-19T08:05:00+02:00", guided_flow.rest_taken(2000.0, 2061.0))
+    assert session_save.records_from_raw(SPLIT, RAW_BODY["exercises"][1]["raw_sets"][:1]) == [expected]

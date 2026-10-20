@@ -183,6 +183,11 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
         "steps": guided_flow.walk(dosed, first),
         "model_minutes": sess.estimate_duration(dosed),
         "min_minutes": sess.MIN_ACCESSORY_MINUTES if kind == ACCESSORY else sess.MIN_SESSION_MINUTES,
+        # The save asks which length to keep when the clock runs past this (T93;
+        # sessions.duration_needs_a_check), sent with the plan so the phone can ask
+        # it offline without holding the rule. None: the question is never asked.
+        "ask_length_above_minutes": (sess.DURATION_CHECK_RATIO * sess.estimate_duration(dosed)
+                                     if kind == PLAN else None),
         "rest_taken_max_seconds": guided_flow.REST_TAKEN_MAX_SECONDS,
         "garmin_configured": garmin_ok,
         "band_tiers": [{"tier": t, "label": sess.BAND_TIER_LABELS.get(t, "")}
@@ -261,6 +266,18 @@ def au_by_rpe(minutes: int | float) -> list[float]:
 
 # ─── The save ────────────────────────────────────────────────────────────────
 
+def _set_log(exercises: list[dict], flow_ex: list[dict]) -> dict[int, list[dict]]:
+    """Each exercise's recorded sets: built here from the phone's raw facts
+    (session_save.records_from_raw) when it sent them, else as sent."""
+    out: dict[int, list[dict]] = {}
+    for i, e in enumerate(exercises):
+        if e.get("raw_sets"):
+            out[i] = session_save.records_from_raw(flow_ex[i], list(e["raw_sets"]))
+        elif e.get("sets"):
+            out[i] = list(e["sets"])
+    return out
+
+
 def build_save(body: dict) -> session_save.SessionSave:
     """One SessionSave from the phone's complete session. The phone minted
     every id once, before the first send. Each exercise carries the
@@ -283,7 +300,7 @@ def build_save(body: dict) -> session_save.SessionSave:
     return session_save.build_session(
         pending, flow_ex,
         actuals={i: e.get("actual") for i, e in enumerate(exercises) if e.get("actual")},
-        set_log={i: list(e.get("sets") or []) for i, e in enumerate(exercises) if e.get("sets")},
+        set_log=_set_log(exercises, flow_ex),
         notes_by_idx={i: e.get("note") or "" for i, e in enumerate(exercises)},
         garmin_minutes={i: e["garmin_minutes"] for i, e in enumerate(exercises)
                         if e.get("garmin_minutes")},

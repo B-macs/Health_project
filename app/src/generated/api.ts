@@ -2097,6 +2097,25 @@ export interface components {
             year: number;
         };
         /**
+         * RawSetIn
+         * @description One set as the phone saw it (rebuild Phase 6); the engine builds the
+         *     record (session_save.records_from_raw).
+         */
+        RawSetIn: {
+            /** Band Tier */
+            band_tier?: string | null;
+            /** Completed At */
+            completed_at: string;
+            left?: components["schemas"]["SideIn"] | null;
+            /** Rest Ended At */
+            rest_ended_at?: number | null;
+            /** Rest Started At */
+            rest_started_at?: number | null;
+            right?: components["schemas"]["SideIn"] | null;
+            /** Set Num */
+            set_num: number;
+        };
+        /**
          * ReadinessBand
          * @description The words services/dashboard.readiness_meta gives a score. The phone
          *     shows them; it never maps a number to a band itself.
@@ -2332,6 +2351,11 @@ export interface components {
              */
             note: string;
             /**
+             * Raw Sets
+             * @default []
+             */
+            raw_sets: components["schemas"]["RawSetIn"][];
+            /**
              * Sets
              * @default []
              */
@@ -2452,6 +2476,8 @@ export interface components {
          */
         SessionPlanOut: {
             adaptation: components["schemas"]["Adaptation"];
+            /** Ask Length Above Minutes */
+            ask_length_above_minutes?: number | null;
             /** Band Tiers */
             band_tiers: components["schemas"]["BandTier"][];
             banner: components["schemas"]["VerdictBanner"];
@@ -2556,6 +2582,18 @@ export interface components {
         ShiftPrompt: {
             /** Reason */
             reason: string;
+        };
+        /**
+         * SideIn
+         * @description One side's numbers in a set: reps and weight, or a timed hold's seconds.
+         */
+        SideIn: {
+            /** Reps */
+            reps?: number | null;
+            /** Seconds */
+            seconds?: number | null;
+            /** Weight Kg */
+            weight_kg?: number | null;
         };
         /** SleepArchitectureOut */
         SleepArchitectureOut: {

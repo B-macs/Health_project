@@ -275,6 +275,12 @@ def test_todays_session_carries_every_exercise_and_the_walk(env, monkeypatch):
                            content.get("day_type"))
     assert plan["steps"] == json.loads(json.dumps(guided_flow.walk(dosed, plan["first_side"])))
     assert plan["model_minutes"] == sess.estimate_duration(dosed)
+    # The length question's threshold rides with the plan (the phone asks it offline),
+    # and it is the completion rule's own: just past it, the engine asks too.
+    above = plan["ask_length_above_minutes"]
+    assert above == sess.DURATION_CHECK_RATIO * plan["model_minutes"]
+    assert sess.duration_needs_a_check(int(above) + 1, plan["model_minutes"])
+    assert not sess.duration_needs_a_check(int(above), plan["model_minutes"])
     assert plan["next_day"]["day_num"] == 2
     tests = [e for e in plan["exercises"] if e["timed_test"]]
     assert tests and all(e["timer"] == "stopwatch" for e in tests), "the plank test counts up"
@@ -291,6 +297,7 @@ def test_the_accessory_session_runs_through_the_same_flow(env, monkeypatch):
     plan = env.ok(monkeypatch, "get", "/api/training/accessory")
     assert plan["kind"] == "accessory" and plan["exercises"] and plan["steps"]
     assert plan["min_minutes"] == sess.MIN_ACCESSORY_MINUTES and plan["reasons"]
+    assert plan["ask_length_above_minutes"] is None, "the accessory session never asks the length"
 
 
 def test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan(env, monkeypatch):

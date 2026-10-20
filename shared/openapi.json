@@ -3836,6 +3836,79 @@
         "title": "QueueOut",
         "type": "object"
       },
+      "RawSetIn": {
+        "description": "One set as the phone saw it (rebuild Phase 6); the engine builds the\nrecord (session_save.records_from_raw).",
+        "properties": {
+          "band_tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Band Tier"
+          },
+          "completed_at": {
+            "title": "Completed At",
+            "type": "string"
+          },
+          "left": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SideIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rest_ended_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rest Ended At"
+          },
+          "rest_started_at": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rest Started At"
+          },
+          "right": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SideIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "set_num": {
+            "minimum": 1.0,
+            "title": "Set Num",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "set_num",
+          "completed_at"
+        ],
+        "title": "RawSetIn",
+        "type": "object"
+      },
       "ReadinessBand": {
         "description": "The words services/dashboard.readiness_meta gives a score. The phone\nshows them; it never maps a number to a band itself.",
         "properties": {
@@ -4567,6 +4640,14 @@
             "title": "Note",
             "type": "string"
           },
+          "raw_sets": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RawSetIn"
+            },
+            "title": "Raw Sets",
+            "type": "array"
+          },
           "sets": {
             "default": [],
             "items": {
@@ -4998,6 +5079,17 @@
           "adaptation": {
             "$ref": "#/components/schemas/Adaptation"
           },
+          "ask_length_above_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ask Length Above Minutes"
+          },
           "band_tiers": {
             "items": {
               "$ref": "#/components/schemas/BandTier"
@@ -5294,6 +5386,46 @@
           "reason"
         ],
         "title": "ShiftPrompt",
+        "type": "object"
+      },
+      "SideIn": {
+        "description": "One side's numbers in a set: reps and weight, or a timed hold's seconds.",
+        "properties": {
+          "reps": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reps"
+          },
+          "seconds": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seconds"
+          },
+          "weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Kg"
+          }
+        },
+        "title": "SideIn",
         "type": "object"
       },
       "SleepArchitectureOut": {
