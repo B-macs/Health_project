@@ -11,11 +11,11 @@ the one error shape.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from services import background_writer, engine_actions
+from services import background_writer, data_check, engine_actions
 from services import flexibility_screen as fxs
 from services import insights_screens as ins
 from services.background_sync import BackgroundSyncRunner, SyncBusyError
@@ -23,9 +23,9 @@ from services.clients import oura
 from services.repository import Repository
 
 from ..deps import get_repository, get_sync_runner, local_today
-from ..schemas_insights import (CaptureStartIn, CaptureStepIn, ClearedOut, DataTableOut,
-                                EngineDataOut, FlexCapture, FlexibilityOut, ManualSyncOut,
-                                MetabolismOut, MissingIn, OuraCallbackIn, OuraLoginIn,
+from ..schemas_insights import (CaptureStartIn, CaptureStepIn, ClearedOut, DataCheckOut,
+                                DataTableOut, EngineDataOut, FlexCapture, FlexibilityOut,
+                                ManualSyncOut, MetabolismOut, MissingIn, OuraCallbackIn, OuraLoginIn,
                                 OuraLoginOut, OuraLoginStatus, PlanStartIn, ProcessOut,
                                 QueueOut, SessionChecksOut, SettingsOut, SleepArchitectureOut,
                                 StrengthOut, TrendsOut)
@@ -157,6 +157,17 @@ def get_sleep_architecture(night: str | None = Query(default=None),
 def get_session_checks(today: date = Depends(local_today),
                        repo: Repository = Depends(get_repository)) -> dict:
     return ins.session_checks(repo, today)
+
+
+@router.get("/api/data/check", response_model=DataCheckOut)
+def get_data_check(repo: Repository = Depends(get_repository)) -> dict:
+    """The daily data check: the rows of the newest backup the store no longer
+    holds. Reads only; the Worker's daily trigger and Settings' "Check now"
+    call it. Ages are in hours, so it needs no caller day."""
+    try:
+        return repo.data_check(datetime.now(timezone.utc))
+    except data_check.DataCheckFailed:
+        raise HTTPException(status_code=503, detail="store_unavailable") from None
 
 
 @router.get("/api/data/tables/{table}", response_model=DataTableOut)

@@ -11,7 +11,7 @@ re-declared field by field here: the service is the specification.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 
 from pydantic import BaseModel
@@ -360,6 +360,28 @@ class DataTableOut(BaseModel):
 
 class SessionChecksOut(BaseModel):
     warnings: list[str]
+
+
+class DataCheckTable(BaseModel):
+    table: str
+    backup_rows: int
+    store_rows: int
+    #: The backup's rows whose key the store no longer holds.
+    missing: int
+    #: Up to five of their keys (ids and dates, never a reading).
+    examples: list[str]
+
+
+class DataCheckOut(BaseModel):
+    """The daily data check (services/data_check.py): the rows of the newest
+    backup that the store no longer holds. Reads only."""
+    checked_at: datetime
+    backup_name: str | None
+    backup_day: date | None
+    #: The newest backup is older than two days, so the check misses what came after it.
+    backup_stale: bool
+    missing_rows: int
+    tables: list[DataCheckTable]
 
 
 class ManualSyncOut(BaseModel):

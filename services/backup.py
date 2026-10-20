@@ -83,13 +83,26 @@ class Storage:
         if status >= 300:
             raise StorageError(f"upload {name}: HTTP {status} {body[:200]!r}")
 
-    def names(self) -> list[str]:
+    def objects(self) -> list[dict]:
+        """Every object in the bucket, as Storage lists it (name, updated_at, ...)."""
         status, body = self._http(
             "POST", f"{self._store.url}/storage/v1/object/list/{BUCKET}", self._headers(),
             json.dumps({"prefix": "", "limit": 1000}).encode())
         if status >= 300:
             raise StorageError(f"list {BUCKET}: HTTP {status} {body[:200]!r}")
-        return [o["name"] for o in json.loads(body or b"[]") if o.get("name")]
+        return [o for o in json.loads(body or b"[]") if o.get("name")]
+
+    def names(self) -> list[str]:
+        return [o["name"] for o in self.objects()]
+
+    def download(self, name: str) -> bytes:
+        """One copy's bytes (the daily data check reads the newest; it changes nothing)."""
+        status, body = self._http(
+            "GET", f"{self._store.url}/storage/v1/object/{BUCKET}/{name}",
+            self._store._headers({"Accept": "*/*"}))
+        if status >= 300:
+            raise StorageError(f"download {name}: HTTP {status} {body[:200]!r}")
+        return body
 
     def delete(self, names: list[str]) -> None:
         if not names:

@@ -22,6 +22,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/data/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Data Check
+         * @description The daily data check: the rows of the newest backup the store no longer
+         *     holds. Reads only; the Worker's daily trigger and Settings' "Check now"
+         *     call it. Ages are in hours, so it needs no caller day.
+         */
+        get: operations["get_data_check_api_data_check_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/data/session-checks": {
         parameters: {
             query?: never;
@@ -1033,6 +1055,41 @@ export interface components {
             scored: boolean;
             /** Unscored Reason */
             unscored_reason: string;
+        };
+        /**
+         * DataCheckOut
+         * @description The daily data check (services/data_check.py): the rows of the newest
+         *     backup that the store no longer holds. Reads only.
+         */
+        DataCheckOut: {
+            /** Backup Day */
+            backup_day: string | null;
+            /** Backup Name */
+            backup_name: string | null;
+            /** Backup Stale */
+            backup_stale: boolean;
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            /** Missing Rows */
+            missing_rows: number;
+            /** Tables */
+            tables: components["schemas"]["DataCheckTable"][];
+        };
+        /** DataCheckTable */
+        DataCheckTable: {
+            /** Backup Rows */
+            backup_rows: number;
+            /** Examples */
+            examples: string[];
+            /** Missing */
+            missing: number;
+            /** Store Rows */
+            store_rows: number;
+            /** Table */
+            table: string;
         };
         /** DataTableOut */
         DataTableOut: {
@@ -3407,6 +3464,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CheckInFormOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_data_check_api_data_check_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DataCheckOut"];
                 };
             };
             /** @description Validation Error */

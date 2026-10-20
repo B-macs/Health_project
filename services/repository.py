@@ -32,7 +32,7 @@ import time
 import uuid
 from datetime import date, datetime, timedelta
 
-from services import backup
+from services import backup, data_check
 from services import background_writer
 from services import biometrics
 from services import body_composition
@@ -6438,6 +6438,15 @@ class Repository:
         today = today or date.today()
         return self.run_sync_if_due(
             "supabase_backup", lambda: backup.run(self._sb, today), hours=hours, now=now)
+
+    def data_check(self, now: datetime) -> dict:
+        """The daily data check (services/data_check.py): the rows of the
+        newest backup that the store no longer holds. Reads only. Raises
+        data_check.DataCheckFailed when the backup or the store cannot be read,
+        and when Supabase is not the system of record (there is no backup)."""
+        if not self.supabase_record or self._sb is None:
+            raise data_check.DataCheckFailed("supabase is not the system of record")
+        return data_check.run(self._sb, now)
 
     def sync_garmin_activities_if_due(self, today: date | None = None,
                                       now: datetime | None = None, hours: float = 2,

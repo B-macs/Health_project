@@ -269,6 +269,30 @@ def test_the_data_tables_answer_and_filter(env, monkeypatch):
     assert env.ok(monkeypatch, "get", "/api/data/session-checks") == {"warnings": []}
 
 
+def test_the_data_check_reads_the_store_and_says_when_it_cannot(env, monkeypatch):
+    """GET /api/data/check (rebuild Phase 4): the Repository hands its own store
+    and the time to services/data_check.py; a failed read is 503 store_unavailable."""
+    from services import data_check
+    seen = []
+    result = {"checked_at": "2026-10-20T06:00:00+00:00", "backup_name": "health-2026-10-19.db.gz",
+              "backup_day": "2026-10-19", "backup_stale": False, "missing_rows": 1,
+              "tables": [{"table": "config", "backup_rows": 2, "store_rows": 1, "missing": 1,
+                          "examples": ["lost"]}]}
+    monkeypatch.setattr(data_check, "run", lambda store, now: seen.append((store, now)) or result)
+    out = env.ok(monkeypatch, "get", "/api/data/check")
+    assert out["missing_rows"] == 1 and out["tables"][0]["examples"] == ["lost"]
+    assert out["backup_day"] == "2026-10-19" and out["backup_stale"] is False
+    store, now = seen[0]
+    assert store is env.store and now.tzinfo is not None
+
+    def failed(store, now):
+        raise data_check.DataCheckFailed("download health-2026-10-19.db.gz: HTTP 500")
+
+    monkeypatch.setattr(data_check, "run", failed)
+    r = env.call(monkeypatch, "get", "/api/data/check")
+    assert r.status_code == 503 and r.json() == {"error": "store_unavailable"}
+
+
 def test_a_manual_sync_is_the_background_writers(env, monkeypatch):
     r = env.call(monkeypatch, "post", "/api/data/sync/sleep_fusion")
     assert r.status_code == 409 and r.json() == {"error": "not_the_writer"}

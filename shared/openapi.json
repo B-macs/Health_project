@@ -704,6 +704,100 @@
         "title": "Contributors",
         "type": "object"
       },
+      "DataCheckOut": {
+        "description": "The daily data check (services/data_check.py): the rows of the newest\nbackup that the store no longer holds. Reads only.",
+        "properties": {
+          "backup_day": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Day"
+          },
+          "backup_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backup Name"
+          },
+          "backup_stale": {
+            "title": "Backup Stale",
+            "type": "boolean"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "missing_rows": {
+            "title": "Missing Rows",
+            "type": "integer"
+          },
+          "tables": {
+            "items": {
+              "$ref": "#/components/schemas/DataCheckTable"
+            },
+            "title": "Tables",
+            "type": "array"
+          }
+        },
+        "required": [
+          "checked_at",
+          "backup_name",
+          "backup_day",
+          "backup_stale",
+          "missing_rows",
+          "tables"
+        ],
+        "title": "DataCheckOut",
+        "type": "object"
+      },
+      "DataCheckTable": {
+        "properties": {
+          "backup_rows": {
+            "title": "Backup Rows",
+            "type": "integer"
+          },
+          "examples": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Examples",
+            "type": "array"
+          },
+          "missing": {
+            "title": "Missing",
+            "type": "integer"
+          },
+          "store_rows": {
+            "title": "Store Rows",
+            "type": "integer"
+          },
+          "table": {
+            "title": "Table",
+            "type": "string"
+          }
+        },
+        "required": [
+          "table",
+          "backup_rows",
+          "store_rows",
+          "missing",
+          "examples"
+        ],
+        "title": "DataCheckTable",
+        "type": "object"
+      },
       "DataTableOut": {
         "properties": {
           "earliest": {
@@ -7990,6 +8084,53 @@
           }
         },
         "summary": "Put Checkin"
+      }
+    },
+    "/api/data/check": {
+      "get": {
+        "description": "The daily data check: the rows of the newest backup the store no longer\nholds. Reads only; the Worker's daily trigger and Settings' \"Check now\"\ncall it. Ages are in hours, so it needs no caller day.",
+        "operationId": "get_data_check_api_data_check_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DataCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Data Check"
       }
     },
     "/api/data/session-checks": {
