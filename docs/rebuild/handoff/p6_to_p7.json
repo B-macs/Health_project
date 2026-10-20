@@ -1,0 +1,43 @@
+{
+  "from_phase": "P6",
+  "to_phase": "P7",
+  "written": "2026-10-20",
+  "verdict": "Every p6 counter is 0 except device_checklist_open (10: the owner's real gym session in the new app, the timer alerts included). Signed off under the owner's standing instruction (2026-10-19); his session stays open in his batch.",
+  "address": "https://health.lauscher-worker.workers.dev (Worker deed0fd2; engine revision health-engine-00010-hpf, commit 7a751f5)",
+  "what_exists": {
+    "session_store": "app/src/lib/training.ts: TrainingState in the database's session row from Start to Save (overview = no row; flow; saving; savedId; hr); ids minted once at Start; loadState fills fields an earlier version lacked; an app update waits while a session exists",
+    "flow": "app/src/screens/Session.tsx: one exercise at a time with the day line, progress and list, set chips, steppers, timer, Next/Then, numbers and how-to, note, Back (30) and Skip (asks); a walk or run takes the watch's minutes (8 s, else the save asks again online); a warning only when the engine sent one",
+    "timers": "app/src/lib/timers.ts: timestamps, no drift; ended while hidden says when and waits for a tap; the engine marks which timer starts by itself (guided_flow.timer_starts); arrivalTimer reads the mark",
+    "sounds": "app/src/lib/sounds.ts: Web Audio bells by the walk's ending (1, 2 falling, 3, 4), a rising pair at the rest's end, 880 Hz ticks; audioSession 'playback' (the owner: always over everything)",
+    "save": "app/src/screens/SessionSave.tsx: review, watch check, rating, the length question past the engine's threshold, the engine's load, notes, one outbox save with the Start ids, then the heart-rate match (matched, choose, no match)",
+    "alerts": "Web Push timer alerts: app/src/lib/alerts.ts (Settings card, subscription at every start, keepalive PUT/DELETE /api/push/alert on going to the background / coming back), app/src/sw/sw.ts (push and notificationclick), worker/src/alerts.ts (the routes and the TimerAlerts Durable Object, @block65/webcrypto-web-push 2.0.0), worker/scripts/vapid-keygen.mjs",
+    "engine": "services/guided_flow.py hold_starts_next and the walk's timer_starts (views/training.py asks the same function); plan_days on the session plan; POST /api/training/heart-rate takes the saved session (training_session.sets_by_name)",
+    "field_check": "scripts/session_field_check.py --date <day>: the real session against the last Streamlit one, field names and counts only",
+    "gate_counters": "scripts/rebuild_gate.py p6: test_failures, duplicate_sessions, fields_missing, rule_in_typescript, warning_shown_when_not_due, timer_drift, text_rule_violations, inventory_rows_open, device_checklist_open",
+    "tests": "Python 5582 passed, 1 skipped; app Vitest 174; Worker 42; Playwright 59"
+  },
+  "ios": {
+    "wake_lock": "works in Home Screen apps from iOS 18.4 (WebKit bug 254545); to confirm in the real session",
+    "silent_switch": "audioSession 'playback' plays with the switch on and stops other audio (Safari 17+)",
+    "audio_after_lock": "Lauscher saw audio fail after the lock screen; to check in the real session",
+    "background": "no page code runs while locked; the Web Push alert covers a timer that ends then; Web Push needs the Home Screen app and a tap for permission (iOS 16.4+)"
+  },
+  "owner_decisions": [
+    "2026-10-20 \"Yes push\": the Phase 6 commits pushed (85fdf31..03cf8fe, then 03cf8fe..dcd3bd1)",
+    "2026-10-20 \"Yes id like a push alert\": the timer alerts built the same day",
+    "2026-10-20 \"Yes always play the bells over everything\": audioSession 'playback' stays"
+  ],
+  "phase_7_may_rely_on": [
+    "TrainingTab: the overview, the flow and the save as the tab's three states; noSessionReason; longDate; Banner",
+    "SessionFlow and SessionSave run any plan the engine sends: the accessory session is the same flow (kind 'accessory'; ask_length_above_minutes null)",
+    "useApp().alerts and the alert requests, which any countdown screen can use",
+    "The outbox for a save with its own confirmation (a live query on its id); the ids minted by the phone",
+    "dev/session_fixture.json from the engine's walk; the mock's /api/dev/received and /api/dev/sessions; the browser-test helpers startTraining, leaveSession and the muted test"
+  ],
+  "open": [
+    "The owner's real session: owner_checks.json p6, 10 items; then scripts/session_field_check.py --date <day>",
+    "His answers to 4a (the length at Save; recommended: stop the clock at the last tap) and 4b (no card photos; recommended yes)",
+    "Carried: the Phase 4 iPhone checklist, the Phase 5 two mornings, the hosted-app check, the Strength reference, the voice app's address, the voice secrets",
+    "The image store: 599 MB before revision 10, over 0.5 GB until the clean-up removes the 2026-10-19 images; billed on the month's average"
+  ]
+}

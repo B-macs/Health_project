@@ -574,7 +574,7 @@
         "P6-01"
       ],
       "gate": "inventory_rows_open",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P6-03",
