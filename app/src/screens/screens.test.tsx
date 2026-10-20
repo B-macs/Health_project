@@ -159,6 +159,21 @@ describe('the Readiness and Strain screens', () => {
     expect(html).toContain(S.detail.showWeek)
   })
 
+  it('strain: the card says how the number was measured, and lists no exercise without a body area', () => {
+    const base = fx.strainDetail(LOCAL, LOCAL, false)
+    const d = {
+      ...base,
+      region: base.region && { ...base.region, unmapped_names: ['Made-up pose'] },
+      source: { kind: 'hr', label: 'Made-up method', hr_rows: [{ label: 'Average heart rate', value: '119 bpm' }],
+        blend: { hr_strain: 16.4, rpe_strain: 16.2, hr_weight_pct: 70 } },
+    }
+    const html = text(draw(<DetailFrame heading={S.detail.strain} view={fresh(d)}>{(x) => <StrainBody d={x} onWeek={() => undefined} />}</DetailFrame>))
+    expect(html).toContain(S.detail.source)
+    expect(html).toContain('Average heart rate')
+    expect(html).toContain(S.detail.blend(70, 16.4, 16.2))
+    expect(html).not.toContain('Made-up pose')
+  })
+
   it('with nothing saved and the engine down, a detail screen says why', () => {
     const html = draw(<DetailFrame heading={S.detail.strain} view={nothing<ReturnType<typeof fx.strainDetail>>()}>{() => null}</DetailFrame>)
     expect(text(html)).toContain(S.fresh.nothingSaved)

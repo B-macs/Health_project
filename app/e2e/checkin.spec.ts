@@ -52,3 +52,24 @@ test('the check-in sheet offers today and the three days before', async ({ page 
   await expect(dates.first()).toHaveText(S.checkin.today)
   await expect(dates.first()).toHaveAttribute('aria-checked', 'true')
 })
+
+test('the bottom bar stays on screen over the check-in, and a tab leaves it', async ({ page }) => {
+  // The owner, 2026-10-20: "Check in is an option at the bottom bar but when pressed I can no
+  // longer see the bottom bar". The sheet sat over the whole app, bar included.
+  await onboard(page)
+  await openTab(page, S.nav.checkin)
+  const sheet = page.getByRole('dialog', { name: S.checkin.title })
+  await expect(sheet).toBeVisible()
+  const bar = page.getByRole('navigation', { name: S.app })
+  await expect(bar).toBeInViewport()
+  const box = (await bar.boundingBox())!
+  const onTop = await page.evaluate(([x, y]) => !!document.elementFromPoint(x!, y!)?.closest('.tabbar'),
+    [box.x + box.width / 2, box.y + box.height / 2])
+  expect(onTop).toBe(true)
+  // Opening it moves nothing: the app is not scrolled up under the status bar.
+  expect(await page.evaluate(() => document.querySelector('.app')!.scrollTop)).toBe(0)
+  // A tap on the bar reaches it: Training opens and the check-in closes.
+  await openTab(page, S.nav.training)
+  await expect(sheet).toHaveCount(0)
+  await expect(page).toHaveURL(/#\/training/)
+})

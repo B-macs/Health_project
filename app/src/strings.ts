@@ -85,11 +85,10 @@ export const S = {
     noSplit: 'There is no split by body area for this day.',
     share: (pct: number, au: number | null) => (au == null ? `${pct}% of the load` : `${pct}% of the load · ${au} AU`),
     acwr: (value: string) => `Load ratio ${value}`,
-    unmapped: (names: readonly string[]) => `Not in the body-area map: ${names.join(', ')}.`,
     showWeek: "Show the week's shape",
     hideWeek: 'Hide the week',
-    source: 'Where the number comes from',
-    blend: (pct: number, hr: number, rpe: number) => `${pct}% heart rate (${hr.toFixed(1)}), the rest your rating (${rpe.toFixed(1)}).`,
+    source: 'How this strain was measured',
+    blend: (pct: number, hr: number, rpe: number) => `Strain is ${pct}% from your heart rate (${hr.toFixed(1)}) and the rest from your session rating (${rpe.toFixed(1)}).`,
   },
   charts: {
     empty: 'Not enough readings for a chart in this period.',

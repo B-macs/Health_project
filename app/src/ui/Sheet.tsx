@@ -3,11 +3,16 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { IconClose } from './icons'
 
-export function Sheet(p: { title: string; closeLabel: string; onClose: () => void; children: ReactNode }) {
+/** A sheet over the screen. `contained` keeps it inside the screen area, above the bottom
+ *  bar, for a sheet that IS a tab (Check-in; the owner, 2026-10-20: "when pressed I can no
+ *  longer see the bottom bar"); other sheets cover the whole app. */
+export function Sheet(p: { title: string; closeLabel: string; onClose: () => void; children: ReactNode; contained?: boolean }) {
   const close = useRef<HTMLButtonElement>(null)
   const onClose = p.onClose
   useEffect(() => {
-    close.current?.focus()
+    // No scroll on focus: the panel starts below its box while it slides up, and a focus
+    // that scrolls to it moved the whole app up 16 px over a contained sheet.
+    close.current?.focus({ preventScroll: true })
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
     }
@@ -15,9 +20,9 @@ export function Sheet(p: { title: string; closeLabel: string; onClose: () => voi
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose])
   return (
-    <div className="sheet">
+    <div className={p.contained ? 'sheet sheet--contained' : 'sheet'}>
       <div className="sheet__scrim" aria-hidden="true" onClick={onClose} />
-      <section className="sheet__panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+      <section className="sheet__panel" role="dialog" aria-modal={!p.contained} aria-labelledby="sheet-title">
         <div className="sheet__grip" aria-hidden="true" />
         <header className="sheet__head">
           <h2 id="sheet-title" className="sheet__title">{p.title}</h2>

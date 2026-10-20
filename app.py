@@ -1838,12 +1838,9 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
     panel = strain_screen.region_panel(data, overall, stage)
 
     if panel["state"] == "empty":
-        names = panel["unmapped_names"]
-        listed = ("" if not names else
-                  f'<div style="font-size:11px;color:{s["ink3"]};margin-top:8px;'
-                  f'line-height:1.6;">Not in the region map: '
-                  f'{" &middot; ".join(names[:8])}'
-                  f'{f" +{len(names) - 8} more" if len(names) > 8 else ""}</div>')
+        # No list of the exercises without a body area (the owner, 2026-10-20: it
+        # "doesn't give me any details about strain").
+        listed = ""
         reason = (
             "No session logged for this day, so there is no day to divide. "
             "The number above is the average of the last seven days &mdash; "
@@ -1869,11 +1866,7 @@ def _region_block(data: dict, overall: float | None, stage: int) -> str:
     if panel["thin_sample_pct"] is not None:
         caveat = (f' Attributed from {panel["thin_sample_pct"]:.0f}% of logged session time, '
                   f'so the split rests on a thin sample of the session.')
-    unmapped = panel["unmapped_names"]
-    unmapped_txt = ("" if not unmapped else
-                    f' {len(unmapped)} item(s) have no region mapping and sit '
-                    f'in the unattributed share: {" &middot; ".join(unmapped[:5])}'
-                    f'{f" +{len(unmapped) - 5} more" if len(unmapped) > 5 else ""}.')
+    unmapped_txt = ""   # no list of exercises without a body area (the owner, 2026-10-20)
 
     # A 7-day mean and a single session look alike and are not the same
     # measurement, so the week says so in three places: the panel title, the

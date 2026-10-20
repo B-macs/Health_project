@@ -207,7 +207,7 @@ export function CheckIn({ onClose }: { onClose: () => void }) {
   const yesterday = form?.options[1] ? String(form.options[1]) : ''
   return (
     <div className={`fam-${PAGE_FAMILY.checkin}`}>
-      <Sheet title={S.checkin.title} closeLabel={S.checkin.close} onClose={onClose}>
+      <Sheet title={S.checkin.title} closeLabel={S.checkin.close} onClose={onClose} contained>
         {form && (
           <div className="segmented segmented--wrap" role="radiogroup" aria-label={S.checkin.date}>
             {form.options.map((option) => {

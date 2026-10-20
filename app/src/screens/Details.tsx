@@ -233,7 +233,6 @@ function Regions({ panel, onWeek }: { panel: NonNullable<Schemas['RegionPanel']>
             ))}
           </ul>
           {panel.non_additive_note && <p className="caption">{panel.non_additive_note}</p>}
-          {panel.unmapped_names.length > 0 && <p className="caption">{S.detail.unmapped(panel.unmapped_names)}</p>}
         </>
       )}
       {panel.can_show_window && (

@@ -210,7 +210,7 @@ export function strainDetail(day: string, local: string, showWeek: boolean): Sch
         { id: 'lower_body', name: 'Lower body', short: 'Lower', strain: 8.3, au: 160, au_pct: 50, fill_pct: 60, colour: '', acwr: null },
       ],
     },
-    source: { kind: 'rpe', label: 'RPE only', hr_rows: [], blend: null },
+    source: { kind: 'rpe', label: 'Your session rating only: the watch had no heart rate for this session', hr_rows: [], blend: null },
     hrv_7d: trend(day, 'HRV', () => 44),
     rhr_7d: trend(day, 'Resting heart rate', () => 54),
     trend: trend(day, 'Strain', strainOf),

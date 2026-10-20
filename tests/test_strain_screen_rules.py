@@ -97,15 +97,36 @@ def test_the_strain_source_is_named_or_nothing_is_said():
     assert ss.strain_source({}) is None
     assert ss.strain_source({"strain_source": hr_load.SOURCE_NONE}) is None
     rpe = ss.strain_source({"strain_source": hr_load.SOURCE_RPE, "strain_source_label": "RPE"})
-    assert rpe == {"kind": "rpe", "label": "RPE", "hr_rows": [], "blend": None}
+    assert rpe == {"kind": "rpe", "label": ss.SOURCE_WORDS[hr_load.SOURCE_RPE],
+                   "hr_rows": [], "blend": None}
     hr = ss.strain_source({
         "strain_source": hr_load.SOURCE_BLENDED, "strain_source_label": "Heart rate + RPE",
         "hr_detail": {"edwards_load": 96, "avg_hr": 121, "max_hr": 158, "hr_max_used": 186,
                       "banister_trimp": 74.2, "zone_minutes": {2: 14, 1: 20}},
         "strain_hr_only": 11.8, "strain_rpe_only": 10.9})
     assert hr["kind"] == "hr"
-    assert dict(hr["hr_rows"])["Time in zones"] == "Z1 20m  Z2 14m"
+    # In plain words (the owner, 2026-10-20): every zone with its heart rates, no cross-check.
+    rows = dict(hr["hr_rows"])
+    assert hr["label"] == "Your watch's heart rate and your session rating"
+    assert rows["Average heart rate"] == "121 bpm" and rows["Highest heart rate"] == "158 bpm"
+    assert rows["Zone 1, very easy (93-112 bpm)"] == "20 min"
+    assert rows["Zone 2, easy (112-130 bpm)"] == "14 min"
+    assert rows["Zone 5, very hard (167-186 bpm)"] == "0 min"
+    assert rows["Heart-rate load (minutes × zone number)"] == "96"
+    assert rows["Zones use your top heart rate"] == "186 bpm"
+    assert not any("TRIMP" in name or "Edwards" in name for name in rows)
     assert hr["blend"] == (11.8, 10.9, int(hr_load.HR_BLEND_WEIGHT * 100))
+
+
+def test_a_zone_under_a_minute_says_so_and_unknown_limits_leave_the_words():
+    hr = ss.strain_source({
+        "strain_source": hr_load.SOURCE_HR,
+        "hr_detail": {"edwards_load": 12.4, "avg_hr": None, "max_hr": 150.0,
+                      "zone_minutes": {"5": 0.2}}})
+    rows = dict(hr["hr_rows"])
+    assert rows["Zone 5, very hard"] == "under 1 min"
+    assert rows["Average heart rate"] == "—"
+    assert "Zones use your top heart rate" not in rows
 
 
 def test_a_rest_days_label_says_7d_avg():

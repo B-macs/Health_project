@@ -116,6 +116,17 @@ ul {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* The screen area above the bottom bar: the scroller, and a contained sheet over it. */
+.stage {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* A contained sheet slides up from the bar's top edge, never over the bar. */
+  overflow: hidden;
+}
+
 .scroller {
   flex: 1;
   overflow-x: hidden;
@@ -894,6 +905,15 @@ summary.tapline {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
+}
+
+/* A sheet that is a tab (Check-in) stays above the bottom bar, which keeps the safe area. */
+.sheet--contained {
+  position: absolute;
+}
+
+.sheet--contained .sheet__panel {
+  padding-bottom: var(--sp-l);
 }
 
 .sheet__scrim {

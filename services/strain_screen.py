@@ -110,6 +110,38 @@ def region_panel(data: dict, overall: float | None, stage: int | None) -> dict:
     }
 
 
+#: The method, in the words the Strain screen uses (the owner, 2026-10-20: "more user
+#: friendly"). hr_load.SOURCE_LABELS stay the short names stored and listed elsewhere.
+SOURCE_WORDS = {
+    hr_load.SOURCE_HR: "Your watch's heart rate",
+    hr_load.SOURCE_BLENDED: "Your watch's heart rate and your session rating",
+    hr_load.SOURCE_RPE: "Your session rating only: the watch had no heart rate for this session",
+}
+
+#: Each heart-rate zone in plain words; hr_load.ZONE_LOWER_PCT sets its limits.
+ZONE_WORDS = {1: "very easy", 2: "easy", 3: "moderate", 4: "hard", 5: "very hard"}
+
+
+def _bpm(value) -> str:
+    return "—" if value in (None, "") else f"{float(value):.0f} bpm"
+
+
+def _zone_minutes(minutes) -> str:
+    m = float(minutes or 0)
+    return "under 1 min" if 0 < m < 1 else f"{m:.0f} min"
+
+
+def _zone_name(zone: int, hr_max) -> str:
+    """"Zone 3, moderate (125-142 bpm)": the limits from the top heart rate the zones
+    were set from, or the words alone when it is not known."""
+    words = f"Zone {zone}, {ZONE_WORDS.get(zone, '')}".rstrip(", ")
+    if not hr_max:
+        return words
+    low = hr_load.ZONE_LOWER_PCT[zone] * float(hr_max)
+    high = hr_load.ZONE_LOWER_PCT.get(zone + 1, 1.0) * float(hr_max)
+    return f"{words} ({low:.0f}-{high:.0f} bpm)"
+
+
 def strain_source(snapshot: dict) -> dict | None:
     """Which method produced the strain, and the heart-rate detail behind it
     when there was one, so a fall back to RPE alone is visible rather than
@@ -117,28 +149,36 @@ def strain_source(snapshot: dict) -> dict | None:
     the rolling stand-in, which no single method produced.
 
     {kind: "rpe" or "hr", label, hr_rows: [(name, value)], blend: (HR strain,
-    RPE strain, HR weight %) or None}."""
+    RPE strain, HR weight %) or None}.
+
+    In plain words (the owner, 2026-10-20): the method (SOURCE_WORDS), the average
+    and highest heart rate, the minutes in each zone with its heart rates, the
+    heart-rate load and the top heart rate the zones come from. The Banister
+    figure, a cross-check the strain never used, is not shown."""
     source = snapshot.get("strain_source")
     if not source or source in (hr_load.SOURCE_NONE, "NOT_COMPUTED"):
         return None
     hr = snapshot.get("hr_detail") or {}
     hr_rows = []
     if hr:
-        zones = hr.get("zone_minutes") or {}
-        zone_txt = "  ".join(f"Z{z} {m:g}m" for z, m in sorted(zones.items(),
-                                                               key=lambda kv: str(kv[0])))
+        minutes = {int(z): m for z, m in (hr.get("zone_minutes") or {}).items()}
+        hr_max = hr.get("hr_max_used")
+        load = hr.get("edwards_load")
         hr_rows = [
-            ("Edwards' load", f"{hr.get('edwards_load')} zone-weighted min"),
-            ("Avg / max HR", f"{hr.get('avg_hr') or '—'} / {hr.get('max_hr') or '—'} bpm"),
-            ("HRmax used", f"{hr.get('hr_max_used') or '—'} bpm (observed)"),
-            ("Banister TRIMP", f"{hr.get('banister_trimp') or '—'}  (cross-check)"),
-            ("Time in zones", zone_txt or "—"),
+            ("Average heart rate", _bpm(hr.get("avg_hr"))),
+            ("Highest heart rate", _bpm(hr.get("max_hr"))),
+            *[(_zone_name(z, hr_max), _zone_minutes(minutes.get(z)))
+              for z in sorted(hr_load.ZONE_LOWER_PCT)],
+            ("Heart-rate load (minutes × zone number)",
+             "—" if load in (None, "") else f"{float(load):.0f}"),
         ]
+        if hr_max:
+            hr_rows.append(("Zones use your top heart rate", _bpm(hr_max)))
     both = (snapshot.get("strain_hr_only"), snapshot.get("strain_rpe_only"))
     blend = ((both[0], both[1], int(hr_load.HR_BLEND_WEIGHT * 100))
              if hr and all(v is not None for v in both) else None)
     return {"kind": "rpe" if source == hr_load.SOURCE_RPE else "hr",
-            "label": snapshot.get("strain_source_label") or "",
+            "label": SOURCE_WORDS.get(source) or snapshot.get("strain_source_label") or "",
             "hr_rows": hr_rows, "blend": blend}
 
 

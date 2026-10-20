@@ -176,6 +176,8 @@ function Shell(p: ShellProps) {
   return (
     <AppStateProvider value={state}>
       <div className={classes} style={p.vars as CSSProperties}>
+        {/* The screen area: the screens, and the Check-in sheet over them, above the bar. */}
+        <div className="stage">
         <main className="scroller" ref={scroller}>
           {status.data?.offline && (
             <p className="alert" role="status" data-testid="engine-offline">
@@ -215,8 +217,9 @@ function Shell(p: ShellProps) {
             </Switch>
           </ScreenBoundary>
         </main>
-        {!inSession && <TabBar tab={tab} onTab={go} />}
         {tab === 'checkin' && <CheckIn onClose={() => go('/')} />}
+        </div>
+        {!inSession && <TabBar tab={tab} onTab={go} />}
       </div>
     </AppStateProvider>
   )
