@@ -11,6 +11,8 @@ export interface AppSettings {
   theme: ThemePref
   engineDown: boolean
   installSkipped: boolean
+  /** The timer alerts are on (lib/alerts.ts). */
+  alerts: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -18,6 +20,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'auto',
   engineDown: false,
   installSkipped: false,
+  alerts: false,
 }
 
 const THEMES: readonly ThemePref[] = ['auto', 'light', 'dark']
@@ -32,6 +35,7 @@ export async function readSettings(store: HealthDB): Promise<AppSettings> {
     theme: THEMES.includes(theme as ThemePref) ? (theme as ThemePref) : 'auto',
     engineDown: value(KEYS.engineDown) === true,
     installSkipped: value(KEYS.installSkipped) === true,
+    alerts: value(KEYS.alerts) === true,
   }
 }
 

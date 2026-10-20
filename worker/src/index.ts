@@ -9,6 +9,10 @@
 // The Worker holds no rule (CLAUDE.md, rebuild rule 1): it passes the engine's answer
 // through unchanged, and turns a network failure into one JSON error the app can show.
 //
+// Rebuild Phase 6 adds THE TIMER ALERTS (src/alerts.ts): /api/push/* is answered here, with
+// a Durable Object that sends a Web Push when a rest or a hold ends while the phone is
+// locked. It holds the phone's push subscription and one alert; it never calls the engine.
+//
 // Rebuild Phase 4 adds two things:
 // - THE DAILY DATA CHECK. A Cron Trigger (wrangler.jsonc) asks the engine once a day
 //   which rows of the newest backup the store no longer holds (GET /api/data/check, read
@@ -24,8 +28,11 @@
 //   the first app open (2026-10-19), and a trigger has no phone to give it the day.
 import { Hono, type Context } from 'hono'
 import { bearerAuth } from 'hono/bearer-auth'
+import { type AlertEnv, alertRoutes } from './alerts'
 
-export type Bindings = {
+export { TimerAlerts } from './alerts'
+
+export type Bindings = AlertEnv & {
   ASSETS: Fetcher
   ACCESS_KEY: string
   ENGINE_KEY: string
@@ -146,6 +153,9 @@ app.get('/api/data/check/last', async (c) => c.json((await c.env.STATE.get(LAST_
 
 // Settings' "Check now".
 app.post('/api/data/check/run', (c) => runDataCheck(c.env))
+
+// Rebuild Phase 6: the timer alerts (src/alerts.ts). Answered here, never by the engine.
+alertRoutes(app)
 
 app.all('/api/*', async (c) => {
   const incoming = new URL(c.req.url)

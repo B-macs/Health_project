@@ -13,6 +13,7 @@
 // was hidden at the end, nothing moves by itself and the screen says when it ended. The
 // screen stays on (the Wake Lock API).
 import { useCallback, useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
+import { alertFor, cancelAlert, scheduleAlert } from '../lib/alerts'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../lib/appState'
 import { bell, restOver, tick, unlockAudio, type Ending } from '../lib/sounds'
@@ -220,7 +221,27 @@ export function SessionFlow({ s, update, onExit }: {
   const held = useWakeLock(true)
   const [asking, setAsking] = useState<'exit' | 'skip' | null>(null)
   const [pulling, setPulling] = useState(false)
-  const { ctx } = useApp()
+  const { ctx, alerts } = useApp()
+
+  // The timer alerts (lib/alerts.ts): as the app goes to the background with a countdown
+  // running, ask for an alert at its end; when the app comes back, cancel it.
+  const latest = useRef(s)
+  latest.current = s
+  useEffect(() => {
+    if (!alerts) return
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        const x = latest.current
+        const running = timerHere(x)
+        const alert = running ? alertFor(x, running) : null
+        if (alert && alert.at > Date.now()) void scheduleAlert(ctx, alert)
+      } else {
+        void cancelAlert(ctx)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [alerts, ctx])
 
   /** Move the flow with `f` at the clock, starting the timer the next entry runs itself;
    *  `byTimer` when a timer that ran out moved it, not a tap. */

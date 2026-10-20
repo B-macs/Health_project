@@ -38,6 +38,7 @@
     "audio_after_lock": null,
     "screen_on": null,
     "saved": null,
-    "field_check": null
+    "field_check": null,
+    "alerts": null
   }
 }

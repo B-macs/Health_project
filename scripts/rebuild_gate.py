@@ -1503,6 +1503,7 @@ P6_CHECKLIST = {
     "screen_on": "The screen stayed on during the session",
     "saved": "Save showed 'Saved on the phone', then 'Saved'",
     "field_check": "scripts/session_field_check.py: one session stored for the day, no field missing",
+    "alerts": "Settings > Timer alerts turned on; a test alert arrives; a rest that ends with the phone locked shows its alert",
 }
 #: The engine's training and safety rules by name: none may be written into the phone's
 #: source (rebuild rule 1; also in camelCase). A field the engine SENDS is not here: the

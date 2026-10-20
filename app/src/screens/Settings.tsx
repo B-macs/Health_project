@@ -5,10 +5,11 @@
 // reloads, and the version line (seven taps open the console).
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useEffect, useMemo, useState } from 'react'
-import { KEYS, setSetting, type HealthDB } from '../db/schema'
+import { getSetting, KEYS, setSetting, type HealthDB } from '../db/schema'
 import { debugLines, openConsole, tapCounter } from '../debug/console'
 import type { ThemePref } from '../design/theme'
 import type { components } from '../generated/api'
+import { alertSupport, disableAlerts, enableAlerts, sendTestAlert, type EnableResult } from '../lib/alerts'
 import { ApiError, api } from '../lib/api'
 import { cacheKey, useCached, type Ctx } from '../lib/cache'
 import { drain, retry, wake } from '../lib/outbox'
@@ -176,6 +177,51 @@ function Choice<T extends string | boolean>(p: {
   )
 }
 
+/** The timer alerts (lib/alerts.ts): on from a tap, a test alert, off. */
+function Alerts({ store, ctx, on }: { store: HealthDB; ctx: Ctx; on: boolean }) {
+  const support = alertSupport()
+  const [busy, setBusy] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
+  const run = (task: () => Promise<string | null>) => {
+    setBusy(true)
+    setNote(null)
+    void task().then((text) => setNote(text)).finally(() => setBusy(false))
+  }
+  const words: Record<EnableResult, string | null> = {
+    on: null, denied: S.settings.alertsDenied, 'not-configured': S.settings.alertsNotReady, failed: S.settings.alertsFailed,
+  }
+  return (
+    <section className="card group" aria-labelledby="alerts-title" data-testid="alerts" data-state={on ? 'on' : support}>
+      <h2 id="alerts-title" className="eyebrow">{S.settings.alerts}</h2>
+      <p className="caption">{S.settings.alertsWhat}</p>
+      {support === 'install-first' ? <p className="caption">{S.settings.alertsInstall}</p>
+        : support === 'unsupported' ? <p className="caption">{S.settings.alertsUnsupported}</p>
+          : support === 'denied' ? <p className="caption">{S.settings.alertsDenied}</p>
+            : on ? (
+              <>
+                <p>{S.settings.alertsOn}</p>
+                <div className="pair">
+                  <button className="btn btn--glass" disabled={busy}
+                    onClick={() => run(async () => ((await sendTestAlert(ctx)) ? S.settings.alertsTestSent : S.settings.alertsTestFailed))}>
+                    {S.settings.alertsTest}
+                  </button>
+                  <button className="btn btn--glass" disabled={busy}
+                    onClick={() => run(async () => { await disableAlerts(store, ctx); return null })}>
+                    {S.settings.alertsOff}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <button className="btn btn--primary" disabled={busy}
+                onClick={() => run(async () => words[await enableAlerts(store, ctx)])}>
+                {S.settings.alertsTurnOn}
+              </button>
+            )}
+      {note && <p className="caption" role="status">{note}</p>}
+    </section>
+  )
+}
+
 function Log() {
   const lines = debugLines().slice(-40).reverse()
   return (
@@ -211,6 +257,7 @@ function Version() {
 const ON_OFF = [false, true] as const
 
 export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onTheme: (t: ThemePref) => void }) {
+  const alertsOn = useLiveQuery(() => getSetting(p.store, KEYS.alerts, false), [p.store], false)
   return (
     <div className="screen settings">
       <div className="sky sky--quiet" aria-hidden="true" />
@@ -220,6 +267,7 @@ export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onThe
       <Engine store={p.store} ctx={p.ctx} />
       <Outbox store={p.store} ctx={p.ctx} />
       <DataCheckCard store={p.store} ctx={p.ctx} />
+      <Alerts store={p.store} ctx={p.ctx} on={alertsOn === true} />
       <AccessKey store={p.store} />
       <Storage />
       <section className="card group">

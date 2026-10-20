@@ -251,6 +251,67 @@ test('the overview offers the adapt dialog; a running watch is named; a session 
   await context.clearCookies({ name: 'e2e_hr' })
 })
 
+type AlertWrite = { method: string; path: string; body: { at: number; title: string; body: string; tag: string } | null }
+
+async function alertWrites(page: Page): Promise<AlertWrite[]> {
+  const all = (await (await page.request.get(`${ORIGIN}/api/dev/received`)).json()) as AlertWrite[]
+  return all.filter((r) => r.path === '/api/push/alert')
+}
+
+/** The app goes to the background, or comes back (a test cannot lock the phone). */
+async function visibility(page: Page, state: 'hidden' | 'visible'): Promise<void> {
+  await page.evaluate((to) => {
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => to })
+    document.dispatchEvent(new Event('visibilitychange'))
+  }, state)
+}
+
+test('with the alerts on, a rest that runs as the app goes to the background asks for an alert, and coming back cancels it', async ({ page }) => {
+  await onboard(page)
+  await hook(page)
+  await page.evaluate(() => window.__health!.setSetting('timer_alerts', true))
+  await startTraining(page)
+  const rest = fixture.steps.findIndex((st) => st.phase === 'resting')
+  while ((await position(page)) !== rest) await tap(page)
+  const seen = (await alertWrites(page)).length
+  const before = Date.now()
+  await visibility(page, 'hidden')
+  await expect.poll(async () => (await alertWrites(page)).length - seen).toBe(1)
+  const asked = (await alertWrites(page))[seen]
+  expect(asked.method).toBe('PUT')
+  expect(asked.body?.tag).toBe('rest')
+  expect(asked.body?.title).toBe(S.session.alertRest)
+  const restMs = (fixture.exercises[fixture.steps[rest].ex_idx].rest_seconds ?? 0) * 1000
+  expect(asked.body!.at).toBeGreaterThan(before)
+  expect(asked.body!.at).toBeLessThanOrEqual(Date.now() + restMs)
+  // Back before the rest ended: the alert is cancelled.
+  await visibility(page, 'visible')
+  await expect.poll(async () => (await alertWrites(page)).slice(seen).map((w) => w.method)).toEqual(['PUT', 'DELETE'])
+})
+
+test('Settings offers the timer alerts: on an iPhone from the Home Screen only; and it says when the server is not set up', async ({ page, browserName }) => {
+  if (browserName === 'chromium') {
+    // A test browser always reports notifications as blocked; this stands in for a phone
+    // that asks and gets a yes.
+    await page.addInitScript(() => {
+      Object.defineProperty(Notification, 'permission', { configurable: true, get: () => 'default' })
+      Object.defineProperty(Notification, 'requestPermission', { configurable: true, value: async () => 'granted' })
+    })
+  }
+  await onboard(page)
+  await page.getByRole('navigation', { name: S.app }).getByRole('button', { name: S.nav.settings }).click()
+  const card = page.getByTestId('alerts')
+  if (browserName === 'webkit') {
+    // The iPhone profile in a browser tab, not from the Home Screen: iOS would refuse.
+    await expect(card).toHaveAttribute('data-state', 'install-first')
+    await expect(card).toContainText(S.settings.alertsInstall)
+    return
+  }
+  await expect(card).toHaveAttribute('data-state', 'ready')
+  await card.getByRole('button', { name: S.settings.alertsTurnOn }).click()
+  await expect(card.getByRole('status')).toHaveText(S.settings.alertsNotReady)
+})
+
 test('an app kill in the middle opens the session again at the same place, with its numbers', async ({ page }) => {
   await onboard(page)
   await startTraining(page)

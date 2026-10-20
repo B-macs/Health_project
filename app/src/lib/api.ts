@@ -38,6 +38,9 @@ export interface RequestOptions {
   fetchImpl?: typeof fetch
   /** Give up after this long (a weak signal at the gym): the request fails as offline. */
   timeoutMs?: number
+  /** Let the request finish after the page stops (the timer alerts, sent as the app goes to
+   *  the background). */
+  keepalive?: boolean
 }
 
 const ENGINE_DOWN = new Set(['engine_unavailable', 'engine_timeout', 'not_configured'])
@@ -60,6 +63,7 @@ export async function api<T>(path: string, options: RequestOptions): Promise<T> 
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       cache: 'no-store',
       signal: abort?.signal,
+      ...(options.keepalive ? { keepalive: true } : {}),
     })
   } catch {
     throw new ApiError('offline', null, abort?.signal.aborted ? 'timeout' : 'network')

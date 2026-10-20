@@ -15,6 +15,8 @@ export interface AppState {
   showDay: (day: string | null) => void
   /** Open an address in the app (hash routes), from the top of the page. */
   go: (path: string) => void
+  /** The timer alerts are on (lib/alerts.ts); absent counts as off. */
+  alerts?: boolean
 }
 
 const State = createContext<AppState | null>(null)

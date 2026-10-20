@@ -30,6 +30,7 @@ declare global {
       outbox: () => Promise<{ attempts: number }[]>
       sessionActive: () => boolean
       session: () => Promise<unknown>
+      setSetting: (key: string, value: unknown) => Promise<void>
     }
   }
 }

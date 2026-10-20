@@ -9,6 +9,7 @@
     "types": "wrangler types"
   },
   "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0",
     "hono": "4.13.13"
   },
   "devDependencies": {

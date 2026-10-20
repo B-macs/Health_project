@@ -34,8 +34,21 @@
   "vars": {
     // The second lock on the device syncs and the Oura login (src/index.ts). "true" only
     // at the switch-over (Phase 9), when the engine becomes the one background writer.
-    "SYNC_ENABLED": "false"
+    "SYNC_ENABLED": "false",
+    // The timer alerts (Web Push, src/alerts.ts): the VAPID subject and PUBLIC key, made by
+    // scripts/vapid-keygen.mjs. The private key is the secret VAPID_PRIVATE_KEY, which that
+    // script stores with `wrangler secret put` and never writes anywhere else. Empty: no
+    // alerts (/api/push/key answers 503 push_not_configured).
+    "VAPID_SUBJECT": "https://health.lauscher-worker.workers.dev",
+    "VAPID_PUBLIC_KEY": "BNxc_lMtvnJdPY1I4FvX8Fj60RsJWzgqcPPK6h0ZfczdRYiCya8xdqzfr52cIAg_JadtP_eh4b1SvvGPy7_l30s"
   },
+  // Rebuild Phase 6: one Durable Object keeps the push subscription and the waiting timer
+  // alert, and its alarm sends the alert on the second. Free plan: SQLite-backed objects
+  // only (durable-objects/platform/pricing, checked 2026-10-20).
+  "durable_objects": {
+    "bindings": [{ "name": "ALERTS", "class_name": "TimerAlerts" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["TimerAlerts"] }],
   "kv_namespaces": [
     // health-state: the last data check. Free plan: 1,000 writes and 100,000 reads a day.
     { "binding": "STATE", "id": "84ff9d3f5e48499592ed8fe85b461359" }

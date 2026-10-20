@@ -13,6 +13,8 @@
 //   `e2e_watch=missing` finds none), GET .../garmin/activity-minutes gives a walk 31 min,
 //   and POST /api/training/heart-rate answers a made-up match (`e2e_hr=choose` asks which
 //   activity, `e2e_hr=none` finds no match);
+// - the timer alerts: GET /api/push/key answers "not set up" (a test browser has no push
+//   service); a PUT or DELETE of /api/push/alert is received like any write;
 // - the data check answers as the Worker does: GET .../last (null until a check ran) and
 //   POST .../run (a made-up clean result);
 // - Today, its week, the day's plan, the three detail screens and the check-in answer
@@ -77,6 +79,9 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
   }
   if (url.pathname === '/api/dev/received') return send(200, received)
   if (url.pathname === '/api/dev/sessions') return send(200, [...sessions.values()])
+  if (url.pathname === '/api/push/key' && req.headers.authorization === `Bearer ${KEY}`) {
+    return send(503, { error: 'push_not_configured' })
+  }
   if (cookie(req, 'e2e_engine') === 'down') return send(503, { error: 'engine_unavailable' })
   if (req.headers.authorization !== `Bearer ${KEY}`) return send(401, { error: 'unauthorized' })
   const day = (req.headers['x-local-date'] as string | undefined) ?? null

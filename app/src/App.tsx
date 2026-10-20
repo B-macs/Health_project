@@ -26,6 +26,7 @@ import { AppStateProvider, type AppState } from './lib/appState'
 import { refresh, type Ctx } from './lib/cache'
 import { pickFor, readPick, writePick, type Pick } from './lib/day'
 import { localDay } from './lib/api'
+import { refreshAlerts } from './lib/alerts'
 import { useOutboxLoop } from './lib/outbox'
 import { useAppSettings, type AppSettings } from './lib/settings'
 import { isStandalone } from './lib/standalone'
@@ -113,8 +114,16 @@ function Shell(p: ShellProps) {
     writePick(next)
     setPick(next)
   }, [])
-  const state = useMemo<AppState>(() => ({ store, ctx, reduced: p.reduced, pick, showDay, go }),
-    [store, ctx, p.reduced, pick, showDay, go])
+  const alerts = p.settings.alerts
+  const state = useMemo<AppState>(() => ({ store, ctx, reduced: p.reduced, pick, showDay, go, alerts }),
+    [store, ctx, p.reduced, pick, showDay, go, alerts])
+
+  // The timer alerts' subscription again at every start (iOS has no event when it changes).
+  useEffect(() => {
+    if (ctx.key) void refreshAlerts(store, ctx)
+    // once a start, with the key
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx.key])
 
   if (!p.settings.key) {
     return (

@@ -1039,6 +1039,17 @@
       ],
       "test": "app/e2e/session.spec.ts",
       "note": "Next: day n+1 and its objective."
+    },
+    "T87": {
+      "built": [
+        "app/src/lib/alerts.ts",
+        "app/src/screens/Session.tsx",
+        "app/src/screens/Settings.tsx",
+        "app/src/sw/sw.ts",
+        "worker/src/alerts.ts"
+      ],
+      "test": "worker/test/alerts.test.ts",
+      "note": "Built as Web Push timer alerts (the owner's choice, 2026-10-20: \"Yes id like a push alert\"): an iPhone web app runs no code while locked, so as the app goes to the background with a countdown running the phone asks the Worker for an alert at its end, and cancels it when it comes back. Also app/src/lib/alerts.test.ts and app/e2e/session.spec.ts."
     }
   }
 }

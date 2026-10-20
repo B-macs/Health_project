@@ -72,6 +72,17 @@ describe('the failures', () => {
     await expect(api('/api/x', { key: 'k', fetchImpl, timeoutMs: 20 })).rejects.toMatchObject({ kind: 'offline', code: 'timeout' })
   })
 
+  it('a keepalive request says so, and an ordinary one does not', async () => {
+    const seen: (boolean | undefined)[] = []
+    const fetchImpl = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      seen.push(init?.keepalive)
+      return new Response(null, { status: 204 })
+    }) as typeof fetch
+    await api('/api/x', { key: 'k', fetchImpl, keepalive: true })
+    await api('/api/x', { key: 'k', fetchImpl })
+    expect(seen).toEqual([true, undefined])
+  })
+
   it('no network is offline', async () => {
     const fetchImpl = vi.fn(async () => {
       throw new TypeError('Failed to fetch')

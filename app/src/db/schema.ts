@@ -104,4 +104,8 @@ export const KEYS = {
   theme: 'theme',
   engineDown: 'debug_engine_down',
   installSkipped: 'install_skipped',
+  /** The timer alerts are on (lib/alerts.ts). */
+  alerts: 'timer_alerts',
+  /** The Worker's push key the phone subscribed with: a new key means subscribing again. */
+  pushKey: 'push_key',
 } as const
