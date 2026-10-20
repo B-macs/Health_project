@@ -386,6 +386,24 @@ PROFILE = {
                 "breaks up sitting and standing with walking and short activation efforts. "
                 "If he follows it, read any later change in this finding with that in mind."
             ),
+            "additional_evidence_2026_10_20": (
+                "AFTER THREE DAYS OF LOAD ON ONE MUSCLE. His words, 2026-10-20: 'My right "
+                "glutes medius was so tight all day yesterday and wouldn't relax for long, "
+                "when I did use heat and or walking it helped but still the minute I sat at my "
+                "desk again is started to build in tightness.' What came before it: hikes on "
+                "Saturday 2026-10-17 (19,324 steps) and Sunday 10-18 (13,649), then on Monday "
+                "10-19 the 12-week block's session A - 79 minutes at session RPE 8, with "
+                "walking lunges (15 kg, 3 sets), the five Bunkie lines including the lateral "
+                "one, and the weighted hip airplane (3 sets), all of which load the glute "
+                "medius on one leg. His note on the session: 'I felt tired before starting the "
+                "bunkie test, after two days of hiking.' Tuesday's check-in: tightness 3, pain "
+                "0, both glutes, mild tiredness. "
+                "READING: the desk pattern was still there (heat and walking eased it, sitting "
+                "brought it back), but this time it sat on top of a muscle that had carried "
+                "three days of single-leg work. Like the psoas-attachment soreness after a long "
+                "walk on a gym day (symptom log 2026-10-05, update of 2026-10-12), it reads as "
+                "a dose effect added to the grip, not the grip alone. Recorded, not scored."
+            ),
         },
         {
             "id": 2,
