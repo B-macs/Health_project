@@ -119,8 +119,9 @@ class BiometricRecord:
     weight_kg: float | None = None
     steps: int | None = None
     # Which "engine_field:source" pairs had only one of Oura/Garmin reporting
-    # data for this date — e.g. ("hrv_ms:garmin",) means Oura had no HRV
-    # reading, so Garmin's value was used at 100% weight. Empty when both
+    # data for this date, naming the source that was MISSING (biometrics.
+    # blend_metric) — e.g. ("hrv_ms:garmin",) means Garmin had no HRV
+    # reading, so Oura's value was used at 100% weight. Empty when both
     # sources agreed or the record predates the Oura/Garmin blend (Sheet1).
     sources_missing: tuple[str, ...] = ()
     # Oura's own daily_readiness contributor sub-scores (0-100, pre-scored by

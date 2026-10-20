@@ -369,6 +369,9 @@ _OURA_ROW = {
     "sleep_id": "ac08e613", "day": "2026-07-28", "type": "long_sleep",
     "bedtime_start": "2026-07-27T21:38:00.000+02:00",
     "sleep_phase_30_sec": "22" * 30 + "44" * 5 + "22" * 25,   # 60 minutes
+    # Every real ring period carries its sleep time (529 of 529, 2026-10-20); a night
+    # must reach an hour since then (biometrics.MAIN_NIGHT_MIN_SECONDS).
+    "total_sleep_duration": 3600,
 }
 _GARMIN_ROW = {
     "date": "2026-07-28", "totals_match": True, "utc_offset_minutes": 120,

@@ -255,6 +255,59 @@ def test_no_periods_yields_no_main_and_no_naps():
     assert biometrics.day_total_sleep_seconds(None, []) == 0.0
 
 
+
+# ─── 2b. a night under an hour is no reading (the owner, 2026-10-20) ─────────
+
+def test_a_nine_minute_period_is_no_night():
+    """2026-09-28: the ring off overnight, one 9-minute period at 21:08."""
+    fragment = _period(type="sleep", total_sleep_duration=540,
+                       bedtime_start="2026-09-27T21:08:00.000+02:00",
+                       bedtime_end="2026-09-27T21:41:00.000+02:00")
+    assert biometrics.split_sleep_periods([fragment]) == (None, [])
+
+
+def test_a_day_of_short_naps_has_no_night_and_no_naps():
+    """A nap only adds to a night: with no night, naps over the nap floor go too."""
+    a = _period(type="sleep", total_sleep_duration=2700,
+                bedtime_start="2026-07-19T13:00:00.000+02:00",
+                bedtime_end="2026-07-19T13:50:00.000+02:00")
+    b = _period(type="late_nap", total_sleep_duration=1800,
+                bedtime_start="2026-07-19T19:00:00.000+02:00",
+                bedtime_end="2026-07-19T19:35:00.000+02:00")
+    assert biometrics.split_sleep_periods([a, b]) == (None, [])
+
+
+def test_the_night_floor_is_inclusive_at_exactly_one_hour():
+    hour = _period(type="sleep", total_sleep_duration=biometrics.MAIN_NIGHT_MIN_SECONDS)
+    main, _naps = biometrics.split_sleep_periods([hour])
+    assert main is hour
+
+
+def test_a_long_sleep_under_an_hour_gives_way_to_a_longer_period():
+    """The night must reach the floor before its type counts: a 40-minute
+    long_sleep beside a 2.5 h period leaves the 2.5 h period as the night, and
+    the short one is a nap above the nap floor."""
+    short = _period(type="long_sleep", total_sleep_duration=2400,
+                    bedtime_start="2026-07-19T01:00:00.000+02:00",
+                    bedtime_end="2026-07-19T01:50:00.000+02:00")
+    longer = _period(type="sleep", total_sleep_duration=9000,
+                     bedtime_start="2026-07-19T03:00:00.000+02:00",
+                     bedtime_end="2026-07-19T06:00:00.000+02:00")
+    main, naps = biometrics.split_sleep_periods([short, longer])
+    assert main is longer and naps == [short]
+
+
+def test_a_fragment_night_reaches_the_engine_as_no_ring_reading(monkeypatch):
+    """No sleep time, HRV or resting HR from a fragment: the day reads like a
+    night the ring was not worn, so Sleep Score, Sleep Debt and the drift rule
+    never see it."""
+    repo = _repo_with_periods(monkeypatch, [
+        _period(type="sleep", total_sleep_duration=540, average_hrv=12, lowest_heart_rate=70,
+                bedtime_start="2026-07-18T21:08:00.000+02:00",
+                bedtime_end="2026-07-18T21:41:00.000+02:00"),
+    ])
+    assert "2026-07-19" not in repo._oura_sleep_metrics_by_date("2026-07-01", "2026-07-31")
+
 # ─── 3. duration counts naps, architecture does not ──────────────────────────
 
 def test_duration_includes_naps_but_the_architecture_denominator_does_not(monkeypatch):

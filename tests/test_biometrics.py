@@ -67,9 +67,11 @@ def test_pick_main_sleep_period_falls_back_to_longest_duration():
 
 
 def test_pick_main_sleep_period_handles_missing_duration():
-    entries = [{"type": "nap"}, {"type": "nap", "total_sleep_duration": 900}]
+    # 5400 s since 2026-10-20: a night must reach an hour (MAIN_NIGHT_MIN_SECONDS),
+    # so the old 900 s would now be no night at all; the missing duration is the point.
+    entries = [{"type": "nap"}, {"type": "nap", "total_sleep_duration": 5400}]
     picked = biometrics.pick_main_sleep_period(entries)
-    assert picked["total_sleep_duration"] == 900
+    assert picked["total_sleep_duration"] == 5400
 
 
 # ─── blend_biometric_day ─────────────────────────────────────────────────────

@@ -207,3 +207,30 @@ def test_drift_rows_does_not_leak_into_the_baseline_used_for_today():
     without_drift = engine.traffic_light(recent)
     assert (with_drift["metrics"]["hrv_ms"]["baseline_28d"]
             == without_drift["metrics"]["hrv_ms"]["baseline_28d"] == 60.0)
+
+
+
+# ─── The drift message in plain words (the owner, 2026-10-20) ───────────────
+
+def test_the_drift_message_names_the_metric_in_plain_words():
+    """It had printed "sleep_duration_hours -12.7%" and ended in two full stops."""
+    prior  = _rows(engine.DRIFT_PRIOR_DAYS, sleep=7.0)
+    recent = _rows(engine.DRIFT_RECENT_DAYS, sleep=6.1)
+    tl = engine.traffic_light(recent, drift_rows=prior + recent)
+    message = tl["drift"]["message"]
+    assert message == ("Your average sleep over the last 4 weeks (6.1 h) is 13% below the "
+                       "62 days before (7.0 h). Today's readings are normal, but against a "
+                       "worse base than before.")
+    rec = engine.volume_recommendation(tl, {"hard_locked": False, "acwr": 1.0, "ceiling": 1.3},
+                                       2, 0, 0.3)
+    assert rec["cause"] == message and ".." not in rec["action"]
+
+
+def test_two_adverse_metrics_share_one_window_in_the_message():
+    prior  = _rows(engine.DRIFT_PRIOR_DAYS, hrv=60.0, rhr=55.0)
+    recent = _rows(engine.DRIFT_RECENT_DAYS, hrv=56.0, rhr=58.0)   # -6.7%, +5.5% (shown as 6%)
+    message = engine.baseline_drift(prior + recent)["message"]
+    assert message.startswith("Your average HRV over the last 4 weeks (56 ms) is 7% below "
+                              "the 62 days before (60 ms) and your average resting heart "
+                              "rate (58 bpm) is 6% above the 62 days before (55 bpm).")
+    assert "_" not in message

@@ -194,8 +194,22 @@ def hrv_agreement(paired: list[tuple[float, float]]) -> dict:
 # garbage. services/sleep_score.py depends on exactly this: it divides REM
 # and deep seconds by oura_sleep_total_seconds, which must therefore remain
 # the main night's total and never the day's.
+#
+# 3. A NIGHT HAS A FLOOR TOO (the owner, 2026-10-20: a night under 1 hour
+#    counts as no reading, the same as a night the ring was not worn). On
+#    2026-09-28 the ring was off overnight and held one 9-minute period at
+#    21:08; the longest-period fallback made it the night, so the day carried
+#    0.15 h of "sleep", a 9-minute HRV and resting HR and a Sleep Score of 23,
+#    and the 28-night average it sat in took the baseline-drift rule over its
+#    10% line (9.6% without it). It was the only stored night under an hour
+#    since 2025-09. A day whose periods are all shorter than
+#    MAIN_NIGHT_MIN_SECONDS has no night, and so no naps either: a nap only
+#    ever adds to a night.
 
 NAP_MIN_SECONDS = 900
+
+#: The shortest period that can be a day's night (note 3 above).
+MAIN_NIGHT_MIN_SECONDS = 3600
 
 
 def _duration_seconds(entry: dict | None) -> float:
@@ -261,6 +275,7 @@ def dedupe_sleep_periods(entries: list[dict]) -> list[dict]:
 
 def split_sleep_periods(
     entries: list[dict], nap_min_seconds: float = NAP_MIN_SECONDS,
+    night_min_seconds: float = MAIN_NIGHT_MIN_SECONDS,
 ) -> tuple[dict | None, list[dict]]:
     """DETERMINISTIC. (main sleep period, qualifying naps) for one day.
 
@@ -268,16 +283,19 @@ def split_sleep_periods(
     days in this history where Oura recorded no long_sleep at all, because
     the whole night ran under 3 h — simply the longest period there is.
     That fallback is why a nap-only day still reports a night rather than
-    nothing. Naps are every other surviving period reaching
+    nothing. Either way the night must reach `night_min_seconds` (one hour,
+    note 3 above): only periods that long are candidates, and a day with
+    none has no night. Naps are every other surviving period reaching
     `nap_min_seconds`; ordering is by when they started, so a caller can
     list them down the day.
 
-    (None, []) when there are no periods."""
+    (None, []) when there are no periods, or none long enough to be a night."""
     unique = dedupe_sleep_periods(entries)
-    if not unique:
+    nights = [e for e in unique if _duration_seconds(e) >= night_min_seconds]
+    if not nights:
         return None, []
-    long_sleeps = [e for e in unique if e.get("type") == "long_sleep"]
-    main = max(long_sleeps or unique, key=_duration_seconds)
+    long_sleeps = [e for e in nights if e.get("type") == "long_sleep"]
+    main = max(long_sleeps or nights, key=_duration_seconds)
     naps = [e for e in unique
             if e is not main and _duration_seconds(e) >= nap_min_seconds]
     naps.sort(key=lambda e: (_period_span(e) or (float("inf"), 0))[0])

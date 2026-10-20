@@ -587,6 +587,36 @@ _DRIFT_METRICS = {
     "sleep_duration_hours": True,
 }
 
+# Each watched metric in the words and the unit its message uses (the owner,
+# 2026-10-20: the message had printed "sleep_duration_hours -12.7%").
+_DRIFT_WORDS = {
+    "sleep_duration_hours": ("average sleep", "{:.1f} h"),
+    "hrv_ms":               ("average HRV", "{:.0f} ms"),
+    "resting_heart_rate":   ("average resting heart rate", "{:.0f} bpm"),
+}
+
+
+def _drift_clause(key: str, m: dict, prior_days: int, first: bool) -> str:
+    """One adverse metric of the drift message in plain words, e.g. "your average
+    sleep over the last 4 weeks (6.1 h) is 13% below the 62 days before (7.0 h)".
+    The first clause says which window is recent; the others share it."""
+    name, unit = _DRIFT_WORDS.get(key, (key.replace("_", " "), "{:g}"))
+    side = "below" if m["delta_pct"] < 0 else "above"
+    when = f" over the last {DRIFT_RECENT_DAYS // 7} weeks" if first else ""
+    return (f"your {name}{when} ({unit.format(m['recent'])}) is "
+            f"{abs(m['delta_pct']):.0f}% {side} the {prior_days} days before "
+            f"({unit.format(m['prior'])})")
+
+
+def _as_sentence(text: str) -> str:
+    """`text` with a capital first letter and one full stop at its end: a metric's
+    reason is a clause, the drift message already ends in one."""
+    text = text.strip()
+    if not text:
+        return text
+    text = text[0].upper() + text[1:]
+    return text if text.endswith((".", "!", "?")) else text + "."
+
 
 def _metric_signal(value, baseline, higher_is_better: bool) -> str:
     if value is None or baseline is None or baseline == 0:
@@ -762,13 +792,14 @@ def baseline_drift(biometric_rows: list[dict]) -> dict:
 
     worst = sorted(metrics.items(), key=lambda kv: -kv[1]["adverse_pct"])
     if drifted and worst:
-        detail = ", ".join(
-            f"{k} {v['delta_pct']:+.1f}%" for k, v in worst if v["adverse"]
-        )
+        adverse = [(k, v) for k, v in worst if v["adverse"]]
+        clauses = " and ".join(_drift_clause(k, v, len(prior), first=i == 0)
+                               for i, (k, v) in enumerate(adverse))
+        # The guard downgrades only an otherwise-green day (traffic_light), so
+        # "today's readings are normal" is true whenever this is shown.
         message = (
-            f"Your 28-day baseline has moved against you vs the previous "
-            f"{len(prior)} days ({detail}). Today reads 'normal' against a "
-            f"baseline that is itself declining."
+            f"{clauses[0].upper()}{clauses[1:]}. Today's readings are normal, "
+            f"but against a worse base than before."
         )
     else:
         message = "28-day baseline is stable against the preceding window."
@@ -1415,7 +1446,7 @@ def _volume_recommendation_core(
     # a red with nothing nameable behind it, which should not happen.
     if overall == "red":
         summary = traffic.get("driver_summary") or ""
-        cause = (f"{summary[0].upper()}{summary[1:]}." if summary
+        cause = (_as_sentence(summary) if summary
                  else "Biometrics indicate systemic fatigue or distress.")
         return {
             "label":              "REST / DELOAD",
@@ -1466,7 +1497,7 @@ def _volume_recommendation_core(
     # reason as the red branch above.
     if overall == "yellow":
         summary = traffic.get("driver_summary") or ""
-        cause = (f"{summary[0].upper()}{summary[1:]}." if summary
+        cause = (_as_sentence(summary) if summary
                  else "Biometrics are below baseline.")
         return {
             "label":              "REDUCED VOLUME  (−25%)",
