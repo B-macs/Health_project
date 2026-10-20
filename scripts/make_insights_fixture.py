@@ -115,7 +115,8 @@ def _seed(repo, ask) -> None:
     # A made-up check-in with a note, parsed on save: it reaches the warnings calendar.
     from services import checkin_form as cf
     ask("put", "/api/checkin", {"date": TODAY.isoformat(), "opened_entry": False, "values": {
-        **cf.FORM_DEFAULTS, "tightness_score": 4, "subjective_tightness": "slight tightness lower back"}})
+        **cf.FORM_DEFAULTS, "tightness_score": 4, "subjective_tightness": "slight tightness lower back",
+        "anatomical_locations": ["Central Lower Back", "Glute Medius — Right"]}})
 
 
 def _bio(day: date):

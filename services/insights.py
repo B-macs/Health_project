@@ -135,6 +135,30 @@ def score_timeline_axis(dates: list[str]) -> dict | None:
             "start": days[0].isoformat(), "end": days[-1].isoformat()}
 
 
+#: The check-ins the trend of selected body areas counts: the last 90 days.
+SELECTED_AREA_DAYS = 90
+
+
+def selected_area_frequency(checkin_rows: list[dict]) -> dict[str, int]:
+    """How often each body area was SELECTED in the check-ins: the areas the athlete taps
+    (`anatomical_locations`, a JSON list), counted once per check-in.
+
+    The athlete, 2026-10-20, on the Trends chart that counted body_region_frequency: it did
+    not match the areas he selects. He was right: that count is a keyword reading of the note
+    TEXT, and only the check-ins of 2026-07-03 to 08-03 had ever been read that way. A
+    malformed list is skipped, never guessed at."""
+    freq: dict[str, int] = {}
+    for row in checkin_rows:
+        raw = row.get("anatomical_locations") or "[]"
+        try:
+            areas = json.loads(raw) if isinstance(raw, str) else list(raw)
+        except Exception:
+            areas = []
+        for area in dict.fromkeys(a for a in areas if isinstance(a, str) and a.strip()):
+            freq[area] = freq.get(area, 0) + 1
+    return freq
+
+
 def body_region_frequency(parsed_rows: list[dict]) -> dict[str, int]:
     """Count how often each body region appears across parsed readiness rows'
     ai_body_parts JSON field. Malformed JSON is skipped, not fabricated."""

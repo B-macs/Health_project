@@ -318,7 +318,10 @@ def trends(repo, today: date) -> dict:
                 "recommendations": result.get("recommendations", []),
             },
         }
-    regions = sorted(insights.body_region_frequency(parsed).items(), key=lambda kv: -kv[1])
+    # The body areas he SELECTED in his check-ins (the owner, 2026-10-20), not the keyword
+    # reading of the note text (insights.selected_area_frequency).
+    checkins = repo.get_recent_readiness(days=insights.SELECTED_AREA_DAYS, today=today)
+    regions = sorted(insights.selected_area_frequency(checkins).items(), key=lambda kv: (-kv[1], kv[0]))
     top = max((n for _r, n in regions), default=0)
     oldest_first = sorted(parsed, key=lambda r: str(r.get("date") or ""))
     return {

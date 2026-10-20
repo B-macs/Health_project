@@ -8,7 +8,7 @@
 //
 // Every figure, word and sentence is the engine's (GET /api/today, /api/today/week and
 // /api/training/day), read cache-first: the last answer shows at once.
-import { useEffect, useRef, type TouchEvent } from 'react'
+import { useEffect } from 'react'
 import type { components } from '../generated/api'
 import { localDay } from '../lib/api'
 import { useApp } from '../lib/appState'
@@ -16,6 +16,7 @@ import { useCached, type View } from '../lib/cache'
 import { dayPath } from '../lib/day'
 import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
+import { useSwipe } from '../ui/hooks'
 import { IconBack, IconForward } from '../ui/icons'
 import { Ring, dayOfMonth, longDate, narrowDay } from '../ui/parts'
 
@@ -39,22 +40,6 @@ export function verdictLines(verdict: Schemas['VerdictOut'] | null | undefined):
   return [...lines, verdict.hrv_note].filter((line) => line && line.trim())
 }
 
-function useSwipe(onPrev: (() => void) | null, onNext: (() => void) | null) {
-  const start = useRef<number | null>(null)
-  return {
-    onTouchStart: (e: TouchEvent) => {
-      start.current = e.touches[0]?.clientX ?? null
-    },
-    onTouchEnd: (e: TouchEvent) => {
-      const from = start.current
-      const to = e.changedTouches[0]?.clientX
-      start.current = null
-      if (from == null || to == null || Math.abs(to - from) < 60) return
-      if (to > from) onPrev?.()
-      if (to < from) onNext?.()
-    },
-  }
-}
 
 function WeekStrip({ week, reduced }: { week: WeekAnswer; reduced: boolean }) {
   const { showDay } = useApp()

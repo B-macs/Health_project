@@ -1,6 +1,6 @@
 // The screen wake lock, the rings' grow-in, and the timer's clock text. The session's
 // timers themselves run on timestamps (lib/timers.ts).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type TouchEvent } from 'react'
 import { holdScreen, type WakeLockHost } from '../lib/wakelock'
 
 /** Keeps the screen on while `active` (lib/wakelock.ts); true while the iPhone holds the lock. */
@@ -28,6 +28,25 @@ export function useGrow(target: number, reduced: boolean): number {
     }
   }, [grown])
   return grown ? target : 0
+}
+
+/** A sideways swipe of at least 60 px: right for the earlier one, left for the later one. A
+ *  null side does nothing (the first or last day or week the engine allows). */
+export function useSwipe(onPrev: (() => void) | null, onNext: (() => void) | null) {
+  const start = useRef<number | null>(null)
+  return {
+    onTouchStart: (e: TouchEvent) => {
+      start.current = e.touches[0]?.clientX ?? null
+    },
+    onTouchEnd: (e: TouchEvent) => {
+      const from = start.current
+      const to = e.changedTouches[0]?.clientX
+      start.current = null
+      if (from == null || to == null || Math.abs(to - from) < 60) return
+      if (to > from) onPrev?.()
+      if (to < from) onNext?.()
+    },
+  }
 }
 
 /** The last answer a screen showed, kept while another view of the same screen loads (another

@@ -16,7 +16,8 @@ import type { components } from '../generated/api'
 import { useApp } from '../lib/appState'
 import { refusalText } from '../lib/schedule'
 import { S } from '../strings'
-import { IconBack, IconCheck, IconForward } from '../ui/icons'
+import { useSwipe } from '../ui/hooks'
+import { IconCheck } from '../ui/icons'
 import { dayOfMonth, longDate, narrowDay, shortDate } from '../ui/parts'
 import { HomeItems, Timeline } from '../ui/timeline'
 
@@ -207,39 +208,38 @@ export function Retest({ notice }: { notice: Schemas['RetestNotice'] }) {
 }
 
 /** The week strip (T16, T17): one week of the block, a marker on each day (done, today,
- *  missed, planned, rest: the engine's), the arrows clamped to the block's weeks, and
- *  "Today" when another week shows. Under it, that week's stored verdict (T10). */
+ *  missed, planned, rest: the engine's), the full width of the screen as on Today. A sideways
+ *  swipe changes the week, inside the block's weeks; there are no arrows (the owner,
+ *  2026-10-20). "Today" when another week shows. Under it, that week's stored verdict (T10). */
 export function WeekStrip({ week, selected, onPick, onWeek, onToday }: {
   week: WeekAnswer; selected: string; onPick: (day: string) => void
   onWeek: (step: number) => void; onToday: () => void
 }) {
+  const swipe = useSwipe(week.can_go_back ? () => onWeek(-7) : null, week.can_go_forward ? () => onWeek(7) : null)
   return (
     <section className="group" aria-label={S.week.strip}>
       {!week.is_current_week && (
         <button className="btn btn--glass pill" data-testid="week-today" onClick={onToday}>{S.week.today}</button>
       )}
-      <div className="dayarrows">
-        <button className="iconbtn" aria-label={S.week.previousWeek} disabled={!week.can_go_back} onClick={() => onWeek(-7)}>
-          <IconBack />
-        </button>
-        <nav className="weekstrip" aria-label={S.week.strip} data-week={week.week_start ?? ''}>
-          {week.strip.map((d) => {
-            const on = d.date === selected
-            return (
-              <button key={d.date} className={`weekstrip__day${on ? ' weekstrip__day--on' : ''}`}
-                aria-current={on ? 'date' : undefined} data-date={d.date} data-marker={d.marker}
-                aria-label={S.week.dayLabel(longDate(d.date), S.week.marker[d.marker] ?? d.marker)}
-                onClick={() => onPick(d.date)}>
-                <span className="weekstrip__letter">{narrowDay(d.date)}</span>
-                <span className={`mark mark--${d.marker}`} aria-hidden="true">{d.marker === 'done' && <IconCheck />}</span>
-                <span className="num weekstrip__date">{dayOfMonth(d.date)}</span>
-              </button>
-            )
-          })}
-        </nav>
-        <button className="iconbtn" aria-label={S.week.nextWeek} disabled={!week.can_go_forward} onClick={() => onWeek(7)}>
-          <IconForward />
-        </button>
+      <nav className="weekstrip" aria-label={S.week.strip} data-week={week.week_start ?? ''} {...swipe}>
+        {week.strip.map((d) => {
+          const on = d.date === selected
+          return (
+            <button key={d.date} className={`weekstrip__day${on ? ' weekstrip__day--on' : ''}`}
+              aria-current={on ? 'date' : undefined} data-date={d.date} data-marker={d.marker}
+              aria-label={S.week.dayLabel(longDate(d.date), S.week.marker[d.marker] ?? d.marker)}
+              onClick={() => onPick(d.date)}>
+              <span className="weekstrip__letter">{narrowDay(d.date)}</span>
+              <span className={`mark mark--${d.marker}`} aria-hidden="true">{d.marker === 'done' && <IconCheck />}</span>
+              <span className="num weekstrip__date">{dayOfMonth(d.date)}</span>
+            </button>
+          )
+        })}
+      </nav>
+      {/* The same two moves for a screen reader, which cannot swipe; nothing shows on screen. */}
+      <div className="sr-only">
+        <button disabled={!week.can_go_back} onClick={() => onWeek(-7)}>{S.week.previousWeek}</button>
+        <button disabled={!week.can_go_forward} onClick={() => onWeek(7)}>{S.week.nextWeek}</button>
       </div>
       {week.viewed_week_status && week.week_start && (
         <p className="caption" data-testid="week-status">

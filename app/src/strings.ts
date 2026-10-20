@@ -688,9 +688,9 @@ export const S = {
   // Insights › Trends (Phase 8): what the check-in notes said over time, and the multi-week analysis.
   trend: {
     noParsed: 'No parsed check-in notes yet.',
-    regions: 'Most flagged body regions',
-    regionsWhy: 'How often each region appears in parsed tightness notes (keyword matching).',
-    mentions: (n: number) => `${n} ${n === 1 ? 'mention' : 'mentions'}`,
+    regions: 'Body areas you selected most',
+    regionsWhy: 'How often you selected each area in your check-ins over the last 90 days.',
+    mentions: (n: number) => `${n} ${n === 1 ? 'check-in' : 'check-ins'}`,
     timeline: 'Tightness over time',
     timelineWhy: 'Self-reported against keyword-parsed tightness, with pain, on 0 to 10.',
     series: { self_reported: 'Self-reported', parsed_severity: 'Keyword-parsed', pain: 'Pain' } as Record<string, string>,

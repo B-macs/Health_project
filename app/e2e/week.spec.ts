@@ -42,6 +42,20 @@ async function scenario(context: BrowserContext, tag: string, week = ''): Promis
 
 const strip = (page: Page) => page.getByRole('navigation', { name: S.week.strip })
 
+/** One week back or on. The bar has no arrows (the owner, 2026-10-20); a swipe moves it on a
+ *  phone, and these two buttons, never drawn, are the screen reader's way. */
+const weekStep = (page: Page, step: -1 | 1) =>
+  page.getByRole('button', { name: step < 0 ? S.week.previousWeek : S.week.nextWeek }).dispatchEvent('click')
+
+/** A sideways swipe on the week bar, as a finger makes it (right: the week before). */
+async function swipe(page: Page, from: number, to: number): Promise<void> {
+  await strip(page).evaluate((nav, [x0, x1]) => {
+    const touch = (x: number) => new Touch({ identifier: 1, target: nav, clientX: x, clientY: 10 })
+    nav.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, touches: [touch(x0)], changedTouches: [touch(x0)] }))
+    nav.dispatchEvent(new TouchEvent('touchend', { bubbles: true, touches: [], changedTouches: [touch(x1)] }))
+  }, [from, to] as const)
+}
+
 test('the week page shows the banner, the strip and every kind of day, and writes nothing until asked', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-week-${Date.now()}`, 'carry.shift.redo.gate1.retest')
@@ -62,7 +76,7 @@ test('the week page shows the banner, the strip and every kind of day, and write
   await expect(page.getByTestId('redo')).toBeVisible()
 
   // Last week: a day done, a day missed with the swap offered, a rest day; its verdict.
-  await page.getByRole('button', { name: S.week.previousWeek }).click()
+  await weekStep(page, -1)
   await expect(page.getByTestId('week-today')).toBeVisible()
   await expect(page.getByTestId('week-status')).toContainText(S.week.verdict.normal)
   await strip(page).locator('[data-marker="done"]').first().click()
@@ -74,8 +88,8 @@ test('the week page shows the banner, the strip and every kind of day, and write
   await expect(page.getByTestId('day-rest')).toContainText(S.week.rest)
 
   // The week after this one: a day still to come, with "Do this session today".
-  await page.getByRole('button', { name: S.week.nextWeek }).click()
-  await page.getByRole('button', { name: S.week.nextWeek }).click()
+  await weekStep(page, 1)
+  await weekStep(page, 1)
   await strip(page).locator('[data-marker="planned"]').first().click()
   await expect(page.getByTestId('day-future')).toContainText(S.week.swapFuture)
   // "Today" brings back this week and today's session.
@@ -118,7 +132,7 @@ test('a swap with today is sent once, from the day it names, and today shows aga
   await onboard(page)
   await scenario(context, `e2e-swap-${Date.now()}`)
   await openTab(page, S.nav.training)
-  await page.getByRole('button', { name: S.week.nextWeek }).click()
+  await weekStep(page, 1)
   const day = await strip(page).locator('[data-marker="planned"]').first().getAttribute('data-date')
   await strip(page).locator(`[data-date="${day}"]`).click()
   const before = (await received(page)).length
@@ -137,7 +151,7 @@ test('a move the engine refuses says why, and OK clears it', async ({ page, cont
   await onboard(page)
   await scenario(context, `e2e-refuse-${Date.now()}`, 'refuse')
   await openTab(page, S.nav.training)
-  await page.getByRole('button', { name: S.week.nextWeek }).click()
+  await weekStep(page, 1)
   await strip(page).locator('[data-marker="planned"]').first().click()
   await page.getByRole('button', { name: S.week.swapFuture }).click()
   const refused = page.getByTestId('answer-refused')
@@ -271,14 +285,14 @@ test('a swap that cannot be done says why and offers no button; one that can car
   await onboard(page)
   await scenario(context, `e2e-blocked-${Date.now()}`, 'blocked')
   await openTab(page, S.nav.training)
-  await page.getByRole('button', { name: S.week.nextWeek }).click()
+  await weekStep(page, 1)
   await strip(page).locator('[data-marker="planned"]').first().click()
   await expect(page.getByTestId('swap-blocked')).toContainText(S.week.swapBlocked('made-up: today already has a logged session'))
   await expect(page.getByRole('button', { name: S.week.swapFuture })).toHaveCount(0)
   // Without the block: the warning shows above the button, and nothing is sent unasked.
   await context.clearCookies({ name: 'e2e_week' })
   await page.reload()
-  await page.getByRole('button', { name: S.week.nextWeek }).click()
+  await weekStep(page, 1)
   await strip(page).locator('[data-marker="planned"]').first().click()
   await expect(page.getByTestId('swap')).toContainText('Made-up warning: two main sessions in a row.')
   const swaps = (await weekRun(page)).swaps
@@ -347,4 +361,23 @@ test("the extra session kept from yesterday is never offered as today's", async 
   await expect(page.getByText(S.extras.accessoryNeedsEngine)).toBeVisible()
   await expect(page.getByRole('button', { name: S.extras.start })).toHaveCount(0)
   test.info().annotations.push({ type: 'duplicate_supplementary', description: '0' })
+})
+
+test('the week bar has no arrows, and a sideways swipe changes the week inside the block', async ({ page, context, browserName }) => {
+  test.skip(browserName !== 'chromium', 'the test makes its touches with the Touch constructor, which Chromium has')
+  await onboard(page)
+  await scenario(context, `e2e-swipe-${Date.now()}`)
+  await openTab(page, S.nav.training)
+  const bar = strip(page)
+  await expect(bar).toBeVisible()
+  // Nothing beside the bar: no arrow button is drawn, and the bar spans the screen's width.
+  const drawn = await page.locator(`section[aria-label="${S.week.strip}"] .iconbtn`)
+    .evaluateAll((els) => els.filter((el) => el.getBoundingClientRect().width > 1).length)
+  expect(drawn).toBe(0)
+  const week = await bar.getAttribute('data-week')
+  await swipe(page, 300, 120)
+  await expect(bar).not.toHaveAttribute('data-week', week ?? '')
+  await expect(page.getByTestId('week-today')).toBeVisible()
+  await swipe(page, 120, 300)
+  await expect(bar).toHaveAttribute('data-week', week ?? '')
 })

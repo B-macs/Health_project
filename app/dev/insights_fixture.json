@@ -10553,6 +10553,11 @@
         "mentions": 1,
         "region": "Central Lower Back",
         "share": 1.0
+      },
+      {
+        "mentions": 1,
+        "region": "Glute Medius — Right",
+        "share": 1.0
       }
     ],
     "timeline": [
@@ -10604,6 +10609,11 @@
       {
         "mentions": 1,
         "region": "Central Lower Back",
+        "share": 1.0
+      },
+      {
+        "mentions": 1,
+        "region": "Glute Medius — Right",
         "share": 1.0
       }
     ],

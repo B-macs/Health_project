@@ -139,7 +139,7 @@ describe('the strip', () => {
     expect(html).toContain(S.week.dayLabel(longDate(MONDAY), S.week.marker.done))
   })
 
-  it('another week: "Today", its stored verdict, and the arrows clamped to the block', () => {
+  it('another week: "Today", its stored verdict, and the moves clamped to the block', () => {
     const before = week([], fx.addDays(MONDAY, -7))
     const html = draw(<WeekStrip week={before} selected={LOCAL} onPick={() => undefined} onWeek={() => undefined} onToday={() => undefined} />)
     expect(text(html)).toContain(S.week.today)
@@ -147,8 +147,12 @@ describe('the strip', () => {
     const first = week([], fx.addDays(MONDAY, -70))
     expect(first.week_start).toBe(fx.addDays(MONDAY, -14))
     expect(first.can_go_back).toBe(false)
-    expect(draw(<WeekStrip week={first} selected={LOCAL} onPick={() => undefined} onWeek={() => undefined} onToday={() => undefined} />))
-      .toMatch(/aria-label="Previous week" disabled=""/)
+    const firstHtml = draw(<WeekStrip week={first} selected={LOCAL} onPick={() => undefined} onWeek={() => undefined} onToday={() => undefined} />)
+    // No arrows on screen (the owner, 2026-10-20): a swipe changes the week, and the two moves
+    // a screen reader uses sit in a hidden block, clamped to the block's weeks.
+    expect(firstHtml).not.toContain('dayarrows')
+    expect(firstHtml).toMatch(/<button disabled="">Previous week<\/button>/)
+    expect(firstHtml).toMatch(/<button>Next week<\/button>/)
   })
 })
 

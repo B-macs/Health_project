@@ -2428,41 +2428,31 @@ def render() -> None:
 
     with tab_tightness:
         parsed_rows = repo.get_repository().get_parsed_readiness(limit=90)
+        # The body areas he SELECTED in his check-ins (2026-10-20), as the phone shows them.
+        body_freq = insights_svc.selected_area_frequency(
+            repo.get_repository().get_recent_readiness(days=insights_svc.SELECTED_AREA_DAYS))
+        if body_freq:
+            st.subheader("Body Areas You Selected Most")
+            df_freq = (
+                pd.DataFrame(list(body_freq.items()), columns=["Region", "Mentions"])
+                .sort_values("Mentions", ascending=False)
+                .reset_index(drop=True)
+            )
+            st.altair_chart(
+                alt.Chart(df_freq).mark_bar(color="#00E874").encode(
+                    x=alt.X("Region:N", title=None, sort="-y",
+                            axis=alt.Axis(labelAngle=0, labelLimit=1000, labelPadding=10,
+                                          labelExpr="split(datum.label, ' — ')")),
+                    y=alt.Y("Mentions:Q"),
+                ).properties(height=340),
+                use_container_width=True,
+            )
+            st.caption("How often you selected each area in your check-ins over the last 90 days.")
+            st.divider()
 
         if not parsed_rows:
             st.info("No parsed readiness entries yet. Run the Processing Queue first.")
         else:
-            body_freq = insights_svc.body_region_frequency(parsed_rows)
-
-            if body_freq:
-                st.subheader("Most Flagged Body Regions")
-                df_freq = (
-                    pd.DataFrame(list(body_freq.items()), columns=["Region", "Mentions"])
-                    .sort_values("Mentions", ascending=False)
-                    .reset_index(drop=True)
-                )
-                freq_chart = (
-                    alt.Chart(df_freq)
-                    .mark_bar(color="#00E874")
-                    .encode(
-                        x=alt.X(
-                            "Region:N", title=None, sort="-y",
-                            axis=alt.Axis(
-                                labelAngle=0, labelLimit=1000, labelPadding=10,
-                                labelExpr="split(datum.label, ' — ')",
-                            ),
-                        ),
-                        y=alt.Y("Mentions:Q"),
-                    )
-                    .properties(height=340)
-                )
-                st.altair_chart(freq_chart, use_container_width=True)
-                st.caption(
-                    "Frequency of each region appearing in parsed tightness entries "
-                    "(keyword matching)."
-                )
-
-            st.divider()
             st.subheader("Tightness Severity Timeline")
             df_time = pd.DataFrame(parsed_rows)[
                 ["date", "tightness_score", "ai_tightness_severity", "pain_score"]

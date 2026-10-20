@@ -451,13 +451,16 @@ def test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar(env, monkeyp
     env.ok(monkeypatch, "put", "/api/checkin", {
         "date": TODAY.isoformat(), "opened_entry": False,
         "values": {**cf.FORM_DEFAULTS, "tightness_score": 4,
-                   "subjective_tightness": "slight tightness lower back"}})
+                   "subjective_tightness": "slight tightness lower back",
+                   "anatomical_locations": ["Glute Medius — Right"]}})
     queue = env.ok(monkeypatch, "get", "/api/insights/queue")
     assert queue["pending_readiness"] == 0, "parsed on save (I63)"
     today = next(d for week in queue["weeks"] for d in week if d["date"] == TODAY.isoformat())
     assert today["level"] == "monitor" and today["entries"][0]["source"] == "readiness"
     trends = env.ok(monkeypatch, "get", "/api/insights/trends")
-    assert {r["region"] for r in trends["regions"]} >= {"Central Lower Back"}
+    # The areas he selected, never the keyword reading of the note (the note names the lower
+    # back; he selected the right glute).
+    assert [r["region"] for r in trends["regions"]] == ["Glute Medius — Right"]
     assert max(r["share"] for r in trends["regions"]) == 1.0
     dates = [t["date"] for t in trends["timeline"]]
     assert dates == sorted(dates), "the timeline reads oldest first"

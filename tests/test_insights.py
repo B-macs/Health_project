@@ -124,3 +124,20 @@ def test_one_entry_has_one_date_and_none_has_no_scale():
     from services import insights
     assert insights.score_timeline_axis(["2026-10-20"])["x_labels"] == ["20 Oct"]
     assert insights.score_timeline_axis([]) is None
+
+
+# ── the body areas he selected (rebuild Phase 8, the owner, 2026-10-20) ───────
+
+def test_the_selected_areas_are_counted_once_per_check_in():
+    import json
+    from services import insights
+    rows = [{"anatomical_locations": json.dumps(["Central Lower Back", "Glute Medius — Right"])},
+            {"anatomical_locations": json.dumps(["Central Lower Back", "Central Lower Back"])},
+            {"anatomical_locations": json.dumps([])},
+            {"anatomical_locations": None}]
+    assert insights.selected_area_frequency(rows) == {"Central Lower Back": 2, "Glute Medius — Right": 1}
+
+
+def test_a_malformed_selection_is_skipped_never_guessed():
+    from services import insights
+    assert insights.selected_area_frequency([{"anatomical_locations": "not json"}]) == {}
