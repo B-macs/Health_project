@@ -654,7 +654,7 @@
       "description": "The week page on the Training tab: the rollup banner, last week's line and the past-week badge, the repeat notice and the load hold, the Monday redo, gate 1, the retest banner, the strip with its week arrows, and each day's view (logged, missed, future, rest, the gap screen); every KEEP row of T1-T36 and T103-T112 built and tested.",
       "depends_on": [],
       "gate": "inventory_rows_open",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P7-02",
@@ -664,7 +664,7 @@
         "P7-01"
       ],
       "gate": "unasked_moves",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P7-03",
@@ -672,7 +672,7 @@
       "description": "Every date_overrides write goes through scheduling.apply_schedule_change (plan.reject_violating_overrides, Key Rule 18b) or the week repeat.",
       "depends_on": [],
       "gate": "override_writes_unchecked",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P7-04",
@@ -680,7 +680,7 @@
       "description": "No content lookup by the authored day number in the training endpoints or app/src (sessions.calendar_plan only).",
       "depends_on": [],
       "gate": "day_number_lookups",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P7-05",
@@ -690,7 +690,7 @@
         "P7-01"
       ],
       "gate": "duplicate_supplementary",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P7-06",
@@ -698,7 +698,7 @@
       "description": "The automatic writes (the failed-week rule, the stored no-movement records) stay with the Streamlit app, the background writer, until Phase 9; the engine refuses them while background_writer is \"streamlit\".",
       "depends_on": [],
       "gate": "automatic_writes_in_engine",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P7-07",
@@ -710,7 +710,7 @@
         "P7-05"
       ],
       "gate": "test_failures",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P7-08",

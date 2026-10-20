@@ -1,0 +1,46 @@
+{
+  "from_phase": "P7",
+  "to_phase": "P8",
+  "written": "2026-10-20",
+  "verdict": "Every p7 counter is 0 except device_checklist_open (7: the owner's training week in the new app). Signed off under the owner's standing instruction (2026-10-19); his week stays open in his batch.",
+  "address": "https://health.lauscher-worker.workers.dev (Worker 40674e06; engine revision health-engine-00011-sbc, commit 0caa08d)",
+  "week_screen_states": {
+    "week": "the rollup banner (streak, this week against the plan with the next line, tallies); last week's line while the engine sends it; the Monday repeat notice; the Monday redo (two presses, the engine's list of what moves); the carry (plain or in order) and the readiness shift; gate 1 (the one-tap reason, the card with the count and the lifts, the flare-up asked twice); the retest notice; the strip with the engine's markers (done, today, missed, planned, rest), the arrows clamped to the block, 'Today', and another week's stored verdict",
+    "days": "today: the Phase 6 overview with the day's schedule note (or the rest view, or the gap); another day: logged (effort, minutes, load, exercises), missed (what was planned, the swap with today), future (its plan, at-home items, 'Do this session today' with the engine's warnings), rest (its yoga flow; today: how to train anyway), no block (the next block and the stranded days), damaged phases (said, nothing written; yoga still opens)",
+    "plus_menu": "on the week page only, never during a session (fault F18): yoga (form notes, routine with each pose's hold, Complete), outdoor (a day's Garmin activities, the walking family first, the engine's load for each rating), the accessory session (the same guided flow, saved as its own kind with its note)",
+    "routes": "/training, /training/yoga, /training/yoga/:slug, /training/outdoor, /training/accessory; a kept session takes every /training address"
+  },
+  "move_rules_as_built": [
+    "Nothing moves until the owner answers: the engine's week and day reads write nothing (tests/api/test_moves_once_and_reads_write_nothing.py).",
+    "Each answer is a write through the outbox. A swap, a carry, a shift and a redo carry an id the phone mints (action_id, a ULID); the engine applies an id once (training_screen.once, the newest 200 ids kept in config 'applied_actions'), so an answer sent again after a lost reply moves nothing twice. Gate 1's answers need none (kept per week).",
+    "Every move goes through scheduling.apply_schedule_change (plan.reject_violating_overrides, Key Rule 18b): refused whole, never clamped. A refusal comes back as a 409 with the rule's own words; the page says why, and OK clears that answer (only a schedule answer can be cleared: a refused session or check-in keeps what was typed).",
+    "A question answered stays closed until a read newer than the answer; while it waits to send, it says so. Start waits until today's session is read again after a swap, a carry or a shift.",
+    "A 'no' is remembered by the engine (scheduling.declined_entries): the question does not come back.",
+    "The same yoga or outdoor save sent again answers as it did the first time; another save of it is told it is already logged."
+  ],
+  "engine_changes": [
+    "sessions.join_notes: the accessory session's note before the typed notes; the save's plan_note (the Streamlit save uses the same function)",
+    "the yoga list carries each pose's hold_seconds",
+    "gate1.how_text: when running starts, from the gate's own numbers (both apps); the week's gate1.how",
+    "supplementary_save.save_yoga and save_outdoor answer True for the same save sent again"
+  ],
+  "waits_for_phase_9": [
+    "The automatic writes (the failed-week rule, the stored no-movement records of a carry or a shift) run only in the app background_writer names, still 'streamlit'. The new app shows the schedule the store holds and never judges a week itself. Phase 9 turns the engine's writer on.",
+    "The Garmin daily sync and the weekly rollup sync on open (T5, T6, MOVE to the engine): with the engine's scheduled sync.",
+    "The plan start setup (T29) moves to Settings / first run in Phase 8 or 9 (no block needs it now)."
+  ],
+  "owner_week": "Not done yet. owner_checks.json p7: swap one day, decline one move, log one short extra session, one yoga flow and one outdoor activity, open a past and a future day; then `python scripts/week_saves_check.py --from <first day> --to <last day>` (dates and counts only) shows every save stored once and lists the week's schedule notes by date.",
+  "tests": "Python 5609 passed, 1 skipped (floor 5602 before the gate); app Vitest 203; Worker 42; Playwright 89 (30 week tests in Chromium and WebKit)",
+  "phase_8_may_rely_on": [
+    "The outbox keeps each engine answer for the screen that waits on it (lib/outbox.ts answerOf)",
+    "lib/schedule.ts for any answer that must apply once; lib/dates.ts for the date formats; ui/timeline.tsx for a list of exercises",
+    "The mock's per-test cookie e2e_run and the scenario cookie e2e_week (dev/mockApi.ts); the browser-test helper tapToSave",
+    "The routes under /training/ as the pattern for screens with their own address"
+  ],
+  "open": [
+    "The owner's training week (owner_checks.json p7, 7 items), then scripts/week_saves_check.py",
+    "His answers to 4a (the length at Save) and 4b (no card photos)",
+    "Carried: the Phase 6 real session (10 items), the Phase 4 iPhone checklist, the Phase 5 two mornings, the hosted-app check, the Strength reference, the voice app's address, the voice secrets",
+    "Artifact Registry at 704 MB before revision 11: the clean-up rule is set and had not run yet; check before the next deploy"
+  ]
+}

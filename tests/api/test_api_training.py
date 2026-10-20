@@ -248,6 +248,23 @@ def test_a_failed_week_is_offered_again_on_its_monday(env, monkeypatch):
     assert env.phase().length_days == 84 + 7
 
 
+def test_the_redo_is_offered_on_that_monday_and_on_no_other_day(env, monkeypatch):
+    """Key Rule 22 through the API (rebuild Phase 7): the week after a failed week offers
+    the redo on its Monday only; the phone shows it only when the engine offers it."""
+    next_monday = MONDAY + timedelta(days=7)
+    assert env.ok(monkeypatch, "get", "/api/training/week", local=next_monday)["redo"]["offered"]
+    for day in (next_monday + timedelta(days=1), next_monday + timedelta(days=3)):
+        week = env.ok(monkeypatch, "get", "/api/training/week", local=day)
+        assert week["redo"] == {"offered": False, "consequences": []}, day
+
+
+def test_the_redo_is_not_offered_after_a_week_with_three_logged_days(env, monkeypatch):
+    for day in (MONDAY, TUESDAY, MONDAY + timedelta(days=3)):
+        _log_plan_session(env, monkeypatch, day)
+    week = env.ok(monkeypatch, "get", "/api/training/week", local=MONDAY + timedelta(days=7))
+    assert week["redo"] == {"offered": False, "consequences": []}
+
+
 def test_gate_one_takes_its_reason_and_a_flare_up(env, monkeypatch):
     next_monday = MONDAY + timedelta(days=7)
     env.ok(monkeypatch, "post", "/api/training/gate1/reason", local=next_monday,
