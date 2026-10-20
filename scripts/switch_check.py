@@ -95,16 +95,32 @@ def _backup_names() -> list[str]:
     return backup.Storage(supabase_store.SupabaseStore(cfg.supabase_url, cfg.supabase_secret_key)).names()
 
 
-def check_backups(today: date, names=_backup_names) -> dict:
+#: Days without a backup that the owner accepted, each with his reason: they no
+#: longer fail the check, and its detail still names them. Only he adds one.
+ACCEPTED_BACKUP_GAPS: dict[date, str] = {
+    date(2026, 10, 17): "accepted by the owner on 2026-10-20 (answer a): the old app makes "
+                        "the backup only when its Home page loads to its end",
+}
+
+
+def check_backups(today: date, names=_backup_names, accepted: dict | None = None) -> dict:
     from services import backup
+    accepted = ACCEPTED_BACKUP_GAPS if accepted is None else accepted
     try:
         missing = backup.missing_days(names(), today)
     except Exception as exc:
         return result("backups", False, f"the bucket could not be listed: {type(exc).__name__}")
     first = today - timedelta(days=7)
-    return result("backups", not missing,
-                  f"no copy on {', '.join(d.isoformat() for d in missing)}" if missing
-                  else f"a copy on each day {first.isoformat()} to {(today - timedelta(days=1)).isoformat()}")
+    gaps = [d for d in missing if d not in accepted]
+    if gaps:
+        return result("backups", False, f"no copy on {', '.join(d.isoformat() for d in gaps)}")
+    detail = f"a copy on each day {first.isoformat()} to {(today - timedelta(days=1)).isoformat()}"
+    taken = [d for d in missing if d in accepted]
+    if taken:
+        detail = (f"a copy on every other day {first.isoformat()} to "
+                  f"{(today - timedelta(days=1)).isoformat()}; "
+                  + "; ".join(f"none on {d.isoformat()}, {accepted[d]}" for d in taken))
+    return result("backups", True, detail)
 
 
 def check_oura_login() -> dict:

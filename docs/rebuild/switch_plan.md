@@ -11,9 +11,9 @@ Run `python scripts/switch_check.py` (read-only). All must pass.
 |---|---|
 | Every kept inventory row built, each with a test | ✓ 282 rows |
 | Parity, last 28 days (Today and Insights, under the engine's Python) | ✓ 0 differences each |
-| A daily backup on each of the last 7 days | ✗ none on 2026-10-17 — **accepted by the owner (a)**: the old app makes the backup in its sync chain, and runs the chain only when its Home page loads to its end (found 2026-10-19). After the switch the engine's sync makes it at the first open of any screen. |
+| A daily backup on each of the last 7 days | ✓ with the gap he accepted: none on 2026-10-17 — **accepted by the owner (a)**, and recorded in `scripts/switch_check.py` (`ACCEPTED_BACKUP_GAPS`), which still names it; any other day without a copy fails: the old app makes the backup in its sync chain, and runs the chain only when its Home page loads to its end (found 2026-10-19). After the switch the engine's sync makes it at the first open of any screen. |
 | The Oura login against a mocked Oura | ✓ (the engine's API tests) |
-| The sync rehearsal on Cloud Run, devices mocked, inside the time limit | ✗ not built yet |
+| The sync rehearsal on Cloud Run, devices mocked, inside the time limit | ✓ **88.75 s against 280 s** (2026-10-20, engine revision 20): all 11 steps done, one Oura refresh, no outgoing connection tried; the service deleted after the run |
 | His phone: no save waiting, none refused in 7 days | his check |
 
 ## Still to build before the switch (built 2026-10-20 unless marked)

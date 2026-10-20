@@ -33,13 +33,29 @@ def test_backups_name_each_day_without_a_copy_and_a_failed_listing_fails():
     from services import backup
     today = date(2026, 10, 20)
     every = [backup.object_name(date(2026, 10, d)) for d in range(13, 20)]
-    assert sc.check_backups(today, names=lambda: every)["ok"] is True
-    gap = sc.check_backups(today, names=lambda: [n for n in every if "10-17" not in n])
+    assert sc.check_backups(today, names=lambda: every, accepted={})["ok"] is True
+    gap = sc.check_backups(today, names=lambda: [n for n in every if "10-17" not in n],
+                           accepted={})
     assert gap["ok"] is False and "2026-10-17" in gap["detail"]
 
     def broken():
         raise RuntimeError("no answer")
     assert sc.check_backups(today, names=broken)["ok"] is False
+
+
+def test_a_gap_the_owner_accepted_passes_and_is_still_named():
+    """His answer (a) of 2026-10-20 accepted the 2026-10-17 gap; any other day
+    without a copy still fails."""
+    from services import backup
+    today = date(2026, 10, 20)
+    every = [backup.object_name(date(2026, 10, d)) for d in range(13, 20)]
+    without_17 = [n for n in every if "10-17" not in n]
+    check = sc.check_backups(today, names=lambda: without_17)
+    assert check["ok"] is True
+    assert "none on 2026-10-17" in check["detail"] and "owner" in check["detail"]
+    also_18 = [n for n in without_17 if "10-18" not in n]
+    check = sc.check_backups(today, names=lambda: also_18)
+    assert check["ok"] is False and check["detail"] == "no copy on 2026-10-18"
 
 
 def test_the_rehearsal_passes_only_inside_its_limit(tmp_path):
