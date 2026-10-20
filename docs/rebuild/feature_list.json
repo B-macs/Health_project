@@ -392,7 +392,7 @@
       "description": "Stack as Lauscher's, versions checked on npm and recorded in docs/rebuild/stack.md: Vite, React 19, TypeScript, vite-plugin-pwa (injectManifest), Dexie, wouter, Vitest with fake-indexeddb, Playwright (Chromium and the iPhone WebKit profile), @vite-pwa/assets-generator.",
       "depends_on": [],
       "gate": "test_failures",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P4-02",
@@ -402,7 +402,7 @@
         "P4-01"
       ],
       "gate": "test_failures",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P4-03",
@@ -412,7 +412,7 @@
         "P4-01"
       ],
       "gate": "outbox_loss",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P4-04",
@@ -422,7 +422,7 @@
         "P4-01"
       ],
       "gate": "offline_boot_fail",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P4-05",
@@ -432,7 +432,7 @@
         "P4-04"
       ],
       "gate": "api_cached_by_sw",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P4-06",
@@ -442,7 +442,7 @@
         "P4-03"
       ],
       "gate": "blank_screen_with_engine_down",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P4-07",
@@ -450,7 +450,7 @@
       "description": "The Worker: the key check, the engine's secret, no /api caching, a JSON error when the engine is starting or down; SYNC_ENABLED false until Phase 9 (no sync trigger: the owner's one sync a day at the first open, 2026-10-19).",
       "depends_on": [],
       "gate": "cron_enabled_early",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P4-08",
@@ -460,7 +460,7 @@
         "P4-07"
       ],
       "gate": "mirror_gaps_open",
-      "passes": false
+      "passes": true
     },
     {
       "id": "P4-09",
