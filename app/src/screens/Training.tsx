@@ -140,6 +140,7 @@ export function Training({ mock, onClose }: TrainingProps) {
           </div>
         )}
       </section>
+      <p className="note">{S.sample}</p>
     </div>
   )
 }

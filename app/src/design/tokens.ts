@@ -38,6 +38,10 @@ export type Neutrals = {
   track: string
   tabBar: string
   shadow: string
+  /** The raised surface of a sheet (opaque, so the page behind never shows through). */
+  sheet: string
+  /** The dim over the page behind a sheet. */
+  scrim: string
 }
 
 export const FAMILIES: Record<Mode, Record<FamilyId, Family>> = {
@@ -69,6 +73,8 @@ export const NEUTRALS: Record<Mode, Neutrals> = {
     track: 'rgba(255, 255, 255, 0.09)',
     tabBar: 'rgba(10, 12, 18, 0.72)',
     shadow: 'rgba(0, 0, 0, 0.35)',
+    sheet: '#12151D',
+    scrim: 'rgba(0, 0, 0, 0.55)',
   },
   light: {
     bg: '#F5F5F8',
@@ -83,6 +89,8 @@ export const NEUTRALS: Record<Mode, Neutrals> = {
     track: 'rgba(20, 22, 30, 0.08)',
     tabBar: 'rgba(245, 245, 248, 0.8)',
     shadow: 'rgba(40, 46, 70, 0.1)',
+    sheet: '#FFFFFF',
+    scrim: 'rgba(20, 22, 30, 0.3)',
   },
 }
 
@@ -97,10 +105,12 @@ export const PAGE_FAMILY = {
 
 const SYSTEM = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif'
 const DISPLAY = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif'
+const MONO = 'ui-monospace, "SF Mono", Menlo, Consolas, monospace'
 
 export const DESIGN = {
   fontBody: SYSTEM,
   fontNumber: DISPLAY,
+  fontMono: MONO,
   weightHero: 200,
   weightNumber: 300,
   weightTitle: 600,

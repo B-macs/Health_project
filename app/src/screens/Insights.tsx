@@ -22,6 +22,7 @@ export function Insights({ mock, reduced }: { mock: Mock; reduced: boolean }) {
       <header className="head">
         <h1 className="head__title">{S.insights.title}</h1>
       </header>
+      <p className="note">{S.sample}</p>
 
       <section className="pair">
         <article className="card tile">

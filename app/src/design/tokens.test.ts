@@ -45,6 +45,7 @@ function surfaces(mode: Mode): { name: string; rgb: RGB }[] {
   return [
     { name: 'page', rgb: parse(n.bg).rgb },
     { name: 'card', rgb: over(n.glass, n.bg) },
+    { name: 'sheet', rgb: parse(n.sheet).rgb },
   ]
 }
 

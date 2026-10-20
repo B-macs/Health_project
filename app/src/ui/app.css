@@ -803,6 +803,157 @@ ul {
   color: var(--muted);
 }
 
+/* ── The shell: first open, sheets, fields, Settings (rebuild Phase 4) ─────────────── */
+
+/* How fresh the shown data is: quiet when all is well, a little stronger when the app
+ * shows saved data because the engine did not answer. */
+.fresh {
+  font-size: var(--fs-caption);
+  color: var(--faint);
+}
+
+.fresh--warn {
+  color: var(--muted);
+}
+
+/* "Sample numbers": the frames show the design's made-up numbers until they are wired. */
+.note {
+  align-self: flex-start;
+  padding: var(--sp-xs) var(--sp-s);
+  border-radius: var(--r-pill);
+  background: var(--f-soft);
+  color: var(--f1);
+  font-size: var(--fs-caption);
+  font-weight: var(--w-label);
+}
+
+.steps {
+  list-style: decimal;
+  padding-left: var(--sp-l);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.field {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--sp-m);
+  border-radius: var(--r-tile);
+  border: var(--hair) solid var(--glass-line);
+  background: var(--track);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--fs-body);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--f2);
+}
+
+.kv {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-s);
+  font-size: var(--fs-small);
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-s);
+}
+
+.tapline {
+  min-height: var(--tap);
+  text-align: left;
+  font-size: var(--fs-small);
+  color: var(--text);
+}
+
+.log {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-caption);
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: var(--muted);
+}
+
+.sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.sheet__scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  animation: fade-in var(--quick) var(--ease);
+}
+
+.sheet__panel {
+  position: relative;
+  width: 100%;
+  max-width: var(--content);
+  max-height: 92%;
+  margin: 0 auto;
+  overflow-y: auto;
+  padding: var(--sp-s) var(--sp-m) calc(env(safe-area-inset-bottom) + var(--sp-l));
+  border-radius: var(--r-card) var(--r-card) 0 0;
+  background: var(--sheet);
+  border-top: var(--hair) solid var(--glass-line);
+  box-shadow: 0 calc(-1 * var(--sp-s)) var(--sp-l) var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+  animation: sheet-up var(--quick) var(--ease);
+}
+
+.sheet__grip {
+  align-self: center;
+  width: var(--tap);
+  height: var(--sp-xs);
+  border-radius: var(--r-pill);
+  background: var(--track);
+}
+
+.sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-s);
+}
+
+.sheet__title {
+  font-size: var(--fs-title);
+  font-weight: var(--w-title);
+}
+
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: none;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* ── The tab bar ─────────────────────────────────────────────────────────────────── */
 
 .tabbar {

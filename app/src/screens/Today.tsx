@@ -53,6 +53,7 @@ export function Today(p: TodayProps) {
         <h1 className="head__title">{S.today.title}</h1>
         <div className="caption">{longDate(p.day.date)}</div>
       </header>
+      <p className="note">{S.sample}</p>
 
       <nav className="weekstrip" aria-label={S.today.strip}>
         {p.mock.days.map((d, i) => (
