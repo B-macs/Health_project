@@ -270,6 +270,27 @@ test('the week with no block shows the gap; damaged phases say so, and yoga stil
   test.info().annotations.push({ type: 'unasked_moves', description: '0' })
 })
 
+test('this week keeps one address: back to it from the week before, it is read where the phone kept it', async ({ page, context }) => {
+  // The same fault as the warnings calendar's (2026-10-21): coming back to this week asked for a
+  // second address, where the phone had kept nothing.
+  await onboard(page)
+  await scenario(context, `e2e-home-week-${Date.now()}`)
+  const asked: string[] = []
+  page.on('request', (r) => {
+    if (r.url().includes('/api/training/week')) asked.push(new URL(r.url()).search)
+  })
+  await openTab(page, S.nav.training)
+  const bar = strip(page)
+  await expect(bar).toBeVisible()
+  const week = await bar.getAttribute('data-week')
+  await weekStep(page, -1)
+  await expect(bar).not.toHaveAttribute('data-week', week ?? '')
+  await weekStep(page, 1)
+  await expect(bar).toHaveAttribute('data-week', week ?? '')
+  expect(asked.filter((q) => q.includes(`week_start=${week}`))).toEqual([])
+  test.info().annotations.push({ type: 'unasked_moves', description: '0' })
+})
+
 test('the week strip leads the Training page, with the picked day right under it', async ({ page, context }) => {
   // The owner, 2026-10-21: "Move the week tab to the top of the page in training".
   await onboard(page)

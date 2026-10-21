@@ -100,6 +100,8 @@ def _backup_names() -> list[str]:
 ACCEPTED_BACKUP_GAPS: dict[date, str] = {
     date(2026, 10, 17): "accepted by the owner on 2026-10-20 (answer a): the old app makes "
                         "the backup only when its Home page loads to its end",
+    date(2026, 10, 20): "accepted by the owner on 2026-10-21 (\"1. Yes\"): the same fault of "
+                        "the old app; from the switch on the engine makes the backup",
 }
 
 

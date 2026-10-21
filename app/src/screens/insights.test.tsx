@@ -23,7 +23,7 @@ import { SleepArchBody } from './InsightsSleep'
 import { REFERENCE_MISSING, StrengthBody } from './InsightsStrength'
 import { thinLabels } from '../ui/InsightsCharts'
 import { TrendsBody } from './InsightsTrends'
-import { WarningsBody } from './InsightsWarnings'
+import { WarningsBody, warningsPath } from './InsightsWarnings'
 
 type Schemas = components['schemas']
 const F = fixture as unknown as {
@@ -322,6 +322,17 @@ describe('Engine data', () => {
     expect(html).toContain(S.eng.unreadable('made-up failure'))
     expect(html).not.toContain(S.eng.directive)
     expect(text(draw(<EngineBody view={down(F.engine)} reduced onRefresh={none} />))).toContain(S.fresh.saved)
+  })
+})
+
+describe('Warnings: one address for each month', () => {
+  // The owner, 2026-10-21: "when I went from October calendar to September and then back to
+  // October it wasn't automatic even though I just loaded that information".
+  it('reads today\'s month at the address with no month in it, however it was reached', () => {
+    expect(warningsPath(null, '2026-10-21')).toBe('/api/insights/warnings')
+    expect(warningsPath({ year: 2026, month: 10 }, '2026-10-21')).toBe('/api/insights/warnings')
+    expect(warningsPath({ year: 2026, month: 9 }, '2026-10-21')).toBe('/api/insights/warnings?year=2026&month=9')
+    expect(warningsPath({ year: 2025, month: 10 }, '2026-10-21')).toBe('/api/insights/warnings?year=2025&month=10')
   })
 })
 

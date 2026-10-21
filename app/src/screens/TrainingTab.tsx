@@ -10,7 +10,7 @@
 // with no signal when the phone has read them earlier that day. Every number and word is
 // the engine's; the phone only lays it out.
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { OutboxRow } from '../db/schema'
 import type { components } from '../generated/api'
 import { localDay } from '../lib/api'
@@ -232,8 +232,10 @@ const MOVES_TODAY = ['swap', 'carry', 'shift']
 
 /** The page the owner's answers re-read: it is mounted again each time the engine confirms
  *  one (`version`), so every read under it asks again. */
-function WeekBody({ weekStart, setWeekStart, selected, setSelected, answered, answer, rows, onStart, starting, onClear }: {
+function WeekBody({ weekStart, setWeekStart, homeWeek, setHomeWeek, selected, setSelected, answered, answer, rows, onStart,
+  starting, onClear }: {
   weekStart: string | null; setWeekStart: (week: string | null) => void
+  homeWeek: string | null; setHomeWeek: (week: string) => void
   selected: string; setSelected: (day: string) => void
   answered: Record<string, string>; answer: Answer; rows: OutboxRow[]
   onStart: (plan: Plan, garmin: boolean) => void; starting: boolean; onClear: (row: OutboxRow) => void
@@ -243,6 +245,13 @@ function WeekBody({ weekStart, setWeekStart, selected, setSelected, answered, an
   const week = useCached<WeekAnswer>(store, weekStart ? `/api/training/week?week_start=${weekStart}` : '/api/training/week', null, ctx)
   const day = useCached<DayAnswer>(store, selected === today ? '/api/training/day' : `/api/training/day?date=${selected}`, null, ctx)
   const w = week.data
+  // This week's own Monday, from the answer at the address with no week in it: a swipe that
+  // comes back to this week reads that address again, never a second one the phone has kept
+  // nothing at (2026-10-21, the same fault as the warnings calendar's).
+  useEffect(() => {
+    if (weekStart === null && w?.week_start) setHomeWeek(w.week_start)
+  }, [weekStart, w?.week_start, setHomeWeek])
+  const toWeek = (next: string) => setWeekStart(next === homeWeek ? null : next)
   // A question answered on this page stays closed until a read newer than the answer.
   const isOpen = (key: string) => {
     const at = answered[key]
@@ -267,7 +276,7 @@ function WeekBody({ weekStart, setWeekStart, selected, setSelected, answered, an
       {w && !w.phases_readable && <p className="alert" data-testid="phases-unreadable">{S.week.phasesUnreadable}</p>}
       {ok && w.strip.length > 0 && (
         <WeekStrip week={w} selected={selected} onPick={setSelected}
-          onWeek={(step) => setWeekStart(shiftDay(w.week_start ?? today, step))}
+          onWeek={(step) => toWeek(shiftDay(w.week_start ?? today, step))}
           onToday={() => { setWeekStart(null); setSelected(today) }} />
       )}
       {ok && (
@@ -308,6 +317,7 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
   const confirmed = useConfirmed(rows)
   const [cleared, setCleared] = useState(0)
   const [weekStart, setWeekStart] = useState<string | null>(null)
+  const [homeWeek, setHomeWeek] = useState<string | null>(null)
   const [selected, setSelected] = useState(localDay())
   const [answered, setAnswered] = useState<Record<string, string>>({})
   const [menu, setMenu] = useState(false)
@@ -329,6 +339,7 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
         </button>
       </header>
       <WeekBody key={confirmed + cleared} weekStart={weekStart} setWeekStart={setWeekStart}
+        homeWeek={homeWeek} setHomeWeek={setHomeWeek}
         selected={selected} setSelected={setSelected} answered={answered} answer={answer} rows={rows}
         onStart={onStart} starting={starting} onClear={clear} />
       {menu && <ExtrasMenu onClose={() => setMenu(false)} />}

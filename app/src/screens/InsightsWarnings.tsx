@@ -24,6 +24,18 @@ type Day = components['schemas']['WarningDay']
 
 export const WARNINGS = '/api/insights/warnings'
 
+/** The address of a month's warnings. Today's month is always the address with no month
+ *  in it, however it was reached, so a month read once shows again at once from what the
+ *  phone kept (the owner, 2026-10-21: "when I went from October calendar to September and
+ *  then back to October it wasn't automatic even though I just loaded that information";
+ *  coming back, October was asked for at a second address the phone had kept nothing at). */
+export function warningsPath(month: { year: number; month: number } | null, today: string): string {
+  if (!month || (month.year === Number(today.slice(0, 4)) && month.month === Number(today.slice(5, 7)))) {
+    return WARNINGS
+  }
+  return `${WARNINGS}?year=${month.year}&month=${month.month}`
+}
+
 /** The levels, strongest first: the key under the calendar lists them in this order. */
 const LEVELS = ['rest', 'reduced', 'held'] as const
 
@@ -90,7 +102,7 @@ export function WarningsScreen() {
   const today = localDay()
   const [month, setMonth] = useState<{ year: number; month: number } | null>(null)
   const [picked, setPicked] = useState<string | null>(today)
-  const path = month ? `${WARNINGS}?year=${month.year}&month=${month.month}` : WARNINGS
+  const path = warningsPath(month, today)
   const view = useCached<Warnings>(store, path, null, ctx)
   const data = useKept(view.data)
   return <WarningsBody view={view} data={data} today={today} picked={picked} onPick={setPicked} onMonth={setMonth} />

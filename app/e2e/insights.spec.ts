@@ -12,6 +12,7 @@
 // its own `e2e_run` cookie, so the mock keeps its answers apart from the other tests'.
 import type { BrowserContext, Page } from '@playwright/test'
 import fixture from '../dev/insights_fixture.json' with { type: 'json' }
+import { localDay } from '../src/lib/api'
 import { S } from '../src/strings'
 import { expect, onboard, openTab, ORIGIN, setEngineDown, test } from './helpers'
 
@@ -70,6 +71,27 @@ test('Insights opens each screen in the same page, each drawn from the engine\'s
   await page.getByRole('button', { name: S.ins.sleepArch }).click()
   await expect(page.getByTestId('arch-counts')).toBeVisible()
   expect(await page.evaluate(() => (window as unknown as { __kept?: string }).__kept)).toBe('same page')
+})
+
+test('a month read once shows again from the phone: today\'s month keeps one address', async ({ page }) => {
+  // The owner, 2026-10-21: "when I went from October calendar to September and then back to
+  // October it wasn't automatic even though I just loaded that information".
+  await onboard(page)
+  const asked: string[] = []
+  page.on('request', (r) => {
+    if (r.url().includes('/api/insights/warnings')) asked.push(new URL(r.url()).search)
+  })
+  await page.goto('/#/insights/warnings')
+  const month = page.getByTestId('month')
+  await expect(month).toBeVisible()
+  const home = await month.textContent()
+  await page.getByRole('button', { name: S.warn.previous }).click()
+  await expect(month).not.toHaveText(home ?? '')
+  await page.getByRole('button', { name: S.warn.next }).click()
+  await expect(month).toHaveText(home ?? '')
+  const today = localDay()
+  expect(asked.filter((q) => q.includes(`year=${Number(today.slice(0, 4))}&month=${Number(today.slice(5, 7))}`)))
+    .toEqual([])
 })
 
 test('Strength before the 2025 reference is stored says why there are no figures', async ({ page, context }) => {

@@ -231,7 +231,13 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     if (url.pathname === '/api/insights/flexibility') return send(200, flexibilityOf(runOf(req), scenarioOf(req)))
     if (url.pathname === '/api/insights/engine') return send(200, insights.engine)
     if (url.pathname === '/api/insights/queue') return send(200, insights.queue)
-    if (url.pathname === '/api/insights/warnings') return send(200, insights.warnings)
+    if (url.pathname === '/api/insights/warnings') {
+      const w = insights.warnings as { year: number; month: number }
+      const year = Number(url.searchParams.get('year') ?? w.year)
+      const month = Number(url.searchParams.get('month') ?? w.month)
+      const step = (d: number) => ({ year: year + Math.floor((month - 1 + d) / 12), month: ((month - 1 + d) % 12 + 12) % 12 + 1 })
+      return send(200, { ...w, year, month, previous: step(-1), next: step(1) })
+    }
     if (url.pathname === '/api/insights/trends') {
       return send(200, scenarioOf(req).has('trends_closed') ? insights.trends_closed : insights.trends)
     }

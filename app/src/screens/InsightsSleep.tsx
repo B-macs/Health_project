@@ -4,7 +4,7 @@
 // fused master, Garmin as recorded) on one clock, and its figures. A failed read is named as
 // such, never shown as no nights. What wiring fusion into the engine would change is under
 // Settings › Data (I78). Every figure and strip is the engine's.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { components } from '../generated/api'
 import { useApp } from '../lib/appState'
 import { useCached, type View } from '../lib/cache'
@@ -95,6 +95,14 @@ export function SleepArchBody({ view, data: d, onNight }: {
 export function SleepArchScreen() {
   const { store, ctx } = useApp()
   const [night, setNight] = useState<string | null>(null)
+  const [newest, setNewest] = useState<string | null>(null)
   const view = useCached<Arch>(store, night ? `${SLEEP_ARCH}?night=${night}` : SLEEP_ARCH, null, ctx)
-  return <SleepArchBody view={view} data={useKept(view.data)} onNight={setNight} />
+  // The night the address with no night in it shows: picked again, it is read there, where
+  // the phone kept it, never at a second address (2026-10-21, the warnings calendar's fault).
+  const shown = (view.data?.night as { date?: string } | null | undefined)?.date ?? null
+  useEffect(() => {
+    if (night === null && shown) setNewest(shown)
+  }, [night, shown])
+  const pick = (day: string) => setNight(day === newest ? null : day)
+  return <SleepArchBody view={view} data={useKept(view.data)} onNight={pick} />
 }
