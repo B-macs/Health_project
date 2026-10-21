@@ -1,6 +1,6 @@
 # The switch-over plan (rebuild Phase 9) — DONE 2026-10-21
 
-*Run with the owner on 2026-10-21, 09:55-10:04: steps 1-6 and 8 done; step 7 (the cache-freshness pulls off) left for his call. docs/rebuild/state.md holds the record.*
+*Run with the owner on 2026-10-21, 09:55-10:04: steps 1-6 and 8 done; step 7 (the cache-freshness pulls off) not done, by his choice ("Leave it on"): the 15-minute pull only reads, and its reads keep the Free project from pausing. docs/rebuild/state.md holds the record.*
 
 **Status: his answers of 2026-10-20 ("a yes b yes c yes d yes"): (a) the backup gap of 2026-10-17 is accepted as the old app's known fault; (b) his phone checks of Phases 4-8 come first, then the switch; (c) the six items below are built first; (d) the switch is done with him, step by step.** Nothing below is switched yet. After his OK the switch is done with him, step by step, and stops after the first sync. Then he uses only the new app for 7 days.
 
