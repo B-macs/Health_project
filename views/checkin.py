@@ -7,6 +7,7 @@ from datetime import date, timedelta
 import streamlit as st
 import repo
 from services import checkin_form as cf
+from services import processing_queue
 from services.checkin_form import CONDITIONS, initial_values as _initial_values
 from training_constants import ANATOMICAL_LOCATIONS, SENSATION_TAGS
 
@@ -282,6 +283,8 @@ def render() -> None:
             st.error(f"The check-in was not saved: {exc}")
             st.stop()
         cf.save(repo.get_repository(), record, opened_entry=existing is not None)
+        # The sensation note is read for warnings now, as the phone's save does (I63).
+        processing_queue.parse_after_save(repo.get_repository())
         # Readiness (Home page) reads today's alcohol units via cached
         # get_biometric_rolling() — clear so it recomputes with this
         # check-in's value instead of serving a stale pre-checkin score.

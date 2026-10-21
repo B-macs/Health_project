@@ -411,7 +411,7 @@ export const S = {
     close: 'Close',
     yogaTitle: 'Select yoga',
     yogaNone: 'No yoga flows are in the app yet.',
-    yogaItem: (name: string, minutes: number) => `${name} · ${minutes} min`,
+    minutes: (minutes: number) => `${minutes} min`,
     yogaMeta: (minutes: number, rpe: number) => `${minutes} min · effort ${rpe} of 10`,
     watch: 'Watch on YouTube',
     formNotes: 'Form notes for you',
@@ -695,6 +695,10 @@ export const S = {
     level: { flag: 'Flag', monitor: 'Monitor', none: 'Clear' } as Record<string, string>,
     dayLabel: (day: string, level: string) => `${day}, ${level}`,
     areas: (parts: string) => `Body areas: ${parts}`,
+    noneOnDay: 'No warnings on this day.',
+    // Notes the warning check has not read yet (it reads each note when a save stores it).
+    waiting: (n: number) =>
+      `${n} ${n === 1 ? 'note is' : 'notes are'} not checked for warnings yet. Your next save checks ${n === 1 ? 'it' : 'them'}.`,
   },
   // Insights › Trends (Phase 8): what the check-in notes said over time, and the multi-week analysis.
   trend: {
@@ -857,6 +861,15 @@ export const S = {
     readFailed: 'The saved entry for this day could not be read. The form shows the defaults, and your save adds to the stored entry.',
     saved: 'Saved on this phone. It is sent when the engine answers.',
     save: 'Save the check-in',
+    // The save, then the day done (the owner, 2026-10-21: "completing" where he pressed,
+    // then "completed", then the day marked as done with a button for another check-in).
+    saving: 'Saving…',
+    complete: 'Check-in complete',
+    again: 'Do another check-in',
+    againNote: 'The app keeps one check-in for each day. A new check-in replaces this one.',
+    finish: 'Done',
+    refused: (code: string) => `The engine did not accept the check-in (${code}). Change it and save again.`,
+    doneToday: 'done today',
     tissue: 'Tissue state',
     where: 'Where and what you feel',
     lifestyle: 'Lifestyle',
@@ -932,6 +945,7 @@ export const S = {
     nothingSaved: 'Nothing saved on this phone yet.',
     timeout: 'The engine did not answer in time.',
     again: 'Read again',
+    reading: 'Reading…',
   },
   settings: {
     title: 'Settings',

@@ -119,4 +119,12 @@ export function Contributor(props: { name: string; value: string; fraction: numb
   )
 }
 
+/** The turning ring that says a tap is being worked on: a save sent, a read asked again
+ *  (the owner, 2026-10-21: "there should be a moving object to show that when I pressed
+ *  the button something is happening"). It turns with Reduce Motion on too, as iOS's own
+ *  activity indicator does: it is the only sign that the tap did something. */
+export function Spinner() {
+  return <span className="spinner" aria-hidden="true" data-testid="spinner" />
+}
+
 export { dayOfMonth, longDate, narrowDay, shortDate } from '../lib/dates'

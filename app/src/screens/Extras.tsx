@@ -23,7 +23,7 @@ import { startSession } from '../lib/session'
 import { newExerciseIds, newSessionId, startSessionState, type Plan } from '../lib/training'
 import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
-import { IconBack } from '../ui/icons'
+import { IconBack, IconForward } from '../ui/icons'
 import { longDate } from '../ui/parts'
 import { Sheet } from '../ui/Sheet'
 import { Timeline } from '../ui/timeline'
@@ -85,6 +85,20 @@ function useSent(id: string | null): Sent | null {
 
 const YOGA = '/api/training/yoga'
 
+/** One flow to pick, as a row: its whole name (wrapped, never cut at the screen's edge;
+ *  the owner, 2026-10-21: "all the text should be on the page") and its minutes. */
+export function FlowChoice({ name, minutes, onPick }: { name: string; minutes: number; onPick: () => void }) {
+  return (
+    <button type="button" className="choice" onClick={onPick}>
+      <span className="choice__text">
+        <span className="choice__title">{name}</span>
+        <span className="caption">{S.extras.minutes(minutes)}</span>
+      </span>
+      <IconForward />
+    </button>
+  )
+}
+
 /** The flows (T109). */
 export function YogaList() {
   const { store, ctx, go } = useApp()
@@ -99,9 +113,7 @@ export function YogaList() {
       {!view.data && view.state !== 'loading' && <p className="caption">{S.extras.yogaNeedsEngine}</p>}
       <div className="group">
         {flows.map((f) => (
-          <button key={f.slug} className="btn btn--glass btn--wide" onClick={() => go(`/training/yoga/${f.slug}`)}>
-            {S.extras.yogaItem(f.name, f.minutes)}
-          </button>
+          <FlowChoice key={f.slug} name={f.name} minutes={f.minutes} onPick={() => go(`/training/yoga/${f.slug}`)} />
         ))}
       </div>
     </div>

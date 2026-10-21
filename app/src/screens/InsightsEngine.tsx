@@ -12,7 +12,7 @@ import { Freshness } from '../ui/Freshness'
 import { WeekBars } from '../ui/InsightsCharts'
 import { InsightsHead } from '../ui/InsightsHead'
 import { Marked } from '../ui/Marked'
-import { Contributor } from '../ui/parts'
+import { Contributor, Spinner } from '../ui/parts'
 
 type Engine = components['schemas']['EngineDataOut']
 
@@ -162,7 +162,11 @@ export function EngineBody({ view, reduced, onRefresh }: { view: View<Engine>; r
       <div className="sky sky--quiet" aria-hidden="true" />
       <InsightsHead title={S.ins.engine} />
       <Freshness view={view} />
-      <button className="btn btn--glass pill" onClick={onRefresh}>{S.eng.refresh}</button>
+      {/* While the engine is asked again the button turns and waits (the owner, 2026-10-21). */}
+      <button className="btn btn--glass pill" onClick={onRefresh} disabled={view.state === 'loading'}
+        aria-busy={view.state === 'loading'} data-testid="engine-refresh">
+        {view.state === 'loading' ? <><Spinner />{S.fresh.reading}</> : S.eng.refresh}
+      </button>
       {d?.load_error && <p className="alert" role="alert" data-testid="engine-unreadable">{S.eng.unreadable(d.load_error)}</p>}
       {d && !d.load_error && (
         <>

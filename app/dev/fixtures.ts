@@ -404,6 +404,13 @@ export function yogaCatalogue(): Schemas['YogaCatalogueOut'] {
       video_url: 'https://www.youtube.com/watch?v=made-up',
       poses: [{ name: 'Made-up pose A', hold_seconds: 30 }, { name: 'Made-up pose B', hold_seconds: 45 }],
       cautions: [{ pose: 'Made-up pose B', severity: 'caution', note: 'Made-up form note for the tests.' }],
+    }, {
+      // A name as long as the real ones, so a row that does not wrap shows in the layout test
+      // (2026-10-21: a real flow's name ran off both sides of the page).
+      slug: 'made-up-long-flow', name: 'Made-up 20-Minute Hip, Spine & Shoulder Mobility Flow', minutes: 20, rpe: 2,
+      video_url: 'https://www.youtube.com/watch?v=made-up-long',
+      poses: [{ name: 'Made-up pose C', hold_seconds: 30 }],
+      cautions: [],
     }],
   }
 }

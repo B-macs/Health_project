@@ -196,7 +196,8 @@ describe('a day', () => {
   it('a rest day offers its yoga flow; today adds how to train anyway', () => {
     const rest = text(draw(<DayView day={day(fx.addDays(MONDAY, 2 + 7))} rows={[]} onSwap={() => undefined} />))
     expect(rest).toContain(S.week.rest)
-    expect(rest).toContain(S.extras.yogaItem('Made-up hip flow', 15))
+    // The flow's whole name, then its minutes: a row that wraps, never one line cut off.
+    expect(rest).toContain(`Made-up hip flow ${S.extras.minutes(15)}`)
     expect(rest).not.toContain(S.week.restTrainAnyway)
     const today = fx.trainingDay(LOCAL, LOCAL, new Set(['rest_today']))
     expect(text(draw(<DayView day={today} rows={[]} onSwap={() => undefined} />))).toContain(S.week.restTrainAnyway)

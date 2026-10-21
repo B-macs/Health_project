@@ -13,7 +13,8 @@ import type { View } from '../lib/cache'
 import { S } from '../strings'
 import { MovementStrip } from '../ui/charts'
 import { DetailFrame } from '../ui/detail'
-import { CheckInForm } from './CheckIn'
+import { Freshness } from '../ui/Freshness'
+import { CheckInForm, checkinStage, type Sending } from './CheckIn'
 import { ReadinessBody, SleepBody, StrainBody } from './Details'
 import { TodayView, tone, verdictLines } from './Today'
 
@@ -209,6 +210,71 @@ describe('the check-in form', () => {
     const stored = { ...fx.checkinForm(LOCAL, LOCAL, undefined).values, pain_score: 4 }
     const html = text(draw(<CheckInForm form={fx.checkinForm(LOCAL, LOCAL, stored)} onSaved={() => undefined} />))
     expect(html).toContain(S.checkin.existing)
+  })
+
+  // The owner, 2026-10-21: "completing" where Save was pressed, then "completed", then the
+  // day marked as done with a button for another check-in.
+  it('a save in progress turns Save into "Saving…" with the turning ring, and turns the fields off', () => {
+    const raw = draw(<CheckInForm form={fx.checkinForm(LOCAL, LOCAL, undefined)} stage="saving" onSaved={() => undefined} />)
+    expect(text(raw)).toContain(S.checkin.saving)
+    expect(text(raw)).not.toContain(S.checkin.save)
+    expect(raw).toContain('data-testid="spinner"')
+    expect(raw).toMatch(/<fieldset class="checkin__fields" disabled/)
+    expect(raw).toMatch(/<button type="submit"[^>]* disabled/)
+  })
+
+  it('the engine has it: "Check-in complete" stands where Save was', () => {
+    const html = text(draw(<CheckInForm form={fx.checkinForm(LOCAL, LOCAL, undefined)} stage="complete" onSaved={() => undefined} />))
+    expect(html).toContain(S.checkin.complete)
+    expect(html).not.toContain(S.checkin.save)
+  })
+
+  it('a refused save says why and offers Save again', () => {
+    const html = text(draw(<CheckInForm form={fx.checkinForm(LOCAL, LOCAL, undefined)} refused="invalid_checkin" onSaved={() => undefined} />))
+    expect(html).toContain(S.checkin.refused('invalid_checkin'))
+    expect(html).toContain(S.checkin.save)
+  })
+})
+
+describe('the check-in sheet\'s stage', () => {
+  const stage = (sentId: string | null, sending: Sending | null, existing = false, editing = false, shownComplete = false) =>
+    checkinStage({ sentId, sending, existing, editing, shownComplete })
+
+  it('a day not saved yet opens on the form; a stored day, or one still on the phone, opens as done', () => {
+    expect(stage(null, null)).toBe('form')
+    expect(stage(null, null, true)).toBe('done')
+    expect(stage(null, { state: 'waiting' })).toBe('done')
+    expect(stage(null, null, true, true)).toBe('form')
+    expect(stage(null, { state: 'refused', code: 'x' }, true)).toBe('form')
+  })
+
+  it('a save goes saving, then complete where Save was, then done', () => {
+    // Pressed, its id not known yet: the new item on the phone must not read as the day done.
+    expect(checkinStage({ pressing: true, sentId: null, sending: { state: 'sending' }, existing: false, editing: false, shownComplete: false }))
+      .toBe('saving')
+    expect(stage('id', null)).toBe('saving')
+    expect(stage('id', { state: 'sending' })).toBe('saving')
+    expect(stage('id', { state: 'done' })).toBe('complete')
+    expect(stage('id', { state: 'done' }, false, false, true)).toBe('done')
+  })
+
+  it('a save that has to wait shows the day as done at once; a refused one goes back to the form', () => {
+    expect(stage('id', { state: 'waiting' })).toBe('done')
+    expect(stage('id', { state: 'refused', code: 'x' })).toBe('form')
+  })
+})
+
+describe('the freshness line while the engine is asked', () => {
+  it('turns a ring beside the shown data\'s age, and beside "Loading…" with nothing saved', () => {
+    const raw = draw(<Freshness view={cached({})} />)
+    expect(text(raw)).toContain(S.fresh.reading)
+    expect(raw).toContain('data-testid="spinner"')
+    const empty = draw(<Freshness view={{ data: undefined, fetchedAt: null, state: 'loading' }} />)
+    expect(text(empty)).toContain(S.fresh.loading)
+    expect(empty).toContain('data-testid="spinner"')
+    const answered = draw(<Freshness view={fresh({})} />)
+    expect(answered).not.toContain('data-testid="spinner"')
+    expect(text(answered)).not.toContain(S.fresh.reading)
   })
 })
 

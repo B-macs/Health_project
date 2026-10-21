@@ -18,7 +18,8 @@
 // - the data check answers as the Worker does: GET .../last (null until a check ran) and
 //   POST .../run (a made-up clean result);
 // - Today, its week, the day's plan, the three detail screens and the check-in answer
-//   made-up numbers (dev/fixtures.ts); a saved check-in is kept for the next read.
+//   made-up numbers (dev/fixtures.ts); a saved check-in is kept for the next read, apart for
+//   each `e2e_run` cookie (a day saved by one test never opens another test's sheet as done).
 // - the training week (Phase 7): GET /api/training/week and /day answer a made-up block
 //   (dev/fixtures.ts); a cookie `e2e_week` names what a test asks for, joined by dots
 //   (carry, carry_in_order, shift, redo, gate1, retest, gap, unreadable, rest_today,
@@ -282,7 +283,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     }
     if (url.pathname === '/api/checkin') {
       const d = asked ?? local
-      return send(200, fx.checkinForm(d, local, checkins.get(d)))
+      return send(200, fx.checkinForm(d, local, checkins.get(`${cookie(req, 'e2e_run') ?? ''}|${d}`)))
     }
   }
   if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE') {
@@ -373,7 +374,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
       }
       if (url.pathname === '/api/checkin' && req.method === 'PUT') {
         const b = body as { date: string; values: ReturnType<typeof fx.checkinForm>['values'] }
-        checkins.set(b.date, b.values)
+        checkins.set(`${cookie(req, 'e2e_run') ?? ''}|${b.date}`, b.values)
         return send(200, fx.checkinForm(b.date, local, b.values))
       }
       send(200, { saved: true })

@@ -29,6 +29,7 @@ from services import metrics
 from services import metrics_logic as ml
 from services import plan as ph  # aliased: render()'s guided flow has a local var named `phase`
 from services import prescription
+from services import processing_queue
 from services import scheduling
 from services import session_save
 from services import supplementary_save
@@ -1016,6 +1017,8 @@ def _auto_log_session(day_num: int, exercises: list, session_rpe: int,
         movement_type_override=movement_type_override,
     )
     session_save.save_session(r, session)
+    # The session notes are read for warnings now, as the phone's save does (I63).
+    processing_queue.parse_after_save(r)
     # Everything is written: the pending save is spent, and it is
     # checkpointed, so it must be cleared here or the NEXT session would be
     # sent under this one's ids.
@@ -2803,6 +2806,7 @@ def _log_yoga_completion(session: yg.YogaSession, note: str = "") -> bool:
             session_save.new_exercise_ids(len(session.poses)), note)
     if not logged:
         return False
+    processing_queue.parse_after_save(r)     # the flow's note, read for warnings (I63)
     return True
 
 

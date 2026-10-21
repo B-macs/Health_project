@@ -305,6 +305,16 @@ describe('Engine data', () => {
     expect(html).toContain(S.eng.volume)
   })
 
+  it('Read again turns and waits while the engine is asked (the owner, 2026-10-21)', () => {
+    const raw = draw(<EngineBody view={saved(F.engine)} reduced onRefresh={none} />)
+    expect(raw).toMatch(/<button[^>]*disabled=""[^>]*aria-busy="true"[^>]*data-testid="engine-refresh"/)
+    expect(text(raw)).toContain(S.fresh.reading)
+    expect(raw).toContain('data-testid="spinner"')
+    const idle = draw(<EngineBody view={fresh(F.engine)} reduced onRefresh={none} />)
+    expect(text(idle)).toContain(S.eng.refresh)
+    expect(idle).not.toContain('data-testid="spinner"')
+  })
+
   it('names a failed read, and keeps the saved answer when the engine is down', () => {
     const failed = { today: '2026-10-20', load_error: 'made-up failure' } as Schemas['EngineDataOut']
     const html = text(draw(<EngineBody view={fresh(failed)} reduced onRefresh={none} />))
@@ -324,6 +334,22 @@ describe('Warnings', () => {
     expect(text(html)).toContain(S.warn.areas(marked.entries[0]!.parts))
     expect(text(draw(<WarningsBody view={fresh(q)} data={q} picked={null} onPick={none} onMonth={none} />)))
       .not.toContain(S.warn.areas(marked.entries[0]!.parts))
+  })
+
+  it('a picked day with no warning says so (it opens on today, picked)', () => {
+    const q = F.queue
+    const clear = q.weeks.flat().find((d) => d.in_month && d.entries.length === 0)!
+    const html = text(draw(<WarningsBody view={fresh(q)} data={q} picked={clear.date} onPick={none} onMonth={none} />))
+    expect(html).toContain(S.warn.noneOnDay)
+  })
+
+  it('says when notes still wait for the warning check', () => {
+    const q = { ...F.queue, pending_notes: 2, pending_readiness: 1 }
+    expect(text(draw(<WarningsBody view={fresh(q)} data={q} picked={null} onPick={none} onMonth={none} />)))
+      .toContain(S.warn.waiting(3))
+    const none0 = { ...F.queue, pending_notes: 0, pending_readiness: 0 }
+    expect(draw(<WarningsBody view={fresh(none0)} data={none0} picked={null} onPick={none} onMonth={none} />))
+      .not.toContain('warnings-waiting')
   })
 })
 

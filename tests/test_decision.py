@@ -75,6 +75,13 @@ def test_every_read_behind_the_directive_ends_on_the_day_asked_for():
     assert {day for _, day in repo.days} == {DAY}
 
 
+def test_the_workload_ratio_counts_its_days_to_the_day_asked_for():
+    # Its window ended on the server's own clock (found 2026-10-21): the block began on
+    # 19 Oct, so on 27 Oct nine of its days are in the window, whatever the date is now.
+    state = decision.engine_state(FakeRepo(), DAY)
+    assert state["acwr"]["in_stage_days"] == (DAY - date(2026, 10, 19)).days + 1 == 9
+
+
 def test_a_failed_read_gives_no_opinion():
     assert decision.directive(FakeRepo(fail={"bio"}), DAY) == decision.NO_OPINION
 

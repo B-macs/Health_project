@@ -59,7 +59,10 @@ def engine_state(repo, day: date, *, with_stage_status: bool = False) -> dict:
     streak = repo.get_pain_free_streak(today=day)
     lam = float(diag.get("injury_weight_decay_lambda") or 0.05)
     tl = engine.traffic_light(bio, drift_rows=drift, for_date=day)
-    acwr_r = engine.acwr(au, stage,
+    # `today=day`: the ratio's window ends on the day asked for, never on the server's own
+    # clock (rebuild rule 3; it read the clock until 2026-10-21, found when the made-up
+    # Insights data drifted by a day overnight).
+    acwr_r = engine.acwr(au, stage, today=day,
                          stage_start=_plan.current_stage_start(repo.get_phases(), day))
     inj_w = engine.injury_weight(lam, streak)
     obs_rem = engine.observation_days_remaining(tl["data_days"])

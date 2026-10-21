@@ -18,6 +18,7 @@ import { refusalText } from '../lib/schedule'
 import { S } from '../strings'
 import { useSwipe } from '../ui/hooks'
 import { IconCheck } from '../ui/icons'
+import { FlowChoice } from './Extras'
 import { dayOfMonth, longDate, narrowDay, shortDate } from '../ui/parts'
 import { HomeItems, Timeline } from '../ui/timeline'
 
@@ -286,9 +287,7 @@ export function RestView({ rest }: { rest: Schemas['RestView'] | null | undefine
       {yoga && (
         <>
           <span className="eyebrow">{S.week.restOptional}</span>
-          <button className="btn btn--glass btn--wide" onClick={() => go(`/training/yoga/${yoga.slug}`)}>
-            {S.extras.yogaItem(yoga.name, yoga.minutes)}
-          </button>
+          <FlowChoice name={yoga.name} minutes={yoga.minutes} onPick={() => go(`/training/yoga/${yoga.slug}`)} />
         </>
       )}
       {rest?.is_today && <p className="caption">{S.week.restTrainAnyway}</p>}

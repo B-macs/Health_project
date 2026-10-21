@@ -255,27 +255,26 @@ function WeekBody({ weekStart, setWeekStart, selected, setSelected, answered, an
     setSelected(today)
     answer(`swap:${date}`, () => swapWithToday(store, date))
   }
+  // The week strip leads the page, with the day it picks right under it (the owner,
+  // 2026-10-21: "Move the week tab to the top of the page in training"). The questions about
+  // this week stay above the day, since Start waits for them; the streak, gate 1 and the
+  // retest notice follow the day.
+  const ok = w !== undefined && w.phases_readable
   return (
     <>
       <Freshness view={week} />
       <Refusals rows={rows} onClear={onClear} />
-      {w && !w.phases_readable ? <p className="alert" data-testid="phases-unreadable">{S.week.phasesUnreadable}</p> : w && (
+      {w && !w.phases_readable && <p className="alert" data-testid="phases-unreadable">{S.week.phasesUnreadable}</p>}
+      {ok && w.strip.length > 0 && (
+        <WeekStrip week={w} selected={selected} onPick={setSelected}
+          onWeek={(step) => setWeekStart(shiftDay(w.week_start ?? today, step))}
+          onToday={() => { setWeekStart(null); setSelected(today) }} />
+      )}
+      {ok && (
         <>
-          {w.banner && <RollupBanner banner={w.banner} />}
-          {w.repeat_notice && <p className="note" data-testid="repeat-notice">{w.repeat_notice}</p>}
           <RedoOffer redo={w.redo} rows={rows} open={isOpen('redo')} answer={answer} redoWeek={() => redoWeek(store)} />
           <MovePrompts week={w} rows={rows} isOpen={isOpen} answer={answer}
             carry={(accept) => answerCarry(store, accept)} shift={(accept) => answerShift(store, accept)} />
-          {w.gate1 && (
-            <Gate1 card={w.gate1} rows={rows} isOpen={isOpen} answer={answer}
-              reason={(monday, key) => gate1Reason(store, monday, key)} flare={() => gate1Flare(store)} />
-          )}
-          {w.retest && <Retest notice={w.retest} />}
-          {w.strip.length > 0 && (
-            <WeekStrip week={w} selected={selected} onPick={setSelected}
-              onWeek={(step) => setWeekStart(shiftDay(w.week_start ?? today, step))}
-              onToday={() => { setWeekStart(null); setSelected(today) }} />
-          )}
         </>
       )}
       {selected === today
@@ -283,6 +282,17 @@ function WeekBody({ weekStart, setWeekStart, selected, setSelected, answered, an
         : day.data && day.data.date === selected
           ? <DayView day={day.data} rows={rows} onSwap={swap} />
           : <Freshness view={day} />}
+      {ok && (
+        <>
+          {w.banner && <RollupBanner banner={w.banner} />}
+          {w.repeat_notice && <p className="note" data-testid="repeat-notice">{w.repeat_notice}</p>}
+          {w.gate1 && (
+            <Gate1 card={w.gate1} rows={rows} isOpen={isOpen} answer={answer}
+              reason={(monday, key) => gate1Reason(store, monday, key)} flare={() => gate1Flare(store)} />
+          )}
+          {w.retest && <Retest notice={w.retest} />}
+        </>
+      )}
     </>
   )
 }

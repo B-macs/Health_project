@@ -184,7 +184,7 @@ test('yoga: a flow is saved once however often Complete is pressed, and a second
     await openTab(page, S.nav.training)
     await page.getByTestId('plus').click()
     await page.getByTestId('extras-menu').getByRole('button', { name: S.extras.yoga }).click()
-    await page.getByRole('button', { name: S.extras.yogaItem('Made-up hip flow', 15) }).click()
+    await page.getByRole('button', { name: /Made-up hip flow/ }).click()
     await expect(page.getByTestId('yoga-cautions')).toContainText('Made-up form note for the tests.')
   }
   await openFlow()
@@ -270,13 +270,28 @@ test('the week with no block shows the gap; damaged phases say so, and yoga stil
   test.info().annotations.push({ type: 'unasked_moves', description: '0' })
 })
 
+test('the week strip leads the Training page, with the picked day right under it', async ({ page, context }) => {
+  // The owner, 2026-10-21: "Move the week tab to the top of the page in training".
+  await onboard(page)
+  await scenario(context, `e2e-order-${Date.now()}`, 'gate1')
+  await openTab(page, S.nav.training)
+  await expect(page.getByRole('button', { name: S.session.start })).toBeVisible()
+  const y = async (testid: string) => (await page.getByTestId(testid).first().boundingBox())!.y
+  const stripY = (await strip(page).boundingBox())!.y
+  const startY = (await page.getByRole('button', { name: S.session.start }).boundingBox())!.y
+  expect(stripY).toBeLessThan(startY)
+  expect(startY).toBeLessThan(await y('rollup'))
+  expect(startY).toBeLessThan(await y('gate1-ask'))
+  test.info().annotations.push({ type: 'unasked_moves', description: '0' })
+})
+
 test('the week on a rest day offers its yoga flow and how to train anyway', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-rest-${Date.now()}`, 'rest_today')
   await openTab(page, S.nav.training)
   const rest = page.getByTestId('day-rest')
   await expect(rest).toContainText(S.week.restTrainAnyway)
-  await rest.getByRole('button', { name: S.extras.yogaItem('Made-up hip flow', 15) }).click()
+  await rest.getByRole('button', { name: /Made-up hip flow/ }).click()
   await expect(page.getByTestId('yoga-detail')).toBeVisible()
   test.info().annotations.push({ type: 'unasked_moves', description: '0' })
 })

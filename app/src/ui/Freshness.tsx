@@ -1,8 +1,11 @@
 // How fresh the shown data is (rebuild Phase 4): quiet when the engine answered, and
 // "Showing saved data" with the reason when it did not. A screen shows this under the
-// data it read cache-first (lib/cache.ts); it never replaces the data.
+// data it read cache-first (lib/cache.ts); it never replaces the data. While the engine is
+// being asked, a turning ring and "Reading…" say so (the owner, 2026-10-21: a tap on Read
+// again showed nothing until the answer came).
 import { ageMinutes, type View } from '../lib/cache'
 import { S } from '../strings'
+import { Spinner } from './parts'
 
 type Shown = Pick<View<unknown>, 'data' | 'fetchedAt' | 'state'> & { code?: string; again?: () => void }
 
@@ -20,9 +23,17 @@ export function freshnessText(view: Shown, now: Date = new Date()): string {
 
 export function Freshness({ view }: { view: Shown }) {
   const failed = view.state !== 'loading' && view.state !== 'fresh'
+  const reading = view.state === 'loading'
   return (
     <p className={`fresh${failed ? ' fresh--warn' : ''}`} role="status" data-state={view.state}>
       {freshnessText(view)}
+      {reading && view.data !== undefined && (
+        <span className="fresh__reading" data-testid="reading">
+          <Spinner />
+          {S.fresh.reading}
+        </span>
+      )}
+      {reading && view.data === undefined && <Spinner />}
       {failed && view.again && (
         <>
           {' '}

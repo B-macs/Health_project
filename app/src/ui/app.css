@@ -280,10 +280,15 @@ ul {
   gap: var(--sp-s);
 }
 
+/* A button's words wrap inside it, never past the screen's edge (2026-10-21: a yoga
+ * flow's name ran off both sides of the page). */
 .btn {
-  white-space: nowrap;
+  white-space: normal;
+  text-align: center;
+  text-wrap: balance;
+  line-height: 1.25;
   min-height: calc(var(--tap) + var(--sp-xs));
-  padding: 0 var(--sp-l);
+  padding: var(--sp-xs) var(--sp-l);
   border-radius: var(--r-pill);
   font-size: var(--fs-body);
   font-weight: var(--w-title);
@@ -871,6 +876,81 @@ ul {
   text-decoration: underline;
 }
 
+/* "Reading…" beside the shown data's age while the engine is asked (2026-10-21). */
+.fresh__reading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-xs);
+  margin-left: var(--sp-s);
+  color: var(--muted);
+}
+
+.fresh > .spinner {
+  margin-left: var(--sp-xs);
+  vertical-align: middle;
+}
+
+/* The turning ring (a save sent, a read asked again): the text's colour, open on one side. */
+.spinner {
+  display: inline-block;
+  flex: none;
+  width: calc(var(--sp-m) + var(--hair) * 2);
+  height: calc(var(--sp-m) + var(--hair) * 2);
+  border: calc(var(--hair) * 2) solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin var(--slow) linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* One thing to pick, as a row: its whole name wraps (never cut at the screen's edge), its
+ * detail under it, a chevron at the end (2026-10-21, the yoga flows). */
+.choice {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-m);
+  width: 100%;
+  min-height: calc(var(--tap) + var(--sp-xs));
+  padding: var(--sp-s) var(--sp-m);
+  border-radius: var(--r-tile);
+  background: var(--glass-strong);
+  border: var(--hair) solid var(--glass-line);
+  color: var(--text);
+  text-align: left;
+  -webkit-backdrop-filter: blur(var(--blur));
+  backdrop-filter: blur(var(--blur));
+  transition:
+    transform var(--quick) var(--ease),
+    opacity var(--quick) var(--ease);
+}
+
+.choice:active {
+  transform: scale(0.98);
+  opacity: 0.85;
+}
+
+.choice__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.choice__title {
+  font-weight: var(--w-title);
+  overflow-wrap: anywhere;
+}
+
+.choice .icon {
+  color: var(--muted);
+}
+
 /* "Sample numbers": the frames show the design's made-up numbers until they are wired. */
 .note {
   align-self: flex-start;
@@ -1338,6 +1418,32 @@ button.card {
   gap: var(--sp-m);
 }
 
+/* The check-in's fields: a fieldset only so a save in progress turns them all off at once. */
+.checkin__fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-m);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* "Check-in complete", where Save was pressed, and at the top of the day done. */
+.donemark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-s);
+  min-height: calc(var(--tap) + var(--sp-xs));
+  padding: var(--sp-xs) var(--sp-l);
+  border-radius: var(--r-pill);
+  background: var(--f-soft);
+  color: var(--f1);
+  font-weight: var(--w-title);
+  animation: fade-in var(--quick) var(--ease);
+}
+
 .field-row {
   display: flex;
   align-items: center;
@@ -1476,6 +1582,7 @@ button.card {
 }
 
 .tab {
+  position: relative;
   min-height: var(--tap);
   display: flex;
   flex-direction: column;
@@ -1493,6 +1600,26 @@ button.card {
   color: var(--text);
 }
 
+/* Today's check-in is done: a small check on the Check-in tab's icon (2026-10-21). */
+.tab__badge {
+  position: absolute;
+  top: 0;
+  left: calc(50% + var(--sp-xs));
+  width: var(--sp-m);
+  height: var(--sp-m);
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.tab__badge .icon {
+  width: calc(var(--sp-m) - var(--sp-xs));
+  height: calc(var(--sp-m) - var(--sp-xs));
+  stroke-width: calc(var(--icon-stroke) * 2);
+}
+
 .tab--on .icon {
   color: var(--f1);
   filter: drop-shadow(0 0 calc(var(--glow) / 2) var(--f-glow));
@@ -1507,6 +1634,13 @@ button.card {
     animation-duration: 1ms !important;
     animation-iteration-count: 1 !important;
     transition: none !important;
+  }
+
+  /* The turning ring keeps turning, slower, as iOS's own activity indicator does: it is the
+   * only sign that a tap is being worked on. */
+  .app .spinner {
+    animation-duration: calc(var(--slow) * 2) !important;
+    animation-iteration-count: infinite !important;
   }
 }
 

@@ -265,13 +265,13 @@ def engine_data(repo, today: date) -> dict:
 
 def queue(repo, today: date, year: int | None = None, month: int | None = None) -> dict:
     """The Processing Queue: what still waits for the keyword parse, and
-    the warnings calendar of one month (the latest warning's month without
-    one), each day with its marker and its entries."""
+    the warnings calendar of one month (today's month without one), each day
+    with its marker and its entries."""
     pending = processing_queue.pending(repo)
     flagged = repo.get_flagged_entries()
     by_date = processing_queue.warnings_by_date(flagged)
     if year is None or month is None:
-        year, month = processing_queue.calendar_anchor(by_date, today)
+        year, month = processing_queue.calendar_anchor(today)
     weeks = processing_queue.month_weeks(year, month)
     prev_y, prev_m = processing_queue.step_month(year, month, -1)
     next_y, next_m = processing_queue.step_month(year, month, 1)

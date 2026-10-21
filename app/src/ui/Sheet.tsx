@@ -9,16 +9,24 @@ import { IconClose } from './icons'
 export function Sheet(p: { title: string; closeLabel: string; onClose: () => void; children: ReactNode; contained?: boolean }) {
   const close = useRef<HTMLButtonElement>(null)
   const onClose = p.onClose
+  // The newest close, for Escape: a parent drawn again hands a new one each time.
+  const latest = useRef(onClose)
+  useEffect(() => {
+    latest.current = onClose
+  }, [onClose])
+  // Once, when the sheet opens. Run again on every new `onClose`, it took the focus back to
+  // Close each time the app was drawn again, and that jumped the sheet to its top: on
+  // 2026-10-21 the check-in's "Check-in complete" went out of view the moment it showed.
   useEffect(() => {
     // No scroll on focus: the panel starts below its box while it slides up, and a focus
     // that scrolls to it moved the whole app up 16 px over a contained sheet.
     close.current?.focus({ preventScroll: true })
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape') latest.current()
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [])
   return (
     <div className={p.contained ? 'sheet sheet--contained' : 'sheet'}>
       <div className="sheet__scrim" aria-hidden="true" onClick={onClose} />

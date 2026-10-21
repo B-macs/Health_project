@@ -2335,7 +2335,7 @@ def render() -> None:
             if "queue_cal_year" not in st.session_state:
                 (st.session_state["queue_cal_year"],
                  st.session_state["queue_cal_month"]) = processing_queue.calendar_anchor(
-                    by_date, date.today())
+                    date.today())
 
             cal_year  = st.session_state["queue_cal_year"]
             cal_month = st.session_state["queue_cal_month"]

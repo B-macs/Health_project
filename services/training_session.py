@@ -449,6 +449,8 @@ def log_yoga(repo, today: date, slug: str, session_id: str, pose_ids: list[str],
     with SUPPLEMENTARY_SAVE_LOCK:
         logged = supplementary_save.save_yoga(repo, flow, today, stage, session_id, pose_ids,
                                               note)
+    from services import processing_queue
+    processing_queue.parse_after_save(repo)     # the flow's note: parse on save (I63)
     return {"logged": bool(logged)}
 
 

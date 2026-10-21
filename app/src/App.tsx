@@ -25,7 +25,7 @@ import { KEYS, setSetting, type HealthDB } from './db/schema'
 import { cssVars, useMode, useReducedMotion, type ThemePref } from './design/theme'
 import { PAGE_FAMILY, type Mode } from './design/tokens'
 import { AppStateProvider, type AppState } from './lib/appState'
-import { refresh, useCached, type Ctx } from './lib/cache'
+import { cacheKey, refresh, useCached, type Ctx } from './lib/cache'
 import { pickFor, readPick, writePick, type Pick } from './lib/day'
 import { localDay } from './lib/api'
 import { refreshAlerts } from './lib/alerts'
@@ -53,7 +53,7 @@ import { Today } from './screens/Today'
 import { TrainingTab } from './screens/TrainingTab'
 import { Welcome } from './screens/Welcome'
 import { S } from './strings'
-import { IconCheckin, IconInsights, IconSettings, IconToday, IconTraining } from './ui/icons'
+import { IconCheck, IconCheckin, IconInsights, IconSettings, IconToday, IconTraining } from './ui/icons'
 import { ScreenBoundary } from './ui/ScreenBoundary'
 
 type Tab = keyof typeof PAGE_FAMILY
@@ -74,7 +74,16 @@ export function tabOf(location: string): Tab {
   return TABS.find((t) => t.path === location)?.key ?? 'today'
 }
 
-function TabBar({ tab, onTab }: { tab: Tab; onTab: (path: string) => void }) {
+/** Today's check-in is in the store (or saved on this phone): its tab carries a check (the
+ *  owner, 2026-10-21: "otherwise check in should be marked as complete"). Read from the
+ *  saved form answer, which a save updates at once. */
+function useCheckedInToday(store: HealthDB): boolean {
+  const path = formPath(localDay())
+  const row = useLiveQuery(() => store.cache.get(cacheKey(path, null)), [store, path])
+  return !!(row?.body as { existing?: boolean } | undefined)?.existing
+}
+
+function TabBar({ tab, onTab, checkedIn }: { tab: Tab; onTab: (path: string) => void; checkedIn: boolean }) {
   return (
     <nav className="tabbar" aria-label={S.app}>
       <div className="tabbar__inner">
@@ -83,6 +92,12 @@ function TabBar({ tab, onTab }: { tab: Tab; onTab: (path: string) => void }) {
             aria-current={tab === key ? 'page' : undefined} onClick={() => onTab(path)}>
             <Icon />
             <span className="tab__label">{S.nav[key]}</span>
+            {key === 'checkin' && checkedIn && (
+              <>
+                <span className="tab__badge" aria-hidden="true" data-testid="checkin-badge"><IconCheck /></span>
+                <span className="sr-only">{S.checkin.doneToday}</span>
+              </>
+            )}
           </button>
         ))}
       </div>
@@ -123,6 +138,7 @@ function Shell(p: ShellProps) {
   useEffect(() => {
     if (ctx.key) void refresh(store, formPath(localDay()), null, ctx).catch(() => undefined)
   }, [store, ctx])
+  const checkedIn = useCheckedInToday(store)
 
   const go = useCallback((path: string) => {
     navigate(path)
@@ -257,7 +273,7 @@ function Shell(p: ShellProps) {
         </main>
         {tab === 'checkin' && <CheckIn onClose={() => go('/')} />}
         </div>
-        {!inSession && <TabBar tab={tab} onTab={go} />}
+        {!inSession && <TabBar tab={tab} onTab={go} checkedIn={checkedIn} />}
       </div>
     </AppStateProvider>
   )

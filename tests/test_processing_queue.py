@@ -6,7 +6,9 @@ recovery labels. A fake repository; no network.
 
 from __future__ import annotations
 
+import ast
 from datetime import date
+from pathlib import Path
 
 from services import engine
 from services import insights as insights_svc
@@ -48,7 +50,7 @@ def test_the_job_parses_everything_and_names_each_failure():
     assert seen == [(1, 3), (2, 3), (3, 3)]
 
 
-def test_the_calendar_groups_by_day_and_opens_on_the_latest_warning():
+def test_the_calendar_groups_by_day_and_opens_on_today():
     flagged = [{"session_date": "2026-10-03", "warning_level": "monitor"},
                {"timestamp": "2026-10-03T08:00", "warning_level": "flag"},
                {"timestamp": "2026-09-20", "warning_level": "monitor"}]
@@ -56,8 +58,11 @@ def test_the_calendar_groups_by_day_and_opens_on_the_latest_warning():
     assert sorted(by_date) == ["2026-09-20", "2026-10-03"]
     assert pq.day_level(by_date["2026-10-03"]) == "flag"
     assert pq.day_level(by_date["2026-09-20"]) == "monitor"
-    assert pq.calendar_anchor(by_date, date(2026, 10, 19)) == (2026, 10)
-    assert pq.calendar_anchor({}, date(2026, 10, 19)) == (2026, 10)
+    assert pq.calendar_anchor(date(2026, 10, 19)) == (2026, 10)
+    # The owner, 2026-10-21: "When I go to warnings it should open on the current day". It
+    # opened on the latest warning's month, which read as a calendar stuck in August.
+    assert pq.calendar_anchor(date(2026, 12, 2)) == (2026, 12), "today's month, not the latest warning's"
+
     assert pq.step_month(2026, 1, -1) == (2025, 12)
     assert pq.step_month(2026, 12, 1) == (2027, 1)
     weeks = pq.month_weeks(2026, 10)
@@ -89,3 +94,43 @@ def test_the_trend_gate_and_the_recovery_label():
     assert insights_svc.recovery_label("insufficient_data") == "Insufficient data"
     assert insights_svc.recovery_label("improving") == "Improving"
     assert insights_svc.recovery_label("holding_steady") == "Holding Steady"
+
+
+# ── every save that stores a note reads it for warnings (I63) ──────────────────
+
+#: The calls that store a note (a check-in's sensation note, a session's notes, a yoga
+#: flow's note), by file: the name each is called by there.
+_NOTE_SAVES = {
+    "services/checkin_form.py": {"save"},
+    "services/training_session.py": {"save_session", "save_yoga"},
+    "views/checkin.py": {"save"},
+    "views/training.py": {"save_session", "save_yoga"},
+}
+
+
+def _called(fn: ast.AST) -> set[str]:
+    names = set()
+    for node in ast.walk(fn):
+        if isinstance(node, ast.Call):
+            f = node.func
+            names.add(f.attr if isinstance(f, ast.Attribute) else getattr(f, "id", ""))
+    return names
+
+
+def test_every_save_that_stores_a_note_reads_it_for_warnings():
+    """The old app's check-in and session saves did not run the keyword parse, so every
+    note they stored after the Processing Queue's button was last pressed (early August)
+    waited unread, and the warnings calendar showed nothing after 6 August until the first
+    check-in saved from the phone (2026-10-21, 07:18) read the backlog. Every function that
+    stores a note now runs the parse after it, in the engine and in the old app."""
+    repo_root = Path(__file__).resolve().parents[1]
+    checked = 0
+    for rel, saves in _NOTE_SAVES.items():
+        tree = ast.parse((repo_root / rel).read_text(encoding="utf-8"))
+        for fn in ast.walk(tree):
+            if isinstance(fn, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                called = _called(fn)
+                if called & saves and fn.name not in saves:
+                    checked += 1
+                    assert "parse_after_save" in called, f"{rel}::{fn.name} stores a note and never reads it"
+    assert checked >= 6, f"only {checked} saving functions found: the scan has lost its targets"

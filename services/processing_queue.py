@@ -71,7 +71,14 @@ def parse_after_save(repo) -> dict | None:
     for a button press. It never fails the save that ran it: the save is
     already stored, and an item it could not parse stays pending, on the
     queue, which runs the same job (process_all) on demand. None when the
-    job itself could not start."""
+    job itself could not start.
+
+    Every save that can store a note runs it: the check-in, a session, yoga,
+    in the engine and in the old app alike. Until 2026-10-21 the old app's
+    saves did not, so every note it stored after the Processing Queue's
+    button was last pressed (early August) waited unread, and the warnings
+    calendar showed nothing after 6 August until the first check-in saved
+    from the phone read the backlog."""
     try:
         return process_all(repo, repo.get_diagnostic_profile())
     except Exception:
@@ -97,10 +104,11 @@ def day_level(entries: list[dict]) -> str:
     return "flag" if any(e.get("warning_level") == "flag" for e in entries) else "monitor"
 
 
-def calendar_anchor(by_date: dict[str, list], today: date) -> tuple[int, int]:
-    """(year, month) the calendar opens on: the latest warning's, else today's."""
-    anchor = date.fromisoformat(max(by_date)) if by_date else today
-    return anchor.year, anchor.month
+def calendar_anchor(today: date) -> tuple[int, int]:
+    """(year, month) the calendar opens on: today's (the owner, 2026-10-21: "When I go
+    to warnings it should open on the current day"). Until then it opened on the latest
+    warning's month, which read as a calendar stuck in the past."""
+    return today.year, today.month
 
 
 def step_month(year: int, month: int, delta: int) -> tuple[int, int]:

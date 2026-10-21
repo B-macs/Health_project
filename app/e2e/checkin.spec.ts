@@ -1,9 +1,16 @@
 // The check-in in the browser (rebuild Phase 5): made with no connection, it waits in the
 // outbox and is sent once the phone is back online; the next open shows it as saved.
 // The gate (rebuild_gate.py p5 check_in_lost) adds up this test's check_in_lost count.
-import type { Page } from '@playwright/test'
+// Since 2026-10-21 (the owner): "Check-in complete" where Save was pressed, then the day
+// shown as done, with a button for another check-in, and a check on the Check-in tab.
+import type { BrowserContext, Page } from '@playwright/test'
 import { S } from '../src/strings'
-import { controlled, expect, hook, onboard, openTab, test } from './helpers'
+import { controlled, expect, hook, onboard, openTab, ORIGIN, test } from './helpers'
+
+/** The test's own check-ins in the mock: one test's saved day never opens another's as done. */
+async function ownRun(context: BrowserContext, tag: string): Promise<void> {
+  await context.addCookies([{ name: 'e2e_run', value: `${tag}-${Date.now()}-${Math.random()}`, url: ORIGIN }])
+}
 
 type Received = { method: string; path: string; body: { date: string; opened_entry: boolean; values: { pain_score: number; sensation_tags: string[] } } }
 
@@ -13,6 +20,7 @@ async function checkins(page: Page): Promise<Received[]> {
 }
 
 test('a check-in made offline is sent later, and opens as saved @outbox', async ({ page, context }) => {
+  await ownRun(context, 'checkin-offline')
   await onboard(page)
   await controlled(page)
   await hook(page)
@@ -25,6 +33,8 @@ test('a check-in made offline is sent later, and opens as saved @outbox', async 
   await sheet.getByRole('slider', { name: S.checkin.fields.pain_score.label }).fill('3')
   await sheet.getByRole('button', { name: 'Sore' }).click()
   await sheet.getByRole('button', { name: S.checkin.save }).click()
+  // Not sent: the day shows as done at once, saved on this phone.
+  await expect(sheet.getByTestId('checkin-done')).toBeVisible()
   await expect(sheet.getByText(S.checkin.saved)).toBeVisible()
   expect(await page.evaluate(async () => (await window.__health!.outbox()).length)).toBe(1)
   expect((await checkins(page)).length).toBe(before)
@@ -37,14 +47,64 @@ test('a check-in made offline is sent later, and opens as saved @outbox', async 
   const lost = 1 - (await checkins(page)).length + before - (await page.evaluate(async () => (await window.__health!.outbox()).length))
   test.info().annotations.push({ type: 'check_in_lost', description: String(lost) })
   expect(lost).toBe(0)
+  // Sent: the same card now says complete, and the Check-in tab carries its check.
+  await expect(sheet.getByTestId('checkin-done').getByText(S.checkin.complete)).toBeVisible()
+  await expect(page.getByTestId('checkin-badge')).toBeVisible()
 
-  // Opened again: the day's entry, as the engine now holds it.
+  // Opened again: the day as done; "Do another check-in" opens the day's entry, as the
+  // engine now holds it.
   await sheet.getByRole('button', { name: S.checkin.close }).click()
   await openTab(page, S.nav.checkin)
-  await expect(page.getByRole('dialog', { name: S.checkin.title }).getByText(S.checkin.existing)).toBeVisible()
+  const again = page.getByRole('dialog', { name: S.checkin.title })
+  await expect(again.getByTestId('checkin-done')).toBeVisible()
+  await again.getByRole('button', { name: S.checkin.again }).click()
+  await expect(again.getByText(S.checkin.existing)).toBeVisible()
+  await expect(again.getByRole('slider', { name: S.checkin.fields.pain_score.label })).toHaveValue('3')
 })
 
-test('the check-in sheet offers today and the three days before', async ({ page }) => {
+test('a check-in says "complete" where Save was pressed, then shows the day as done', async ({ page, context }) => {
+  // The owner, 2026-10-21: "When I press check In it should have completing tag and then
+  // completed viewable to the user at the bottom when I pressed it. Then check in should be
+  // done, I can press another button to do another check in for the same day".
+  await ownRun(context, 'checkin-done')
+  await onboard(page)
+  await hook(page)
+  await expect(page.getByTestId('checkin-badge')).toHaveCount(0)
+  await openTab(page, S.nav.checkin)
+  const sheet = page.getByRole('dialog', { name: S.checkin.title })
+  await sheet.getByRole('radio', { name: 'Good', exact: true }).click()
+  const save = sheet.getByRole('button', { name: S.checkin.save })
+  await save.scrollIntoViewIfNeeded()
+  const where = (await save.boundingBox())!
+  await save.click()
+  // Where Save was: "Check-in complete", in view.
+  const complete = sheet.getByTestId('checkin-complete')
+  await expect(complete).toBeVisible()
+  const at = (await complete.boundingBox())!
+  expect(Math.abs(at.y - where.y)).toBeLessThan(where.height)
+  await expect(complete).toBeInViewport()
+  // Then the day as done, and the tab's check.
+  const done = sheet.getByTestId('checkin-done')
+  await expect(done).toBeVisible()
+  await expect(done).toBeInViewport()
+  await expect(done.getByText(S.checkin.complete)).toBeVisible()
+  await expect(done).toContainText(/General readiness\s*Good/)
+  await expect(page.getByTestId('checkin-badge')).toBeVisible()
+  expect(await page.evaluate(async () => (await window.__health!.outbox()).length)).toBe(0)
+  // Another check-in for the same day: the form again, with what was saved; it replaces it.
+  await done.getByRole('button', { name: S.checkin.again }).click()
+  await expect(sheet.getByText(S.checkin.existing)).toBeVisible()
+  await expect(sheet.getByRole('radio', { name: 'Good', exact: true })).toHaveAttribute('aria-checked', 'true')
+  await sheet.getByRole('radio', { name: 'Average', exact: true }).click()
+  await sheet.getByRole('button', { name: S.checkin.save }).click()
+  await expect(sheet.getByTestId('checkin-done')).toContainText(/General readiness\s*Average/)
+  // Done closes the sheet.
+  await sheet.getByRole('button', { name: S.checkin.finish }).click()
+  await expect(sheet).toHaveCount(0)
+})
+
+test('the check-in sheet offers today and the three days before', async ({ page, context }) => {
+  await ownRun(context, 'checkin-days')
   await onboard(page)
   await openTab(page, S.nav.checkin)
   const dates = page.getByRole('radiogroup', { name: S.checkin.date }).getByRole('radio')
