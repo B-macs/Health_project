@@ -21,6 +21,8 @@ from __future__ import annotations
 import json
 from datetime import date, datetime, timedelta, timezone
 
+import pytest
+
 from services import repository as repo_mod
 from services import sleep_fusion as sf
 from services.config import Config
@@ -350,8 +352,36 @@ def test_a_rate_limited_sync_opens_the_breaker_and_is_not_reported_as_failure(mo
     ok, msg = repo.sync_garmin_daily_if_due(today=date(2026, 7, 31),
                                             now=datetime(2026, 7, 31, 9, 0, 0))
     assert ok is True
-    assert "rate-limited" in msg
+    assert msg == "Garmin refused (too many requests); next try after 15:00", "the reason in plain words"
     assert "garmin_rate_limited_until" in stored
+
+
+def test_a_refused_sign_in_opens_the_breaker_and_says_so_in_its_own_line(monkeypatch):
+    """2026-10-21, 09:57: Garmin refused the engine's sign-in, and every Garmin step of
+    that sync read "done". A refused sign-in now pauses Garmin like a refused read, and
+    the chain says it in a line of its own; so does every sync while the pause holds."""
+    repo = _repo(_CountingGarminClient())
+    stored: dict[str, str] = {}
+    monkeypatch.setattr(Repository, "set_config",
+                        lambda self, k, v, today=None: stored.__setitem__(k, v))
+    monkeypatch.setattr(Repository, "get_config_value", lambda self, k: stored.get(k))
+
+    def refuse(config):
+        raise repo_mod.garmin.RateLimited("Mobile login returned 429")
+    monkeypatch.setattr(repo_mod.garmin, "make_client", refuse)
+    repo._garmin_login_attempted = False
+    with pytest.raises(repo_mod.garmin.RateLimited):
+        _ = repo._gc
+    assert "garmin_rate_limited_until" in stored
+    ok, why = repo.garmin_sign_in_result()
+    assert ok is False and why.startswith("Garmin refused (too many requests); next try after ")
+    # A later sync, with a Repository of its own, while the pause holds.
+    later = _repo(_CountingGarminClient())
+    ok, why = later.garmin_sign_in_result()
+    assert ok is False and why.startswith("Garmin is paused after a refusal; next try after ")
+    # And none once Garmin answers again.
+    stored.clear()
+    assert later.garmin_sign_in_result() is None
 
 
 # ─── fusion — reads Sheets only ─────────────────────────────────────────────

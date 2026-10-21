@@ -1266,14 +1266,23 @@ def p4_api_cached_by_sw() -> CounterResult:
     return _browser_counter("p4", lambda title: "caches no /api answer" in title, count)
 
 
+#: The switch-over (rebuild Phase 9, docs/rebuild/switch_plan.md), done with the owner on
+#: 2026-10-21: from it the engine is the one background writer and the Worker's sync
+#: addresses are on (step 4). Its rollback sets this back to None with SYNC_ENABLED "false".
+SWITCHED_OVER: str | None = "2026-10-21"
+
+
 @counter("p4", "cron_enabled_early",
-         "1 if worker/wrangler.jsonc sets SYNC_ENABLED to anything but \"false\" before Phase 9")
+         "1 if worker/wrangler.jsonc sets SYNC_ENABLED to anything but \"false\" before the "
+         "switch-over (Phase 9), or to anything but \"true\" after it")
 def p4_cron_enabled_early() -> CounterResult:
     config = jsonc(WRANGLER.read_text(encoding="utf-8"))
     value = config.get("vars", {}).get("SYNC_ENABLED")
     crons = config.get("triggers", {}).get("crons", [])
-    return CounterResult(0 if value == "false" else 1,
-                         f"SYNC_ENABLED = {value!r}; triggers: {', '.join(crons) or 'none'}")
+    want = "true" if SWITCHED_OVER else "false"
+    when = f"after the switch-over of {SWITCHED_OVER}" if SWITCHED_OVER else "before the switch-over"
+    return CounterResult(0 if value == want else 1,
+                         f"SYNC_ENABLED = {value!r} ({when}); triggers: {', '.join(crons) or 'none'}")
 
 
 @counter("p4", "mirror_gaps_open",

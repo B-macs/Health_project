@@ -546,6 +546,16 @@ _MIRROR_ATEXIT_REGISTERED = False
 
 
 
+def garmin_refused(until_iso: str) -> str:
+    """A refused Garmin sign-in or read, in plain words, with when the next try is."""
+    return f"Garmin refused (too many requests); next try after {until_iso[11:16]}"
+
+
+def garmin_paused(until_iso: str) -> str:
+    """The pause after a refusal, in plain words."""
+    return f"Garmin is paused after a refusal; next try after {until_iso[11:16]}"
+
+
 def _date_window(prop: str, start: str, end: date) -> dict:
     """A query filter for the rows of `prop` from `start` (ISO) to `end`, both
     included: a read for a day ends on that day (rebuild rule 3), never on the
@@ -560,6 +570,8 @@ class Repository:
         self._sheets_client = None
         self._garmin_client_obj = None
         self._garmin_login_attempted = False
+        #: Why this Repository's Garmin sign-in failed, in plain words (None: it did not).
+        self._garmin_login_error: str | None = None
         self._oura_token_obj = None
         self._datastore_conn = None
         # {(tab_title, ignore_cols): (write_generation, monotonic_ts, rows)}
@@ -742,7 +754,18 @@ class Repository:
         failed login raises once and is not silently retried every call."""
         if not self._garmin_login_attempted:
             self._garmin_login_attempted = True
-            self._garmin_client_obj = garmin.make_client(self.config)
+            try:
+                self._garmin_client_obj = garmin.make_client(self.config)
+            except garmin.RateLimited:
+                # A refused sign-in backs off like a refused read, and is said in so
+                # many words (2026-10-21, 09:57: Garmin refused the engine's sign-in,
+                # and every Garmin step of that sync read "done").
+                until = self.open_garmin_rate_limit_breaker()
+                self._garmin_login_error = garmin_refused(until)
+                raise
+            except Exception as exc:
+                self._garmin_login_error = f"Garmin sign-in failed: {exc}"
+                raise
         return self._garmin_client_obj
 
     # ─── Oura credential ─────────────────────────────────────────────────
@@ -5803,27 +5826,32 @@ class Repository:
         today = today or date.today()
         now = now or datetime.now()
         try:
-            if self.has_checked_in(today):
-                return True, None
-            if self.garmin_rate_limited(now=now):
-                # Circuit breaker open. Retrying a throttled endpoint on every
-                # page load is exactly how a transient 429 becomes a
-                # persistent one, so this is "nothing to do", not an error.
-                return True, None
             raw = self.get_config_value("garmin_daily_last_synced_at")
+            last_synced = None
             if raw:
                 try:
                     last_synced = datetime.fromisoformat(raw)
                 except ValueError:
                     last_synced = None
-                if last_synced is not None and now - last_synced < timedelta(hours=hours):
-                    return True, None
+            # The check-in stops the polling only once the day has been synced:
+            # a check-in saved before the day's first sync (2026-10-21: the
+            # phone's check-in at 07:18, the first sync at 09:57) skipped the
+            # whole day's Garmin data, in both apps.
+            if last_synced is not None and last_synced.date() == today and self.has_checked_in(today):
+                return True, None
+            if self.garmin_rate_limited(now=now):
+                # Circuit breaker open. Retrying a throttled endpoint on every
+                # page load is exactly how a transient 429 becomes a
+                # persistent one, so this is "nothing to do", not an error;
+                # run_home_syncs says the pause in its own line.
+                return True, None
+            if last_synced is not None and now - last_synced < timedelta(hours=hours):
+                return True, None
             self.sync_garmin_daily(days=days, today=today)
             self.set_config("garmin_daily_last_synced_at", now.isoformat(), today=today)
             return True, None
-        except garmin.RateLimited as exc:
-            self.open_garmin_rate_limit_breaker(now=now, today=today)
-            return True, f"Garmin rate-limited — backing off until {self.get_config_value('garmin_rate_limited_until')}. ({exc})"
+        except garmin.RateLimited:
+            return True, garmin_refused(self.open_garmin_rate_limit_breaker(now=now, today=today))
         except Exception as exc:
             return False, str(exc)
 
@@ -5833,6 +5861,21 @@ class Repository:
     #  indefinitely — the failure mode observed 2026-07-31.
 
     GARMIN_RATE_LIMIT_BACKOFF_HOURS = 6
+
+    def garmin_sign_in_result(self, now: datetime | None = None) -> tuple[bool, str] | None:
+        """The sync chain's own line for Garmin when it could not sign in: the
+        refusal of this run, or the pause a refusal started (every Garmin step
+        reads "nothing to do" through it). None when Garmin is fine or not set up."""
+        try:
+            if not self.garmin_configured():
+                return None
+            if self._garmin_login_error:
+                return False, self._garmin_login_error
+            if self.garmin_rate_limited(now=now):
+                return False, garmin_paused(self.get_config_value("garmin_rate_limited_until") or "")
+        except Exception as exc:
+            return False, str(exc)
+        return None
 
     def garmin_rate_limited(self, now: datetime | None = None) -> bool:
         raw = self.get_config_value("garmin_rate_limited_until")
@@ -6496,6 +6539,9 @@ class Repository:
         results["metrics_history"] = self.sync_metrics_history_if_due(days=7, **kw)
         results["sleep_fusion"] = self.sync_sleep_fusion_if_due(days=14, **kw)
         results["backup"] = self.backup_supabase_if_due(today=today, now=now)
+        sign_in = self.garmin_sign_in_result(now=now)
+        if sign_in is not None:
+            results["garmin_sign_in"] = sign_in
         # LAST, and unthrottled: it sends only what the steps above actually
         # wrote, so an empty buffer costs nothing and a throttle would just
         # delay rows that are already in hand. Never raises — see

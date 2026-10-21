@@ -50,6 +50,18 @@ describe('the sync card', () => {
   it('draws nothing before the engine has answered', () => {
     expect(draw(<SyncCard status={undefined} />)).toBe('')
   })
+
+  it('a step that did nothing on purpose says why, and a refused Garmin sign-in has its own line', () => {
+    // 2026-10-21, 09:57: Garmin refused the engine's sign-in and every Garmin step read "done".
+    const paused: Status = { ...AFTER, last_sync: { day: '2026-10-21', at: '2026-10-21T07:57:00+00:00', error: null, results: {
+      garmin: [true, 'Garmin is paused after a refusal; next try after 15:57'],
+      garmin_sign_in: [false, 'Garmin refused (too many requests); next try after 15:57'],
+    } } }
+    const html = text(draw(<SyncCard status={paused} />))
+    expect(html).toContain(`${S.settings.steps.garmin} Garmin is paused after a refusal; next try after 15:57`)
+    expect(html).not.toContain(`${S.settings.steps.garmin} ${S.settings.stepOk}`)
+    expect(html).toContain(`${S.settings.steps.garmin_sign_in} ${S.settings.stepFailed}: Garmin refused (too many requests); next try after 15:57`)
+  })
 })
 
 describe('the plan start (first run)', () => {

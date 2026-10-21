@@ -290,12 +290,27 @@ def test_sync_if_due_skips_once_checked_in_today_even_if_2_hours_elapsed():
     assert calls == []
 
 
-def test_sync_if_due_skips_when_checked_in_and_never_synced_before():
+def test_a_check_in_before_the_first_sync_of_the_day_does_not_skip_it():
+    # 2026-10-21: the phone's check-in at 07:18 came before the day's first sync (09:57),
+    # and the rule skipped the whole day's Garmin data in both apps. The check-in now
+    # stops the polling only once the day has been synced: once, then not again.
+    calls = []
+    config = {"garmin_daily_last_synced_at": datetime(2026, 7, 12, 5, 45, 0).isoformat()}
+    repo = _repo_with_due_check(_FakeGarminClient(), config, calls, checked_in=True)
+    now = datetime(2026, 7, 13, 9, 57, 0)
+    assert repo.sync_garmin_daily_if_due(today=date(2026, 7, 13), now=now) == (True, None)
+    assert calls == [(7, date(2026, 7, 13))]
+    later = datetime(2026, 7, 13, 13, 0, 0)
+    assert repo.sync_garmin_daily_if_due(today=date(2026, 7, 13), now=later) == (True, None)
+    assert calls == [(7, date(2026, 7, 13))], "synced today and checked in: no more polling"
+
+
+def test_a_check_in_with_no_sync_ever_still_syncs_once():
     calls, config = [], {}
     repo = _repo_with_due_check(_FakeGarminClient(), config, calls, checked_in=True)
-    ok, err = repo.sync_garmin_daily_if_due(today=date(2026, 7, 13))
-    assert (ok, err) == (True, None)
-    assert calls == []
+    assert repo.sync_garmin_daily_if_due(today=date(2026, 7, 13),
+                                         now=datetime(2026, 7, 13, 8, 0, 0)) == (True, None)
+    assert calls == [(7, date(2026, 7, 13))]
 
 
 def test_sync_if_due_returns_error_on_sync_failure():

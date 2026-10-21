@@ -1029,7 +1029,7 @@ export const S = {
       oura: 'Oura', garmin: 'Garmin daily', garmin_activities: 'Garmin activities', blend: 'Biometric blend',
       session_hr: 'Session heart rate', metrics_history: 'Metrics history', sleep_fusion: 'Sleep fusion',
       backup: 'Daily backup', supabase_mirror: 'Store send', failed_week: 'Failed-week rule',
-      weekly_rollup: 'Weekly rollup',
+      weekly_rollup: 'Weekly rollup', garmin_sign_in: 'Garmin sign-in',
     } as Record<string, string>,
     syncDue: { first_open: 'A sync is due: the first open of the day.', last_night_missing: 'A sync is due: last night is still missing.' } as Record<string, string>,
     syncNotDue: 'No sync is due.',

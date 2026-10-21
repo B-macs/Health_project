@@ -33,7 +33,9 @@ export function SyncCard({ status }: { status: Status | undefined }) {
           {steps.map(([step, [ok, error]]) => (
             <li key={step} className="kv" data-ok={ok}>
               <span>{S.settings.steps[step] ?? step}</span>
-              <span className="caption">{ok ? S.settings.stepOk : `${S.settings.stepFailed}${error ? `: ${error}` : ''}`}</span>
+              {/* A step that did nothing on purpose says why (Garmin paused after a refusal),
+                  never "done" (2026-10-21: Garmin read "done" while it had refused). */}
+              <span className="caption">{ok ? (error ?? S.settings.stepOk) : `${S.settings.stepFailed}${error ? `: ${error}` : ''}`}</span>
             </li>
           ))}
         </ul>

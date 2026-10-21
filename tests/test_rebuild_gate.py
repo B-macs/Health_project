@@ -634,15 +634,26 @@ def test_wrangler_jsonc_is_read_with_its_comments_and_a_url_in_a_string():
     assert gate.jsonc(text) == {"url": "https://x.test/a", "vars": {"SYNC_ENABLED": "false"}}
 
 
-def test_the_sync_switch_is_off_in_the_real_worker_config():
+def test_the_sync_switch_matches_the_switch_over_in_the_real_worker_config():
+    # Off until the switch-over, on from it (2026-10-21, step 4).
+    assert gate.SWITCHED_OVER == "2026-10-21"
     assert gate.p4_cron_enabled_early().count == 0
 
 
-def test_the_sync_switch_counts_one_when_it_is_on(tmp_path, monkeypatch):
+def test_the_sync_switch_counts_one_when_it_is_on_before_the_switch_over(tmp_path, monkeypatch):
     config = tmp_path / "wrangler.jsonc"
     config.write_text('{ "vars": { "SYNC_ENABLED": "true" } }', encoding="utf-8")
     monkeypatch.setattr(gate, "WRANGLER", config)
+    monkeypatch.setattr(gate, "SWITCHED_OVER", None)
     assert gate.p4_cron_enabled_early().count == 1
+
+
+def test_the_sync_switch_counts_one_when_it_is_off_after_the_switch_over(tmp_path, monkeypatch):
+    config = tmp_path / "wrangler.jsonc"
+    config.write_text('{ "vars": { "SYNC_ENABLED": "false" } }', encoding="utf-8")
+    monkeypatch.setattr(gate, "WRANGLER", config)
+    monkeypatch.setattr(gate, "SWITCHED_OVER", "2026-10-21")
+    assert gate.p4_cron_enabled_early().count == 1, "an accidental turn-off after the switch is flagged" 
 
 
 def test_the_iphone_checklist_is_open_until_the_owner_confirms_each_item():

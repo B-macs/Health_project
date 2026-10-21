@@ -33,6 +33,9 @@ class _Chain:
     def flush_supabase_mirror(self):
         return 0
 
+    def garmin_sign_in_result(self, now=None):
+        return None     # Garmin signed in: no line of its own
+
     run_home_syncs = Repository.run_home_syncs
 
 

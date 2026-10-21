@@ -42,7 +42,7 @@ Do the switch right after a Streamlit sync has finished, at a time when no train
 ## ROLLBACK the switch-over (ready to paste)
 ```
 ROLLBACK THE SWITCH-OVER (rebuild Phase 9). Do these in this order, and check each:
-4. Set SYNC_ENABLED to false in worker/wrangler.jsonc and deploy the Worker. Check: POST /api/sync answers 409 sync_disabled.
+4. Set SYNC_ENABLED to false in worker/wrangler.jsonc and deploy the Worker. Check: POST /api/sync answers 409 sync_disabled. Set `SWITCHED_OVER = None` in scripts/rebuild_gate.py with it.
 3. python scripts/set_background_writer.py --to streamlit. Check: GET /api/status names "streamlit" and no sync is due.
 5. Log in to Oura again through the Streamlit app (its Insights > Sync > Oura). Check: the Streamlit app's Oura sync runs.
 8. Nothing to do: the banner and the refusal follow step 3. Check: the Streamlit app saves again.
