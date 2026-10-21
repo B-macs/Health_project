@@ -33,8 +33,9 @@
   },
   "vars": {
     // The second lock on the device syncs and the Oura login (src/index.ts). "true" only
-    // at the switch-over (Phase 9), when the engine becomes the one background writer.
-    "SYNC_ENABLED": "false",
+    // at the switch-over (Phase 9), when the engine becomes the one background writer:
+    // turned on 2026-10-21, switch step 4, after background_writer was set to "engine".
+    "SYNC_ENABLED": "true",
     // The timer alerts (Web Push, src/alerts.ts): the VAPID subject and PUBLIC key, made by
     // scripts/vapid-keygen.mjs. The private key is the secret VAPID_PRIVATE_KEY, which that
     // script stores with `wrangler secret put` and never writes anywhere else. Empty: no
