@@ -307,7 +307,11 @@ describe('Engine data', () => {
   })
 
   it('Read again turns and waits while the engine is asked (the owner, 2026-10-21)', () => {
-    const raw = draw(<EngineBody view={saved(F.engine)} reduced onRefresh={none} />)
+    // The screen's own check is quiet: the button stays as it is.
+    const quiet = draw(<EngineBody view={saved(F.engine)} reduced onRefresh={none} />)
+    expect(quiet).not.toContain('data-testid="spinner"')
+    expect(text(quiet)).toContain(S.eng.refresh)
+    const raw = draw(<EngineBody view={{ ...saved(F.engine), pressed: true }} reduced onRefresh={none} />)
     expect(raw).toMatch(/<button[^>]*disabled=""[^>]*aria-busy="true"[^>]*data-testid="engine-refresh"/)
     expect(text(raw)).toContain(S.fresh.reading)
     expect(raw).toContain('data-testid="spinner"')

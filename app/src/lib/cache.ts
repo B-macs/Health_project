@@ -15,6 +15,10 @@ export interface View<T> {
   state: FetchState
   /** The engine's own word for a refusal (its JSON error), when it refused. */
   code?: string
+  /** The read in progress was asked for by a tap (Read again), not by the screen itself: only
+   *  such a read shows that it is working (the owner, 2026-10-21: "a back ground check can
+   *  happen to see if there is new data but on the front end it should be the same"). */
+  pressed?: boolean
 }
 
 export interface Ctx {
@@ -108,18 +112,25 @@ export async function cacheFirst<T>(store: HealthDB, path: string, day: string |
 /** The hook a screen uses. `again()` asks the engine once more, and so does every engine
  *  sync that ran (lib/refresh.ts). It answers only for its own address: when the address
  *  changes (another day), the previous address's answer is never shown under it, not even
- *  for one frame. */
+ *  for one frame. A read the screen makes by itself (opening it, coming back to the app) is
+ *  quiet; a read `again()` asked for is `pressed` until its answer comes. */
 export function useCached<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx):
   View<T> & { again: () => void } {
   const key = cacheKey(path, day)
   const [view, setView] = useState<View<T> & { key: string }>({ key: '', data: undefined, fetchedAt: null, state: 'loading' })
   const [tick, setTick] = useState(0)
-  const again = useCallback(() => setTick((t) => t + 1), [])
+  const [pressed, setPressed] = useState(false)
+  const again = useCallback(() => {
+    setPressed(true)
+    setTick((t) => t + 1)
+  }, [])
   const epoch = useSyncExternalStore(subscribe, currentEpoch, currentEpoch)
   useEffect(() => {
     let alive = true
     void cacheFirst<T>(store, path, day, ctx, (next) => {
-      if (alive) setView({ ...next, key })
+      if (!alive) return
+      setView({ ...next, key })
+      if (next.state !== 'loading') setPressed(false)
     })
     return () => {
       alive = false
@@ -128,7 +139,8 @@ export function useCached<T>(store: HealthDB, path: string, day: string | null, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [store, path, day, ctx.key, ctx.engineDown, tick, epoch])
   if (view.key !== key) return { data: undefined, fetchedAt: null, state: 'loading', again }
-  return { data: view.data, fetchedAt: view.fetchedAt, state: view.state, code: view.code, again }
+  return { data: view.data, fetchedAt: view.fetchedAt, state: view.state, code: view.code,
+    pressed: pressed && view.state === 'loading', again }
 }
 
 /** How old the shown answer is, in whole minutes (null when nothing is saved). */

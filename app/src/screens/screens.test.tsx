@@ -265,8 +265,12 @@ describe('the check-in sheet\'s stage', () => {
 })
 
 describe('the freshness line while the engine is asked', () => {
-  it('turns a ring beside the shown data\'s age, and beside "Loading…" with nothing saved', () => {
-    const raw = draw(<Freshness view={cached({})} />)
+  it('turns a ring for a read asked for by a tap, and beside "Loading…" with nothing saved', () => {
+    // The screen's own check is quiet: the saved answer stays as it is (2026-10-21).
+    const quiet = draw(<Freshness view={cached({})} />)
+    expect(quiet).not.toContain('data-testid="spinner"')
+    expect(text(quiet)).not.toContain(S.fresh.reading)
+    const raw = draw(<Freshness view={{ ...cached({}), pressed: true }} />)
     expect(text(raw)).toContain(S.fresh.reading)
     expect(raw).toContain('data-testid="spinner"')
     const empty = draw(<Freshness view={{ data: undefined, fetchedAt: null, state: 'loading' }} />)

@@ -162,10 +162,11 @@ export function EngineBody({ view, reduced, onRefresh }: { view: View<Engine>; r
       <div className="sky sky--quiet" aria-hidden="true" />
       <InsightsHead title={S.ins.engine} />
       <Freshness view={view} />
-      {/* While the engine is asked again the button turns and waits (the owner, 2026-10-21). */}
-      <button className="btn btn--glass pill" onClick={onRefresh} disabled={view.state === 'loading'}
-        aria-busy={view.state === 'loading'} data-testid="engine-refresh">
-        {view.state === 'loading' ? <><Spinner />{S.fresh.reading}</> : S.eng.refresh}
+      {/* Pressed, the button turns and waits until the answer comes (the owner, 2026-10-21);
+          the screen's own check is quiet. */}
+      <button className="btn btn--glass pill" onClick={onRefresh} disabled={!!view.pressed}
+        aria-busy={!!view.pressed} data-testid="engine-refresh">
+        {view.pressed ? <><Spinner />{S.fresh.reading}</> : S.eng.refresh}
       </button>
       {d?.load_error && <p className="alert" role="alert" data-testid="engine-unreadable">{S.eng.unreadable(d.load_error)}</p>}
       {d && !d.load_error && (
