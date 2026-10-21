@@ -417,6 +417,28 @@ class ProcessOut(BaseModel):
     errors: list[str]
 
 
+class WarningDay(BaseModel):
+    date: date
+    in_month: bool
+    is_today: bool
+    #: rest, reduced or held on a day the app lowered or held the load; none else.
+    level: str | None = None
+    #: The reading the engine named for a rest or a reduced day.
+    cause: str = ""
+
+
+class WarningsOut(BaseModel):
+    """Insights › Warnings since 2026-10-21: the days the app told him to
+    lower the load (services/load_warnings.py)."""
+    year: int
+    month: int
+    previous: YearMonth
+    next: YearMonth
+    weeks: list[list[WarningDay]]
+    #: Days of the month at each level (rest, reduced, held).
+    counts: dict[str, int]
+
+
 class TrendsOut(BaseModel):
     regions: list[dict[str, Any]]
     timeline: list[dict[str, Any]]

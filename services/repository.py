@@ -545,6 +545,14 @@ _DATASTORE_TABLE_BY_TAB = {
 _MIRROR_ATEXIT_REGISTERED = False
 
 
+
+def _date_window(prop: str, start: str, end: date) -> dict:
+    """A query filter for the rows of `prop` from `start` (ISO) to `end`, both
+    included: a read for a day ends on that day (rebuild rule 3), never on the
+    newest row stored."""
+    return {"and": [{"property": prop, "date": {"on_or_after": start}},
+                    {"property": prop, "date": {"on_or_before": end.isoformat()}}]}
+
 class Repository:
     def __init__(self, config: Config):
         self.config = config
@@ -1935,9 +1943,12 @@ class Repository:
     def get_recent_readiness(self, days: int = 60, today: date | None = None) -> list[dict]:
         today = today or date.today()
         cutoff = (today - timedelta(days=days)).isoformat()
+        # Ends on the day asked for (2026-10-21): with no end, a past day's
+        # biometric rows carried the later check-ins' alcohol rows, so the
+        # newest row was never that day and its light read "no reading".
         pages = self._query(
             self.config.notion_db_readiness,
-            filter_={"property": "Date", "date": {"on_or_after": cutoff}},
+            filter_=_date_window("Date", cutoff, today),
             sorts=[{"property": "Date", "direction": "descending"}],
         )
         out = []
@@ -2131,10 +2142,13 @@ class Repository:
             if not iso:
                 continue
             try:
-                entries.append((date.fromisoformat(str(iso)[:10]),
-                                notion.get_property(p, "Pain", "number") or 0))
+                day = date.fromisoformat(str(iso)[:10])
             except ValueError:
                 continue
+            # As of the day asked for: a later check-in's pain must not reset
+            # an earlier day's streak (2026-10-21).
+            if day <= today:
+                entries.append((day, notion.get_property(p, "Pain", "number") or 0))
         if not entries:
             return 0
         entries.sort(reverse=True)
@@ -2157,7 +2171,7 @@ class Repository:
         cutoff = (today - timedelta(days=days)).isoformat()
         pages = self._query(
             self.config.notion_db_readiness,
-            filter_={"property": "Date", "date": {"on_or_after": cutoff}},
+            filter_=_date_window("Date", cutoff, today),
         )
         vals = [
             v for p in pages
@@ -2811,7 +2825,7 @@ class Repository:
         cutoff = (today - timedelta(days=days)).isoformat()
         pages = self._query(
             self.config.notion_db_training,
-            filter_={"property": "Session Date", "date": {"on_or_after": cutoff}},
+            filter_=_date_window("Session Date", cutoff, today),
         )
         sessions_by_id: dict[str, dict] = {}
         for p in pages:

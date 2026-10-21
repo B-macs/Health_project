@@ -746,9 +746,9 @@
       ]
     },
     "I64": {
-      "endpoint": "GET /api/insights/queue",
+      "endpoint": "GET /api/insights/warnings",
       "test": [
-        "tests/api/test_api_insights.py::test_a_check_in_note_is_parsed_on_save_and_reaches_the_calendar"
+        "tests/api/test_api_insights.py::test_the_warnings_are_the_days_the_load_was_lowered"
       ]
     },
     "I65": {

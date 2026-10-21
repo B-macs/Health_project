@@ -277,6 +277,37 @@ def test_the_queue_opens_on_a_month_and_steps(env, monkeypatch):
     assert env.ok(monkeypatch, "post", "/api/insights/queue/process") == {"total": 0, "errors": []}
 
 
+def test_the_warnings_are_the_days_the_load_was_lowered(env, monkeypatch):
+    """The owner, 2026-10-21: "I thought the warning was the days that it says reduce
+    load because of tiredness or other reason strain". Each day's own decision, with the
+    reading it named; a day with no reading, a clear day and a day after his are none."""
+    import types
+    from services import load_warnings
+    kinds = {TODAY - timedelta(days=2): ("error", "Made-up reading A."),
+             TODAY - timedelta(days=1): ("warning", "Made-up reading B."),
+             TODAY - timedelta(days=5): ("info", ""),
+             TODAY: ("neutral", "")}
+    asked: list[date] = []
+
+    def verdict(repo, day):
+        asked.append(day)
+        kind, cause = kinds.get(day, ("", ""))
+        return types.SimpleNamespace(banner_kind=kind, cause=cause)
+    monkeypatch.setattr(load_warnings.decision, "day_verdict", verdict)
+    body = env.ok(monkeypatch, "get", "/api/insights/warnings")
+    assert (body["year"], body["month"]) == (TODAY.year, TODAY.month), "opens on his month"
+    days = {d["date"]: d for week in body["weeks"] for d in week}
+    assert days[(TODAY - timedelta(days=2)).isoformat()]["level"] == "rest"
+    assert days[(TODAY - timedelta(days=2)).isoformat()]["cause"] == "Made-up reading A."
+    assert days[(TODAY - timedelta(days=1)).isoformat()]["level"] == "reduced"
+    assert days[(TODAY - timedelta(days=5)).isoformat()]["level"] == "held"
+    assert days[TODAY.isoformat()]["level"] is None and days[TODAY.isoformat()]["is_today"]
+    assert body["counts"] == {"rest": 1, "reduced": 1, "held": 1}
+    assert max(asked) == TODAY, "no day after his is worked out"
+    later = env.ok(monkeypatch, "get", f"/api/insights/warnings?year={TODAY.year}&month={TODAY.month % 12 + 1}")
+    assert all(d["level"] is None for week in later["weeks"] for d in week)
+
+
 def test_trends_wait_for_enough_data(env, monkeypatch):
     body = env.ok(monkeypatch, "get", "/api/insights/trends")
     assert not body["gate"]["enough"] and body["analysis"] is None

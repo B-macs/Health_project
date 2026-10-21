@@ -15,8 +15,10 @@ import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
 import { InsightsHead } from '../ui/InsightsHead'
 import { failure } from './FlexibilityShared'
-import { QUEUE } from './InsightsWarnings'
 import { SLEEP_ARCH } from './InsightsSleep'
+
+/** The keyword parse of typed notes (its queue and the run on demand). */
+export const QUEUE = '/api/insights/queue'
 
 type Schemas = components['schemas']
 

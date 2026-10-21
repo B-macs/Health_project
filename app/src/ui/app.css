@@ -2109,14 +2109,24 @@ button.card {
   color: var(--text);
 }
 
-.cal__day[data-level='monitor'] {
+/* The days the app lowered the load (2026-10-21): rest the strongest, reduced softer, held
+ * an outline only. The key under the calendar draws the same three. */
+.cal__day[data-level='rest'],
+.warnkey--rest {
+  background: var(--f1);
+  color: var(--bg);
+}
+
+.cal__day[data-level='reduced'],
+.warnkey--reduced {
   background: var(--f-soft);
   color: var(--text);
 }
 
-.cal__day[data-level='flag'] {
-  background: var(--f1);
-  color: var(--bg);
+.cal__day[data-level='held'],
+.warnkey--held {
+  border: var(--hair) dashed var(--f2);
+  color: var(--text);
 }
 
 .cal__day--on {

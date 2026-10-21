@@ -119,12 +119,18 @@ def _seed(repo, ask) -> None:
         "anatomical_locations": ["Central Lower Back", "Glute Medius — Right"]}})
 
 
+#: Made-up tired nights, so the warnings calendar shows each of its levels: a very low
+#: night (rest advised) and a low one (reduced load), as (HRV, resting heart rate).
+TIRED = {TODAY - timedelta(days=3): (22.0, 66.0), TODAY - timedelta(days=6): (33.0, 59.0)}
+
+
 def _bio(day: date):
     """A made-up night's blended readings: each day's numbers come from its date."""
     from services.models import BiometricRecord
     i = day.toordinal()
+    hrv, rhr = TIRED.get(day, (40.0 + i % 6, 54.0 + i % 4))
     return BiometricRecord(
-        date=day.isoformat(), hrv_ms=40.0 + i % 6, resting_heart_rate=54.0 + i % 4,
+        date=day.isoformat(), hrv_ms=hrv, resting_heart_rate=rhr,
         sleep_duration_hours=6.75 + (i % 4) * 0.25, steps=7000 + 250 * (i % 9),
         oura_hrv_balance=70.0 + i % 7, oura_recovery_index=80.0, oura_previous_night=75.0,
         oura_resting_heart_rate_score=85.0, oura_body_temperature=90.0,
@@ -246,6 +252,7 @@ def build() -> dict:
             _made_up_reads(repo)
             out["engine"] = ask("get", "/api/insights/engine")
             out["queue"] = ask("get", "/api/insights/queue")
+            out["warnings"] = ask("get", "/api/insights/warnings")
             out["trends"] = ask("get", "/api/insights/trends")
             out["sleep_architecture"] = ask("get", "/api/insights/sleep-architecture")
             out["tables"] = {t: ask("get", f"/api/data/tables/{t}")

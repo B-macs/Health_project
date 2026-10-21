@@ -8254,6 +8254,92 @@
         "title": "WakeControl",
         "type": "object"
       },
+      "WarningDay": {
+        "properties": {
+          "cause": {
+            "default": "",
+            "title": "Cause",
+            "type": "string"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "in_month": {
+            "title": "In Month",
+            "type": "boolean"
+          },
+          "is_today": {
+            "title": "Is Today",
+            "type": "boolean"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          }
+        },
+        "required": [
+          "date",
+          "in_month",
+          "is_today"
+        ],
+        "title": "WarningDay",
+        "type": "object"
+      },
+      "WarningsOut": {
+        "description": "Insights › Warnings since 2026-10-21: the days the app told him to\nlower the load (services/load_warnings.py).",
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counts",
+            "type": "object"
+          },
+          "month": {
+            "title": "Month",
+            "type": "integer"
+          },
+          "next": {
+            "$ref": "#/components/schemas/YearMonth"
+          },
+          "previous": {
+            "$ref": "#/components/schemas/YearMonth"
+          },
+          "weeks": {
+            "items": {
+              "items": {
+                "$ref": "#/components/schemas/WarningDay"
+              },
+              "type": "array"
+            },
+            "title": "Weeks",
+            "type": "array"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "year",
+          "month",
+          "previous",
+          "next",
+          "weeks",
+          "counts"
+        ],
+        "title": "WarningsOut",
+        "type": "object"
+      },
       "WatchOnlyNight": {
         "properties": {
           "hypnogram": {
@@ -10048,6 +10134,105 @@
           }
         },
         "summary": "Get Trends"
+      }
+    },
+    "/api/insights/warnings": {
+      "get": {
+        "description": "The days the app told him to lower the load, one month at a time\n(services/load_warnings.py; the owner, 2026-10-21).",
+        "operationId": "get_warnings_api_insights_warnings_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2100,
+                  "minimum": 2000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Year"
+            }
+          },
+          {
+            "in": "query",
+            "name": "month",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 12,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Month"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WarningsOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Warnings"
       }
     },
     "/api/oura/callback": {

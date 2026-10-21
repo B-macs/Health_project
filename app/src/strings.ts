@@ -688,17 +688,25 @@ export const S = {
   },
   // Insights › Warnings (Phase 8): the month's calendar of flagged entries.
   warn: {
-    none: 'No warnings on record.',
     previous: 'Earlier month',
     next: 'Later month',
     weekdays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    // The keyword parse's levels of a typed note (Insights › Trends uses them).
     level: { flag: 'Flag', monitor: 'Monitor', none: 'Clear' } as Record<string, string>,
     dayLabel: (day: string, level: string) => `${day}, ${level}`,
     areas: (parts: string) => `Body areas: ${parts}`,
-    noneOnDay: 'No warnings on this day.',
-    // Notes the warning check has not read yet (it reads each note when a save stores it).
-    waiting: (n: number) =>
-      `${n} ${n === 1 ? 'note is' : 'notes are'} not checked for warnings yet. Your next save checks ${n === 1 ? 'it' : 'them'}.`,
+    // The calendar since 2026-10-21: the days the app told you to lower the load.
+    intro: 'The days the app told you to rest, to lower the load, or to keep it at your last session, and why.',
+    load: { rest: 'Rest advised', reduced: 'Reduced load', held: 'Load held' } as Record<string, string>,
+    why: {
+      rest: 'Your readings asked for rest.',
+      reduced: 'Your readings asked for less load.',
+      held: 'The load stayed at your last session: too few days without pain.',
+    } as Record<string, string>,
+    clear: 'No warning',
+    noneOnDay: 'No warning on this day: the app did not lower the load.',
+    key: 'What the colours mean',
+    count: (word: string, n: number) => `${word}: ${n} ${n === 1 ? 'day' : 'days'}`,
   },
   // Insights › Trends (Phase 8): what the check-in notes said over time, and the multi-week analysis.
   trend: {

@@ -15,7 +15,7 @@ from datetime import date, datetime, timezone
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
-from services import background_writer, data_check, engine_actions
+from services import background_writer, data_check, engine_actions, load_warnings
 from services import flexibility_screen as fxs
 from services import insights_screens as ins
 from services.background_sync import BackgroundSyncRunner, SyncBusyError
@@ -28,7 +28,7 @@ from ..schemas_insights import (CaptureStartIn, CaptureStepIn, ClearedOut, DataC
                                 ManualSyncOut, MetabolismOut, MissingIn, OuraCallbackIn, OuraLoginIn,
                                 OuraLoginOut, OuraLoginStatus, PlanStartIn, ProcessOut,
                                 QueueOut, SessionChecksOut, SettingsOut, SleepArchitectureOut,
-                                StrengthOut, TrendsOut)
+                                StrengthOut, TrendsOut, WarningsOut)
 
 router = APIRouter()
 
@@ -136,6 +136,16 @@ def get_queue(year: int | None = Query(default=None, ge=2000, le=2100),
 @router.post("/api/insights/queue/process", response_model=ProcessOut)
 def post_queue_process(repo: Repository = Depends(get_repository)) -> dict:
     return ins.process_queue(repo)
+
+
+@router.get("/api/insights/warnings", response_model=WarningsOut)
+def get_warnings(year: int | None = Query(default=None, ge=2000, le=2100),
+                 month: int | None = Query(default=None, ge=1, le=12),
+                 today: date = Depends(local_today),
+                 repo: Repository = Depends(get_repository)) -> dict:
+    """The days the app told him to lower the load, one month at a time
+    (services/load_warnings.py; the owner, 2026-10-21)."""
+    return load_warnings.calendar(repo, today, year, month)
 
 
 @router.get("/api/insights/trends", response_model=TrendsOut)

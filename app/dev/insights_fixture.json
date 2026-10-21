@@ -640,8 +640,8 @@
     "traffic_light": {
       "cards": [
         {
-          "change": "▼ 3.5%",
-          "comparison": "28d avg: 42.5 ms",
+          "change": "▼ 1.0%",
+          "comparison": "28d avg: 41.4 ms",
           "key": "hrv_ms",
           "label": "HRV",
           "missing_source": null,
@@ -649,8 +649,8 @@
           "value": "41.0 ms"
         },
         {
-          "change": "▼ 0.9%",
-          "comparison": "28d avg: 55.5 bpm",
+          "change": "▼ 1.7%",
+          "comparison": "28d avg: 55.9 bpm",
           "key": "resting_heart_rate",
           "label": "RHR",
           "missing_source": null,
@@ -10897,7 +10897,7 @@
           "active_kcal": null,
           "alcohol_units": null,
           "date": "2026-10-14",
-          "hrv_ms": 41.0,
+          "hrv_ms": 33.0,
           "oura_activity_balance": 72.0,
           "oura_body_temperature": 90.0,
           "oura_hrv_balance": 73.0,
@@ -10916,7 +10916,7 @@
           "oura_sleep_restless_periods": null,
           "oura_sleep_total_seconds": null,
           "oura_temperature_deviation": 0.05,
-          "resting_heart_rate": 57.0,
+          "resting_heart_rate": 59.0,
           "sleep_deep_hours": null,
           "sleep_duration_hours": 7.5,
           "sources_missing": [],
@@ -10987,7 +10987,7 @@
           "active_kcal": null,
           "alcohol_units": null,
           "date": "2026-10-17",
-          "hrv_ms": 44.0,
+          "hrv_ms": 22.0,
           "oura_activity_balance": 72.0,
           "oura_body_temperature": 90.0,
           "oura_hrv_balance": 76.0,
@@ -11006,7 +11006,7 @@
           "oura_sleep_restless_periods": null,
           "oura_sleep_total_seconds": null,
           "oura_temperature_deviation": -0.05,
-          "resting_heart_rate": 56.0,
+          "resting_heart_rate": 66.0,
           "sleep_deep_hours": null,
           "sleep_duration_hours": 7.25,
           "sources_missing": [],
@@ -11416,5 +11416,279 @@
         "0"
       ]
     }
+  },
+  "warnings": {
+    "counts": {
+      "held": 18,
+      "reduced": 1,
+      "rest": 1
+    },
+    "month": 10,
+    "next": {
+      "month": 11,
+      "year": 2026
+    },
+    "previous": {
+      "month": 9,
+      "year": 2026
+    },
+    "weeks": [
+      [
+        {
+          "cause": "",
+          "date": "2026-09-28",
+          "in_month": false,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-09-29",
+          "in_month": false,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-09-30",
+          "in_month": false,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-01",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-02",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-03",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-04",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        }
+      ],
+      [
+        {
+          "cause": "",
+          "date": "2026-10-05",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-06",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-07",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-08",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-09",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-10",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-11",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        }
+      ],
+      [
+        {
+          "cause": "",
+          "date": "2026-10-12",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-13",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "HRV 33 ms, 22% below your 28-day average of 42.2 ms.",
+          "date": "2026-10-14",
+          "in_month": true,
+          "is_today": false,
+          "level": "reduced"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-15",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-16",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "HRV 22 ms, 47% below your 28-day average of 41.4 ms.",
+          "date": "2026-10-17",
+          "in_month": true,
+          "is_today": false,
+          "level": "rest"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-18",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        }
+      ],
+      [
+        {
+          "cause": "",
+          "date": "2026-10-19",
+          "in_month": true,
+          "is_today": false,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-20",
+          "in_month": true,
+          "is_today": true,
+          "level": "held"
+        },
+        {
+          "cause": "",
+          "date": "2026-10-21",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-22",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-23",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-24",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-25",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        }
+      ],
+      [
+        {
+          "cause": "",
+          "date": "2026-10-26",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-27",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-28",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-29",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-30",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-10-31",
+          "in_month": true,
+          "is_today": false,
+          "level": null
+        },
+        {
+          "cause": "",
+          "date": "2026-11-01",
+          "in_month": false,
+          "is_today": false,
+          "level": null
+        }
+      ]
+    ],
+    "year": 2026
   }
 }

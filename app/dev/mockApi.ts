@@ -100,7 +100,7 @@ function answerSchedule(path: string, body: Record<string, unknown> | null, run:
 const insights = insightsFixture as unknown as {
   strength: Record<string, unknown>; metabolism: Record<string, unknown>
   flexibility_empty: unknown; flexibility_capturing: Record<string, unknown>; flexibility_populated: unknown
-  capture: { states: unknown[] }; engine: unknown; queue: unknown; trends: unknown; trends_closed: unknown
+  capture: { states: unknown[] }; engine: unknown; queue: unknown; warnings: unknown; trends: unknown; trends_closed: unknown
   sleep_architecture: unknown; sleep_architecture_empty: unknown; tables: Record<string, unknown>
   session_checks: unknown; settings: unknown
 }
@@ -231,6 +231,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     if (url.pathname === '/api/insights/flexibility') return send(200, flexibilityOf(runOf(req), scenarioOf(req)))
     if (url.pathname === '/api/insights/engine') return send(200, insights.engine)
     if (url.pathname === '/api/insights/queue') return send(200, insights.queue)
+    if (url.pathname === '/api/insights/warnings') return send(200, insights.warnings)
     if (url.pathname === '/api/insights/trends') {
       return send(200, scenarioOf(req).has('trends_closed') ? insights.trends_closed : insights.trends)
     }

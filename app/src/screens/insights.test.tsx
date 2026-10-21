@@ -35,6 +35,7 @@ const F = fixture as unknown as {
   capture: { states: Schemas['FlexCapture'][] }
   engine: Schemas['EngineDataOut']
   queue: Schemas['QueueOut']
+  warnings: Schemas['WarningsOut']
   trends: Schemas['TrendsOut']
   trends_closed: Schemas['TrendsOut']
   sleep_architecture: Schemas['SleepArchitectureOut']
@@ -324,32 +325,41 @@ describe('Engine data', () => {
   })
 })
 
-describe('Warnings', () => {
-  it('draws the month with its marked days, and a tapped day\'s entries', () => {
-    const q = F.queue
-    const marked = q.weeks.flat().find((d) => d.entries.length > 0)!
-    const html = draw(<WarningsBody view={fresh(q)} data={q} picked={marked.date} onPick={none} onMonth={none} />)
-    expect(html).toContain(`data-level="${marked.level}"`)
-    expect(text(html)).toContain(S.warn.level[marked.entries[0]!.level]!)
-    expect(text(html)).toContain(S.warn.areas(marked.entries[0]!.parts))
-    expect(text(draw(<WarningsBody view={fresh(q)} data={q} picked={null} onPick={none} onMonth={none} />)))
-      .not.toContain(S.warn.areas(marked.entries[0]!.parts))
+describe('Warnings (the days the app lowered the load, since 2026-10-21)', () => {
+  const W = F.warnings
+  const days = W.weeks.flat()
+  const today = days.find((d) => d.is_today)!.date
+  const at = (level: string) => days.find((d) => d.level === level && d.in_month)!
+
+  it('marks each day by what the app said, with a key that counts the month', () => {
+    const raw = draw(<WarningsBody view={fresh(W)} data={W} today={today} picked={null} onPick={none} onMonth={none} />)
+    for (const level of ['rest', 'reduced', 'held']) {
+      expect(raw).toContain(`data-level="${level}"`)
+      expect(text(raw)).toContain(S.warn.count(S.warn.load[level]!, W.counts[level]!))
+    }
+    expect(text(raw)).toContain(S.warn.intro)
   })
 
-  it('a picked day with no warning says so (it opens on today, picked)', () => {
-    const q = F.queue
-    const clear = q.weeks.flat().find((d) => d.in_month && d.entries.length === 0)!
-    const html = text(draw(<WarningsBody view={fresh(q)} data={q} picked={clear.date} onPick={none} onMonth={none} />))
-    expect(html).toContain(S.warn.noneOnDay)
+  it('a picked rest or reduced day names the reading; a held day says why it was held', () => {
+    const rest = at('rest')
+    const html = text(draw(<WarningsBody view={fresh(W)} data={W} today={today} picked={rest.date} onPick={none} onMonth={none} />))
+    expect(html).toContain(S.warn.load.rest)
+    expect(html).toContain(rest.cause || S.warn.why.rest!)
+    const held = at('held')
+    const heldHtml = text(draw(<WarningsBody view={fresh(W)} data={W} today={today} picked={held.date} onPick={none} onMonth={none} />))
+    expect(heldHtml).toContain(S.warn.load.held)
+    expect(heldHtml).toContain(held.cause || S.warn.why.held!)
   })
 
-  it('says when notes still wait for the warning check', () => {
-    const q = { ...F.queue, pending_notes: 2, pending_readiness: 1 }
-    expect(text(draw(<WarningsBody view={fresh(q)} data={q} picked={null} onPick={none} onMonth={none} />)))
-      .toContain(S.warn.waiting(3))
-    const none0 = { ...F.queue, pending_notes: 0, pending_readiness: 0 }
-    expect(draw(<WarningsBody view={fresh(none0)} data={none0} picked={null} onPick={none} onMonth={none} />))
-      .not.toContain('warnings-waiting')
+  it('a picked day the app did not lower the load says so, and a day after today cannot be picked', () => {
+    // The made-up month is held on every other day, so one day is made clear here.
+    const day = at('held').date
+    const C = { ...W, weeks: W.weeks.map((w) => w.map((d) => (d.date === day ? { ...d, level: null, cause: '' } : d))) }
+    expect(text(draw(<WarningsBody view={fresh(C)} data={C} today={today} picked={day} onPick={none} onMonth={none} />)))
+      .toContain(S.warn.noneOnDay)
+    const raw = draw(<WarningsBody view={fresh(W)} data={W} today={today} picked={null} onPick={none} onMonth={none} />)
+    const pickable = days.filter((d) => d.date <= today && (d.in_month || d.level)).length
+    expect((raw.match(/class="cal__day[^"]*"[^>]*aria-pressed/g) ?? []).length).toBe(pickable)
   })
 })
 

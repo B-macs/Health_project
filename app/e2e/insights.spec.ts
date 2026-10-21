@@ -62,6 +62,10 @@ test('Insights opens each screen in the same page, each drawn from the engine\'s
   await back(page).click()
   await page.getByRole('button', { name: S.ins.warnings }).click()
   await expect(page.getByTestId('calendar')).toBeVisible()
+  // The days the app lowered the load (2026-10-21): a rest day names what it was.
+  await expect(page.getByTestId('warnings-key')).toContainText(S.warn.load.rest!)
+  await page.getByTestId('calendar').getByRole('button', { name: new RegExp(S.warn.load.rest!) }).first().click()
+  await expect(page.getByTestId('day-entries')).toContainText(S.warn.load.rest!)
   await back(page).click()
   await page.getByRole('button', { name: S.ins.sleepArch }).click()
   await expect(page.getByTestId('arch-counts')).toBeVisible()

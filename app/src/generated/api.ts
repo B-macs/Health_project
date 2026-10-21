@@ -301,6 +301,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/insights/warnings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Warnings
+         * @description The days the app told him to lower the load, one month at a time
+         *     (services/load_warnings.py; the owner, 2026-10-21).
+         */
+        get: operations["get_warnings_api_insights_warnings_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/oura/callback": {
         parameters: {
             query?: never;
@@ -3523,6 +3544,44 @@ export interface components {
             /** Source */
             source: string;
         };
+        /** WarningDay */
+        WarningDay: {
+            /**
+             * Cause
+             * @default
+             */
+            cause: string;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** In Month */
+            in_month: boolean;
+            /** Is Today */
+            is_today: boolean;
+            /** Level */
+            level?: string | null;
+        };
+        /**
+         * WarningsOut
+         * @description Insights › Warnings since 2026-10-21: the days the app told him to
+         *     lower the load (services/load_warnings.py).
+         */
+        WarningsOut: {
+            /** Counts */
+            counts: {
+                [key: string]: number;
+            };
+            /** Month */
+            month: number;
+            next: components["schemas"]["YearMonth"];
+            previous: components["schemas"]["YearMonth"];
+            /** Weeks */
+            weeks: components["schemas"]["WarningDay"][][];
+            /** Year */
+            year: number;
+        };
         /** WatchOnlyNight */
         WatchOnlyNight: {
             hypnogram: components["schemas"]["Hypnogram"];
@@ -4346,6 +4405,41 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrendsOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_warnings_api_insights_warnings_get: {
+        parameters: {
+            query?: {
+                year?: number | null;
+                month?: number | null;
+            };
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WarningsOut"];
                 };
             };
             /** @description Validation Error */
