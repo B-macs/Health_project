@@ -79,6 +79,15 @@ def test_a_stale_copy_is_pulled_again_and_a_fresh_one_is_not(copy_path):
     assert again == cf.FRESH
 
 
+def test_a_pull_counts_as_a_write_for_the_reads(copy_path):
+    # A read shared while it is computed (api/healthapi/shared_reads.py) is keyed on the
+    # write counter: one asked after a pull never takes an answer computed before it.
+    from services.clients import sheets
+    before = sheets.write_generation()
+    record_cache.refresh(record_config(copy_path), lambda url, key: FakeStore())
+    assert sheets.write_generation() > before
+
+
 def test_an_open_repository_reads_the_pulled_rows_and_still_writes(copy_path):
     store = FakeStore()
     repo = record_repo(copy_path, store)

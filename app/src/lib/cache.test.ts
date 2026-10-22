@@ -3,7 +3,9 @@
 // screen with the reason. Nothing ever renders blank once something was saved.
 import { describe, expect, it, vi } from 'vitest'
 import { HealthDB } from '../db/schema'
-import { READ_TIMEOUT_MS, SAVED_MS, ageMinutes, cacheFirst, cacheKey, within, type View } from './cache'
+import { api } from './api'
+import { READ_TIMEOUT_MS, SAVED_MS, ageMinutes, cacheFirst, cacheKey, readsOnTheWay, within, type Ctx, type View } from './cache'
+import { bump } from './refresh'
 
 let n = 0
 const freshDb = () => new HealthDB(`cache-test-${++n}-${Date.now()}`)
@@ -104,6 +106,135 @@ describe("a read that never finishes (the owner's iPhone, 2026-10-20)", () => {
     expect(await within(Promise.resolve(3), 50)).toBe(3)
     expect(await within(Promise.reject(new Error('no')), 50)).toBeUndefined()
     expect(await within(new Promise(() => undefined), 30)).toBeUndefined()
+  })
+})
+
+// The first open of 2026-10-22 sent /api/training/day fifteen times in a minute (one for
+// every tab change) and the engine computed every copy: a screen asking for an address
+// already on its way now waits for that read.
+describe('one read per address on its way', () => {
+  const NOON = () => new Date('2026-10-20T12:00:00Z')
+
+  /** A fetch that answers only when told, and counts the requests. */
+  function held() {
+    const waiting: { resolve: (r: Response) => void; reject: (e: unknown) => void }[] = []
+    const fetchImpl = vi.fn(() => new Promise<Response>((resolve, reject) => waiting.push({ resolve, reject })))
+    const answerAll = (body: unknown) => waiting.splice(0).forEach((w) =>
+      w.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } })))
+    const failAll = () => waiting.splice(0).forEach((w) => w.reject(new TypeError('Failed to fetch')))
+    return { fetchImpl: fetchImpl as unknown as typeof fetch, calls: () => fetchImpl.mock.calls.length, answerAll, failAll }
+  }
+
+  const ctxOf = (fetchImpl: typeof fetch): Ctx => ({ key: 'k', engineDown: false, fetchImpl, now: NOON })
+
+  /** Start a read and wait until it is on its way (it shows its saved answer just before). */
+  async function start<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx) {
+    const seen: View<T>[] = []
+    const done = cacheFirst<T>(store, path, day, ctx, (v) => seen.push(v))
+    await vi.waitFor(() => expect(seen.length).toBe(1))
+    return { seen, done }
+  }
+
+  it('a second screen asking for the same address waits for the read on its way', async () => {
+    const store = freshDb()
+    const f = held()
+    const a = await start<{ n: number }>(store, '/api/training/day', null, ctxOf(f.fetchImpl))
+    const b = await start<{ n: number }>(store, '/api/training/day', null, ctxOf(f.fetchImpl))
+    expect(f.calls()).toBe(1)
+    expect(readsOnTheWay()).toBe(1)
+    f.answerAll({ n: 1 })
+    await Promise.all([a.done, b.done])
+    expect(a.seen.at(-1)).toMatchObject({ state: 'fresh', data: { n: 1 } })
+    expect(b.seen.at(-1)).toMatchObject({ state: 'fresh', data: { n: 1 } })
+    expect(readsOnTheWay()).toBe(0)
+  })
+
+  it('a write that ended meanwhile: the next screen asks again', async () => {
+    const store = freshDb()
+    const f = held()
+    const a = await start(store, '/api/checkin?date=2026-10-20', null, ctxOf(f.fetchImpl))
+    await api('/api/checkin', { method: 'PUT', key: 'k', body: {}, fetchImpl: answer(200, {}) })
+    const b = await start(store, '/api/checkin?date=2026-10-20', null, ctxOf(f.fetchImpl))
+    expect(f.calls()).toBe(2)
+    f.answerAll({})
+    await Promise.all([a.done, b.done])
+  })
+
+  it('a sync that ran meanwhile: the next screen asks again', async () => {
+    const store = freshDb()
+    const f = held()
+    const a = await start(store, '/api/today', null, ctxOf(f.fetchImpl))
+    bump()
+    const b = await start(store, '/api/today', null, ctxOf(f.fetchImpl))
+    expect(f.calls()).toBe(2)
+    f.answerAll({})
+    await Promise.all([a.done, b.done])
+  })
+
+  it('another day, or another address, is another read', async () => {
+    const store = freshDb()
+    const f = held()
+    const reads = [
+      await start(store, '/api/today', '2026-10-19', ctxOf(f.fetchImpl)),
+      await start(store, '/api/today', '2026-10-20', ctxOf(f.fetchImpl)),
+      await start(store, '/api/today/week', '2026-10-20', ctxOf(f.fetchImpl)),
+    ]
+    expect(f.calls()).toBe(3)
+    f.answerAll({})
+    await Promise.all(reads.map((r) => r.done))
+  })
+
+  it('a failed read fails for every screen that waited, and the next one asks again', async () => {
+    const store = freshDb()
+    const f = held()
+    const a = await start(store, '/api/training/session', null, ctxOf(f.fetchImpl))
+    const b = await start(store, '/api/training/session', null, ctxOf(f.fetchImpl))
+    f.failAll()
+    await Promise.all([a.done, b.done])
+    expect([a.seen.at(-1)?.state, b.seen.at(-1)?.state]).toEqual(['offline', 'offline'])
+    const c = await start(store, '/api/training/session', null, ctxOf(f.fetchImpl))
+    expect(f.calls()).toBe(2)
+    f.answerAll({})
+    await c.done
+  })
+})
+
+// A today address: on the morning of 2026-10-22 Home showed the day before's "Rest day" under
+// Thursday's date until the engine answered.
+describe('an address that answers for today', () => {
+  const at = (iso: string): Ctx => ({ key: 'k', engineDown: false, fetchImpl: answer(503, { error: 'engine_unavailable' }),
+    now: () => new Date(iso) })
+
+  async function keptOn(store: HealthDB, fetchedAt: string) {
+    await store.cache.put({ key: cacheKey('/api/training/day', null), path: '/api/training/day', day: null,
+      body: { date: fetchedAt.slice(0, 10) }, fetched_at: fetchedAt })
+  }
+
+  async function shown(store: HealthDB, ctx: Ctx, today: boolean | undefined) {
+    const seen: View<{ date: string }>[] = []
+    await cacheFirst<{ date: string }>(store, '/api/training/day', null, ctx, (v) => seen.push(v), { today })
+    return seen.map((v) => [v.state, v.data])
+  }
+
+  it('does not show a copy kept on an earlier day: the screen loads instead', async () => {
+    const store = freshDb()
+    await keptOn(store, '2026-10-21T12:00:00.000Z')
+    expect(await shown(store, at('2026-10-22T12:00:00Z'), true)).toEqual([
+      ['loading', undefined], ['engine_unavailable', undefined]])
+  })
+
+  it('shows a copy kept earlier the same day (the gym with no signal)', async () => {
+    const store = freshDb()
+    await keptOn(store, '2026-10-22T06:00:00.000Z')
+    expect(await shown(store, at('2026-10-22T12:00:00Z'), true)).toEqual([
+      ['loading', { date: '2026-10-22' }], ['engine_unavailable', { date: '2026-10-22' }]])
+  })
+
+  it('an address with its own day in it shows its copy whenever it was kept', async () => {
+    const store = freshDb()
+    await keptOn(store, '2026-10-21T12:00:00.000Z')
+    expect(await shown(store, at('2026-10-22T12:00:00Z'), undefined)).toEqual([
+      ['loading', { date: '2026-10-21' }], ['engine_unavailable', { date: '2026-10-21' }]])
   })
 })
 

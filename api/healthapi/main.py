@@ -27,6 +27,7 @@ from . import __version__, engine, settings  # noqa: E402
 from .auth import require_engine_key  # noqa: E402
 from .routes import (checkin, health, insights, probes, readiness, status,  # noqa: E402
                      today, today_detail, training)
+from .shared_reads import SharedReads, slots_from_env  # noqa: E402
 
 _IMPORT_SECONDS = time.perf_counter() - _T0
 
@@ -81,6 +82,10 @@ def create_app(startup: bool = True, with_probes: bool | None = None) -> FastAPI
         response = await call_next(request)
         response.headers["Cache-Control"] = "no-store"
         return response
+
+    # Outermost of the app's own layers (added last): identical reads that arrive together
+    # share one answer, and only a few reads compute at once (shared_reads.py, 2026-10-22).
+    app.add_middleware(SharedReads, limit=slots_from_env())
 
     app.include_router(health.router)
     app.include_router(readiness.router)

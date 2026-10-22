@@ -4,7 +4,7 @@
 // waits blank. A saved answer is replaced only by a good one.
 import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import type { HealthDB } from '../db/schema'
-import { ApiError, api, localDay, type ApiErrorKind } from './api'
+import { ApiError, api, localDay, writesEnded, type ApiErrorKind } from './api'
 import { currentEpoch, subscribe } from './refresh'
 
 export type FetchState = 'loading' | 'fresh' | ApiErrorKind
@@ -35,6 +35,15 @@ export function cacheKey(path: string, day: string | null): string {
   return day ? `${path}|${day}` : path
 }
 
+/** How a screen reads an address. `today`: the address answers for today (Today's and
+ *  Training's addresses with no day in them), so a copy saved on an earlier day is not
+ *  shown: on the morning of 2026-10-22, Home showed the day before's "Rest day" under
+ *  Thursday's date until the engine answered. The screen loads instead, as the Sleep
+ *  screen does when a night is not there yet. */
+export interface ReadOptions {
+  today?: boolean
+}
+
 /** How long a screen waits for the engine before it shows its saved answer with the reason
  *  (2026-10-20: on the owner's iPhone, reads that never finished left every screen on its
  *  saved copy with no word of why, and the Strength buttons seemed dead). The Worker gives
@@ -61,14 +70,40 @@ export function within<T>(promise: Promise<T>, ms: number): Promise<T | undefine
   })
 }
 
+/** The engine reads on their way. A screen that asks for an address already on its way
+ *  waits for that read instead of sending another (2026-10-22: the first open of the
+ *  morning sent /api/training/day fifteen times in a minute, one for every tab change, and
+ *  the engine computed every copy side by side on its one processor). A read is shared only
+ *  while nothing can have changed its answer: the same day and key, no sync run since
+ *  (lib/refresh.ts) and no write ended since (lib/api.ts). */
+const onTheWay = new Map<string, Promise<unknown>>()
+
+/** For the tests: how many reads are on their way. */
+export const readsOnTheWay = (): number => onTheWay.size
+
 function ask<T>(path: string, day: string | null, ctx: Ctx): Promise<T> {
-  return api<T>(path, {
+  const asOf = day ?? localDay(ctx.now?.())
+  const id = [currentEpoch(), writesEnded(), ctx.key ?? '', ctx.engineDown, asOf, cacheKey(path, day)].join('|')
+  const waiting = onTheWay.get(id)
+  if (waiting) return waiting as Promise<T>
+  const read: Promise<T> = api<T>(path, {
     key: ctx.key,
-    day: day ?? localDay(ctx.now?.()),
+    day: asOf,
     engineDown: ctx.engineDown,
     fetchImpl: ctx.fetchImpl,
     timeoutMs: ctx.readTimeoutMs ?? READ_TIMEOUT_MS,
+  }).finally(() => {
+    if (onTheWay.get(id) === read) onTheWay.delete(id)
   })
+  onTheWay.set(id, read)
+  return read
+}
+
+/** A saved answer the screen may show: for a `today` address, only one kept on this day. */
+function showable(saved: { fetched_at: string } | undefined, day: string | null, ctx: Ctx,
+  options: ReadOptions | undefined): boolean {
+  if (!saved || !options?.today) return !!saved
+  return localDay(new Date(saved.fetched_at)) === (day ?? localDay(ctx.now?.()))
 }
 
 /** Ask the engine and keep its answer. Throws an ApiError; the saved row stays. */
@@ -92,9 +127,10 @@ export async function keepAnswer(store: HealthDB, path: string, day: string | nu
  *  before it is kept, so a stalled database never holds it back, and a read that takes
  *  longer than READ_TIMEOUT_MS ends as "no connection" with the code "timeout". */
 export async function cacheFirst<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx,
-  show: (view: View<T>) => void): Promise<void> {
+  show: (view: View<T>) => void, options?: ReadOptions): Promise<void> {
   const savedMs = ctx.savedMs ?? SAVED_MS
-  const saved = await within(store.cache.get(cacheKey(path, day)), savedMs)
+  const row = await within(store.cache.get(cacheKey(path, day)), savedMs)
+  const saved = showable(row, day, ctx, options) ? row : undefined
   const kept: View<T> = { data: saved?.body as T | undefined, fetchedAt: saved?.fetched_at ?? null, state: 'loading' }
   show(kept)
   let body: T
@@ -114,8 +150,8 @@ export async function cacheFirst<T>(store: HealthDB, path: string, day: string |
  *  changes (another day), the previous address's answer is never shown under it, not even
  *  for one frame. A read the screen makes by itself (opening it, coming back to the app) is
  *  quiet; a read `again()` asked for is `pressed` until its answer comes. */
-export function useCached<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx):
-  View<T> & { again: () => void } {
+export function useCached<T>(store: HealthDB, path: string, day: string | null, ctx: Ctx,
+  options?: ReadOptions): View<T> & { again: () => void } {
   const key = cacheKey(path, day)
   const [view, setView] = useState<View<T> & { key: string }>({ key: '', data: undefined, fetchedAt: null, state: 'loading' })
   const [tick, setTick] = useState(0)
@@ -131,13 +167,13 @@ export function useCached<T>(store: HealthDB, path: string, day: string | null, 
       if (!alive) return
       setView({ ...next, key })
       if (next.state !== 'loading') setPressed(false)
-    })
+    }, { today: options?.today })
     return () => {
       alive = false
     }
-    // ctx is rebuilt on every render; its two values are the real inputs
+    // ctx and options are rebuilt on every render; their values are the real inputs
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [store, path, day, ctx.key, ctx.engineDown, tick, epoch])
+  }, [store, path, day, ctx.key, ctx.engineDown, tick, epoch, options?.today])
   if (view.key !== key) return { data: undefined, fetchedAt: null, state: 'loading', again }
   return { data: view.data, fetchedAt: view.fetchedAt, state: view.state, code: view.code,
     pressed: pressed && view.state === 'loading', again }

@@ -16,6 +16,7 @@ import type { components } from '../generated/api'
 import { localDay } from '../lib/api'
 import { useApp } from '../lib/appState'
 import { useCached, type View } from '../lib/cache'
+import { useToday } from '../lib/day'
 import {
   answerCarry, answerShift, clearRefused, gate1Flare, gate1Reason, redoWeek, swapWithToday, useConfirmed,
   useScheduleAnswers,
@@ -25,6 +26,7 @@ import { loadState, newExerciseIds, newSessionId, startSessionState, type Plan, 
 import { S } from '../strings'
 import { Freshness } from '../ui/Freshness'
 import { IconPlus } from '../ui/icons'
+import { Spinner } from '../ui/parts'
 import { Sheet } from '../ui/Sheet'
 import { HomeItems, Timeline } from '../ui/timeline'
 import { AccessoryOverview, ExtrasMenu, Outdoor, YogaDetail, YogaList } from './Extras'
@@ -61,6 +63,29 @@ export function noSessionReason(day: DayPlan | undefined): string | null {
       : o?.screen === 'logged' ? 'already_logged'
         : o?.screen === 'not_started' ? 'not_started'
           : o?.screen === 'complete' ? 'complete' : null
+}
+
+/** What today's overview says while it has no session to show. A read the engine was too
+ *  slow for is said as such, never as "no connection" (2026-10-22: the first open of the
+ *  morning took 45-64 s, and the screen said there was no connection). */
+export function noSessionLine(reason: string | null, session: Pick<View<Plan>, 'state' | 'code'>):
+  { text: string; reading: boolean } {
+  if (reason) return { text: S.session.noSession[reason], reading: false }
+  if (session.state === 'loading') return { text: S.session.reading, reading: true }
+  if (session.state === 'offline' && session.code === 'timeout') return { text: S.session.slowEngine, reading: false }
+  if (session.state === 'offline' || session.state === 'engine_unavailable') {
+    return { text: S.session.needsEngine, reading: false }
+  }
+  return { text: S.session.noSessionOther, reading: false }
+}
+
+function NoSession({ line }: { line: { text: string; reading: boolean } }) {
+  return (
+    <p className={`caption${line.reading ? ' fresh__reading' : ''}`} data-testid="no-session">
+      {line.reading && <Spinner />}
+      {line.text}
+    </p>
+  )
 }
 
 function Progress({ value, label }: { value: number; label: string }) {
@@ -149,7 +174,7 @@ function Overview({ day, onStart, starting, waitingMove, movedAt }: {
   waitingMove: boolean; movedAt: string | undefined
 }) {
   const { store, ctx } = useApp()
-  const session = useCached<Plan>(store, '/api/training/session', null, ctx)
+  const session = useCached<Plan>(store, '/api/training/session', null, ctx, { today: true })
   const held = waitingMove || (movedAt !== undefined && (session.state !== 'fresh' || (session.fetchedAt ?? '') < movedAt))
   const [garmin, setGarmin] = useState(false)
   const [adapting, setAdapting] = useState(false)
@@ -214,15 +239,7 @@ function Overview({ day, onStart, starting, waitingMove, movedAt }: {
           </div>
           {adapting && <AdaptSheet a={plan.adaptation} onClose={() => setAdapting(false)} />}
         </>
-      ) : (
-        <p className="caption" data-testid="no-session">
-          {reason
-            ? S.session.noSession[reason]
-            : session.state === 'loading' ? S.fresh.loading
-              : session.state === 'offline' || session.state === 'engine_unavailable' ? S.session.needsEngine
-                : S.session.noSessionOther}
-        </p>
-      )}
+      ) : <NoSession line={noSessionLine(reason, session)} />}
     </div>
   )
 }
@@ -242,8 +259,10 @@ function WeekBody({ weekStart, setWeekStart, homeWeek, setHomeWeek, selected, se
 }) {
   const { store, ctx } = useApp()
   const today = localDay()
-  const week = useCached<WeekAnswer>(store, weekStart ? `/api/training/week?week_start=${weekStart}` : '/api/training/week', null, ctx)
-  const day = useCached<DayAnswer>(store, selected === today ? '/api/training/day' : `/api/training/day?date=${selected}`, null, ctx)
+  const week = useCached<WeekAnswer>(store, weekStart ? `/api/training/week?week_start=${weekStart}` : '/api/training/week', null, ctx,
+    { today: weekStart === null })
+  const day = useCached<DayAnswer>(store, selected === today ? '/api/training/day' : `/api/training/day?date=${selected}`, null, ctx,
+    { today: selected === today })
   const w = week.data
   // This week's own Monday, from the answer at the address with no week in it: a swipe that
   // comes back to this week reads that address again, never a second one the phone has kept
@@ -318,7 +337,12 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
   const [cleared, setCleared] = useState(0)
   const [weekStart, setWeekStart] = useState<string | null>(null)
   const [homeWeek, setHomeWeek] = useState<string | null>(null)
-  const [selected, setSelected] = useState(localDay())
+  // The day picked in the strip, with the day it was picked on: a pick lasts that day, so a
+  // page left open overnight opens on the new today, not on the day before (2026-10-22).
+  const today = useToday()
+  const [picked, setPicked] = useState<{ day: string; on: string } | null>(null)
+  const selected = picked && picked.on === today ? picked.day : today
+  const setSelected = useCallback((day: string) => setPicked({ day, on: localDay() }), [])
   const [answered, setAnswered] = useState<Record<string, string>>({})
   const [menu, setMenu] = useState(false)
   const answer: Answer = (key, send) => {
@@ -332,7 +356,7 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
       <header className="head head--row">
         <div>
           <h1 className="head__title">{S.session.title}</h1>
-          <div className="caption">{longDate(localDay())}</div>
+          <div className="caption">{longDate(today)}</div>
         </div>
         <button className="iconbtn" aria-label={S.week.plus} data-testid="plus" onClick={() => setMenu(true)}>
           <IconPlus />

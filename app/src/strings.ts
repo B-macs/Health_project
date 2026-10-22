@@ -113,6 +113,8 @@ export const S = {
     start: 'Start session',
     starting: 'Getting today’s session…',
     needsEngine: 'The session comes from the engine. There is no connection now, and this phone has not saved today’s session yet.',
+    reading: 'Reading today’s session…',
+    slowEngine: 'The engine took too long to answer. It can be starting, or busy with the morning sync. Read again in a minute.',
     noSession: {
       rest_day: 'Rest day: no session today.',
       already_logged: 'Today’s session is already logged.',

@@ -26,7 +26,7 @@ type StrainDetail = Schemas['StrainDetailOut']
 
 function useDetail<T>(base: string, extra: Record<string, string> = {}) {
   const { store, ctx, pick } = useApp()
-  return useCached<T>(store, dayPath(base, pick, extra), null, ctx)
+  return useCached<T>(store, dayPath(base, pick, extra), null, ctx, { today: !pick })
 }
 
 export function ReadinessBody({ d }: { d: ReadinessDetail }) {

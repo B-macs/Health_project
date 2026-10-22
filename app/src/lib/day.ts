@@ -6,7 +6,26 @@
 // is the ENGINE's rule (services/home.py:opening_day, H7): the phone sends both days with
 // `picked_on` and shows the day the engine answers for; when the engine answers today,
 // the pick is dropped. The phone keeps no copy of the rule (rebuild rule 1).
+import { useEffect, useState } from 'react'
 import { localDay } from './api'
+
+const systemNow = (): Date => new Date()
+
+/** The phone's day, again each time the app comes to the front and once a minute: a page
+ *  left open overnight shows the new day, never the day it was opened on (2026-10-22). */
+export function useToday(now: () => Date = systemNow): string {
+  const [day, setDay] = useState(() => localDay(now()))
+  useEffect(() => {
+    const check = () => setDay(localDay(now()))
+    document.addEventListener('visibilitychange', check)
+    const timer = setInterval(check, 60_000)
+    return () => {
+      document.removeEventListener('visibilitychange', check)
+      clearInterval(timer)
+    }
+  }, [now])
+  return day
+}
 
 export interface Pick {
   day: string

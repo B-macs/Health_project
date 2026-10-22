@@ -16,7 +16,7 @@ import { DetailFrame } from '../ui/detail'
 import { Freshness } from '../ui/Freshness'
 import { CheckInForm, checkinStage, type Sending } from './CheckIn'
 import { ReadinessBody, SleepBody, StrainBody } from './Details'
-import { TodayView, tone, verdictLines } from './Today'
+import { TodayView, planForDay, tone, verdictLines } from './Today'
 
 const LOCAL = '2026-10-20'
 const SAVED_AT = '2026-10-20T05:00:00Z'
@@ -296,5 +296,16 @@ describe('the movement strip', () => {
     const html = draw(<MovementStrip strip={strip} />)
     for (const level of ['1', '2', '3', '4']) expect(html).toContain(`move move--${level}`)
     expect(html).not.toContain('move--0')
+  })
+})
+
+// 2026-10-22: the day before's saved "Rest day" stood under Thursday's date on Home while the
+// engine answered.
+describe("Home's plan card", () => {
+  it('shows only the plan of the day on the header', () => {
+    const plan = { date: '2026-10-21', route: 'rest' } as Parameters<typeof planForDay>[0]
+    expect(planForDay(plan, '2026-10-22')).toBeUndefined()
+    expect(planForDay(plan, '2026-10-21')).toBe(plan)
+    expect(planForDay(undefined, '2026-10-22')).toBeUndefined()
   })
 })

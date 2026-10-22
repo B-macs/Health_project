@@ -108,12 +108,22 @@ function Plan({ plan }: { plan: DayPlan }) {
   )
 }
 
+/** The plan Home shows: only the plan of the day on the header (2026-10-22: the day
+ *  before's saved "Rest day" stood under Thursday's date while the engine answered). */
+export function planForDay(plan: DayPlan | undefined, shownDay: string): DayPlan | undefined {
+  return plan?.date === shownDay ? plan : undefined
+}
+
 export function Today() {
   const { store, ctx, pick, showDay } = useApp()
-  const view = useCached<TodayAnswer>(store, dayPath('/api/today', pick), null, ctx)
-  const week = useCached<WeekAnswer>(store, dayPath('/api/today/week', pick), null, ctx)
+  // With no day picked the addresses answer for today: a copy saved on an earlier day is
+  // not shown (lib/cache.ts ReadOptions), so the day shown is never the day before's.
+  const view = useCached<TodayAnswer>(store, dayPath('/api/today', pick), null, ctx, { today: !pick })
+  const week = useCached<WeekAnswer>(store, dayPath('/api/today/week', pick), null, ctx, { today: !pick })
   const shownDay = view.data?.date ?? pick?.day ?? localDay()
-  const plan = useCached<DayPlan>(store, shownDay === localDay() ? '/api/training/day' : `/api/training/day?date=${shownDay}`, null, ctx)
+  const planToday = shownDay === localDay()
+  const plan = useCached<DayPlan>(store, planToday ? '/api/training/day' : `/api/training/day?date=${shownDay}`, null, ctx,
+    { today: planToday })
   // The engine opened another day than the one picked (a pick lasts the day it was made
   // on): follow the engine.
   const answered = view.data?.date
@@ -122,7 +132,8 @@ export function Today() {
     if (answered && pick && answered !== pick.day) showDay(answeredToday ? null : answered)
   }, [answered, answeredToday, pick, showDay])
   const status = useCached<Status>(store, '/api/status', null, ctx)
-  return <TodayView view={view} week={week.data} plan={plan.data} shownDay={shownDay} notices={status.data?.notices ?? []} />
+  return <TodayView view={view} week={week.data} plan={planForDay(plan.data, shownDay)} shownDay={shownDay}
+    notices={status.data?.notices ?? []} />
 }
 
 /** The engine's sync notices (H21-H24): a dead Oura login is an alert, a failed step a caption. */

@@ -119,8 +119,13 @@ def refresh(config, store_factory=None) -> str:
     the backup their connections see the new rows at their next read, where
     a replaced file would leave them on the old one (and Windows will not
     replace an open file at all). The whole pull holds WRITE_LOCK, so no row
-    this process writes meanwhile is lost."""
+    this process writes meanwhile is lost.
+
+    The pull counts as a write for the reads (services/clients/sheets.py's
+    write counter): a read computed from the copy before it is not an answer
+    after it (api/healthapi/shared_reads.py shares a read only under one count)."""
     from services import supabase_store
+    from services.clients import sheets
 
     key = _key(config.datastore_path)
     store = (store_factory or supabase_store.SupabaseStore)(
@@ -144,6 +149,7 @@ def refresh(config, store_factory=None) -> str:
         with _LOCK:
             _HYDRATED.add(key)
             _PULLED_AT[key] = time.time()
+        sheets.bump_write_generation()
     return config.datastore_path
 
 

@@ -16,7 +16,7 @@ import {
 import { S } from '../strings'
 import { arrivalTimer, SessionFlow } from './Session'
 import { HeartRateMatch, reviewLine } from './SessionSave'
-import { Banner, longDate, noSessionReason } from './TrainingTab'
+import { Banner, longDate, noSessionLine, noSessionReason } from './TrainingTab'
 import * as fx from '../../dev/fixtures'
 
 const plan = fixture as unknown as Plan
@@ -251,5 +251,29 @@ describe('the overview and the flow, as drawn', () => {
     const html = render(at(firstEntry(walk)))
     expect(html).toContain('data-testid="garmin-activity"')
     expect(html).not.toContain('role="timer"')
+  })
+})
+
+// 2026-10-22: the first open of the morning took 45-64 s, the phone stopped waiting at 30 s,
+// and the overview said there was no connection.
+describe("today's overview while it has no session", () => {
+  it('says it is reading while the session is on its way', () => {
+    expect(noSessionLine(null, { state: 'loading' })).toEqual({ text: S.session.reading, reading: true })
+  })
+
+  it('a read the engine was too slow for is said as such, never as no connection', () => {
+    const line = noSessionLine(null, { state: 'offline', code: 'timeout' })
+    expect(line).toEqual({ text: S.session.slowEngine, reading: false })
+    expect(line.text).not.toBe(S.session.needsEngine)
+  })
+
+  it('no network, or the engine down, still says the session needs the engine', () => {
+    expect(noSessionLine(null, { state: 'offline', code: 'network' }).text).toBe(S.session.needsEngine)
+    expect(noSessionLine(null, { state: 'engine_unavailable' }).text).toBe(S.session.needsEngine)
+  })
+
+  it("the day's own reason comes first", () => {
+    expect(noSessionLine('rest_day', { state: 'loading' })).toEqual({ text: S.session.noSession.rest_day, reading: false })
+    expect(noSessionLine(null, { state: 'fresh' }).text).toBe(S.session.noSessionOther)
   })
 })

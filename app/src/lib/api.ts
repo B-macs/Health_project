@@ -45,7 +45,25 @@ export interface RequestOptions {
 
 const ENGINE_DOWN = new Set(['engine_unavailable', 'engine_timeout', 'not_configured'])
 
+let writes = 0
+
+/** How many writes (POST, PUT, DELETE) have ended in this run of the app, sent or not. A
+ *  read on its way from before a write ended never answers a read asked after it
+ *  (lib/cache.ts shares one read per address). */
+export function writesEnded(): number {
+  return writes
+}
+
 export async function api<T>(path: string, options: RequestOptions): Promise<T> {
+  const writing = (options.method ?? 'GET') !== 'GET'
+  try {
+    return await send<T>(path, options)
+  } finally {
+    if (writing) writes += 1
+  }
+}
+
+async function send<T>(path: string, options: RequestOptions): Promise<T> {
   if (options.engineDown) throw new ApiError('engine_unavailable', null, 'debug_engine_down')
   const headers: Record<string, string> = {
     Accept: 'application/json',
