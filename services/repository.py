@@ -239,6 +239,30 @@ _OURA_DAILY_ENDPOINTS = (
 _OURA_SYNC_ORDER = ("daily", "sleep_periods", "workouts", "sessions", "rest_mode_periods")
 
 
+def _page_sets(page: dict) -> list[dict]:
+    """A training page's per-set array; [] when it is empty or unparseable."""
+    try:
+        sets = json.loads(notion.get_property(page, "Sets", "rich_text") or "[]")
+    except Exception:
+        return []
+    return sets if isinstance(sets, list) else []
+
+
+def _newest_page_with_sets(pages: list[dict] | None) -> tuple[dict | None, list[dict]]:
+    """(page, sets) of the newest page by Session Date that holds at least one
+    set, or (None, []) when none does. A skipped exercise is stored with no sets
+    (WP-22, 2026-10-22), so "the last time" is the newest page that was done.
+    On one date the first page in query order wins, as before."""
+    dated = sorted(enumerate(pages or []),
+                   key=lambda ip: (notion.get_property(ip[1], "Session Date", "date") or "", -ip[0]),
+                   reverse=True)
+    for _i, page in dated:
+        sets = _page_sets(page)
+        if sets:
+            return page, sets
+    return None, []
+
+
 def _working_volume_kg(sets: list[dict]) -> float:
     """Sum of reps x weight across WORKING sets only — the value written to
     every `total_volume_kg`, and the one services/volume.py adds up.
@@ -2445,21 +2469,15 @@ class Repository:
         flow. Deliberately does NOT touch the Notes field (that feeds the
         unrelated AI sentiment pipeline — see get_unparsed_session_notes).
 
-        Returns None if the movement has never been logged, or its most
-        recent logged page has an empty/unparseable Sets JSON."""
-        pages = self._query(
+        Returns None if the movement has never been logged with a set. A
+        page with an empty/unparseable Sets JSON is passed over, so a skipped
+        exercise (stored with no sets, WP-22) never hides the last session
+        that was done."""
+        latest, sets = _newest_page_with_sets(self._query(
             self.config.notion_db_training,
             filter_={"property": "Movement", "title": {"equals": movement_name}},
             sorts=[{"property": "Session Date", "direction": "descending"}],
-        )
-        if not pages:
-            return None
-        latest = max(pages, key=lambda p: notion.get_property(p, "Session Date", "date") or "")
-        sets_raw = notion.get_property(latest, "Sets", "rich_text") or "[]"
-        try:
-            sets = json.loads(sets_raw)
-        except Exception:
-            sets = []
+        ))
         if not sets:
             return None
         last_set = sets[-1]
@@ -2487,24 +2505,15 @@ class Repository:
         stepper should seed from. The rep range is unaffected either way:
         ramp exercises carry no rep_min/rep_max, so it never runs on them.
 
-        Returns None if the movement has never been logged, or its most
-        recent logged page has an empty/unparseable Sets JSON."""
-        pages = self._query(
+        Returns None if the movement has never been logged with a set; a
+        skipped exercise's page (no sets, WP-22) is passed over, as in
+        get_last_performance."""
+        _latest, sets = _newest_page_with_sets(self._query(
             self.config.notion_db_training,
             filter_={"property": "Movement", "title": {"equals": movement_name}},
             sorts=[{"property": "Session Date", "direction": "descending"}],
-        )
-        if not pages:
-            return None
-        latest = max(pages, key=lambda p: notion.get_property(p, "Session Date", "date") or "")
-        sets_raw = notion.get_property(latest, "Sets", "rich_text") or "[]"
-        try:
-            sets = json.loads(sets_raw)
-        except Exception:
-            sets = []
-        if not sets:
-            return None
-        return sets
+        ))
+        return sets or None
 
     def get_recent_session_sets(self, movement_name: str,
                                 limit: int = 8) -> list[tuple[str, list[dict]]]:

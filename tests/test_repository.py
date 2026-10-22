@@ -432,6 +432,35 @@ def test_get_last_performance_parses_band_tier():
     assert result["weight_kg"] == 0.0
 
 
+def test_get_last_performance_passes_over_a_skipped_newer_session():
+    """WP-22 (2026-10-22): a skipped exercise is stored with no sets, so it must
+    not hide the last session that was done (the next weight seeds from it)."""
+    done = {"properties": {
+        "Movement": _title_prop("Romanian Deadlift (DB)"), "Session Date": _date_prop("2026-10-20"),
+        "Sets": _rich_text_prop(json.dumps([{"reps": 10, "weight": 40.0}])),
+    }}
+    skipped = {"properties": {
+        "Movement": _title_prop("Romanian Deadlift (DB)"), "Session Date": _date_prop("2026-10-22"),
+        "Sets": _rich_text_prop("[]"),
+    }}
+    repo = _repo({"db-training": [skipped, done]})
+    last = repo.get_last_performance("Romanian Deadlift (DB)")
+    assert last["session_date"] == "2026-10-20" and last["weight_kg"] == 40.0
+
+
+def test_get_last_session_all_sets_passes_over_a_skipped_newer_session():
+    done = {"properties": {
+        "Movement": _title_prop("Romanian Deadlift (DB)"), "Session Date": _date_prop("2026-10-20"),
+        "Sets": _rich_text_prop(json.dumps([{"reps": 10, "weight": 40.0}] * 3)),
+    }}
+    skipped = {"properties": {
+        "Movement": _title_prop("Romanian Deadlift (DB)"), "Session Date": _date_prop("2026-10-22"),
+        "Sets": _rich_text_prop("[]"),
+    }}
+    repo = _repo({"db-training": [skipped, done]})
+    assert repo.get_last_session_all_sets("Romanian Deadlift (DB)") == [{"reps": 10, "weight": 40.0}] * 3
+
+
 def test_get_last_performance_empty_sets_json_returns_none():
     page = {"properties": {
         "Movement": _title_prop("Goblet Squat"), "Session Date": _date_prop("2026-07-14"),

@@ -174,9 +174,13 @@ def exercise_from_flow(ex: dict, exercise_id: str, *, actual: dict | None = None
     The Garmin-verified minutes and the live reps, weight and band steppers
     replace the prescription, on a copy, so the plan's own dict is never
     changed. The per-set records captured as each set was finished are the
-    sets; when none were captured (a session saved without the guided flow,
-    or a checkpoint from before per-set capture), the prescription is repeated
-    with the stepped values (sessions.make_sets_data).
+    sets. `logged_sets` None means no set was captured because the flow did
+    not run (a session saved without the guided flow, or a checkpoint from
+    before per-set capture): the prescription is repeated with the stepped
+    values (sessions.make_sets_data). An EMPTY list means the flow ran and
+    recorded no set: the exercise was skipped, and it is stored with its
+    planned sets and no set done (WP-22, 2026-10-22). Until then a skip
+    stored the prescription as if it was done.
 
     `movement_type_override` stores every exercise under one Type: the
     accessory session's, which keeps it from marking a plan day done
@@ -205,7 +209,7 @@ def exercise_from_flow(ex: dict, exercise_id: str, *, actual: dict | None = None
         movement_type=movement_type_override or sess.movement_category(ex),
         planned_sets=ex.get("sets", 1),
         planned_reps=sess.planned_reps(ex),
-        sets=tuple(logged_sets or sess.make_sets_data(log_ex)),
+        sets=tuple(sess.make_sets_data(log_ex) if logged_sets is None else logged_sets),
         note=note,
         garmin_avg_hr=detail.get("avg_hr"),
         garmin_max_hr=detail.get("max_hr"),

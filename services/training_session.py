@@ -269,13 +269,18 @@ def au_by_rpe(minutes: int | float) -> list[float]:
 
 def _set_log(exercises: list[dict], flow_ex: list[dict]) -> dict[int, list[dict]]:
     """Each exercise's recorded sets: built here from the phone's raw facts
-    (session_save.records_from_raw) when it sent them, else as sent."""
+    (session_save.records_from_raw) when it sent them, else as sent. The phone
+    walks every exercise of the session and records each set it completes, so
+    an exercise with neither was skipped: it gets an empty list, and the save
+    stores it with no set done (WP-22) rather than its prescription."""
     out: dict[int, list[dict]] = {}
     for i, e in enumerate(exercises):
         if e.get("raw_sets"):
             out[i] = session_save.records_from_raw(flow_ex[i], list(e["raw_sets"]))
         elif e.get("sets"):
             out[i] = list(e["sets"])
+        else:
+            out[i] = []
     return out
 
 

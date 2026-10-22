@@ -285,6 +285,23 @@ RAW_BODY = {
 }
 
 
+def test_a_skipped_exercise_is_stored_with_no_set_done(monkeypatch, local_copy):
+    """WP-22 (2026-10-22): an exercise the phone sends with no raw set was
+    skipped. It is stored with its planned sets and none done, and no set row;
+    the save used to store its prescription as if it was done."""
+    body = {**RAW_BODY, "session_id": "2026-10-19-5c1pped0",
+            "exercises": [RAW_BODY["exercises"][1],
+                          {"exercise_id": "ex-skipped", "exercise": GOBLET, "raw_sets": []}]}
+    store = FakeStore()
+    repo = record_repo(local_copy, store)
+    with _client(monkeypatch, repo, local_copy) as c:
+        assert _send(c, "post", "/api/training/sessions", body).status_code == 200
+    skipped = next(r for r in _rows(store, "training_exercises") if r["exercise_id"] == "ex-skipped")
+    assert skipped["planned_sets"] == 3 and skipped["actual_sets"] == 0
+    assert not [s for s in _rows(store, "training_sets") if s["exercise_id"] == "ex-skipped"]
+    assert [s for s in _rows(store, "training_sets") if s["exercise_id"] == "ex-split"]
+
+
 def test_raw_sets_become_the_engines_own_set_records(monkeypatch, local_copy):
     from services import guided_flow, session_save
     from services import sessions as sess
