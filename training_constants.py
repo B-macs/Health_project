@@ -346,6 +346,9 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Walking Lunge (DB)",
     "Hack Squat",
     "Hack Squat (Ramp Set)",
+    # The hack squat's swap when its machine is in use (goal_block.ALTERNATIVES).
+    "V Squat",
+    "V Squat (Ramp Set)",
     "Seated Leg Curl",
     "Adductor Machine (Seated)",
     "Standing Cable Hip Flexion",
@@ -685,6 +688,8 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Walking Lunge (DB)":                     {"upper_body": 0.05, "core": 0.20, "lower_body": 0.75},
     "Hack Squat":                             {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     "Hack Squat (Ramp Set)":                  {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "V Squat":                                {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
+    "V Squat (Ramp Set)":                     {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90},
     "Seated Leg Curl":                        {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
     "Adductor Machine (Seated)":              {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
     "Standing Cable Hip Flexion":             {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80},
@@ -946,6 +951,8 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Walking Lunge (DB)":                       ("squat", 1.3),
     "Hack Squat":                               ("squat", 1.3),
     "Hack Squat (Ramp Set)":                    ("squat", 1.3),
+    "V Squat":                                  ("squat", 1.3),
+    "V Squat (Ramp Set)":                       ("squat", 1.3),
     # A hip hinge with a plate held: the hinge tier, as the hip thrust.
     "45° Back Extension":                       ("hinge", 1.0),
     "Machine Chest Press":                      ("upper_push", 0.7),

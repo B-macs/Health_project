@@ -239,6 +239,16 @@ PICKS: dict[str, Pick] = {
         "tier_lists/quads.md #6, S — named the list's best",
         listed_as="Hack squat",
         better=_TIER_FIRST + "; the pendulum squat is also S, and the list names the hack squat best"),
+    # The hack squat's swap when its machine is in use (goal_block.ALTERNATIVES, WP-28).
+    "V Squat": Pick(
+        "A", "quads", "strength and size",
+        "The hack squat's place when its machine is in use: a squat machine with a back pad, "
+        "the quads first and glute max second.",
+        "his note, 2026-10-22: 'hack squat change to V squat'",
+        listed_as="",
+        better="Checked 2026-10-22 against tier_lists/quads.md: the pendulum squat (S) is not "
+               "in his gym (his answer 9, 2026-10-22), and the 45° leg press (A) is a lower tier "
+               "with less depth; the V squat keeps the hack squat's back-supported squat"),
     "Walking Lunge (DB)": Pick(
         "A", "glute max", "strength and size",
         "The glutes' best exercise, with the quads second; one set is both legs, as he "

@@ -24,8 +24,8 @@ import {
 import {
   advance, back, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder, exerciseProgress, finished,
   lastRecorded, setBand, setGarmin, setNote, setRecordedSide, setSide, sideValues, skip, stepBand, stepWeight,
-  timerHere, withTimer, type Exercise, type FlowStep, type GarminPull, type Side, type SideValues,
-  type TrainingState,
+  swapCandidates, swapTo, timerHere, withTimer, type Exercise, type FlowStep, type GarminPull, type Side,
+  type SideValues, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { clock, useWakeLock } from '../ui/hooks'
@@ -372,6 +372,7 @@ export function SessionFlow({ s, update, onExit }: {
   const order = exerciseOrder(s)
   const n = order.length
   const candidates = !resting && !t ? doFirstCandidates(s) : []
+  const swaps = !resting && !t ? swapCandidates(s) : []
   const ended = t && hasEnded(t, now)
   const seconds = t ? shownSeconds(t, now) : null
   const fraction = t && t.lengthMs ? Math.min(1, 1 - remainingMs(t, now) / t.lengthMs) : 0
@@ -440,7 +441,14 @@ export function SessionFlow({ s, update, onExit }: {
 
       {asking === 'busy' && (
         <section className="card group" role="dialog" aria-label={S.session.inUse} data-testid="in-use">
-          <p>{S.session.doFirstAsk}</p>
+          {swaps.length > 0 && <p>{S.session.swapAsk}</p>}
+          {swaps.map((a) => (
+            <button key={a.name} className="btn btn--glass btn--wide" onClick={() => {
+              setAsking(null)
+              update((x) => swapTo(x, a))
+            }}>{S.session.swapFor(a.name)}</button>
+          ))}
+          {candidates.length > 0 && <p>{S.session.doFirstAsk}</p>}
           {candidates.map((c) => (
             <button key={c.group} className="btn btn--glass btn--wide" onClick={() => {
               setAsking(null)
@@ -595,7 +603,7 @@ export function SessionFlow({ s, update, onExit }: {
         </button>
         <button className="btn btn--glass" onClick={() => setAsking('skip')}>{S.session.skip}</button>
       </div>
-      {candidates.length > 0 && (
+      {(candidates.length > 0 || swaps.length > 0) && (
         <button className="btn btn--glass btn--wide" onClick={() => setAsking('busy')}>{S.session.inUse}</button>
       )}
     </div>

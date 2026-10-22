@@ -4945,6 +4945,41 @@
         "title": "Sector",
         "type": "object"
       },
+      "SessionAlternative": {
+        "description": "A lift's swap when its equipment is in use (WP-28): the entries that\nrun in the place of group `for_group`, numbered from 0, with their own\nwalk. The phone adds them to the session only when the athlete swaps.",
+        "properties": {
+          "exercises": {
+            "items": {
+              "$ref": "#/components/schemas/SessionExercise"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "for_group": {
+            "title": "For Group",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/FlowStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          }
+        },
+        "required": [
+          "for_group",
+          "name",
+          "exercises",
+          "steps"
+        ],
+        "title": "SessionAlternative",
+        "type": "object"
+      },
       "SessionChecksOut": {
         "properties": {
           "warnings": {
@@ -5321,6 +5356,14 @@
         "properties": {
           "adaptation": {
             "$ref": "#/components/schemas/Adaptation"
+          },
+          "alternatives": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SessionAlternative"
+            },
+            "title": "Alternatives",
+            "type": "array"
           },
           "ask_length_above_minutes": {
             "anyOf": [

@@ -142,19 +142,10 @@ def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tu
     }
 
 
-def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
-            decided: dict) -> dict:
-    """A session as it runs today, from a plan day's content (or the
-    accessory session's, accessory.build_day): every exercise dosed by the
-    one load decision (sessions.dosed_day), each seeded in order, a ramp set
-    after the lift it prepares; the walk; the modelled minutes and the
-    clock's floor; the first side; the banner and the adaptation."""
-    policy, modifier = decided["policy"], decided["modifier"]
-    plan_ex = content["exercises"]
-    dosed = sess.dosed_day(plan_ex, policy["volume_factor"], content.get("day_type"))
-    first = sess.first_side(today)
-    strains = _warning_strains(repo, today)
-    garmin_ok = bool(_try(repo.garmin_configured, False))
+def _seeder(repo, today: date, plan_ex: list[dict], dosed: list[dict], policy: dict,
+            modifier: dict):
+    """seed_for(i): exercise i's seeded numbers, each seeded once, a ramp set
+    after the lift it prepares (its weight follows the lift's)."""
     seeds: dict[int, object] = {}
 
     def seed_for(i: int):
@@ -169,11 +160,59 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
                 policy=policy, today=today, lift_entry=lift_entry)
         return seeds[i]
 
+    return seed_for
+
+
+def _alternatives(repo, today: date, dosed: list[dict], moves: list, first: str,
+                  strains: tuple, garmin_ok: bool, policy: dict, modifier: dict,
+                  day_type: str | None) -> list[dict]:
+    """Each lift's swap when its equipment is in use (WP-28): its entries dosed
+    and seeded as they would run today, from their own history, with their own
+    walk, numbered from 0, and the replaced group's move; one per group whose
+    lift has one (session_order.alternatives_for). The phone puts them in the
+    group's place only when the athlete swaps."""
+    out, done = [], set()
+    for i, ex in enumerate(dosed):
+        alt = session_order.alternatives_for(ex.get("name") or "")
+        move = moves[i]
+        if not alt or move is None or move["group"] in done:
+            continue
+        done.add(move["group"])
+        alt_dosed = sess.dosed_day(alt, policy["volume_factor"], day_type)
+        seed_for = _seeder(repo, today, alt, alt_dosed, policy, modifier)
+        out.append({
+            "for_group": move["group"],
+            "name": alt[-1]["name"],
+            "exercises": [exercise_out(a, j, seed_for(j), sess.ramp_lift_index(alt, j), strains,
+                                       garmin_ok, move) for j, a in enumerate(alt_dosed)],
+            "steps": guided_flow.walk(alt_dosed, first),
+        })
+    return out
+
+
+def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
+            decided: dict) -> dict:
+    """A session as it runs today, from a plan day's content (or the
+    accessory session's, accessory.build_day): every exercise dosed by the
+    one load decision (sessions.dosed_day), each seeded in order, a ramp set
+    after the lift it prepares; the walk; the modelled minutes and the
+    clock's floor; the first side; the banner and the adaptation; and each
+    lift's swap (WP-28)."""
+    policy, modifier = decided["policy"], decided["modifier"]
+    plan_ex = content["exercises"]
+    dosed = sess.dosed_day(plan_ex, policy["volume_factor"], content.get("day_type"))
+    first = sess.first_side(today)
+    strains = _warning_strains(repo, today)
+    garmin_ok = bool(_try(repo.garmin_configured, False))
+    seed_for = _seeder(repo, today, plan_ex, dosed, policy, modifier)
+
     # The accessory session moves nothing: its items are not the block's cards.
     moves = session_order.move_groups(dosed) if kind == PLAN else [None] * len(dosed)
     exercises = [exercise_out(ex, i, seed_for(i), sess.ramp_lift_index(plan_ex, i), strains,
                               garmin_ok, moves[i])
                  for i, ex in enumerate(dosed)]
+    alternatives = (_alternatives(repo, today, dosed, moves, first, strains, garmin_ok, policy,
+                                  modifier, content.get("day_type")) if kind == PLAN else [])
     return {
         "kind": kind,
         "date": today,
@@ -198,6 +237,7 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
         "band_tiers": [{"tier": t, "label": sess.BAND_TIER_LABELS.get(t, "")}
                        for t in sess.BAND_TIERS],
         "reasons": list(content.get("accessory_reasons") or ()),
+        "alternatives": alternatives,
     }
 
 

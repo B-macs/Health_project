@@ -306,6 +306,23 @@ def test_todays_session_carries_every_exercise_and_the_walk(env, monkeypatch):
     assert [b["tier"] for b in plan["band_tiers"]] == list(sess.BAND_TIERS)
 
 
+def test_the_hack_squats_day_carries_the_v_squat_in_its_place(env, monkeypatch):
+    """WP-28: the swap rides with the session, dosed, seeded and walked by the
+    engine, numbered from 0, with the hack squat group's move; the session's
+    own list stays the plan's (the phone adds the swap only when it is taken)."""
+    plan = env.ok(monkeypatch, "get", "/api/training/session", local=TUESDAY)
+    hack = next(e for e in plan["exercises"] if e["name"] == "Hack Squat")
+    [alt] = plan["alternatives"]
+    assert alt["name"] == "V Squat" and alt["for_group"] == hack["move"]["group"]
+    assert [e["name"] for e in alt["exercises"]] == ["V Squat (Ramp Set)", "V Squat"]
+    assert [e["index"] for e in alt["exercises"]] == [0, 1] and alt["exercises"][0]["ramp_for"] == 1
+    assert all(e["move"] == hack["move"] for e in alt["exercises"])
+    dosed = sess.dosed_day(gb.ALTERNATIVES["Hack Squat"], plan["adaptation"]["volume_factor"], "main")
+    assert alt["steps"] == json.loads(json.dumps(guided_flow.walk(dosed, plan["first_side"])))
+    assert "V Squat" not in [e["name"] for e in plan["exercises"]]
+    assert env.ok(monkeypatch, "get", "/api/training/session")["alternatives"] == [], "no hack squat on Monday"
+
+
 def test_a_rest_day_has_no_session(env, monkeypatch):
     r = env.call(monkeypatch, "get", "/api/training/session", local=WEDNESDAY)
     assert r.status_code == 409 and r.json() == {"error": "rest_day"}

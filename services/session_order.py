@@ -24,6 +24,12 @@ over goal_week's cards):
 - every other lift ("main") moves.
 An exercise no card names (the accessory session, an older block) does not
 move, so the phone offers nothing there.
+
+A SWAP (WP-28, his note: "hack squat change to V squat"): a lift may have
+entries that run in the place of its group when its equipment is in use
+(goal_block.ALTERNATIVES). The engine sends them dosed, seeded from their own
+history and walked; the phone puts them in the group's place only when the
+athlete swaps, and the swapped-out lift is not saved.
 """
 
 from __future__ import annotations
@@ -38,6 +44,13 @@ def block_sections() -> dict[str, tuple[str, bool]]:
     import goal_week as gw  # the cards hold each exercise's section (placement.order)
     cards = list(gw.WARMUP) + list(gw.CARDS) + list(gw.BONUS_ORDER)
     return {c.name: (c.section, bool(c.is_press)) for c in cards}
+
+
+def alternatives_for(name: str) -> list[dict]:
+    """The entries that run in a lift's place when its equipment is in use
+    (goal_block.ALTERNATIVES: its ramp, then itself), or [] (WP-28)."""
+    import goal_block as gb
+    return list(gb.ALTERNATIVES.get(name, []))
 
 
 def move_groups(exercises: list[dict],

@@ -2495,6 +2495,22 @@ export interface components {
             /** Unloaded Seconds */
             unloaded_seconds: number;
         };
+        /**
+         * SessionAlternative
+         * @description A lift's swap when its equipment is in use (WP-28): the entries that
+         *     run in the place of group `for_group`, numbered from 0, with their own
+         *     walk. The phone adds them to the session only when the athlete swaps.
+         */
+        SessionAlternative: {
+            /** Exercises */
+            exercises: components["schemas"]["SessionExercise"][];
+            /** For Group */
+            for_group: number;
+            /** Name */
+            name: string;
+            /** Steps */
+            steps: components["schemas"]["FlowStep"][];
+        };
         /** SessionChecksOut */
         SessionChecksOut: {
             /** Warnings */
@@ -2588,6 +2604,11 @@ export interface components {
          */
         SessionPlanOut: {
             adaptation: components["schemas"]["Adaptation"];
+            /**
+             * Alternatives
+             * @default []
+             */
+            alternatives: components["schemas"]["SessionAlternative"][];
             /** Ask Length Above Minutes */
             ask_length_above_minutes?: number | null;
             /** Band Tiers */

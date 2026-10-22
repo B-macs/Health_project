@@ -233,6 +233,9 @@ export const S = {
     doFirstAsk: 'Do one of these first. This exercise comes straight after it.',
     doFirst: (name: string) => `Do ${name} now`,
     keepOrder: 'Keep the order',
+    // A swap (WP-28): another exercise in this one's place.
+    swapAsk: 'Do this one in its place:',
+    swapFor: (name: string) => `Swap for ${name}`,
     // The save screen.
     complete: (day: number | null) => (day ? `Day ${day} complete: save your session.` : 'Session complete: save it.'),
     review: 'What you did',

@@ -319,6 +319,46 @@ function renumbered(steps: FlowStep[]): FlowStep[] {
   })
 }
 
+export type Alternative = Schemas['SessionAlternative']
+
+/** The swaps that may be taken now (WP-28): at the first entry of a group, before any of its
+ *  sets, each alternative the engine sent for that group, except the one already running. */
+export function swapCandidates(s: TrainingState): Alternative[] {
+  const step = currentStep(s)
+  if (!step || step.phase === 'resting') return []
+  const here = groupOf(s, step.ex_idx)
+  if (!here) return []
+  if (s.plan.steps.findIndex((st) => groupOf(s, st.ex_idx)?.group === here.group) !== s.step) return []
+  const running = s.plan.exercises[step.ex_idx]?.name
+  return (s.plan.alternatives ?? []).filter((a) =>
+    a.for_group === here.group && !a.exercises.some((e) => e.name === running))
+}
+
+/** Swap the group the flow is on for an alternative (WP-28): its exercises join the session
+ *  with ids of their own and their seeded numbers, its walked steps run in the group's place,
+ *  and the swapped-out lift is not saved (it is in no step). Back undoes the swap. */
+export function swapTo(s: TrainingState, alt: Alternative): TrainingState {
+  const step = currentStep(s)
+  const here = step ? groupOf(s, step.ex_idx) : null
+  if (!step || !here) return s
+  const base = s.plan.exercises.length
+  const exercises = alt.exercises.map((e) => ({
+    ...e, index: base + e.index, ramp_for: e.ramp_for == null ? null : base + e.ramp_for,
+  }))
+  const steps = alt.steps.map((st) => ({ ...st, ex_idx: base + st.ex_idx }))
+  const kept = s.plan.steps.filter((st, i) => !(i >= s.step && groupOf(s, st.ex_idx)?.group === here.group))
+  const next = renumbered([...kept.slice(0, s.step), ...steps, ...kept.slice(s.step)])
+  return {
+    ...s,
+    history: remember(s),
+    plan: { ...s.plan, exercises: [...s.plan.exercises, ...exercises], steps: next },
+    exerciseIds: [...s.exerciseIds, ...newExerciseIds(exercises.length)],
+    live: { ...s.live, ...Object.fromEntries(exercises.map((e) => [e.index, startingLive(e)])) },
+    timer: null,
+    notice: null,
+  }
+}
+
 /** Run `group` now (WP-27): its steps move, in one block, in front of the group the flow is
  *  on, which then comes straight after it. Back undoes the move. */
 export function doFirst(s: TrainingState, group: number): TrainingState {

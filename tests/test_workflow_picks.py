@@ -27,12 +27,14 @@ WEEK = gw.week()
 
 def _every_name() -> set[str]:
     """Every entry the sessions run, in their final order (ramp sets
-    included), plus the home and off-gym items, and every entry of the
-    registered block (goal_block.py): its tests and its Sunday session."""
+    included), plus the home and off-gym items, every entry of the
+    registered block (goal_block.py): its tests and its Sunday session, and
+    every swap a session offers when equipment is in use (WP-28)."""
     names = {c.name for d in gw.DAYS for c in pl.order(WEEK[d])}
     names |= {c.name for c in gw.CARDS + gw.BONUS_ORDER}
     names |= {e["name"] for day in gb.PLAN_GOAL_BLOCK.values()
               for e in day["exercises"] + day.get("home", [])}
+    names |= {e["name"] for alt in gb.ALTERNATIVES.values() for e in alt}
     return names | set(gw.HOME) | set(gw.OFF_GYM)
 
 
@@ -43,7 +45,7 @@ def test_every_exercise_in_the_week_has_a_workflow_record():
 
 def test_the_ramp_sets_are_in_the_sessions_and_read_their_own_record():
     ramps = sorted(n for n in _every_name() if n.endswith("(Ramp Set)"))
-    assert ramps == ["Hack Squat (Ramp Set)", "Romanian Deadlift (Ramp Set)"]
+    assert ramps == ["Hack Squat (Ramp Set)", "Romanian Deadlift (Ramp Set)", "V Squat (Ramp Set)"]
     assert all(gw.pick_for(n) is gw.PICKS["Ramp set"] for n in ramps)
 
 

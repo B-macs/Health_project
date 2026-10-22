@@ -305,6 +305,35 @@ HACK_SQUAT = _ex(
     regression="The hips lift off the pad at the bottom → stop the descent just above that point.",
 )
 
+#: The hack squat's swap when its machine is in use (WP-28). His note of
+#: 2026-10-22: "There should be an option to change the type of the exercise if
+#: the machine isn't available - hack squat change to V squat". Offered under
+#: "In use?" on the session screen (ALTERNATIVES below), never placed by itself.
+V_SQUAT = _ex(
+    name="V Squat",
+    ex_type="reps",
+    sets=3, reps=10, rest_seconds=90,
+    equipment_type="machine", weight_kg=20.0,
+    increment_size=MACHINE_KG, **COMPOUND_RANGE,
+    mechanics=(
+        "Back against the back pad, shoulders under the shoulder pads, feet hip-width in the "
+        "middle of the platform. Bend the knees and lower slowly as deep as your back and hips "
+        "stay on the pad, then press up through the whole foot until the legs are straight, "
+        "without locking the knees hard. The knees follow the line of the toes; on the RIGHT "
+        "the kneecap points straight ahead. Log the plates you add, both sides together. "
+        + _LAST_SET_TO_FAILURE
+    ),
+    biomechanical_focus=(
+        "The hack squat's place when its machine is in use (his note, 2026-10-22): the quads, "
+        "glute max second, on a squat machine with a back pad, as the hack squat. It keeps "
+        "its own history and its own rep-range rule, and gate 1 reads only the hack squat's "
+        "sets. Right kneecap straight ahead above 60 degrees of hip flexion (finding #4, key "
+        "rule 7)."
+    ),
+    progression="The rep-range rule adds 5 kg (2.5 kg a side).",
+    regression="The hips lift off the pad at the bottom → stop the descent just above that point.",
+)
+
 BACK_EXTENSION = _ex(
     name="45° Back Extension",
     ex_type="reps",
@@ -648,6 +677,13 @@ def _ramp(name: str, lift: dict) -> dict:
 
 RDL_RAMP = _ramp("Romanian Deadlift (Ramp Set)", RDL)
 HACK_RAMP = _ramp("Hack Squat (Ramp Set)", HACK_SQUAT)
+V_SQUAT_RAMP = _ramp("V Squat (Ramp Set)", V_SQUAT)
+
+#: Each lift's swap when its equipment is in use (WP-28, his answer 9 of
+#: 2026-10-22: the V squat now, others when he names them): the lift's name, and
+#: the entries that run in the place of its group (its ramp, then itself).
+#: services/session_order.alternatives_for reads it; the phone swaps the group.
+ALTERNATIVES: dict[str, list[dict]] = {"Hack Squat": [V_SQUAT_RAMP, V_SQUAT]}
 
 
 # ─── The four sessions, as placed (goal_week.week(), see the docstring) ─────

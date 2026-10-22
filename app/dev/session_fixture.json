@@ -978,5 +978,110 @@
     "objective": "Made-up next day.",
     "exercises": []
   },
-  "note": ""
+  "note": "",
+  "alternatives": [
+    {
+      "for_group": 2,
+      "name": "Made-up box squat",
+      "exercises": [
+        {
+          "index": 0,
+          "name": "Made-up box squat",
+          "type": "reps",
+          "laterality": "bilateral",
+          "sets": 2,
+          "reps": 10,
+          "reps_in_set": null,
+          "hold_seconds": null,
+          "duration_minutes": null,
+          "rest_seconds": 40.0,
+          "tempo": null,
+          "rep_min": 8,
+          "rep_max": 12,
+          "equipment_type": "machine",
+          "increment_size": 5.0,
+          "increment_unit": "kg",
+          "weight_kg": 30.0,
+          "band_tier": null,
+          "icon": "↕",
+          "warmup": false,
+          "timed_test": false,
+          "timer": null,
+          "prescription": "2 sets × 10 reps (range 8-12)  |  40s rest",
+          "mechanics": "How to do the made-up box squat: made-up words for the tests.",
+          "warning": "",
+          "ramp_for": null,
+          "reps_editable": true,
+          "entry": {
+            "reps": 10,
+            "weight_kg": 30.0,
+            "band_tier": null,
+            "source": "range",
+            "next_step": ""
+          },
+          "previous": null,
+          "previous_caption": "",
+          "delta": "",
+          "delta_direction": "",
+          "entry_caption": "",
+          "contradiction": null,
+          "garmin_pull": false,
+          "garmin_window": null,
+          "estimated_minutes": 1,
+          "move": {
+            "group": 2,
+            "movable": true,
+            "after": []
+          }
+        }
+      ],
+      "steps": [
+        {
+          "index": 0,
+          "ex_idx": 0,
+          "set_num": 1,
+          "rep": 1,
+          "phase": "intro",
+          "side": "left",
+          "event": "complete",
+          "record_set": 1,
+          "rest_begins": true,
+          "rest_ends": false,
+          "ending": null,
+          "timer_starts": null,
+          "skip_to": 3
+        },
+        {
+          "index": 1,
+          "ex_idx": 0,
+          "set_num": 2,
+          "rep": 1,
+          "phase": "resting",
+          "side": "left",
+          "event": "next_set",
+          "record_set": null,
+          "rest_begins": false,
+          "rest_ends": true,
+          "ending": null,
+          "timer_starts": "on_arrival",
+          "skip_to": 3
+        },
+        {
+          "index": 2,
+          "ex_idx": 0,
+          "set_num": 2,
+          "rep": 1,
+          "phase": "intro",
+          "side": "left",
+          "event": "complete",
+          "record_set": 2,
+          "rest_begins": false,
+          "rest_ends": false,
+          "ending": null,
+          "timer_starts": null,
+          "skip_to": 3
+        }
+      ]
+    }
+  ]
 }

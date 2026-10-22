@@ -379,6 +379,16 @@ class NextDay(BaseModel):
     exercises: list[ExerciseLine]
 
 
+class SessionAlternative(BaseModel):
+    """A lift's swap when its equipment is in use (WP-28): the entries that
+    run in the place of group `for_group`, numbered from 0, with their own
+    walk. The phone adds them to the session only when the athlete swaps."""
+    for_group: int
+    name: str
+    exercises: list[SessionExercise]
+    steps: list[FlowStep]
+
+
 class SessionPlanOut(BaseModel):
     """`kind`: plan or accessory."""
     kind: str
@@ -406,6 +416,8 @@ class SessionPlanOut(BaseModel):
     reasons: list[str]
     next_day: NextDay | None
     note: str = ""
+    #: Each lift's swap when its equipment is in use (WP-28); none on most days.
+    alternatives: list[SessionAlternative] = []
 
 
 class CompletionIn(BaseModel):

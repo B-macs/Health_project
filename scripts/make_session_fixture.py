@@ -99,6 +99,25 @@ def build() -> dict:
             "estimated_minutes": max(1, round(sess.exercise_duration_seconds(ex) / 60)),
             "move": moves[i],
         })
+    # A swap for the made-up squat (WP-28), numbered from 0 with its own walk, as
+    # training_session._alternatives sends one.
+    box = {"name": "Made-up box squat", "type": "reps", "laterality": "bilateral", "sets": 2,
+           "reps": 10, "rep_min": 8, "rep_max": 12, "rest_seconds": 40, "equipment_type": "machine",
+           "increment_size": 5.0, "increment_unit": "kg", "weight_kg": 30.0}
+    alternatives = [{
+        "for_group": moves[2]["group"], "name": box["name"],
+        "exercises": [{
+            "index": 0, **{k: box.get(k) for k in ts.EXERCISE_FIELDS},
+            "icon": sess.type_icon(box), "warmup": False, "timed_test": False,
+            "timer": ts.timer_kind(box), "prescription": sess.prescription_label(box),
+            "mechanics": "How to do the made-up box squat: made-up words for the tests.",
+            "warning": "", "ramp_for": None, "reps_editable": sess.reps_are_editable(box),
+            "entry": {"reps": 10, "weight_kg": 30.0, "band_tier": None, "source": "range", "next_step": ""},
+            "previous": None, "previous_caption": "", "delta": "", "delta_direction": "",
+            "entry_caption": "", "contradiction": None, "garmin_pull": False, "garmin_window": None,
+            "estimated_minutes": max(1, round(sess.exercise_duration_seconds(box) / 60)),
+            "move": moves[2]}],
+        "steps": guided_flow.walk([box], FIRST)}]
     model = sess.estimate_duration(exercises)
     plan = {
         "kind": "plan", "date": DAY, "day_num": 2, "plan_days": 84,
@@ -117,6 +136,7 @@ def build() -> dict:
         "reasons": [],
         "next_day": {"day_num": 3, "objective": "Made-up next day.", "exercises": []},
         "note": "",
+        "alternatives": alternatives,
     }
     return SessionPlanOut(**plan).model_dump(mode="json")
 

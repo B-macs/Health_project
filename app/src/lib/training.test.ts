@@ -9,8 +9,8 @@ import fixture from '../../dev/session_fixture.json'
 import {
   advance, asksLength, back, clockMinutes, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder,
   exerciseProgress, finished, lastRecorded, loadState, localStamp, newExerciseIds, newSessionId, saveBody, setBand,
-  setGarmin, setRecordedSide, setSide, sideValues, skip, startSessionState, stepBand, stepWeight, UNDO_LIMIT,
-  type Plan, type TrainingState,
+  setGarmin, setRecordedSide, setSide, sideValues, skip, startSessionState, stepBand, stepWeight, swapCandidates,
+  swapTo, UNDO_LIMIT, type Plan, type TrainingState,
 } from './training'
 
 const plan = fixture as unknown as Plan
@@ -132,6 +132,24 @@ describe('walking the engine steps', () => {
     const walked = walkAll(moved)
     expect(saveBody(walked, 30, 6, '').exercises.map((e) => e.exercise_id).slice(2, 4)).toEqual([`ex-${split}`, `ex-${squat}`])
     expect(back(moved).plan.steps).toEqual(s.plan.steps)
+  })
+
+  it('a swap runs the other exercise in the group\'s place, saves it under its own id, and Back undoes it', () => {
+    // WP-28: "hack squat change to V squat". The made-up session swaps its squat.
+    const s = at(fresh(), 'Made-up squat')
+    const squat = plan.exercises.findIndex((e) => e.name === 'Made-up squat')
+    const swaps = swapCandidates(s)
+    expect(swaps.map((a) => a.name)).toEqual(['Made-up box squat'])
+    const swapped = swapTo(s, swaps[0])
+    const box = swapped.plan.exercises.length - 1
+    expect(exerciseOf(swapped)!.name).toBe('Made-up box squat')
+    expect(exerciseOrder(swapped)).not.toContain(squat)
+    expect(exerciseOrder(swapped)).toContain(box)
+    expect(swapCandidates(swapped)).toEqual([])                       // not the one already running
+    const ids = saveBody(walkAll(swapped), 30, 6, '').exercises.map((e) => e.exercise_id)
+    expect(ids).not.toContain(`ex-${squat}`)
+    expect(ids).toContain(swapped.exerciseIds[box])
+    expect(back(swapped).plan.steps).toEqual(s.plan.steps)
   })
 
   it('Skip moves to the next exercise, and Back undoes the last tap', () => {
