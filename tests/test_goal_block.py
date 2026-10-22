@@ -263,6 +263,47 @@ def test_the_crossover_is_one_arm_at_a_time_with_a_short_rest():
     assert s.session_seconds(gb.SESSIONS["C"]) / 60 <= pl.SESSION_MINUTES_LIMIT
 
 
+def test_the_walking_lunge_is_one_set_for_both_legs():
+    """His note, 2026-10-22: "walking lunge you walk so you do both right and
+    left at the same time". It is alternating: one tap ends a set, and the
+    reps shown are each leg's."""
+    from services import guided_flow
+    for letter in ("A", "D"):
+        lunge = next(x for x in gb.SESSIONS[letter] if x["name"] == "Walking Lunge (DB)")
+        assert lunge["laterality"] == "alternating"
+        working = [st for st in guided_flow.walk([lunge], "right") if st["phase"] != "resting"]
+        assert len(working) == lunge["sets"], "one entry per set, no side steps"
+        assert "each side" in s.prescription_label(lunge)
+
+
+def test_an_alternating_set_counts_both_legs_in_the_tonnage():
+    """The same three sets of 10 at 15 kg count 900 kg whether the lunge is
+    read as one side at a time (its record before 2026-10-22) or alternating:
+    both legs did 10 reps in every set (sessions.logged_sides)."""
+    from datetime import date
+
+    from services import tonnage
+    rows = [{"movement_name": "Walking Lunge (DB)", "session_date": "2026-10-19",
+             "sets": [{"set_num": n, "reps": 10, "weight": 15.0} for n in (1, 2, 3)]}]
+    regions = {"Walking Lunge (DB)": "lower_body"}
+    for sides_trait in (2, s.logged_sides({"laterality": "alternating"})):
+        series, _ = tonnage.weekly_tonnage(rows, regions, today=date(2026, 10, 22), weeks=1,
+                                           traits={"Walking Lunge (DB)": {"sides": sides_trait,
+                                                                          "unit": "kg"}})
+        assert series[-1].sectors["lower_body"].kg == 900.0
+    assert s.exercise_traits()["Walking Lunge (DB)"]["sides"] == 2
+    assert s.sides({"laterality": "alternating"}) == 1, "the time model counts the set once"
+
+
+def test_the_posterior_stabilizing_line_has_the_knee_bent():
+    """His note, 2026-10-22: "Stabilising line should mention that you need to
+    Bend your knee", and his answer: the knee was bent on 2026-10-19, so the
+    text catches up with the position and week 12 repeats it."""
+    line = next(e for e in gb.PLANK_TEST if e["name"] == "Bunkie — Posterior Stabilizing Line (Timed)")
+    assert "knee bent to about 90 degrees" in line["mechanics"]
+    assert "straight" not in line["mechanics"]
+
+
 def test_his_dumbbells_go_up_in_2_5_kg():
     """His answer, 2026-10-22: every dumbbell goes 2.5 to 40 kg in 2.5 kg steps
     (his notes of 2026-10-19/20: a 15 kg lunge, a 40 kg RDL, a 25 kg ramp set).
@@ -314,8 +355,9 @@ def test_the_plank_test_runs_in_weeks_1_and_12_in_place_of_session_a_s_abs():
 
 
 def test_the_test_mondays_run_over_70_minutes_by_his_choice():
-    """With the five timed lines in place of the abs, session A models 75
-    minutes (73 until the crossover became one arm at a time, 2026-10-22).
+    """With the five timed lines in place of the abs, session A models 73
+    minutes (2026-10-22: the one-arm crossover added 2, and the walking lunge,
+    now one set for both legs, took 2 away).
     Asked whether the walking lunge should give way, he kept it (2026-10-16:
     "Leave it in for those days"), so the limit reads the training and not the
     test inside it: the day passes the shape check while its full time stays
@@ -323,7 +365,7 @@ def test_the_test_mondays_run_over_70_minutes_by_his_choice():
     full = s.session_seconds(PLAN[1]["exercises"]) / 60
     training = s.session_seconds(
         [e for e in PLAN[1]["exercises"] if not s.is_measurement(e["name"])]) / 60
-    assert full > pl.SESSION_MINUTES_LIMIT and round(full) == 75
+    assert full > pl.SESSION_MINUTES_LIMIT and round(full) == 73
     assert training <= pl.SESSION_MINUTES_LIMIT
     assert "Walking Lunge (DB)" in _names(PLAN[1]["exercises"])
     assert not s.session_shape_violations(PLAN[1])

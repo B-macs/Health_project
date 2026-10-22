@@ -79,8 +79,10 @@ CHEST_PRESS = Card("Machine Chest Press", area="chest", second="press muscles",
                    fixed_days=PRESS_DAYS)
 HACK = Card("Hack Squat", area="quads", second="glute max", equipment_type="machine",
             kind="compound", demand=3, ramp=True, days=1, pattern="knee")
+#: One set is both legs, one stride after the other (his note, 2026-10-22:
+#: "walking lunge you walk so you do both right and left at the same time").
 LUNGE = Card("Walking Lunge (DB)", area="glute max", second="quads", equipment_type="dumbbell",
-             laterality="unilateral", kind="compound", demand=3, priority=1, days=1, pattern="knee")
+             laterality="alternating", kind="compound", demand=3, priority=1, days=1, pattern="knee")
 RDL = Card("Romanian Deadlift (DB)", area="hamstrings", second="glute max", equipment_type="dumbbell",
            kind="compound", demand=3, priority=1, ramp=True, days=2)
 CURL = Card("Seated Leg Curl", area="hamstrings", reps=12, rest_seconds=75, equipment_type="machine",
@@ -239,7 +241,8 @@ PICKS: dict[str, Pick] = {
         better=_TIER_FIRST + "; the pendulum squat is also S, and the list names the hack squat best"),
     "Walking Lunge (DB)": Pick(
         "A", "glute max", "strength and size",
-        "The glutes' best exercise, with the quads second.",
+        "The glutes' best exercise, with the quads second; one set is both legs, as he "
+        "walks (2026-10-22).",
         "tier_lists/glutes.md #16, S+ — best overall",
         listed_as="Walking lunge",
         better=_TIER_FIRST + "; the top of its list"),

@@ -1828,6 +1828,19 @@ def sides(ex: dict) -> int:
     return 1
 
 
+def logged_sides(ex: dict) -> int:
+    """How many sides one logged set holds: 2 for a two-sided unilateral item
+    (its record keeps the left's numbers only where they differ) and for an
+    alternating one (its reps are each side's and both sides are done in the
+    set: the walking lunge's "10 each side" is 20 strides), otherwise 1. The
+    time model still counts an alternating set once (sides()): on 2026-10-19
+    and 10-20 a psoas march set took 62-88 s against the 80 s modelled
+    (WP-24, 2026-10-22)."""
+    if ex.get("laterality") == "alternating":
+        return 2
+    return sides(ex)
+
+
 def tempo_seconds(tempo: str | None) -> int:
     """'3-1-1' -> 5 seconds per rep. No tempo -> REPS_SECONDS_DEFAULT."""
     if not tempo:
@@ -2229,9 +2242,10 @@ def exercise_traits() -> dict[str, dict]:
     """{name: {"sides": 1 or 2, "unit": "kg" or "unit"}} for every exercise of
     every registered plan: what a logged set cannot say by itself (2026-10-20).
 
-    `sides` is sides(): 2 for an exercise done one side at a time, whose set
-    record keeps the right side's numbers and the left's only where they
-    differ (build_set_record). `unit` is the plan's increment_unit: "unit" for
+    `sides` is logged_sides(): 2 for an exercise done one side at a time, whose
+    set record keeps the right side's numbers and the left's only where they
+    differ (build_set_record), and for an alternating one, whose reps are each
+    side's (2026-10-22). `unit` is the plan's increment_unit: "unit" for
     a machine whose stack shows units, not kilograms. A later plan's entry wins
     a name two plans define; a name no plan defines has no traits (one side,
     kilograms)."""
@@ -2240,7 +2254,7 @@ def exercise_traits() -> dict[str, dict]:
         for day in _PLAN_BY_PHASE_NUMBER[number].values():
             for ex in day.get("exercises") or []:
                 if ex.get("name"):
-                    traits[ex["name"]] = {"sides": sides(ex),
+                    traits[ex["name"]] = {"sides": logged_sides(ex),
                                           "unit": ex.get("increment_unit") or "kg"}
     return traits
 

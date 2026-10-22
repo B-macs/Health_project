@@ -61,7 +61,7 @@ st.session_state.tp_started = True
 import goal_block as gb
 _day = sess.calendar_plan(sess.build_phase(5, gb.START))[1]["exercises"]
 EXERCISES = [next(e for e in _day if e["name"] == "Machine Chest Press"),
-             next(e for e in _day if e["name"] == "Walking Lunge (DB)")]
+             next(e for e in _day if e["name"] == "Single-Arm Cable Y Raise")]
 # The page shows the save screen once every exercise is done, as render() does.
 if not st.session_state.tp_done_today:
     training._render_guided_flow(1, EXERCISES, len(EXERCISES), sess.load_policy(None, None),

@@ -235,7 +235,7 @@ SHOULDER_PRESS = _ex(
 WALKING_LUNGE = _ex(
     name="Walking Lunge (DB)",
     ex_type="reps",
-    laterality="unilateral",
+    laterality="alternating",
     sets=3, reps=10, rest_seconds=90,
     equipment_type="dumbbell", weight_kg=15.0,
     increment_size=DUMBBELL_PAIR_KG, **COMPOUND_RANGE,
@@ -244,12 +244,14 @@ WALKING_LUNGE = _ex(
         "until the back knee is just above the floor, front shin close to upright, then "
         "push through the front foot and step the back leg through into the next stride. "
         "The knees follow the line of the toes; on the RIGHT the kneecap points straight "
-        "ahead. The reps shown are for each leg: log each leg's reps. Log the weight as "
-        "both dumbbells together. " + _LAST_SET_TO_FAILURE
+        "ahead. The reps shown are for each leg, and one set is both legs, one stride after "
+        "the other. Log the weight as both dumbbells together. " + _LAST_SET_TO_FAILURE
     ),
     biomechanical_focus=(
         "Glute max (goal A, priority 1), quads second: tier_lists/glutes.md, S+, the best "
-        "overall. A long stride keeps the work in the glutes at length. Dumbbells by his "
+        "overall. A long stride keeps the work in the glutes at length. One set is both legs "
+        "(his note, 2026-10-22: 'walking lunge you walk so you do both right and left at the "
+        "same time'), so it is alternating, not one side and then the other. Dumbbells by his "
         "rule; logged as the total, so one step is both dumbbells one size up (5 kg)."
     ),
     progression="The rep-range rule adds 5 kg (both dumbbells one size up).",
@@ -707,9 +709,11 @@ PLANK_TEST = [
     ),
     _bunkie(
         "Bunkie — Posterior Stabilizing Line (Timed)",
-        "On your back, hips lifted, one heel on the bench with that knee straight and the toes "
-        "pulled toward you. Lift the other leg and hold.",
-        "The hamstring alone, at the sit-bone attachment (finding #2).",
+        "On your back, hips lifted, one heel on the bench with that knee bent to about 90 "
+        "degrees and the toes pulled toward you. Lift the other leg and hold.",
+        "The hamstrings and glute max on one leg, the knee bent to about 90 degrees: the "
+        "position he held on 2026-10-19 (his answer, 2026-10-22), so week 12 repeats it. It "
+        "reads the hamstrings, whose sit-bone attachment is finding #2.",
     ),
     _bunkie(
         "Bunkie — Lateral Stabilizing Line (Timed)",
