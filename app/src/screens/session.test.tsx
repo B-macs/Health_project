@@ -11,7 +11,8 @@ import { HealthDB } from '../db/schema'
 import { AppStateProvider } from '../lib/appState'
 import { drain, enqueue } from '../lib/outbox'
 import {
-  advance, finished, saveBody, setGarmin, setSide, startSessionState, type HeartRate, type Plan, type TrainingState,
+  advance, finished, saveBody, setGarmin, setSide, skip, startSessionState, type HeartRate, type Plan,
+  type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { arrivalTimer, SessionFlow } from './Session'
@@ -147,8 +148,54 @@ describe('the save through the outbox', () => {
   })
 })
 
+describe('both sides of a one-side exercise (WP-25)', () => {
+  const split = plan.exercises.findIndex((e) => e.name === 'Made-up split squat')
+  const first = plan.first_side as 'left' | 'right'
+  const second = first === 'left' ? 'right' : 'left'
+
+  it('a working step shows the other side\'s own numbers to change, named with their side', () => {
+    const html = text(render(at(firstEntry(split))))
+    expect(html).toContain(S.session.side[second])
+    expect(render(at(firstEntry(split)))).toContain(
+      `aria-label="${S.session.more(S.session.named(S.session.side[second], S.session.reps))}"`)
+  })
+
+  it('the rest after a set shows that set, each side to change', () => {
+    let s = at(firstEntry(split))
+    while (currentStepOf(s).phase !== 'resting') s = advance(s, T0)
+    const html = render(s)
+    expect(html).toContain('data-testid="just-done"')
+    expect(text(html)).toContain(S.session.justDone(1))
+    for (const side of [first, second]) {
+      expect(html).toContain(`aria-label="${S.session.less(
+        S.session.named(S.session.named(S.session.setN(1), S.session.side[side]), S.session.reps))}"`)
+    }
+  })
+})
+
+function currentStepOf(s: TrainingState) {
+  return s.plan.steps[s.step]
+}
+
+/** Walk to an exercise's first entry, then Skip it. */
+function skipOne(s: TrainingState, exIdx: number): TrainingState {
+  let t = T0
+  while (currentStepOf(s).ex_idx !== exIdx) {
+    s = advance(s, t)
+    t += 30_000
+  }
+  return skip(s)
+}
+
 describe('the save screen', () => {
-  it('each exercise shows its time (the watch, else the estimate), its dosed sets and its weight', () => {
+  it('a skipped exercise reads as skipped, with no set done (WP-22)', () => {
+    const s = walked(skipOne(at(0), 1))
+    const line = reviewLine(s, plan.exercises[1])
+    expect(line.skipped).toBe(true)
+    expect(line.sets).toBe(0)
+  })
+
+  it('each exercise shows its time (the watch, else the estimate), its recorded sets and its weight', () => {
     const walk = plan.exercises.findIndex((e) => e.garmin_pull)
     let s = at(0)
     // The ramp's weight changed during the set: a ramp is not a working set, so its line keeps

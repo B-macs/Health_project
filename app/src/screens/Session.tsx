@@ -22,9 +22,9 @@ import {
   ticksCrossed, type Timer,
 } from '../lib/timers'
 import {
-  advance, back, currentStep, exerciseOf, exerciseProgress, finished, setBand, setGarmin, setNote, setSide,
-  sideValues, skip, stepBand, stepWeight, timerHere, withTimer, type Exercise, type FlowStep, type GarminPull,
-  type Side, type TrainingState,
+  advance, back, currentStep, exerciseOf, exerciseProgress, finished, lastRecorded, setBand, setGarmin, setNote,
+  setRecordedSide, setSide, sideValues, skip, stepBand, stepWeight, timerHere, withTimer, type Exercise,
+  type FlowStep, type GarminPull, type Side, type SideValues, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { clock, useWakeLock } from '../ui/hooks'
@@ -155,21 +155,105 @@ function Stepper({ label, value, onLess, onMore }: { label: string; value: strin
   )
 }
 
-/** The reps, the weight and the band of the side the step is on. */
+/** A small stepper: the other side's numbers beside the big ones, and the set just done.
+ *  `name` names the buttons with the side and the set, so no two buttons share a name. */
+function MiniStepper({ label, name, value, onLess, onMore }: {
+  label: string; name: string; value: string; onLess: () => void; onMore: () => void
+}) {
+  return (
+    <div className="ministep">
+      <span className="caption">{label}</span>
+      <div className="stepper">
+        <button className="iconbtn" aria-label={S.session.less(name)} onClick={onLess}>{S.detail.minus}</button>
+        <span className="num stepper__value">{value}</span>
+        <button className="iconbtn" aria-label={S.session.more(name)} onClick={onMore}>{S.detail.plus}</button>
+      </div>
+    </div>
+  )
+}
+
+/** Which of reps, weight and band an exercise's steppers show. */
+function shown(ex: Exercise) {
+  return {
+    reps: ex.type === 'reps' || ex.type === 'hold_reps' ? ex.reps_editable || !!ex.equipment_type : false,
+    weight: !!ex.equipment_type && ex.equipment_type !== 'band',
+    band: ex.equipment_type === 'band',
+  }
+}
+
+const weightText = (ex: Exercise, w: number | null | undefined) =>
+  (ex.increment_unit === 'kg' ? S.session.kg(w ?? 0) : String(w ?? 0))
+
+/** One side's reps and weight as small steppers (WP-25). `title` is the side's name on a
+ *  one-side exercise; `prefix` starts each button's name. */
+function SideRow({ ex, title, prefix, values, onChange }: {
+  ex: Exercise
+  title: string | null
+  prefix: string
+  values: Partial<SideValues>
+  onChange: (patch: Partial<SideValues>) => void
+}) {
+  const show = shown(ex)
+  return (
+    <div className="siderow">
+      {title && <span className="eyebrow">{title}</span>}
+      <div className="siderow__steps">
+        {show.reps && (
+          <MiniStepper label={S.session.reps} name={S.session.named(prefix, S.session.reps)} value={String(values.reps ?? '—')}
+            onLess={() => onChange({ reps: Math.max(1, (values.reps ?? 1) - 1) })}
+            onMore={() => onChange({ reps: (values.reps ?? 0) + 1 })} />
+        )}
+        {show.weight && (
+          <MiniStepper label={S.session.weight} name={S.session.named(prefix, S.session.weight)}
+            value={weightText(ex, values.weight_kg)}
+            onLess={() => onChange({ weight_kg: stepWeight(values.weight_kg ?? null, -1, ex.increment_size) })}
+            onMore={() => onChange({ weight_kg: stepWeight(values.weight_kg ?? null, 1, ex.increment_size) })} />
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** The set just done, in the rest after it (WP-25): each side's numbers, changed in that
+ *  set's own record; the next set starts from them. */
+function JustDone({ s, ex, update }: {
+  s: TrainingState
+  ex: Exercise
+  update: (f: (s: TrainingState) => TrainingState) => void
+}) {
+  const rec = lastRecorded(s, ex.index)
+  const show = shown(ex)
+  if (!rec || !(show.reps || show.weight)) return null
+  const first = s.plan.first_side as Side
+  const oneSide = ex.laterality === 'unilateral'
+  const sides: Side[] = oneSide ? [first, first === 'right' ? 'left' : 'right'] : ['right']
+  return (
+    <section className="card group" data-testid="just-done">
+      <p className="eyebrow">{S.session.justDone(rec.set_num)}</p>
+      {sides.map((side) => (
+        <SideRow key={side} ex={ex} title={oneSide ? S.session.side[side] : null}
+          prefix={oneSide ? S.session.named(S.session.setN(rec.set_num), S.session.side[side]) : S.session.setN(rec.set_num)}
+          values={rec[side] ?? {}}
+          onChange={(patch) => update((x) => setRecordedSide(x, ex.index, rec.set_num, side, patch))} />
+      ))}
+    </section>
+  )
+}
+
+/** The reps, the weight and the band of the side the step is on; on a one-side exercise,
+ *  the other side's own numbers below them, to change at any time (WP-25). */
 function Steppers({ s, step, ex, update }: {
   s: TrainingState
   step: FlowStep
   ex: Exercise
   update: (f: (s: TrainingState) => TrainingState) => void
 }) {
-  const first = s.plan.first_side as Side
   const side = (ex.laterality === 'unilateral' ? step.side : 'right') as Side
+  const other: Side = side === 'right' ? 'left' : 'right'
   const live = s.live[ex.index]
-  const values = sideValues(live, side, first)
+  const values = sideValues(live, side)
   const tiers = s.plan.band_tiers.map((b) => b.tier)
-  const showReps = ex.type === 'reps' || ex.type === 'hold_reps' ? ex.reps_editable || !!ex.equipment_type : false
-  const showWeight = !!ex.equipment_type && ex.equipment_type !== 'band'
-  const showBand = ex.equipment_type === 'band'
+  const { reps: showReps, weight: showWeight, band: showBand } = shown(ex)
   if (!showReps && !showWeight && !showBand) return null
   return (
     <section className="card steppers">
@@ -180,7 +264,7 @@ function Steppers({ s, step, ex, update }: {
       )}
       {showWeight && (
         <Stepper label={S.session.weight}
-          value={ex.increment_unit === 'kg' ? S.session.kg(values.weight_kg ?? 0) : String(values.weight_kg ?? 0)}
+          value={weightText(ex, values.weight_kg)}
           onLess={() => update((x) => setSide(x, ex.index, side, { weight_kg: stepWeight(values.weight_kg, -1, ex.increment_size) }))}
           onMore={() => update((x) => setSide(x, ex.index, side, { weight_kg: stepWeight(values.weight_kg, 1, ex.increment_size) }))} />
       )}
@@ -189,6 +273,11 @@ function Steppers({ s, step, ex, update }: {
           value={s.plan.band_tiers.find((b) => b.tier === live.band_tier)?.label || live.band_tier || '—'}
           onLess={() => update((x) => setBand(x, ex.index, stepBand(live.band_tier, -1, tiers) ?? ''))}
           onMore={() => update((x) => setBand(x, ex.index, stepBand(live.band_tier, 1, tiers) ?? ''))} />
+      )}
+      {ex.laterality === 'unilateral' && (showReps || showWeight) && (
+        <SideRow ex={ex} title={S.session.side[other]} prefix={S.session.side[other]}
+          values={sideValues(live, other)}
+          onChange={(patch) => update((x) => setSide(x, ex.index, other, patch))} />
       )}
     </section>
   )
@@ -285,7 +374,7 @@ export function SessionFlow({ s, update, onExit }: {
   const fraction = t && t.lengthMs ? Math.min(1, 1 - remainingMs(t, now) / t.lengthMs) : 0
   const word = resting ? S.session.rest : t?.kind === 'hold' ? S.session.hold : S.session.ready
   const live = s.live[ex.index]
-  const typed = sideValues(live, side, first).seconds
+  const typed = sideValues(live, side).seconds
   const isFirstSide = ex.laterality === 'unilateral' && step.side === first && step.record_set == null
 
   const doneLabel = resting ? S.session.nextSet
@@ -396,6 +485,7 @@ export function SessionFlow({ s, update, onExit }: {
       )}
 
       {!resting && <Steppers s={s} step={step} ex={ex} update={update} />}
+      {resting && <JustDone s={s} ex={ex} update={update} />}
 
       {ex.timer === 'stopwatch' && !resting && (
         <section className="card group">

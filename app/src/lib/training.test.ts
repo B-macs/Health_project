@@ -1,14 +1,15 @@
 // The session state machine (rebuild Phase 6), walked over a session the engine's own
 // guided_flow.walk made (dev/session_fixture.json, scripts/make_session_fixture.py): every
 // set recorded once with its side's numbers, the rests measured on the phone's clock and
-// attached to the set they followed, Skip and Back, the second side following the first
-// until it is edited, the steppers, the length question, and the complete save body.
+// attached to the set they followed, Skip and Back, each side keeping its own numbers and
+// the set just done changed in the rest (WP-25), the steppers, the length question, and the
+// complete save body.
 import { describe, expect, it } from 'vitest'
 import fixture from '../../dev/session_fixture.json'
 import {
-  advance, asksLength, back, clockMinutes, currentStep, exerciseOf, exerciseProgress, finished, loadState,
-  localStamp, newExerciseIds, newSessionId, saveBody, setBand, setGarmin, setSide, sideValues, skip,
-  startSessionState, stepBand, stepWeight, UNDO_LIMIT, type Plan, type TrainingState,
+  advance, asksLength, back, clockMinutes, currentStep, exerciseOf, exerciseProgress, finished, lastRecorded,
+  loadState, localStamp, newExerciseIds, newSessionId, saveBody, setBand, setGarmin, setRecordedSide, setSide,
+  sideValues, skip, startSessionState, stepBand, stepWeight, UNDO_LIMIT, type Plan, type TrainingState,
 } from './training'
 
 const plan = fixture as unknown as Plan
@@ -49,21 +50,52 @@ describe('walking the engine steps', () => {
     expect(one.rest_ended_at).toBe((T0 + 75_000) / 1000)
   })
 
-  it('a one-side exercise records both sides; the second follows the first until edited', () => {
+  it('a one-side exercise records both sides, and a change to one side never moves the other', () => {
+    // WP-25 (2026-10-22): "Uncouple the right and the left so you can change the reps of both
+    // after use". Until then an unedited second side followed the first.
     let s = fresh()
     const split = plan.exercises.findIndex((e) => e.name === 'Made-up split squat')
     const first = plan.first_side as 'left' | 'right'
     const second = first === 'left' ? 'right' : 'left'
+    const seeded = sideValues(s.live[split], second).reps
     s = setSide(s, split, first, { reps: 7 })
-    expect(sideValues(s.live[split], second, first).reps).toBe(7)
+    expect(sideValues(s.live[split], second).reps).toBe(seeded)
     s = setSide(s, split, second, { reps: 6 })
     s = setSide(s, split, first, { reps: 8 })
-    expect(sideValues(s.live[split], second, first).reps).toBe(6)
+    expect(sideValues(s.live[split], second).reps).toBe(6)
     while (currentStep(s)!.ex_idx !== split || currentStep(s)!.record_set == null) s = advance(s, T0)
     s = advance(s, T0)
     const set1 = s.sets[split][0]
     expect(set1[first]?.reps).toBe(8)
     expect(set1[second]?.reps).toBe(6)
+  })
+
+  it('the set just done can be changed in the rest, each side on its own, and the next set starts from it', () => {
+    let s = fresh()
+    const split = plan.exercises.findIndex((e) => e.name === 'Made-up split squat')
+    const first = plan.first_side as 'left' | 'right'
+    const second = first === 'left' ? 'right' : 'left'
+    while (currentStep(s)!.ex_idx !== split || currentStep(s)!.record_set == null) s = advance(s, T0)
+    s = advance(s, T0)
+    expect(currentStep(s)!.phase).toBe('resting')
+    const done = lastRecorded(s, split)!
+    expect(done.set_num).toBe(1)
+    s = setRecordedSide(s, split, 1, first, { reps: 5 })
+    const set1 = s.sets[split].find((r) => r.set_num === 1)!
+    expect(set1[first]?.reps).toBe(5)
+    expect(set1[second]?.reps).toBe(done[second]?.reps)
+    expect(sideValues(s.live[split], first).reps).toBe(5)
+  })
+
+  it('a session stored before the sides were uncoupled keeps the numbers it showed', () => {
+    const split = plan.exercises.findIndex((e) => e.name === 'Made-up split squat')
+    const first = plan.first_side as 'left' | 'right'
+    const second = first === 'left' ? 'right' : 'left'
+    const old = fresh()
+    const live = { ...old.live[split], [first]: { ...old.live[split][first], reps: 9 }, secondEdited: false }
+    const loaded = loadState({ ...old, live: { ...old.live, [split]: live } })!
+    expect(sideValues(loaded.live[split], second).reps).toBe(9)
+    expect('secondEdited' in loaded.live[split]).toBe(false)
   })
 
   it('Skip moves to the next exercise, and Back undoes the last tap', () => {

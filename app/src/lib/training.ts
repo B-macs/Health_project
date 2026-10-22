@@ -36,13 +36,14 @@ export interface SideValues {
   seconds: number | null
 }
 
-/** One exercise's steppers: each side's numbers, the band, and whether the second side
- *  was edited (an unedited second side follows the first). */
+/** One exercise's steppers: each side's own numbers, and the band. Each side starts a set
+ *  from its own last set, and a change to one side never changes the other (WP-25, the
+ *  owner's note of 2026-10-22: "Uncouple the right and the left so you can change the reps
+ *  of both after use"). Until then an unedited second side followed the first. */
 export interface Live {
   right: SideValues
   left: SideValues
   band_tier: string | null
-  secondEdited: boolean
 }
 
 /** One set as the phone saw it; the engine builds the record (RawSetIn). */
@@ -113,7 +114,20 @@ export function startingLive(ex: Exercise): Live {
   const weight = num(entry.weight_kg) ?? ex.weight_kg ?? null
   const side: SideValues = { reps, weight_kg: weight, seconds: null }
   const band = (typeof entry.band_tier === 'string' ? entry.band_tier : null) ?? ex.band_tier ?? null
-  return { right: { ...side }, left: { ...side }, band_tier: band, secondEdited: false }
+  return { right: { ...side }, left: { ...side }, band_tier: band }
+}
+
+/** A session stored before WP-25 kept `secondEdited`, and its unedited second side showed
+ *  the first side's numbers. Keep the numbers it showed, then drop the flag. */
+function uncoupled(live: Record<number, Live & { secondEdited?: boolean }>, first: Side): Record<number, Live> {
+  const second: Side = first === 'right' ? 'left' : 'right'
+  return Object.fromEntries(Object.entries(live).map(([idx, l]) => {
+    const { secondEdited, ...rest } = l
+    const kept: Live = secondEdited === false
+      ? { ...rest, [second]: { ...rest[first], seconds: rest[second].seconds } }
+      : rest
+    return [idx, kept]
+  }))
 }
 
 export function startSessionState(plan: Plan, sessionId: string, exerciseIds: string[],
@@ -147,9 +161,12 @@ export function startSessionState(plan: Plan, sessionId: string, exerciseIds: st
 export function loadState(data: unknown): TrainingState | null {
   const s = data as Partial<TrainingState> | null
   if (!s || s.version !== 1 || !s.plan) return null
+  const first = s.plan.first_side as Side
   return {
     garminDeclared: false, garmin: {}, notice: null, saved: null, hr: null,
     ...s,
+    live: uncoupled(s.live ?? {}, first),
+    history: (s.history ?? []).map((h) => ({ ...h, live: uncoupled(h.live, first) })),
   } as TrainingState
 }
 
@@ -184,10 +201,15 @@ export function localStamp(ms: number): string {
     + `${sign}${pad(Math.floor(Math.abs(offset) / 60))}:${pad(Math.abs(offset) % 60)}`
 }
 
-/** The second side's numbers: the first side's until the second was edited (T68). */
-export function sideValues(live: Live, side: Side, first: Side): SideValues {
-  if (side === first || live.secondEdited) return live[side]
-  return { ...live[first], seconds: live[side].seconds }
+/** One side's own numbers (WP-25: the sides never follow each other). */
+export function sideValues(live: Live, side: Side): SideValues {
+  return live[side]
+}
+
+/** The set just done: the exercise's recorded set with the highest number, or null. */
+export function lastRecorded(s: TrainingState, exIdx: number): RawSet | null {
+  const rows = s.sets[exIdx] ?? []
+  return rows.length ? rows.reduce((a, b) => (b.set_num > a.set_num ? b : a)) : null
 }
 
 function snapshot(s: TrainingState): Snapshot {
@@ -202,7 +224,6 @@ function remember(s: TrainingState): Snapshot[] {
 export function advance(s: TrainingState, now: number): TrainingState {
   const step = currentStep(s)
   if (!step) return s
-  const first = s.plan.first_side as Side
   const sets = structuredClone(s.sets)
   let firstSetAt = s.firstSetAt
   let lastSetAt = s.lastSetAt
@@ -215,8 +236,8 @@ export function advance(s: TrainingState, now: number): TrainingState {
   if (step.record_set != null) {
     const live = s.live[step.ex_idx]
     const ex = s.plan.exercises[step.ex_idx]
-    const right = sideValues(live, 'right', first)
-    const left = sideValues(live, 'left', first)
+    const right = sideValues(live, 'right')
+    const left = sideValues(live, 'left')
     const record: RawSet = {
       set_num: step.record_set,
       completed_at: localStamp(now),
@@ -254,19 +275,21 @@ export function back(s: TrainingState): TrainingState {
   return { ...s, step: last.step, live: last.live, sets: last.sets, history: s.history.slice(0, -1) }
 }
 
-/** Change one side's numbers (reps, weight or held seconds). Editing the second side
- *  stops it following the first. */
+/** Change one side's numbers (reps, weight or held seconds). The other side keeps its own. */
 export function setSide(s: TrainingState, exIdx: number, side: Side, patch: Partial<SideValues>): TrainingState {
   const live = s.live[exIdx]
-  const first = s.plan.first_side as Side
-  const second = side !== first
-  const base = second && !live.secondEdited ? sideValues(live, side, first) : live[side]
-  const next: Live = {
-    ...live,
-    [side]: { ...base, ...patch },
-    secondEdited: live.secondEdited || (second && (patch.reps !== undefined || patch.weight_kg !== undefined)),
-  }
+  const next: Live = { ...live, [side]: { ...live[side], ...patch } }
   return { ...s, live: { ...s.live, [exIdx]: next } }
+}
+
+/** Change one side of a set already recorded (in the rest after it, WP-25): the set's own
+ *  record, and that side's live numbers, so the next set starts from what was done. */
+export function setRecordedSide(s: TrainingState, exIdx: number, setNum: number, side: Side,
+  patch: Partial<SideValues>): TrainingState {
+  const rows = (s.sets[exIdx] ?? []).map((r) =>
+    r.set_num === setNum ? { ...r, [side]: { ...(r[side] ?? {}), ...patch } } : r)
+  const moved = setSide(s, exIdx, side, patch)
+  return { ...moved, sets: { ...s.sets, [exIdx]: rows } }
 }
 
 export function setBand(s: TrainingState, exIdx: number, band: string): TrainingState {
@@ -307,7 +330,6 @@ export function asksLength(s: TrainingState, minutes: number): boolean {
 /** The complete session for POST /api/training/sessions (SessionSaveIn): every exercise in
  *  the order trained, with its plan fields, its steppers, its raw sets and its note. */
 export function saveBody(s: TrainingState, minutes: number, rpe: number, notes: string): Schemas['SessionSaveIn'] {
-  const first = s.plan.first_side as Side
   return {
     session_id: s.sessionId,
     date: s.plan.date,
@@ -319,7 +341,7 @@ export function saveBody(s: TrainingState, minutes: number, rpe: number, notes: 
     plan_note: s.plan.note ?? '',
     exercises: s.plan.exercises.map((ex, i) => {
       const live = s.live[ex.index]
-      const right = sideValues(live, 'right', first)
+      const right = sideValues(live, 'right')
       return {
         exercise_id: s.exerciseIds[i],
         exercise: ex as unknown as Record<string, unknown>,

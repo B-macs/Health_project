@@ -179,6 +179,9 @@ export const S = {
     band: 'Band',
     less: (what: string) => `${what}: less`,
     more: (what: string) => `${what}: more`,
+    // A button's name with its side and set, so no two buttons share one (WP-25).
+    named: (first: string, what: string) => `${first}, ${what.toLowerCase()}`,
+    justDone: (n: number) => `Set ${n}: change it to what you did`,
     kg: (v: number) => `${v} kg`,
     setDone: (n: number) => `Set ${n} done`,
     sideDone: (side: string) => `${side === 'right' ? 'Right' : 'Left'} side done`,

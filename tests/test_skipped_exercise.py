@@ -34,6 +34,16 @@ def test_a_save_without_the_flow_still_repeats_the_prescription():
     assert [(s["reps"], s["weight"]) for s in saved.sets] == [(10, 5.0)] * 3
 
 
+def test_the_save_screen_review_counts_the_sets_recorded():
+    """The review before Save reads the sets recorded, so a skipped exercise
+    shows none done (the phone words 0 as "Skipped"); the sets as dosed stay."""
+    from services import sessions as sess
+    assert sess.review_figures(LIFT, [], None)["done_sets"] == 0
+    rows = [{"set_num": n, "reps": 10, "weight": 5.0} for n in (1, 2)]
+    review = sess.review_figures(LIFT, rows, None)
+    assert (review["done_sets"], review["sets"]) == (2, 3)
+
+
 def test_the_phone_save_reads_an_exercise_without_raw_sets_as_skipped():
     body = {"session_id": "2026-10-22-5c1pped0", "date": "2026-10-22", "kind": "plan",
             "duration_minutes": 50, "session_rpe": 7, "notes": "",

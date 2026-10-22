@@ -2827,8 +2827,10 @@ def review_figures(ex: dict, set_rows: list[dict] | None,
                    garmin_minutes: float | None) -> dict:
     """The save screen's review of one exercise as done today: its time (the
     watch's minutes when it verified the activity, else the estimate), its
-    sets, and its weight from the last recorded working set (the prescribed
-    weight when no set was recorded). `ex` is the dosed exercise."""
+    sets as dosed and the sets recorded (`done_sets`: 0 is a skipped
+    exercise, which the save stores with no set done, WP-22), and its weight
+    from the last recorded working set (the prescribed weight when no set was
+    recorded). `ex` is the dosed exercise."""
     if garmin_minutes:
         time_label, minutes = "Time (Garmin-verified)", round(garmin_minutes)
     else:
@@ -2837,4 +2839,4 @@ def review_figures(ex: dict, set_rows: list[dict] | None,
     work = [r for r in (set_rows or []) if not r.get("is_warmup")]
     weight = work[-1].get("weight") if work else ex.get("weight_kg")
     return {"time_label": time_label, "minutes": minutes, "sets": ex.get("sets", 1),
-            "weight_kg": weight or None}
+            "done_sets": len(set_rows or []), "weight_kg": weight or None}

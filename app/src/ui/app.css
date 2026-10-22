@@ -1542,6 +1542,25 @@ button.card {
   font-weight: var(--w-hero);
 }
 
+/* The other side's numbers, and the set just done (WP-25): small steppers that wrap. */
+.siderow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
+.siderow__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-m);
+}
+
+.ministep {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+}
+
 /* The session's controls share the row at any phone width: long words wrap. */
 .controls .btn--gym {
   flex: 1 1 0;

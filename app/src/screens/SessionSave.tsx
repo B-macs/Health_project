@@ -27,15 +27,19 @@ type OpenActivity = Schemas['OpenActivityOut']
 type Update = (f: (s: TrainingState) => TrainingState) => void
 
 /** One exercise as done today (T90; sessions.review_figures): the watch's minutes for a
- *  walk or run it verified, else the engine's estimate; the sets as dosed; the weight of
+ *  walk or run it verified, else the engine's estimate; the sets recorded (`done_sets`: none
+ *  is a skipped exercise, which the engine stores with no set done, WP-22); the weight of
  *  the last recorded working set, else the prescribed one. */
-export function reviewLine(s: TrainingState, ex: Exercise): { time: string; sets: number; weight: string } {
+export function reviewLine(s: TrainingState, ex: Exercise): {
+  time: string; sets: number; weight: string; skipped: boolean
+} {
   const pull = s.garmin[ex.index]
   const time = pull?.state === 'found' ? S.session.timeGarmin(Math.round(pull.minutes))
     : S.session.timeEstimated(ex.estimated_minutes)
+  const done = (s.sets[ex.index] ?? []).length
   const recorded = ex.warmup ? [] : (s.sets[ex.index] ?? [])
   const weight = recorded[recorded.length - 1]?.right?.weight_kg ?? ex.weight_kg ?? null
-  return { time, sets: ex.sets ?? 1, weight: weight ? S.session.kg(weight) : S.session.bodyweightShort }
+  return { time, sets: done, weight: weight ? S.session.kg(weight) : S.session.bodyweightShort, skipped: done === 0 }
 }
 
 function Review({ s }: { s: TrainingState }) {
@@ -48,7 +52,9 @@ function Review({ s }: { s: TrainingState }) {
           return (
             <li key={ex.index} className="group" data-testid="review-line">
               <span>{ex.name}</span>
-              <span className="caption">{`${line.time} · ${S.session.setsDone(line.sets)} · ${line.weight}`}</span>
+              <span className="caption">
+                {line.skipped ? S.session.skipped : `${line.time} · ${S.session.setsDone(line.sets)} · ${line.weight}`}
+              </span>
             </li>
           )
         })}
