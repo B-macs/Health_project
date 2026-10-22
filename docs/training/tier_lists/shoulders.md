@@ -126,6 +126,11 @@ From two shoulder videos that rank nothing (pasted 2026-10-15):
   limit came from. **Changed 2026-10-16** when he removed it: the first and
   the last are lifted, and the crossover's limit stays (it is the measured
   one).
+- **The crossover is one arm at a time** (his note, 2026-10-22: *"Reverse cross
+  over cable can only be done single hand also I can go up in 0.5 units with
+  it"*): his gym's station takes one hand. Checked again: done one arm at a time
+  it is still the list's best for the rear delts (#21, S); the reverse pec deck
+  sideways, one arm (#18, S), is not better for the same goal.
 - **The overhead press is machine-only** (his rule): #8; the barbell presses (#5,
   #6) are out. The goal-B proof stays a seated dumbbell press (approved).
 - **Safety rules:** every exercise here except the face pull is "unknown". The

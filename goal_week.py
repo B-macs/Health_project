@@ -89,8 +89,11 @@ BACK_EXT = Card("45° Back Extension", area="deep back", second="glute max", rep
                 equipment_type="machine", kind="compound", demand=2, priority=1, days=2)
 ROW = Card("Single-Arm DB Row", area="back", second="shoulder-blade muscles", rest_seconds=60,
            equipment_type="dumbbell", laterality="unilateral", kind="compound", demand=2, days=2)
-CROSSOVER = Card("Reverse Cable Crossover", area="rear delts", reps=15, rest_seconds=45,
-                 equipment_type="cable", days=2)
+#: One arm at a time (his gym, 2026-10-22: "Reverse cross over cable can only be
+#: done single hand"), and 15 s rest after both arms (his answer, 2026-10-22):
+#: each arm rests while the other works, and session C stays under 70 minutes.
+CROSSOVER = Card("Reverse Cable Crossover", area="rear delts", reps=15, rest_seconds=15,
+                 equipment_type="cable", laterality="unilateral", days=2)
 LATERAL = Card("Cable Lateral Raise", area="side delts", reps=15, rest_seconds=45, equipment_type="cable",
                laterality="unilateral", days=1)
 CRUNCH = Card("Lat-Pulldown Cable Crunch (Facing Away)", area="abs", reps=12, rest_seconds=60,
@@ -268,10 +271,13 @@ PICKS: dict[str, Pick] = {
                "the tie"),
     "Reverse Cable Crossover": Pick(
         "B", "rear delts", "strength and size",
-        "Rear delts, through a long range.",
+        "Rear delts, through a long range, one arm at a time (his gym, 2026-10-22: "
+        "'can only be done single hand').",
         "tier_lists/shoulders.md #21, S — best for the rear delts",
         listed_as="Reverse cable crossover",
-        better=_TIER_FIRST + "; the list's best for the rear delts"),
+        better=_TIER_FIRST + "; the list's best for the rear delts. Checked again for one arm "
+               "at a time (2026-10-22) against the reverse pec deck sideways, one arm (#18, S): "
+               "not better for the same goal, so the crossover stays"),
     "Cable Lateral Raise": Pick(
         "B", "side delts", "strength and size",
         "Side delts, with tension at the stretch.",

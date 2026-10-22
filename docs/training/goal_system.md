@@ -922,7 +922,9 @@ monday. lets complete all other steps and then push."*
 - **His answers of 2026-10-16 to the step-8 inputs:** the rule as built is his
   (*"Yes built correct"*); the machine steps are confirmed (*"Yes all are
   correct"*) — hack squat 5 kg (2.5 kg a side), chest press, shoulder press and
-  leg curl 5 kg, cable lateral raise and crossover 1 unit, back extension
+  leg curl 5 kg, cable lateral raise and crossover 1 unit (half a unit on
+  every cable since 2026-10-22, his answer; the crossover one arm at a time
+  with 15 s after both arms, the same day), back extension
   2.5 kg (a plate held), dumbbells 2.25 kg (2.5 kg since 2026-10-22, below) (one real dumbbell number is still
   asked, so the + and − buttons land on his dumbbells); **starting weights:**
   the app shows a light weight, he sets the real one in the first session, and

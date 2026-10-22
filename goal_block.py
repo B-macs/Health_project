@@ -37,7 +37,7 @@ the real weight in the first session, and the rule takes over from the second
 (his choice, 2026-10-16). Steps: his dumbbells go up in 2.5 kg (corrected
 2026-10-22), so a lift with a dumbbell in each hand (logged as the total) steps
 5 kg; machines 5 kg (the hack squat 2.5 kg a side); the back extension a 2.5 kg
-plate; cables one unit.
+plate; cables half a unit (every cable, 2026-10-22).
 
 EFFORT (step 4). Machines and cables: working sets 1-2 reps short, the last set
 to failure. Dumbbell Romanian deadlift and the back extension: 1-3 short, never
@@ -89,7 +89,10 @@ DUMBBELL_PAIR_KG = 5.0
 #: Confirmed 2026-10-16 ("Yes all are correct").
 MACHINE_KG = 5.0
 PLATE_KG = 2.5
-CABLE_UNIT = 1.0
+#: Every cable steps half a unit (his answer, 2026-10-22: "No on all cables", to
+#: "only on the crossover's cable, or on every cable?"; his note on the crossover
+#: of 2026-10-19: "1.5 Units for the last 2 sets"). Until then one unit.
+CABLE_UNIT = 0.5
 
 _EVERY_SET_TO_FAILURE = "Take every set to failure."
 _LAST_SET_TO_FAILURE = "Stop each working set 1-2 reps before failure; take the last set to failure."
@@ -173,11 +176,11 @@ Y_RAISE = _ex(
     biomechanical_focus=(
         "The shoulder-blade muscles (lower and middle trapezius), straight after the release "
         "(his decision, 2026-10-15). Replaced the prone Y raise on 2026-10-16 (tier_lists/"
-        "shoulder_blades.md): tension with the arm across the body, steps of one unit, one "
+        "shoulder_blades.md): tension with the arm across the body, steps of half a unit, one "
         "arm at a time so the left cannot do the right's work (physiotherapist, 2026-08-10: "
         "the right is weaker and the left works too much)."
     ),
-    progression="The rep-range rule adds one unit.",
+    progression="The rep-range rule adds half a unit.",
     regression="The right arm stops early → raise it only as far as it goes easily; log what you did.",
 )
 
@@ -372,22 +375,26 @@ LEG_CURL = _ex(
 CROSSOVER = _ex(
     name="Reverse Cable Crossover",
     ex_type="reps",
-    sets=3, reps=15, rest_seconds=45,
+    laterality="unilateral",
+    sets=3, reps=15, rest_seconds=15,
     equipment_type="cable", weight_kg=3.0,
     increment_size=CABLE_UNIT, increment_unit="unit", **ISOLATION_RANGE,
     mechanics=(
-        "Two cables at shoulder height, no handles. Hold the cable ends crossed in front of "
-        "you: the right cable in the left hand, the left cable in the right hand. Stand in "
-        "the middle. Pull both arms out and back in a wide arc, arms almost straight, until "
-        "your hands are out to the sides in line with your body; on the RIGHT, not behind "
-        "it. Return slowly across the front. " + _LAST_SET_TO_FAILURE
+        "One cable at shoulder height, no handle. Stand side-on with the cable on the side "
+        "away from the working arm, and hold the cable end in that hand in front of your "
+        "chest, arm almost straight. Pull the arm out and back in a wide arc until your hand "
+        "is out to the side in line with your body; on the RIGHT, not behind it. Return "
+        "slowly across the front. All the reps on one arm, then the other. "
+        + _LAST_SET_TO_FAILURE
     ),
     biomechanical_focus=(
         "The rear delts (goal B): tier_lists/shoulders.md, S, the best for the rear delts. "
-        "The right arm stops at the line of the body (rules: 'reverse cable crossover', the "
-        "measured limit of 2026-08-13)."
+        "One arm at a time: his gym's station takes one hand (2026-10-22). The right arm "
+        "stops at the line of the body (rules: 'reverse cable crossover', the measured limit "
+        "of 2026-08-13). 15 s rest after both arms (his answer, 2026-10-22): each arm rests "
+        "while the other works, and session C stays under 70 modelled minutes."
     ),
-    progression="The rep-range rule adds one unit.",
+    progression="The rep-range rule adds half a unit.",
     regression="The right shoulder objects at the end → finish the arc in front of the body.",
 )
 
@@ -411,7 +418,7 @@ LATERAL_RAISE = _ex(
         "file's line that the shoulder injury came back above a 7 kg dumbbell carries no "
         "date and sits in the compiled movement analysis, not in a dated entry."
     ),
-    progression="The rep-range rule adds one unit.",
+    progression="The rep-range rule adds half a unit.",
     regression="Pain at the front of the shoulder → stop at a lower height; log it.",
 )
 
@@ -458,7 +465,7 @@ HIP_FLEXION = _ex(
         "the end-range psoas isometric on 2026-10-16. Standing, not lying: lying on his back "
         "is where the right hip clicked at about 45 degrees (finding #4)."
     ),
-    progression="The rep-range rule adds one unit.",
+    progression="The rep-range rule adds half a unit.",
     regression="A click at the right hip → start the lift from less far behind you.",
 )
 
@@ -482,7 +489,7 @@ CABLE_CRUNCH = _ex(
         "tier_lists/abs.md, S; within the S tier picked by safety margin (approved "
         "2026-10-15). The stretch at the top is what puts it in S."
     ),
-    progression="The rep-range rule adds one unit.",
+    progression="The rep-range rule adds half a unit.",
     regression="The hip flexors take over → sit more upright at the start and curl less far.",
 )
 
@@ -527,7 +534,7 @@ WOODCHOP = _ex(
         "tier there. The turn from the hips and the upper back is the rule for turning under "
         "load at L3-L5 (rules: 'woodchop')."
     ),
-    progression="The rep-range rule adds one unit.",
+    progression="The rep-range rule adds half a unit.",
     regression="You feel the turn in the lower back → turn less far.",
 )
 

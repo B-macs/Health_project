@@ -61,7 +61,8 @@ for that for now."*
 - **The hang** (scapular pull-up): the shoulder's hang ladder is held at its
   second step; it carries the most load on the shoulder in the A tier.
 - **What is left in the A tier:** the single-arm cable Y raise — tension with
-  the arm across the body, load in steps of one unit (about 0.5 kg), one arm at a
+  the arm across the body, load in steps of half a unit (about 0.25 kg; every
+  cable since 2026-10-22), one arm at a
   time (his single-arm rule) — and the wall slide, which carries almost no load.
 - **The prone Y raise (B)** is hardest at the top, where the lower traps are
   shortest, and his lightest dumbbells go from 2.5 to 5 kg, a 100% step.

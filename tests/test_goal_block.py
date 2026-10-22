@@ -232,7 +232,7 @@ def test_every_loaded_lift_has_the_range_its_kind_takes():
 
 def test_every_step_is_one_he_confirmed():
     """Dumbbells 2.5 kg, a pair 5 kg (2026-10-22); machines 5 kg; the back
-    extension a 2.5 kg plate; cables one unit (2026-10-16)."""
+    extension a 2.5 kg plate (2026-10-16); cables half a unit (2026-10-22)."""
     for _, _, e in _every_entry():
         if e.get("equipment_type") in _STEPS and not e.get("warmup"):
             assert e["increment_size"] in _STEPS[e["equipment_type"]], e["name"]
@@ -240,6 +240,27 @@ def test_every_step_is_one_he_confirmed():
             assert e["increment_unit"] == unit, e["name"]
     assert next(e for e in gb.SESSIONS["B"] if e["name"] == "45° Back Extension")[
         "increment_size"] == gb.PLATE_KG
+
+
+def test_every_cable_steps_half_a_unit():
+    """His answer, 2026-10-22 ("No on all cables"): half-unit steps on every
+    cable, not only the crossover's (his note of 2026-10-19: "1.5 Units for the
+    last 2 sets", which the one-unit step could not show)."""
+    assert gb.CABLE_UNIT == 0.5
+    cables = [e for _, _, e in _every_entry() if e.get("equipment_type") == "cable"]
+    assert cables and all(e["increment_size"] == 0.5 for e in cables)
+
+
+def test_the_crossover_is_one_arm_at_a_time_with_a_short_rest():
+    """His note, 2026-10-22: "Reverse cross over cable can only be done single
+    hand". One arm at a time adds 3 modelled minutes; 15 s after both arms (his
+    answer 5: each arm rests while the other works) keeps session C at or under
+    70, and the right arm still stops at the line of the body."""
+    for letter in ("A", "C"):
+        e = next(x for x in gb.SESSIONS[letter] if x["name"] == "Reverse Cable Crossover")
+        assert e["laterality"] == "unilateral" and e["rest_seconds"] == 15
+        assert "one arm, then the other" in e["mechanics"] and "RIGHT, not behind it" in e["mechanics"]
+    assert s.session_seconds(gb.SESSIONS["C"]) / 60 <= pl.SESSION_MINUTES_LIMIT
 
 
 def test_his_dumbbells_go_up_in_2_5_kg():
@@ -293,15 +314,16 @@ def test_the_plank_test_runs_in_weeks_1_and_12_in_place_of_session_a_s_abs():
 
 
 def test_the_test_mondays_run_over_70_minutes_by_his_choice():
-    """With the five timed lines in place of the abs, session A models 73
-    minutes. Asked whether the walking lunge should give way, he kept it
-    (2026-10-16: "Leave it in for those days"), so the limit reads the
-    training and not the test inside it: the day passes the shape check while
-    its full time stays visible here."""
+    """With the five timed lines in place of the abs, session A models 75
+    minutes (73 until the crossover became one arm at a time, 2026-10-22).
+    Asked whether the walking lunge should give way, he kept it (2026-10-16:
+    "Leave it in for those days"), so the limit reads the training and not the
+    test inside it: the day passes the shape check while its full time stays
+    visible here."""
     full = s.session_seconds(PLAN[1]["exercises"]) / 60
     training = s.session_seconds(
         [e for e in PLAN[1]["exercises"] if not s.is_measurement(e["name"])]) / 60
-    assert full > pl.SESSION_MINUTES_LIMIT and round(full) == 73
+    assert full > pl.SESSION_MINUTES_LIMIT and round(full) == 75
     assert training <= pl.SESSION_MINUTES_LIMIT
     assert "Walking Lunge (DB)" in _names(PLAN[1]["exercises"])
     assert not s.session_shape_violations(PLAN[1])
