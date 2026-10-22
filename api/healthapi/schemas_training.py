@@ -291,6 +291,15 @@ class StoredOut(BaseModel):
 
 # ── Today's session ──────────────────────────────────────────────────────────
 
+class ExerciseMove(BaseModel):
+    """Which exercises move together when a machine is busy (WP-27,
+    services/session_order.move_groups): the phone moves whole groups of the
+    walked steps. A group runs only after every group in `after`."""
+    group: int
+    movable: bool
+    after: list[int]
+
+
 class SessionExercise(BaseModel):
     index: int
     name: str
@@ -334,6 +343,8 @@ class SessionExercise(BaseModel):
     garmin_window: list[float] | None
     #: The save screen's review time when the watch verified none.
     estimated_minutes: int
+    #: Its move group; None where nothing moves (the accessory session).
+    move: ExerciseMove | None = None
 
 
 class FlowStep(BaseModel):

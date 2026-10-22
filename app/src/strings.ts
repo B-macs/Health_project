@@ -227,6 +227,12 @@ export const S = {
     skip: 'Skip this exercise',
     skipAsk: 'Skip only if pain stops you. Skip it?',
     skipYes: 'Skip it',
+    // Equipment in use (WP-27): another exercise first, the busy one straight after it.
+    // Not "machine": the session screen never names a machine (Key Rule 20's test).
+    inUse: 'In use? Do another first',
+    doFirstAsk: 'Do one of these first. This exercise comes straight after it.',
+    doFirst: (name: string) => `Do ${name} now`,
+    keepOrder: 'Keep the order',
     // The save screen.
     complete: (day: number | null) => (day ? `Day ${day} complete: save your session.` : 'Session complete: save it.'),
     review: 'What you did',

@@ -12,6 +12,7 @@
 !cluster_a_prescription.py
 !flexibility_baselines.py
 !goal_block.py
+!goal_week.py
 **/__pycache__
 **/*.pyc
 **/*.db

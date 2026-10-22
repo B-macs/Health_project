@@ -58,7 +58,12 @@
       "contradiction": null,
       "garmin_pull": false,
       "garmin_window": null,
-      "estimated_minutes": 1
+      "estimated_minutes": 1,
+      "move": {
+        "group": 0,
+        "movable": false,
+        "after": []
+      }
     },
     {
       "index": 1,
@@ -103,7 +108,12 @@
       "contradiction": null,
       "garmin_pull": false,
       "garmin_window": null,
-      "estimated_minutes": 1
+      "estimated_minutes": 1,
+      "move": {
+        "group": 1,
+        "movable": false,
+        "after": []
+      }
     },
     {
       "index": 2,
@@ -151,7 +161,12 @@
       "contradiction": null,
       "garmin_pull": false,
       "garmin_window": null,
-      "estimated_minutes": 2
+      "estimated_minutes": 2,
+      "move": {
+        "group": 2,
+        "movable": true,
+        "after": []
+      }
     },
     {
       "index": 3,
@@ -196,7 +211,12 @@
       "contradiction": null,
       "garmin_pull": false,
       "garmin_window": null,
-      "estimated_minutes": 1
+      "estimated_minutes": 1,
+      "move": {
+        "group": 3,
+        "movable": true,
+        "after": []
+      }
     },
     {
       "index": 4,
@@ -235,7 +255,12 @@
       "contradiction": null,
       "garmin_pull": false,
       "garmin_window": null,
-      "estimated_minutes": 1
+      "estimated_minutes": 1,
+      "move": {
+        "group": 4,
+        "movable": true,
+        "after": []
+      }
     },
     {
       "index": 5,
@@ -274,7 +299,12 @@
       "contradiction": null,
       "garmin_pull": false,
       "garmin_window": null,
-      "estimated_minutes": 1
+      "estimated_minutes": 1,
+      "move": {
+        "group": 5,
+        "movable": false,
+        "after": []
+      }
     },
     {
       "index": 6,
@@ -319,7 +349,12 @@
       "contradiction": null,
       "garmin_pull": false,
       "garmin_window": null,
-      "estimated_minutes": 1
+      "estimated_minutes": 1,
+      "move": {
+        "group": 6,
+        "movable": true,
+        "after": []
+      }
     },
     {
       "index": 7,
@@ -358,7 +393,12 @@
       "contradiction": null,
       "garmin_pull": false,
       "garmin_window": null,
-      "estimated_minutes": 1
+      "estimated_minutes": 1,
+      "move": {
+        "group": 7,
+        "movable": false,
+        "after": []
+      }
     },
     {
       "index": 8,
@@ -400,7 +440,12 @@
         0.0,
         6.0
       ],
-      "estimated_minutes": 1
+      "estimated_minutes": 1,
+      "move": {
+        "group": 8,
+        "movable": true,
+        "after": []
+      }
     }
   ],
   "steps": [

@@ -24,7 +24,7 @@ import threading
 from datetime import date, datetime, time
 
 from services import accessory as acc
-from services import guided_flow, prescription, session_save, strain_regions
+from services import guided_flow, prescription, session_order, session_save, strain_regions
 from services import sessions as sess
 from services import supplementary_save
 from services import training_screen as ts
@@ -95,15 +95,15 @@ EXERCISE_FIELDS = ("name", "type", "laterality", "sets", "reps", "reps_in_set", 
 
 
 def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tuple,
-                 garmin_ok: bool) -> dict:
+                 garmin_ok: bool, move: dict | None = None) -> dict:
     """One exercise as the guided flow shows it today: its fields, the
     prescription with the seeded numbers in it (sessions.displayed_
     prescription), the how-to, the safety warning only when its own body
     area is over the strain threshold (Key Rule 20), its timer, the lift a
     ramp set prepares, the stepper's starting values, the previous session
     and the difference, where today's numbers came from, a contradiction the
-    resolution reported, and whether a walk or run pulls its minutes from
-    the watch."""
+    resolution reported, whether a walk or run pulls its minutes from the
+    watch, and its move group (session_order.move_groups, WP-27)."""
     entry = seed.entry if seed is not None else None
     previous = seed.previous if seed is not None else None
     warning = ""
@@ -136,6 +136,9 @@ def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tu
         # The save screen's review shows this when the watch verified no time
         # (sessions.review_figures' estimate, fault F20).
         "estimated_minutes": max(1, round(sess.exercise_duration_seconds(ex) / 60)),
+        # Which exercises move together when a machine is busy, and which never
+        # move (WP-27): the phone moves whole groups of the walked steps.
+        "move": move,
     }
 
 
@@ -166,8 +169,10 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
                 policy=policy, today=today, lift_entry=lift_entry)
         return seeds[i]
 
+    # The accessory session moves nothing: its items are not the block's cards.
+    moves = session_order.move_groups(dosed) if kind == PLAN else [None] * len(dosed)
     exercises = [exercise_out(ex, i, seed_for(i), sess.ramp_lift_index(plan_ex, i), strains,
-                              garmin_ok)
+                              garmin_ok, moves[i])
                  for i, ex in enumerate(dosed)]
     return {
         "kind": kind,

@@ -177,6 +177,14 @@ function currentStepOf(s: TrainingState) {
   return s.plan.steps[s.step]
 }
 
+describe('"In use? Do another first" (WP-27)', () => {
+  it('shows at a lift that moves, and not at the warm-up that never does', () => {
+    const squat = plan.exercises.findIndex((e) => e.name === 'Made-up squat')
+    expect(text(render(at(firstEntry(squat))))).toContain(S.session.inUse)
+    expect(text(render(at(0)))).not.toContain(S.session.inUse)
+  })
+})
+
 /** Walk to an exercise's first entry, then Skip it. */
 function skipOne(s: TrainingState, exIdx: number): TrainingState {
   let t = T0

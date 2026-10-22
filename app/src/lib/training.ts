@@ -61,6 +61,8 @@ export interface Snapshot {
   step: number
   live: Record<number, Live>
   sets: Record<number, RawSet[]>
+  /** The steps in the order they ran then, when an exercise was moved since (WP-27). */
+  steps?: FlowStep[]
 }
 
 export interface TrainingState {
@@ -213,7 +215,7 @@ export function lastRecorded(s: TrainingState, exIdx: number): RawSet | null {
 }
 
 function snapshot(s: TrainingState): Snapshot {
-  return { step: s.step, live: structuredClone(s.live), sets: structuredClone(s.sets) }
+  return { step: s.step, live: structuredClone(s.live), sets: structuredClone(s.sets), steps: s.plan.steps }
 }
 
 function remember(s: TrainingState): Snapshot[] {
@@ -272,7 +274,60 @@ export function skip(s: TrainingState): TrainingState {
 export function back(s: TrainingState): TrainingState {
   const last = s.history[s.history.length - 1]
   if (!last) return s
-  return { ...s, step: last.step, live: last.live, sets: last.sets, history: s.history.slice(0, -1) }
+  const plan = last.steps ? { ...s.plan, steps: last.steps } : s.plan
+  return { ...s, plan, step: last.step, live: last.live, sets: last.sets, history: s.history.slice(0, -1) }
+}
+
+/** The order the exercises run in now: each exercise's index, by its first entry in the
+ *  steps (the engine's walk, with any group moved since, WP-27). */
+export function exerciseOrder(s: TrainingState): number[] {
+  const order: number[] = []
+  for (const st of s.plan.steps) if (!order.includes(st.ex_idx)) order.push(st.ex_idx)
+  return order
+}
+
+const groupOf = (s: TrainingState, exIdx: number) => s.plan.exercises[exIdx]?.move ?? null
+
+/** The exercises that may run now, before the one the flow is on ("Machine busy", WP-27):
+ *  only at the first entry of a group that moves, before any of its sets; each a later
+ *  group that moves and whose `after` groups have all run. One exercise names each group:
+ *  its last (the lift, not its ramp). The engine sent the groups; nothing is decided here. */
+export function doFirstCandidates(s: TrainingState): { group: number; exercise: Exercise }[] {
+  const step = currentStep(s)
+  if (!step || step.phase === 'resting') return []
+  const here = groupOf(s, step.ex_idx)
+  if (!here?.movable) return []
+  if (s.plan.steps.findIndex((st) => groupOf(s, st.ex_idx)?.group === here.group) !== s.step) return []
+  const ran = new Set(s.plan.steps.slice(0, s.step).map((st) => groupOf(s, st.ex_idx)?.group))
+  const named = new Map<number, number>()
+  for (const st of s.plan.steps.slice(s.step)) {
+    const g = groupOf(s, st.ex_idx)
+    if (g && g.group !== here.group && g.movable && g.after.every((a) => ran.has(a))) named.set(g.group, st.ex_idx)
+  }
+  return [...named].map(([group, exIdx]) => ({ group, exercise: s.plan.exercises[exIdx] }))
+}
+
+/** The steps numbered again after a move: each entry's place, and Skip's target, the next
+ *  exercise's first entry (the walk's own skip_to, over the new order). */
+function renumbered(steps: FlowStep[]): FlowStep[] {
+  const firstOf = new Map<number, number>()
+  steps.forEach((st, i) => { if (!firstOf.has(st.ex_idx)) firstOf.set(st.ex_idx, i) })
+  const order = [...firstOf.keys()]
+  return steps.map((st, i) => {
+    const next = order[order.indexOf(st.ex_idx) + 1]
+    return { ...st, index: i, skip_to: next === undefined ? steps.length : firstOf.get(next)! }
+  })
+}
+
+/** Run `group` now (WP-27): its steps move, in one block, in front of the group the flow is
+ *  on, which then comes straight after it. Back undoes the move. */
+export function doFirst(s: TrainingState, group: number): TrainingState {
+  const steps = s.plan.steps
+  const moving = steps.filter((st, i) => i >= s.step && groupOf(s, st.ex_idx)?.group === group)
+  if (!moving.length) return s
+  const rest = steps.filter((st, i) => !(i >= s.step && groupOf(s, st.ex_idx)?.group === group))
+  const next = renumbered([...rest.slice(0, s.step), ...moving, ...rest.slice(s.step)])
+  return { ...s, history: remember(s), plan: { ...s.plan, steps: next }, timer: null, notice: null }
 }
 
 /** Change one side's numbers (reps, weight or held seconds). The other side keeps its own. */
@@ -339,7 +394,9 @@ export function saveBody(s: TrainingState, minutes: number, rpe: number, notes: 
     notes,
     // The session's own note (the accessory session's): the engine stores it before `notes`.
     plan_note: s.plan.note ?? '',
-    exercises: s.plan.exercises.map((ex, i) => {
+    // In the order trained (WP-27): an exercise moved by "Machine busy" goes where it ran.
+    exercises: exerciseOrder(s).map((i) => {
+      const ex = s.plan.exercises[i]
       const live = s.live[ex.index]
       const right = sideValues(live, 'right')
       return {
@@ -367,8 +424,8 @@ function pulled(s: TrainingState, exIdx: number) {
 /** Where the flow is in today's list: the exercises behind it, and the one it is on. */
 export function exerciseProgress(s: TrainingState): { done: number; total: number } {
   const step = currentStep(s)
-  const total = s.plan.exercises.length
-  return { done: step ? step.ex_idx : total, total }
+  const order = exerciseOrder(s)
+  return { done: step ? order.indexOf(step.ex_idx) : order.length, total: order.length }
 }
 
 /** A session id in the Training page's shape (the date, then 8 hex digits), minted once. */

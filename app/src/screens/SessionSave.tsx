@@ -17,7 +17,7 @@ import { api, ApiError } from '../lib/api'
 import { useApp } from '../lib/appState'
 import { enqueue } from '../lib/outbox'
 import {
-  asksLength, clockMinutes, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
+  asksLength, clockMinutes, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 
@@ -47,7 +47,7 @@ function Review({ s }: { s: TrainingState }) {
     <section className="card group" aria-label={S.session.review}>
       <h2 className="eyebrow">{S.session.review}</h2>
       <ul className="list">
-        {s.plan.exercises.map((ex) => {
+        {exerciseOrder(s).map((i) => s.plan.exercises[i]).map((ex) => {
           const line = reviewLine(s, ex)
           return (
             <li key={ex.index} className="group" data-testid="review-line">
@@ -270,7 +270,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         <div className="sky" aria-hidden="true" />
         <header className="head">
           <h1 className="head__title">{accessory ? S.session.accessoryLogged : S.session.congrats}</h1>
-          {!accessory && <div className="caption">{S.session.congratsNext(s.plan.exercises.length)}</div>}
+          {!accessory && <div className="caption">{S.session.congratsNext(exerciseOrder(s).length)}</div>}
         </header>
         <section className="card group" role="status" data-testid="save-state" data-state={saved}>
           <p>{saved === 'confirmed' ? S.session.saved : saved === 'refused' ? S.session.refused : S.session.savedPhone}</p>
@@ -287,7 +287,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
       <div className="sky" aria-hidden="true" />
       <header className="head">
         <h1 className="head__title">{S.session.complete(s.plan.day_num)}</h1>
-        <div className="caption">{S.session.allDone(s.plan.exercises.length)}</div>
+        <div className="caption">{S.session.allDone(exerciseOrder(s).length)}</div>
       </header>
       {s.notice && <p className="note" role="status" data-testid="notice">{s.notice}</p>}
       <Review s={s} />

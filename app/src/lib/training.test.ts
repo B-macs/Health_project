@@ -7,9 +7,10 @@
 import { describe, expect, it } from 'vitest'
 import fixture from '../../dev/session_fixture.json'
 import {
-  advance, asksLength, back, clockMinutes, currentStep, exerciseOf, exerciseProgress, finished, lastRecorded,
-  loadState, localStamp, newExerciseIds, newSessionId, saveBody, setBand, setGarmin, setRecordedSide, setSide,
-  sideValues, skip, startSessionState, stepBand, stepWeight, UNDO_LIMIT, type Plan, type TrainingState,
+  advance, asksLength, back, clockMinutes, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder,
+  exerciseProgress, finished, lastRecorded, loadState, localStamp, newExerciseIds, newSessionId, saveBody, setBand,
+  setGarmin, setRecordedSide, setSide, sideValues, skip, startSessionState, stepBand, stepWeight, UNDO_LIMIT,
+  type Plan, type TrainingState,
 } from './training'
 
 const plan = fixture as unknown as Plan
@@ -96,6 +97,41 @@ describe('walking the engine steps', () => {
     const loaded = loadState({ ...old, live: { ...old.live, [split]: live } })!
     expect(sideValues(loaded.live[split], second).reps).toBe(9)
     expect('secondEdited' in loaded.live[split]).toBe(false)
+  })
+
+  // "In use? Do another first" (WP-27): the engine's move groups, applied as they came.
+  const named = (s: TrainingState, list: { exercise: { name: string } }[]) => list.map((c) => c.exercise.name)
+  const at = (s: TrainingState, name: string) => {
+    const exIdx = plan.exercises.findIndex((e) => e.name === name)
+    while (currentStep(s)!.ex_idx !== exIdx) s = advance(s, T0)
+    return s
+  }
+
+  it('at a lift\'s first entry the later groups that move are offered; fixed ones are not', () => {
+    const s = at(fresh(), 'Made-up squat')
+    expect(named(s, doFirstCandidates(s))).toEqual(
+      ['Made-up split squat', 'Made-up side plank', 'Made-up band row', 'Made-up walk'])
+    expect(doFirstCandidates(fresh())).toEqual([])                    // the warm-up never moves
+    const set1 = advance(s, T0)                                        // set 1 done: a rest
+    expect(doFirstCandidates(set1)).toEqual([])
+    expect(doFirstCandidates(advance(set1, T0))).toEqual([])           // set 2 of the same lift
+  })
+
+  it('a group done first runs now, the busy one straight after it, and Back puts the order back', () => {
+    const s = at(fresh(), 'Made-up squat')
+    const squat = plan.exercises.findIndex((e) => e.name === 'Made-up squat')
+    const split = plan.exercises.findIndex((e) => e.name === 'Made-up split squat')
+    const plank = plan.exercises.findIndex((e) => e.name === 'Made-up side plank')
+    const group = doFirstCandidates(s).find((c) => c.exercise.index === split)!.group
+    const moved = doFirst(s, group)
+    expect(currentStep(moved)!.ex_idx).toBe(split)
+    expect(exerciseOrder(moved).slice(2, 5)).toEqual([split, squat, plank])
+    moved.plan.steps.forEach((st, i) => expect(st.index).toBe(i))
+    const splitEntries = moved.plan.steps.filter((st) => st.ex_idx === split)
+    expect(splitEntries.every((st) => st.skip_to === moved.plan.steps.findIndex((x) => x.ex_idx === squat))).toBe(true)
+    const walked = walkAll(moved)
+    expect(saveBody(walked, 30, 6, '').exercises.map((e) => e.exercise_id).slice(2, 4)).toEqual([`ex-${split}`, `ex-${squat}`])
+    expect(back(moved).plan.steps).toEqual(s.plan.steps)
   })
 
   it('Skip moves to the next exercise, and Back undoes the last tap', () => {

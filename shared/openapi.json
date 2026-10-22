@@ -1148,6 +1148,33 @@
         "title": "ExerciseLine",
         "type": "object"
       },
+      "ExerciseMove": {
+        "description": "Which exercises move together when a machine is busy (WP-27,\nservices/session_order.move_groups): the phone moves whole groups of the\nwalked steps. A group runs only after every group in `after`.",
+        "properties": {
+          "after": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "After",
+            "type": "array"
+          },
+          "group": {
+            "title": "Group",
+            "type": "integer"
+          },
+          "movable": {
+            "title": "Movable",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "group",
+          "movable",
+          "after"
+        ],
+        "title": "ExerciseMove",
+        "type": "object"
+      },
       "FlexCapture": {
         "properties": {
           "cluster": {
@@ -5081,6 +5108,16 @@
           "mechanics": {
             "title": "Mechanics",
             "type": "string"
+          },
+          "move": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExerciseMove"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "name": {
             "title": "Name",

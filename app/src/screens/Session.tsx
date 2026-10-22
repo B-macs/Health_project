@@ -22,9 +22,10 @@ import {
   ticksCrossed, type Timer,
 } from '../lib/timers'
 import {
-  advance, back, currentStep, exerciseOf, exerciseProgress, finished, lastRecorded, setBand, setGarmin, setNote,
-  setRecordedSide, setSide, sideValues, skip, stepBand, stepWeight, timerHere, withTimer, type Exercise,
-  type FlowStep, type GarminPull, type Side, type SideValues, type TrainingState,
+  advance, back, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder, exerciseProgress, finished,
+  lastRecorded, setBand, setGarmin, setNote, setRecordedSide, setSide, sideValues, skip, stepBand, stepWeight,
+  timerHere, withTimer, type Exercise, type FlowStep, type GarminPull, type Side, type SideValues,
+  type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { clock, useWakeLock } from '../ui/hooks'
@@ -107,9 +108,9 @@ function SessionHeader({ s }: { s: TrainingState }) {
       <details className="guide">
         <summary className="tapline">{S.session.allExercises}</summary>
         <ol className="list">
-          {s.plan.exercises.map((ex, i) => (
-            <li key={ex.index} className="kv" data-state={i < done ? 'done' : i === done ? 'now' : 'todo'}>
-              <span>{ex.name}</span>
+          {exerciseOrder(s).map((exIdx, i) => (
+            <li key={exIdx} className="kv" data-state={i < done ? 'done' : i === done ? 'now' : 'todo'}>
+              <span>{s.plan.exercises[exIdx].name}</span>
               <span className="caption">
                 {i < done ? S.session.doneMark : i === done ? S.session.nowMark : i === done + 1 ? S.session.nextMark : ''}
               </span>
@@ -308,7 +309,7 @@ export function SessionFlow({ s, update, onExit }: {
   // restart ring again).
   const handled = useRef<Timer | null>(null)
   const held = useWakeLock(true)
-  const [asking, setAsking] = useState<'exit' | 'skip' | null>(null)
+  const [asking, setAsking] = useState<'exit' | 'skip' | 'busy' | null>(null)
   const [pulling, setPulling] = useState(false)
   const { ctx, alerts } = useApp()
 
@@ -368,7 +369,9 @@ export function SessionFlow({ s, update, onExit }: {
   const first = s.plan.first_side as Side
   const resting = step.phase === 'resting'
   const side = (ex.laterality === 'unilateral' ? step.side : 'right') as Side
-  const n = s.plan.exercises.length
+  const order = exerciseOrder(s)
+  const n = order.length
+  const candidates = !resting && !t ? doFirstCandidates(s) : []
   const ended = t && hasEnded(t, now)
   const seconds = t ? shownSeconds(t, now) : null
   const fraction = t && t.lengthMs ? Math.min(1, 1 - remainingMs(t, now) / t.lengthMs) : 0
@@ -428,14 +431,27 @@ export function SessionFlow({ s, update, onExit }: {
         <button className="iconbtn" onClick={() => setAsking('exit')} aria-label={S.session.exit}>
           <IconClose />
         </button>
-        <div className="topbar__title">{S.session.exerciseOf(ex.index + 1, n)}</div>
+        <div className="topbar__title">{S.session.exerciseOf(order.indexOf(ex.index) + 1, n)}</div>
         <span className="topbar__note">{held ? S.session.screenOn : ''}</span>
       </header>
 
       <SessionHeader s={s} />
       {s.notice && <p className="note" role="status" data-testid="notice">{s.notice}</p>}
 
-      {asking && (
+      {asking === 'busy' && (
+        <section className="card group" role="dialog" aria-label={S.session.inUse} data-testid="in-use">
+          <p>{S.session.doFirstAsk}</p>
+          {candidates.map((c) => (
+            <button key={c.group} className="btn btn--glass btn--wide" onClick={() => {
+              setAsking(null)
+              update((x) => doFirst(x, c.group))
+            }}>{S.session.doFirst(c.exercise.name)}</button>
+          ))}
+          <button className="btn btn--primary btn--wide" onClick={() => setAsking(null)}>{S.session.keepOrder}</button>
+        </section>
+      )}
+
+      {(asking === 'exit' || asking === 'skip') && (
         <section className="card group" role="alertdialog" aria-label={asking === 'exit' ? S.session.exit : S.session.skip}>
           <p>{asking === 'exit' ? S.session.exitAsk : S.session.skipAsk}</p>
           <div className="pair">
@@ -579,6 +595,9 @@ export function SessionFlow({ s, update, onExit }: {
         </button>
         <button className="btn btn--glass" onClick={() => setAsking('skip')}>{S.session.skip}</button>
       </div>
+      {candidates.length > 0 && (
+        <button className="btn btn--glass btn--wide" onClick={() => setAsking('busy')}>{S.session.inUse}</button>
+      )}
     </div>
   )
 }

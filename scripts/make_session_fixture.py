@@ -58,11 +58,19 @@ def _exercises() -> list[dict]:
 
 def build() -> dict:
     from healthapi.schemas_training import SessionPlanOut
-    from services import guided_flow
+    from services import guided_flow, session_order
     from services import sessions as sess
     from services import training_session as ts
 
     exercises = _exercises()
+    # The made-up session's sections (session_order.move_groups, WP-27): the march
+    # opens it, the ramp keeps its place, the dead bug and the timed plank close it.
+    moves = session_order.move_groups(exercises, sections={
+        "Made-up march": ("warmup", False), "Made-up squat ramp": ("warmup", False),
+        "Made-up squat": ("main", False), "Made-up split squat": ("main", False),
+        "Made-up side plank": ("main", False), "Made-up dead bug": ("last", False),
+        "Made-up band row": ("main", False), "Made-up plank (Timed)": ("last", False),
+        "Made-up walk": ("main", False)})
     out = []
     for i, ex in enumerate(exercises):
         pulls = ex["type"] == "duration" and sess.is_run_or_walk(ex)
@@ -89,6 +97,7 @@ def build() -> dict:
             "garmin_window": ([max(0, minutes - sess.GARMIN_ACTIVITY_BUFFER_MINUTES),
                                minutes + sess.GARMIN_ACTIVITY_BUFFER_MINUTES] if pulls else None),
             "estimated_minutes": max(1, round(sess.exercise_duration_seconds(ex) / 60)),
+            "move": moves[i],
         })
     model = sess.estimate_duration(exercises)
     plan = {

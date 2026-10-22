@@ -1245,6 +1245,20 @@ export interface components {
             /** Type */
             type: string | null;
         };
+        /**
+         * ExerciseMove
+         * @description Which exercises move together when a machine is busy (WP-27,
+         *     services/session_order.move_groups): the phone moves whole groups of the
+         *     walked steps. A group runs only after every group in `after`.
+         */
+        ExerciseMove: {
+            /** After */
+            after: number[];
+            /** Group */
+            group: number;
+            /** Movable */
+            movable: boolean;
+        };
         /** FlexCapture */
         FlexCapture: {
             /** Cluster */
@@ -2526,6 +2540,7 @@ export interface components {
             laterality: string | null;
             /** Mechanics */
             mechanics: string;
+            move?: components["schemas"]["ExerciseMove"] | null;
             /** Name */
             name: string;
             /** Prescription */

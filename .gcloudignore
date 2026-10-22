@@ -21,6 +21,7 @@
 !/cluster_a_prescription.py
 !/flexibility_baselines.py
 !/goal_block.py
+!/goal_week.py
 
 # Never, even inside an admitted folder.
 **/__pycache__/
