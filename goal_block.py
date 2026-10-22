@@ -34,9 +34,10 @@ set went past it, in every session of that lift within 7 days; then the aim is
 the middle-bottom of the range. 8-12 for a compound lift, 10-15 for an
 isolation or core item. Starting weights are light on purpose: the athlete sets
 the real weight in the first session, and the rule takes over from the second
-(his choice, 2026-10-16). Steps: his dumbbells go up in 2.25 kg, so a lift with
-a dumbbell in each hand (logged as the total) steps 4.5 kg; machines 5 kg (the
-hack squat 2.5 kg a side); the back extension a 2.5 kg plate; cables one unit.
+(his choice, 2026-10-16). Steps: his dumbbells go up in 2.5 kg (corrected
+2026-10-22), so a lift with a dumbbell in each hand (logged as the total) steps
+5 kg; machines 5 kg (the hack squat 2.5 kg a side); the back extension a 2.5 kg
+plate; cables one unit.
 
 EFFORT (step 4). Machines and cables: working sets 1-2 reps short, the last set
 to failure. Dumbbell Romanian deadlift and the back extension: 1-3 short, never
@@ -76,11 +77,15 @@ SESSION_RPE_TARGET = 8
 COMPOUND_RANGE = {"rep_min": 8, "rep_max": 12}
 ISOLATION_RANGE = {"rep_min": 10, "rep_max": 15}
 
-#: His dumbbells, 2026-10-16: "all Dumbells go from 2.25 - 40kg in increments
-#: of 2.25kg". A lift with one dumbbell steps one size; a lift with one in each
-#: hand is logged as the total, so it steps both, 4.5 kg.
-DUMBBELL_KG = 2.25
-DUMBBELL_PAIR_KG = 4.5
+#: His dumbbells go from 2.5 to 40 kg in 2.5 kg steps (his answer, 2026-10-22).
+#: It corrects his message of 2026-10-16 ("all Dumbells go from 2.25 - 40kg in
+#: increments of 2.25kg"): his notes of 2026-10-19 and 10-20 give the weights he
+#: lifted as 15 kg (the walking lunge), 40 kg (the Romanian deadlift) and 25 kg
+#: (its ramp set), none of which the 2.25 kg steps could show. A lift with one
+#: dumbbell steps one size; a lift with one in each hand is logged as the total,
+#: so it steps both, 5 kg.
+DUMBBELL_KG = 2.5
+DUMBBELL_PAIR_KG = 5.0
 #: Confirmed 2026-10-16 ("Yes all are correct").
 MACHINE_KG = 5.0
 PLATE_KG = 2.5
@@ -229,7 +234,7 @@ WALKING_LUNGE = _ex(
     ex_type="reps",
     laterality="unilateral",
     sets=3, reps=10, rest_seconds=90,
-    equipment_type="dumbbell", weight_kg=13.5,
+    equipment_type="dumbbell", weight_kg=15.0,
     increment_size=DUMBBELL_PAIR_KG, **COMPOUND_RANGE,
     mechanics=(
         "A dumbbell in each hand at your sides. Step forward into a long stride and lower "
@@ -242,9 +247,9 @@ WALKING_LUNGE = _ex(
     biomechanical_focus=(
         "Glute max (goal A, priority 1), quads second: tier_lists/glutes.md, S+, the best "
         "overall. A long stride keeps the work in the glutes at length. Dumbbells by his "
-        "rule; logged as the total, so one step is both dumbbells one size up (4.5 kg)."
+        "rule; logged as the total, so one step is both dumbbells one size up (5 kg)."
     ),
-    progression="The rep-range rule adds 4.5 kg (both dumbbells one size up).",
+    progression="The rep-range rule adds 5 kg (both dumbbells one size up).",
     regression="Balance goes before the legs tire → do it as a static split squat by a rack.",
 )
 
@@ -252,7 +257,7 @@ RDL = _ex(
     name="Romanian Deadlift (DB)",
     ex_type="reps",
     sets=3, reps=10, rest_seconds=90,
-    equipment_type="dumbbell", weight_kg=27.0,
+    equipment_type="dumbbell", weight_kg=25.0,
     increment_size=DUMBBELL_PAIR_KG, **COMPOUND_RANGE,
     mechanics=(
         "Stand tall with a dumbbell in each hand in front of your thighs, feet hip-width, "
@@ -268,7 +273,7 @@ RDL = _ex(
         "came from overload and fatigue). Logged as the total of both dumbbells, as his log "
         "has always been."
     ),
-    progression="The rep-range rule adds 4.5 kg (both dumbbells one size up).",
+    progression="The rep-range rule adds 5 kg (both dumbbells one size up).",
     regression="The stretch arrives before mid-shin → stop where it arrives; that is your range.",
 )
 
@@ -339,7 +344,7 @@ ROW = _ex(
         "S. One arm at a time so the left cannot do the right's work. The right elbow's "
         "limit is the measured limit of the arm behind the body (2026-08-13)."
     ),
-    progression="The rep-range rule adds 2.25 kg (one dumbbell size).",
+    progression="The rep-range rule adds 2.5 kg (one dumbbell size).",
     regression="The right shoulder pinches at the top → stop the pull with the elbow level with your back.",
 )
 
@@ -552,7 +557,7 @@ HIP_AIRPLANE = _ex(
     ex_type="reps",
     laterality="unilateral",
     sets=3, reps=10, rest_seconds=60,
-    equipment_type="dumbbell", weight_kg=4.5,
+    equipment_type="dumbbell", weight_kg=5.0,
     increment_size=DUMBBELL_KG, **COMPOUND_RANGE,
     mechanics=(
         "Hold one dumbbell behind your back in both hands, against the base of your back. "
@@ -573,7 +578,7 @@ HIP_AIRPLANE = _ex(
         "the back and the compound range so the one rule adds weight. Slight bow: the right "
         "hip stays under 60 degrees of flexion (rules: 'hip airplane', key rule 7)."
     ),
-    progression="The rep-range rule adds 2.25 kg (one dumbbell size).",
+    progression="The rep-range rule adds 2.5 kg (one dumbbell size).",
     regression="A click on the right → smaller turn; no click at a smaller turn is the range.",
 )
 

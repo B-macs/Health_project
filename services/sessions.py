@@ -681,10 +681,10 @@ def step_band_tier(current_tier: str, direction: int) -> str:
 def whole_dumbbells(weight_kg: float | None, step: float, *, down: bool = False) -> float | None:
     """A dumbbell lift's weight as real dumbbells: a whole number of its step.
 
-    His dumbbells, 2026-10-16: "all Dumbells go from 2.25 - 40kg in increments
-    of 2.25kg" — so one dumbbell steps 2.25 kg, and a pair, logged as the total,
-    4.5 kg. A weight logged under the old 2.5 kg steps (42.5, 25) reads as the
-    nearest real one, his rule. On a day that may not go up (`down`: a
+    His dumbbells go from 2.5 to 40 kg in 2.5 kg steps (his answer, 2026-10-22,
+    correcting the 2.25 kg of 2026-10-16), so one dumbbell steps 2.5 kg, and a
+    pair, logged as the total, 5 kg. A weight logged under the 2.25 kg steps
+    (13.5, 40.5) reads as the nearest real one, his rule. On a day that may not go up (`down`: a
     reduced-load day or a failed-week hold) it reads as the real one at or
     below, so it never passes the last session. A weight under one step, or
     no step, is left as it is."""

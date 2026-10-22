@@ -811,7 +811,9 @@ EVERY release (his 2026-10-15 rule), which is what lifted the core from the
    weight of 5 units; at his logged 9-10 units the step is +10-11% and the
    weight goes up at 15, the top of its range.
    **His answers, 2026-10-16:** the dumbbells go up in **2.25 kg** (*"Incline
-   press goes up by the DB available which are in 2.25 increments"*) — the app
+   press goes up by the DB available which are in 2.25 increments"*;
+   **corrected 2026-10-22 to 2.5 kg steps, 2.5 to 40 kg** — see "His
+   dumbbells" in step 8) — the app
    has logged every dumbbell lift in 2.5 kg steps, so the dumbbell series is
    asked before the step changes; the cable machines' **units are fine as
    long as it is the same machine, and 1 unit is about 0.5 kg** (*"this doesnt
@@ -921,7 +923,7 @@ monday. lets complete all other steps and then push."*
   (*"Yes built correct"*); the machine steps are confirmed (*"Yes all are
   correct"*) — hack squat 5 kg (2.5 kg a side), chest press, shoulder press and
   leg curl 5 kg, cable lateral raise and crossover 1 unit, back extension
-  2.5 kg (a plate held), dumbbells 2.25 kg (one real dumbbell number is still
+  2.5 kg (a plate held), dumbbells 2.25 kg (2.5 kg since 2026-10-22, below) (one real dumbbell number is still
   asked, so the + and − buttons land on his dumbbells); **starting weights:**
   the app shows a light weight, he sets the real one in the first session, and
   the rule takes over from the second (option a); **the timed plank test:** in
@@ -935,6 +937,13 @@ monday. lets complete all other steps and then push."*
   when the heaviest is 40 — so one step there is both dumbbells one size up
   (4.5 kg). Logged weights that are not real dumbbells (for example 42.5 or
   25) are read as the nearest real one when the block starts.
+  **Corrected 2026-10-22 (his answer):** every dumbbell goes 2.5 to 40 kg in
+  2.5 kg steps. His notes of 2026-10-19 and 10-20 give 15 kg for the walking
+  lunge, 40 kg for the Romanian deadlift and 25 kg for its ramp set, weights the
+  2.25 kg steps could not show (the app stored 13.5, 40.5 and 22.5). One
+  dumbbell steps 2.5 kg and a pair 5 kg; a weight stored under the 2.25 kg steps
+  is read as the nearest real one, and the rows of 10-19 and 10-20 were
+  corrected from his notes (WP-21).
 
 ---
 
@@ -990,7 +999,7 @@ filters applied after the ranking:
 | Right-shoulder release | KEEP | The chest stretches take the right arm past its measured limit; the release passes, and he uses its short-lived effect |
 | High-to-low woodchop | KEEP | A, the sides' best tier; the best safety margin in it |
 | Side plank with hip raises | KEEP | A, the sides' best tier; the best safety margin in it |
-| Prone Y raise (B) | ASKED: the single-arm cable Y raise (A) | The S rows and pulldowns fail his right-arm limit or load pec minor; the Y raise is hardest where the muscle is shortest, and 2.25 → 4.5 kg is a 100% step |
+| Prone Y raise (B) | ASKED: the single-arm cable Y raise (A) | The S rows and pulldowns fail his right-arm limit or load pec minor; the Y raise is hardest where the muscle is shortest, and 2.5 → 5 kg is a 100% step |
 | Hip airplane (A) | ASKED: the prone cable hip rotation (S) | Load in small steps, hips straight (no click); gives up the only exercise that turns the pelvis on a standing leg; about 5 more minutes on two days |
 | End-range psoas isometric (B) | ASKED: the cable hip flexion from behind the body (S) | The isometric works the psoas at its shortest — not the area's job of strength at length; the bench-edge version is the Thomas-test position, where the right hip clicks |
 | Adductor ladder | ASKED: the adductor machine (S), if his gym has one | Knees bent, starting wide under load; about 5 minutes on two sessions instead of at home; without one, the ladder stays |

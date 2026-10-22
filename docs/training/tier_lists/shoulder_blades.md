@@ -64,7 +64,7 @@ for that for now."*
   the arm across the body, load in steps of one unit (about 0.5 kg), one arm at a
   time (his single-arm rule) — and the wall slide, which carries almost no load.
 - **The prone Y raise (B)** is hardest at the top, where the lower traps are
-  shortest, and his lightest dumbbells go from 2.25 to 4.5 kg, a 100% step.
+  shortest, and his lightest dumbbells go from 2.5 to 5 kg, a 100% step.
 - **Safety rules:** the cable Y raise reads "unknown" and gets a rule before use.
 
 **Check of the pick (step 8, 2026-10-16): the single-arm cable Y raise (A)

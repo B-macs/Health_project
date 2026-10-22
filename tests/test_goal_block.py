@@ -231,8 +231,8 @@ def test_every_loaded_lift_has_the_range_its_kind_takes():
 
 
 def test_every_step_is_one_he_confirmed():
-    """Dumbbells 2.25 kg, a pair 4.5 kg; machines 5 kg; the back extension a
-    2.5 kg plate; cables one unit (2026-10-16)."""
+    """Dumbbells 2.5 kg, a pair 5 kg (2026-10-22); machines 5 kg; the back
+    extension a 2.5 kg plate; cables one unit (2026-10-16)."""
     for _, _, e in _every_entry():
         if e.get("equipment_type") in _STEPS and not e.get("warmup"):
             assert e["increment_size"] in _STEPS[e["equipment_type"]], e["name"]
@@ -240,6 +240,17 @@ def test_every_step_is_one_he_confirmed():
             assert e["increment_unit"] == unit, e["name"]
     assert next(e for e in gb.SESSIONS["B"] if e["name"] == "45° Back Extension")[
         "increment_size"] == gb.PLATE_KG
+
+
+def test_his_dumbbells_go_up_in_2_5_kg():
+    """His answer, 2026-10-22: every dumbbell goes 2.5 to 40 kg in 2.5 kg steps
+    (his notes of 2026-10-19/20: a 15 kg lunge, a 40 kg RDL, a 25 kg ramp set).
+    A pair is logged as the total, so it steps both dumbbells: 5 kg."""
+    assert gb.DUMBBELL_KG == 2.5
+    assert gb.DUMBBELL_PAIR_KG == 2 * gb.DUMBBELL_KG
+    for name in ("Walking Lunge (DB)", "Romanian Deadlift (DB)"):
+        e = next(x for day in PLAN.values() for x in day["exercises"] if x["name"] == name)
+        assert e["increment_size"] == gb.DUMBBELL_PAIR_KG, name
 
 
 def test_a_starting_weight_is_a_real_dumbbell():
@@ -378,37 +389,38 @@ def test_a_right_hip_flexion_item_carries_the_kneecap_cue(name):
 # ─── The load helpers the block needs (services/sessions.py) ────────────────
 
 @pytest.mark.parametrize("logged,step,down,want", [
-    (42.5, 4.5, False, 40.5),    # an old 2.5 kg-step total reads as the nearest real pair
-    (42.5, 4.5, True, 40.5),
-    (47.0, 4.5, False, 45.0),    # a step up from 42.5 lands on a real pair
-    (43.6, 4.5, False, 45.0),
-    (43.6, 4.5, True, 40.5),     # a day that may not go up never rounds up
-    (22.5, 2.25, False, 22.5),   # his row this morning is a real dumbbell
-    (25.0, 2.25, False, 24.75),
-    (None, 2.25, False, None),
-    (1.0, 2.25, False, 1.0),     # under one step: left as it is
+    (40.5, 5.0, False, 40.0),    # a 2.25 kg-step total reads as the nearest real pair
+    (40.5, 5.0, True, 40.0),
+    (13.5, 5.0, False, 15.0),    # the walking lunge of 2026-10-19: 15 kg, his note
+    (13.5, 5.0, True, 10.0),     # a day that may not go up never rounds up
+    (45.5, 5.0, False, 45.0),    # a step up from 40.5 lands on a real pair
+    (22.5, 2.5, False, 22.5),    # his row is a real dumbbell
+    (4.5, 2.5, False, 5.0),      # the hip airplane's 2.25 kg-step weight
+    (None, 2.5, False, None),
+    (1.0, 2.5, False, 1.0),      # under one step: left as it is
 ])
 def test_a_dumbbell_weight_is_whole_dumbbells(logged, step, down, want):
     assert s.whole_dumbbells(logged, step, down=down) == want
 
 
 def test_the_resolved_dumbbell_weight_is_whole_dumbbells():
-    """His RDL was logged at 42.5 kg under the old 2.5 kg steps; the block
-    reads it as 40.5 (two 20.25 kg dumbbells) and steps from there."""
+    """His RDL was logged at 40.5 kg under the 2.25 kg steps on 2026-10-20 (his
+    note: "40kg x 10"); the block reads it as 40 (two 20 kg dumbbells) and
+    steps from there, both dumbbells one size up."""
     rdl = next(e for e in gb.SESSIONS["B"] if e["name"] == "Romanian Deadlift (DB)")
-    sets = [{"reps": 10, "weight": 42.5}] * 3
+    sets = [{"reps": 10, "weight": 40.5}] * 3
     entry = s.resolve_prescription(
-        rdl, {"session_date": "2026-10-12", "reps": 10, "weight_kg": 42.5}, "normal",
+        rdl, {"session_date": "2026-10-20", "reps": 10, "weight_kg": 40.5}, "normal",
         {"reduced": False, "volume_factor": 1.0},
         weight_increment=rdl["increment_size"], last_session_sets=sets,
-        history=[("2026-10-12", sets)])
-    assert entry["weight_kg"] == 40.5 and entry["action"] == "hold"
-    up = [{"reps": 12, "weight": 42.5}] * 3
+        history=[("2026-10-20", sets)])
+    assert entry["weight_kg"] == 40.0 and entry["action"] == "hold"
+    up = [{"reps": 12, "weight": 40.0}] * 3
     entry = s.resolve_prescription(
-        rdl, {"session_date": "2026-10-12", "reps": 12, "weight_kg": 42.5}, "normal",
+        rdl, {"session_date": "2026-10-20", "reps": 12, "weight_kg": 40.0}, "normal",
         {"reduced": False, "volume_factor": 1.0},
         weight_increment=rdl["increment_size"], last_session_sets=up,
-        history=[("2026-10-12", up)])
+        history=[("2026-10-20", up)])
     assert entry["weight_kg"] == 45.0 and entry["action"] == "step_up"
 
 
@@ -418,7 +430,8 @@ def test_a_ramp_follows_its_lift_at_about_60_percent():
     assert s.ramp_lift_index(b, i) == i + 1
     assert s.ramp_lift_index(b, i + 1) is None
     entry = s.ramp_entry(b[i], {"weight_kg": 45.0})
-    assert entry["weight_kg"] == 27.0 and entry["reps"] == 6 and entry["source"] == s.RAMP_SOURCE
+    # 60% of 45 is 27, rounded down to a real pair of dumbbells (5 kg steps).
+    assert entry["weight_kg"] == 25.0 and entry["reps"] == 6 and entry["source"] == s.RAMP_SOURCE
     assert s.ramp_weight_kg(60.0, gb.MACHINE_KG) == 35.0      # 36 rounded down to the step
     assert s.ramp_weight_kg(0.0, gb.PLATE_KG) == 0.0
     assert "60%" in s.actual_caption(entry)
