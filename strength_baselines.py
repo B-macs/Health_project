@@ -56,17 +56,19 @@ PEAKS_2025: dict[str, tuple[float, int, float, str]] = {
     "Incline DB Press":       (18.0, 12, 1.00, "same exercise"),
     "Face Pull (Cable)":      (21.0, 15, 0.60, "machine-dependent; 2025 log records 15-24 kg"),
     # -- lower body --
-    "Hip Thrust (Loaded)":    (50.0, 12, 1.00, "same exercise"),
+    "Hip Thrust (Loaded)":    (50.0, 12, 1.00, "same exercise and equipment then and now (the owner, 2026-10-22)"),
     "Romanian Deadlift (DB)": (60.0, 12, 0.70, "barbell in 2025, dumbbell now"),
-    "Goblet Squat":           (22.5, 10, 0.40, "reps not recorded in 2025; x10 assumed"),
-    "Bulgarian Split Squat":  (15.0, 12, 1.00, "logged as Split Squat in 2025"),
+    "Goblet Squat":           (22.5, 12, 0.40, "reps not recorded in 2025; x12 assumed, the owner's "
+                                                "estimate (2026-10-22: \"12 probably\"; it was x10 before)"),
+    "Bulgarian Split Squat":  (15.0, 12, 1.00, "logged as Split Squat in 2025; 15 kg in each hand (the "
+                                                "owner, 2026-10-22), the way the plans log it"),
     # -- core --
     # Pallof Press's 2025 entry is "orange band x 15". A band is not a
     # kilogram and there is no defined conversion, so it gets NO baseline
     # rather than an invented one. Core therefore runs on the prior alone
     # until a loaded or repeatable core measurement is logged; the two
     # candidates already in the 2025 log are the Copenhagen plank (30s x 3)
-    # and the side plank + march (15/15 x 3), neither of which needs a 1RM.
+    # and the side plank + march (15 s each side x 3), neither of which needs a 1RM.
 }
 
 # A 2025 PR set has no logged RPE. "Best ever" is taken to be one rep from
@@ -98,7 +100,8 @@ REGION_PRIOR: dict[str, float] = {
 #
 #: The timed line → (the 2025 hold in seconds, a side; what the 2025 log holds).
 HOLD_BASELINES_2025: dict[str, tuple[float, str]] = {
-    "Bunkie — Lateral Stabilizing Line (Timed)": (15.0, "side plank with a march, 15 s each side × 3"),
+    "Bunkie — Lateral Stabilizing Line (Timed)": (15.0, "side plank with a march, 15 s each side × 3 "
+                                                        "(seconds, the owner, 2026-10-22)"),
     "Bunkie — Medial Stabilizing Line (Timed)": (30.0, "Copenhagen plank, 30 s × 3"),
 }
 #: Between a same-pattern different-implement baseline (0.70) and an assumed
