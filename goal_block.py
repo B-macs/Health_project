@@ -90,8 +90,9 @@ DUMBBELL_PAIR_KG = 5.0
 MACHINE_KG = 5.0
 PLATE_KG = 2.5
 #: Every cable steps half a unit (his answer, 2026-10-22: "No on all cables", to
-#: "only on the crossover's cable, or on every cable?"; his note on the crossover
-#: of 2026-10-19: "1.5 Units for the last 2 sets"). Until then one unit.
+#: "only on the crossover's cable, or on every cable?", confirmed the same day:
+#: "Yes, 0.5-unit steps on every cable"; his note on the crossover of
+#: 2026-10-19: "1.5 Units for the last 2 sets"). Until then one unit.
 CABLE_UNIT = 0.5
 
 _EVERY_SET_TO_FAILURE = "Take every set to failure."
