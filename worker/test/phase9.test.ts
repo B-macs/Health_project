@@ -5,6 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { app } from '../src/index'
 
 const ON = { ...env, SYNC_ENABLED: 'true' } as never
+// The config has the switch on since the switch-over (2026-10-21); the shut page is tested
+// with the switch off in the test's own bindings.
+const OFF = { ...env, SYNC_ENABLED: 'false' } as never
 
 function engineAnswers(body: unknown, status = 200) {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(
@@ -41,9 +44,9 @@ describe('the Oura return page', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
-  it('stays shut, like the syncs, until the switch-over turns them on', async () => {
+  it('stays shut, like the syncs, while the switch is off', async () => {
     const spy = engineAnswers({})
-    const res = await app.request('/oura/callback?code=c&state=s', {}, env as never)
+    const res = await app.request('/oura/callback?code=c&state=s', {}, OFF)
     expect(res.headers.get('location')).toBe('/#/oura-done?result=sync_disabled')
     expect(spy).not.toHaveBeenCalled()
   })

@@ -105,9 +105,20 @@ describe('running the check', () => {
   })
 })
 
+// The switch-over turned the syncs on (2026-10-21, switch step 4). The lock itself is still
+// tested: with the switch off in the test's own bindings, every sync path stays shut.
+const OFF = { ...env, SYNC_ENABLED: 'false' } as never
+
 describe('the sync switch', () => {
-  it('is off in the config until the switch-over', () => {
-    expect(env.SYNC_ENABLED).toBe('false')
+  it('is on in the config since the switch-over (2026-10-21)', () => {
+    expect(env.SYNC_ENABLED).toBe('true')
+  })
+
+  it('lets a sync through the Worker as deployed', async () => {
+    const spy = engineAnswers({ ran: true })
+    const res = await call('/api/sync', { method: 'POST', headers: ACCESS })
+    expect(res.status).toBe(200)
+    expect(spy).toHaveBeenCalledTimes(1)
   })
 
   it.each([
@@ -117,7 +128,7 @@ describe('the sync switch', () => {
     ['POST', '/api/oura/callback'],
   ])('closes %s %s while off, and the engine is never called', async (method, path) => {
     const spy = engineAnswers({ ok: true })
-    const res = await call(path, { method, headers: { ...ACCESS, 'content-type': 'application/json' }, body: '{}' })
+    const res = await app.request(path, { method, headers: { ...ACCESS, 'content-type': 'application/json' }, body: '{}' }, OFF)
     expect(res.status).toBe(409)
     expect(await res.json()).toEqual({ error: 'sync_disabled' })
     expect(spy).not.toHaveBeenCalled()
