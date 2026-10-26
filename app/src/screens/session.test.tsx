@@ -11,13 +11,13 @@ import { HealthDB } from '../db/schema'
 import { AppStateProvider } from '../lib/appState'
 import { drain, enqueue } from '../lib/outbox'
 import {
-  advance, finished, saveBody, setGarmin, setSide, skip, startSessionState, type HeartRate, type Plan,
+  advance, doFirst, finished, saveBody, setGarmin, setSide, skip, startSessionState, type HeartRate, type Plan,
   type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
-import { arrivalTimer, SessionFlow } from './Session'
-import { HeartRateMatch, reviewLine } from './SessionSave'
-import { Banner, longDate, noSessionLine, noSessionReason } from './TrainingTab'
+import { arrivalTimer, backLabel, SessionFlow } from './Session'
+import { HeartRateMatch, reviewLine, SessionSave } from './SessionSave'
+import { Banner, longDate, noSessionLine, noSessionReason, TrainedToday, trainedToday } from './TrainingTab'
 import * as fx from '../../dev/fixtures'
 
 const plan = fixture as unknown as Plan
@@ -330,5 +330,106 @@ describe("today's overview while it has no session", () => {
   it("the day's own reason comes first", () => {
     expect(noSessionLine('rest_day', { state: 'loading' })).toEqual({ text: S.session.noSession.rest_day, reading: false })
     expect(noSessionLine(null, { state: 'fresh' }).text).toBe(S.session.noSessionOther)
+  })
+})
+
+describe('Back beside the main button (WP-34)', () => {
+  const walk = (n: number) => {
+    let s = at(0)
+    for (let i = 0; i < n; i++) s = advance(s, T0 + i * 1000)
+    return s
+  }
+
+  it('says where it goes: the side, the rest or the exercise before', () => {
+    expect(backLabel(at(0))).toBe(S.session.back)
+    expect(backLabel(walk(1))).toBe(S.session.backTo(`${S.session.setN(1)} · ${S.session.side.left}`))
+    expect(backLabel(walk(3))).toBe(S.session.backTo(S.session.backRest))
+    expect(backLabel(walk(5))).toBe(S.session.backTo('Made-up march'))
+  })
+
+  it('after a change of order it says it puts the order back', () => {
+    const squat = walk(6)
+    expect(squat.plan.steps[squat.step].ex_idx).toBe(2)
+    const moved = doFirst(squat, 3)
+    expect(backLabel(moved)).toBe(S.session.backOrder)
+  })
+
+  it('sits in the controls row before the main button, and Skip stays below', () => {
+    const html = render(walk(1))
+    const controls = html.slice(html.indexOf('class="controls"'))
+    const row = controls.slice(0, controls.indexOf('</div>'))
+    expect(row).toContain('data-testid="back"')
+    expect(row.indexOf('data-testid="back"')).toBeLessThan(row.indexOf('btn--primary'))
+    expect(text(html)).toContain(S.session.skip)
+    expect(render(at(0))).not.toContain('data-testid="back"')
+  })
+})
+
+describe('the exercise the flow is on (WP-31)', () => {
+  it('is the one row of the list marked now', () => {
+    const html = render(at(6))
+    expect(html.match(/data-state="now"/g)?.length).toBe(1)
+  })
+})
+
+describe('a trained day stays trained (WP-32)', () => {
+  const today = fx.trainingDay('2026-10-20', '2026-10-20')
+  const logged = { ...today, overview: { ...today.overview!, screen: 'logged' },
+    logged: { rpe: 6, minutes: 50, au: 300, exercises: [{ name: 'Made-up squat', movement_type: 'Strength', planned_sets: 3 }] } }
+
+  it('the engine\'s logged answer or a save on this phone today: never Start again', () => {
+    expect(trainedToday(today, null, '2026-10-20')).toBe(false)
+    expect(trainedToday(logged, null, '2026-10-20')).toBe(true)
+    expect(trainedToday(today, '2026-10-20', '2026-10-20')).toBe(true)
+    expect(trainedToday(today, '2026-10-19', '2026-10-20')).toBe(false)
+  })
+
+  it('shows what was logged, or that the save is on its way', () => {
+    const shown = text(provide(<TrainedToday day={logged} />))
+    expect(shown).toContain(S.session.trainedToday)
+    expect(shown).toContain('Made-up squat')
+    expect(text(provide(<TrainedToday day={today} />))).toContain(S.session.trainedSaving)
+    expect(provide(<TrainedToday day={logged} />)).not.toContain(S.session.start)
+  })
+
+  it('the saved screen congratulates with a check that grows into place', () => {
+    const s = { ...walked(at(0)), saving: true, savedId: 'outbox-1', saved: { rpe: 6, minutes: 30, notes: '' } }
+    const html = provide(<SessionSave s={s} update={() => undefined} onDone={() => undefined} />)
+    expect(html).toContain('data-testid="celebrate"')
+    expect(text(html)).toContain(S.session.congrats)
+  })
+})
+
+describe('a test of the flexibility retest on the screen (WP-33)', () => {
+  const testPlan = (): Plan => ({
+    ...plan,
+    exercises: plan.exercises.map((e) => (e.index === 8 ? {
+      ...e, name: 'Made-up test (Test)', timer: null, garmin_pull: false, garmin_window: null,
+      reading: { test_key: 'one', unit: 'cm', sides: ['left', 'right'], input_hint: 'Made-up hint',
+        setup_input: 'Made-up setup (cm)', prior_setup: 30, takes_load: false },
+    } : e)),
+  })
+
+  it('asks for each side and the setup number, with no timer, and waits for the values', () => {
+    const p = testPlan()
+    const s = { ...startSessionState(p, '2026-11-01-00000001', p.exercises.map((_, i) => `ex-${i}`)),
+      step: p.steps.findIndex((st) => st.ex_idx === 8) }
+    const html = render(s)
+    const shown = text(html)
+    expect(html).toContain('data-testid="reading"')
+    expect(shown).toContain('Made-up hint')
+    expect(shown).toContain(S.session.readingFor('left', 'cm'))
+    expect(shown).toContain('Made-up setup (cm)')
+    expect(html).toContain('value="30"')
+    expect(shown).toContain(S.session.readingDone)
+    expect(html).not.toContain('role="timer"')
+    expect(html).toMatch(/disabled=""[^>]*>Reading done/)
+  })
+})
+
+describe('leaving a session (WP-33)', () => {
+  it('Leave for now is offered beside losing it', () => {
+    expect(S.session.exitAsk).toContain('Leave for now')
+    expect(S.session.leaveForNow).toBe('Leave for now')
   })
 })

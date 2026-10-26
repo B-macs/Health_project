@@ -1261,6 +1261,48 @@
         "title": "FlexCapture",
         "type": "object"
       },
+      "FlexCheckIn": {
+        "properties": {
+          "readings": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ReadingIn"
+            },
+            "title": "Readings",
+            "type": "array"
+          }
+        },
+        "title": "FlexCheckIn",
+        "type": "object"
+      },
+      "FlexCheckOut": {
+        "description": "The battery's early answer over the readings so far: a pattern means\nthe tests left are not needed this morning.",
+        "properties": {
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
+          "pattern": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pattern"
+          },
+          "reason": {
+            "default": "",
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "title": "FlexCheckOut",
+        "type": "object"
+      },
       "FlexReading": {
         "properties": {
           "label": {
@@ -2563,6 +2605,61 @@
         "title": "LengthChoice",
         "type": "object"
       },
+      "LiftRow": {
+        "description": "One lift against its 2025 best (WP-38): its latest session's best set,\nthe one-rep max of both, the % and how close the two lifts are (same,\nclose, machine or rough).",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "match": {
+            "title": "Match",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "one_rm_2025_kg": {
+            "title": "One Rm 2025 Kg",
+            "type": "number"
+          },
+          "one_rm_kg": {
+            "title": "One Rm Kg",
+            "type": "number"
+          },
+          "pct_of_2025": {
+            "title": "Pct Of 2025",
+            "type": "number"
+          },
+          "region": {
+            "title": "Region",
+            "type": "string"
+          },
+          "reps": {
+            "title": "Reps",
+            "type": "integer"
+          },
+          "weight_kg": {
+            "title": "Weight Kg",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "region",
+          "pct_of_2025",
+          "weight_kg",
+          "reps",
+          "date",
+          "one_rm_kg",
+          "one_rm_2025_kg",
+          "match"
+        ],
+        "title": "LiftRow",
+        "type": "object"
+      },
       "LoggedExercise": {
         "properties": {
           "movement_type": {
@@ -2777,6 +2874,16 @@
               }
             ]
           },
+          "headline": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WeightHeadline"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -2823,6 +2930,16 @@
             },
             "title": "Ranges",
             "type": "array"
+          },
+          "seca": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SecaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "series": {
             "$ref": "#/components/schemas/MetabolismSeries"
@@ -4373,6 +4490,57 @@
         "title": "ReadinessOut",
         "type": "object"
       },
+      "ReadingIn": {
+        "description": "One test of the flexibility retest as typed (WP-33): a value per side\n(\"\" for a one-number test), the setup number and the added load.",
+        "properties": {
+          "load_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Kg"
+          },
+          "setup_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setup Value"
+          },
+          "test_key": {
+            "title": "Test Key",
+            "type": "string"
+          },
+          "values": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "default": {},
+            "title": "Values",
+            "type": "object"
+          }
+        },
+        "required": [
+          "test_key"
+        ],
+        "title": "ReadingIn",
+        "type": "object"
+      },
       "RedoIn": {
         "properties": {
           "action_id": {
@@ -4876,6 +5044,16 @@
             "title": "Raw Sets",
             "type": "array"
           },
+          "reading": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReadingIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "sets": {
             "default": [],
             "items": {
@@ -4910,6 +5088,177 @@
           "moved"
         ],
         "title": "ScheduleNote",
+        "type": "object"
+      },
+      "SecaFigure": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Change"
+          },
+          "dp": {
+            "title": "Dp",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "unit",
+          "dp",
+          "value",
+          "change"
+        ],
+        "title": "SecaFigure",
+        "type": "object"
+      },
+      "SecaImportIn": {
+        "description": "The SECA's export as text (its table view, a CSV in German).",
+        "properties": {
+          "csv": {
+            "title": "Csv",
+            "type": "string"
+          }
+        },
+        "required": [
+          "csv"
+        ],
+        "title": "SecaImportIn",
+        "type": "object"
+      },
+      "SecaOut": {
+        "description": "The latest SECA scan (WP-37), its own lane: never set against the scale\nor the InBody.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "days_old": {
+            "title": "Days Old",
+            "type": "integer"
+          },
+          "device": {
+            "title": "Device",
+            "type": "string"
+          },
+          "figures": {
+            "items": {
+              "$ref": "#/components/schemas/SecaFigure"
+            },
+            "title": "Figures",
+            "type": "array"
+          },
+          "height_cm": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height Cm"
+          },
+          "sides": {
+            "items": {
+              "$ref": "#/components/schemas/SecaSide"
+            },
+            "title": "Sides",
+            "type": "array"
+          },
+          "torso_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Torso Kg"
+          }
+        },
+        "required": [
+          "date",
+          "device",
+          "count",
+          "days_old",
+          "height_cm",
+          "figures",
+          "sides",
+          "torso_kg"
+        ],
+        "title": "SecaOut",
+        "type": "object"
+      },
+      "SecaSide": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "left_kg": {
+            "title": "Left Kg",
+            "type": "number"
+          },
+          "right_kg": {
+            "title": "Right Kg",
+            "type": "number"
+          },
+          "right_vs_left_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right Vs Left Pct"
+          }
+        },
+        "required": [
+          "label",
+          "left_kg",
+          "right_kg",
+          "right_vs_left_pct"
+        ],
+        "title": "SecaSide",
         "type": "object"
       },
       "Sector": {
@@ -5188,6 +5537,16 @@
               }
             ],
             "title": "Ramp For"
+          },
+          "reading": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionReading"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "rep_max": {
             "anyOf": [
@@ -5514,6 +5873,65 @@
           "next_day"
         ],
         "title": "SessionPlanOut",
+        "type": "object"
+      },
+      "SessionReading": {
+        "description": "What a test of the flexibility retest asks for (WP-33): its unit, its\nsides (\"\" for a one-number test), the hint at the input, the setup number\nand the one offered back from the last assessment, and whether the step\ntakes an added load.",
+        "properties": {
+          "input_hint": {
+            "title": "Input Hint",
+            "type": "string"
+          },
+          "prior_setup": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prior Setup"
+          },
+          "setup_input": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setup Input"
+          },
+          "sides": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Sides",
+            "type": "array"
+          },
+          "takes_load": {
+            "default": false,
+            "title": "Takes Load",
+            "type": "boolean"
+          },
+          "test_key": {
+            "title": "Test Key",
+            "type": "string"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "test_key",
+          "unit",
+          "sides",
+          "input_hint"
+        ],
+        "title": "SessionReading",
         "type": "object"
       },
       "SessionSaveIn": {
@@ -6555,6 +6973,14 @@
             "additionalProperties": true,
             "title": "Imbalances",
             "type": "object"
+          },
+          "lifts": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/LiftRow"
+            },
+            "title": "Lifts",
+            "type": "array"
           },
           "load_error": {
             "anyOf": [
@@ -8587,6 +9013,31 @@
         "title": "WeekDayOut",
         "type": "object"
       },
+      "WeightHeadline": {
+        "description": "The newest weight from either device, for the Insights tile (WP-37).",
+        "properties": {
+          "date": {
+            "format": "date",
+            "title": "Date",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "weight_kg": {
+            "title": "Weight Kg",
+            "type": "number"
+          }
+        },
+        "required": [
+          "date",
+          "weight_kg",
+          "source"
+        ],
+        "title": "WeightHeadline",
+        "type": "object"
+      },
       "WholeRange": {
         "properties": {
           "field": {
@@ -9858,6 +10309,79 @@
           }
         },
         "summary": "Get Metabolism"
+      }
+    },
+    "/api/insights/metabolism/seca": {
+      "post": {
+        "description": "Store a SECA export (WP-37) and answer the Metabolism screen. The same\nexport sent again stores one scan.",
+        "operationId": "post_seca_api_insights_metabolism_seca_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecaImportIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetabolismOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Seca"
       }
     },
     "/api/insights/queue": {
@@ -11611,6 +12135,79 @@
           }
         },
         "summary": "Get Day"
+      }
+    },
+    "/api/training/flexibility-check": {
+      "post": {
+        "description": "The battery's early answer over the retest readings typed so far (WP-33).\nIt reads and writes nothing.",
+        "operationId": "post_flexibility_check_api_training_flexibility_check_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FlexCheckIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FlexCheckOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Flexibility Check"
       }
     },
     "/api/training/garmin/activity-minutes": {

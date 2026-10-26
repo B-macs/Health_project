@@ -41,28 +41,29 @@ def test_the_session_slider_is_no_longer_copied_onto_every_exercise():
     assert "rpe=None," in [line.strip() for line in save.splitlines()]
 
 
-def test_a_null_exercise_rpe_falls_back_to_the_session_figure():
+def test_a_null_exercise_rpe_changes_no_strength_estimate():
     """Nulling must not change any number downstream — it removes a claim, not
-    data. strength.py's fallback is what makes that true."""
+    data. Since WP-38 (2026-10-26) the estimate reads neither figure: every
+    working set gets the 2025 best's one rep left (strength.estimate_rpe)."""
     rows = [{"movement_name": "Goblet Squat", "session_date": "2026-08-14",
              "exercise_rpe": None, "session_rpe": 8,
              "sets": [{"reps": 10, "weight": 20.0}]}]
     out = list(strength.qualifying_rows(rows, date(2026, 8, 15)))
     assert len(out) == 1
-    assert out[0][3] == 8
+    assert out[0][3] == 9.0
 
 
-def test_the_strength_estimate_reads_the_session_figure_not_the_heart_rate_one():
-    """Reversed on purpose 2026-10-13 (WP-15). This test was "an assigned
-    exercise RPE wins over the session figure". Key Rule 23 (2026-09-16) then
-    settled that the heart-rate figure is not reps in reserve, and the strength
-    estimate turns RPE straight into reps in reserve — so it reads the
-    athlete's own session rating. The heart-rate figure still lands on the
-    exercise (the tests below); nothing that estimates strength reads it."""
+def test_the_strength_estimate_never_reads_the_heart_rate_figure():
+    """Reversed on purpose twice. It was "an assigned exercise RPE wins over the
+    session figure"; Key Rule 23 (2026-09-16) settled that the heart-rate figure
+    is not reps in reserve, so WP-15 (2026-10-13) read the session rating; WP-38
+    (2026-10-26) reads neither and gives both years the same one rep left. The
+    heart-rate figure still lands on the exercise (the tests below); nothing that
+    estimates strength reads it."""
     rows = [{"movement_name": "Goblet Squat", "session_date": "2026-08-14",
              "exercise_rpe": 5.2, "session_rpe": 8,
              "sets": [{"reps": 10, "weight": 20.0}]}]
-    assert list(strength.qualifying_rows(rows, date(2026, 8, 15)))[0][3] == 8
+    assert list(strength.qualifying_rows(rows, date(2026, 8, 15)))[0][3] == 9.0
 
 
 def test_heart_rate_separates_a_release_from_a_working_set():

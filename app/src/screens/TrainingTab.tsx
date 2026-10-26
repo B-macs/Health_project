@@ -11,7 +11,7 @@
 // the engine's; the phone only lays it out.
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useCallback, useEffect, useState } from 'react'
-import type { OutboxRow } from '../db/schema'
+import { KEYS, type OutboxRow } from '../db/schema'
 import type { components } from '../generated/api'
 import { localDay } from '../lib/api'
 import { useApp } from '../lib/appState'
@@ -33,8 +33,8 @@ import { AccessoryOverview, ExtrasMenu, Outdoor, YogaDetail, YogaList } from './
 import { SessionFlow } from './Session'
 import { SessionSave } from './SessionSave'
 import {
-  DayView, Gate1, GapScreen, MovePrompts, RedoOffer, Refusals, RestView, Retest, RollupBanner, ScheduleNote, WeekStrip,
-  waiting, type Answer, type DayAnswer, type WeekAnswer,
+  DayView, Gate1, GapScreen, LoggedView, MovePrompts, RedoOffer, Refusals, RestView, Retest, RollupBanner, ScheduleNote,
+  WeekStrip, waiting, type Answer, type DayAnswer, type WeekAnswer,
 } from './Week'
 
 type Schemas = components['schemas']
@@ -52,6 +52,25 @@ export function Banner({ kind, text }: { kind: string; text: string }) {
   if (kind === 'error' || kind === 'warning') return <p className="alert" data-kind={kind}>{text}</p>
   if (kind === 'info') return <p className="note" data-kind={kind}>{text}</p>
   return <p className="caption" data-kind={kind || 'neutral'}>{text}</p>
+}
+
+/** Today is trained (WP-32): the engine says so, or this phone saved today's plan session
+ *  (the save may still be on its way). Training then shows what was done, never Start. */
+export function trainedToday(day: DayPlan | undefined, savedOn: unknown, today: string): boolean {
+  return day?.overview?.screen === 'logged' || savedOn === today
+}
+
+/** Today once it is trained (WP-32): what was logged, or that the save is on its way. */
+export function TrainedToday({ day }: { day: DayPlan | undefined }) {
+  return (
+    <div className="group" data-testid="trained-today">
+      <section className="card group">
+        <span className="eyebrow logged">{S.session.trainedToday}</span>
+        <p className="caption">{S.session.trainedTodayNext}</p>
+      </section>
+      {day?.logged ? <LoggedView logged={day.logged} /> : <p className="caption">{S.session.trainedSaving}</p>}
+    </div>
+  )
 }
 
 /** Why there is no session today, from the day's own answer (the block complete, T50,
@@ -175,6 +194,7 @@ function Overview({ day, onStart, starting, waitingMove, movedAt }: {
 }) {
   const { store, ctx } = useApp()
   const session = useCached<Plan>(store, '/api/training/session', null, ctx, { today: true })
+  const savedOn = useLiveQuery(async () => (await store.settings.get(KEYS.trainedOn))?.value ?? null, [store])
   const held = waitingMove || (movedAt !== undefined && (session.state !== 'fresh' || (session.fetchedAt ?? '') < movedAt))
   const [garmin, setGarmin] = useState(false)
   const [adapting, setAdapting] = useState(false)
@@ -189,6 +209,7 @@ function Overview({ day, onStart, starting, waitingMove, movedAt }: {
   if (d?.route === 'rest') return <><ScheduleNote note={d.note} /><RestView rest={d.rest} /></>
   if (d?.route === 'no_phase') return <GapScreen gap={d.gap} />
   if (d?.route === 'phases_unreadable') return <p className="alert">{S.week.phasesUnreadable}</p>
+  if (trainedToday(d, savedOn, today)) return <TrainedToday day={d} />
   return (
     <div className="group" data-testid="today-overview">
       {/* The week's read says how fresh the page is; the session's only when it failed. */}
@@ -398,9 +419,12 @@ export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
     }
   }
   const leave = useCallback(() => void endSession(store).then(() => go('/')), [store, go])
+  // Leave for now (WP-33): the session stays in the phone's database, the tab bar comes
+  // back, and Training opens it again where it was.
+  const away = useCallback(() => go('/'), [go])
   if (row === undefined) return null
   if (state?.saving) return <SessionSave s={state} update={update} onDone={leave} />
-  if (state) return <SessionFlow s={state} update={update} onExit={leave} />
+  if (state) return <SessionFlow s={state} update={update} onExit={leave} onLeave={away} />
   if (extra === 'yoga') return slug ? <YogaDetail slug={slug} /> : <YogaList />
   if (extra === 'outdoor') return <Outdoor />
   if (extra === 'accessory') return <AccessoryOverview />

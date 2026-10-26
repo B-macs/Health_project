@@ -27,7 +27,8 @@ from ..schemas_insights import (CaptureStartIn, CaptureStepIn, ClearedOut, DataC
                                 DataTableOut, EngineDataOut, FlexCapture, FlexibilityOut,
                                 ManualSyncOut, MetabolismOut, MissingIn, OuraCallbackIn, OuraLoginIn,
                                 OuraLoginOut, OuraLoginStatus, PlanStartIn, ProcessOut,
-                                QueueOut, SessionChecksOut, SettingsOut, SleepArchitectureOut,
+                                QueueOut, SecaImportIn, SessionChecksOut, SettingsOut,
+                                SleepArchitectureOut,
                                 StrengthOut, TrendsOut, WarningsOut)
 
 router = APIRouter()
@@ -65,6 +66,17 @@ def get_metabolism(metric: str = Query(default="Weight"), kind: str = Query(defa
                    repo: Repository = Depends(get_repository)) -> dict:
     try:
         return ins.metabolism(repo, today, metric, kind, offset)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=f"invalid_request: {exc}") from None
+
+
+@router.post("/api/insights/metabolism/seca", response_model=MetabolismOut)
+def post_seca(body: SecaImportIn, today: date = Depends(local_today),
+              repo: Repository = Depends(get_repository)) -> dict:
+    """Store a SECA export (WP-37) and answer the Metabolism screen. The same
+    export sent again stores one scan."""
+    try:
+        return ins.import_seca(repo, today, body.csv)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=f"invalid_request: {exc}") from None
 

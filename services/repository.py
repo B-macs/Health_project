@@ -2664,6 +2664,18 @@ class Repository:
             for p in pages
         )
 
+    def get_plan_session_ids(self, d: date) -> set[str]:
+        """The session ids of the plan sessions logged on `d`, in
+        has_logged_session's meaning: a supplementary session is not one. The
+        save reads it to refuse a second plan session on a day (WP-32)."""
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"equals": str(d)}},
+        )
+        return {sid for p in pages
+                if notion.get_property(p, "Type", "select") not in self.SUPPLEMENTARY_SESSION_TYPES
+                and (sid := notion.get_property(p, "Session ID", "rich_text"))}
+
     def get_logged_session_dates(self, start: date, end: date,
                                  include_supplementary: bool = True) -> set[str]:
         """Dates with any logged session in [start, end]. The default includes
@@ -6659,6 +6671,26 @@ class Repository:
             row = body_composition.scale_reading_row(reading)
             rows[row["taken_at"]] = row
         return self._write_store_only_rows("scale_readings", rows)
+
+    #: The SECA scans' config row (WP-37): a JSON list of
+    #: body_composition.seca_scan_row, a handful a year.
+    SECA_SCANS_KEY = "seca_scans"
+
+    def get_seca_scans(self) -> list:
+        """Every SECA scan, oldest first (body_composition.SecaScan). An
+        unreadable row raises: the screen says so rather than "no scan"."""
+        raw = self.get_config_value(self.SECA_SCANS_KEY)
+        return body_composition.seca_scans_from_rows(json.loads(raw) if raw else [])
+
+    def save_seca_scan(self, scan) -> list:
+        """Store one SECA scan, replacing one of the same time (the same export
+        sent again stores one scan); the scans as stored, oldest first."""
+        raw = self.get_config_value_live(self.SECA_SCANS_KEY)
+        rows = {r["taken_at"]: r for r in (json.loads(raw) if raw else []) if r.get("taken_at")}
+        row = body_composition.seca_scan_row(scan)
+        rows[row["taken_at"]] = row
+        self.set_config(self.SECA_SCANS_KEY, json.dumps([rows[k] for k in sorted(rows)]))
+        return body_composition.seca_scans_from_rows(list(rows.values()))
 
     def save_inbody_scans(self, scans: list) -> int:
         """Upsert gym scans by their time; each carries its device model."""

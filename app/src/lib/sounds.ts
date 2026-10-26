@@ -8,9 +8,14 @@
 // end is a RISING pair, and the 3-2-1 ticks are a short thin tone. Each bell that is
 // followed by another rep is one short strike, so it dies before the next rep starts.
 //
-// iOS: audio starts only after a tap, so the first tap of the session unlocks it; the
-// page declares itself a media player (the Audio Session API, Safari 17), which lets the
-// sounds play with the silent switch on. Web apps on iOS cannot vibrate.
+// iOS: audio starts only after a tap, so the first tap of the session unlocks it. The
+// page's sounds MIX WITH OTHER AUDIO (WP-29, the owner, 2026-10-26: "Keep Spotify music
+// and Apple Podcasts playing ... Play timer beeps over the background audio without
+// stopping it"): the Audio Session API's "ambient" type (Safari 17). Safari offers no
+// type that both mixes and plays with the silent switch on ("transient" is "ambient" in
+// WebKit's DOMAudioSession.cpp), so the bells need silent mode off. Until 2026-10-26 the
+// type was "playback", his choice of 2026-10-20 ("always play the bells over
+// everything"), which stopped his music at the first tap. Web apps on iOS cannot vibrate.
 export type Ending = 'continue' | 'switch' | 'finish' | 'done'
 
 type Ctx = AudioContext
@@ -25,11 +30,13 @@ function context(): Ctx | null {
   return ctx
 }
 
-/** Declare a media player (so the silent switch does not mute the bells) and wake the
- *  audio. Call from a tap. */
+/** The Audio Session type: sounds that mix with the music already playing (WP-29). */
+export const AUDIO_SESSION_TYPE = 'ambient'
+
+/** Declare sounds that mix with other audio, and wake the audio. Call from a tap. */
 export function unlockAudio(nav: Navigator = navigator): void {
   const session = (nav as Navigator & { audioSession?: { type: string } }).audioSession
-  if (session) session.type = 'playback'
+  if (session) session.type = AUDIO_SESSION_TYPE
   const c = context()
   if (c && c.state !== 'running') void c.resume().catch(() => undefined)
 }

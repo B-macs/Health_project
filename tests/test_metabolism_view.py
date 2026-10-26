@@ -40,6 +40,9 @@ class _Repo:
                               skeletal_muscle_kg=37.0, ecw_tbw=0.377, phase_angle_deg=6.0,
                               device="Model A")]
 
+    def get_seca_scans(self):
+        return []
+
 
 repo.get_repository = lambda: _Repo()
 from views import insights as V

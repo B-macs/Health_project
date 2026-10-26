@@ -484,3 +484,148 @@ def latest_device_scans(scans: list[InBodyScan]) -> list[InBodyScan]:
         return []
     device = scans[-1].device
     return [s for s in scans if s.device == device]
+
+
+# ─── The SECA scans (WP-37, from 2026-10-22) ─────────────────────────────────
+#
+# The gym's new machine, a SECA, every 12 weeks (the owner, 2026-10-26: "the
+# new metabolism update is coming from the new SECA machine in the gym that is
+# more accurate ... ill be doing this every 12 weeks"). It exports a German
+# table, one row per figure: "Wert" (the figure), "Einheit" (its unit) and the
+# scan's time ("Oct 22, 2026, 6:44 PM") as the third column's heading.
+#
+# A THIRD LANE. Its readings are never pooled with the Foryond scale's or the
+# InBody's: different machines, different models inside them. A new machine
+# starts its own series, the way latest_device_scans keeps the InBody's.
+# Stored in one config row (Repository.get_seca_scans), a handful of rows a
+# year, so it needs no table of its own.
+
+SECA_DEVICE = "SECA"
+
+#: The SECA's German labels -> the field each fills, for the figures shown.
+SECA_FIELDS: dict[str, str] = {
+    "Gewicht": "weight_kg",
+    "Body-Mass-Index": "bmi",
+    "Fettmasse": "fat_mass_kg",
+    "Prozentuale Fettmasse": "fat_pct",
+    "Fettmasse-Index": "fat_mass_index",
+    "Fettfreie-Masse-Index": "fat_free_mass_index",
+    "Skelettmuskelmasse": "skeletal_muscle_kg",
+    "Phasenwinkel": "phase_angle_deg",
+    "Wasserverhältnis": "water_ratio_pct",
+    "Viszerales Fett": "visceral_fat",
+    "Taillenumfang": "waist_cm",
+}
+#: The segment rows that follow "Segmentale Skelettmuskelmasse" (the first block).
+SECA_SEGMENTS: dict[str, str] = {
+    "Torso": "torso", "Linker Arm": "left_arm", "Rechter Arm": "right_arm",
+    "Linkes Bein": "left_leg", "Rechtes Bein": "right_leg",
+}
+
+
+@dataclass(frozen=True)
+class SecaScan:
+    """One SECA scan as the machine printed it. Fat-free mass is the weight
+    less the fat mass (the machine's own fat-free mass index is that over the
+    height squared). `water_ratio_pct` is the machine's "Wasserverhältnis"."""
+    taken_at: datetime
+    weight_kg: float
+    bmi: float | None = None
+    fat_mass_kg: float | None = None
+    fat_pct: float | None = None
+    fat_mass_index: float | None = None
+    fat_free_mass_index: float | None = None
+    skeletal_muscle_kg: float | None = None
+    phase_angle_deg: float | None = None
+    water_ratio_pct: float | None = None
+    visceral_fat: float | None = None
+    waist_cm: float | None = None
+    resting_kcal: float | None = None
+    segments: tuple[tuple[str, float], ...] = ()
+    device: str = SECA_DEVICE
+
+    @property
+    def day(self) -> date:
+        return self.taken_at.date()
+
+    @property
+    def fat_free_mass_kg(self) -> float | None:
+        return None if self.fat_mass_kg is None else round(self.weight_kg - self.fat_mass_kg, 2)
+
+    @property
+    def height_m(self) -> float | None:
+        """The height the machine worked with, from its own weight and BMI."""
+        return None if not self.bmi else round(math.sqrt(self.weight_kg / self.bmi), 3)
+
+
+def _seca_number(text: str) -> float | None:
+    text = (text or "").strip().replace(",", ".")
+    try:
+        return float(text) if text else None
+    except ValueError:
+        return None
+
+
+def parse_seca_csv(text: str) -> SecaScan:
+    """One SECA export. Raises ValueError when it is not one: no scan time in
+    the heading, or no weight."""
+    rows = [r for r in csv.reader(io.StringIO(text.lstrip("﻿"))) if r]
+    if not rows or len(rows[0]) < 3:
+        raise ValueError("not a SECA export: the heading names no scan time")
+    try:
+        taken_at = datetime.strptime(rows[0][2].strip(), "%b %d, %Y, %I:%M %p")
+    except ValueError:
+        raise ValueError(f"not a SECA export: unreadable scan time {rows[0][2]!r}") from None
+    fields: dict[str, float | None] = {}
+    segments: dict[str, float] = {}
+    in_segments = False
+    for row in rows[1:]:
+        label, unit, value = (row + ["", "", ""])[:3]
+        label, unit = label.strip(), unit.strip()
+        if label == "Segmentale Skelettmuskelmasse":
+            in_segments = not segments
+            continue
+        if in_segments and label in SECA_SEGMENTS:
+            number = _seca_number(value)
+            if number is not None:
+                segments[SECA_SEGMENTS[label]] = number
+            continue
+        in_segments = False
+        if label == "Ruheenergieverbrauch" and unit.startswith("kcal"):
+            fields.setdefault("resting_kcal", _seca_number(value))
+        elif label in SECA_FIELDS:
+            fields.setdefault(SECA_FIELDS[label], _seca_number(value))
+    if fields.get("weight_kg") is None:
+        raise ValueError("not a SECA export: no weight")
+    return SecaScan(taken_at=taken_at, **{k: v for k, v in fields.items() if k != "weight_kg"},
+                    weight_kg=float(fields["weight_kg"]),
+                    segments=tuple(sorted(segments.items())))
+
+
+def seca_scan_row(scan: SecaScan) -> dict:
+    """The scan as stored: every printed figure, its time and its machine."""
+    row = {"taken_at": _stamp(scan.taken_at), "device": scan.device}
+    for name in ("weight_kg", "bmi", "fat_mass_kg", "fat_pct", "fat_mass_index",
+                 "fat_free_mass_index", "skeletal_muscle_kg", "phase_angle_deg",
+                 "water_ratio_pct", "visceral_fat", "waist_cm", "resting_kcal"):
+        row[name] = getattr(scan, name)
+    row["segments"] = dict(scan.segments)
+    return row
+
+
+def seca_scans_from_rows(rows: list[dict]) -> list[SecaScan]:
+    """Stored rows back to scans, oldest first."""
+    out = []
+    for row in rows:
+        if not row.get("taken_at") or _float(row.get("weight_kg")) is None:
+            continue
+        figures = {name: _float(row.get(name)) for name in (
+            "bmi", "fat_mass_kg", "fat_pct", "fat_mass_index", "fat_free_mass_index",
+            "skeletal_muscle_kg", "phase_angle_deg", "water_ratio_pct", "visceral_fat",
+            "waist_cm", "resting_kcal")}
+        out.append(SecaScan(taken_at=datetime.fromisoformat(str(row["taken_at"])),
+                            weight_kg=float(row["weight_kg"]), **figures,
+                            segments=tuple(sorted((k, float(v)) for k, v in
+                                                  (row.get("segments") or {}).items())),
+                            device=str(row.get("device") or SECA_DEVICE)))
+    return sorted(out, key=lambda s: s.taken_at)

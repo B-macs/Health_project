@@ -58,10 +58,16 @@ PEAKS_2025: dict[str, tuple[float, int, float, str]] = {
     # -- lower body --
     "Hip Thrust (Loaded)":    (50.0, 12, 1.00, "same exercise and equipment then and now (the owner, 2026-10-22)"),
     "Romanian Deadlift (DB)": (60.0, 12, 0.70, "barbell in 2025, dumbbell now"),
-    "Goblet Squat":           (22.5, 12, 0.40, "reps not recorded in 2025; x12 assumed, the owner's "
-                                                "estimate (2026-10-22: \"12 probably\"; it was x10 before)"),
     "Bulgarian Split Squat":  (15.0, 12, 1.00, "logged as Split Squat in 2025; 15 kg in each hand (the "
                                                 "owner, 2026-10-22), the way the plans log it"),
+    # NO GOBLET SQUAT (WP-38, the owner, 2026-10-26: "The goblet squat doesnt
+    # really matter if it was my max if I moved from that to squatting 80kg in
+    # 2025. it would be near impossible to goblet squat 80kg"). Its 22.5 kg x 12
+    # was a warm-up-sized lift on the way to an 80 kg back squat, limited by
+    # holding the weight, so a goblet squat at or past it read over 100% of his
+    # 2025 squatting. Its reps were never recorded either (comparability 0.40).
+    # The squat pattern has no comparable 2025 entry until the same lift is
+    # trained again: a machine squat's sled does not convert to a barbell.
     # -- core --
     # Pallof Press's 2025 entry is "orange band x 15". A band is not a
     # kilogram and there is no defined conversion, so it gets NO baseline

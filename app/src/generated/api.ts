@@ -216,6 +216,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/insights/metabolism/seca": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Seca
+         * @description Store a SECA export (WP-37) and answer the Metabolism screen. The same
+         *     export sent again stores one scan.
+         */
+        post: operations["post_seca_api_insights_metabolism_seca_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/insights/queue": {
         parameters: {
             query?: never;
@@ -605,6 +626,27 @@ export interface paths {
         get: operations["get_day_api_training_day_get"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/training/flexibility-check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Flexibility Check
+         * @description The battery's early answer over the retest readings typed so far (WP-33).
+         *     It reads and writes nothing.
+         */
+        post: operations["post_flexibility_check_api_training_flexibility_check_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1292,6 +1334,33 @@ export interface components {
              */
             taken_on: string;
         };
+        /** FlexCheckIn */
+        FlexCheckIn: {
+            /**
+             * Readings
+             * @default []
+             */
+            readings: components["schemas"]["ReadingIn"][];
+        };
+        /**
+         * FlexCheckOut
+         * @description The battery's early answer over the readings so far: a pattern means
+         *     the tests left are not needed this morning.
+         */
+        FlexCheckOut: {
+            /**
+             * Label
+             * @default
+             */
+            label: string;
+            /** Pattern */
+            pattern?: string | null;
+            /**
+             * Reason
+             * @default
+             */
+            reason: string;
+        };
         /** FlexReading */
         FlexReading: {
             /**
@@ -1726,6 +1795,35 @@ export interface components {
             /** Source */
             source: string;
         };
+        /**
+         * LiftRow
+         * @description One lift against its 2025 best (WP-38): its latest session's best set,
+         *     the one-rep max of both, the % and how close the two lifts are (same,
+         *     close, machine or rough).
+         */
+        LiftRow: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Match */
+            match: string;
+            /** Name */
+            name: string;
+            /** One Rm 2025 Kg */
+            one_rm_2025_kg: number;
+            /** One Rm Kg */
+            one_rm_kg: number;
+            /** Pct Of 2025 */
+            pct_of_2025: number;
+            /** Region */
+            region: string;
+            /** Reps */
+            reps: number;
+            /** Weight Kg */
+            weight_kg: number;
+        };
         /** LoggedExercise */
         LoggedExercise: {
             /** Movement Type */
@@ -1793,6 +1891,7 @@ export interface components {
                 [key: string]: unknown;
             }[];
             cellular: components["schemas"]["Cellular"] | null;
+            headline?: components["schemas"]["WeightHeadline"] | null;
             /** Kind */
             kind: string;
             latest: components["schemas"]["LatestWeighIn"] | null;
@@ -1806,6 +1905,7 @@ export interface components {
             offset: number;
             /** Ranges */
             ranges: components["schemas"]["PeriodOption"][];
+            seca?: components["schemas"]["SecaOut"] | null;
             series: components["schemas"]["MetabolismSeries"];
             /** Split */
             split: {
@@ -2303,6 +2403,26 @@ export interface components {
             /** Window Days */
             window_days: number;
         };
+        /**
+         * ReadingIn
+         * @description One test of the flexibility retest as typed (WP-33): a value per side
+         *     ("" for a one-number test), the setup number and the added load.
+         */
+        ReadingIn: {
+            /** Load Kg */
+            load_kg?: number | null;
+            /** Setup Value */
+            setup_value?: number | null;
+            /** Test Key */
+            test_key: string;
+            /**
+             * Values
+             * @default {}
+             */
+            values: {
+                [key: string]: number | null;
+            };
+        };
         /** RedoIn */
         RedoIn: {
             /** Action Id */
@@ -2461,6 +2581,7 @@ export interface components {
              * @default []
              */
             raw_sets: components["schemas"]["RawSetIn"][];
+            reading?: components["schemas"]["ReadingIn"] | null;
             /**
              * Sets
              * @default []
@@ -2478,6 +2599,66 @@ export interface components {
             moved: boolean;
             /** Text */
             text: string;
+        };
+        /** SecaFigure */
+        SecaFigure: {
+            /** Change */
+            change: number | null;
+            /** Dp */
+            dp: number;
+            /** Key */
+            key: string;
+            /** Label */
+            label: string;
+            /** Unit */
+            unit: string;
+            /** Value */
+            value: number | null;
+        };
+        /**
+         * SecaImportIn
+         * @description The SECA's export as text (its table view, a CSV in German).
+         */
+        SecaImportIn: {
+            /** Csv */
+            csv: string;
+        };
+        /**
+         * SecaOut
+         * @description The latest SECA scan (WP-37), its own lane: never set against the scale
+         *     or the InBody.
+         */
+        SecaOut: {
+            /** Count */
+            count: number;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Days Old */
+            days_old: number;
+            /** Device */
+            device: string;
+            /** Figures */
+            figures: components["schemas"]["SecaFigure"][];
+            /** Height Cm */
+            height_cm: number | null;
+            /** Sides */
+            sides: components["schemas"]["SecaSide"][];
+            /** Torso Kg */
+            torso_kg: number | null;
+        };
+        /** SecaSide */
+        SecaSide: {
+            /** Label */
+            label: string;
+            /** Left Kg */
+            left_kg: number;
+            /** Right Kg */
+            right_kg: number;
+            /** Right Vs Left Pct */
+            right_vs_left_pct: number | null;
         };
         /** Sector */
         Sector: {
@@ -2569,6 +2750,7 @@ export interface components {
             previous_caption: string;
             /** Ramp For */
             ramp_for: number | null;
+            reading?: components["schemas"]["SessionReading"] | null;
             /** Rep Max */
             rep_max: number | null;
             /** Rep Min */
@@ -2653,6 +2835,32 @@ export interface components {
             rpe_target: number | null;
             /** Steps */
             steps: components["schemas"]["FlowStep"][];
+        };
+        /**
+         * SessionReading
+         * @description What a test of the flexibility retest asks for (WP-33): its unit, its
+         *     sides ("" for a one-number test), the hint at the input, the setup number
+         *     and the one offered back from the last assessment, and whether the step
+         *     takes an added load.
+         */
+        SessionReading: {
+            /** Input Hint */
+            input_hint: string;
+            /** Prior Setup */
+            prior_setup?: number | null;
+            /** Setup Input */
+            setup_input?: string | null;
+            /** Sides */
+            sides: string[];
+            /**
+             * Takes Load
+             * @default false
+             */
+            takes_load: boolean;
+            /** Test Key */
+            test_key: string;
+            /** Unit */
+            unit: string;
         };
         /** SessionSaveIn */
         SessionSaveIn: {
@@ -3007,6 +3215,11 @@ export interface components {
             imbalances: {
                 [key: string]: unknown;
             };
+            /**
+             * Lifts
+             * @default []
+             */
+            lifts: components["schemas"]["LiftRow"][];
             /** Load Error */
             load_error: string | null;
             /** Metric */
@@ -3681,6 +3894,21 @@ export interface components {
             /** Selected */
             selected: boolean;
         };
+        /**
+         * WeightHeadline
+         * @description The newest weight from either device, for the Insights tile (WP-37).
+         */
+        WeightHeadline: {
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Source */
+            source: string;
+            /** Weight Kg */
+            weight_kg: number;
+        };
         /** WholeRange */
         WholeRange: {
             /** Field */
@@ -4267,6 +4495,42 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetabolismOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_seca_api_insights_metabolism_seca_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SecaImportIn"];
+            };
+        };
         responses: {
             /** @description Successful Response */
             200: {
@@ -5066,6 +5330,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrainingDayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_flexibility_check_api_training_flexibility_check_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["FlexCheckIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FlexCheckOut"];
                 };
             };
             /** @description Validation Error */

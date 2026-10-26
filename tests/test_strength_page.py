@@ -90,3 +90,26 @@ def test_the_trend_carries_each_weeks_measure_and_the_headline_as_it_read():
         {"week": MONDAY, "measured": None, "level": 82.0, "why": ""}]}
     assert ss.trend(data) == [{"label": "12 Oct", "measured": 82.0, "level": 85.4},
                               {"label": "19 Oct", "measured": None, "level": 82.0}]
+
+
+def test_each_lift_shows_its_own_percent_of_2025():
+    """WP-38 (2026-10-26): each lift against its own 2025 best, highest first in
+    each body area, with how close the two lifts are."""
+    def obs(name, w, r, day):
+        return strength.Observation(exercise=name, session_date=date.fromisoformat(day),
+                                    weight_kg=w, reps=r, rpe=9.0, effective_reps=r + 1,
+                                    e1rm=w * (1 + (r + 1) / 30), within_epley_range=True)
+    exercises = {
+        "Made-up row": {"index": 72.0, "e1rm_now": 33.0, "e1rm_2025": 45.8, "comparability": 1.0,
+                        "region": "upper_body", "observation": obs("Made-up row", 22.5, 12, "2026-10-22")},
+        "Made-up hinge": {"index": 64.0, "e1rm_now": 57.3, "e1rm_2025": 89.6, "comparability": 0.7,
+                          "region": "lower_body", "observation": obs("Made-up hinge", 40, 12, "2026-10-22")},
+        "Made-up press": {"index": 81.0, "e1rm_now": 20.0, "e1rm_2025": 24.7, "comparability": 0.6,
+                          "region": "upper_body", "observation": obs("Made-up press", 15, 10, "2026-10-12")},
+    }
+    rows = ss.lift_rows(exercises)
+    assert [r["name"] for r in rows] == ["Made-up press", "Made-up row", "Made-up hinge"]
+    press, row, hinge = rows
+    assert (row["pct_of_2025"], row["weight_kg"], row["reps"], row["match"]) == (72.0, 22.5, 12, "same")
+    assert hinge["match"] == "close" and press["match"] == "machine"
+    assert ss.lift_match(0.4) == "rough"

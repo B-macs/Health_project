@@ -610,9 +610,22 @@ def test_a_history_table_filters_by_its_dates(env, monkeypatch):
 
 
 def test_the_session_checks_name_a_repeat_save(env, monkeypatch):
+    """A day with two plan sessions. The save refuses a second one since WP-32
+    (2026-10-26), so the second is written past it, as one stored before then."""
+    from services import session_save
+    from services import training_session as tsession
     day = TODAY - timedelta(days=2)
     _log(env, monkeypatch, day, "Hack Squat", 10, 100.0)
-    _log(env, monkeypatch, day, "Machine Chest Press", 10, 50.0)
+    body = {"session_id": f"{day}-00000002", "date": day.isoformat(), "kind": "plan",
+            "duration_minutes": 45, "session_rpe": 6, "exercises": [{
+                "exercise_id": f"ex-{day}-second", "exercise": {
+                    "name": "Machine Chest Press", "type": "reps", "sets": 3, "reps": 10,
+                    "equipment_type": "machine"},
+                "sets": [{"set_num": i, "reps": 10, "weight": 50.0,
+                          "ts": f"{day}T09:1{i}:00"} for i in (1, 2, 3)]}]}
+    r = env.call(monkeypatch, "post", "/api/training/sessions", body, local=day)
+    assert r.status_code == 409 and r.json() == {"error": "already_logged"}
+    session_save.save_session(env.repo, tsession.build_save(body))
     warnings = env.ok(monkeypatch, "get", "/api/data/session-checks")["warnings"]
     assert warnings and day.isoformat() in " ".join(warnings)
 
@@ -632,3 +645,17 @@ def test_each_manual_sync_runs_its_wider_window(env, monkeypatch, kind, method, 
     monkeypatch.setattr(env.repo, method, lambda *a, **k: 5)
     assert env.ok(monkeypatch, "post", f"/api/data/sync/{kind}") == {
         "kind": kind, "result": {"count": 5}}
+
+
+# ── the SECA scan (WP-37) ────────────────────────────────────────────────────
+
+def test_a_seca_export_is_stored_once_and_shown_in_its_own_lane(env, monkeypatch):
+    from tests.test_seca_scans import EXPORT
+    first = env.ok(monkeypatch, "post", "/api/insights/metabolism/seca", {"csv": EXPORT})
+    again = env.ok(monkeypatch, "post", "/api/insights/metabolism/seca", {"csv": EXPORT})
+    assert first["seca"]["count"] == again["seca"]["count"] == 1
+    assert first["headline"] == {"date": "2026-03-03", "weight_kg": 80.0, "source": "seca"}
+    shown = env.ok(monkeypatch, "get", "/api/insights/metabolism")
+    assert shown["seca"]["date"] == "2026-03-03" and shown["seca"]["sides"][0]["label"] == "Arms"
+    r = env.call(monkeypatch, "post", "/api/insights/metabolism/seca", {"csv": "not,a,scan"})
+    assert r.status_code == 422

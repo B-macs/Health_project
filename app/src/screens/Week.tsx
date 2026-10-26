@@ -295,8 +295,8 @@ export function RestView({ rest }: { rest: Schemas['RestView'] | null | undefine
   )
 }
 
-/** A past day with a logged session (T20). */
-function LoggedView({ logged }: { logged: Schemas['LoggedSession'] | null | undefined }) {
+/** A past day with a logged session (T20), and today once it is logged (WP-32). */
+export function LoggedView({ logged }: { logged: Schemas['LoggedSession'] | null | undefined }) {
   if (!logged) return <p className="caption" data-testid="day-logged">{S.week.loggedNoDetail}</p>
   return (
     <section className="card group" data-testid="day-logged">

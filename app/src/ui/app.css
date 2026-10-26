@@ -1094,6 +1094,39 @@ summary.tapline {
   }
 }
 
+/* The congratulations after a save (WP-32): a check that grows into place. Reduce Motion
+   stops it with the one rule below. */
+.celebrate {
+  display: grid;
+  place-items: center;
+  width: calc(var(--gym) * 1.6);
+  height: calc(var(--gym) * 1.6);
+  margin-inline: auto;
+  border-radius: var(--r-pill);
+  color: var(--on-accent);
+  background: var(--accent);
+  animation: celebrate calc(var(--slow) * 3) var(--ease) both;
+}
+
+.celebrate svg {
+  width: var(--gym);
+  height: var(--gym);
+}
+
+@keyframes celebrate {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
 @keyframes fade-in {
   from {
     opacity: 0;
@@ -1568,6 +1601,21 @@ button.card {
   white-space: normal;
   text-align: center;
   line-height: 1.2;
+}
+
+/* Back sits first in the row, quieter and narrower than the button it stands beside
+   (WP-34), so a tap meant for the main button does not land on it. */
+.controls .btn--back {
+  flex: 0.7 1 0;
+  font-size: var(--fs-small);
+  font-weight: var(--w-label);
+  color: var(--muted);
+}
+
+/* The exercise the flow is on stands out in the list of all exercises (WP-31). */
+.list .kv[data-state='now'] {
+  font-size: var(--fs-body);
+  font-weight: var(--w-title);
 }
 
 .iconbtn--gym {

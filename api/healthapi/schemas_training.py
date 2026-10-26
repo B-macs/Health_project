@@ -291,6 +291,20 @@ class StoredOut(BaseModel):
 
 # ── Today's session ──────────────────────────────────────────────────────────
 
+class SessionReading(BaseModel):
+    """What a test of the flexibility retest asks for (WP-33): its unit, its
+    sides ("" for a one-number test), the hint at the input, the setup number
+    and the one offered back from the last assessment, and whether the step
+    takes an added load."""
+    test_key: str
+    unit: str
+    sides: list[str]
+    input_hint: str
+    setup_input: str | None = None
+    prior_setup: float | None = None
+    takes_load: bool = False
+
+
 class ExerciseMove(BaseModel):
     """Which exercises move together when a machine is busy (WP-27,
     services/session_order.move_groups): the phone moves whole groups of the
@@ -345,6 +359,8 @@ class SessionExercise(BaseModel):
     estimated_minutes: int
     #: Its move group; None where nothing moves (the accessory session).
     move: ExerciseMove | None = None
+    #: A test of the flexibility retest: what its reading asks for (WP-33).
+    reading: SessionReading | None = None
 
 
 class FlowStep(BaseModel):
@@ -466,6 +482,27 @@ class RawSetIn(BaseModel):
     rest_ended_at: float | None = None
 
 
+class ReadingIn(BaseModel):
+    """One test of the flexibility retest as typed (WP-33): a value per side
+    ("" for a one-number test), the setup number and the added load."""
+    test_key: str
+    values: dict[str, float | None] = {}
+    setup_value: float | None = None
+    load_kg: float | None = None
+
+
+class FlexCheckIn(BaseModel):
+    readings: list[ReadingIn] = []
+
+
+class FlexCheckOut(BaseModel):
+    """The battery's early answer over the readings so far: a pattern means
+    the tests left are not needed this morning."""
+    pattern: str | None = None
+    label: str = ""
+    reason: str = ""
+
+
 class SavedExerciseIn(BaseModel):
     #: Minted by the phone once, before the first send.
     exercise_id: str
@@ -480,6 +517,8 @@ class SavedExerciseIn(BaseModel):
     note: str = ""
     garmin_minutes: float | None = None
     garmin_detail: dict[str, Any] | None = None
+    #: A test of the flexibility retest: its reading (WP-33).
+    reading: ReadingIn | None = None
 
 
 class SessionSaveIn(BaseModel):

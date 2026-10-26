@@ -177,6 +177,63 @@ def test_two_exercises_with_one_id_are_refused_before_anything_is_written(monkey
     assert _rows(store, "training_exercises") == []
 
 
+def test_a_second_plan_session_on_a_logged_day_is_refused(monkeypatch, local_copy):
+    """WP-32 (2026-10-26): after a save the Training tab showed the morning's plan
+    with Start, and a second session under new ids would have counted the day
+    twice. The engine refuses it; the accessory session still saves that day."""
+    store = FakeStore()
+    repo = record_repo(local_copy, store)
+    second = {**BODY, "session_id": "2026-10-19-ffffffff",
+              "exercises": [{**e, "exercise_id": e["exercise_id"] + "-2"} for e in BODY["exercises"]]}
+    accessory = {**second, "session_id": "2026-10-19-acc00001", "kind": "accessory",
+                 "exercises": [{**e, "exercise_id": e["exercise_id"] + "-acc"} for e in BODY["exercises"]]}
+    with _client(monkeypatch, repo, local_copy) as c:
+        assert _send(c, "post", "/api/training/sessions", BODY).status_code == 200
+        r = _send(c, "post", "/api/training/sessions", second)
+        assert _send(c, "post", "/api/training/sessions", BODY).status_code == 200
+        assert _send(c, "post", "/api/training/sessions", accessory).status_code == 200
+    assert r.status_code == 409 and r.json() == {"error": "already_logged"}
+    ids = {row["exercise_id"] for row in _rows(store, "training_exercises")}
+    assert "ex-goblet-2" not in ids and {"ex-goblet", "ex-goblet-acc"} <= ids
+
+
+def test_the_retest_readings_are_stored_once_as_the_morning_s_assessment(monkeypatch, local_copy):
+    """WP-33: each test of the retest is its own entry; its reading rides in the
+    save and lands in the flexibility record Insights reads, once however often
+    the save is sent."""
+    store = FakeStore()
+    repo = record_repo(local_copy, store)
+    test = {"name": "Flexibility Test: Knees fully bent (Test)", "type": "duration", "sets": 1,
+            "duration_minutes": 3}
+    body = {**BODY, "exercises": BODY["exercises"] + [{
+        "exercise_id": "ex-bent", "exercise": test, "sets": [],
+        "reading": {"test_key": "leverage_bent", "values": {"left": 20.0, "right": 22.5},
+                    "setup_value": 31.0}}]}
+    with _client(monkeypatch, repo, local_copy) as c:
+        assert _send(c, "post", "/api/training/sessions", body).status_code == 200
+        assert _send(c, "post", "/api/training/sessions", body).status_code == 200
+        bad = {**body, "session_id": BODY["session_id"], "exercises": body["exercises"][:2] + [{
+            **body["exercises"][2], "reading": {"test_key": "made_up", "values": {"": 1.0}}}]}
+        refused = _send(c, "post", "/api/training/sessions", bad)
+    stored = repo.get_flexibility_assessments()
+    assert len(stored) == 1 and stored[0].taken_on == TODAY and stored[0].cold
+    assert sorted((r.side, r.value) for r in stored[0].readings) == [("left", 20.0), ("right", 22.5)]
+    assert refused.status_code == 422 and refused.json()["error"].startswith("invalid_session")
+
+
+def test_the_retest_check_answers_from_the_readings_and_writes_nothing(monkeypatch, local_copy):
+    store = FakeStore()
+    repo = record_repo(local_copy, store)
+    with _client(monkeypatch, repo, local_copy) as c:
+        ok = _send(c, "post", "/api/training/flexibility-check", {"readings": [
+            {"test_key": "leverage_bent", "values": {"left": 20.0, "right": 22.5}}]})
+        bad = _send(c, "post", "/api/training/flexibility-check", {"readings": [
+            {"test_key": "made_up", "values": {"": 1.0}}]})
+    assert ok.status_code == 200 and set(ok.json()) == {"pattern", "label", "reason"}
+    assert bad.status_code == 422
+    assert repo.get_flexibility_assessments() == ()
+
+
 # ── yoga and outdoor ─────────────────────────────────────────────────────────
 
 def test_a_yoga_flow_sent_twice_stores_one_session(monkeypatch, local_copy):

@@ -24,6 +24,7 @@ import threading
 from datetime import date, datetime, time
 
 from services import accessory as acc
+from services import flexibility_screen as fxs
 from services import guided_flow, prescription, session_order, session_save, strain_regions
 from services import sessions as sess
 from services import supplementary_save
@@ -76,7 +77,10 @@ def _warning_strains(repo, today: date) -> tuple[dict | None, dict | None]:
 def timer_kind(ex: dict) -> str | None:
     """Which timer an exercise runs: "stopwatch" for a timed test (it counts
     up and asks for the seconds), "hold" for a held exercise, "duration" for
-    an activity, None for reps."""
+    an activity, None for reps and for a test of the flexibility retest (its
+    reading is typed, WP-33)."""
+    if ex.get("battery_test"):
+        return None
     if sess.is_timed_test(ex):
         return "stopwatch"
     if ex.get("type") in sess.HOLD_TIMER_TYPES:
@@ -95,7 +99,8 @@ EXERCISE_FIELDS = ("name", "type", "laterality", "sets", "reps", "reps_in_set", 
 
 
 def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tuple,
-                 garmin_ok: bool, move: dict | None = None) -> dict:
+                 garmin_ok: bool, move: dict | None = None,
+                 reading: dict | None = None) -> dict:
     """One exercise as the guided flow shows it today: its fields, the
     prescription with the seeded numbers in it (sessions.displayed_
     prescription), the how-to, the safety warning only when its own body
@@ -139,6 +144,8 @@ def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tu
         # Which exercises move together when a machine is busy, and which never
         # move (WP-27): the phone moves whole groups of the walked steps.
         "move": move,
+        # A test of the flexibility retest: what its reading asks for (WP-33).
+        "reading": reading,
     }
 
 
@@ -190,6 +197,17 @@ def _alternatives(repo, today: date, dosed: list[dict], moves: list, first: str,
     return out
 
 
+def _readings(repo, today: date, dosed: list[dict]) -> dict[int, dict]:
+    """What each test of the flexibility retest asks for, by exercise index
+    (WP-33); the setup numbers offered back come from the stored assessments,
+    and a failed read offers none."""
+    keys = {i: ex["battery_test"] for i, ex in enumerate(dosed) if ex.get("battery_test")}
+    if not keys:
+        return {}
+    earlier = _try(repo.get_flexibility_assessments, ())
+    return {i: fxs.session_reading(key, earlier, today) for i, key in keys.items()}
+
+
 def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
             decided: dict) -> dict:
     """A session as it runs today, from a plan day's content (or the
@@ -208,8 +226,9 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
 
     # The accessory session moves nothing: its items are not the block's cards.
     moves = session_order.move_groups(dosed) if kind == PLAN else [None] * len(dosed)
+    readings = _readings(repo, today, dosed)
     exercises = [exercise_out(ex, i, seed_for(i), sess.ramp_lift_index(plan_ex, i), strains,
-                              garmin_ok, moves[i])
+                              garmin_ok, moves[i], readings.get(i))
                  for i, ex in enumerate(dosed)]
     alternatives = (_alternatives(repo, today, dosed, moves, first, strains, garmin_ok, policy,
                                   modifier, content.get("day_type")) if kind == PLAN else [])
@@ -384,19 +403,44 @@ def save(repo, body: dict, today: date) -> dict:
     caller's day. A write that fails partway raises
     session_save.SessionSaveError with how many exercises are stored; the
     same body sent again completes it."""
-    if date.fromisoformat(str(body["date"])) > today:
+    day = date.fromisoformat(str(body["date"]))
+    if day > today:
         raise SessionRefused("future_day")
     session = build_save(body)
+    # The retest's readings (WP-33), checked before anything is written.
+    retest = [e["reading"] for e in body.get("exercises") or [] if e.get("reading")]
+    try:
+        fxs.readings_from_session(retest, day)
+    except fxs.CaptureRefused as exc:
+        raise SessionRefused("invalid_session", [str(exc)]) from None
+    # A logged plan day never takes a second plan session (WP-32, 2026-10-26): the
+    # Training tab had shown the morning's copy of the plan with Start after a save,
+    # and a second session under new ids would count the day twice. The same
+    # session sent again (its own id) still completes a save that stopped partway.
+    if body.get("kind", PLAN) == PLAN and repo.get_plan_session_ids(day) - {session.session_id}:
+        raise SessionRefused("already_logged")
     try:
         session_save.check(session)
     except ValueError as exc:
         raise SessionRefused("invalid_session", [str(exc)]) from None
     written = session_save.save_session(repo, session)
+    if retest:
+        # One cold assessment of that morning, in the store Insights reads.
+        fxs.save_session_readings(repo, retest, day)
     from services import processing_queue
     processing_queue.parse_after_save(repo)     # the session notes: parse on save (I63)
     return {"stored": True, "session_id": session.session_id, "exercise_ids": written,
             "duration_minutes": session.duration_minutes, "session_rpe": session.session_rpe,
             "au": session.session_au}
+
+
+def flexibility_check(entries: list[dict], today: date) -> dict:
+    """The battery's early answer over the retest readings typed so far
+    (WP-33): the phone skips the tests left when it has a pattern."""
+    try:
+        return fxs.session_check(entries, today)
+    except fxs.CaptureRefused as exc:
+        raise SessionRefused("invalid_session", [str(exc)]) from None
 
 
 # ─── Garmin, on a tap ────────────────────────────────────────────────────────

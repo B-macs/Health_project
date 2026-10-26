@@ -24,8 +24,8 @@ from services.background_sync import BackgroundSyncRunner, SyncBusyError
 from services.repository import Repository
 
 from ..deps import get_repository, get_sync_runner, local_today
-from ..schemas_training import (ActivityMinutesOut, AnswerIn, CompletionIn, CompletionOut, RedoIn,
-                                Gate1ReasonIn, HeartRateIn, HeartRateOut, LoggedOut,
+from ..schemas_training import (ActivityMinutesOut, AnswerIn, CompletionIn, CompletionOut,
+                                FlexCheckIn, FlexCheckOut, RedoIn, Gate1ReasonIn, HeartRateIn, HeartRateOut, LoggedOut,
                                 OpenActivityOut, OutdoorListOut, OutdoorLogIn, OutdoorLogOut,
                                 SessionPlanOut, SessionSaveIn, SessionSaveOut, StoredOut,
                                 SwapIn, TrainingDayOut, TrainingWeekOut, YogaCatalogueOut,
@@ -150,6 +150,14 @@ def get_accessory(today: date = Depends(local_today),
 def post_completion(body: CompletionIn) -> dict:
     return _session(lambda: tsession.completion(body.model_minutes, body.start_ts,
                                                 body.end_ts, body.rpe, body.kind))
+
+
+@router.post("/api/training/flexibility-check", response_model=FlexCheckOut)
+def post_flexibility_check(body: FlexCheckIn, today: date = Depends(local_today)) -> dict:
+    """The battery's early answer over the retest readings typed so far (WP-33).
+    It reads and writes nothing."""
+    return _session(lambda: tsession.flexibility_check(
+        [r.model_dump() for r in body.readings], today))
 
 
 @router.post("/api/training/sessions", response_model=SessionSaveOut)

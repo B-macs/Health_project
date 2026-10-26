@@ -184,6 +184,13 @@ class Pick:
 
 _TIER_FIRST = "step 5: the best tier in its list that passes the five filters"
 
+def _flexibility_test_names() -> tuple[str, ...]:
+    """The retest's entries, one per test of the battery, named as goal_block
+    names them (WP-33); tests/test_goal_block.py keeps the two equal."""
+    import cluster_a_battery as cab
+    return tuple(f"Flexibility Test: {cab.TESTS[k].label} (Test)" for k in cab.AVAILABLE_TESTS)
+
+
 PICKS: dict[str, Pick] = {
     "Standing Psoas March": Pick(
         "warm-up", "hip flexors", "warm-up",
@@ -363,17 +370,14 @@ PICKS: dict[str, Pick] = {
         "his decision, 2026-10-16: the timed plank test in week 1 and week 12, at the end of "
         "session A in place of that day's abs work",
         better="a measurement: the protocol stays the same, so week 1 and week 12 compare"),
-    "Rib and Pelvis Test (Test)": Pick(
-        "A", "pelvis and ribs", "measurement",
-        "Finding #7's four-part test, graded for the first time in week 1 and again in week 12.",
-        "his answer, 2026-10-16: week 1 and week 12, on the test Sunday morning",
-        better="a measurement: the protocol stays the same, so week 1 and week 12 compare"),
-    "Flexibility Retest (Test)": Pick(
+    **{name: Pick(
         "C", "the flexibility skills", "measurement",
-        "The 12-week flexibility test on three Sunday mornings, so the day-to-day spread is known "
-        "before a number counts.",
-        "his answers, 2026-10-14 ('three mornings once') and 2026-10-16 ('Sunday morning before')",
-        better="a measurement: the battery's own protocol"),
+        "One test of the 12-week flexibility retest, on three Sunday mornings, so the "
+        "day-to-day spread is known before a number counts; one reading per entry (WP-33).",
+        "his answers, 2026-10-14 ('three mornings once'), 2026-10-16 ('Sunday morning before') "
+        "and 2026-10-26 ('Always split a retest into its individual items')",
+        better="a measurement: the battery's own protocol")
+       for name in _flexibility_test_names()},
     **{name: Pick(
         "C", "adductors and hip rotators", "range",
         f"Item {i} of the flexibility prescription for the last reading (pattern D: the "

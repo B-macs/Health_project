@@ -31,7 +31,8 @@ export function InsightsHub({ strength, metab, flex, go }: {
   strength: View<StrengthAnswer>; metab: View<MetabolismAnswer>; flex: View<FlexibilityAnswer>; go: (path: string) => void
 }) {
   const st = strength.data
-  const latest = metab.data?.latest
+  // The newest weight from either device, the SECA scan included (WP-37).
+  const latest = metab.data?.headline ?? metab.data?.latest
   const report = flex.data?.report
   return (
     <div className="screen insights" data-testid="insights-hub">
@@ -51,7 +52,8 @@ export function InsightsHub({ strength, metab, flex, go }: {
       <section className="pair">
         <Tile title={S.ins.metabolism} testId="tile-metabolism" onOpen={() => go('/insights/metabolism')}
           value={latest ? latest.weight_kg.toFixed(1) : S.ins.none}
-          note={latest ? `kg · ${S.ins.measuredOn(shortDate(latest.date))}` : S.ins.noWeighIn} />
+          note={latest ? `kg · ${S.ins.measuredOn(shortDate(latest.date))}${
+            metab.data?.headline?.source === 'seca' ? ` · ${S.ins.fromSeca}` : ''}` : S.ins.noWeighIn} />
         <Tile title={S.ins.cardio} testId="tile-cardio" onOpen={() => go('/insights/cardio')}
           value={S.ins.none} note={S.ins.cardioSoon} />
       </section>

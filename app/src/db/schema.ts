@@ -108,4 +108,7 @@ export const KEYS = {
   alerts: 'timer_alerts',
   /** The Worker's push key the phone subscribed with: a new key means subscribing again. */
   pushKey: 'push_key',
+  /** The day a plan session was saved on this phone (WP-32): Training shows that day as
+   *  trained before the engine's answer says so, and never offers Start again. */
+  trainedOn: 'trained_on',
 } as const

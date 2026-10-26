@@ -318,7 +318,9 @@ def suggested_weight_kg(
 #  1. ONE WEIGHT, A RANGE, AN AIM. Every working set of a lift uses one weight;
 #     the screen shows the weight, the rep range and today's aim.
 #  2. BETWEEN STEPS THE AIM CLIMBS ONE REP: one more than the last set made
-#     last time, never past the top of the range. Adding reps works as well as
+#     last time, never past the top of the range and never under its bottom
+#     (WP-35, the athlete, 2026-10-26: 12, 10 and 6 on 8-12 gave an aim of 7;
+#     "the next target should be 8 or 9, not 7"). Adding reps works as well as
 #     adding load (Plotkin 2022; Chaves 2024).
 #  3. THE WEIGHT GOES UP ONE STEP when every working set reached the top of the
 #     range, or one set went past it — in every session of the lift within
@@ -431,7 +433,7 @@ def range_progression(
     weight = plan_weight if weight is None else weight
     last = _last_set_reps(newest_sets)
     if hold:
-        return {"weight": weight, "aim": last, "action": "held", "date": newest_date}
+        return {"weight": weight, "aim": clamp(last), "action": "held", "date": newest_date}
 
     def at_weight(sets: list[dict]) -> bool:
         lifted = _working_weight(sets)
@@ -456,7 +458,7 @@ def range_progression(
                 "aim": range_middle_bottom(rep_min, rep_max),
                 "action": "step_back", "date": newest_date}
 
-    return {"weight": weight, "aim": min(rep_max, last + 1), "action": "hold",
+    return {"weight": weight, "aim": clamp(last + 1), "action": "hold",
             "date": newest_date}
 
 

@@ -22,10 +22,10 @@ import {
   ticksCrossed, type Timer,
 } from '../lib/timers'
 import {
-  advance, back, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder, exerciseProgress, finished,
-  lastRecorded, setBand, setGarmin, setNote, setRecordedSide, setSide, sideValues, skip, stepBand, stepWeight,
-  swapCandidates, swapTo, timerHere, withTimer, type Exercise, type FlowStep, type GarminPull, type Side,
-  type SideValues, type TrainingState,
+  advance, back, backTarget, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder, exerciseProgress, finished,
+  lastRecorded, readingComplete, setBand, setGarmin, setNote, setReading, setRecordedSide, setSide, sideValues, skip,
+  skipRestOfRetest, stepBand, stepWeight, swapCandidates, swapTo, timerHere, typedReadings, withTimer,
+  type Exercise, type FlowStep, type GarminPull, type Side, type SideValues, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { clock, useWakeLock } from '../ui/hooks'
@@ -284,6 +284,49 @@ function Steppers({ s, step, ex, update }: {
   )
 }
 
+/** A test of the flexibility retest (WP-33): a value per side, typed here, with the
+ *  setup number (the last one offered back) and the added load when the test takes one. */
+function ReadingCard({ s, ex, update }: {
+  s: TrainingState
+  ex: Exercise
+  update: (f: (s: TrainingState) => TrainingState) => void
+}) {
+  const spec = ex.reading
+  if (!spec) return null
+  const typed = s.readings[ex.index]
+  const num = (v: string) => (v === '' ? null : Number(v))
+  const text = (v: number | null | undefined) => (v == null ? '' : String(v))
+  return (
+    <section className="card group" data-testid="reading">
+      <p className="caption">{spec.input_hint}</p>
+      {spec.sides.map((side) => (
+        <label key={side || 'one'} className="group">
+          <span>{S.session.readingFor(side, spec.unit)}</span>
+          <Field key={`reading-${ex.index}-${side}`} className="field" type="number" inputMode="decimal" min={0}
+            initial={text(typed?.values[side])}
+            onValue={(v) => update((x) => setReading(x, ex.index, { values: { [side]: num(v) } }))} />
+        </label>
+      ))}
+      {spec.setup_input && (
+        <label className="group">
+          <span>{spec.setup_input}</span>
+          <Field key={`setup-${ex.index}`} className="field" type="number" inputMode="decimal" min={0}
+            initial={text(typed?.setup_value)}
+            onValue={(v) => update((x) => setReading(x, ex.index, { setup_value: num(v) }))} />
+        </label>
+      )}
+      {spec.takes_load && (
+        <label className="group">
+          <span>{S.session.readingLoad}</span>
+          <Field key={`load-${ex.index}`} className="field" type="number" inputMode="decimal" min={0}
+            initial={text(typed?.load_kg)}
+            onValue={(v) => update((x) => setReading(x, ex.index, { load_kg: num(v) }))} />
+        </label>
+      )}
+    </section>
+  )
+}
+
 function nextText(s: TrainingState, offset: number): string | null {
   const st = s.plan.steps[s.step + offset]
   if (!st) return null
@@ -295,10 +338,28 @@ function nextText(s: TrainingState, offset: number): string | null {
   return `${S.session.setN(st.set_num)}${side}`
 }
 
-export function SessionFlow({ s, update, onExit }: {
+/** What Back's button says (WP-34): the entry it goes back to, or the order before a
+ *  change of order. */
+export function backLabel(s: TrainingState): string {
+  const target = backTarget(s)
+  if (!target) return S.session.back
+  if (target.reordered) return S.session.backOrder
+  const { step } = target
+  const ex = exerciseOf(s, step)
+  if (!ex) return S.session.back
+  if (step.phase === 'resting') return S.session.backTo(S.session.backRest)
+  if (step.ex_idx !== currentStep(s)?.ex_idx) return S.session.backTo(ex.name)
+  const side = ex.laterality === 'unilateral' ? ` · ${S.session.side[step.side]}` : ''
+  return S.session.backTo(`${S.session.setN(step.set_num)}${side}`)
+}
+
+export function SessionFlow({ s, update, onExit, onLeave }: {
   s: TrainingState
   update: (f: (s: TrainingState) => TrainingState) => void
+  /** Leave and lose the session. */
   onExit: () => void
+  /** Leave for now (WP-33): the session stays on the phone where it was. */
+  onLeave?: () => void
 }) {
   const step = currentStep(s)
   const ex = exerciseOf(s, step)
@@ -382,6 +443,7 @@ export function SessionFlow({ s, update, onExit }: {
   const isFirstSide = ex.laterality === 'unilateral' && step.side === first && step.record_set == null
 
   const doneLabel = resting ? S.session.nextSet
+    : ex.reading ? S.session.readingDone
     : ex.type === 'duration' ? S.session.activityDone
       : ex.type === 'hold_reps' && step.record_set == null && !isFirstSide ? S.session.repDone(step.rep)
         : isFirstSide ? S.session.sideDone(step.side)
@@ -396,6 +458,18 @@ export function SessionFlow({ s, update, onExit }: {
    *  (T75); with no answer in a few seconds the flow moves on and the save asks again. */
   const done = async () => {
     unlockAudio()
+    if (ex.reading && !resting) {
+      // After each test, the engine's early answer (WP-33): with a pattern, the tests left
+      // cannot be interpreted and are skipped. No connection: every test runs.
+      move((x, at) => advance(x, at))
+      const readings = typedReadings(s)
+      void api<{ pattern: string | null; label: string }>('/api/training/flexibility-check', {
+        method: 'POST', key: ctx.key, engineDown: ctx.engineDown, day: s.plan.date, body: { readings },
+      }).then((answer) => {
+        if (answer.pattern) update((x) => skipRestOfRetest(x, S.session.retestAnswered(answer.label || answer.pattern!)))
+      }, () => undefined)
+      return
+    }
     if (!(ex.garmin_pull && step.event === 'complete' && ex.garmin_window)) {
       move((x, at) => advance(x, at))
       return
@@ -462,6 +536,12 @@ export function SessionFlow({ s, update, onExit }: {
       {(asking === 'exit' || asking === 'skip') && (
         <section className="card group" role="alertdialog" aria-label={asking === 'exit' ? S.session.exit : S.session.skip}>
           <p>{asking === 'exit' ? S.session.exitAsk : S.session.skipAsk}</p>
+          {asking === 'exit' && onLeave && (
+            <button className="btn btn--glass btn--wide" data-testid="leave-for-now" onClick={() => {
+              setAsking(null)
+              onLeave()
+            }}>{S.session.leaveForNow}</button>
+          )}
           <div className="pair">
             <button className="btn btn--glass" onClick={() => setAsking(null)}>{S.session.keep}</button>
             <button className="btn btn--primary" onClick={() => {
@@ -509,6 +589,7 @@ export function SessionFlow({ s, update, onExit }: {
       )}
 
       {!resting && <Steppers s={s} step={step} ex={ex} update={update} />}
+      {!resting && <ReadingCard s={s} ex={ex} update={update} />}
       {resting && <JustDone s={s} ex={ex} update={update} />}
 
       {ex.timer === 'stopwatch' && !resting && (
@@ -523,6 +604,12 @@ export function SessionFlow({ s, update, onExit }: {
       )}
 
       <div className="controls">
+        {s.history.length > 0 && (
+          <button className="btn btn--glass btn--gym btn--back" data-testid="back"
+            onClick={() => update((x) => { const b = back(x); return withTimer(b, arrivalTimer(b, Date.now(), false)) })}>
+            {backLabel(s)}
+          </button>
+        )}
         {!t && ex.timer === 'hold' && !resting && (
           <button className="btn btn--glass btn--gym" onClick={() => start(startTimer('hold', (ex.hold_seconds ?? 0) * 1000, Date.now()))}>
             <IconPlay /> {S.session.startHold}
@@ -560,7 +647,9 @@ export function SessionFlow({ s, update, onExit }: {
         {resting && t && !ended && (
           <button className="btn btn--glass btn--gym" onClick={() => update((x) => withTimer(x, extendTimer(t, 15_000)))}>{S.session.plus15}</button>
         )}
-        <button className="btn btn--primary btn--gym" disabled={pulling || (ex.timer === 'stopwatch' && !resting && typed == null)}
+        <button className="btn btn--primary btn--gym"
+          disabled={pulling || (ex.timer === 'stopwatch' && !resting && typed == null)
+            || (!!ex.reading && !resting && !readingComplete(s, ex))}
           onClick={() => void done()}>
           {pulling ? S.session.garminChecking : doneLabel}
         </button>
@@ -596,13 +685,7 @@ export function SessionFlow({ s, update, onExit }: {
           onValue={(v) => update((x) => setNote(x, ex.index, v))} />
       </label>
 
-      <div className="pair">
-        <button className="btn btn--glass" disabled={!s.history.length}
-          onClick={() => update((x) => { const b = back(x); return withTimer(b, arrivalTimer(b, Date.now(), false)) })}>
-          {S.session.back}
-        </button>
-        <button className="btn btn--glass" onClick={() => setAsking('skip')}>{S.session.skip}</button>
-      </div>
+      <button className="btn btn--glass btn--wide" onClick={() => setAsking('skip')}>{S.session.skip}</button>
       {(candidates.length > 0 || swaps.length > 0) && (
         <button className="btn btn--glass btn--wide" onClick={() => setAsking('busy')}>{S.session.inUse}</button>
       )}

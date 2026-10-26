@@ -35,10 +35,11 @@ def _row(name, day, sets):
     return {"movement_name": name, "session_date": day, "sets": sets}
 
 
-def test_epley_is_the_weight_at_one_rep():
-    assert orm.epley(100, 1) == 100
-    assert orm.epley(60, 12) == 84.0
-    assert round(orm.epley(80, 5), 1) == 93.3
+def test_the_estimate_is_the_strength_page_s_own():
+    """Both years with the 2025 best's one rep left (WP-38)."""
+    from services import strength
+    assert orm.epley(60, 12) == strength.estimated_1rm(60, 12, 9.0)[0] == 60 * (1 + 13 / 30)
+    assert orm.epley(80, 5) == 80 * (1 + 6 / 30)
 
 
 def test_the_pr_list_reads_weight_times_reps_only():
@@ -82,7 +83,7 @@ def test_the_side_by_side_divides_by_the_2025_estimate():
     text = orm.report(prs, year, year, set(), date(2026, 1, 1))
     side_by_side = text.split("Side by side")[1]
     line = next(l for l in side_by_side.splitlines() if l.startswith("RDL "))
-    assert "70%" in line and "close" in line
+    assert "70%" in line and "close" in line          # same reps both years: 42 / 60
 
 
 def test_every_pair_names_a_lift_a_plan_defines():

@@ -182,6 +182,8 @@ def test_a_logged_day_locks_the_session_and_shows_what_was_logged(env, monkeypat
     _log_plan_session(env, monkeypatch, MONDAY)
     today = env.ok(monkeypatch, "get", "/api/training/day")
     assert today["overview"]["screen"] == "logged"
+    # WP-32: today shows what was done, as a past day does.
+    assert today["logged"]["au"] == 300 and today["logged"]["exercises"][0]["name"] == "Hack Squat"
     r = env.call(monkeypatch, "get", "/api/training/session")
     assert r.status_code == 409 and r.json() == {"error": "already_logged"}
     past = env.ok(monkeypatch, "get", f"/api/training/day?date={MONDAY}", local=TUESDAY)

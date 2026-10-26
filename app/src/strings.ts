@@ -167,8 +167,10 @@ export const S = {
     doneMark: 'Done',
     screenOn: 'Screen stays on',
     exit: 'Leave the session',
-    exitAsk: 'Your place is saved. Leave the session and lose it?',
+    exitAsk: 'Leave for now and come back to the same place, or leave and lose the session?',
     keep: 'Keep training',
+    // WP-33: leaving to look at another page keeps the session where it was.
+    leaveForNow: 'Leave for now',
     discard: 'Leave and lose it',
     side: { right: 'Right side', left: 'Left side' } as Record<string, string>,
     sideShort: { right: 'R', left: 'L' } as Record<string, string>,
@@ -224,6 +226,15 @@ export const S = {
     numbers: 'Today’s numbers',
     note: 'Add a note for this exercise',
     back: 'Back',
+    // WP-34: Back sits beside the main button and says where it goes.
+    backTo: (where: string) => `Back to ${where}`,
+    backRest: 'the rest',
+    backOrder: 'Back to the order before',
+    // A test of the flexibility retest, its reading typed here (WP-33).
+    readingDone: 'Reading done',
+    readingFor: (side: string, unit: string) => `${side === 'left' ? 'Left' : side === 'right' ? 'Right' : 'Reading'} (${unit})`,
+    readingLoad: 'Added load (kg)',
+    retestAnswered: (label: string) => `The flexibility test has its answer: ${label}. The tests left are not needed today.`,
     skip: 'Skip this exercise',
     skipAsk: 'Skip only if pain stops you. Skip it?',
     skipYes: 'Skip it',
@@ -265,6 +276,10 @@ export const S = {
     savedPhone: 'Saved on the phone. It is sent when the engine answers.',
     saved: 'Saved. Well done.',
     congrats: 'Congratulations: session logged.',
+    // Today once it is trained (WP-32): what was done, never Start again.
+    trainedToday: 'Trained today',
+    trainedTodayNext: 'Today’s session is done. Record your pain score in the check-in, then come back tomorrow.',
+    trainedSaving: 'Saved on the phone. The details show here once it has reached the engine.',
     congratsNext: (n: number) => `All ${n} exercises done. Record your pain score in the check-in, then come back tomorrow.`,
     hrMatching: 'Matching heart rate to exercises…',
     hrMeasuredRpe: 'Measured effort',
@@ -513,6 +528,18 @@ export const S = {
     areaHold: (date: string) => `Your plank test${date ? ` of ${date}` : ''} against 2025. It is not in the number at the top.`,
     areaNoneCore: 'No kg measure: core work is holds and bands.',
     areaNone: 'No lift here matches a 2025 lift yet.',
+    // Each lift against its own 2025 best (WP-38).
+    lifts: 'Each lift against 2025',
+    liftLine: (kg: number, reps: number, date: string, now: number, then: number) =>
+      `${kg} kg × ${reps} on ${date} · one-rep max ${Math.round(now)} kg against ${Math.round(then)} kg`,
+    liftMatch: {
+      same: 'Same lift as in 2025.',
+      close: 'Close: other equipment in 2025.',
+      machine: 'Rough: the load depends on the machine.',
+      rough: 'Rough match.',
+    } as Record<string, string>,
+    liftsNone: 'No lift this year has a 2025 lift to set it against yet.',
+    liftsHow: 'One-rep max from each best set, worked out the same way for both years: weight × (1 + (reps + 1) ÷ 30). Lifts with no 2025 match, such as the machines, are not listed.',
     volume: 'Training volume',
     kg: (v: number) => `${Math.round(v).toLocaleString('en-GB')} kg`,
     lastFullWeek: (label: string) => (label ? `Last full week · ${label}` : 'Last full week'),
@@ -533,6 +560,24 @@ export const S = {
     unmapped: (names: string) => `Not counted in any body part: ${names}`,
     // Metabolism
     composition: 'Composition',
+    // The gym's SECA scan, every 12 weeks (WP-37): its own lane.
+    seca: 'Gym scan (SECA)',
+    secaNone: 'No SECA scan yet. Add the export from the gym’s machine below.',
+    secaAdd: 'Add a SECA scan (its CSV export)',
+    secaState: {
+      waiting: 'Saved on the phone. It shows here once the engine has it.',
+      refused: 'The engine could not read that file as a SECA export.',
+      stored: 'Stored.',
+    } as Record<string, string>,
+    secaChange: (change: number, dp: number, unit: string) =>
+      `${change > 0 ? '+' : ''}${change.toFixed(dp)}${unit ? ` ${unit}` : ''} since the scan before`,
+    secaSide: (label: string) => `${label}, muscle`,
+    secaSides: (left: number, right: number, pct: number | null) =>
+      `Left ${left} kg · right ${right} kg${pct == null ? '' : ` (right ${pct > 0 ? '+' : ''}${pct}%)`}`,
+    secaTorso: (kg: number) => `Torso, muscle: ${kg} kg`,
+    secaLane: 'A new machine: its own series, never compared with the old InBody scans or the scale.',
+    secaHeight: (cm: number) => `Height the machine used: ${cm} cm.`,
+    fromSeca: 'SECA scan',
     fat: 'kg fat',
     lean: 'kg fat-free',
     noWeighIn: 'No weigh-in on record.',

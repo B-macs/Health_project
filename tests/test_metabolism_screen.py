@@ -85,6 +85,9 @@ def test_the_store_is_read_and_a_failed_read_is_said_out_loud():
         def get_inbody_scans(self):
             return [_scan(date(2026, 3, 1), 6.0, "Model A"), _scan(date(2026, 9, 1), 6.1, "Model B")]
 
+        def get_seca_scans(self):
+            return []
+
     data = ms.read_data(_Repo(), TODAY)
     assert data["load_error"] is None and len(data["readings"]) == 1
     assert [s.device for s in data["scans"]] == ["Model B"], "the latest machine only"
@@ -97,8 +100,13 @@ def test_the_store_is_read_and_a_failed_read_is_said_out_loud():
         def get_inbody_scans(self):
             return []
 
+        def get_seca_scans(self):
+            raise RuntimeError("config unreadable")
+
     broken = ms.read_data(_Broken(), TODAY)
     assert broken["readings"] == [] and "store unreachable" in broken["load_error"]
+    assert broken["seca"] == [] and "SECA scans" in broken["load_error"], \
+        "a SECA read that failed is said, never shown as no scan"
 
 
 def test_the_split_and_the_scan_age():

@@ -260,6 +260,39 @@ def area_rows(regions: list, core_hold: dict | None = None) -> list[dict]:
     return rows
 
 
+def lift_match(comparability: float) -> str:
+    """How close a 2025 lift is to today's, in words (strength_baselines'
+    comparability): "same", "close" (other equipment), "machine" (the load
+    depends on the machine) or "rough"."""
+    if comparability >= 1.0:
+        return "same"
+    if comparability >= 0.7:
+        return "close"
+    if comparability >= 0.6:
+        return "machine"
+    return "rough"
+
+
+def lift_rows(exercises: dict) -> list[dict]:
+    """Each lift that has a 2025 entry, against it (WP-38, the owner, 2026-10-26:
+    "tell me what it really is"): its latest session's best set, that set's
+    one-rep max as a % of the 2025 best's (both read the same way,
+    strength.estimate_rpe), and how close the two lifts are. Ordered by body
+    area, then highest first. A lift with no 2025 entry is not here: there is
+    nothing to divide it by."""
+    order = {r: i for i, r in enumerate(REGION_ORDER)}
+    rows = []
+    for name, data in exercises.items():
+        obs = data["observation"]
+        rows.append({"name": name, "region": data["region"] or "",
+                     "pct_of_2025": round(data["index"], 1),
+                     "weight_kg": obs.weight_kg, "reps": int(obs.reps), "date": obs.session_date,
+                     "one_rm_kg": round(data["e1rm_now"], 1),
+                     "one_rm_2025_kg": round(data["e1rm_2025"], 1),
+                     "match": lift_match(data["comparability"])})
+    return sorted(rows, key=lambda r: (order.get(r["region"], len(order)), -r["pct_of_2025"]))
+
+
 def volume(series: list) -> dict:
     """The work in kilograms by week (tonnage.weekly_tonnage's window, oldest
     first; its last week is the caller's own and unfinished): each week's

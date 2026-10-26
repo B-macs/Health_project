@@ -66,8 +66,79 @@ def read_data(repo, today: date) -> dict:
     except Exception as exc:
         scans = []
         errors.append(f"gym scans: {type(exc).__name__}: {exc}")
-    return {"readings": readings, "scans": scans, "today": today,
+    try:
+        seca = repo.get_seca_scans()
+    except Exception as exc:
+        seca = []
+        errors.append(f"SECA scans: {type(exc).__name__}: {exc}")
+    return {"readings": readings, "scans": scans, "seca": seca, "today": today,
             "load_error": "; ".join(errors) or None}
+
+
+#: The SECA scan's figures as the screen shows them: (field, label, unit, decimals).
+SECA_FIGURES: tuple[tuple[str, str, str, int], ...] = (
+    ("weight_kg", "Weight", "kg", 1),
+    ("fat_pct", "Body fat", "%", 1),
+    ("fat_mass_kg", "Fat mass", "kg", 1),
+    ("fat_free_mass_kg", "Fat-free mass", "kg", 1),
+    ("skeletal_muscle_kg", "Skeletal muscle", "kg", 1),
+    ("phase_angle_deg", "Phase angle", "°", 1),
+    ("water_ratio_pct", "Water ratio", "%", 0),
+    ("resting_kcal", "Resting energy", "kcal a day", 0),
+    ("visceral_fat", "Visceral fat", "", 1),
+)
+
+#: The segment rows, left before right, in the screen's order.
+SECA_SEGMENT_ORDER: tuple[tuple[str, str, str], ...] = (
+    ("Arms", "left_arm", "right_arm"),
+    ("Legs", "left_leg", "right_leg"),
+)
+
+
+def seca(scans: list, today: date) -> dict | None:
+    """The latest SECA scan for its own section (WP-37): its figures (a figure
+    the machine left blank is listed as not measured), the muscle of each arm
+    and leg with the right side against the left, the torso's, how many scans
+    there are and the change in each figure since the one before. None
+    without a scan. A third lane: never set against the scale or the InBody."""
+    if not scans:
+        return None
+    scan, before = scans[-1], (scans[-2] if len(scans) > 1 else None)
+    segments = dict(scan.segments)
+
+    def figure(name: str):
+        return getattr(scan, name, None)
+
+    cards = []
+    for name, label, unit, dp in SECA_FIGURES:
+        value = figure(name)
+        prior = None if before is None else getattr(before, name, None)
+        cards.append({"key": name, "label": label, "unit": unit, "dp": dp,
+                      "value": None if value is None else round(value, dp),
+                      "change": None if value is None or prior is None else round(value - prior, dp)})
+    sides = []
+    for label, left, right in SECA_SEGMENT_ORDER:
+        l, r = segments.get(left), segments.get(right)
+        if l is None or r is None:
+            continue
+        sides.append({"label": label, "left_kg": l, "right_kg": r,
+                      "right_vs_left_pct": round((r - l) / l * 100, 1) if l else None})
+    return {"date": scan.day, "device": scan.device, "count": len(scans),
+            "days_old": (today - scan.day).days,
+            "height_cm": None if scan.height_m is None else round(scan.height_m * 100),
+            "figures": cards, "sides": sides, "torso_kg": segments.get("torso")}
+
+
+def headline(readings: list, seca_scans: list) -> dict | None:
+    """The Insights tile's figure: the newest weight from either device, with
+    the device named (a weight is a weight; the composition lanes stay apart)."""
+    latest = readings[-1] if readings else None
+    scan = seca_scans[-1] if seca_scans else None
+    if scan is not None and (latest is None or scan.day >= latest.day):
+        return {"date": scan.day, "weight_kg": scan.weight_kg, "source": "seca"}
+    if latest is not None:
+        return {"date": latest.day, "weight_kg": latest.weight_kg, "source": "scale"}
+    return None
 
 
 def value(record, key: str) -> float | None:

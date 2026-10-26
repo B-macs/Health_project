@@ -467,13 +467,13 @@ _DAYS = ["2026-09-08", "2026-09-15", "2026-09-22", "2026-09-29"]
 def _confident_upper_rows():
     """Three comparable upper-body lifts, each at 70% of its own 2025 e1RM on
     four days: quantity 12/12, comparability 1.0, consistency 1.0, so upper's
-    confidence is 1.0. Weight = 0.5 x base: 10 reps at RPE 8 is 12 effective
-    reps, a factor of 1.4, and 0.5 x 1.4 = 0.7."""
+    confidence is 1.0. Weight = 0.5 x base: 11 reps with the 2025 best's one
+    rep left is 12 effective reps, a factor of 1.4, and 0.5 x 1.4 = 0.7."""
     rows = []
     for name in ("Lat Pulldown", "Single-Arm DB Row", "Incline DB Press"):
         peak_kg, peak_reps, _c, _w = sb.PEAKS_2025[name]
         base = strength.baseline_e1rm(peak_kg, peak_reps, sb.PR_RIR)
-        rows += [_row(name, d, [{"reps": 10, "weight": round(0.5 * base, 4)}], rpe=8)
+        rows += [_row(name, d, [{"reps": 11, "weight": round(0.5 * base, 4)}], rpe=8)
                  for d in _DAYS]
     return rows
 
@@ -518,21 +518,35 @@ def test_with_no_lift_the_screen_has_no_headline_and_no_points():
     assert all(r.contribution_points == 0.0 for r in out["regions"])
 
 
-def test_the_estimate_reads_the_session_rpe_not_the_heart_rate_one():
-    """exercise_rpe has been filled from heart rate since 2026-08-14, and heart
-    rate is not reps in reserve (Key Rule 23). 10 reps at the session's RPE 8
-    is 12 effective reps; at the heart rate's 3 it would be 17."""
+def test_both_years_are_read_with_the_same_reps_left():
+    """WP-38 (2026-10-26): every working set today gets the one rep left the
+    2025 best is given (PR_RIR), whatever the session was rated or the heart
+    rate read. 10 reps is 11 effective reps on both sides of the ratio. It
+    replaced the session rating (WP-15), which read a set to failure in a
+    session rated 6 as four reps short."""
+    for session_rpe, hr_rpe in ((8.0, 3.0), (5.0, 9.0), (None, None)):
+        row = {"movement_name": "Lat Pulldown", "session_date": "2026-09-08",
+               "sets": [{"reps": 10, "weight": 50}], "exercise_rpe": hr_rpe,
+               "session_rpe": session_rpe}
+        obs = strength.best_observations([row], today=date(2026, 9, 9),
+                                         pr_rir=sb.PR_RIR)["Lat Pulldown"]
+        assert obs.rpe == 10.0 - sb.PR_RIR and obs.effective_reps == 10 + sb.PR_RIR
+        week = strength.weekly_measured_index([row], sb.PEAKS_2025, MW, sb.PR_RIR,
+                                              today=date(2026, 9, 9), weeks=1)
+        base = strength.baseline_e1rm(*sb.PEAKS_2025["Lat Pulldown"][:2], sb.PR_RIR)
+        assert week[-1][1] == pytest.approx(50 * (1 + (10 + sb.PR_RIR) / 30) / base * 100)
+
+
+def test_the_same_lift_at_last_year_s_best_reads_100():
+    """60 kg x 12 on the pulldown, its 2025 best, is 100% of it."""
     row = {"movement_name": "Lat Pulldown", "session_date": "2026-09-08",
-           "sets": [{"reps": 10, "weight": 50}], "exercise_rpe": 3.0, "session_rpe": 8.0}
-    obs = strength.best_observations([row], today=date(2026, 9, 9))["Lat Pulldown"]
-    assert obs.rpe == 8.0 and obs.effective_reps == 12.0
+           "sets": [{"reps": 12, "weight": 60}], "session_rpe": 4}
     week = strength.weekly_measured_index([row], sb.PEAKS_2025, MW, sb.PR_RIR,
                                           today=date(2026, 9, 9), weeks=1)
-    base = strength.baseline_e1rm(*sb.PEAKS_2025["Lat Pulldown"][:2], sb.PR_RIR)
-    assert week[-1][1] == pytest.approx(50 * (1 + 12 / 30) / base * 100)
+    assert week[-1][1] == pytest.approx(100.0)
 
 
-def test_a_missing_session_rpe_reads_as_all_out_never_as_the_heart_rate():
-    row = {"movement_name": "Lat Pulldown", "session_date": "2026-09-08",
-           "sets": [{"reps": 10, "weight": 50}], "exercise_rpe": 3.0, "session_rpe": None}
-    assert strength.best_observations([row], today=date(2026, 9, 9))["Lat Pulldown"].rpe == 10.0
+def test_the_goblet_squat_is_not_a_2025_peak():
+    """WP-38: a goblet squat is limited by holding the weight; his 2025 squat
+    was an 80 kg back squat."""
+    assert "Goblet Squat" not in sb.PEAKS_2025

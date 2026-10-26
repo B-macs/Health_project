@@ -104,6 +104,18 @@ describe('Strength (redone 2026-10-20)', () => {
     expect(html).toContain(`${S.ins.imbalances} ${STRENGTH.imbalance_count}`)
   })
 
+  it('lists each lift against its own 2025 best (WP-38), or says none matches yet', () => {
+    const lifts = STRENGTH.lifts!
+    expect(lifts.length).toBeGreaterThan(0)
+    const html = text(draw(<StrengthBody view={fresh(STRENGTH)} reduced />))
+    for (const l of lifts) {
+      expect(html).toContain(`${l.name} ${S.ins.pct(l.pct_of_2025)}`)
+      expect(html).toContain(S.ins.liftMatch[l.match]!)
+    }
+    expect(html).toContain(S.ins.liftsHow)
+    expect(text(draw(<StrengthBody view={fresh({ ...STRENGTH, lifts: [] })} reduced />))).toContain(S.ins.liftsNone)
+  })
+
   it('has no button that asks the engine for another series', () => {
     const raw = draw(<StrengthBody view={fresh(STRENGTH)} reduced />)
     expect(raw).not.toContain('role="radio"')
@@ -154,6 +166,43 @@ describe('Strength (redone 2026-10-20)', () => {
     expect(off).toContain(S.fresh.nothingSaved)
     expect(off).not.toContain(S.ins.overall)
     expect(text(draw(<StrengthBody view={saved(STRENGTH)} reduced />))).toContain(S.ins.pct(STRENGTH.overall!))
+  })
+})
+
+describe('the SECA scan (WP-37)', () => {
+  const seca: Schemas['SecaOut'] = {
+    date: '2026-03-03', device: 'SECA', count: 2, days_old: 4, height_cm: 183, torso_kg: 14,
+    figures: [
+      { key: 'weight_kg', label: 'Weight', unit: 'kg', dp: 1, value: 80, change: 1 },
+      { key: 'visceral_fat', label: 'Visceral fat', unit: '', dp: 1, value: null, change: null },
+    ],
+    sides: [{ label: 'Arms', left_kg: 2, right_kg: 1.8, right_vs_left_pct: -10 }],
+  }
+
+  it('shows its own section: each figure, a blank one as not measured, and each side', () => {
+    const html = text(draw(<MetabolismBody view={fresh({ ...WEIGHT, seca })} kept={{ ...WEIGHT, seca }}
+      onMetric={none} onKind={none} onStep={none} onStored={none} />))
+    expect(html).toContain(S.ins.seca)
+    expect(html).toContain('Weight 80.0 kg')
+    expect(html).toContain(S.ins.secaChange(1, 1, 'kg'))
+    expect(html).toContain(`Visceral fat ${S.ins.notMeasured}`)
+    expect(html).toContain(S.ins.secaSides(2, 1.8, -10))
+    expect(html).toContain(S.ins.secaLane)
+    expect(html).toContain(S.ins.secaAdd)
+  })
+
+  it('says when there is no scan yet', () => {
+    const html = text(draw(<MetabolismBody view={fresh(WEIGHT)} kept={{ ...WEIGHT, seca: null }}
+      onMetric={none} onKind={none} onStep={none} />))
+    expect(html).toContain(S.ins.secaNone)
+  })
+
+  it('the Insights tile shows the newest weight and names the SECA', () => {
+    const headline = { date: '2026-10-22', weight_kg: 84.0, source: 'seca' }
+    const html = text(draw(<InsightsHub strength={fresh(STRENGTH)} metab={fresh({ ...WEIGHT, headline })}
+      flex={fresh(F.flexibility_empty)} go={none} />))
+    expect(html).toContain('84.0')
+    expect(html).toContain(S.ins.fromSeca)
   })
 })
 

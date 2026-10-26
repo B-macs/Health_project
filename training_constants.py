@@ -130,6 +130,21 @@ SENSATION_TAGS: list[str] = [
 #  muscle target, so it shouldn't count toward any region.
 # ─────────────────────────────────────────────────────────────────────────────
 
+#: The 12-week block's flexibility retest, one entry per test of the battery
+#: (WP-33, 2026-10-26: "Always split a retest into its individual items"), as
+#: goal_block.FLEXIBILITY_TEST_NAMES names them; tests/test_measurement_entries.py
+#: keeps the two equal. Written out here because this file imports nothing.
+FLEXIBILITY_TEST_NAMES: tuple[str, ...] = (
+    "Flexibility Test: Knees fully bent (Test)",
+    "Flexibility Test: Knees fully straight (Test)",
+    "Flexibility Test: Tilt — under your own power (Test)",
+    "Flexibility Test: Tilt — with help (Test)",
+    "Flexibility Test: Active — leg raise to the side (Test)",
+    "Flexibility Test: Isometric — split, hands off (Test)",
+    "Flexibility Test: Passive — split, supported (Test)",
+)
+
+
 _UPPER_BODY_EXERCISES: tuple[str, ...] = (
     "Scapular Wall Slide",
     "Prone Y-Raise (Scapular)",
@@ -354,6 +369,7 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Standing Cable Hip Flexion",
     "Hip Airplane (Weighted)",
     "Flexibility Retest (Test)",
+    *FLEXIBILITY_TEST_NAMES,
 )
 
 EXERCISE_BODY_REGION: dict[str, str] = {
@@ -696,6 +712,8 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     # The dumbbell held behind the back in both hands gives the arms a little.
     "Hip Airplane (Weighted)":                {"upper_body": 0.05, "core": 0.25, "lower_body": 0.70},
     "Flexibility Retest (Test)":              {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
+    # The retest's entries, one per test (WP-33): the old entry's split, each.
+    **{name: {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75} for name in FLEXIBILITY_TEST_NAMES},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -977,6 +995,7 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Neck Working Stretch (Right)":             ("mobility_core", 0.25),
     "Rib and Pelvis Test (Test)":               ("mobility_core", 0.25),
     "Flexibility Retest (Test)":                ("mobility_core", 0.25),
+    **{name: ("mobility_core", 0.25) for name in FLEXIBILITY_TEST_NAMES},
 }
 
 

@@ -365,6 +365,10 @@ def day_view(repo, day: date, today: date) -> dict:
         out["swap"] = swap_offer(repo, r, day)
     elif route == "today":
         out["overview"] = today_overview(repo, r)
+        if out["overview"]["screen"] == "logged":
+            # Today's logged session, as a past day shows its own (WP-32): the
+            # Training tab shows what was done, never the plan again.
+            out["logged"] = _logged_session(repo, day, today)
     return out
 
 

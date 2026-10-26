@@ -170,6 +170,70 @@ def finish(repo, draft: btry.Assessment) -> None:
     repo.clear_flexibility_draft()
 
 
+# ─── The retest inside the training session (WP-33) ──────────────────────────
+#
+# The 12-week block runs the retest as one session entry per test (goal_block.
+# FLEXIBILITY_TESTS). Each entry's reading is typed on the session screen and
+# rides in the session's save; the save stores them as ONE cold assessment of
+# that morning, through the same merge the capture screen uses, so Insights ›
+# Flexibility reads them. The battery's early answer is asked after each test:
+# a pattern means the tests left are not needed that morning.
+
+def session_reading(test_key: str, earlier: tuple, today: date) -> dict:
+    """What a retest entry asks for: the test's unit and sides, the hint at the
+    input, the setup number with the one from the last assessment offered
+    back, and whether the step takes an added load."""
+    shown = test_out(_battery().TESTS[test_key], earlier, begin(today, cold=True))
+    return {"test_key": test_key, "unit": shown["unit"],
+            "sides": ["left", "right"] if shown["bilateral"] else [""],
+            "input_hint": shown["input_hint"].replace("**", ""),
+            "setup_input": shown["setup_input"] or None,
+            "prior_setup": shown["prior_setup"], "takes_load": shown["takes_load"]}
+
+
+def readings_from_session(entries: list[dict], day: date) -> btry.Assessment:
+    """The readings a session typed into its retest entries, as one cold
+    assessment of `day`. Each entry: {"test_key", "values": {side: value},
+    "setup_value", "load_kg"}; a side left blank is not a reading. Raises
+    CaptureRefused on a test or a side the battery does not have."""
+    draft = begin(day, cold=True)
+    order = capture_order(draft)
+    for e in entries:
+        key = e.get("test_key")
+        if key not in order:
+            raise CaptureRefused("unknown_test", [str(key)])
+        test = _battery(draft.cluster).TESTS[key]
+        sides = {"left", "right"} if test.bilateral else {""}
+        values = {side: v for side, v in (e.get("values") or {}).items() if v is not None}
+        if set(values) - sides:
+            raise CaptureRefused("unknown_side", sorted(set(values) - sides))
+        draft = apply_entries(draft, key, values, load=e.get("load_kg"),
+                              setup_value=e.get("setup_value"))
+    return draft
+
+
+def session_check(entries: list[dict], day: date) -> dict:
+    """The battery's early answer over the readings typed so far: a pattern
+    means the slot that stopped has answered, and the tests left cannot be
+    interpreted."""
+    import cluster_a_battery as cba
+    live = live_result(readings_from_session(entries, day))
+    return {"pattern": live.pattern,
+            "label": cba.PATTERNS.get(live.pattern, "") if live.pattern else "",
+            "reason": live.slots[-1].reason if live.pattern and live.slots else ""}
+
+
+def save_session_readings(repo, entries: list[dict], day: date) -> bool:
+    """Store a session's retest readings as the assessment of `day`; False when
+    none was typed. The same date replaces (save_flexibility_assessment), so
+    the same session sent again stores one assessment."""
+    assessment = readings_from_session(entries, day)
+    if not assessment.readings:
+        return False
+    repo.save_flexibility_assessment(assessment)
+    return True
+
+
 # ─── The screen, served (GET /api/insights/flexibility and the capture
 #     actions; rebuild Phase 2, milestone 5) ──────────────────────────────────
 

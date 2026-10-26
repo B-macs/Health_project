@@ -619,6 +619,22 @@ def test_the_aim_climbs_one_rep_and_never_past_the_top():
     assert _rp([_session("2026-10-10", [13, 12, 12])], allow_step=False)["aim"] == 12
 
 
+def test_the_aim_never_falls_under_the_range():
+    """WP-35 (the athlete, 2026-10-26): the shoulder press at 10 kg x 12, 10, 6
+    on 8-12 aimed at 7. One more than the last set, but never under the bottom."""
+    out = _rp([_session("2026-10-19", [12, 10, 6], 10.0)], weight=10.0)
+    assert (out["weight"], out["aim"], out["action"]) == (10.0, 8, "hold")
+    assert _rp([_session("2026-10-19", [9, 7, 3])])["aim"] == 8
+    assert _rp([_session("2026-10-19", [11, 10, 5])], rep_min=10, rep_max=15)["aim"] == 10
+
+
+def test_a_failed_week_holds_the_reps_inside_the_range():
+    """The repeat week's hold keeps last time's reps, raised to the bottom of the
+    range when the last set fell under it (WP-35: no aim outside the range)."""
+    out = _rp([_session("2026-10-19", [12, 10, 6], 10.0)], weight=10.0, hold=True)
+    assert (out["weight"], out["aim"], out["action"]) == (10.0, 8, "held")
+
+
 def test_the_last_set_under_the_range_twice_steps_back():
     s = [_session("2026-10-17", [9, 8, 7]), _session("2026-10-10", [9, 8, 6])]
     out = _rp(s)
@@ -684,7 +700,7 @@ def test_the_weight_moves_at_most_one_step_and_the_aim_stays_in_reach(weight, re
                  _session("2026-10-10", [older] * 3, weight)]
             out = _rp(s, weight=weight, rep_min=rep_min, rep_max=rep_max)
             assert abs(out["weight"] - weight) <= 2.5 + 1e-9
-            assert 1 <= out["aim"] <= rep_max
+            assert rep_min <= out["aim"] <= rep_max
             if out["action"] in ("step_up", "step_back"):
                 assert out["aim"] == engine.range_middle_bottom(rep_min, rep_max)
 

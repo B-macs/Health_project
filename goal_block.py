@@ -51,6 +51,7 @@ from __future__ import annotations
 import re
 from datetime import date
 
+import cluster_a_battery as _battery
 import cluster_a_mechanics as _mech
 import cluster_a_prescription as _rx
 from training_plan import _ex
@@ -61,8 +62,8 @@ WEEKS = 12
 #: monday"). The changeover stored the block here on 2026-10-16 and ended
 #: Block B the day before (its code was dropped 2026-10-19).
 START = date(2026, 10, 19)
-#: The timed plank test (session A, in place of that day's abs) and the rib
-#: and pelvis test (Sunday morning): week 1 and week 12.
+#: The timed plank test (session A, in place of that day's abs): week 1 and
+#: week 12.
 TEST_WEEKS = (1, 12)
 #: The flexibility retest: three Sunday mornings, before the session, so the
 #: day-to-day spread is known before a number counts.
@@ -86,8 +87,12 @@ ISOLATION_RANGE = {"rep_min": 10, "rep_max": 15}
 #: so it steps both, 5 kg.
 DUMBBELL_KG = 2.5
 DUMBBELL_PAIR_KG = 5.0
-#: Confirmed 2026-10-16 ("Yes all are correct").
-MACHINE_KG = 5.0
+#: Every machine steps 2.5 kg (WP-36, the athlete, 2026-10-26: "Allow weight
+#: increases and decreases in 2.5 kg steps for the shoulder press machine and
+#: all other machines"): the chest and shoulder presses, the hack and V squats,
+#: the leg curl and the adductor machine. It replaces 5 kg ("Yes all are
+#: correct", 2026-10-16, and the adductor's 5 kg the same day).
+MACHINE_KG = 2.5
 PLATE_KG = 2.5
 #: Every cable steps half a unit (his answer, 2026-10-22: "No on all cables", to
 #: "only on the crossover's cable, or on every cable?", confirmed the same day:
@@ -766,56 +771,64 @@ PLANK_TEST = [
     ),
 ]
 
-RIB_AND_PELVIS_TEST = _ex(
-    name="Rib and Pelvis Test (Test)",
-    ex_type="duration",
-    sets=1, duration_minutes=10, rest_seconds=0,
-    mechanics=(
-        "Cold, before anything else today. Write each reading in the note. (1) Pelvis: lie on "
-        "your back on a firm floor, legs straight, arms by your sides, and take five slow "
-        "breaths. Fingertips on the bony point at the front of each hip: which one sits "
-        "higher off the floor? Grade 0 (level), 1 (slight) or 2 (clear), and name the side. "
-        "(2) Heel drive: same position. Press one heel into the floor for five seconds and "
-        "rate the stretch at the front of that hip 0-10; then the other heel. (3) Ribs: stand "
-        "in front of a mirror, shirt off, arms relaxed, and breathe out normally. Which side's "
-        "lower ribs stick forward more? Grade 0-2 and name the side. (4) Thomas test: lie on "
-        "your back with your hips at the end of a firm bed. Hug your left knee to your chest "
-        "and let the right leg hang; note where the right thigh settles against the level of "
-        "the bed, and any click. Then the other side. When you hug the right knee, keep it "
-        "pointing straight up."
-    ),
-    biomechanical_focus=(
-        "Finding #7's test (patient_profile), first observed 2026-10-05 and never graded: this "
-        "is its baseline (week 1) and its re-read (week 12). His answer, 2026-10-16: week 1 and "
-        "week 12, on the test Sunday morning. In week 1 it follows the flexibility retest, so "
-        "the retest's three mornings stay identical."
-    ),
-    progression="A measurement: nothing to progress.",
-    regression="Any symptom → stop and write what you have.",
-)
+# NO RIB AND PELVIS TEST. Finding #7's four-part check (the pelvis height, the
+# heel drive, the ribs in the mirror and the Thomas test) ran on the week 1 and
+# week 12 Sundays on his answer of 2026-10-16. Removed 2026-10-26 (WP-34): "it
+# was not requested and its explanation is unclear"; week 1's run (2026-10-25)
+# stays in the log. It comes back only if he asks for it, and then as four
+# entries with one reading each (WP-33's rule), never one timer.
 
 # NO GRIP GRADE. Block B read the Upper Glute Grip Grade on Wednesday, a rest
 # day here; moving it to Sunday was put to him and he declined (2026-10-16:
 # "b drop it"). Key Rule 6's release now comes back only if the hip-crest or
 # front-of-hip symptoms return. tests/test_goal_block.py keeps it out.
 
-FLEXIBILITY_RETEST = _ex(
-    name="Flexibility Retest (Test)",
-    ex_type="duration",
-    sets=1, duration_minutes=20, rest_seconds=0,
-    mechanics=(
-        "Cold, before anything else today. Open Insights, then Flexibility, and run the test "
-        "there; the readings are entered on that page. This entry keeps the time for it."
-    ),
-    biomechanical_focus=(
-        "The 12-week flexibility retest (goal C), on three Sunday mornings, weeks 1-3, so the "
-        "day-to-day spread is known before a number counts (his answer, 2026-10-16: 'Sunday "
-        "morning before'). Sunday follows Saturday's rest: a retest is never the morning after "
-        "leg work (his rule, 2026-08-07)."
-    ),
-    progression="A measurement: nothing to progress.",
-    regression="Short of time → run it next Sunday rather than warm.",
-)
+# THE FLEXIBILITY RETEST, ONE ENTRY PER TEST (WP-33, the athlete, 2026-10-26:
+# "Always split a retest into its individual items; never add it to the
+# training block as a single combined item"). Until then it was one 20-minute
+# entry, "Flexibility Retest (Test)", that sent him to Insights for the
+# readings, and Insights could only be reached by leaving the session and
+# losing it. Each test is now its own entry in the battery's own order, its
+# reading typed on the session screen, and the readings are stored at Save as
+# the battery's assessment of that morning (flexibility_screen.
+# save_session_readings): one store, so Insights › Flexibility reads them. When
+# the battery has its answer, the phone skips the tests left (the engine's
+# answer, POST /api/training/flexibility-check): a reading below a failing slot
+# cannot be interpreted. The three Sunday mornings of weeks 1-3 are his answer
+# of 2026-10-16 ("Sunday morning before"); Sunday follows Saturday's rest, so a
+# retest is never the morning after leg work (his rule, 2026-08-07).
+
+#: Each test's share of the retest's 20 minutes.
+FLEX_TEST_MINUTES = 3
+
+
+def _plain(text: str) -> str:
+    """The battery's protocol text without its bold marks: the session screen
+    shows plain text."""
+    return text.replace("**", "")
+
+
+def _flexibility_test(key: str) -> dict:
+    test = _battery.TESTS[key]
+    entry = _ex(
+        name=f"Flexibility Test: {test.label} (Test)",
+        ex_type="duration",
+        sets=1, duration_minutes=FLEX_TEST_MINUTES, rest_seconds=0,
+        mechanics=" ".join(_plain(t) for t in (test.setup, test.lock, test.measurement) if t),
+        biomechanical_focus=(
+            f"Goal C's 12-week flexibility retest, one test of the battery ({test.label}, slot "
+            f"{test.slot}), cold, before anything else that morning. One reading per entry "
+            "(WP-33, 2026-10-26)."
+        ),
+        progression="A measurement: nothing to progress.",
+        regression="Short of time → run the tests left next Sunday rather than warm.",
+    )
+    entry["battery_test"] = key
+    return entry
+
+
+FLEXIBILITY_TESTS: list[dict] = [_flexibility_test(k) for k in _battery.AVAILABLE_TESTS]
+FLEXIBILITY_TEST_NAMES: tuple[str, ...] = tuple(e["name"] for e in FLEXIBILITY_TESTS)
 
 
 # ─── The Sunday session: the flexibility prescription for the last reading ──
@@ -906,13 +919,9 @@ def _rest_day(week: int) -> dict:
 
 
 def _flexibility_day(week: int) -> dict:
-    """The tests come first, cold, in a fixed order, so each one sits in the
-    same conditions every time it runs: the flexibility retest on its three
-    mornings, then the rib and pelvis test. The retest goes before the rib
-    and pelvis test because its own rule is that passive work loosens tissue
-    for an hour or more, and the Thomas test is passive."""
-    tests = ([FLEXIBILITY_RETEST] if week in FLEX_RETEST_WEEKS else []) \
-        + ([RIB_AND_PELVIS_TEST] if week in TEST_WEEKS else [])
+    """The flexibility retest comes first on its three mornings, cold, so it
+    sits in the same conditions every time it runs."""
+    tests = list(FLEXIBILITY_TESTS) if week in FLEX_RETEST_WEEKS else []
     objective = f"Flexibility — Adductors and Hip Rotators (week {week})"
     if tests:
         objective += " — test morning"

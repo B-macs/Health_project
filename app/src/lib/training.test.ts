@@ -9,7 +9,8 @@ import fixture from '../../dev/session_fixture.json'
 import {
   advance, asksLength, back, clockMinutes, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder,
   exerciseProgress, finished, lastRecorded, loadState, localStamp, newExerciseIds, newSessionId, saveBody, setBand,
-  setGarmin, setRecordedSide, setSide, sideValues, skip, startSessionState, stepBand, stepWeight, swapCandidates,
+  setGarmin, setReading, setRecordedSide, setSide, sideValues, skip, skipRestOfRetest, startSessionState, stepBand,
+  stepWeight, swapCandidates, readingComplete, typedReadings,
   swapTo, UNDO_LIMIT, type Plan, type TrainingState,
 } from './training'
 
@@ -51,16 +52,31 @@ describe('walking the engine steps', () => {
     expect(one.rest_ended_at).toBe((T0 + 75_000) / 1000)
   })
 
-  it('a one-side exercise records both sides, and a change to one side never moves the other', () => {
-    // WP-25 (2026-10-22): "Uncouple the right and the left so you can change the reps of both
-    // after use". Until then an unedited second side followed the first.
+  it('the first side carries to the second until the second is changed by hand', () => {
+    // WP-30 (2026-10-26): "When weight or reps are updated for the left side, automatically
+    // apply the same targets to the right side". Sides alternate by day, so it is the first.
     let s = fresh()
     const split = plan.exercises.findIndex((e) => e.name === 'Made-up split squat')
     const first = plan.first_side as 'left' | 'right'
     const second = first === 'left' ? 'right' : 'left'
-    const seeded = sideValues(s.live[split], second).reps
-    s = setSide(s, split, first, { reps: 7 })
-    expect(sideValues(s.live[split], second).reps).toBe(seeded)
+    s = setSide(s, split, first, { reps: 7, weight_kg: 12.5 })
+    expect(sideValues(s.live[split], second).reps).toBe(7)
+    expect(sideValues(s.live[split], second).weight_kg).toBe(12.5)
+    s = setSide(s, split, first, { seconds: 30 })
+    expect(sideValues(s.live[split], second).seconds).toBeNull()      // a reading is each side's own
+    s = setSide(s, split, second, { reps: 6 })
+    s = setSide(s, split, first, { reps: 8, weight_kg: 15 })
+    expect(sideValues(s.live[split], second).reps).toBe(6)
+    expect(sideValues(s.live[split], second).weight_kg).toBe(12.5)
+  })
+
+  it('a one-side exercise records both sides, and a side changed by hand keeps its own', () => {
+    // WP-25 (2026-10-22): "Uncouple the right and the left so you can change the reps of both
+    // after use".
+    let s = fresh()
+    const split = plan.exercises.findIndex((e) => e.name === 'Made-up split squat')
+    const first = plan.first_side as 'left' | 'right'
+    const second = first === 'left' ? 'right' : 'left'
     s = setSide(s, split, second, { reps: 6 })
     s = setSide(s, split, first, { reps: 8 })
     expect(sideValues(s.live[split], second).reps).toBe(6)
@@ -287,5 +303,70 @@ describe('the watch and the stored session', () => {
     const s = startSessionState(plan, '2026-10-20-0a1b2c3d', plan.exercises.map((_, i) => `ex-${i}`), true)
     expect(s.garminDeclared).toBe(true)
     expect(fresh().garminDeclared).toBe(false)
+  })
+})
+
+describe('the flexibility retest, one reading per entry (WP-33)', () => {
+  // Two made-up tests in front of the session, as the Sunday puts the retest first.
+  const reading = (key: string, sides: string[]) => ({
+    test_key: key, unit: 'cm', sides, input_hint: 'Made-up hint', setup_input: null, prior_setup: null,
+    takes_load: false,
+  })
+  const withRetest = (): Plan => {
+    const exercises = plan.exercises.map((e) => ({ ...e }))
+    exercises[7] = { ...exercises[7], name: 'Made-up test one (Test)', type: 'duration', timer: null,
+      reading: { ...reading('one', ['left', 'right']), setup_input: 'Made-up setup (cm)', prior_setup: 30 } }
+    exercises[8] = { ...exercises[8], name: 'Made-up test two (Test)', type: 'duration', timer: null, garmin_pull: false,
+      reading: reading('two', ['']) }
+    const steps = [...plan.steps.filter((st) => st.ex_idx >= 7), ...plan.steps.filter((st) => st.ex_idx < 7)]
+      .map((st, index) => ({ ...st, index }))
+    let next = 0
+    const firstOf = (exIdx: number) => steps.findIndex((st) => st.ex_idx === exIdx)
+    for (const st of steps) {
+      next = steps.findIndex((o, i) => i > st.index && o.ex_idx !== st.ex_idx)
+      st.skip_to = next < 0 ? steps.length : next
+    }
+    expect(firstOf(7)).toBe(0)
+    return { ...plan, exercises, steps }
+  }
+  const start = () => startSessionState(withRetest(), '2026-11-01-00000001', plan.exercises.map((_, i) => `ex-${i}`))
+
+  it('each test starts empty, with the last setup number offered back', () => {
+    const s = start()
+    expect(s.readings[7]).toEqual({ values: { left: null, right: null }, setup_value: 30, load_kg: null })
+    expect(s.readings[8]).toEqual({ values: { '': null }, setup_value: null, load_kg: null })
+    expect(s.readings[2]).toBeUndefined()
+  })
+
+  it('a test is done when every side has its value, and the reading rides in the save', () => {
+    let s = start()
+    const one = s.plan.exercises[7]
+    expect(readingComplete(s, one)).toBe(false)
+    s = setReading(s, 7, { values: { left: 21.5 } })
+    expect(readingComplete(s, one)).toBe(false)
+    s = setReading(s, 7, { values: { right: 23 }, setup_value: 31 })
+    expect(readingComplete(s, one)).toBe(true)
+    expect(typedReadings(s)).toEqual([
+      { test_key: 'one', values: { left: 21.5, right: 23 }, setup_value: 31, load_kg: null },
+      { test_key: 'two', values: { '': null }, setup_value: null, load_kg: null }])
+    const body = saveBody(s, 40, 4, '')
+    const saved = body.exercises.find((e) => e.exercise_id === 'ex-7')!
+    expect(saved.reading).toEqual({ test_key: 'one', values: { left: 21.5, right: 23 }, setup_value: 31, load_kg: null })
+    expect(body.exercises.find((e) => e.exercise_id === 'ex-2')!.reading).toBeNull()
+  })
+
+  it('with the engine\'s answer the tests left are skipped, and nothing else', () => {
+    let s = start()
+    s = advance(s, T0)
+    expect(currentStep(s)!.ex_idx).toBe(8)
+    const skipped = skipRestOfRetest(s, 'Made-up answer')
+    expect(exerciseOf(skipped)!.reading).toBeFalsy()
+    expect(skipped.notice).toBe('Made-up answer')
+    expect(skipRestOfRetest(skipped, 'again')).toBe(skipped)
+  })
+
+  it('a session stored before the retest was split still loads', () => {
+    const { readings: _gone, ...old } = fresh()
+    expect(loadState(old)!.readings).toEqual({})
   })
 })

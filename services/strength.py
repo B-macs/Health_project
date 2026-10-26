@@ -140,7 +140,7 @@ def exercise_index(e1rm_now: float, e1rm_2025: float) -> float | None:
     return e1rm_now / e1rm_2025 * 100.0
 
 
-def qualifying_rows(rows: list[dict], today: date):
+def qualifying_rows(rows: list[dict], today: date, pr_rir: float = 1.0):
     """Every row that can produce an estimate, as (name, day, loaded_sets, rpe).
 
     ONE gate, used by everything that counts or measures. A set only qualifies
@@ -178,19 +178,23 @@ def qualifying_rows(rows: list[dict], today: date):
         ]
         if not loaded:
             continue
-        yield name, day, loaded, estimate_rpe(row)
+        yield name, day, loaded, estimate_rpe(row, pr_rir)
 
 
-def estimate_rpe(row: dict) -> float | None:
-    """The RPE a strength estimate reads: the athlete's own SESSION rating.
+def estimate_rpe(row: dict, pr_rir: float = 1.0) -> float:
+    """The RPE a strength estimate reads for every working set: the same reps
+    left the 2025 best is given (strength_baselines.PR_RIR, `pr_rir`), so both
+    years are estimated the same way (WP-38, the athlete, 2026-10-26: "take my
+    2025 lifts and extrapolate what would be my ONE REP MAX and then compare
+    that against my ORM this year if you extrapolated it as well").
 
-    Never `exercise_rpe` (2026-10-13, WP-15). Since 2026-08-14 that field is
-    filled from heart rate (Repository.reassign_exercise_rpe_from_hr), and heart
-    rate is not reps in reserve — Key Rule 23 says so — while estimated_1rm
-    converts RPE straight into reps in reserve. Before 2026-08-14 every exercise
-    carried the session rating, so those rows read exactly as before. None
-    reads as RPE 10 in estimated_1rm, the conservative reading."""
-    return row.get("session_rpe")
+    Until 2026-10-26 it was the SESSION rating (WP-15, 2026-10-13): a session
+    rated 6 read every set as 4 reps short of failure, sets taken to failure
+    included, while the 2025 best was read as 1 short, which lifted today's
+    estimates about 6-10% against last year's. Never `exercise_rpe` either:
+    since 2026-08-14 it is filled from heart rate, which is not reps in reserve
+    (Key Rule 23). `row` is kept for the call sites; nothing in it is read."""
+    return 10.0 - float(pr_rir)
 
 
 def observation_days(rows: list[dict], today: date | None = None) -> dict[str, set[date]]:
@@ -207,11 +211,13 @@ def observation_days(rows: list[dict], today: date | None = None) -> dict[str, s
 def best_observations(
     rows: list[dict],
     today: date | None = None,
+    pr_rir: float = 1.0,
 ) -> dict[str, Observation]:
-    """The most recent qualifying observation per exercise."""
+    """The most recent qualifying observation per exercise, each set read with
+    the 2025 best's reps left (`pr_rir`, estimate_rpe)."""
     today = today or date.today()
     latest: dict[str, Observation] = {}
-    for name, session_date, loaded, rpe in qualifying_rows(rows, today):
+    for name, session_date, loaded, rpe in qualifying_rows(rows, today, pr_rir):
         best: Observation | None = None
         for s in loaded:
             e1rm, eff, ok = estimated_1rm(float(s["weight"]), float(s["reps"]), rpe)
@@ -393,7 +399,7 @@ def weekly_measured_index(
                   and not s.get("is_warmup")]
         if not loaded:
             continue
-        rpe = estimate_rpe(row)
+        rpe = estimate_rpe(row, pr_rir)
         peak_kg, peak_reps, _comparability, _why = peaks[name]
         base = baseline_e1rm(peak_kg, peak_reps, pr_rir)
         top = max(estimated_1rm(float(s["weight"]), float(s["reps"]), rpe)[0] for s in loaded)
@@ -478,7 +484,7 @@ def snapshot(
     Contributions divide `overall` by the shares, so the three always total
     the headline on screen."""
     today = today or date.today()
-    observed = best_observations(rows, today=today)
+    observed = best_observations(rows, today=today, pr_rir=pr_rir)
 
     per_exercise: dict[str, dict] = {}
     for name, obs in observed.items():

@@ -231,8 +231,9 @@ def test_every_loaded_lift_has_the_range_its_kind_takes():
 
 
 def test_every_step_is_one_he_confirmed():
-    """Dumbbells 2.5 kg, a pair 5 kg (2026-10-22); machines 5 kg; the back
-    extension a 2.5 kg plate (2026-10-16); cables half a unit (2026-10-22)."""
+    """Dumbbells 2.5 kg, a pair 5 kg (2026-10-22); machines 2.5 kg (2026-10-26,
+    WP-36); the back extension a 2.5 kg plate (2026-10-16); cables half a unit
+    (2026-10-22)."""
     for _, _, e in _every_entry():
         if e.get("equipment_type") in _STEPS and not e.get("warmup"):
             assert e["increment_size"] in _STEPS[e["equipment_type"]], e["name"]
@@ -240,6 +241,17 @@ def test_every_step_is_one_he_confirmed():
             assert e["increment_unit"] == unit, e["name"]
     assert next(e for e in gb.SESSIONS["B"] if e["name"] == "45° Back Extension")[
         "increment_size"] == gb.PLATE_KG
+
+
+def test_every_machine_steps_two_and_a_half_kg():
+    """WP-36 (2026-10-26): the shoulder press machine and every other machine."""
+    assert gb.MACHINE_KG == 2.5
+    machines = {e["name"]: e["increment_size"] for _, _, e in _every_entry()
+                if e.get("equipment_type") == "machine" and not e.get("warmup")
+                and e["name"] != "45° Back Extension"}
+    assert {"Machine Shoulder Press", "Machine Chest Press", "Hack Squat", "Seated Leg Curl",
+            "Adductor Machine (Seated)"} <= set(machines)
+    assert set(machines.values()) == {2.5}
 
 
 def test_every_cable_steps_half_a_unit():
@@ -385,11 +397,18 @@ def test_the_sunday_tests_run_first_and_in_a_fixed_order():
         names = _names(PLAN[week * 7]["exercises"])
         want = []
         if week in gb.FLEX_RETEST_WEEKS:
-            want.append("Flexibility Retest (Test)")
-        if week in gb.TEST_WEEKS:
-            want.append("Rib and Pelvis Test (Test)")
+            want.extend(gb.FLEXIBILITY_TEST_NAMES)
         assert names[:len(want)] == want, week
         assert names[len(want):] == _names(gb.FLEX_STACK), week
+
+
+def test_the_rib_and_pelvis_test_is_not_in_the_block():
+    """Removed on his note of 2026-10-26 (WP-34): "it was not requested and its
+    explanation is unclear"."""
+    for d, _, e in _every_entry():
+        assert "Rib and Pelvis" not in e["name"], d
+    assert "Rib and Pelvis Test (Test)" not in gw.PICKS
+    assert not hasattr(gb, "RIB_AND_PELVIS_TEST")
 
 
 def test_the_grip_grade_is_not_in_the_block():

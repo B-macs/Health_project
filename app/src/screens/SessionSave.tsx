@@ -15,11 +15,13 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import type { components } from '../generated/api'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../lib/appState'
+import { KEYS } from '../db/schema'
 import { enqueue } from '../lib/outbox'
 import {
   asksLength, clockMinutes, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
+import { IconCheck } from '../ui/icons'
 
 type Schemas = components['schemas']
 type Completion = Schemas['CompletionOut']
@@ -261,6 +263,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
     sending.current = true
     setBusy(true)
     const id = await enqueue(store, { kind: 'session', method: 'POST', path: '/api/training/sessions', body: saveBody(s, minutes, rpe, notes) })
+    if (!accessory) await store.settings.put({ key: KEYS.trainedOn, value: s.plan.date })
     update((x) => ({ ...x, savedId: id, saved: { rpe, minutes, notes } }))
   }
 
@@ -268,6 +271,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
     return (
       <div className="screen train">
         <div className="sky" aria-hidden="true" />
+        <div className="celebrate" aria-hidden="true" data-testid="celebrate"><IconCheck /></div>
         <header className="head">
           <h1 className="head__title">{accessory ? S.session.accessoryLogged : S.session.congrats}</h1>
           {!accessory && <div className="caption">{S.session.congratsNext(exerciseOrder(s).length)}</div>}

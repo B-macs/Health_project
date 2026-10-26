@@ -519,14 +519,15 @@ def test_the_squat_day_that_went_up_now_starts_at_last_session():
 
 def test_a_hold_stops_an_earned_step_and_says_so():
     # A session at 13 reps earns 22.5 -> 25 kg at 9 reps; the held week
-    # repeats 22.5 x 13 instead, and the caption names the failed week.
+    # repeats 22.5 kg at the top of the range instead (13 until 2026-10-26;
+    # WP-35: no aim above the range's top), and the caption names the failed week.
     last, sets = _last([13, 13, 13], 22.5)
     free = sess.resolve_prescription(_GOBLET, last, "normal", _GREEN,
                                      last_session_sets=sets)
     assert (free["weight_kg"], free["reps"]) == (25.0, 9)
     held = sess.resolve_prescription(_GOBLET, last, "normal", _HELD,
                                      last_session_sets=sets)
-    assert (held["weight_kg"], held["reps"]) == (22.5, 13)
+    assert (held["weight_kg"], held["reps"]) == (22.5, 12)
     assert held["clamped"] == {"weight_kg": {"from": 25.0, "to": 22.5}}
     caption = sess.actual_caption(held)
     assert "25 → 22.5 kg" in caption and "last week failed" in caption
@@ -536,11 +537,12 @@ def test_a_hold_stops_an_earned_step_and_says_so():
 
 def test_a_hold_repeats_the_reps_rather_than_lowering_them():
     # A step lowers the reps by what it costs. Putting only the weight back
-    # would prescribe 22.5 x 9 in a week meant to repeat 22.5 x 13.
+    # would prescribe 22.5 x 9 in a week meant to repeat last week's reps:
+    # 13 there, held at the range's top, 12 (WP-35, 2026-10-26).
     last, sets = _last([13, 13, 13], 22.5)
     held = sess.resolve_prescription(_GOBLET, last, "normal", _HELD,
                                      last_session_sets=sets)
-    assert held["reps"] == 13
+    assert held["reps"] == 12
 
 
 def test_a_hold_keeps_the_band_and_still_lowers_it_on_a_low_streak():

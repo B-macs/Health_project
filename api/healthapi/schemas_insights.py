@@ -98,6 +98,21 @@ class AreaRow(BaseModel):
     hold_date: date | None
 
 
+class LiftRow(BaseModel):
+    """One lift against its 2025 best (WP-38): its latest session's best set,
+    the one-rep max of both, the % and how close the two lifts are (same,
+    close, machine or rough)."""
+    name: str
+    region: str
+    pct_of_2025: float
+    weight_kg: float
+    reps: int
+    date: date
+    one_rm_kg: float
+    one_rm_2025_kg: float
+    match: str
+
+
 class VolumeWeek(BaseModel):
     label: str
     upper_body: float
@@ -161,6 +176,7 @@ class StrengthOut(BaseModel):
     trend_axis: dict[str, float] = {}
     areas: list[AreaRow] = []
     volume: VolumeOut | None = None
+    lifts: list[LiftRow] = []
 
 
 # ── Metabolism ───────────────────────────────────────────────────────────────
@@ -226,6 +242,50 @@ class LatestWeighIn(BaseModel):
     body_fat_pct: float | None
 
 
+class SecaFigure(BaseModel):
+    key: str
+    label: str
+    unit: str
+    dp: int
+    #: None: the machine left it blank (not measured).
+    value: float | None
+    #: Against the scan before; None for the first scan.
+    change: float | None
+
+
+class SecaSide(BaseModel):
+    label: str
+    left_kg: float
+    right_kg: float
+    right_vs_left_pct: float | None
+
+
+class SecaOut(BaseModel):
+    """The latest SECA scan (WP-37), its own lane: never set against the scale
+    or the InBody."""
+    date: date
+    device: str
+    count: int
+    days_old: int
+    height_cm: int | None
+    figures: list[SecaFigure]
+    sides: list[SecaSide]
+    torso_kg: float | None
+
+
+class WeightHeadline(BaseModel):
+    """The newest weight from either device, for the Insights tile (WP-37)."""
+    date: date
+    weight_kg: float
+    #: scale or seca.
+    source: str
+
+
+class SecaImportIn(BaseModel):
+    """The SECA's export as text (its table view, a CSV in German)."""
+    csv: str
+
+
 class Cellular(BaseModel):
     device: str
     days_old: int
@@ -248,6 +308,8 @@ class MetabolismOut(BaseModel):
     cellular: Cellular | None
     #: The body-analysis cards in groups: {group, blurb, cards: [{name, value, dp, unit, source}]}.
     analysis: list[dict[str, Any]]
+    seca: SecaOut | None = None
+    headline: WeightHeadline | None = None
 
 
 # ── Flexibility ──────────────────────────────────────────────────────────────

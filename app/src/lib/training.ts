@@ -37,13 +37,17 @@ export interface SideValues {
 }
 
 /** One exercise's steppers: each side's own numbers, and the band. Each side starts a set
- *  from its own last set, and a change to one side never changes the other (WP-25, the
- *  owner's note of 2026-10-22: "Uncouple the right and the left so you can change the reps
- *  of both after use"). Until then an unedited second side followed the first. */
+ *  from its own last set, and either side can be changed at any time (WP-25, the owner's
+ *  note of 2026-10-22: "Uncouple the right and the left so you can change the reps of both
+ *  after use"). A change to the first side's reps or weight carries to the second side
+ *  until the second side is changed by hand (WP-30, 2026-10-26: "Avoid entering the same
+ *  changes twice"); from then on each side keeps its own. */
 export interface Live {
   right: SideValues
   left: SideValues
   band_tier: string | null
+  /** The second side's reps or weight were changed by hand: the first no longer carries. */
+  secondByHand?: boolean
 }
 
 /** One set as the phone saw it; the engine builds the record (RawSetIn). */
@@ -55,6 +59,14 @@ export interface RawSet {
   band_tier?: string | null
   rest_started_at?: number
   rest_ended_at?: number
+}
+
+/** A test of the flexibility retest as typed (WP-33): a value per side ("" for a
+ *  one-number test), the setup number and the added load. */
+export interface Typed {
+  values: Record<string, number | null>
+  setup_value: number | null
+  load_kg: number | null
 }
 
 export interface Snapshot {
@@ -101,6 +113,8 @@ export interface TrainingState {
   saved: { rpe: number; minutes: number; notes: string } | null
   /** The heart-rate match's answer after the save (T97-T101), kept across a reload. */
   hr: HeartRate | null
+  /** The retest's readings by exercise index (WP-33); saved with the session. */
+  readings: Record<number, Typed>
 }
 
 /** How many taps Back can undo (the Streamlit flow's limit, T78). */
@@ -127,7 +141,7 @@ function uncoupled(live: Record<number, Live & { secondEdited?: boolean }>, firs
     const { secondEdited, ...rest } = l
     const kept: Live = secondEdited === false
       ? { ...rest, [second]: { ...rest[first], seconds: rest[second].seconds } }
-      : rest
+      : secondEdited === true ? { ...rest, secondByHand: true } : rest
     return [idx, kept]
   }))
 }
@@ -155,6 +169,11 @@ export function startSessionState(plan: Plan, sessionId: string, exerciseIds: st
     notice: null,
     saved: null,
     hr: null,
+    readings: Object.fromEntries(plan.exercises.filter((ex) => ex.reading).map((ex) => [ex.index, {
+      values: Object.fromEntries(ex.reading!.sides.map((side) => [side, null])),
+      setup_value: ex.reading!.prior_setup ?? null,
+      load_kg: null,
+    }])),
   }
 }
 
@@ -165,7 +184,7 @@ export function loadState(data: unknown): TrainingState | null {
   if (!s || s.version !== 1 || !s.plan) return null
   const first = s.plan.first_side as Side
   return {
-    garminDeclared: false, garmin: {}, notice: null, saved: null, hr: null,
+    garminDeclared: false, garmin: {}, notice: null, saved: null, hr: null, readings: {},
     ...s,
     live: uncoupled(s.live ?? {}, first),
     history: (s.history ?? []).map((h) => ({ ...h, live: uncoupled(h.live, first) })),
@@ -278,6 +297,18 @@ export function back(s: TrainingState): TrainingState {
   return { ...s, plan, step: last.step, live: last.live, sets: last.sets, history: s.history.slice(0, -1) }
 }
 
+/** Where Back lands (WP-34): the entry before the last tap, and whether that tap changed
+ *  the order (Back then puts the order back first). Null when there is nothing to undo. */
+export function backTarget(s: TrainingState): { step: FlowStep; reordered: boolean } | null {
+  const last = s.history[s.history.length - 1]
+  if (!last) return null
+  const steps = last.steps ?? s.plan.steps
+  const step = steps[last.step]
+  if (!step) return null
+  const order = (list: FlowStep[]) => list.map((st) => st.ex_idx).join(',')
+  return { step, reordered: !!last.steps && order(last.steps) !== order(s.plan.steps) }
+}
+
 /** The order the exercises run in now: each exercise's index, by its first entry in the
  *  steps (the engine's walk, with any group moved since, WP-27). */
 export function exerciseOrder(s: TrainingState): number[] {
@@ -370,10 +401,22 @@ export function doFirst(s: TrainingState, group: number): TrainingState {
   return { ...s, history: remember(s), plan: { ...s.plan, steps: next }, timer: null, notice: null }
 }
 
-/** Change one side's numbers (reps, weight or held seconds). The other side keeps its own. */
+/** Change one side's numbers (reps, weight or held seconds). On a one-side exercise a
+ *  change to the first side's reps or weight carries to the second side until the second
+ *  side is changed by hand (WP-30); held seconds are each side's own reading. */
 export function setSide(s: TrainingState, exIdx: number, side: Side, patch: Partial<SideValues>): TrainingState {
   const live = s.live[exIdx]
   const next: Live = { ...live, [side]: { ...live[side], ...patch } }
+  const target: Partial<SideValues> = {
+    ...('reps' in patch ? { reps: patch.reps } : {}),
+    ...('weight_kg' in patch ? { weight_kg: patch.weight_kg } : {}),
+  }
+  if (s.plan.exercises[exIdx]?.laterality === 'unilateral' && Object.keys(target).length) {
+    const first = s.plan.first_side as Side
+    const second: Side = first === 'right' ? 'left' : 'right'
+    if (side === second) next.secondByHand = true
+    else if (!live.secondByHand) next[second] = { ...live[second], ...target }
+  }
   return { ...s, live: { ...s.live, [exIdx]: next } }
 }
 
@@ -389,6 +432,33 @@ export function setRecordedSide(s: TrainingState, exIdx: number, setNum: number,
 
 export function setBand(s: TrainingState, exIdx: number, band: string): TrainingState {
   return { ...s, live: { ...s.live, [exIdx]: { ...s.live[exIdx], band_tier: band } } }
+}
+
+/** Change a retest entry's typed reading (WP-33). */
+export function setReading(s: TrainingState, exIdx: number, patch: Partial<Typed>): TrainingState {
+  const was = s.readings[exIdx] ?? { values: {}, setup_value: null, load_kg: null }
+  const next: Typed = { ...was, ...patch, values: { ...was.values, ...(patch.values ?? {}) } }
+  return { ...s, readings: { ...s.readings, [exIdx]: next } }
+}
+
+/** Every side of a retest entry has its value typed. */
+export function readingComplete(s: TrainingState, ex: Exercise): boolean {
+  const typed = s.readings[ex.index]
+  return !!ex.reading && ex.reading.sides.every((side) => typeof typed?.values[side] === 'number')
+}
+
+/** The readings typed so far, as the engine reads them (POST /api/training/flexibility-check). */
+export function typedReadings(s: TrainingState): Schemas['ReadingIn'][] {
+  return s.plan.exercises.filter((ex) => ex.reading && s.readings[ex.index])
+    .map((ex) => ({ test_key: ex.reading!.test_key, ...s.readings[ex.index] }))
+}
+
+/** The battery has its answer (WP-33): skip the retest's entries left, up to the first
+ *  entry that is not one, with a line for the next screen. */
+export function skipRestOfRetest(s: TrainingState, notice: string): TrainingState {
+  let x = s
+  while (!finished(x) && exerciseOf(x)?.reading) x = skip(x)
+  return x === s ? s : { ...x, notice }
 }
 
 export function setNote(s: TrainingState, exIdx: number, note: string): TrainingState {
@@ -451,6 +521,8 @@ export function saveBody(s: TrainingState, minutes: number, rpe: number, notes: 
         // The watch's minutes for a walk or run, when it had them (T75).
         garmin_minutes: pulled(s, ex.index)?.minutes ?? null,
         garmin_detail: pulled(s, ex.index)?.detail ?? null,
+        // A test of the flexibility retest: its reading (WP-33).
+        reading: ex.reading && s.readings[ex.index] ? { test_key: ex.reading.test_key, ...s.readings[ex.index] } : null,
       }
     }),
   }

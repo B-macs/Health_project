@@ -2024,6 +2024,41 @@ def is_measurement(name: str) -> bool:
     return any(tag in (name or "") for tag in ("(Test)", "(Timed Test)", "(Timed)", "(Trial)"))
 
 
+# ─── A test is one reading per entry (WP-33) ────────────────────────────────
+#
+# The athlete, 2026-10-26: "Always split a retest into its individual items;
+# never add it to the training block as a single combined item. Make this a
+# mandatory validation gate before a retest can be added to the training
+# block." The 12-week block's flexibility retest was one 20-minute entry that
+# sent him to Insights for its readings, which could only be reached by
+# leaving the session and losing it; the rib and pelvis test was four checks
+# under one 10-minute timer, read into a note. A test entry is now ONE
+# reading: a timed line held until it breaks (the stopwatch asks for the
+# seconds), or one test of the flexibility battery (`battery_test`, its
+# reading typed on the session screen). tests/test_measurement_entries.py runs
+# this over every plan from MEASUREMENT_SPLIT_FROM_PHASE on.
+
+#: The first phase whose test entries must each be one reading: the 12-week block.
+MEASUREMENT_SPLIT_FROM_PHASE = 5
+
+
+def measurement_violations(day: dict) -> list[str]:
+    """Why a day's test entries are not one reading each; empty when they are."""
+    out: list[str] = []
+    for ex in day.get("exercises") or []:
+        name = ex.get("name", "")
+        if not is_measurement(name):
+            continue
+        if is_timed_test(ex):
+            continue
+        key = ex.get("battery_test")
+        if isinstance(key, str) and key and int(ex.get("sets") or 1) == 1:
+            continue
+        out.append(f"{name} is a test that is not one reading: split it into its own "
+                   f"entries, one reading each")
+    return out
+
+
 #: A session whose clock time runs past this multiple of its modelled time is
 #: asked about before it saves (2026-10-13). 2026-09-16 was left open after a
 #: walk and logged 189 minutes — 378 AU against a real ~90, four times the load.

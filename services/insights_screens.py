@@ -19,6 +19,7 @@ from dataclasses import asdict, is_dataclass
 from datetime import date
 
 from services import ai
+from services import body_composition
 from services import dashboard as dash
 from services import decision, engine, insights, metabolism_screen, processing_queue
 from services import sessions as sess
@@ -140,6 +141,7 @@ def strength(repo, today: date, metric: str = DEFAULT_STRENGTH_METRIC) -> dict:
         "trend": strength_screen.trend(data),
         "trend_axis": dict(zip(("lo", "hi"), strength_screen.score_axis(data["score_series"]))),
         "areas": strength_screen.area_rows(data["regions"], data.get("core_hold")),
+        "lifts": strength_screen.lift_rows(data["exercises"]),
         "volume": strength_screen.volume(data["tonnage"]),
     }
 
@@ -195,7 +197,17 @@ def metabolism(repo, today: date, metric: str = "Weight", kind: str = "all",
             "device": cell["device"], "days_old": cell["days_old"], "date": cell["scan"].day,
             "phase_angle_deg": cell["scan"].phase_angle_deg, "ecw_tbw": cell["scan"].ecw_tbw},
         "analysis": metabolism_screen.analysis(latest),
+        # The SECA's own section and the tile's newest weight (WP-37).
+        "seca": metabolism_screen.seca(data["seca"], today),
+        "headline": metabolism_screen.headline(readings, data["seca"]),
     }
+
+
+def import_seca(repo, today: date, text: str) -> dict:
+    """Store a SECA export (body_composition.parse_seca_csv; ValueError when it
+    is not one) and answer the Metabolism screen with it."""
+    repo.save_seca_scan(body_composition.parse_seca_csv(text))
+    return metabolism(repo, today)
 
 
 # ─── Engine Data ─────────────────────────────────────────────────────────────

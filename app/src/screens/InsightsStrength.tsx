@@ -85,6 +85,28 @@ function Areas({ d, reduced }: { d: StrengthAnswer; reduced: boolean }) {
   )
 }
 
+/** Each lift against its own 2025 best (WP-38): its latest best set, both one-rep maxes
+ *  and how close the two lifts are. Every figure is the engine's. */
+function Lifts({ d }: { d: StrengthAnswer }) {
+  const lifts = d.lifts ?? []
+  return (
+    <section className="card group" aria-label={S.ins.lifts} data-testid="lifts">
+      <h2 className="eyebrow">{S.ins.lifts}</h2>
+      {lifts.length === 0 && <p className="caption">{S.ins.liftsNone}</p>}
+      <ul className="list">
+        {lifts.map((l) => (
+          <li key={l.name} className="group" data-match={l.match}>
+            <span className="kv"><span>{l.name}</span><span className="num">{S.ins.pct(l.pct_of_2025)}</span></span>
+            <span className="caption">{S.ins.liftLine(l.weight_kg, l.reps, shortDate(l.date), l.one_rm_kg, l.one_rm_2025_kg)}</span>
+            <span className="caption">{S.ins.liftMatch[l.match] ?? ''}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="caption">{S.ins.liftsHow}</p>
+    </section>
+  )
+}
+
 /** The training volume (I8, I10, I11): the last full week against the one before, this
  *  week so far, the weeks by body area, and the work not counted in kilograms. */
 function Volume({ v }: { v: Schemas['VolumeOut'] }) {
@@ -182,6 +204,7 @@ export function StrengthBody({ view, reduced }: { view: View<StrengthAnswer>; re
           {d.load_error && <p className="alert" data-testid="load-error">{S.ins.loadError(d.load_error)}</p>}
           <Trend d={d} />
           <Areas d={d} reduced={reduced} />
+          <Lifts d={d} />
           {d.volume && <Volume v={d.volume} />}
           <Imbalances d={d} />
         </>

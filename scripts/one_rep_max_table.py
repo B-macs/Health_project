@@ -16,10 +16,10 @@ session's effort rating as reps left on every set.
 - This year: every working set in the store. A ramp set does not count. A lift in
   machine units (a cable stack) is listed apart, because a unit is not a kilogram.
   On a one-side lift the stronger side counts.
-- Both years use one estimate, Epley on the reps done: weight x (1 + reps / 30), and
-  one rep is the weight itself. It assumes each set went to failure; a set that
-  stopped short gives a lower estimate, in either year. Past about 10 reps the
-  estimate gets rough, and the table marks those with *.
+- Both years use the Strength page's own estimate (services/strength.py, WP-38):
+  Epley with the one rep left the 2025 best is given, weight x (1 + (reps + 1) / 30),
+  for every set of both years. Past about 10 reps the estimate gets rough, and the
+  table marks those with *.
 
 The pairs below say which 2025 lift each current lift is set against and how close
 the match is. A machine's stack weight does not convert to dumbbells or a barbell,
@@ -72,9 +72,15 @@ class Best(NamedTuple):
     one_rm: float
 
 
+#: The reps left every set is given, both years (strength_baselines.PR_RIR).
+REPS_LEFT = 1.0
+
+
 def epley(weight: float, reps: int) -> float:
-    """The estimated one-rep max: weight x (1 + reps / 30); one rep is the weight."""
-    return float(weight) if reps <= 1 else float(weight) * (1.0 + reps / 30.0)
+    """The estimated one-rep max as the Strength page works it out (services/strength.py,
+    estimated_1rm with the 2025 best's reps left): weight x (1 + (reps + 1) / 30)."""
+    from services import strength
+    return strength.estimated_1rm(float(weight), float(reps), 10.0 - REPS_LEFT)[0]
 
 
 _PR_LINE = re.compile(r"^\s*-\s*\*\*(?P<name>[^*]+?):?\*\*:?\s*(?P<rest>.+)$")
@@ -178,7 +184,8 @@ def report(prs: list[Best], year: dict[str, Best], recent: dict[str, Best],
         lines.append(f"{old:18s} {then.one_rm:6.1f} {new:28s} {b.one_rm:6.1f} "
                      f"{b.one_rm / then.one_rm * 100:4.0f}% {now}  {close}")
     lines += ["", "* more than 10 reps: the estimate is rough.",
-              "Est. 1RM: weight x (1 + reps / 30), the same way for both years."]
+              "Est. 1RM: weight x (1 + (reps + 1) / 30), the same way for both years,",
+              "as the Strength page works it out."]
     return "\n".join(lines)
 
 
