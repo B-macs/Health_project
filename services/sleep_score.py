@@ -1,55 +1,62 @@
 """
-services/sleep_score.py — Deterministic Sleep Score, our own composite
-mirroring Oura's 7 real contributors (see services/repository.py's
-_oura_daily_row: total_sleep, efficiency, restfulness, rem_sleep,
-deep_sleep, latency, timing) — computed from the raw sleep-architecture
-data Oura already reports (services/models.py's oura_sleep_* fields), not
-from Oura's own pre-computed score or contributor sub-scores. Same
-philosophy as services/readiness.py::compute_readiness: build our own
-0-100 composite from raw values rather than relaying a third party's
-finished number.
+services/sleep_score.py — Deterministic Sleep Score: Oura's own seven sleep
+contributors (each 0-100, from Oura's daily sleep summary — total_sleep,
+efficiency, restfulness, rem_sleep, deep_sleep, latency, timing; see
+services/repository.py's _oura_readiness_contributors_by_date) combined with
+this project's weights. The same shape as services/readiness.py since its
+MODEL_VERSION 2: Oura scores each part against its own norms, this project
+decides what each part is worth.
 
-ONE EXCEPTION SINCE MODEL_VERSION 2 (2026-10-13): Restfulness is Oura's own
-0-100 Restfulness contributor. The raw restless-period count it replaces runs
-at a median of 46.7 per hour, and this project's band for it (2-12 per hour)
-scored 0 on 426 of 427 ring nights — a fixed 10% handicap carrying nothing.
-The athlete chose Oura's own reading (option A of
-docs/restfulness_and_watch_movement_2026-10-13.md) over a re-guessed band:
-Oura made both the count and the score, so its scale is the only one known
-to fit. readiness.py already scores from Oura's contributors the same way.
+MODEL_VERSION 3 (2026-10-27, the athlete's choice of three measured options:
+"rebuild the Sleep score on Oura's seven sleep parts with our weights, keep the
+watch correction out of the score"). Version 2 scored the parts itself from the
+raw night and read a short night far above both devices: 2026-10-27 read 91
+against Oura's 63 and Garmin's 62, and over the 55 stored nights from
+2026-08-28 it read 11 points above Oura on average (up to 23) and 25 above
+Garmin; Oura scored 25 of those nights under 70, version 2 only 9. Three
+causes, measured that morning:
+  - Total Sleep was scored against his own 56-night average (6.9 h), where Oura
+    scores against a fixed adult target: 5.85 h read 85 against Oura's 56.
+  - REM and Deep were scored as a SHARE of the night, so a short night of normal
+    proportions read 94 and 100 against Oura's 62 and 61; Efficiency was the
+    plain percent (73 against Oura's 55).
+  - The wake-time correction (the watch fusion's phantom wake, or the manual
+    stepper) was added to Total Sleep and Efficiency: that night's 58 min moved
+    85 to 91, and it lifted 23 of the 30 nights before it, by 1.7 on average.
+NO CORRECTION REACHES THE SCORE NOW. Oura's parts are Oura's reading of its own
+night, and a correction cannot be applied to a part Oura already scored. The
+correction stays on the Sleep screen's night figures
+(dashboard.sleep_night_figures), which say so.
 
-All 7 contributors are Oura-exclusive (no Garmin equivalent — same
-situation as readiness.py's oura_recovery_index trio), sourced from the
-*main* sleep period Oura reports (services.biometrics.pick_main_sleep_period
-already picked it out, before this data reaches here). The whole score is
-NOT_COMPUTED on any day Oura has no sleep-period reading.
+MEASURED 2026-10-27 against Oura's own Sleep Score, on the 112 nights from
+2026-07-01 to 2026-10-27 that carry one: r = 0.982, mean difference -0.8, sd
+1.9, every night within 5 points (largest 4.5). 2026-10-27 reads 62.4 against
+Oura's 63. Oura scored 26 of the 56 nights from 2026-08-28 under 70, and
+version 3 reads all 26 under 70 (version 2: 9). The weights are this
+project's, so the two still differ by a point or two where the parts disagree.
 
-Weights and band thresholds below are this project's own reasoned
-defaults, not published Oura constants — Oura doesn't disclose their exact
-algorithm. Each is called out so they're easy to recalibrate later against
-real logged nights, same spirit as the Garmin HRV field-shape caveat in
-services/repository.py::_garmin_daily_row.
+Earlier versions: 2 (2026-10-13) changed Restfulness alone to Oura's own
+contributor, because the raw restless-period band of version 1 scored 0 on 426
+of 427 nights (docs/restfulness_and_watch_movement_2026-10-13.md). Version 1
+built all seven parts from the raw night. Every model change ships with a
+re-derive of every stored row (MODEL_VERSION).
 
-Weights
+Weights (this project's; Oura does not publish its own)
 -------
-Total Sleep   25%   blended sleep_duration_hours vs personal baseline (capped at 100)
-Efficiency    20%   Oura's own raw efficiency reading (already 0-100), used directly
-REM Sleep     15%   rem seconds as % of total sleep, ramped over an ideal band
-Deep Sleep    15%   deep seconds as % of total sleep, ramped over an ideal band
-Restfulness   10%   Oura's own Restfulness contributor, 0-100 (MODEL_VERSION 2;
-                    version 1 inverted restless periods per hour — see below)
-Latency       10%   seconds to fall asleep, banded (too fast or too slow both penalised)
-Timing         5%   bedtime deviation from your own rolling-average bedtime
+Total Sleep   25%
+Efficiency    20%
+REM Sleep     15%
+Deep Sleep    15%
+Restfulness   10%
+Latency       10%
+Timing         5%
 
-Restfulness, version 1 (until 2026-10-13): restless periods per hour of
-sleep, inverted over a band of 2-12 per hour, whose unit the docstring always
-flagged as an unverified guess. MEASURED 2026-10-13, THE GUESS WAS WRONG: the
-input runs at a median of 46.7 per hour (427 ring nights since 2023, range
-3.6-120), so the band scored 0 on 426 of 427 nights. The athlete chose
-option A (Oura's own contributor) from the four measured in
-docs/restfulness_and_watch_movement_2026-10-13.md; the band is gone, and
-scripts/compare_restfulness_sources.py keeps a copy of it to re-measure.
-The change ships with a re-derive of every stored row (MODEL_VERSION).
+NO RING, NO SCORE: a night the ring did not record is NOT_COMPUTED (WP-11). A
+part Oura did not report is missing, and its weight renormalises away.
+
+The breakdown still carries each part's RAW reading from Oura's own night
+(hours asleep, efficiency %, REM/deep share, minutes to sleep, minutes off the
+usual bedtime) for the screen's right-hand value. Nothing scores from it.
 """
 
 from __future__ import annotations
@@ -62,19 +69,14 @@ NOT_COMPUTED = readiness.NOT_COMPUTED
 
 _BEDTIME_WINDOWS = (7, 14, 28, 56)   # same progressive schedule as sleep_baseline
 
-# (x, y) knots, piecewise-linear, clamped to the nearest endpoint outside range.
-_REM_PCT_BAND  = ((10.0, 0.0), (22.0, 100.0))               # % of total sleep
-_DEEP_PCT_BAND = ((5.0, 0.0), (15.0, 100.0))                # % of total sleep
-_LATENCY_BAND  = ((0.0, 0.0), (10.0, 100.0), (20.0, 100.0), (45.0, 0.0))  # minutes
-_TIMING_BAND   = ((30.0, 100.0), (180.0, 0.0))              # minutes deviation from your average bedtime
-
-#: Which Sleep Score model produced a number. 2 (2026-10-13): Restfulness is
-#: Oura's own contributor instead of a band over restless periods per hour.
-#: Not stored per row — the Supabase metrics_history table has no version
-#: column (readiness's stamp reaches only the frozen Sheets copy) — so a
-#: change of model ships with a re-derive of EVERY stored row, which keeps the
-#: stored series one version throughout.
-MODEL_VERSION = 2
+#: Which Sleep Score model produced a number. 3 (2026-10-27): every part is
+#: Oura's own contributor and no wake-time correction reaches the score. 2
+#: (2026-10-13): Restfulness alone was Oura's. Not stored per row — the
+#: Supabase metrics_history table has no version column (readiness's stamp
+#: reaches only the frozen Sheets copy) — so a change of model ships with a
+#: re-derive of EVERY stored row, which keeps the stored series one version
+#: throughout.
+MODEL_VERSION = 3
 
 _WEIGHTS = {
     "total_sleep": 0.25,
@@ -84,6 +86,17 @@ _WEIGHTS = {
     "restfulness": 0.10,
     "latency":     0.10,
     "timing":      0.05,
+}
+
+#: Each part -> the BiometricRecord field holding Oura's own 0-100 contributor.
+OURA_PARTS = {
+    "total_sleep": "oura_sleep_total_sleep_score",
+    "efficiency":  "oura_sleep_efficiency_score",
+    "restfulness": "oura_sleep_restfulness",
+    "rem":         "oura_sleep_rem_score",
+    "deep":        "oura_sleep_deep_score",
+    "latency":     "oura_sleep_latency_score",
+    "timing":      "oura_sleep_timing_score",
 }
 
 # Display order for the breakdown — Oura's own ordering on its sleep screen,
@@ -106,7 +119,9 @@ CONTRIBUTOR_LABELS = {
 
 def _interp(value: float, points: tuple[tuple[float, float], ...]) -> float:
     """Piecewise-linear interpolation over sorted (x, y) knots; clamps to
-    the nearest endpoint's y outside the knots' x-range."""
+    the nearest endpoint's y outside the knots' x-range. No part scores with
+    it since MODEL_VERSION 3; scripts/compare_restfulness_sources.py still
+    re-runs version 1's restfulness band with it."""
     if value <= points[0][0]:
         return points[0][1]
     if value >= points[-1][0]:
@@ -137,7 +152,8 @@ def bedtime_baseline(rows: list[dict]) -> tuple[float | None, int]:
     """Progressive personal bedtime baseline (minutes since noon — see
     _bedtime_minutes_since_noon), same 7->14->28->56-night schedule as
     services.readiness.sleep_baseline. Returns (baseline_minutes,
-    window_nights_used) — (None, 0) when insufficient data."""
+    window_nights_used) — (None, 0) when insufficient data. Feeds the Timing
+    row's "minutes off usual", not the score."""
     clean = [
         m for r in rows
         for m in [_bedtime_minutes_since_noon(r.get("oura_sleep_bedtime_start"))]
@@ -153,31 +169,20 @@ def bedtime_baseline(rows: list[dict]) -> tuple[float | None, int]:
 def compute_sleep_score(
     for_date: date | None = None,
     bio_rows: list[dict] | None = None,
-    wake_time_adjustments: dict[str, float] | None = None,
 ) -> float | str:
     """
-    Compute a 0-100 Sleep Score for for_date — see module docstring for the
-    7-contributor design.
+    Compute a 0-100 Sleep Score for for_date: the weighted mean of Oura's
+    seven sleep contributors on that night (see the module docstring).
 
-    wake_time_adjustments: {ISO date string: minutes to subtract from
-    recorded awake time}, keyed the same way as CLAUDE.md rule 4's narrow
-    manual-entry exception (services.repository.get_wake_time_adjustment /
-    get_wake_time_adjustments) — a per-night correction for Oura's known
-    wake-time-overestimation pattern. Kept as a plain dict param (not a
-    repository read) so this function stays pure/testable. None (the
-    default) or no entry for for_date's own date behaves identically to
-    never having this parameter at all. When an entry does exist, it's
-    floored at the date's own raw oura_sleep_awake_seconds so it can never
-    subtract more awake-time than was actually recorded, and only ever
-    affects for_date's own row — never the historical rows baselines are
-    computed from.
+    No wake-time correction is a parameter any more (MODEL_VERSION 3): the
+    correction belongs to the night figures, never to the score.
 
     Returns:
         float        — sleep score 0-100
-        NOT_COMPUTED — no contributor could be computed for this day
-                       (no Oura sleep-period reading)
+        NOT_COMPUTED — the ring did not record the night, or Oura reported
+                       none of the seven parts
     """
-    scored = _contributor_scores(for_date, bio_rows, wake_time_adjustments)
+    scored = _contributor_scores(for_date, bio_rows)
     if scored is None:
         return NOT_COMPUTED
     return _composite([
@@ -203,12 +208,13 @@ def _composite(available: list[tuple[float, float]]) -> float | str:
     return round(weighted_sum, 1)
 
 
-#: The ring's own sleep-period readings. A row with none of them is a night the
-#: ring did not record, whatever the watch saw.
+#: The ring's own readings of the night: the sleep period's raw fields, or
+#: Oura's own parts. A row with none of them is a night the ring did not
+#: record, whatever the watch saw.
 _RING_SLEEP_FIELDS = (
     "oura_sleep_total_seconds", "oura_sleep_efficiency", "oura_sleep_rem_seconds",
     "oura_sleep_deep_seconds", "oura_sleep_restless_periods", "oura_sleep_latency_seconds",
-)
+) + tuple(OURA_PARTS.values())
 
 
 def _has_ring_reading(row: dict | None) -> bool:
@@ -218,11 +224,9 @@ def _has_ring_reading(row: dict | None) -> bool:
 def _contributor_scores(
     for_date: date | None,
     bio_rows: list[dict] | None,
-    wake_time_adjustments: dict[str, float] | None,
 ) -> dict | None:
-    """Every sub-score, plus the raw value and baseline each was scored
-    against. None when there is no usable row at all — the two cases that
-    previously returned NOT_COMPUTED before any contributor was computed.
+    """Every part's score (Oura's own), plus the raw reading the screen shows
+    beside it. None when there is no usable row at all.
 
     Split out of compute_sleep_score so sleep_score_breakdown can show the
     seven contributors without that function's public float changing.
@@ -238,13 +242,9 @@ def _contributor_scores(
 
     today_row = next((r for r in rows_to_date if r["date"] == date_str), None)
 
-    # NO RING, NO SCORE (2026-10-13, the athlete's approval of WP-11). On a
-    # night only the watch recorded, Total Sleep was the one input left — from
-    # Garmin's duration, which reads about an hour longer than Oura's — and the
-    # six missing inputs' weights moved onto it, so a long watch-only night
-    # scored 100 (2026-08-16, during the Oura outage). The module docstring
-    # always said a night with no Oura sleep period is NOT_COMPUTED; this makes
-    # it true. The watch-only night still shows its timeline on the Sleep screen.
+    # NO RING, NO SCORE (2026-10-13, the athlete's approval of WP-11). A night
+    # only the watch recorded has no Oura part to score; the Sleep screen keeps
+    # its timeline and says there is no score.
     if not _has_ring_reading(today_row):
         return None
 
@@ -253,89 +253,40 @@ def _contributor_scores(
             return None
         return float(today_row[key])
 
-    # ── Wake-time adjustment — CLAUDE.md rule 4's narrow manual-entry
-    #    exception, correcting Oura's known wake-time-overestimation
-    #    pattern. Floored at the date's own raw awake seconds so it can
-    #    never subtract more awake-time than was actually recorded. Stays
-    #    0.0 (no-op) whenever wake_time_adjustments is None or has no entry
-    #    for date_str — the default, and every pre-existing caller/test —
-    #    so this is 100% behavior-preserving in that case. ─────────────────
-    adjustment_seconds = 0.0
-    if wake_time_adjustments and today_row is not None and date_str in wake_time_adjustments:
-        adjustment_seconds = min(
-            wake_time_adjustments[date_str] * 60,
-            today_row.get("oura_sleep_awake_seconds") or 0,
-        )
+    def _part(key):
+        """Oura's own 0-100 reading for one part, kept inside 0-100."""
+        value = _get(OURA_PARTS[key])
+        return None if value is None else max(0.0, min(100.0, value))
 
-    # ── Total Sleep — blended hours vs personal baseline, capped ─────────────
-    sleep_base, _win = readiness.sleep_baseline(rows_to_date)
-    today_sleep = _get("sleep_duration_hours")
-    if adjustment_seconds and today_sleep is not None:
-        today_sleep = today_sleep + adjustment_seconds / 3600.0
-    total_sleep_s = (
-        min(100.0, (today_sleep / sleep_base) * 100.0)
-        if today_sleep is not None and sleep_base and sleep_base > 0
-        else None
-    )
-
-    # ── Efficiency — Oura's own raw reading, already 0-100. When a
-    #    wake-time adjustment applies, scaled by the same effective-total-
-    #    sleep-seconds ratio as Total Sleep above: efficiency = sleep-time /
-    #    time-in-bed, so a proportional increase in sleep seconds (time in
-    #    bed held fixed) scales efficiency by that same ratio. ───────────────
-    efficiency_raw = _get("oura_sleep_efficiency")
-    raw_total_seconds = _get("oura_sleep_total_seconds")
-    if adjustment_seconds and efficiency_raw is not None and raw_total_seconds:
-        effective_total_seconds = raw_total_seconds + adjustment_seconds
-        efficiency_raw = efficiency_raw * (effective_total_seconds / raw_total_seconds)
-    efficiency_s = None if efficiency_raw is None else max(0.0, min(100.0, efficiency_raw))
-
-    # ── REM / Deep — % of Oura's own total sleep, ramped over an ideal band ──
-    total_s   = _get("oura_sleep_total_seconds")
-    rem_raw   = _get("oura_sleep_rem_seconds")
-    deep_raw  = _get("oura_sleep_deep_seconds")
-    rem_s  = _interp(rem_raw / total_s * 100.0, _REM_PCT_BAND) if rem_raw is not None and total_s else None
-    deep_s = _interp(deep_raw / total_s * 100.0, _DEEP_PCT_BAND) if deep_raw is not None and total_s else None
-
-    # ── Restfulness — Oura's own Restfulness contributor (MODEL_VERSION 2) ───
-    #  The restless-period count stays as the row's raw value, for the record;
-    #  it no longer scores (see the module docstring). No contributor, no
-    #  score: the part is missing and its weight renormalises away.
-    restless_raw = _get("oura_sleep_restless_periods")
-    restfulness_s = _get("oura_sleep_restfulness")
-    if restfulness_s is not None:
-        restfulness_s = max(0.0, min(100.0, restfulness_s))
-
-    # ── Latency — minutes to fall asleep, banded both sides ──────────────────
+    # The raw readings of Oura's own night, for the screen only — the
+    # uncorrected night the parts were scored on.
+    total_s = _get("oura_sleep_total_seconds")
+    rem_raw = _get("oura_sleep_rem_seconds")
+    deep_raw = _get("oura_sleep_deep_seconds")
     latency_raw = _get("oura_sleep_latency_seconds")
-    latency_s = _interp(latency_raw / 60.0, _LATENCY_BAND) if latency_raw is not None else None
-
-    # ── Timing — bedtime deviation from your own rolling-average bedtime ─────
-    bedtime_base, _bwin = bedtime_baseline(rows_to_date)
-    today_bedtime = _bedtime_minutes_since_noon(today_row.get("oura_sleep_bedtime_start") if today_row else None)
-    timing_s = (
-        _interp(abs(today_bedtime - bedtime_base), _TIMING_BAND)
-        if today_bedtime is not None and bedtime_base is not None else None
-    )
-
-    # raw = the value the sub-score was computed FROM, in the unit the UI
-    # shows. reference = what it was compared against, where the sub-score is
-    # relative rather than absolute. Both carried so the UI never recomputes.
+    restless_raw = _get("oura_sleep_restless_periods")
     rem_pct = rem_raw / total_s * 100.0 if rem_raw is not None and total_s else None
     deep_pct = deep_raw / total_s * 100.0 if deep_raw is not None and total_s else None
+    bedtime_base, bed_window = bedtime_baseline(rows_to_date)
+    today_bedtime = _bedtime_minutes_since_noon(today_row.get("oura_sleep_bedtime_start"))
+    off_usual = (abs(today_bedtime - bedtime_base)
+                 if today_bedtime is not None and bedtime_base is not None else None)
+
+    # (score, raw, reference, reference_window): reference is what a raw
+    # reading is shown against, where it has one.
     built = {
-        "total_sleep": (total_sleep_s, today_sleep, sleep_base, _win),
-        "efficiency":  (efficiency_s, efficiency_raw, None, 0),
-        "restfulness": (restfulness_s,
+        "total_sleep": (_part("total_sleep"), total_s / 3600.0 if total_s else None, None, 0),
+        "efficiency":  (_part("efficiency"), _get("oura_sleep_efficiency"), None, 0),
+        "restfulness": (_part("restfulness"),
                         restless_raw / (total_s / 3600.0)
                         if restless_raw is not None and total_s else None, None, 0),
-        "rem":         (rem_s, rem_pct, None, 0),
-        "deep":        (deep_s, deep_pct, None, 0),
-        "latency":     (latency_s, latency_raw / 60.0 if latency_raw is not None else None, None, 0),
-        "timing":      (timing_s,
-                        abs(today_bedtime - bedtime_base)
-                        if today_bedtime is not None and bedtime_base is not None else None,
-                        bedtime_base, _bwin),
+        "rem":         (_part("rem"), rem_pct, None, 0),
+        "deep":        (_part("deep"), deep_pct, None, 0),
+        "latency":     (_part("latency"),
+                        latency_raw / 60.0 if latency_raw is not None else None, None, 0),
+        "timing":      (_part("timing"), off_usual,
+                        bedtime_base if off_usual is not None else None,
+                        bed_window if off_usual is not None else 0),
     }
     if all(v[0] is None for v in built.values()):
         return None
@@ -352,17 +303,12 @@ def _contributor_scores(
         }
         for key in CONTRIBUTOR_ORDER
     }
-    return {
-        "contributors": contributors,
-        "wake_adjustment_minutes": adjustment_seconds / 60.0,
-        "total_seconds": total_s,
-    }
+    return {"contributors": contributors, "total_seconds": total_s}
 
 
 def sleep_score_breakdown(
     for_date: date | None = None,
     bio_rows: list[dict] | None = None,
-    wake_time_adjustments: dict[str, float] | None = None,
 ) -> dict:
     """The composite plus the seven sub-scores that produced it.
 
@@ -382,7 +328,7 @@ def sleep_score_breakdown(
     composite is rounded once, the parts are not), so present it as a
     contribution, never as exact arithmetic.
     """
-    scored = _contributor_scores(for_date, bio_rows, wake_time_adjustments)
+    scored = _contributor_scores(for_date, bio_rows)
     if scored is None:
         return {
             "score": NOT_COMPUTED,
@@ -394,7 +340,6 @@ def sleep_score_breakdown(
             ],
             "available_weight": 0.0,
             "missing": list(CONTRIBUTOR_ORDER),
-            "wake_adjustment_minutes": 0.0,
         }
 
     by_key = scored["contributors"]
@@ -417,7 +362,6 @@ def sleep_score_breakdown(
         "contributors": contributors,
         "available_weight": round(sum(w for _, w in available), 4),
         "missing": [c["key"] for c in contributors if c["score"] is None],
-        "wake_adjustment_minutes": scored["wake_adjustment_minutes"],
         # Lets a formatter turn REM/deep's percentage back into a duration
         # ("1h 24m, 23 %") without re-reading the row and risking a different
         # rounding than the one the score used.

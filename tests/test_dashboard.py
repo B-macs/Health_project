@@ -173,16 +173,20 @@ def test_sleep_meta_none_score():
     assert val == "--"
 
 
-def test_sleep_meta_optimal_tier_with_baseline_window():
+def test_sleep_meta_optimal_tier():
     _, val, lbl, _, desc = dashboard.sleep_meta(90, 7.8, 28)
     assert lbl == "Optimal"
     assert val == "90"
-    assert "28d avg" in desc
+    assert desc.startswith("Sleep score 90/100")
 
 
-def test_sleep_meta_no_baseline_window_uses_target_copy():
-    _, _, _, _, desc = dashboard.sleep_meta(90, 8.0, None)
-    assert "target" in desc
+def test_sleep_meta_names_no_personal_baseline_since_oura_scores_every_part():
+    """Sleep Score MODEL_VERSION 3 (2026-10-27): every part is Oura's own
+    reading, so the words no longer say "against your baseline"."""
+    for score in (90, 75, 60):
+        for window in (28, None):
+            _, _, _, _, desc = dashboard.sleep_meta(score, 7.8, window)
+            assert "avg" not in desc and "baseline" not in desc and "target" not in desc
 
 
 # ─── compute_daily_metrics_snapshot ─────────────────────────────────────────
@@ -355,30 +359,68 @@ def test_snapshot_rolling_reference_date_override_shifts_the_rolling_window():
     assert snap["strain_7d"] is None
 
 
-def test_snapshot_wake_time_adjustments_defaults_to_none_and_is_a_passthrough():
-    # None is the default -- must reproduce the exact prior sleep_score
-    # behavior when the caller doesn't pass this at all.
+def test_snapshot_sleep_score_is_oura_s_parts_and_takes_no_wake_correction():
+    """Sleep Score MODEL_VERSION 3 (2026-10-27, the athlete: "keep the watch
+    correction out of the score"): the snapshot, which both the Home card and
+    the stored history use, has no correction parameter at all."""
+    import inspect
+    assert "wake_time_adjustments" not in inspect.signature(
+        dashboard.compute_daily_metrics_snapshot).parameters
     bio_rows = [{"date": f"2026-06-{i+1:02d}", "sleep_duration_hours": 8.0} for i in range(10)] + [
         {"date": "2026-07-20", "sleep_duration_hours": 6.0,
-         "oura_sleep_total_seconds": 21600.0, "oura_sleep_awake_seconds": 1800.0},
+         "oura_sleep_total_seconds": 21600.0, "oura_sleep_awake_seconds": 1800.0,
+         "oura_sleep_total_sleep_score": 70.0},
     ]
-    snap_default = dashboard.compute_daily_metrics_snapshot(date(2026, 7, 20), bio_rows, au_rows=[], stage=1)
-    snap_explicit_none = dashboard.compute_daily_metrics_snapshot(
-        date(2026, 7, 20), bio_rows, au_rows=[], stage=1, wake_time_adjustments=None,
-    )
-    assert snap_default["sleep_score"] == snap_explicit_none["sleep_score"] == 77.8
+    snap = dashboard.compute_daily_metrics_snapshot(date(2026, 7, 20), bio_rows, au_rows=[], stage=1)
+    assert snap["sleep_score"] == 70.0
 
 
-def test_snapshot_wake_time_adjustments_raises_the_sleep_score():
-    bio_rows = [{"date": f"2026-06-{i+1:02d}", "sleep_duration_hours": 8.0} for i in range(10)] + [
-        {"date": "2026-07-20", "sleep_duration_hours": 6.0,
-         "oura_sleep_total_seconds": 21600.0, "oura_sleep_awake_seconds": 1800.0},
-    ]
-    snap = dashboard.compute_daily_metrics_snapshot(
-        date(2026, 7, 20), bio_rows, au_rows=[], stage=1,
-        wake_time_adjustments={"2026-07-20": 30},
-    )
-    assert snap["sleep_score"] == 84.3
+# ─── The correction lands on the night figures (2026-10-27) ─────────────────
+
+_NIGHT = {"total_seconds": 20640.0, "time_in_bed_seconds": 28380.0, "efficiency": 73.0,
+          "awake_seconds": 4260.0, "lowest_heart_rate": 53.0}
+
+
+def test_a_manual_correction_moves_the_night_figures_on_a_night_the_fusion_did_not():
+    """Until 2026-10-27 the stepper corrected the score; the score takes no
+    correction now, so the stepper corrects the night it shows."""
+    plain = dashboard.sleep_night_figures(_NIGHT, None)
+    fixed = dashboard.sleep_night_figures(_NIGHT, None, 30.0)
+    assert fixed["total_seconds"] == plain["total_seconds"] + 1800
+    assert fixed["awake_seconds"] == plain["awake_seconds"] - 1800
+    assert fixed["efficiency"] > plain["efficiency"]
+    assert fixed["time_in_bed_seconds"] == plain["time_in_bed_seconds"]
+    assert fixed["manual_minutes"] == 30.0
+    assert "Wake time corrected: 30 min" in dashboard.sleep_fusion_caption(fixed)
+    assert "Oura's own night" in dashboard.sleep_fusion_caption(fixed)
+
+
+def test_a_manual_correction_never_takes_more_awake_time_than_oura_recorded():
+    fixed = dashboard.sleep_night_figures({**_NIGHT, "awake_seconds": 600.0}, None, 60.0)
+    assert fixed["total_seconds"] == _NIGHT["total_seconds"] + 600
+    assert fixed["awake_seconds"] == 0.0
+    assert fixed["manual_minutes"] == 10.0
+
+
+def test_on_a_fused_night_the_fusion_figure_wins_over_a_manual_value():
+    fused = {"source": "fused", "master_hypnogram": "2222", "phantom_wake_minutes": 58}
+    figs = dashboard.sleep_night_figures(_NIGHT, fused, 30.0)
+    assert figs["total_seconds"] == _NIGHT["total_seconds"] + 58 * 60
+    assert figs["manual_minutes"] == 0.0
+    caption = dashboard.sleep_fusion_caption(figs)
+    assert caption.startswith("Fused with Garmin: 58 min")
+    assert "The score uses Oura's own night." in caption
+    assert "figures the score used" not in caption
+
+
+def test_the_key_metrics_show_the_manually_corrected_night():
+    grid = {m["label"]: m["value"] for m in dashboard.sleep_key_metrics(_NIGHT, None, 30.0)}
+    assert grid["Total sleep"] == dashboard.format_duration(_NIGHT["total_seconds"] + 1800)
+
+
+def test_a_part_scored_without_a_raw_reading_shows_a_dash_not_not_scored():
+    assert dashboard._contributor_value("timing", None, 85.0, None) == "—"
+    assert dashboard._contributor_value("timing", None, None, None) == "not scored"
 
 
 # ─── sleep_fusion_shadow_report (2026-07-31) ────────────────────────────────

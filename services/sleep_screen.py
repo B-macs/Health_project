@@ -192,14 +192,15 @@ def wake_display(day: date, adjustments: dict, window: list[date]) -> dict:
             "nights_adjusted": sum(1 for d in window if adjustments.get(d.isoformat()))}
 
 
-def contributors_caption(coverage_caption: str, breakdown: dict) -> str:
+def contributors_caption(coverage_caption: str, correction_minutes: float) -> str:
     """The caption under the sleep contributors: the coverage line, and when
-    a wake-time correction applied, that Total sleep and Efficiency include
-    it, and so do the figures below (since 2026-08-25 they are the same
-    corrected ones, so the note names the correction and stops there)."""
-    minutes = breakdown.get("wake_adjustment_minutes") or 0
+    the night below carries a wake-time correction, that the score is Oura's
+    own night and the night below counts that much more sleep. Since
+    2026-10-27 (Sleep Score MODEL_VERSION 3) no correction reaches the
+    score; until then Total sleep and Efficiency included it."""
+    minutes = correction_minutes or 0
     if not minutes:
         return coverage_caption
-    note = (f"Total sleep and Efficiency include a {minutes:.0f} min wake-time "
-            f"correction, and so do the figures below.")
+    note = (f"Scored on Oura's own night: the night below counts {minutes:.0f} min "
+            f"more sleep (the wake-time correction).")
     return f"{coverage_caption} {note}".strip()

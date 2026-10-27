@@ -221,3 +221,26 @@ def test_the_readiness_pair_is_always_both_figures_titled():
     assert home.score_pair(56.7, 61.2) == (("DAILY", "57"), ("TREND", "61"))
     assert home.score_pair(None, 61.2) == (("DAILY", "--"), ("TREND", "61"))
     assert home.score_pair(None, None) == (("DAILY", "--"), ("TREND", "--"))
+
+
+# ─── The Readiness card's words on a reduced-load day (2026-10-27) ──────────
+#  2026-10-27 read "Ready to train" above a "Reduced load" badge.
+
+def test_on_a_reduced_load_day_the_readiness_words_follow_the_verdict():
+    verdict = {"reduced": True, "cause": "Sleep 5.8 h, 16% below your 28-day average of 6.9 h."}
+    header, description = home.readiness_words("Ready to train", "A solid session.", verdict)
+    assert header == home.REDUCED_HEADER == "Reduced load today"
+    assert description == ("Sleep 5.8 h, 16% below your 28-day average of 6.9 h. "
+                           + home.REDUCED_DESCRIPTION)
+    assert "Ready to train" not in header + description
+
+
+def test_on_any_other_day_the_band_keeps_its_own_words():
+    for verdict in (None, {"reduced": False, "cause": "Sleep 7.2 h."}):
+        assert home.readiness_words("Ready to train", "A solid session.", verdict) == (
+            "Ready to train", "A solid session.")
+
+
+def test_a_reduced_day_without_a_cause_still_says_the_load_is_held():
+    assert home.readiness_words("Bring it on", "x", {"reduced": True, "cause": ""}) == (
+        home.REDUCED_HEADER, home.REDUCED_DESCRIPTION)

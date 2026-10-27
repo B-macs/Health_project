@@ -1104,7 +1104,7 @@ def _sleep_breakdown() -> dict:
     global _sleep_breakdown_cache
     if _sleep_breakdown_cache is None:
         _sleep_breakdown_cache = sleep_score_model.sleep_score_breakdown(
-            selected_date, _bio_rows, wake_time_adjustments=_wake_adjustments,
+            selected_date, _bio_rows,
         )
     return _sleep_breakdown_cache
 
@@ -1138,10 +1138,12 @@ def _sleep_contributors_block() -> str:
             'earlier night.</span></div>'
         )
     rows = "".join(_contributor_row(r) for r in dash.sleep_breakdown_rows(breakdown))
-    # Total sleep and Efficiency here are the ADJUSTED figures the score was
-    # computed from, and the figures below are the same corrected ones; the
-    # caption names the correction (sleep_screen.contributors_caption).
-    caption = sleep_screen.contributors_caption(dash.sleep_coverage_caption(breakdown), breakdown)
+    # The score is Oura's own night (Sleep Score MODEL_VERSION 3, 2026-10-27);
+    # the figures below carry the wake-time correction, and the caption names
+    # the difference (sleep_screen.contributors_caption).
+    caption = sleep_screen.contributors_caption(
+        dash.sleep_coverage_caption(breakdown),
+        float(_wake_adjustments.get(selected_date.isoformat()) or 0.0))
     return _panel("Contributors", rows, caption)
 
 
@@ -1513,16 +1515,16 @@ def _sleep_night_blocks() -> str:
         # BLANK, or a scored night without a detail row: nothing below the score.
         return ""
 
-    # EVERY FIGURE ON THIS SCREEN IS THE FUSED NIGHT — athlete, 2026-08-25.
-    # The score above already was (a fusion row's phantom_wake_minutes reaches
-    # sleep_score.py as a wake-time adjustment), so this closes a gap rather
-    # than opening one: the panels used to draw Oura's raw scalars under a
-    # score computed on the fused night, with a caption explaining the
-    # difference instead of removing it. Time in bed, heart rate, HRV,
-    # breathing and temperature pass through — fusion merges STAGES and has no
-    # opinion about any of them. See dashboard.sleep_night_figures.
-    figures = dash.sleep_night_figures(detail, fused)
-    out = _key_metric_grid(dash.sleep_key_metrics(detail, fused))
+    # EVERY FIGURE ON THIS SCREEN IS THE CORRECTED NIGHT — athlete, 2026-08-25
+    # (the fused night) — while the score above is Oura's own night since
+    # 2026-10-27 (Sleep Score MODEL_VERSION 3). The stepper's manual correction
+    # lands here too. Time in bed, heart rate, HRV, breathing and temperature
+    # pass through. See dashboard.sleep_night_figures.
+    _key = selected_date.isoformat()
+    manual = (float(_wake_adjustments.get(_key) or 0.0)
+              if _wake_sources.get(_key) == sleep_screen.MANUAL else 0.0)
+    figures = dash.sleep_night_figures(detail, fused, manual)
+    out = _key_metric_grid(dash.sleep_key_metrics(detail, fused, manual))
     fusion_caption = dash.sleep_fusion_caption(figures)
     if fusion_caption:
         out += (f'<div style="font-size:10px;color:#6B7A9B;line-height:1.5;'

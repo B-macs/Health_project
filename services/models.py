@@ -178,6 +178,16 @@ class BiometricRecord:
     # this project guessed (2-12 per hour) scored 0 on 426 of 427 nights.
     # docs/restfulness_and_watch_movement_2026-10-13.md has the measurement.
     oura_sleep_restfulness: float | None = None
+    # Oura's other six sleep CONTRIBUTORS (0-100), from the same daily sleep
+    # summary. Sleep Score MODEL_VERSION 3 (2026-10-27, the athlete's choice)
+    # scores from all seven with this project's weights. Named `_score` because
+    # oura_sleep_efficiency above is the raw percent, a different quantity.
+    oura_sleep_total_sleep_score: float | None = None
+    oura_sleep_efficiency_score: float | None = None
+    oura_sleep_rem_score: float | None = None
+    oura_sleep_deep_score: float | None = None
+    oura_sleep_latency_score: float | None = None
+    oura_sleep_timing_score: float | None = None
     oura_sleep_bedtime_start: str | None = None  # ISO datetime string
     # Raw awake-time seconds from the same main sleep period — feeds the
     # per-night wake-time adjustment (services.repository.get_wake_time_

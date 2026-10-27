@@ -103,7 +103,6 @@ def compute_daily_metrics_snapshot(
     stage: int | None,
     sleep_base_hours: float | None = None,
     rolling_reference_date: date | None = None,
-    wake_time_adjustments: dict[str, float] | None = None,
     hr_rows: list[dict] | None = None,
     walks: dict[str, list[dict]] | None = None,
 ) -> dict:
@@ -133,10 +132,9 @@ def compute_daily_metrics_snapshot(
     run on. A live page that lets the user browse past dates (app.py's
     Home) should pass date.today() explicitly here to preserve that framing.
 
-    wake_time_adjustments: passed straight through to services.sleep_score.
-    compute_sleep_score (see its own docstring) — keyed by ISO date string,
-    minutes to subtract from that date's recorded awake time. None (the
-    default) reproduces the exact prior sleep_score behavior.
+    No wake-time correction is a parameter (Sleep Score MODEL_VERSION 3,
+    2026-10-27): the score is Oura's own seven parts, and a correction belongs
+    to the Sleep screen's night figures, never to a stored number.
 
     stage: the clinical stage, or None when it could not be read. Then no
     strain is scored at all (strain None, source "none") rather than one
@@ -173,7 +171,7 @@ def compute_daily_metrics_snapshot(
     sleep_need = sleep_base_hours if sleep_base_hours else SLEEP_NEED_HOURS_DEFAULT
     sleep_pct = sleep_percent(sleep_hours, sleep_need)
 
-    sleep_score = _sleep_score.compute_sleep_score(d, bio_rows, wake_time_adjustments=wake_time_adjustments)
+    sleep_score = _sleep_score.compute_sleep_score(d, bio_rows)
     if sleep_score == _sleep_score.NOT_COMPUTED:
         sleep_score = None
 
@@ -493,10 +491,10 @@ def compute_region_strain_snapshot(
 
 def sleep_meta(score, sleep_need_hours: float, sleep_base_window: int | None) -> tuple:
     """score: services.sleep_score.compute_sleep_score's 0-100 composite
-    (or None). sleep_need_hours/sleep_base_window are still shown in the
-    description text — they're the Total Sleep contributor's own baseline,
-    not the score's full scale — even though the score itself no longer is
-    a plain percent of that baseline."""
+    (or None). Since MODEL_VERSION 3 (2026-10-27) every part is Oura's own
+    reading, so the words no longer name a personal baseline;
+    sleep_need_hours/sleep_base_window stay in the signature for the callers,
+    and the Sleep Debt still uses that baseline."""
     if score is None:
         return "#555555", "--", "No Readings", "Sleep data missing", \
                "No sleep data available for this day."
@@ -507,15 +505,11 @@ def sleep_meta(score, sleep_need_hours: float, sleep_base_window: int | None) ->
     else:         c, lbl = "#C47878", "Insufficient"
     heads = {"Optimal": "Well rested", "Good": "Adequate rest",
              "Pay Attention": "Sleep deficit", "Insufficient": "Significant deficit"}
-    base_label = (
-        f"{sleep_base_window}d avg ({sleep_need_hours:.1f} h)"
-        if sleep_base_window else f"target ({sleep_need_hours:.0f} h)"
-    )
     descs = {
         "Optimal":       f"Sleep score {s:.0f}/100 — total sleep, efficiency, REM/deep, "
-                          f"restfulness, latency and timing all scored well against your baseline ({base_label}).",
+                          f"restfulness, latency and timing all scored well.",
         "Good":          f"Sleep score {s:.0f}/100. Recovery is solid; check the breakdown for what's holding it back.",
-        "Pay Attention": f"Sleep score {s:.0f}/100. One or more contributors (total sleep vs {base_label}, "
+        "Pay Attention": f"Sleep score {s:.0f}/100. One or more contributors (total sleep, "
                           f"efficiency, sleep stages, latency, timing) is below par.",
         "Insufficient":  f"Sleep score {s:.0f}/100 — critically low. Recovery is impaired.",
     }
@@ -647,7 +641,7 @@ def _contributor_value(key: str, raw, score, total_seconds) -> str:
     would state a fact we can't stand behind.
     """
     if raw is None:
-        return "not scored"
+        return "not scored" if score is None else "—"
     if key == "total_sleep":
         return format_hours(raw) or "—"
     if key == "efficiency":
@@ -956,21 +950,27 @@ def sleep_stage_minutes(detail: dict | None, fused: dict | None) -> dict | None:
     return {k: max(0.0, base[k] / 60.0 + delta[k]) for k in base}
 
 
-def sleep_night_figures(detail: dict | None, fused: dict | None = None) -> dict:
+def sleep_night_figures(detail: dict | None, fused: dict | None = None,
+                        manual_minutes: float = 0.0) -> dict:
     """The night AS PRESENTED — fused where fusion has an opinion, Oura's own
     reading where it has none.
 
     Athlete, 2026-08-25: "I would like all of the data to be presented in the
     sleep part to be fused data."
 
-    THE SCORE WAS ALREADY FUSED AND THE PANELS UNDER IT WERE NOT. A fusion
-    row's `phantom_wake_minutes` reaches services/sleep_score.py as a wake-time
-    adjustment (repository.get_effective_wake_adjustments →
-    sleep_fusion.effective_wake_adjustments), so the Sleep Score's Total Sleep
-    and Efficiency have been computed on the fused night all along, while the
-    key metrics and the stage rows drew Oura's raw scalars — two different
-    totals a few centimetres apart, with a caption explaining the gap instead
-    of closing it. This closes it.
+    THE SCORE IS NOT FUSED ANY MORE (Sleep Score MODEL_VERSION 3, 2026-10-27,
+    the athlete: "keep the watch correction out of the score"). From
+    2026-08-25 to 2026-10-27 the score's Total Sleep and Efficiency used this
+    same corrected night; now the score is Oura's own seven parts of Oura's
+    own night, and the correction lives here only. The contributors caption
+    (sleep_screen.contributors_caption) names the difference in one line.
+
+    THE MANUAL CORRECTION LANDS HERE TOO. `manual_minutes` is the stepper's
+    correction (Key Rule 4's one manual entry), applied on a night the fusion
+    did not correct, floored at the awake time Oura recorded so it can never
+    take more awake time than there was. Until 2026-10-27 it corrected the
+    score; the score no longer takes a correction, so without this the
+    stepper would change nothing at all. The stage rows stay Oura's.
 
     WHAT FUSION DOES AND DOES NOT TOUCH. It merges STAGES: Oura supplies the
     stage, Garmin supplies permission to call a minute Awake, so the only
@@ -980,9 +980,8 @@ def sleep_night_figures(detail: dict | None, fused: dict | None = None) -> dict:
     no opinion about them, so they pass through untouched rather than being
     relabelled as something they are not.
 
-    Efficiency is scaled by the same effective-total-seconds ratio
-    services/sleep_score.py uses, not recomputed as sleep/time-in-bed, so the
-    figure on screen is arithmetically the one the score used.
+    Efficiency is scaled by the effective-total-seconds ratio (time in bed
+    held fixed), not recomputed as sleep/time-in-bed.
     """
     d, f = detail or {}, fused or {}
     total = _num(d.get("total_seconds"))
@@ -991,8 +990,15 @@ def sleep_night_figures(detail: dict | None, fused: dict | None = None) -> dict:
     phantom = _num(f.get("phantom_wake_minutes")) or 0.0
     is_fused = str(f.get("source") or "") == "fused" and bool(f.get("master_hypnogram"))
 
+    manual = 0.0
     if is_fused and phantom and total:
         gained = phantom * 60.0
+    elif not is_fused and manual_minutes and total:
+        gained = min(float(manual_minutes) * 60.0, awake or 0.0)
+        manual = gained / 60.0
+    else:
+        gained = 0.0
+    if gained:
         ratio = (total + gained) / total
         if efficiency is not None:
             efficiency = max(0.0, min(100.0, efficiency * ratio))
@@ -1008,30 +1014,39 @@ def sleep_night_figures(detail: dict | None, fused: dict | None = None) -> dict:
         "awake_seconds": awake,
         "is_fused": is_fused,
         "phantom_wake_minutes": phantom if is_fused else 0.0,
+        "manual_minutes": manual,
     }
 
 
 def sleep_fusion_caption(figures: dict | None) -> str:
-    """One line naming what fusion moved, or "" when it moved nothing.
+    """One line naming what the correction moved, or "" when it moved nothing.
 
     Said once, under the figures it applies to. A night where Garmin agreed
-    with Oura minute for minute gets no line — there is nothing to explain."""
+    with Oura minute for minute, and no manual correction, gets no line —
+    there is nothing to explain. Since 2026-10-27 the score does not include
+    the correction (Sleep Score MODEL_VERSION 3), and the line says so."""
     fig = figures or {}
     minutes = fig.get("phantom_wake_minutes") or 0
-    if not fig.get("is_fused") or not minutes:
-        return ""
-    return (f"Fused with Garmin: {minutes:.0f} min Oura called awake are counted "
-            f"as sleep, because the watch saw no movement. Total sleep and "
-            f"Efficiency here are the figures the score used.")
+    if fig.get("is_fused") and minutes:
+        return (f"Fused with Garmin: {minutes:.0f} min Oura called awake are counted "
+                f"as sleep, because the watch saw no movement. The score uses "
+                f"Oura's own night.")
+    manual = fig.get("manual_minutes") or 0
+    if manual:
+        return (f"Wake time corrected: {manual:.0f} min Oura called awake are counted "
+                f"as sleep. The score uses Oura's own night.")
+    return ""
 
 
-def sleep_key_metrics(detail: dict | None, fused: dict | None = None) -> list[dict]:
+def sleep_key_metrics(detail: dict | None, fused: dict | None = None,
+                      manual_minutes: float = 0.0) -> list[dict]:
     """The 2x2 grid — a fixed set, so a missing reading shows a dash rather
     than collapsing the grid and moving everything else around.
 
     `fused` applies the night's stage fusion; omitted, this is Oura's raw
     reading exactly as before. See sleep_night_figures."""
-    d = sleep_night_figures(detail, fused) if fused else (detail or {})
+    d = (sleep_night_figures(detail, fused, manual_minutes)
+         if fused or manual_minutes else (detail or {}))
     return [
         {"label": "Total sleep", "value": format_duration(d.get("total_seconds")) or "—"},
         {"label": "Time in bed", "value": format_duration(d.get("time_in_bed_seconds")) or "—"},

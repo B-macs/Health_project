@@ -3682,11 +3682,18 @@ class Repository:
                 "sleep_regularity":       r.get("readiness_sleep_regularity") or None,
                 "activity_balance":       r.get("readiness_activity_balance") or None,
                 "resting_heart_rate":     r.get("readiness_resting_heart_rate") or None,
-                # The one SLEEP contributor read from the same row: Sleep
-                # Score MODEL_VERSION 2 scores Restfulness from Oura's own
-                # 0-100 reading (2026-10-13). _float_or_none, not `or None`:
-                # a genuine 0 is a reading.
+                # The SLEEP contributors read from the same row: Sleep Score
+                # MODEL_VERSION 2 scored Restfulness from Oura's own 0-100
+                # reading (2026-10-13), and MODEL_VERSION 3 scores all seven
+                # (2026-10-27). _float_or_none, not `or None`: a genuine 0 is
+                # a reading.
                 "sleep_restfulness":      _float_or_none(r.get("sleep_restfulness")),
+                "sleep_total_sleep":      _float_or_none(r.get("sleep_total_sleep")),
+                "sleep_efficiency":       _float_or_none(r.get("sleep_efficiency")),
+                "sleep_rem_sleep":        _float_or_none(r.get("sleep_rem_sleep")),
+                "sleep_deep_sleep":       _float_or_none(r.get("sleep_deep_sleep")),
+                "sleep_latency":          _float_or_none(r.get("sleep_latency")),
+                "sleep_timing":           _float_or_none(r.get("sleep_timing")),
             }
             for r in rows if r.get("date") and start <= str(r["date"]) <= end
         }
@@ -3896,6 +3903,12 @@ class Repository:
                     oura_activity_balance=contributors.get("activity_balance"),
                     oura_resting_heart_rate_score=contributors.get("resting_heart_rate"),
                     oura_sleep_restfulness=contributors.get("sleep_restfulness"),
+                    oura_sleep_total_sleep_score=contributors.get("sleep_total_sleep"),
+                    oura_sleep_efficiency_score=contributors.get("sleep_efficiency"),
+                    oura_sleep_rem_score=contributors.get("sleep_rem_sleep"),
+                    oura_sleep_deep_score=contributors.get("sleep_deep_sleep"),
+                    oura_sleep_latency_score=contributors.get("sleep_latency"),
+                    oura_sleep_timing_score=contributors.get("sleep_timing"),
                 )
             sleep_raw = oura_sleep.get(d)
             if sleep_raw:
@@ -4089,10 +4102,9 @@ class Repository:
         trend's 14-day EMA lookback; 28 extra days of session AU to support
         the 7-day rolling-strain lookback with margin) so even the oldest
         day in the `days` window gets a correctly-computed value, not one
-        truncated by an under-fetched window. Also fetches wake-time
-        adjustments (get_wake_time_adjustments) for the same `days` window
-        as a single bulk read, threaded into each day's snapshot so the
-        persisted Sleep Score reflects any per-night wake-time correction.
+        truncated by an under-fetched window. No wake-time correction reaches
+        the persisted Sleep Score (MODEL_VERSION 3, 2026-10-27): it is Oura's
+        own seven parts.
 
         `only_dates` (ISO date strings) restricts which days inside the
         window are written, without narrowing the window itself — the
@@ -4104,9 +4116,6 @@ class Repository:
         bio_rows = [dataclasses.asdict(r) for r in self.get_biometric_rolling(days=days + 60, today=today)]
         au_rows = self.get_daily_session_au_weighted(days=days + 28, today=today)
         stage = self.get_current_stage()
-        wake_adjustments, _sources = self.get_effective_wake_adjustments(
-            start=(today - timedelta(days=days - 1)).isoformat(), end=today.isoformat(),
-        )
         # THE HEART-RATE ROWS, which the Home card passes and this did not
         # (2026-10-13): the card blends heart-rate strain in when a watch
         # activity matched, so the stored history and the trend line were the
@@ -4132,8 +4141,7 @@ class Repository:
             if only_dates is not None and iso not in only_dates:
                 continue
             snapshot = dashboard.compute_daily_metrics_snapshot(
-                d, bio_rows, au_rows, stage, wake_time_adjustments=wake_adjustments,
-                hr_rows=hr_rows, walks=walks,
+                d, bio_rows, au_rows, stage, hr_rows=hr_rows, walks=walks,
             )
             snapshot["date"] = iso
             self.upsert_metrics_history_row(

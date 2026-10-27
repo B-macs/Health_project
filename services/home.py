@@ -117,8 +117,7 @@ def snapshot(reads: HomeReads) -> dict:
     snap = dash.compute_daily_metrics_snapshot(
         reads.day, reads.bio_rows, reads.au_rows, reads.stage,
         sleep_base_hours=base_hours, rolling_reference_date=reads.day,
-        wake_time_adjustments=reads.wake_adjustments, hr_rows=reads.hr_rows,
-        walks=reads.walks)
+        hr_rows=reads.hr_rows, walks=reads.walks)
     snap["sleep_need_hours"] = _need
     snap["sleep_base_window"] = base_window
     snap["strain_unscored_reason"] = STAGE_UNREAD if reads.stage is None else ""
@@ -236,6 +235,24 @@ def score_pair(daily: float | None, trend: float | None) -> tuple[tuple[str, str
     return ("DAILY", fmt(daily)), ("TREND", fmt(trend))
 
 
+#: The Readiness card's words on a day the verdict reduced the load
+#: (2026-10-27, the athlete's choice): 2026-10-27 read "Ready to train" above a
+#: "Reduced load" badge.
+REDUCED_HEADER = "Reduced load today"
+REDUCED_DESCRIPTION = "Today's weights and reps stay at or under your last session."
+
+
+def readiness_words(header: str, description: str, verdict: dict | None) -> tuple[str, str]:
+    """The Readiness card's header and description: its band's own words,
+    except on a day the verdict reduced the load, where they say so and give
+    the verdict's cause. The band's label and colour do not change: the score
+    is what it is, and the load decision is the verdict's."""
+    if verdict and verdict.get("reduced"):
+        cause = (verdict.get("cause") or "").strip()
+        return REDUCED_HEADER, f"{cause} {REDUCED_DESCRIPTION}".strip()
+    return header, description
+
+
 def _verdict_out(v) -> dict | None:
     if v is None:
         return None
@@ -273,6 +290,7 @@ def cards(repo, requested: date | None, caller_today: date) -> dict:
                 repo, day, readiness_display=trend, readiness_band=r_lbl))
         except Exception:
             verdict_out = None
+    r_hdr, r_desc = readiness_words(r_hdr, r_desc, verdict_out)
     s_col, s_disp, s_lbl, s_hdr, s_desc = dash.strain_meta(
         snap["strain"], rest_day=bool(snap.get("rest_day")))
     if snap["strain_unscored_reason"]:
