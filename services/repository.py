@@ -4102,9 +4102,10 @@ class Repository:
         trend's 14-day EMA lookback; 28 extra days of session AU to support
         the 7-day rolling-strain lookback with margin) so even the oldest
         day in the `days` window gets a correctly-computed value, not one
-        truncated by an under-fetched window. No wake-time correction reaches
-        the persisted Sleep Score (MODEL_VERSION 3, 2026-10-27): it is Oura's
-        own seven parts.
+        truncated by an under-fetched window. Also fetches the effective
+        wake-time corrections (get_effective_wake_adjustments) for the same
+        `days` window as one bulk read, so the persisted Sleep Score moves with
+        them as the Home card's does (MODEL_VERSION 4).
 
         `only_dates` (ISO date strings) restricts which days inside the
         window are written, without narrowing the window itself — the
@@ -4116,6 +4117,9 @@ class Repository:
         bio_rows = [dataclasses.asdict(r) for r in self.get_biometric_rolling(days=days + 60, today=today)]
         au_rows = self.get_daily_session_au_weighted(days=days + 28, today=today)
         stage = self.get_current_stage()
+        wake_adjustments, _sources = self.get_effective_wake_adjustments(
+            start=(today - timedelta(days=days - 1)).isoformat(), end=today.isoformat(),
+        )
         # THE HEART-RATE ROWS, which the Home card passes and this did not
         # (2026-10-13): the card blends heart-rate strain in when a watch
         # activity matched, so the stored history and the trend line were the
@@ -4141,7 +4145,8 @@ class Repository:
             if only_dates is not None and iso not in only_dates:
                 continue
             snapshot = dashboard.compute_daily_metrics_snapshot(
-                d, bio_rows, au_rows, stage, hr_rows=hr_rows, walks=walks,
+                d, bio_rows, au_rows, stage, wake_time_adjustments=wake_adjustments,
+                hr_rows=hr_rows, walks=walks,
             )
             snapshot["date"] = iso
             self.upsert_metrics_history_row(

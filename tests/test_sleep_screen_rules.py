@@ -119,12 +119,10 @@ def test_the_drill_down_marks_adjusted_nights():
 
 
 def test_the_sleep_contributors_caption_names_the_correction():
-    """Since 2026-10-27 (Sleep Score MODEL_VERSION 3) the score is Oura's own
-    night and the night below carries the correction; the caption says so."""
     assert ss.contributors_caption("6 of 7 measured.", 0.0) == "6 of 7 measured."
     assert ss.contributors_caption("", 12.0) == (
-        "Scored on Oura's own night: the night below counts 12 min more sleep "
-        "(the wake-time correction).")
+        "Total sleep and Efficiency include a 12 min wake-time correction, "
+        "and so do the figures below.")
 
 
 # ─── the Readiness drill-down (HOME-14, HOME-15) ────────────────────────────

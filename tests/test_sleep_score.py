@@ -1,14 +1,14 @@
 """Tests for services/sleep_score.py — the deterministic Sleep Score.
 
-MODEL_VERSION 3 (2026-10-27, the athlete's choice): the weighted mean of Oura's
-own seven sleep parts with this project's weights, and no wake-time correction
-in the score. Version 2 scored the parts itself and read 2026-10-27 at 91
-against Oura's 63; its tests pinned that arithmetic and went with it, replaced
-by the ones below. The bedtime helpers are unchanged: they still give the
-Timing row its "minutes off usual".
+MODEL_VERSION 4 (2026-10-27, the athlete's choices that day): the weighted mean
+of Oura's own seven sleep parts with this project's weights, with a wake-time
+correction moving Total Sleep and Efficiency along Oura's own curve. Version 2
+scored the parts itself and read 2026-10-27 at 91 against Oura's 63; its tests
+pinned that arithmetic and went with it, replaced by the ones below. The
+bedtime helpers are unchanged: they still give the Timing row its "minutes off
+usual".
 """
 
-import inspect
 from datetime import date
 
 import pytest
@@ -102,14 +102,76 @@ def test_the_weights_are_this_project_s():
     assert set(sleep_score.OURA_PARTS) == set(sleep_score._WEIGHTS)
 
 
-def test_no_wake_time_correction_reaches_the_score():
-    """The athlete, 2026-10-27: "keep the watch correction out of the score".
-    Neither the score nor its breakdown takes a correction; the Sleep screen's
-    night figures carry it (dashboard.sleep_night_figures)."""
-    for fn in (sleep_score.compute_sleep_score, sleep_score.sleep_score_breakdown):
-        assert "wake_time_adjustments" not in inspect.signature(fn).parameters
-    assert "wake_adjustment_minutes" not in sleep_score.sleep_score_breakdown(
-        date(2026, 7, 1), _night(**_PARTS_27_OCT))
+# ─── The wake-time correction moves two parts along Oura's curve (version 4) ─
+#  The athlete, 2026-10-27 afternoon: "I want it to still change the number of
+#  hours Ive slept and such the overall sleep score".
+
+def _by_key(rows, adjustments=None):
+    b = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows, adjustments)
+    return b, {c["key"]: c for c in b["contributors"]}
+
+
+def test_without_a_correction_every_part_is_oura_s_own():
+    rows = _night(**_PARTS_27_OCT)
+    for adjustments in (None, {}, {"2026-06-30": 30.0}):
+        assert sleep_score.compute_sleep_score(date(2026, 7, 1), rows, adjustments) == 62.4
+
+
+def test_the_watch_s_58_minutes_move_total_sleep_and_efficiency_along_oura_s_curve():
+    """27 Oct: Oura 5h 44m at 73 %; the watch's 58 min make it 6h 42m at 85 %.
+    Each part moves by the step Oura's own curve gives for that change."""
+    curve_t, curve_e = sleep_score.OURA_TOTAL_SLEEP_CURVE, sleep_score.OURA_EFFICIENCY_CURVE
+    raw_h, cor_h = 20640.0 / 3600, (20640.0 + 58 * 60) / 3600
+    raw_e, cor_e = 73.0, 73.0 * (20640.0 + 58 * 60) / 20640.0
+    plain_b, plain = _by_key(_night(**_PARTS_27_OCT))
+    fixed_b, fixed = _by_key(_night(**_PARTS_27_OCT), {"2026-07-01": 58.0})
+    assert fixed["total_sleep"]["score"] == pytest.approx(
+        56.0 + sleep_score._interp(cor_h, curve_t) - sleep_score._interp(raw_h, curve_t))
+    assert fixed["efficiency"]["score"] == pytest.approx(
+        55.0 + sleep_score._interp(cor_e, curve_e) - sleep_score._interp(raw_e, curve_e))
+    assert round(fixed["total_sleep"]["score"]) == 69 and round(fixed["efficiency"]["score"]) == 81
+    assert fixed["total_sleep"]["raw"] == pytest.approx(cor_h), "the row shows the hours the score used"
+    assert fixed["efficiency"]["raw"] == pytest.approx(cor_e)
+    for key in ("restfulness", "rem", "deep", "latency", "timing"):
+        assert fixed[key]["score"] == plain[key]["score"], key
+    assert fixed_b["score"] == 70.8
+    assert fixed_b["wake_adjustment_minutes"] == 58.0
+    assert plain_b["wake_adjustment_minutes"] == 0.0
+
+
+def test_the_correction_never_takes_more_awake_time_than_oura_recorded():
+    rows = _history() + [{**_night(**_PARTS_27_OCT)[-1], "oura_sleep_awake_seconds": 600.0}]
+    sixty = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows, {"2026-07-01": 60.0})
+    ten = sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows, {"2026-07-01": 10.0})
+    assert sixty["score"] == ten["score"]
+    assert sixty["wake_adjustment_minutes"] == 10.0
+
+
+def test_a_corrected_part_stays_inside_zero_to_one_hundred():
+    rows = _night(**{**_PARTS_27_OCT, "oura_sleep_total_sleep_score": 98.0,
+                     "oura_sleep_efficiency_score": 99.0})
+    _b, fixed = _by_key(rows, {"2026-07-01": 70.0})
+    assert fixed["total_sleep"]["score"] <= 100.0
+    assert fixed["efficiency"]["score"] <= 100.0
+
+
+@pytest.mark.parametrize("curve", [sleep_score.OURA_TOTAL_SLEEP_CURVE,
+                                   sleep_score.OURA_EFFICIENCY_CURVE])
+def test_oura_s_curves_never_fall_as_the_reading_rises(curve):
+    """A longer night can never score lower; the curves are measured by
+    scripts/measure_oura_sleep_curves.py, never tuned by hand."""
+    xs = [x for x, _ in curve]
+    ys = [y for _, y in curve]
+    assert xs == sorted(xs) and len(set(xs)) == len(xs)
+    assert ys == sorted(ys)
+    assert all(0.0 <= y <= 100.0 for y in ys)
+
+
+def test_the_breakdown_and_the_score_agree_with_a_correction():
+    rows = _night(**_PARTS_27_OCT)
+    adj = {"2026-07-01": 58.0}
+    assert (sleep_score.sleep_score_breakdown(date(2026, 7, 1), rows, adj)["score"]
+            == sleep_score.compute_sleep_score(date(2026, 7, 1), rows, adj))
 
 
 def test_the_raw_night_does_not_move_the_score():
@@ -292,8 +354,8 @@ def test_without_oura_s_reading_the_part_is_missing_not_zero():
 
 # ─── The model ───────────────────────────────────────────────────────────────
 
-def test_the_model_version_says_three():
-    assert sleep_score.MODEL_VERSION == 3
+def test_the_model_version_says_four():
+    assert sleep_score.MODEL_VERSION == 4
     for retired in ("_RESTLESS_BAND", "_REM_PCT_BAND", "_DEEP_PCT_BAND",
                     "_LATENCY_BAND", "_TIMING_BAND"):
         assert not hasattr(sleep_score, retired), f"{retired}: version 1 and 2 bands are retired"

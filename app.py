@@ -1104,7 +1104,7 @@ def _sleep_breakdown() -> dict:
     global _sleep_breakdown_cache
     if _sleep_breakdown_cache is None:
         _sleep_breakdown_cache = sleep_score_model.sleep_score_breakdown(
-            selected_date, _bio_rows,
+            selected_date, _bio_rows, wake_time_adjustments=_wake_adjustments,
         )
     return _sleep_breakdown_cache
 
@@ -1138,12 +1138,11 @@ def _sleep_contributors_block() -> str:
             'earlier night.</span></div>'
         )
     rows = "".join(_contributor_row(r) for r in dash.sleep_breakdown_rows(breakdown))
-    # The score is Oura's own night (Sleep Score MODEL_VERSION 3, 2026-10-27);
-    # the figures below carry the wake-time correction, and the caption names
-    # the difference (sleep_screen.contributors_caption).
+    # Total sleep and Efficiency here include the wake-time correction the
+    # score used (Sleep Score MODEL_VERSION 4), and the figures below are the
+    # same corrected ones; the caption names it (sleep_screen.contributors_caption).
     caption = sleep_screen.contributors_caption(
-        dash.sleep_coverage_caption(breakdown),
-        float(_wake_adjustments.get(selected_date.isoformat()) or 0.0))
+        dash.sleep_coverage_caption(breakdown), breakdown.get("wake_adjustment_minutes") or 0.0)
     return _panel("Contributors", rows, caption)
 
 
@@ -1516,9 +1515,8 @@ def _sleep_night_blocks() -> str:
         return ""
 
     # EVERY FIGURE ON THIS SCREEN IS THE CORRECTED NIGHT — athlete, 2026-08-25
-    # (the fused night) — while the score above is Oura's own night since
-    # 2026-10-27 (Sleep Score MODEL_VERSION 3). The stepper's manual correction
-    # lands here too. Time in bed, heart rate, HRV, breathing and temperature
+    # (the fused night) — and the score above used the same correction (Sleep
+    # Score MODEL_VERSION 4). The stepper's manual correction lands here too. Time in bed, heart rate, HRV, breathing and temperature
     # pass through. See dashboard.sleep_night_figures.
     _key = selected_date.isoformat()
     manual = (float(_wake_adjustments.get(_key) or 0.0)

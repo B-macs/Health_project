@@ -117,7 +117,8 @@ def snapshot(reads: HomeReads) -> dict:
     snap = dash.compute_daily_metrics_snapshot(
         reads.day, reads.bio_rows, reads.au_rows, reads.stage,
         sleep_base_hours=base_hours, rolling_reference_date=reads.day,
-        hr_rows=reads.hr_rows, walks=reads.walks)
+        wake_time_adjustments=reads.wake_adjustments, hr_rows=reads.hr_rows,
+        walks=reads.walks)
     snap["sleep_need_hours"] = _need
     snap["sleep_base_window"] = base_window
     snap["strain_unscored_reason"] = STAGE_UNREAD if reads.stage is None else ""

@@ -103,6 +103,7 @@ def compute_daily_metrics_snapshot(
     stage: int | None,
     sleep_base_hours: float | None = None,
     rolling_reference_date: date | None = None,
+    wake_time_adjustments: dict[str, float] | None = None,
     hr_rows: list[dict] | None = None,
     walks: dict[str, list[dict]] | None = None,
 ) -> dict:
@@ -132,9 +133,11 @@ def compute_daily_metrics_snapshot(
     run on. A live page that lets the user browse past dates (app.py's
     Home) should pass date.today() explicitly here to preserve that framing.
 
-    No wake-time correction is a parameter (Sleep Score MODEL_VERSION 3,
-    2026-10-27): the score is Oura's own seven parts, and a correction belongs
-    to the Sleep screen's night figures, never to a stored number.
+    wake_time_adjustments: passed straight through to services.sleep_score.
+    compute_sleep_score — keyed by ISO date, the minutes of Oura's awake time
+    that were sleep (the watch fusion's or the manual stepper's). Since
+    MODEL_VERSION 4 (2026-10-27) they move Total Sleep and Efficiency along
+    Oura's own curve. None is Oura's own night.
 
     stage: the clinical stage, or None when it could not be read. Then no
     strain is scored at all (strain None, source "none") rather than one
@@ -171,7 +174,7 @@ def compute_daily_metrics_snapshot(
     sleep_need = sleep_base_hours if sleep_base_hours else SLEEP_NEED_HOURS_DEFAULT
     sleep_pct = sleep_percent(sleep_hours, sleep_need)
 
-    sleep_score = _sleep_score.compute_sleep_score(d, bio_rows)
+    sleep_score = _sleep_score.compute_sleep_score(d, bio_rows, wake_time_adjustments=wake_time_adjustments)
     if sleep_score == _sleep_score.NOT_COMPUTED:
         sleep_score = None
 
@@ -958,19 +961,17 @@ def sleep_night_figures(detail: dict | None, fused: dict | None = None,
     Athlete, 2026-08-25: "I would like all of the data to be presented in the
     sleep part to be fused data."
 
-    THE SCORE IS NOT FUSED ANY MORE (Sleep Score MODEL_VERSION 3, 2026-10-27,
-    the athlete: "keep the watch correction out of the score"). From
-    2026-08-25 to 2026-10-27 the score's Total Sleep and Efficiency used this
-    same corrected night; now the score is Oura's own seven parts of Oura's
-    own night, and the correction lives here only. The contributors caption
-    (sleep_screen.contributors_caption) names the difference in one line.
+    THE SCORE USES THIS SAME CORRECTED NIGHT. Its Total Sleep and Efficiency
+    parts are Oura's own, moved along Oura's own curve by the corrected
+    minutes (Sleep Score MODEL_VERSION 4, 2026-10-27, the athlete: "I want it
+    to still change the number of hours Ive slept and such the overall sleep
+    score"). For one morning (version 3) the score left the correction out.
 
     THE MANUAL CORRECTION LANDS HERE TOO. `manual_minutes` is the stepper's
     correction (Key Rule 4's one manual entry), applied on a night the fusion
     did not correct, floored at the awake time Oura recorded so it can never
-    take more awake time than there was. Until 2026-10-27 it corrected the
-    score; the score no longer takes a correction, so without this the
-    stepper would change nothing at all. The stage rows stay Oura's.
+    take more awake time than there was — the same floor the score uses, so
+    the figures here are the ones the score used. The stage rows stay Oura's.
 
     WHAT FUSION DOES AND DOES NOT TOUCH. It merges STAGES: Oura supplies the
     stage, Garmin supplies permission to call a minute Awake, so the only
@@ -1023,18 +1024,17 @@ def sleep_fusion_caption(figures: dict | None) -> str:
 
     Said once, under the figures it applies to. A night where Garmin agreed
     with Oura minute for minute, and no manual correction, gets no line —
-    there is nothing to explain. Since 2026-10-27 the score does not include
-    the correction (Sleep Score MODEL_VERSION 3), and the line says so."""
+    there is nothing to explain."""
     fig = figures or {}
     minutes = fig.get("phantom_wake_minutes") or 0
     if fig.get("is_fused") and minutes:
         return (f"Fused with Garmin: {minutes:.0f} min Oura called awake are counted "
-                f"as sleep, because the watch saw no movement. The score uses "
-                f"Oura's own night.")
+                f"as sleep, because the watch saw no movement. Total sleep and "
+                f"Efficiency here are the figures the score used.")
     manual = fig.get("manual_minutes") or 0
     if manual:
         return (f"Wake time corrected: {manual:.0f} min Oura called awake are counted "
-                f"as sleep. The score uses Oura's own night.")
+                f"as sleep. Total sleep and Efficiency here are the figures the score used.")
     return ""
 
 

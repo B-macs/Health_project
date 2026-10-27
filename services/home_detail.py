@@ -318,7 +318,8 @@ def sleep_detail(repo, requested: date | None, caller_today: date) -> dict:
     detail = nights["details"].get(key)
     context = nights["context"].get(key) or {}
     fused = nights["fusion"].get(key) or {}
-    breakdown = sleep_score.sleep_score_breakdown(day, reads.bio_rows)
+    breakdown = sleep_score.sleep_score_breakdown(
+        day, reads.bio_rows, wake_time_adjustments=reads.wake_adjustments)
     scored = breakdown["score"] != sleep_score.NOT_COMPUTED
     mode = sleep_screen.screen_mode(scored, fused, detail, nights["details_loaded"])
     colour, display, label, _header, _desc = dash.sleep_meta(
@@ -326,13 +327,11 @@ def sleep_detail(repo, requested: date | None, caller_today: date) -> dict:
     trend = history_trend("sleep", reads.metrics_history, day)
     trend_dates = [date.fromisoformat(d) for d in trend["dates"]]
     wake_view = sleep_screen.wake_display(day, reads.wake_adjustments, trend_dates)
-    # The correction belongs to the night figures, never to the score (Sleep
-    # Score MODEL_VERSION 3, 2026-10-27): the fusion's on a fused night, the
-    # stepper's on any other.
+    # The night figures carry the correction the score used (MODEL_VERSION 4):
+    # the fusion's on a fused night, the stepper's on any other.
     manual = (float(reads.wake_adjustments.get(key) or 0.0)
               if reads.wake_sources.get(key) == sleep_screen.MANUAL else 0.0)
     figures = dash.sleep_night_figures(detail, fused, manual)
-    correction = (figures.get("phantom_wake_minutes") or 0.0) + (figures.get("manual_minutes") or 0.0)
 
     watch_only = None
     if mode == sleep_screen.WATCH_ONLY:
@@ -370,7 +369,8 @@ def sleep_detail(repo, requested: date | None, caller_today: date) -> dict:
         "mode": mode,
         "contributors": _contributors(
             scored, dash.sleep_breakdown_rows(breakdown) if scored else [],
-            sleep_screen.contributors_caption(dash.sleep_coverage_caption(breakdown), correction)
+            sleep_screen.contributors_caption(dash.sleep_coverage_caption(breakdown),
+                                              breakdown.get("wake_adjustment_minutes") or 0.0)
             if scored else "",
             dash.sleep_unscored_reason(reads.bio_failed, stale)),
         "watch_only": watch_only,
@@ -481,7 +481,8 @@ def set_wake_adjustment(repo, day: date, caller_today: date, minutes: float) -> 
     if float(minutes) not in WAKE_VALUES:
         raise WakeAdjustmentError("minutes_invalid")
     reads = home.read_home(repo, day)
-    breakdown = sleep_score.sleep_score_breakdown(day, reads.bio_rows)
+    breakdown = sleep_score.sleep_score_breakdown(
+        day, reads.bio_rows, wake_time_adjustments=reads.wake_adjustments)
     if breakdown["score"] == sleep_score.NOT_COMPUTED:
         raise WakeAdjustmentError("night_not_scored")
     if not sleep_screen.wake_control(day, reads.wake_adjustments, reads.wake_sources)["editable"]:
