@@ -15,6 +15,7 @@ import { MovementStrip } from '../ui/charts'
 import { DetailFrame } from '../ui/detail'
 import { Freshness } from '../ui/Freshness'
 import { CheckInForm, checkinStage, type Sending } from './CheckIn'
+import { TrainingTiles } from './Daily'
 import { ReadinessBody, SleepBody, StrainBody } from './Details'
 import { TodayView, planForDay, tone, verdictLines } from './Today'
 
@@ -307,5 +308,20 @@ describe("Home's plan card", () => {
     expect(planForDay(plan, '2026-10-22')).toBeUndefined()
     expect(planForDay(plan, '2026-10-21')).toBe(plan)
     expect(planForDay(undefined, '2026-10-22')).toBeUndefined()
+  })
+})
+
+describe("Training's two tiles", () => {
+  // The owner, 2026-10-28: "Keep all the rest of the data on the training page just put the
+  // two title right and left of each other".
+  it('sit in one row of two, the training day marked as the page they are on', () => {
+    const html = draw(<TrainingTiles onTrainingDay={() => undefined} />)
+    expect(html).toMatch(/<div class="pair tiles" data-testid="training-tiles">/)
+    expect((html.match(/class="card tile tile--button"/g) ?? []).length).toBe(2)
+    expect(html.indexOf('tile-training-day')).toBeLessThan(html.indexOf('tile-daily'))
+    expect(html).toMatch(/data-testid="tile-training-day" aria-current="page"/)
+    expect(html).not.toMatch(/data-testid="tile-daily" aria-current/)
+    expect(text(html)).toContain(S.daily.trainingDay)
+    expect(text(html)).toContain(S.daily.dailyTitle)
   })
 })

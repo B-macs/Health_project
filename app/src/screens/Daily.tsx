@@ -2,8 +2,10 @@
 // "the first tile when selected will bring me to the normal training day and what is
 // required for that day. the other tile will be the daily training day."
 //
-// - The tiles (/training): "Training day" opens the week page as before (/training/day);
-//   "Daily tendon session" opens its overview (/training/daily).
+// - The tiles: side by side at the top of the week page (/training), above all its data (the
+//   owner, 2026-10-28: "Keep all the rest of the data on the training page just put the two
+//   title right and left of each other"). "Training day" is the page they sit on and takes
+//   the strip back to today; "Daily tendon session" opens its overview (/training/daily).
 // - The daily session: the same session every day, from the engine (GET
 //   /api/training/daily), run in the same guided flow as the plan session and saved as its
 //   own kind, so it never marks the training day done. Its 8-hour line is a reminder only:
@@ -45,20 +47,21 @@ export function trainingDayLine(day: DayPlan | undefined, savedOn: unknown, toda
   return day.overview?.headline || S.daily.trainingDayOpen
 }
 
-function Tile({ title, line, note, testId, onOpen }: {
-  title: string; line: string; note: string | null; testId: string; onOpen: () => void
+function Tile({ title, line, note, testId, current, onOpen }: {
+  title: string; line: string; note: string | null; testId: string; current?: boolean; onOpen: () => void
 }) {
   return (
-    <button className="card tile tile--button" data-testid={testId} onClick={onOpen}>
+    <button className="card tile tile--button" data-testid={testId} aria-current={current ? 'page' : undefined}
+      onClick={onOpen}>
       <span className="eyebrow">{title}</span>
-      <span className="plan__title">{line}</span>
+      <span className="tile__line">{line}</span>
       {note && <span className="caption">{note}</span>}
     </button>
   )
 }
 
-/** The Training tab's landing: the two tiles. */
-export function TrainingTiles() {
+/** The two tiles, side by side, at the top of the week page. */
+export function TrainingTiles({ onTrainingDay }: { onTrainingDay: () => void }) {
   const { store, ctx, go } = useApp()
   const today = localDay()
   const day = useCached<DayPlan>(store, '/api/training/day', null, ctx, { today: true })
@@ -66,19 +69,12 @@ export function TrainingTiles() {
   const savedOn = useLiveQuery(async () => (await store.settings.get(KEYS.trainedOn))?.value ?? null, [store])
   const d = daily.data && daily.data.date === today ? daily.data : null
   return (
-    <div className="screen train" data-testid="training-tiles">
-      <div className="sky" aria-hidden="true" />
-      <header className="head">
-        <h1 className="head__title">{S.session.title}</h1>
-      </header>
-      <Freshness view={day} />
-      <div className="group">
-        <Tile title={S.daily.trainingDay} testId="tile-training-day" onOpen={() => go('/training/day')}
-          line={trainingDayLine(day.data, savedOn, today)} note={null} />
-        <Tile title={S.daily.dailyTitle} testId="tile-daily" onOpen={() => go('/training/daily')}
-          line={d?.done_today ? S.daily.doneToday : S.daily.minutes(d?.model_minutes ?? null)}
-          note={reminderLine(d?.reminder)} />
-      </div>
+    <div className="pair tiles" data-testid="training-tiles">
+      <Tile title={S.daily.trainingDay} testId="tile-training-day" current onOpen={onTrainingDay}
+        line={trainingDayLine(day.data, savedOn, today)} note={null} />
+      <Tile title={S.daily.dailyTitle} testId="tile-daily" onOpen={() => go('/training/daily')}
+        line={d?.done_today ? S.daily.doneToday : S.daily.minutes(d?.model_minutes ?? null)}
+        note={reminderLine(d?.reminder)} />
     </div>
   )
 }

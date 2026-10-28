@@ -1,13 +1,14 @@
 // The Training tab (rebuild Phases 6 and 7). The session the phone keeps (the database's
 // `session` row) decides what shows: while one exists, the guided flow or its save (a plan
 // session, the accessory session or the daily tendon session, the same flow); else the
-// screen the address names (the week page, the daily session before Start, the "+" menu's
-// yoga, outdoor and accessory session); else the two tiles (WP-40: "Training day" and
-// "Daily tendon session", screens/Daily.tsx).
+// screen the address names (the daily session before Start, the "+" menu's yoga, outdoor
+// and accessory session); else the week page.
 //
-// The week page (screens/Week.tsx): the banner and the week's questions, the strip, and the
-// day picked in it. Today's day is the session overview before Start (inventory T37-T47):
-// Start downloads the whole session (GET /api/training/session) and mints the ids once. The
+// The week page (screens/Week.tsx): the two tiles side by side (WP-40: "Training day" and
+// "Daily tendon session", screens/Daily.tsx), the banner and the week's questions, the
+// strip, and the day picked in it. Today's day is the session overview before Start
+// (inventory T37-T47): Start downloads the whole session (GET /api/training/session) and
+// mints the ids once. The
 // day's and the session's answers are read cache-first, so a session can start at the gym
 // with no signal when the phone has read them earlier that day. Every number and word is
 // the engine's; the phone only lays it out.
@@ -386,6 +387,7 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
           <IconPlus />
         </button>
       </header>
+      <TrainingTiles onTrainingDay={() => { setWeekStart(null); setSelected(today) }} />
       <WeekBody key={confirmed + cleared} weekStart={weekStart} setWeekStart={setWeekStart}
         homeWeek={homeWeek} setHomeWeek={setHomeWeek}
         selected={selected} setSelected={setSelected} answered={answered} answer={answer} rows={rows}
@@ -395,8 +397,8 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
   )
 }
 
-/** The screens by address: the week page ("day"), the daily tendon session, and the "+"
- *  menu's screens. No address: the two tiles. */
+/** The screens by address: the daily tendon session and the "+" menu's screens. No
+ *  address, or "day": the week page, with the two tiles at its top. */
 export type Extra = 'day' | 'daily' | 'yoga' | 'outdoor' | 'accessory'
 
 export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
@@ -433,6 +435,5 @@ export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
   if (extra === 'outdoor') return <Outdoor />
   if (extra === 'accessory') return <AccessoryOverview />
   if (extra === 'daily') return <DailyOverview />
-  if (extra === 'day') return <WeekPage onStart={(p, garmin) => void start(p, garmin)} starting={starting} />
-  return <TrainingTiles />
+  return <WeekPage onStart={(p, garmin) => void start(p, garmin)} starting={starting} />
 }

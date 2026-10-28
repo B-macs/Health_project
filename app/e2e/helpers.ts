@@ -63,11 +63,9 @@ export async function openTab(page: Page, name: string): Promise<void> {
   await page.getByRole('navigation', { name: S.app }).getByRole('button', { name }).click()
 }
 
-/** Open Training and its "Training day" tile (WP-40): the week page with today's day. The
- *  tab itself opens on the two tiles. */
+/** Open Training: the week page with today's day, the two tiles (WP-40) at its top. */
 export async function openTraining(page: Page): Promise<void> {
   await openTab(page, S.nav.training)
-  await page.getByTestId('tile-training-day').click()
   await expect(page.getByTestId('week-page')).toBeVisible()
 }
 
