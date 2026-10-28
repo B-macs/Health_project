@@ -82,6 +82,12 @@ st.session_state["fx_mode"] = {mode!r}
 st.session_state["fx_step"] = {step}
 from views import insights as V
 V._flexibility_screen_data.clear()
+# The retest line reads the sessions through this cache, which lives for the
+# whole test process. Left alone it answers with ANOTHER test's sessions:
+# tests/test_engine_data_screen.py logs a leg session dated today, and on the
+# day before the retest is due that turned the line into its leg-day warning
+# (found 2026-10-28, the day before a retest due 2026-10-29).
+V._recent_sessions.clear()
 V._render_flexibility_detail()
 '''
 
