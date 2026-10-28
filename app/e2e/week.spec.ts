@@ -15,7 +15,7 @@ import type { BrowserContext, Page } from '@playwright/test'
 import { localDay } from '../src/lib/api'
 import { S } from '../src/strings'
 import { longDate } from '../src/lib/dates'
-import { expect, leaveSession, onboard, openTab, ORIGIN, startTraining, tapToSave, test } from './helpers'
+import { expect, leaveSession, onboard, openTab, ORIGIN, startTraining, tapToSave, test, openTraining } from './helpers'
 
 type Received = { method: string; path: string; body: Record<string, unknown> }
 type Run = { applied: string[]; swaps: string[]; carry: boolean; redo: boolean; reasons: Record<string, string> }
@@ -60,7 +60,7 @@ test('the week page shows the banner, the strip and every kind of day, and write
   await onboard(page)
   await scenario(context, `e2e-week-${Date.now()}`, 'carry.shift.redo.gate1.retest')
   const before = (await received(page)).length
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await expect(page.getByTestId('rollup')).toContainText(S.week.thisWeek(1, 4))
   await expect(page.getByTestId('rollup')).toContainText(S.week.tier.failing(2))
   await expect(page.getByTestId('last-week')).toHaveText(S.week.lastWeek(S.week.verdict.failed))
@@ -105,7 +105,7 @@ test('the week page shows the banner, the strip and every kind of day, and write
 test('a move is asked first and sent once, even when its answer is lost', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-carry-${Date.now()}`, 'carry_in_order')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await expect(page.getByTestId('carry')).toContainText(S.week.carryInOrder)
   const before = (await received(page)).length
   // The engine stores the answer and the reply is lost: the phone sends it again.
@@ -131,7 +131,7 @@ test('a move is asked first and sent once, even when its answer is lost', async 
 test('a swap with today is sent once, from the day it names, and today shows again', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-swap-${Date.now()}`)
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await weekStep(page, 1)
   const day = await strip(page).locator('[data-marker="planned"]').first().getAttribute('data-date')
   await strip(page).locator(`[data-date="${day}"]`).click()
@@ -150,7 +150,7 @@ test('a swap with today is sent once, from the day it names, and today shows aga
 test('a move the engine refuses says why, and OK clears it', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-refuse-${Date.now()}`, 'refuse')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await weekStep(page, 1)
   await strip(page).locator('[data-marker="planned"]').first().click()
   await page.getByRole('button', { name: S.week.swapFuture }).click()
@@ -163,10 +163,39 @@ test('a move the engine refuses says why, and OK clears it', async ({ page, cont
   expect(await outboxLength(page)).toBe(0)
 })
 
+test('the Training tab opens on two tiles; the daily tendon session runs its slow start and saves as its own kind (WP-40)', async ({ page, context }) => {
+  await onboard(page)
+  await scenario(context, `e2e-daily-${Date.now()}`)
+  await openTab(page, S.nav.training)
+  await expect(page.getByTestId('training-tiles')).toBeVisible()
+  await expect(page.getByTestId('tile-daily')).toContainText(S.daily.after('16:13'))
+  await page.getByTestId('tile-daily').click()
+  await expect(page.getByTestId('daily-reminder')).toHaveText(S.daily.after('16:13'))
+  await expect(page.getByTestId('daily')).toContainText(S.daily.gelatin)
+  // Never locked: Start is there whatever the reminder says.
+  await page.getByTestId('daily-start').click()
+  await expect(page.locator('.exercise__name')).toHaveText('Active Hang')
+  await page.getByRole('button', { name: S.session.startHold }).click()
+  await expect(page.locator('.timer__word')).toHaveText(S.session.leadIn)
+  await expect(page.locator('.timer__word')).toHaveText(S.session.hold, { timeout: 8000 })
+  await expect(page.getByTestId('let-go')).toBeVisible()
+  const before = (await received(page)).length
+  await tapToSave(page)
+  await page.getByRole('button', { name: S.session.save }).click()
+  await expect(page.getByRole('heading', { name: S.session.dailyLogged })).toBeVisible()
+  const sent = (await received(page)).slice(before).filter((r) => r.path === '/api/training/sessions')
+  expect(sent).toHaveLength(1)
+  expect(sent[0].body.kind).toBe('daily')
+  await page.getByRole('button', { name: S.session.done }).click()
+  // The daily session never marks the training day trained.
+  await openTraining(page)
+  await expect(page.getByTestId('trained-today')).toHaveCount(0)
+})
+
 test('the + menu offers yoga, an outdoor activity and the extra session, and is not drawn during a session', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-menu-${Date.now()}`)
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await page.getByTestId('plus').click()
   await expect(page.getByTestId('extras-menu').getByRole('button')).toHaveText([S.extras.yoga, S.extras.outdoor, S.extras.accessory])
   await page.getByRole('button', { name: S.extras.close }).click()
@@ -181,7 +210,7 @@ test('yoga: a flow is saved once however often Complete is pressed, and a second
   await scenario(context, `e2e-yoga-${Date.now()}`)
   const before = (await received(page)).length
   const openFlow = async () => {
-    await openTab(page, S.nav.training)
+    await openTraining(page)
     await page.getByTestId('plus').click()
     await page.getByTestId('extras-menu').getByRole('button', { name: S.extras.yoga }).click()
     await page.getByRole('button', { name: /Made-up hip flow/ }).click()
@@ -206,7 +235,7 @@ test('an outdoor activity is logged once, with the load its rating gives', async
   await onboard(page)
   await scenario(context, `e2e-outdoor-${Date.now()}`)
   const today = localDay()
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await page.getByTestId('plus').click()
   await page.getByTestId('extras-menu').getByRole('button', { name: S.extras.outdoor }).click()
   await expect(page.getByText(S.extras.outdoorHelp)).toBeVisible()
@@ -232,7 +261,7 @@ test('the extra session runs in the same flow and saves as its own kind, with it
   const tag = `e2e-accessory-${Date.now()}`
   await onboard(page)
   await scenario(context, tag)
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await page.getByTestId('plus').click()
   await page.getByTestId('extras-menu').getByRole('button', { name: S.extras.accessory }).click()
   await expect(page.getByTestId('accessory-why')).toBeVisible()
@@ -258,7 +287,7 @@ test('the extra session runs in the same flow and saves as its own kind, with it
 test('the week with no block shows the gap; damaged phases say so, and yoga still opens', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-gap-${Date.now()}`, 'gap')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await expect(page.getByTestId('gap').first()).toContainText(S.week.gapTitle)
   await expect(page.getByRole('button', { name: S.session.start })).toHaveCount(0)
   await context.addCookies([{ name: 'e2e_week', value: 'unreadable', url: ORIGIN }])
@@ -279,7 +308,7 @@ test('this week keeps one address: back to it from the week before, it is read w
   page.on('request', (r) => {
     if (r.url().includes('/api/training/week')) asked.push(new URL(r.url()).search)
   })
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   const bar = strip(page)
   await expect(bar).toBeVisible()
   const week = await bar.getAttribute('data-week')
@@ -295,7 +324,7 @@ test('the week strip leads the Training page, with the picked day right under it
   // The owner, 2026-10-21: "Move the week tab to the top of the page in training".
   await onboard(page)
   await scenario(context, `e2e-order-${Date.now()}`, 'gate1')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await expect(page.getByRole('button', { name: S.session.start })).toBeVisible()
   const y = async (testid: string) => (await page.getByTestId(testid).first().boundingBox())!.y
   const stripY = (await strip(page).boundingBox())!.y
@@ -309,7 +338,7 @@ test('the week strip leads the Training page, with the picked day right under it
 test('the week on a rest day offers its yoga flow and how to train anyway', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-rest-${Date.now()}`, 'rest_today')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   const rest = page.getByTestId('day-rest')
   await expect(rest).toContainText(S.week.restTrainAnyway)
   await rest.getByRole('button', { name: /Made-up hip flow/ }).click()
@@ -320,7 +349,7 @@ test('the week on a rest day offers its yoga flow and how to train anyway', asyn
 test('a swap that cannot be done says why and offers no button; one that can carries its warning', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-blocked-${Date.now()}`, 'blocked')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await weekStep(page, 1)
   await strip(page).locator('[data-marker="planned"]').first().click()
   await expect(page.getByTestId('swap-blocked')).toContainText(S.week.swapBlocked('made-up: today already has a logged session'))
@@ -339,7 +368,7 @@ test('a swap that cannot be done says why and offers no button; one that can car
 test('a move declined is recorded and not asked again', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-decline-${Date.now()}`, 'shift')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   const before = (await received(page)).length
   await page.getByTestId('shift').getByRole('button', { name: S.week.keepPlanned }).click()
   await expect.poll(() => outboxLength(page)).toBe(0)
@@ -356,7 +385,7 @@ test('a move declined is recorded and not asked again', async ({ page, context }
 test('the week of a failed week offers the redo on its Monday: asked twice, sent once', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-redo-${Date.now()}`, 'redo')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   const before = (await received(page)).length
   await page.getByTestId('redo').click()
   await page.getByRole('button', { name: S.week.redoYes }).click()
@@ -373,7 +402,7 @@ test('the extra session left with Discard is gone, and nothing is saved', async 
   await onboard(page)
   await scenario(context, `e2e-discard-${Date.now()}`)
   const before = (await received(page)).length
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await page.getByTestId('plus').click()
   await page.getByTestId('extras-menu').getByRole('button', { name: S.extras.accessory }).click()
   await page.getByRole('button', { name: S.extras.start }).click()
@@ -381,7 +410,7 @@ test('the extra session left with Discard is gone, and nothing is saved', async 
   await leaveSession(page)
   await expect(page.getByRole('heading', { name: S.today.title })).toBeVisible()
   expect(await page.evaluate(() => window.__health!.sessionActive())).toBe(false)
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await expect(page.getByTestId('week-page')).toBeVisible()
   const saves = (await received(page)).slice(before).filter((r) => r.path === '/api/training/sessions')
   test.info().annotations.push({ type: 'duplicate_supplementary', description: String(saves.length) })
@@ -391,7 +420,7 @@ test('the extra session left with Discard is gone, and nothing is saved', async 
 test("the extra session kept from yesterday is never offered as today's", async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-stale-${Date.now()}`, 'accessory_yesterday')
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await page.getByTestId('plus').click()
   await page.getByTestId('extras-menu').getByRole('button', { name: S.extras.accessory }).click()
   await expect(page.getByText(S.extras.accessoryNeedsEngine)).toBeVisible()
@@ -403,7 +432,7 @@ test('the week bar has no arrows, and a sideways swipe changes the week inside t
   test.skip(browserName !== 'chromium', 'the test makes its touches with the Touch constructor, which Chromium has')
   await onboard(page)
   await scenario(context, `e2e-swipe-${Date.now()}`)
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   const bar = strip(page)
   await expect(bar).toBeVisible()
   // Nothing beside the bar: no arrow button is drawn, and the bar spans the screen's width.

@@ -63,6 +63,14 @@ export async function openTab(page: Page, name: string): Promise<void> {
   await page.getByRole('navigation', { name: S.app }).getByRole('button', { name }).click()
 }
 
+/** Open Training and its "Training day" tile (WP-40): the week page with today's day. The
+ *  tab itself opens on the two tiles. */
+export async function openTraining(page: Page): Promise<void> {
+  await openTab(page, S.nav.training)
+  await page.getByTestId('tile-training-day').click()
+  await expect(page.getByTestId('week-page')).toBeVisible()
+}
+
 /** The mock build's test hook, once the app has started (main.tsx installs it). */
 export async function hook(page: Page): Promise<void> {
   await page.waitForFunction(() => window.__health !== undefined, null, { timeout: 20_000 })
@@ -77,7 +85,7 @@ export async function sessionStored(page: Page): Promise<void> {
 /** Open Training and start today's session (the mock engine's made-up one), with a Garmin
  *  workout declared when `garmin` is set. */
 export async function startTraining(page: Page, options: { garmin?: boolean } = {}): Promise<void> {
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   if (options.garmin) await page.getByRole('switch', { name: S.session.garminDeclare }).check()
   await page.getByRole('button', { name: S.session.start }).click()
   await expect(page.locator('.exercise__name')).toBeVisible()

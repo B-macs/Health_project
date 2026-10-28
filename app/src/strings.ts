@@ -202,6 +202,9 @@ export const S = {
     alertNext: (what: string, name: string) => `Next: ${what} · ${name}`,
     nextSet: 'Next set',
     hold: 'Hold',
+    // The slow start before a hold of the daily tendon session (WP-40).
+    leadIn: 'Take the weight slowly',
+    letGo: 'Let go slowly at the bell.',
     rest: 'Rest',
     ready: 'Ready',
     go: 'Go',
@@ -315,6 +318,26 @@ export const S = {
     done: 'Done',
     accessoryLogged: 'Accessory session logged.',
     accessoryEffortHelp: 'This one should be low. If it climbs past about 4, it has stopped being an accessory session and competes with the real one.',
+    dailyLogged: 'Daily tendon session logged.',
+    dailyEffortHelp: 'About half effort: the holds were hard by the end, never maximal.',
+  },
+  // The Training tab's two tiles and the daily tendon session (WP-40, 2026-10-28).
+  daily: {
+    trainingDay: 'Training day',
+    trainingDayOpen: 'Today’s session and the week',
+    dailyTitle: 'Daily tendon session',
+    minutes: (minutes: number | null) => (minutes == null ? 'About 10 min, at home' : `About ${minutes} min, at home`),
+    after: (time: string) => `8 hours after your gym session: from ${time}`,
+    before: 'Keep 8 hours before your gym session.',
+    doneToday: 'Done today',
+    rounds: (n: number, minutes: number) => `3 rounds · ${n} entries · about ${minutes} min`,
+    gelatin: 'Gelatin: about 15 g with about 200 mg vitamin C, 30–60 minutes before.',
+    howTo: 'How to do it',
+    start: 'Start',
+    again: 'Do it again',
+    cancel: 'Cancel',
+    blocked: 'There is a session in progress. Finish it or leave it first: the daily session shares the same saved progress, so starting one now would lose where you are.',
+    needsEngine: 'The daily session comes from the engine. There is no connection now, and this phone has not saved it yet.',
   },
   // The week page on the Training tab (rebuild Phase 7, T8-T36): the engine's week and
   // day answers, laid out. Every verdict, count and rule is the engine's.

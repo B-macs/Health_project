@@ -146,6 +146,15 @@ def get_accessory(today: date = Depends(local_today),
     return _session(lambda: tsession.accessory_plan(repo, today))
 
 
+@router.get("/api/training/daily", response_model=SessionPlanOut)
+def get_daily(today: date = Depends(local_today),
+              repo: Repository = Depends(get_repository)) -> dict:
+    """The daily tendon session (WP-40): the same session every day, its
+    8-hour line and whether it is done today. Never refused for the time of
+    day: when to do it is the athlete's decision."""
+    return _session(lambda: tsession.daily_plan(repo, today))
+
+
 @router.post("/api/training/completion", response_model=CompletionOut)
 def post_completion(body: CompletionIn) -> dict:
     return _session(lambda: tsession.completion(body.model_minutes, body.start_ts,

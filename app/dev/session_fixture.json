@@ -64,7 +64,8 @@
         "movable": false,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     },
     {
       "index": 1,
@@ -115,7 +116,8 @@
         "movable": false,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     },
     {
       "index": 2,
@@ -169,7 +171,8 @@
         "movable": true,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     },
     {
       "index": 3,
@@ -220,7 +223,8 @@
         "movable": true,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     },
     {
       "index": 4,
@@ -265,7 +269,8 @@
         "movable": true,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     },
     {
       "index": 5,
@@ -310,7 +315,8 @@
         "movable": false,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     },
     {
       "index": 6,
@@ -361,7 +367,8 @@
         "movable": true,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     },
     {
       "index": 7,
@@ -406,7 +413,8 @@
         "movable": false,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     },
     {
       "index": 8,
@@ -454,7 +462,8 @@
         "movable": true,
         "after": []
       },
-      "reading": null
+      "reading": null,
+      "lead_in_seconds": null
     }
   ],
   "steps": [
@@ -1042,7 +1051,8 @@
             "movable": true,
             "after": []
           },
-          "reading": null
+          "reading": null,
+          "lead_in_seconds": null
         }
       ],
       "steps": [
@@ -1093,5 +1103,7 @@
         }
       ]
     }
-  ]
+  ],
+  "reminder": null,
+  "done_today": false
 }

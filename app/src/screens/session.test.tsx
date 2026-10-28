@@ -8,13 +8,15 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
 import fixture from '../../dev/session_fixture.json'
 import { HealthDB } from '../db/schema'
+import { holdLengthMs, startTimer } from '../lib/timers'
 import { AppStateProvider } from '../lib/appState'
 import { drain, enqueue } from '../lib/outbox'
 import {
-  advance, doFirst, finished, saveBody, setGarmin, setSide, skip, startSessionState, type HeartRate, type Plan,
+  advance, doFirst, finished, saveBody, setGarmin, setSide, skip, startSessionState, withTimer, type HeartRate, type Plan,
   type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
+import { reminderLine, trainingDayLine } from './Daily'
 import { arrivalTimer, backLabel, SessionFlow } from './Session'
 import { HeartRateMatch, reviewLine, SessionSave } from './SessionSave'
 import { Banner, longDate, noSessionLine, noSessionReason, TrainedToday, trainedToday } from './TrainingTab'
@@ -431,5 +433,84 @@ describe('leaving a session (WP-33)', () => {
   it('Leave for now is offered beside losing it', () => {
     expect(S.session.exitAsk).toContain('Leave for now')
     expect(S.session.leaveForNow).toBe('Leave for now')
+  })
+})
+
+describe('the daily tendon session (WP-40)', () => {
+  const daily = fx.dailyPlan('2026-10-20', new Set()) as unknown as Plan
+  const dAt = (step: number): TrainingState =>
+    ({ ...startSessionState(daily, '2026-10-20-dai10001', daily.exercises.map((_, i) => `dx-${i}`)), step })
+
+  it('a hold with a slow start runs the slow start and the hold as one timer', () => {
+    const marked = daily.steps.filter((st) => st.timer_starts === 'after_timer'
+      && daily.exercises[st.ex_idx].type === 'hold')
+    expect(marked.length).toBeGreaterThan(0)     // the calves' second side
+    for (const st of marked) {
+      const ex = daily.exercises[st.ex_idx]
+      expect(arrivalTimer(dAt(st.index), T0, true)?.lengthMs)
+        .toBe(((ex.hold_seconds ?? 0) + (ex.lead_in_seconds ?? 0)) * 1000)
+    }
+  })
+
+  it('the screen counts the slow start down first, then the hold, with the let-go line', () => {
+    const start = dAt(0)
+    const hold = daily.exercises[0]
+    expect(hold.lead_in_seconds).toBe(5)
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(T0 + 2000)
+      const early = withTimer(start, startTimer('hold', holdLengthMs(hold), T0))
+      const earlyText = text(render(early))
+      expect(earlyText).toContain(S.session.leadIn)
+      expect(earlyText).not.toContain(S.session.letGo)
+      vi.setSystemTime(T0 + 10_000)
+      const later = text(render(early))
+      expect(later).toContain(S.session.hold)
+      expect(later).toContain(S.session.letGo)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a hold with no slow start shows no slow-start words', () => {
+    const t = withTimer(at(firstEntry(plan.exercises.findIndex((e) => e.type === 'hold'))),
+      startTimer('hold', 6000, Date.now()))
+    const shown = text(render(t))
+    expect(shown).not.toContain(S.session.leadIn)
+    expect(shown).not.toContain(S.session.letGo)
+  })
+
+  it('the save screen starts at its effort target and says it is the daily session', () => {
+    const walkedDaily = (): TrainingState => {
+      let s = dAt(0)
+      let t = T0
+      while (!finished(s)) { s = advance(s, t); t += 30_000 }
+      return s
+    }
+    const unsaved = { ...walkedDaily(), saving: true }
+    const html = text(provide(<SessionSave s={unsaved} update={() => undefined} onDone={() => undefined} />))
+    expect(html).toContain(S.session.dailyEffortHelp)
+    expect(html).toContain(S.session.effortValue(daily.rpe_target ?? 0))
+    const saved = { ...unsaved, savedId: 'outbox-1', saved: { rpe: 4, minutes: 11, notes: '' } }
+    const done = text(provide(<SessionSave s={saved} update={() => undefined} onDone={() => undefined} />))
+    expect(done).toContain(S.session.dailyLogged)
+    expect(done).not.toContain(S.session.congrats)
+  })
+
+  it('the tiles say the 8-hour line, and the training day\'s own state', () => {
+    expect(reminderLine({ kind: 'after', time: '16:13' })).toBe(S.daily.after('16:13'))
+    expect(reminderLine({ kind: 'before', time: null })).toBe(S.daily.before)
+    expect(reminderLine(null)).toBeNull()
+    const today = fx.trainingDay('2026-10-20', '2026-10-20')
+    expect(trainingDayLine(today, '2026-10-20', '2026-10-20')).toBe(S.session.trainedToday)
+    expect(trainingDayLine(today, null, '2026-10-21')).toBe(S.daily.trainingDayOpen)
+    const rest = { ...today, route: 'rest' }
+    expect(trainingDayLine(rest, null, '2026-10-20')).toBe(S.session.noSession.rest_day)
+  })
+
+  it('the mock answers each reminder the engine can send', () => {
+    expect(fx.dailyPlan('2026-10-20', new Set(['daily_rest'])).reminder).toBeNull()
+    expect(fx.dailyPlan('2026-10-20', new Set(['daily_before'])).reminder).toEqual({ kind: 'before', time: null })
+    expect(fx.dailyPlan('2026-10-20', new Set(['daily_done'])).done_today).toBe(true)
   })
 })

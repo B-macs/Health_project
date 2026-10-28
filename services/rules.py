@@ -898,6 +898,24 @@ MOVEMENT_RULES: list[MovementRule] = [
                "2026-10-16.",
         stage_cap=1, severity="caution", laterality="right",
     ),
+    # The daily tendon session (WP-40, 2026-10-28): its two new names. "Active
+    # Hang" already lands on the hang rule and the neck stretch on its own.
+    MovementRule(
+        movement="half push up hold",
+        reason="A push-up held half way, body weight only: the elbows stop level with the "
+               "body and never go lower — deeper takes the RIGHT arm behind the line of the "
+               "body, the measured limit (a face-down arm raise, right 20 cm, left 40 cm, "
+               "2026-08-13). About half effort, lowered slowly into the hold. A wrist that "
+               "complains holds on the fists. Ruled 2026-10-28.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="single leg calf hold",
+        reason="A calf raise held half way up on one foot, fingertips on a wall for "
+               "balance: body weight, no spinal load, no hip or shoulder in range. Ruled "
+               "2026-10-28.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
     # Step 8's better-exercise checks, 2026-10-16 (CLAUDE.md Key Rule 25): the
     # three picks that replaced the prone Y raise, the end-range psoas
     # isometric and the adductor ladder.

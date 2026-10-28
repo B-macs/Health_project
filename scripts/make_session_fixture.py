@@ -25,6 +25,8 @@ for extra in (ROOT, ROOT / "api"):
         sys.path.insert(0, str(extra))
 
 OUT = ROOT / "app" / "dev" / "session_fixture.json"
+#: The daily tendon session (WP-40), made the same way from its own entries.
+DAILY_OUT = ROOT / "app" / "dev" / "daily_fixture.json"
 DAY = "2026-10-20"
 FIRST = "left"
 
@@ -141,22 +143,69 @@ def build() -> dict:
     return SessionPlanOut(**plan).model_dump(mode="json")
 
 
+def build_daily() -> dict:
+    """The daily tendon session as the engine sends it (WP-40): its own entries
+    (daily_tendon.py, already in the repo and without personal readings), walked
+    and timed as training_session.daily_plan does, with an "after" reminder."""
+    from healthapi.schemas_training import SessionPlanOut
+    from services import daily_session as dly
+    from services import guided_flow
+    from services import sessions as sess
+    from services import training_session as ts
+
+    exercises = dly.build_day()["exercises"]
+    out = [{
+        "index": i, **{k: ex.get(k) for k in ts.EXERCISE_FIELDS},
+        "icon": sess.type_icon(ex), "warmup": False, "timed_test": False,
+        "timer": ts.timer_kind(ex), "prescription": sess.prescription_label(ex),
+        "mechanics": ex["mechanics"], "warning": "", "ramp_for": None,
+        "reps_editable": sess.reps_are_editable(ex), "entry": None, "previous": None,
+        "previous_caption": "", "delta": "", "delta_direction": "", "entry_caption": "",
+        "contradiction": None, "garmin_pull": False, "garmin_window": None,
+        "estimated_minutes": max(1, round(sess.exercise_duration_seconds(ex) / 60)), "move": None,
+    } for i, ex in enumerate(exercises)]
+    plan = {
+        "kind": "daily", "date": DAY, "day_num": None, "plan_days": None,
+        "objective": dly.dt.OBJECTIVE, "phase": dly.dt.PHASE, "rpe_target": dly.dt.RPE_TARGET,
+        "first_side": FIRST,
+        "banner": {"kind": "", "text": "", "cause": "", "acwr_advisory": ""},
+        "adaptation": {"volume_factor": 1.0, "reduced": False, "banner_kind": "", "volume_note": "",
+                       "badge_shown": False},
+        "exercises": out, "steps": guided_flow.walk(exercises, FIRST),
+        "model_minutes": dly.modelled_minutes(exercises), "min_minutes": sess.MIN_ACCESSORY_MINUTES,
+        "ask_length_above_minutes": None,
+        "rest_taken_max_seconds": guided_flow.REST_TAKEN_MAX_SECONDS, "garmin_configured": True,
+        "band_tiers": [{"tier": t, "label": sess.BAND_TIER_LABELS.get(t, "")} for t in sess.BAND_TIERS],
+        "reasons": [], "next_day": None, "note": dly.dt.NOTE, "alternatives": [],
+        "reminder": {"kind": "after", "time": "16:13"}, "done_today": False,
+    }
+    return SessionPlanOut(**plan).model_dump(mode="json")
+
+
 def text() -> str:
     return json.dumps(build(), indent=2, ensure_ascii=False) + "\n"
 
 
+def daily_text() -> str:
+    return json.dumps(build_daily(), indent=2, ensure_ascii=False) + "\n"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--check", action="store_true", help="exit 1 when the file is not this output")
+    ap.add_argument("--check", action="store_true", help="exit 1 when a file is not this output")
     args = ap.parse_args()
-    fresh = text()
+    files = ((OUT, text()), (DAILY_OUT, daily_text()))
     if args.check:
-        # Line endings as git may check them out on Windows.
-        same = OUT.exists() and OUT.read_text(encoding="utf-8").replace("\r\n", "\n") == fresh
-        print("session_fixture.json is current" if same else "session_fixture.json is stale: run the script")
-        return 0 if same else 1
-    OUT.write_text(fresh, encoding="utf-8", newline="\n")
-    print(f"wrote {OUT.relative_to(ROOT)}")
+        stale = 0
+        for path, fresh in files:
+            # Line endings as git may check them out on Windows.
+            same = path.exists() and path.read_text(encoding="utf-8").replace("\r\n", "\n") == fresh
+            print(f"{path.name} is current" if same else f"{path.name} is stale: run the script")
+            stale += not same
+        return 1 if stale else 0
+    for path, fresh in files:
+        path.write_text(fresh, encoding="utf-8", newline="\n")
+        print(f"wrote {path.relative_to(ROOT)}")
     return 0
 
 

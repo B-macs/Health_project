@@ -23,14 +23,15 @@ COPY requirements-engine.txt .
 RUN pip install -r requirements-engine.txt
 
 # The engine: services/ and the root modules its import chain needs (training_plan,
-# training_constants, the Cluster A trio, flexibility_baselines, goal_block, and
-# goal_week for the session order's sections, WP-27).
+# training_constants, the Cluster A trio, flexibility_baselines, goal_block,
+# goal_week for the session order's sections, WP-27, and daily_tendon for the daily
+# tendon session, WP-40).
 # tests/api/test_image_file_set.py fails when services/ or api/ imports a root
 # module this list does not copy, or when it copies one nothing imports.
 COPY services/ services/
 COPY training_plan.py training_constants.py cluster_a_battery.py \
      cluster_a_mechanics.py cluster_a_prescription.py flexibility_baselines.py \
-     goal_block.py goal_week.py ./
+     goal_block.py goal_week.py daily_tendon.py ./
 COPY api/ api/
 
 # Compiled once here, never at a cold start. PYTHONDONTWRITEBYTECODE stops the

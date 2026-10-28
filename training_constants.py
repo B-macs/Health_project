@@ -182,6 +182,8 @@ _UPPER_BODY_EXERCISES: tuple[str, ...] = (
     "Reverse Cable Crossover",
     "Cable Lateral Raise",
     "Neck Working Stretch (Right)",
+    # The daily tendon session (WP-40, 2026-10-28). Active Hang is above.
+    "Half Push-Up Hold",
 )
 
 _CORE_EXERCISES: tuple[str, ...] = (
@@ -370,6 +372,9 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Hip Airplane (Weighted)",
     "Flexibility Retest (Test)",
     *FLEXIBILITY_TEST_NAMES,
+    # The daily tendon session (WP-40, 2026-10-28).
+    "Single-Leg Calf Hold",
+    "Single-Leg Calf Hold (Bent Knee)",
 )
 
 EXERCISE_BODY_REGION: dict[str, str] = {
@@ -714,6 +719,12 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Flexibility Retest (Test)":              {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75},
     # The retest's entries, one per test (WP-33): the old entry's split, each.
     **{name: {"upper_body": 0.00, "core": 0.25, "lower_body": 0.75} for name in FLEXIBILITY_TEST_NAMES},
+    # The daily tendon session (WP-40). The push-up hold is a plank on the hands:
+    # the trunk holds the line. The calf holds are the lower leg, a little trunk
+    # for the balance on one foot.
+    "Half Push-Up Hold":                      {"upper_body": 0.70, "core": 0.30, "lower_body": 0.00},
+    "Single-Leg Calf Hold":                   {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
+    "Single-Leg Calf Hold (Bent Knee)":       {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -996,6 +1007,11 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Rib and Pelvis Test (Test)":               ("mobility_core", 0.25),
     "Flexibility Retest (Test)":                ("mobility_core", 0.25),
     **{name: ("mobility_core", 0.25) for name in FLEXIBILITY_TEST_NAMES},
+    # The daily tendon session (WP-40): body weight only. The push-up hold is a
+    # multi-joint hold, the active hang's tier; a calf hold is one joint.
+    "Half Push-Up Hold":                        ("bodyweight_compound", 0.5),
+    "Single-Leg Calf Hold":                     ("isolation", 0.3),
+    "Single-Leg Calf Hold (Bent Knee)":         ("isolation", 0.3),
 }
 
 

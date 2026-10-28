@@ -813,6 +813,35 @@
         "title": "Contributors",
         "type": "object"
       },
+      "DailyReminder": {
+        "description": "The daily tendon session's 8-hour line (WP-40, services/daily_session.\nreminder): \"after\" today's gym session, with the time (HH:MM, the phone's\nown clock) the gap ends; or \"before\" it, with no time. Never a lock.",
+        "properties": {
+          "kind": {
+            "enum": [
+              "after",
+              "before"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "time": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Time"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "DailyReminder",
+        "type": "object"
+      },
       "DataCheckOut": {
         "description": "The daily data check (services/data_check.py): the rows of the newest\nbackup that the store no longer holds. Reads only.",
         "properties": {
@@ -5489,6 +5518,17 @@
             ],
             "title": "Laterality"
           },
+          "lead_in_seconds": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lead In Seconds"
+          },
           "mechanics": {
             "title": "Mechanics",
             "type": "string"
@@ -5711,7 +5751,7 @@
         "type": "object"
       },
       "SessionPlanOut": {
-        "description": "`kind`: plan or accessory.",
+        "description": "`kind`: plan, accessory or daily (the daily tendon session, WP-40).",
         "properties": {
           "adaptation": {
             "$ref": "#/components/schemas/Adaptation"
@@ -5760,6 +5800,11 @@
               }
             ],
             "title": "Day Num"
+          },
+          "done_today": {
+            "default": false,
+            "title": "Done Today",
+            "type": "boolean"
           },
           "exercises": {
             "items": {
@@ -5828,6 +5873,16 @@
             },
             "title": "Reasons",
             "type": "array"
+          },
+          "reminder": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DailyReminder"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "rest_taken_max_seconds": {
             "title": "Rest Taken Max Seconds",
@@ -12056,6 +12111,69 @@
           }
         },
         "summary": "Post Completion"
+      }
+    },
+    "/api/training/daily": {
+      "get": {
+        "description": "The daily tendon session (WP-40): the same session every day, its\n8-hour line and whether it is done today. Never refused for the time of\nday: when to do it is the athlete's decision.",
+        "operationId": "get_daily_api_training_daily_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Daily"
       }
     },
     "/api/training/day": {

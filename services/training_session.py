@@ -24,6 +24,7 @@ import threading
 from datetime import date, datetime, time
 
 from services import accessory as acc
+from services import daily_session as dly
 from services import flexibility_screen as fxs
 from services import guided_flow, prescription, session_order, session_save, strain_regions
 from services import sessions as sess
@@ -47,10 +48,15 @@ class SessionRefused(ValueError):
 #: another.
 SUPPLEMENTARY_SAVE_LOCK = threading.Lock()
 
-#: The kinds of session the save takes: the plan day, and the accessory
-#: session (the "+" button), stored under its own Type so it never marks a
+#: The kinds of session the save takes: the plan day, the accessory session
+#: (the "+" button) and the daily tendon session (the Training tab's second
+#: tile, WP-40), the last two stored under their own Type so they never mark a
 #: plan day done (Repository.SUPPLEMENTARY_SESSION_TYPES).
-PLAN, ACCESSORY = "plan", "accessory"
+PLAN, ACCESSORY, DAILY = "plan", "accessory", "daily"
+
+#: The Type each kind's rows are stored under; a plan exercise keeps its own
+#: movement type (None).
+_STORED_TYPE = {PLAN: None, ACCESSORY: acc.ACCESSORY_TYPE, DAILY: dly.DAILY_TYPE}
 
 
 def _try(read, default):
@@ -95,7 +101,7 @@ def timer_kind(ex: dict) -> str | None:
 EXERCISE_FIELDS = ("name", "type", "laterality", "sets", "reps", "reps_in_set", "hold_seconds",
                    "duration_minutes", "rest_seconds", "tempo", "rep_min", "rep_max",
                    "equipment_type", "increment_size", "increment_unit", "weight_kg",
-                   "band_tier")
+                   "band_tier", "lead_in_seconds")
 
 
 def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tuple,
@@ -218,7 +224,10 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
     lift's swap (WP-28)."""
     policy, modifier = decided["policy"], decided["modifier"]
     plan_ex = content["exercises"]
-    dosed = sess.dosed_day(plan_ex, policy["volume_factor"], content.get("day_type"))
+    # The daily tendon session runs its full dose on every day: readiness lowers
+    # only the gym's main work (Key Rule 23 (6)), and Baar's dose is the hold time.
+    factor = 1.0 if kind == DAILY else policy["volume_factor"]
+    dosed = sess.dosed_day(plan_ex, factor, content.get("day_type"))
     first = sess.first_side(today)
     strains = _warning_strains(repo, today)
     garmin_ok = bool(_try(repo.garmin_configured, False))
@@ -244,8 +253,10 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
         "adaptation": ts.adaptation(policy),
         "exercises": exercises,
         "steps": guided_flow.walk(dosed, first),
-        "model_minutes": sess.estimate_duration(dosed),
-        "min_minutes": sess.MIN_ACCESSORY_MINUTES if kind == ACCESSORY else sess.MIN_SESSION_MINUTES,
+        # The daily session has its own time model: it never leaves one room, so
+        # the gym's measured changeovers do not apply (daily_session.modelled_seconds).
+        "model_minutes": dly.modelled_minutes(dosed) if kind == DAILY else sess.estimate_duration(dosed),
+        "min_minutes": sess.MIN_SESSION_MINUTES if kind == PLAN else sess.MIN_ACCESSORY_MINUTES,
         # The save asks which length to keep when the clock runs past this (T93;
         # sessions.duration_needs_a_check), sent with the plan so the phone can ask
         # it offline without holding the rule. None: the question is never asked.
@@ -302,6 +313,36 @@ def accessory_plan(repo, today: date) -> dict:
     return out
 
 
+def daily_plan(repo, today: date) -> dict:
+    """The daily tendon session for today (the Training tab's second tile,
+    WP-40): the same session every day, with its 8-hour line and whether it
+    is done today. It is offered on every day, a rest day and a day already
+    done included: when to do it is the athlete's decision, never a lock."""
+    r = ts.read(repo, today)
+    decided = ts.todays_decision(repo, r.phases, today)
+    out = compose(repo, today, kind=DAILY, day_num=None, content=dly.build_day(), decided=decided)
+    out["next_day"] = None
+    out["note"] = dly.dt.NOTE
+    day_sessions = dly.read_day_sessions(repo, today)
+    out["reminder"] = dly.reminder(day_sessions, _plan_still_to_do(repo, r, today))
+    out["done_today"] = dly.done_today(day_sessions)
+    return out
+
+
+def _plan_still_to_do(repo, r, today: date) -> bool:
+    """Today has a plan session that is not logged yet: session_plan would
+    offer it (a block today, not a rest day, the day's overview), and it is
+    not logged."""
+    try:
+        if r.phases_error or r.active is None or sess.today_is_rest(r.active, today):
+            return False
+        if sess.today_screen(r.day_num, len(r.plan), False, False) != "overview":
+            return False
+        return not sess.logged_today(repo, today)
+    except Exception:
+        return False
+
+
 # ─── Completion ──────────────────────────────────────────────────────────────
 
 def completion(model_minutes: int, start_ts: float, end_ts: float, rpe: int,
@@ -311,7 +352,7 @@ def completion(model_minutes: int, start_ts: float, end_ts: float, rpe: int,
     the plan that the athlete chooses the length to save
     (sessions.duration_needs_a_check), and the session load for each
     choice. The clock readings are the phone's own."""
-    floor = sess.MIN_ACCESSORY_MINUTES if kind == ACCESSORY else sess.MIN_SESSION_MINUTES
+    floor = sess.MIN_SESSION_MINUTES if kind == PLAN else sess.MIN_ACCESSORY_MINUTES
     clock = (max(floor, int((end_ts - start_ts) / 60)) if start_ts and start_ts > 0
              else int(model_minutes))
     ask = kind == PLAN and sess.duration_needs_a_check(clock, model_minutes)
@@ -370,10 +411,10 @@ def build_save(body: dict) -> session_save.SessionSave:
     every id once, before the first send. Each exercise carries the
     fields the session plan gave it, its stepper's final values (`actual`),
     its recorded sets, its note and its Garmin minutes. A plan exercise is
-    stored under its own movement type; the accessory session's under its
-    Type (accessory.ACCESSORY_TYPE)."""
+    stored under its own movement type; the accessory session's and the daily
+    session's under their Type (_STORED_TYPE)."""
     kind = body.get("kind", PLAN)
-    if kind not in (PLAN, ACCESSORY):
+    if kind not in _STORED_TYPE:
         raise SessionRefused("unknown_kind", [str(kind)])
     exercises = body.get("exercises") or []
     pending = {"session_id": body["session_id"], "session_date": str(body["date"]),
@@ -394,7 +435,7 @@ def build_save(body: dict) -> session_save.SessionSave:
         garmin_detail={i: e["garmin_detail"] for i, e in enumerate(exercises)
                        if e.get("garmin_detail")},
         session_notes=sess.join_notes(body.get("plan_note") or "", body.get("notes") or ""),
-        movement_type_override=acc.ACCESSORY_TYPE if kind == ACCESSORY else None)
+        movement_type_override=_STORED_TYPE[kind])
 
 
 def save(repo, body: dict, today: date) -> dict:

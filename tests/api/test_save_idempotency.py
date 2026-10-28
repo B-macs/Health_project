@@ -308,6 +308,24 @@ def test_an_accessory_session_never_marks_the_plan_day_done(monkeypatch, local_c
     assert not repo.has_logged_session(TODAY)
 
 
+def test_a_daily_session_sent_twice_stores_one_session_under_its_own_type(monkeypatch, local_copy):
+    """WP-40: the daily tendon session is idempotent like every save, is
+    stored under its own Type, and never marks the plan day done."""
+    from services import daily_session as dly
+    store = FakeStore()
+    repo = record_repo(local_copy, store)
+    body = {**BODY, "session_id": "2026-10-19-dai10001", "kind": "daily",
+            "exercises": [{**BODY["exercises"][1], "exercise_id": "ex-daily"}]}
+    with _client(monkeypatch, repo, local_copy) as c:
+        for _ in range(2):
+            assert _send(c, "post", "/api/training/sessions", body).status_code == 200
+    rows = _rows(store, "training_exercises")
+    assert [r["exercise_id"] for r in rows] == ["ex-daily"]
+    assert {r.get("movement_type") for r in rows} == {dly.DAILY_TYPE}
+    assert len(_rows(store, "training_sessions")) == 1
+    assert not repo.has_logged_session(TODAY)
+
+
 # ── the phone's raw sets (rebuild Phase 6) ───────────────────────────────────
 
 SPLIT = {"name": "Split Squat", "type": "reps", "laterality": "unilateral", "sets": 2, "reps": 8,

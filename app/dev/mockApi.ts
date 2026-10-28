@@ -257,6 +257,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
       // `accessory_yesterday`: an answer kept from the day before, which is never today's.
       return send(200, fx.accessoryPlan(scenarioOf(req).has('accessory_yesterday') ? fx.addDays(local, -1) : local))
     }
+    if (url.pathname === '/api/training/daily') return send(200, fx.dailyPlan(local, scenarioOf(req)))
     if (url.pathname === '/api/training/yoga') return send(200, fx.yogaCatalogue())
     if (url.pathname === '/api/training/outdoor') {
       if (scenarioOf(req).has('garmin_busy')) return send(409, { error: 'sync_running' })

@@ -95,8 +95,9 @@ SAME guided flow as the plan session.
    shoulder with three dislocations, a failed wrap and a Latarjet on a shallow
    glenoid. Cluster D prescribes it; the clinical record argues against it;
    nobody has asked the physio. Raise to 3 only after two clean weeks at step 2
-   **and** the question has been put. Raise `HANG_STEP` (currently 1) on two
-   clean weeks alone.
+   **and** the question has been put. Raise `HANG_STEP` (currently 2, on his
+   report of 2026-10-28: he holds the bar for more than 15 s) on two clean
+   weeks alone. Since 2026-08-17 step 3 needs four clean weeks at step 2.
 2. **The interscapular exit criterion is being confounded.** Its own text says
    the intervention under test is the **desk height, not the training**. Upper
    activation days now add scapular work, and the session note says so, so the

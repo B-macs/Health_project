@@ -1,7 +1,9 @@
 // The Training tab (rebuild Phases 6 and 7). The session the phone keeps (the database's
 // `session` row) decides what shows: while one exists, the guided flow or its save (a plan
-// session or the accessory session, the same flow); else the "+" menu's screen the address
-// names (yoga, outdoor, the accessory session before Start); else the week page.
+// session, the accessory session or the daily tendon session, the same flow); else the
+// screen the address names (the week page, the daily session before Start, the "+" menu's
+// yoga, outdoor and accessory session); else the two tiles (WP-40: "Training day" and
+// "Daily tendon session", screens/Daily.tsx).
 //
 // The week page (screens/Week.tsx): the banner and the week's questions, the strip, and the
 // day picked in it. Today's day is the session overview before Start (inventory T37-T47):
@@ -29,6 +31,7 @@ import { IconPlus } from '../ui/icons'
 import { Spinner } from '../ui/parts'
 import { Sheet } from '../ui/Sheet'
 import { HomeItems, Timeline } from '../ui/timeline'
+import { DailyOverview, TrainingTiles } from './Daily'
 import { AccessoryOverview, ExtrasMenu, Outdoor, YogaDetail, YogaList } from './Extras'
 import { SessionFlow } from './Session'
 import { SessionSave } from './SessionSave'
@@ -392,8 +395,9 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
   )
 }
 
-/** The "+" menu's screens, by address. */
-export type Extra = 'yoga' | 'outdoor' | 'accessory'
+/** The screens by address: the week page ("day"), the daily tendon session, and the "+"
+ *  menu's screens. No address: the two tiles. */
+export type Extra = 'day' | 'daily' | 'yoga' | 'outdoor' | 'accessory'
 
 export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
   const { store, go } = useApp()
@@ -428,5 +432,7 @@ export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
   if (extra === 'yoga') return slug ? <YogaDetail slug={slug} /> : <YogaList />
   if (extra === 'outdoor') return <Outdoor />
   if (extra === 'accessory') return <AccessoryOverview />
-  return <WeekPage onStart={(p, garmin) => void start(p, garmin)} starting={starting} />
+  if (extra === 'daily') return <DailyOverview />
+  if (extra === 'day') return <WeekPage onStart={(p, garmin) => void start(p, garmin)} starting={starting} />
+  return <TrainingTiles />
 }

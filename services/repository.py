@@ -580,6 +580,16 @@ def garmin_paused(until_iso: str) -> str:
     return f"Garmin is paused after a refusal; next try after {until_iso[11:16]}"
 
 
+def _ts_after(a: str, b: str) -> bool:
+    """Whether ISO time `a` is later than `b`, compared as instants (a set's
+    "ts" carries the phone's own UTC offset); a time that does not parse is
+    never later."""
+    try:
+        return datetime.fromisoformat(a) > datetime.fromisoformat(b)
+    except (TypeError, ValueError):
+        return False
+
+
 def _date_window(prop: str, start: str, end: date) -> dict:
     """A query filter for the rows of `prop` from `start` (ISO) to `end`, both
     included: a read for a day ends on that day (rebuild rule 3), never on the
@@ -2640,7 +2650,15 @@ class Repository:
     #: from membership here, which is why the accessory session needs no
     #: special case anywhere in `has_logged_session`, the swap gates or the
     #: reschedule logic — only its own literal on the write.
-    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor", "Accessory"})
+    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor", "Accessory", "Daily"})
+
+    #: Types that never make a date a LOGGED DAY, whatever the caller counts
+    #: (WP-40, the athlete's decision of 2026-10-28). The daily tendon session
+    #: runs every day: counted as a logged day it would give every week seven,
+    #: and the failed-week rule (0-2 logged days, Key Rule 22) could never
+    #: fire; the week strip would mark a rest day done. It still counts in
+    #: strain and the load ratio (Foster AU) — only the day count leaves it out.
+    NOT_A_TRAINING_DAY_TYPES: frozenset[str] = frozenset({"Daily"})
 
     def has_logged_session(self, d: date) -> bool:
         """True only for a logged rehab-plan session — a logged Yoga,
@@ -2695,10 +2713,9 @@ class Repository:
                 {"property": "Session Date", "date": {"on_or_before": str(end)}},
             ]},
         )
-        if not include_supplementary:
-            pages = [p for p in pages
-                     if notion.get_property(p, "Type", "select")
-                     not in self.SUPPLEMENTARY_SESSION_TYPES]
+        left_out = (self.SUPPLEMENTARY_SESSION_TYPES if not include_supplementary
+                    else self.NOT_A_TRAINING_DAY_TYPES)
+        pages = [p for p in pages if notion.get_property(p, "Type", "select") not in left_out]
         return {d for p in pages if (d := notion.get_property(p, "Session Date", "date"))}
 
     def get_logged_session_dates_live(self, start: date, end: date) -> set[str]:
@@ -2714,7 +2731,8 @@ class Repository:
         Block B back a week. get_phases_live already kept the SCHEDULE it
         writes from being stale; this keeps the COUNT it judges on from being
         stale. Every logged session counts, supplementary ones included, the
-        way the rule's count always has.
+        way the rule's count always has — except the daily tendon session,
+        which never makes a logged day (NOT_A_TRAINING_DAY_TYPES, WP-40).
 
         Offline (a read-only snapshot) there is no live side to read, and
         every write raises anyway, so this is the ordinary read there.
@@ -2728,7 +2746,39 @@ class Repository:
                 {"property": "Session Date", "date": {"on_or_before": str(end)}},
             ]},
         )
-        return {d for p in pages if (d := notion.get_property(p, "Session Date", "date"))}
+        return {d for p in pages
+                if notion.get_property(p, "Type", "select") not in self.NOT_A_TRAINING_DAY_TYPES
+                and (d := notion.get_property(p, "Session Date", "date"))}
+
+    def get_day_sessions(self, d: date) -> list[dict]:
+        """The sessions logged on `d`, one dict each: {"session_id", "type",
+        "last_set_ts"} — the Type of its exercise rows, and the latest per-set
+        "ts" among them (ISO with the phone's own UTC offset; None when no set
+        carries one). For the daily tendon session's tile (WP-40): whether the
+        daily session is done today, and when today's plan session ended, for
+        the 8-hour reminder. One filtered query, the same seam as every other
+        read of the day."""
+        pages = self._query(
+            self.config.notion_db_training,
+            filter_={"property": "Session Date", "date": {"equals": str(d)}},
+        )
+        out: dict[str, dict] = {}
+        for p in pages:
+            sid = notion.get_property(p, "Session ID", "rich_text") or ""
+            if not sid:
+                continue
+            row = out.setdefault(sid, {"session_id": sid,
+                                       "type": notion.get_property(p, "Type", "select") or "",
+                                       "last_set_ts": None})
+            try:
+                sets = json.loads(notion.get_property(p, "Sets", "rich_text") or "[]")
+            except Exception:
+                sets = []
+            for s in sets if isinstance(sets, list) else []:
+                ts = s.get("ts") if isinstance(s, dict) else None
+                if ts and (row["last_set_ts"] is None or _ts_after(ts, row["last_set_ts"])):
+                    row["last_set_ts"] = ts
+        return list(out.values())
 
     def get_supplementary_sessions_live(self, day: date, session_type: str) -> dict[str, dict]:
         """One day's sessions of one supplementary Type, read from Notion

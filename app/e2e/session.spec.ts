@@ -15,7 +15,7 @@ import type { Page } from '@playwright/test'
 import fixture from '../dev/session_fixture.json' with { type: 'json' }
 import { stepWeight } from '../src/lib/training'
 import { S } from '../src/strings'
-import { expect, hook, leaveSession, onboard, ORIGIN, startTraining, test } from './helpers'
+import { expect, hook, leaveSession, onboard, ORIGIN, startTraining, test, openTraining } from './helpers'
 
 type Side = { reps: number | null; weight_kg: number | null; seconds: number | null } | null
 type RawSet = {
@@ -212,7 +212,7 @@ test('a save whose answer is lost is sent again with the same ids, and the engin
 test('the overview offers the adapt dialog; a running watch is named; a session the watch cannot place asks which', async ({ page, context }) => {
   const tag = `e2e-choose-${Date.now()}`
   await onboard(page)
-  await page.getByRole('navigation', { name: S.app }).getByRole('button', { name: S.nav.training }).click()
+  await openTraining(page)
   // The overview: plan start, today and the day; the load banner; the workout card; the
   // lists; the at-home item and its how-to; the first side.
   await expect(page.getByRole('region', { name: S.session.blockProgress })).toContainText(S.session.planStart)

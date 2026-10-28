@@ -168,10 +168,13 @@ def test_the_90_90_hip_lift_is_not_in_the_new_week():
 
 
 def test_the_neck_stretch_is_done_at_home_not_in_the_gym():
-    """Approved 2026-10-16: at home on the core days, so it takes no gym time."""
+    """Approved 2026-10-16: at home, so it takes no gym time — on the core days
+    until 2026-10-28, every day in the daily tendon session since (WP-40)."""
+    import daily_tendon as dt
     name = "Neck Working Stretch (Right)"
     assert all(name not in _names(d) for d in gw.DAYS)
-    assert gw.HOME[name]["days"] == gw.CORE_DAYS
+    assert name not in gw.HOME
+    assert sum(ex["name"] == name for ex in dt.entries()) == 2
     assert rules.check_movement(name, 2)["severity"] == "caution"
 
 

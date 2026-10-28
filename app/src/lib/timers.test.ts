@@ -3,7 +3,7 @@
 // error over one second after a simulated background is a failure here.
 import { describe, expect, it } from 'vitest'
 import {
-  elapsedMs, endsAt, extendTimer, hasEnded, pauseTimer, remainingMs, resumeTimer, shownSeconds, startTimer,
+  elapsedMs, endsAt, extendTimer, hasEnded, holdLengthMs, leadInLeftMs, pauseTimer, remainingMs, resumeTimer, shownSeconds, startTimer,
   ticksCrossed,
 } from './timers'
 
@@ -67,5 +67,22 @@ describe('the 3-2-1 ticks', () => {
   it('a tick a hidden app missed is not played late', () => {
     const t = startTimer('rest', 10_000, T0)
     expect(ticksCrossed(t, T0 + 1_000, T0 + 9_500)).toEqual([])
+  })
+})
+
+describe('a hold with a slow start (WP-40)', () => {
+  it('is one timer: the slow start, then the hold', () => {
+    expect(holdLengthMs({ hold_seconds: 30, lead_in_seconds: 5 })).toBe(35_000)
+    expect(holdLengthMs({ hold_seconds: 30, lead_in_seconds: null })).toBe(30_000)
+    expect(holdLengthMs({ hold_seconds: 30 })).toBe(30_000)
+  })
+
+  it('counts the slow start down, then reads 0 while the hold runs', () => {
+    const t = startTimer('hold', 35_000, 1000)
+    expect(leadInLeftMs(t, 5000, 1000)).toBe(5000)
+    expect(leadInLeftMs(t, 5000, 3500)).toBe(2500)
+    expect(leadInLeftMs(t, 5000, 6000)).toBe(0)
+    expect(leadInLeftMs(t, 0, 1000)).toBe(0)
+    expect(leadInLeftMs(startTimer('rest', 35_000, 1000), 5000, 1000)).toBe(0)
   })
 })

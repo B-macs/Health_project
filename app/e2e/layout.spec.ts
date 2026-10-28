@@ -5,7 +5,7 @@
 import type { Page } from '@playwright/test'
 import { expect, onboard, ORIGIN, test } from './helpers'
 
-const SCREENS = ['/readiness', '/sleep', '/strain', '/training', '/insights', '/insights/strength',
+const SCREENS = ['/readiness', '/sleep', '/strain', '/training', '/training/day', '/training/daily', '/insights', '/insights/strength',
   '/insights/metabolism', '/insights/engine', '/insights/trends', '/insights/sleep', '/insights/warnings']
 
 /** The elements wider than the card they sit in (or than the screen), named by class. */
@@ -75,6 +75,6 @@ test('no text runs past the screen\'s edge, on any screen', async ({ page, conte
   // Training on a rest day, with its yoga flow to pick.
   await context.addCookies([{ name: 'e2e_run', value: `layout-${Date.now()}`, url: ORIGIN },
     { name: 'e2e_week', value: 'rest_today', url: ORIGIN }])
-  await visit('/training', '/training (rest day)')
+  await visit('/training/day', '/training/day (rest day)')
   expect(found).toEqual([])
 })

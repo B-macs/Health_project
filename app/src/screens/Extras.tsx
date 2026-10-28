@@ -48,7 +48,7 @@ export function ExtrasMenu({ onClose }: { onClose: () => void }) {
 }
 
 /** The back link (to the page the screen opened from) and the title. */
-function Head({ title, back, onBack, caption }: { title: string; back: string; onBack: () => void; caption?: string }) {
+export function Head({ title, back, onBack, caption }: { title: string; back: string; onBack: () => void; caption?: string }) {
   return (
     <>
       <header className="topbar">
@@ -107,7 +107,7 @@ export function YogaList() {
   return (
     <div className="screen train" data-testid="yoga-list">
       <div className="sky" aria-hidden="true" />
-      <Head title={S.extras.yogaTitle} back={S.nav.training} onBack={() => go('/training')} />
+      <Head title={S.extras.yogaTitle} back={S.nav.training} onBack={() => go('/training/day')} />
       <Freshness view={view} />
       {view.data && flows.length === 0 && <p className="caption">{S.extras.yogaNone}</p>}
       {!view.data && view.state !== 'loading' && <p className="caption">{S.extras.yogaNeedsEngine}</p>}
@@ -191,7 +191,7 @@ export function YogaDetail({ slug }: { slug: string }) {
               : sent?.state === 'answered' ? (logged === false ? S.extras.yogaAlready(flow.name) : S.extras.yogaLogged(flow.name))
                 : S.session.savedPhone}
           </p>
-          <button className="btn btn--primary btn--wide" onClick={() => go('/training')}>{S.extras.done}</button>
+          <button className="btn btn--primary btn--wide" onClick={() => go('/training/day')}>{S.extras.done}</button>
         </section>
       )}
     </div>
@@ -243,7 +243,7 @@ export function Outdoor() {
   return (
     <div className="screen train" data-testid="outdoor">
       <div className="sky" aria-hidden="true" />
-      <Head title={S.extras.outdoorTitle} back={S.nav.training} onBack={() => go('/training')} />
+      <Head title={S.extras.outdoorTitle} back={S.nav.training} onBack={() => go('/training/day')} />
       {!sentId && (
         <section className="card group">
           <label className="group">
@@ -294,7 +294,7 @@ export function Outdoor() {
                 : S.extras.outdoorAlready(answer.logs_as, longDate(search.date)))
                 : S.session.savedPhone}
           </p>
-          <button className="btn btn--primary btn--wide" onClick={() => go('/training')}>{S.extras.done}</button>
+          <button className="btn btn--primary btn--wide" onClick={() => go('/training/day')}>{S.extras.done}</button>
         </section>
       )}
     </div>
@@ -327,7 +327,7 @@ export function AccessoryOverview() {
   return (
     <div className="screen train" data-testid="accessory">
       <div className="sky" aria-hidden="true" />
-      <Head title={plan?.objective || S.extras.accessory} back={S.nav.training} onBack={() => go('/training')}
+      <Head title={plan?.objective || S.extras.accessory} back={S.nav.training} onBack={() => go('/training/day')}
         caption={plan ? S.extras.accessoryMeta(plan.phase, plan.rpe_target ?? null) : undefined} />
       <Freshness view={view} />
       {busy && <p className="alert" data-testid="accessory-blocked">{S.extras.blocked}</p>}
@@ -346,7 +346,7 @@ export function AccessoryOverview() {
             </details>
           )}
           <div className="pair">
-            <button className="btn btn--glass btn--gym" onClick={() => go('/training')}>{S.extras.cancel}</button>
+            <button className="btn btn--glass btn--gym" onClick={() => go('/training/day')}>{S.extras.cancel}</button>
             <button className="btn btn--primary btn--gym" disabled={busy || starting} onClick={() => void start()}>{S.extras.start}</button>
           </div>
         </>

@@ -18,8 +18,8 @@ import { api, ApiError } from '../lib/api'
 import { useApp } from '../lib/appState'
 import { bell, restOver, tick, unlockAudio, type Ending } from '../lib/sounds'
 import {
-  endsAt, extendTimer, hasEnded, isRunning, pauseTimer, remainingMs, resumeTimer, shownSeconds, startTimer,
-  ticksCrossed, type Timer,
+  endsAt, extendTimer, hasEnded, holdLengthMs, isRunning, leadInLeftMs, pauseTimer, remainingMs, resumeTimer, shownSeconds,
+  startTimer, ticksCrossed, type Timer,
 } from '../lib/timers'
 import {
   advance, back, backTarget, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder, exerciseProgress, finished,
@@ -67,7 +67,7 @@ export function arrivalTimer(s: TrainingState, now: number, byTimer: boolean): T
   const ex = exerciseOf(s, step)
   if (!step || !ex) return null
   if (step.timer_starts === 'on_arrival') return startTimer('rest', (ex.rest_seconds ?? 0) * 1000, now)
-  if (step.timer_starts === 'after_timer' && byTimer) return startTimer('hold', (ex.hold_seconds ?? 0) * 1000, now)
+  if (step.timer_starts === 'after_timer' && byTimer) return startTimer('hold', holdLengthMs(ex), now)
   return null
 }
 
@@ -411,6 +411,10 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
     lastNow.current = now
     if (!t || !step || !ex) return
     if (isRunning(t)) for (const _ of ticksCrossed(t, before, now)) tick()
+    // The slow start's end (WP-40): one tick as the hold itself begins.
+    const leadMs = (ex.lead_in_seconds ?? 0) * 1000
+    if (isRunning(t) && leadInLeftMs(t, leadMs, before) > 0 && leadInLeftMs(t, leadMs, now) === 0
+      && now - before <= 1500) tick()
     if (!isRunning(t) || !hasEnded(t, now) || handled.current === t) return
     handled.current = t
     const endedAt = endsAt(t) ?? now
@@ -435,9 +439,15 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
   const candidates = !resting && !t ? doFirstCandidates(s) : []
   const swaps = !resting && !t ? swapCandidates(s) : []
   const ended = t && hasEnded(t, now)
-  const seconds = t ? shownSeconds(t, now) : null
-  const fraction = t && t.lengthMs ? Math.min(1, 1 - remainingMs(t, now) / t.lengthMs) : 0
-  const word = resting ? S.session.rest : t?.kind === 'hold' ? S.session.hold : S.session.ready
+  // A hold with a slow start (WP-40): its first seconds count the slow start down, then the
+  // hold runs its own seconds; the bar fills over the hold only.
+  const leadMs = t?.kind === 'hold' ? (ex.lead_in_seconds ?? 0) * 1000 : 0
+  const leadLeft = t ? leadInLeftMs(t, leadMs, now) : 0
+  const inLead = leadLeft > 0 && !ended
+  const seconds = t ? (inLead ? Math.ceil(leadLeft / 1000) : shownSeconds(t, now)) : null
+  const span = t ? t.lengthMs - leadMs : 0
+  const fraction = t && span > 0 && !inLead ? Math.min(1, 1 - remainingMs(t, now) / span) : 0
+  const word = resting ? S.session.rest : inLead ? S.session.leadIn : t?.kind === 'hold' ? S.session.hold : S.session.ready
   const live = s.live[ex.index]
   const typed = sideValues(live, side).seconds
   const isFirstSide = ex.laterality === 'unilateral' && step.side === first && step.record_set == null
@@ -585,6 +595,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
           {ended && t && endsAt(t) != null && now - endsAt(t)! > 2000 && (
             <span className="caption">{S.session.endedAt(time(endsAt(t)!))}</span>
           )}
+          {leadMs > 0 && !inLead && !ended && <span className="caption" data-testid="let-go">{S.session.letGo}</span>}
         </div>
       )}
 
@@ -611,7 +622,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
           </button>
         )}
         {!t && ex.timer === 'hold' && !resting && (
-          <button className="btn btn--glass btn--gym" onClick={() => start(startTimer('hold', (ex.hold_seconds ?? 0) * 1000, Date.now()))}>
+          <button className="btn btn--glass btn--gym" onClick={() => start(startTimer('hold', holdLengthMs(ex), Date.now()))}>
             <IconPlay /> {S.session.startHold}
           </button>
         )}

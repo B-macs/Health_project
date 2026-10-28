@@ -82,7 +82,7 @@ function Plan({ plan }: { plan: DayPlan }) {
             </li>
           ))}
         </ol>
-        <button className="btn btn--primary btn--wide" onClick={() => go('/training')}>{S.today.start}</button>
+        <button className="btn btn--primary btn--wide" onClick={() => go('/training/day')}>{S.today.start}</button>
       </section>
     )
   }

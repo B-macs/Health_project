@@ -63,12 +63,15 @@ _THIRD_PERSON = re.compile(
 
 
 def _plans():
+    import daily_tendon as dt
     import goal_block as gb
     return [(n, getattr(tp, n)) for n in dir(tp)
             if n.startswith("PLAN") and isinstance(getattr(tp, n), dict)] + [
         # The 12-week block lives in its own file (Key Rule 25) and is
         # rendered the same way.
-        ("PLAN_GOAL_BLOCK", gb.PLAN_GOAL_BLOCK)]
+        ("PLAN_GOAL_BLOCK", gb.PLAN_GOAL_BLOCK),
+        # The daily tendon session (WP-40), rendered by the same guided flow.
+        ("DAILY_TENDON", {1: {"exercises": list(dt.LIBRARY)}})]
 
 
 def _rendered_strings():

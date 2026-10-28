@@ -246,6 +246,8 @@ function Shell(p: ShellProps) {
               <Route path="/sleep"><SleepScreen /></Route>
               <Route path="/strain"><StrainScreen /></Route>
               <Route path="/training"><TrainingTab /></Route>
+              <Route path="/training/day"><TrainingTab extra="day" /></Route>
+              <Route path="/training/daily"><TrainingTab extra="daily" /></Route>
               <Route path="/training/yoga"><TrainingTab extra="yoga" /></Route>
               <Route path="/training/yoga/:slug">{(params) => <TrainingTab extra="yoga" slug={params.slug} />}</Route>
               <Route path="/training/outdoor"><TrainingTab extra="outdoor" /></Route>

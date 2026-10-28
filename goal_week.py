@@ -138,11 +138,12 @@ BONUS_ORDER = [RDL, BACK_EXT, LUNGE, CURL, WOODCHOP, SIDE_PLANK, HIP_FLEXION, HA
 #: Sunday at home) was replaced by the adductor machine in the gym sessions.
 OFF_GYM: dict = {}
 
-#: At home, on the core days (approved 2026-10-16): the neck working stretch,
-#: 2 sets of 4 efforts (10 s on, 5 s off). It trains no required area, and
-#: doing it at home brings Tuesday and Thursday back toward the 60-minute target.
-HOME = {"Neck Working Stretch (Right)": {"sets": 2, "dose": "4 efforts of 10 s, 5 s off",
-                                         "days": CORE_DAYS}}
+#: At home, on the core days. Empty since 2026-10-28 (WP-40): the neck working
+#: stretch (2 sets of 4 efforts, approved 2026-10-16) moved into the daily
+#: tendon session (daily_tendon.py, his words: "Put the neck stretch into this
+#: daily training as well"), and its workflow record moved with it
+#: (daily_tendon.DAILY_PICKS).
+HOME: dict = {}
 EXTRA_SETS = {v["area"]: v["sets"] * len(v["days"]) for v in OFF_GYM.values()}
 EXTRA_DAYS = {v["area"]: len(v["days"]) for v in OFF_GYM.values()}
 
@@ -347,12 +348,6 @@ PICKS: dict[str, Pick] = {
         better="checked 2026-10-16: it replaced the end-range psoas isometric (B), which worked "
                "the psoas at its shortest; standing, not lying — the bench-edge version is the "
                "Thomas-test position, where the right hip clicked; approved 2026-10-16 ('3 yes')"),
-    "Neck Working Stretch (Right)": Pick(
-        "B", "neck, right side", "strength at length",
-        "Head tilted to the left, 10-second pushes into the hand, at home on the core days.",
-        "his choice, 2026-10-15; at home from 2026-10-16",
-        better="checked 2026-10-15: contract-relax and static stretching gain about the same range "
-               "(Konrad et al. 2024), and this one adds a strength part"),
     "Adductor Machine (Seated)": Pick(
         "C", "adductors", "strength at length",
         "The flexibility goal's blocker, the adductors with the knees bent (21.5 cm against "

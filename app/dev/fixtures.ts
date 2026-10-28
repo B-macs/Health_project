@@ -4,6 +4,7 @@
 // contract (src/generated/api.ts), so a change in the contract breaks this file's type
 // check instead of a browser test.
 import type { components } from '../src/generated/api'
+import daily from './daily_fixture.json' with { type: 'json' }
 import session from './session_fixture.json' with { type: 'json' }
 
 type Schemas = components['schemas']
@@ -394,6 +395,15 @@ export function accessoryPlan(local: string) {
     ask_length_above_minutes: null, next_day: null, reasons: ['Made-up: the upper body is the least loaded area today.'],
     note: 'Made-up accessory note.',
   }
+}
+
+/** The daily tendon session (WP-40, dev/daily_fixture.json, made by the engine's walk).
+ *  `daily_before`: today's gym session is still to come; `daily_rest`: no reminder line;
+ *  `daily_done`: a daily session is already logged today. */
+export function dailyPlan(local: string, scenario: Set<string>) {
+  const reminder = scenario.has('daily_rest') ? null
+    : scenario.has('daily_before') ? { kind: 'before' as const, time: null } : daily.reminder
+  return { ...daily, date: local, reminder, done_today: scenario.has('daily_done') }
 }
 
 export function yogaCatalogue(): Schemas['YogaCatalogueOut'] {

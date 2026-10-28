@@ -628,27 +628,12 @@ HIP_AIRPLANE = _ex(
 
 
 # ─── At home on the core days (step 6, approved 2026-10-16) ─────────────────
-
-NECK_STRETCH = _ex(
-    name="Neck Working Stretch (Right)",
-    ex_type="hold_reps",
-    sets=2, reps_in_set=4, hold_seconds=10, rest_seconds=30,
-    mechanics=(
-        "Sit tall. Tilt your head to the left, ear toward the shoulder, until you feel a "
-        "stretch on the right side of your neck. Put your right hand on the right side of "
-        "your head. Push your head into the hand for 10 seconds at about a third of your "
-        "effort; the hand stops it moving. Relax for 5 seconds and let the head sink a little "
-        "further. Four pushes is one set."
-    ),
-    biomechanical_focus=(
-        "The right side of the neck (goal B), strength at length: his choice, 2026-10-15, at "
-        "home from 2026-10-16. Contract-relax and static stretching gain about the same range "
-        "(Konrad et al. 2024); this one adds a strength part."
-    ),
-    progression="The stretch eases in the first push → tilt a little further at the start.",
-    regression="Any tingling into the arm → stop; tilt less.",
-)
-HOME = (NECK_STRETCH,)
+#
+# Empty since 2026-10-28 (WP-40): the neck working stretch, the one home item,
+# moved into the daily tendon session (daily_tendon.py) at the athlete's word —
+# "Put the neck stretch into this daily training as well" — and runs every day
+# there, two sets as before. The list stays so a later home item has a place.
+HOME: tuple[dict, ...] = ()
 
 
 # ─── The ramp sets (step 7): one light set straight before its own lift ──────

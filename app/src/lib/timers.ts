@@ -59,6 +59,19 @@ export function extendTimer(t: Timer, ms: number): Timer {
   return { ...t, lengthMs: t.lengthMs + ms }
 }
 
+/** A hold timer's length: the slow start the engine sends (`lead_in_seconds`, the daily
+ *  tendon session, WP-40) and the hold, run as one timer, so the bell, the alert and the
+ *  automatic move all keep working unchanged. */
+export function holdLengthMs(ex: { hold_seconds?: number | null; lead_in_seconds?: number | null }): number {
+  return ((ex.hold_seconds ?? 0) + (ex.lead_in_seconds ?? 0)) * 1000
+}
+
+/** The slow start still to run on a hold timer whose first `leadMs` are the lead-in: 0 once
+ *  the hold itself runs. */
+export function leadInLeftMs(t: Timer, leadMs: number, now: number): number {
+  return t.kind === 'hold' && leadMs > 0 ? Math.max(0, leadMs - elapsedMs(t, now)) : 0
+}
+
 /** The whole seconds shown: remaining for a countdown (rounded up, so 0.2 s left reads 1),
  *  elapsed for the stopwatch (rounded down). */
 export function shownSeconds(t: Timer, now: number): number {

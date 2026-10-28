@@ -615,6 +615,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/training/daily": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Daily
+         * @description The daily tendon session (WP-40): the same session every day, its
+         *     8-hour line and whether it is done today. Never refused for the time of
+         *     day: when to do it is the athlete's decision.
+         */
+        get: operations["get_daily_api_training_daily_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/training/day": {
         parameters: {
             query?: never;
@@ -1167,6 +1189,21 @@ export interface components {
             scored: boolean;
             /** Unscored Reason */
             unscored_reason: string;
+        };
+        /**
+         * DailyReminder
+         * @description The daily tendon session's 8-hour line (WP-40, services/daily_session.
+         *     reminder): "after" today's gym session, with the time (HH:MM, the phone's
+         *     own clock) the gap ends; or "before" it, with no time. Never a lock.
+         */
+        DailyReminder: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "after" | "before";
+            /** Time */
+            time?: string | null;
         };
         /**
          * DataCheckOut
@@ -2735,6 +2772,8 @@ export interface components {
             index: number;
             /** Laterality */
             laterality: string | null;
+            /** Lead In Seconds */
+            lead_in_seconds?: number | null;
             /** Mechanics */
             mechanics: string;
             move?: components["schemas"]["ExerciseMove"] | null;
@@ -2782,7 +2821,7 @@ export interface components {
         };
         /**
          * SessionPlanOut
-         * @description `kind`: plan or accessory.
+         * @description `kind`: plan, accessory or daily (the daily tendon session, WP-40).
          */
         SessionPlanOut: {
             adaptation: components["schemas"]["Adaptation"];
@@ -2803,6 +2842,11 @@ export interface components {
             date: string;
             /** Day Num */
             day_num: number | null;
+            /**
+             * Done Today
+             * @default false
+             */
+            done_today: boolean;
             /** Exercises */
             exercises: components["schemas"]["SessionExercise"][];
             /** First Side */
@@ -2829,6 +2873,7 @@ export interface components {
             plan_days?: number | null;
             /** Reasons */
             reasons: string[];
+            reminder?: components["schemas"]["DailyReminder"] | null;
             /** Rest Taken Max Seconds */
             rest_taken_max_seconds: number;
             /** Rpe Target */
@@ -5296,6 +5341,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CompletionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_daily_api_training_daily_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionPlanOut"];
                 };
             };
             /** @description Validation Error */

@@ -203,8 +203,12 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
   const clock = clockMinutes(s, end)
   const ask = asksLength(s, clock)
   const accessory = s.plan.kind === 'accessory'
-  // The slider starts at 5, and on the accessory session at its own effort target (low).
-  const [rpe, setRpe] = useState(accessory ? (s.plan.rpe_target ?? 3) : 5)
+  // The daily tendon session (WP-40): like the accessory session, it is not the training
+  // day, so it never marks the day trained.
+  const daily = s.plan.kind === 'daily'
+  const extra = accessory || daily
+  // The slider starts at 5, and on the accessory and daily sessions at their own effort target.
+  const [rpe, setRpe] = useState(extra ? (s.plan.rpe_target ?? 3) : 5)
   const [choice, setChoice] = useState<'plan' | 'clock'>(ask ? 'plan' : 'clock')
   const [notes, setNotes] = useState('')
   const [completion, setCompletion] = useState<Completion | null>(null)
@@ -263,7 +267,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
     sending.current = true
     setBusy(true)
     const id = await enqueue(store, { kind: 'session', method: 'POST', path: '/api/training/sessions', body: saveBody(s, minutes, rpe, notes) })
-    if (!accessory) await store.settings.put({ key: KEYS.trainedOn, value: s.plan.date })
+    if (!extra) await store.settings.put({ key: KEYS.trainedOn, value: s.plan.date })
     update((x) => ({ ...x, savedId: id, saved: { rpe, minutes, notes } }))
   }
 
@@ -273,8 +277,8 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         <div className="sky" aria-hidden="true" />
         <div className="celebrate" aria-hidden="true" data-testid="celebrate"><IconCheck /></div>
         <header className="head">
-          <h1 className="head__title">{accessory ? S.session.accessoryLogged : S.session.congrats}</h1>
-          {!accessory && <div className="caption">{S.session.congratsNext(exerciseOrder(s).length)}</div>}
+          <h1 className="head__title">{accessory ? S.session.accessoryLogged : daily ? S.session.dailyLogged : S.session.congrats}</h1>
+          {!extra && <div className="caption">{S.session.congratsNext(exerciseOrder(s).length)}</div>}
         </header>
         <section className="card group" role="status" data-testid="save-state" data-state={saved}>
           <p>{saved === 'confirmed' ? S.session.saved : saved === 'refused' ? S.session.refused : S.session.savedPhone}</p>
@@ -303,6 +307,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
             onChange={(e) => setRpe(Number(e.target.value))} />
         </label>
         {accessory && <p className="caption">{S.session.accessoryEffortHelp}</p>}
+        {daily && <p className="caption">{S.session.dailyEffortHelp}</p>}
       </section>
       {ask && (
         <section className="card group">

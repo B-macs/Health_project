@@ -338,6 +338,60 @@ def test_the_accessory_session_runs_through_the_same_flow(env, monkeypatch):
     assert plan["plan_days"] is None
 
 
+def test_the_daily_session_runs_through_the_same_flow(env, monkeypatch):
+    """WP-40: the same session every day, each 30-second hold with its slow
+    start, about 11 minutes, and on a gym day before the gym session the line
+    "keep 8 hours before"."""
+    import daily_tendon as dt
+    plan = env.ok(monkeypatch, "get", "/api/training/daily")
+    assert plan["kind"] == "daily" and plan["steps"] and plan["plan_days"] is None
+    assert [e["name"] for e in plan["exercises"]] == [e["name"] for e in dt.entries()]
+    holds = [e for e in plan["exercises"] if e["type"] == "hold"]
+    assert holds and all(e["hold_seconds"] == dt.HOLD_SECONDS
+                         and e["lead_in_seconds"] == dt.LEAD_IN_SECONDS for e in holds)
+    assert all(e["lead_in_seconds"] is None for e in plan["exercises"] if e["type"] == "hold_reps")
+    assert plan["ask_length_above_minutes"] is None and plan["min_minutes"] == sess.MIN_ACCESSORY_MINUTES
+    assert 9 <= plan["model_minutes"] <= 12
+    assert plan["reminder"] == {"kind": "before", "time": None}, "Monday's gym session is to come"
+    assert plan["done_today"] is False and plan["note"] == dt.NOTE
+
+
+def test_the_daily_sessions_reminder_is_eight_hours_after_todays_gym_session(env, monkeypatch):
+    _log_plan_session(env, monkeypatch, MONDAY)          # last set 08:13
+    plan = env.ok(monkeypatch, "get", "/api/training/daily")
+    assert plan["reminder"] == {"kind": "after", "time": "16:13"}
+
+
+def test_a_rest_day_offers_the_daily_session_with_no_reminder(env, monkeypatch):
+    plan = env.ok(monkeypatch, "get", "/api/training/daily", local=WEDNESDAY)
+    assert plan["kind"] == "daily" and plan["exercises"] and plan["reminder"] is None
+
+
+def test_a_saved_daily_session_is_done_today_counts_in_strain_and_is_never_a_logged_day(
+        env, monkeypatch):
+    """WP-40, the athlete's decision of 2026-10-28: a daily session counts in
+    strain and never makes a logged day — the failed-week rule counts logged
+    days, and a session every day would pass every week."""
+    import daily_tendon as dt
+    hang = dt.entries()[0]
+    body = {"session_id": f"{WEDNESDAY}-dai10001", "date": WEDNESDAY.isoformat(), "kind": "daily",
+            "duration_minutes": 11, "session_rpe": 4, "exercises": [{
+                "exercise_id": "ex-daily-1", "exercise": hang,
+                "sets": [{"set_num": 1, "reps": 1, "weight": 0, "tut": 30,
+                          "ts": f"{WEDNESDAY}T19:00:00"}]}]}
+    env.ok(monkeypatch, "post", "/api/training/sessions", local=WEDNESDAY, body=body)
+    assert env.ok(monkeypatch, "get", "/api/training/daily", local=WEDNESDAY)["done_today"]
+    assert not env.repo.has_logged_session(WEDNESDAY)
+    week = (MONDAY, MONDAY + timedelta(days=6))
+    assert WEDNESDAY.isoformat() not in env.repo.get_logged_session_dates(*week)
+    assert WEDNESDAY.isoformat() not in env.repo.get_logged_session_dates_live(*week)
+    thursday = MONDAY + timedelta(days=3)
+    strip = env.ok(monkeypatch, "get", "/api/training/week", local=thursday)["strip"]
+    assert strip[2]["marker"] == "rest", "a day with only a daily session is not 'done'"
+    rows = env.repo.get_daily_region_au(days=7, today=WEDNESDAY)["rows"]
+    assert any(r["date"] == WEDNESDAY.isoformat() and r["total_au"] > 0 for r in rows)
+
+
 def test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan(env, monkeypatch):
     body = {"model_minutes": 60, "start_ts": 1000.0, "end_ts": 1000.0 + 150 * 60, "rpe": 7}
     out = env.ok(monkeypatch, "post", "/api/training/completion", body=body)

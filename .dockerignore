@@ -13,6 +13,7 @@
 !flexibility_baselines.py
 !goal_block.py
 !goal_week.py
+!daily_tendon.py
 **/__pycache__
 **/*.pyc
 **/*.db

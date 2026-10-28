@@ -63,15 +63,16 @@ def test_the_core_sessions_meet_the_required_dose_and_no_limit_is_broken():
     assert pl.violations(WEEK, gw.SPEC, gw.EXTRA_SETS, gw.EXTRA_DAYS) == []
 
 
-def test_the_home_item_is_the_week_s_home_item_on_the_core_days():
+def test_no_day_of_the_block_carries_a_home_item():
+    """The neck working stretch, the one home item (approved 2026-10-16 on the
+    core days), moved into the daily tendon session on 2026-10-28 (WP-40, his
+    words: "Put the neck stretch into this daily training as well"). No block
+    day carries it, and the week's home list is empty with it."""
+    import daily_tendon as dt
     for d, day in PLAN.items():
-        home = _names(day.get("home", []))
-        if day.get("session_letter") in gb.CORE_LETTERS:
-            assert home == list(gw.HOME), d
-        else:
-            assert home == [], d
-    assert set(gw.HOME["Neck Working Stretch (Right)"]["days"]) == {
-        DAY_OF[letter] for letter in gb.CORE_LETTERS}
+        assert _names(day.get("home", [])) == [], d
+    assert gw.HOME == {} and gb.HOME == ()
+    assert "Neck Working Stretch (Right)" in dt.names()
 
 
 # ─── The week ───────────────────────────────────────────────────────────────

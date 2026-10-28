@@ -361,6 +361,17 @@ class SessionExercise(BaseModel):
     move: ExerciseMove | None = None
     #: A test of the flexibility retest: what its reading asks for (WP-33).
     reading: SessionReading | None = None
+    #: The slow start before a hold, in seconds (the daily tendon session, WP-40):
+    #: the phone counts it down, then runs the hold. None: the hold starts at once.
+    lead_in_seconds: int | None = None
+
+
+class DailyReminder(BaseModel):
+    """The daily tendon session's 8-hour line (WP-40, services/daily_session.
+    reminder): "after" today's gym session, with the time (HH:MM, the phone's
+    own clock) the gap ends; or "before" it, with no time. Never a lock."""
+    kind: Literal["after", "before"]
+    time: str | None = None
 
 
 class FlowStep(BaseModel):
@@ -406,7 +417,7 @@ class SessionAlternative(BaseModel):
 
 
 class SessionPlanOut(BaseModel):
-    """`kind`: plan or accessory."""
+    """`kind`: plan, accessory or daily (the daily tendon session, WP-40)."""
     kind: str
     date: date
     day_num: int | None
@@ -434,6 +445,10 @@ class SessionPlanOut(BaseModel):
     note: str = ""
     #: Each lift's swap when its equipment is in use (WP-28); none on most days.
     alternatives: list[SessionAlternative] = []
+    #: The daily tendon session only (WP-40): the 8-hour line, and whether a
+    #: daily session is already logged today.
+    reminder: DailyReminder | None = None
+    done_today: bool = False
 
 
 class CompletionIn(BaseModel):

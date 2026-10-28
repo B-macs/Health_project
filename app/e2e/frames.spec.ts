@@ -2,7 +2,7 @@
 // same page (no reload), Check-in is a sheet over Today, and the training session survives
 // a reload: the app opens on it again.
 import { S } from '../src/strings'
-import { expect, leaveSession, onboard, openTab, startTraining, test } from './helpers'
+import { expect, leaveSession, onboard, openTab, startTraining, test, openTraining } from './helpers'
 
 test('every tab opens its frame in the same page', async ({ page }) => {
   await onboard(page)
@@ -33,7 +33,7 @@ test('check-in opens as a sheet over Today and closes with Escape', async ({ pag
 test('the training session survives a reload, and closing it ends it', async ({ page }) => {
   await onboard(page)
   // Before Start: today's session, with the tab bar.
-  await openTab(page, S.nav.training)
+  await openTraining(page)
   await expect(page.getByRole('button', { name: S.session.start })).toBeVisible()
   await expect(page.getByRole('navigation', { name: S.app })).toBeVisible()
   await startTraining(page)

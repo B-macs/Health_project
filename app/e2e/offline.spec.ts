@@ -6,7 +6,7 @@
 //   shows with "Showing saved data".
 import type { Page } from '@playwright/test'
 import { S } from '../src/strings'
-import { controlled, expect, onboard, openTab, setEngineDown, test } from './helpers'
+import { controlled, expect, onboard, openTab, setEngineDown, test, openTraining } from './helpers'
 
 async function engineCard(page: Page) {
   const card = page.getByTestId('engine')
@@ -75,9 +75,9 @@ const SCREENS: {
   { name: S.nav.checkin, path: '/#/checkin', shows: (page) => expect(page.getByRole('dialog', { name: S.checkin.title })).toBeVisible() },
   {
     name: S.nav.training,
-    path: '/#/training',
+    path: '/#/training/day',
     before: async (page) => {
-      await openTab(page, S.nav.training)
+      await openTraining(page)
       await expect(page.getByRole('button', { name: S.session.start })).toBeVisible()
     },
     shows: async (page) => {

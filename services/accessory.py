@@ -142,7 +142,10 @@ LOW_VOLUME_MULTIPLIER: float = 0.75
 # means back to 1 and an entry in patient_profile's symptom_log.
 
 HANG_MAX_STEP: int = 2
-HANG_STEP: int = 1
+#: 2 since 2026-10-28 (WP-40), on his report: "Im already at step 2 I can hold
+#: on a bar for more than 15 seconds". HANG_MAX_STEP stays 2: the passive hang
+#: still needs four clean weeks at this step.
+HANG_STEP: int = 2
 
 #: On a shrunk day the hang always runs at step 1, whatever HANG_STEP says. The
 #: shrunk tier exists because the day is already heavy or already reduced, and
