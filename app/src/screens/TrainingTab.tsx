@@ -13,7 +13,7 @@
 // with no signal when the phone has read them earlier that day. Every number and word is
 // the engine's; the phone only lays it out.
 import { useLiveQuery } from 'dexie-react-hooks'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type ReactNode } from 'react'
 import { KEYS, type OutboxRow } from '../db/schema'
 import type { components } from '../generated/api'
 import { localDay } from '../lib/api'
@@ -274,8 +274,9 @@ const MOVES_TODAY = ['swap', 'carry', 'shift']
 
 /** The page the owner's answers re-read: it is mounted again each time the engine confirms
  *  one (`version`), so every read under it asks again. */
-function WeekBody({ weekStart, setWeekStart, homeWeek, setHomeWeek, selected, setSelected, answered, answer, rows, onStart,
+function WeekBody({ tiles, weekStart, setWeekStart, homeWeek, setHomeWeek, selected, setSelected, answered, answer, rows, onStart,
   starting, onClear }: {
+  tiles: ReactNode
   weekStart: string | null; setWeekStart: (week: string | null) => void
   homeWeek: string | null; setHomeWeek: (week: string) => void
   selected: string; setSelected: (day: string) => void
@@ -308,21 +309,24 @@ function WeekBody({ weekStart, setWeekStart, homeWeek, setHomeWeek, selected, se
     setSelected(today)
     answer(`swap:${date}`, () => swapWithToday(store, date))
   }
-  // The week strip leads the page, with the day it picks right under it (the owner,
-  // 2026-10-21: "Move the week tab to the top of the page in training"). The questions about
-  // this week stay above the day, since Start waits for them; the streak, gate 1 and the
-  // retest notice follow the day.
+  // The week strip leads the page, right under the title, and nothing goes above it (the
+  // owner, 2026-10-21: "Move the week tab to the top of the page in training", and 2026-10-28:
+  // "Make the week dates at the top of the page always, nothing goes above them"). The two
+  // tiles, the read's freshness and the refused answers follow it. The questions about this
+  // week stay above the day, since Start waits for them; the streak, gate 1 and the retest
+  // notice follow the day.
   const ok = w !== undefined && w.phases_readable
   return (
     <>
-      <Freshness view={week} />
-      <Refusals rows={rows} onClear={onClear} />
       {w && !w.phases_readable && <p className="alert" data-testid="phases-unreadable">{S.week.phasesUnreadable}</p>}
       {ok && w.strip.length > 0 && (
         <WeekStrip week={w} selected={selected} onPick={setSelected}
           onWeek={(step) => toWeek(shiftDay(w.week_start ?? today, step))}
           onToday={() => { setWeekStart(null); setSelected(today) }} />
       )}
+      {tiles}
+      <Freshness view={week} />
+      <Refusals rows={rows} onClear={onClear} />
       {ok && (
         <>
           <RedoOffer redo={w.redo} rows={rows} open={isOpen('redo')} answer={answer} redoWeek={() => redoWeek(store)} />
@@ -387,8 +391,8 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
           <IconPlus />
         </button>
       </header>
-      <TrainingTiles onTrainingDay={() => { setWeekStart(null); setSelected(today) }} />
       <WeekBody key={confirmed + cleared} weekStart={weekStart} setWeekStart={setWeekStart}
+        tiles={<TrainingTiles onTrainingDay={() => { setWeekStart(null); setSelected(today) }} />}
         homeWeek={homeWeek} setHomeWeek={setHomeWeek}
         selected={selected} setSelected={setSelected} answered={answered} answer={answer} rows={rows}
         onStart={onStart} starting={starting} onClear={clear} />
@@ -398,7 +402,7 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
 }
 
 /** The screens by address: the daily tendon session and the "+" menu's screens. No
- *  address, or "day": the week page, with the two tiles at its top. */
+ *  address, or "day": the week page, with the two tiles under its week dates. */
 export type Extra = 'day' | 'daily' | 'yoga' | 'outdoor' | 'accessory'
 
 export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {

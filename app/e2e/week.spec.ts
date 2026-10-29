@@ -163,15 +163,19 @@ test('a move the engine refuses says why, and OK clears it', async ({ page, cont
   expect(await outboxLength(page)).toBe(0)
 })
 
-test('the Training tab opens on the week page with the two tiles side by side; the daily tendon session runs its slow start and saves as its own kind (WP-40)', async ({ page, context }) => {
+test('the Training tab opens on the week page: the week dates first, then the two tiles side by side; the daily tendon session runs its slow start and saves as its own kind (WP-40)', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-daily-${Date.now()}`)
   await openTab(page, S.nav.training)
   await expect(page.getByTestId('week-page').getByTestId('training-tiles')).toBeVisible()
   await expect(page.getByTestId('today-overview')).toBeVisible()
-  // Side by side: one row, "Training day" on the left.
+  // The week dates lead the page: nothing between the title and the strip.
+  await expect(page.locator('[data-testid="week-page"] > header + section.group .weekstrip')).toBeVisible()
+  // The tiles under the strip, side by side: one row, "Training day" on the left.
+  const strip = await page.getByTestId('week-page').locator('.weekstrip').boundingBox()
   const left = await page.getByTestId('tile-training-day').boundingBox()
   const right = await page.getByTestId('tile-daily').boundingBox()
+  expect(strip && left && strip.y + strip.height <= left.y).toBe(true)
   expect(left && right && Math.abs(left.y - right.y) < 1 && left.x + left.width <= right.x).toBe(true)
   await expect(page.getByTestId('tile-daily')).toContainText(S.daily.after('16:13'))
   await page.getByTestId('tile-daily').click()

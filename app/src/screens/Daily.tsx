@@ -2,10 +2,12 @@
 // "the first tile when selected will bring me to the normal training day and what is
 // required for that day. the other tile will be the daily training day."
 //
-// - The tiles: side by side at the top of the week page (/training), above all its data (the
-//   owner, 2026-10-28: "Keep all the rest of the data on the training page just put the two
-//   title right and left of each other"). "Training day" is the page they sit on and takes
-//   the strip back to today; "Daily tendon session" opens its overview (/training/daily).
+// - The tiles: side by side on the week page (/training), right under its week dates, which
+//   nothing goes above (the owner, 2026-10-28: "Keep all the rest of the data on the
+//   training page just put the two title right and left of each other", and "Make the week
+//   dates at the top of the page always, nothing goes above them"). "Training day" is the
+//   page they sit on and takes the strip back to today; "Daily tendon session" opens its
+//   overview (/training/daily).
 // - The daily session: the same session every day, from the engine (GET
 //   /api/training/daily), run in the same guided flow as the plan session and saved as its
 //   own kind, so it never marks the training day done. Its 8-hour line is a reminder only:
@@ -60,7 +62,7 @@ function Tile({ title, line, note, testId, current, onOpen }: {
   )
 }
 
-/** The two tiles, side by side, at the top of the week page. */
+/** The two tiles, side by side, under the week page's week dates. */
 export function TrainingTiles({ onTrainingDay }: { onTrainingDay: () => void }) {
   const { store, ctx, go } = useApp()
   const today = localDay()
