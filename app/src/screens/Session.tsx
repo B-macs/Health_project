@@ -13,10 +13,11 @@
 // was hidden at the end, nothing moves by itself and the screen says when it ended. The
 // screen stays on (the Wake Lock API).
 import { useCallback, useEffect, useRef, useState, type InputHTMLAttributes } from 'react'
+import { debugLog } from '../debug/console'
 import { alertFor, cancelAlert, scheduleAlert } from '../lib/alerts'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../lib/appState'
-import { bell, restOver, tick, unlockAudio, type Ending } from '../lib/sounds'
+import { bell, reportAudioOnce, restOver, tick, unlockAudio, type Ending } from '../lib/sounds'
 import {
   endsAt, extendTimer, hasEnded, holdLengthMs, isRunning, leadInLeftMs, pauseTimer, remainingMs, resumeTimer, shownSeconds,
   startTimer, ticksCrossed, type Timer,
@@ -510,7 +511,10 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
 
   return (
     <div className={`screen train ${resting ? 'train--rest' : 'train--hold'}`} data-step={s.step}
-      onPointerDown={() => unlockAudio()}>
+      onPointerDown={() => {
+        unlockAudio()
+        reportAudioOnce((detail) => debugLog('audio', detail))
+      }}>
       <div className="sky" aria-hidden="true" />
       <header className="topbar">
         <button className="iconbtn" onClick={() => setAsking('exit')} aria-label={S.session.exit}>

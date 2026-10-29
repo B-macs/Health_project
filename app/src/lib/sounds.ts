@@ -16,6 +16,11 @@
 // WebKit's DOMAudioSession.cpp), so the bells need silent mode off. Until 2026-10-26 the
 // type was "playback", his choice of 2026-10-20 ("always play the bells over
 // everything"), which stopped his music at the first tap. Web apps on iOS cannot vibrate.
+//
+// 2026-10-29, his report: Spotify still stops at his first tap in a session. The type is now
+// also declared at the app's start, before any sound exists, and the first tap writes what
+// the phone did into the debug log (seven taps on the version line in Settings): whether
+// the browser offers the Audio Session API, the type it holds, and the sound's state.
 export type Ending = 'continue' | 'switch' | 'finish' | 'done'
 
 type Ctx = AudioContext
@@ -33,16 +38,41 @@ function context(): Ctx | null {
 /** The Audio Session type: sounds that mix with the music already playing (WP-29). */
 export const AUDIO_SESSION_TYPE = 'ambient'
 
+type SessionHost = Navigator & { audioSession?: { type: string } }
+
+/** Declare sounds that mix with other audio. Call at the app's start, before any sound. */
+export function declareMixing(nav: Navigator = navigator): void {
+  const session = (nav as SessionHost).audioSession
+  if (session) session.type = AUDIO_SESSION_TYPE
+}
+
 /** Declare sounds that mix with other audio, and wake the audio. Call from a tap. */
 export function unlockAudio(nav: Navigator = navigator): void {
-  const session = (nav as Navigator & { audioSession?: { type: string } }).audioSession
-  if (session) session.type = AUDIO_SESSION_TYPE
+  declareMixing(nav)
   const c = context()
   if (c && c.state !== 'running') void c.resume().catch(() => undefined)
 }
 
 export function audioState(): string {
   return ctx?.state ?? 'not started'
+}
+
+/** For the debug log: the Audio Session type the phone holds (null: the browser has no
+ *  Audio Session API) and the sound's state. */
+export function audioReport(nav: Navigator = navigator): { session: string | null; sound: string } {
+  const session = (nav as SessionHost).audioSession
+  return { session: session ? session.type : null, sound: audioState() }
+}
+
+let reported = false
+
+/** The first tap's report, once per app start, and again a second later, when the sound
+ *  has had time to start. */
+export function reportAudioOnce(log: (detail: Record<string, unknown>) => void, nav: Navigator = navigator): void {
+  if (reported) return
+  reported = true
+  log({ at: 'first tap', ...audioReport(nav) })
+  setTimeout(() => log({ at: 'a second later', ...audioReport(nav) }), 1000)
 }
 
 function play(build: (c: Ctx, out: AudioNode) => void): void {

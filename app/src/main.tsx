@@ -11,6 +11,7 @@ import { db } from './db/schema'
 import { debugLog, loadLog } from './debug/console'
 import { loadSession, sessionActive } from './lib/session'
 import { DEFAULT_SETTINGS, readSettings, type AppSettings } from './lib/settings'
+import { audioReport, declareMixing } from './lib/sounds'
 import { isStandalone } from './lib/standalone'
 import { registerServiceWorker } from './lib/updates'
 
@@ -25,6 +26,8 @@ async function start(): Promise<void> {
     debugLog('start: the phone database did not open', { error: String(err) })
   }
   debugLog('start', { commit: __APP_BUILD__.commit, standalone: isStandalone(), session: resume })
+  declareMixing()
+  debugLog('audio at start', audioReport())
   registerServiceWorker(() => !sessionActive())
   if (import.meta.env.MODE === 'mock') {
     const { installTestHooks } = await import('./debug/testHooks')
