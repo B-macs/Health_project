@@ -52,9 +52,12 @@ describe('the settings', () => {
     await setSetting(store, KEYS.accessKey, 'k1')
     await setSetting(store, KEYS.theme, 'dark')
     await setSetting(store, KEYS.engineDown, true)
-    expect(await readSettings(store)).toEqual({ key: 'k1', theme: 'dark', engineDown: true, installSkipped: false, alerts: false })
+    expect(await readSettings(store)).toEqual({ key: 'k1', theme: 'dark', engineDown: true, installSkipped: false, alerts: false, bells: true })
     await setSetting(store, KEYS.alerts, true)
     expect((await readSettings(store)).alerts).toBe(true)
+    expect((await readSettings(store)).bells).toBe(true)
+    await setSetting(store, KEYS.bells, false)
+    expect((await readSettings(store)).bells).toBe(false)
   })
 
   it('ignore an appearance they do not know', async () => {

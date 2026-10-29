@@ -13,6 +13,8 @@ export interface AppSettings {
   installSkipped: boolean
   /** The timer alerts are on (lib/alerts.ts). */
   alerts: boolean
+  /** The session's bells and beeps are on (lib/sounds.ts); on unless switched off. */
+  bells: boolean
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -21,6 +23,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   engineDown: false,
   installSkipped: false,
   alerts: false,
+  bells: true,
 }
 
 const THEMES: readonly ThemePref[] = ['auto', 'light', 'dark']
@@ -36,6 +39,7 @@ export async function readSettings(store: HealthDB): Promise<AppSettings> {
     engineDown: value(KEYS.engineDown) === true,
     installSkipped: value(KEYS.installSkipped) === true,
     alerts: value(KEYS.alerts) === true,
+    bells: value(KEYS.bells) !== false,
   }
 }
 

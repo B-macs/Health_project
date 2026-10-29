@@ -260,6 +260,7 @@ const ON_OFF = [false, true] as const
 
 export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onTheme: (t: ThemePref) => void }) {
   const alertsOn = useLiveQuery(() => getSetting(p.store, KEYS.alerts, false), [p.store], false)
+  const bellsOn = useLiveQuery(() => getSetting(p.store, KEYS.bells, true), [p.store], true)
   return (
     <div className="screen settings">
       <div className="sky sky--quiet" aria-hidden="true" />
@@ -274,6 +275,13 @@ export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onThe
       <DataCheckCard store={p.store} ctx={p.ctx} />
       <DataLink />
       <Alerts store={p.store} ctx={p.ctx} on={alertsOn === true} />
+      <section className="card group" data-testid="bells">
+        <h2 className="eyebrow">{S.settings.bells}</h2>
+        <div className="caption">{S.settings.bellsWhat}</div>
+        <Choice<boolean> label={S.settings.bells} options={ON_OFF} value={bellsOn !== false}
+          name={(on) => (on ? S.settings.on : S.settings.off)}
+          onChoose={(on) => void setSetting(p.store, KEYS.bells, on)} />
+      </section>
       <AccessKey store={p.store} />
       <Storage />
       <section className="card group">

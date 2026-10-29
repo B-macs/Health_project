@@ -21,14 +21,29 @@
 // also declared at the app's start, before any sound exists, and the first tap writes what
 // the phone did into the debug log (seven taps on the version line in Settings): whether
 // the browser offers the Audio Session API, the type it holds, and the sound's state.
+// His log the same evening: "ambient" held at start and at the tap, the sound running a
+// second later, and Spotify stopped all the same. So the bells can be switched off in
+// Settings (his choice, "start with the first"): off, the app starts no sound at all.
 export type Ending = 'continue' | 'switch' | 'finish' | 'done'
 
 type Ctx = AudioContext
 
 let ctx: Ctx | null = null
+let bellsOn = true
+
+/** The Settings switch (KEYS.bells). Off closes the sound, so the phone's audio is let go
+ *  at once, and no tap or countdown starts it again until the bells are on. */
+export function setBells(on: boolean): void {
+  bellsOn = on
+  if (!on && ctx) {
+    const closing = ctx
+    ctx = null
+    void closing.close().catch(() => undefined)
+  }
+}
 
 function context(): Ctx | null {
-  if (typeof window === 'undefined') return null
+  if (!bellsOn || typeof window === 'undefined') return null
   const Audio = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
   if (!Audio) return null
   ctx ??= new Audio()
@@ -59,9 +74,9 @@ export function audioState(): string {
 
 /** For the debug log: the Audio Session type the phone holds (null: the browser has no
  *  Audio Session API) and the sound's state. */
-export function audioReport(nav: Navigator = navigator): { session: string | null; sound: string } {
+export function audioReport(nav: Navigator = navigator): { session: string | null; sound: string; bells: boolean } {
   const session = (nav as SessionHost).audioSession
-  return { session: session ? session.type : null, sound: audioState() }
+  return { session: session ? session.type : null, sound: audioState(), bells: bellsOn }
 }
 
 let reported = false

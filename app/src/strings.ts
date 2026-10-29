@@ -1090,6 +1090,8 @@ export const S = {
     version: 'Version',
     versionTap: 'Tap the version line seven times to open the console.',
     updateReady: 'A new version is ready. It loads when you close and reopen the app.',
+    bells: 'Bells',
+    bellsWhat: 'The bells and the countdown beeps in a training session. Off, the app plays no sound.',
     alerts: 'Timer alerts',
     alertsWhat: 'When a rest or a hold ends while the phone is locked, an alert tells you.',
     alertsTurnOn: 'Turn on the alerts',
