@@ -2,7 +2,8 @@
 // "Keep Spotify music and Apple Podcasts playing"). "playback" stops other audio on iOS.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  AUDIO_SESSION_TYPE, audioReport, bell, declareMixing, reportAudioOnce, setBells, tick, unlockAudio,
+  AUDIO_SESSION_TYPE, RELEASE_AFTER_MS, audioReport, bell, declareMixing, reportAudioOnce, setBells,
+  setSoundLog, tick, unlockAudio,
 } from './sounds'
 
 describe('the audio session', () => {
@@ -41,6 +42,10 @@ describe('the bells switch (his choice, 2026-10-29)', () => {
       this.state = 'running'
       return Promise.resolve()
     }
+    suspend() {
+      this.state = 'suspended'
+      return Promise.resolve()
+    }
     close() {
       this.closed = true
       return Promise.resolve()
@@ -72,6 +77,88 @@ describe('the bells switch (his choice, 2026-10-29)', () => {
     expect(audioReport({} as Navigator).sound).toBe('running')
     setBells(false)
     expect(audioReport({} as Navigator).sound).toBe('not started')
+  })
+})
+
+describe('the sound runs only while a bell or a beep plays (his choice, 2026-10-29)', () => {
+  // No oscillators: building a sound throws inside play(), which a session survives, and
+  // the hold and the release still run.
+  class FakeContext {
+    static resumes = 0
+    state = 'suspended'
+    resume() {
+      FakeContext.resumes += 1
+      this.state = 'running'
+      return Promise.resolve()
+    }
+    suspend() {
+      this.state = 'suspended'
+      return Promise.resolve()
+    }
+    close() {
+      return Promise.resolve()
+    }
+  }
+
+  afterEach(() => {
+    setBells(false)
+    setBells(true)
+    setSoundLog(null)
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  const start = async () => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', { AudioContext: FakeContext })
+    FakeContext.resumes = 0
+    unlockAudio({} as Navigator)
+    await vi.advanceTimersByTimeAsync(0)
+  }
+
+  it('the first tap starts the sound, and it is let go right after', async () => {
+    await start()
+    expect(audioReport({} as Navigator).sound).toBe('running')
+    await vi.advanceTimersByTimeAsync(RELEASE_AFTER_MS)
+    expect(audioReport({} as Navigator).sound).toBe('suspended')
+  })
+
+  it('a later tap leaves the sound alone', async () => {
+    await start()
+    await vi.advanceTimersByTimeAsync(RELEASE_AFTER_MS)
+    unlockAudio({} as Navigator)
+    await vi.advanceTimersByTimeAsync(0)
+    expect(FakeContext.resumes).toBe(1)
+    expect(audioReport({} as Navigator).sound).toBe('suspended')
+  })
+
+  it('a beep wakes the sound and lets it go once the beep has ended', async () => {
+    await start()
+    await vi.advanceTimersByTimeAsync(RELEASE_AFTER_MS)
+    tick()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(audioReport({} as Navigator).sound).toBe('running')
+    await vi.advanceTimersByTimeAsync(120 + RELEASE_AFTER_MS)
+    expect(audioReport({} as Navigator).sound).toBe('suspended')
+  })
+
+  it('a long bell keeps the sound until its last strike has rung out', async () => {
+    await start()
+    bell('finish')
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(audioReport({} as Navigator).sound).toBe('running')
+    await vi.advanceTimersByTimeAsync(1500)
+    expect(audioReport({} as Navigator).sound).toBe('suspended')
+  })
+
+  it('writes the first wakes and releases into the log', async () => {
+    const lines: string[] = []
+    setSoundLog((kind) => lines.push(kind))
+    await start()
+    await vi.advanceTimersByTimeAsync(RELEASE_AFTER_MS)
+    tick()
+    await vi.advanceTimersByTimeAsync(120 + RELEASE_AFTER_MS)
+    expect(lines).toEqual(['sound let go', 'sound woken for a bell', 'sound let go'])
   })
 })
 

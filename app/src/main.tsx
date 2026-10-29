@@ -11,7 +11,7 @@ import { db } from './db/schema'
 import { debugLog, loadLog } from './debug/console'
 import { loadSession, sessionActive } from './lib/session'
 import { DEFAULT_SETTINGS, readSettings, type AppSettings } from './lib/settings'
-import { audioReport, declareMixing, setBells } from './lib/sounds'
+import { audioReport, declareMixing, setBells, setSoundLog } from './lib/sounds'
 import { isStandalone } from './lib/standalone'
 import { registerServiceWorker } from './lib/updates'
 
@@ -27,6 +27,7 @@ async function start(): Promise<void> {
   }
   debugLog('start', { commit: __APP_BUILD__.commit, standalone: isStandalone(), session: resume })
   setBells(settings.bells)
+  setSoundLog((kind, detail) => debugLog(kind, detail))
   declareMixing()
   debugLog('audio at start', audioReport())
   registerServiceWorker(() => !sessionActive())

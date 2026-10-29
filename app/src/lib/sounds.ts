@@ -24,22 +24,67 @@
 // His log the same evening: "ambient" held at start and at the tap, the sound running a
 // second later, and Spotify stopped all the same. So the bells can be switched off in
 // Settings (his choice, "start with the first"): off, the app starts no sound at all.
+// The second fix, the same evening ("Let's try both"): the sound runs only while a bell or
+// a beep plays. The first tap starts it (iOS starts a sound only from a tap) and every
+// sound lets it go again RELEASE_AFTER_MS after it ends, so the phone can give the music
+// back between bells; later taps no longer wake it. The log notes the first few releases
+// and wakes, which shows whether this phone lets a countdown wake the sound by itself.
 export type Ending = 'continue' | 'switch' | 'finish' | 'done'
 
 type Ctx = AudioContext
 
 let ctx: Ctx | null = null
 let bellsOn = true
+/** The sound has run once from a tap; from then on a bell may wake it by itself. */
+let unlocked = false
+
+/** How long after the last bell or beep ends the sound is let go. */
+export const RELEASE_AFTER_MS = 500
+let releaseTimer: ReturnType<typeof setTimeout> | null = null
+let busyUntil = 0
+
+type SoundLog = (kind: string, detail: Record<string, unknown>) => void
+let soundLog: SoundLog | null = null
+let notes = 0
+const MAX_NOTES = 12
+
+/** Where the first releases and wakes of each app start are written (the debug log). */
+export function setSoundLog(log: SoundLog | null): void {
+  soundLog = log
+}
+
+function note(kind: string, detail: Record<string, unknown>): void {
+  if (!soundLog || notes >= MAX_NOTES) return
+  notes += 1
+  soundLog(kind, detail)
+}
 
 /** The Settings switch (KEYS.bells). Off closes the sound, so the phone's audio is let go
  *  at once, and no tap or countdown starts it again until the bells are on. */
 export function setBells(on: boolean): void {
   bellsOn = on
-  if (!on && ctx) {
+  if (on) return
+  unlocked = false
+  busyUntil = 0
+  if (releaseTimer !== null) clearTimeout(releaseTimer)
+  releaseTimer = null
+  if (ctx) {
     const closing = ctx
     ctx = null
     void closing.close().catch(() => undefined)
   }
+}
+
+/** Keep the sound running until `seconds` from now (the longest sound playing), then let
+ *  it go. */
+function holdThenRelease(c: Ctx, seconds: number): void {
+  busyUntil = Math.max(busyUntil, Date.now() + seconds * 1000)
+  if (releaseTimer !== null) clearTimeout(releaseTimer)
+  releaseTimer = setTimeout(() => {
+    releaseTimer = null
+    if (ctx !== c || c.state !== 'running') return
+    void c.suspend().then(() => note('sound let go', { sound: c.state }), () => undefined)
+  }, busyUntil - Date.now() + RELEASE_AFTER_MS)
 }
 
 function context(): Ctx | null {
@@ -61,11 +106,16 @@ export function declareMixing(nav: Navigator = navigator): void {
   if (session) session.type = AUDIO_SESSION_TYPE
 }
 
-/** Declare sounds that mix with other audio, and wake the audio. Call from a tap. */
+/** Declare sounds that mix with other audio, and start the sound once, from a tap, so a
+ *  bell may wake it later; it is let go again at once. Later taps leave it alone. */
 export function unlockAudio(nav: Navigator = navigator): void {
   declareMixing(nav)
   const c = context()
-  if (c && c.state !== 'running') void c.resume().catch(() => undefined)
+  if (!c || unlocked) return
+  void c.resume().then(() => {
+    unlocked = true
+    holdThenRelease(c, 0)
+  }, () => undefined)
 }
 
 export function audioState(): string {
@@ -90,7 +140,9 @@ export function reportAudioOnce(log: (detail: Record<string, unknown>) => void, 
   setTimeout(() => log({ at: 'a second later', ...audioReport(nav) }), 1000)
 }
 
-function play(build: (c: Ctx, out: AudioNode) => void): void {
+/** Play one sound `seconds` long: wake the sound if it was let go, then let it go again
+ *  after the sound ends. */
+function play(build: (c: Ctx, out: AudioNode) => void, seconds: number): void {
   const c = context()
   if (!c) return
   const go = () => {
@@ -99,9 +151,16 @@ function play(build: (c: Ctx, out: AudioNode) => void): void {
     } catch {
       // a sound that cannot play must never stop the session
     }
+    holdThenRelease(c, seconds)
   }
-  if (c.state === 'suspended') void c.resume().then(go, go)
-  else go()
+  if (c.state === 'running') {
+    go()
+    return
+  }
+  void c.resume().then(() => {
+    note('sound woken for a bell', { sound: c.state })
+    go()
+  }, go)
 }
 
 /** A plain tone: the 3-2-1 ticks. Thin and short, so it never sounds like a bell. */
@@ -117,7 +176,7 @@ export function tick(): void {
     g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.12)
     o.start(c.currentTime)
     o.stop(c.currentTime + 0.12)
-  })
+  }, 0.12)
 }
 
 /** One struck-bell hit: mildly inharmonic partials, the higher ones decaying fastest. */
@@ -144,7 +203,7 @@ function strike(root: number, at: number, volume: number, length: number): void 
       o.start(t0)
       o.stop(t0 + length * p.d + 0.02)
     }
-  })
+  }, at + length + 0.02)
 }
 
 const D6 = 1174.7
