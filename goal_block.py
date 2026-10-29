@@ -412,24 +412,23 @@ LEG_CURL = _ex(
 CROSSOVER = _ex(
     name="Reverse Cable Crossover",
     ex_type="reps",
-    laterality="unilateral",
-    sets=3, reps=15, rest_seconds=15,
+    sets=3, reps=15, rest_seconds=45,
     equipment_type="cable", weight_kg=3.0,
     increment_size=CABLE_UNIT, increment_unit="unit", **ISOLATION_RANGE,
     mechanics=(
-        "One cable at shoulder height, no handle. Stand side-on with the cable on the side "
-        "away from the working arm, and hold the cable end in that hand in front of your "
-        "chest, arm almost straight. Pull the arm out and back in a wide arc until your hand "
-        "is out to the side in line with your body; on the RIGHT, not behind it. Return "
-        "slowly across the front. All the reps on one arm, then the other. "
-        + _LAST_SET_TO_FAILURE
+        "Two cables at shoulder height, no handles. Hold the cable ends crossed in front of "
+        "you: the right cable in the left hand, the left cable in the right hand. Stand in "
+        "the middle. Pull both arms out and back in a wide arc, arms almost straight, until "
+        "your hands are out to the sides in line with your body; on the RIGHT, not behind "
+        "it. Return slowly across the front. " + _LAST_SET_TO_FAILURE
     ),
     biomechanical_focus=(
         "The rear delts (goal B): tier_lists/shoulders.md, S, the best for the rear delts. "
-        "One arm at a time: his gym's station takes one hand (2026-10-22). The right arm "
-        "stops at the line of the body (rules: 'reverse cable crossover', the measured limit "
-        "of 2026-08-13). 15 s rest after both arms (his answer, 2026-10-22): each arm rests "
-        "while the other works, and session C stays under 70 modelled minutes."
+        "Both arms at once on the station he found (2026-10-29); one arm at a time from "
+        "2026-10-22, when his gym's station took one hand, with 15 s after both arms. The "
+        "right arm stops at the line of the body (rules: 'reverse cable crossover', the "
+        "measured limit of 2026-08-13). 45 s rest: both arms rest together, so the timer is "
+        "all the rest each arm gets."
     ),
     progression="The rep-range rule adds half a unit.",
     regression="The right shoulder objects at the end → finish the arc in front of the body.",

@@ -91,11 +91,12 @@ BACK_EXT = Card("45° Back Extension", area="deep back", second="glute max", rep
                 equipment_type="machine", kind="compound", demand=2, priority=1, days=2)
 ROW = Card("Single-Arm DB Row", area="back", second="shoulder-blade muscles", rest_seconds=60,
            equipment_type="dumbbell", laterality="unilateral", kind="compound", demand=2, days=2)
-#: One arm at a time (his gym, 2026-10-22: "Reverse cross over cable can only be
-#: done single hand"), and 15 s rest after both arms (his answer, 2026-10-22):
-#: each arm rests while the other works, and session C stays under 70 minutes.
-CROSSOVER = Card("Reverse Cable Crossover", area="rear delts", reps=15, rest_seconds=15,
-                 equipment_type="cable", laterality="unilateral", days=2)
+#: Both arms at once (his note, 2026-10-29: "Reverse cable cross over is now done
+#: with both arms. I found a machine for it"), so the rest is 45 s again. From
+#: 2026-10-22 it was one arm at a time ("can only be done single hand") with 15 s
+#: after both arms, because each arm rested while the other worked.
+CROSSOVER = Card("Reverse Cable Crossover", area="rear delts", reps=15, rest_seconds=45,
+                 equipment_type="cable", days=2)
 LATERAL = Card("Cable Lateral Raise", area="side delts", reps=15, rest_seconds=45, equipment_type="cable",
                laterality="unilateral", days=1)
 CRUNCH = Card("Lat-Pulldown Cable Crunch (Facing Away)", area="abs", reps=12, rest_seconds=60,
@@ -292,13 +293,14 @@ PICKS: dict[str, Pick] = {
                "the tie"),
     "Reverse Cable Crossover": Pick(
         "B", "rear delts", "strength and size",
-        "Rear delts, through a long range, one arm at a time (his gym, 2026-10-22: "
-        "'can only be done single hand').",
+        "Rear delts, through a long range, both arms at once on the station he found "
+        "(2026-10-29: 'now done with both arms. I found a machine for it').",
         "tier_lists/shoulders.md #21, S — best for the rear delts",
         listed_as="Reverse cable crossover",
-        better=_TIER_FIRST + "; the list's best for the rear delts. Checked again for one arm "
-               "at a time (2026-10-22) against the reverse pec deck sideways, one arm (#18, S): "
-               "not better for the same goal, so the crossover stays"),
+        better=_TIER_FIRST + "; the list's best for the rear delts. Checked for one arm at a "
+               "time (2026-10-22) against the reverse pec deck sideways, one arm (#18, S): not "
+               "better for the same goal. Both arms at once (2026-10-29) is the form the list "
+               "ranks, so the crossover stays"),
     "Cable Lateral Raise": Pick(
         "B", "side delts", "strength and size",
         "Side delts, with tension at the stretch.",
