@@ -26,7 +26,14 @@
       "Bash(python -c \"import patient_profile; print\\('symptom_log entries:', len\\(patient_profile.PROFILE['symptom_log']\\)\\); print\\('finding 6 keys:', list\\(patient_profile.PROFILE['biomechanical_findings'][5].keys\\(\\)\\)\\)\")",
       "Bash(python -c \"import patient_profile; e = patient_profile.PROFILE['symptom_log'][-1]; print\\(e['date'], '|', e['status']\\); print\\('escalation items:', len\\(e['escalation_criteria']\\)\\)\")",
       "Bash(HEALTH_DATASTORE_PATH=datastore.db python -m pytest tests/ -q)",
-      "PowerShell(python -m pytest tests/ -q 2>$null)"
+      "PowerShell(python -m pytest tests/ -q 2>$null)",
+      "Bash(gcloud run deploy health-engine *)",
+      "PowerShell(gcloud run deploy health-engine *)",
+      "Bash(./node_modules/.bin/wrangler deploy *)",
+      "Bash(wrangler deploy *)",
+      "Bash(pnpm exec wrangler deploy *)",
+      "Bash(npx wrangler deploy *)",
+      "PowerShell(npx wrangler deploy *)"
     ]
   }
 }
