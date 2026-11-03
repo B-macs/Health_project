@@ -215,6 +215,16 @@ def with_units(traits: dict[str, dict], plan_exercises: list[dict],
     return out
 
 
+def block_lifts() -> list[dict]:
+    """The 12-week block's lifts with a weight stepper, its swaps included,
+    once each: the list Settings shows and the lifts a replacement may stand
+    in for."""
+    import goal_block as gb  # the block's sessions as written (goal_block.SESSIONS)
+    plan = [ex for day in gb.SESSIONS.values() for ex in day]
+    plan += [ex for alts in gb.ALTERNATIVES.values() for ex in alts]
+    return lifts(plan)
+
+
 def answer(settings: Settings, plan_exercises: list[dict]) -> dict:
     """The Settings screen's list: the items, and each lift with its item and
     the step it takes."""

@@ -30,6 +30,7 @@ NO_DAY = {
     "DELETE /api/insights/flexibility/capture": "drops the draft, whatever its day",
     "POST /api/insights/queue/process": "parses what is pending, whatever its day",
     "GET /api/settings": "the stored settings",
+    "GET /api/settings/equipment": "the stored weight steps (WP-46), the same every day",
     "GET /api/data/check": "the store against its newest backup; ages are in hours, not days",
 }
 

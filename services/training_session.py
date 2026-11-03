@@ -319,15 +319,6 @@ def session_plan(repo, today: date) -> dict:
 
 # ─── The equipment list and the replacements (WP-46) ────────────────────────
 
-def block_lifts() -> list[dict]:
-    """The 12-week block's lifts with a weight stepper, its swaps included,
-    once each (equipment.lifts)."""
-    import goal_block as gb
-    plan = [ex for day in gb.SESSIONS.values() for ex in day]
-    plan += [ex for alts in gb.ALTERNATIVES.values() for ex in alts]
-    return equipment.lifts(plan)
-
-
 def equipment_settings(repo) -> dict:
     """Settings › Weight steps: the items and each lift's item and step.
     An unreadable stored list reads as the defaults, and says so."""
@@ -335,7 +326,7 @@ def equipment_settings(repo) -> dict:
         stored, error = repo.get_equipment_steps(), None
     except Exception as exc:
         stored, error = None, f"{type(exc).__name__}: {exc}"
-    return {**equipment.answer(equipment.from_stored(stored), block_lifts()), "load_error": error}
+    return {**equipment.answer(equipment.from_stored(stored), equipment.block_lifts()), "load_error": error}
 
 
 def save_equipment_settings(repo, body: dict, today: date) -> dict:
@@ -343,11 +334,11 @@ def save_equipment_settings(repo, body: dict, today: date) -> dict:
     stores one) and answer with it. SessionRefused("invalid_equipment") with
     the reason when it is refused."""
     try:
-        stored = equipment.validated(body, {ex["name"] for ex in block_lifts()})
+        stored = equipment.validated(body, {ex["name"] for ex in equipment.block_lifts()})
     except equipment.InvalidSettings as exc:
         raise SessionRefused("invalid_equipment", [str(exc)]) from None
     repo.save_equipment_steps(stored, today)
-    return {**equipment.answer(equipment.from_stored(stored), block_lifts()), "load_error": None}
+    return {**equipment.answer(equipment.from_stored(stored), equipment.block_lifts()), "load_error": None}
 
 
 def add_replacement(repo, today: date, lift: str, name: str, item_id: str) -> dict:
@@ -359,8 +350,8 @@ def add_replacement(repo, today: date, lift: str, name: str, item_id: str) -> di
     stored = repo.get_replacements(live=True)
     try:
         new_stored, entry = replacements.validated(
-            stored, lift, name, item_id, lift_names={ex["name"] for ex in block_lifts()},
-            known_names=set(sess.exercise_traits()) | {ex["name"] for ex in block_lifts()},
+            stored, lift, name, item_id, lift_names={ex["name"] for ex in equipment.block_lifts()},
+            known_names=set(sess.exercise_traits()) | {ex["name"] for ex in equipment.block_lifts()},
             settings=settings, today=today)
     except replacements.ReplacementRefused as exc:
         raise SessionRefused("invalid_replacement", [str(exc)]) from None
