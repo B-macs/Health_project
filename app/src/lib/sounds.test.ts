@@ -2,8 +2,8 @@
 // "Keep Spotify music and Apple Podcasts playing"). "playback" stops other audio on iOS.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  AUDIO_SESSION_TYPE, RELEASE_AFTER_MS, audioReport, bell, declareMixing, reportAudioOnce, setBells,
-  setSoundLog, tick, unlockAudio,
+  AUDIO_SESSION_TYPE, HELD_RELEASE_MS, RELEASE_AFTER_MS, audioReport, bell, declareMixing,
+  reportAudioOnce, restOver, setBells, setSoundLog, setSoundWay, tick, unlockAudio,
 } from './sounds'
 
 describe('the audio session', () => {
@@ -67,7 +67,7 @@ describe('the bells switch (his choice, 2026-10-29)', () => {
     bell('finish')
     tick()
     expect(FakeContext.made).toBe(0)
-    expect(audioReport({} as Navigator)).toEqual({ session: null, sound: 'not started', bells: false })
+    expect(audioReport({} as Navigator)).toEqual({ session: null, sound: 'not started', bells: false, way: 'short' })
   })
 
   it('switched off during a session, the running sound is closed', () => {
@@ -174,5 +174,106 @@ describe('the first tap report', () => {
     expect(lines).toEqual([expect.objectContaining({ at: 'first tap', session: 'ambient' })])
     vi.advanceTimersByTime(1000)
     expect(lines.map((d) => d.at)).toEqual(['first tap', 'a second later'])
+  })
+})
+
+describe('the headphone test ways (WP-42, his report of 2026-11-03)', () => {
+  // "On the headphones, End of the rest": the music stops after the 3-2-1 beeps.
+  class FakeContext {
+    static resumes = 0
+    static made = 0
+    state = 'suspended'
+    constructor() {
+      FakeContext.made += 1
+    }
+    resume() {
+      FakeContext.resumes += 1
+      this.state = 'running'
+      return Promise.resolve()
+    }
+    suspend() {
+      this.state = 'suspended'
+      return Promise.resolve()
+    }
+    close() {
+      return Promise.resolve()
+    }
+  }
+
+  afterEach(() => {
+    setSoundWay('short')
+    setBells(false)
+    setBells(true)
+    vi.useRealTimers()
+    vi.unstubAllGlobals()
+  })
+
+  const restEnd = async () => {
+    for (let i = 0; i < 3; i += 1) {
+      tick()
+      await vi.advanceTimersByTimeAsync(1000)
+    }
+    restOver()
+    await vi.advanceTimersByTimeAsync(2100)
+  }
+
+  const started = async (way: 'short' | 'held') => {
+    vi.useFakeTimers()
+    vi.stubGlobal('window', { AudioContext: FakeContext })
+    setSoundWay(way)
+    unlockAudio({} as Navigator)
+    await vi.advanceTimersByTimeAsync(HELD_RELEASE_MS)
+    FakeContext.resumes = 0
+  }
+
+  it('short: the end of a rest starts the sound four times', async () => {
+    await started('short')
+    await restEnd()
+    expect(FakeContext.resumes).toBe(4)
+  })
+
+  it('held: the sound starts once at the first beep and stays on through the bell', async () => {
+    await started('held')
+    await restEnd()
+    expect(FakeContext.resumes).toBe(1)
+    expect(audioReport({} as Navigator)).toMatchObject({ sound: 'running', way: 'held' })
+    await vi.advanceTimersByTimeAsync(HELD_RELEASE_MS)
+    expect(audioReport({} as Navigator).sound).toBe('suspended')
+  })
+
+  it('file: the sounds play as audio files and the live sound never starts', async () => {
+    const played: string[] = []
+    let files = 0
+    class FakeAudio {
+      muted = false
+      preload = ''
+      currentTime = 0
+      constructor(public src: string) {}
+      play() {
+        if (!this.muted) played.push(this.src)
+        return Promise.resolve()
+      }
+      pause() {}
+    }
+    vi.stubGlobal('window', { AudioContext: FakeContext })
+    vi.stubGlobal('Audio', FakeAudio)
+    vi.stubGlobal('URL', { createObjectURL: () => `blob:${(files += 1)}` })
+    FakeContext.made = 0
+    setSoundWay('file')
+    unlockAudio({} as Navigator)
+    await Promise.resolve()
+    expect(files).toBe(6)
+    tick()
+    restOver()
+    bell('done')
+    expect(played).toHaveLength(3)
+    expect(new Set(played).size).toBe(3)
+    expect(FakeContext.made).toBe(0)
+    expect(audioReport({} as Navigator).way).toBe('file')
+  })
+
+  it('an unknown way reads as short', () => {
+    setSoundWay('loud' as never)
+    expect(audioReport({} as Navigator).way).toBe('short')
   })
 })

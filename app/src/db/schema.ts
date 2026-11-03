@@ -108,6 +108,9 @@ export const KEYS = {
   alerts: 'timer_alerts',
   /** The session's bells and beeps; absent counts as on (lib/sounds.ts, 2026-10-29). */
   bells: 'bells',
+  /** How the session's sound plays: 'short', 'held' or 'file' (lib/sounds.ts, WP-42);
+   *  absent counts as 'short'. */
+  soundWay: 'sound_way',
   /** The Worker's push key the phone subscribed with: a new key means subscribing again. */
   pushKey: 'push_key',
   /** The day a plan session was saved on this phone (WP-32): Training shows that day as

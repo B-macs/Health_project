@@ -4,6 +4,7 @@
 // appearance; after that the screens follow every change live.
 import { useLiveQuery } from 'dexie-react-hooks'
 import type { ThemePref } from '../design/theme'
+import { SOUND_WAYS, type SoundWay } from './sounds'
 import { KEYS, type HealthDB } from '../db/schema'
 
 export interface AppSettings {
@@ -15,6 +16,8 @@ export interface AppSettings {
   alerts: boolean
   /** The session's bells and beeps are on (lib/sounds.ts); on unless switched off. */
   bells: boolean
+  /** How the sound plays (lib/sounds.ts, WP-42): the headphone test of 2026-11-03. */
+  soundWay: SoundWay
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -24,6 +27,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   installSkipped: false,
   alerts: false,
   bells: true,
+  soundWay: 'short',
 }
 
 const THEMES: readonly ThemePref[] = ['auto', 'light', 'dark']
@@ -40,6 +44,7 @@ export async function readSettings(store: HealthDB): Promise<AppSettings> {
     installSkipped: value(KEYS.installSkipped) === true,
     alerts: value(KEYS.alerts) === true,
     bells: value(KEYS.bells) !== false,
+    soundWay: SOUND_WAYS.includes(value(KEYS.soundWay) as SoundWay) ? (value(KEYS.soundWay) as SoundWay) : 'short',
   }
 }
 

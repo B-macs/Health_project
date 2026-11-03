@@ -33,7 +33,7 @@ import { useOutboxLoop } from './lib/outbox'
 import { REREAD_AFTER_MS, bump } from './lib/refresh'
 import { syncIfDue } from './lib/sync'
 import { useAppSettings, type AppSettings } from './lib/settings'
-import { setBells } from './lib/sounds'
+import { setBells, setSoundWay } from './lib/sounds'
 import { isStandalone } from './lib/standalone'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { CheckIn, formPath } from './screens/CheckIn'
@@ -198,6 +198,7 @@ function Shell(p: ShellProps) {
 
   // The bells switch in Settings, followed live (lib/sounds.ts).
   useEffect(() => setBells(p.settings.bells), [p.settings.bells])
+  useEffect(() => setSoundWay(p.settings.soundWay), [p.settings.soundWay])
 
   // The result page needs no key: on iOS the login can come back in Safari, which does not
   // share the Home Screen app's storage. "Open Settings" leaves it for the app itself.

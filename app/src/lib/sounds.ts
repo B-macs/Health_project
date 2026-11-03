@@ -29,7 +29,24 @@
 // sound lets it go again RELEASE_AFTER_MS after it ends, so the phone can give the music
 // back between bells; later taps no longer wake it. The log notes the first few releases
 // and wakes, which shows whether this phone lets a countdown wake the sound by itself.
-export type Ending = 'continue' | 'switch' | 'finish' | 'done'
+//
+// WP-42, his report of 2026-11-03: with headphones the music still stops at the end of a
+// rest ("On the headphones, End of the rest"); on the loudspeaker it keeps playing. Two
+// more ways to play the same sounds, chosen in Settings › Bells, for his test with
+// headphones: "held" keeps the sound on from the first countdown beep until HELD_RELEASE_MS
+// after the bell, so iOS starts and stops it once a rest instead of four times; "file"
+// plays the same recipes (soundFiles.ts) as WAV files through an audio element, a
+// different path through iOS. "short" is the way of 2026-10-30.
+import {
+  BELLS, PARTIALS, REST_OVER, TICK, partialSeconds, renderStrikes, renderTick, wav,
+  type Ending, type Strike,
+} from './soundFiles'
+
+export type { Ending } from './soundFiles'
+
+/** How the sound plays (Settings › Bells, WP-42). */
+export type SoundWay = 'short' | 'held' | 'file'
+export const SOUND_WAYS: readonly SoundWay[] = ['short', 'held', 'file']
 
 type Ctx = AudioContext
 
@@ -40,6 +57,10 @@ let unlocked = false
 
 /** How long after the last bell or beep ends the sound is let go. */
 export const RELEASE_AFTER_MS = 500
+/** The "held" way: longer than the second between two countdown beeps, so the sound
+ *  runs from the first beep until after the bell. */
+export const HELD_RELEASE_MS = 2500
+let way: SoundWay = 'short'
 let releaseTimer: ReturnType<typeof setTimeout> | null = null
 let busyUntil = 0
 
@@ -75,6 +96,21 @@ export function setBells(on: boolean): void {
   }
 }
 
+/** The Settings choice of how the sound plays (KEYS.soundWay). The "file" way closes the
+ *  live sound, so only the audio elements play. */
+export function setSoundWay(next: SoundWay): void {
+  way = SOUND_WAYS.includes(next) ? next : 'short'
+  if (way !== 'file' || !ctx) return
+  const closing = ctx
+  ctx = null
+  unlocked = false
+  void closing.close().catch(() => undefined)
+}
+
+export function soundWay(): SoundWay {
+  return way
+}
+
 /** Keep the sound running until `seconds` from now (the longest sound playing), then let
  *  it go. */
 function holdThenRelease(c: Ctx, seconds: number): void {
@@ -84,11 +120,11 @@ function holdThenRelease(c: Ctx, seconds: number): void {
     releaseTimer = null
     if (ctx !== c || c.state !== 'running') return
     void c.suspend().then(() => note('sound let go', { sound: c.state }), () => undefined)
-  }, busyUntil - Date.now() + RELEASE_AFTER_MS)
+  }, busyUntil - Date.now() + (way === 'held' ? HELD_RELEASE_MS : RELEASE_AFTER_MS))
 }
 
 function context(): Ctx | null {
-  if (!bellsOn || typeof window === 'undefined') return null
+  if (!bellsOn || way === 'file' || typeof window === 'undefined') return null
   const Audio = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
   if (!Audio) return null
   ctx ??= new Audio()
@@ -110,6 +146,10 @@ export function declareMixing(nav: Navigator = navigator): void {
  *  bell may wake it later; it is let go again at once. Later taps leave it alone. */
 export function unlockAudio(nav: Navigator = navigator): void {
   declareMixing(nav)
+  if (way === 'file') {
+    if (bellsOn) unlockFiles()
+    return
+  }
   const c = context()
   if (!c || unlocked) return
   void c.resume().then(() => {
@@ -124,9 +164,9 @@ export function audioState(): string {
 
 /** For the debug log: the Audio Session type the phone holds (null: the browser has no
  *  Audio Session API) and the sound's state. */
-export function audioReport(nav: Navigator = navigator): { session: string | null; sound: string; bells: boolean } {
+export function audioReport(nav: Navigator = navigator): { session: string | null; sound: string; bells: boolean; way: SoundWay } {
   const session = (nav as SessionHost).audioSession
-  return { session: session ? session.type : null, sound: audioState(), bells: bellsOn }
+  return { session: session ? session.type : null, sound: audioState(), bells: bellsOn, way }
 }
 
 let reported = false
@@ -163,76 +203,124 @@ function play(build: (c: Ctx, out: AudioNode) => void, seconds: number): void {
   }, go)
 }
 
+// ─── The "file" way (WP-42): the same sounds, played as WAV files ───────────────────
+
+/** The sample rate of the files: the highest partial (D6 × 5.4, about 6.3 kHz) fits. */
+export const FILE_RATE = 22050
+
+type FileKey = 'tick' | 'rest' | Ending
+
+const players = new Map<FileKey, HTMLAudioElement>()
+let filesUnlocked = false
+
+function samples(key: FileKey): Float32Array {
+  if (key === 'tick') return renderTick(FILE_RATE)
+  if (key === 'rest') return renderStrikes(REST_OVER, FILE_RATE)
+  return renderStrikes(BELLS[key], FILE_RATE)
+}
+
+/** The audio element of one sound, made once (its WAV file drawn from the recipe). */
+function player(key: FileKey): HTMLAudioElement | null {
+  if (!bellsOn || typeof Audio === 'undefined' || typeof URL === 'undefined') return null
+  let el = players.get(key)
+  if (!el) {
+    const url = URL.createObjectURL(new Blob([wav(samples(key), FILE_RATE)], { type: 'audio/wav' }))
+    el = new Audio(url)
+    el.preload = 'auto'
+    players.set(key, el)
+  }
+  return el
+}
+
+const FILE_KEYS: readonly FileKey[] = ['tick', 'rest', 'continue', 'switch', 'finish', 'done']
+
+/** iOS lets an audio element play by itself only after it has played once from a tap: the
+ *  first tap plays each one muted and stops it at once. */
+function unlockFiles(): void {
+  if (filesUnlocked) return
+  filesUnlocked = true
+  for (const key of FILE_KEYS) {
+    const el = player(key)
+    if (!el) continue
+    el.muted = true
+    void el.play().then(() => {
+      el.pause()
+      el.currentTime = 0
+      el.muted = false
+    }, () => {
+      el.muted = false
+      note('a sound file was refused at the tap', { sound: key })
+    })
+  }
+}
+
+function playFile(key: FileKey): void {
+  const el = player(key)
+  if (!el) return
+  try {
+    el.currentTime = 0
+  } catch {
+    // not loaded yet: it plays from the start anyway
+  }
+  void el.play().catch(() => note('a sound file did not play', { sound: key }))
+}
+
+// ─── The sounds ─────────────────────────────────────────────────────────────────────
+
 /** A plain tone: the 3-2-1 ticks. Thin and short, so it never sounds like a bell. */
 export function tick(): void {
+  if (way === 'file') {
+    playFile('tick')
+    return
+  }
   play((c, out) => {
     const o = c.createOscillator()
     const g = c.createGain()
     o.connect(g)
     g.connect(out)
     o.type = 'sine'
-    o.frequency.value = 880
-    g.gain.setValueAtTime(0.35, c.currentTime)
-    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + 0.12)
+    o.frequency.value = TICK.frequency
+    g.gain.setValueAtTime(TICK.volume, c.currentTime)
+    g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + TICK.seconds)
     o.start(c.currentTime)
-    o.stop(c.currentTime + 0.12)
-  }, 0.12)
+    o.stop(c.currentTime + TICK.seconds)
+  }, TICK.seconds)
 }
 
 /** One struck-bell hit: mildly inharmonic partials, the higher ones decaying fastest. */
-function strike(root: number, at: number, volume: number, length: number): void {
+function strike(s: Strike): void {
   play((c, out) => {
-    const t0 = c.currentTime + at
-    const partials = [
-      { r: 1.0, g: 1.0, d: 1.0 },
-      { r: 2.0, g: 0.55, d: 0.62 },
-      { r: 2.76, g: 0.38, d: 0.42 },
-      { r: 4.07, g: 0.22, d: 0.28 },
-      { r: 5.4, g: 0.14, d: 0.18 },
-    ]
-    for (const p of partials) {
+    const t0 = c.currentTime + s.at
+    for (const p of PARTIALS) {
       const o = c.createOscillator()
       const g = c.createGain()
       o.connect(g)
       g.connect(out)
       o.type = 'sine'
-      o.frequency.setValueAtTime(root * p.r, t0)
+      o.frequency.setValueAtTime(s.root * p.r, t0)
       g.gain.setValueAtTime(0.0001, t0)
-      g.gain.linearRampToValueAtTime(volume * p.g, t0 + 0.002)
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + length * p.d)
+      g.gain.linearRampToValueAtTime(s.volume * p.g, t0 + 0.002)
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + s.length * p.d)
       o.start(t0)
-      o.stop(t0 + length * p.d + 0.02)
+      o.stop(t0 + partialSeconds(s, p))
     }
-  }, at + length + 0.02)
+  }, s.at + s.length + 0.02)
 }
-
-const D6 = 1174.7
-const C6 = 1046.5
-const G5 = 784.0
-const E5 = 659.3
-const C5 = 523.3
 
 /** The bell a hold rings at its end, by the engine's ending. */
 export function bell(ending: Ending): void {
-  if (ending === 'continue') {
-    strike(D6, 0, 0.9, 0.45)
-  } else if (ending === 'switch') {
-    strike(D6, 0, 0.95, 1.2)
-    strike(G5, 0.16, 1.0, 1.9)
-  } else if (ending === 'finish') {
-    strike(C6, 0, 0.9, 1.0)
-    strike(G5, 0.18, 0.95, 1.2)
-    strike(C5, 0.36, 1.0, 2.6)
-  } else {
-    strike(C6, 0, 0.9, 1.0)
-    strike(G5, 0.18, 0.95, 1.1)
-    strike(E5, 0.36, 0.95, 1.2)
-    strike(C5, 0.54, 1.0, 2.8)
+  if (way === 'file') {
+    playFile(ending)
+    return
   }
+  for (const s of BELLS[ending]) strike(s)
 }
 
 /** The rest's end: a rising pair, so it is never the hold's swap. */
 export function restOver(): void {
-  strike(G5, 0, 0.95, 1.5)
-  strike(D6, 0.16, 1.0, 1.9)
+  if (way === 'file') {
+    playFile('rest')
+    return
+  }
+  for (const s of REST_OVER) strike(s)
 }
