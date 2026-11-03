@@ -805,6 +805,7 @@ def seed_actual_entry(
             rep_min, rep_max, history, entry["weight_kg"], entry["reps"],
             increment=weight_increment, allow_step=allow_increase, hold=hold,
             prescribed_sets=ex.get("sets", 1),
+            window_days=step_window_days(ex),
         )
         entry.update(rep_min=rep_min, rep_max=rep_max)
         if plan["action"] != "start":
@@ -1388,6 +1389,14 @@ def resolve_prescription(
     return final
 
 
+def step_window_days(ex: dict) -> int:
+    """How many days back every session of this lift must have earned a step
+    (engine.range_progression's window_days): the exercise's own
+    "progression_window_days" (WP-43: 14 on the three shoulder lifts of the
+    new machine), else engine.PROGRESSION_WINDOW_DAYS."""
+    return int(ex.get("progression_window_days") or engine.PROGRESSION_WINDOW_DAYS)
+
+
 def next_step_caption(ex: dict, entry: dict) -> str:
     """When this lift's weight goes up next, in one sentence: the rep range's
     rule 3 (engine.range_progression), which is the same for every lift and
@@ -1399,9 +1408,10 @@ def next_step_caption(ex: dict, entry: dict) -> str:
     if (rep_min is None or rep_max is None or ex.get("type") != "reps"
             or ex.get("equipment_type") in (None, "band") or entry.get("weight_kg") is None):
         return ""
-    days = engine.PROGRESSION_WINDOW_DAYS
-    return (f"The weight goes up when every set reaches {rep_max} reps or one set goes "
-            f"past {rep_max}, in each session of this lift in {days} days.")
+    days = step_window_days(ex)
+    arms = ", on both arms," if ex.get("laterality") == "unilateral" else ""
+    return (f"The weight goes up when{arms} every set reaches {rep_max} reps or one set "
+            f"goes past {rep_max}, in each session of this lift in {days} days.")
 
 
 def _held_below(proposed: dict, final: dict) -> dict:

@@ -19,7 +19,7 @@ import goal_week as gw
 import training_constants as tc
 import training_plan as tp
 from services import placement as pl
-from services import rules
+from services import engine, rules
 from services import sessions as s
 
 WEEK = gw.week()
@@ -200,7 +200,11 @@ def test_every_exercise_lands_on_a_safety_rule():
 
 _CARDS = {c.name: c for c in gw.CARDS + gw.BONUS_ORDER}
 _STEPS = {"dumbbell": {gb.DUMBBELL_KG, gb.DUMBBELL_PAIR_KG},
-          "machine": {gb.MACHINE_KG, gb.PLATE_KG}, "cable": {gb.CABLE_UNIT}}
+          "machine": {gb.MACHINE_KG, gb.PLATE_KG},
+          "cable": {gb.CABLE_UNIT, gb.SHOULDER_MACHINE_KG}}
+#: On the new machine, in kg (WP-45, 2026-11-03).
+_SHOULDER_MACHINE_LIFTS = {"Single-Arm Cable Y Raise", "Cable Lateral Raise",
+                           "Reverse Cable Crossover"}
 
 
 def _training(day):
@@ -234,11 +238,13 @@ def test_every_loaded_lift_has_the_range_its_kind_takes():
 def test_every_step_is_one_he_confirmed():
     """Dumbbells 2.5 kg, a pair 5 kg (2026-10-22); machines 2.5 kg (2026-10-26,
     WP-36); the back extension a 2.5 kg plate (2026-10-16); cables half a unit
-    (2026-10-22)."""
+    (2026-10-22), and the three shoulder lifts on the new machine 2 kg
+    (2026-11-03, WP-45)."""
     for _, _, e in _every_entry():
         if e.get("equipment_type") in _STEPS and not e.get("warmup"):
             assert e["increment_size"] in _STEPS[e["equipment_type"]], e["name"]
-            unit = "unit" if e["equipment_type"] == "cable" else "kg"
+            unit = ("unit" if e["equipment_type"] == "cable"
+                    and e["name"] not in _SHOULDER_MACHINE_LIFTS else "kg")
             assert e["increment_unit"] == unit, e["name"]
     assert next(e for e in gb.SESSIONS["B"] if e["name"] == "45° Back Extension")[
         "increment_size"] == gb.PLATE_KG
@@ -255,13 +261,33 @@ def test_every_machine_steps_two_and_a_half_kg():
     assert set(machines.values()) == {2.5}
 
 
-def test_every_cable_steps_half_a_unit():
+def test_every_other_cable_steps_half_a_unit():
     """His answer, 2026-10-22 ("No on all cables"): half-unit steps on every
     cable, not only the crossover's (his note of 2026-10-19: "1.5 Units for the
-    last 2 sets", which the one-unit step could not show)."""
+    last 2 sets", which the one-unit step could not show). Since 2026-11-03
+    the three shoulder lifts are on the new machine (the next test)."""
     assert gb.CABLE_UNIT == 0.5
-    cables = [e for _, _, e in _every_entry() if e.get("equipment_type") == "cable"]
-    assert cables and all(e["increment_size"] == 0.5 for e in cables)
+    cables = [e for _, _, e in _every_entry() if e.get("equipment_type") == "cable"
+              and e["name"] not in _SHOULDER_MACHINE_LIFTS and not e.get("warmup")]
+    assert cables and all(e["increment_size"] == 0.5 and e["increment_unit"] == "unit"
+                          for e in cables)
+
+
+def test_the_three_shoulder_lifts_step_two_kg_over_fourteen_days():
+    """WP-43 and WP-45, the athlete, 2026-11-03: "I have found a new machine
+    which is better for all the listed exercises, but I can only go up in
+    2kg"; "Double the time means a"; "Single arm db row can stay the same
+    rule". Same names, so the stored history carries on."""
+    assert gb.SHOULDER_MACHINE_KG == 2.0 and gb.SHOULDER_WINDOW_DAYS == 14
+    seen = set()
+    for _, _, e in _every_entry():
+        if e["name"] in _SHOULDER_MACHINE_LIFTS:
+            seen.add(e["name"])
+            assert (e["increment_size"], e["increment_unit"]) == (2.0, "kg"), e["name"]
+            assert s.step_window_days(e) == 14, e["name"]
+        elif e.get("rep_min") is not None:
+            assert s.step_window_days(e) == engine.PROGRESSION_WINDOW_DAYS == 7, e["name"]
+    assert seen == _SHOULDER_MACHINE_LIFTS
 
 
 def test_the_crossover_is_both_arms_at_once_with_45_s_rest():

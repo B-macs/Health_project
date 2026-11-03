@@ -2526,7 +2526,7 @@ class Repository:
         return sets or None
 
     def get_recent_session_sets(self, movement_name: str,
-                                limit: int = 8) -> list[tuple[str, list[dict]]]:
+                                limit: int = 15) -> list[tuple[str, list[dict]]]:
         """The per-set arrays of this exact movement's most recent sessions,
         NEWEST FIRST, as (session_date, sets) — what the rep range reads
         (engine.range_progression, approved 2026-10-16): the weight goes up
@@ -2539,8 +2539,8 @@ class Repository:
         and can never pass for two. Within a date the page is picked the way
         get_last_session_all_sets picks, first in query order. A date whose
         Sets JSON is empty or unparseable is left out; a page without a date
-        too. At most `limit` sessions — seven days of daily training and one
-        more is the most the rule reads.
+        too. At most `limit` sessions — fourteen days of daily training and
+        one more is the most the rule reads (the longest window, WP-43).
 
         Returns [] when the movement has never been logged."""
         pages = self._query(

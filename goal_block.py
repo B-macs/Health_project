@@ -37,7 +37,8 @@ the real weight in the first session, and the rule takes over from the second
 (his choice, 2026-10-16). Steps: his dumbbells go up in 2.5 kg (corrected
 2026-10-22), so a lift with a dumbbell in each hand (logged as the total) steps
 5 kg; machines 5 kg (the hack squat 2.5 kg a side); the back extension a 2.5 kg
-plate; cables half a unit (every cable, 2026-10-22).
+plate; cables half a unit (every cable, 2026-10-22), except the three shoulder
+lifts on the new machine, 2 kg with a 14-day window (WP-43, WP-45, 2026-11-03).
 
 EFFORT (step 4). Machines and cables: working sets 1-2 reps short, the last set
 to failure. Dumbbell Romanian deadlift and the back extension: 1-3 short, never
@@ -99,6 +100,25 @@ PLATE_KG = 2.5
 #: "Yes, 0.5-unit steps on every cable"; his note on the crossover of
 #: 2026-10-19: "1.5 Units for the last 2 sets"). Until then one unit.
 CABLE_UNIT = 0.5
+#: The new cable machine, in kg (WP-45, the athlete, 2026-11-03: "I have found a
+#: new machine which is better for all the listed exercises, but I can only go
+#: up in 2kg"): the Y raise, the lateral raise and the reverse crossover step
+#: 2 kg on it. Same exercises ("New machine not new exercise"), same names and
+#: the stored history as it is ("dont touch the previous setting just leave it
+#: as is"); every other cable keeps half a unit.
+SHOULDER_MACHINE_KG = 2.0
+#: Those three shoulder lifts step only when every session of the lift in 14
+#: days earned it, twice the usual window (WP-43, 2026-11-03: "We need to go
+#: more gradually up with single arm exercises, esp shoulder double the time";
+#: "Double the time means a"; "Single arm db row can stay the same rule").
+SHOULDER_WINDOW_DAYS = 14
+
+
+def _on_shoulder_machine(ex: dict) -> dict:
+    """One of the three shoulder lifts on the new machine: 2 kg steps, in kg,
+    and the 14-day window (engine.range_progression's window_days)."""
+    return {**ex, "increment_size": SHOULDER_MACHINE_KG, "increment_unit": "kg",
+            "progression_window_days": SHOULDER_WINDOW_DAYS}
 
 _EVERY_SET_TO_FAILURE = "Take every set to failure."
 _LAST_SET_TO_FAILURE = "Stop each working set 1-2 reps before failure; take the last set to failure."
@@ -163,7 +183,7 @@ SHOULDER_RELEASE = _ex(
     regression="Any arm symptom → leave the ball out today and do the scar work only.",
 )
 
-Y_RAISE = _ex(
+Y_RAISE = _on_shoulder_machine(_ex(
     name="Single-Arm Cable Y Raise",
     ex_type="reps",
     laterality="unilateral",
@@ -182,13 +202,13 @@ Y_RAISE = _ex(
     biomechanical_focus=(
         "The shoulder-blade muscles (lower and middle trapezius), straight after the release "
         "(his decision, 2026-10-15). Replaced the prone Y raise on 2026-10-16 (tier_lists/"
-        "shoulder_blades.md): tension with the arm across the body, steps of half a unit, one "
+        "shoulder_blades.md): tension with the arm across the body, steps of 2 kg on the new machine (2026-11-03), one "
         "arm at a time so the left cannot do the right's work (physiotherapist, 2026-08-10: "
         "the right is weaker and the left works too much)."
     ),
-    progression="The rep-range rule adds half a unit.",
+    progression="The rep-range rule adds 2 kg.",
     regression="The right arm stops early → raise it only as far as it goes easily; log what you did.",
-)
+))
 
 CHEST_PRESS = _ex(
     name="Machine Chest Press",
@@ -409,7 +429,7 @@ LEG_CURL = _ex(
     regression="A cramp at the back of the thigh → stop the set; lower the weight next time.",
 )
 
-CROSSOVER = _ex(
+CROSSOVER = _on_shoulder_machine(_ex(
     name="Reverse Cable Crossover",
     ex_type="reps",
     sets=3, reps=15, rest_seconds=45,
@@ -430,11 +450,11 @@ CROSSOVER = _ex(
         "measured limit of 2026-08-13). 45 s rest: both arms rest together, so the timer is "
         "all the rest each arm gets."
     ),
-    progression="The rep-range rule adds half a unit.",
+    progression="The rep-range rule adds 2 kg.",
     regression="The right shoulder objects at the end → finish the arc in front of the body.",
-)
+))
 
-LATERAL_RAISE = _ex(
+LATERAL_RAISE = _on_shoulder_machine(_ex(
     name="Cable Lateral Raise",
     ex_type="reps",
     laterality="unilateral",
@@ -454,9 +474,9 @@ LATERAL_RAISE = _ex(
         "file's line that the shoulder injury came back above a 7 kg dumbbell carries no "
         "date and sits in the compiled movement analysis, not in a dated entry."
     ),
-    progression="The rep-range rule adds half a unit.",
+    progression="The rep-range rule adds 2 kg.",
     regression="Pain at the front of the shoulder → stop at a lower height; log it.",
-)
+))
 
 ADDUCTOR_MACHINE = _ex(
     name="Adductor Machine (Seated)",

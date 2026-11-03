@@ -326,7 +326,12 @@ def suggested_weight_kg(
 #     range, or one set went past it — in every session of the lift within
 #     PROGRESSION_WINDOW_DAYS. The trigger is never above the top of the range,
 #     for any lift. A session with fewer working sets than prescribed never
-#     counts toward a step.
+#     counts toward a step. ON A ONE-ARM LIFT BOTH ARMS MUST EARN IT (WP-43,
+#     the athlete, 2026-11-03: "Yes both arms must reach the top of the range
+#     before weight increase"): until then the rule read the right arm's reps
+#     only. A lift can carry its own, longer window (an exercise's
+#     "progression_window_days"; WP-43: "Double the time" on the Y raise, the
+#     lateral raise and the reverse crossover, 14 days).
 #  4. AFTER ANY WEIGHT CHANGE THE AIM RESETS TO THE MIDDLE-BOTTOM of the range,
 #     halfway between the bottom and the middle (range_middle_bottom: 8-12 → 9,
 #     10-15 → 11).
@@ -381,15 +386,25 @@ def _last_set_reps(sets: list[dict] | None) -> int | None:
     return int(work[-1].get("reps") or 0) if work else None
 
 
-def _within_window(day: str, newest: str) -> bool:
-    """Whether `day` is inside the PROGRESSION_WINDOW_DAYS that end on `newest`.
+def _left_arm(s: dict) -> dict:
+    """The set as the LEFT arm did it. A one-arm lift stores the left arm's
+    reps and weight only where they differ from the right's
+    (sessions.actual_to_set_record), so a missing value is the right arm's,
+    and a lift done with both arms together reads the same as itself."""
+    reps, weight = s.get("reps_left"), s.get("weight_left")
+    return {**s, "reps": s.get("reps") if reps is None else reps,
+            "weight": s.get("weight") if weight is None else weight}
+
+
+def _within_window(day: str, newest: str, window_days: int = PROGRESSION_WINDOW_DAYS) -> bool:
+    """Whether `day` is inside the `window_days` that end on `newest`.
     A date that cannot be read is outside, never inside: an unreadable session
     must not count toward a step."""
     try:
         gap = (date.fromisoformat(str(newest)[:10]) - date.fromisoformat(str(day)[:10])).days
     except (TypeError, ValueError):
         return False
-    return 0 <= gap < PROGRESSION_WINDOW_DAYS
+    return 0 <= gap < window_days
 
 
 def range_progression(
@@ -402,6 +417,7 @@ def range_progression(
     allow_step: bool = True,
     hold: bool = False,
     prescribed_sets: int = 1,
+    window_days: int = PROGRESSION_WINDOW_DAYS,
 ) -> dict:
     """The next session of one loaded lift with a rep range: its weight, its
     aim and why. See the LOAD PROGRESSION section above for the rules.
@@ -419,7 +435,12 @@ def range_progression(
 
     `allow_step` False blocks only the step up (the pain gate, a missing
     check-in); `hold` True is the failed-week hold, where nothing climbs, not
-    even a rep.
+    even a rep. `window_days` is how far back every session must have earned
+    the step (rule 3).
+
+    A step needs BOTH arms (rule 3): each set is read once as the right arm
+    did it and once as the left arm did it (_left_arm), and each arm must
+    earn the step on its own.
     """
     def clamp(reps: int) -> int:
         return max(rep_min, min(rep_max, reps))
@@ -439,13 +460,17 @@ def range_progression(
         lifted = _working_weight(sets)
         return lifted is None or abs(lifted - weight) < 1e-6
 
-    def earns_step(sets: list[dict]) -> bool:
+    def arm_earns_step(sets: list[dict]) -> bool:
         reps = [int(s.get("reps") or 0) for s in _working(sets)]
         return (at_weight(sets) and len(reps) >= prescribed_sets
                 and (all(r >= rep_max for r in reps) or any(r > rep_max for r in reps)))
 
-    # The newest session is always in the week, so the check is never vacuous.
-    week = [newest_sets] + [s for d, s in sessions[1:] if _within_window(d, newest_date)]
+    def earns_step(sets: list[dict]) -> bool:
+        return arm_earns_step(sets) and arm_earns_step([_left_arm(s) for s in sets])
+
+    # The newest session is always in the window, so the check is never vacuous.
+    week = [newest_sets] + [s for d, s in sessions[1:]
+                            if _within_window(d, newest_date, window_days)]
     if allow_step and all(earns_step(s) for s in week):
         return {"weight": round(weight + increment, 2),
                 "aim": range_middle_bottom(rep_min, rep_max),
