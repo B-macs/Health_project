@@ -1251,7 +1251,7 @@ button.card {
 .balance__track {
   position: relative;
   display: flex;
-  gap: 2px;
+  gap: calc(var(--hair) * 2);
   height: var(--bar);
   border-radius: var(--r-pill);
   background: var(--track);
@@ -1274,8 +1274,8 @@ button.card {
   left: 50%;
   top: 0;
   bottom: 0;
-  width: 2px;
-  margin-left: -1px;
+  width: calc(var(--hair) * 2);
+  margin-left: calc(var(--hair) * -1);
   background: var(--muted);
 }
 
