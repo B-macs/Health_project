@@ -102,7 +102,7 @@ const insights = insightsFixture as unknown as {
   flexibility_empty: unknown; flexibility_capturing: Record<string, unknown>; flexibility_populated: unknown
   capture: { states: unknown[] }; engine: unknown; queue: unknown; warnings: unknown; trends: unknown; trends_closed: unknown
   sleep_architecture: unknown; sleep_architecture_empty: unknown; tables: Record<string, unknown>
-  session_checks: unknown; settings: unknown
+  session_checks: unknown; settings: unknown; equipment: unknown
 }
 const STRENGTH_DEFAULT = 'Overall Strength Score'
 
@@ -253,6 +253,7 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
       // Phase 9: with e2e_week writer_engine the engine runs the syncs (the sync buttons are on).
       return send(200, scenarioOf(req).has('writer_engine') ? { ...(insights.settings as Record<string, unknown>), writer: 'engine' } : insights.settings)
     }
+    if (url.pathname === '/api/settings/equipment') return send(200, insights.equipment)
     if (url.pathname === '/api/training/accessory') {
       // `accessory_yesterday`: an answer kept from the day before, which is never today's.
       return send(200, fx.accessoryPlan(scenarioOf(req).has('accessory_yesterday') ? fx.addDays(local, -1) : local))
@@ -380,6 +381,8 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
         if (cookie(req, 'e2e_lose_answer') === '1') return send(503, { error: 'engine_unavailable' })
         return send(200, { session_id: b.session_id, exercises: b.exercises.length })
       }
+      // Settings › Weight steps (WP-46): the list as the engine answered it; a save answers it.
+      if (url.pathname === '/api/settings/equipment' && req.method === 'PUT') return send(200, insights.equipment)
       if (url.pathname === '/api/checkin' && req.method === 'PUT') {
         const b = body as { date: string; values: ReturnType<typeof fx.checkinForm>['values'] }
         checkins.set(`${cookie(req, 'e2e_run') ?? ''}|${b.date}`, b.values)

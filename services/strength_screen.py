@@ -18,7 +18,9 @@ from datetime import date
 
 import training_constants
 from services import bioage
+from services import equipment
 from services import imbalance
+from services import replacements
 from services import sessions
 from services import strength
 from services import tonnage
@@ -91,8 +93,10 @@ def read_data(repo, today: date, reference: dict) -> dict:
         rows, load_error = [], f"{type(exc).__name__}: {exc}"
     movement_weights = {name: weight for name, (_category, weight)
                         in training_constants.EXERCISE_MOVEMENT_WEIGHT.items()}
-    # What a logged set cannot say by itself: its sides and its unit (2026-10-20).
-    traits = sessions.exercise_traits()
+    # What a logged set cannot say by itself: its sides and its unit (2026-10-20),
+    # the unit as the equipment list gives it, and the replacements made in a
+    # session as the lifts they replace (WP-46).
+    traits = equipment_traits(repo, sessions.exercise_traits())
     # One call, so the headline IS the chart's current level and each region
     # leaves calibration on its own confidence (WP-15, 2026-10-13).
     snapshot = strength.screen(
@@ -114,6 +118,25 @@ def read_data(repo, today: date, reference: dict) -> dict:
         "imbalance_count": bioage.muscle_imbalance_count(imbalances),
         "balance": balance,
     }
+
+
+def equipment_traits(repo, traits: dict[str, dict]) -> dict[str, dict]:
+    """The traits with the equipment list's units and the replacements' own
+    entries; the replacements are entered in the body-area maps first. A failed
+    read leaves that part as the block wrote it."""
+    import goal_block as gb
+    try:
+        settings = equipment.from_stored(repo.get_equipment_steps())
+    except Exception:
+        settings = equipment.defaults()
+    try:
+        stored = repo.get_replacements()
+    except Exception:
+        stored = {}
+    replacements.register(stored)
+    plan = [ex for day in gb.SESSIONS.values() for ex in day]
+    traits = equipment.with_units(traits, plan, settings)
+    return {**traits, **replacements.traits(stored, traits, settings)}
 
 
 def muscle_balance(repo, rows: list[dict], traits: dict[str, dict], today: date,

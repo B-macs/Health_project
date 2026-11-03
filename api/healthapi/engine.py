@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
-from services import cache_freshness, datastore
+from services import cache_freshness, datastore, replacements
 from services.background_sync import BackgroundSyncRunner
 from services.config import Config
 from services.repository import Repository
@@ -73,7 +73,14 @@ def new_repository() -> Repository:
         raise RuntimeError("engine not started")
     cache_freshness.refresh_if_stale(STATE.config, sync_runner(),
                                      wait_seconds=REFRESH_WAIT_SECONDS)
-    return Repository(STATE.config)
+    repo = Repository(STATE.config)
+    # The replacements made in a session count in their lift's body areas in
+    # every read and every sync of this process (services/replacements.py).
+    try:
+        replacements.register(repo.get_replacements())
+    except Exception:
+        log.warning("replacements: the stored list could not be read")
+    return repo
 
 
 def sync_runner() -> BackgroundSyncRunner:

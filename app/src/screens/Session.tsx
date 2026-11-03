@@ -25,10 +25,12 @@ import {
 import {
   advance, back, backTarget, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder, exerciseProgress, finished,
   lastRecorded, readingComplete, setBand, setGarmin, setNote, setReading, setRecordedSide, setSide, sideValues, skip,
-  skipRestOfRetest, stepBand, stepWeight, swapCandidates, swapTo, timerHere, typedReadings, withTimer,
-  type Exercise, type FlowStep, type GarminPull, type Side, type SideValues, type TrainingState,
+  replaceTarget, skipRestOfRetest, stepBand, stepWeight, swapCandidates, swapTo, timerHere, typedReadings, withTimer,
+  type Alternative, type Exercise, type FlowStep, type GarminPull, type Side, type SideValues, type TrainingState,
 } from '../lib/training'
+import { useCached } from '../lib/cache'
 import { S } from '../strings'
+import { EQUIPMENT, type EquipmentAnswer } from './SettingsEquipment'
 import { clock, useWakeLock } from '../ui/hooks'
 import { IconCheck, IconClose, IconPause, IconPlay } from '../ui/icons'
 
@@ -341,6 +343,66 @@ function nextText(s: TrainingState, offset: number): string | null {
 
 /** What Back's button says (WP-34): the entry it goes back to, or the order before a
  *  change of order. */
+type ReplacementAnswer = { replacement: { name: string }; alternative?: Alternative | null }
+
+/** Another machine or free weight for the lift the flow is on (WP-46, the owner, 2026-11-03:
+ *  "if the machine with the current settings isnt available I should be able to do another
+ *  machine or free weight by creating it easy in the app"). A name and the equipment; the
+ *  engine stores it, offers it every time after, and answers with its swap for today. */
+export function ReplaceForm({ lift, day, onBack, onUse }: {
+  lift: string; day: string; onBack: () => void; onUse: (alt: Alternative | null) => void
+}) {
+  const { store, ctx } = useApp()
+  const equipment = useCached<EquipmentAnswer>(store, EQUIPMENT, null, ctx)
+  const items = equipment.data?.items ?? []
+  const [name, setName] = useState('')
+  const [itemId, setItemId] = useState<string>('')
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState<string | null>(null)
+  const chosen = itemId || items[0]?.id || ''
+  async function add() {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const got = await api<ReplacementAnswer>('/api/training/replacements', {
+        method: 'POST', key: ctx.key, engineDown: ctx.engineDown, fetchImpl: ctx.fetchImpl, day,
+        body: { lift, name: name.trim(), item_id: chosen },
+      })
+      if (got.alternative) onUse(got.alternative)
+      else setMessage(S.session.replaceSaved)
+    } catch (err) {
+      if (err instanceof ApiError && err.kind === 'rejected') {
+        const [, ...why] = err.code.split(': ')
+        setMessage(S.session.replaceRefused(why.join(': ') || err.code))
+      } else {
+        setMessage(S.session.replaceOffline)
+      }
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="card group" role="dialog" aria-label={S.session.replaceTitle} data-testid="replace">
+      <h2 className="eyebrow">{S.session.replaceTitle}</h2>
+      <p className="caption">{S.session.replaceWhat(lift)}</p>
+      <input className="field" type="text" aria-label={S.session.replaceName} placeholder={S.session.replaceName}
+        value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
+      <label className="group">
+        <span className="caption">{S.session.replaceItem}</span>
+        <select className="field" value={chosen} onChange={(e) => setItemId(e.target.value)}>
+          {items.map((i) => <option key={i.id} value={i.id}>{i.name}</option>)}
+        </select>
+      </label>
+      {message && <p className="note" role="status">{message}</p>}
+      <div className="pair">
+        <button className="btn btn--glass" onClick={onBack}>{S.session.replaceBack}</button>
+        <button className="btn btn--primary" disabled={busy || !name.trim() || !chosen}
+          onClick={() => void add()}>{S.session.replaceAdd}</button>
+      </div>
+    </section>
+  )
+}
+
 export function backLabel(s: TrainingState): string {
   const target = backTarget(s)
   if (!target) return S.session.back
@@ -371,7 +433,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
   // restart ring again).
   const handled = useRef<Timer | null>(null)
   const held = useWakeLock(true)
-  const [asking, setAsking] = useState<'exit' | 'skip' | 'busy' | null>(null)
+  const [asking, setAsking] = useState<'exit' | 'skip' | 'busy' | 'replace' | null>(null)
   const [pulling, setPulling] = useState(false)
   const { ctx, alerts } = useApp()
 
@@ -439,6 +501,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
   const n = order.length
   const candidates = !resting && !t ? doFirstCandidates(s) : []
   const swaps = !resting && !t ? swapCandidates(s) : []
+  const target = !resting && !t ? replaceTarget(s) : null
   const ended = t && hasEnded(t, now)
   // A hold with a slow start (WP-40): its first seconds count the slow start down, then the
   // hold runs its own seconds; the bar fills over the hold only.
@@ -536,6 +599,10 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
               update((x) => swapTo(x, a))
             }}>{S.session.swapFor(a.name)}</button>
           ))}
+          {target && (
+            <button className="btn btn--glass btn--wide" data-testid="replace-open"
+              onClick={() => setAsking('replace')}>{S.session.replaceOpen}</button>
+          )}
           {candidates.length > 0 && <p>{S.session.doFirstAsk}</p>}
           {candidates.map((c) => (
             <button key={c.group} className="btn btn--glass btn--wide" onClick={() => {
@@ -545,6 +612,14 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
           ))}
           <button className="btn btn--primary btn--wide" onClick={() => setAsking(null)}>{S.session.keepOrder}</button>
         </section>
+      )}
+
+      {asking === 'replace' && target && (
+        <ReplaceForm lift={target} day={s.plan.date} onBack={() => setAsking('busy')}
+          onUse={(alt) => {
+            setAsking(null)
+            if (alt) update((x) => swapTo(x, alt))
+          }} />
       )}
 
       {(asking === 'exit' || asking === 'skip') && (
@@ -701,7 +776,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
       </label>
 
       <button className="btn btn--glass btn--wide" onClick={() => setAsking('skip')}>{S.session.skip}</button>
-      {(candidates.length > 0 || swaps.length > 0) && (
+      {(candidates.length > 0 || swaps.length > 0 || target) && (
         <button className="btn btn--glass btn--wide" onClick={() => setAsking('busy')}>{S.session.inUse}</button>
       )}
     </div>

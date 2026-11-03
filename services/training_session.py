@@ -25,6 +25,7 @@ from datetime import date, datetime, time
 
 from services import accessory as acc
 from services import daily_session as dly
+from services import equipment, replacements
 from services import flexibility_screen as fxs
 from services import guided_flow, prescription, session_order, session_save, strain_regions
 from services import sessions as sess
@@ -176,30 +177,42 @@ def _seeder(repo, today: date, plan_ex: list[dict], dosed: list[dict], policy: d
     return seed_for
 
 
-def _alternatives(repo, today: date, dosed: list[dict], moves: list, first: str,
-                  strains: tuple, garmin_ok: bool, policy: dict, modifier: dict,
-                  day_type: str | None) -> list[dict]:
-    """Each lift's swap when its equipment is in use (WP-28): its entries dosed
-    and seeded as they would run today, from their own history, with their own
-    walk, numbered from 0, and the replaced group's move; one per group whose
-    lift has one (session_order.alternatives_for). The phone puts them in the
+def _alternatives(repo, today: date, plan_ex: list[dict], dosed: list[dict], moves: list,
+                  first: str, strains: tuple, garmin_ok: bool, policy: dict, modifier: dict,
+                  day_type: str | None, settings: equipment.Settings,
+                  stored_replacements: dict) -> list[dict]:
+    """Each lift's swaps when its equipment is in use: the block's own (WP-28,
+    session_order.alternatives_for) and every replacement made in a session
+    (WP-46, services/replacements.py), each with its entries dosed and seeded as
+    they would run today, from their own history, with their own walk,
+    numbered from 0, and the replaced group's move. The phone puts one in the
     group's place only when the athlete swaps."""
     out, done = [], set()
     for i, ex in enumerate(dosed):
-        alt = session_order.alternatives_for(ex.get("name") or "")
+        name = ex.get("name") or ""
         move = moves[i]
-        if not alt or move is None or move["group"] in done:
+        if move is None or move["group"] in done:
+            continue
+        groups = []
+        code = session_order.alternatives_for(name)
+        if code:
+            groups.append([equipment.apply(a, settings) for a in code])
+        ramp = plan_ex[i - 1] if i > 0 and sess.ramp_lift_index(plan_ex, i - 1) == i else None
+        for entry in stored_replacements.get(name, []):
+            groups.append(replacements.exercises_for(plan_ex[i], entry, settings, ramp))
+        if not groups:
             continue
         done.add(move["group"])
-        alt_dosed = sess.dosed_day(alt, policy["volume_factor"], day_type)
-        seed_for = _seeder(repo, today, alt, alt_dosed, policy, modifier)
-        out.append({
-            "for_group": move["group"],
-            "name": alt[-1]["name"],
-            "exercises": [exercise_out(a, j, seed_for(j), sess.ramp_lift_index(alt, j), strains,
-                                       garmin_ok, move) for j, a in enumerate(alt_dosed)],
-            "steps": guided_flow.walk(alt_dosed, first),
-        })
+        for alt in groups:
+            alt_dosed = sess.dosed_day(alt, policy["volume_factor"], day_type)
+            seed_for = _seeder(repo, today, alt, alt_dosed, policy, modifier)
+            out.append({
+                "for_group": move["group"],
+                "name": alt[-1]["name"],
+                "exercises": [exercise_out(a, j, seed_for(j), sess.ramp_lift_index(alt, j), strains,
+                                           garmin_ok, move) for j, a in enumerate(alt_dosed)],
+                "steps": guided_flow.walk(alt_dosed, first),
+            })
     return out
 
 
@@ -223,7 +236,11 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
     clock's floor; the first side; the banner and the adaptation; and each
     lift's swap (WP-28)."""
     policy, modifier = decided["policy"], decided["modifier"]
-    plan_ex = content["exercises"]
+    # The equipment list's steps (WP-46): with nothing stored, the block's own.
+    settings = equipment.from_stored(_try(repo.get_equipment_steps, None))
+    stored_replacements = _try(repo.get_replacements, {}) if kind == PLAN else {}
+    replacements.register(stored_replacements)
+    plan_ex = [equipment.apply(ex, settings) for ex in content["exercises"]]
     # The daily tendon session runs its full dose on every day: readiness lowers
     # only the gym's main work (Key Rule 23 (6)), and Baar's dose is the hold time.
     factor = 1.0 if kind == DAILY else policy["volume_factor"]
@@ -239,8 +256,9 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
     exercises = [exercise_out(ex, i, seed_for(i), sess.ramp_lift_index(plan_ex, i), strains,
                               garmin_ok, moves[i], readings.get(i))
                  for i, ex in enumerate(dosed)]
-    alternatives = (_alternatives(repo, today, dosed, moves, first, strains, garmin_ok, policy,
-                                  modifier, content.get("day_type")) if kind == PLAN else [])
+    alternatives = (_alternatives(repo, today, plan_ex, dosed, moves, first, strains, garmin_ok,
+                                  policy, modifier, content.get("day_type"), settings,
+                                  stored_replacements) if kind == PLAN else [])
     return {
         "kind": kind,
         "date": today,
@@ -297,6 +315,64 @@ def session_plan(repo, today: date) -> dict:
         "day_num": r.day_num + 1, "objective": following["objective"],
         "exercises": [ts.exercise_line(ex) for ex in following.get("exercises", [])]})
     return out
+
+
+# ─── The equipment list and the replacements (WP-46) ────────────────────────
+
+def block_lifts() -> list[dict]:
+    """The 12-week block's lifts with a weight stepper, its swaps included,
+    once each (equipment.lifts)."""
+    import goal_block as gb
+    plan = [ex for day in gb.SESSIONS.values() for ex in day]
+    plan += [ex for alts in gb.ALTERNATIVES.values() for ex in alts]
+    return equipment.lifts(plan)
+
+
+def equipment_settings(repo) -> dict:
+    """Settings › Weight steps: the items and each lift's item and step.
+    An unreadable stored list reads as the defaults, and says so."""
+    try:
+        stored, error = repo.get_equipment_steps(), None
+    except Exception as exc:
+        stored, error = None, f"{type(exc).__name__}: {exc}"
+    return {**equipment.answer(equipment.from_stored(stored), block_lifts()), "load_error": error}
+
+
+def save_equipment_settings(repo, body: dict, today: date) -> dict:
+    """Store the list the phone sent (the whole list: the same list sent twice
+    stores one) and answer with it. SessionRefused("invalid_equipment") with
+    the reason when it is refused."""
+    try:
+        stored = equipment.validated(body, {ex["name"] for ex in block_lifts()})
+    except equipment.InvalidSettings as exc:
+        raise SessionRefused("invalid_equipment", [str(exc)]) from None
+    repo.save_equipment_steps(stored, today)
+    return {**equipment.answer(equipment.from_stored(stored), block_lifts()), "load_error": None}
+
+
+def add_replacement(repo, today: date, lift: str, name: str, item_id: str) -> dict:
+    """Store a replacement made in a session (services/replacements.py) and
+    answer with it and with its swap as today's session offers it (None when
+    today has no plan session to run it in). SessionRefused("invalid_replacement")
+    with the reason when it is refused."""
+    settings = equipment.from_stored(_try(repo.get_equipment_steps, None))
+    stored = repo.get_replacements(live=True)
+    try:
+        new_stored, entry = replacements.validated(
+            stored, lift, name, item_id, lift_names={ex["name"] for ex in block_lifts()},
+            known_names=set(sess.exercise_traits()) | {ex["name"] for ex in block_lifts()},
+            settings=settings, today=today)
+    except replacements.ReplacementRefused as exc:
+        raise SessionRefused("invalid_replacement", [str(exc)]) from None
+    if new_stored is not stored:
+        repo.save_replacements(new_stored, today)
+    replacements.register(new_stored)
+    try:
+        plan = session_plan(repo, today)
+    except SessionRefused:
+        plan = {"alternatives": []}
+    alt = next((a for a in plan["alternatives"] if a["name"] == entry["name"]), None)
+    return {"replacement": entry, "alternative": alt}
 
 
 def accessory_plan(repo, today: date) -> dict:

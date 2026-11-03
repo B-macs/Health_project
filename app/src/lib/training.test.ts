@@ -10,7 +10,7 @@ import {
   advance, asksLength, back, clockMinutes, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder,
   exerciseProgress, finished, lastRecorded, loadState, localStamp, newExerciseIds, newSessionId, saveBody, setBand,
   setGarmin, setReading, setRecordedSide, setSide, sideValues, skip, skipRestOfRetest, startSessionState, stepBand,
-  stepWeight, swapCandidates, readingComplete, typedReadings,
+  stepWeight, swapCandidates, readingComplete, replaceTarget, typedReadings,
   swapTo, UNDO_LIMIT, type Plan, type TrainingState,
 } from './training'
 
@@ -166,6 +166,17 @@ describe('walking the engine steps', () => {
     expect(ids).not.toContain(`ex-${squat}`)
     expect(ids).toContain(swapped.exerciseIds[box])
     expect(back(swapped).plan.steps).toEqual(s.plan.steps)
+  })
+
+  it('a replacement is offered for the lift with a weight at its first entry (WP-46)', () => {
+    // "if the machine with the current settings isnt available I should be able to do
+    // another machine or free weight by creating it easy in the app".
+    const s = at(fresh(), 'Made-up squat')
+    expect(replaceTarget(s)).toBe('Made-up squat')
+    expect(replaceTarget(advance(s, T0))).toBeNull()                       // its sets have begun
+    expect(replaceTarget(at(fresh(), 'Made-up band row'))).toBeNull()        // a band has no weight
+    expect(replaceTarget(fresh())).toBeNull()                               // body weight
+    expect(replaceTarget({ ...s, plan: { ...s.plan, kind: 'accessory' } })).toBeNull()
   })
 
   it('Skip moves to the next exercise, and Back undoes the last tap', () => {

@@ -406,6 +406,61 @@ class NextDay(BaseModel):
     exercises: list[ExerciseLine]
 
 
+class EquipmentItem(BaseModel):
+    """One piece of equipment on the list (WP-46): its weight step, its unit
+    ("kg" or "unit") and its kind (dumbbell, machine or cable)."""
+    id: str
+    name: str
+    step: float
+    unit: str
+    kind: str
+    default: bool = False
+
+
+class EquipmentLift(BaseModel):
+    """A lift of the block, the item it is on, its default item, whether it is
+    logged as a pair (it then steps twice the item's step) and the step it takes."""
+    name: str
+    item_id: str
+    default_item_id: str | None
+    pair: bool
+    step: float | None
+    unit: str | None
+
+
+class EquipmentOut(BaseModel):
+    items: list[EquipmentItem]
+    exercises: list[EquipmentLift]
+    load_error: str | None = None
+
+
+class EquipmentItemIn(BaseModel):
+    id: str
+    name: str
+    step: float
+    unit: str
+    kind: str
+
+
+class EquipmentIn(BaseModel):
+    items: list[EquipmentItemIn]
+    links: dict[str, str] = {}
+
+
+class ReplacementIn(BaseModel):
+    """A replacement made in a session (WP-46): the lift it replaces, its name
+    and the equipment it is done on."""
+    lift: str
+    name: str
+    item_id: str
+
+
+class ReplacementEntry(BaseModel):
+    name: str
+    item_id: str
+    created: str
+
+
 class SessionAlternative(BaseModel):
     """A lift's swap when its equipment is in use (WP-28): the entries that
     run in the place of group `for_group`, numbered from 0, with their own
@@ -414,6 +469,11 @@ class SessionAlternative(BaseModel):
     name: str
     exercises: list[SessionExercise]
     steps: list[FlowStep]
+
+
+class ReplacementOut(BaseModel):
+    replacement: ReplacementEntry
+    alternative: SessionAlternative | None = None
 
 
 class SessionPlanOut(BaseModel):

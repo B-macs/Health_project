@@ -411,6 +411,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/settings/equipment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Equipment
+         * @description Settings › Weight steps (WP-46): each item's step and each lift's item.
+         */
+        get: operations["get_equipment_api_settings_equipment_get"];
+        /**
+         * Put Equipment
+         * @description The whole list as the phone holds it; the same list sent twice stores one.
+         */
+        put: operations["put_equipment_api_settings_equipment_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/settings/plan-start": {
         parameters: {
             query?: never;
@@ -789,6 +813,27 @@ export interface paths {
         put?: never;
         /** Post Redo */
         post: operations["post_redo_api_training_redo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/training/replacements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Post Replacement
+         * @description A replacement made in a session (WP-46), stored and offered every time
+         *     after; the answer carries its swap for today's session.
+         */
+        post: operations["post_replacement_api_training_replacements_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1346,6 +1391,81 @@ export interface components {
             }[];
             /** Volume Hi */
             volume_hi?: number | null;
+        };
+        /** EquipmentIn */
+        EquipmentIn: {
+            /** Items */
+            items: components["schemas"]["EquipmentItemIn"][];
+            /**
+             * Links
+             * @default {}
+             */
+            links: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * EquipmentItem
+         * @description One piece of equipment on the list (WP-46): its weight step, its unit
+         *     ("kg" or "unit") and its kind (dumbbell, machine or cable).
+         */
+        EquipmentItem: {
+            /**
+             * Default
+             * @default false
+             */
+            default: boolean;
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Step */
+            step: number;
+            /** Unit */
+            unit: string;
+        };
+        /** EquipmentItemIn */
+        EquipmentItemIn: {
+            /** Id */
+            id: string;
+            /** Kind */
+            kind: string;
+            /** Name */
+            name: string;
+            /** Step */
+            step: number;
+            /** Unit */
+            unit: string;
+        };
+        /**
+         * EquipmentLift
+         * @description A lift of the block, the item it is on, its default item, whether it is
+         *     logged as a pair (it then steps twice the item's step) and the step it takes.
+         */
+        EquipmentLift: {
+            /** Default Item Id */
+            default_item_id: string | null;
+            /** Item Id */
+            item_id: string;
+            /** Name */
+            name: string;
+            /** Pair */
+            pair: boolean;
+            /** Step */
+            step: number | null;
+            /** Unit */
+            unit: string | null;
+        };
+        /** EquipmentOut */
+        EquipmentOut: {
+            /** Exercises */
+            exercises: components["schemas"]["EquipmentLift"][];
+            /** Items */
+            items: components["schemas"]["EquipmentItem"][];
+            /** Load Error */
+            load_error?: string | null;
         };
         /** ExerciseLine */
         ExerciseLine: {
@@ -2609,6 +2729,33 @@ export interface components {
             short: string;
             /** Strain */
             strain: number | null;
+        };
+        /** ReplacementEntry */
+        ReplacementEntry: {
+            /** Created */
+            created: string;
+            /** Item Id */
+            item_id: string;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ReplacementIn
+         * @description A replacement made in a session (WP-46): the lift it replaces, its name
+         *     and the equipment it is done on.
+         */
+        ReplacementIn: {
+            /** Item Id */
+            item_id: string;
+            /** Lift */
+            lift: string;
+            /** Name */
+            name: string;
+        };
+        /** ReplacementOut */
+        ReplacementOut: {
+            alternative?: components["schemas"]["SessionAlternative"] | null;
+            replacement: components["schemas"]["ReplacementEntry"];
         };
         /** RestView */
         RestView: {
@@ -4974,6 +5121,73 @@ export interface operations {
             };
         };
     };
+    get_equipment_api_settings_equipment_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    put_equipment_api_settings_equipment_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EquipmentIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EquipmentOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     put_plan_start_api_settings_plan_start_put: {
         parameters: {
             query?: never;
@@ -5758,6 +5972,42 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StoredOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    post_replacement_api_training_replacements_post: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReplacementIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplacementOut"];
                 };
             };
             /** @description Validation Error */

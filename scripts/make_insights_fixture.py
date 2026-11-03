@@ -259,6 +259,7 @@ def build() -> dict:
                              for t in ("engine_view", "blend_history", "metrics_history")}
             out["session_checks"] = ask("get", "/api/data/session-checks")
             out["settings"] = ask("get", "/api/settings")
+            out["equipment"] = ask("get", "/api/settings/equipment")
             return out
         finally:
             local_cache._DEFAULT_PATH = real_state

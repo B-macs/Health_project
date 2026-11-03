@@ -620,3 +620,51 @@ def test_the_warning_shows_only_while_its_area_is_strained():
     shown = tsession.exercise_out(ex, 0, None, None, (hot, cool), False)
     hidden = tsession.exercise_out(ex, 0, None, None, (cool, cool), False)
     assert shown["warning"] == "Stop at any shoulder pinch." and hidden["warning"] == ""
+
+
+# ── Weight steps and replacements (WP-46) ────────────────────────────────────
+
+def _equipment_body(env, monkeypatch, **steps):
+    got = env.ok(monkeypatch, "get", "/api/settings/equipment")
+    items = [{k: i[k] for k in ("id", "name", "step", "unit", "kind")} for i in got["items"]]
+    for i in items:
+        i["step"] = steps.get(i["id"], i["step"])
+    return {"items": items, "links": {}}
+
+
+def test_the_weight_steps_are_the_blocks_until_changed_and_a_change_reaches_the_session(env, monkeypatch):
+    got = env.ok(monkeypatch, "get", "/api/settings/equipment")
+    assert {i["id"] for i in got["items"]} >= {"dumbbells", "machines", "cables", "new_cable_machine"}
+    hack = next(e for e in got["exercises"] if e["name"] == "Hack Squat")
+    assert (hack["item_id"], hack["step"]) == ("machines", 2.5)
+    body = _equipment_body(env, monkeypatch, machines=5.0)
+    saved = env.ok(monkeypatch, "put", "/api/settings/equipment", body=body)
+    assert next(e for e in saved["exercises"] if e["name"] == "Hack Squat")["step"] == 5.0
+    assert env.ok(monkeypatch, "put", "/api/settings/equipment", body=body) == saved, "the same list twice"
+    plan = env.ok(monkeypatch, "get", "/api/training/session", local=TUESDAY)
+    assert next(e for e in plan["exercises"] if e["name"] == "Hack Squat")["increment_size"] == 5.0
+
+
+def test_a_list_the_engine_refuses_is_answered_with_its_reason(env, monkeypatch):
+    body = _equipment_body(env, monkeypatch)
+    body["items"] = body["items"][1:]
+    r = env.call(monkeypatch, "put", "/api/settings/equipment", body=body)
+    assert r.status_code == 422 and "default items cannot be removed" in r.json()["error"]
+
+
+def test_a_replacement_made_in_a_session_is_offered_today_and_every_time_after(env, monkeypatch):
+    body = {"lift": "Hack Squat", "name": "Smith Machine Squat", "item_id": "machines"}
+    got = env.ok(monkeypatch, "post", "/api/training/replacements", body=body, local=TUESDAY)
+    assert got["replacement"]["name"] == "Smith Machine Squat"
+    alt = got["alternative"]
+    assert [e["name"] for e in alt["exercises"]] == ["Smith Machine Squat (Ramp Set)", "Smith Machine Squat"]
+    plan = env.ok(monkeypatch, "get", "/api/training/session", local=TUESDAY)
+    hack = next(e for e in plan["exercises"] if e["name"] == "Hack Squat")
+    names = [a["name"] for a in plan["alternatives"]]
+    assert names == ["V Squat", "Smith Machine Squat"]
+    assert all(a["for_group"] == hack["move"]["group"] for a in plan["alternatives"])
+    again = env.ok(monkeypatch, "post", "/api/training/replacements", body=body, local=TUESDAY)
+    assert again["replacement"] == got["replacement"], "the same name twice stores one"
+    r = env.call(monkeypatch, "post", "/api/training/replacements",
+                 body={**body, "name": "Machine Chest Press"}, local=TUESDAY)
+    assert r.status_code == 422 and "already called" in r.json()["error"]

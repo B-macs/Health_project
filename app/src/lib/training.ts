@@ -365,6 +365,23 @@ export function swapCandidates(s: TrainingState): Alternative[] {
     a.for_group === here.group && !a.exercises.some((e) => e.name === running))
 }
 
+/** The lift a replacement made now would stand in for (WP-46): the group the flow is on,
+ *  at its first entry and before any of its sets, when the group's lift has a weight; null
+ *  otherwise, and always outside the plan session. The engine checks the lift again. */
+export function replaceTarget(s: TrainingState): string | null {
+  if (s.plan.kind !== 'plan') return null
+  const step = currentStep(s)
+  if (!step || step.phase === 'resting') return null
+  const here = groupOf(s, step.ex_idx)
+  if (!here) return null
+  if (s.plan.steps.findIndex((st) => groupOf(s, st.ex_idx)?.group === here.group) !== s.step) return null
+  const ahead = new Set(s.plan.steps.slice(s.step)
+    .filter((st) => groupOf(s, st.ex_idx)?.group === here.group).map((st) => st.ex_idx))
+  const lift = s.plan.exercises.find((e) => ahead.has(e.index) && e.ramp_for == null
+    && e.equipment_type != null && e.equipment_type !== 'band')
+  return lift?.name ?? null
+}
+
 /** Swap the group the flow is on for an alternative (WP-28): its exercises join the session
  *  with ids of their own and their seeded numbers, its walked steps run in the group's place,
  *  and the swapped-out lift is not saved (it is in no step). Back undoes the swap. */

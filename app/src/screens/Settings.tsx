@@ -21,6 +21,7 @@ import { DataLink } from './DataTables'
 import { OuraLogin, PlanStart, SyncStatus } from './SettingsSync'
 import { Freshness } from '../ui/Freshness'
 import { versionLine } from '../version'
+import { Equipment } from './SettingsEquipment'
 import { KeyForm } from './Welcome'
 
 type Health = components['schemas']['HealthOut']
@@ -289,6 +290,7 @@ export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onThe
           name={(w) => S.settings.soundWays[w]}
           onChoose={(w) => void setSetting(p.store, KEYS.soundWay, w)} />
       </section>
+      <Equipment />
       <AccessKey store={p.store} />
       <Storage />
       <section className="card group">

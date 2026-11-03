@@ -724,6 +724,189 @@
     ],
     "volume_hi": 6000.0
   },
+  "equipment": {
+    "exercises": [
+      {
+        "default_item_id": "dumbbells",
+        "item_id": "dumbbells",
+        "name": "Walking Lunge (DB)",
+        "pair": true,
+        "step": 5.0,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "new_cable_machine",
+        "item_id": "new_cable_machine",
+        "name": "Single-Arm Cable Y Raise",
+        "pair": false,
+        "step": 2.0,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "machines",
+        "item_id": "machines",
+        "name": "Machine Chest Press",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "machines",
+        "item_id": "machines",
+        "name": "Machine Shoulder Press",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "new_cable_machine",
+        "item_id": "new_cable_machine",
+        "name": "Reverse Cable Crossover",
+        "pair": false,
+        "step": 2.0,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "machines",
+        "item_id": "machines",
+        "name": "Adductor Machine (Seated)",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "cables",
+        "item_id": "cables",
+        "name": "Lat-Pulldown Cable Crunch (Facing Away)",
+        "pair": false,
+        "step": 0.5,
+        "unit": "unit"
+      },
+      {
+        "default_item_id": "dumbbells",
+        "item_id": "dumbbells",
+        "name": "Hip Airplane (Weighted)",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "dumbbells",
+        "item_id": "dumbbells",
+        "name": "Romanian Deadlift (DB)",
+        "pair": true,
+        "step": 5.0,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "machines",
+        "item_id": "machines",
+        "name": "Hack Squat",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "plates",
+        "item_id": "plates",
+        "name": "45° Back Extension",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "dumbbells",
+        "item_id": "dumbbells",
+        "name": "Single-Arm DB Row",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "new_cable_machine",
+        "item_id": "new_cable_machine",
+        "name": "Cable Lateral Raise",
+        "pair": false,
+        "step": 2.0,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "cables",
+        "item_id": "cables",
+        "name": "Standing Cable Hip Flexion",
+        "pair": false,
+        "step": 0.5,
+        "unit": "unit"
+      },
+      {
+        "default_item_id": "machines",
+        "item_id": "machines",
+        "name": "Seated Leg Curl",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default_item_id": "cables",
+        "item_id": "cables",
+        "name": "High-to-Low Cable Woodchop",
+        "pair": false,
+        "step": 0.5,
+        "unit": "unit"
+      },
+      {
+        "default_item_id": "machines",
+        "item_id": "machines",
+        "name": "V Squat",
+        "pair": false,
+        "step": 2.5,
+        "unit": "kg"
+      }
+    ],
+    "items": [
+      {
+        "default": true,
+        "id": "dumbbells",
+        "kind": "dumbbell",
+        "name": "Dumbbells",
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default": true,
+        "id": "machines",
+        "kind": "machine",
+        "name": "Machines",
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default": true,
+        "id": "plates",
+        "kind": "machine",
+        "name": "Plates",
+        "step": 2.5,
+        "unit": "kg"
+      },
+      {
+        "default": true,
+        "id": "cables",
+        "kind": "cable",
+        "name": "Cables",
+        "step": 0.5,
+        "unit": "unit"
+      },
+      {
+        "default": true,
+        "id": "new_cable_machine",
+        "kind": "cable",
+        "name": "New cable machine",
+        "step": 2.0,
+        "unit": "kg"
+      }
+    ],
+    "load_error": null
+  },
   "flexibility_capturing": {
     "capture": {
       "cluster": "a",

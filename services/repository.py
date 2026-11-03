@@ -6755,6 +6755,31 @@ class Repository:
         self.set_config(self.SECA_SCANS_KEY, json.dumps([rows[k] for k in sorted(rows)]))
         return body_composition.seca_scans_from_rows(list(rows.values()))
 
+    #: The equipment list's config row (WP-46): each item's weight step and the
+    #: item each lift is on, as services/equipment.validated returns it.
+    EQUIPMENT_STEPS_KEY = "equipment_steps"
+    #: The replacements created in a session (WP-46): {lift: [{"name", "item_id",
+    #: "created"}, ...]}, services/replacements.py.
+    REPLACEMENTS_KEY = "replacements"
+
+    def get_equipment_steps(self) -> dict | None:
+        """The stored equipment list, or None when nothing is stored (the
+        defaults apply). An unreadable row raises."""
+        raw = self.get_config_value(self.EQUIPMENT_STEPS_KEY)
+        return json.loads(raw) if raw else None
+
+    def save_equipment_steps(self, stored: dict, today: date) -> None:
+        self.set_config(self.EQUIPMENT_STEPS_KEY, json.dumps(stored, sort_keys=True), today=today)
+
+    def get_replacements(self, live: bool = False) -> dict:
+        """Every replacement created in a session, by the lift it replaces;
+        {} when none. `live` reads the store itself, for a write that adds one."""
+        raw = (self.get_config_value_live if live else self.get_config_value)(self.REPLACEMENTS_KEY)
+        return json.loads(raw) if raw else {}
+
+    def save_replacements(self, stored: dict, today: date) -> None:
+        self.set_config(self.REPLACEMENTS_KEY, json.dumps(stored, sort_keys=True), today=today)
+
     def save_inbody_scans(self, scans: list) -> int:
         """Upsert gym scans by their time; each carries its device model."""
         rows = {}

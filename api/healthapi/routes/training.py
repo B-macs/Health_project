@@ -25,6 +25,7 @@ from services.repository import Repository
 
 from ..deps import get_repository, get_sync_runner, local_today
 from ..schemas_training import (ActivityMinutesOut, AnswerIn, CompletionIn, CompletionOut,
+                                EquipmentIn, EquipmentOut, ReplacementIn, ReplacementOut,
                                 FlexCheckIn, FlexCheckOut, RedoIn, Gate1ReasonIn, HeartRateIn, HeartRateOut, LoggedOut,
                                 OpenActivityOut, OutdoorListOut, OutdoorLogIn, OutdoorLogOut,
                                 SessionPlanOut, SessionSaveIn, SessionSaveOut, StoredOut,
@@ -36,7 +37,8 @@ router = APIRouter()
 #: Refusals that are a request the engine cannot take (422); every other
 #: refusal is a state that refuses it (409).
 _INVALID = {"future_day", "invalid_session", "unknown_kind", "exercise_incomplete",
-            "pose_ids", "rpe_out_of_range", "unknown_reason", "unknown_flow"}
+            "pose_ids", "rpe_out_of_range", "unknown_reason", "unknown_flow",
+            "invalid_equipment", "invalid_replacement"}
 #: How long a Garmin read waits for a running sync before answering 409.
 GARMIN_WAIT_SECONDS = 30.0
 
@@ -153,6 +155,28 @@ def get_daily(today: date = Depends(local_today),
     8-hour line and whether it is done today. Never refused for the time of
     day: when to do it is the athlete's decision."""
     return _session(lambda: tsession.daily_plan(repo, today))
+
+
+@router.get("/api/settings/equipment", response_model=EquipmentOut)
+def get_equipment(repo: Repository = Depends(get_repository)) -> dict:
+    """Settings › Weight steps (WP-46): each item's step and each lift's item."""
+    return tsession.equipment_settings(repo)
+
+
+@router.put("/api/settings/equipment", response_model=EquipmentOut)
+def put_equipment(body: EquipmentIn, today: date = Depends(local_today),
+                  repo: Repository = Depends(get_repository)) -> dict:
+    """The whole list as the phone holds it; the same list sent twice stores one."""
+    return _session(lambda: tsession.save_equipment_settings(repo, body.model_dump(), today))
+
+
+@router.post("/api/training/replacements", response_model=ReplacementOut)
+def post_replacement(body: ReplacementIn, today: date = Depends(local_today),
+                     repo: Repository = Depends(get_repository)) -> dict:
+    """A replacement made in a session (WP-46), stored and offered every time
+    after; the answer carries its swap for today's session."""
+    return _session(lambda: tsession.add_replacement(repo, today, body.lift, body.name,
+                                                     body.item_id))
 
 
 @router.post("/api/training/completion", response_model=CompletionOut)

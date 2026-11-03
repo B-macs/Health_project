@@ -1255,6 +1255,197 @@
         "title": "EngineDataOut",
         "type": "object"
       },
+      "EquipmentIn": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EquipmentItemIn"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "links": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Links",
+            "type": "object"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "EquipmentIn",
+        "type": "object"
+      },
+      "EquipmentItem": {
+        "description": "One piece of equipment on the list (WP-46): its weight step, its unit\n(\"kg\" or \"unit\") and its kind (dumbbell, machine or cable).",
+        "properties": {
+          "default": {
+            "default": false,
+            "title": "Default",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "number"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "step",
+          "unit",
+          "kind"
+        ],
+        "title": "EquipmentItem",
+        "type": "object"
+      },
+      "EquipmentItemIn": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "number"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "step",
+          "unit",
+          "kind"
+        ],
+        "title": "EquipmentItemIn",
+        "type": "object"
+      },
+      "EquipmentLift": {
+        "description": "A lift of the block, the item it is on, its default item, whether it is\nlogged as a pair (it then steps twice the item's step) and the step it takes.",
+        "properties": {
+          "default_item_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Default Item Id"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "pair": {
+            "title": "Pair",
+            "type": "boolean"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          }
+        },
+        "required": [
+          "name",
+          "item_id",
+          "default_item_id",
+          "pair",
+          "step",
+          "unit"
+        ],
+        "title": "EquipmentLift",
+        "type": "object"
+      },
+      "EquipmentOut": {
+        "properties": {
+          "exercises": {
+            "items": {
+              "$ref": "#/components/schemas/EquipmentLift"
+            },
+            "title": "Exercises",
+            "type": "array"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EquipmentItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "load_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Load Error"
+          }
+        },
+        "required": [
+          "items",
+          "exercises"
+        ],
+        "title": "EquipmentOut",
+        "type": "object"
+      },
       "ExerciseLine": {
         "properties": {
           "icon": {
@@ -5094,6 +5285,75 @@
           "fill_pct"
         ],
         "title": "RegionRow",
+        "type": "object"
+      },
+      "ReplacementEntry": {
+        "properties": {
+          "created": {
+            "title": "Created",
+            "type": "string"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "item_id",
+          "created"
+        ],
+        "title": "ReplacementEntry",
+        "type": "object"
+      },
+      "ReplacementIn": {
+        "description": "A replacement made in a session (WP-46): the lift it replaces, its name\nand the equipment it is done on.",
+        "properties": {
+          "item_id": {
+            "title": "Item Id",
+            "type": "string"
+          },
+          "lift": {
+            "title": "Lift",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "lift",
+          "name",
+          "item_id"
+        ],
+        "title": "ReplacementIn",
+        "type": "object"
+      },
+      "ReplacementOut": {
+        "properties": {
+          "alternative": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SessionAlternative"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "replacement": {
+            "$ref": "#/components/schemas/ReplacementEntry"
+          }
+        },
+        "required": [
+          "replacement"
+        ],
+        "title": "ReplacementOut",
         "type": "object"
       },
       "RestView": {
@@ -11296,6 +11556,124 @@
         "summary": "Get Settings"
       }
     },
+    "/api/settings/equipment": {
+      "get": {
+        "description": "Settings › Weight steps (WP-46): each item's step and each lift's item.",
+        "operationId": "get_equipment_api_settings_equipment_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Equipment"
+      },
+      "put": {
+        "description": "The whole list as the phone holds it; the same list sent twice stores one.",
+        "operationId": "put_equipment_api_settings_equipment_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EquipmentIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EquipmentOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Equipment"
+      }
+    },
     "/api/settings/plan-start": {
       "put": {
         "operationId": "put_plan_start_api_settings_plan_start_put",
@@ -13034,6 +13412,79 @@
           }
         },
         "summary": "Post Redo"
+      }
+    },
+    "/api/training/replacements": {
+      "post": {
+        "description": "A replacement made in a session (WP-46), stored and offered every time\nafter; the answer carries its swap for today's session.",
+        "operationId": "post_replacement_api_training_replacements_post",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplacementIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplacementOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Post Replacement"
       }
     },
     "/api/training/session": {
