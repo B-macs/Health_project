@@ -136,6 +136,7 @@ def strength(repo, today: date, metric: str = DEFAULT_STRENGTH_METRIC) -> dict:
         "unmapped": data["unmapped"],
         "imbalances": data["imbalances"],
         "imbalance_count": data["imbalance_count"],
+        "balance": data["balance"],
         # The phone's page since 2026-10-20 (strength_screen, the redo): the whole page in
         # one answer, whatever `metric` asked for.
         "trend": strength_screen.trend(data),

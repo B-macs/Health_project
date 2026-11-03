@@ -104,6 +104,23 @@ describe('Strength (redone 2026-10-20)', () => {
     expect(html).toContain(`${S.ins.imbalances} ${STRENGTH.imbalance_count}`)
   })
 
+  it('draws the muscle balance (WP-44): one bar a pair, the stronger side lit, the sentence', () => {
+    const b = STRENGTH.balance!
+    expect(b.pairs.map((p) => p.key)).toEqual(['chest_back', 'front_rear_shoulder', 'quads_hamstrings', 'arms', 'legs'])
+    const raw = draw(<StrengthBody view={fresh(STRENGTH)} reduced />)
+    const html = text(raw)
+    expect(html).toContain(S.ins.balance)
+    for (const p of b.pairs) expect(html).toContain(p.words)
+    expect(html).toContain(b.method)
+    const drawn = b.pairs.filter((p) => p.left_share != null)
+    expect(drawn.length).toBeGreaterThan(0)
+    for (const p of drawn) expect(raw).toContain(`aria-label="${S.ins.balanceBar(p.left, p.right, p.left_share!)}"`)
+    const lit = b.pairs.filter((p) => p.stronger != null).length
+    expect(raw.split('balance__side--strong').length - 1).toBe(lit)
+    const none = text(draw(<StrengthBody view={fresh({ ...STRENGTH, balance: { ...b, pairs: [] } })} reduced />))
+    expect(none).toContain(S.ins.balanceNone)
+  })
+
   it('lists each lift against its own 2025 best (WP-38), or says none matches yet', () => {
     const lifts = STRENGTH.lifts!
     expect(lifts.length).toBeGreaterThan(0)

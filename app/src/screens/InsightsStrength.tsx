@@ -162,6 +162,41 @@ function Volume({ v }: { v: Schemas['VolumeOut'] }) {
   )
 }
 
+/** The muscle balance (WP-44): each pair as one bar split at the two sides' shares, the
+ *  stronger side lit, the sentence and what it was read from. Every figure and sentence is
+ *  the engine's (services/imbalance.py). */
+function Balance({ b }: { b: Schemas['BalanceOut'] }) {
+  return (
+    <section className="card group" aria-label={S.ins.balance} data-testid="balance">
+      <h2 className="eyebrow">{S.ins.balance}</h2>
+      {b.pairs.length === 0 && <p className="caption">{S.ins.balanceNone}</p>}
+      {b.pairs.map((p) => (
+        <div key={p.key} className="balance" data-pair={p.key} data-stronger={p.stronger ?? 'even'}>
+          <div className="balance__top">
+            <span className={p.stronger === 'left' ? 'balance__name--strong' : undefined}>{p.left}</span>
+            <span className="num">{S.ins.balanceGap(p.difference_pct ?? null, p.stronger ?? null)}</span>
+            <span className={p.stronger === 'right' ? 'balance__name--strong' : undefined}>{p.right}</span>
+          </div>
+          {p.left_share != null && (
+            <div className="balance__track" role="img" aria-label={S.ins.balanceBar(p.left, p.right, p.left_share)}>
+              <span className={`balance__side${p.stronger === 'left' ? ' balance__side--strong' : ''}`}
+                style={{ width: `${p.left_share * 100}%` }} />
+              <span className={`balance__side${p.stronger === 'right' ? ' balance__side--strong' : ''}`}
+                style={{ width: `${(1 - p.left_share) * 100}%` }} />
+              <span className="balance__mid" />
+            </div>
+          )}
+          <div className="contrib__note">{p.words}</div>
+          {p.parts.length > 0 && (
+            <ul className="list caption">{p.parts.map((part) => <li key={part}>{part}</li>)}</ul>
+          )}
+        </div>
+      ))}
+      <p className="caption">{b.method}</p>
+    </section>
+  )
+}
+
 /** The muscle-balance findings (I15): the count and the two groups, each heading a state. */
 function Imbalances({ d }: { d: StrengthAnswer }) {
   const groups = d.imbalances as { overactive_tight?: string[]; underactive_weak?: string[] }
@@ -206,6 +241,7 @@ export function StrengthBody({ view, reduced }: { view: View<StrengthAnswer>; re
           <Areas d={d} reduced={reduced} />
           <Lifts d={d} />
           {d.volume && <Volume v={d.volume} />}
+          {d.balance && <Balance b={d.balance} />}
           <Imbalances d={d} />
         </>
       )}

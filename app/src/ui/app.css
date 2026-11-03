@@ -1229,6 +1229,56 @@ button.card {
   opacity: 0.55;
 }
 
+/* The muscle balance (WP-44): one bar per pair, split at the two sides' shares. */
+.balance {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-xs);
+  padding: var(--sp-s) 0;
+}
+
+.balance__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--sp-s);
+}
+
+.balance__name--strong {
+  font-weight: 600;
+}
+
+.balance__track {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: var(--bar);
+  border-radius: var(--r-pill);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.balance__side {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--f2), var(--f1));
+  opacity: 0.35;
+}
+
+.balance__side--strong {
+  opacity: 1;
+}
+
+.balance__mid {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--muted);
+}
+
 .segments {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

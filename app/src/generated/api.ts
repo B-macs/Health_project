@@ -958,6 +958,44 @@ export interface components {
             /** Text */
             text: string;
         };
+        /** BalanceOut */
+        BalanceOut: {
+            /** Body Weight Kg */
+            body_weight_kg: number | null;
+            /** Method */
+            method: string;
+            /** Pairs */
+            pairs: components["schemas"]["BalancePair"][];
+        };
+        /**
+         * BalancePair
+         * @description One pair of the muscle balance (WP-44, services/imbalance.py): the two
+         *     sides' values (a % of the lift's standard, or left and right around 100),
+         *     the left side's share of the two, which side is stronger (None: about even
+         *     or no data), how far apart, the sentence, and what it was read from.
+         */
+        BalancePair: {
+            /** Difference Pct */
+            difference_pct: number | null;
+            /** Key */
+            key: string;
+            /** Left */
+            left: string;
+            /** Left Share */
+            left_share: number | null;
+            /** Left Value */
+            left_value: number | null;
+            /** Parts */
+            parts: string[];
+            /** Right */
+            right: string;
+            /** Right Value */
+            right_value: number | null;
+            /** Stronger */
+            stronger: string | null;
+            /** Words */
+            words: string;
+        };
         /** BandTier */
         BandTier: {
             /** Label */
@@ -3252,6 +3290,7 @@ export interface components {
             axis: {
                 [key: string]: number;
             };
+            balance?: components["schemas"]["BalanceOut"] | null;
             /** Calibrating */
             calibrating: boolean;
             /** Imbalance Count */

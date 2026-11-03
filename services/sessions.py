@@ -2287,7 +2287,8 @@ def exercise_traits() -> dict[str, dict]:
     """{name: {"sides": 1 or 2, "unit": "kg" or "unit"}} for every exercise of
     every registered plan: what a logged set cannot say by itself (2026-10-20).
 
-    `sides` is logged_sides(): 2 for an exercise done one side at a time, whose
+    `one_arm` is True for an exercise done one side at a time (the muscle
+    balance's left-right pairs, WP-44). `sides` is logged_sides(): 2 for an exercise done one side at a time, whose
     set record keeps the right side's numbers and the left's only where they
     differ (build_set_record), and for an alternating one, whose reps are each
     side's (2026-10-22). `unit` is the plan's increment_unit: "unit" for
@@ -2300,7 +2301,8 @@ def exercise_traits() -> dict[str, dict]:
             for ex in day.get("exercises") or []:
                 if ex.get("name"):
                     traits[ex["name"]] = {"sides": logged_sides(ex),
-                                          "unit": ex.get("increment_unit") or "kg"}
+                                          "unit": ex.get("increment_unit") or "kg",
+                                          "one_arm": ex.get("laterality") == "unilateral"}
     return traits
 
 #: Everything needed to CREATE a phase, per phase number. Only consulted when a

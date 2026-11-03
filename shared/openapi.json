@@ -174,6 +174,136 @@
         "title": "AxisTick",
         "type": "object"
       },
+      "BalanceOut": {
+        "properties": {
+          "body_weight_kg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Body Weight Kg"
+          },
+          "method": {
+            "title": "Method",
+            "type": "string"
+          },
+          "pairs": {
+            "items": {
+              "$ref": "#/components/schemas/BalancePair"
+            },
+            "title": "Pairs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "pairs",
+          "body_weight_kg",
+          "method"
+        ],
+        "title": "BalanceOut",
+        "type": "object"
+      },
+      "BalancePair": {
+        "description": "One pair of the muscle balance (WP-44, services/imbalance.py): the two\nsides' values (a % of the lift's standard, or left and right around 100),\nthe left side's share of the two, which side is stronger (None: about even\nor no data), how far apart, the sentence, and what it was read from.",
+        "properties": {
+          "difference_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Difference Pct"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "left": {
+            "title": "Left",
+            "type": "string"
+          },
+          "left_share": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left Share"
+          },
+          "left_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Left Value"
+          },
+          "parts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "right": {
+            "title": "Right",
+            "type": "string"
+          },
+          "right_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Right Value"
+          },
+          "stronger": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stronger"
+          },
+          "words": {
+            "title": "Words",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "left",
+          "right",
+          "left_value",
+          "right_value",
+          "left_share",
+          "stronger",
+          "difference_pct",
+          "words",
+          "parts"
+        ],
+        "title": "BalancePair",
+        "type": "object"
+      },
       "BandTier": {
         "properties": {
           "label": {
@@ -7008,6 +7138,16 @@
             },
             "title": "Axis",
             "type": "object"
+          },
+          "balance": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/BalanceOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "calibrating": {
             "title": "Calibrating",

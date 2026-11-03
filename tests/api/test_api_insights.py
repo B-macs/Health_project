@@ -127,6 +127,10 @@ def test_strength_reads_its_reference_from_the_store(env, monkeypatch):
     assert len(body["tonnage"]) == 6 and body["readout"]["points"]
     assert [m["label"] for m in body["metrics"]][0] == ins.DEFAULT_STRENGTH_METRIC
     assert body["imbalance_count"] == 1 and {c["region"] for c in body["regions"]}
+    # The muscle balance (WP-44): the five pairs in screen order, each with its sentence.
+    assert [p["key"] for p in body["balance"]["pairs"]] == [
+        "chest_back", "front_rear_shoulder", "quads_hamstrings", "arms", "legs"]
+    assert all(p["words"] for p in body["balance"]["pairs"]) and body["balance"]["method"]
     # The redone page (2026-10-20): the whole page in every answer, whatever metric asked.
     assert {a["region"] for a in body["areas"]} == {"upper_body", "core", "lower_body"}
     assert len(body["trend"]) == 6 and body["trend_axis"]["hi"] > body["trend_axis"]["lo"]

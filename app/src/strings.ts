@@ -577,6 +577,12 @@ export const S = {
     notInKg: 'Not counted in kg',
     weekWord: { last_full: 'Last full week', this_week: 'This week so far' } as Record<string, string>,
     imbalances: 'Muscle imbalances',
+    balance: 'Muscle balance',
+    balanceGap: (pct: number | null, stronger: string | null) =>
+      (pct == null ? '—' : stronger == null ? 'Even' : `${Math.round(pct)}%`),
+    balanceNone: 'No pairs to compare yet.',
+    balanceBar: (left: string, right: string, share: number) =>
+      `${left} ${Math.round(share * 100)}%, ${right} ${Math.round((1 - share) * 100)}%`,
     imbalanceCount: (n: number | null) => (n == null ? '—' : String(n)),
     holdTension: 'Hold tension at rest',
     workTooLittle: 'Work too little',

@@ -98,6 +98,29 @@ class AreaRow(BaseModel):
     hold_date: date | None
 
 
+class BalancePair(BaseModel):
+    """One pair of the muscle balance (WP-44, services/imbalance.py): the two
+    sides' values (a % of the lift's standard, or left and right around 100),
+    the left side's share of the two, which side is stronger (None: about even
+    or no data), how far apart, the sentence, and what it was read from."""
+    key: str
+    left: str
+    right: str
+    left_value: float | None
+    right_value: float | None
+    left_share: float | None
+    stronger: str | None
+    difference_pct: float | None
+    words: str
+    parts: list[str]
+
+
+class BalanceOut(BaseModel):
+    pairs: list[BalancePair]
+    body_weight_kg: float | None
+    method: str
+
+
 class LiftRow(BaseModel):
     """One lift against its 2025 best (WP-38): its latest session's best set,
     the one-rep max of both, the % and how close the two lifts are (same,
@@ -177,6 +200,7 @@ class StrengthOut(BaseModel):
     areas: list[AreaRow] = []
     volume: VolumeOut | None = None
     lifts: list[LiftRow] = []
+    balance: BalanceOut | None = None
 
 
 # ── Metabolism ───────────────────────────────────────────────────────────────

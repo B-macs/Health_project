@@ -18,6 +18,7 @@ from datetime import date
 
 import training_constants
 from services import bioage
+from services import imbalance
 from services import sessions
 from services import strength
 from services import tonnage
@@ -101,6 +102,7 @@ def read_data(repo, today: date, reference: dict) -> dict:
     series, unmapped = tonnage.weekly_tonnage(
         rows, training_constants.EXERCISE_BODY_REGION, today=today, weeks=WEEKS, traits=traits)
     imbalances = reference["imbalances"] or {}
+    balance = muscle_balance(repo, kilogram_rows(rows, traits), traits, today, reference["pr_rir"])
     return {
         "today": today, "load_error": load_error,
         "overall": snapshot["overall"], "calibrating": snapshot["calibrating"],
@@ -110,7 +112,34 @@ def read_data(repo, today: date, reference: dict) -> dict:
         "week_labels": [week_label(w.week_start) for w in series],
         "imbalances": imbalances,
         "imbalance_count": bioage.muscle_imbalance_count(imbalances),
+        "balance": balance,
     }
+
+
+def muscle_balance(repo, rows: list[dict], traits: dict[str, dict], today: date,
+                   pr_rir: float) -> dict:
+    """The five pairs of the muscle balance (services/imbalance.py, WP-44): the
+    log in kilograms, the newest SECA scan's muscle per arm and leg, and the body
+    weight the standards are read at (the newest SECA scan's, else the newest
+    weigh-in). A failed read leaves its part out; the pair says when it has too
+    little data."""
+    try:
+        scans = repo.get_seca_scans()
+    except Exception:
+        scans = []
+    newest = scans[-1] if scans else None
+    body_weight = newest.weight_kg if newest else None
+    if body_weight is None:
+        try:
+            readings = repo.get_scale_readings()
+            body_weight = readings[-1].weight_kg if readings else None
+        except Exception:
+            body_weight = None
+    return imbalance.balance(
+        rows, today=today, body_weight_kg=body_weight,
+        seca_segments=dict(newest.segments) if newest else None,
+        one_arm={name for name, t in traits.items() if t.get("one_arm")},
+        region_of=training_constants.EXERCISE_BODY_REGION, pr_rir=pr_rir)
 
 
 def readout(data: dict, label: str) -> dict:
