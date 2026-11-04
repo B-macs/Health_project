@@ -44,7 +44,10 @@ def test_a_press_runs_only_after_the_release_and_the_y_raise():
         for press in ("Machine Chest Press", "Machine Shoulder Press"):
             if press in moves:
                 assert set(moves[press]["after"]) == lead_in, (letter, press)
-        assert moves["Reverse Cable Crossover"]["after"] == []
+    # The crossover is no press: it waits for nothing (Monday and Friday since
+    # WP-47, his choice of 2026-11-03: "Move crossover to D").
+    for letter in ("A", "D"):
+        assert _by_name(letter)["Reverse Cable Crossover"]["after"] == [], letter
 
 
 def test_the_timed_plank_test_never_moves():
