@@ -230,6 +230,11 @@ def test_every_loaded_lift_has_the_range_its_kind_takes():
         if not e.get("equipment_type"):
             assert e["rep_min"] is None and e["rep_max"] is None, name
             continue
+        if e["type"] == "hold":
+            # A timed lift takes a range in seconds (WP-47, the farmer walk: 30-45 s).
+            assert e["rep_min"] is None and e["rep_max"] is None, name
+            assert {"hold_min": e["hold_min"], "hold_max": e["hold_max"]} == gb.FARMER_RANGE, name
+            continue
         want = gb.COMPOUND_RANGE if (c.kind == "compound" or name == "Hip Airplane (Weighted)") \
             else gb.ISOLATION_RANGE
         assert {"rep_min": e["rep_min"], "rep_max": e["rep_max"]} == want, name
@@ -295,8 +300,11 @@ def test_the_crossover_is_both_arms_at_once_with_45_s_rest():
     arms. I found a machine for it". From 2026-10-22 it was one arm at a time
     with 15 s after both arms, which gave each arm the other arm's set as rest;
     with both arms together the timer is all the rest each arm gets, so it is
-    45 s again. The right arm still stops at the line of the body."""
-    for letter in ("A", "C"):
+    45 s again. The right arm still stops at the line of the body. Monday and
+    Friday since WP-47 (his choice, 2026-11-03: "Move crossover to D")."""
+    assert [k for k, day in gb.SESSIONS.items()
+            if any(x["name"] == "Reverse Cable Crossover" for x in day)] == ["A", "D"]
+    for letter in ("A", "D"):
         e = next(x for x in gb.SESSIONS[letter] if x["name"] == "Reverse Cable Crossover")
         assert e["laterality"] == "bilateral" and e["rest_seconds"] == 45
         assert "Pull both arms" in e["mechanics"] and "RIGHT, not behind it" in e["mechanics"]

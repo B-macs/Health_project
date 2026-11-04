@@ -82,13 +82,14 @@ def _warning_strains(repo, today: date) -> tuple[dict | None, dict | None]:
 
 
 def timer_kind(ex: dict) -> str | None:
-    """Which timer an exercise runs: "stopwatch" for a timed test (it counts
-    up and asks for the seconds), "hold" for a held exercise, "duration" for
+    """Which timer an exercise runs: "stopwatch" for a timed test or a timed
+    lift such as the farmer walk (it counts up and asks for the seconds,
+    sessions.counts_up), "hold" for a held exercise, "duration" for
     an activity, None for reps and for a test of the flexibility retest (its
     reading is typed, WP-33)."""
     if ex.get("battery_test"):
         return None
-    if sess.is_timed_test(ex):
+    if sess.counts_up(ex):
         return "stopwatch"
     if ex.get("type") in sess.HOLD_TIMER_TYPES:
         return "hold"
@@ -129,6 +130,9 @@ def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tu
         "icon": sess.type_icon(ex),
         "warmup": bool(ex.get("warmup")),
         "timed_test": sess.is_timed_test(ex),
+        # A timed lift's aim in seconds (WP-47): the seconds rule's, not the plan's.
+        **({"hold_seconds": entry["hold_seconds"]}
+           if entry and entry.get("hold_seconds") is not None else {}),
         "timer": timer_kind(ex),
         "prescription": sess.prescription_label(sess.displayed_prescription(ex, entry)),
         "mechanics": ex.get("mechanics") or "",

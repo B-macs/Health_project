@@ -107,7 +107,7 @@ def hold_starts_next(ex: dict, pos: Position, first: str) -> bool:
     (the Training page's auto-start, rebuild Phase 6 move). A set's last hold
     starts nothing itself: a rest follows, and the rest's own end starts the
     next set's hold. A timed test (the plank test) never starts by itself."""
-    if ex.get("type") not in sessions.HOLD_TIMER_TYPES or sessions.is_timed_test(ex):
+    if ex.get("type") not in sessions.HOLD_TIMER_TYPES or sessions.counts_up(ex):
         return False
     if pos.phase != INTRO:
         return False
@@ -125,7 +125,7 @@ def timer_starts(exercises: list[dict], prev: Position | None, pos: Position,
         return ON_ARRIVAL
     ex = exercises[pos.ex_idx]
     if (prev is None or prev.ex_idx != pos.ex_idx
-            or ex.get("type") not in sessions.HOLD_TIMER_TYPES or sessions.is_timed_test(ex)):
+            or ex.get("type") not in sessions.HOLD_TIMER_TYPES or sessions.counts_up(ex)):
         return None
     if prev.phase == RESTING or hold_starts_next(ex, prev, first):
         return AFTER_TIMER

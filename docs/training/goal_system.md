@@ -204,6 +204,17 @@ of them makes sense as I get older and don't want any issues"*):
   release protocol (annotated), and an August design mockup
   (`mockups/flexibility_v2_architecture.html`, a deleted model).
 
+## Goal D — general carrying strength — his words, 2026-11-03 (WP-47)
+
+*"I want to add farmer walks into my program"*; asked for the goal: *"General
+Carrying strength."*; placed by him: *"Id rather it in C - and by time more than
+distance."* The farmer walk, a dumbbell in each hand, three walks of 30-45
+seconds at the end of session C, timed on a count-up stopwatch. Its weight goes
+up by his one rule in seconds: every walk at 45 s or one past it, then the aim
+is 34 s ("5. Yes"). To keep C under 70 minutes the reverse cable crossover moved
+from C to D (*"Move crossover to D"*): the rear delts' weekly dose now counts
+the bonus day (`goal_week.BONUS_DOSE_AREAS`).
+
 ## Goal C — flexibility that lasts — APPROVED 2026-10-14
 
 A separate goal: to be more flexible, and to keep it. One session a week in

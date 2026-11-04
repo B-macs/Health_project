@@ -764,6 +764,17 @@ MOVEMENT_RULES: list[MovementRule] = [
         stage_cap=1, severity="caution", laterality="right",
     ),
     MovementRule(
+        movement="farmer walk",
+        reason="Farmer walk: a dumbbell in each hand, walked for time. The weight pulls "
+               "both arms down at the shoulder, and the RIGHT shoulder has had three "
+               "anterior dislocations, a failed capsular wrap and a Latarjet, its "
+               "stability now muscular: the shoulders stay set back and down, never "
+               "hanging, and the dumbbells go down at any feeling of the right shoulder "
+               "slipping. Both hands always, so the load is even. Ruled 2026-11-03 "
+               "(WP-47).",
+        stage_cap=2, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
         movement="side bridge",
         reason="Side bridge, any variant. Lateral trunk endurance in a neutral spine — "
                "the flexion-free alternative to the contraindicated sit-up and crunch.",

@@ -442,7 +442,9 @@ def prescription_label(ex: dict) -> str:
     t = ex["type"]
     if t == "hold":
         sides = " each side" if ex["laterality"] == "unilateral" else ""
-        return f"{ex['sets']} sets × {ex['hold_seconds']}s hold{sides}  |  {ex['rest_seconds']}s rest"
+        rng = (f" (range {ex['hold_min']}-{ex['hold_max']}s)"
+               if ex.get("hold_min") is not None and ex.get("hold_max") is not None else "")
+        return f"{ex['sets']} sets × {ex['hold_seconds']}s hold{sides}{rng}  |  {ex['rest_seconds']}s rest"
     if t == "hold_reps":
         sides = " each side" if ex["laterality"] in ("unilateral", "alternating") else ""
         return f"{ex['sets']} sets × {ex['reps_in_set']} reps × {ex['hold_seconds']}s hold{sides}  |  {ex['rest_seconds']}s rest"
@@ -810,6 +812,30 @@ def seed_actual_entry(
         entry.update(rep_min=rep_min, rep_max=rep_max)
         if plan["action"] != "start":
             entry.update(weight_kg=plan["weight"], reps=plan["aim"], source=RANGE_SOURCE,
+                         action=plan["action"], last_seen_date=plan["date"])
+            if plan["action"] != "step_up":
+                entry["weight_kg"] = engine.suggested_weight_kg(
+                    entry["weight_kg"], streak_label, increment=weight_increment,
+                )
+            return entry
+
+    # A timed lift with a seconds range (WP-47, the farmer walk): the same rule
+    # in seconds — its held seconds are what each set reads, and the aim is
+    # seconds (engine.range_progression, reading="tut").
+    hold_min, hold_max = ex.get("hold_min"), ex.get("hold_max")
+    if (hold_min is not None and hold_max is not None and ex["type"] == "hold"
+            and equip != "band" and entry["weight_kg"] is not None):
+        if history is None and last_session_sets and (last_performance or {}).get("session_date"):
+            history = [(last_performance["session_date"], last_session_sets)]
+        plan = engine.range_progression(
+            hold_min, hold_max, history, entry["weight_kg"], ex.get("hold_seconds") or hold_min,
+            increment=weight_increment, allow_step=allow_increase, hold=hold,
+            prescribed_sets=ex.get("sets", 1), window_days=step_window_days(ex),
+            reading="tut", aim_step=engine.HOLD_AIM_STEP_SECONDS,
+        )
+        entry.update(hold_min=hold_min, hold_max=hold_max, hold_seconds=plan["aim"])
+        if plan["action"] != "start":
+            entry.update(weight_kg=plan["weight"], source=RANGE_SOURCE,
                          action=plan["action"], last_seen_date=plan["date"])
             if plan["action"] != "step_up":
                 entry["weight_kg"] = engine.suggested_weight_kg(
@@ -1404,6 +1430,11 @@ def next_step_caption(ex: dict, entry: dict) -> str:
 
     "" for anything the range does not run on.
     """
+    hold_min, hold_max = ex.get("hold_min"), ex.get("hold_max")
+    if (hold_min is not None and hold_max is not None and ex.get("type") == "hold"
+            and ex.get("equipment_type") not in (None, "band") and entry.get("weight_kg") is not None):
+        return (f"The weight goes up when every set reaches {hold_max} seconds or one set goes "
+                f"past {hold_max} seconds, in each session of this lift in {step_window_days(ex)} days.")
     rep_min, rep_max = ex.get("rep_min"), ex.get("rep_max")
     if (rep_min is None or rep_max is None or ex.get("type") != "reps"
             or ex.get("equipment_type") in (None, "band") or entry.get("weight_kg") is None):
@@ -1452,6 +1483,9 @@ def displayed_prescription(ex: dict, actual: dict | None) -> dict:
     # disagree. Overlaying it here would reintroduce that from the other end.
     if out.get("type") == "reps" and actual.get("reps") is not None:
         out["reps"] = actual["reps"]
+    # A timed lift's aim in seconds (WP-47, the seconds rule).
+    if out.get("type") == "hold" and actual.get("hold_seconds") is not None:
+        out["hold_seconds"] = actual["hold_seconds"]
     if actual.get("weight_kg") is not None:
         out["weight_kg"] = actual["weight_kg"]
     if actual.get("band_tier"):
@@ -2016,6 +2050,15 @@ def is_timed_test(ex: dict) -> bool:
     that counts up and asks for the seconds, never a countdown that ends the
     set at the reference time."""
     return ex.get("type") == "hold" and is_measurement(ex.get("name", ""))
+
+
+def counts_up(ex: dict) -> bool:
+    """A hold timed on a stopwatch that counts up, with the seconds typed: a
+    timed test (is_timed_test), or a timed lift whose seconds decide its weight
+    (`count_up`, WP-47: the farmer walk, "by time more than distance"). Never a
+    countdown that ends the set at a set time, and never one that starts by
+    itself."""
+    return ex.get("type") == "hold" and (is_timed_test(ex) or bool(ex.get("count_up")))
 
 
 def timed_hold_entry(entry: dict | None, side: str, seconds: int) -> dict:

@@ -646,6 +646,39 @@ HIP_AIRPLANE = _ex(
 )
 
 
+#: The farmer walk's time range (WP-47, his answer "5. Yes", 2026-11-03): three
+#: walks of 30-45 seconds. His one rule in seconds (engine.range_progression with
+#: reading="tut"): the weight goes up when every walk reached 45 s or one went
+#: past it, then the aim is 34 s; between steps the aim climbs
+#: HOLD_AIM_STEP_SECONDS from the last walk.
+FARMER_RANGE = {"hold_min": 30, "hold_max": 45}
+
+FARMER_WALK = {**_ex(
+    name="Farmer Walk (DB)",
+    ex_type="hold",
+    sets=3, hold_seconds=34, rest_seconds=90,
+    equipment_type="dumbbell", weight_kg=30.0,
+    increment_size=DUMBBELL_PAIR_KG,
+    mechanics=(
+        "A dumbbell in each hand at your sides, arms straight, shoulders back and down. "
+        "Stand tall and walk with short, even steps, the dumbbells still at your sides. "
+        "Start the stopwatch as you lift the dumbbells and stop it when you put them down, "
+        "or when your grip lets go. Type the seconds you walked. On the RIGHT, the shoulder "
+        "stays set back; at any feeling of the shoulder slipping, put the dumbbells down."
+    ),
+    biomechanical_focus=(
+        "General carrying strength (goal D, his words 2026-11-03: 'General Carrying "
+        "strength.'): grip, upper back and trunk hold the weight while the legs walk. By "
+        "time, not distance (his choice). Both hands, so the load is even; the suitcase "
+        "carry (one hand) trains the sides of the trunk instead. The right shoulder is "
+        "pulled down by the weight: the hang rule's cue, shoulders set, never hanging "
+        "(rules: 'farmer walk', caution)."
+    ),
+    progression="The seconds rule adds 5 kg (2.5 kg a hand) when every walk reaches 45 s.",
+    regression="The grip lets go before 30 s → the weight comes back one step after two sessions.",
+), **FARMER_RANGE, "count_up": True}
+
+
 # ─── At home on the core days (step 6, approved 2026-10-16) ─────────────────
 #
 # Empty since 2026-10-28 (WP-40): the neck working stretch, the one home item,
@@ -704,9 +737,9 @@ SESSIONS: dict[str, list[dict]] = {
     "B": [PSOAS_MARCH, RDL_RAMP, RDL, HACK_RAMP, HACK_SQUAT, BACK_EXTENSION, ROW, LATERAL_RAISE,
           REVERSE_CRUNCH, HIP_FLEXION],
     "C": [PSOAS_MARCH, RDL_RAMP, RDL, BACK_EXTENSION, ROW, SHOULDER_RELEASE, Y_RAISE, CHEST_PRESS,
-          CROSSOVER, ADDUCTOR_MACHINE, HIP_AIRPLANE],
-    "D": [PSOAS_MARCH, WALKING_LUNGE, HACK_RAMP, HACK_SQUAT, BACK_EXTENSION, LEG_CURL, WOODCHOP,
-          SIDE_PLANK, HIP_FLEXION],
+          ADDUCTOR_MACHINE, FARMER_WALK, HIP_AIRPLANE],
+    "D": [PSOAS_MARCH, WALKING_LUNGE, HACK_RAMP, HACK_SQUAT, BACK_EXTENSION, LEG_CURL, CROSSOVER,
+          WOODCHOP, SIDE_PLANK, HIP_FLEXION],
 }
 #: The core sessions meet the weekly dose; D is the bonus.
 CORE_LETTERS = ("A", "B", "C")

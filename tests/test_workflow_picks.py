@@ -58,7 +58,8 @@ def test_no_record_is_left_over_from_an_exercise_that_is_gone():
 def test_every_record_names_a_goal_an_area_a_job_a_reason_and_a_source():
     for name, p in gw.PICKS.items():
         goals = {g.strip() for g in p.goal.split(",")}
-        assert goals and goals <= {"A", "B", "C", "warm-up"}, (name, p.goal)
+        # Goal D, general carrying strength: his words, 2026-11-03 (WP-47).
+        assert goals and goals <= {"A", "B", "C", "D", "warm-up"}, (name, p.goal)
         assert p.area and p.job and p.reason and p.source, name
 
 

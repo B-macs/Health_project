@@ -359,6 +359,14 @@ PROGRESSION_WINDOW_DAYS = 7
 #: at one weight, takes the weight back one step (rule 5).
 STEP_BACK_SESSIONS = 2
 
+#: A timed lift's aim climbs this many seconds from the last set between steps,
+#: where a rep lift's climbs one rep (rule 2, read in seconds: the farmer walk,
+#: WP-47, his one rule in seconds, "5. Yes", 2026-11-03). Five seconds is about
+#: one rep's time; his to change.
+HOLD_AIM_STEP_SECONDS = 5
+#: What a set reads, and its left side's key, by `reading` (range_progression).
+_LEFT_KEY = {"reps": "reps_left", "tut": "tut_left"}
+
 
 def _round_half_up(x: float) -> int:
     return int(math.floor(x + 0.5))
@@ -381,18 +389,18 @@ def _working_weight(sets: list[dict] | None) -> float | None:
     return None if w is None else float(w)
 
 
-def _last_set_reps(sets: list[dict] | None) -> int | None:
+def _last_set_reps(sets: list[dict] | None, reading: str = "reps") -> int | None:
     work = _working(sets)
-    return int(work[-1].get("reps") or 0) if work else None
+    return int(work[-1].get(reading) or 0) if work else None
 
 
-def _left_arm(s: dict) -> dict:
+def _left_arm(s: dict, reading: str = "reps") -> dict:
     """The set as the LEFT arm did it. A one-arm lift stores the left arm's
-    reps and weight only where they differ from the right's
+    reps (or held seconds) and weight only where they differ from the right's
     (sessions.actual_to_set_record), so a missing value is the right arm's,
     and a lift done with both arms together reads the same as itself."""
-    reps, weight = s.get("reps_left"), s.get("weight_left")
-    return {**s, "reps": s.get("reps") if reps is None else reps,
+    value, weight = s.get(_LEFT_KEY[reading]), s.get("weight_left")
+    return {**s, reading: s.get(reading) if value is None else value,
             "weight": s.get("weight") if weight is None else weight}
 
 
@@ -418,6 +426,8 @@ def range_progression(
     hold: bool = False,
     prescribed_sets: int = 1,
     window_days: int = PROGRESSION_WINDOW_DAYS,
+    reading: str = "reps",
+    aim_step: int = 1,
 ) -> dict:
     """The next session of one loaded lift with a rep range: its weight, its
     aim and why. See the LOAD PROGRESSION section above for the rules.
@@ -441,6 +451,11 @@ def range_progression(
     A step needs BOTH arms (rule 3): each set is read once as the right arm
     did it and once as the left arm did it (_left_arm), and each arm must
     earn the step on its own.
+
+    A timed lift runs the same rule in seconds (WP-47): `reading` "tut" reads
+    each set's held seconds where a rep lift reads its reps, the range and the
+    aim are seconds, and the aim climbs `aim_step` (HOLD_AIM_STEP_SECONDS)
+    between steps.
     """
     def clamp(reps: int) -> int:
         return max(rep_min, min(rep_max, reps))
@@ -452,7 +467,7 @@ def range_progression(
     newest_date, newest_sets = sessions[0]
     weight = _working_weight(newest_sets)
     weight = plan_weight if weight is None else weight
-    last = _last_set_reps(newest_sets)
+    last = _last_set_reps(newest_sets, reading)
     if hold:
         return {"weight": weight, "aim": clamp(last), "action": "held", "date": newest_date}
 
@@ -461,12 +476,12 @@ def range_progression(
         return lifted is None or abs(lifted - weight) < 1e-6
 
     def arm_earns_step(sets: list[dict]) -> bool:
-        reps = [int(s.get("reps") or 0) for s in _working(sets)]
+        reps = [int(s.get(reading) or 0) for s in _working(sets)]
         return (at_weight(sets) and len(reps) >= prescribed_sets
                 and (all(r >= rep_max for r in reps) or any(r > rep_max for r in reps)))
 
     def earns_step(sets: list[dict]) -> bool:
-        return arm_earns_step(sets) and arm_earns_step([_left_arm(s) for s in sets])
+        return arm_earns_step(sets) and arm_earns_step([_left_arm(s, reading) for s in sets])
 
     # The newest session is always in the window, so the check is never vacuous.
     week = [newest_sets] + [s for d, s in sessions[1:]
@@ -478,12 +493,12 @@ def range_progression(
 
     recent = [s for _, s in sessions[:STEP_BACK_SESSIONS]]
     if (len(recent) == STEP_BACK_SESSIONS and weight - increment > 0
-            and all(at_weight(s) and _last_set_reps(s) < rep_min for s in recent)):
+            and all(at_weight(s) and _last_set_reps(s, reading) < rep_min for s in recent)):
         return {"weight": round(weight - increment, 2),
                 "aim": range_middle_bottom(rep_min, rep_max),
                 "action": "step_back", "date": newest_date}
 
-    return {"weight": weight, "aim": clamp(last + 1), "action": "hold",
+    return {"weight": weight, "aim": clamp(last + aim_step), "action": "hold",
             "date": newest_date}
 
 

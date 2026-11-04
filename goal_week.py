@@ -13,6 +13,10 @@ docs/training/goal_system.md, steps 3-6, as approved on 2026-10-16:
   hip work, then the gate-1 main lifts, then goal B), up to 60 minutes, never
   with a heavy lift from the day before.
 - Every exercise has 3 working sets; 60 minutes is the target and 70 the limit.
+- **One exception to the core dose, his choice (WP-47, 2026-11-03: "Move
+  crossover to D")**: the reverse cable crossover runs Monday (A) and Friday
+  (D), so the rear delts' weekly dose counts the bonus day (BONUS_DOSE_AREAS);
+  it left Thursday (C) to make room for the farmer walk.
 
 Changing a pick means changing a card here; the week is then placed again by
 the rules, never by hand. `python scripts/draft_week.py` prints it.
@@ -41,14 +45,24 @@ REQUIRED = {
 }
 MINIMUMS = REQUIRED
 
+#: The areas whose weekly dose counts the bonus day (WP-47, his choice,
+#: 2026-11-03: "Move crossover to D", to keep session C under 70 minutes with
+#: the farmer walk in it). The core sessions alone check every other area; the
+#: whole week, the bonus day included, checks these too (WEEK_SPEC). With the
+#: bonus day missed, the rear delts get 3 of their 4 sets that week.
+BONUS_DOSE_AREAS = ("rear delts",)
+
 #: Every area on 2 or more days (step 3), with one exception: the hip flexors'
 #: 3 required sets are one appearance, so the core trains them on one day and
 #: the bonus gives the second (the daily psoas march works them too). APPROVED
 #: 2026-10-16 ("Approved all recommendations").
 MIN_DAYS = {"hip flexors": 1}
 
-SPEC = WeekSpec(days=CORE_DAYS, in_a_row=frozenset({("Mon", "Tue")}), minimums=REQUIRED,
+SPEC = WeekSpec(days=CORE_DAYS, in_a_row=frozenset({("Mon", "Tue")}),
+                minimums={a: n for a, n in REQUIRED.items() if a not in BONUS_DOSE_AREAS},
                 min_days=MIN_DAYS)
+#: The whole week, the bonus day included: every area's dose, these too.
+WEEK_SPEC = replace(SPEC, days=DAYS, minimums=REQUIRED)
 
 #: The press days: the right-shoulder release, then the Y raise (stopping 1-2
 #: reps short of failure there, approved 2026-10-16), straight before a press.
@@ -94,9 +108,17 @@ ROW = Card("Single-Arm DB Row", area="back", second="shoulder-blade muscles", re
 #: Both arms at once (his note, 2026-10-29: "Reverse cable cross over is now done
 #: with both arms. I found a machine for it"), so the rest is 45 s again. From
 #: 2026-10-22 it was one arm at a time ("can only be done single hand") with 15 s
-#: after both arms, because each arm rested while the other worked.
+#: after both arms, because each arm rested while the other worked. Monday in
+#: the core sessions and Friday in the bonus (WP-47, his choice, 2026-11-03:
+#: "Move crossover to D"): it left Thursday for the farmer walk (week()).
 CROSSOVER = Card("Reverse Cable Crossover", area="rear delts", reps=15, rest_seconds=45,
-                 equipment_type="cable", days=2)
+                 equipment_type="cable", fixed_days=("Mon",))
+#: The farmer walk (WP-47, 2026-11-03: "I want to add farmer walks into my
+#: program"; the goal "General Carrying strength."; "Id rather it in C - and by
+#: time more than distance."): a dumbbell in each hand, logged as the total; 3
+#: walks timed on a count-up stopwatch, 30-45 s (his "5. Yes"), at the end of C.
+FARMER = Card("Farmer Walk (DB)", area="carrying", type="hold", reps=None, hold_seconds=34,
+              rest_seconds=90, equipment_type="dumbbell", section="last", fixed_days=("Thu",))
 LATERAL = Card("Cable Lateral Raise", area="side delts", reps=15, rest_seconds=45, equipment_type="cable",
                laterality="unilateral", days=1)
 CRUNCH = Card("Lat-Pulldown Cable Crunch (Facing Away)", area="abs", reps=12, rest_seconds=60,
@@ -127,7 +149,8 @@ ADDUCTOR = Card("Adductor Machine (Seated)", area="adductors", reps=12, rest_sec
 
 #: The core cards: each runs on the days its areas need for the REQUIRED dose.
 CARDS = WARMUP + [RELEASE, Y_RAISE, SHOULDER_PRESS, CHEST_PRESS, HACK, LUNGE, RDL, BACK_EXT,
-                  ROW, CROSSOVER, LATERAL, ADDUCTOR, CRUNCH, REVERSE_CRUNCH, AIRPLANE, HIP_FLEXION]
+                  ROW, CROSSOVER, LATERAL, ADDUCTOR, CRUNCH, REVERSE_CRUNCH, AIRPLANE, HIP_FLEXION,
+                  FARMER]
 
 #: The drop order (approved 2026-10-16), as the bonus session reads it: goal A's
 #: priority areas, then the hip work, then the gate-1 main lifts, then goal B.
@@ -164,7 +187,8 @@ class Pick:
     """Why one exercise is in the block.
 
     goal       "A" (hips and back, the main goal), "B" (the press), "C"
-               (flexibility) or "warm-up"; several are comma-separated.
+               (flexibility), "D" (general carrying strength, his words of
+               2026-11-03) or "warm-up"; several are comma-separated.
     area, job  the step-2 area it trains, and its job there.
     reason     why this exercise, in plain words.
     source     where the pick came from: a tier-list file and the exercise's
@@ -301,6 +325,15 @@ PICKS: dict[str, Pick] = {
                "time (2026-10-22) against the reverse pec deck sideways, one arm (#18, S): not "
                "better for the same goal. Both arms at once (2026-10-29) is the form the list "
                "ranks, so the crossover stays"),
+    "Farmer Walk (DB)": Pick(
+        "D", "carrying", "strength",
+        "General carrying strength: a dumbbell in each hand, walked for 30-45 seconds, the "
+        "weight going up by his one rule in seconds.",
+        "his words, 2026-11-03: 'I want to add farmer walks into my program'; 'General "
+        "Carrying strength.'; 'Id rather it in C - and by time more than distance.'",
+        better="checked 2026-11-03: for carrying with both hands the farmer walk is the carry "
+               "itself; the suitcase carry (one hand, tier_lists/abs_sides.md #11, B) trains "
+               "the sides of the trunk, a different goal, so the farmer walk stays"),
     "Cable Lateral Raise": Pick(
         "B", "side delts", "strength and size",
         "Side delts, with tension at the stretch.",
@@ -416,6 +449,10 @@ def week() -> dict:
     warm = [replace(c, fixed_days=()) for c in WARMUP]
     block = [replace(c, fixed_days=()) for c in (RELEASE, Y_RAISE)]
     candidates = [replace(c, fixed_days=(), pattern="", rotation="")
-                  for c in BONUS_ORDER if c.name not in (RELEASE.name, Y_RAISE.name)]
+                  for c in BONUS_ORDER if c.name not in (RELEASE.name, Y_RAISE.name, CROSSOVER.name)]
     bonus = fill_bonus(core["Thu"], warm, candidates, block)
+    # The crossover's second day (WP-47, his choice: "Move crossover to D"): added
+    # after the fill, so the bonus keeps what it had and runs over the 60-minute
+    # target, never over the 70-minute limit.
+    bonus = bonus + [replace(CROSSOVER, fixed_days=())]
     return {**core, BONUS_DAY: bonus}

@@ -180,6 +180,8 @@ _UPPER_BODY_EXERCISES: tuple[str, ...] = (
     "Machine Chest Press",
     "Machine Shoulder Press",
     "Reverse Cable Crossover",
+    # A loaded carry (WP-47): grip and upper back hold the weight.
+    "Farmer Walk (DB)",
     "Cable Lateral Raise",
     "Neck Working Stretch (Right)",
     # The daily tendon session (WP-40, 2026-10-28). Active Hang is above.
@@ -695,6 +697,9 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Machine Chest Press":                    {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
     "Machine Shoulder Press":                 {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
     "Reverse Cable Crossover":                {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
+    # Grip, shoulders and upper back hold the dumbbells, the trunk holds the
+    # body still, the legs walk (WP-47).
+    "Farmer Walk (DB)":                       {"upper_body": 0.50, "core": 0.35, "lower_body": 0.15},
     "Cable Lateral Raise":                    {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00},
     "Neck Working Stretch (Right)":           {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00},
     "Lat-Pulldown Cable Crunch (Facing Away)": {"upper_body": 0.05, "core": 0.95, "lower_body": 0.00},
@@ -989,6 +994,9 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     # Single-joint and loaded: the isolation tier.
     "Single-Arm Cable Y Raise":                 ("isolation", 0.3),
     "Reverse Cable Crossover":                  ("isolation", 0.3),
+    # A loaded carry: two heavy dumbbells held by the grip and the upper back,
+    # the pull tier (WP-47).
+    "Farmer Walk (DB)":                         ("pull", 0.7),
     "Cable Lateral Raise":                      ("isolation", 0.3),
     "Seated Leg Curl":                          ("isolation", 0.3),
     "Adductor Machine (Seated)":                ("isolation", 0.3),

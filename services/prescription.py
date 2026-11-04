@@ -74,7 +74,8 @@ def seed_exercise(repo, ex: dict, *, streak_label: str, policy: dict, today: dat
     if not loaded:
         return Seed(previous, sess.bodyweight_entry(ex))
     history = None
-    if ex.get("rep_min") is not None and ex.get("rep_max") is not None:
+    if ((ex.get("rep_min") is not None and ex.get("rep_max") is not None)
+            or (ex.get("hold_min") is not None and ex.get("hold_max") is not None)):
         history = _read(lambda: repo.get_recent_session_sets(ex["name"]), default=[])
     step_block = None
     if history:

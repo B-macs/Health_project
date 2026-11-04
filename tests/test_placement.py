@@ -31,9 +31,17 @@ def test_the_three_core_sessions_break_no_rule():
 
 
 def test_the_core_reaches_every_required_number():
+    """Every area but the rear delts, whose second day is the bonus by his
+    choice (WP-47, 2026-11-03: "Move crossover to D"); the whole week reaches
+    theirs too."""
     total = pl.weekly_sets(CORE, gw.EXTRA_SETS)
     for area, minimum in gw.REQUIRED.items():
-        assert total.get(area, 0) >= minimum, area
+        if area not in gw.BONUS_DOSE_AREAS:
+            assert total.get(area, 0) >= minimum, area
+    week = pl.weekly_sets(WEEK, gw.EXTRA_SETS)
+    for area in gw.BONUS_DOSE_AREAS:
+        assert week.get(area, 0) >= gw.REQUIRED[area], area
+    assert gw.BONUS_DOSE_AREAS == ("rear delts",)
 
 
 def test_the_required_dose_is_the_approved_one():
@@ -134,7 +142,13 @@ def test_the_release_and_the_y_raise_come_straight_before_the_first_press():
 # ── the bonus ────────────────────────────────────────────────────────────────
 
 def test_the_bonus_stays_within_the_target():
-    assert pl.minutes(WEEK[gw.BONUS_DAY]) <= pl.SESSION_MINUTES_TARGET + 0.5
+    """The fill stays within 60 minutes; the crossover's second day is added
+    after it (WP-47, his choice: "Move crossover to D"), and the bonus stays
+    under the 70-minute limit."""
+    filled = [c for c in WEEK[gw.BONUS_DAY] if c.name != gw.CROSSOVER.name]
+    assert pl.minutes(filled) <= pl.SESSION_MINUTES_TARGET + 0.5
+    assert [c.name for c in WEEK[gw.BONUS_DAY]][-1] == gw.CROSSOVER.name
+    assert pl.minutes(WEEK[gw.BONUS_DAY]) <= pl.SESSION_MINUTES_LIMIT + 0.5
 
 
 def test_the_bonus_never_repeats_a_heavy_lift_from_the_day_before():
@@ -152,11 +166,14 @@ def test_the_bonus_follows_the_drop_order():
 
 def test_the_minimums_hold_without_the_bonus():
     """The 4th day is a bonus: nothing required depends on it — except the
-    hip flexors' second day, the one named exception (gw.MIN_DAYS, approved
-    2026-10-16)."""
+    hip flexors' second day (gw.MIN_DAYS, approved 2026-10-16) and the rear
+    delts' second day (gw.BONUS_DOSE_AREAS, his choice of 2026-11-03: "Move
+    crossover to D"), the two named exceptions."""
     total = pl.weekly_sets(CORE, gw.EXTRA_SETS)
-    assert all(total.get(a, 0) >= m for a, m in gw.REQUIRED.items())
+    assert all(total.get(a, 0) >= m for a, m in gw.REQUIRED.items()
+               if a not in gw.BONUS_DOSE_AREAS)
     assert set(gw.MIN_DAYS) == {"hip flexors"}
+    assert set(gw.BONUS_DOSE_AREAS) == {"rear delts"}
 
 
 def test_the_90_90_hip_lift_is_not_in_the_new_week():
