@@ -22,12 +22,13 @@ TWO KINDS OF PAIR.
 
 A pair reads "about even" when its two sides are less than EVEN_PCT apart.
 
-A LIFT UNDER THE BEGINNER STANDARD IS LEFT OUT and says why: for a man who
-trains it is almost always a weight logged another way (one side of a
-plate-loaded machine, plates without the sled, a stack number), and drawn it
-would make the pair's difference several hundred percent. The machine
-shoulder press was logged at 5-10 kg in October 2026, against a beginner
-standard of 32 kg.
+A LIFT UNDER THE BEGINNER STANDARD COUNTS LIKE ANY OTHER (the athlete,
+2026-11-04: "Stack number is the number on the machine, its really low I know,
+im suprised myself but again not suprised"). The first version left such a
+lift out, on the guess that its weight was logged another way; the machine
+shoulder press, at 5-10 kg against a beginner standard of about 31 kg, was the
+lift it hid. A difference of 100% or more reads in times ("4.6 times as
+strong"), which says the same as "360% stronger" in plainer words.
 
 Pure logic: no I/O, no clock. The caller reads the log, the scans and the body
 weight (insights_screens.strength).
@@ -142,7 +143,10 @@ def _row(key: str, left: str, right: str, a: float | None, b: float | None,
         words = f"About even: {pct:g}% apart."
     else:
         strong, weak = (left, right) if stronger == "left" else (right, left)
-        words = f"{strong} is {pct:g}% stronger than {weak.lower()}."
+        if pct >= 100.0:
+            words = f"{strong} is {pct / 100.0 + 1.0:.1f} times as strong as {weak.lower()}."
+        else:
+            words = f"{strong} is {pct:g}% stronger than {weak.lower()}."
     return {"key": key, "left": left, "right": right,
             "left_value": round(a, 1), "right_value": round(b, 1),
             "left_share": round(a / (a + b), 3), "stronger": stronger,
@@ -158,12 +162,6 @@ def muscle_pair(pair: MusclePair, observations: dict, body_weight_kg: float | No
             obs = observations.get(name)
             std = standard_kg(name, body_weight_kg) if body_weight_kg else None
             if obs is None or not std:
-                continue
-            floor = standard_kg(name, body_weight_kg, standards.LEVELS[0])
-            if floor and obs.e1rm < floor:
-                parts.append(f"{name}: one-rep max about {obs.e1rm:.0f} kg, under the beginner "
-                             f"standard ({floor:.0f} kg), so left out: check how this "
-                             "machine's weight is logged")
                 continue
             score = obs.e1rm / std * 100.0
             scores.append(score)

@@ -68,12 +68,18 @@ def test_under_ten_percent_apart_reads_about_even():
     assert pairs["chest_back"]["words"].startswith("About even")
 
 
-def test_a_lift_under_the_beginner_standard_is_left_out_and_says_why():
-    """The shoulder press logged at 5 kg would read the pair hundreds of percent apart."""
+def test_a_lift_under_the_beginner_standard_counts_like_any_other():
+    """His answer, 2026-11-04: the shoulder press's 5 kg is the number on the
+    machine. It is drawn, and a pair 100% or more apart reads in times."""
     pairs, _ = _pairs([_row("Machine Shoulder Press", 5.0), _row("Reverse Cable Crossover", 6.0, reps=15)])
     shoulders = pairs["front_rear_shoulder"]
-    assert shoulders["stronger"] is None and shoulders["left_share"] is None
-    assert any("under the beginner standard" in p for p in shoulders["parts"])
+    assert shoulders["stronger"] == "right" and shoulders["left_share"] < 0.5
+    assert shoulders["difference_pct"] >= 100
+    assert shoulders["words"] == (f"Rear shoulder is {shoulders['difference_pct'] / 100 + 1:.1f} "
+                                  "times as strong as front shoulder.")
+    assert not any("left out" in p for p in shoulders["parts"])
+    assert any(p.startswith("Machine Shoulder Press") and "of the standard" in p
+               for p in shoulders["parts"])
 
 
 def test_a_pair_without_data_says_so_and_draws_no_bar():
