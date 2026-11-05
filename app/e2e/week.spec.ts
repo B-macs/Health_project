@@ -207,6 +207,7 @@ test('the + menu offers yoga, an outdoor activity and the extra session, and is 
   await openTraining(page)
   await page.getByTestId('plus').click()
   await expect(page.getByTestId('extras-menu').getByRole('button')).toHaveText([S.extras.yoga, S.extras.outdoor, S.extras.accessory])
+  await expect(page.locator('.sheet')).toHaveCSS('position', 'fixed')
   await page.getByRole('button', { name: S.extras.close }).click()
   await startTraining(page)
   await expect(page.getByTestId('plus')).toHaveCount(0)

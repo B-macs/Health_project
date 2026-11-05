@@ -312,6 +312,45 @@ test('Settings offers the timer alerts: on an iPhone from the Home Screen only; 
   await expect(card.getByRole('status')).toHaveText(S.settings.alertsNotReady)
 })
 
+test('the options open over the page where the button was, and the next exercise opens at its top', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 700 })
+  await onboard(page)
+  await startTraining(page)
+  const inUse = page.getByRole('button', { name: S.session.inUse })
+  while (!(await inUse.count())) await tap(page)
+  const scrolled = () => page.locator('.scroller').evaluate((el) => el.scrollTop)
+  const name = () => page.locator('.exercise__name').innerText()
+
+  // Down the page to the button, as the athlete goes: the page stays where it is.
+  const pressDown = async (button: string) => {
+    const it = page.getByRole('button', { name: button, exact: true })
+    await it.scrollIntoViewIfNeeded()
+    const down = await scrolled()
+    expect(down).toBeGreaterThan(0)
+    await it.click()
+    expect(await scrolled()).toBe(down)
+  }
+
+  await pressDown(S.session.inUse)
+  const options = page.getByRole('dialog', { name: S.session.inUse })
+  await expect(page.locator('.sheet')).toHaveCSS('position', 'fixed')
+  for (const option of await options.getByRole('button').all()) await expect(option).toBeInViewport({ ratio: 1 })
+
+  const was = await name()
+  await options.getByRole('button', { name: S.session.doFirst('Made-up split squat') }).click()
+  await expect(options).toHaveCount(0)
+  await expect.poll(name).not.toBe(was)
+  await expect.poll(scrolled).toBe(0)
+
+  await pressDown(S.session.skip)
+  const skip = page.getByRole('dialog', { name: S.session.skip })
+  for (const option of await skip.getByRole('button').all()) await expect(option).toBeInViewport({ ratio: 1 })
+  const skipped = await name()
+  await skip.getByRole('button', { name: S.session.skipYes }).click()
+  await expect.poll(name).not.toBe(skipped)
+  await expect.poll(scrolled).toBe(0)
+})
+
 test('an app kill in the middle opens the session again at the same place, with its numbers', async ({ page }) => {
   await onboard(page)
   await startTraining(page)

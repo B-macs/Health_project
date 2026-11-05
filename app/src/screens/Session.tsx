@@ -33,6 +33,7 @@ import { S } from '../strings'
 import { EQUIPMENT, type EquipmentAnswer } from './SettingsEquipment'
 import { clock, useWakeLock } from '../ui/hooks'
 import { IconCheck, IconClose, IconPause, IconPlay } from '../ui/icons'
+import { Sheet } from '../ui/Sheet'
 
 const HOLD_AUTO_MS = 700
 const REST_AUTO_MS = 900
@@ -382,8 +383,7 @@ export function ReplaceForm({ lift, day, onBack, onUse }: {
     }
   }
   return (
-    <section className="card group" role="dialog" aria-label={S.session.replaceTitle} data-testid="replace">
-      <h2 className="eyebrow">{S.session.replaceTitle}</h2>
+    <div className="group" data-testid="replace">
       <p className="caption">{S.session.replaceWhat(lift)}</p>
       <input className="field" type="text" aria-label={S.session.replaceName} placeholder={S.session.replaceName}
         value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
@@ -399,9 +399,14 @@ export function ReplaceForm({ lift, day, onBack, onUse }: {
         <button className="btn btn--primary" disabled={busy || !name.trim() || !chosen}
           onClick={() => void add()}>{S.session.replaceAdd}</button>
       </div>
-    </section>
+    </div>
   )
 }
+
+/** What each question of the session is called on its sheet. */
+const ASK_TITLE = {
+  busy: S.session.inUse, replace: S.session.replaceTitle, skip: S.session.skip, exit: S.session.exit,
+} as const
 
 export function backLabel(s: TrainingState): string {
   const target = backTarget(s)
@@ -433,9 +438,19 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
   // restart ring again).
   const handled = useRef<Timer | null>(null)
   const held = useWakeLock(true)
-  const [asking, setAsking] = useState<'exit' | 'skip' | 'busy' | 'replace' | null>(null)
+  const [asking, setAsking] = useState<keyof typeof ASK_TITLE | null>(null)
   const [pulling, setPulling] = useState(false)
   const { ctx, alerts } = useApp()
+  const root = useRef<HTMLDivElement>(null)
+
+  /** A choice on a sheet. The sheet opens over the page wherever it is scrolled to (the owner,
+   *  2026-11-05: "I shouldnt have to scroll back up"), so the exercise the choice leads to
+   *  opens at the top of the page. */
+  const choose = (f: () => void) => {
+    setAsking(null)
+    f()
+    root.current?.closest('.scroller')?.scrollTo?.(0, 0)
+  }
 
   // The timer alerts (lib/alerts.ts): as the app goes to the background with a countdown
   // running, ask for an alert at its end; when the app comes back, cancel it.
@@ -573,7 +588,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
   }
 
   return (
-    <div className={`screen train ${resting ? 'train--rest' : 'train--hold'}`} data-step={s.step}
+    <div ref={root} className={`screen train ${resting ? 'train--rest' : 'train--hold'}`} data-step={s.step}
       onPointerDown={() => {
         unlockAudio()
         reportAudioOnce((detail) => debugLog('audio', detail))
@@ -590,56 +605,54 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
       <SessionHeader s={s} />
       {s.notice && <p className="note" role="status" data-testid="notice">{s.notice}</p>}
 
-      {asking === 'busy' && (
-        <section className="card group" role="dialog" aria-label={S.session.inUse} data-testid="in-use">
-          {swaps.length > 0 && <p>{S.session.swapAsk}</p>}
-          {swaps.map((a) => (
-            <button key={a.name} className="btn btn--glass btn--wide" onClick={() => {
-              setAsking(null)
-              update((x) => swapTo(x, a))
-            }}>{S.session.swapFor(a.name)}</button>
-          ))}
-          {target && (
-            <button className="btn btn--glass btn--wide" data-testid="replace-open"
-              onClick={() => setAsking('replace')}>{S.session.replaceOpen}</button>
+      {asking && (
+        <Sheet title={ASK_TITLE[asking]} closeLabel={S.session.close} onClose={() => setAsking(null)}>
+          {asking === 'busy' && (
+            <div className="group" data-testid="in-use">
+              {swaps.length > 0 && <p>{S.session.swapAsk}</p>}
+              {swaps.map((a) => (
+                <button key={a.name} className="btn btn--glass btn--wide"
+                  onClick={() => choose(() => update((x) => swapTo(x, a)))}>{S.session.swapFor(a.name)}</button>
+              ))}
+              {target && (
+                <button className="btn btn--glass btn--wide" data-testid="replace-open"
+                  onClick={() => setAsking('replace')}>{S.session.replaceOpen}</button>
+              )}
+              {candidates.length > 0 && <p>{S.session.doFirstAsk}</p>}
+              {candidates.map((c) => (
+                <button key={c.group} className="btn btn--glass btn--wide"
+                  onClick={() => choose(() => update((x) => doFirst(x, c.group)))}>{S.session.doFirst(c.exercise.name)}</button>
+              ))}
+              <button className="btn btn--primary btn--wide" onClick={() => setAsking(null)}>{S.session.keepOrder}</button>
+            </div>
           )}
-          {candidates.length > 0 && <p>{S.session.doFirstAsk}</p>}
-          {candidates.map((c) => (
-            <button key={c.group} className="btn btn--glass btn--wide" onClick={() => {
-              setAsking(null)
-              update((x) => doFirst(x, c.group))
-            }}>{S.session.doFirst(c.exercise.name)}</button>
-          ))}
-          <button className="btn btn--primary btn--wide" onClick={() => setAsking(null)}>{S.session.keepOrder}</button>
-        </section>
-      )}
 
-      {asking === 'replace' && target && (
-        <ReplaceForm lift={target} day={s.plan.date} onBack={() => setAsking('busy')}
-          onUse={(alt) => {
-            setAsking(null)
-            if (alt) update((x) => swapTo(x, alt))
-          }} />
-      )}
-
-      {(asking === 'exit' || asking === 'skip') && (
-        <section className="card group" role="alertdialog" aria-label={asking === 'exit' ? S.session.exit : S.session.skip}>
-          <p>{asking === 'exit' ? S.session.exitAsk : S.session.skipAsk}</p>
-          {asking === 'exit' && onLeave && (
-            <button className="btn btn--glass btn--wide" data-testid="leave-for-now" onClick={() => {
-              setAsking(null)
-              onLeave()
-            }}>{S.session.leaveForNow}</button>
+          {asking === 'replace' && target && (
+            <ReplaceForm lift={target} day={s.plan.date} onBack={() => setAsking('busy')}
+              onUse={(alt) => choose(() => {
+                if (alt) update((x) => swapTo(x, alt))
+              })} />
           )}
-          <div className="pair">
-            <button className="btn btn--glass" onClick={() => setAsking(null)}>{S.session.keep}</button>
-            <button className="btn btn--primary" onClick={() => {
-              setAsking(null)
-              if (asking === 'exit') onExit()
-              else move((x) => skip(x))
-            }}>{asking === 'exit' ? S.session.discard : S.session.skipYes}</button>
-          </div>
-        </section>
+
+          {(asking === 'exit' || asking === 'skip') && (
+            <div className="group">
+              <p>{asking === 'exit' ? S.session.exitAsk : S.session.skipAsk}</p>
+              {asking === 'exit' && onLeave && (
+                <button className="btn btn--glass btn--wide" data-testid="leave-for-now" onClick={() => {
+                  setAsking(null)
+                  onLeave()
+                }}>{S.session.leaveForNow}</button>
+              )}
+              <div className="pair">
+                <button className="btn btn--glass" onClick={() => setAsking(null)}>{S.session.keep}</button>
+                <button className="btn btn--primary" onClick={() => choose(() => {
+                  if (asking === 'exit') onExit()
+                  else move((x) => skip(x))
+                })}>{asking === 'exit' ? S.session.discard : S.session.skipYes}</button>
+              </div>
+            </div>
+          )}
+        </Sheet>
       )}
 
       <section className="card exercise">

@@ -185,7 +185,8 @@ ul {
   gap: var(--sp-m);
 }
 
-.screen > :not(.sky) {
+/* A sheet stays out of this rule: it covers the screen wherever the page is scrolled to. */
+.screen > :not(.sky, .sheet) {
   position: relative;
   z-index: 1;
 }
