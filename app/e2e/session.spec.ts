@@ -321,9 +321,10 @@ test('the options open over the page where the button was, and the next exercise
   const scrolled = () => page.locator('.scroller').evaluate((el) => el.scrollTop)
   const name = () => page.locator('.exercise__name').innerText()
 
-  // Down the page to the button, as the athlete goes: the page stays where it is.
+  // From down the page, as the athlete may be: the page stays where it is.
   const pressDown = async (button: string) => {
     const it = page.getByRole('button', { name: button, exact: true })
+    await page.locator('.scroller').evaluate((el) => el.scrollTo(0, el.scrollHeight))
     await it.scrollIntoViewIfNeeded()
     const down = await scrolled()
     expect(down).toBeGreaterThan(0)
@@ -349,6 +350,23 @@ test('the options open over the page where the button was, and the next exercise
   await skip.getByRole('button', { name: S.session.skipYes }).click()
   await expect.poll(name).not.toBe(skipped)
   await expect.poll(scrolled).toBe(0)
+})
+
+test('Skip and "In use?" sit right under the main buttons, on the first screen of a phone', async ({ page }) => {
+  // The owner, 2026-11-07: at the foot of the page the skip went unseen. Checked at the
+  // full screen of the profile's iPhone 17 Pro Max (440 x 956), as a Home Screen app has it.
+  await page.setViewportSize({ width: 440, height: 956 })
+  await onboard(page)
+  await startTraining(page)
+  const inUse = page.getByRole('button', { name: S.session.inUse })
+  while (!(await inUse.count())) await tap(page)
+  const atTop = () => page.locator('.scroller').evaluate((el) => el.scrollTo(0, 0))
+  await atTop()
+  await expect(page.getByTestId('skip')).toBeInViewport({ ratio: 1 })
+  await expect(inUse).toBeInViewport({ ratio: 1 })
+  await tap(page)
+  await atTop()
+  await expect(page.getByTestId('skip')).toBeInViewport({ ratio: 1 })
 })
 
 test('an app kill in the middle opens the session again at the same place, with its numbers', async ({ page }) => {

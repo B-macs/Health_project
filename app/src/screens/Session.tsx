@@ -517,6 +517,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
   const candidates = !resting && !t ? doFirstCandidates(s) : []
   const swaps = !resting && !t ? swapCandidates(s) : []
   const target = !resting && !t ? replaceTarget(s) : null
+  const inUse = candidates.length > 0 || swaps.length > 0 || !!target
   const ended = t && hasEnded(t, now)
   // A hold with a slow start (WP-40): its first seconds count the slow start down, then the
   // hold runs its own seconds; the bar fills over the hold only.
@@ -758,6 +759,16 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
         </button>
       </div>
 
+      {/* Right under the main buttons (the owner, 2026-11-07: "I didnt have that choice when I
+          was just before the aductor exercise"): at the foot of the page, under the note, the
+          skip went unseen and the adductor's three sets were tapped through as done. */}
+      <div className={inUse ? 'pair' : 'group'}>
+        <button className="btn btn--glass" data-testid="skip" onClick={() => setAsking('skip')}>{S.session.skip}</button>
+        {inUse && (
+          <button className="btn btn--glass" data-testid="in-use-open" onClick={() => setAsking('busy')}>{S.session.inUse}</button>
+        )}
+      </div>
+
       <section className="card next">
         <div className="eyebrow">{S.session.next}</div>
         <div className="next__main">{nextText(s, 1) ?? S.session.lastOne}</div>
@@ -787,11 +798,6 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
         <Field key={`note-${ex.index}`} className="field" type="text" initial={s.notes[ex.index] ?? ''}
           onValue={(v) => update((x) => setNote(x, ex.index, v))} />
       </label>
-
-      <button className="btn btn--glass btn--wide" onClick={() => setAsking('skip')}>{S.session.skip}</button>
-      {(candidates.length > 0 || swaps.length > 0 || target) && (
-        <button className="btn btn--glass btn--wide" onClick={() => setAsking('busy')}>{S.session.inUse}</button>
-      )}
     </div>
   )
 }
