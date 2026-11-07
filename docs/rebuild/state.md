@@ -4,7 +4,9 @@
 
 
 ## Now
-**2026-11-07, his note ("I didnt have that choice when I was just before the aductor exercise"):** Skip and "In use?" now sit in one row right under the session's main buttons; at the foot of the page the skip went unseen. Live as Worker 44f97567 (from 5bf1c06), phone app only. **Open:** his answer on removing the three adductor sets of 2026-11-06 (tapped through at 08:30:01-06, stored as done), and on the farmer walk's third set (logged 4 s after the second); his check on the iPhone.
+**2026-11-07, his second note ("there was no option to go to farmer walk"):** at the adductor machine "In use? Do another first" offered nothing, because every item of the end section never moves and the farmer walk is one of them since WP-47. `goal_week.MOVES_EARLIER` lets the farmer walk move; its place at the end of C, the abs and the hip work are unchanged. Engine revision 40 (`health-engine-00040-t2h`, from e0b8770), engine only. He did every exercise of 11-06: the adductor after the farmer walk, its three sets stored first at the app's numbers (15 x 22.5 kg) and the walk's third set saved late, so nothing is removed. **Open:** whether the adductor's stored numbers are what he did; his check on the iPhone.
+
+**2026-11-07, his note ("I didnt have that choice when I was just before the aductor exercise"):** Skip and "In use?" now sit in one row right under the session's main buttons; at the foot of the page the skip went unseen. Live as Worker 44f97567 (from 5bf1c06), phone app only. **Open:** his check on the iPhone (the adductor sets and the farmer walk: see the entry above).
 
 **2026-11-05, his note from a session:** the session's questions ("In use?", "Another machine or free weight", Skip, Leave) open as a sheet over the page, not near the top of it, and a choice that leads to another exercise opens it at the top of the page. The "+" menu had the same fault and is fixed by the same rule (`.screen > :not(.sky, .sheet)`). Live as Worker b101ef1c (from 69bb47f), phone app only. **Open:** his check on the iPhone.
 
