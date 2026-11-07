@@ -4,6 +4,8 @@
 
 
 ## Now
+**2026-11-07, his note ("I didnt have that choice when I was just before the aductor exercise"):** Skip and "In use?" now sit in one row right under the session's main buttons; at the foot of the page the skip went unseen. Live as Worker 44f97567 (from 5bf1c06), phone app only. **Open:** his answer on removing the three adductor sets of 2026-11-06 (tapped through at 08:30:01-06, stored as done), and on the farmer walk's third set (logged 4 s after the second); his check on the iPhone.
+
 **2026-11-05, his note from a session:** the session's questions ("In use?", "Another machine or free weight", Skip, Leave) open as a sheet over the page, not near the top of it, and a choice that leads to another exercise opens it at the top of the page. The "+" menu had the same fault and is fixed by the same rule (`.screen > :not(.sky, .sheet)`). Live as Worker b101ef1c (from 69bb47f), phone app only. **Open:** his check on the iPhone.
 
 **2026-11-04, WP-47, his answer "Move crossover to D":** the farmer walk ends session C (3 walks of 30-45 s on the count-up stopwatch, the weight by his one rule in seconds), and the reverse cable crossover runs Monday and Friday, so the rear delts' weekly dose counts the bonus day (`goal_week.BONUS_DOSE_AREAS`). Engine only. **Question 6 answered the same day** (*"Stack number is the number on the machine, its really low I know"*): the machine shoulder press counts at that number, so Strength › Muscle balance draws the front/rear shoulder pair (on his log: rear shoulder 4.8 times as strong as front shoulder), and a pair 100% or more apart reads in times. Engine revision 39 (`health-engine-00039-lx4`, from 15ad7d4), engine only. **Open:** his headphone test of Held and File, his iPhone checks.
