@@ -119,6 +119,13 @@ CROSSOVER = Card("Reverse Cable Crossover", area="rear delts", reps=15, rest_sec
 #: walks timed on a count-up stopwatch, 30-45 s (his "5. Yes"), at the end of C.
 FARMER = Card("Farmer Walk (DB)", area="carrying", type="hold", reps=None, hold_seconds=34,
               rest_seconds=90, equipment_type="dumbbell", section="last", fixed_days=("Thu",))
+#: The items at the end of a session that may still run earlier when a machine is
+#: in use ("In use? Do another first", services/session_order). The farmer walk
+#: ends C by his choice, but it is no abs or hip work, which stay at the end
+#: (2026-11-07, his note from the adductor machine on 11-06: "the only option was
+#: to train the same muscle using a different exercise there was no option to go
+#: to farmer walk").
+MOVES_EARLIER = (FARMER.name,)
 LATERAL = Card("Cable Lateral Raise", area="side delts", reps=15, rest_seconds=45, equipment_type="cable",
                laterality="unilateral", days=1)
 CRUNCH = Card("Lat-Pulldown Cable Crunch (Facing Away)", area="abs", reps=12, rest_seconds=60,

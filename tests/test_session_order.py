@@ -37,6 +37,22 @@ def test_the_warm_up_the_press_lead_in_and_the_end_of_the_session_never_move():
         assert a[name]["movable"], name
 
 
+def test_the_farmer_walk_may_run_before_the_adductor_machine():
+    """2026-11-07, his note from the adductor machine on 11-06: "the only option was
+    to train the same muscle using a different exercise there was no option to go to
+    farmer walk". The farmer walk keeps its place at the end of C and may run earlier;
+    the hip airplane after it still never moves."""
+    c = _by_name("C")
+    order = list(c)
+    assert order.index("Adductor Machine (Seated)") < order.index("Farmer Walk (DB)")
+    assert c["Farmer Walk (DB)"]["movable"] and c["Farmer Walk (DB)"]["after"] == []
+    assert c["Adductor Machine (Seated)"]["movable"]
+    assert not c["Hip Airplane (Weighted)"]["movable"]
+    # Only the farmer walk leaves the end's rule: the abs and the hip work stay.
+    import goal_week as gw
+    assert gw.MOVES_EARLIER == ("Farmer Walk (DB)",)
+
+
 def test_a_press_runs_only_after_the_release_and_the_y_raise():
     for letter in ("A", "C"):
         moves = _by_name(letter)

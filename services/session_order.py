@@ -20,6 +20,9 @@ over goal_week's cards):
   run only after them (`after`): they run straight before the first press;
 - the abs and hip work at the end ("last") never move: the abs are trained to
   failure at the end of the session;
+- the farmer walk at the end of C moves (goal_week.MOVES_EARLIER, 2026-11-07,
+  his note: "there was no option to go to farmer walk"): it keeps its place at
+  the end, and runs earlier only when he picks it;
 - a timed test never moves: a measurement keeps its place;
 - every other lift ("main") moves.
 An exercise no card names (the accessory session, an older block) does not
@@ -40,10 +43,13 @@ MOVABLE = "main"
 
 
 def block_sections() -> dict[str, tuple[str, bool]]:
-    """{exercise name: (section, is a press)} from the 12-week block's cards."""
+    """{exercise name: (section, is a press)} from the 12-week block's cards. An
+    item at the end that may run earlier (goal_week.MOVES_EARLIER) reads as a lift
+    that moves; its place in the session is placement.order's, unchanged."""
     import goal_week as gw  # the cards hold each exercise's section (placement.order)
     cards = list(gw.WARMUP) + list(gw.CARDS) + list(gw.BONUS_ORDER)
-    return {c.name: (c.section, bool(c.is_press)) for c in cards}
+    earlier = set(gw.MOVES_EARLIER)
+    return {c.name: (MOVABLE if c.name in earlier else c.section, bool(c.is_press)) for c in cards}
 
 
 def alternatives_for(name: str) -> list[dict]:
