@@ -160,9 +160,9 @@ def get_daily(today: date = Depends(local_today),
 @router.get("/api/training/egym", response_model=SessionPlanOut)
 def get_egym(today: date = Depends(local_today),
              repo: Repository = Depends(get_repository)) -> dict:
-    """The EGYM circuit (the "+" menu, 2026-11-08): two rounds of the gym's
-    fourteen EGYM machines, each set's tonnage typed from the machine. Offered
-    on every day: it is extra to the plan day."""
+    """The EGYM session (the "+" menu, 2026-11-08): the gym's fourteen EGYM
+    machines, two sets one after the other on each, each set's tonnage typed
+    from the machine. Offered on every day: it is extra to the plan day."""
     return _session(lambda: tsession.egym_plan(repo, today))
 
 

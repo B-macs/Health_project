@@ -18,7 +18,7 @@ import { useApp } from '../lib/appState'
 import { KEYS } from '../db/schema'
 import { enqueue } from '../lib/outbox'
 import {
-  asksLength, circuitTonnage, clockMinutes, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
+  asksLength, clockMinutes, egymTonnage, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { IconCheck } from '../ui/icons'
@@ -65,10 +65,10 @@ function Review({ s }: { s: TrainingState }) {
   )
 }
 
-/** The EGYM circuit's review (2026-11-08): each machine's tonnage, round 1 and round 2 as
- *  typed from the EGYM screen, the two added, and the whole circuit. */
+/** The EGYM session's review (2026-11-08): each machine's tonnage, set by set as typed from
+ *  the EGYM screen, the sets added, and the whole session. */
 function TonnageReview({ s }: { s: TrainingState }) {
-  const t = circuitTonnage(s)
+  const t = egymTonnage(s)
   return (
     <section className="card group" aria-label={S.session.tonnageTitle} data-testid="tonnage-review">
       <h2 className="eyebrow">{S.session.tonnageTitle}</h2>
@@ -76,7 +76,7 @@ function TonnageReview({ s }: { s: TrainingState }) {
         {t.machines.map((m) => (
           <li key={m.name} className="group" data-testid="tonnage-line">
             <span className="kv"><span>{m.name}</span><span className="num">{S.session.tonnageKg(m.total)}</span></span>
-            <span className="caption">{S.session.tonnageRounds(S.session.tonnageKg(m.rounds[0] ?? null), S.session.tonnageKg(m.rounds[1] ?? null))}</span>
+            <span className="caption">{S.session.tonnageSets(m.sets.map((v) => S.session.tonnageKg(v)))}</span>
           </li>
         ))}
       </ul>
@@ -226,7 +226,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
   // The daily tendon session (WP-40): like the accessory session, it is not the training
   // day, so it never marks the day trained.
   const daily = s.plan.kind === 'daily'
-  // The EGYM circuit (2026-11-08): extra to the plan day, so it never marks the day trained.
+  // The EGYM session (2026-11-08): extra to the plan day, so it never marks the day trained.
   const egym = s.plan.kind === 'egym'
   const extra = accessory || daily || egym
   // The slider starts at 5, and on the accessory and daily sessions at their own effort target.

@@ -12,9 +12,9 @@
 // - Accessory (T104-T108): the short second session the engine chooses from the strain by
 //   body area. It runs in the same guided flow as the plan session and saves as its own
 //   kind, so it never marks a plan day as done.
-// - EGYM circuit (2026-11-08): two rounds of the gym's fourteen EGYM machines; each set's
-//   tonnage is typed from the machine. The same guided flow; round 2 follows the order of
-//   round 1 (the engine's move groups). It never marks a plan day as done.
+// - EGYM session (2026-11-08): the gym's fourteen EGYM machines, two sets one after the
+//   other on each; each set's tonnage is typed from the machine. The same guided flow; any
+//   machine can run next when one is in use. It never marks a plan day as done.
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
 import type { components } from '../generated/api'
@@ -359,9 +359,9 @@ export function AccessoryOverview() {
   )
 }
 
-// ── The EGYM circuit ─────────────────────────────────────────────────────────
+// ── The EGYM session ─────────────────────────────────────────────────────────
 
-/** The EGYM circuit before Start (2026-11-08): the machines in the order the engine sends,
+/** The EGYM session before Start (2026-11-08): the machines in the order the engine sends,
  *  the note, and Start. Start hands it to the same guided flow as the plan session. */
 export function EgymOverview() {
   const { store, ctx, go } = useApp()
@@ -370,8 +370,7 @@ export function EgymOverview() {
   const [starting, setStarting] = useState(false)
   const today = localDay()
   const plan = view.data && view.data.date === today && view.data.kind === 'egym' ? view.data : null
-  // One round's machines, in order: round 2 runs the same machines.
-  const round = plan ? plan.exercises.filter((e, i, all) => all.findIndex((x) => x.name === e.name) === i) : []
+  const machines = plan?.exercises ?? []
   const start = async () => {
     if (!plan || starting) return
     setStarting(true)
@@ -388,7 +387,7 @@ export function EgymOverview() {
     <div className="screen train" data-testid="egym">
       <div className="sky" aria-hidden="true" />
       <Head title={plan?.objective || S.extras.egym} back={S.nav.training} onBack={() => go('/training/day')}
-        caption={plan ? S.extras.egymMeta(round.length, plan.model_minutes) : undefined} />
+        caption={plan ? S.extras.egymMeta(machines.length, machines[0]?.sets ?? 0, plan.model_minutes) : undefined} />
       <Freshness view={view} />
       {busy && <p className="alert" data-testid="egym-blocked">{S.extras.egymBlocked}</p>}
       {!plan ? (
@@ -399,7 +398,7 @@ export function EgymOverview() {
           <section className="card group" aria-label={S.extras.egymOrder}>
             <h2 className="eyebrow">{S.extras.egymOrder}</h2>
             <ol className="list" data-testid="egym-order">
-              {round.map((e, i) => <li key={e.name}><span className="num">{i + 1}</span> · {e.name}</li>)}
+              {machines.map((e, i) => <li key={e.name}><span className="num">{i + 1}</span> · {e.name}</li>)}
             </ol>
           </section>
           <div className="pair">

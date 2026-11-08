@@ -1,4 +1,4 @@
-"""The EGYM circuit (2026-11-08) — the fourth item of the Training tab's "+" menu.
+"""The EGYM session (2026-11-08) — the fourth item of the Training tab's "+" menu.
 
 The athlete, 2026-11-08: "I want to be able to do a egym circuit at any time in
 training by pressing the plus button at the top right of the training, it is a
@@ -12,11 +12,18 @@ different machines, so keep them apart", "round two always follows round one
 same", "the weight doesn't change, all your recording is tonnage", "add it to
 the weekly tonnage".
 
-WHAT RUNS. His gym's fourteen EGYM machines, two rounds, one set on each
-machine in each round. EGYM sets the weight from its own strength test and
-counts the set; the app records the one number the machine shows at the end of
-the set, the tonnage (reps x kg in the Classic method, where the weight is the
-same for the whole set). The app prescribes no weight and no reps.
+NOT A CIRCUIT ANY MORE (the same day, after the first build): "Unfortunately it
+can't be a circuit because of the current usage; I will have to do both sets
+just after each other". The first build ran two rounds of one set, round 2 in
+the order of round 1 (commit 3209e2f); it is now two sets back to back on each
+machine, and the machine order is still his to change.
+
+WHAT RUNS. His gym's fourteen EGYM machines, two sets on each machine, one
+after the other (SETS, REST_SECONDS). EGYM sets the weight from its own
+strength test and counts the set; the app records the one number the machine
+shows at the end of each set, the tonnage (reps x kg in the Classic method,
+where the weight is the same for the whole set). The app prescribes no weight
+and no reps.
 
 HOW A TONNAGE IS STORED. Each set is one rep at the tonnage, in kg: the stored
 set's reps x weight IS the tonnage, so every reader of the log's work —
@@ -27,12 +34,11 @@ so no 1RM is ever estimated from "1 rep at 1,240 kg" (tests/test_egym_circuit.py
 
 THE ORDER. Lower and upper body take turns, so each muscle rests; the biggest
 machines come first and the core comes last, as in the 12-week block. He may
-change it in round 1; round 2 then follows the order he used in round 1
-(services/egym_session.move_groups).
+run any machine next when one is in use (services/egym_session.move_groups).
 
 THE THREE LAYERS, the "+" session's pattern (services/accessory.py):
 
-    egym_circuit.py             WHAT  — the machines, the rounds, the records
+    egym_circuit.py             WHAT  — the machines, the sets, the records
         |
     services/egym_session.py    WHICH — the moves, the time, the last tonnage
         |
@@ -49,12 +55,15 @@ from goal_week import Pick
 from training_plan import _ex
 
 #: The session's name on the menu and the overview.
-OBJECTIVE = "EGYM circuit"
-PHASE = "EGYM — Circuit"
+OBJECTIVE = "EGYM session"
+PHASE = "EGYM — Machines"
 #: The session rating the save screen starts at.
 RPE_TARGET = 6
-#: Two rounds, one set on each machine in each round.
-ROUNDS = 2
+#: Two sets on each machine, one after the other.
+SETS = 2
+#: The rest between the two sets: the phone's rest timer, which a tap on "Next
+#: set" ends at once. His words: "both sets just after each other".
+REST_SECONDS = 60
 #: One EGYM set, in seconds: 15 reps at 2 s up and 2 s down, EGYM's own
 #: program (knowledge.egym.com, training programs, read 2026-11-08). The time
 #: model's only use of it (services/egym_session.modelled_seconds).
@@ -66,11 +75,11 @@ _TAIL = ("Log in with your wristband and use the Classic method. At the end of t
 
 
 def _machine(name: str, position: str, focus: str) -> dict:
-    """One machine: a one-set entry whose single "rep" carries the tonnage."""
+    """One machine: two sets, each set's single "rep" carrying its tonnage."""
     ex = _ex(
         name=name,
         ex_type="reps",
-        sets=1, reps=1, rest_seconds=0,
+        sets=SETS, reps=1, rest_seconds=REST_SECONDS,
         mechanics=f"{position} {_TAIL}",
         biomechanical_focus=focus,
         progression="EGYM sets the weight from its own strength test.",
@@ -147,7 +156,7 @@ ABDOMINAL_CRUNCH = _machine(
     "the hips.",
     "Abs, trunk curl; last, as the abs are in the block.")
 
-#: The suggested order of one round.
+#: The suggested order.
 MACHINES: tuple[dict, ...] = (
     SQUAT, LAT_PULLDOWN, LEG_CURL, CHEST_PRESS, LEG_PRESS, ROW, GLUTE_PRESS, TRICEPS_DIP,
     LEG_EXTENSION, BICEPS_CURL, HIP_ABDUCTOR, HIP_ADDUCTOR, BACK_EXTENSION, ABDOMINAL_CRUNCH,
@@ -155,9 +164,8 @@ MACHINES: tuple[dict, ...] = (
 
 
 def entries() -> list[dict]:
-    """The session's entries in order: round 1, then round 2 in the same order,
-    each a fresh copy (one object runs in both rounds)."""
-    return [dict(ex) for _ in range(ROUNDS) for ex in MACHINES]
+    """The session's entries in order, one per machine, each a fresh copy."""
+    return [dict(ex) for ex in MACHINES]
 
 
 def names() -> tuple[str, ...]:
@@ -172,36 +180,38 @@ TONNAGE_ONLY: frozenset[str] = frozenset(names())
 
 #: The session note, shown on the overview before Start and stored with the session.
 NOTE = (
-    "Two rounds, one set on each machine. Log in with your wristband and use the Classic "
-    "method, so the tonnage is exact. After each set, type the tonnage the screen shows. "
-    "In round 1 you can change the order; round 2 follows the order you used."
+    "Two sets on each machine, one after the other. Log in with your wristband and use the "
+    "Classic method, so the tonnage is exact. After each set, type the tonnage the screen "
+    "shows. When a machine is in use, do another first."
 )
 
 
 # ─── The workflow record — no exercise enters by copying (Key Rule 25) ───────
 
 _SOURCE = ("his words, 2026-11-08: 'Above are the EGYM Machines, in my gym, I want to be able "
-           "to do a egym circuit at any time in training'")
-_BETTER = ("checked 2026-11-08: the circuit is his gym's EGYM line, so a better exercise "
+           "to do a egym circuit at any time in training'; 'I will have to do both sets just "
+           "after each other'")
+_BETTER = ("checked 2026-11-08: the session is his gym's EGYM line, so a better exercise "
            "can only be another EGYM machine; he named all fourteen")
 
-#: goal "egym": the extra full-body circuit on his gym's EGYM machines.
+#: goal "egym": the extra full-body session on his gym's EGYM machines.
 EGYM_PICKS: dict[str, Pick] = {
-    ex["name"]: Pick("egym", area, "one set a round, Classic", reason, _SOURCE, better=_BETTER)
+    ex["name"]: Pick("egym", area, "two sets back to back, Classic", reason, _SOURCE,
+                     better=_BETTER)
     for ex, area, reason in (
-        (SQUAT, "quads and glutes", "His gym's EGYM squat; the circuit's biggest lift, first."),
-        (LAT_PULLDOWN, "lats", "The circuit's vertical pull."),
-        (LEG_CURL, "hamstrings", "The circuit's knee bend for the back of the thigh."),
-        (CHEST_PRESS, "chest", "The circuit's horizontal press."),
-        (LEG_PRESS, "quads and glutes", "The circuit's second leg press pattern."),
-        (ROW, "mid-back", "The circuit's horizontal pull."),
-        (GLUTE_PRESS, "glutes", "The circuit's hip extension."),
-        (TRICEPS_DIP, "triceps", "The circuit's arm press; he keeps it (answer 4, 2026-11-08)."),
-        (LEG_EXTENSION, "quads", "The circuit's knee straightening."),
-        (BICEPS_CURL, "biceps", "The circuit's arm curl."),
-        (HIP_ABDUCTOR, "outer hip", "The circuit's hip opening."),
-        (HIP_ADDUCTOR, "inner thigh", "The circuit's hip closing."),
-        (BACK_EXTENSION, "back extensors", "The circuit's back extension."),
-        (ABDOMINAL_CRUNCH, "abs", "The circuit's trunk curl, last."),
+        (SQUAT, "quads and glutes", "His gym's EGYM squat; the session's biggest lift, first."),
+        (LAT_PULLDOWN, "lats", "The session's vertical pull."),
+        (LEG_CURL, "hamstrings", "The session's knee bend for the back of the thigh."),
+        (CHEST_PRESS, "chest", "The session's horizontal press."),
+        (LEG_PRESS, "quads and glutes", "The session's second leg press pattern."),
+        (ROW, "mid-back", "The session's horizontal pull."),
+        (GLUTE_PRESS, "glutes", "The session's hip extension."),
+        (TRICEPS_DIP, "triceps", "The session's arm press; he keeps it (answer 4, 2026-11-08)."),
+        (LEG_EXTENSION, "quads", "The session's knee straightening."),
+        (BICEPS_CURL, "biceps", "The session's arm curl."),
+        (HIP_ABDUCTOR, "outer hip", "The session's hip opening."),
+        (HIP_ADDUCTOR, "inner thigh", "The session's hip closing."),
+        (BACK_EXTENSION, "back extensors", "The session's back extension."),
+        (ABDOMINAL_CRUNCH, "abs", "The session's trunk curl, last."),
     )
 }

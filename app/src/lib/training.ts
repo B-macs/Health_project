@@ -246,6 +246,7 @@ export function advance(s: TrainingState, now: number): TrainingState {
   const step = currentStep(s)
   if (!step) return s
   const sets = structuredClone(s.sets)
+  let nextLive = s.live
   let firstSetAt = s.firstSetAt
   let lastSetAt = s.lastSetAt
   if (step.rest_ends) {
@@ -269,12 +270,17 @@ export function advance(s: TrainingState, now: number): TrainingState {
     }
     const rows = (sets[step.ex_idx] ?? []).filter((r) => r.set_num !== record.set_num)
     sets[step.ex_idx] = [...rows, record]
+    // An EGYM set's tonnage is that set's own number: the next set starts empty, so the
+    // same number is never saved twice by a tap on Done.
+    if (ex.tonnage_entry) {
+      nextLive = { ...s.live, [step.ex_idx]: { ...live, right: { ...live.right, weight_kg: null } } }
+    }
   }
   if (step.event === 'complete') {
     firstSetAt ??= now
     lastSetAt = now
   }
-  return { ...s, history: remember(s), step: s.step + 1, sets, firstSetAt, lastSetAt, notice: null }
+  return { ...s, history: remember(s), step: s.step + 1, sets, live: nextLive, firstSetAt, lastSetAt, notice: null }
 }
 
 /** The watch's answer for a walk or run (T75), kept with the session. */
@@ -408,53 +414,31 @@ export function swapTo(s: TrainingState, alt: Alternative): TrainingState {
 }
 
 /** Run `group` now (WP-27): its steps move, in one block, in front of the group the flow is
- *  on, which then comes straight after it. A group the engine marked as the mirror of the
- *  moved one (`mirror_of`: the EGYM circuit's round 2, 2026-11-08) moves the same way, in
- *  front of the mirror of the group the flow is on. Back undoes the move. */
+ *  on, which then comes straight after it. Back undoes the move. */
 export function doFirst(s: TrainingState, group: number): TrainingState {
   const steps = s.plan.steps
   const moving = steps.filter((st, i) => i >= s.step && groupOf(s, st.ex_idx)?.group === group)
   if (!moving.length) return s
-  const here = groupOf(s, steps[s.step]?.ex_idx ?? -1)?.group
   const rest = steps.filter((st, i) => !(i >= s.step && groupOf(s, st.ex_idx)?.group === group))
-  let order = [...rest.slice(0, s.step), ...moving, ...rest.slice(s.step)]
-  const mirror = (g: number | undefined) =>
-    g == null ? undefined : s.plan.exercises.find((e) => e.move?.mirror_of === g)?.move?.group
-  const [mg, mh] = [mirror(group), mirror(here)]
-  if (mg != null && mh != null) order = moveBefore(s, order, mg, mh)
-  const next = renumbered(order)
+  const next = renumbered([...rest.slice(0, s.step), ...moving, ...rest.slice(s.step)])
   return { ...s, history: remember(s), plan: { ...s.plan, steps: next }, timer: null, notice: null }
 }
 
-/** `group`'s steps moved, in one block, to just in front of `before`'s first step; the order
- *  unchanged when either is not ahead of the flow. */
-function moveBefore(s: TrainingState, steps: FlowStep[], group: number, before: number): FlowStep[] {
-  const inGroup = (st: FlowStep, g: number) => groupOf(s, st.ex_idx)?.group === g
-  const ahead = (g: number) => steps.every((st, i) => !inGroup(st, g) || i > s.step)
-  if (!ahead(group) || !ahead(before)) return steps
-  const moving = steps.filter((st) => inGroup(st, group))
-  const rest = steps.filter((st) => !inGroup(st, group))
-  const at = rest.findIndex((st) => inGroup(st, before))
-  return moving.length && at >= 0 ? [...rest.slice(0, at), ...moving, ...rest.slice(at)] : steps
-}
-
-/** The EGYM circuit's tonnage as typed (2026-11-08): each machine, in the order of round 1 as
- *  run, with each round's tonnage (null when skipped or not reached) and the two added; and
- *  the circuit's total. The numbers are the owner's own, read from the EGYM screen. */
-export function circuitTonnage(s: TrainingState): {
-  machines: { name: string; rounds: (number | null)[]; total: number }[]
+/** The EGYM session's tonnage as typed (2026-11-08): each machine in the order run, with each
+ *  set's tonnage (null when skipped or not reached) and the sets added; and the session's
+ *  total. The numbers are the owner's own, read from the EGYM screen. */
+export function egymTonnage(s: TrainingState): {
+  machines: { name: string; sets: (number | null)[]; total: number }[]
   total: number
 } {
-  const byName = new Map<string, (number | null)[]>()
-  for (const i of exerciseOrder(s)) {
-    const ex = s.plan.exercises[i]
-    if (!ex.tonnage_entry) continue
-    const kg = (s.sets[i] ?? [])[0]?.right?.weight_kg
-    byName.set(ex.name, [...(byName.get(ex.name) ?? []), typeof kg === 'number' ? kg : null])
-  }
-  const machines = [...byName].map(([name, rounds]) => ({
-    name, rounds, total: rounds.reduce<number>((a, b) => a + (b ?? 0), 0),
-  }))
+  const machines = exerciseOrder(s).map((i) => s.plan.exercises[i]).filter((ex) => ex.tonnage_entry).map((ex) => {
+    const rows = s.sets[ex.index] ?? []
+    const sets = Array.from({ length: ex.sets ?? 1 }, (_, n) => {
+      const kg = rows.find((r) => r.set_num === n + 1)?.right?.weight_kg
+      return typeof kg === 'number' ? kg : null
+    })
+    return { name: ex.name, sets, total: sets.reduce<number>((a, b) => a + (b ?? 0), 0) }
+  })
   return { machines, total: machines.reduce((a, m) => a + m.total, 0) }
 }
 

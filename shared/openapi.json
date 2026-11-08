@@ -1499,7 +1499,7 @@
         "type": "object"
       },
       "ExerciseMove": {
-        "description": "Which exercises move together when a machine is busy (WP-27,\nservices/session_order.move_groups): the phone moves whole groups of the\nwalked steps. A group runs only after every group in `after`. A group\nwith `mirror_of` moves the same way as that group (the EGYM circuit's\nround 2 follows round 1, services/egym_session.move_groups): when that\ngroup runs before another, this one runs before the other's mirror.",
+        "description": "Which exercises move together when a machine is busy (WP-27,\nservices/session_order.move_groups): the phone moves whole groups of the\nwalked steps. A group runs only after every group in `after`.",
         "properties": {
           "after": {
             "items": {
@@ -1511,17 +1511,6 @@
           "group": {
             "title": "Group",
             "type": "integer"
-          },
-          "mirror_of": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Mirror Of"
           },
           "movable": {
             "title": "Movable",
@@ -6157,7 +6146,7 @@
         "type": "object"
       },
       "SessionPlanOut": {
-        "description": "`kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym\n(the EGYM circuit, 2026-11-08).",
+        "description": "`kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym\n(the EGYM session, 2026-11-08).",
         "properties": {
           "adaptation": {
             "$ref": "#/components/schemas/Adaptation"
@@ -12791,7 +12780,7 @@
     },
     "/api/training/egym": {
       "get": {
-        "description": "The EGYM circuit (the \"+\" menu, 2026-11-08): two rounds of the gym's\nfourteen EGYM machines, each set's tonnage typed from the machine. Offered\non every day: it is extra to the plan day.",
+        "description": "The EGYM session (the \"+\" menu, 2026-11-08): the gym's fourteen EGYM\nmachines, two sets one after the other on each, each set's tonnage typed\nfrom the machine. Offered on every day: it is extra to the plan day.",
         "operationId": "get_egym_api_training_egym_get",
         "parameters": [
           {

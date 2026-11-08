@@ -62,8 +62,7 @@
       "move": {
         "group": 0,
         "movable": false,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -116,8 +115,7 @@
       "move": {
         "group": 1,
         "movable": false,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -173,8 +171,7 @@
       "move": {
         "group": 2,
         "movable": true,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -227,8 +224,7 @@
       "move": {
         "group": 3,
         "movable": true,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -275,8 +271,7 @@
       "move": {
         "group": 4,
         "movable": true,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -323,8 +318,7 @@
       "move": {
         "group": 5,
         "movable": false,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -377,8 +371,7 @@
       "move": {
         "group": 6,
         "movable": true,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -425,8 +418,7 @@
       "move": {
         "group": 7,
         "movable": false,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -476,8 +468,7 @@
       "move": {
         "group": 8,
         "movable": true,
-        "after": [],
-        "mirror_of": null
+        "after": []
       },
       "reading": null,
       "lead_in_seconds": null,
@@ -1067,8 +1058,7 @@
           "move": {
             "group": 2,
             "movable": true,
-            "after": [],
-            "mirror_of": null
+            "after": []
           },
           "reading": null,
           "lead_in_seconds": null,

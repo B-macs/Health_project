@@ -1,10 +1,12 @@
-"""The EGYM circuit (2026-11-08): egym_circuit.py (WHAT) and
+"""The EGYM session (2026-11-08): egym_circuit.py (WHAT) and
 services/egym_session.py (WHICH).
 
-The athlete, 2026-11-08: "it is a two round circuit, I should be presented a
-order but I can change it up as I please, The numbers I calculate at the end is
-the tonage that I do per exercise", then "All I want to add in is the tonnage",
-"round two always follows round one", "add it to the weekly tonnage".
+The athlete, 2026-11-08: "I should be presented a order but I can change it up
+as I please, The numbers I calculate at the end is the tonage that I do per
+exercise", then "All I want to add in is the tonnage", "add it to the weekly
+tonnage", and after the first build: "Unfortunately it can't be a circuit
+because of the current usage; I will have to do both sets just after each
+other".
 """
 from __future__ import annotations
 
@@ -24,21 +26,22 @@ N = len(ec.MACHINES)
 
 # ─── What runs ───────────────────────────────────────────────────────────────
 
-def test_the_circuit_is_his_fourteen_machines_in_two_rounds_of_the_same_order():
-    assert N == 14 and ec.ROUNDS == 2
+def test_the_session_is_his_fourteen_machines_once_each_in_order():
+    """"it can't be a circuit": each machine once, its two sets together."""
+    assert N == 14 and ec.SETS == 2
     entries = ec.entries()
-    assert len(entries) == 28
-    names = [e["name"] for e in entries]
-    assert names[:N] == names[N:] == list(ec.names())
+    assert [e["name"] for e in entries] == list(ec.names())
     assert len(set(ec.names())) == N
 
 
-def test_every_entry_is_one_set_that_records_a_tonnage_only():
-    """"I don't want to add in the sets and reps. All I want to add in is the
-    tonnage": one set, one "rep" that carries the tonnage, no rest timer."""
+def test_every_machine_is_two_sets_back_to_back_that_record_a_tonnage_only():
+    """"All I want to add in is the tonnage", "both sets just after each other":
+    two sets, each one "rep" that carries the set's tonnage, a short rest
+    between them that a tap ends."""
     for ex in ec.entries():
-        assert ex["type"] == "reps" and ex["sets"] == 1 and ex["reps"] == 1, ex["name"]
-        assert ex["rest_seconds"] == 0 and ex["tonnage_entry"] is True, ex["name"]
+        assert ex["type"] == "reps" and ex["sets"] == 2 and ex["reps"] == 1, ex["name"]
+        assert ex["rest_seconds"] == ec.REST_SECONDS == 60, ex["name"]
+        assert ex["tonnage_entry"] is True, ex["name"]
         assert ex["equipment_type"] is None, "no weight stepper: EGYM sets the weight"
 
 
@@ -115,76 +118,68 @@ def test_the_circuit_is_extra_and_a_logged_day():
 
 # ─── The order ───────────────────────────────────────────────────────────────
 
-def test_round_2_runs_after_round_1_and_mirrors_it():
-    """"if I switch them around in round one, then in round two, they should be
-    the same": each round-2 group mirrors its round-1 machine."""
+def test_any_machine_may_run_next():
+    """"I can change it up as I please": every machine its own group, none
+    waiting on another; a move takes both its sets."""
     moves = egs.move_groups(ec.entries())
-    assert [m["group"] for m in moves] == list(range(28))
-    assert all(m["movable"] for m in moves)
-    for i, m in enumerate(moves):
-        if i < N:
-            assert m["after"] == [] and m["mirror_of"] is None
-        else:
-            assert m["after"] == list(range(N)) and m["mirror_of"] == i - N
+    assert moves == [{"group": i, "movable": True, "after": []} for i in range(N)]
 
 
-def test_the_round_and_its_label():
-    assert egs.round_of(0) == 1 and egs.round_of(N - 1) == 1 and egs.round_of(N) == 2
-    assert egs.prescription(0) == "Round 1 of 2" and egs.prescription(27) == "Round 2 of 2"
+def test_the_label_under_each_machine():
+    assert egs.prescription() == "2 sets, one after the other"
 
 
-def test_the_circuit_models_at_about_eighty_minutes():
-    """28 EGYM sets of 60 s and his measured change to a gym station before each:
-    a full session, not a short extra (he: "it's a full session, I understand that")."""
-    assert 75 <= egs.modelled_minutes(ec.entries()) <= 85
+def test_the_session_models_at_about_seventy_minutes():
+    """28 EGYM sets of 60 s, a minute's rest between a machine's sets and his
+    measured change to a gym station before each machine: a full session."""
+    assert 65 <= egs.modelled_minutes(ec.entries()) <= 73
 
 
 # ─── The tonnage ─────────────────────────────────────────────────────────────
 
-def _row(name, day, kg, ts, session="2026-11-09-egym0001", kind=egs.EGYM_TYPE):
-    sets = [] if kg is None else [{"set_num": 1, "reps": 1, "weight": kg, "rest": 0, "tut": 0,
-                                   "velocity": "controlled", "ts": ts}]
-    return {"session_id": session, "session_date": day, "movement_name": name,
-            "movement_type": kind, "sets": sets}
+def _row(name, day, sets, session="2026-11-09-egym0001", kind=egs.EGYM_TYPE):
+    """A stored machine: each set one rep at its tonnage."""
+    return {"session_id": session, "session_date": day, "movement_name": name, "movement_type": kind,
+            "sets": [{"set_num": n, "reps": 1, "weight": kg, "rest": 60, "tut": 0,
+                      "velocity": "controlled", "ts": ts} for n, (kg, ts) in enumerate(sets, start=1)]}
 
 
-def test_the_last_circuit_gives_each_machine_its_tonnage_round_by_round():
+def test_the_last_session_gives_each_machine_its_tonnage_set_by_set():
     rows = [
-        _row("EGYM Squat", "2026-11-02", 900, "2026-11-02T08:00:00+01:00", session="old"),
-        _row("EGYM Squat", "2026-11-09", 1300, "2026-11-09T08:40:00+01:00"),
-        _row("EGYM Squat", "2026-11-09", 1240, "2026-11-09T08:00:00+01:00"),
-        _row("EGYM Row", "2026-11-09", None, ""),
-        _row("EGYM Row", "2026-11-09", 800, "2026-11-09T08:10:00+01:00"),
-        _row("Machine Chest Press", "2026-11-10", 60, "2026-11-10T08:00:00+01:00", kind="Push"),
+        _row("EGYM Squat", "2026-11-02", [(900, "2026-11-02T08:00:00+01:00")], session="old"),
+        _row("EGYM Squat", "2026-11-09", [(1240, "2026-11-09T08:00:00+01:00"),
+                                          (1300, "2026-11-09T08:02:00+01:00")]),
+        _row("EGYM Row", "2026-11-09", []),
+        _row("Machine Chest Press", "2026-11-10", [(60, "2026-11-10T08:00:00+01:00")], kind="Push"),
     ]
     last = egs.last_tonnage(rows, date(2026, 11, 10))
-    assert last["EGYM Squat"] == [1240.0, 1300.0]
-    assert last["EGYM Row"] == [800.0, None], "a skipped entry goes last"
-    assert "Machine Chest Press" not in last
-    assert egs.last_tonnage(rows, date(2026, 11, 5))["EGYM Squat"] == [900.0]
+    assert last == {"EGYM Squat": [1240.0, 1300.0]}, "a skipped machine has no line"
+    assert egs.last_tonnage(rows, date(2026, 11, 5)) == {"EGYM Squat": [900.0]}
     assert egs.last_tonnage([], date(2026, 11, 5)) == {}
 
 
-def test_the_caption_reads_the_last_tonnage():
-    assert egs.tonnage_caption(1240.0) == "Last time 1,240 kg"
-    assert egs.tonnage_caption(None) == ""
+def test_the_caption_reads_the_last_tonnage_set_by_set():
+    assert egs.tonnage_caption([1240.0, 1300.0]) == "Last time 1,240 kg and 1,300 kg"
+    assert egs.tonnage_caption([900.0]) == "Last time 900 kg"
+    assert egs.tonnage_caption(None) == "" and egs.tonnage_caption([]) == ""
 
 
 def test_the_weekly_tonnage_counts_the_typed_tonnage():
     """"Yeah, add it to the weekly tonnage": a stored set is one rep at the tonnage."""
-    rows = [_row("EGYM Squat", "2026-11-09", 1240, "2026-11-09T08:00:00+01:00"),
-            _row("EGYM Lat Pulldown", "2026-11-09", 700, "2026-11-09T08:05:00+01:00")]
+    rows = [_row("EGYM Squat", "2026-11-09", [(1240, "2026-11-09T08:00:00+01:00"),
+                                              (1300, "2026-11-09T08:02:00+01:00")]),
+            _row("EGYM Lat Pulldown", "2026-11-09", [(700, "2026-11-09T08:05:00+01:00")])]
     series, unmapped = tonnage.weekly_tonnage(rows, tc.EXERCISE_BODY_REGION,
                                               today=date(2026, 11, 9), weeks=1, traits={})
     assert not unmapped
     week = series[-1]
-    assert week.sectors["lower_body"].kg == pytest.approx(1240)
+    assert week.sectors["lower_body"].kg == pytest.approx(2540)
     assert week.sectors["upper_body"].kg == pytest.approx(700)
 
 
 def test_no_strength_reader_reads_a_tonnage_as_a_lift():
     """"1 rep at 1,240 kg" is a tonnage: it must never give a 1RM."""
-    rows = [{**_row("EGYM Squat", "2026-11-09", 1240, "2026-11-09T08:00:00+01:00"),
+    rows = [{**_row("EGYM Squat", "2026-11-09", [(1240, "2026-11-09T08:00:00+01:00")]),
              "exercise_rpe": None, "session_rpe": 6}]
     assert list(strength.qualifying_rows(rows, date(2026, 11, 9))) == []
     assert strength.best_observations(rows, today=date(2026, 11, 9)) == {}

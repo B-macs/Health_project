@@ -687,9 +687,9 @@ export interface paths {
         };
         /**
          * Get Egym
-         * @description The EGYM circuit (the "+" menu, 2026-11-08): two rounds of the gym's
-         *     fourteen EGYM machines, each set's tonnage typed from the machine. Offered
-         *     on every day: it is extra to the plan day.
+         * @description The EGYM session (the "+" menu, 2026-11-08): the gym's fourteen EGYM
+         *     machines, two sets one after the other on each, each set's tonnage typed
+         *     from the machine. Offered on every day: it is extra to the plan day.
          */
         get: operations["get_egym_api_training_egym_get"];
         put?: never;
@@ -1508,18 +1508,13 @@ export interface components {
          * ExerciseMove
          * @description Which exercises move together when a machine is busy (WP-27,
          *     services/session_order.move_groups): the phone moves whole groups of the
-         *     walked steps. A group runs only after every group in `after`. A group
-         *     with `mirror_of` moves the same way as that group (the EGYM circuit's
-         *     round 2 follows round 1, services/egym_session.move_groups): when that
-         *     group runs before another, this one runs before the other's mirror.
+         *     walked steps. A group runs only after every group in `after`.
          */
         ExerciseMove: {
             /** After */
             after: number[];
             /** Group */
             group: number;
-            /** Mirror Of */
-            mirror_of?: number | null;
             /** Movable */
             movable: boolean;
         };
@@ -3039,7 +3034,7 @@ export interface components {
         /**
          * SessionPlanOut
          * @description `kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym
-         *     (the EGYM circuit, 2026-11-08).
+         *     (the EGYM session, 2026-11-08).
          */
         SessionPlanOut: {
             adaptation: components["schemas"]["Adaptation"];

@@ -185,10 +185,11 @@ def build_daily() -> dict:
 
 
 def build_egym() -> dict:
-    """The EGYM circuit as the engine sends it (2026-11-08): its own entries
-    (egym_circuit.py, machine names only), each shaped by training_session.
-    exercise_out with its round, its move group and a made-up last tonnage on
-    the first machine, walked and timed as training_session.egym_plan does."""
+    """The EGYM session as the engine sends it (2026-11-08): its own entries
+    (egym_circuit.py, machine names only, two sets each), each shaped by
+    training_session.exercise_out with its move group and a made-up last
+    tonnage on the first machine, walked and timed as training_session.
+    egym_plan does."""
     from healthapi.schemas_training import SessionPlanOut
     from services import egym_session as egs
     from services import guided_flow
@@ -200,9 +201,9 @@ def build_egym() -> dict:
     out = []
     for i, ex in enumerate(exercises):
         row = ts.exercise_out(ex, i, None, None, (None, None), False, moves[i])
-        out.append({**row, "prescription": egs.prescription(i), "reps_editable": False,
-                    "previous_caption": egs.tonnage_caption(1240.0) if i == 0 else "",
-                    "estimated_minutes": 1})
+        out.append({**row, "prescription": egs.prescription(), "reps_editable": False,
+                    "previous_caption": egs.tonnage_caption([1240.0, 1300.0]) if i == 0 else "",
+                    "estimated_minutes": 2})
     plan = {
         "kind": "egym", "date": DAY, "day_num": None, "plan_days": None,
         "objective": egs.ec.OBJECTIVE, "phase": egs.ec.PHASE, "rpe_target": egs.ec.RPE_TARGET,

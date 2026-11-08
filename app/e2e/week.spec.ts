@@ -294,9 +294,10 @@ test('the extra session runs in the same flow and saves as its own kind, with it
   await expect(page.getByRole('heading', { name: S.today.title })).toBeVisible()
 })
 
-test('the EGYM circuit asks only for each set’s tonnage, round 2 follows round 1, and the end shows each machine’s tonnage', async ({ page, context }) => {
-  // The owner, 2026-11-08: "All I want to add in is the tonnage", "round two always follows
-  // round one", and "The numbers I calculate at the end is the tonage that I do per exercise".
+test('the EGYM session asks only for each set\u2019s tonnage, runs both sets of a machine together, and the end shows each machine\u2019s tonnage', async ({ page, context }) => {
+  // The owner, 2026-11-08: "All I want to add in is the tonnage", "I will have to do both
+  // sets just after each other", and "The numbers I calculate at the end is the tonage that
+  // I do per exercise".
   const tag = `e2e-egym-${Date.now()}`
   await onboard(page)
   await scenario(context, tag)
@@ -306,29 +307,43 @@ test('the EGYM circuit asks only for each set’s tonnage, round 2 follows round
   await expect(page.getByTestId('egym-order').getByRole('listitem')).toHaveCount(14)
   await page.getByRole('button', { name: S.extras.start }).click()
   await expect(page.locator('.exercise__name')).toHaveText('EGYM Squat')
-  await expect(page.getByText('Last time 1,240 kg')).toBeVisible()
+  await expect(page.getByText('Last time 1,240 kg and 1,300 kg')).toBeVisible()
   const done = page.getByRole('button', { name: S.session.tonnageDone, exact: true })
-  await expect(done).toBeDisabled()                                   // no tonnage typed yet
   const field = page.getByTestId('tonnage').getByRole('spinbutton')
+  await expect(done).toBeDisabled()                                   // no tonnage typed yet
   await field.fill('1240')
   await done.click()
-  // Round 1: the row now, before the pulldown; round 2 then runs in the same order.
+  await expect(page.locator('[data-step="1"]')).toBeVisible()         // the rest between the sets
+  await page.getByRole('button', { name: S.session.nextSet, exact: true }).click()
+  await expect(page.locator('[data-step="2"]')).toBeVisible()         // set 2 of the squat
+  await expect(page.locator('.exercise__name')).toHaveText('EGYM Squat')
+  await expect(field).toHaveValue('')                                 // set 2 starts empty
+  await expect(done).toBeDisabled()
+  await field.fill('1300')
+  await done.click()
+  // A machine in use: the row now, both its sets, before the pulldown.
+  await expect(page.locator('[data-step="3"]')).toBeVisible()
   await expect(page.locator('.exercise__name')).toHaveText('EGYM Lat Pulldown')
   await page.getByTestId('in-use-open').click()
   await page.getByRole('button', { name: S.session.doFirst('EGYM Row') }).click()
   await expect(page.locator('.exercise__name')).toHaveText('EGYM Row')
   const order: string[] = []
-  for (let i = 1; i < 28; i += 1) {
+  for (let i = 3; i < 42; i += 1) {
     await expect(page.locator(`[data-step="${i}"]`)).toBeVisible()   // the next entry is drawn
+    if (await page.locator('.train--rest').count()) {
+      await page.getByRole('button', { name: S.session.nextSet, exact: true }).click()
+      continue
+    }
     order.push((await page.locator('.exercise__name').textContent()) ?? '')
-    await page.getByTestId('tonnage').getByRole('spinbutton').fill(String(100 + i))
-    await page.getByRole('button', { name: S.session.tonnageDone, exact: true }).click()
+    await field.fill(String(100 + i))
+    await done.click()
   }
-  expect(order.slice(13, 16)).toEqual(['EGYM Squat', 'EGYM Row', 'EGYM Lat Pulldown'])
+  expect(order.slice(0, 4)).toEqual(['EGYM Row', 'EGYM Row', 'EGYM Lat Pulldown', 'EGYM Lat Pulldown'])
   await expect(page.getByTestId('tonnage-review')).toBeVisible()
   await expect(page.getByTestId('tonnage-line')).toHaveCount(14)
   await expect(page.getByTestId('tonnage-line').first()).toContainText('EGYM Squat')
-  await expect(page.getByTestId('tonnage-line').first()).toContainText(S.session.tonnageRounds('1,240 kg', '114 kg'))
+  await expect(page.getByTestId('tonnage-line').first()).toContainText(S.session.tonnageSets(['1,240 kg', '1,300 kg']))
+  await expect(page.getByTestId('tonnage-line').first()).toContainText('2,540 kg')
   await expect(page.getByText(S.session.egymEffortHelp)).toBeVisible()
   await page.getByRole('textbox', { name: S.session.sessionNotes }).fill(tag)
   await page.getByRole('button', { name: S.session.save }).click()
@@ -339,8 +354,8 @@ test('the EGYM circuit asks only for each set’s tonnage, round 2 follows round
   await expect.poll(async () => (await stored()).length, { timeout: 30_000 }).toBe(1)
   const [body] = await stored()
   expect(body.kind).toBe('egym')
-  expect(body.exercises).toHaveLength(28)
-  expect(body.exercises[0].raw_sets[0].right).toMatchObject({ reps: 1, weight_kg: 1240 })
+  expect(body.exercises).toHaveLength(14)
+  expect(body.exercises[0].raw_sets.map((r) => r.right.weight_kg)).toEqual([1240, 1300])
   await page.getByRole('button', { name: S.session.done }).click()
   await expect(page.getByRole('heading', { name: S.today.title })).toBeVisible()
 })
