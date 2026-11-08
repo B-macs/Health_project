@@ -997,7 +997,9 @@ be registered before.
   session, and his rule of 2026-08-07 is that a retest is never the morning
   after leg work; Sunday morning follows Saturday's rest. The 12-week
   flexibility retest runs on three Sunday mornings (three mornings before a
-  number counts).
+  number counts). **Changed 2026-11-08**: weeks 1 and 2 only, and no test
+  after them in the block (*"I dont want another test until im finished the
+  12 week block"*); the next retest is after the block.
 - **The rib and pelvis test** (finding #7's test from 2026-10-05, never scored):
   in week 1 and week 12, on the test Sunday morning (*"Yes"* — his answer read
   "Yes skip", taken as yes and flagged to him).
@@ -1062,8 +1064,10 @@ number two is correct"*).
    90/90 rotations with lift-offs (with the right-side cue), the triangle side
    split — built from the prescription and the exercise library, not copied.
 3. **Test days.** The timed plank test in weeks 1 and 12, in place of session
-   A's abs. The flexibility retest on the Sunday mornings of weeks 1-3, cold
-   and first. The rib and pelvis test in weeks 1 and 12, after the retest
+   A's abs. The flexibility retest on the Sunday mornings of weeks 1 and 2,
+   cold and first (weeks 1-3 until 2026-11-08, his rule that day: *"I dont
+   want another test until im finished the 12 week block"*; the week 1
+   morning ran on 2026-10-25, the week 2 morning was not done). The rib and pelvis test in weeks 1 and 12, after the retest
    (the retest's own rule: passive work loosens tissue, and the Thomas test is
    passive). With the plank test session A models 73 minutes; he kept the
    walking lunge (answer 1 below).

@@ -66,12 +66,16 @@ START = date(2026, 10, 19)
 #: The timed plank test (session A, in place of that day's abs): week 1 and
 #: week 12.
 TEST_WEEKS = (1, 12)
-#: The flexibility retest: three Sunday mornings, before the session, so the
-#: day-to-day spread is known before a number counts.
-FLEX_RETEST_WEEKS = (1, 2, 3)
+#: The flexibility retest: the Sunday mornings of weeks 1 and 2, before the
+#: session. It was three mornings (weeks 1-3), so the day-to-day spread was
+#: known before a number counts; week 3's morning (2026-11-08) is out on his
+#: rule of that day: "I dont want another test until im finished the 12 week
+#: block". The next retest is after the block (cluster_a_prescription.
+#: RETEST_INTERVAL_DAYS from the last reading, 2026-10-25, is 2027-01-17).
+FLEX_RETEST_WEEKS = (1, 2)
 #: The flexibility reading the Sunday session is prescribed for: the battery of
 #: 2026-08-12 read pattern D (the adductors with the knees bent). The retest in
-#: weeks 1-3 reads it again; a different pattern brings its own stack.
+#: weeks 1-2 reads it again; a different pattern brings its own stack.
 FLEX_PATTERN = "D"
 #: The stage-2 limit on the session's own rating (rules.STAGE_CONSTRAINTS).
 SESSION_RPE_TARGET = 8
@@ -831,9 +835,10 @@ PLANK_TEST = [
 # save_session_readings): one store, so Insights › Flexibility reads them. When
 # the battery has its answer, the phone skips the tests left (the engine's
 # answer, POST /api/training/flexibility-check): a reading below a failing slot
-# cannot be interpreted. The three Sunday mornings of weeks 1-3 are his answer
-# of 2026-10-16 ("Sunday morning before"); Sunday follows Saturday's rest, so a
-# retest is never the morning after leg work (his rule, 2026-08-07).
+# cannot be interpreted. The Sunday mornings are his answer of 2026-10-16
+# ("Sunday morning before"); Sunday follows Saturday's rest, so a retest is
+# never the morning after leg work (his rule, 2026-08-07). Weeks 1 and 2 only
+# since 2026-11-08 (FLEX_RETEST_WEEKS): no test after them in the block.
 
 #: Each test's share of the retest's 20 minutes.
 FLEX_TEST_MINUTES = 3

@@ -409,10 +409,11 @@ PICKS: dict[str, Pick] = {
         better="a measurement: the protocol stays the same, so week 1 and week 12 compare"),
     **{name: Pick(
         "C", "the flexibility skills", "measurement",
-        "One test of the 12-week flexibility retest, on three Sunday mornings, so the "
-        "day-to-day spread is known before a number counts; one reading per entry (WP-33).",
-        "his answers, 2026-10-14 ('three mornings once'), 2026-10-16 ('Sunday morning before') "
-        "and 2026-10-26 ('Always split a retest into its individual items')",
+        "One test of the 12-week flexibility retest, on the Sunday mornings of weeks 1 and 2; "
+        "no test after them in the block; one reading per entry (WP-33).",
+        "his answers, 2026-10-14 ('three mornings once'), 2026-10-16 ('Sunday morning before'), "
+        "2026-10-26 ('Always split a retest into its individual items') and 2026-11-08 "
+        "('I dont want another test until im finished the 12 week block')",
         better="a measurement: the battery's own protocol")
        for name in _flexibility_test_names()},
     **{name: Pick(
@@ -421,7 +422,7 @@ PICKS: dict[str, Pick] = {
         "adductors with the knees bent).",
         "cluster_a_prescription.py, pattern D, from the flexibility battery of 2026-08-12",
         better="checked 2026-10-16: the prescription chooses the stack from the battery's "
-               "pattern; the retest in weeks 1-3 reads the pattern again, and a new pattern "
+               "pattern; the retest in weeks 1-2 reads the pattern again, and a new pattern "
                "brings its own stack")
        for i, name in enumerate((
            "Tailor's pose, unloaded", "Frog rocks", "Butterfly PIR",

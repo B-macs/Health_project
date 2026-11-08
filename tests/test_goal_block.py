@@ -440,6 +440,18 @@ def test_the_sunday_tests_run_first_and_in_a_fixed_order():
         assert names[len(want):] == _names(gb.FLEX_STACK), week
 
 
+def test_no_flexibility_test_after_week_2():
+    """His rule, 2026-11-08: "I dont want another test until im finished the 12
+    week block". Week 3's Sunday (2026-11-08) was the third retest morning; the
+    retest now runs in weeks 1 and 2 only, and no Sunday after them names a
+    test of the battery."""
+    assert gb.FLEX_RETEST_WEEKS == (1, 2)
+    for week in range(3, gb.WEEKS + 1):
+        sunday = PLAN[week * 7]
+        assert not any(e.get("battery_test") for e in sunday["exercises"]), week
+        assert "test morning" not in sunday["objective"], week
+
+
 def test_the_rib_and_pelvis_test_is_not_in_the_block():
     """Removed on his note of 2026-10-26 (WP-34): "it was not requested and its
     explanation is unclear"."""
