@@ -18,12 +18,19 @@ just after each other". The first build ran two rounds of one set, round 2 in
 the order of round 1 (commit 3209e2f); it is now two sets back to back on each
 machine, and the machine order is still his to change.
 
+AUTO MODE ON EVERY MACHINE (his answers, the same day: "Yes auto for all", "2
+sets on each machine", "I can still see the tonnage at the end of an auto
+set"). He first chose the Classic method so the tonnage would be exact; in Auto
+mode EGYM's program sets the method, the weight and the reps, tests his
+strength after six training days and changes the method over time. The number
+on the screen then means a little different things as the method changes: the
+weekly tonnage and the "Last time" line show a trend, not an exact set-by-set
+comparison.
+
 WHAT RUNS. His gym's fourteen EGYM machines, two sets on each machine, one
-after the other (SETS, REST_SECONDS). EGYM sets the weight from its own
-strength test and counts the set; the app records the one number the machine
-shows at the end of each set, the tonnage (reps x kg in the Classic method,
-where the weight is the same for the whole set). The app prescribes no weight
-and no reps.
+after the other (SETS, REST_SECONDS). EGYM sets the weight and counts the set;
+the app records the one number the machine shows at the end of each set, the
+tonnage. The app prescribes no weight and no reps.
 
 HOW A TONNAGE IS STORED. Each set is one rep at the tonnage, in kg: the stored
 set's reps x weight IS the tonnage, so every reader of the log's work —
@@ -70,7 +77,7 @@ REST_SECONDS = 60
 SET_SECONDS = 60
 
 #: Every set's last line of the how-to.
-_TAIL = ("Log in with your wristband and use the Classic method. At the end of the set, "
+_TAIL = ("Log in with your wristband and use Auto mode. At the end of the set, "
          "type the tonnage the screen shows.")
 
 
@@ -180,8 +187,8 @@ TONNAGE_ONLY: frozenset[str] = frozenset(names())
 
 #: The session note, shown on the overview before Start and stored with the session.
 NOTE = (
-    "Two sets on each machine, one after the other. Log in with your wristband and use the "
-    "Classic method, so the tonnage is exact. After each set, type the tonnage the screen "
+    "Two sets on each machine, one after the other. Log in with your wristband and use Auto "
+    "mode: EGYM sets the weight and the reps. After each set, type the tonnage the screen "
     "shows. When a machine is in use, do another first."
 )
 
@@ -196,7 +203,7 @@ _BETTER = ("checked 2026-11-08: the session is his gym's EGYM line, so a better 
 
 #: goal "egym": the extra full-body session on his gym's EGYM machines.
 EGYM_PICKS: dict[str, Pick] = {
-    ex["name"]: Pick("egym", area, "two sets back to back, Classic", reason, _SOURCE,
+    ex["name"]: Pick("egym", area, "two sets back to back, Auto mode", reason, _SOURCE,
                      better=_BETTER)
     for ex, area, reason in (
         (SQUAT, "quads and glutes", "His gym's EGYM squat; the session's biggest lift, first."),

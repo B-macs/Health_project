@@ -64,11 +64,15 @@ def test_the_order_ends_with_the_core():
     assert ec.names()[0] == "EGYM Squat"
 
 
-def test_every_how_to_says_classic_and_the_tonnage():
+def test_every_how_to_says_auto_mode_and_the_tonnage():
+    """His answers of 2026-11-08: "Yes auto for all", "I can still see the tonnage
+    at the end of an auto set"."""
     for ex in ec.MACHINES:
         assert ex["mechanics"].endswith(ec._TAIL), ex["name"]
-        assert "Classic" in ex["mechanics"] and "tonnage" in ex["mechanics"]
+        assert "Auto mode" in ex["mechanics"] and "tonnage" in ex["mechanics"]
+        assert "Classic" not in ex["mechanics"], ex["name"]
         assert "machine" not in ex["mechanics"].lower(), "the session screen never names a machine"
+    assert "Auto mode" in ec.NOTE and "Classic" not in ec.NOTE
 
 
 # ─── The maps and the record ─────────────────────────────────────────────────
