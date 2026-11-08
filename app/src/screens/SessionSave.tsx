@@ -18,7 +18,7 @@ import { useApp } from '../lib/appState'
 import { KEYS } from '../db/schema'
 import { enqueue } from '../lib/outbox'
 import {
-  asksLength, clockMinutes, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
+  asksLength, circuitTonnage, clockMinutes, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { IconCheck } from '../ui/icons'
@@ -61,6 +61,26 @@ function Review({ s }: { s: TrainingState }) {
           )
         })}
       </ul>
+    </section>
+  )
+}
+
+/** The EGYM circuit's review (2026-11-08): each machine's tonnage, round 1 and round 2 as
+ *  typed from the EGYM screen, the two added, and the whole circuit. */
+function TonnageReview({ s }: { s: TrainingState }) {
+  const t = circuitTonnage(s)
+  return (
+    <section className="card group" aria-label={S.session.tonnageTitle} data-testid="tonnage-review">
+      <h2 className="eyebrow">{S.session.tonnageTitle}</h2>
+      <ul className="list">
+        {t.machines.map((m) => (
+          <li key={m.name} className="group" data-testid="tonnage-line">
+            <span className="kv"><span>{m.name}</span><span className="num">{S.session.tonnageKg(m.total)}</span></span>
+            <span className="caption">{S.session.tonnageRounds(S.session.tonnageKg(m.rounds[0] ?? null), S.session.tonnageKg(m.rounds[1] ?? null))}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="kv" data-testid="tonnage-total"><span>{S.session.tonnageTotal}</span><span className="num">{S.session.tonnageKg(t.total)}</span></p>
     </section>
   )
 }
@@ -206,7 +226,9 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
   // The daily tendon session (WP-40): like the accessory session, it is not the training
   // day, so it never marks the day trained.
   const daily = s.plan.kind === 'daily'
-  const extra = accessory || daily
+  // The EGYM circuit (2026-11-08): extra to the plan day, so it never marks the day trained.
+  const egym = s.plan.kind === 'egym'
+  const extra = accessory || daily || egym
   // The slider starts at 5, and on the accessory and daily sessions at their own effort target.
   const [rpe, setRpe] = useState(extra ? (s.plan.rpe_target ?? 3) : 5)
   const [choice, setChoice] = useState<'plan' | 'clock'>(ask ? 'plan' : 'clock')
@@ -277,12 +299,14 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         <div className="sky" aria-hidden="true" />
         <div className="celebrate" aria-hidden="true" data-testid="celebrate"><IconCheck /></div>
         <header className="head">
-          <h1 className="head__title">{accessory ? S.session.accessoryLogged : daily ? S.session.dailyLogged : S.session.congrats}</h1>
+          <h1 className="head__title">{accessory ? S.session.accessoryLogged : daily ? S.session.dailyLogged
+            : egym ? S.session.egymLogged : S.session.congrats}</h1>
           {!extra && <div className="caption">{S.session.congratsNext(exerciseOrder(s).length)}</div>}
         </header>
         <section className="card group" role="status" data-testid="save-state" data-state={saved}>
           <p>{saved === 'confirmed' ? S.session.saved : saved === 'refused' ? S.session.refused : S.session.savedPhone}</p>
         </section>
+        {egym && <TonnageReview s={s} />}
         <HeartRateMatch s={s} update={update} confirmed={saved === 'confirmed'} />
         {s.plan.next_day && <p className="caption">{S.session.tomorrow(s.plan.next_day.day_num, s.plan.next_day.objective)}</p>}
         <button className="btn btn--primary btn--wide" onClick={onDone}>{S.session.done}</button>
@@ -298,7 +322,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         <div className="caption">{S.session.allDone(exerciseOrder(s).length)}</div>
       </header>
       {s.notice && <p className="note" role="status" data-testid="notice">{s.notice}</p>}
-      <Review s={s} />
+      {egym ? <TonnageReview s={s} /> : <Review s={s} />}
       <WatchCheck s={s} />
       <section className="card group">
         <label className="group">
@@ -308,6 +332,7 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
         </label>
         {accessory && <p className="caption">{S.session.accessoryEffortHelp}</p>}
         {daily && <p className="caption">{S.session.dailyEffortHelp}</p>}
+        {egym && <p className="caption">{S.session.egymEffortHelp}</p>}
       </section>
       {ask && (
         <section className="card group">

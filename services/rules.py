@@ -954,6 +954,76 @@ MOVEMENT_RULES: list[MovementRule] = [
                "end — controlled range only at Beighton 6/9. Ruled 2026-10-16.",
         stage_cap=1, severity="caution", laterality="bilateral",
     ),
+    # ── The EGYM circuit (2026-11-08, egym_circuit.py) ──────────────────────
+    # His gym's EGYM machines, each set at the weight EGYM sets. Light rules on his
+    # word ("we don't need that much of a safety rule because these are machines"):
+    # cleared where the machine holds the body and loads one joint or a supported
+    # pull; caution only where a rule of the block already names the risk. The
+    # squat, the leg press, the back extension and the crunch already land on
+    # their own caution rules.
+    MovementRule(
+        movement="egym lat pulldown",
+        reason="EGYM lat pulldown: a seated vertical pull with the thighs held by the pad; "
+               "no load on the spine. Ruled 2026-11-08.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="egym leg curl",
+        reason="EGYM leg curl: a knee bend against a pad, back supported; no load on the "
+               "spine. Ruled 2026-11-08.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="egym chest press",
+        reason="EGYM chest press, back supported: on the RIGHT the arm goes back only as "
+               "deep as it goes easily (the machine chest press's measured limit). Ruled "
+               "2026-11-08.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="egym row",
+        reason="EGYM row: a seated pull with the chest on the pad; no load on the spine. "
+               "Ruled 2026-11-08.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="egym glute press",
+        reason="EGYM glute press: hip extension that stops at a straight hip; past it the "
+               "movement becomes lumbar extension (the hip thrust's rule). Ruled 2026-11-08.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="egym triceps dip",
+        reason="EGYM triceps dip: a seated downward press. The elbows stay at or in front "
+               "of the line of the body: shoulder extension under load drives the arm bone "
+               "forward on the right, the direction of three dislocations and the Latarjet "
+               "(the reverse plank's reason). He keeps it (2026-11-08). Ruled 2026-11-08.",
+        stage_cap=1, severity="caution", laterality="right",
+    ),
+    MovementRule(
+        movement="egym leg extension",
+        reason="EGYM leg extension: knee straightening, back supported; knee-local, no load "
+               "on the spine or hip. Ruled 2026-11-08.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="egym biceps curl",
+        reason="EGYM biceps curl: elbow bend with the upper arms on the pad. Ruled 2026-11-08.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="egym hip abductor",
+        reason="EGYM hip abductor: seated hip opening against the pads, knees bent; no load "
+               "on the spine. Ruled 2026-11-08.",
+        stage_cap=1, severity="cleared", laterality="bilateral",
+    ),
+    MovementRule(
+        movement="egym hip adductor",
+        reason="EGYM hip adductor: the legs start only as wide as they go under control, "
+               "with no bounce at the open end (the adductor machine's rule, Beighton 6/9). "
+               "Ruled 2026-11-08.",
+        stage_cap=1, severity="caution", laterality="bilateral",
+    ),
 ]
 
 

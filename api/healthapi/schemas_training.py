@@ -308,10 +308,14 @@ class SessionReading(BaseModel):
 class ExerciseMove(BaseModel):
     """Which exercises move together when a machine is busy (WP-27,
     services/session_order.move_groups): the phone moves whole groups of the
-    walked steps. A group runs only after every group in `after`."""
+    walked steps. A group runs only after every group in `after`. A group
+    with `mirror_of` moves the same way as that group (the EGYM circuit's
+    round 2 follows round 1, services/egym_session.move_groups): when that
+    group runs before another, this one runs before the other's mirror."""
     group: int
     movable: bool
     after: list[int]
+    mirror_of: int | None = None
 
 
 class SessionExercise(BaseModel):
@@ -364,6 +368,9 @@ class SessionExercise(BaseModel):
     #: The slow start before a hold, in seconds (the daily tendon session, WP-40):
     #: the phone counts it down, then runs the hold. None: the hold starts at once.
     lead_in_seconds: int | None = None
+    #: The EGYM circuit (2026-11-08): the phone asks for the set's tonnage in kg,
+    #: as the machine shows it, and sends it as the set's weight (one rep).
+    tonnage_entry: bool = False
 
 
 class DailyReminder(BaseModel):
@@ -477,7 +484,8 @@ class ReplacementOut(BaseModel):
 
 
 class SessionPlanOut(BaseModel):
-    """`kind`: plan, accessory or daily (the daily tendon session, WP-40)."""
+    """`kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym
+    (the EGYM circuit, 2026-11-08)."""
     kind: str
     date: date
     day_num: int | None

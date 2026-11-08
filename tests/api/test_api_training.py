@@ -404,6 +404,68 @@ def test_a_saved_daily_session_is_done_today_counts_in_strain_and_is_never_a_log
     assert any(r["date"] == WEDNESDAY.isoformat() and r["total_au"] > 0 for r in rows)
 
 
+def test_the_egym_circuit_runs_through_the_same_flow_on_any_day(env, monkeypatch):
+    """The EGYM circuit (2026-11-08): two rounds of his gym's fourteen machines,
+    each set's tonnage typed from the machine; offered on a rest day too ("No,
+    it's extra"); round 2 after round 1, each round-2 machine the mirror of its
+    round-1 one ("round two always follows round one")."""
+    import egym_circuit as ec
+    plan = env.ok(monkeypatch, "get", "/api/training/egym", local=WEDNESDAY)
+    assert plan["kind"] == "egym" and plan["plan_days"] is None and plan["note"] == ec.NOTE
+    names = [e["name"] for e in plan["exercises"]]
+    assert names == [e["name"] for e in ec.entries()] and len(names) == 28
+    assert all(e["tonnage_entry"] and not e["reps_editable"] and e["timer"] is None
+               for e in plan["exercises"])
+    assert plan["exercises"][0]["prescription"] == "Round 1 of 2"
+    assert plan["exercises"][14]["prescription"] == "Round 2 of 2"
+    assert plan["exercises"][14]["move"] == {"group": 14, "movable": True,
+                                            "after": list(range(14)), "mirror_of": 0}
+    assert plan["exercises"][3]["move"]["mirror_of"] is None
+    assert len(plan["steps"]) == 28 and all(st["record_set"] == 1 for st in plan["steps"])
+    assert plan["ask_length_above_minutes"] is None and 75 <= plan["model_minutes"] <= 85
+    assert plan["rpe_target"] == ec.RPE_TARGET
+
+
+def test_a_saved_egym_circuit_stores_its_tonnage_and_is_a_logged_day_that_marks_no_plan_day(
+        env, monkeypatch):
+    """His answers of 2026-11-08: only the tonnage is typed, the circuit counts as
+    a training day, it is extra to the plan day, and it goes into the weekly
+    tonnage. The next circuit shows each round's last tonnage."""
+    import egym_circuit as ec
+    import training_constants as tc
+    from services import tonnage
+    plan = env.ok(monkeypatch, "get", "/api/training/egym", local=WEDNESDAY)
+    squat = plan["exercises"][0]
+    squat2 = plan["exercises"][14]
+    body = {"session_id": f"{WEDNESDAY}-egym0001", "date": WEDNESDAY.isoformat(), "kind": "egym",
+            "duration_minutes": 70, "session_rpe": 6, "exercises": [
+                {"exercise_id": "ex-egym-1", "exercise": squat, "raw_sets": [
+                    {"set_num": 1, "completed_at": f"{WEDNESDAY}T18:00:00+01:00",
+                     "right": {"reps": 1, "weight_kg": 1240, "seconds": None}}]},
+                {"exercise_id": "ex-egym-2", "exercise": squat2, "raw_sets": [
+                    {"set_num": 1, "completed_at": f"{WEDNESDAY}T18:40:00+01:00",
+                     "right": {"reps": 1, "weight_kg": 1300, "seconds": None}}]}]}
+    out = env.ok(monkeypatch, "post", "/api/training/sessions", local=WEDNESDAY, body=body)
+    assert out["stored"] and len(out["exercise_ids"]) == 2
+    rows = [r for r in env.repo.get_all_training_exercises_raw()
+            if r["session_id"] == body["session_id"]]
+    assert {r["movement_type"] for r in rows} == {"EGYM"}
+    assert sorted(r["total_volume_kg"] for r in rows) == [1240.0, 1300.0]
+    assert sorted((s["reps"], s["weight"]) for r in rows for s in r["sets"]) == [(1, 1240), (1, 1300)]
+    assert not env.repo.has_logged_session(WEDNESDAY), "extra: it never marks a plan day done"
+    week = (MONDAY, MONDAY + timedelta(days=6))
+    assert WEDNESDAY.isoformat() in env.repo.get_logged_session_dates(*week)
+    assert WEDNESDAY.isoformat() in env.repo.get_logged_session_dates_live(*week)
+    series, _ = tonnage.weekly_tonnage(env.repo.get_all_training_exercises_raw(),
+                                       tc.EXERCISE_BODY_REGION, today=WEDNESDAY, weeks=1)
+    assert series[-1].sectors["lower_body"].kg == pytest.approx(2540)
+    again = env.ok(monkeypatch, "get", "/api/training/egym", local=WEDNESDAY)
+    assert again["exercises"][0]["previous_caption"] == "Last time 1,240 kg"
+    assert again["exercises"][14]["previous_caption"] == "Last time 1,300 kg"
+    assert again["exercises"][1]["previous_caption"] == ""
+    assert ec.names()[0] == "EGYM Squat"
+
+
 def test_completion_asks_the_length_when_the_clock_ran_far_past_the_plan(env, monkeypatch):
     body = {"model_minutes": 60, "start_ts": 1000.0, "end_ts": 1000.0 + 150 * 60, "rpe": 7}
     out = env.ok(monkeypatch, "post", "/api/training/completion", body=body)

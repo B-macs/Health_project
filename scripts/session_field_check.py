@@ -40,7 +40,7 @@ if str(ROOT) not in sys.path:
 
 OUT = ROOT / "reports" / "rebuild" / "p6" / "field_check.json"
 TABLES = ("training_sessions", "training_exercises", "training_sets")
-SUPPLEMENTARY = frozenset({"Yoga", "Outdoor", "Accessory"})
+SUPPLEMENTARY = frozenset({"Yoga", "Outdoor", "Accessory", "EGYM"})
 #: Ids and keys: compared by matching, not as fields.
 KEYS = {"training_sessions": {"session_id", "session_date"},
         "training_exercises": {"exercise_id", "session_id", "session_date", "movement_name"},

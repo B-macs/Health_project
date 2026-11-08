@@ -177,8 +177,10 @@ function MiniStepper({ label, name, value, onLess, onMore }: {
   )
 }
 
-/** Which of reps, weight and band an exercise's steppers show. */
+/** Which of reps, weight and band an exercise's steppers show. The EGYM circuit's entries
+ *  show none: their one number is the tonnage, typed (TonnageCard). */
 function shown(ex: Exercise) {
+  if (ex.tonnage_entry) return { reps: false, weight: false, band: false }
   return {
     reps: ex.type === 'reps' || ex.type === 'hold_reps' ? ex.reps_editable || !!ex.equipment_type : false,
     weight: !!ex.equipment_type && ex.equipment_type !== 'band',
@@ -532,7 +534,9 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
   const typed = sideValues(live, side).seconds
   const isFirstSide = ex.laterality === 'unilateral' && step.side === first && step.record_set == null
 
+  const tonnage = ex.tonnage_entry ? sideValues(live, 'right').weight_kg : null
   const doneLabel = resting ? S.session.nextSet
+    : ex.tonnage_entry ? S.session.tonnageDone
     : ex.reading ? S.session.readingDone
     : ex.type === 'duration' ? S.session.activityDone
       : ex.type === 'hold_reps' && step.record_set == null && !isFirstSide ? S.session.repDone(step.rep)
@@ -696,6 +700,17 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
       {!resting && <ReadingCard s={s} ex={ex} update={update} />}
       {resting && <JustDone s={s} ex={ex} update={update} />}
 
+      {ex.tonnage_entry && !resting && (
+        <section className="card group" data-testid="tonnage">
+          <label className="group">
+            <span>{S.session.tonnage}</span>
+            <Field key={`tonnage-${s.step}`} className="field" type="number" inputMode="decimal" min={0}
+              initial={tonnage == null ? '' : String(tonnage)}
+              onValue={(v) => update((x) => setSide(x, ex.index, 'right', { weight_kg: v === '' ? null : Number(v) }))} />
+          </label>
+        </section>
+      )}
+
       {ex.timer === 'stopwatch' && !resting && (
         <section className="card group">
           <label className="group">
@@ -753,6 +768,7 @@ export function SessionFlow({ s, update, onExit, onLeave }: {
         )}
         <button className="btn btn--primary btn--gym"
           disabled={pulling || (ex.timer === 'stopwatch' && !resting && typed == null)
+            || (!!ex.tonnage_entry && !resting && tonnage == null)
             || (!!ex.reading && !resting && !readingComplete(s, ex))}
           onClick={() => void done()}>
           {pulling ? S.session.garminChecking : doneLabel}

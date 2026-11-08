@@ -27,6 +27,8 @@ for extra in (ROOT, ROOT / "api"):
 OUT = ROOT / "app" / "dev" / "session_fixture.json"
 #: The daily tendon session (WP-40), made the same way from its own entries.
 DAILY_OUT = ROOT / "app" / "dev" / "daily_fixture.json"
+#: The EGYM circuit (2026-11-08), made the same way from its own entries.
+EGYM_OUT = ROOT / "app" / "dev" / "egym_fixture.json"
 DAY = "2026-10-20"
 FIRST = "left"
 
@@ -182,6 +184,46 @@ def build_daily() -> dict:
     return SessionPlanOut(**plan).model_dump(mode="json")
 
 
+def build_egym() -> dict:
+    """The EGYM circuit as the engine sends it (2026-11-08): its own entries
+    (egym_circuit.py, machine names only), each shaped by training_session.
+    exercise_out with its round, its move group and a made-up last tonnage on
+    the first machine, walked and timed as training_session.egym_plan does."""
+    from healthapi.schemas_training import SessionPlanOut
+    from services import egym_session as egs
+    from services import guided_flow
+    from services import sessions as sess
+    from services import training_session as ts
+
+    exercises = egs.build_day()["exercises"]
+    moves = egs.move_groups(exercises)
+    out = []
+    for i, ex in enumerate(exercises):
+        row = ts.exercise_out(ex, i, None, None, (None, None), False, moves[i])
+        out.append({**row, "prescription": egs.prescription(i), "reps_editable": False,
+                    "previous_caption": egs.tonnage_caption(1240.0) if i == 0 else "",
+                    "estimated_minutes": 1})
+    plan = {
+        "kind": "egym", "date": DAY, "day_num": None, "plan_days": None,
+        "objective": egs.ec.OBJECTIVE, "phase": egs.ec.PHASE, "rpe_target": egs.ec.RPE_TARGET,
+        "first_side": FIRST,
+        "banner": {"kind": "", "text": "", "cause": "", "acwr_advisory": ""},
+        "adaptation": {"volume_factor": 1.0, "reduced": False, "banner_kind": "", "volume_note": "",
+                       "badge_shown": False},
+        "exercises": out, "steps": guided_flow.walk(exercises, FIRST),
+        "model_minutes": egs.modelled_minutes(exercises), "min_minutes": sess.MIN_ACCESSORY_MINUTES,
+        "ask_length_above_minutes": None,
+        "rest_taken_max_seconds": guided_flow.REST_TAKEN_MAX_SECONDS, "garmin_configured": True,
+        "band_tiers": [{"tier": t, "label": sess.BAND_TIER_LABELS.get(t, "")} for t in sess.BAND_TIERS],
+        "reasons": [], "next_day": None, "note": egs.ec.NOTE, "alternatives": [],
+    }
+    return SessionPlanOut(**plan).model_dump(mode="json")
+
+
+def egym_text() -> str:
+    return json.dumps(build_egym(), indent=2, ensure_ascii=False) + "\n"
+
+
 def text() -> str:
     return json.dumps(build(), indent=2, ensure_ascii=False) + "\n"
 
@@ -194,7 +236,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true", help="exit 1 when a file is not this output")
     args = ap.parse_args()
-    files = ((OUT, text()), (DAILY_OUT, daily_text()))
+    files = ((OUT, text()), (DAILY_OUT, daily_text()), (EGYM_OUT, egym_text()))
     if args.check:
         stale = 0
         for path, fresh in files:

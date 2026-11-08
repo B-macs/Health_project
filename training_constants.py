@@ -379,10 +379,40 @@ _LOWER_BODY_EXERCISES: tuple[str, ...] = (
     "Single-Leg Calf Hold (Bent Knee)",
 )
 
+# ─── The EGYM circuit (2026-11-08, egym_circuit.py) ─────────────────────────
+# His gym's fourteen EGYM machines: (region, shares, movement category). One
+# table feeds the three maps below, so a machine cannot be in one and missing
+# from another; tests/test_egym_circuit.py keeps the names equal to
+# egym_circuit.names(). The splits and the categories follow the block's
+# machine of the same kind where there is one (Machine Chest Press, Seated Leg
+# Curl, Adductor Machine (Seated), V Squat, Lat Pulldown, Hip Thrust (Loaded)).
+_EGYM_MACHINES: dict[str, tuple[str, dict[str, float], tuple[str, float]]] = {
+    "EGYM Squat":            ("lower_body", {"upper_body": 0.00, "core": 0.10, "lower_body": 0.90}, ("squat", 1.3)),
+    "EGYM Lat Pulldown":     ("upper_body", {"upper_body": 0.90, "core": 0.10, "lower_body": 0.00}, ("pull", 0.7)),
+    "EGYM Leg Curl":         ("lower_body", {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95}, ("isolation", 0.3)),
+    "EGYM Chest Press":      ("upper_body", {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00}, ("upper_push", 0.7)),
+    "EGYM Leg Press":        ("lower_body", {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95}, ("squat", 1.3)),
+    "EGYM Row":              ("upper_body", {"upper_body": 0.85, "core": 0.15, "lower_body": 0.00}, ("pull", 0.7)),
+    "EGYM Glute Press":      ("lower_body", {"upper_body": 0.00, "core": 0.20, "lower_body": 0.80}, ("hinge", 1.0)),
+    "EGYM Triceps Dip":      ("upper_body", {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00}, ("upper_push", 0.7)),
+    "EGYM Leg Extension":    ("lower_body", {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95}, ("isolation", 0.3)),
+    "EGYM Biceps Curl":      ("upper_body", {"upper_body": 0.95, "core": 0.05, "lower_body": 0.00}, ("isolation", 0.3)),
+    "EGYM Hip Abductor":     ("lower_body", {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95}, ("isolation", 0.3)),
+    "EGYM Hip Adductor":     ("lower_body", {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95}, ("isolation", 0.3)),
+    "EGYM Back Extension":   ("core",       {"upper_body": 0.05, "core": 0.80, "lower_body": 0.15}, ("isolation", 0.3)),
+    "EGYM Abdominal Crunch": ("core",       {"upper_body": 0.05, "core": 0.95, "lower_body": 0.00}, ("isolation", 0.3)),
+}
+
+#: Names whose stored set is a tonnage (one rep at the machine's tonnage, in kg),
+#: never a lift: no strength reader estimates a 1RM from them
+#: (services/strength.qualifying_rows).
+TONNAGE_ONLY_EXERCISES: frozenset[str] = frozenset(_EGYM_MACHINES)
+
 EXERCISE_BODY_REGION: dict[str, str] = {
     **{name: "upper_body" for name in _UPPER_BODY_EXERCISES},
     **{name: "core" for name in _CORE_EXERCISES},
     **{name: "lower_body" for name in _LOWER_BODY_EXERCISES},
+    **{name: row[0] for name, row in _EGYM_MACHINES.items()},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -730,6 +760,8 @@ EXERCISE_REGION_SHARES: dict[str, dict[str, float]] = {
     "Half Push-Up Hold":                      {"upper_body": 0.70, "core": 0.30, "lower_body": 0.00},
     "Single-Leg Calf Hold":                   {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
     "Single-Leg Calf Hold (Bent Knee)":       {"upper_body": 0.00, "core": 0.05, "lower_body": 0.95},
+    # The EGYM circuit (2026-11-08): _EGYM_MACHINES above.
+    **{name: dict(row[1]) for name, row in _EGYM_MACHINES.items()},
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1020,6 +1052,8 @@ EXERCISE_MOVEMENT_WEIGHT: dict[str, tuple[str, float]] = {
     "Half Push-Up Hold":                        ("bodyweight_compound", 0.5),
     "Single-Leg Calf Hold":                     ("isolation", 0.3),
     "Single-Leg Calf Hold (Bent Knee)":         ("isolation", 0.3),
+    # The EGYM circuit (2026-11-08): _EGYM_MACHINES above.
+    **{name: row[2] for name, row in _EGYM_MACHINES.items()},
 }
 
 

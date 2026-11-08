@@ -33,7 +33,7 @@ import { Spinner } from '../ui/parts'
 import { Sheet } from '../ui/Sheet'
 import { HomeItems, Timeline } from '../ui/timeline'
 import { DailyOverview, TrainingTiles } from './Daily'
-import { AccessoryOverview, ExtrasMenu, Outdoor, YogaDetail, YogaList } from './Extras'
+import { AccessoryOverview, EgymOverview, ExtrasMenu, Outdoor, YogaDetail, YogaList } from './Extras'
 import { SessionFlow } from './Session'
 import { SessionSave } from './SessionSave'
 import {
@@ -403,7 +403,7 @@ function WeekPage({ onStart, starting }: { onStart: (plan: Plan, garmin: boolean
 
 /** The screens by address: the daily tendon session and the "+" menu's screens. No
  *  address, or "day": the week page, with the two tiles under its week dates. */
-export type Extra = 'day' | 'daily' | 'yoga' | 'outdoor' | 'accessory'
+export type Extra = 'day' | 'daily' | 'yoga' | 'outdoor' | 'accessory' | 'egym'
 
 export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
   const { store, go } = useApp()
@@ -438,6 +438,7 @@ export function TrainingTab({ extra, slug }: { extra?: Extra; slug?: string }) {
   if (extra === 'yoga') return slug ? <YogaDetail slug={slug} /> : <YogaList />
   if (extra === 'outdoor') return <Outdoor />
   if (extra === 'accessory') return <AccessoryOverview />
+  if (extra === 'egym') return <EgymOverview />
   if (extra === 'daily') return <DailyOverview />
   return <WeekPage onStart={(p, garmin) => void start(p, garmin)} starting={starting} />
 }

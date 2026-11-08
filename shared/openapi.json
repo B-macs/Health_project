@@ -1499,7 +1499,7 @@
         "type": "object"
       },
       "ExerciseMove": {
-        "description": "Which exercises move together when a machine is busy (WP-27,\nservices/session_order.move_groups): the phone moves whole groups of the\nwalked steps. A group runs only after every group in `after`.",
+        "description": "Which exercises move together when a machine is busy (WP-27,\nservices/session_order.move_groups): the phone moves whole groups of the\nwalked steps. A group runs only after every group in `after`. A group\nwith `mirror_of` moves the same way as that group (the EGYM circuit's\nround 2 follows round 1, services/egym_session.move_groups): when that\ngroup runs before another, this one runs before the other's mirror.",
         "properties": {
           "after": {
             "items": {
@@ -1511,6 +1511,17 @@
           "group": {
             "title": "Group",
             "type": "integer"
+          },
+          "mirror_of": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mirror Of"
           },
           "movable": {
             "title": "Movable",
@@ -6074,6 +6085,11 @@
             ],
             "title": "Timer"
           },
+          "tonnage_entry": {
+            "default": false,
+            "title": "Tonnage Entry",
+            "type": "boolean"
+          },
           "type": {
             "title": "Type",
             "type": "string"
@@ -6141,7 +6157,7 @@
         "type": "object"
       },
       "SessionPlanOut": {
-        "description": "`kind`: plan, accessory or daily (the daily tendon session, WP-40).",
+        "description": "`kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym\n(the EGYM circuit, 2026-11-08).",
         "properties": {
           "adaptation": {
             "$ref": "#/components/schemas/Adaptation"
@@ -12771,6 +12787,69 @@
           }
         },
         "summary": "Get Day"
+      }
+    },
+    "/api/training/egym": {
+      "get": {
+        "description": "The EGYM circuit (the \"+\" menu, 2026-11-08): two rounds of the gym's\nfourteen EGYM machines, each set's tonnage typed from the machine. Offered\non every day: it is extra to the plan day.",
+        "operationId": "get_egym_api_training_egym_get",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-engine-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Engine-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-local-date",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Local-Date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionPlanOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Egym"
       }
     },
     "/api/training/flexibility-check": {

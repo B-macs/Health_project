@@ -12,6 +12,9 @@
 // - Accessory (T104-T108): the short second session the engine chooses from the strain by
 //   body area. It runs in the same guided flow as the plan session and saves as its own
 //   kind, so it never marks a plan day as done.
+// - EGYM circuit (2026-11-08): two rounds of the gym's fourteen EGYM machines; each set's
+//   tonnage is typed from the machine. The same guided flow; round 2 follows the order of
+//   round 1 (the engine's move groups). It never marks a plan day as done.
 import { useLiveQuery } from 'dexie-react-hooks'
 import { useRef, useState } from 'react'
 import type { components } from '../generated/api'
@@ -42,6 +45,7 @@ export function ExtrasMenu({ onClose }: { onClose: () => void }) {
         <button className="btn btn--glass btn--wide" onClick={() => go('/training/yoga')}>{S.extras.yoga}</button>
         <button className="btn btn--glass btn--wide" onClick={() => go('/training/outdoor')}>{S.extras.outdoor}</button>
         <button className="btn btn--glass btn--wide" onClick={() => go('/training/accessory')}>{S.extras.accessory}</button>
+        <button className="btn btn--glass btn--wide" onClick={() => go('/training/egym')}>{S.extras.egym}</button>
       </div>
     </Sheet>
   )
@@ -345,6 +349,59 @@ export function AccessoryOverview() {
               <ul className="list">{plan.reasons.map((r) => <li key={r} className="caption">{r}</li>)}</ul>
             </details>
           )}
+          <div className="pair">
+            <button className="btn btn--glass btn--gym" onClick={() => go('/training/day')}>{S.extras.cancel}</button>
+            <button className="btn btn--primary btn--gym" disabled={busy || starting} onClick={() => void start()}>{S.extras.start}</button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── The EGYM circuit ─────────────────────────────────────────────────────────
+
+/** The EGYM circuit before Start (2026-11-08): the machines in the order the engine sends,
+ *  the note, and Start. Start hands it to the same guided flow as the plan session. */
+export function EgymOverview() {
+  const { store, ctx, go } = useApp()
+  const view = useCached<Plan>(store, '/api/training/egym', null, ctx)
+  const busy = useLiveQuery(async () => (await store.session.get('current')) !== undefined, [store], false)
+  const [starting, setStarting] = useState(false)
+  const today = localDay()
+  const plan = view.data && view.data.date === today && view.data.kind === 'egym' ? view.data : null
+  // One round's machines, in order: round 2 runs the same machines.
+  const round = plan ? plan.exercises.filter((e, i, all) => all.findIndex((x) => x.name === e.name) === i) : []
+  const start = async () => {
+    if (!plan || starting) return
+    setStarting(true)
+    try {
+      // One session at a time: a session already kept on this phone is never replaced.
+      if (await store.session.get('current')) return
+      await startSession(store, startSessionState(plan, newSessionId(plan.date), newExerciseIds(plan.exercises.length)))
+      go('/training')
+    } finally {
+      setStarting(false)
+    }
+  }
+  return (
+    <div className="screen train" data-testid="egym">
+      <div className="sky" aria-hidden="true" />
+      <Head title={plan?.objective || S.extras.egym} back={S.nav.training} onBack={() => go('/training/day')}
+        caption={plan ? S.extras.egymMeta(round.length, plan.model_minutes) : undefined} />
+      <Freshness view={view} />
+      {busy && <p className="alert" data-testid="egym-blocked">{S.extras.egymBlocked}</p>}
+      {!plan ? (
+        view.state !== 'loading' && <p className="caption">{S.extras.egymNeedsEngine}</p>
+      ) : (
+        <>
+          {plan.note && <p className="note">{plan.note}</p>}
+          <section className="card group" aria-label={S.extras.egymOrder}>
+            <h2 className="eyebrow">{S.extras.egymOrder}</h2>
+            <ol className="list" data-testid="egym-order">
+              {round.map((e, i) => <li key={e.name}><span className="num">{i + 1}</span> · {e.name}</li>)}
+            </ol>
+          </section>
           <div className="pair">
             <button className="btn btn--glass btn--gym" onClick={() => go('/training/day')}>{S.extras.cancel}</button>
             <button className="btn btn--primary btn--gym" disabled={busy || starting} onClick={() => void start()}>{S.extras.start}</button>

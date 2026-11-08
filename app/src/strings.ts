@@ -216,6 +216,9 @@ export const S = {
     reset: 'Reset',
     again: 'Run the timer again',
     secondsHeld: (side: string) => `Seconds held${side ? `, ${side === 'right' ? 'right' : 'left'} side` : ''}`,
+    // The EGYM circuit (2026-11-08): the one number typed, from the EGYM screen.
+    tonnage: 'Tonnage in kg, from the screen',
+    tonnageDone: 'Done',
     pause: 'Pause',
     resume: 'Resume',
     plus15: '+15 s',
@@ -331,6 +334,13 @@ export const S = {
     accessoryEffortHelp: 'This one should be low. If it climbs past about 4, it has stopped being an accessory session and competes with the real one.',
     dailyLogged: 'Daily tendon session logged.',
     dailyEffortHelp: 'About half effort: the holds were hard by the end, never maximal.',
+    egymLogged: 'EGYM circuit logged.',
+    egymEffortHelp: 'How hard the whole circuit was, both rounds.',
+    // The EGYM circuit's review (2026-11-08): each machine's tonnage, round by round.
+    tonnageTitle: 'Tonnage',
+    tonnageRounds: (a: string, b: string) => `Round 1: ${a} · Round 2: ${b}`,
+    tonnageKg: (v: number | null) => (v == null ? '—' : `${Math.round(v).toLocaleString('en-GB')} kg`),
+    tonnageTotal: 'Total, both rounds',
   },
   // The Training tab's two tiles and the daily tendon session (WP-40, 2026-10-28).
   daily: {
@@ -470,6 +480,7 @@ export const S = {
     yoga: 'Yoga',
     outdoor: 'Hike / Walk',
     accessory: 'Accessory',
+    egym: 'EGYM circuit',
     back: 'Back',
     close: 'Close',
     yogaTitle: 'Select yoga',
@@ -515,6 +526,11 @@ export const S = {
     cancel: 'Cancel',
     blocked: 'There is a session in progress. Finish it or leave it first: an accessory session shares the same saved progress, so starting one now would lose where you are.',
     accessoryNeedsEngine: 'The accessory session comes from the engine. There is no connection now, and this phone has not saved one for today.',
+    // The EGYM circuit (2026-11-08).
+    egymMeta: (machines: number, minutes: number) => `${machines} machines · 2 rounds · about ${minutes} min`,
+    egymOrder: 'The order',
+    egymNeedsEngine: 'The EGYM circuit comes from the engine. There is no connection now, and this phone has not saved it yet.',
+    egymBlocked: 'There is a session in progress. Finish it or leave it first: the EGYM circuit shares the same saved progress, so starting one now would lose where you are.',
   },
   insights: {
     title: 'Insights',

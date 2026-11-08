@@ -408,14 +408,54 @@ export function swapTo(s: TrainingState, alt: Alternative): TrainingState {
 }
 
 /** Run `group` now (WP-27): its steps move, in one block, in front of the group the flow is
- *  on, which then comes straight after it. Back undoes the move. */
+ *  on, which then comes straight after it. A group the engine marked as the mirror of the
+ *  moved one (`mirror_of`: the EGYM circuit's round 2, 2026-11-08) moves the same way, in
+ *  front of the mirror of the group the flow is on. Back undoes the move. */
 export function doFirst(s: TrainingState, group: number): TrainingState {
   const steps = s.plan.steps
   const moving = steps.filter((st, i) => i >= s.step && groupOf(s, st.ex_idx)?.group === group)
   if (!moving.length) return s
+  const here = groupOf(s, steps[s.step]?.ex_idx ?? -1)?.group
   const rest = steps.filter((st, i) => !(i >= s.step && groupOf(s, st.ex_idx)?.group === group))
-  const next = renumbered([...rest.slice(0, s.step), ...moving, ...rest.slice(s.step)])
+  let order = [...rest.slice(0, s.step), ...moving, ...rest.slice(s.step)]
+  const mirror = (g: number | undefined) =>
+    g == null ? undefined : s.plan.exercises.find((e) => e.move?.mirror_of === g)?.move?.group
+  const [mg, mh] = [mirror(group), mirror(here)]
+  if (mg != null && mh != null) order = moveBefore(s, order, mg, mh)
+  const next = renumbered(order)
   return { ...s, history: remember(s), plan: { ...s.plan, steps: next }, timer: null, notice: null }
+}
+
+/** `group`'s steps moved, in one block, to just in front of `before`'s first step; the order
+ *  unchanged when either is not ahead of the flow. */
+function moveBefore(s: TrainingState, steps: FlowStep[], group: number, before: number): FlowStep[] {
+  const inGroup = (st: FlowStep, g: number) => groupOf(s, st.ex_idx)?.group === g
+  const ahead = (g: number) => steps.every((st, i) => !inGroup(st, g) || i > s.step)
+  if (!ahead(group) || !ahead(before)) return steps
+  const moving = steps.filter((st) => inGroup(st, group))
+  const rest = steps.filter((st) => !inGroup(st, group))
+  const at = rest.findIndex((st) => inGroup(st, before))
+  return moving.length && at >= 0 ? [...rest.slice(0, at), ...moving, ...rest.slice(at)] : steps
+}
+
+/** The EGYM circuit's tonnage as typed (2026-11-08): each machine, in the order of round 1 as
+ *  run, with each round's tonnage (null when skipped or not reached) and the two added; and
+ *  the circuit's total. The numbers are the owner's own, read from the EGYM screen. */
+export function circuitTonnage(s: TrainingState): {
+  machines: { name: string; rounds: (number | null)[]; total: number }[]
+  total: number
+} {
+  const byName = new Map<string, (number | null)[]>()
+  for (const i of exerciseOrder(s)) {
+    const ex = s.plan.exercises[i]
+    if (!ex.tonnage_entry) continue
+    const kg = (s.sets[i] ?? [])[0]?.right?.weight_kg
+    byName.set(ex.name, [...(byName.get(ex.name) ?? []), typeof kg === 'number' ? kg : null])
+  }
+  const machines = [...byName].map(([name, rounds]) => ({
+    name, rounds, total: rounds.reduce<number>((a, b) => a + (b ?? 0), 0),
+  }))
+  return { machines, total: machines.reduce((a, m) => a + m.total, 0) }
 }
 
 /** Change one side's numbers (reps, weight or held seconds). On a one-side exercise a

@@ -157,6 +157,15 @@ def get_daily(today: date = Depends(local_today),
     return _session(lambda: tsession.daily_plan(repo, today))
 
 
+@router.get("/api/training/egym", response_model=SessionPlanOut)
+def get_egym(today: date = Depends(local_today),
+             repo: Repository = Depends(get_repository)) -> dict:
+    """The EGYM circuit (the "+" menu, 2026-11-08): two rounds of the gym's
+    fourteen EGYM machines, each set's tonnage typed from the machine. Offered
+    on every day: it is extra to the plan day."""
+    return _session(lambda: tsession.egym_plan(repo, today))
+
+
 @router.get("/api/settings/equipment", response_model=EquipmentOut)
 def get_equipment(repo: Repository = Depends(get_repository)) -> dict:
     """Settings › Weight steps (WP-46): each item's step and each lift's item."""

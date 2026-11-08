@@ -64,6 +64,7 @@ _THIRD_PERSON = re.compile(
 
 def _plans():
     import daily_tendon as dt
+    import egym_circuit as ec
     import goal_block as gb
     return [(n, getattr(tp, n)) for n in dir(tp)
             if n.startswith("PLAN") and isinstance(getattr(tp, n), dict)] + [
@@ -71,7 +72,9 @@ def _plans():
         # rendered the same way.
         ("PLAN_GOAL_BLOCK", gb.PLAN_GOAL_BLOCK),
         # The daily tendon session (WP-40), rendered by the same guided flow.
-        ("DAILY_TENDON", {1: {"exercises": list(dt.LIBRARY)}})]
+        ("DAILY_TENDON", {1: {"exercises": list(dt.LIBRARY)}}),
+        # The EGYM circuit (2026-11-08), rendered by the same guided flow.
+        ("EGYM_CIRCUIT", {1: {"exercises": list(ec.MACHINES)}})]
 
 
 def _rendered_strings():

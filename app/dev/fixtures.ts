@@ -5,6 +5,7 @@
 // check instead of a browser test.
 import type { components } from '../src/generated/api'
 import daily from './daily_fixture.json' with { type: 'json' }
+import egym from './egym_fixture.json' with { type: 'json' }
 import session from './session_fixture.json' with { type: 'json' }
 
 type Schemas = components['schemas']
@@ -404,6 +405,11 @@ export function dailyPlan(local: string, scenario: Set<string>) {
   const reminder = scenario.has('daily_rest') ? null
     : scenario.has('daily_before') ? { kind: 'before' as const, time: null } : daily.reminder
   return { ...daily, date: local, reminder, done_today: scenario.has('daily_done') }
+}
+
+/** The EGYM circuit (2026-11-08, dev/egym_fixture.json, made by the engine's walk). */
+export function egymPlan(local: string) {
+  return { ...egym, date: local }
 }
 
 export function yogaCatalogue(): Schemas['YogaCatalogueOut'] {

@@ -25,6 +25,7 @@ from datetime import date, datetime, time
 
 from services import accessory as acc
 from services import daily_session as dly
+from services import egym_session as egs
 from services import equipment, replacements
 from services import flexibility_screen as fxs
 from services import guided_flow, prescription, session_order, session_save, strain_regions
@@ -50,14 +51,16 @@ class SessionRefused(ValueError):
 SUPPLEMENTARY_SAVE_LOCK = threading.Lock()
 
 #: The kinds of session the save takes: the plan day, the accessory session
-#: (the "+" button) and the daily tendon session (the Training tab's second
-#: tile, WP-40), the last two stored under their own Type so they never mark a
-#: plan day done (Repository.SUPPLEMENTARY_SESSION_TYPES).
-PLAN, ACCESSORY, DAILY = "plan", "accessory", "daily"
+#: (the "+" button), the daily tendon session (the Training tab's second
+#: tile, WP-40) and the EGYM circuit (the "+" button, 2026-11-08), the last
+#: three stored under their own Type so they never mark a plan day done
+#: (Repository.SUPPLEMENTARY_SESSION_TYPES).
+PLAN, ACCESSORY, DAILY, EGYM = "plan", "accessory", "daily", "egym"
 
 #: The Type each kind's rows are stored under; a plan exercise keeps its own
 #: movement type (None).
-_STORED_TYPE = {PLAN: None, ACCESSORY: acc.ACCESSORY_TYPE, DAILY: dly.DAILY_TYPE}
+_STORED_TYPE = {PLAN: None, ACCESSORY: acc.ACCESSORY_TYPE, DAILY: dly.DAILY_TYPE,
+                EGYM: egs.EGYM_TYPE}
 
 
 def _try(read, default):
@@ -157,7 +160,26 @@ def exercise_out(ex: dict, index: int, seed, lift_index: int | None, strains: tu
         "move": move,
         # A test of the flexibility retest: what its reading asks for (WP-33).
         "reading": reading,
+        # The EGYM circuit: the phone asks for the tonnage the machine shows,
+        # never reps or weight (egym_circuit.py).
+        "tonnage_entry": bool(ex.get("tonnage_entry")),
     }
+
+
+def _circuit_entries(repo, today: date, exercises: list[dict]) -> list[dict]:
+    """The EGYM circuit's entries as the phone shows them: the round under the
+    name, no reps stepper, and the same round of the last circuit."""
+    last = egs.last_tonnage(_try(repo.get_all_training_exercises_raw, []), today)
+    seen: dict[str, int] = {}
+    out = []
+    for ex in exercises:
+        nth = seen.get(ex["name"], 0)
+        seen[ex["name"]] = nth + 1
+        values = last.get(ex["name"], [])
+        out.append({**ex, "prescription": egs.prescription(ex["index"]), "reps_editable": False,
+                    "previous_caption": egs.tonnage_caption(values[nth] if nth < len(values) else None),
+                    "estimated_minutes": max(1, round(egs.ec.SET_SECONDS / 60))})
+    return out
 
 
 def _seeder(repo, today: date, plan_ex: list[dict], dosed: list[dict], policy: dict,
@@ -247,19 +269,26 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
     plan_ex = [equipment.apply(ex, settings) for ex in content["exercises"]]
     # The daily tendon session runs its full dose on every day: readiness lowers
     # only the gym's main work (Key Rule 23 (6)), and Baar's dose is the hold time.
-    factor = 1.0 if kind == DAILY else policy["volume_factor"]
+    # The EGYM circuit has nothing to lower: EGYM sets the weight and the reps.
+    factor = 1.0 if kind in (DAILY, EGYM) else policy["volume_factor"]
     dosed = sess.dosed_day(plan_ex, factor, content.get("day_type"))
     first = sess.first_side(today)
     strains = _warning_strains(repo, today)
     garmin_ok = bool(_try(repo.garmin_configured, False))
-    seed_for = _seeder(repo, today, plan_ex, dosed, policy, modifier)
+    # The circuit records a tonnage only: nothing of it is seeded (prescription.py).
+    seed_for = ((lambda _i: None) if kind == EGYM
+                else _seeder(repo, today, plan_ex, dosed, policy, modifier))
 
     # The accessory session moves nothing: its items are not the block's cards.
-    moves = session_order.move_groups(dosed) if kind == PLAN else [None] * len(dosed)
+    # The circuit moves every machine, round 2 after round 1 (egym_session.move_groups).
+    moves = (session_order.move_groups(dosed) if kind == PLAN
+             else egs.move_groups(dosed) if kind == EGYM else [None] * len(dosed))
     readings = _readings(repo, today, dosed)
     exercises = [exercise_out(ex, i, seed_for(i), sess.ramp_lift_index(plan_ex, i), strains,
                               garmin_ok, moves[i], readings.get(i))
                  for i, ex in enumerate(dosed)]
+    if kind == EGYM:
+        exercises = _circuit_entries(repo, today, exercises)
     alternatives = (_alternatives(repo, today, plan_ex, dosed, moves, first, strains, garmin_ok,
                                   policy, modifier, content.get("day_type"), settings,
                                   stored_replacements) if kind == PLAN else [])
@@ -277,7 +306,10 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
         "steps": guided_flow.walk(dosed, first),
         # The daily session has its own time model: it never leaves one room, so
         # the gym's measured changeovers do not apply (daily_session.modelled_seconds).
-        "model_minutes": dly.modelled_minutes(dosed) if kind == DAILY else sess.estimate_duration(dosed),
+        # The circuit too: one EGYM set on each entry (egym_session.modelled_seconds).
+        "model_minutes": (dly.modelled_minutes(dosed) if kind == DAILY
+                          else egs.modelled_minutes(dosed) if kind == EGYM
+                          else sess.estimate_duration(dosed)),
         "min_minutes": sess.MIN_SESSION_MINUTES if kind == PLAN else sess.MIN_ACCESSORY_MINUTES,
         # The save asks which length to keep when the clock runs past this (T93;
         # sessions.duration_needs_a_check), sent with the plan so the phone can ask
@@ -397,6 +429,18 @@ def daily_plan(repo, today: date) -> dict:
     day_sessions = dly.read_day_sessions(repo, today)
     out["reminder"] = dly.reminder(day_sessions, _plan_still_to_do(repo, r, today))
     out["done_today"] = dly.done_today(day_sessions)
+    return out
+
+
+def egym_plan(repo, today: date) -> dict:
+    """The EGYM circuit (the "+" button, 2026-11-08): his gym's fourteen EGYM
+    machines, two rounds, the tonnage of each set typed from the machine. It is
+    offered on every day: it is extra to the plan day and never marks it done."""
+    r = ts.read(repo, today)
+    decided = ts.todays_decision(repo, r.phases, today)
+    out = compose(repo, today, kind=EGYM, day_num=None, content=egs.build_day(), decided=decided)
+    out["next_day"] = None
+    out["note"] = egs.ec.NOTE
     return out
 
 

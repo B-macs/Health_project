@@ -23,6 +23,7 @@
 !/goal_block.py
 !/goal_week.py
 !/daily_tendon.py
+!/egym_circuit.py
 
 # Never, even inside an admitted folder.
 **/__pycache__/

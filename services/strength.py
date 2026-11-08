@@ -62,6 +62,8 @@ import statistics
 from dataclasses import dataclass, field, replace
 from datetime import date, timedelta
 
+from training_constants import TONNAGE_ONLY_EXERCISES
+
 REGIONS: tuple[str, ...] = ("upper_body", "core", "lower_body")
 
 # ── estimation ──────────────────────────────────────────────────────────────
@@ -161,7 +163,9 @@ def qualifying_rows(rows: list[dict], today: date, pr_rir: float = 1.0):
     for row in rows:
         name = row.get("movement_name")
         raw_date = row.get("session_date")
-        if not name or not raw_date:
+        # An EGYM circuit set is one rep at the machine's tonnage (egym_circuit.py):
+        # a tonnage, never a lift, so it never gives a 1RM.
+        if not name or not raw_date or name in TONNAGE_ONLY_EXERCISES:
             continue
         try:
             day = date.fromisoformat(raw_date)

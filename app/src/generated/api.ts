@@ -678,6 +678,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/training/egym": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Egym
+         * @description The EGYM circuit (the "+" menu, 2026-11-08): two rounds of the gym's
+         *     fourteen EGYM machines, each set's tonnage typed from the machine. Offered
+         *     on every day: it is extra to the plan day.
+         */
+        get: operations["get_egym_api_training_egym_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/training/flexibility-check": {
         parameters: {
             query?: never;
@@ -1486,13 +1508,18 @@ export interface components {
          * ExerciseMove
          * @description Which exercises move together when a machine is busy (WP-27,
          *     services/session_order.move_groups): the phone moves whole groups of the
-         *     walked steps. A group runs only after every group in `after`.
+         *     walked steps. A group runs only after every group in `after`. A group
+         *     with `mirror_of` moves the same way as that group (the EGYM circuit's
+         *     round 2 follows round 1, services/egym_session.move_groups): when that
+         *     group runs before another, this one runs before the other's mirror.
          */
         ExerciseMove: {
             /** After */
             after: number[];
             /** Group */
             group: number;
+            /** Mirror Of */
+            mirror_of?: number | null;
             /** Movable */
             movable: boolean;
         };
@@ -2995,6 +3022,11 @@ export interface components {
             timed_test: boolean;
             /** Timer */
             timer: string | null;
+            /**
+             * Tonnage Entry
+             * @default false
+             */
+            tonnage_entry: boolean;
             /** Type */
             type: string;
             /** Warmup */
@@ -3006,7 +3038,8 @@ export interface components {
         };
         /**
          * SessionPlanOut
-         * @description `kind`: plan, accessory or daily (the daily tendon session, WP-40).
+         * @description `kind`: plan, accessory, daily (the daily tendon session, WP-40) or egym
+         *     (the EGYM circuit, 2026-11-08).
          */
         SessionPlanOut: {
             adaptation: components["schemas"]["Adaptation"];
@@ -5660,6 +5693,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TrainingDayOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_egym_api_training_egym_get: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-engine-key"?: string | null;
+                "x-local-date"?: string | null;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionPlanOut"];
                 };
             };
             /** @description Validation Error */

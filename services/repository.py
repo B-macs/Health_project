@@ -2650,7 +2650,9 @@ class Repository:
     #: from membership here, which is why the accessory session needs no
     #: special case anywhere in `has_logged_session`, the swap gates or the
     #: reschedule logic — only its own literal on the write.
-    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor", "Accessory", "Daily"})
+    #: "EGYM" (2026-11-08): the circuit on the "+" menu (services/egym_session.py)
+    #: is extra to the plan day, and it IS a logged day (his answer of 2026-11-08).
+    SUPPLEMENTARY_SESSION_TYPES: frozenset[str] = frozenset({"Yoga", "Outdoor", "Accessory", "Daily", "EGYM"})
 
     #: Types that never make a date a LOGGED DAY, whatever the caller counts
     #: (WP-40, the athlete's decision of 2026-10-28). The daily tendon session

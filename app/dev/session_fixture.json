@@ -62,10 +62,12 @@
       "move": {
         "group": 0,
         "movable": false,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     },
     {
       "index": 1,
@@ -114,10 +116,12 @@
       "move": {
         "group": 1,
         "movable": false,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     },
     {
       "index": 2,
@@ -169,10 +173,12 @@
       "move": {
         "group": 2,
         "movable": true,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     },
     {
       "index": 3,
@@ -221,10 +227,12 @@
       "move": {
         "group": 3,
         "movable": true,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     },
     {
       "index": 4,
@@ -267,10 +275,12 @@
       "move": {
         "group": 4,
         "movable": true,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     },
     {
       "index": 5,
@@ -313,10 +323,12 @@
       "move": {
         "group": 5,
         "movable": false,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     },
     {
       "index": 6,
@@ -365,10 +377,12 @@
       "move": {
         "group": 6,
         "movable": true,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     },
     {
       "index": 7,
@@ -411,10 +425,12 @@
       "move": {
         "group": 7,
         "movable": false,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     },
     {
       "index": 8,
@@ -460,10 +476,12 @@
       "move": {
         "group": 8,
         "movable": true,
-        "after": []
+        "after": [],
+        "mirror_of": null
       },
       "reading": null,
-      "lead_in_seconds": null
+      "lead_in_seconds": null,
+      "tonnage_entry": false
     }
   ],
   "steps": [
@@ -1049,10 +1067,12 @@
           "move": {
             "group": 2,
             "movable": true,
-            "after": []
+            "after": [],
+            "mirror_of": null
           },
           "reading": null,
-          "lead_in_seconds": null
+          "lead_in_seconds": null,
+          "tonnage_entry": false
         }
       ],
       "steps": [
