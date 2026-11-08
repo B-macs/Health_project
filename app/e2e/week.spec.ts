@@ -201,6 +201,33 @@ test('the Training tab opens on the week page: the week dates first, then the tw
   await expect(page.getByTestId('trained-today')).toHaveCount(0)
 })
 
+test('every item of the + menu shows above the bottom bar, with nothing over it', async ({ page, context }) => {
+  // The owner, 2026-11-08, with the EGYM circuit as the fourth item: "I can't see the
+  // training as a choice". The bottom bar covered the sheet's last item.
+  await onboard(page)
+  await scenario(context, `e2e-menu-bar-${Date.now()}`)
+  await openTraining(page)
+  await page.getByTestId('plus').click()
+  const items = page.getByTestId('extras-menu').getByRole('button')
+  await expect(items).toHaveCount(4)
+  // On the iPhone a fixed box inside the scrolling area is cut at its edges, which no test
+  // browser does: the sheet must be drawn outside that area, on the app's frame.
+  await expect(page.locator('.app > .sheet')).toHaveCount(1)
+  await expect(page.locator('.stage .sheet')).toHaveCount(0)
+  for (const item of await items.all()) {
+    await expect(item).toBeInViewport({ ratio: 1 })
+    const covered = await item.evaluate((b) => {
+      const r = b.getBoundingClientRect()
+      const points = [[r.left + r.width / 2, r.top + 2], [r.left + r.width / 2, r.top + r.height / 2],
+        [r.left + r.width / 2, r.bottom - 2]]
+      return points.some(([x, y]) => { const at = document.elementFromPoint(x, y); return !at || !b.contains(at) })
+    })
+    expect(covered, await item.innerText()).toBe(false)
+  }
+  await page.getByRole('button', { name: S.extras.egym }).click()
+  await expect(page.getByTestId('extras-menu')).toHaveCount(0)
+})
+
 test('the + menu offers yoga, an outdoor activity and the extra session, and is not drawn during a session', async ({ page, context }) => {
   await onboard(page)
   await scenario(context, `e2e-menu-${Date.now()}`)
