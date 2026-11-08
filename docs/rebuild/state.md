@@ -4,6 +4,8 @@
 
 
 ## Now
+**2026-11-08, his note on week 3's Sunday ("I dont want another test until im finished the 12 week block"):** the flexibility retest ran on the Sunday mornings of weeks 1-3; it now runs in weeks 1 and 2 only (`goal_block.FLEX_RETEST_WEEKS`), so no Sunday from week 3 on carries a test. Week 1's ran 2026-10-25, week 2's was not done. The next retest falls after the block (2027-01-17). Engine revision 41 (`health-engine-00041-v7v`, from 6c6c301), engine only.
+
 **2026-11-07, his second note ("there was no option to go to farmer walk"):** at the adductor machine "In use? Do another first" offered nothing, because every item of the end section never moves and the farmer walk is one of them since WP-47. `goal_week.MOVES_EARLIER` lets the farmer walk move; its place at the end of C, the abs and the hip work are unchanged. Engine revision 40 (`health-engine-00040-t2h`, from e0b8770), engine only. He did every exercise of 11-06: the adductor after the farmer walk, its three sets stored first at the app's numbers (15 x 22.5 kg) and the walk's third set saved late, so nothing is removed. **Open:** whether the adductor's stored numbers are what he did; his check on the iPhone.
 
 **2026-11-07, his note ("I didnt have that choice when I was just before the aductor exercise"):** Skip and "In use?" now sit in one row right under the session's main buttons; at the foot of the page the skip went unseen. Live as Worker 44f97567 (from 5bf1c06), phone app only. **Open:** his check on the iPhone (the adductor sets and the farmer walk: see the entry above).
