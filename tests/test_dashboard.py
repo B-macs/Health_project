@@ -68,6 +68,34 @@ def test_rolling_prior_strain_averages_across_7_prior_days_including_rest_days()
     assert result is not None
 
 
+def test_four_rest_days_pull_the_7_day_average_down():
+    """The owner, 2026-11-09: "it say 14 even when ive had 0 strain in the last
+    4 days". Three gym days and four rest days: the line is the average of the
+    seven daily strains, not the strain of the average load."""
+    today = date(2026, 11, 9)
+    gym = {"2026-11-05": 389.0, "2026-11-04": 409.0, "2026-11-03": 512.0}
+    au_rows = [{"date": d, "total_au": a} for d, a in gym.items()]
+    daily = [dashboard.au_to_strain_or_none(a, 2) for a in gym.values()]
+    result = dashboard.rolling_prior_strain(au_rows, stage=2, today=today)
+    assert result == round(sum(daily) / 7, 1)
+    old_figure = dashboard.au_to_strain_or_none(sum(gym.values()) / 7, 2)
+    assert old_figure >= 14 and result < 8
+
+
+def test_the_7_day_average_counts_each_days_own_strain():
+    """A prior day's walks count as that day's card counts them, and a gym day
+    with a matched watch activity keeps its rating's strain."""
+    today = date(2026, 11, 9)
+    walks = {"2026-11-08": [{"load": 60.0}]}
+    hr_rows = [{"date": "2026-11-07", "activity_type": "indoor_cardio", "hr_strain": 3.0}]
+    au_rows = [{"date": "2026-11-07", "total_au": 400.0}]
+    walk_day = dashboard.day_strain("2026-11-08", au_rows, 2, hr_rows, walks)["strain"]
+    gym_day = dashboard.day_strain("2026-11-07", au_rows, 2, hr_rows, walks)["strain"]
+    assert walk_day > 0 and gym_day == dashboard.au_to_strain_or_none(400.0, 2)
+    assert dashboard.rolling_prior_strain(au_rows, 2, today=today, hr_rows=hr_rows,
+                                          walks=walks) == round((walk_day + gym_day) / 7, 1)
+
+
 # display_strain and apply_step_modifier went on 2026-10-20 with the owner's
 # answers: a day shows its own strain (never the 7-day stand-in), and the steps
 # rule is gone (a watch walk counts on the day walked instead).

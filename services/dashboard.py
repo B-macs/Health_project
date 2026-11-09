@@ -42,19 +42,63 @@ def fill_7day(rows: list[dict], key: str, selected_date: date) -> list:
     return [by_date.get((selected_date - timedelta(days=6 - i)).isoformat()) for i in range(7)]
 
 
-def rolling_prior_strain(au_rows: list[dict], stage: int, today: date | None = None) -> float | None:
-    """Average AU over the 7 days before today (today excluded, rest days
-    count as 0), converted to a strain value — the body load already
-    accumulated going into today, independent of whether today's own
-    session has happened yet."""
+def day_strain(d_str: str, au_rows: list[dict], stage: int,
+               hr_rows: list[dict] | None = None,
+               walks: dict[str, list[dict]] | None = None) -> dict:
+    """One day's own strain, the figure its Strain card shows: the session
+    rating's strain, heart rate leading only for a walk or a run, and the
+    watch walks no session holds added on the load scale. `strain` is None
+    when the day carried nothing at all."""
+    au_day = next((r for r in au_rows if r.get("date") == d_str), None)
+    rpe_strain = au_to_strain_or_none(au_day["total_au"] if au_day else None, stage)
+
+    # WHO LEADS (the owner, 2026-10-20). A gym session is measured by the
+    # session rating: wrist heart rate during lifting is not reliable, and the
+    # rating is the tested measure for resistance training. Heart rate leads,
+    # blended with the rating, only when the matched activity is a walk or a
+    # run (hr_load.hr_leads). With no matched activity this is the rating
+    # alone, as before heart-rate load existed.
+    hr_row = next((r for r in (hr_rows or []) if r.get("date") == d_str), None)
+    hr_strain_value = hr_row.get("hr_strain") if hr_row else None
+    if hr_row and rpe_strain is not None and not _hr_load.hr_leads(hr_row.get("activity_type")):
+        strain, source = rpe_strain, _hr_load.SOURCE_GYM_RATED
+    else:
+        strain, source = _hr_load.blend_strain(hr_strain_value, rpe_strain)
+
+    # THE WALKS COUNT ON THE DAY YOU WALK (2026-10-20). A watch walk or run no
+    # logged session holds adds its heart-rate load to the day's, on the load
+    # scale. It replaced the steps rule, which moved the NEXT day's strain by
+    # -1.0 to +1.5 from yesterday's step count.
+    day_walks = (walks or {}).get(d_str) or []
+    walk_load = sum(float(w.get("load") or 0) for w in day_walks)
+    if walk_load > 0:
+        strain = _hr_load.with_extra_load(strain, walk_load)
+        if source == _hr_load.SOURCE_NONE:
+            source = _hr_load.SOURCE_WALKS
+
+    return {"strain": strain, "source": source, "rpe_strain": rpe_strain,
+            "hr_strain": hr_strain_value, "hr_row": hr_row, "walks": day_walks,
+            "au_day": au_day}
+
+
+def rolling_prior_strain(au_rows: list[dict], stage: int, today: date | None = None,
+                         hr_rows: list[dict] | None = None,
+                         walks: dict[str, list[dict]] | None = None) -> float | None:
+    """The average of the seven days' own strains before today (today
+    excluded, a day with nothing counts as 0): the Strain card's "7-day
+    average" on a rest day. None when none of the seven carried any load.
+
+    The owner, 2026-11-09 (*"it say 14 even when ive had 0 strain in the last
+    4 days"*): until then this was the strain OF the seven days' average load.
+    The 0-21 curve rises fast and then flattens, so the rest days hardly pulled
+    it down: one gym day and six rest days read 11.2, three gym days and four
+    rest days about 14, while their daily strains averaged 5-8."""
     today = today or date.today()
-    au_by_date = {r["date"]: float(r["total_au"]) for r in au_rows}
-    prior_7d_au = [
-        au_by_date.get((today - timedelta(days=d)).isoformat(), 0.0)
-        for d in range(1, 8)
-    ]
-    prior_avg_au = sum(prior_7d_au) / 7
-    return _engine.au_to_strain(prior_avg_au, stage) if prior_avg_au > 0 else None
+    days = [day_strain((today - timedelta(days=k)).isoformat(), au_rows, stage,
+                       hr_rows, walks)["strain"] for k in range(1, 8)]
+    if not any(days):
+        return None
+    return round(sum(v or 0.0 for v in days) / 7, 1)
 
 
 def sleep_percent(sleep_hours: float | None, sleep_need_hours: float) -> int | None:
@@ -194,39 +238,19 @@ def compute_daily_metrics_snapshot(
             "strain_7d": None,
             "walks": [],
         }
-    au_day = next((r for r in au_rows if r.get("date") == d_str), None)
-    rpe_strain = au_to_strain_or_none(au_day["total_au"] if au_day else None, stage)
-
-    # WHO LEADS (the owner, 2026-10-20). A gym session is measured by the
-    # session rating: wrist heart rate during lifting is not reliable, and the
-    # rating is the tested measure for resistance training. Heart rate leads,
-    # blended with the rating, only when the matched activity is a walk or a
-    # run (hr_load.hr_leads). With no matched activity this is the rating
-    # alone, as before heart-rate load existed.
-    hr_row = next((r for r in (hr_rows or []) if r.get("date") == d_str), None)
-    hr_strain_value = hr_row.get("hr_strain") if hr_row else None
-    if hr_row and rpe_strain is not None and not _hr_load.hr_leads(hr_row.get("activity_type")):
-        today_strain, strain_source = rpe_strain, _hr_load.SOURCE_GYM_RATED
-    else:
-        today_strain, strain_source = _hr_load.blend_strain(hr_strain_value, rpe_strain)
-
-    # THE WALKS COUNT ON THE DAY YOU WALK (2026-10-20). A watch walk or run no
-    # logged session holds adds its heart-rate load to the day's, on the load
-    # scale. It replaced the steps rule, which moved the NEXT day's strain by
-    # -1.0 to +1.5 from yesterday's step count.
-    day_walks = (walks or {}).get(d_str) or []
-    walk_load = sum(float(w.get("load") or 0) for w in day_walks)
-    if walk_load > 0:
-        today_strain = _hr_load.with_extra_load(today_strain, walk_load)
-        if strain_source == _hr_load.SOURCE_NONE:
-            strain_source = _hr_load.SOURCE_WALKS
+    today_d = day_strain(d_str, au_rows, stage, hr_rows, walks)
+    au_day, rpe_strain = today_d["au_day"], today_d["rpe_strain"]
+    hr_row, hr_strain_value = today_d["hr_row"], today_d["hr_strain"]
+    today_strain, strain_source = today_d["strain"], today_d["source"]
+    day_walks = today_d["walks"]
 
     # EACH DAY ITS OWN STRAIN (2026-10-20): a day with no session reads its own
     # figure (its walks, or 0) and says it is a rest day; the 7 days before it
     # are their own line, not a stand-in for the day.
     rest_day = not (au_day and au_day.get("total_au"))
     strain = today_strain if today_strain is not None else 0.0
-    strain_7d = rolling_prior_strain(au_rows, stage, today=rolling_reference_date)
+    strain_7d = rolling_prior_strain(au_rows, stage, today=rolling_reference_date,
+                                     hr_rows=hr_rows, walks=walks)
 
     return {
         "readiness_score": readiness_score,

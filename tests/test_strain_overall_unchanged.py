@@ -64,10 +64,15 @@ def test_the_strain_curve_saturates_where_it_always_did():
 
 # ─── the rolling stand-in ────────────────────────────────────────────────────
 
-def test_rolling_prior_strain_is_untouched():
+def test_rolling_prior_strain_is_the_average_of_the_daily_strains():
+    # The owner, 2026-11-09: the 7-day line is the average of the seven days'
+    # own strains (a rest day counts 0). Until then it was the strain of the
+    # average load, 5.3 here, which read 14 after four rest days.
+    one_day = dashboard.au_to_strain_or_none(700.0, 1)
+    assert one_day == 11.1
     assert dashboard.rolling_prior_strain(
         [{"date": "2026-07-06", "total_au": 700.0}], 1, today=date(2026, 7, 7),
-    ) == 5.3
+    ) == round(one_day / 7, 1) == 1.6
     # Today's own AU is outside the prior-7-days window.
     assert dashboard.rolling_prior_strain(
         [{"date": "2026-07-07", "total_au": 500.0}], 1, today=date(2026, 7, 7),
@@ -200,8 +205,9 @@ def test_metrics_history_row_maps_a_populated_snapshot_unchanged():
 
 
 
-def test_a_rest_days_seven_day_line_is_the_old_stand_in():
-    """The 7 days before a rest day keep their old figure, now on their own line."""
+def test_a_rest_days_seven_day_line_averages_the_daily_strains():
+    """The 7 days before a rest day, on their own line: the average of their
+    own strains (the owner, 2026-11-09; it was the old stand-in, 5.3)."""
     snap = dashboard.compute_daily_metrics_snapshot(
         _D, [], [{"date": "2026-07-13", "total_au": 700.0}], 1)
-    assert snap["strain_7d"] == 5.3 and snap["rest_day"] is True
+    assert snap["strain_7d"] == 1.6 and snap["rest_day"] is True
