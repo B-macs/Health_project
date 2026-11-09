@@ -13,7 +13,7 @@ import { alertSupport, disableAlerts, enableAlerts, sendTestAlert, type EnableRe
 import { ApiError, api } from '../lib/api'
 import { cacheKey, useCached, type Ctx } from '../lib/cache'
 import { drain, retry, wake } from '../lib/outbox'
-import { SOUND_WAYS, type SoundWay } from '../lib/sounds'
+import { DEFAULT_SOUND_WAY, SOUND_WAYS, type SoundWay } from '../lib/sounds'
 import { formatBytes, storageInfo, type StorageInfo } from '../lib/storage'
 import { updateWaiting } from '../lib/updates'
 import { S } from '../strings'
@@ -263,7 +263,8 @@ const ON_OFF = [false, true] as const
 export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onTheme: (t: ThemePref) => void }) {
   const alertsOn = useLiveQuery(() => getSetting(p.store, KEYS.alerts, false), [p.store], false)
   const bellsOn = useLiveQuery(() => getSetting(p.store, KEYS.bells, true), [p.store], true)
-  const soundWay = useLiveQuery(() => getSetting(p.store, KEYS.soundWay, 'short'), [p.store], 'short')
+  const soundWay = useLiveQuery(() => getSetting(p.store, KEYS.soundWay, DEFAULT_SOUND_WAY),
+    [p.store], DEFAULT_SOUND_WAY)
   return (
     <div className="screen settings">
       <div className="sky sky--quiet" aria-hidden="true" />
@@ -286,7 +287,7 @@ export function Settings(p: { store: HealthDB; ctx: Ctx; theme: ThemePref; onThe
           onChoose={(on) => void setSetting(p.store, KEYS.bells, on)} />
         <div className="caption">{S.settings.soundWayWhat}</div>
         <Choice<SoundWay> label={S.settings.soundWay} options={SOUND_WAYS}
-          value={SOUND_WAYS.includes(soundWay as SoundWay) ? (soundWay as SoundWay) : 'short'}
+          value={SOUND_WAYS.includes(soundWay as SoundWay) ? (soundWay as SoundWay) : DEFAULT_SOUND_WAY}
           name={(w) => S.settings.soundWays[w]}
           onChoose={(w) => void setSetting(p.store, KEYS.soundWay, w)} />
       </section>

@@ -2,9 +2,10 @@
 // "Keep Spotify music and Apple Podcasts playing"). "playback" stops other audio on iOS.
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
-  AUDIO_SESSION_TYPE, HELD_RELEASE_MS, RELEASE_AFTER_MS, audioReport, bell, declareMixing,
-  reportAudioOnce, restOver, setBells, setSoundLog, setSoundWay, tick, unlockAudio,
+  AUDIO_SESSION_TYPE, DEFAULT_SOUND_WAY, HELD_RELEASE_MS, RELEASE_AFTER_MS, audioReport, bell,
+  declareMixing, reportAudioOnce, restOver, setBells, setSoundLog, setSoundWay, tick, unlockAudio,
 } from './sounds'
+import { DEFAULT_SETTINGS } from './settings'
 
 describe('the audio session', () => {
   it('declares sounds that mix with other audio, never a media player', () => {
@@ -67,7 +68,7 @@ describe('the bells switch (his choice, 2026-10-29)', () => {
     bell('finish')
     tick()
     expect(FakeContext.made).toBe(0)
-    expect(audioReport({} as Navigator)).toEqual({ session: null, sound: 'not started', bells: false, way: 'short' })
+    expect(audioReport({} as Navigator)).toEqual({ session: null, sound: 'not started', bells: false, way: 'held' })
   })
 
   it('switched off during a session, the running sound is closed', () => {
@@ -101,6 +102,7 @@ describe('the sound runs only while a bell or a beep plays (his choice, 2026-10-
   }
 
   afterEach(() => {
+    setSoundWay(DEFAULT_SOUND_WAY)
     setBells(false)
     setBells(true)
     setSoundLog(null)
@@ -108,9 +110,11 @@ describe('the sound runs only while a bell or a beep plays (his choice, 2026-10-
     vi.unstubAllGlobals()
   })
 
+  // The way of 2026-10-29/30, still offered in Settings as "short".
   const start = async () => {
     vi.useFakeTimers()
     vi.stubGlobal('window', { AudioContext: FakeContext })
+    setSoundWay('short')
     FakeContext.resumes = 0
     unlockAudio({} as Navigator)
     await vi.advanceTimersByTimeAsync(0)
@@ -201,7 +205,7 @@ describe('the headphone test ways (WP-42, his report of 2026-11-03)', () => {
   }
 
   afterEach(() => {
-    setSoundWay('short')
+    setSoundWay(DEFAULT_SOUND_WAY)
     setBells(false)
     setBells(true)
     vi.useRealTimers()
@@ -272,8 +276,13 @@ describe('the headphone test ways (WP-42, his report of 2026-11-03)', () => {
     expect(audioReport({} as Navigator).way).toBe('file')
   })
 
-  it('an unknown way reads as short', () => {
+  it('an unknown way reads as held, the default', () => {
     setSoundWay('loud' as never)
-    expect(audioReport({} as Navigator).way).toBe('short')
+    expect(audioReport({} as Navigator).way).toBe('held')
+  })
+
+  it('held is the way unless Settings says otherwise (his test with AirPods, 2026-11-09)', () => {
+    expect(DEFAULT_SOUND_WAY).toBe('held')
+    expect(DEFAULT_SETTINGS.soundWay).toBe('held')
   })
 })

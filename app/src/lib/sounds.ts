@@ -37,6 +37,11 @@
 // after the bell, so iOS starts and stops it once a rest instead of four times; "file"
 // plays the same recipes (soundFiles.ts) as WAV files through an audio element, a
 // different path through iOS. "short" is the way of 2026-10-30.
+//
+// His test of 2026-11-09 with AirPods: on "short" the log showed the sound started and
+// stopped four times in 2.5 s at the end of a rest, and the music stopped at the second
+// and third beep; on "held" the music kept playing ("Tested and held worked"). "held" is
+// the way from then on (DEFAULT_SOUND_WAY); Settings › Bells still offers all three.
 import {
   BELLS, PARTIALS, REST_OVER, TICK, partialSeconds, renderStrikes, renderTick, wav,
   type Ending, type Strike,
@@ -47,6 +52,9 @@ export type { Ending } from './soundFiles'
 /** How the sound plays (Settings › Bells, WP-42). */
 export type SoundWay = 'short' | 'held' | 'file'
 export const SOUND_WAYS: readonly SoundWay[] = ['short', 'held', 'file']
+/** The way the sound plays unless Settings says otherwise: the one that kept his music
+ *  playing with AirPods (his test, 2026-11-09). */
+export const DEFAULT_SOUND_WAY: SoundWay = 'held'
 
 type Ctx = AudioContext
 
@@ -60,7 +68,7 @@ export const RELEASE_AFTER_MS = 500
 /** The "held" way: longer than the second between two countdown beeps, so the sound
  *  runs from the first beep until after the bell. */
 export const HELD_RELEASE_MS = 2500
-let way: SoundWay = 'short'
+let way: SoundWay = DEFAULT_SOUND_WAY
 let releaseTimer: ReturnType<typeof setTimeout> | null = null
 let busyUntil = 0
 
@@ -99,7 +107,7 @@ export function setBells(on: boolean): void {
 /** The Settings choice of how the sound plays (KEYS.soundWay). The "file" way closes the
  *  live sound, so only the audio elements play. */
 export function setSoundWay(next: SoundWay): void {
-  way = SOUND_WAYS.includes(next) ? next : 'short'
+  way = SOUND_WAYS.includes(next) ? next : DEFAULT_SOUND_WAY
   if (way !== 'file' || !ctx) return
   const closing = ctx
   ctx = null

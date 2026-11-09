@@ -1143,7 +1143,7 @@ export const S = {
     equipmentRefused: (why: string) => `Not saved: ${why}`,
     equipmentOffline: 'This needs a connection to the engine. Try again when the phone is online.',
     soundWay: 'How the sound plays',
-    soundWayWhat: 'For the test with headphones. Short: the sound starts and stops at each beep. Held: the sound stays on from the first countdown beep until after the bell. File: the bells play as sound files.',
+    soundWayWhat: 'Held keeps your music playing with headphones: the sound stays on from the first countdown beep until after the bell. Short: the sound starts and stops at each beep. File: the bells play as sound files.',
     soundWays: { short: 'Short', held: 'Held', file: 'File' },
     alerts: 'Timer alerts',
     alertsWhat: 'When a rest or a hold ends while the phone is locked, an alert tells you.',
