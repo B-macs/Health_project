@@ -8,7 +8,7 @@ import { describe, expect, it } from 'vitest'
 import fixture from '../../dev/session_fixture.json'
 import {
   advance, asksLength, back, clockMinutes, currentStep, doFirst, doFirstCandidates, exerciseOf, exerciseOrder,
-  exerciseProgress, finished, lastRecorded, loadState, localStamp, newExerciseIds, newSessionId, saveBody, setBand,
+  exerciseProgress, finished, lastRecorded, loadState, localStamp, newExerciseIds, newSessionId, saveBody, sessionEnd, setBand,
   setGarmin, setReading, setRecordedSide, setSide, sideValues, skip, skipRestOfRetest, startSessionState, stepBand,
   stepWeight, swapCandidates, readingComplete, replaceTarget, typedReadings,
   swapTo, UNDO_LIMIT, type Plan, type TrainingState,
@@ -235,12 +235,24 @@ describe('the steppers', () => {
 })
 
 describe('the save', () => {
-  it('the clock counts from the first set, with the plan floor', () => {
+  it('the clock counts from the first set to the last, with the plan floor', () => {
     let s = fresh()
     expect(clockMinutes(s, T0)).toBe(plan.model_minutes)
     s = advance(s, T0)
-    expect(clockMinutes(s, T0 + 2 * 60_000)).toBe(plan.min_minutes)
-    expect(clockMinutes(s, T0 + 47 * 60_000 + 59_000)).toBe(47)
+    expect(clockMinutes(s, T0 + 47 * 60_000)).toBe(plan.min_minutes)
+    s = advance(s, T0 + 47 * 60_000 + 59_000)
+    expect(clockMinutes(s, T0 + 48 * 60_000)).toBe(47)
+  })
+
+  it('the clock stops at the last set: the save screen never adds to the session', () => {
+    // The owner, 2026-11-09: "stop the timer the minute the workout is complete".
+    // On 2026-11-03 a daily session left on the save screen was saved at 850 minutes.
+    const s = walkAll(fresh())
+    expect(s.lastSetAt).not.toBeNull()
+    const done = clockMinutes(s, s.lastSetAt!)
+    expect(sessionEnd(s, s.lastSetAt! + 14 * 3_600_000)).toBe(s.lastSetAt)
+    expect(clockMinutes(s, s.lastSetAt! + 10 * 60_000)).toBe(done)
+    expect(clockMinutes(s, s.lastSetAt! + 14 * 3_600_000)).toBe(done)
   })
 
   it('the length question follows the engine threshold', () => {

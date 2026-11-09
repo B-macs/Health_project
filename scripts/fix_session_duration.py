@@ -25,6 +25,8 @@ that Notion will refuse to update.
 
     python scripts/fix_session_duration.py --date 2026-09-16 --minutes 45
     python scripts/fix_session_duration.py --date 2026-09-16 --minutes 45 --apply
+    python scripts/fix_session_duration.py --date 2026-11-03 --minutes 11 \
+        --session-id 2026-11-03-9459f3ac          # one of two sessions that day
 
 With SUPABASE AS THE SYSTEM OF RECORD (2026-10-09) steps 3 and 4 are one
 write: the training_sessions row in Supabase, which is where the duration
@@ -62,6 +64,9 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--date", required=True, help="ISO date of the session")
     ap.add_argument("--minutes", required=True, type=float, help="the real duration")
+    ap.add_argument("--session-id", default=None,
+                    help="the session to correct, on a date with more than one "
+                         "(2026-11-03: a gym session and a daily session)")
     ap.add_argument("--apply", action="store_true", help="without this, nothing is written")
     args = ap.parse_args()
 
@@ -81,9 +86,18 @@ def main() -> int:
     by_session: dict[str, list[dict]] = defaultdict(list)
     for p in pages:
         by_session[notion.get_property(p, "Session ID", "rich_text") or ""].append(p)
-    if len(by_session) > 1:
-        print(f"REFUSED: {len(by_session)} session ids on {args.date} — "
-              f"archive the duplicates first.")
+    if args.session_id is not None:
+        if args.session_id not in by_session:
+            print(f"REFUSED: no session {args.session_id} on {args.date}; "
+                  f"there are {', '.join(sorted(by_session))}")
+            return 1
+        by_session = {args.session_id: by_session[args.session_id]}
+    elif len(by_session) > 1:
+        # Two ids on a date are a duplicate save (archive_duplicate_sessions.py)
+        # or two real sessions; --session-id names the one to correct.
+        print(f"REFUSED: {len(by_session)} session ids on {args.date} "
+              f"({', '.join(sorted(by_session))}) — name one with --session-id, "
+              f"or archive the duplicates first.")
         return 1
     session_id, session_pages = next(iter(by_session.items()))
     if not repo.supabase_record:

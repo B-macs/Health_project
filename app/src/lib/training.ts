@@ -520,11 +520,19 @@ export function stepBand(band: string | null, direction: 1 | -1, tiers: readonly
   return tiers[Math.max(0, Math.min(tiers.length - 1, at + direction))]
 }
 
-/** The minutes the save's clock reads: from the first set to `end`, at least the plan's
- *  floor; the modelled minutes when no set was ever completed. */
-export function clockMinutes(s: TrainingState, end: number): number {
+/** The moment the session ended: the last completion tap (the owner, 2026-11-09: "stop
+ *  the timer the minute the workout is complete", not after the rating and the watch
+ *  are put in). `now` only when no set was ever completed. */
+export function sessionEnd(s: TrainingState, now: number): number {
+  return s.lastSetAt ?? now
+}
+
+/** The minutes the save's clock reads: from the first set to the last, at least the
+ *  plan's floor; the modelled minutes when no set was ever completed. The time on the
+ *  save screen never counts, so a save screen left open does not add to the session. */
+export function clockMinutes(s: TrainingState, now: number): number {
   if (s.firstSetAt == null) return s.plan.model_minutes
-  return Math.max(s.plan.min_minutes, Math.floor((end - s.firstSetAt) / 60_000))
+  return Math.max(s.plan.min_minutes, Math.floor((sessionEnd(s, now) - s.firstSetAt) / 60_000))
 }
 
 /** Whether the save asks which length to keep: the engine's threshold, sent with the plan. */

@@ -497,8 +497,8 @@ class SessionPlanOut(BaseModel):
     steps: list[FlowStep]
     model_minutes: int
     min_minutes: int
-    #: The save asks which length to keep when the clock passes this (T93); None
-    #: when it never asks (the accessory session).
+    #: The save asks which length to keep when the clock passes this (T93): every
+    #: kind, against its own time model (2026-11-09). None: it never asks.
     ask_length_above_minutes: float | None = None
     rest_taken_max_seconds: int
     garmin_configured: bool

@@ -283,6 +283,12 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
                  for i, ex in enumerate(dosed)]
     if kind == EGYM:
         exercises = _egym_entries(repo, today, exercises)
+    # The daily session has its own time model: it never leaves one room, so
+    # the gym's measured changeovers do not apply (daily_session.modelled_seconds).
+    # The EGYM session too: EGYM's own set length (egym_session.modelled_seconds).
+    model_minutes = (dly.modelled_minutes(dosed) if kind == DAILY
+                     else egs.modelled_minutes(dosed) if kind == EGYM
+                     else sess.estimate_duration(dosed))
     alternatives = (_alternatives(repo, today, plan_ex, dosed, moves, first, strains, garmin_ok,
                                   policy, modifier, content.get("day_type"), settings,
                                   stored_replacements) if kind == PLAN else [])
@@ -298,18 +304,15 @@ def compose(repo, today: date, *, kind: str, day_num: int | None, content: dict,
         "adaptation": ts.adaptation(policy),
         "exercises": exercises,
         "steps": guided_flow.walk(dosed, first),
-        # The daily session has its own time model: it never leaves one room, so
-        # the gym's measured changeovers do not apply (daily_session.modelled_seconds).
-        # The EGYM session too: EGYM's own set length (egym_session.modelled_seconds).
-        "model_minutes": (dly.modelled_minutes(dosed) if kind == DAILY
-                          else egs.modelled_minutes(dosed) if kind == EGYM
-                          else sess.estimate_duration(dosed)),
+        "model_minutes": model_minutes,
         "min_minutes": sess.MIN_SESSION_MINUTES if kind == PLAN else sess.MIN_ACCESSORY_MINUTES,
         # The save asks which length to keep when the clock runs past this (T93;
         # sessions.duration_needs_a_check), sent with the plan so the phone can ask
-        # it offline without holding the rule. None: the question is never asked.
-        "ask_length_above_minutes": (sess.DURATION_CHECK_RATIO * sess.estimate_duration(dosed)
-                                     if kind == PLAN else None),
+        # it offline without holding the rule. Every kind asks, against its own
+        # time model (the owner, 2026-11-09): the daily session of 2026-11-03 was
+        # left open and saved at 850 minutes, 4,250 AU, because only the plan
+        # session asked.
+        "ask_length_above_minutes": sess.DURATION_CHECK_RATIO * model_minutes,
         "rest_taken_max_seconds": guided_flow.REST_TAKEN_MAX_SECONDS,
         "garmin_configured": garmin_ok,
         "band_tiers": [{"tier": t, "label": sess.BAND_TIER_LABELS.get(t, "")}

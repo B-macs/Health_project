@@ -18,7 +18,7 @@ import { useApp } from '../lib/appState'
 import { KEYS } from '../db/schema'
 import { enqueue } from '../lib/outbox'
 import {
-  asksLength, clockMinutes, egymTonnage, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
+  asksLength, clockMinutes, egymTonnage, sessionEnd, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { IconCheck } from '../ui/icons'
@@ -219,7 +219,8 @@ export function HeartRateMatch({ s, update, confirmed }: { s: TrainingState; upd
 
 export function SessionSave({ s, update, onDone }: { s: TrainingState; update: Update; onDone: () => void }) {
   const { store, ctx } = useApp()
-  const end = useMemo(() => Date.now(), [])
+  // The session ended at the last completion tap, not when this screen opened.
+  const end = useMemo(() => sessionEnd(s, Date.now()), [s])
   const clock = clockMinutes(s, end)
   const ask = asksLength(s, clock)
   const accessory = s.plan.kind === 'accessory'

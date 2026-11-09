@@ -346,7 +346,8 @@ def test_the_accessory_session_runs_through_the_same_flow(env, monkeypatch):
     plan = env.ok(monkeypatch, "get", "/api/training/accessory")
     assert plan["kind"] == "accessory" and plan["exercises"] and plan["steps"]
     assert plan["min_minutes"] == sess.MIN_ACCESSORY_MINUTES and plan["reasons"]
-    assert plan["ask_length_above_minutes"] is None, "the accessory session never asks the length"
+    # Every kind asks the length past its own model (2026-11-09).
+    assert plan["ask_length_above_minutes"] == sess.DURATION_CHECK_RATIO * plan["model_minutes"]
     assert plan["plan_days"] is None
 
 
@@ -362,8 +363,12 @@ def test_the_daily_session_runs_through_the_same_flow(env, monkeypatch):
     assert holds and all(e["hold_seconds"] == dt.HOLD_SECONDS
                          and e["lead_in_seconds"] == dt.LEAD_IN_SECONDS for e in holds)
     assert all(e["lead_in_seconds"] is None for e in plan["exercises"] if e["type"] == "hold_reps")
-    assert plan["ask_length_above_minutes"] is None and plan["min_minutes"] == sess.MIN_ACCESSORY_MINUTES
+    assert plan["min_minutes"] == sess.MIN_ACCESSORY_MINUTES
     assert 9 <= plan["model_minutes"] <= 12
+    # The session of 2026-11-03 was saved at 850 minutes because the daily
+    # session never asked the length (the owner, 2026-11-09: it asks now).
+    assert plan["ask_length_above_minutes"] == sess.DURATION_CHECK_RATIO * plan["model_minutes"]
+    assert sess.duration_needs_a_check(850, plan["model_minutes"])
     assert plan["reminder"] == {"kind": "before", "time": None}, "Monday's gym session is to come"
     assert plan["done_today"] is False and plan["note"] == dt.NOTE
 
@@ -422,7 +427,8 @@ def test_the_egym_session_runs_through_the_same_flow_on_any_day(env, monkeypatch
     first = [st for st in plan["steps"] if st["ex_idx"] == 0]
     assert [(st["phase"], st["record_set"]) for st in first] == [
         ("intro", 1), ("resting", None), ("intro", 2)]
-    assert plan["ask_length_above_minutes"] is None and 65 <= plan["model_minutes"] <= 73
+    assert 65 <= plan["model_minutes"] <= 73
+    assert plan["ask_length_above_minutes"] == sess.DURATION_CHECK_RATIO * plan["model_minutes"]
     assert plan["rpe_target"] == ec.RPE_TARGET
 
 
