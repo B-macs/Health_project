@@ -145,4 +145,7 @@ def test_a_needs_choice_result_is_not_saved_as_a_measurement():
     from services import repository as repo_mod
     src = inspect.getsource(repo_mod.Repository.sync_session_hr_for_date)
     assert 'summary.get("needs_choice")' in src
-    assert src.index('needs_choice') < src.index("self.save_session_hr(summary)")
+    # The sync stores through store_session_hr since 2026-11-11 (the match after a
+    # save stores the same way), and that is where save_session_hr is called.
+    assert src.index('needs_choice') < src.index("self.store_session_hr(d, summary)")
+    assert "self.save_session_hr(summary)" in inspect.getsource(repo_mod.Repository.store_session_hr)

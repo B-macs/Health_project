@@ -18,7 +18,7 @@ import {
 import { S } from '../strings'
 import { reminderLine, trainingDayLine } from './Daily'
 import { arrivalTimer, backLabel, SessionFlow } from './Session'
-import { HeartRateMatch, reviewLine, SessionSave } from './SessionSave'
+import { HeartRateMatch, holdsDone, HOLD_MAX_MS, reviewLine, SessionSave, type Queued } from './SessionSave'
 import { Banner, longDate, noSessionLine, noSessionReason, TrainedToday, trainedToday } from './TrainingTab'
 import * as fx from '../../dev/fixtures'
 
@@ -261,6 +261,70 @@ describe('the save screen', () => {
   it('no match says why and keeps the rating', () => {
     const hr: HeartRate = { state: 'no_match', reason: 'no activity today', candidates: [], comparison: null }
     expect(matchOf(savedState(true, hr))).toContain(S.session.hrNone('no activity today', 6))
+  })
+})
+
+// The athlete, 2026-11-11: "why didnt it take the data over at that stage ?", then "add in a
+// turning ring for loading as it is doing it untill it is done, I dont want the user the
+// option to close until it is sent". The match is queued with the save; Done waits.
+describe('the heart-rate match queued with the save', () => {
+  const waiting = (tried = false): Queued => ({ state: 'waiting', tried })
+  const gone: Queued = { state: 'gone', tried: false }
+  const failed: Queued = { state: 'failed', tried: true }
+
+  it('Done waits while the save, then the match behind it, goes out for the first time', () => {
+    expect(holdsDone(undefined, undefined, false)).toBe(true)             // not read yet
+    expect(holdsDone(waiting(), waiting(), false)).toBe(true)             // the save is going
+    expect(holdsDone(gone, waiting(), false)).toBe(true)                  // the match is going
+    expect(holdsDone(gone, undefined, false)).toBe(true)
+    expect(holdsDone(gone, gone, true)).toBe(true)                        // asked again on the screen
+    expect(holdsDone(gone, gone, false)).toBe(false)                      // both have reached the engine
+    expect(holdsDone(gone, null, false)).toBe(false)                      // no watch: no match to wait for
+  })
+
+  it('a failed try or a refusal gives Done back: the phone keeps sending', () => {
+    // No connection: the match waits behind the save, so the save's failed try is enough.
+    expect(holdsDone(waiting(true), waiting(), false)).toBe(false)
+    expect(holdsDone(gone, waiting(true), false)).toBe(false)
+    expect(holdsDone(failed, waiting(), false)).toBe(false)
+    expect(holdsDone(gone, failed, false)).toBe(false)
+    expect(HOLD_MAX_MS).toBe(60_000)
+  })
+
+  const queuedState = (): TrainingState => ({
+    ...walked(startSessionState(plan, '2026-10-20-0a1b2c3d', plan.exercises.map((_, i) => `ex-${i}`), true)),
+    saving: true, savedId: 'outbox-1', hrId: 'outbox-2', saved: { rpe: 6, minutes: 30, notes: '' }, hr: null,
+  })
+  const queuedOf = (q: Queued | null | undefined, confirmed = true) =>
+    provide(<HeartRateMatch s={queuedState()} update={() => undefined} confirmed={confirmed} queued={q} />)
+
+  it('while it goes out, the match shows the turning ring; nothing shows while the save itself goes', () => {
+    const going = queuedOf(waiting())
+    expect(going).toContain('data-state="matching"')
+    expect(going).toContain('data-testid="spinner"')
+    expect(text(going)).toContain(S.session.hrMatching)
+    expect(text(queuedOf(waiting(), false)).trim()).toBe('')
+  })
+
+  it('with no connection it says the match goes later, and is stored even when the screen is closed', () => {
+    const later = queuedOf(waiting(true))
+    expect(later).toContain('data-state="later"')
+    expect(text(later)).toContain(S.session.hrLater)
+    expect(later).not.toContain('data-testid="spinner"')
+  })
+
+  it('a refused match keeps the rating and offers to check again', () => {
+    const refused = text(queuedOf(failed))
+    expect(refused).toContain(S.session.hrNone('', 6))
+    expect(refused).toContain(S.session.watchAgain)
+  })
+
+  it('the saved screen opens with the turning ring and no Done until the engine has the save', () => {
+    const html = provide(<SessionSave s={queuedState()} update={() => undefined} onDone={() => undefined} />)
+    expect(html).toContain('data-testid="sending"')
+    expect(text(html)).toContain(S.session.sending)
+    expect(text(html)).toContain(S.session.holdDone)
+    expect(html).not.toMatch(new RegExp(`<button[^>]*>${S.session.done}</button>`))
   })
 })
 

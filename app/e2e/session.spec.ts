@@ -8,7 +8,10 @@
 // - an app kill in the middle opens the session again at the same place, with its numbers;
 // - with a Garmin workout started: the walk takes its minutes from the watch (or, with no
 //   connection, its planned minutes), the save screen checks the watch, and the heart-rate
-//   match shows after the engine has the save.
+//   match shows after the engine has the save;
+// - the heart-rate match goes in the outbox right behind the save (2026-11-11): Done waits,
+//   with a turning ring, until both have reached the engine, and with no connection Done
+//   closes the screen and the phone still sends both.
 // The gate (rebuild_gate.py p6) adds up three annotations of these tests:
 // duplicate_sessions, fields_missing and warning_shown_when_not_due.
 import type { Page } from '@playwright/test'
@@ -112,6 +115,14 @@ async function stored(page: Page, tag: string): Promise<SaveBody[]> {
   return all.filter((b) => b.notes === tag)
 }
 
+/** This session's writes as the mock engine received them, in order: the save, the match. */
+async function writesOf(page: Page, tag: string): Promise<string[]> {
+  type Write = { path: string; body: { notes?: string; session?: { notes?: string } } | null }
+  const all = (await (await page.request.get(`${ORIGIN}/api/dev/received`)).json()) as Write[]
+  return all.filter((r) => (r.path === '/api/training/sessions' && r.body?.notes === tag)
+    || (r.path === '/api/training/heart-rate' && r.body?.session?.notes === tag)).map((r) => r.path)
+}
+
 async function saveWithNotes(page: Page, tag: string): Promise<void> {
   await expect(page.getByRole('heading', { name: S.session.complete(fixture.day_num) })).toBeVisible()
   await page.getByRole('textbox', { name: S.session.sessionNotes }).fill(tag)
@@ -140,8 +151,12 @@ test('a whole session runs from Start to Save, offline in the middle, and is sto
   await expect(state).toHaveAttribute('data-state', 'waiting')
   await expect(state).toContainText(S.session.savedPhone)
   await hook(page)
-  expect(await page.evaluate(async () => (await window.__health!.outbox()).length)).toBe(1)
+  // The heart-rate match waits right behind the session (2026-11-11).
+  expect(await page.evaluate(async () => (await window.__health!.outbox()).map((r) => (r as { kind: string }).kind)))
+    .toEqual(['session', 'heart-rate'])
   expect(await sends(page, tag)).toEqual([])
+  // No connection: Done comes back at once; the phone keeps both.
+  await expect(page.getByRole('button', { name: S.session.done })).toBeVisible()
 
   await context.setOffline(false)
   await expect(state).toHaveAttribute('data-state', 'confirmed', { timeout: 20_000 })
@@ -207,6 +222,51 @@ test('a save whose answer is lost is sent again with the same ids, and the engin
   test.info().annotations.push({ type: 'fields_missing', description: String(lacking.length) })
   expect(lacking).toEqual([])
   await expect(page.getByTestId('hr')).toHaveAttribute('data-state', 'matched')
+})
+
+test('Done waits, with a turning ring, until the save and then the heart-rate match reach the engine', async ({ page, context }) => {
+  const tag = `e2e-hold-${Date.now()}`
+  await onboard(page)
+  await startTraining(page, { garmin: true })
+  await walk(page)
+  // The mock engine holds both answers back, to see the screen while each one goes out.
+  await context.addCookies([{ name: 'e2e_hold', value: tag, url: ORIGIN }])
+  const release = (what: string) => page.request.post(`${ORIGIN}/api/dev/release?hold=${tag}&what=${what}`)
+  await saveWithNotes(page, tag)
+  const done = page.getByRole('button', { name: S.session.done })
+  const state = page.getByTestId('save-state')
+  await expect(state.getByTestId('spinner')).toBeVisible()
+  await expect(state).toContainText(S.session.sending)
+  await expect(page.getByTestId('hold-done')).toHaveText(S.session.holdDone)
+  await expect(done).toHaveCount(0)
+  await release('sessions')
+  await expect(state).toHaveAttribute('data-state', 'confirmed', { timeout: 20_000 })
+  const hr = page.getByTestId('hr')
+  await expect(hr).toHaveAttribute('data-state', 'matching')
+  await expect(hr.getByTestId('spinner')).toBeVisible()
+  await expect(done).toHaveCount(0)
+  await release('heart-rate')
+  await expect(hr).toHaveAttribute('data-state', 'matched', { timeout: 20_000 })
+  await expect(page.getByTestId('hold-done')).toHaveCount(0)
+  await expect(done).toBeVisible()
+  // The engine had the session first, then the match of that same session, once each.
+  expect(await writesOf(page, tag)).toEqual(['/api/training/sessions', '/api/training/heart-rate'])
+  await context.clearCookies({ name: 'e2e_hold' })
+})
+
+test('with no connection, Done closes the screen and the phone still sends the save and its heart-rate match', async ({ page, context }) => {
+  const tag = `e2e-later-${Date.now()}`
+  await onboard(page)
+  await startTraining(page, { garmin: true })
+  await walk(page)
+  await context.setOffline(true)
+  await saveWithNotes(page, tag)
+  await expect(page.getByTestId('save-state')).toContainText(S.session.savedPhone)
+  await page.getByRole('button', { name: S.session.done }).click()
+  await expect(page.getByRole('heading', { name: S.today.title })).toBeVisible()
+  await context.setOffline(false)
+  await expect.poll(() => writesOf(page, tag), { timeout: 30_000 })
+    .toEqual(['/api/training/sessions', '/api/training/heart-rate'])
 })
 
 test('the overview offers the adapt dialog; a running watch is named; a session the watch cannot place asks which', async ({ page, context }) => {

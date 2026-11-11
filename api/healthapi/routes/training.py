@@ -239,9 +239,12 @@ def post_heart_rate(body: HeartRateIn, today: date = Depends(local_today),
         raise HTTPException(status_code=422, detail="future_day")
     sets = (tsession.sets_by_name(body.session.model_dump(mode="json")) if body.session
             else body.sets_by_exercise)
+    # A match of the day's plan session is stored (2026-11-11); an extra session's is shown only.
+    session_id = (body.session.session_id
+                  if body.session and body.session.kind == tsession.PLAN else None)
     return _garmin(runner, lambda: tsession.heart_rate(
         repo, body.date, sets, body.duration_minutes, body.reported_rpe,
-        activity_id=body.activity_id, shift_hours=body.shift_hours))
+        activity_id=body.activity_id, shift_hours=body.shift_hours, session_id=session_id))
 
 
 # ── The "+" menu ─────────────────────────────────────────────────────────────

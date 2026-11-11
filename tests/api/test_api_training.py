@@ -598,6 +598,69 @@ def test_the_heart_rate_match_reads_the_session_the_phone_saved(env, monkeypatch
     assert seen[0]["Split Squat"] == json.loads(json.dumps(session_save.records_from_raw(split, raw)))
 
 
+def _saved_session(kind="plan", session_id="2026-10-19-1a2b3c4d"):
+    split = {"name": "Split Squat", "type": "reps", "laterality": "bilateral", "sets": 1,
+             "reps": 8, "weight_kg": 9.0, "equipment_type": "dumbbell", "rest_seconds": 60}
+    raw = [{"set_num": 1, "completed_at": "2026-10-19T08:05:00+02:00",
+            "right": {"reps": 8, "weight_kg": 9.0}}]
+    return {"session_id": session_id, "date": MONDAY.isoformat(), "kind": kind,
+            "duration_minutes": 40, "session_rpe": 7, "notes": "",
+            "exercises": [{"exercise_id": "ex-1", "exercise": split, "raw_sets": raw}]}
+
+
+def _storing(env, monkeypatch, summary, plan_ids=("2026-10-19-1a2b3c4d",)):
+    stored, read = [], []
+    monkeypatch.setattr(env.repo, "compute_session_hr", lambda *a, **k: dict(summary))
+    monkeypatch.setattr(env.repo, "store_session_hr", lambda d, s: stored.append((d, s)))
+    monkeypatch.setattr(env.repo, "get_plan_session_ids",
+                        lambda d: read.append(d) or set(plan_ids))
+    return stored, read
+
+
+_MATCH = {"date": MONDAY.isoformat(), "hr_rpe": 6.8, "hr_au": 340.0, "hr_coverage": 0.95,
+          "activity_name": "Strength", "per_exercise": {"Split Squat": {"rpe": 6.1}}}
+
+
+def test_a_match_of_the_stored_plan_session_is_kept_at_once(env, monkeypatch):
+    """The athlete, 2026-11-11: "why didnt it take the data over at that stage ?".
+    The match after a save stores the day's heart-rate row and each exercise's own
+    effort (Repository.store_session_hr, as the morning sync does), and the same
+    match sent again from the phone's outbox writes the same row."""
+    stored, read = _storing(env, monkeypatch, _MATCH)
+    body = {"date": MONDAY.isoformat(), "session": _saved_session(), "duration_minutes": 40,
+            "reported_rpe": 7}
+    assert env.ok(monkeypatch, "post", "/api/training/heart-rate", body=body)["state"] == "matched"
+    env.ok(monkeypatch, "post", "/api/training/heart-rate", body=body)
+    assert stored == [(MONDAY, _MATCH), (MONDAY, _MATCH)]
+    assert read == [MONDAY, MONDAY]
+
+
+def test_the_athletes_pick_in_the_travel_case_is_stored_too(env, monkeypatch):
+    stored, _read = _storing(env, monkeypatch, _MATCH)
+    body = {"date": MONDAY.isoformat(), "session": _saved_session(), "duration_minutes": 40,
+            "reported_rpe": 7, "activity_id": "7", "shift_hours": -1}
+    env.ok(monkeypatch, "post", "/api/training/heart-rate", body=body)
+    assert stored == [(MONDAY, _MATCH)]
+
+
+@pytest.mark.parametrize("case", ["refused_save", "extra_session", "no_session", "asks_which"])
+def test_a_match_with_no_stored_plan_session_behind_it_stores_nothing(env, monkeypatch, case):
+    """A save the engine refused (its id is not one of the day's plan sessions), an
+    extra session (the "+" menu's), a match sent with the sets only, and a session the
+    watch cannot place: shown, never stored. The morning sync keeps those days its own way."""
+    summary = ({"needs_choice": True, "reason": "made-up", "candidates": []}
+               if case == "asks_which" else _MATCH)
+    stored, read = _storing(env, monkeypatch, summary,
+                            plan_ids=() if case == "refused_save" else ("2026-10-19-1a2b3c4d",))
+    session = _saved_session(kind="accessory" if case == "extra_session" else "plan")
+    body = {"date": MONDAY.isoformat(), "duration_minutes": 40, "reported_rpe": 7,
+            **({"sets_by_exercise": {"Split Squat": []}} if case == "no_session" else {"session": session})}
+    env.ok(monkeypatch, "post", "/api/training/heart-rate", body=body)
+    assert stored == []
+    if case in ("extra_session", "no_session", "asks_which"):
+        assert read == [], "the day's plan sessions are read only for a plan session's match"
+
+
 # ── the "+" menu ─────────────────────────────────────────────────────────────
 
 def test_the_yoga_catalogue_names_each_flows_cautions(env, monkeypatch):

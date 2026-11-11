@@ -26,6 +26,11 @@ export function backoff(attempts: number): number {
   return BACKOFF_MS[Math.min(Math.max(attempts, 1), BACKOFF_MS.length) - 1]
 }
 
+/** The engine's refusals that mean "not now", not "never": it was running the device sync
+ *  and waited its while for it (2026-11-11, the heart-rate match queued with a save). Such an
+ *  item is tried again later, as with no connection, instead of waiting for Settings. */
+export const BUSY_CODES: ReadonlySet<string> = new Set(['sync_running'])
+
 /** The event that wakes the outbox loop when something is written. */
 export const OUTBOX_EVENT = 'health-outbox'
 
@@ -108,7 +113,7 @@ export async function drain(store: HealthDB, ctx: DrainCtx): Promise<DrainResult
           await store.outbox.update(item.seq!, { last_error: e.code })
           return 'unauthorized'
         }
-        if (e.kind === 'rejected') {
+        if (e.kind === 'rejected' && !BUSY_CODES.has(e.code)) {
           await store.outbox.update(item.seq!, { state: 'failed', attempts, last_error: e.code })
           continue
         }

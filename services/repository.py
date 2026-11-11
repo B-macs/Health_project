@@ -4973,6 +4973,14 @@ class Repository:
             # match, fall back to RPE — and leaves the choice to the screen that
             # can ask.
             return False
+        self.store_session_hr(d, summary)
+        return True
+
+    def store_session_hr(self, d: date, summary: dict) -> None:
+        """Keep one session's heart-rate match: the day's Session HR row, then
+        each exercise's own RPE from it. The background sync and the match after
+        a save (training_session.heart_rate, 2026-11-11) both store through here,
+        so the two cannot store a match differently."""
         self.save_session_hr(summary)
         # Assign each exercise its own RPE from its own heart rate. Deliberately
         # after save_session_hr: the HR record is the measurement and lands
@@ -4983,7 +4991,6 @@ class Repository:
             # Never fail the HR sync over the write-back. The measurement is
             # saved either way, and per_exercise_json keeps the same numbers.
             pass
-        return True
 
     def sync_session_hr_recent_if_due(self, days: int = 2, today: date | None = None,
                                        hours: float = 2, now: datetime | None = None

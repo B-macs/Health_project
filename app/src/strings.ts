@@ -291,6 +291,10 @@ export const S = {
     sessionNotes: 'Notes for the session (you can leave this empty)',
     save: 'Save the session',
     savedPhone: 'Saved on the phone. It is sent when the engine answers.',
+    // The saved screen while the save and the heart-rate match go out (2026-11-11).
+    sending: 'Sending the session to the engine…',
+    holdDone: 'Keep the app open. Done shows when the engine has it.',
+    hrLater: 'The heart-rate match goes to the engine after the session. It is stored even if you close this screen.',
     saved: 'Saved. Well done.',
     congrats: 'Congratulations: session logged.',
     // Today once it is trained (WP-32): what was done, never Start again.
@@ -1093,6 +1097,7 @@ export const S = {
       redo: 'Week redo',
       yoga: 'Yoga',
       outdoor: 'Outdoor activity',
+      'heart-rate': 'Heart-rate match',
       test: 'Test save',
     } as Record<string, string>,
     check: 'Data check',

@@ -111,6 +111,23 @@ describe('sending', () => {
     expect(await store.outbox.count()).toBe(0)
   })
 
+  it('"the sync is running" is a "not now": the write waits and goes later, never refused', async () => {
+    const store = new HealthDB(dbName())
+    await enqueue(store, write(1), T0)
+    const statuses = [409, 200]
+    const fetchImpl = vi.fn(async () => {
+      const status = statuses.shift() ?? 200
+      return new Response(JSON.stringify(status === 200 ? { saved: true } : { error: 'sync_running' }),
+        { status, headers: { 'content-type': 'application/json' } })
+    })
+    expect(await drain(store, { key: 'k', engineDown: false, fetchImpl, now: () => T0 })).toBe('offline')
+    const [left] = await store.outbox.toArray()
+    expect([left.state, left.attempts, left.last_error]).toEqual(['waiting', 1, 'sync_running'])
+    const later = new Date(T0.getTime() + BACKOFF_MS[0])
+    expect(await drain(store, { key: 'k', engineDown: false, fetchImpl, now: () => later })).toBe('done')
+    expect(await store.outbox.count()).toBe(0)
+  })
+
   it('a wrong key stops the queue and keeps every write', async () => {
     const store = new HealthDB(dbName())
     for (const i of [1, 2]) await enqueue(store, write(i), T0)

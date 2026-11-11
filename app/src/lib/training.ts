@@ -101,6 +101,10 @@ export interface TrainingState {
   /** The outbox id of the save, once Save was pressed (the save waits there until the
    *  engine confirms it), with the body it holds. */
   savedId: string | null
+  /** The outbox id of the heart-rate match, queued right after the save when a Garmin
+   *  workout was started (2026-11-11): it goes to the engine after the save, even if the
+   *  screen or the app is closed. Null before the save, and for a save without the watch. */
+  hrId: string | null
   /** The athlete started a Garmin workout for this session (T42): the save screen checks
    *  the watch, and the heart-rate match runs after the save. */
   garminDeclared: boolean
@@ -164,6 +168,7 @@ export function startSessionState(plan: Plan, sessionId: string, exerciseIds: st
     timer: null,
     saving: false,
     savedId: null,
+    hrId: null,
     garminDeclared,
     garmin: {},
     notice: null,
@@ -184,7 +189,7 @@ export function loadState(data: unknown): TrainingState | null {
   if (!s || s.version !== 1 || !s.plan) return null
   const first = s.plan.first_side as Side
   return {
-    garminDeclared: false, garmin: {}, notice: null, saved: null, hr: null, readings: {},
+    garminDeclared: false, garmin: {}, notice: null, saved: null, hr: null, hrId: null, readings: {},
     ...s,
     live: uncoupled(s.live ?? {}, first),
     history: (s.history ?? []).map((h) => ({ ...h, live: uncoupled(h.live, first) })),
@@ -543,6 +548,17 @@ export function asksLength(s: TrainingState, minutes: number): boolean {
 
 /** The complete session for POST /api/training/sessions (SessionSaveIn): every exercise in
  *  the order trained, with its plan fields, its steppers, its raw sets and its note. */
+/** The heart-rate match's body (T97-T101): the session as saved, its length and rating,
+ *  and the athlete's pick when the watch could not place the session. The queued match and
+ *  the one asked again on the screen send the same body. */
+export function heartRateBody(s: TrainingState, saved: { rpe: number; minutes: number; notes: string },
+  choice?: { activity_id: string; shift_hours: number }) {
+  return {
+    date: s.plan.date, session: saveBody(s, saved.minutes, saved.rpe, saved.notes),
+    duration_minutes: saved.minutes, reported_rpe: saved.rpe, ...(choice ?? {}),
+  }
+}
+
 export function saveBody(s: TrainingState, minutes: number, rpe: number, notes: string): Schemas['SessionSaveIn'] {
   return {
     session_id: s.sessionId,

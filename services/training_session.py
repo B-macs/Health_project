@@ -647,13 +647,23 @@ def _candidate(c: dict) -> dict:
 
 def heart_rate(repo, session_date: date, sets_by_exercise: dict, duration_minutes: float,
                reported_rpe: int | None, *, activity_id: str | None = None,
-               shift_hours: float = 0.0) -> dict:
+               shift_hours: float = 0.0, session_id: str | None = None) -> dict:
     """The heart-rate match after a save (T97-T101): the measured figures
     against the athlete's own rating (sessions.hr_comparison), or the day's
     activities to choose from when none lines up with the session's clock
-    (the travel case), or no match. Display only: the stored load stays the
-    athlete's rating (Key Rule 2b), and the background sync stores the
-    session's heart rate on its own."""
+    (the travel case), or no match. The stored load stays the athlete's
+    rating (Key Rule 2b).
+
+    A MATCH IS STORED AT ONCE (the athlete, 2026-11-11: "why didnt it take
+    the data over at that stage ?"). Until then the match was display only and
+    the day's heart-rate row waited for the next morning's sync. Now a match of
+    a stored plan session (`session_id` is one of the day's plan sessions) is
+    kept as the background sync keeps it (Repository.store_session_hr): the
+    day's row and each exercise's own effort. A refused save, an extra session
+    (accessory, daily, the "+" menu's EGYM) or a match with no session id
+    stores nothing; the sync still stores those days its own way. The same
+    match sent again writes the same row (keyed by date), and the athlete's
+    pick in the travel case is stored too, which the sync cannot do."""
     hr = repo.compute_session_hr(session_date, sets_by_exercise,
                                  duration_minutes=duration_minutes,
                                  force_activity_id=activity_id, shift_hours=shift_hours)
@@ -663,6 +673,8 @@ def heart_rate(repo, session_date: date, sets_by_exercise: dict, duration_minute
         return {"state": "choose", "reason": hr.get("reason") or "",
                 "candidates": [_candidate(c) for c in hr.get("candidates") or []],
                 "comparison": None}
+    if hr and session_id and session_id in repo.get_plan_session_ids(session_date):
+        repo.store_session_hr(session_date, hr)
     comparison = sess.hr_comparison(hr, reported_rpe, reported_au)
     if comparison is None:
         return {"state": "no_match", "reason": (hr or {}).get("reason") or "",

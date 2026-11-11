@@ -12,7 +12,9 @@
 // - the watch: GET .../garmin/open-activity finds a made-up workout (a cookie
 //   `e2e_watch=missing` finds none), GET .../garmin/activity-minutes gives a walk 31 min,
 //   and POST /api/training/heart-rate answers a made-up match (`e2e_hr=choose` asks which
-//   activity, `e2e_hr=none` finds no match);
+//   activity, `e2e_hr=none` finds no match); a cookie `e2e_hold=<name>` holds the session
+//   save and the heart-rate match until POST /api/dev/release?hold=<name>&what=sessions or
+//   &what=heart-rate lets each one go (the saved screen's turning ring, 2026-11-11);
 // - the timer alerts: GET /api/push/key answers "not set up" (a test browser has no push
 //   service); a PUT or DELETE of /api/push/alert is received like any write;
 // - the data check answers as the Worker does: GET .../last (null until a check ran) and
@@ -45,6 +47,19 @@ import insightsFixture from './insights_fixture.json' with { type: 'json' }
 
 const KEY = 'dev'
 const received: { method: string; path: string; body: unknown; day: string | null }[] = []
+
+/** The writes held back for a test (`e2e_hold`), by "<name>|<what>": a release that comes
+ *  before the write lets it through, so the test cannot race its own request. */
+const holds = new Map<string, { released: boolean; waiting: (() => void)[] }>()
+function holdOf(key: string) {
+  const h = holds.get(key) ?? { released: false, waiting: [] }
+  holds.set(key, h)
+  return h
+}
+function heldUntilReleased(key: string): Promise<void> {
+  const h = holdOf(key)
+  return h.released ? Promise.resolve() : new Promise((go) => { h.waiting.push(go) })
+}
 // Sessions saved through the mock, by session id: a save sent again replaces itself.
 const sessions = new Map<string, { session_id: string; notes: string; exercises: unknown[] }>()
 // Check-ins saved through the mock, by date.
@@ -175,6 +190,12 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     res.end(JSON.stringify(body))
   }
   if (url.pathname === '/api/dev/received') return send(200, received)
+  if (url.pathname === '/api/dev/release') {
+    const h = holdOf(`${url.searchParams.get('hold')}|${url.searchParams.get('what')}`)
+    h.released = true
+    for (const go of h.waiting.splice(0)) go()
+    return send(200, { released: true })
+  }
   if (url.pathname === '/api/dev/sessions') return send(200, [...sessions.values()])
   if (url.pathname === '/api/dev/week-run') return send(200, runOf(req))
   if (url.pathname === '/api/push/key' && req.headers.authorization === `Bearer ${KEY}`) {
@@ -297,8 +318,12 @@ function handler(req: IncomingMessage, res: ServerResponse, next: () => void): v
     }
   }
   if (req.method === 'PUT' || req.method === 'POST' || req.method === 'DELETE') {
-    void readBody(req).then((body) => {
+    void readBody(req).then(async (body) => {
       received.push({ method: req.method!, path: url.pathname, body, day })
+      const what = url.pathname === '/api/training/sessions' ? 'sessions'
+        : url.pathname === '/api/training/heart-rate' ? 'heart-rate' : null
+      const hold = cookie(req, 'e2e_hold')
+      if (hold && what && req.method === 'POST') await heldUntilReleased(`${hold}|${what}`)
       if (url.pathname === '/api/training/completion') {
         const b = body as { model_minutes: number; start_ts: number; end_ts: number; rpe: number }
         const clock = Math.max(5, Math.floor((b.end_ts - b.start_ts) / 60))

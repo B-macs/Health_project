@@ -5,6 +5,15 @@
 // sent (rebuild rule 4); the screen says "saved on the phone", then "saved" when the engine
 // confirms it. Then the heart-rate match, when a Garmin workout was started (T97-T101).
 //
+// THE MATCH IS QUEUED WITH THE SAVE (the athlete, 2026-11-11: "why didnt it take the data
+// over at that stage ?"): it was asked only after the engine had confirmed the save AND
+// while this screen was still open, so a Done tapped before the answer, or the app put
+// away, never sent it (one match in the 30 days to 11 Nov). Now Save puts the match in the
+// outbox right behind the session, and the engine stores it at once. The screen holds
+// Done, with a turning ring, until both have reached the engine (his words: "I dont want
+// the user the option to close until it is sent"); Done comes back when a try fails (no
+// connection: the phone keeps both and sends them later) or after HOLD_MAX_MS.
+//
 // The length: the clock counts from the first completion tap, with the plan's floor; past
 // the threshold the engine sent with the plan (T93), the owner picks the plan's length or
 // the clock's. The load shown is the engine's (POST /api/training/completion), when it
@@ -16,17 +25,39 @@ import type { components } from '../generated/api'
 import { api, ApiError } from '../lib/api'
 import { useApp } from '../lib/appState'
 import { KEYS } from '../db/schema'
-import { enqueue } from '../lib/outbox'
+import { answerOf, enqueue } from '../lib/outbox'
 import {
-  asksLength, clockMinutes, egymTonnage, sessionEnd, exerciseOrder, saveBody, setGarmin, type Exercise, type HeartRate, type TrainingState,
+  asksLength, clockMinutes, egymTonnage, heartRateBody, sessionEnd, exerciseOrder, saveBody, setGarmin, type Exercise,
+  type HeartRate, type TrainingState,
 } from '../lib/training'
 import { S } from '../strings'
 import { IconCheck } from '../ui/icons'
+import { Spinner } from '../ui/parts'
 
 type Schemas = components['schemas']
 type Completion = Schemas['CompletionOut']
 type OpenActivity = Schemas['OpenActivityOut']
 type Update = (f: (s: TrainingState) => TrainingState) => void
+
+/** An outbox item as the saved screen reads it: still there (waiting, or refused), or gone
+ *  (the engine has it); `tried` once a try has failed (no connection, the engine down). */
+export interface Queued { state: 'waiting' | 'failed' | 'gone'; tried: boolean }
+
+/** The longest the saved screen holds Done while it sends (2026-11-11). The save takes 5-9 s
+ *  and the heart-rate match about 8 s (the engine's log, 23 Oct to 11 Nov); a request that
+ *  hangs gives Done back after this, and the phone keeps sending. */
+export const HOLD_MAX_MS = 60_000
+
+/** Done waits while the save, then the heart-rate match behind it, is sent for the first
+ *  time (undefined: not read yet). A failed try of the save gives Done back at once (the
+ *  match waits behind the save, so it cannot be tried before it), and so does a refused
+ *  save (its match is not stored, and the screen shows the refusal). */
+export function holdsDone(save: Queued | null | undefined, hr: Queued | null | undefined, busy: boolean): boolean {
+  if (busy || save === undefined) return true
+  if (save !== null && save.state !== 'gone') return save.state === 'waiting' && !save.tried
+  if (hr === undefined) return true
+  return hr !== null && hr.state === 'waiting' && !hr.tried
+}
 
 /** One exercise as done today (T90; sessions.review_figures): the watch's minutes for a
  *  walk or run it verified, else the engine's estimate; the sets recorded (`done_sets`: none
@@ -116,8 +147,15 @@ function WatchCheck({ s }: { s: TrainingState }) {
   )
 }
 
-/** The heart-rate match after the save (T97-T101): asked once the engine has the session. */
-export function HeartRateMatch({ s, update, confirmed }: { s: TrainingState; update: Update; confirmed: boolean }) {
+/** The heart-rate match after the save (T97-T101). Queued with the save (`s.hrId`), its
+ *  answer comes back through the outbox; a save from before the queue asks once the engine
+ *  has the session. The athlete's pick in the travel case is asked here, on the screen. */
+export function HeartRateMatch({ s, update, confirmed, queued, onBusy }: {
+  s: TrainingState; update: Update; confirmed: boolean
+  /** The queued match's outbox item: undefined while it is read, null when none was queued. */
+  queued?: Queued | null
+  onBusy?: (busy: boolean) => void
+}) {
   const { ctx } = useApp()
   const [busy, setBusy] = useState(false)
   const [failed, setFailed] = useState(false)
@@ -131,10 +169,7 @@ export function HeartRateMatch({ s, update, confirmed }: { s: TrainingState; upd
     try {
       const answer = await api<HeartRate>('/api/training/heart-rate', {
         method: 'POST', key: ctx.key, engineDown: ctx.engineDown, day: s.plan.date,
-        body: {
-          date: s.plan.date, session: saveBody(s, saved.minutes, saved.rpe, saved.notes),
-          duration_minutes: saved.minutes, reported_rpe: saved.rpe, ...(choice ?? {}),
-        },
+        body: heartRateBody(s, saved, choice),
       })
       update((x) => ({ ...x, hr: answer }))
     } catch {
@@ -143,8 +178,22 @@ export function HeartRateMatch({ s, update, confirmed }: { s: TrainingState; upd
       setBusy(false)
     }
   }
+  useEffect(() => onBusy?.(busy), [busy, onBusy])
+  // The queued match has reached the engine: its answer is the one the outbox kept. When the
+  // app was opened again since, that answer is gone from memory, and the match is asked again
+  // (the engine stores the same row).
   useEffect(() => {
-    if (confirmed && s.garminDeclared && !s.hr && !asked.current) {
+    if (!s.hrId || queued?.state !== 'gone' || s.hr || asked.current) return
+    asked.current = true
+    const answer = answerOf(s.hrId) as HeartRate | undefined
+    if (answer) update((x) => ({ ...x, hr: answer }))
+    else void match()
+    // read once, when the queued match leaves the outbox
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queued?.state])
+  // A save made before the match was queued with it: asked once the engine has the save.
+  useEffect(() => {
+    if (!s.hrId && confirmed && s.garminDeclared && !s.hr && !asked.current) {
       asked.current = true
       void match()
     }
@@ -153,14 +202,26 @@ export function HeartRateMatch({ s, update, confirmed }: { s: TrainingState; upd
   }, [confirmed])
   if (!saved) return null
   if (!s.garminDeclared) return <p className="caption" data-testid="hr">{S.session.hrNotStarted(saved.rpe)}</p>
-  if (!confirmed) return null
-  if (busy) return <p className="caption" data-testid="hr">{S.session.hrMatching}</p>
   const hr = s.hr
+  if (!hr && s.hrId && queued?.state !== 'failed') {
+    // Queued: nothing to show while the session itself is still on its way.
+    if (!confirmed || !queued || (queued.state === 'gone' && !busy && !failed)) return null
+    if (queued.state === 'waiting' && queued.tried) {
+      return <p className="caption" data-testid="hr" data-state="later">{S.session.hrLater}</p>
+    }
+    if (queued.state === 'waiting' || busy) {
+      return <p className="caption sending" data-testid="hr" data-state="matching"><Spinner />{S.session.hrMatching}</p>
+    }
+  }
+  if (!s.hrId && !confirmed) return null
+  if (busy) return <p className="caption sending" data-testid="hr" data-state="matching"><Spinner />{S.session.hrMatching}</p>
   if (failed || !hr || hr.state === 'no_match') {
     return (
       <section className="group" data-testid="hr" data-state="no_match">
         <p className="caption">{S.session.hrNone(hr?.reason ?? '', saved.rpe)}</p>
-        {failed && <button className="btn btn--glass" onClick={() => void match()}>{S.session.watchAgain}</button>}
+        {(failed || (!hr && queued?.state === 'failed')) && (
+          <button className="btn btn--glass" onClick={() => void match()}>{S.session.watchAgain}</button>
+        )}
       </section>
     )
   }
@@ -239,11 +300,27 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
   const [notes, setNotes] = useState('')
   const [completion, setCompletion] = useState<Completion | null>(null)
   const minutes = choice === 'plan' ? s.plan.model_minutes : clock
-  const saved = useLiveQuery(async () => {
-    if (!s.savedId) return 'unsaved' as const
-    const row = await store.outbox.where('id').equals(s.savedId).first()
-    return row ? (row.state === 'failed' ? ('refused' as const) : ('waiting' as const)) : ('confirmed' as const)
-  }, [store, s.savedId])
+  // The save and the queued heart-rate match, as the outbox holds them.
+  const sent = useLiveQuery(async () => {
+    const read = async (id: string | null): Promise<Queued | null> => {
+      if (!id) return null
+      const row = await store.outbox.where('id').equals(id).first()
+      if (!row) return { state: 'gone', tried: false }
+      return { state: row.state === 'failed' ? 'failed' : 'waiting', tried: row.attempts > 0 || !!row.last_error }
+    }
+    return { save: await read(s.savedId), hr: await read(s.hrId) }
+  }, [store, s.savedId, s.hrId])
+  const saved = !s.savedId ? ('unsaved' as const) : !sent?.save ? undefined
+    : sent.save.state === 'gone' ? ('confirmed' as const)
+      : sent.save.state === 'failed' ? ('refused' as const) : ('waiting' as const)
+  const [hrBusy, setHrBusy] = useState(false)
+  const [heldTooLong, setHeldTooLong] = useState(false)
+  useEffect(() => {
+    if (!s.savedId) return
+    const timer = setTimeout(() => setHeldTooLong(true), HOLD_MAX_MS)
+    return () => clearTimeout(timer)
+  }, [s.savedId])
+  const holding = !heldTooLong && holdsDone(sent?.save, sent ? sent.hr : undefined, hrBusy)
 
   // The load at each rating for each length, from the engine (no rule here).
   useEffect(() => {
@@ -293,8 +370,12 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
     sending.current = true
     setBusy(true)
     const id = await enqueue(store, { kind: 'session', method: 'POST', path: '/api/training/sessions', body: saveBody(s, minutes, rpe, notes) })
+    // The heart-rate match goes right behind the session (nothing overtakes it in the outbox).
+    const hrId = s.garminDeclared ? await enqueue(store, {
+      kind: 'heart-rate', method: 'POST', path: '/api/training/heart-rate', body: heartRateBody(s, { rpe, minutes, notes }),
+    }) : null
     if (!extra) await store.settings.put({ key: KEYS.trainedOn, value: s.plan.date })
-    update((x) => ({ ...x, savedId: id, saved: { rpe, minutes, notes } }))
+    update((x) => ({ ...x, savedId: id, hrId, saved: { rpe, minutes, notes } }))
   }
 
   if (s.savedId) {
@@ -307,13 +388,19 @@ export function SessionSave({ s, update, onDone }: { s: TrainingState; update: U
             : egym ? S.session.egymLogged : S.session.congrats}</h1>
           {!extra && <div className="caption">{S.session.congratsNext(exerciseOrder(s).length)}</div>}
         </header>
-        <section className="card group" role="status" data-testid="save-state" data-state={saved}>
-          <p>{saved === 'confirmed' ? S.session.saved : saved === 'refused' ? S.session.refused : S.session.savedPhone}</p>
+        <section className="card group" role="status" data-testid="save-state" data-state={saved ?? 'waiting'}>
+          {saved === 'confirmed' ? <p>{S.session.saved}</p> : saved === 'refused' ? <p>{S.session.refused}</p>
+            : saved === undefined || !sent?.save?.tried
+              ? <p className="sending" data-testid="sending"><Spinner />{S.session.sending}</p>
+              : <p>{S.session.savedPhone}</p>}
         </section>
         {tonnage && <TonnageReview s={s} />}
-        <HeartRateMatch s={s} update={update} confirmed={saved === 'confirmed'} />
+        <HeartRateMatch s={s} update={update} confirmed={saved === 'confirmed'} queued={sent ? sent.hr : undefined}
+          onBusy={setHrBusy} />
         {s.plan.next_day && <p className="caption">{S.session.tomorrow(s.plan.next_day.day_num, s.plan.next_day.objective)}</p>}
-        <button className="btn btn--primary btn--wide" onClick={onDone}>{S.session.done}</button>
+        {holding
+          ? <p className="caption" data-testid="hold-done">{S.session.holdDone}</p>
+          : <button className="btn btn--primary btn--wide" onClick={onDone}>{S.session.done}</button>}
       </div>
     )
   }

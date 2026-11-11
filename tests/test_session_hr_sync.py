@@ -171,6 +171,27 @@ def test_the_sync_no_longer_raises_and_reaches_compute(monkeypatch):
     assert seen["saved"] == {"session_au": 300.0}, "the result must be PERSISTED"
 
 
+def test_storing_a_match_keeps_the_row_first_then_each_exercises_effort(monkeypatch):
+    """Repository.store_session_hr (2026-11-11), the one way the sync and the match
+    after a save keep a match: the day's row lands first, then each exercise's own
+    effort; a failed write-back of the efforts never fails the store."""
+    repo = Repository(_config())
+    d = date(2026, 8, 10)
+    summary = {"date": d.isoformat(), "per_exercise": {"Goblet Squat": {"rpe": 6.0}}}
+    order = []
+    monkeypatch.setattr(repo, "save_session_hr", lambda s: order.append(("row", s)))
+    monkeypatch.setattr(repo, "reassign_exercise_rpe_from_hr",
+                        lambda day, per: order.append(("efforts", day, per)))
+    repo.store_session_hr(d, summary)
+    assert order == [("row", summary), ("efforts", d, {"Goblet Squat": {"rpe": 6.0}})]
+
+    def broken(day, per):
+        raise RuntimeError("made-up write-back failure")
+
+    monkeypatch.setattr(repo, "reassign_exercise_rpe_from_hr", broken)
+    repo.store_session_hr(d, summary)          # does not raise
+
+
 def test_the_sync_never_reads_a_sets_attribute_off_exercise_entry():
     """ExerciseEntry has no `sets` field, and this is the assertion that would
     have caught the original bug at the point it was written."""

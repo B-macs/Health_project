@@ -903,6 +903,14 @@ ul {
   animation: spin var(--slow) linear infinite;
 }
 
+/* A line that is being worked on: the turning ring, then what is being done (the saved
+ * screen, 2026-11-11). */
+.sending {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-s);
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);

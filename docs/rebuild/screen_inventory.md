@@ -273,7 +273,7 @@ The owner decided on 2026-10-19 that the live Streamlit app gets no more fixes. 
 | T94 | Duration and AU caption | "Session duration… · Estimated AU…" | — | L4062-4066 (RPE fixed at 5) | — | KEEP (see F16) |
 | T95 | Session notes | "Session Notes (optional)" | save_session_notes | L4067-4071 | last exercise row | KEEP |
 | T96 | "Save Session to Log" (resumable) | Saves; on failure "press Save again and it continues…" | create_training_session, save_training_exercise, save_session_notes | `_auto_log_session` L991-1124, L4074-4118 | session, exercise and set rows | KEEP (becomes one idempotent save) |
-| T97 | Heart-rate match | "Matching heart rate to exercises…" | compute_session_hr | L1278-1302, L4098-4099 | tp_hr_au | KEEP |
+| T97 | Heart-rate match | "Matching heart rate to exercises…" | compute_session_hr | L1278-1302, L4098-4099 | tp_hr_au | KEEP (2026-11-11: queued with the save, stored at once for a plan session; the saved screen holds Done with a turning ring until it is sent) |
 | T98 | Congratulations | "Congratulations — session logged…" | — | L4121-4134 | — | KEEP |
 | T99 | Watch/timezone mismatch picker | "Couldn't line this session up with your watch…"; "Use this activity" | compute_session_hr(force_activity_id, shift_hours) | L4146-4184 | tp_hr_au | KEEP |
 | T100 | Measured vs reported | Measured RPE and AU vs yours; cover line | — | L4186-4225 | — | KEEP |
