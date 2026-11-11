@@ -171,6 +171,27 @@ def test_the_sync_no_longer_raises_and_reaches_compute(monkeypatch):
     assert seen["saved"] == {"session_au": 300.0}, "the result must be PERSISTED"
 
 
+def test_the_match_asks_garmin_for_the_sessions_own_day_not_the_newest_activities(monkeypatch):
+    """2026-11-11: the candidates were Garmin's 20 newest activities, about two
+    weeks, so an older session could never be matched and the 35-day catch-up
+    found nothing. The match now asks for the session's own day, and for the
+    next day too when the travel shift moves the window onto it."""
+    from services.clients import garmin
+    repo = Repository(_config())
+    repo._garmin_login_attempted = True       # a made-up signed-in client, no login
+    repo._garmin_client_obj = object()
+    asked = []
+    monkeypatch.setattr(repo, "get_garmin_activities_for_date", lambda d: asked.append(d) or [])
+    monkeypatch.setattr(garmin, "get_recent_activities",
+                        lambda *a, **k: pytest.fail("the newest activities are not the candidates"))
+    sets = {"Goblet Squat": SETS_A, "RDL": SETS_B}
+    assert repo.compute_session_hr(date(2026, 8, 10), sets, duration_minutes=50) is None
+    assert asked == ["2026-08-10"]
+    asked.clear()
+    repo.compute_session_hr(date(2026, 8, 10), sets, duration_minutes=50, shift_hours=15)
+    assert asked == ["2026-08-10", "2026-08-11"]
+
+
 def test_storing_a_match_keeps_the_row_first_then_each_exercises_effort(monkeypatch):
     """Repository.store_session_hr (2026-11-11), the one way the sync and the match
     after a save keep a match: the day's row lands first, then each exercise's own

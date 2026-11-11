@@ -4602,7 +4602,7 @@ class Repository:
     def compute_session_hr(
         self, session_date: date | str, set_records_by_exercise: dict,
         duration_minutes: float = 0.0, hr_max: float | None = None,
-        hr_rest: float | None = None, activity_limit: int = 20,
+        hr_rest: float | None = None,
         force_activity_id: str | None = None, shift_hours: float = 0.0,
     ) -> dict | None:
         """Match a logged session to a Garmin activity and derive its
@@ -4623,6 +4623,13 @@ class Repository:
         attribute every exercise an hour of the wrong heart rate.
 
         `force_activity_id` / `shift_hours` are how that answer comes back.
+
+        THE CANDIDATES ARE THE SESSION'S OWN DAY (2026-11-11). Until then they
+        were Garmin's 20 newest activities, about two weeks of walks and gym
+        sessions, so a session older than that could never be matched: the
+        35-day catch-up asked about it and found nothing, every time. Now one
+        date-scoped fetch per day (get_garmin_activities_for_date), the
+        shifted window's day too when the travel shift moves it.
         """
         if self._gc is None:
             return None
@@ -4642,10 +4649,8 @@ class Repository:
             }
 
         day = str(session_date)[:10]
-        candidates = [
-            self._garmin_activity_row(a)
-            for a in garmin.get_recent_activities(self._gc, limit=activity_limit)
-        ]
+        candidates = [row for d in sorted({day, str(window[0].date())})
+                      for row in self.get_garmin_activities_for_date(d)]
         # Same-day filter uses the SHIFTED window's date: training late in
         # Ireland can land the Berlin-rendered clock on the following day.
         candidates = [c for c in candidates
@@ -4930,7 +4935,8 @@ class Repository:
     def sync_session_hr_for_date(self, d: date, hr_rest: float | None = None) -> bool:
         """Compute + persist HR load for the session logged on `d`. False when
         there's no session, no timestamps, or no matching Garmin activity —
-        all ordinary "fall back to RPE" outcomes, not errors.
+        all ordinary "fall back to RPE" outcomes, not errors. The match itself
+        is match_session_hr_for_date (2026-11-11), which a dry run reads.
 
         This raised AttributeError on EVERY call until 2026-08-10: it read
         `ex.sets` off models.ExerciseEntry, which has no such field. Nothing
@@ -4942,26 +4948,7 @@ class Repository:
         to SOURCE_RPE, and the Edwards'-TRIMP half of strain reached the
         displayed number on zero days ever.
         """
-        # Narrow window deliberately: this runs on page open, and
-        # get_recent_sessions is a full Notion query per call.
-        lookback = max(2, (date.today() - d).days + 2)
-        sessions_on_day = [
-            s for s in self.get_recent_sessions(days=lookback) if s.session_date == str(d)
-        ]
-        if not sessions_on_day:
-            return False
-        session = sessions_on_day[0]
-        by_exercise = self.get_session_sets_by_exercise(d)
-        if not by_exercise:
-            return False           # logged before per-set capture existed
-        summary = self.compute_session_hr(
-            d, by_exercise,
-            # session_duration_minutes, not duration_minutes — a SECOND
-            # AttributeError sitting behind the first, on the same statement,
-            # and equally unreachable while the first one fired.
-            duration_minutes=float(session.session_duration_minutes or 0),
-            hr_rest=hr_rest,
-        )
+        summary = self.match_session_hr_for_date(d, hr_rest=hr_rest)
         if not summary:
             return False
         if summary.get("needs_choice"):
@@ -4975,6 +4962,35 @@ class Repository:
             return False
         self.store_session_hr(d, summary)
         return True
+
+    def match_session_hr_for_date(self, d: date, hr_rest: float | None = None, *,
+                                  shift_hours: float = 0.0) -> dict | None:
+        """The heart-rate match of the session logged on `d`, stored nowhere:
+        compute_session_hr's answer (a load summary, a needs_choice dict, or
+        None), or None with no session or no per-set times on the day.
+        sync_session_hr_for_date stores what this finds;
+        scripts/backfill_session_hr.py lists it first (2026-11-11), with a
+        `shift_hours` for a day whose set times were stored with no time zone."""
+        # Narrow window deliberately: this runs on page open, and
+        # get_recent_sessions is a full Notion query per call.
+        lookback = max(2, (date.today() - d).days + 2)
+        sessions_on_day = [
+            s for s in self.get_recent_sessions(days=lookback) if s.session_date == str(d)
+        ]
+        if not sessions_on_day:
+            return None
+        session = sessions_on_day[0]
+        by_exercise = self.get_session_sets_by_exercise(d)
+        if not by_exercise:
+            return None            # logged before per-set capture existed
+        return self.compute_session_hr(
+            d, by_exercise,
+            # session_duration_minutes, not duration_minutes — a SECOND
+            # AttributeError sitting behind the first, on the same statement,
+            # and equally unreachable while the first one fired.
+            duration_minutes=float(session.session_duration_minutes or 0),
+            hr_rest=hr_rest, shift_hours=shift_hours,
+        )
 
     def store_session_hr(self, d: date, summary: dict) -> None:
         """Keep one session's heart-rate match: the day's Session HR row, then
