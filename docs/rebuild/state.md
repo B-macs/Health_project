@@ -4,6 +4,8 @@
 
 
 ## Now
+**2026-11-11, his question on the RDL ("how many times have I already done 40x12"):** three times with every set at 12 (29 Oct, 4 Nov, 6 Nov), so the step to 45 kg was due on 6 Nov. It waited both on 6 Nov (session built 06:04, check-in 09:06) and on 11 Nov (no check-in) because a missing check-in held a step. His answer: "remove it its not required". `sessions.step_block_reason` now holds a step only on pain above 5/10. Engine revision 47 (`health-engine-00047-xlv`, from 2cdc45a), engine only. He set 45 kg by hand on 11 Nov.
+
 **2026-11-09, WP-42 closed, his test with AirPods: "Tested and held worked".** On "short" his debug log showed the sound started and stopped four times in 2.5 s at the end of a rest, and Spotify stopped at the second and third beep; on "held" (the sound on from the first countdown beep until 2.5 s after the bell) the music kept playing. "held" is now the way unless Settings says otherwise (`sounds.DEFAULT_SOUND_WAY`); Settings › Bells still offers Short, Held and File, and its caption says Held keeps the music playing with headphones. Live as Worker 6ec70d60 (from 9b0bc4e), phone app only.
 
 **2026-11-08, his screenshot of the "+" menu ("I can't see the training as a choice"):** the fourth item, the EGYM circuit, was cut off at the top edge of the bottom bar: on the iPhone a fixed box inside the scrolling area is cut at that area's edges. `ui/Sheet` now draws a sheet that covers the whole app on `.app` (a portal); the Check-in sheet stays above the bar. Live as Worker a59a9529 (from 64cef51), phone app only. **Open:** his check on the iPhone.

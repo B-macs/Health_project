@@ -137,7 +137,9 @@ disc or for hypermobility. The best-matched evidence:
 
 The 2026-08-10 design had already chosen 5/10 on the athlete's own record.
 **A missing check-in blocks a step** by his choice: an unmeasured day is not
-evidence of a clean one.
+evidence of a clean one. **REMOVED 2026-11-11** (the athlete: "remove it its not required"):
+only pain above 5/10 on today's check-in holds a step now. It had held his RDL
+at 40 kg on 6 and 11 Nov because he checks in after the gym.
 
 ## 6. Two measurements the app must not use for load
 
