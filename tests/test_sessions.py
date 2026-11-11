@@ -1631,82 +1631,43 @@ def test_stage_2b_is_a_new_block_at_the_same_clinical_stage():
     assert sessions.plan_dict_for_phase(3) is not None
 
 
-# ─── the pain gate on a weight step (athlete, 2026-09-16) ──────────────────
+# ─── no check-in reading holds a weight step (athlete, 2026-11-11) ──────────
+#
+# "remove it its not required" (the missing check-in), then "Remove both of
+# these" (a pain score above 5/10, and a check-in that could not be read). From
+# 2026-09-16 to 2026-11-11 all three held a step.
 
 _MAXED_AT_40 = [{"reps": 12, "weight": 40.0}] * 3
 _LP_40 = {"session_date": "2026-09-15", "reps": 12, "weight_kg": 40.0}
 
 
-@pytest.mark.parametrize("check_in,reason", [
-    # The athlete, 2026-11-11: "remove it its not required" -- no check-in
-    # and no pain score no longer hold a step.
-    (None, None),
-    ({"date": "2026-09-18", "pain_score": None}, None),
-    ({"date": "2026-09-18", "pain_score": ""}, None),
-    ({"date": "2026-09-18", "pain_score": 6}, "today's pain score is 6/10"),
-    ({"date": "2026-09-18", "pain_score": 5.5}, "today's pain score is 5.5/10"),
-    ({"date": "2026-09-18", "pain_score": 5}, None),
-    ({"date": "2026-09-18", "pain_score": 0}, None),
-])
-def test_step_block_reason(check_in, reason):
-    assert sessions.step_block_reason(check_in) == reason
+def test_the_check_in_rules_on_a_step_are_gone():
+    import inspect
+    assert "step_block" not in inspect.signature(sessions.resolve_prescription).parameters
+    for gone in ("step_block_reason", "STEP_PAIN_CEILING", "todays_check_in"):
+        assert not hasattr(sessions, gone), gone
 
 
-def test_todays_check_in_is_the_row_dated_today():
-    rows = [{"date": "2026-09-17", "pain_score": 0}, {"date": "2026-09-18", "pain_score": 2}]
-    assert sessions.todays_check_in(rows, date(2026, 9, 18))["pain_score"] == 2
-    assert sessions.todays_check_in(rows, date(2026, 9, 19)) is None
-    assert sessions.todays_check_in(None, date(2026, 9, 19)) is None
-
-
-def test_a_blocked_step_keeps_the_last_session_and_says_why():
+def test_a_lift_at_the_top_of_its_range_steps_with_no_check_in():
+    """His RDL was 40 x 12 on every set on 29 Oct, 4 and 6 Nov and stayed at
+    40 kg on 6 and 11 Nov because the phone built the session before his
+    check-in."""
     entry = sessions.resolve_prescription(
-        _RDL, _LP_40, "normal", {"reduced": False},
-        last_session_sets=_MAXED_AT_40,
-        step_block="today's pain score is 7/10")
-    assert (entry["weight_kg"], entry["reps"]) == (40.0, 12)
-    assert entry["step_blocked"] == "today's pain score is 7/10"
-    assert entry["next_step"] == ("The weight is ready to go up, but it stays the same "
-                                  "today: today's pain score is 7/10.")
-    assert entry["next_step"] in sessions.actual_caption(entry)
-
-
-def test_a_clear_check_in_lets_the_step_through():
-    entry = sessions.resolve_prescription(
-        _RDL, _LP_40, "normal", {"reduced": False},
-        last_session_sets=_MAXED_AT_40,
-        step_block=sessions.step_block_reason({"date": "2026-09-18", "pain_score": 3}))
+        _RDL, _LP_40, "normal", {"reduced": False}, last_session_sets=_MAXED_AT_40)
     assert (entry["weight_kg"], entry["reps"]) == (42.5, 9)
-    assert "step_blocked" not in entry
+    assert entry["action"] == "step_up" and "next_step" not in entry
 
 
-def test_a_day_with_no_check_in_steps_the_weight():
-    """The athlete, 2026-11-11: "remove it its not required". His RDL was
-    40 x 12 on every set on 29 Oct, 4 and 6 Nov and stayed at 40 kg on 6 and
-    11 Nov because the phone built the session before his check-in."""
-    entry = sessions.resolve_prescription(
-        _RDL, _LP_40, "normal", {"reduced": False},
-        last_session_sets=_MAXED_AT_40,
-        step_block=sessions.step_block_reason(None))
-    assert (entry["weight_kg"], entry["reps"]) == (42.5, 9)
-    assert "step_blocked" not in entry
-
-
-def test_a_block_changes_nothing_when_no_step_was_due():
+def test_a_lift_not_yet_at_the_top_says_when_it_steps():
     short = [{"reps": 10, "weight": 40.0}] * 3
     entry = sessions.resolve_prescription(
-        _RDL, _LP_40, "normal", {"reduced": False},
-        last_session_sets=short,
-        step_block="today's pain score is 7/10")
-    assert "step_blocked" not in entry
+        _RDL, _LP_40, "normal", {"reduced": False}, last_session_sets=short)
+    assert (entry["weight_kg"], entry["action"]) == (40.0, "hold")
     assert "12 reps" in entry["next_step"]
 
 
-def test_a_block_on_a_reduced_day_stays_at_or_under_the_last_session():
+def test_a_step_on_a_reduced_day_stays_at_or_under_the_last_session():
     p = sessions.load_policy(_ORANGE, _NEUTRAL)
     entry = sessions.resolve_prescription(
-        _RDL, _LP_40, "normal", p,
-        last_session_sets=_MAXED_AT_40,
-        step_block="today's pain score is 7/10")
+        _RDL, _LP_40, "normal", p, last_session_sets=_MAXED_AT_40)
     assert entry["weight_kg"] <= 40.0 and entry["reps"] <= 12
-    assert entry["step_blocked"] == "today's pain score is 7/10"

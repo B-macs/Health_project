@@ -718,7 +718,7 @@
         "app/src/screens/Session.tsx"
       ],
       "test": "app/src/screens/session.test.tsx",
-      "note": "The engine's next-step line, the pain gate's words included (sessions: 'The weight is ready to go up, but it stays the same today')."
+      "note": "The engine's next-step line (the pain gate's 'The weight is ready to go up, but it stays the same today' went on 2026-11-11: no check-in reading holds a step)."
     },
     "T59": {
       "built": [

@@ -26,10 +26,6 @@ from datetime import date
 
 from services import sessions as sess
 
-#: Why a weight step waits when the check-ins could not be read: a check-in
-#: with pain above 5/10 may be there. A day with NO check-in steps
-#: (sessions.step_block_reason, 2026-11-11).
-CHECK_IN_UNREAD = "today's check-in could not be read"
 
 
 @dataclass(frozen=True)
@@ -61,8 +57,9 @@ def seed_exercise(repo, ex: dict, *, streak_label: str, policy: dict, today: dat
     lift's weight for today, whatever it logged last time. An unloaded "reps"
     exercise gets a reps-only entry at today's prescription
     (sessions.bodyweight_entry). A loaded lift with a rep range reads its
-    recent sessions for the range's step (engine.range_progression), and a
-    step then waits on today's check-in (the pain gate)."""
+    recent sessions for the range's step (engine.range_progression). No
+    check-in is read: none holds a step (the athlete, 2026-11-11). `today` is
+    the caller's day, kept in the call; nothing in the seed reads it now."""
     loaded = bool(ex.get("equipment_type"))
     if not loaded and not sess.reps_are_editable(ex):
         return None
@@ -79,21 +76,12 @@ def seed_exercise(repo, ex: dict, *, streak_label: str, policy: dict, today: dat
     if ((ex.get("rep_min") is not None and ex.get("rep_max") is not None)
             or (ex.get("hold_min") is not None and ex.get("hold_max") is not None)):
         history = _read(lambda: repo.get_recent_session_sets(ex["name"]), default=[])
-    step_block = None
-    if history:
-        # Read per exercise, so a check-in made mid-session counts.
-        try:
-            step_block = sess.step_block_reason(sess.todays_check_in(
-                repo.get_recent_readiness(days=1, today=today), today))
-        except Exception:
-            step_block = CHECK_IN_UNREAD
     try:
         return Seed(previous, sess.resolve_prescription(
             ex, last, streak_label, policy,
             weight_increment=ex.get("increment_size", 2.5),
             last_session_sets=last_session_sets,
             history=history,
-            step_block=step_block,
         ))
     except sess.PrescriptionContradiction as exc:
         # The clamp should make this unreachable, so reaching it means the

@@ -339,8 +339,8 @@ def suggested_weight_kg(
 #     STEP_BACK_SESSIONS sessions in a row, at one weight, takes the weight
 #     back one step.
 #  6. Readiness never raises the weight (suggested_weight_kg only lowers); a
-#     step waits when today's check-in reads pain above 5/10
-#     (sessions.step_block_reason; a day with no check-in steps, 2026-11-11);
+#     step reads no check-in (the athlete, 2026-11-11: no missing check-in,
+#     pain score or failed read holds it);
 #     a failed week holds weight and reps (sessions.hold_for_failed_week).
 #
 #  REPLACED 2026-10-16, the athlete's decision: the reps after a step were set

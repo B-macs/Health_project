@@ -4,8 +4,8 @@ Moved out of the Training page's `_seed_actuals_if_needed` on 2026-10-19 so
 the phone's API gets the same numbers. What it pins:
 
   * a loaded lift resolves exactly as sessions.resolve_prescription does with
-    the same reads, and the pain gate reads the CALLER's day;
-  * an unreadable check-in blocks a weight step, like a missing one;
+    the same reads, and reads no check-in (the athlete, 2026-11-11: no
+    check-in reading holds a weight step);
   * a ramp, an unloaded exercise and an exercise without a stepper each get
     what the page gave them;
   * a failed lookup reads as no data and never blocks;
@@ -60,10 +60,9 @@ class FakeRepo:
         return list(self.check_ins)
 
 
-def _expected(step_block, last=LAST, last_sets=LAST_SETS, history=HISTORY):
+def _expected(last=LAST, last_sets=LAST_SETS, history=HISTORY):
     return sess.resolve_prescription(LIFT, last, "normal", POLICY, weight_increment=2.25,
-                                     last_session_sets=last_sets, history=history,
-                                     step_block=step_block)
+                                     last_session_sets=last_sets, history=history)
 
 
 def _seed(repo, ex=LIFT, **kw):
@@ -71,31 +70,31 @@ def _seed(repo, ex=LIFT, **kw):
                                       today=TODAY, **kw)
 
 
-@pytest.mark.parametrize("check_ins, block", [
-    ([{"date": "2026-10-20", "pain_score": 2}], None),
-    ([{"date": "2026-10-20", "pain_score": 7}], "today's pain score is 7/10"),
-    ([{"date": "2026-10-19", "pain_score": 1}], None),     # no check-in today: it steps
-    ([], None),
+@pytest.mark.parametrize("check_ins", [
+    [{"date": "2026-10-20", "pain_score": 2}],
+    [{"date": "2026-10-20", "pain_score": 7}],    # pain above 5/10 holds nothing
+    [{"date": "2026-10-19", "pain_score": 1}],
+    [],
 ])
-def test_a_loaded_lift_resolves_as_sessions_does_with_the_pain_gate(check_ins, block):
+def test_a_loaded_lift_resolves_as_sessions_does_and_reads_no_check_in(check_ins):
     repo = FakeRepo(check_ins)
     seed = _seed(repo)
-    assert seed.entry == _expected(block)
-    assert repo.readiness_args == (1, TODAY)              # the caller's day
+    assert seed.entry == _expected()
+    assert seed.entry["action"] == "step_up"
+    assert repo.readiness_args is None                    # no check-in is read
     assert seed.contradiction is None
 
 
-def test_check_ins_that_cannot_be_read_still_hold_the_step():
-    # A missing check-in steps (2026-11-11), but a failed read may hide one
-    # with pain above 5/10.
+def test_check_ins_that_cannot_be_read_change_nothing():
     seed = _seed(FakeRepo(fail={"readiness"}))
-    assert seed.entry == _expected(prescription.CHECK_IN_UNREAD)
+    assert seed.entry == _expected()
+    assert not hasattr(prescription, "CHECK_IN_UNREAD")
 
 
-def test_a_failed_lookup_reads_as_no_data_and_never_blocks():
+def test_a_failed_lookup_reads_as_no_data():
     seed = _seed(FakeRepo(fail={"last", "last_sets", "history"}))
     assert seed.previous == sess.previous_performance(None, None)
-    assert seed.entry == _expected(None, last=None, last_sets=None, history=[])
+    assert seed.entry == _expected(last=None, last_sets=None, history=[])
 
 
 def test_the_previous_session_is_the_raw_reading_never_the_proposal():

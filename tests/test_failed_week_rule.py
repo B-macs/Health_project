@@ -797,9 +797,10 @@ def test_the_screen_holds_the_load_before_anything_reads_the_policy():
 
 
 def test_the_screen_seeds_with_the_recent_sessions_and_the_pain_gate():
-    """The rep range's one-week rule and the pain gate only exist if the screen
-    hands them their inputs; a missing argument would silently mean 'step on
-    the last session alone' (no history) or 'always allowed' (no block)."""
+    """The rep range's one-week rule only exists if the screen hands it its
+    inputs; a missing argument would silently mean 'step on the last session
+    alone' (no history). No check-in is read for a step (the athlete,
+    2026-11-11)."""
     # The seeding moved to services/prescription.py on 2026-10-19.
     assert "prescription.seed_exercise(" in _function_source("_seed_actuals_if_needed")
     import inspect
@@ -808,12 +809,8 @@ def test_the_screen_seeds_with_the_recent_sessions_and_the_pain_gate():
     seed = inspect.getsource(prescription.seed_exercise)
     call_at = seed.index("sess.resolve_prescription(")
     assert "get_recent_session_sets(" in seed[:call_at]
-    assert "get_recent_readiness(" in seed[:call_at]
     assert "history=history" in seed[call_at:]
-    assert "step_block=step_block" in seed[call_at:]
-    # A failed read blocks rather than allowing the step.
-    assert "step_block = CHECK_IN_UNREAD" in seed
-    assert prescription.CHECK_IN_UNREAD == "today's check-in could not be read"
+    assert "get_recent_readiness(" not in seed and "step_block" not in seed
 
 
 # ═════════════════════════════════════════════════════════════════════════════

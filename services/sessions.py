@@ -1098,44 +1098,13 @@ def load_policy(directive: dict | None, readiness_modifier: dict | None) -> dict
     }
 
 
-#: A weight step waits when today's check-in pain score is ABOVE this, out of
-#: 10 (athlete, 2026-09-16). The pain-monitoring model's acceptable zone:
-#: Silbernagel 2007 allowed pain up to 5/10 during loading provided it settled
-#: by the next morning, and the HEAVY trial in hypermobile shoulders (Liaghat
-#: 2022) progressed load with symptoms under 5/10. The 2026-08-10 progression
-#: design chose the same number on his own record — 3-4/10 has repeatedly been
-#: fine to train on — and docs/training/load_progression_evidence_review_
-#: 2026-09-16.md carries the sources. Both are borrowed from tendon and shoulder
-#: work; nothing tests a threshold for a lumbar disc.
-STEP_PAIN_CEILING = 5
-
-
-def todays_check_in(rows: list[dict] | None, today: date) -> dict | None:
-    """The check-in row dated `today` among Repository.get_recent_readiness'
-    rows, or None."""
-    iso = today.isoformat()
-    return next((r for r in rows or [] if r.get("date") == iso), None)
-
-
-def step_block_reason(check_in: dict | None) -> str | None:
-    """Why a weight step must wait today, in words for the screen, or None
-    when it may go ahead.
-
-    Only a pain score above STEP_PAIN_CEILING on today's check-in holds a step.
-    A day with no check-in, or a check-in without a pain score, steps as usual
-    (the athlete, 2026-11-11: "remove it its not required"). From 2026-09-16 a
-    missing check-in held the step too, and his RDL stayed at 40 kg on 6 and 11
-    Nov after three sessions at 40 x 12: the phone builds the session before he
-    checks in, which he does after the gym.
-    """
-    if not check_in:
-        return None
-    pain = check_in.get("pain_score")
-    if pain is None or pain == "":
-        return None
-    if float(pain) > STEP_PAIN_CEILING:
-        return f"today's pain score is {float(pain):g}/10"
-    return None
+# NO CHECK-IN READING HOLDS A WEIGHT STEP (the athlete, 2026-11-11). He
+# removed the missing-check-in hold ("remove it its not required"), then the
+# pain score above 5/10 and the hold on a failed read ("Remove both of
+# these"). From 2026-09-16 all three held a step; the missing check-in kept
+# his RDL at 40 kg on 6 and 11 Nov after three sessions at 40 x 12.
+# The step is the lifts' rule alone (engine.range_progression), held only by a
+# failed week (hold_for_failed_week) and capped on a reduced-load day.
 
 
 #: What a failed-week hold adds to the reasons a number was held. See
@@ -1320,7 +1289,6 @@ def resolve_prescription(
     weight_increment: float = 2.5,
     last_session_sets: list[dict] | None = None,
     history: list[tuple[str, list[dict]]] | None = None,
-    step_block: str | None = None,
 ) -> dict:
     """THE single ordered resolution. Every prescribed number the live training
     screen shows comes out of here, and the banner above them comes out of the
@@ -1361,10 +1329,7 @@ def resolve_prescription(
     next. It is left out in a failed-week hold, where nothing goes up, and on
     the step itself.
 
-    `step_block` is step_block_reason's answer for today: when it is set and
-    the range wanted to step, the entry is seeded again with the step OFF and
-    says why in `step_blocked` and `next_step`. Nothing else is gated: a block
-    only ever stops the one upward move there is.
+    No check-in reading holds a step (the athlete, 2026-11-11).
     """
     proposed = seed_actual_entry(
         ex, last_performance, streak_label,
@@ -1388,29 +1353,14 @@ def resolve_prescription(
         if not policy.get("reduced"):
             final["held_because"] = "failed_week"
     else:
-        blocked = bool(step_block) and proposed.get("action") == "step_up"
-        base = proposed
-        if blocked:
-            base = seed_actual_entry(
-                ex, last_performance, streak_label,
-                allow_increase=False,
-                weight_increment=weight_increment,
-                last_session_sets=last_session_sets,
-                history=history,
-            )
-        final = clamp_to_ceiling(base, ceiling) if policy.get("reduced") else dict(base)
-        if blocked:
-            final["step_blocked"] = step_block
+        final = clamp_to_ceiling(proposed, ceiling) if policy.get("reduced") else dict(proposed)
     final.setdefault("clamped", {})
     if ex.get("equipment_type") == "dumbbell":
         final["weight_kg"] = whole_dumbbells(
             final.get("weight_kg"), weight_increment,
             down=bool(policy.get("reduced") or policy.get("failed_week_hold")))
     assert_within_ceiling(final, ceiling, policy, ex.get("name", ""))
-    if final.get("step_blocked"):
-        final["next_step"] = ("The weight is ready to go up, but it stays the same "
-                              f"today: {final['step_blocked']}.")
-    elif not policy.get("failed_week_hold") and final.get("action") != "step_up":
+    if not policy.get("failed_week_hold") and final.get("action") != "step_up":
         step = next_step_caption(ex, final)
         if step:
             final["next_step"] = step

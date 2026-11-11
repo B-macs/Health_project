@@ -1535,7 +1535,7 @@ P6_CHECKLIST = {
 #: phone reads its value (timer_starts, ask_length_above_minutes, first_side_note).
 RULE_NAMES = (
     "hold_ending", "hold_starts_next", "warning_is_due", "WARNING_STRAIN_THRESHOLD",
-    "step_block_reason", "hold_for_failed_week", "failed_week_holds_load", "readiness_scales",
+    "hold_for_failed_week", "failed_week_holds_load", "readiness_scales",
     "readiness_dose", "range_progression", "range_middle_bottom", "PROGRESSION_WINDOW_DAYS",
     "STEP_BACK_SESSIONS", "FAILED_WEEK_MAX_DAYS", "duration_needs_a_check", "DURATION_CHECK_RATIO",
     "REST_TAKEN_MAX_SECONDS", "session_au", "dosed_day", "estimate_duration",

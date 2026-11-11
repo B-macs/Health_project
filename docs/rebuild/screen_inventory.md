@@ -226,7 +226,7 @@ The owner decided on 2026-10-19 that the live Streamlit app gets no more fixes. 
 | T55 | Exercise header and prescription | "Exercise n of N", "sets × reps each side (range a-b) Tempo … rest" | displayed_prescription, prescription_label | L4364-4377 | — | KEEP |
 | T56 | Prescription seeding | Today's numbers on the first view of a lift | get_last_performance, get_recent_session_sets, get_recent_readiness(1); resolve_prescription | L1351-1467 | tp_actuals; checkpoint | KEEP |
 | T57 | Ramp set | About 60% of the next lift | ramp_lift_index, ramp_entry | L4340-4349 | tp_actuals | KEEP |
-| T58 | Pain gate on a weight step | "The weight is ready to go up, but it stays the same today: …" | todays_check_in, step_block_reason | L1434-1440 | — | KEEP (safety) |
+| T58 | Pain gate on a weight step (removed 2026-11-11: no check-in reading holds a step) | "The weight is ready to go up, but it stays the same today: …" | todays_check_in, step_block_reason | L1434-1440 | — | KEEP (safety) |
 | T59 | Prescription contradiction | "Prescription contradiction — …"; falls back to the last session | PrescriptionContradiction, last_completed_ceiling | L1450-1465 | tp_actuals | KEEP |
 | T60 | Previous session box | "Last: … · vs prescribed +2.5 kg" | previous_caption, prescription_delta, delta_direction | L4396-4415 | — | KEEP |
 | T61 | Where today's numbers came from | Range aim, held amount, when the weight goes up next | actual_caption; next_step_caption | L4483 | — | KEEP |
