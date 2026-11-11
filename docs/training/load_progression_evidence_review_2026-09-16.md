@@ -22,7 +22,7 @@ Grades: **A** meta-analysis or systematic review · **B** RCT · **C** other stu
 > | 2 | **A weight steps after two sessions in a row** at the same weight with every set at the rep target. **REPLACED 2026-10-16 by his rep-range rule — §10.** | was `engine.double_progression`, `PROGRESSION_SESSIONS`; now `engine.range_progression` | E (ACSM 2009 body text, NSCA) — no trial compares triggers |
 > | 3 | **After a step, the reps drop by what the step costs** — about 0.37 reps per 1% of load. **REPLACED 2026-10-16 by his reset to the middle-bottom of the range — §10.** | was `engine.reps_after_load_step`, `REPS_LOST_PER_LOAD_PERCENT`; now `engine.range_middle_bottom` | A (Nuzzo 2024 tables; the slope is derived here) |
 > | 4 | **On a light weight, reps climb past the range first**, until the drop after the step still lands inside it. **REMOVED 2026-10-16 — §10.** | was `engine.progression_rep_target` | E + A (ACSM's 2-10%; the same slope read backwards) |
-> | 5 | **No step when today's pain is above 5/10, or there is no check-in.** | `sessions.step_block_reason`, `STEP_PAIN_CEILING` | B, borrowed (HEAVY trial, shoulders; pain-monitoring model, Achilles) |
+> | 5 | **No step when today's pain is above 5/10, or there is no check-in.** REMOVED 2026-11-11 (§5). | `sessions.step_block_reason`, `STEP_PAIN_CEILING` | B, borrowed (HEAVY trial, shoulders; pain-monitoring model, Achilles) |
 >
 > Rules 2, 3 and 5 were the athlete's choices between options on 2026-09-16.
 > The screen now says, under each lift, when its weight goes up next
@@ -139,7 +139,8 @@ The 2026-08-10 design had already chosen 5/10 on the athlete's own record.
 **A missing check-in blocks a step** by his choice: an unmeasured day is not
 evidence of a clean one. **REMOVED 2026-11-11** (the athlete: "remove it its not required"):
 only pain above 5/10 on today's check-in holds a step now. It had held his RDL
-at 40 kg on 6 and 11 Nov because he checks in after the gym.
+at 40 kg on 6 and 11 Nov because he checks in after the gym. **The pain gate went the
+same day** ("Remove both of these"): no check-in reading holds a step.
 
 ## 6. Two measurements the app must not use for load
 
