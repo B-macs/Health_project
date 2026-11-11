@@ -9,7 +9,8 @@ import { HealthDB, type OutboxRow } from '../db/schema'
 import { S } from '../strings'
 import { ANSWERS_KEPT, answerOf, drain, enqueue } from './outbox'
 import {
-  answerCarry, answerShift, clearRefused, gate1Flare, gate1Reason, isSchedule, redoWeek, refusalText, swapWithToday,
+  answerCarry, answerShift, clearRefused, gate1Flare, gate1Reason, isSchedule, moveToDay, redoWeek, refusalText,
+  swapWithToday,
 } from './schedule'
 import { ULID } from './ulid'
 
@@ -36,6 +37,16 @@ describe('the answers', () => {
     expect(rows[0].body).toMatchObject({ date: '2026-10-22' })
     expect(rows[1].body).toMatchObject({ accept: true })
     expect(rows[2].body).toMatchObject({ accept: false })
+  })
+
+  it('a move to a later day is a swap with the day it goes to, and carries its own id', async () => {
+    // The owner, 2026-11-11: "if I move Friday training of this week C to tomorrow ...".
+    const db = store()
+    await moveToDay(db, '2026-11-13', '2026-11-12')
+    const [row] = await db.outbox.orderBy('seq').toArray()
+    expect([row.kind, row.path]).toEqual(['swap', '/api/training/swap'])
+    expect(row.body).toMatchObject({ date: '2026-11-13', to: '2026-11-12' })
+    expect((row.body as { action_id: string }).action_id).toMatch(ULID)
   })
 
   it("gate 1's answers carry no id: a reason is kept per week, a flare-up per week", async () => {
